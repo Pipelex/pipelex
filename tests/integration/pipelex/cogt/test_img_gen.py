@@ -4,10 +4,10 @@ from pipelex import pretty_print, pretty_print_url
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_job_factory import ImgGenJobFactory
-from pipelex.cogt.img_gen.img_gen_model_rules import BackgroundTaxonomy, ImgGenArgTopic
 from pipelex.hub import get_img_gen_worker, get_report_delegate
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.image_utils import ImageFormat
+from tests.integration.pipelex.fixtures.img_gen_fixtures import skip_if_img_gen_params_unsupported
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 from tests.integration.pipelex.test_data import ImageGenTestCases
 
@@ -33,6 +33,7 @@ class TestImageGeneration:
         pretty_print(f"Testing image generation with handle '{img_gen_combo.handle}', output format '{img_gen_job_params.output_format}'")
         pretty_print(f"Positive text: {positive_text}\nNegative text: {negative_text}", title="Prompts")
         img_gen_worker_async = get_img_gen_worker(img_gen_handle=img_gen_combo.handle)
+        skip_if_img_gen_params_unsupported(img_gen_worker_async.inference_model, img_gen_job_params)
         img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt_contents(
             positive_text=positive_text,
             negative_text=negative_text,
@@ -64,20 +65,13 @@ class TestImageGeneration:
         generated_content_factory: GeneratedContentFactory,
     ):
         img_gen_worker_async = get_img_gen_worker(img_gen_handle=img_gen_combo.handle)
-        rules = img_gen_worker_async.inference_model.rules
-        background_value = rules.get(ImgGenArgTopic.BACKGROUND) if rules else None
-        if background_value is not None:
-            match BackgroundTaxonomy(background_value):
-                case BackgroundTaxonomy.UNAVAILABLE:
-                    pytest.skip(f"Model '{img_gen_worker_async.inference_model.name}' does not support transparent background")
-                case BackgroundTaxonomy.AVAILABLE:
-                    pass
         img_gen_job_params = ImgGenJobParams(
             aspect_ratio=AspectRatio.SQUARE,
             is_raw=None,
             background=Background.TRANSPARENT,
             output_format=ImageFormat.PNG,
         )
+        skip_if_img_gen_params_unsupported(img_gen_worker_async.inference_model, img_gen_job_params)
         img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt_contents(
             positive_text=positive_text,
             negative_text=negative_text,
@@ -109,6 +103,7 @@ class TestImageGeneration:
         generated_content_factory: GeneratedContentFactory,
     ):
         img_gen_worker_async = get_img_gen_worker(img_gen_handle=img_gen_combo.handle)
+        skip_if_img_gen_params_unsupported(img_gen_worker_async.inference_model, img_gen_job_params)
         img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt_contents(
             positive_text=positive_text,
             negative_text=negative_text,

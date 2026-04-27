@@ -51,7 +51,7 @@
       tests/unit/pipelex/cogt/ tests/unit/pipelex/plugins/ tests/integration/pipelex/cogt/
     ```
 
-- [ ] **C.2 — Live integration probe (`gha_disabled`).** Once mocks pass, exercise the OpenAI direct + Azure + edit paths against real APIs for `gpt-image-1`, `gpt-image-1-mini`, `gpt-image-1.5`, and `gpt-image-2`. Cover text-to-image opaque, text-to-image transparent (skip on `UNAVAILABLE`), and image-edit with and without `is_moderated`.
+- [x] **C.2 — Live integration probe (`gha_disabled`).** Exercised OpenAI direct + Azure + edit paths against real APIs for `gpt-image-1`, `gpt-image-1-mini`, `gpt-image-1.5`, and `gpt-image-2`. Covered text-to-image opaque, text-to-image transparent (auto-skips on `UNAVAILABLE`), and image-edit. Aspect-ratio mismatches (legacy + landscape_4_3 / portrait_9_16) now skip gracefully via the new `ImgGenParamSupport` helper, replacing the previous noisy failures.
 
 - [x] **C.3 — Delete orphaned helpers in `OpenAIImgGenFactory`** (`pipelex/plugins/openai/openai_img_gen_factory.py`). After the refactor these are unreferenced (verified by grep across the repo):
   - `output_format_for_openai_image` (line 121)
@@ -94,24 +94,101 @@
 
 ---
 
+## Refactor: Unify `GoogleImgGenWorker` onto `ImgGenArgsFactory.make_args_for_model()`
+
+**Goal.** Bring the Google nano-banana family inline with the rule-driven flow used by OpenAI / Azure / FAL / HuggingFace / Gateway. Today `pipelex/plugins/google/google_img_gen_worker.py` reads `inference_model.rules` zero times: it directly calls `GoogleImgGenFactory.aspect_ratio_literal()` and `dimensions_for_aspect_ratio_and_size()` and silently drops every other `ImgGenJobParams` field (`size`, `background`, `quality`, `output_format`, `seed`, `is_moderated`, `safety_tolerance`, `nb_steps`, `guidance_scale`, `is_raw`, `input_fidelity`, `input_images`).
+
+**Scope.** Request-side only. The worker still owns the SDK-specific wrapping (`genai_types.GenerateContentConfig` / `ImageConfig`) and response-side dim lookup (since dims are response metadata, not request args).
+
+### Phase G.A — Taxonomy & factory
+
+- [ ] **G.A.1 — Add `AspectRatioTaxonomy.GOOGLE_NANO_BANANA = "google_nano_banana"`.** `pipelex/cogt/img_gen/img_gen_model_rules.py`. New arm in `ImgGenArgsFactory.make_args_from_aspect_ratio` returns `{"aspect_ratio": "<google_ratio_string>"}`, mapping the 8 supported Pipelex aspect ratios to Google's literal strings (`"1:1"`, `"4:3"`, `"3:2"`, `"16:9"`, `"21:9"`, `"3:4"`, `"2:3"`, `"9:16"`) and raising `ImgGenParameterError` for `PORTRAIT_9_21` (already enforced by `GoogleImgGenFactory.aspect_ratio_literal`).
+- [ ] **G.A.2 — Decide on `size` handling.** Today the worker hardcodes `size="1K"`, dropping `job_params.size`. Choices:
+  - (a) Keep hardcoded `1K` in the worker (status-quo behavior).
+  - (b) Add a new `ImgGenArgTopic.SIZE_TIER` topic + `SizeTierTaxonomy.GOOGLE_NANO_BANANA` (values `1K` / `2K` / `4K`) so `nano-banana-pro` users can opt into 2K/4K — useful since `nano-banana-pro` already supports the higher tiers in `GoogleImgGenFactory`. **Recommend (b)** but flag for the user — `ImgGenJobParams.size` is `ImageSize | None`, not a tier; we'd derive the tier from a separate field or extend job params. Land (a) first to keep PR small.
+- [ ] **G.A.3 — `PromptTaxonomy.POSITIVE_ONLY` already fits.** No new arm needed; nano-banana doesn't support negative prompts.
+
+### Phase G.B — TOML rules
+
+- [ ] **G.B.1 — Add `[<model>.rules]` blocks** for `nano-banana`, `nano-banana-2`, `nano-banana-pro` in BOTH `.pipelex/inference/backends/google.toml` and `pipelex/kit/configs/inference/backends/google.toml`. Initial set: `model_name = "standard"`, `prompt = "positive_only"`, `aspect_ratio = "google_nano_banana"`. Explicitly omit topics the API doesn't accept (`background`, `output_format`, `quality`, `inference`, `safety_checker`, `input_fidelity`).
+- [ ] **G.B.2 — `nano-banana-2` is referenced in TOML but missing from `GoogleImageGenModel` enum** (`google_img_gen_factory.py:14-16`). Add it once we know the actual SDK model id and dim table — or document in the rule that it falls through `dimensions_for_aspect_ratio_and_size` so the user gets a clear error if dims are queried.
+
+### Phase G.C — Worker rewrite
+
+- [ ] **G.C.1 — Read rules in `_gen_image`.** `pipelex/plugins/google/google_img_gen_worker.py:85-115`. Mirror the `OpenAIImgGenWorker` pattern: build `args_dict = await ImgGenArgsFactory.make_args_for_model(model_rules=...)` once, then translate flat kwargs to the nested `genai_types` structure (`ImageConfig(aspect_ratio=args_dict["aspect_ratio"])` → `GenerateContentConfig(image_config=..., response_modalities=["Image"])`). Worker becomes ~40 lines shorter.
+- [ ] **G.C.2 — Keep dim lookup local to the worker.** `dimensions_for_aspect_ratio_and_size` still runs in `_gen_image` because the dims are needed for the *response* `ImageSize`, not the request. Source the size tier from job params if G.A.2(b) lands; else hardcoded `"1K"` like today.
+- [ ] **G.C.3 — img2img scope decision.** The worker currently silently drops `input_images`. Either (a) enforce explicit error via `ImgGenParamSupport.check_input_images_topic` (rule omits `input_images` topic → helper raises) — **recommended**, parity with OpenAI; or (b) add `InputImagesTaxonomy.GOOGLE_NANO_BANANA` arm + `Part.from_bytes(...)` in the worker if Google nano-banana supports image inputs (pro variant likely does). Land (a) first to lock the contract; (b) is a follow-up enhancement.
+
+### Phase G.D — Cleanup
+
+- [ ] **G.D.1 — Inline / delete `GoogleImgGenFactory.aspect_ratio_literal`.** After G.C.1 lands, the literal mapping moves into `ImgGenArgsFactory.make_args_from_aspect_ratio`'s new `GOOGLE_NANO_BANANA` arm. Either delete `aspect_ratio_literal` or have it call into the new central place (single source of truth). The dim tables stay (still needed for response sizing).
+- [ ] **G.D.2 — Update TODOS C.2 matrix** to add a `make tip PROF=test_google TEST=test_img_gen_single_opaque` probe row. The existing `test_google` profile already lists the nano-banana models.
+
+### Verification
+
+- [ ] **G.V.1 — `make agent-check`** + targeted unit suite (`tests/unit/pipelex/cogt/img_gen/`, `tests/unit/pipelex/plugins/`).
+- [ ] **G.V.2 — Run `make tip PROF=test_google TEST=test_img_gen_single_opaque`** against the real API. Cover `nano-banana`, `nano-banana-2`, `nano-banana-pro`. The fixture's PORTRAIT_9_16 / LANDSCAPE_4_3 cases should now run (Google supports them) — no skip expected. Today these FAIL because the worker silently produces wrong dims for unsupported ratios (or works by accident).
+- [ ] **G.V.3 — Add Google rules to `tests/integration/pipelex/cogt/test_img_gen_param_support.py`** so the "every img-gen model accepts at least one aspect ratio" sanity check exercises Google rules too.
+
+---
+
+## Refactor: Unify `OpenAICompletionsImgGenWorker` onto rule-driven flow
+
+**Goal.** Push the per-backend hardcoded branches in `pipelex/plugins/openai/openai_completions_img_gen_worker.py` (`if backend_name == "pipelex_gateway"` → PNG-only; `if backend_name == "blackboxai"` → JPEG-only) into rules. This worker handles ~15 OpenRouter img-gen models (`flux.2-*`, `gemini-image-*`, `seedream`, `gpt-5-image`, etc.) plus the gateway-completions and blackboxai paths. **Today none of those models have `[model.rules]`.**
+
+**Constraint.** This worker uses `chat.completions.create(messages=...)` — fundamentally different request shape from `images.generate / images.edit`. The current `make_args_for_model` returns flat kwargs (`{"prompt": ..., "aspect_ratio": ...}`); the chat path needs `{"messages": [{"role": "user", "content": [...]}]}`. We won't force the chat shape into the existing factory.
+
+**Approach (recommended: pragmatic Option C — request constraints in rules, message-building stays in worker).** Introduce only the rule pieces that meaningfully eliminate hardcoded branches:
+
+### Phase OCC.A — Output-format constraints in rules
+
+- [ ] **OCC.A.1 — Add `OutputFormatTaxonomy.FORCED_PNG` and `OutputFormatTaxonomy.FORCED_JPEG`.** `pipelex/cogt/img_gen/img_gen_model_rules.py:135-149`. New arms in `ImgGenArgsFactory.make_args_from_output_format`: when `output_format` is None or matches the forced format → return `{}`; otherwise raise `ImgGenParameterError` ("Model X only emits PNG; requested format is WEBP"). The worker reads the resolved format off `job_params.output_format` (defaulted by the rule) for response decoding.
+- [ ] **OCC.A.2 — Worker uses the helper.** Replace lines 51-66 of `openai_completions_img_gen_worker.py` with a single `ImgGenArgsFactory.make_args_for_model(...)` call that already validates the format constraint via the new taxonomy. The worker still derives `image_format` for the response-shape branch, but the *enforcement* happens in the factory (uniform error path).
+
+### Phase OCC.B — Models, rules, worker glue
+
+- [ ] **OCC.B.1 — Add `[<model>.rules]` to every `sdk = "openrouter_img_gen"` entry** in `.pipelex/inference/backends/openrouter.toml` and `pipelex/kit/configs/inference/backends/openrouter.toml`. Minimal initial set per model: `model_name = "standard"`, `prompt = "positive_only"`. Per-family additions (Flux 2 vs Gemini-via-router vs GPT-5-image) get their existing taxonomy arms (`OutputFormatTaxonomy.FLUX_2` / `OutputFormatTaxonomy.GPT` etc.) where the chat-completions endpoint actually honors them — verify case-by-case.
+- [ ] **OCC.B.2 — Gateway-completions and blackboxai entries (when un-commented) get `output_format = "forced_png"` / `"forced_jpeg"` respectively.** Documents the constraint in TOML and removes both `if backend_name == ...` branches from the worker.
+- [ ] **OCC.B.3 — Worker wires the rule call without changing message construction.** `_build_messages_with_images` stays in the worker (chat-message shape doesn't fit the factory's flat-kwargs return type). Worker reads `args_dict["prompt"]` from the rule output for the user-message text content. `extra_body` / `extra_headers` continue to flow through `OpenAICompletionsFactory.make_extras` — that subclass-driven hook (BlackboxaiCompletionsFactory adds `seed`, OpenRouterCompletionsFactory adds `modalities`) is orthogonal to rules and stays as-is.
+
+### Phase OCC.C — Response shape (deferred)
+
+- [ ] **OCC.C.1 — Document but do NOT implement a `ResponseShapeTaxonomy`.** The worker's three response branches (`openai_message.images` / `content as URL` / `content_blocks`) aren't strictly per-backend — they're per-model-version. A rule-system extension that controls *response parsing* (not request building) is genuinely new ground and out of scope for this pass. Note the deferral in the TODOS Later section so we revisit if a fourth response shape lands.
+
+### Phase OCC.D — img2img alignment
+
+- [ ] **OCC.D.1 — Add `input_images = "<chat_msg_arm>"` topic to model rules where the chat endpoint accepts image inputs** (Gemini-via-OpenRouter supports it; verify per-model). The rule presence/absence is what `ImgGenParamSupport.check_input_images_topic` reads — so once rules carry the topic correctly, `skip_if_img_gen_params_unsupported(has_input_images=True)` skips img2img tests on models that lack the capability, just like the unified path does. *Note: no new `InputImagesTaxonomy` value is needed* because the chat-message construction stays in the worker (it doesn't need taxonomy dispatch). The taxonomy presence is purely a capability flag here.
+
+### Phase OCC.E — Verification
+
+- [ ] **OCC.E.1 — `make agent-check`** + targeted tests under `tests/unit/pipelex/plugins/`.
+- [ ] **OCC.E.2 — `make tip` over OpenRouter img-gen profiles** (need new profiles in `.pipelex-dev/test_profiles_override.toml`: e.g. `verify_flux_2_pro_openrouter`, `verify_gemini_image_openrouter`). Cover `test_img_gen_single_opaque` and `test_img2img_single_input_image` for each new family.
+- [ ] **OCC.E.3 — Confirm no regressions on `nano-banana` via gateway** (if any model still routes through `gateway_completions` after the migration; verify .pipelex/inference/backends/pipelex_gateway.toml comments aren't actually live).
+
+### Out-of-scope alternatives (record only)
+
+- [ ] **OCC.X — Aggressive: parallel `make_messages_for_model()` factory method.** Fully rule-driven message construction, including taxonomy dispatch for img2img message format (data URL vs HTTP URL etc.). Touches `ImgGenArgsFactory` API surface and adds a new entry point. Strictly more powerful than the recommended approach but ~3× the diff and breaks the "factory returns flat kwargs" invariant. Revisit only if a third worker (beyond `OpenAICompletionsImgGenWorker`) starts using the chat-completions image path.
+
+---
+
 ## Independent cleanup (not blocked by the refactor)
 
-- [ ] **`AspectRatioTaxonomy.GPT` is dead.** `pipelex/cogt/img_gen/img_gen_model_rules.py:86` and `pipelex/cogt/img_gen/img_gen_args_factory.py:309`. No TOML in `.pipelex/` or `pipelex/kit/configs/` uses `aspect_ratio = "gpt"` anymore — all migrated to `openai_gpt_image_legacy` or `openai_gpt_image_2`. Remove the `GPT` enum value and drop `GPT |` from the `case AspectRatioTaxonomy.GPT | AspectRatioTaxonomy.OPENAI_GPT_IMAGE_LEGACY:` match arm.
+- [x] **`AspectRatioTaxonomy.GPT` removed** — was used only by the gateway's remote config (which the original TODO author missed); gateway updated in lockstep, enum value dropped, match arm collapsed.
 
-### Naming consistency — rename `gpt` → `gpt_image_legacy` where it refers only to the legacy gpt-image models
+### Naming convention — DONE
 
-The `"gpt"` taxonomy value is ambiguous now that gpt-image-2 has its own taxonomies. Where the rule is **legacy-only**, rename to the shorter `gpt_image_legacy` (not `openai_gpt_image_legacy`). Where the rule is **shared** between legacy and gpt-image-2, leave it alone.
+Final rule: `gpt_image` = shared by all OpenAI GPT Image models (legacy + gpt-image-2); `gpt_image_legacy` = legacy-only (gpt-image-2 uses `unavailable`).
 
-- **Rename:**
-  - [ ] `OutputFormatTaxonomy.GPT = "gpt"` (`pipelex/cogt/img_gen/img_gen_model_rules.py:148-149`) → `GPT_IMAGE_LEGACY = "gpt_image_legacy"` (gpt-image-2 uses `OutputFormatTaxonomy.UNAVAILABLE`, so `GPT` here is legacy-only).
-  - [ ] `AspectRatioTaxonomy.GPT = "gpt"` (`pipelex/cogt/img_gen/img_gen_model_rules.py:86`) — already flagged for removal as dead code; if kept for any reason, rename to `GPT_IMAGE_LEGACY` for consistency.
-  - [ ] Optional: rename `AspectRatioTaxonomy.OPENAI_GPT_IMAGE_LEGACY` → `GPT_IMAGE_LEGACY` and `AspectRatioTaxonomy.OPENAI_GPT_IMAGE_2` → `GPT_IMAGE_2` (drop the `OPENAI_` prefix, since the file/class context already implies OpenAI).
-
-- **Do NOT rename** (these taxonomies are shared by gpt-image-1, -1.5, AND gpt-image-2):
-  - `NumImagesTaxonomy.GPT` — both legacy and gpt-image-2 use `num_images = "gpt"` (param `n`).
-  - `InferenceTaxonomy.GPT` — both legacy and gpt-image-2 use `inference = "gpt"` (param `quality`).
-
-- **TOML updates required (if renaming):** every `output_format = "gpt"` in `.pipelex/inference/backends/*.toml` and `pipelex/kit/configs/inference/backends/*.toml` must be updated in lockstep with the enum rename.
+Renames:
+- [x] `AspectRatioTaxonomy.OPENAI_GPT_IMAGE_LEGACY` → `GPT_IMAGE_LEGACY = "gpt_image_legacy"`
+- [x] `AspectRatioTaxonomy.OPENAI_GPT_IMAGE_2` → `GPT_IMAGE_2 = "gpt_image_2"`
+- [x] `OutputFormatTaxonomy.GPT` → `GPT_IMAGE_LEGACY = "gpt_image_legacy"`
+- [x] `OutputCompressionTaxonomy.GPT_IMAGE` → `GPT_IMAGE_LEGACY = "gpt_image_legacy"` (legacy-only)
+- [x] `InputFidelityTaxonomy.OPENAI_IMAGE` → `GPT_IMAGE_LEGACY = "gpt_image_legacy"` (legacy-only)
+- [x] `NumImagesTaxonomy.GPT` → `GPT_IMAGE = "gpt_image"` (shared)
+- [x] `InferenceTaxonomy.GPT` → `GPT_IMAGE = "gpt_image"` (shared)
+- [x] `InputImagesTaxonomy.GPT_IMAGE` unchanged (already correct, shared)
+- [x] Local backend TOMLs and the remote Pipelex Gateway config (`pipelex-back-office/.../gateway_models.toml`) updated in lockstep.
 
 ---
 

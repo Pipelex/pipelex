@@ -197,7 +197,7 @@ class ImgGenArgsFactory:
         match num_images_taxonomy:
             case NumImagesTaxonomy.FAL:
                 return {"num_images": nb_images}
-            case NumImagesTaxonomy.GPT:
+            case NumImagesTaxonomy.GPT_IMAGE:
                 return {"n": nb_images}
 
     @classmethod
@@ -313,14 +313,14 @@ class ImgGenArgsFactory:
                     case AspectRatio.LANDSCAPE_3_2 | AspectRatio.PORTRAIT_2_3:
                         msg = f"Aspect ratio '{aspect_ratio}' is not supported by Flux-1.1 Ultra image generation model"
                         raise ImgGenParameterError(msg)
-            case AspectRatioTaxonomy.GPT | AspectRatioTaxonomy.OPENAI_GPT_IMAGE_LEGACY:
+            case AspectRatioTaxonomy.GPT_IMAGE_LEGACY:
                 key = "size"
                 value = OpenAIImgGenFactory.size_for_legacy_openai_image(
                     model_name=model_name,
                     aspect_ratio=aspect_ratio,
                     size=size,
                 )[0]
-            case AspectRatioTaxonomy.OPENAI_GPT_IMAGE_2:
+            case AspectRatioTaxonomy.GPT_IMAGE_2:
                 key = "size"
                 value = OpenAIImgGenFactory.size_for_gpt_image_2(
                     model_name=model_name,
@@ -406,7 +406,7 @@ class ImgGenArgsFactory:
             case InferenceTaxonomy.FLUX_11_ULTRA:
                 if is_raw:
                     args_dict["raw"] = is_raw
-            case InferenceTaxonomy.GPT:
+            case InferenceTaxonomy.GPT_IMAGE:
                 args_dict["quality"] = (quality or Quality.MEDIUM).value
         return args_dict
 
@@ -483,7 +483,7 @@ class ImgGenArgsFactory:
                     return {}
                 key = "output_format"
                 value = output_format.value
-            case OutputFormatTaxonomy.GPT:
+            case OutputFormatTaxonomy.GPT_IMAGE_LEGACY:
                 if output_format is None:
                     return {}
                 key = "output_format"
@@ -503,7 +503,7 @@ class ImgGenArgsFactory:
         PNG ignores this value (lossless). Models that do not expose this parameter use UNAVAILABLE.
         """
         match output_compression_taxonomy:
-            case OutputCompressionTaxonomy.GPT_IMAGE:
+            case OutputCompressionTaxonomy.GPT_IMAGE_LEGACY:
                 return {"output_compression": 100}
             case OutputCompressionTaxonomy.UNAVAILABLE:
                 return {}
@@ -578,7 +578,7 @@ class ImgGenArgsFactory:
             return {}
 
         match input_fidelity_taxonomy:
-            case InputFidelityTaxonomy.OPENAI_IMAGE:
+            case InputFidelityTaxonomy.GPT_IMAGE_LEGACY:
                 return {
                     "input_fidelity": OpenAIImgGenFactory.input_fidelity_for_openai_image(input_fidelity=input_fidelity),
                 }

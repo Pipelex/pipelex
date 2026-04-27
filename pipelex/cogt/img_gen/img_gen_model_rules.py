@@ -41,11 +41,11 @@ class NumImagesTaxonomy(StrEnum):
 
     Different providers use different parameter names:
     - FAL: uses `num_images`
-    - GPT: uses `n`
+    - GPT_IMAGE: uses `n` (shared across all OpenAI GPT Image models — legacy and gpt-image-2)
     """
 
     FAL = "fal"
-    GPT = "gpt"
+    GPT_IMAGE = "gpt_image"
 
 
 class SpecificTaxonomy(StrEnum):
@@ -75,8 +75,8 @@ class AspectRatioTaxonomy(StrEnum):
     Different providers use different parameter names and value formats:
     - FLUX: uses `image_size` with values like "square_hd", "landscape_4_3"
     - FLUX_11_ULTRA: uses `aspect_ratio` with values like "1:1", "4:3"
-    - OPENAI_GPT_IMAGE_LEGACY: uses fixed OpenAI GPT Image sizes
-    - OPENAI_GPT_IMAGE_2: validates and forwards exact OpenAI GPT Image 2 sizes
+    - GPT_IMAGE_LEGACY: uses fixed OpenAI GPT Image sizes (gpt-image-1 / -1-mini / -1.5)
+    - GPT_IMAGE_2: validates and forwards exact OpenAI GPT Image 2 sizes
     - QWEN_IMAGE: uses `width` and `height` with pixel dimensions mapped from aspect ratios
       (e.g., "1:1" -> 1328x1328, "16:9" -> 1664x928, "9:16" -> 928x1664,
        "4:3" -> 1472x1140, "3:4" -> 1140x1472, "3:2" -> 1584x1056, "2:3" -> 1056x1584)
@@ -84,9 +84,8 @@ class AspectRatioTaxonomy(StrEnum):
 
     FLUX = "flux"
     FLUX_11_ULTRA = "flux_11_ultra"
-    GPT = "gpt"
-    OPENAI_GPT_IMAGE_LEGACY = "openai_gpt_image_legacy"
-    OPENAI_GPT_IMAGE_2 = "openai_gpt_image_2"
+    GPT_IMAGE_LEGACY = "gpt_image_legacy"
+    GPT_IMAGE_2 = "gpt_image_2"
     QWEN_IMAGE = "qwen_image"
 
 
@@ -97,14 +96,14 @@ class InferenceTaxonomy(StrEnum):
     - SDXL_LIGHTNING: uses `num_inference_steps` (valid: 1, 2, 4, 8)
     - FLUX: uses `num_inference_steps` and `guidance_scale`
     - FLUX_11_ULTRA: uses `raw` mode
-    - GPT: uses `quality` ("low", "medium", "high")
+    - GPT_IMAGE: uses `quality` ("low", "medium", "high") — shared across all OpenAI GPT Image models
     - QWEN_IMAGE: uses `num_inference_steps` and `guidance_scale`
     """
 
     SDXL_LIGHTNING = "sdxl_lightning"
     FLUX = "flux"
     FLUX_11_ULTRA = "flux_11_ultra"
-    GPT = "gpt"
+    GPT_IMAGE = "gpt_image"
     QWEN_IMAGE = "qwen_image"
 
 
@@ -140,25 +139,27 @@ class OutputFormatTaxonomy(StrEnum):
     - SDXL: uses `format`, supports png/jpeg only
     - FLUX_1: uses `output_format`, supports png/jpeg only
     - FLUX_2: uses `output_format`, supports png/jpeg/webp
-    - GPT: uses `output_format`, supports png/jpeg/webp
+    - GPT_IMAGE_LEGACY: uses `output_format`, supports png/jpeg/webp (gpt-image-1 / -1-mini / -1.5).
+      gpt-image-2 ignores `output_format` and uses `OutputFormatTaxonomy.UNAVAILABLE` instead.
     """
 
     SDXL = "sdxl"
     FLUX_1 = "flux_1"
     FLUX_2 = "flux_2"
-    GPT = "gpt"
+    GPT_IMAGE_LEGACY = "gpt_image_legacy"
     UNAVAILABLE = "unavailable"
 
 
 class OutputCompressionTaxonomy(StrEnum):
     """Taxonomy for output compression parameters.
 
-    - GPT_IMAGE: emits `output_compression = 100` for OpenAI gpt-image-1/-1-mini/-1.5 models
-      (lossless for PNG, max quality for JPEG/WEBP)
+    - GPT_IMAGE_LEGACY: emits `output_compression = 100` for OpenAI gpt-image-1/-1-mini/-1.5
+      (lossless for PNG, max quality for JPEG/WEBP). gpt-image-2 does not expose this param
+      and uses `UNAVAILABLE` instead — hence the `_legacy` suffix.
     - UNAVAILABLE: model does not expose `output_compression`; the parameter is skipped
     """
 
-    GPT_IMAGE = "gpt_image"
+    GPT_IMAGE_LEGACY = "gpt_image_legacy"
     UNAVAILABLE = "unavailable"
 
 
@@ -188,11 +189,13 @@ class InputImagesTaxonomy(StrEnum):
 class InputFidelityTaxonomy(StrEnum):
     """Taxonomy for image-editing fidelity controls.
 
-    - OPENAI_IMAGE: OpenAI GPT Image edit `input_fidelity`, values "low" or "high"
+    - GPT_IMAGE_LEGACY: OpenAI GPT Image edit `input_fidelity`, values "low" or "high"
+      (gpt-image-1/-1-mini/-1.5). gpt-image-2 does not expose this param and uses
+      `UNAVAILABLE` instead — hence the `_legacy` suffix.
     - UNAVAILABLE: model does not support input fidelity configuration
     """
 
-    OPENAI_IMAGE = "openai_image"
+    GPT_IMAGE_LEGACY = "gpt_image_legacy"
     UNAVAILABLE = "unavailable"
 
 

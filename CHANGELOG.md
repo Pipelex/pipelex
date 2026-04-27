@@ -5,6 +5,18 @@
 ### Changed
 
 - **OpenAI direct img-gen now defaults `quality` to `medium`**: Previously this path implicitly defaulted to `low` via the bespoke `OpenAIImgGenWorker`. The unified rule-driven flow now sets `quality = "medium"` when `job_params.quality` is unset, aligning OpenAI direct and Azure OpenAI img-gen on a single explicit default.
+- **Img-gen taxonomy naming unified.** Convention: `gpt_image` for taxonomies/values shared across all OpenAI GPT Image models (legacy + gpt-image-2); `gpt_image_legacy` when the value applies only to gpt-image-1/-1-mini/-1.5 (gpt-image-2 uses `unavailable`). Renames:
+  - `AspectRatioTaxonomy.OPENAI_GPT_IMAGE_LEGACY` → `GPT_IMAGE_LEGACY` (value `"openai_gpt_image_legacy"` → `"gpt_image_legacy"`)
+  - `AspectRatioTaxonomy.OPENAI_GPT_IMAGE_2` → `GPT_IMAGE_2` (value `"openai_gpt_image_2"` → `"gpt_image_2"`)
+  - `OutputFormatTaxonomy.GPT` → `GPT_IMAGE_LEGACY` (value `"gpt"` → `"gpt_image_legacy"`)
+  - `OutputCompressionTaxonomy.GPT_IMAGE` → `GPT_IMAGE_LEGACY` (value `"gpt_image"` → `"gpt_image_legacy"`)
+  - `InputFidelityTaxonomy.OPENAI_IMAGE` → `GPT_IMAGE_LEGACY` (value `"openai_image"` → `"gpt_image_legacy"`)
+  - `NumImagesTaxonomy.GPT` → `GPT_IMAGE` (value `"gpt"` → `"gpt_image"`)
+  - `InferenceTaxonomy.GPT` → `GPT_IMAGE` (value `"gpt"` → `"gpt_image"`)
+  - Removed dead `AspectRatioTaxonomy.GPT`.
+  - `InputImagesTaxonomy.GPT_IMAGE` unchanged (already correct — shared across legacy and gpt-image-2).
+
+  Local backend TOMLs (`openai`, `azure_openai` in both `.pipelex/` and `pipelex/kit/configs/`) and the remote Pipelex Gateway config updated in lockstep.
 
 ## [v0.24.1] - 2026-04-22
 

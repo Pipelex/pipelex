@@ -196,10 +196,10 @@ class TestImgGenArgsFactory:
         return {
             ImgGenArgTopic.MODEL_NAME: ModelNameTaxonomy.STANDARD,
             ImgGenArgTopic.PROMPT: PromptTaxonomy.POSITIVE_ONLY,
-            ImgGenArgTopic.NUM_IMAGES: NumImagesTaxonomy.GPT,
-            ImgGenArgTopic.ASPECT_RATIO: AspectRatioTaxonomy.OPENAI_GPT_IMAGE_2,
+            ImgGenArgTopic.NUM_IMAGES: NumImagesTaxonomy.GPT_IMAGE,
+            ImgGenArgTopic.ASPECT_RATIO: AspectRatioTaxonomy.GPT_IMAGE_2,
             ImgGenArgTopic.BACKGROUND: BackgroundTaxonomy.UNAVAILABLE,
-            ImgGenArgTopic.INFERENCE: InferenceTaxonomy.GPT,
+            ImgGenArgTopic.INFERENCE: InferenceTaxonomy.GPT_IMAGE,
             ImgGenArgTopic.SAFETY_CHECKER: SafetyCheckerTaxonomy.UNAVAILABLE,
             ImgGenArgTopic.OUTPUT_FORMAT: OutputFormatTaxonomy.UNAVAILABLE,
             ImgGenArgTopic.INPUT_IMAGES: InputImagesTaxonomy.GPT_IMAGE,
@@ -210,13 +210,13 @@ class TestImgGenArgsFactory:
     def _make_legacy_openai_rules() -> ImgGenModelRules:
         return {
             ImgGenArgTopic.PROMPT: PromptTaxonomy.POSITIVE_ONLY,
-            ImgGenArgTopic.NUM_IMAGES: NumImagesTaxonomy.GPT,
-            ImgGenArgTopic.ASPECT_RATIO: AspectRatioTaxonomy.OPENAI_GPT_IMAGE_LEGACY,
+            ImgGenArgTopic.NUM_IMAGES: NumImagesTaxonomy.GPT_IMAGE,
+            ImgGenArgTopic.ASPECT_RATIO: AspectRatioTaxonomy.GPT_IMAGE_LEGACY,
             ImgGenArgTopic.BACKGROUND: BackgroundTaxonomy.AVAILABLE,
-            ImgGenArgTopic.INFERENCE: InferenceTaxonomy.GPT,
+            ImgGenArgTopic.INFERENCE: InferenceTaxonomy.GPT_IMAGE,
             ImgGenArgTopic.SAFETY_CHECKER: SafetyCheckerTaxonomy.OPENAI_MODERATION,
-            ImgGenArgTopic.OUTPUT_FORMAT: OutputFormatTaxonomy.GPT,
-            ImgGenArgTopic.INPUT_FIDELITY: InputFidelityTaxonomy.OPENAI_IMAGE,
+            ImgGenArgTopic.OUTPUT_FORMAT: OutputFormatTaxonomy.GPT_IMAGE_LEGACY,
+            ImgGenArgTopic.INPUT_FIDELITY: InputFidelityTaxonomy.GPT_IMAGE_LEGACY,
         }
 
     @pytest.mark.asyncio
@@ -327,7 +327,7 @@ class TestImgGenArgsFactory:
     def test_make_args_from_output_compression_gpt_image_emits_100(self) -> None:
         """Legacy gpt-image rules emit `output_compression = 100` (max quality for JPEG/WEBP, no-op for PNG)."""
         result = ImgGenArgsFactory.make_args_from_output_compression(
-            output_compression_taxonomy=OutputCompressionTaxonomy.GPT_IMAGE,
+            output_compression_taxonomy=OutputCompressionTaxonomy.GPT_IMAGE_LEGACY,
         )
 
         assert result == {"output_compression": 100}
@@ -347,7 +347,7 @@ class TestImgGenArgsFactory:
             OutputFormatTaxonomy.SDXL,
             OutputFormatTaxonomy.FLUX_1,
             OutputFormatTaxonomy.FLUX_2,
-            OutputFormatTaxonomy.GPT,
+            OutputFormatTaxonomy.GPT_IMAGE_LEGACY,
             OutputFormatTaxonomy.UNAVAILABLE,
         ],
     )
@@ -485,14 +485,14 @@ class TestImgGenArgsFactory:
             rules={
                 ImgGenArgTopic.MODEL_NAME: ModelNameTaxonomy.STANDARD,
                 ImgGenArgTopic.PROMPT: PromptTaxonomy.POSITIVE_ONLY,
-                ImgGenArgTopic.NUM_IMAGES: NumImagesTaxonomy.GPT,
-                ImgGenArgTopic.ASPECT_RATIO: AspectRatioTaxonomy.OPENAI_GPT_IMAGE_LEGACY,
+                ImgGenArgTopic.NUM_IMAGES: NumImagesTaxonomy.GPT_IMAGE,
+                ImgGenArgTopic.ASPECT_RATIO: AspectRatioTaxonomy.GPT_IMAGE_LEGACY,
                 ImgGenArgTopic.BACKGROUND: BackgroundTaxonomy.AVAILABLE,
-                ImgGenArgTopic.INFERENCE: InferenceTaxonomy.GPT,
+                ImgGenArgTopic.INFERENCE: InferenceTaxonomy.GPT_IMAGE,
                 ImgGenArgTopic.SAFETY_CHECKER: SafetyCheckerTaxonomy.OPENAI_MODERATION,
-                ImgGenArgTopic.OUTPUT_FORMAT: OutputFormatTaxonomy.GPT,
+                ImgGenArgTopic.OUTPUT_FORMAT: OutputFormatTaxonomy.GPT_IMAGE_LEGACY,
                 ImgGenArgTopic.INPUT_IMAGES: InputImagesTaxonomy.GPT_IMAGE,
-                ImgGenArgTopic.INPUT_FIDELITY: InputFidelityTaxonomy.OPENAI_IMAGE,
+                ImgGenArgTopic.INPUT_FIDELITY: InputFidelityTaxonomy.GPT_IMAGE_LEGACY,
             },
         )
         worker = OpenAIImgGenWorker(
