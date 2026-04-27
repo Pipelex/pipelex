@@ -1,0 +1,80 @@
+pipelex/kit/configs/inference/backends/openai.toml
+  6166e385aed4bc0f 255-256,258,260-261,263,275-276,278,280-281,283,296-297,299,301-302,304,316-317,319,336-337,339
+pipelex/pipe_operators/img_gen/pipe_img_gen.py
+  2b1dfbbad4549b40 10-11,70-108
+pipelex/cogt/img_gen/img_gen_args_factory.py
+  6166e385aed4bc0f 200,316,323,409,486,506,581
+tests/e2e/pipelex/pipes/pipe_operators/pipe_img_gen/test_pipe_img_gen_validation.py
+  2b1dfbbad4549b40 1-31,33-140
+  6166e385aed4bc0f 32
+.pipelex/inference/backends/openai.toml
+  6166e385aed4bc0f 255-256,258,260-261,263,275-276,278,280-281,283,296-297,299,301-302,304,316-317,319,336-337,339
+pipelex/cogt/img_gen/img_gen_model_rules.py
+  6166e385aed4bc0f 44,48,78-79,87-88,99,106,142-143,149,156-158,162,192-194,198
+pipelex/cogt/img_gen/img_gen_param_support.py
+  2b1dfbbad4549b40 1-223
+tests/unit/pipelex/cogt/img_gen/test_img_gen_param_support.py
+  6166e385aed4bc0f 37-42,44,53-54,56
+  2b1dfbbad4549b40 1-36,43,45-52,55,57-301
+tests/integration/pipelex/fixtures/img_gen_fixtures.py
+  2b1dfbbad4549b40 6-7,10-29
+pipelex/system/pipelex_service/pipelex_details.py
+  h_ad2a9d0839b83e 5
+tests/integration/pipelex/cogt/test_img_gen_param_support.py
+  2b1dfbbad4549b40 1-165
+tests/integration/pipelex/pipes/operator/pipe_img_gen/test_pipe_img_gen_blueprint_validation.py
+  2b1dfbbad4549b40 1-204
+TODOS.md
+  6166e385aed4bc0f 176,178,180,182-191
+  2b1dfbbad4549b40 54,97-137,139,141-173
+tests/unit/pipelex/cogt/img_gen/test_img_gen_args_factory.py
+  6166e385aed4bc0f 199-200,202,213-214,216,218-219,330,350,488-489,491,493,495
+tests/integration/pipelex/cogt/test_img2img.py
+  2b1dfbbad4549b40 17,95,152,214,271
+.pipelex/inference/backends/azure_openai.toml
+  6166e385aed4bc0f 235-236,238,240-242,254-255,257,259-261,273-274,276,278-280,292-293,295
+tests/integration/pipelex/cogt/test_img_gen.py
+  2b1dfbbad4549b40 10,36,74,106
+CHANGELOG.md
+  6166e385aed4bc0f 8-19
+pipelex/kit/configs/inference/backends/azure_openai.toml
+  6166e385aed4bc0f 235-236,238,240-242,254-255,257,259-261,273-274,276,278-280,292-293,295
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "cd66e675ccdb08efae5865491b38f0c9a344a66e",
+  "prompts": {
+    "2b1dfbbad4549b40": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "71ec7525-93a3-45d9-aa5a-eec1b9a36291",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 77,
+      "total_deletions": 0,
+      "accepted_lines": 1188,
+      "overriden_lines": 0
+    },
+    "6166e385aed4bc0f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "24791176-179b-4834-92f9-29e12f4a98a6",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 308,
+      "total_deletions": 293,
+      "accepted_lines": 170,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}
