@@ -65,8 +65,13 @@ class TestImageGeneration:
     ):
         img_gen_worker_async = get_img_gen_worker(img_gen_handle=img_gen_combo.handle)
         rules = img_gen_worker_async.inference_model.rules
-        if rules and rules.get(ImgGenArgTopic.BACKGROUND) == BackgroundTaxonomy.UNAVAILABLE:
-            pytest.skip(f"Model '{img_gen_worker_async.inference_model.name}' does not support transparent background")
+        background_value = rules.get(ImgGenArgTopic.BACKGROUND) if rules else None
+        if background_value is not None:
+            match BackgroundTaxonomy(background_value):
+                case BackgroundTaxonomy.UNAVAILABLE:
+                    pytest.skip(f"Model '{img_gen_worker_async.inference_model.name}' does not support transparent background")
+                case BackgroundTaxonomy.AVAILABLE:
+                    pass
         img_gen_job_params = ImgGenJobParams(
             aspect_ratio=AspectRatio.SQUARE,
             is_raw=None,

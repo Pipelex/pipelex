@@ -5,14 +5,10 @@ from openai import Omit, omit
 from pipelex import log
 from pipelex.cogt.exceptions import ImgGenParameterError
 from pipelex.cogt.image.image_size import ImageSize
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, InputFidelity, Quality
-from pipelex.tools.misc.image_utils import ImageFormat
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, InputFidelity
 
 OpenAIImageLegacySizeType = Literal["1024x1024", "1536x1024", "1024x1536"]
-OpenAIImageOutputFormatType = Literal["png", "jpeg", "webp"]
 OpenAIImageModerationType = Literal["low", "auto"] | Omit
-OpenAIImageQualityType = Literal["low", "medium", "high"]
-OpenAIImageBackgroundType = Literal["transparent", "opaque", "auto"]
 OpenAIImageInputFidelityType = Literal["low", "high"]
 
 
@@ -118,18 +114,6 @@ class OpenAIImgGenFactory:
             log.warning(f"Size '{size_string}' is valid for OpenAI image model '{model_name}', but it is above the 2560x1440 reliability boundary.")
 
     @classmethod
-    def output_format_for_openai_image(cls, output_format: ImageFormat | None) -> OpenAIImageOutputFormatType | None:
-        if output_format is None:
-            return None
-        match output_format:
-            case ImageFormat.PNG:
-                return "png"
-            case ImageFormat.JPEG:
-                return "jpeg"
-            case ImageFormat.WEBP:
-                return "webp"
-
-    @classmethod
     def moderation_for_openai_image(cls, is_moderated: bool | None) -> OpenAIImageModerationType:
         if is_moderated is None:
             return omit
@@ -138,36 +122,12 @@ class OpenAIImgGenFactory:
         return "auto"
 
     @classmethod
-    def quality_for_openai_image(cls, quality: Quality) -> OpenAIImageQualityType:
-        match quality:
-            case Quality.LOW:
-                return "low"
-            case Quality.MEDIUM:
-                return "medium"
-            case Quality.HIGH:
-                return "high"
-
-    @classmethod
-    def background_for_openai_image(cls, background: Background) -> OpenAIImageBackgroundType:
-        match background:
-            case Background.TRANSPARENT:
-                return "transparent"
-            case Background.OPAQUE:
-                return "opaque"
-            case Background.AUTO:
-                return "auto"
-
-    @classmethod
     def input_fidelity_for_openai_image(cls, input_fidelity: InputFidelity) -> OpenAIImageInputFidelityType:
         match input_fidelity:
             case InputFidelity.LOW:
                 return "low"
             case InputFidelity.HIGH:
                 return "high"
-
-    @classmethod
-    def output_compression_for_openai_image(cls) -> int:
-        return 100
 
     @staticmethod
     def _size_to_string(size: ImageSize) -> str:

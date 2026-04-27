@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, cast
 import openai
 from typing_extensions import override
 
+from pipelex import log
 from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
@@ -61,8 +62,11 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
             model_id=self.inference_model.model_id,
         )
 
+        images_response: ImagesResponse
         if image_arg := args_dict.get("image"):
             args_dict["image"] = self._convert_image_data_urls_for_openai_sdk(image_arg=image_arg)
+            if args_dict.pop("moderation", None) is not None:
+                log.warning("OpenAI images.edit does not accept 'moderation'; dropping the kwarg")
             images_response = cast("ImagesResponse", await self.openai_client.images.edit(**args_dict))
         else:
             images_response = cast("ImagesResponse", await self.openai_client.images.generate(**args_dict))

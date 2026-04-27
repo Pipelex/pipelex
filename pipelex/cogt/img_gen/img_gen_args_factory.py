@@ -26,6 +26,7 @@ from pipelex.cogt.img_gen.img_gen_model_rules import (
     InputImagesTaxonomy,
     ModelNameTaxonomy,
     NumImagesTaxonomy,
+    OutputCompressionTaxonomy,
     OutputFormatTaxonomy,
     PromptTaxonomy,
     SafetyCheckerTaxonomy,
@@ -130,11 +131,17 @@ class ImgGenArgsFactory:
                     )
                 case ImgGenArgTopic.OUTPUT_FORMAT:
                     output_format_taxonomy = OutputFormatTaxonomy(taxonomy_value)
-                    # TODO: test without imposing the format
                     args_dict.update(
                         cls.make_args_from_output_format(
                             output_format_taxonomy=output_format_taxonomy,
-                            output_format=job_params.output_format or ImageFormat.PNG,
+                            output_format=job_params.output_format,
+                        )
+                    )
+                case ImgGenArgTopic.OUTPUT_COMPRESSION:
+                    output_compression_taxonomy = OutputCompressionTaxonomy(taxonomy_value)
+                    args_dict.update(
+                        cls.make_args_from_output_compression(
+                            output_compression_taxonomy=output_compression_taxonomy,
                         )
                     )
                 case ImgGenArgTopic.SPECIFIC:
@@ -400,8 +407,7 @@ class ImgGenArgsFactory:
                 if is_raw:
                     args_dict["raw"] = is_raw
             case InferenceTaxonomy.GPT:
-                if quality:
-                    args_dict["quality"] = quality.value
+                args_dict["quality"] = (quality or Quality.MEDIUM).value
         return args_dict
 
     @classmethod
@@ -436,9 +442,11 @@ class ImgGenArgsFactory:
     def make_args_from_output_format(
         cls,
         output_format_taxonomy: OutputFormatTaxonomy,
-        output_format: ImageFormat,
+        output_format: ImageFormat | None,
     ) -> dict[str, Any]:
         """Map output format to provider-specific parameter name and validate support.
+
+        When output_format is None, returns an empty dict so the provider applies its own default.
 
         Raises:
             ImgGenParameterError: If the output format is not supported by the target model
@@ -447,6 +455,8 @@ class ImgGenArgsFactory:
         value: str
         match output_format_taxonomy:
             case OutputFormatTaxonomy.SDXL:
+                if output_format is None:
+                    return {}
                 key = "format"
                 match output_format:
                     case ImageFormat.PNG:
@@ -457,6 +467,8 @@ class ImgGenArgsFactory:
                         msg = "Output format WebP is not supported by SDXL image generation models"
                         raise ImgGenParameterError(msg)
             case OutputFormatTaxonomy.FLUX_1:
+                if output_format is None:
+                    return {}
                 key = "output_format"
                 match output_format:
                     case ImageFormat.PNG:
@@ -467,14 +479,34 @@ class ImgGenArgsFactory:
                         msg = "Output format WebP is not supported by Flux 1 image generation models"
                         raise ImgGenParameterError(msg)
             case OutputFormatTaxonomy.FLUX_2:
+                if output_format is None:
+                    return {}
                 key = "output_format"
                 value = output_format.value
             case OutputFormatTaxonomy.GPT:
+                if output_format is None:
+                    return {}
                 key = "output_format"
                 value = output_format.value
             case OutputFormatTaxonomy.UNAVAILABLE:
                 return {}
         return {key: value}
+
+    @classmethod
+    def make_args_from_output_compression(
+        cls,
+        output_compression_taxonomy: OutputCompressionTaxonomy,
+    ) -> dict[str, Any]:
+        """Map output compression to provider-specific parameter.
+
+        OpenAI gpt-image-1/-1-mini/-1.5 accept `output_compression` (0-100) for JPEG/WEBP outputs.
+        PNG ignores this value (lossless). Models that do not expose this parameter use UNAVAILABLE.
+        """
+        match output_compression_taxonomy:
+            case OutputCompressionTaxonomy.GPT_IMAGE:
+                return {"output_compression": 100}
+            case OutputCompressionTaxonomy.UNAVAILABLE:
+                return {}
 
     @classmethod
     async def make_args_from_input_images(

@@ -30,6 +30,7 @@ class ImgGenArgTopic(StrEnum):
     SAFETY_CHECKER = "safety_checker"
     BACKGROUND = "background"
     OUTPUT_FORMAT = "output_format"
+    OUTPUT_COMPRESSION = "output_compression"
     SPECIFIC = "specific"
     INPUT_IMAGES = "input_images"
     INPUT_FIDELITY = "input_fidelity"
@@ -146,6 +147,18 @@ class OutputFormatTaxonomy(StrEnum):
     FLUX_1 = "flux_1"
     FLUX_2 = "flux_2"
     GPT = "gpt"
+    UNAVAILABLE = "unavailable"
+
+
+class OutputCompressionTaxonomy(StrEnum):
+    """Taxonomy for output compression parameters.
+
+    - GPT_IMAGE: emits `output_compression = 100` for OpenAI gpt-image-1/-1-mini/-1.5 models
+      (lossless for PNG, max quality for JPEG/WEBP)
+    - UNAVAILABLE: model does not expose `output_compression`; the parameter is skipped
+    """
+
+    GPT_IMAGE = "gpt_image"
     UNAVAILABLE = "unavailable"
 
 

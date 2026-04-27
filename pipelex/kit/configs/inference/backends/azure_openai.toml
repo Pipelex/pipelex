@@ -238,6 +238,7 @@ background = "available"
 inference = "gpt"
 safety_checker = "unavailable"
 output_format = "gpt"
+output_compression = "gpt_image"
 input_fidelity = "openai_image"
 
 [gpt-image-1-mini]
@@ -256,6 +257,7 @@ background = "available"
 inference = "gpt"
 safety_checker = "unavailable"
 output_format = "gpt"
+output_compression = "gpt_image"
 input_fidelity = "openai_image"
 
 ["gpt-image-1.5"]
@@ -274,6 +276,7 @@ background = "available"
 inference = "gpt"
 safety_checker = "unavailable"
 output_format = "gpt"
+output_compression = "gpt_image"
 input_fidelity = "openai_image"
 
 [gpt-image-2]
@@ -292,5 +295,6 @@ background = "unavailable"
 inference = "gpt"
 safety_checker = "unavailable"
 output_format = "unavailable"
+output_compression = "unavailable"
 input_images = "gpt_image"
 input_fidelity = "unavailable"

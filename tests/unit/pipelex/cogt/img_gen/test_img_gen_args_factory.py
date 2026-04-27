@@ -35,6 +35,7 @@ from pipelex.cogt.img_gen.img_gen_model_rules import (
     InputImagesTaxonomy,
     ModelNameTaxonomy,
     NumImagesTaxonomy,
+    OutputCompressionTaxonomy,
     OutputFormatTaxonomy,
     PromptTaxonomy,
     SafetyCheckerTaxonomy,
@@ -63,6 +64,7 @@ class TestImgGenArgsFactory:
         aspect_ratio: AspectRatio = AspectRatio.SQUARE,
         size: ImageSize | None = None,
         input_fidelity: InputFidelity | None = None,
+        output_format: ImageFormat | None = ImageFormat.PNG,
     ) -> ImgGenJob:
         """Create a test ImgGenJob with optional input images."""
         return ImgGenJob(
@@ -75,7 +77,7 @@ class TestImgGenArgsFactory:
                 size=size,
                 background=Background.OPAQUE,
                 input_fidelity=input_fidelity,
-                output_format=ImageFormat.PNG,
+                output_format=output_format,
             ),
             job_config=ImgGenJobConfig(is_sync_mode=False),
             job_report=ImgGenJobReport(),
@@ -322,6 +324,59 @@ class TestImgGenArgsFactory:
         assert "OpenAI image model" in error_message
         assert "GPT Image 1" not in error_message
 
+    def test_make_args_from_output_compression_gpt_image_emits_100(self) -> None:
+        """Legacy gpt-image rules emit `output_compression = 100` (max quality for JPEG/WEBP, no-op for PNG)."""
+        result = ImgGenArgsFactory.make_args_from_output_compression(
+            output_compression_taxonomy=OutputCompressionTaxonomy.GPT_IMAGE,
+        )
+
+        assert result == {"output_compression": 100}
+
+    def test_make_args_from_output_compression_unavailable_emits_nothing(self) -> None:
+        """Models without `output_compression` support skip the kwarg entirely."""
+        result = ImgGenArgsFactory.make_args_from_output_compression(
+            output_compression_taxonomy=OutputCompressionTaxonomy.UNAVAILABLE,
+        )
+
+        assert result == {}
+        assert "output_compression" not in result
+
+    @pytest.mark.parametrize(
+        "output_format_taxonomy",
+        [
+            OutputFormatTaxonomy.SDXL,
+            OutputFormatTaxonomy.FLUX_1,
+            OutputFormatTaxonomy.FLUX_2,
+            OutputFormatTaxonomy.GPT,
+            OutputFormatTaxonomy.UNAVAILABLE,
+        ],
+    )
+    def test_make_args_from_output_format_returns_empty_when_none(self, output_format_taxonomy: OutputFormatTaxonomy) -> None:
+        """When output_format is None, every taxonomy returns an empty dict so the provider applies its own default."""
+        result = ImgGenArgsFactory.make_args_from_output_format(
+            output_format_taxonomy=output_format_taxonomy,
+            output_format=None,
+        )
+
+        assert result == {}
+        assert "format" not in result
+        assert "output_format" not in result
+
+    @pytest.mark.asyncio
+    async def test_gpt_inference_taxonomy_defaults_quality_to_medium(self) -> None:
+        """When job_params.quality is None and inference taxonomy is GPT, quality defaults to 'medium'."""
+        job = self._make_test_job()
+        # Ensure no explicit quality on the job
+        job.job_params.quality = None
+        result = await ImgGenArgsFactory.make_args_for_model(
+            model_rules=self._make_gpt_image_2_rules(),
+            img_gen_job=job,
+            nb_images=1,
+            model_id="gpt-image-2",
+        )
+
+        assert result["quality"] == "medium"
+
     @pytest.mark.asyncio
     async def test_openai_direct_worker_uses_rule_generated_args(self, mocker: MockerFixture) -> None:
         openai_client = openai.AsyncOpenAI(api_key="sk-test")
@@ -377,3 +432,82 @@ class TestImgGenArgsFactory:
         assert "output_format" not in kwargs
         assert "background" not in kwargs
         assert generated_images[0].size == ImageSize(width=2560, height=1440)
+
+    @pytest.mark.asyncio
+    async def test_openai_edit_endpoint_strips_moderation_kwarg(self, mocker: MockerFixture) -> None:
+        """When routing to images.edit (input_images present), the 'moderation' kwarg is dropped to match the SDK signature."""
+        openai_client = openai.AsyncOpenAI(api_key="sk-test")
+
+        class FakeImageData:
+            b64_json = "dGVzdA=="
+
+        class FakeUsage:
+            input_tokens = 1
+            output_tokens = 2
+
+        class FakeImagesResponse:
+            def __init__(self) -> None:
+                self.data = [FakeImageData()]
+                self.output_format = "png"
+                self.size = "1024x1024"
+                self.usage = FakeUsage()
+
+        edit_mock = mocker.AsyncMock(return_value=FakeImagesResponse())
+        generate_mock = mocker.AsyncMock(return_value=FakeImagesResponse())
+        mocker.patch.object(openai_client.images, "edit", edit_mock)
+        mocker.patch.object(openai_client.images, "generate", generate_mock)
+
+        # Mock prep_prompt_images to avoid network calls
+        mock_prepped = [
+            PreparedFileBase64(
+                base64_data="iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+                file_type=FileType(extension="png", mime="image/png"),
+            )
+        ]
+        mocker.patch(
+            "pipelex.cogt.img_gen.img_gen_args_factory.prep_prompt_images",
+            new_callable=mocker.AsyncMock,
+            return_value=mock_prepped,
+        )
+
+        inference_model = InferenceModelSpec(
+            backend_name="openai",
+            name="gpt-image-1",
+            sdk="openai_img_gen",
+            model_type=ModelType.IMG_GEN,
+            model_id="gpt-image-1",
+            inputs=["text", "images"],
+            outputs=["image"],
+            costs={CostCategory.INPUT: 10, CostCategory.OUTPUT: 40},
+            thinking_mode=ThinkingMode.NONE,
+            max_tokens=None,
+            max_prompt_images=None,
+            rules={
+                ImgGenArgTopic.MODEL_NAME: ModelNameTaxonomy.STANDARD,
+                ImgGenArgTopic.PROMPT: PromptTaxonomy.POSITIVE_ONLY,
+                ImgGenArgTopic.NUM_IMAGES: NumImagesTaxonomy.GPT,
+                ImgGenArgTopic.ASPECT_RATIO: AspectRatioTaxonomy.OPENAI_GPT_IMAGE_LEGACY,
+                ImgGenArgTopic.BACKGROUND: BackgroundTaxonomy.AVAILABLE,
+                ImgGenArgTopic.INFERENCE: InferenceTaxonomy.GPT,
+                ImgGenArgTopic.SAFETY_CHECKER: SafetyCheckerTaxonomy.OPENAI_MODERATION,
+                ImgGenArgTopic.OUTPUT_FORMAT: OutputFormatTaxonomy.GPT,
+                ImgGenArgTopic.INPUT_IMAGES: InputImagesTaxonomy.GPT_IMAGE,
+                ImgGenArgTopic.INPUT_FIDELITY: InputFidelityTaxonomy.OPENAI_IMAGE,
+            },
+        )
+        worker = OpenAIImgGenWorker(
+            sdk_instance=openai_client,
+            inference_model=inference_model,
+        )
+
+        input_images = cast("list[PromptImage]", [PromptImageUri(uri="https://example.com/image.png")])
+        job = self._make_test_job(input_images=input_images)
+        job.job_params.is_moderated = True
+
+        await worker.gen_image_list(img_gen_job=job, nb_images=1)
+
+        edit_mock.assert_awaited_once()
+        generate_mock.assert_not_awaited()
+        assert edit_mock.await_args is not None
+        kwargs = edit_mock.await_args.kwargs
+        assert "moderation" not in kwargs

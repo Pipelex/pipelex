@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **OpenAI direct img-gen now defaults `quality` to `medium`**: Previously this path implicitly defaulted to `low` via the bespoke `OpenAIImgGenWorker`. The unified rule-driven flow now sets `quality = "medium"` when `job_params.quality` is unset, aligning OpenAI direct and Azure OpenAI img-gen on a single explicit default.
+
 ## [v0.24.1] - 2026-04-22
 
 ### Security
