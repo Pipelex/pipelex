@@ -258,6 +258,7 @@ outputs = ["image"]
 costs = { input = 10, output = 40 }
 
 [gpt-image-1.rules]
+model_choice = "model_id"
 prompt = "positive_only"
 num_images = "gpt_image"
 aspect_ratio = "gpt_image_legacy"
@@ -277,6 +278,7 @@ outputs = ["image"]
 costs = { input = 2.5, output = 8 }
 
 [gpt-image-1-mini.rules]
+model_choice = "model_id"
 prompt = "positive_only"
 num_images = "gpt_image"
 aspect_ratio = "gpt_image_legacy"
@@ -297,6 +299,7 @@ outputs = ["image"]
 costs = { input = 8, output = 32 }
 
 ["gpt-image-1.5".rules]
+model_choice = "model_id"
 prompt = "positive_only"
 num_images = "gpt_image"
 aspect_ratio = "gpt_image_legacy"
@@ -316,6 +319,7 @@ outputs = ["image"]
 costs = { input = 8, output = 30 }
 
 [gpt-image-2-2026-04-21.rules]
+model_choice = "model_id"
 prompt = "positive_only"
 num_images = "gpt_image"
 aspect_ratio = "gpt_image_2"
@@ -335,6 +339,7 @@ outputs = ["image"]
 costs = { input = 8, output = 30 }
 
 [gpt-image-2.rules]
+model_choice = "model_id"
 prompt = "positive_only"
 num_images = "gpt_image"
 aspect_ratio = "gpt_image_2"

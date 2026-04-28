@@ -25,6 +25,8 @@
   - Removed dead `AspectRatioTaxonomy.GPT`.
   - `InputImagesTaxonomy.GPT_IMAGE` unchanged (already correct — shared across legacy and gpt-image-2).
 
+- **HuggingFace and Fal img-gen workers honor `model_choice` rule.** `huggingface_img_gen` and `fal` workers now pop `"model"` from `args_dict` instead of hardcoding `inference_model.model_id`, mirroring how `prompt` is already extracted. The `model_choice = "model_id"` rule is now required on every model under these backends; missing it raises `ImgGenParameterError` at call time. Rules added to `qwen-image` (HF) and to all Fal models (`flux-pro`, `flux-pro/v1.1`, `flux-pro/v1.1-ultra`, `flux-2`, `fast-lightning-sdxl`).
+
 ## [v0.24.1] - 2026-04-22
 
 ### Security
