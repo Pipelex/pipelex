@@ -1,0 +1,44 @@
+pipelex/plugins/huggingface/huggingface_img_gen_worker.py
+  db834136851ac7c6 48-51
+pipelex/kit/configs/inference/backends/fal.toml
+  db834136851ac7c6 41,57,73,89,106
+CHANGELOG.md
+  h_ad2a9d0839b83e 28
+.pipelex/inference/backends/fal.toml
+  db834136851ac7c6 41,57,73,89,106
+.pipelex/inference/backends/huggingface.toml
+  db834136851ac7c6 42
+pipelex/plugins/fal/fal_img_gen_worker.py
+  db834136851ac7c6 47-50
+pipelex/kit/configs/inference/backends/openai.toml
+  db834136851ac7c6 261,281,302,322,342
+.pipelex/inference/backends/openai.toml
+  db834136851ac7c6 261,281,302,322,342
+pipelex/kit/configs/inference/backends/huggingface.toml
+  db834136851ac7c6 42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "186662c39891e2c2883a13e782d0c43be2c53f59",
+  "prompts": {
+    "db834136851ac7c6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7c11d817-612e-46e4-8e4d-c3cbab1d20dc",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 37,
+      "total_deletions": 5,
+      "accepted_lines": 31,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}
