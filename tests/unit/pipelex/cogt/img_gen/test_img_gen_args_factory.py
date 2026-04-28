@@ -319,7 +319,7 @@ class TestImgGenArgsFactory:
         assert result["size"] == "1536x1024"
 
     @pytest.mark.asyncio
-    async def test_legacy_openai_models_reject_unsupported_aspect_ratio_with_model_id(self) -> None:
+    async def test_legacy_openai_models_reject_unsupported_aspect_ratio_with_model_name(self) -> None:
         with pytest.raises(ImgGenParameterError) as exc_info:
             await ImgGenArgsFactory.make_args_for_model(
                 model_rules=self._make_legacy_openai_rules(),
@@ -330,7 +330,8 @@ class TestImgGenArgsFactory:
             )
 
         error_message = str(exc_info.value)
-        assert "azure-gpt-image-1-mini-deployment" in error_message
+        assert "gpt-image-1-mini" in error_message
+        assert "azure-gpt-image-1-mini-deployment" not in error_message
         assert "OpenAI image model" in error_message
         assert "GPT Image 1" not in error_message
 
