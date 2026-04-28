@@ -127,6 +127,9 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **gpt-5.4-pro**
   - inputs: text, images
   - outputs: text, structured
+- **gpt-5.5**
+  - inputs: text, images
+  - outputs: text, structured
 - **gpt-oss-120b**
   - inputs: text
   - outputs: text, structured
@@ -220,6 +223,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-04-28T09:55:00Z
+> Last updated: 2026-04-28T11:06:01Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.
