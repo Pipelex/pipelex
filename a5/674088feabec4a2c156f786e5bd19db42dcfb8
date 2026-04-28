@@ -1,0 +1,60 @@
+pipelex/plugins/azure_rest/azure_img_gen_worker.py
+  9715bb5a1effb263 80
+pipelex/plugins/huggingface/huggingface_img_gen_worker.py
+  9715bb5a1effb263 45
+pipelex/plugins/fal/fal_img_gen_worker.py
+  9715bb5a1effb263 45
+pipelex/plugins/gateway/gateway_img_gen_worker.py
+  9715bb5a1effb263 72
+pipelex/cogt/img_gen/img_gen_args_factory.py
+  9715bb5a1effb263 55,162,247
+  h_ad2a9d0839b83e 27,67,156-157,238,240,244,246
+pipelex/cogt/img_gen/img_gen_model_rules.py
+  h_ad2a9d0839b83e 25,166-167,169,173
+  9715bb5a1effb263 170,174
+tests/unit/pipelex/cogt/img_gen/test_img_gen_param_support.py
+  h_ad2a9d0839b83e 22,35,51
+pipelex/plugins/openai/openai_img_gen_worker.py
+  9715bb5a1effb263 63
+tests/unit/pipelex/cogt/img_gen/test_img_gen_args_factory.py
+  h_ad2a9d0839b83e 36,201,357,507
+  9715bb5a1effb263 322,328-329,333,354-356,358-363
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "a5674088feabec4a2c156f786e5bd19db42dcfb8",
+  "prompts": {
+    "1728140d7b2fb4ff": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ba470c03-6978-406f-850e-d89ef49b6bd3",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 1,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    },
+    "9715bb5a1effb263": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "ca50963c-50aa-4b5c-9690-b86a57de1f73",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 35,
+      "total_deletions": 14,
+      "accepted_lines": 26,
+      "overriden_lines": 3
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}
