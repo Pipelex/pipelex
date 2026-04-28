@@ -6,7 +6,7 @@
 
 - **GPT-5.5 model support.** New `gpt-5.5` entry on the `openai`, `azure_openai` and gateway backends.
 
-- **`gpt-image-2` image generation (OpenAI).** New model entry with img-gen routing and constraints on `openai`, `azure_openai`, and gateway backends; `openai.toml` / `azure_openai.toml` in `.pipelex/` and `pipelex/kit/configs/`, plus gateway model lists and regenerated docs, updated in lockstep.
+- **`gpt-image-2` image generation (OpenAI).** New model entry with img-gen routing and constraints on `openai`, `azure_openai`.
 
 ### Fixed
 
