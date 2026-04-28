@@ -14,6 +14,7 @@ from pipelex.hub import get_img_gen_worker
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.image_utils import ImageFormat
 from tests.cases import ImageTestCases
+from tests.integration.pipelex.fixtures.img_gen_fixtures import skip_if_img_gen_params_unsupported
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 
 PRIMARY_ID = "img2img_1"
@@ -91,6 +92,7 @@ class TestImageToImageGeneration:
             background=Background.OPAQUE,
             output_format=ImageFormat.PNG,
         )
+        skip_if_img_gen_params_unsupported(img_gen_worker.inference_model, img_gen_job_params, has_input_images=True)
 
         img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt(
             img_gen_prompt=img_gen_prompt,
@@ -147,6 +149,7 @@ class TestImageToImageGeneration:
             background=Background.OPAQUE,
             output_format=ImageFormat.PNG,
         )
+        skip_if_img_gen_params_unsupported(img_gen_worker.inference_model, img_gen_job_params, has_input_images=True)
 
         img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt(
             img_gen_prompt=img_gen_prompt,
@@ -208,6 +211,7 @@ class TestImageToImageGeneration:
             background=Background.OPAQUE,
             output_format=ImageFormat.PNG,
         )
+        skip_if_img_gen_params_unsupported(img_gen_worker.inference_model, img_gen_job_params, has_input_images=True)
 
         img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt(
             img_gen_prompt=img_gen_prompt,
@@ -264,6 +268,7 @@ class TestImageToImageGeneration:
             background=Background.OPAQUE,
             output_format=ImageFormat.PNG,
         )
+        skip_if_img_gen_params_unsupported(img_gen_worker.inference_model, img_gen_job_params, has_input_images=True)
 
         img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt(
             img_gen_prompt=img_gen_prompt,

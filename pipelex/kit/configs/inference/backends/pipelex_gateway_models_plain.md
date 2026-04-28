@@ -46,13 +46,16 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **gemini-2.5-pro**
   - inputs: text, images, pdf
   - outputs: text, structured
-- **gemini-3.0-flash-preview**
+- **gemini-3.0-flash**
   - inputs: text, images, pdf
   - outputs: text, structured
 - **gemini-3.0-pro**
   - inputs: text, images, pdf
   - outputs: text, structured
-- **gemini-3.1-flash-lite-preview**
+- **gemini-3.1-flash-lite**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gemini-3.1-pro**
   - inputs: text, images, pdf
   - outputs: text, structured
 - **gemini-flash-latest**
@@ -122,6 +125,9 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
   - inputs: text, images
   - outputs: text, structured
 - **gpt-5.4-pro**
+  - inputs: text, images
+  - outputs: text, structured
+- **gpt-5.5**
   - inputs: text, images
   - outputs: text, structured
 - **gpt-oss-120b**
@@ -202,6 +208,9 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **gpt-image-1.5**
   - inputs: text, images
   - outputs: image
+- **gpt-image-2**
+  - inputs: text, images
+  - outputs: image
 - **nano-banana**
   - inputs: text, images
   - outputs: image
@@ -214,6 +223,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-04-17T12:23:17Z
+> Last updated: 2026-04-28T11:06:01Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.

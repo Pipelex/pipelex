@@ -7,7 +7,8 @@ from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams
-from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting
+from pipelex.cogt.img_gen.img_gen_param_support import ImgGenParamSupport
+from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting, ImgGenSettingValueError
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck_check import check_img_gen_choice_with_deck
 from pipelex.config import get_config
@@ -66,6 +67,45 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     def validate_inputs_static(self):
         if self.img_gen_choice:
             check_img_gen_choice_with_deck(img_gen_choice=self.img_gen_choice)
+            self._validate_param_support_against_model_rules()
+
+    def _validate_param_support_against_model_rules(self) -> None:
+        """If `img_gen_choice` resolves to a concrete inference model with rules,
+        validate that explicitly-set blueprint params are accepted by those rules.
+
+        Skipped silently when the choice is a preset/alias/waterfall whose target
+        cannot be resolved at static-validation time, or when the resolved spec
+        has no rules attached.
+        """
+        if self.img_gen_choice is None:
+            return
+        model_deck = get_model_deck()
+        try:
+            img_gen_setting = model_deck.get_img_gen_setting(self.img_gen_choice)
+        except ImgGenSettingValueError:
+            return
+        spec = model_deck.get_optional_inference_model(
+            model_handle=img_gen_setting.model,
+            model_type=ModelType.IMG_GEN,
+        )
+        if spec is None or spec.rules is None:
+            return
+        unsupported = ImgGenParamSupport.check_blueprint_params(
+            rules=spec.rules,
+            aspect_ratio=self.aspect_ratio,
+            background=self.background,
+            output_format=self.output_format,
+            model_name=img_gen_setting.model,
+        )
+        if unsupported:
+            joined = "; ".join(unsupported)
+            msg = f"PipeImgGen '{self.code}' uses parameter values not supported by model '{img_gen_setting.model}': {joined}"
+            raise PipeValidationError(
+                message=msg,
+                error_type=PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR,
+                domain_code=self.domain_code,
+                pipe_code=self.code,
+            )
 
     @override
     def validate_inputs_with_library(self):
