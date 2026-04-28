@@ -99,7 +99,7 @@ class ImgGenArgsFactory:
                             aspect_ratio_taxonomy=aspect_ratio_taxonomy,
                             aspect_ratio=job_params.aspect_ratio,
                             size=job_params.size,
-                            model_name=model_id,
+                            model_name=model_name,
                         )
                     )
                 case ImgGenArgTopic.BACKGROUND:
@@ -108,7 +108,7 @@ class ImgGenArgsFactory:
                         cls.make_args_from_background(
                             background_taxonomy=background_taxonomy,
                             background=job_params.background,
-                            model_name=model_id,
+                            model_name=model_name,
                         )
                     )
                 case ImgGenArgTopic.INFERENCE:
@@ -175,7 +175,7 @@ class ImgGenArgsFactory:
                         cls.make_args_from_input_fidelity(
                             input_fidelity_taxonomy=input_fidelity_taxonomy,
                             input_fidelity=job_params.input_fidelity,
-                            model_name=model_id,
+                            model_name=model_name,
                         )
                     )
 
