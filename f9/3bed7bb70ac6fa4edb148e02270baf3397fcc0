@@ -1,0 +1,28 @@
+tests/unit/pipelex/cogt/img_gen/test_img_gen_args_factory.py
+  4be3e57ead55ce5c 322,333-334
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "f93bed7bb70ac6fa4edb148e02270baf3397fcc0",
+  "prompts": {
+    "4be3e57ead55ce5c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6cf357db-d90a-4698-8afb-8f45373d18cc",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 2,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}
