@@ -107,9 +107,15 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
         if (usage_dict := response_dict.get("usage")) and (img_gen_tokens_usage := img_gen_job.job_report.img_gen_tokens_usage):
             log.debug(usage_dict, title="Azure img gen usage")
             nb_tokens: NbTokensByCategoryDict = {}
-            if input_tokens := usage_dict.get("prompt_tokens") or usage_dict.get("input_tokens"):
+            input_tokens = usage_dict.get("prompt_tokens")
+            if input_tokens is None:
+                input_tokens = usage_dict.get("input_tokens")
+            if input_tokens is not None:
                 nb_tokens[TokenCategory.INPUT] = input_tokens
-            if output_tokens := usage_dict.get("completion_tokens") or usage_dict.get("output_tokens"):
+            output_tokens = usage_dict.get("completion_tokens")
+            if output_tokens is None:
+                output_tokens = usage_dict.get("output_tokens")
+            if output_tokens is not None:
                 nb_tokens[TokenCategory.OUTPUT] = output_tokens
             img_gen_tokens_usage.nb_tokens_by_category = nb_tokens
 

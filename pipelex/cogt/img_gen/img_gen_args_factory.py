@@ -189,7 +189,7 @@ class ImgGenArgsFactory:
                 raise ImgGenParameterError(msg)
 
         if job_params.input_fidelity is not None and ImgGenArgTopic.INPUT_FIDELITY not in model_rules:
-            msg = f"Model '{model_id}' does not support input_fidelity"
+            msg = f"Model '{model_name}' does not support input_fidelity"
             raise ImgGenParameterError(msg)
 
         return args_dict
