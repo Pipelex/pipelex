@@ -69,11 +69,11 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
             img_gen_job=img_gen_job,
             nb_images=nb_images,
             model_id=self.inference_model.model_id,
+            model_name=self.inference_model.name,
         )
 
         endpoint_path = (self.inference_model.extra_headers or {}).get("endpoint_path") or f"/{self.inference_model.model_id}"
         config_id = GatewayDeck.get_config_id(headers=self.inference_model.extra_headers or {})
-        args_dict["model"] = self.inference_model.name
         log.debug(args_dict, title="Gateway img gen args")
         try:
             # TODO: add portkey tracing headers when enabled

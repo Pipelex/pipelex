@@ -33,7 +33,7 @@ from pipelex.cogt.img_gen.img_gen_model_rules import (
     InferenceTaxonomy,
     InputFidelityTaxonomy,
     InputImagesTaxonomy,
-    ModelNameTaxonomy,
+    ModelChoiceTaxonomy,
     NumImagesTaxonomy,
     OutputCompressionTaxonomy,
     OutputFormatTaxonomy,
@@ -117,6 +117,7 @@ class TestImgGenArgsFactory:
                 img_gen_job=job,
                 nb_images=1,
                 model_id="test-model",
+                model_name="test-model",
             )
 
         error_message = str(exc_info.value)
@@ -148,6 +149,7 @@ class TestImgGenArgsFactory:
             img_gen_job=job,
             nb_images=1,
             model_id="test-model",
+            model_name="test-model",
         )
 
         assert isinstance(result, dict)
@@ -168,6 +170,7 @@ class TestImgGenArgsFactory:
             img_gen_job=job,
             nb_images=1,
             model_id="test-model",
+            model_name="test-model",
         )
 
         assert isinstance(result, dict)
@@ -187,6 +190,7 @@ class TestImgGenArgsFactory:
             img_gen_job=job,
             nb_images=1,
             model_id="test-model",
+            model_name="test-model",
         )
 
         assert isinstance(result, dict)
@@ -194,7 +198,7 @@ class TestImgGenArgsFactory:
     @staticmethod
     def _make_gpt_image_2_rules() -> ImgGenModelRules:
         return {
-            ImgGenArgTopic.MODEL_NAME: ModelNameTaxonomy.STANDARD,
+            ImgGenArgTopic.MODEL_CHOICE: ModelChoiceTaxonomy.MODEL_ID,
             ImgGenArgTopic.PROMPT: PromptTaxonomy.POSITIVE_ONLY,
             ImgGenArgTopic.NUM_IMAGES: NumImagesTaxonomy.GPT_IMAGE,
             ImgGenArgTopic.ASPECT_RATIO: AspectRatioTaxonomy.GPT_IMAGE_2,
@@ -236,6 +240,7 @@ class TestImgGenArgsFactory:
             img_gen_job=self._make_test_job(size=size),
             nb_images=1,
             model_id="gpt-image-2",
+            model_name="gpt-image-2",
         )
 
         assert result["size"] == f"{size.width}x{size.height}"
@@ -258,6 +263,7 @@ class TestImgGenArgsFactory:
                 img_gen_job=self._make_test_job(size=size),
                 nb_images=1,
                 model_id="gpt-image-2",
+                model_name="gpt-image-2",
             )
 
         assert expected_error in str(exc_info.value)
@@ -270,6 +276,7 @@ class TestImgGenArgsFactory:
                 img_gen_job=self._make_test_job(input_fidelity=InputFidelity.HIGH),
                 nb_images=1,
                 model_id="gpt-image-2",
+                model_name="gpt-image-2",
             )
 
         error_message = str(exc_info.value)
@@ -291,6 +298,7 @@ class TestImgGenArgsFactory:
             img_gen_job=self._make_test_job(aspect_ratio=aspect_ratio),
             nb_images=1,
             model_id="gpt-image-1",
+            model_name="gpt-image-1",
         )
 
         assert result["size"] == expected_size
@@ -305,22 +313,24 @@ class TestImgGenArgsFactory:
             ),
             nb_images=1,
             model_id="gpt-image-1.5",
+            model_name="gpt-image-1.5",
         )
 
         assert result["size"] == "1536x1024"
 
     @pytest.mark.asyncio
-    async def test_legacy_openai_models_reject_unsupported_aspect_ratio_with_model_name(self) -> None:
+    async def test_legacy_openai_models_reject_unsupported_aspect_ratio_with_model_id(self) -> None:
         with pytest.raises(ImgGenParameterError) as exc_info:
             await ImgGenArgsFactory.make_args_for_model(
                 model_rules=self._make_legacy_openai_rules(),
                 img_gen_job=self._make_test_job(aspect_ratio=AspectRatio.LANDSCAPE_4_3),
                 nb_images=1,
-                model_id="gpt-image-1-mini",
+                model_id="azure-gpt-image-1-mini-deployment",
+                model_name="gpt-image-1-mini",
             )
 
         error_message = str(exc_info.value)
-        assert "gpt-image-1-mini" in error_message
+        assert "azure-gpt-image-1-mini-deployment" in error_message
         assert "OpenAI image model" in error_message
         assert "GPT Image 1" not in error_message
 
@@ -340,6 +350,16 @@ class TestImgGenArgsFactory:
 
         assert result == {}
         assert "output_compression" not in result
+
+    def test_make_args_from_model_name_can_emit_pipelex_model_name(self) -> None:
+        """Some gateway-style APIs expect the Pipelex model name rather than the backend model id."""
+        result = ImgGenArgsFactory.make_args_from_model_name(
+            model_name_taxonomy=ModelChoiceTaxonomy.MODEL_NAME,
+            model_id="provider-deployment-id",
+            model_name="pipelex-model-name",
+        )
+
+        assert result == {"model": "pipelex-model-name"}
 
     @pytest.mark.parametrize(
         "output_format_taxonomy",
@@ -373,6 +393,7 @@ class TestImgGenArgsFactory:
             img_gen_job=job,
             nb_images=1,
             model_id="gpt-image-2",
+            model_name="gpt-image-2",
         )
 
         assert result["quality"] == "medium"
@@ -483,7 +504,7 @@ class TestImgGenArgsFactory:
             max_tokens=None,
             max_prompt_images=None,
             rules={
-                ImgGenArgTopic.MODEL_NAME: ModelNameTaxonomy.STANDARD,
+                ImgGenArgTopic.MODEL_CHOICE: ModelChoiceTaxonomy.MODEL_ID,
                 ImgGenArgTopic.PROMPT: PromptTaxonomy.POSITIVE_ONLY,
                 ImgGenArgTopic.NUM_IMAGES: NumImagesTaxonomy.GPT_IMAGE,
                 ImgGenArgTopic.ASPECT_RATIO: AspectRatioTaxonomy.GPT_IMAGE_LEGACY,

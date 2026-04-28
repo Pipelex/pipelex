@@ -24,7 +24,7 @@ from pipelex.cogt.img_gen.img_gen_model_rules import (
     InferenceTaxonomy,
     InputFidelityTaxonomy,
     InputImagesTaxonomy,
-    ModelNameTaxonomy,
+    ModelChoiceTaxonomy,
     NumImagesTaxonomy,
     OutputCompressionTaxonomy,
     OutputFormatTaxonomy,
@@ -52,6 +52,7 @@ class ImgGenArgsFactory:
         img_gen_job: ImgGenJob,
         nb_images: int,
         model_id: str,
+        model_name: str,
     ) -> dict[str, Any]:
         """Build provider-specific API arguments from model rules and job parameters.
 
@@ -62,7 +63,8 @@ class ImgGenArgsFactory:
             model_rules: Mapping of argument topics to their taxonomy values for the target model
             img_gen_job: The image generation job containing prompt and parameters
             nb_images: Number of images to generate
-            model_id: The model identifier to pass to the provider API
+            model_id: The model identifier
+            model_name: The config model name
 
         Returns:
             Dictionary of API arguments ready to be passed to the provider's API
@@ -151,12 +153,13 @@ class ImgGenArgsFactory:
                             specific_taxonomy=specific_taxonomy,
                         )
                     )
-                case ImgGenArgTopic.MODEL_NAME:
-                    model_name_taxonomy = ModelNameTaxonomy(taxonomy_value)
+                case ImgGenArgTopic.MODEL_CHOICE:
+                    model_name_taxonomy = ModelChoiceTaxonomy(taxonomy_value)
                     args_dict.update(
                         cls.make_args_from_model_name(
                             model_name_taxonomy=model_name_taxonomy,
                             model_id=model_id,
+                            model_name=model_name,
                         )
                     )
                 case ImgGenArgTopic.INPUT_IMAGES:
@@ -232,13 +235,16 @@ class ImgGenArgsFactory:
     @classmethod
     def make_args_from_model_name(
         cls,
-        model_name_taxonomy: ModelNameTaxonomy,
+        model_name_taxonomy: ModelChoiceTaxonomy,
         model_id: str,
+        model_name: str,
     ) -> dict[str, Any]:
         """Map model identifier to provider-specific parameter."""
         match model_name_taxonomy:
-            case ModelNameTaxonomy.STANDARD:
+            case ModelChoiceTaxonomy.MODEL_ID:
                 return {"model": model_id}
+            case ModelChoiceTaxonomy.MODEL_NAME:
+                return {"model": model_name}
 
     @classmethod
     def make_args_from_background(cls, background_taxonomy: BackgroundTaxonomy, background: Background, model_name: str) -> dict[str, Any]:

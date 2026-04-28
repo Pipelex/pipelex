@@ -42,6 +42,7 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
             img_gen_job=img_gen_job,
             nb_images=1,
             model_id=self.inference_model.model_id,
+            model_name=self.inference_model.name,
         )
         prompt = args_dict.pop("prompt")
         model_id = self.inference_model.model_id

@@ -22,7 +22,7 @@ class ImgGenArgTopic(StrEnum):
     depending on the model backend being used.
     """
 
-    MODEL_NAME = "model_name"
+    MODEL_CHOICE = "model_choice"
     PROMPT = "prompt"
     NUM_IMAGES = "num_images"
     ASPECT_RATIO = "aspect_ratio"
@@ -163,13 +163,15 @@ class OutputCompressionTaxonomy(StrEnum):
     UNAVAILABLE = "unavailable"
 
 
-class ModelNameTaxonomy(StrEnum):
-    """Taxonomy for how model name/id is passed to the API.
+class ModelChoiceTaxonomy(StrEnum):
+    """Taxonomy for how model choice is passed to the API.
 
-    - STANDARD: passes model as {"model": model_id}
+    - MODEL_ID: passes model as {"model": model_id}
+    - MODEL_NAME: passes model as {"model": model_name}
     """
 
-    STANDARD = "standard"
+    MODEL_ID = "model_id"
+    MODEL_NAME = "model_name"
 
 
 class InputImagesTaxonomy(StrEnum):

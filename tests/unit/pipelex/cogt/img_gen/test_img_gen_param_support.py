@@ -19,7 +19,7 @@ from pipelex.cogt.img_gen.img_gen_model_rules import (
     InferenceTaxonomy,
     InputFidelityTaxonomy,
     InputImagesTaxonomy,
-    ModelNameTaxonomy,
+    ModelChoiceTaxonomy,
     NumImagesTaxonomy,
     OutputFormatTaxonomy,
     PromptTaxonomy,
@@ -32,7 +32,7 @@ from pipelex.tools.misc.image_utils import ImageFormat
 def _make_legacy_openai_rules() -> ImgGenModelRules:
     """Rules matching gpt-image-1 / gpt-image-1-mini / gpt-image-1.5."""
     return {
-        ImgGenArgTopic.MODEL_NAME: ModelNameTaxonomy.STANDARD,
+        ImgGenArgTopic.MODEL_CHOICE: ModelChoiceTaxonomy.MODEL_ID,
         ImgGenArgTopic.PROMPT: PromptTaxonomy.POSITIVE_ONLY,
         ImgGenArgTopic.NUM_IMAGES: NumImagesTaxonomy.GPT_IMAGE,
         ImgGenArgTopic.ASPECT_RATIO: AspectRatioTaxonomy.GPT_IMAGE_LEGACY,
@@ -48,7 +48,7 @@ def _make_legacy_openai_rules() -> ImgGenModelRules:
 def _make_gpt_image_2_rules() -> ImgGenModelRules:
     """Rules matching gpt-image-2."""
     return {
-        ImgGenArgTopic.MODEL_NAME: ModelNameTaxonomy.STANDARD,
+        ImgGenArgTopic.MODEL_CHOICE: ModelChoiceTaxonomy.MODEL_ID,
         ImgGenArgTopic.PROMPT: PromptTaxonomy.POSITIVE_ONLY,
         ImgGenArgTopic.NUM_IMAGES: NumImagesTaxonomy.GPT_IMAGE,
         ImgGenArgTopic.ASPECT_RATIO: AspectRatioTaxonomy.GPT_IMAGE_2,

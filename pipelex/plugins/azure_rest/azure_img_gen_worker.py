@@ -77,6 +77,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
             img_gen_job=img_gen_job,
             nb_images=nb_images,
             model_id=self.inference_model.model_id,
+            model_name=self.inference_model.name,
         )
 
         args_dict["prompt"] = img_gen_job.img_gen_prompt.positive_text

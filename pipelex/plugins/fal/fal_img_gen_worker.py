@@ -42,6 +42,7 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
             img_gen_job=img_gen_job,
             nb_images=nb_images,
             model_id=self.inference_model.model_id,
+            model_name=self.inference_model.name,
         )
         fal_application = self.inference_model.model_id
         log.verbose(args_dict, title=f"Fal arguments, application={fal_application}")

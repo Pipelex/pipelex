@@ -205,6 +205,9 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **gpt-image-1.5**
   - inputs: text, images
   - outputs: image
+- **gpt-image-2**
+  - inputs: text, images
+  - outputs: image
 - **nano-banana**
   - inputs: text, images
   - outputs: image
@@ -217,6 +220,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-04-17T12:49:19Z
+> Last updated: 2026-04-28T09:55:00Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.
