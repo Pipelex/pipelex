@@ -1,0 +1,28 @@
+pipelex/plugins/openai/openai_img_gen_factory.py
+  48ea3acdf9c2cdae 90-93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "ac1247b19a9e60d3040214cdd3c262ea56c86b65",
+  "prompts": {
+    "48ea3acdf9c2cdae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bbc9f1a7-70d4-4b09-8e07-7842f31b05ca",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 0,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}
