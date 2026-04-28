@@ -26,7 +26,7 @@ choice_default = "$gen-image"
 ####################################################################################################
 
 [img_gen.aliases]
-best-gpt = "gpt-image-1.5"
+best-gpt = "gpt-image-2"
 best-gemini = "nano-banana-2"
 
 default-general = "nano-banana"

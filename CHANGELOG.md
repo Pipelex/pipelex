@@ -1,5 +1,32 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **GPT-5.5 model support.** New `gpt-5.5` entry on the `openai`, `azure_openai` and gateway backends.
+
+- **`gpt-image-2` image generation (OpenAI).** New model entry with img-gen routing and constraints on `openai`, `azure_openai`.
+
+### Fixed
+
+- **PDF input declared on Azure OpenAI and gateway for the GPT-5.4 series.** `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.4-nano`, `gpt-5.4-pro` (and `gpt-5.5`) now advertise `pdf` in their `inputs` on `azure_openai` and the gateway, matching the existing OpenAI direct entries. Verified end-to-end with live document tests against both backends.
+
+### Changed
+
+- **Img-gen taxonomies aligned for `gpt-image-2`.** Convention: `gpt_image` for taxonomies/values shared across all OpenAI GPT Image models (legacy + gpt-image-2); `gpt_image_legacy` when the value applies only to gpt-image-1/-1-mini/-1.5 (gpt-image-2 uses `unavailable` where a legacy-only option does not apply). Renames:
+  - `AspectRatioTaxonomy.OPENAI_GPT_IMAGE_LEGACY` → `GPT_IMAGE_LEGACY` (value `"openai_gpt_image_legacy"` → `"gpt_image_legacy"`)
+  - `AspectRatioTaxonomy.OPENAI_GPT_IMAGE_2` → `GPT_IMAGE_2` (value `"openai_gpt_image_2"` → `"gpt_image_2"`)
+  - `OutputFormatTaxonomy.GPT` → `GPT_IMAGE_LEGACY` (value `"gpt"` → `"gpt_image_legacy"`)
+  - `OutputCompressionTaxonomy.GPT_IMAGE` → `GPT_IMAGE_LEGACY` (value `"gpt_image"` → `"gpt_image_legacy"`)
+  - `InputFidelityTaxonomy.OPENAI_IMAGE` → `GPT_IMAGE_LEGACY` (value `"openai_image"` → `"gpt_image_legacy"`)
+  - `NumImagesTaxonomy.GPT` → `GPT_IMAGE` (value `"gpt"` → `"gpt_image"`)
+  - `InferenceTaxonomy.GPT` → `GPT_IMAGE` (value `"gpt"` → `"gpt_image"`)
+  - Removed dead `AspectRatioTaxonomy.GPT`.
+  - `InputImagesTaxonomy.GPT_IMAGE` unchanged (already correct — shared across legacy and gpt-image-2).
+
+- **HuggingFace and Fal img-gen workers honor `model_choice` rule.** `huggingface_img_gen` and `fal` workers now pop `"model"` from `args_dict` instead of hardcoding `inference_model.model_id`, mirroring how `prompt` is already extracted. The `model_choice = "model_id"` rule is now required on every model under these backends; missing it raises `ImgGenParameterError` at call time. Rules added to `qwen-image` (HF) and to all Fal models (`flux-pro`, `flux-pro/v1.1`, `flux-pro/v1.1-ultra`, `flux-2`, `fast-lightning-sdxl`).
+
 ## [v0.24.1] - 2026-04-22
 
 ### Security

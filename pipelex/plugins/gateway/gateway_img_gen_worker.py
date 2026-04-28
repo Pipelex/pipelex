@@ -21,6 +21,7 @@ from pipelex.plugins.fal.fal_poller import FalPoller
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
 from pipelex.plugins.gateway.gateway_schemas import GatewayImgGenAzureFlux2Pro, GatewayImgGenAzureGptImage
+from pipelex.tools.log.log import log
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
@@ -68,10 +69,12 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
             img_gen_job=img_gen_job,
             nb_images=nb_images,
             model_id=self.inference_model.model_id,
+            model_name=self.inference_model.name,
         )
 
         endpoint_path = (self.inference_model.extra_headers or {}).get("endpoint_path") or f"/{self.inference_model.model_id}"
         config_id = GatewayDeck.get_config_id(headers=self.inference_model.extra_headers or {})
+        log.debug(args_dict, title="Gateway img gen args")
         try:
             # TODO: add portkey tracing headers when enabled
             response = await self.portkey_client.with_options(config=config_id).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]

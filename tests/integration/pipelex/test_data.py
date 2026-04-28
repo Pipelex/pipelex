@@ -166,7 +166,7 @@ class ImageGenTestCases:
     IMAGE_GEN_PROMPT_CONTENTS: ClassVar[list[tuple[str, str, str | None]]] = [  # topic, positive_text, negative_text
         # ("dog wearing sunglasses", "a dog wearing sunglasses", "blue sky"),
         # ("otter playing poker", "an otter playing poker", None),
-        ("coding woman with dragon tatoo", "a woman with a dragon tatoo, wearing a tank top, coding in python", "nude"),
+        ("coding woman with dragon tatoo", "a woman with a dragon tatoo, wearing a tank top, coding in python", None),
     ]
 
 

@@ -42,8 +42,12 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
             img_gen_job=img_gen_job,
             nb_images=nb_images,
             model_id=self.inference_model.model_id,
+            model_name=self.inference_model.name,
         )
-        fal_application = self.inference_model.model_id
+        fal_application = args_dict.pop("model", None)
+        if fal_application is None:
+            msg = f"Model '{self.inference_model.name}' rules must include a 'model_choice' entry"
+            raise ImgGenParameterError(msg)
         log.verbose(args_dict, title=f"Fal arguments, application={fal_application}")
         handler = await self.fal_async_client.submit(
             application=fal_application,

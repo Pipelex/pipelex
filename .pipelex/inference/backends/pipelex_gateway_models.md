@@ -312,7 +312,7 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <td>gpt-5.4</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
@@ -320,7 +320,7 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <td>gpt-5.4-mini</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
@@ -328,7 +328,7 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <td>gpt-5.4-nano</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
@@ -336,7 +336,15 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <td>gpt-5.4-pro</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+</tr>
+<tr>
+<td>gpt-5.5</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
@@ -562,6 +570,12 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
 <tr>
+<td>gpt-image-2</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+</tr>
+<tr>
 <td>nano-banana</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
@@ -584,6 +598,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-04-17T12:49:19Z
+> Last updated: 2026-04-28T12:50:14Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.
