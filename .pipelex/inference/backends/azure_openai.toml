@@ -282,7 +282,6 @@ input_fidelity = "gpt_image_legacy"
 [gpt-image-2]
 sdk = "azure_rest_img_gen"
 model_type = "img_gen"
-model_id = "gpt-image-2-2026-04-21"
 inputs = ["text", "images"]
 outputs = ["image"]
 costs = { input = 8, output = 30 }
