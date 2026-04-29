@@ -1,17 +1,19 @@
-"""Unit tests for `PipeLLM._resolve_dynamic_output_concept_if_needed`.
+"""Unit tests for `PipeLLM.resolve_dynamic_output_stuff_spec`.
 
 When a PipeLLM declares `output = "Dynamic"`, the actual output concept is supplied
 at run time via `pipe_run_params.dynamic_output_concept_ref` (or the legacy
-`params[DYNAMIC_OUTPUT_CONCEPT]` key). The resolver mutates `self.output.concept`
-so downstream synthesis/validation operates on the resolved concept rather than
-`native.Dynamic` (which is an empty `StuffContent` subclass and would silently
-drop every field returned by the LLM).
+`params[DYNAMIC_OUTPUT_CONCEPT]` key). The resolver returns a fresh `StuffSpec` with
+the resolved concept, leaving `self.output` unchanged so the same pipe instance can
+be reused across runs with different overrides.
 
-These tests pin the behavior of the resolver in isolation:
+Pinned behaviors:
 
-- explicit override (qualified ref or bare code) → concept becomes the resolved one
-- no override → concept defaults to `native.Text`
-- non-Dynamic output → resolver is a no-op
+- explicit override (qualified ref or bare code) → returned StuffSpec carries that concept
+- no override → fallback `native.Text`
+- non-Dynamic output → returns `self.output` unchanged
+- `self.output.concept` is **never mutated** (regression guard for the cubic P1 bug
+  where the resolver mutated state, making the second run on the same instance
+  silently ignore a different `dynamic_output_concept_ref`)
 """
 
 from typing import Callable
@@ -44,18 +46,21 @@ class TestPipeLLMDynamicOutputResolution:
         self,
         load_empty_library: Callable[[], str],
     ):
-        """Regression: when the run params provide no override, the resolver must still
-        replace the `Dynamic` concept (previously, the fallback was assigned to a local
-        variable but never applied to `self.output.concept`, so downstream code ran with
-        `Dynamic` and the LLM's structured JSON deserialized to `{}`).
+        """Regression: when the run params provide no override, the resolver still
+        returns a StuffSpec carrying `native.Text` (previously, the fallback was
+        only assigned to a local variable, so downstream code ran with `Dynamic`
+        and the LLM's structured JSON deserialized to `{}`).
         """
         load_empty_library()
         pipe_llm = _make_pipe(domain_code="test_domain", pipe_code="test_dyn_fallback", output="native.Dynamic")
         params = PipeRunParamsFactory.make_run_params()  # no dynamic_output_concept_ref
 
-        pipe_llm.resolve_dynamic_output_concept_if_needed(pipe_run_params=params)
+        resolved = pipe_llm.resolve_dynamic_output_stuff_spec(pipe_run_params=params)
 
-        assert pipe_llm.output.concept.code == NativeConceptCode.TEXT
+        assert resolved.concept.code == NativeConceptCode.TEXT
+        assert resolved.concept.domain_code == SpecialDomain.NATIVE
+        # self.output is untouched.
+        assert pipe_llm.output.concept.code == NativeConceptCode.DYNAMIC
         assert pipe_llm.output.concept.domain_code == SpecialDomain.NATIVE
 
     def test_override_with_qualified_native_ref(
@@ -66,10 +71,11 @@ class TestPipeLLMDynamicOutputResolution:
         pipe_llm = _make_pipe(domain_code="test_domain", pipe_code="test_dyn_qualified", output="native.Dynamic")
         params = PipeRunParamsFactory.make_run_params(dynamic_output_concept_ref="native.Number")
 
-        pipe_llm.resolve_dynamic_output_concept_if_needed(pipe_run_params=params)
+        resolved = pipe_llm.resolve_dynamic_output_stuff_spec(pipe_run_params=params)
 
-        assert pipe_llm.output.concept.code == NativeConceptCode.NUMBER
-        assert pipe_llm.output.concept.domain_code == SpecialDomain.NATIVE
+        assert resolved.concept.code == NativeConceptCode.NUMBER
+        assert resolved.concept.domain_code == SpecialDomain.NATIVE
+        assert pipe_llm.output.concept.code == NativeConceptCode.DYNAMIC
 
     def test_override_with_bare_code_uses_pipe_domain(
         self,
@@ -83,10 +89,10 @@ class TestPipeLLMDynamicOutputResolution:
         pipe_llm = _make_pipe(domain_code="test_domain", pipe_code="test_dyn_bare", output="native.Dynamic")
         params = PipeRunParamsFactory.make_run_params(dynamic_output_concept_ref="Number")
 
-        pipe_llm.resolve_dynamic_output_concept_if_needed(pipe_run_params=params)
+        resolved = pipe_llm.resolve_dynamic_output_stuff_spec(pipe_run_params=params)
 
-        assert pipe_llm.output.concept.code == NativeConceptCode.NUMBER
-        assert pipe_llm.output.concept.domain_code == SpecialDomain.NATIVE
+        assert resolved.concept.code == NativeConceptCode.NUMBER
+        assert resolved.concept.domain_code == SpecialDomain.NATIVE
 
     def test_legacy_params_key_override(
         self,
@@ -100,10 +106,10 @@ class TestPipeLLMDynamicOutputResolution:
         pipe_llm = _make_pipe(domain_code="test_domain", pipe_code="test_dyn_legacy", output="native.Dynamic")
         params = PipeRunParamsFactory.make_run_params(params={PipeRunParamKey.DYNAMIC_OUTPUT_CONCEPT: "native.Number"})
 
-        pipe_llm.resolve_dynamic_output_concept_if_needed(pipe_run_params=params)
+        resolved = pipe_llm.resolve_dynamic_output_stuff_spec(pipe_run_params=params)
 
-        assert pipe_llm.output.concept.code == NativeConceptCode.NUMBER
-        assert pipe_llm.output.concept.domain_code == SpecialDomain.NATIVE
+        assert resolved.concept.code == NativeConceptCode.NUMBER
+        assert resolved.concept.domain_code == SpecialDomain.NATIVE
 
     def test_non_dynamic_output_is_unchanged(
         self,
@@ -113,8 +119,37 @@ class TestPipeLLMDynamicOutputResolution:
         pipe_llm = _make_pipe(domain_code="test_domain", pipe_code="test_dyn_non_dynamic", output="native.Text")
         params = PipeRunParamsFactory.make_run_params(dynamic_output_concept_ref="native.Number")
 
-        pipe_llm.resolve_dynamic_output_concept_if_needed(pipe_run_params=params)
+        resolved = pipe_llm.resolve_dynamic_output_stuff_spec(pipe_run_params=params)
 
-        # Output stays Text — the override only applies when the declared output is Dynamic.
-        assert pipe_llm.output.concept.code == NativeConceptCode.TEXT
-        assert pipe_llm.output.concept.domain_code == SpecialDomain.NATIVE
+        # Non-Dynamic output: helper returns the static spec unchanged, ignoring the override.
+        assert resolved is pipe_llm.output
+        assert resolved.concept.code == NativeConceptCode.TEXT
+        assert resolved.concept.domain_code == SpecialDomain.NATIVE
+
+    def test_resolves_independently_across_invocations(
+        self,
+        load_empty_library: Callable[[], str],
+    ):
+        """Regression for the cubic P1: the same pipe instance must resolve a different
+        dynamic output concept on each call. The previous implementation mutated
+        `self.output.concept` on the first call, so the guard at the top of the helper
+        (which short-circuits when concept is no longer Dynamic) silently ignored every
+        subsequent override.
+        """
+        load_empty_library()
+        pipe_llm = _make_pipe(domain_code="test_domain", pipe_code="test_dyn_repeat", output="native.Dynamic")
+
+        first = pipe_llm.resolve_dynamic_output_stuff_spec(
+            pipe_run_params=PipeRunParamsFactory.make_run_params(dynamic_output_concept_ref="native.Number"),
+        )
+        assert first.concept.code == NativeConceptCode.NUMBER
+        # self.output stays Dynamic between runs.
+        assert pipe_llm.output.concept.code == NativeConceptCode.DYNAMIC
+
+        second = pipe_llm.resolve_dynamic_output_stuff_spec(
+            pipe_run_params=PipeRunParamsFactory.make_run_params(dynamic_output_concept_ref="native.Text"),
+        )
+        assert second.concept.code == NativeConceptCode.TEXT
+        # First call's resolution didn't leak into the second.
+        assert first.concept.code == NativeConceptCode.NUMBER
+        assert pipe_llm.output.concept.code == NativeConceptCode.DYNAMIC
