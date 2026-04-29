@@ -63,7 +63,7 @@ From here, Pipelex handles model routing across 60+ models, structured output pa
 Paste this into Claude Code:
 
 ```
-Install mthds: run bash -c 'npm install -g mthds && mthds-agent bootstrap && claude plugin marketplace add mthds-ai/mthds-plugins && claude plugin install mthds@mthds-plugins'. Then tell me to restart Claude Code.
+Install mthds: run bash -c 'npm install -g mthds && mthds-agent bootstrap && claude plugin marketplace add mthds-ai/mthds-plugins && claude plugin install mthds@mthds-plugins'. Then tell me to /reload-plugins.
 ```
 
 ## With Codex
@@ -71,7 +71,7 @@ Install mthds: run bash -c 'npm install -g mthds && mthds-agent bootstrap && cla
 Paste this into Codex:
 
 ```
-Install mthds: run bash -c 'npm install -g mthds && mthds-agent bootstrap && bash <(curl -fsSL https://raw.githubusercontent.com/mthds-ai/mthds-plugins/main/bin/install-codex.sh)'. Then tell me to run /plugins, search for MTHDS, and install it.
+Install mthds: run bash -c 'npm install -g mthds && mthds-agent bootstrap && mthds-agent codex install-hook && mthds-agent codex apply-config && codex plugin marketplace add mthds-ai/mthds-plugins'. Then tell me to restart Codex and run /plugins to install mthds.
 ```
 
 Install the [VS Code extension](https://go.pipelex.com/vscode) for `.mthds` syntax highlighting and flowchart visualization.
