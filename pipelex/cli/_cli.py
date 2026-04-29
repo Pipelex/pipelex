@@ -14,8 +14,10 @@ from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cli.commands.login.command import login_cmd
 from pipelex.cli.commands.run.app import run_app
 from pipelex.cli.commands.show_cmd import show_app
+from pipelex.cli.commands.update_cmd import update_cmd
 from pipelex.cli.commands.validate.app import validate_app
 from pipelex.cli.commands.which_cmd import which_cmd
+from pipelex.cli.deck_notice import warn_if_deck_stale
 from pipelex.cli.readiness import check_readiness
 from pipelex.hub import get_console
 from pipelex.tools.misc.package_utils import get_package_version
@@ -27,7 +29,7 @@ class PipelexCLI(TyperGroup):
     @override
     def list_commands(self, ctx: Context) -> list[str]:
         # List the commands in the proper order because natural ordering doesn't work between Typer groups and commands
-        return ["login", "init", "doctor", "build", "validate", "run", "graph", "show", "which"]
+        return ["login", "init", "doctor", "update", "build", "validate", "run", "graph", "show", "which"]
 
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
@@ -115,12 +117,15 @@ def app_callback(
                ░██                                     v[cyan]{package_version}[/cyan]
 """
         )
-    # Skip checks if no command is being run (e.g., just --help) or if running init/doctor command
-    if ctx.invoked_subcommand is None or ctx.invoked_subcommand in {"login", "init", "doctor"}:
+    # Skip checks if no command is being run (e.g., just --help) or if running setup/diagnostic commands
+    if ctx.invoked_subcommand is None or ctx.invoked_subcommand in {"login", "init", "doctor", "update", "which"}:
         return
 
     # Check system readiness (dependencies and venv for dev installs)
     check_readiness()
+
+    # Warn if the model deck has fallen behind the installed pipelex version
+    warn_if_deck_stale()
 
 
 @app.command(name="login", help="Log in to Pipelex Gateway via the browser and save your API key")
@@ -168,6 +173,24 @@ def doctor_command(
 ) -> None:
     """Check Pipelex configuration health."""
     doctor_cmd(fix=fix)
+
+
+@app.command(name="update", help="Update the model deck to match the installed pipelex version")
+def update_command(
+    local: Annotated[
+        bool,
+        typer.Option(
+            "--local",
+            "-l",
+            help="Force the project-local .pipelex/ deck. Default targets the resolved deck dir (project if .pipelex/ exists, else global)",
+        ),
+    ] = False,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Apply updates without the interactive confirmation prompt")] = False,
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="Show the planned actions without modifying any file")] = False,
+    no_backup: Annotated[bool, typer.Option("--no-backup", help="Skip .bak files when overwriting locally-modified deck files")] = False,
+) -> None:
+    """Refresh the installed deck to match the kit shipped with the running pipelex version."""
+    update_cmd(local=local, yes=yes, dry_run=dry_run, no_backup=no_backup)
 
 
 app.add_typer(

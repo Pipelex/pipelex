@@ -83,6 +83,11 @@ All inference backend configurations are stored in the `.pipelex/inference/` dir
 
 Deck files are loaded in order by their numeric prefix (`1_`, `2_`, `3_`), with custom/override files (`x_` prefix) loaded last.
 
+!!! tip "Numbered files are pipelex-managed; overrides go in `x_custom_*.toml`"
+    The numbered deck files (`1_llm_deck.toml`...`4_search_deck.toml`) are refreshed by `pipelex update` when a new release ships an updated deck. Local edits to those files are preserved with a timestamped `.bak` backup but will not survive future updates.
+
+    To customize aliases, presets, or default choices without conflict, edit (or create) any file in this directory whose name starts with `x_custom_` — Pipelex never tracks or overwrites those. See [`pipelex update`](../../tools/cli/update.md) for the full workflow.
+
 ## Pipelex Gateway (Optional & Free)
 
 Pipelex Gateway is a unified inference backend that provides access to all major AI providers through a single API key. This is the **recommended approach for getting started quickly** with Pipelex and **unlocking its full power**—with many models already available and new ones being added constantly. Using Pipelex Gateway is **completely optional**.

@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`pipelex update` command + model-deck staleness detection.** New top-level command refreshes the installed model deck (`~/.pipelex/inference/deck/`) to match the kit shipped with the running pipelex version. Tracks per-file SHA-256 hashes plus the kit version in a `.kit_manifest.json` written next to the deck files. Supports `--dry-run`, `--yes` (non-interactive), `--no-backup` (skip `.bak` files for locally-modified deck files), and `--local` (project-local deck instead of global).
+- **Boot-time deck staleness warn.** Every `pipelex` CLI invocation prints a one-line yellow advisory when the installed deck's recorded kit version is older than the running pipelex (or when no manifest exists yet). Cost is one file read + one string compare. Suppress with `PIPELEX_NO_DECK_NOTICE=1`. Skipped automatically for `pipelex login`, `init`, `doctor`, `update`, and `which`.
+- **`pipelex doctor` deck section.** Reports per-file deck status (`up_to_date`, `kit_added`, `kit_removed`, `clean_behind`, `locally_modified`) and offers `pipelex update` as an auto-fix under `--fix`.
+- **Manifest written by `pipelex init`.** Fresh installs land with a current `.kit_manifest.json` so future updates can detect drift cleanly.
+
+### Changed
+
+- **Numbered deck files (`N_*_deck.toml`) are pipelex-managed.** Each file now carries a header banner explaining that customizations belong in `x_custom_*.toml` (which pipelex never tracks or overwrites). Local edits to numbered files are preserved with a timestamped `.bak.<UTC-timestamp>` backup on `pipelex update` but will not survive future updates.
+
 ## [v0.25.0] - 2026-04-28
 
 ### Added

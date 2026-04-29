@@ -16,6 +16,7 @@ from pipelex.cli.commands.doctor_cmd import (
     check_telemetry_config,
     do_doctor_cmd,
 )
+from pipelex.cogt.models.deck_manifest import DeckSyncReport
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
 
@@ -50,6 +51,14 @@ class TestDoctorLayeredResolution:
             "pipelex.cli.commands.doctor_cmd.check_models",
             return_value=(True, "OK", {}),
         )
+        mock_check_deck = mocker.patch(
+            "pipelex.cli.commands.doctor_cmd.check_deck_sync",
+            return_value=(
+                True,
+                DeckSyncReport(kit_version="1.0.0", installed_kit_version="1.0.0", manifest_present=True, files={}),
+                "OK",
+            ),
+        )
         mocker.patch("pipelex.cli.commands.doctor_cmd.display_health_report")
 
         with pytest.raises(SystemExit) as exc_info:
@@ -61,6 +70,7 @@ class TestDoctorLayeredResolution:
         mock_check_telemetry.assert_called_once_with()
         mock_check_backends.assert_called_once_with()
         mock_check_models.assert_called_once_with()
+        mock_check_deck.assert_called_once_with()
 
     def test_telemetry_check_falls_back_to_global(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """When project .pipelex/ exists but has no telemetry.toml, fall back to global ~/.pipelex/."""

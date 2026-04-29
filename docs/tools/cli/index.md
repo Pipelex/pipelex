@@ -14,6 +14,7 @@ The Pipelex CLI is organized into several command groups:
 | Command | Description |
 |---------|-------------|
 | [**init**](init.md) | Initialize Pipelex configuration |
+| [**update**](update.md) | Refresh the model deck to match the installed pipelex version |
 | [**validate**](validate.md) | Validate configuration and pipelines |
 | [**show**](show.md) | Inspect configuration, pipes, and AI models |
 | [**run**](run.md) | Execute pipelines |
