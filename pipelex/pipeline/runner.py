@@ -103,7 +103,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         output_multiplicity:
             Output multiplicity specification.
         dynamic_output_concept_ref:
-            Override the dynamic output concept code.
+            Override the dynamic output concept ref.
 
         Returns:
         -------

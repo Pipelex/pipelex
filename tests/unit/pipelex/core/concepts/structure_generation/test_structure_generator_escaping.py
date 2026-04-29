@@ -516,10 +516,10 @@ class LongDesc(StructuredContent):
     """Generated LongDesc class"""
 
     long_field: str = Field(..., description=(
-"This is a very long description that contains many words and also has some \\"quoted sections\\" that need to be properly "
-"escaped. It goes on and on with more details about the field, including examples like \\"example1\\", \\"example2\\", and "
-"\\"example3\\". The description continues with even more information to test the robustness of the escaping mechanism."
-))
+        "This is a very long description that contains many words and also has some \\"quoted sections\\" that need to be properly "
+        "escaped. It goes on and on with more details about the field, including examples like \\"example1\\", \\"example2\\", and "
+        "\\"example3\\". The description continues with even more information to test the robustness of the escaping mechanism."
+    ))
 '''
 
         assert generated_code == expected_code

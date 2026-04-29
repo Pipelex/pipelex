@@ -101,7 +101,7 @@ async def pipeline_run_setup(
     output_multiplicity:
         Output multiplicity specification.
     dynamic_output_concept_ref:
-        Override the dynamic output concept code.
+        Override the dynamic output concept ref.
     pipe_run_mode:
         Pipe run mode: ``PipeRunMode.LIVE`` or ``PipeRunMode.DRY``. If not specified,
         inferred from the environment variable ``PIPELEX_FORCE_DRY_RUN_MODE``. Defaults
