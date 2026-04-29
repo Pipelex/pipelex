@@ -30,6 +30,9 @@ _PIPE_CODE_ALIASES = ("pipe", "the_pipe_code", "code", "name", "pipe_name", "pip
 # Aliases that agents may use instead of "output". First found is promoted when canonical key is absent; extras are dropped.
 _OUTPUT_ALIASES = ("output_concept", "output_type")
 
+# Aliases that agents may use instead of "prompt". First found is promoted when canonical key is absent; extras are dropped.
+_PROMPT_ALIASES = ("prompt_template",)
+
 
 def _normalize_sub_pipe_dict(data: dict[str, Any]) -> None:
     """Normalize a step/branch dict: resolve pipe_code aliases and drop extraneous fields."""
@@ -45,6 +48,16 @@ def _normalize_pipe_code_aliases(data: dict[str, Any]) -> None:
         if alias in data:
             if "pipe_code" not in data:
                 data["pipe_code"] = data.pop(alias)
+            else:
+                data.pop(alias)
+
+
+def _normalize_prompt_aliases(data: dict[str, Any]) -> None:
+    """Convert any alias of ``prompt`` to the canonical field name, in-place."""
+    for alias in _PROMPT_ALIASES:
+        if alias in data:
+            if "prompt" not in data:
+                data["prompt"] = data.pop(alias)
             else:
                 data.pop(alias)
 
@@ -78,6 +91,9 @@ def parse_pipe_spec(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
 
     # Accept common aliases for "pipe_code" at the top level
     _normalize_pipe_code_aliases(spec_data)
+
+    # Accept common aliases for "prompt" (e.g. "prompt_template")
+    _normalize_prompt_aliases(spec_data)
 
     # Handle steps/branches conversion — normalize aliases and drop unknown fields.
     # Deep-copy nested dicts to avoid mutating caller's nested structures.

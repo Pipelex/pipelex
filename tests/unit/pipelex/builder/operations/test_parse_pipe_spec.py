@@ -113,6 +113,36 @@ class TestParsePipeSpec:
         result = parse_pipe_spec("PipeLLM", spec)
         assert result.output == "FirstAlias"
 
+    # -- prompt aliases ---------------------------------------------------
+
+    def test_prompt_template_alias_for_llm(self) -> None:
+        """`prompt_template` alone is promoted to `prompt` for PipeLLM."""
+        spec = {key: val for key, val in _BASE_LLM.items() if key != "prompt"}
+        spec["prompt_template"] = "Write about @text"
+        result = parse_pipe_spec("PipeLLM", spec)
+        assert isinstance(result, PipeLLMSpec)
+        assert result.prompt == "Write about @text"
+
+    def test_canonical_prompt_takes_precedence_over_alias(self) -> None:
+        """When both `prompt` and `prompt_template` are present, canonical wins and alias is dropped."""
+        spec = {**_BASE_LLM, "prompt_template": "alias_value"}
+        result = parse_pipe_spec("PipeLLM", spec)
+        assert isinstance(result, PipeLLMSpec)
+        assert result.prompt == _BASE_LLM["prompt"]
+
+    def test_prompt_template_alias_for_img_gen(self) -> None:
+        """`prompt_template` alias also works for PipeImgGen."""
+        spec: dict[str, Any] = {
+            "pipe_code": "my_img",
+            "description": "Generate image",
+            "inputs": {"prompt_text": "ImgGenPrompt"},
+            "output": "Image",
+            "prompt_template": "Generate: $prompt_text",
+        }
+        result = parse_pipe_spec("PipeImgGen", spec)
+        assert isinstance(result, PipeImgGenSpec)
+        assert result.prompt == "Generate: $prompt_text"
+
     # -- steps/branches 'pipe' → 'pipe_code' alias -----------------------
 
     def test_sequence_steps_canonical_pipe_code(self) -> None:
