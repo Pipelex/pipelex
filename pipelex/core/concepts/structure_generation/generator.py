@@ -219,12 +219,14 @@ class StructureGenerator:
             return f"description={escaped}"
         # Join trailing space on each chunk except the last so the concatenation reads
         # naturally; textwrap dropped the original spaces.
+        # Indent chunk literals (and the closing paren) so `ruff format` preserves the
+        # implicit-string-concat — un-indented chunks get collapsed back to a single line.
         chunk_literals: list[str] = []
         for index, chunk in enumerate(chunks):
             content = chunk if index == len(chunks) - 1 else f"{chunk} "
-            chunk_literals.append(self._escape_string_for_python(content))
+            chunk_literals.append(f"        {self._escape_string_for_python(content)}")
         body = "\n".join(chunk_literals)
-        return f"description=(\n{body}\n)"
+        return f"description=(\n{body}\n    )"
 
     def _generate_class_source_code_from_blueprint(
         self,

@@ -12,6 +12,12 @@ Generated structure files must stay under the project's ruff line-length limit
 For short descriptions, both fall back to the compact single-line form.
 """
 
+import shutil
+import subprocess  # noqa: S404
+from pathlib import Path
+
+import pytest
+
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.structure_generation.generator import StructureGenerator
 
@@ -119,6 +125,57 @@ class TestStructureGeneratorWrapping:
             "answerable type just to be helpful",
         ]:
             assert fragment in code
+
+    def test_long_field_description_survives_ruff_format(self, tmp_path: Path):
+        """Generated multi-line description blocks must survive `ruff format` without
+        the chunks being collapsed back into a single line. Un-indented chunks under a
+        hanging-indent paren block get joined by ruff format, defeating the wrap.
+        """
+        ruff_bin = shutil.which("ruff")
+        if ruff_bin is None:
+            pytest.skip("ruff not on PATH")
+
+        long_description = (
+            "Whether a factual answer could in principle be derived from documents. False for counterfactual, opinion, "
+            "and out_of_scope questions. This field is the central gate that prevents synthesis from forcing a question "
+            "into an answerable type just to be helpful."
+        )
+        blueprint = {
+            "is_answerable_from_documents": ConceptStructureBlueprint(
+                description=long_description,
+                type=ConceptStructureBlueprintFieldType.BOOLEAN,
+                required=True,
+            ),
+        }
+        code, _ = StructureGenerator().generate_from_structure_blueprint(
+            class_name="QuestionAnalysis",
+            structure_blueprint=blueprint,
+        )
+
+        target = tmp_path / "generated.py"
+        target.write_text(code)
+        subprocess.run([ruff_bin, "format", str(target)], check=True, capture_output=True)  # noqa: S603
+        formatted = target.read_text()
+
+        # The implicit-string-concat must still be present after formatting — i.e. ruff
+        # didn't merge the chunks. We check by counting string literal lines inside the
+        # description block.
+        assert "description=(" in formatted
+        # At least two string-literal lines remain inside the description block.
+        in_block = False
+        literal_lines = 0
+        for line in formatted.splitlines():
+            stripped = line.strip()
+            if "description=(" in stripped:
+                in_block = True
+                continue
+            if in_block:
+                if stripped.startswith((")", "),")):
+                    break
+                if stripped.startswith('"'):
+                    literal_lines += 1
+        assert literal_lines >= 2, f"ruff format collapsed the description chunks; got {literal_lines} literal line(s)"
+        assert _max_line_length(formatted) <= _LINE_LIMIT
 
     def test_long_descriptions_in_long_class_produce_clean_output(self):
         """End-to-end: a class with a long docstring AND multiple long field descriptions

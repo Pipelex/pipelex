@@ -92,9 +92,10 @@ def _resolve_deck_dir(local: bool) -> Path:
     if local:
         project_root = config_manager.project_root
         base = project_root / ".pipelex" if project_root is not None else Path.cwd() / ".pipelex"
-    else:
-        base = config_manager.pipelex_config_dir
-    return base / "inference" / "deck"
+        return base / "inference" / "deck"
+    # Match runtime resolution: fall through to the global deck when the project .pipelex/
+    # does not contain inference/deck, so update targets the deck actually in use.
+    return config_manager.model_decks_dir_path
 
 
 def _print_status_table(report: DeckSyncReport, deck_dir: Path) -> None:

@@ -667,8 +667,10 @@ def check_deck_sync(config_dir: Path | None = None) -> tuple[bool, DeckSyncRepor
     Returns:
         Tuple of (is_healthy, sync_report, summary_message)
     """
-    effective_config_dir = config_dir or config_manager.pipelex_config_dir
-    deck_dir = Path(effective_config_dir) / "inference" / "deck"
+    # When no explicit config_dir is given, mirror runtime layered resolution so we report
+    # against the deck that's actually in use (project .pipelex/ wins when it ships a deck,
+    # otherwise we fall through to the global deck).
+    deck_dir = Path(config_dir) / "inference" / "deck" if config_dir is not None else config_manager.model_decks_dir_path
 
     if not deck_dir.exists():
         # Match the existing doctor pattern: surface as healthy when the area isn't initialized,
