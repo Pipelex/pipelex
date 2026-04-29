@@ -12,8 +12,8 @@ Generated structure files must stay under the project's ruff line-length limit
 For short descriptions, both fall back to the compact single-line form.
 """
 
-import shutil
 import subprocess  # noqa: S404
+import sys
 from pathlib import Path
 
 import pytest
@@ -131,9 +131,10 @@ class TestStructureGeneratorWrapping:
         the chunks being collapsed back into a single line. Un-indented chunks under a
         hanging-indent paren block get joined by ruff format, defeating the wrap.
         """
-        ruff_bin = shutil.which("ruff")
-        if ruff_bin is None:
-            pytest.skip("ruff not on PATH")
+        try:
+            subprocess.run([sys.executable, "-m", "ruff", "--version"], check=True, capture_output=True)  # noqa: S603
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pytest.skip("ruff not available in current interpreter")
 
         long_description = (
             "Whether a factual answer could in principle be derived from documents. False for counterfactual, opinion, "
@@ -154,7 +155,13 @@ class TestStructureGeneratorWrapping:
 
         target = tmp_path / "generated.py"
         target.write_text(code)
-        subprocess.run([ruff_bin, "format", str(target)], check=True, capture_output=True)  # noqa: S603
+        # Use --isolated so ruff ignores any pyproject.toml in the path above tmp_path,
+        # and run via the current interpreter to ensure we use the project's pinned ruff.
+        subprocess.run(  # noqa: S603
+            [sys.executable, "-m", "ruff", "format", "--isolated", str(target)],
+            check=True,
+            capture_output=True,
+        )
         formatted = target.read_text()
 
         # The implicit-string-concat must still be present after formatting — i.e. ruff
