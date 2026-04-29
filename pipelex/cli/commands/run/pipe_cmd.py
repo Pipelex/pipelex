@@ -65,6 +65,14 @@ def run_pipe_cmd(
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files). Can be specified multiple times."),
     ] = None,
+    dynamic_output_concept_ref: Annotated[
+        str | None,
+        typer.Option(
+            "--dynamic-output-concept",
+            "-O",
+            help="Concept ref (e.g. 'document_qa.ReferenceCount') used to resolve a pipe whose output is declared as 'Dynamic'.",
+        ),
+    ] = None,
 ) -> None:
     """Run a pipe by code.
 
@@ -125,4 +133,5 @@ def run_pipe_cmd(
         mock_inputs=mock_inputs,
         library_dir=library_dir,
         telemetry_command_label=f"{COMMAND} pipe",
+        dynamic_output_concept_ref=dynamic_output_concept_ref,
     )

@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`--dynamic-output-concept` / `-O` flag on `pipelex run`.** All three subcommands (`run bundle`, `run pipe`, `run method`) accept a concept ref (e.g. `document_qa.ReferenceCount`) used to resolve a pipe whose output is declared as `Dynamic`. Threaded through `_run_core.execute_run` to `PipelexRunner.execute_pipeline(dynamic_output_concept_ref=...)`. Until now, Dynamic-output pipes were only callable from the Python runner.
+
+- **Line-length-safe wrapping in the structures generator.** `pipelex build structures` now wraps long descriptions so every emitted line stays under the 150-char ruff limit. Long class docstrings become a multi-line triple-quoted block; long Field descriptions become a parenthesized implicit-string-concatenation block (`description=("first chunk " "second chunk")`). Short descriptions still emit the compact single-line form. New unit tests in `tests/unit/pipelex/core/concepts/structure_generation/test_structure_generator_wrapping.py` cover both lengths and the combined long-everything case. Previously, descriptions above ~140 chars produced files that failed `ruff check` with E501.
+
+### Fixed
+
+- **`PipeLLM` Dynamic-output detection compared the wrong fields.** `pipe_llm.py` checked `self.output.concept.code == "native.Dynamic"`, but `concept.code` is the bare code (`"Dynamic"`) not the qualified ref. The check never matched, so when a caller passed `dynamic_output_concept_ref` for a `Dynamic`-output pipe, the resolver branch was skipped silently: the output structure stayed `DynamicContent` (an empty `StuffContent` subclass), the LLM produced JSON shaped like the requested concept, and the result deserialized to `{}`. Detection now uses `concept.code == NativeConceptCode.DYNAMIC and concept.domain_code == SpecialDomain.NATIVE`.
+
+- **Dynamic-output concept resolution rejected qualified refs.** When the runtime override was supplied (e.g. `"document_qa.ReferenceCount"`), the previous code called `make_concept_ref_with_domain(domain_code=self.domain_code, concept_code=output_concept_ref)`, producing `"document_qa.document_qa.ReferenceCount"` and a missing-concept lookup. Now uses `make_concept_ref_with_domain_from_concept_ref_or_code`, which extracts the domain from the input when it's already qualified and falls back to the pipe's domain only for bare codes. Callers can pass either form.
+
 ## [v0.25.0] - 2026-04-28
 
 ### Added

@@ -139,7 +139,7 @@ class PipeRunParams(BaseModel):
     final_stuff_code: str | None = None
     is_with_preliminary_text: bool | None = None
     output_multiplicity: VariableMultiplicity | None = None
-    dynamic_output_concept_code: str | None = None
+    dynamic_output_concept_ref: str | None = None
     batch_params: BatchParams | None = None
     params: dict[str, Any] = Field(default_factory=dict)
 
