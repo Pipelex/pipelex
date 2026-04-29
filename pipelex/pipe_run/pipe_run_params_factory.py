@@ -12,7 +12,7 @@ class PipeRunParamsFactory:
         pipe_run_mode: PipeRunMode = PipeRunMode.LIVE,
         pipe_stack_limit: int | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
-        dynamic_output_concept_code: str | None = None,
+        dynamic_output_concept_ref: str | None = None,
         batch_params: BatchParams | None = None,
         params: dict[str, Any] | None = None,
     ) -> PipeRunParams:
@@ -21,7 +21,7 @@ class PipeRunParamsFactory:
             run_mode=pipe_run_mode,
             pipe_stack_limit=pipe_stack_limit,
             output_multiplicity=output_multiplicity,
-            dynamic_output_concept_code=dynamic_output_concept_code,
+            dynamic_output_concept_ref=dynamic_output_concept_ref,
             batch_params=batch_params,
             params=params or {},
         )
