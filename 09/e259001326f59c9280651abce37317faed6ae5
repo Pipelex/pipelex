@@ -1,0 +1,23 @@
+CHANGELOG.md
+  9b4748e3daf5235b 11-12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "09e259001326f59c9280651abce37317faed6ae5",
+  "prompts": {
+    "9b4748e3daf5235b": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c0a89ef7-4685-40d7-891e-dc58b7c05cf6",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 8,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
