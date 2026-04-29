@@ -23,6 +23,7 @@ from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErr
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.validation import is_input_used_by_variables, is_variable_satisfied_by_inputs
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
@@ -152,6 +153,32 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     def required_variables(self) -> set[str]:
         return {variable_name for variable_name in self.llm_prompt_spec.required_variables() if not variable_name.startswith("_")}
 
+    def resolve_dynamic_output_stuff_spec(self, pipe_run_params: PipeRunParams) -> StuffSpec:
+        """Return the `StuffSpec` to use for this run. When the pipe's declared output is
+        `native.Dynamic`, the actual concept is resolved from the run params (override
+        on `pipe_run_params.dynamic_output_concept_ref`, with a legacy fallback on
+        `pipe_run_params.params[DYNAMIC_OUTPUT_CONCEPT]`, defaulting to `native.Text`)
+        and returned in a copy of `self.output`. Otherwise returns `self.output` unchanged.
+
+        Pure: never mutates `self`. The same pipe instance can therefore be reused across
+        runs with different `dynamic_output_concept_ref` values without the first run's
+        choice sticking.
+        """
+        # TODO: DYNAMIC_OUTPUT_CONCEPT should not be a key in `params`; promote to an
+        # attribute on PipeRunParams and drop the params-key fallback.
+        if self.output.concept.code != NativeConceptCode.DYNAMIC or self.output.concept.domain_code != SpecialDomain.NATIVE:
+            return self.output
+        output_concept_ref = pipe_run_params.dynamic_output_concept_ref or pipe_run_params.params.get(PipeRunParamKey.DYNAMIC_OUTPUT_CONCEPT)
+        if not output_concept_ref:
+            output_concept_ref = SpecialDomain.NATIVE + "." + NativeConceptCode.TEXT
+        resolved_concept = get_required_concept(
+            concept_ref=ConceptFactory.make_concept_ref_with_domain_from_concept_ref_or_code(
+                domain_code=self.domain_code,
+                concept_ref_or_code=output_concept_ref,
+            ),
+        )
+        return self.output.model_copy(update={"concept": resolved_concept})
+
     @override
     async def _live_run_operator_pipe(
         self,
@@ -163,18 +190,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     ) -> PipeLLMOutput:
         content_generator = content_generator or get_content_generator()
         # interpret / unwrap the arguments
-        output_stuff_spec = self.output
-        if self.output.concept.code == SpecialDomain.NATIVE + "." + NativeConceptCode.DYNAMIC:
-            # TODO: This DYNAMIC_OUTPUT_CONCEPT should not be a field in the params attribute of PipeRunParams.
-            # It should be an attribute of PipeRunParams.
-            output_concept_code = pipe_run_params.dynamic_output_concept_code or pipe_run_params.params.get(PipeRunParamKey.DYNAMIC_OUTPUT_CONCEPT)
-
-            if not output_concept_code:
-                output_concept_code = SpecialDomain.NATIVE + "." + NativeConceptCode.TEXT
-            else:
-                output_stuff_spec.concept = get_required_concept(
-                    concept_ref=ConceptFactory.make_concept_ref_with_domain(domain_code=self.domain_code, concept_code=output_concept_code),
-                )
+        output_stuff_spec = self.resolve_dynamic_output_stuff_spec(pipe_run_params=pipe_run_params)
 
         multiplicity_resolution = output_multiplicity_to_apply(
             base_multiplicity=self.output_multiplicity,
@@ -302,7 +318,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             output_structure_prompt: str | None = None
             if get_config().cogt.llm_config.is_structure_prompt_enabled:
                 output_structure_prompt = await get_output_structure_prompt(
-                    concept_ref=pipe_run_params.dynamic_output_concept_code or output_stuff_spec.concept.concept_ref,
+                    concept_ref=pipe_run_params.dynamic_output_concept_ref or output_stuff_spec.concept.concept_ref,
                     is_with_preliminary_text=is_with_preliminary_text,
                 )
             llm_prompt_1_for_object = await self.llm_prompt_spec.make_llm_prompt(

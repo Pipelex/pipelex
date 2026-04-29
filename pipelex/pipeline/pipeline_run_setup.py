@@ -53,7 +53,7 @@ async def pipeline_run_setup(
     inputs: PipelineInputs | WorkingMemory | None = None,
     output_name: str | None = None,
     output_multiplicity: VariableMultiplicity | None = None,
-    dynamic_output_concept_code: str | None = None,
+    dynamic_output_concept_ref: str | None = None,
     pipe_run_mode: PipeRunMode | None = None,
     search_domain_codes: list[str] | None = None,
     user_id: str | None = None,
@@ -100,8 +100,8 @@ async def pipeline_run_setup(
         Name of the output slot to write to.
     output_multiplicity:
         Output multiplicity specification.
-    dynamic_output_concept_code:
-        Override the dynamic output concept code.
+    dynamic_output_concept_ref:
+        Override the dynamic output concept ref.
     pipe_run_mode:
         Pipe run mode: ``PipeRunMode.LIVE`` or ``PipeRunMode.DRY``. If not specified,
         inferred from the environment variable ``PIPELEX_FORCE_DRY_RUN_MODE``. Defaults
@@ -283,7 +283,7 @@ async def pipeline_run_setup(
 
         pipe_run_params = PipeRunParamsFactory.make_run_params(
             output_multiplicity=output_multiplicity,
-            dynamic_output_concept_code=dynamic_output_concept_code,
+            dynamic_output_concept_ref=dynamic_output_concept_ref,
             pipe_run_mode=pipe_run_mode,
         )
 

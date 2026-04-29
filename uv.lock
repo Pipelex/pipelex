@@ -2480,7 +2480,7 @@ wheels = [
 
 [[package]]
 name = "mthds"
-version = "0.2.0"
+version = "0.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "backports-strenum", marker = "python_full_version < '3.11'" },
@@ -2491,9 +2491,9 @@ dependencies = [
     { name = "tomlkit" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c6/e8/69d60b665f10a28c5efede63ccf95bdf75954701023e38138dc97da5862a/mthds-0.2.0.tar.gz", hash = "sha256:95952b489e0a6336667086a3eddb0f761f81d4af29f32de28b4182b33d265fc9", size = 112564, upload-time = "2026-03-24T13:33:51.927Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5b/3c/eea615b49c011657246ff61371ca4a95ab3baa94d4b79541bd4b0f816ae5/mthds-0.3.0.tar.gz", hash = "sha256:de479f977b2ec3614b23bdb53ed3e28e2332a2f1653ee92e118c530fe3d5d820", size = 112693, upload-time = "2026-04-29T12:50:11.426Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cc/64/3fe70f33f0f9c6237336f368cf0a24d28fce60fc1d486f0df308b36d3beb/mthds-0.2.0-py3-none-any.whl", hash = "sha256:72f6765ef48caff24211c0fc3523f61a7118ae829bd54caf1b9eba7fb4e4f281", size = 49346, upload-time = "2026-03-24T13:33:50.479Z" },
+    { url = "https://files.pythonhosted.org/packages/f3/86/1184f31583d3089baea9316853b329720cb786d8e01f38f303a17f1e3f4c/mthds-0.3.0-py3-none-any.whl", hash = "sha256:3f9822c23beb82607ec4bafcff99717fb6531eed8d19b86086dc9deb7825b06b", size = 49356, upload-time = "2026-04-29T12:50:09.734Z" },
 ]
 
 [[package]]
@@ -3496,7 +3496,7 @@ wheels = [
 
 [[package]]
 name = "pipelex"
-version = "0.25.0"
+version = "0.25.1"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -3645,7 +3645,7 @@ requires-dist = [
     { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = ">=1.1.0" },
     { name = "mkdocs-redirects", marker = "extra == 'docs'", specifier = "==1.2.2" },
     { name = "moto", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "mthds", specifier = ">=0.2.0" },
+    { name = "mthds", specifier = ">=0.3.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
     { name = "networkx", specifier = ">=3.4.2" },
     { name = "openai", specifier = ">=1.108.1" },
