@@ -164,16 +164,19 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         content_generator = content_generator or get_content_generator()
         # interpret / unwrap the arguments
         output_stuff_spec = self.output
-        if self.output.concept.code == SpecialDomain.NATIVE + "." + NativeConceptCode.DYNAMIC:
+        if self.output.concept.code == NativeConceptCode.DYNAMIC and self.output.concept.domain_code == SpecialDomain.NATIVE:
             # TODO: This DYNAMIC_OUTPUT_CONCEPT should not be a field in the params attribute of PipeRunParams.
             # It should be an attribute of PipeRunParams.
-            output_concept_code = pipe_run_params.dynamic_output_concept_code or pipe_run_params.params.get(PipeRunParamKey.DYNAMIC_OUTPUT_CONCEPT)
+            output_concept_ref = pipe_run_params.dynamic_output_concept_ref or pipe_run_params.params.get(PipeRunParamKey.DYNAMIC_OUTPUT_CONCEPT)
 
-            if not output_concept_code:
-                output_concept_code = SpecialDomain.NATIVE + "." + NativeConceptCode.TEXT
+            if not output_concept_ref:
+                output_concept_ref = SpecialDomain.NATIVE + "." + NativeConceptCode.TEXT
             else:
                 output_stuff_spec.concept = get_required_concept(
-                    concept_ref=ConceptFactory.make_concept_ref_with_domain(domain_code=self.domain_code, concept_code=output_concept_code),
+                    concept_ref=ConceptFactory.make_concept_ref_with_domain_from_concept_ref_or_code(
+                        domain_code=self.domain_code,
+                        concept_sring_or_code=output_concept_ref,
+                    ),
                 )
 
         multiplicity_resolution = output_multiplicity_to_apply(
@@ -302,7 +305,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             output_structure_prompt: str | None = None
             if get_config().cogt.llm_config.is_structure_prompt_enabled:
                 output_structure_prompt = await get_output_structure_prompt(
-                    concept_ref=pipe_run_params.dynamic_output_concept_code or output_stuff_spec.concept.concept_ref,
+                    concept_ref=pipe_run_params.dynamic_output_concept_ref or output_stuff_spec.concept.concept_ref,
                     is_with_preliminary_text=is_with_preliminary_text,
                 )
             llm_prompt_1_for_object = await self.llm_prompt_spec.make_llm_prompt(
