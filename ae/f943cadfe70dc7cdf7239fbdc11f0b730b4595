@@ -1,0 +1,63 @@
+pipelex/cli/deck_notice.py
+  abf5636409e31576 1-38
+docs/tools/cli/update.md
+  abf5636409e31576 1-99
+docs/features/cli.md
+  abf5636409e31576 20
+pipelex/cli/commands/doctor_cmd.py
+  abf5636409e31576 22,27,414-416,434-436,440,541-554,580,587,603-605,661-693,811,826-828,833,856-858,902-912
+pipelex/kit/configs/inference/deck/1_llm_deck.toml
+  abf5636409e31576 7-11
+docs/configuration/config-technical/inference-backend-config.md
+  abf5636409e31576 86-90
+tests/unit/pipelex/cogt/models/test_deck_manifest.py
+  abf5636409e31576 1-269
+pipelex/cli/agent_cli/commands/init_cmd.py
+  abf5636409e31576 18,120-121
+pipelex/cli/commands/update_cmd.py
+  abf5636409e31576 1-186
+pipelex/cogt/models/deck_manifest.py
+  abf5636409e31576 1-278
+CHANGELOG.md
+  abf5636409e31576 3-15
+pipelex/system/configuration/config_loader.py
+  abf5636409e31576 162-167
+pipelex/kit/configs/inference/deck/2_img_gen_deck.toml
+  abf5636409e31576 7-11
+pipelex/kit/configs/inference/deck/4_search_deck.toml
+  abf5636409e31576 8-12
+mkdocs.yml
+  abf5636409e31576 262,439
+tests/unit/pipelex/cli/test_doctor_cmd.py
+  abf5636409e31576 19,54-61,73
+docs/tools/cli/index.md
+  abf5636409e31576 17
+tests/unit/pipelex/cli/test_update_cmd.py
+  abf5636409e31576 1-189
+pipelex/cli/commands/init/command.py
+  abf5636409e31576 30,258-261
+pipelex/cli/_cli.py
+  abf5636409e31576 17,20,32,120-121,127-129,178-195
+pipelex/kit/configs/inference/deck/3_extract_deck.toml
+  abf5636409e31576 8-12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "aef943cadfe70dc7cdf7239fbdc11f0b730b4595",
+  "prompts": {
+    "abf5636409e31576": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "057b4f25-3b26-4c9f-8f34-fa8e40418805",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 1323,
+      "total_deletions": 98,
+      "accepted_lines": 1231,
+      "overriden_lines": 0
+    }
+  }
+}
