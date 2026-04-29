@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -94,16 +95,18 @@ def kit_deck_dir() -> Path:
     return Path(str(get_kit_configs_dir())) / "inference" / "deck"
 
 
-def _is_managed_deck_filename(filename: str) -> bool:
-    """True for files that pipelex manages (numbered ``*_deck.toml``).
+_MANAGED_DECK_FILENAME_PATTERN = re.compile(r"^\d+_.*\.toml$")
 
-    Excludes any ``x_custom_*.toml`` override (the user-owned escape hatch) and non-TOML files
-    (e.g. an accidental ``.DS_Store``). The ``x_custom_`` prefix is the agreed-upon namespace for
-    user overrides — pipelex never tracks or overwrites those.
+
+def _is_managed_deck_filename(filename: str) -> bool:
+    """True for files that pipelex manages (numbered ``<digits>_*.toml``, e.g. ``1_llm_deck.toml``).
+
+    Only files matching the numbered-prefix pattern are pipelex-managed; everything else
+    (``x_custom_*.toml`` overrides, user-authored TOMLs without the numbered prefix,
+    ``.DS_Store``, etc.) is left untouched. This guards against accidentally treating a
+    user file as kit-managed and overwriting it during ``pipelex update``.
     """
-    if not filename.endswith(".toml"):
-        return False
-    return not filename.startswith("x_custom_")
+    return _MANAGED_DECK_FILENAME_PATTERN.match(filename) is not None
 
 
 def list_managed_kit_files() -> dict[str, str]:

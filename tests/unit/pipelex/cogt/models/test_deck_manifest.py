@@ -102,6 +102,23 @@ class TestDeckManifest:
         installed = list_managed_installed_files(deck_dir)
         assert set(installed.keys()) == {"1_llm_deck.toml"}
 
+    def test_list_managed_installed_files_ignores_non_numbered_user_tomls(self, tmp_path: Path) -> None:
+        """Only numbered ``<digits>_*.toml`` files are kit-managed. A user TOML without the
+        numbered prefix and without the ``x_custom_`` prefix must be left alone so it isn't
+        reported / overwritten as if it were a kit file.
+        """
+        deck_dir = tmp_path / "deck"
+        self._seed_installed(
+            deck_dir,
+            {
+                "1_llm_deck.toml": "managed",
+                "my_overrides.toml": "user-authored",
+                "notes.toml": "user-authored",
+            },
+        )
+        installed = list_managed_installed_files(deck_dir)
+        assert set(installed.keys()) == {"1_llm_deck.toml"}
+
     def test_list_managed_installed_files_missing_dir(self, tmp_path: Path) -> None:
         assert list_managed_installed_files(tmp_path / "absent") == {}
 

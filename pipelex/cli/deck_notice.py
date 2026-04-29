@@ -18,10 +18,10 @@ DECK_NOTICE_SUPPRESS_ENV_VAR = "PIPELEX_NO_DECK_NOTICE"
 def warn_if_deck_stale() -> None:
     """Print a one-line yellow advisory when the installed deck appears to be out of date.
 
-    Suppressed entirely when ``PIPELEX_NO_DECK_NOTICE`` is set in the environment.
+    Suppressed entirely when ``PIPELEX_NO_DECK_NOTICE=1`` is set in the environment.
     Silent when no deck dir exists yet (init_check elsewhere already prompts the user to run init).
     """
-    if os.environ.get(DECK_NOTICE_SUPPRESS_ENV_VAR):
+    if os.environ.get(DECK_NOTICE_SUPPRESS_ENV_VAR) == "1":
         return
 
     deck_dir = config_manager.pipelex_config_dir / "inference" / "deck"

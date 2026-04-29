@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **Managed-deck detection no longer misclassifies user TOMLs.** `_is_managed_deck_filename` previously treated any non-`x_custom_*.toml` as kit-managed, so a user file like `my_overrides.toml` dropped into the deck dir would have been reported (and on `pipelex update` overwritten) as if it were a kit file. Now requires the numbered `^\d+_.*\.toml$` prefix that the kit actually ships.
+- **`PipeLLM` output structure prompt used the unresolved concept ref.** When `is_structure_prompt_enabled`, `get_output_structure_prompt` was called with `pipe_run_params.dynamic_output_concept_ref or output_stuff_spec.concept.concept_ref`. The first form can be a bare code (no domain), which broke downstream concept resolution. Now passes the already-resolved `output_stuff_spec.concept.concept_ref` directly.
+- **`PIPELEX_NO_DECK_NOTICE` suppression was too lax.** Any non-empty value silenced the deck-staleness notice — including `PIPELEX_NO_DECK_NOTICE=0`, which users might reasonably expect to *enable* the notice. Now requires the documented `PIPELEX_NO_DECK_NOTICE=1`.
+- **Shipped `.kit_manifest.json` carried `kit_version: "0.25.0"`** for the 0.25.1 release, which would have triggered false stale-detection on fresh installs. Bumped to `0.25.1` and re-synced into `pipelex/kit/configs/`.
+
+### Documentation
+
+- **`docs/tools/cli/update.md` no longer claims the deck advisory fires on every CLI invocation.** Clarified that it is suppressed for `login`, `init`, `doctor`, `update`, and `which`.
+
 ## [v0.25.1] - 2026-04-29
 
 ### Added
