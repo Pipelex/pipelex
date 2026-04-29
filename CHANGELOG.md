@@ -4,9 +4,16 @@
 
 ### Added
 
+- **`pipelex update` command + model-deck staleness detection.** New top-level command refreshes the installed model deck (`~/.pipelex/inference/deck/`) to match the kit shipped with the running pipelex version. Tracks per-file SHA-256 hashes plus the kit version in a `.kit_manifest.json` written next to the deck files. Supports `--dry-run`, `--yes` (non-interactive), `--no-backup` (skip `.bak` files for locally-modified deck files), and `--local` (project-local deck instead of global).
+- **Boot-time deck staleness warn.** Every `pipelex` CLI invocation prints a one-line yellow advisory when the installed deck's recorded kit version is older than the running pipelex (or when no manifest exists yet). Cost is one file read + one string compare. Suppress with `PIPELEX_NO_DECK_NOTICE=1`. Skipped automatically for `pipelex login`, `init`, `doctor`, `update`, and `which`.
+- **`pipelex doctor` deck section.** Reports per-file deck status (`up_to_date`, `kit_added`, `kit_removed`, `clean_behind`, `locally_modified`) and offers `pipelex update` as an auto-fix under `--fix`.
+- **Manifest written by `pipelex init`.** Fresh installs land with a current `.kit_manifest.json` so future updates can detect drift cleanly.
 - **`--dynamic-output-concept` / `-O` flag on `pipelex run`.** All three subcommands (`run bundle`, `run pipe`, `run method`) accept a concept ref (e.g. `document_qa.ReferenceCount`) used to resolve a pipe whose output is declared as `Dynamic`. Threaded through `_run_core.execute_run` to `PipelexRunner.execute_pipeline(dynamic_output_concept_ref=...)`. Until now, Dynamic-output pipes were only callable from the Python runner.
-
 - **Line-length-safe wrapping in the structures generator.** `pipelex build structures` now wraps long descriptions so every emitted line stays under the 150-char ruff limit. Long class docstrings become a multi-line triple-quoted block; long Field descriptions become a parenthesized implicit-string-concatenation block (`description=("first chunk " "second chunk")`). Short descriptions still emit the compact single-line form. New unit tests in `tests/unit/pipelex/core/concepts/structure_generation/test_structure_generator_wrapping.py` cover both lengths and the combined long-everything case. Previously, descriptions above ~140 chars produced files that failed `ruff check` with E501.
+
+### Changed
+
+- **Numbered deck files (`N_*_deck.toml`) are pipelex-managed.** Each file now carries a header banner explaining that customizations belong in `x_custom_*.toml` (which pipelex never tracks or overwrites). Local edits to numbered files are preserved with a timestamped `.bak.<UTC-timestamp>` backup on `pipelex update` but will not survive future updates.
 
 ### Fixed
 

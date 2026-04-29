@@ -19,10 +19,12 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.ui.types import InitFocus
+from pipelex.cli.commands.update_cmd import update_cmd
 from pipelex.cogt.exceptions import InferenceBackendLibraryError
 from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsErrorMsgFactory
 from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport, InferenceBackendLibrary
 from pipelex.cogt.model_backends.gateway_config import GatewayConfig
+from pipelex.cogt.models.deck_manifest import DeckFileStatus, DeckSyncReport, compute_deck_sync_report, status_rich_label
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.config import get_config
 from pipelex.core.validation import report_validation_error
@@ -409,6 +411,9 @@ def display_health_report(
     models_healthy: bool,
     models_message: str,
     backend_file_reports: dict[str, BackendFileReport],
+    deck_healthy: bool,
+    deck_message: str,
+    deck_report: DeckSyncReport,
     config_location: ConfigLocationInfo,
     fix_mode: bool = False,
 ) -> None:
@@ -426,10 +431,13 @@ def display_health_report(
         models_healthy: Whether models check passed
         models_message: Message about models status
         backend_file_reports: Dict of backend file validation reports
+        deck_healthy: Whether the model deck is in sync with the kit shipped by this pipelex version
+        deck_message: Summary message about deck sync status
+        deck_report: Per-file sync status report (used to render the per-file detail when not healthy)
         config_location: Resolved configuration location information
         fix_mode: Whether we're in interactive fix mode (--fix flag)
     """
-    all_healthy = config_healthy and telemetry_healthy and backends_healthy and models_healthy
+    all_healthy = config_healthy and telemetry_healthy and backends_healthy and models_healthy and deck_healthy
 
     # Overall status panel
     if all_healthy:
@@ -530,6 +538,20 @@ def display_health_report(
                         console.print(f"    [dim]{error_lines[0][:100]}[/dim]")
     console.print()
 
+    # Model Deck section
+    console.print("[bold]Model Deck[/bold]")
+    if deck_healthy:
+        console.print(f"  [green]✓[/green] {deck_message}")
+    else:
+        console.print(f"  [yellow]⚠[/yellow]  {deck_message}")
+        # Per-file detail when there are pending actions
+        actionable_statuses = {name: status for name, status in deck_report.files.items() if status != DeckFileStatus.UP_TO_DATE}
+        if actionable_statuses:
+            for filename in sorted(actionable_statuses):
+                status = actionable_statuses[filename]
+                console.print(f"    [dim]{filename}[/dim] — {status_rich_label(status)}")
+    console.print()
+
     # Recommended actions
     if not all_healthy:
         # Check what can be auto-fixed
@@ -555,12 +577,14 @@ def display_health_report(
                 has_custom_backend_issues = any(not report.has_kit_template for report in invalid_backends.values())
 
         # Determine if we have any recommendations to show
+        has_deck_drift = not deck_healthy
         has_recommendations = (
             can_auto_fix_config
             or can_auto_fix_telemetry
             or has_telemetry_validation_error
             or (not backends_healthy and backend_credential_reports)
             or has_backend_file_issues
+            or has_deck_drift
         )
 
         if has_recommendations:
@@ -575,6 +599,9 @@ def display_health_report(
             if has_telemetry_validation_error and "pipelex init telemetry" not in telemetry_message:
                 console.print(f"  • Fix validation errors in [cyan]{config_location.config_dir}/telemetry.toml[/cyan]")
                 console.print("    or run [cyan]pipelex init telemetry[/cyan] to regenerate")
+
+            if has_deck_drift:
+                console.print("  • Run [cyan]pipelex update[/cyan] to refresh the model deck from the current kit")
 
             # Backend file issues
             if can_auto_fix_backends:
@@ -629,6 +656,39 @@ def display_health_report(
             console.print("  [cyan]https://docs.pipelex.com[/cyan] - Documentation")
             console.print("  [cyan]https://go.pipelex.com/discord[/cyan] - Discord Community")
             console.print()
+
+
+def check_deck_sync(config_dir: Path | None = None) -> tuple[bool, DeckSyncReport, str]:
+    """Check whether the installed model deck is in sync with the kit shipped by this pipelex version.
+
+    Args:
+        config_dir: Explicit config directory override. If None, uses layered resolution.
+
+    Returns:
+        Tuple of (is_healthy, sync_report, summary_message)
+    """
+    effective_config_dir = config_dir or config_manager.pipelex_config_dir
+    deck_dir = Path(effective_config_dir) / "inference" / "deck"
+
+    if not deck_dir.exists():
+        # Match the existing doctor pattern: surface as healthy when the area isn't initialized,
+        # since the missing-init advisory is handled by the config_files / backends checks above.
+        return True, DeckSyncReport(kit_version="", installed_kit_version=None, manifest_present=False, files={}), "Deck directory not present"
+
+    report = compute_deck_sync_report(deck_dir)
+    if report.is_clean():
+        return True, report, f"Deck is up to date with pipelex {report.kit_version}"
+
+    actionable = [name for name, status in report.files.items() if status.needs_action]
+    if not report.manifest_present:
+        return False, report, "Deck manifest missing — run `pipelex update` to materialize a baseline"
+    if report.installed_kit_version != report.kit_version:
+        return (
+            False,
+            report,
+            f"Deck installed for pipelex {report.installed_kit_version}, current is {report.kit_version} ({len(actionable)} file(s) need action)",
+        )
+    return False, report, f"{len(actionable)} deck file(s) need action"
 
 
 def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, BackendFileReport]]:
@@ -748,6 +808,7 @@ def do_doctor_cmd(
     telemetry_healthy, telemetry_message = check_telemetry_config()
     backends_healthy, backend_credential_reports, backends_message = check_backend_credentials()
     models_healthy, models_message, backend_file_reports = check_models()
+    deck_healthy, deck_report, deck_message = check_deck_sync()
 
     # Display report
     display_health_report(
@@ -762,11 +823,14 @@ def do_doctor_cmd(
         models_healthy=models_healthy,
         models_message=models_message,
         backend_file_reports=backend_file_reports,
+        deck_healthy=deck_healthy,
+        deck_message=deck_message,
+        deck_report=deck_report,
         config_location=config_location,
         fix_mode=fix,
     )
 
-    all_healthy = config_healthy and telemetry_healthy and backends_healthy and models_healthy
+    all_healthy = config_healthy and telemetry_healthy and backends_healthy and models_healthy and deck_healthy
 
     # Exit code: 0 if healthy, 1 if issues found
     if all_healthy:
@@ -789,7 +853,9 @@ def do_doctor_cmd(
         fixable_backends = [(name, report) for name, report in invalid_backends if report.has_kit_template]
         can_fix_backends = len(fixable_backends) > 0
 
-    has_auto_fixable_issues = can_fix_config or can_fix_telemetry or can_fix_backends
+    can_fix_deck = not deck_healthy and deck_report.kit_version != ""
+
+    has_auto_fixable_issues = can_fix_config or can_fix_telemetry or can_fix_backends or can_fix_deck
 
     # Determine what requires manual fixes (excludes auto-fixable issues)
     has_config_validation_error = not config_healthy and config_missing_count == 0
@@ -831,6 +897,17 @@ def do_doctor_cmd(
                     console.print("[green]✓[/green] Telemetry configured")
                 except Exception as exc:
                     console.print(f"[red]Failed to configure telemetry: {exc!s}[/red]")
+                console.print()
+
+        # Fix outdated model deck
+        if can_fix_deck:
+            if Confirm.ask("[bold]Update the model deck now?[/bold]", default=True):
+                try:
+                    console.print()
+                    update_cmd(yes=True)
+                    console.print("[green]✓[/green] Model deck updated")
+                except Exception as exc:
+                    console.print(f"[red]Failed to update deck: {exc!s}[/red]")
                 console.print()
 
         # Fix outdated backend files
