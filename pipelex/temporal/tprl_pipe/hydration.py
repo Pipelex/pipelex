@@ -30,6 +30,7 @@ def _validate_as_known_class(item_class: type[StuffContent], raw_item: Any) -> S
     if type(raw_item) is item_class:
         return raw_item
     if isinstance(raw_item, StuffContent):
+        # TODO: use smart_dump() instead (--> serialize_as_any=True)
         return item_class.model_validate(raw_item.model_dump())
     return item_class.model_validate(raw_item)
 

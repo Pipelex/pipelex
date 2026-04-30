@@ -43,6 +43,7 @@ async def act_flush_trace_events(arg: FlushTraceEventsArg) -> None:  # noqa: RUF
                 region=tracing_config.temporal_dynamodb.region,
             )
         case _:
+            # TODO: don't use catch-all on an enum
             log.warning(f"act_flush_trace_events called with unexpected backend: {tracing_config.backend}")
             return
 

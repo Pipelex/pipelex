@@ -389,6 +389,7 @@ def get_storage_provider() -> StorageProviderAbstract:
     return get_pipelex_hub().get_storage_provider()
 
 
+# TODO: should be required?
 def get_event_log() -> EventLogProtocol | None:
     return get_pipelex_hub().get_event_log()
 
