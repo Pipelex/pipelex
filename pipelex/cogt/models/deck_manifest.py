@@ -7,8 +7,9 @@ each managed deck file at install/update time. It enables three independent sign
 - Manifest's per-file hash vs the installed file's actual hash → user has locally edited a numbered file.
 - Kit content vs installed content → upstream changed.
 
-Numbered deck files (``1_llm_deck.toml``...``4_search_deck.toml``) are pipelex-managed.
-``x_custom_*.toml`` files are user-owned and never tracked.
+Numbered deck files (``<digits>_*.toml``, e.g. ``1_llm_deck.toml``) are pipelex-managed. Anything
+else is left alone — including ``x_custom_*.toml`` overrides (the recommended escape hatch) and
+any other project-local additions (e.g. a cookbook's preset file).
 """
 
 from __future__ import annotations
@@ -95,18 +96,17 @@ def kit_deck_dir() -> Path:
     return Path(str(get_kit_configs_dir())) / "inference" / "deck"
 
 
-_MANAGED_DECK_FILENAME_PATTERN = re.compile(r"^\d+_.*\.toml$")
-
-
 def _is_managed_deck_filename(filename: str) -> bool:
-    """True for files that pipelex manages (numbered ``<digits>_*.toml``, e.g. ``1_llm_deck.toml``).
+    """True for files that follow the pipelex-managed numbered convention.
 
-    Only files matching the numbered-prefix pattern are pipelex-managed; everything else
-    (``x_custom_*.toml`` overrides, user-authored TOMLs without the numbered prefix,
-    ``.DS_Store``, etc.) is left untouched. This guards against accidentally treating a
-    user file as kit-managed and overwriting it during ``pipelex update``.
+    Only ``<digits>_*.toml`` filenames (e.g., ``1_llm_deck.toml``) are pipelex-managed.
+    Everything else is left untouched: ``x_custom_*.toml`` overrides, project-local additions
+    like ``cookbook.toml``, and non-TOML files (e.g. an accidental ``.DS_Store``).
     """
-    return _MANAGED_DECK_FILENAME_PATTERN.match(filename) is not None
+    if not filename.endswith(".toml"):
+        return False
+    head, sep, _ = filename.partition("_")
+    return bool(sep) and head.isdigit()
 
 
 def list_managed_kit_files() -> dict[str, str]:

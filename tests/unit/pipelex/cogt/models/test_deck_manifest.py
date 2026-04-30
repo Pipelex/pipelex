@@ -74,7 +74,7 @@ class TestDeckManifest:
         assert first == second
         assert len(first) == 64
 
-    def test_x_custom_files_excluded(self, mocker: MockerFixture, tmp_path: Path) -> None:
+    def test_managed_filter_only_admits_numbered_files(self, mocker: MockerFixture, tmp_path: Path) -> None:
         kit_dir = tmp_path / "kit"
         self._seed_kit(
             mocker,
@@ -84,6 +84,8 @@ class TestDeckManifest:
                 "2_img_gen_deck.toml": "managed",
                 "x_custom_llm_deck.toml": "user-owned",
                 "x_custom_extract_deck.toml": "user-owned",
+                "cookbook.toml": "user-owned",
+                "not_numbered.toml": "user-owned",
                 ".DS_Store": "junk",
             },
         )
@@ -97,6 +99,7 @@ class TestDeckManifest:
             {
                 "1_llm_deck.toml": "a",
                 "x_custom_llm_deck.toml": "b",
+                "cookbook.toml": "c",
             },
         )
         installed = list_managed_installed_files(deck_dir)
@@ -207,6 +210,18 @@ class TestDeckManifest:
 
         report = compute_deck_sync_report(deck_dir)
         assert report.files["9_retired_deck.toml"] == DeckFileStatus.KIT_REMOVED
+        assert report.files["1_llm_deck.toml"] == DeckFileStatus.UP_TO_DATE
+
+    def test_sync_report_ignores_user_added_files(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        kit_dir = tmp_path / "kit"
+        deck_dir = tmp_path / "deck"
+        self._seed_kit(mocker, kit_dir, {"1_llm_deck.toml": "kit"})
+        self._seed_installed(deck_dir, {"1_llm_deck.toml": "kit", "cookbook.toml": "user-content"})
+        mocker.patch.object(deck_manifest, "get_package_version", return_value="1.0.0")
+        write_manifest(deck_dir, compute_kit_manifest())
+
+        report = compute_deck_sync_report(deck_dir)
+        assert "cookbook.toml" not in report.files
         assert report.files["1_llm_deck.toml"] == DeckFileStatus.UP_TO_DATE
 
     def test_sync_report_no_manifest_treats_matching_files_as_up_to_date(self, mocker: MockerFixture, tmp_path: Path) -> None:
