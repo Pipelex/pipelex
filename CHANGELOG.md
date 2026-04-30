@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.25.2] - 2026-04-30
+
+### Fixed
+
+- **`pipelex update` no longer flags user-added deck files for removal.** The "managed file" filter accepted any `.toml` not prefixed with `x_custom_`, so project-local additions like `pipelex-cookbook`'s `cookbook.toml` were reported as "removed upstream" with action "back up + remove". The filter now matches the documented numbered convention only (`<digits>_*.toml`); any other filename — `cookbook.toml`, `x_custom_*.toml`, etc. — is invisible to the update planner.
+
 ## [v0.25.1] - 2026-04-29
 
 ### Added
