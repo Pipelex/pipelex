@@ -24,7 +24,7 @@ def warn_if_deck_stale() -> None:
     if os.environ.get(DECK_NOTICE_SUPPRESS_ENV_VAR) == "1":
         return
 
-    deck_dir = config_manager.pipelex_config_dir / "inference" / "deck"
+    deck_dir = config_manager.model_decks_dir_path
     if not deck_dir.exists():
         return
 
