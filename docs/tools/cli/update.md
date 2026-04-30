@@ -15,7 +15,7 @@ When a new `pipelex` release ships changes to the model deck — new models, new
 
 ## When to run it
 
-Pipelex prints a one-line yellow advisory at the top of every CLI invocation when it detects that the installed deck is older than the running package, or when no deck manifest is present yet:
+Pipelex prints a one-line yellow advisory on most CLI invocations when it detects that the installed deck is older than the running package, or when no deck manifest is present yet (it is suppressed for `login`, `init`, `doctor`, `update`, and `which`):
 
 ```text
 ⚠ Pipelex model deck may be out of date — run pipelex update to refresh

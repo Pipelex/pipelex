@@ -318,7 +318,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             output_structure_prompt: str | None = None
             if get_config().cogt.llm_config.is_structure_prompt_enabled:
                 output_structure_prompt = await get_output_structure_prompt(
-                    concept_ref=pipe_run_params.dynamic_output_concept_ref or output_stuff_spec.concept.concept_ref,
+                    concept_ref=output_stuff_spec.concept.concept_ref,
                     is_with_preliminary_text=is_with_preliminary_text,
                 )
             llm_prompt_1_for_object = await self.llm_prompt_spec.make_llm_prompt(
