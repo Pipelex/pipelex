@@ -52,5 +52,5 @@ def assemble_graph_on_output(
         finally:
             event_log.close()
     except Exception as exc:
-        # TODO: do not catch all exceptions
+        # TODO: wip - do not catch all exceptions
         log.warning(f"Graph assembly failed, using existing graph: {exc}")

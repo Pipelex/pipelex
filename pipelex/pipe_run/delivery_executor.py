@@ -69,25 +69,25 @@ class DeliveryExecutor:
         try:
             files["main_stuff.json"] = (await main_stuff.content.rendered_json_async()).encode("utf-8")
         except Exception:
-            # TODO: do not catch all exceptions
+            # TODO: wip - do not catch all exceptions
             log.warning("Failed to render main_stuff.json")
 
         try:
             files["main_stuff.md"] = (await main_stuff.content.rendered_markdown_async()).encode("utf-8")
         except Exception:
-            # TODO: do not catch all exceptions
+            # TODO: wip - do not catch all exceptions
             log.warning("Failed to render main_stuff.md")
 
         try:
             files["main_stuff.html"] = (await main_stuff.content.rendered_html_async()).encode("utf-8")
         except Exception:
-            # TODO: do not catch all exceptions
+            # TODO: wip - do not catch all exceptions
             log.warning("Failed to render main_stuff.html")
 
         try:
             files["main_stuff_viewer.html"] = (await render_stuff_viewer(main_stuff)).encode("utf-8")
         except Exception:
-            # TODO: do not catch all exceptions
+            # TODO: wip - do not catch all exceptions
             log.warning("Failed to render main_stuff_viewer.html")
 
     async def _generate_graph_files(self, graph_spec: Any, files: dict[str, bytes]) -> None:
@@ -107,7 +107,7 @@ class DeliveryExecutor:
             if graph_outputs.reactflow_html is not None:
                 files["reactflow.html"] = graph_outputs.reactflow_html.encode("utf-8")
         except Exception:
-            # TODO: do not catch all exceptions
+            # TODO: wip - do not catch all exceptions
             log.warning("Failed to generate graph outputs")
 
     # ---- Storage ----
@@ -129,7 +129,7 @@ class DeliveryExecutor:
 
             for filename, data in result_files.items():
                 key: str = f"{base_key}/{filename}"
-                # TODO: set the content type when the files are created
+                # TODO: wip - set the content type when the files are created
                 content_type: str = _content_type_for(filename)
                 await storage_provider.store(data=data, key=key, content_type=content_type)
                 log.debug(f"Stored: {key}")
@@ -140,7 +140,7 @@ class DeliveryExecutor:
             log.info(f"Storage delivery completed: pipeline_run_id={pipeline_run_id}, files={len(result_files)}")
             return result_url
         except Exception as exc:
-            # TODO: do not catch all exceptions
+            # TODO: wip - do not catch all exceptions
             msg = f"Storage delivery failed for pipeline_run_id={pipeline_run_id}"
             raise StorageDeliveryError(msg) from exc
 
@@ -174,7 +174,7 @@ class DeliveryExecutor:
             msg = f"Webhook delivery failed for pipeline_run_id={pipeline_run_id}: HTTP {exc.response.status_code}"
             raise WebhookDeliveryError(msg) from exc
         except Exception as exc:
-            # TODO: do not catch all exceptions
+            # TODO: wip - do not catch all exceptions
             msg = f"Webhook delivery failed for pipeline_run_id={pipeline_run_id}: {exc}"
             raise WebhookDeliveryError(msg) from exc
 

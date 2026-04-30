@@ -32,7 +32,7 @@ from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_require
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 
-# TODO: don't include all the details
+# TODO: wip - don't include all the details
 def _stringify_resolved_fields(field_values: dict[str, Any]) -> dict[str, Any]:
     """Convert resolved construct fields to JSON-serializable values for execution_data.
 
@@ -41,7 +41,7 @@ def _stringify_resolved_fields(field_values: dict[str, Any]) -> dict[str, Any]:
     We use model_dump(mode='json') for BaseModel instances and fall back to str()
     for anything else that isn't a primitive.
     """
-    # TODO: move import to top of file
+    # TODO: wip - move import to top of file
     from pydantic import BaseModel  # noqa: PLC0415
 
     result: dict[str, Any] = {}
@@ -56,7 +56,7 @@ def _stringify_resolved_fields(field_values: dict[str, Any]) -> dict[str, Any]:
                 items.append(item.model_dump(mode="json") if isinstance(item, BaseModel) else item)
             result[field_name] = items
         elif isinstance(value, dict):
-            # TODO: do we need to stringify dicts?
+            # TODO: wip - do we need to stringify dicts?
             result[field_name] = value
         else:
             result[field_name] = str(value)
@@ -216,7 +216,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         if self.extra_context:
             context.update(**self.extra_context)
 
-        # TODO: rename to rendered_template_text
+        # TODO: wip - rename to rendered_template_text
         jinja2_text = await render_template(
             template=self.template,
             category=self.category,

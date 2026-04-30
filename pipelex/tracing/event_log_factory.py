@@ -15,7 +15,7 @@ def make_event_log(tracing_config: TracingConfig) -> EventLogProtocol:
     1. If an event log was injected via Pipelex.setup(event_log=...), use it
     2. Otherwise create a backend based on tracing_config.backend
     """
-    # TODO: it's not the right place to check injected
+    # TODO: wip - it's not the right place to check injected
     injected = get_event_log()
     if injected is not None:
         return injected
