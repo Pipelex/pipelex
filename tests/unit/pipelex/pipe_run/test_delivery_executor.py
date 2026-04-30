@@ -37,7 +37,7 @@ class TestDeliveryExecutor:
 
         mock_storage.store.assert_called()
         stored_keys = [call.kwargs["key"] for call in mock_storage.store.call_args_list]
-        assert any("test-user/plr-123/results/working_memory.json" in key for key in stored_keys)
+        assert any("test-user/plr-123/working_memory.json" in key for key in stored_keys)
 
     async def test_execute_webhook_only(self, mocker: MockerFixture) -> None:
         mock_client = mocker.AsyncMock()

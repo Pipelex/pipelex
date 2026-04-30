@@ -1026,6 +1026,20 @@ wheels = [
 ]
 
 [[package]]
+name = "docker"
+version = "7.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pywin32", marker = "sys_platform == 'win32'" },
+    { name = "requests" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/91/9b/4a2ea29aeba62471211598dac5d96825bb49348fa07e906ea930394a83ce/docker-7.1.0.tar.gz", hash = "sha256:ad8c70e6e3f8926cb8a92619b832b4ea5299e2831c14284663184e200546fa6c", size = 117834, upload-time = "2024-05-23T11:13:57.216Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e3/26/57c6fb270950d476074c087527a558ccb6f4436657314bfb6cdf484114c4/docker-7.1.0-py3-none-any.whl", hash = "sha256:c96b93b7f0a746f9e77d325bcfb87422a3d8bd4f03136ae8a85b37f1898d5fc0", size = 147774, upload-time = "2024-05-23T11:13:55.01Z" },
+]
+
+[[package]]
 name = "docling"
 version = "2.84.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1925,13 +1939,9 @@ wheels = [
 [[package]]
 name = "kajson"
 version = "0.4.2"
-source = { registry = "https://pypi.org/simple" }
+source = { git = "https://github.com/Pipelex/kajson.git?rev=fix%2Fenum-source-registry#4e80ebf729e22f4f3a6a4fac846a024e38fc2fd0" }
 dependencies = [
     { name = "pydantic" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/79/fa/11fde666e69639165f4bf4c59ebed263b7cce8b06b2d2b64699f6555f484/kajson-0.4.2.tar.gz", hash = "sha256:a8db97020d0e6c868eb4f2e999baeee477f410d8afc47fc91247745c725c271d", size = 21862, upload-time = "2026-04-02T04:30:11.51Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/18/72/a36ea3e9d5ca919b2a34ee2f4abf0817e97b22c8de89e378c76809ba6cba/kajson-0.4.2-py3-none-any.whl", hash = "sha256:12a9e1cc957d51fbabb89d2975732436df6fe2c9159e6030149169db9b3bbaa4", size = 28224, upload-time = "2026-04-02T04:30:10.319Z" },
 ]
 
 [[package]]
@@ -2494,6 +2504,10 @@ wheels = [
 ]
 
 [package.optional-dependencies]
+dynamodb = [
+    { name = "docker" },
+    { name = "py-partiql-parser" },
+]
 s3 = [
     { name = "py-partiql-parser" },
     { name = "pyyaml" },
@@ -3667,7 +3681,7 @@ bedrock = [
 ]
 dev = [
     { name = "boto3-stubs" },
-    { name = "moto", extra = ["s3"] },
+    { name = "moto", extra = ["dynamodb", "s3"] },
     { name = "mypy" },
     { name = "pipelex-tools" },
     { name = "pylint" },
@@ -3696,6 +3710,9 @@ docs = [
     { name = "mkdocs-material" },
     { name = "mkdocs-meta-manager" },
     { name = "mkdocs-redirects" },
+]
+dynamodb = [
+    { name = "boto3" },
 ]
 fal = [
     { name = "fal-client" },
@@ -3737,6 +3754,7 @@ requires-dist = [
     { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.78.0" },
     { name = "backports-strenum", marker = "python_full_version < '3.11'", specifier = ">=1.3.0" },
     { name = "boto3", marker = "extra == 'bedrock'", specifier = ">=1.34.131" },
+    { name = "boto3", marker = "extra == 'dynamodb'", specifier = ">=1.34.131" },
     { name = "boto3", marker = "extra == 's3'", specifier = ">=1.34.131" },
     { name = "boto3-stubs", marker = "extra == 'dev'", specifier = ">=1.35.24" },
     { name = "datamodel-code-generator", specifier = ">=0.55.0" },
@@ -3752,7 +3770,7 @@ requires-dist = [
     { name = "instructor", extras = ["google-genai"], marker = "extra == 'google-genai'" },
     { name = "jinja2", specifier = ">=3.1.4" },
     { name = "json2html", specifier = ">=1.3.0" },
-    { name = "kajson", specifier = "==0.4.2" },
+    { name = "kajson", git = "https://github.com/Pipelex/kajson.git?rev=fix%2Fenum-source-registry" },
     { name = "linkup-sdk", marker = "extra == 'linkup'", specifier = ">=0.12.0" },
     { name = "markdown", specifier = ">=3.6" },
     { name = "mike", marker = "extra == 'docs'", specifier = ">=2.1.3" },
@@ -3763,7 +3781,7 @@ requires-dist = [
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.6.14" },
     { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = ">=1.1.0" },
     { name = "mkdocs-redirects", marker = "extra == 'docs'", specifier = "==1.2.2" },
-    { name = "moto", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
+    { name = "moto", extras = ["dynamodb", "s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
     { name = "mthds", specifier = ">=0.2.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
     { name = "networkx", specifier = ">=3.4.2" },
@@ -3805,7 +3823,7 @@ requires-dist = [
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.12.20250326" },
     { name = "typing-extensions", specifier = ">=4.13.2" },
 ]
-provides-extras = ["anthropic", "bedrock", "docling", "fal", "gcp-storage", "google", "google-genai", "huggingface", "linkup", "mistralai", "s3", "temporal", "docs", "dev"]
+provides-extras = ["anthropic", "bedrock", "docling", "fal", "gcp-storage", "google", "google-genai", "huggingface", "linkup", "mistralai", "dynamodb", "s3", "temporal", "docs", "dev"]
 
 [[package]]
 name = "pipelex-tools"
