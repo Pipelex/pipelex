@@ -13,7 +13,6 @@ from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.temporal.temporal_manager import TemporalWorkerEnvironment
 from pipelex.temporal.tprl.conditional_worker import with_conditional_worker
 from pipelex.temporal.tprl.workflow_caller import WorkflowClass, WorkflowExecutor, WorkflowExecutorFactory
-from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
 from pipelex.temporal.tprl_pipe.pipe_run_arg import PipeRunArg
 from pipelex.temporal.tprl_pipe.wf_pipe_run import WfPipeRun
 
@@ -58,18 +57,11 @@ class TemporalPipeRun(WorkflowExecutor[PipeRunArg, PipeOutput], PipeRunProtocol)
             should_auto_connect_temporal=self.should_auto_connect_temporal,
             worker_environment=self.worker_environment,
         )
-        pipe_output = await executor.execute_workflow(
+        return await executor.execute_workflow(
             workflow_class=WfPipeRun,
             workflow_id=self.make_workflow_id(base_id=wfid or self.class_name),
             workflow_arg=pipe_run_arg,
         )
-
-        # Rehydrate PipeOutput
-        if pipe_output.working_memory_raw is not None:
-            pipe_output.working_memory = hydrate_working_memory(pipe_output.working_memory_raw)
-            pipe_output.working_memory_raw = None
-
-        return pipe_output
 
     @with_conditional_worker
     async def start(

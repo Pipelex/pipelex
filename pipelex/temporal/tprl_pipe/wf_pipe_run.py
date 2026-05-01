@@ -51,6 +51,7 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
                 pipe_output.working_memory = hydrate_working_memory(pipe_output.working_memory_raw)
                 pipe_output.working_memory_raw = None
         except Exception as exc:
+            # TODO: wip - do not catch all exceptions
             status = DeliveryStatus.FAILED
             execution_error = exc
             workflow_log.error(f"WfPipeRouter failed: {exc}")
