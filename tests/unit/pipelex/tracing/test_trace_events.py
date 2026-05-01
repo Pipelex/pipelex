@@ -17,6 +17,7 @@ from pipelex.tracing.trace_events import (
     BatchItemEvent,
     ControllerOutputEvent,
     EdgeEvent,
+    ExecutionDataEvent,
     ParallelCombineEvent,
     PipeEndErrorEvent,
     PipeEndSuccessEvent,
@@ -176,6 +177,14 @@ class TestTraceEvents:
             },
         ),
         (
+            "execution_data",
+            TraceEventKind.EXECUTION_DATA,
+            {
+                "node_id": _Shared.NODE_ID,
+                "execution_data": {"rendered_prompt": "hello", "resolved_model": "claude-sonnet"},
+            },
+        ),
+        (
             "usage_report",
             TraceEventKind.USAGE_REPORT,
             {
@@ -194,6 +203,7 @@ class TestTraceEvents:
         TraceEventKind.BATCH_ITEM: BatchItemEvent,
         TraceEventKind.BATCH_AGGREGATE: BatchAggregateEvent,
         TraceEventKind.PARALLEL_COMBINE: ParallelCombineEvent,
+        TraceEventKind.EXECUTION_DATA: ExecutionDataEvent,
         TraceEventKind.USAGE_REPORT: UsageReportEvent,
     }
 
