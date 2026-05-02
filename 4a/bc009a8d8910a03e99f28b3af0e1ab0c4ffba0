@@ -1,0 +1,28 @@
+pipelex/tracing/event_log_factory.py
+  b1c2176038cc7d37 11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "4abc009a8d8910a03e99f28b3af0e1ab0c4ffba0",
+  "prompts": {
+    "b1c2176038cc7d37": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cfc14209-64fc-4f71-9731-20fbfb190de9",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 30,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}
