@@ -2,6 +2,7 @@
 python -m pipelex.temporal.worker_cli --is-unit-testing
 python -m pipelex.temporal.worker_cli --is-not-sandboxed
 python -m pipelex.temporal.worker_cli --task-queue my_task_queue
+python -m pipelex.temporal.worker_cli --scope router
 """
 
 import asyncio
@@ -25,12 +26,18 @@ async def run_worker(
     is_not_sandboxed: bool = False,
     is_unit_testing: bool = False,
     task_queue: str | None = None,
+    scope_name: str | None = None,
 ):
     if project is None:
         log.info(f"Starting worker for current project '{project}', from {os.path.relpath(__file__)}")
     else:
         log.info(f"Starting worker for chosen project '{project}', from {os.path.relpath(__file__)}")
-    await get_task_manager().run_worker(is_not_sandboxed=is_not_sandboxed, is_unit_testing=is_unit_testing, task_queue=task_queue)
+    await get_task_manager().run_worker(
+        is_not_sandboxed=is_not_sandboxed,
+        is_unit_testing=is_unit_testing,
+        task_queue=task_queue,
+        scope_name=scope_name,
+    )
 
 
 @app.command()
@@ -39,6 +46,7 @@ def configure(
     is_not_sandboxed: Annotated[bool, typer.Option(help="Flag to run without sandbox")] = False,
     is_unit_testing: Annotated[bool, typer.Option(help="Flag to indicate if running unit tests")] = False,
     task_queue: Annotated[str | None, typer.Option(help="The task queue to use")] = None,
+    scope: Annotated[str | None, typer.Option(help="Worker scope name from [temporal.worker_scopes.scopes] (defaults to default_scope)")] = None,
 ):
     if is_unit_testing:
         runtime_manager.set_run_mode(RunMode.UNIT_TEST)
@@ -71,7 +79,7 @@ def configure(
         updated_temporal = get_config().temporal.model_copy(update={"is_enabled": True})
         get_config().temporal = updated_temporal
 
-    asyncio.run(run_worker(project, is_not_sandboxed, is_unit_testing, task_queue))
+    asyncio.run(run_worker(project, is_not_sandboxed, is_unit_testing, task_queue, scope))
 
 
 if __name__ == "__main__":

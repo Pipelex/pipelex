@@ -285,8 +285,3 @@ managed_loggers = [
   "temporalio.workflow",
   "temporalio.worker._activity",
 ]
-
-[temporal.temporal_config.temporal_tasks_config]
-required_tasks_packs = ["crafting"]
-required_workflows = []
-required_activities = []

@@ -525,7 +525,36 @@ managed_loggers = [
   "temporalio.worker._activity",
 ]
 
-[temporal.temporal_config.temporal_tasks_config]
-required_tasks_packs = ["crafting"]
+[temporal.worker_scopes]
+default_scope = "full"
+
+# Default — single worker handling everything.
+[temporal.worker_scopes.scopes.full]
+required_tasks_packs = ["crafting", "pipe"]
 required_workflows = []
 required_activities = []
+excluded_workflows = []
+excluded_activities = []
+disable_all_workflows = false
+disable_all_activities = false
+
+# Workflow-only worker. Pair with `runner` on the same task queue to force
+# activity dispatch to a different process (deterministic cross-worker hops).
+[temporal.worker_scopes.scopes.router]
+required_tasks_packs = ["crafting", "pipe"]
+required_workflows = []
+required_activities = []
+excluded_workflows = []
+excluded_activities = []
+disable_all_workflows = false
+disable_all_activities = true
+
+# Activity-only worker. Counterpart to `router`.
+[temporal.worker_scopes.scopes.runner]
+required_tasks_packs = ["crafting", "pipe"]
+required_workflows = []
+required_activities = []
+excluded_workflows = []
+excluded_activities = []
+disable_all_workflows = true
+disable_all_activities = false

@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from temporalio.client import Client as TemporalClient
     from temporalio.worker import Worker
 
+    from pipelex.temporal.config_temporal import WorkerScope
     from pipelex.temporal.temporal_tasks import TaskPack
     from pipelex.temporal.temporal_types import ActivityList, ActivityType, WorkflowList, WorkflowType
 
@@ -23,17 +24,25 @@ class TaskManager(Protocol):
         temporal_client: TemporalClient,
         task_queue: str,
         is_not_sandboxed: bool = False,
+        scope: WorkerScope | None = None,
         substitute_activities: dict[ActivityType, ActivityType] | None = None,
         test_workflows: WorkflowList | None = None,
         test_activities: ActivityList | None = None,
     ) -> Worker: ...
 
-    async def run_worker(self, is_not_sandboxed: bool, is_unit_testing: bool, task_queue: str | None = None): ...
+    async def run_worker(
+        self,
+        is_not_sandboxed: bool,
+        is_unit_testing: bool,
+        task_queue: str | None = None,
+        scope_name: str | None = None,
+    ): ...
 
     def task_packs(self) -> list[str]: ...
 
     def workflows_and_activities(
         self,
+        scope: WorkerScope | None = None,
         test_workflows: WorkflowList | None = None,
         test_activities: ActivityList | None = None,
         substitute_activities: dict[ActivityType, ActivityType] | None = None,
