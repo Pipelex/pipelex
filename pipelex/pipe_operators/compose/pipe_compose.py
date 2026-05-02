@@ -32,37 +32,6 @@ from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_require
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 
-# TODO: wip - don't include all the details
-def _stringify_resolved_fields(field_values: dict[str, Any]) -> dict[str, Any]:
-    """Convert resolved construct fields to JSON-serializable values for execution_data.
-
-    The tracer payload travels through Temporal and lands in DynamoDB event log, so
-    arbitrary Python objects (Pydantic models, custom classes) need to be flattened.
-    We use model_dump(mode='json') for BaseModel instances and fall back to str()
-    for anything else that isn't a primitive.
-    """
-    # TODO: wip - move import to top of file
-    from pydantic import BaseModel  # noqa: PLC0415
-
-    result: dict[str, Any] = {}
-    for field_name, value in field_values.items():
-        if value is None or isinstance(value, (bool, int, float, str)):
-            result[field_name] = value
-        elif isinstance(value, BaseModel):
-            result[field_name] = value.model_dump(mode="json")
-        elif isinstance(value, (list, tuple)):
-            items: list[Any] = []
-            for item in value:  # type: ignore[assignment]
-                items.append(item.model_dump(mode="json") if isinstance(item, BaseModel) else item)
-            result[field_name] = items
-        elif isinstance(value, dict):
-            # TODO: wip - do we need to stringify dicts?
-            result[field_name] = value
-        else:
-            result[field_name] = str(value)
-    return result
-
-
 class PipeComposeOutput(PipeOutput):
     pass
 
@@ -301,14 +270,9 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             name=output_name,
         )
 
-        # Capture execution data for the graph tracer. Record per-field resolved values
-        # so the sidepanel can show what each field was computed to at runtime:
-        # - from_var fields → the value pulled from working_memory at the given path
-        # - template fields → the rendered Jinja2 string (with $vars substituted)
-        # - fixed/nested fields → the concrete value
         execution_data_dict: dict[str, Any] = {
             "compose_mode": "construct",
-            "resolved_fields": _stringify_resolved_fields(composer.resolved_field_values),
+            "fields": composer.field_resolutions,
         }
         self._register_execution_data(job_metadata, execution_data_dict)
 
