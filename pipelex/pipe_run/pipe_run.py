@@ -39,6 +39,7 @@ class PipeRun(PipeRunProtocol):
         try:
             pipe_output = await self._pipe_router.run(pipe_job, wfid=wfid)
         except Exception as exc:
+            # TODO: wip - use a "finally" block
             status = DeliveryStatus.FAILED
             execution_error = exc
             log.error(f"Pipe execution failed for pipeline_run_id={pipeline_run_id}: {exc}")

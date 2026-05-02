@@ -14,7 +14,7 @@ from pipelex.temporal.temporal_manager import TemporalWorkerEnvironment
 from pipelex.temporal.temporal_workflow_utils import is_in_temporal_workflow
 from pipelex.temporal.tprl.conditional_worker import with_conditional_worker
 from pipelex.temporal.tprl.workflow_caller import WorkflowExecutor, WorkflowExecutorFactory
-from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
+from pipelex.temporal.tprl_pipe.submitter_hydration import rehydrate_pipe_output_with_crate
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 
 
@@ -80,12 +80,10 @@ class TemporalPipeRouter(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtoc
                 workflow_arg=pipe_job,
             )
 
-        # Rehydrate PipeOutput: reconstruct typed WorkingMemory from raw dict
-        if pipe_output.working_memory_raw is not None:
-            pipe_output.working_memory = hydrate_working_memory(pipe_output.working_memory_raw)
-            pipe_output.working_memory_raw = None
-
-        return pipe_output
+        # Rehydrate PipeOutput: reconstruct typed WorkingMemory from raw dict.
+        # Uses a per-call scoped library when the pipe_job carries a crate so the
+        # submitter does not need to have pre-loaded the bundle into its global registry.
+        return rehydrate_pipe_output_with_crate(pipe_output, pipe_job.library_crate)
 
 
 def make_temporal_pipe_router(

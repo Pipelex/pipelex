@@ -111,6 +111,7 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
                 rpc_timeout=self.rpc_timeout,
             )
         except Exception as exc:
+            # TODO: wip - do not catch all exceptions
             log.error(f"Failed to execute workflow {workflow_class.__name__}: {exc}")
             msg = f"Failed to execute workflow {workflow_class.__name__}"
             raise WorkflowExecutionError(msg) from exc

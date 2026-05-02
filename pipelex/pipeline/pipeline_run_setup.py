@@ -219,6 +219,8 @@ async def pipeline_run_setup(
         tracing_config = config.pipelex.tracing_config
         if tracing_config.is_enabled:
             try:
+                # TODO: wip - cleanup + can raise configuration errors that are not caught here,
+                # causing setup to fail instead of gracefully continuing without tracing.
                 from pipelex.tracing.event_log_factory import make_event_log  # noqa: PLC0415
 
                 event_log = make_event_log(tracing_config)

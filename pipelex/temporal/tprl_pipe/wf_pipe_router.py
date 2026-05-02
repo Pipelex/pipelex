@@ -68,18 +68,7 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                 # 3. Load crate (registers dynamic classes into workflow_registry via hub.get_class_registry())
                 library_manager.load_from_crate(library_id=wf_library_id, crate=library_crate)
 
-                # 4. Propagate dynamic classes to global registry so child workflows and
-                #    activities (which don't have the per-workflow ContextVar) can find them
-                if isinstance(global_registry, ClassRegistry):
-                    for class_name, class_type in workflow_registry.root.items():
-                        if class_name not in global_registry.root:
-                            global_registry.register_class(
-                                class_type=class_type,
-                                name=class_name,
-                                should_warn_if_already_registered=False,
-                            )
-
-                # 5. Hydrate WorkingMemory (now that dynamic classes are registered)
+                # 4. Hydrate WorkingMemory if needed
                 if workflow_arg.working_memory_raw is not None:
                     workflow_arg.working_memory = hydrate_working_memory(workflow_arg.working_memory_raw)
                     workflow_arg.working_memory_raw = None
@@ -200,8 +189,7 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
         # raw dict so the parent's data converter can deserialize without needing
         # dynamic concept classes in its ClassRegistry.
         assert pipe_output is not None
-        if library_crate is not None:
-            pipe_output = pipe_output.prepare_for_temporal()
+        pipe_output = pipe_output.prepare_for_temporal(library_crate=library_crate)
 
         workflow_log.debug("Workflow complete")
         return pipe_output

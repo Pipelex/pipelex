@@ -27,6 +27,7 @@ class EventLogProtocol(Protocol):
         """
         ...
 
+    # TODO: wip - make it async
     def emit(self, event: TraceEvent) -> None:
         """Append a single event to the log.
 
@@ -35,6 +36,7 @@ class EventLogProtocol(Protocol):
         """
         ...
 
+    # TODO: wip - make it async
     def read_events(self, pipeline_run_id: str) -> list[TraceEvent]:
         """Read all events for a pipeline run.
 

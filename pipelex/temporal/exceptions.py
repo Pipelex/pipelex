@@ -23,3 +23,7 @@ class TemporalConfigError(ValueError, TemporalFlowError):
 
 class TemporalServerError(TemporalFlowError):
     pass
+
+
+class WorkerScopeConfigError(TemporalConfigError):
+    pass

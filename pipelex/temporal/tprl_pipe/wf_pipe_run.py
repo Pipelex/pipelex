@@ -11,7 +11,6 @@ with workflow.unsafe.imports_passed_through():
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
     from pipelex.temporal.tprl_pipe.act_assemble_graph import AssembleGraphArg, act_assemble_graph
     from pipelex.temporal.tprl_pipe.act_deliver import DeliveryActivityArg, act_deliver
-    from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
     from pipelex.temporal.tprl_pipe.pipe_run_arg import PipeRunArg
     from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 
@@ -46,11 +45,8 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
                 id=f"{workflow.info().workflow_id}-pipe-router",
             )
             workflow_log.debug("WfPipeRouter completed successfully")
-            # Rehydrate working_memory from raw dict (dehydrated for Temporal transit)
-            if pipe_output.working_memory_raw is not None:
-                pipe_output.working_memory = hydrate_working_memory(pipe_output.working_memory_raw)
-                pipe_output.working_memory_raw = None
         except Exception as exc:
+            # TODO: wip - do not catch all exceptions
             status = DeliveryStatus.FAILED
             execution_error = exc
             workflow_log.error(f"WfPipeRouter failed: {exc}")

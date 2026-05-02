@@ -50,5 +50,6 @@ async def act_assemble_graph(arg: AssembleGraphArg) -> GraphSpec | None:  # noqa
         finally:
             event_log.close()
     except Exception as exc:
+        # TODO: wip - do not catch all exceptions
         log.warning(f"Graph assembly activity failed: {exc}")
         return None

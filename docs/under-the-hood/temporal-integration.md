@@ -100,9 +100,33 @@ class PipeOutput(PipeOutputAbstract[WorkingMemory]):
 **Output dehydration/hydration cycle:**
 
 - Before returning from a workflow, `WfPipeRouter` calls `PipeOutput.prepare_for_temporal()` to dehydrate `WorkingMemory` to `working_memory_raw`.
-- After receiving, `PipeRouterChild` (for child workflows) or `PipeRouterTop` (for top-level workflows) hydrates the raw dict using the scoped class registry.
+- The raw dict flows **end-to-end**: child workflow → parent `WfPipeRun` → `act_deliver` activity, all without intermediate rehydration. Parents do not own a per-workflow registry that would let them rehydrate the child's output, and the activity worker is typically a different process that has not loaded the crate.
+- Only the **top-level submitter** rehydrates, via `rehydrate_pipe_output_with_crate()` (`pipelex/temporal/tprl_pipe/submitter_hydration.py`). When the submitter has not loaded the bundle locally (e.g., a remote API client that built the `PipeJob` from a serialized `LibraryCrate`), this function opens a fresh per-call scoped Library, loads the crate into a scoped `ClassRegistry` pre-seeded from the global, hydrates inside the scope, then tears down — leaving the submitter's global registry untouched.
 
-The hydration function (`pipelex/temporal/tprl_pipe/hydration.py`) iterates the raw dict, uses `StuffContentFactory` to reconstruct typed content objects using the now-registered classes, and preserves aliases.
+The hydration function (`pipelex/temporal/tprl_pipe/hydration.py`) iterates the raw dict, uses `StuffContentFactory` to reconstruct typed content objects using the registered classes, and preserves aliases. It also includes a small but unintuitive guard (`_validate_as_known_class`) that round-trips items through `model_dump()` to defeat cross-exec class-identity mismatches: kajson may eagerly rebuild instances using one class identity, then `load_from_crate` re-execs the source and replaces the registry entry with a new identity (same name, different `id()`), which would otherwise cause Pydantic's `model_validate` to reject the older instance.
+
+### Why output dehydration goes end-to-end
+
+Earlier designs had the parent `WfPipeRun` rehydrate the child's `PipeOutput` before scheduling `act_deliver`, then propagated dynamic classes from the per-workflow registry into the worker's global `KajsonManager` registry so the activity worker could decode the typed payload. This worked on a single worker but broke under distributed Temporal: any worker polling the task queue can pick up the activity, and `ContextVars` / per-worker globals do not cross processes. The current design eliminates that hack — `act_deliver` receives the raw dict directly, never needs class resolution for transport, and the activity worker does not need the crate loaded.
+
+### Activity-side rendering of the raw working memory
+
+`act_deliver` cannot assume dynamic concept classes are registered on its worker. `DeliveryExecutor.generate_result_files()` (`pipelex/pipe_run/delivery_executor.py`) therefore branches on which field is populated:
+
+- **Typed path** (`working_memory` set, in-process / same-worker): existing typed renderers run unchanged.
+- **Raw path** (`working_memory_raw` set, cross-process Temporal): `working_memory.json` is written directly from the raw dict; for the main stuff, `try_local_hydrate_stuff()` attempts a single-Stuff hydration using only globally registered classes (built-in `StuffContent` subclasses are always present). On success, typed renderers produce `main_stuff.{md,html}` and the viewer; on miss (dynamic concept class not registered locally), a generic field-walking fallback renders JSON-in-markdown and `<pre>`-in-HTML so users still get readable output. Misses log a warning so silent regressions on built-in hydration surface.
+
+Tradeoff: dynamic concepts lose typed rendering on the activity worker, but the activity worker no longer needs the crate, which is the precondition for true distributed execution.
+
+### Boundary-by-boundary summary
+
+| Boundary | Direction | What crosses | Hydration on receive? |
+|----------|-----------|--------------|------------------------|
+| Submitter → top `WfPipeRouter` | input | `PipeJob` with `working_memory_raw` + `library_crate` | Yes — worker loads crate, then hydrates inside scope |
+| Parent `WfPipeRouter` → child `WfPipeRouter` | input | Same `PipeJob` shape (crate re-loaded idempotently via fingerprint) | Yes — child worker loads crate, hydrates inside its own scope |
+| Child `WfPipeRouter` → parent `WfPipeRun` | output | `PipeOutput` with `working_memory_raw` | **No** — parent forwards raw dict |
+| Parent `WfPipeRun` → `act_deliver` | activity arg | `PipeOutput` with `working_memory_raw` (no crate) | **No** — activity renders from raw, with best-effort local hydration of the main stuff using only globally registered classes |
+| Top `WfPipeRouter` → submitter | output | `PipeOutput` with `working_memory_raw` | Yes — `rehydrate_pipe_output_with_crate()` opens a fresh scoped Library if a crate is available, otherwise falls back to the global registry |
 
 ### Dashboard visibility
 
@@ -223,7 +247,10 @@ In dry-run mode, PipeLLM produces `StuffArtefact` debug objects as working memor
 | PipeRouterTop (submitter-side dispatch) | `pipelex/temporal/tprl_pipe/pipe_router_top.py` |
 | PipeRouterChild (worker-side child dispatch) | `pipelex/temporal/tprl_pipe/pipe_router_child.py` |
 | WfPipeRouter (workflow entry point) | `pipelex/temporal/tprl_pipe/wf_pipe_router.py` |
-| Deferred hydration | `pipelex/temporal/tprl_pipe/hydration.py` |
+| Deferred hydration (worker-side) | `pipelex/temporal/tprl_pipe/hydration.py` |
+| Submitter-side rehydration | `pipelex/temporal/tprl_pipe/submitter_hydration.py` |
+| Activity-side delivery rendering (typed/raw dual path) | `pipelex/pipe_run/delivery_executor.py` |
+| WorkingMemory dehydration helper | `pipelex/core/memory/working_memory.py` (`dump_for_temporal`) |
 | Kajson data converter | `pipelex/temporal/temporal_data_converter.py` |
 | Hub (ClassRegistry + Library scoping) | `pipelex/hub.py` |
 | Library (PrivateAttr ClassRegistry) | `pipelex/libraries/library.py` |

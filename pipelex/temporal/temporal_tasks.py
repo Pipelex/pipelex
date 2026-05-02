@@ -1,4 +1,6 @@
 from pipelex import log
+from pipelex.temporal.config_temporal import WorkerScope
+from pipelex.temporal.exceptions import WorkerScopeConfigError
 from pipelex.temporal.temporal_types import ActivityList, ActivityType, WorkflowList, WorkflowType
 
 
@@ -45,22 +47,41 @@ class TemporalTasks:
     def task_packs(self) -> list[str]:
         return list(self.tasks_catalog.keys())
 
+    def _full_catalog(self) -> tuple[dict[str, WorkflowType], dict[str, ActivityType]]:
+        all_workflows: dict[str, WorkflowType] = {}
+        all_activities: dict[str, ActivityType] = {}
+        for task_pack in self.tasks_catalog.values():
+            for workflow in task_pack.workflow_list:
+                all_workflows[workflow.__name__] = workflow
+            for activity in task_pack.activity_list:
+                all_activities[activity.__name__] = activity
+        for workflow in self.extra_workflows:
+            all_workflows[workflow.__name__] = workflow
+        for activity in self.extra_activities:
+            all_activities[activity.__name__] = activity
+        return all_workflows, all_activities
+
     def workflows_and_activities(
         self,
+        scope: WorkerScope | None = None,
         test_workflows: WorkflowList | None = None,
         test_activities: ActivityList | None = None,
         substitute_activities: dict[ActivityType, ActivityType] | None = None,
     ) -> tuple[list[WorkflowType], list[ActivityType]]:
-        # aggregating lists from all task packs first as sets to remove duplicates
-        the_workflows: set[WorkflowType] = set()
-        the_activities: set[ActivityType] = set()
-        for task_pack in self.tasks_catalog.values():
-            the_workflows.update(task_pack.workflow_list)
-            the_activities.update(task_pack.activity_list)
-        # adding extra workflows and activities
-        the_workflows.update(self.extra_workflows)
-        the_activities.update(self.extra_activities)
-        # adding test workflows and activities
+        all_workflows, all_activities = self._full_catalog()
+
+        the_workflows: set[WorkflowType]
+        the_activities: set[ActivityType]
+        if scope is None:
+            the_workflows = set(all_workflows.values())
+            the_activities = set(all_activities.values())
+        else:
+            the_workflows, the_activities = self._resolve_scope(
+                scope=scope,
+                all_workflows=all_workflows,
+                all_activities=all_activities,
+            )
+
         if test_workflows:
             the_workflows.update(test_workflows)
         if test_activities:
@@ -71,6 +92,63 @@ class TemporalTasks:
                     the_activities.remove(old_activity)
                     the_activities.add(new_activity)
         return list(the_workflows), list(the_activities)
+
+    def _resolve_scope(
+        self,
+        scope: WorkerScope,
+        all_workflows: dict[str, WorkflowType],
+        all_activities: dict[str, ActivityType],
+    ) -> tuple[set[WorkflowType], set[ActivityType]]:
+        known_packs = set(self.tasks_catalog.keys())
+        unknown_packs = [pack for pack in scope.required_tasks_packs if pack not in known_packs]
+        if unknown_packs:
+            msg = f"Unknown task pack(s) in scope: {unknown_packs} (known: {sorted(known_packs)})"
+            raise WorkerScopeConfigError(msg)
+
+        unknown_required_workflows = [name for name in scope.required_workflows if name not in all_workflows]
+        if unknown_required_workflows:
+            msg = f"Unknown workflow(s) in scope.required_workflows: {unknown_required_workflows} (known: {sorted(all_workflows.keys())})"
+            raise WorkerScopeConfigError(msg)
+        unknown_required_activities = [name for name in scope.required_activities if name not in all_activities]
+        if unknown_required_activities:
+            msg = f"Unknown activity(ies) in scope.required_activities: {unknown_required_activities} (known: {sorted(all_activities.keys())})"
+            raise WorkerScopeConfigError(msg)
+        unknown_excluded_workflows = [name for name in scope.excluded_workflows if name not in all_workflows]
+        if unknown_excluded_workflows:
+            msg = f"Unknown workflow(s) in scope.excluded_workflows: {unknown_excluded_workflows} (known: {sorted(all_workflows.keys())})"
+            raise WorkerScopeConfigError(msg)
+        unknown_excluded_activities = [name for name in scope.excluded_activities if name not in all_activities]
+        if unknown_excluded_activities:
+            msg = f"Unknown activity(ies) in scope.excluded_activities: {unknown_excluded_activities} (known: {sorted(all_activities.keys())})"
+            raise WorkerScopeConfigError(msg)
+
+        the_workflows: set[WorkflowType] = set()
+        the_activities: set[ActivityType] = set()
+        for pack_name in scope.required_tasks_packs:
+            task_pack = self.tasks_catalog[pack_name]
+            the_workflows.update(task_pack.workflow_list)
+            the_activities.update(task_pack.activity_list)
+
+        the_workflows.update(all_workflows[name] for name in scope.required_workflows)
+        the_activities.update(all_activities[name] for name in scope.required_activities)
+
+        the_workflows.difference_update(all_workflows[name] for name in scope.excluded_workflows)
+        the_activities.difference_update(all_activities[name] for name in scope.excluded_activities)
+
+        if scope.disable_all_workflows:
+            the_workflows.clear()
+        if scope.disable_all_activities:
+            the_activities.clear()
+
+        if not the_workflows and not the_activities:
+            msg = (
+                f"Worker scope resolves to an empty set (packs={scope.required_tasks_packs}, "
+                f"required_workflows={scope.required_workflows}, required_activities={scope.required_activities}, "
+                f"excluded_workflows={scope.excluded_workflows}, excluded_activities={scope.excluded_activities})"
+            )
+            raise WorkerScopeConfigError(msg)
+
+        return the_workflows, the_activities
 
     def workflows_and_activities_str(self) -> tuple[list[str], list[str]]:
         workflows, activities = self.workflows_and_activities(test_workflows=None, test_activities=None)

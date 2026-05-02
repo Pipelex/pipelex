@@ -1024,11 +1024,24 @@ TEMPORAL_BUNDLE ?= tests/integration/pipelex/pipes/controller/pipe_sequence/pipe
 TEMPORAL_PIPE ?= simple_text_sequence
 TEMPORAL_LIB ?=
 
+TEMPORAL_SCOPE ?=
+
 temporal-worker: env
-	$(call PRINT_TITLE,"Starting Temporal worker")
-	$(if $(TEMPORAL_LIB),PIPELEXPATH=$(TEMPORAL_LIB),) $(VENV_PYTHON) -m pipelex.temporal.worker_cli --is-not-sandboxed
+	$(call PRINT_TITLE,"Starting Temporal worker$(if $(TEMPORAL_SCOPE), (scope: $(TEMPORAL_SCOPE)),)")
+	$(if $(TEMPORAL_LIB),PIPELEXPATH=$(TEMPORAL_LIB),) $(VENV_PYTHON) -m pipelex.temporal.worker_cli --is-not-sandboxed \
+		$(if $(TEMPORAL_SCOPE),--scope $(TEMPORAL_SCOPE),)
 
 tw: temporal-worker
+
+temporal-worker-router: env
+	$(MAKE) temporal-worker TEMPORAL_SCOPE=router
+
+twr: temporal-worker-router
+
+temporal-worker-runner: env
+	$(MAKE) temporal-worker TEMPORAL_SCOPE=runner
+
+twn: temporal-worker-runner
 
 temporal-run: env
 	$(call PRINT_TITLE,"Running pipe through Temporal")

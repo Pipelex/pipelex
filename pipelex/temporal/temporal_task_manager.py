@@ -14,6 +14,8 @@ from pipelex import log
 from pipelex.config import get_config
 from pipelex.hub import get_class_registry
 from pipelex.system.runtime import WorkerMode, runtime_manager
+from pipelex.temporal.config_temporal import WorkerScope
+from pipelex.temporal.exceptions import WorkerScopeConfigError
 from pipelex.temporal.log_temporal import configure_temporal_logs
 from pipelex.temporal.sandbox_manager import sandbox_manager
 from pipelex.temporal.task_manager import TaskManager
@@ -81,11 +83,13 @@ class TemporalTaskManager(TaskManager):
         temporal_client: TemporalClient,
         task_queue: str,
         is_not_sandboxed: bool = False,
+        scope: WorkerScope | None = None,
         substitute_activities: dict[ActivityType, ActivityType] | None = None,
         test_workflows: WorkflowList | None = None,
         test_activities: ActivityList | None = None,
     ) -> Worker:
         workflows, activities = self.temporal_tasks.workflows_and_activities(
+            scope=scope,
             test_activities=test_activities,
             test_workflows=test_workflows,
             substitute_activities=substitute_activities,
@@ -139,6 +143,7 @@ class TemporalTaskManager(TaskManager):
         is_not_sandboxed: bool,
         is_unit_testing: bool,
         task_queue: str | None = None,
+        scope_name: str | None = None,
     ):
         try:
             test_workflows: WorkflowList | None = None
@@ -159,10 +164,13 @@ class TemporalTaskManager(TaskManager):
             temporal_client = await connect_to_temporal()
             worker_config = get_config().temporal.worker_config
             task_queue = task_queue or worker_config.task_queue
+            scope = self._resolve_scope_by_name(scope_name=scope_name)
+            log.info(f"Temporal Worker scope: '{scope_name or get_config().temporal.worker_scopes.default_scope}'")
             async with self.make_worker(
                 temporal_client=temporal_client,
                 task_queue=task_queue,
                 is_not_sandboxed=is_not_sandboxed,
+                scope=scope,
                 test_workflows=test_workflows,
                 test_activities=test_activities,
             ):
@@ -175,6 +183,15 @@ class TemporalTaskManager(TaskManager):
         finally:
             log.info("Shutting down")
 
+    @staticmethod
+    def _resolve_scope_by_name(scope_name: str | None) -> WorkerScope:
+        worker_scopes = get_config().temporal.worker_scopes
+        effective_name = scope_name or worker_scopes.default_scope
+        if effective_name not in worker_scopes.scopes:
+            msg = f"Unknown worker scope '{effective_name}' (known: {sorted(worker_scopes.scopes.keys())})"
+            raise WorkerScopeConfigError(msg)
+        return worker_scopes.scopes[effective_name]
+
     @override
     def task_packs(self) -> list[str]:
         return self.temporal_tasks.task_packs()
@@ -182,11 +199,13 @@ class TemporalTaskManager(TaskManager):
     @override
     def workflows_and_activities(
         self,
+        scope: WorkerScope | None = None,
         test_workflows: WorkflowList | None = None,
         test_activities: ActivityList | None = None,
         substitute_activities: dict[ActivityType, ActivityType] | None = None,
     ) -> tuple[list[WorkflowType], list[ActivityType]]:
         return self.temporal_tasks.workflows_and_activities(
+            scope=scope,
             test_workflows=test_workflows,
             test_activities=test_activities,
             substitute_activities=substitute_activities,

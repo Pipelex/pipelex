@@ -56,10 +56,39 @@ class TemporalLogConfig(ConfigModel):
     managed_loggers: list[str]
 
 
-class TemporalTasksConfig(ConfigModel):
+class WorkerScope(ConfigModel):
+    """Defines the subset of workflows and activities a worker registers.
+
+    Resolution order: pack contents → required_* additions → excluded_* subtractions →
+    disable_all_* clearing. Names match TaskPack keys, workflow class __name__, and
+    activity function __name__.
+
+    `disable_all_workflows` / `disable_all_activities` are useful to split workflow-only
+    and activity-only workers on the same task queue (Temporal SDK rejects multiple
+    workers with overlapping task types on the same queue).
+    """
+
     required_tasks_packs: list[str]
     required_workflows: list[str]
     required_activities: list[str]
+    excluded_workflows: list[str]
+    excluded_activities: list[str]
+    disable_all_workflows: bool
+    disable_all_activities: bool
+
+
+class WorkerScopesConfig(ConfigModel):
+    """Named worker scopes selectable via --scope on the worker CLI."""
+
+    default_scope: str
+    scopes: dict[str, WorkerScope]
+
+    @model_validator(mode="after")
+    def validate_default_scope(self) -> Self:
+        if self.default_scope not in self.scopes:
+            msg = f"default_scope '{self.default_scope}' not found in scopes (known: {sorted(self.scopes.keys())})"
+            raise TemporalConfigError(msg)
+        return self
 
 
 class TemporalConfig(ConfigModel):
@@ -68,7 +97,6 @@ class TemporalConfig(ConfigModel):
     temporal_server_configs: dict[str, TemporalServerConfig]
     selected_server: str
     temporal_log_config: TemporalLogConfig
-    temporal_tasks_config: TemporalTasksConfig
 
     @model_validator(mode="after")
     def validate_selected_server(self) -> Self:
@@ -179,4 +207,5 @@ class Temporal(ConfigModel):
     is_enabled: bool
     temporal_config: TemporalConfig
     worker_config: WorkerConfig
+    worker_scopes: WorkerScopesConfig
     payload_codec_config: PayloadCodecConfig

@@ -126,12 +126,14 @@ async def validate_bundle(
         if blueprints is not None:
             loaded_blueprints = blueprints
             loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints)
+            # TODO: wip - restore or refactor dry run
             # dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
             return ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result={})
 
         elif mthds_contents is not None:
             loaded_blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
             loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
+            # TODO: wip - restore or refactor dry run
             # dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
             return ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result={})
 
@@ -148,6 +150,7 @@ async def validate_bundle(
                 pipe_codes = list(blueprint.pipe.keys()) if blueprint.pipe else []
                 loaded_pipes = [library.pipe_library.get_required_pipe(pipe_code=code) for code in pipe_codes]
 
+            # TODO: wip - restore or refactor dry run
             # dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
             return ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result={})
 
