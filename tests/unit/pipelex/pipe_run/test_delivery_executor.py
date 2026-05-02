@@ -20,6 +20,7 @@ class TestDeliveryExecutor:
         mocker.patch("pipelex.pipe_run.delivery_executor.get_storage_provider", return_value=mock_storage)
 
         mock_output = mocker.MagicMock()
+        mock_output.working_memory_raw = None
         mock_output.working_memory.smart_dump.return_value = {"root": {}, "aliases": {}}
         mock_output.working_memory.get_optional_main_stuff.return_value = None
         mock_output.graph_spec = None
@@ -131,6 +132,7 @@ class TestDeliveryExecutor:
         mocker.patch("pipelex.pipe_run.delivery_executor.get_storage_provider", return_value=mock_storage)
 
         mock_output = mocker.MagicMock()
+        mock_output.working_memory_raw = None
         mock_output.working_memory.smart_dump.return_value = {}
         mock_output.working_memory.get_optional_main_stuff.return_value = None
         mock_output.graph_spec = None
@@ -146,6 +148,67 @@ class TestDeliveryExecutor:
                 delivery_assignment=assignment,
                 status=DeliveryStatus.COMPLETED,
             )
+
+    async def test_try_local_hydrate_stuff_returns_typed_for_builtin(self) -> None:
+        from pipelex.core.stuffs.text_content import TextContent  # noqa: PLC0415
+        from pipelex.hub import get_class_registry  # noqa: PLC0415
+
+        registry = get_class_registry()
+        if not registry.has_class(name="TextContent"):
+            registry.register_class(TextContent)
+
+        stuff_raw = {
+            "stuff_code": "test",
+            "stuff_name": "greeting",
+            "concept": {
+                "code": "Text",
+                "domain_code": "native",
+                "description": "Plain text",
+                "structure_class_name": "TextContent",
+            },
+            "content": {"text": "Hello!"},
+        }
+
+        result = DeliveryExecutor.try_local_hydrate_stuff(stuff_raw)
+
+        assert result is not None
+        assert isinstance(result.content, TextContent)
+        assert result.content.text == "Hello!"
+
+    async def test_try_local_hydrate_stuff_returns_none_for_missing_class(self, mocker: MockerFixture) -> None:
+        from pipelex import log as pipelex_log  # noqa: PLC0415
+
+        warn_spy = mocker.spy(pipelex_log, "warning")
+
+        stuff_raw = {
+            "stuff_code": "test",
+            "stuff_name": "x",
+            "concept": {
+                "code": "Greeting",
+                "domain_code": "dynamic_test",
+                "description": "Dynamic concept",
+                "structure_class_name": "dynamic_test__Greeting",
+            },
+            "content": {"message": "hi"},
+        }
+
+        result = DeliveryExecutor.try_local_hydrate_stuff(stuff_raw)
+
+        assert result is None
+        assert warn_spy.call_count == 1
+        assert "Local hydration failed" in str(warn_spy.call_args)
+
+    async def test_try_local_hydrate_stuff_returns_none_for_malformed_dict(self, mocker: MockerFixture) -> None:
+        from pipelex import log as pipelex_log  # noqa: PLC0415
+
+        warn_spy = mocker.spy(pipelex_log, "warning")
+
+        stuff_raw: dict[str, object] = {"stuff_code": "test", "content": {"text": "x"}}
+
+        result = DeliveryExecutor.try_local_hydrate_stuff(stuff_raw)
+
+        assert result is None
+        assert warn_spy.call_count == 1
 
     async def test_webhook_failure_raises(self, mocker: MockerFixture) -> None:
         import httpx  # noqa: PLC0415

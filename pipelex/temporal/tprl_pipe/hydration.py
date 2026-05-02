@@ -69,7 +69,7 @@ def _hydrate_list_item(raw_item: dict[str, Any] | str | StuffContent) -> StuffCo
     raise PipeJobError(msg)
 
 
-def _hydrate_content(concept: Concept, raw_content: list[Any] | dict[str, Any] | str) -> StuffContent:
+def hydrate_content(concept: Concept, raw_content: list[Any] | dict[str, Any] | str) -> StuffContent:
     """Hydrate a single StuffContent from a raw value.
 
     Handles both plain content and ListContent.  The Temporal serialization
@@ -114,7 +114,7 @@ def hydrate_working_memory(working_memory_raw: dict[str, Any]) -> WorkingMemory:
     for stuff_name, stuff_dict in raw_root.items():
         try:
             concept = Concept.model_validate(stuff_dict["concept"])
-            content = _hydrate_content(concept=concept, raw_content=stuff_dict["content"])
+            content = hydrate_content(concept=concept, raw_content=stuff_dict["content"])
             stuff = Stuff(
                 stuff_code=stuff_dict["stuff_code"],
                 stuff_name=stuff_dict.get("stuff_name"),

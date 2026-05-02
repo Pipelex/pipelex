@@ -1,4 +1,5 @@
-"""Submitter that mirrors `pipelex run bundle` but attaches a DeliveryAssignment so
+# ruff: noqa: INP001
+r"""Submitter that mirrors `pipelex run bundle` but attaches a DeliveryAssignment so
 `act_deliver` fires on the runner worker. This forces Temporal's data converter on
 the runner process to deserialize a hydrated PipeOutput — the path that surfaces
 the cross-process dynamic-class registry bug when the bundle defines a dynamic

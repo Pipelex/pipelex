@@ -14,6 +14,7 @@ from pipelex.temporal.temporal_manager import TemporalWorkerEnvironment
 from pipelex.temporal.tprl.conditional_worker import with_conditional_worker
 from pipelex.temporal.tprl.workflow_caller import WorkflowClass, WorkflowExecutor, WorkflowExecutorFactory
 from pipelex.temporal.tprl_pipe.pipe_run_arg import PipeRunArg
+from pipelex.temporal.tprl_pipe.submitter_hydration import rehydrate_pipe_output_with_crate
 from pipelex.temporal.tprl_pipe.wf_pipe_run import WfPipeRun
 
 
@@ -57,11 +58,16 @@ class TemporalPipeRun(WorkflowExecutor[PipeRunArg, PipeOutput], PipeRunProtocol)
             should_auto_connect_temporal=self.should_auto_connect_temporal,
             worker_environment=self.worker_environment,
         )
-        return await executor.execute_workflow(
+        pipe_output = await executor.execute_workflow(
             workflow_class=WfPipeRun,
             workflow_id=self.make_workflow_id(base_id=wfid or self.class_name),
             workflow_arg=pipe_run_arg,
         )
+
+        # Rehydrate PipeOutput on the submitter. When the pipe_job carries a crate,
+        # the helper opens a per-call scoped library so the submitter does not need
+        # the bundle pre-loaded in its global registry.
+        return rehydrate_pipe_output_with_crate(pipe_output, pipe_job.library_crate)
 
     @with_conditional_worker
     async def start(

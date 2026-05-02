@@ -1,15 +1,22 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import httpx
+from kajson.exceptions import KajsonException
+from pydantic import ValidationError
 
 from pipelex import log
 from pipelex.config import get_config
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
+from pipelex.core.stuffs.stuff import Stuff
+from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
 from pipelex.graph.graph_factory import generate_graph_outputs
-from pipelex.hub import get_storage_provider
-from pipelex.pipe_run.exceptions import StorageDeliveryError, WebhookDeliveryError
+from pipelex.hub import get_class_registry, get_storage_provider
+from pipelex.pipe_run.exceptions import PipeJobError, StorageDeliveryError, WebhookDeliveryError
+from pipelex.temporal.tprl_pipe.hydration import hydrate_content
 from pipelex.tools.misc.json_utils import clean_json_dumps
 
 if TYPE_CHECKING:
@@ -46,26 +53,93 @@ class DeliveryExecutor:
         Produces: working_memory.json, main_stuff (json/md/html/viewer),
         graph outputs (mermaidflow, reactflow, graphspec).
 
+        Supports two `pipe_output` shapes:
+        - Typed: `working_memory` populated (in-process / same-worker path).
+        - Raw: `working_memory_raw` populated (cross-process Temporal path,
+          where the activity worker may not have the dynamic concept classes
+          loaded). The activity tries to locally hydrate using only globally
+          registered classes; on failure it falls back to a generic dict
+          render so built-in content types still get typed rendering and
+          dynamic concepts produce a readable JSON dump.
         """
         files: dict[str, bytes] = {}
 
-        # Working memory
-        working_memory_dict = pipe_output.working_memory.smart_dump()
-        files["working_memory.json"] = clean_json_dumps(working_memory_dict, indent=2).encode("utf-8")
+        if pipe_output.working_memory_raw is not None:
+            files["working_memory.json"] = clean_json_dumps(pipe_output.working_memory_raw, indent=2).encode("utf-8")
+            raw_main_stuff = self._get_raw_main_stuff_dict(pipe_output.working_memory_raw)
+            main_stuff = self.try_local_hydrate_stuff(raw_main_stuff) if raw_main_stuff is not None else None
+            if main_stuff is not None:
+                await self._generate_main_stuff_files(main_stuff, files)
+            elif raw_main_stuff is not None:
+                self._generate_main_stuff_files_from_raw(raw_main_stuff, files)
+        else:
+            files["working_memory.json"] = clean_json_dumps(pipe_output.working_memory.smart_dump(), indent=2).encode("utf-8")
+            main_stuff = pipe_output.working_memory.get_optional_main_stuff()
+            if main_stuff is not None:
+                await self._generate_main_stuff_files(main_stuff, files)
 
-        # Main stuff (json, md, html, viewer)
-        main_stuff = pipe_output.working_memory.get_optional_main_stuff()
-        if main_stuff:
-            await self._generate_main_stuff_files(main_stuff, files)
-
-        # Graph outputs
         graph_spec = pipe_output.graph_spec
         if graph_spec:
             await self._generate_graph_files(graph_spec, files)
 
         return files
 
-    async def _generate_main_stuff_files(self, main_stuff: Any, files: dict[str, bytes]) -> None:
+    @staticmethod
+    def _get_raw_main_stuff_dict(working_memory_raw: dict[str, Any]) -> dict[str, Any] | None:
+        """Extract the main stuff dict from a raw working_memory, following aliases."""
+        root: dict[str, Any] = working_memory_raw.get("root", {})
+        aliases: dict[str, str] = working_memory_raw.get("aliases", {})
+        target_name = aliases.get(MAIN_STUFF_NAME, MAIN_STUFF_NAME)
+        candidate = root.get(target_name)
+        if isinstance(candidate, dict):
+            return cast("dict[str, Any]", candidate)
+        return None
+
+    @staticmethod
+    def try_local_hydrate_stuff(stuff_raw: dict[str, Any]) -> Stuff | None:
+        """Attempt to hydrate a single Stuff dict using only globally-registered classes.
+
+        Returns None when the structure class isn't available locally (typically
+        a dynamic concept class missing from the activity worker's registry) —
+        callers then fall back to a generic raw-dict render. A warning is
+        emitted on the fallback path so silent regressions on built-in
+        hydration surface in logs.
+        """
+        try:
+            concept = Concept.model_validate(stuff_raw["concept"])
+            registry = get_class_registry()
+            item_class = registry.get_class(name=concept.structure_class_name)
+            if item_class is None or not issubclass(item_class, StuffContent):
+                log.warning(
+                    f"Local hydration failed for delivery main stuff, falling back to raw render: "
+                    f"class '{concept.structure_class_name}' not registered locally"
+                )
+                return None
+            content = hydrate_content(concept=concept, raw_content=stuff_raw["content"])
+            return Stuff(
+                stuff_code=stuff_raw["stuff_code"],
+                stuff_name=stuff_raw.get("stuff_name"),
+                concept=concept,
+                content=content,
+            )
+        except (PipeJobError, ValidationError, KajsonException, KeyError) as exc:
+            log.warning(f"Local hydration failed for delivery main stuff, falling back to raw render: {exc}")
+            return None
+
+    @staticmethod
+    def _generate_main_stuff_files_from_raw(raw_main_stuff: dict[str, Any], files: dict[str, bytes]) -> None:
+        """Generic fallback rendering of a main stuff that we couldn't locally hydrate.
+
+        Produces JSON-in-markdown and `<pre>`-in-HTML so the user still gets
+        readable output for dynamic concepts the activity worker doesn't know about.
+        """
+        content_dict = raw_main_stuff.get("content", raw_main_stuff)
+        json_text = clean_json_dumps(content_dict, indent=2)
+        files["main_stuff.json"] = json_text.encode("utf-8")
+        files["main_stuff.md"] = f"```json\n{json_text}\n```\n".encode()
+        files["main_stuff.html"] = f"<pre>{json_text}</pre>".encode()
+
+    async def _generate_main_stuff_files(self, main_stuff: Stuff, files: dict[str, bytes]) -> None:
         try:
             files["main_stuff.json"] = (await main_stuff.content.rendered_json_async()).encode("utf-8")
         except Exception:
