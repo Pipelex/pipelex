@@ -39,38 +39,33 @@ class PipeRun(PipeRunProtocol):
         try:
             pipe_output = await self._pipe_router.run(pipe_job, wfid=wfid)
         except Exception as exc:
-            # TODO: wip - use a "finally" block
             status = DeliveryStatus.FAILED
             execution_error = exc
             log.error(f"Pipe execution failed for pipeline_run_id={pipeline_run_id}: {exc}")
+        finally:
+            tracer_manager = GraphTracerManager.get_instance()
+            if tracer_manager is not None:
+                tracer_manager.close_tracer(pipeline_run_id)
 
-        # Close graph tracer (flushes in-memory nodes to the event log)
-        tracer_manager = GraphTracerManager.get_instance()
-        if tracer_manager is not None:
-            tracer_manager.close_tracer(pipeline_run_id)
+            if pipe_output is not None:
+                assemble_graph_on_output(
+                    pipe_output=pipe_output,
+                    pipeline_run_id=pipeline_run_id,
+                    domain_code=pipe_job.pipe.domain_code,
+                    main_pipe_code=pipe_job.pipe.code,
+                )
 
-        # Assemble full graph from trace events
-        if pipe_output is not None:
-            assemble_graph_on_output(
+            if delivery_assignment is None:
+                delivery_assignment = DeliveryAssignment(storage=StorageTarget())
+            log.debug(f"Executing delivery for pipeline_run_id={pipeline_run_id}, status={status}")
+            await self._delivery_executor.execute(
                 pipe_output=pipe_output,
+                user_id=pipe_job.job_metadata.user_id,
                 pipeline_run_id=pipeline_run_id,
-                domain_code=pipe_job.pipe.domain_code,
-                main_pipe_code=pipe_job.pipe.code,
+                delivery_assignment=delivery_assignment,
+                status=status,
             )
 
-        # Deliver results — always. Default to storage-only if no assignment provided.
-        if delivery_assignment is None:
-            delivery_assignment = DeliveryAssignment(storage=StorageTarget())
-        log.debug(f"Executing delivery for pipeline_run_id={pipeline_run_id}, status={status}")
-        await self._delivery_executor.execute(
-            pipe_output=pipe_output,
-            user_id=pipe_job.job_metadata.user_id,
-            pipeline_run_id=pipeline_run_id,
-            delivery_assignment=delivery_assignment,
-            status=status,
-        )
-
-        # Re-raise after delivery so the caller sees the error
         if execution_error is not None:
             raise execution_error
 
