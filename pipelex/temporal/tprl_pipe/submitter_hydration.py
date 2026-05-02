@@ -78,13 +78,15 @@ def rehydrate_pipe_output_with_crate(
         pipe_output.working_memory = hydrate_working_memory(pipe_output.working_memory_raw)
         pipe_output.working_memory_raw = None
     finally:
-        if library_opened:
-            library_manager.teardown(library_id=rehydration_library_id)
-        if library_set_as_current:
-            if prev_library_id is not None:
-                set_current_library(library_id=prev_library_id)
-            else:
-                teardown_current_library()
+        try:
+            if library_opened:
+                library_manager.teardown(library_id=rehydration_library_id)
+        finally:
+            if library_set_as_current:
+                if prev_library_id is not None:
+                    set_current_library(library_id=prev_library_id)
+                else:
+                    teardown_current_library()
 
     return pipe_output
 
