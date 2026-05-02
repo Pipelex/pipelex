@@ -237,7 +237,7 @@ class TestDeliveryExecutor:
 
         files = await DeliveryExecutor().generate_result_files(mock_output)
 
-        html_text = files["main_stuff.html"].decode("utf-8")
+        html_text = files["main_stuff.html"].data.decode("utf-8")
         assert html_text.startswith("<pre>")
         assert html_text.endswith("</pre>")
         # The injected closing tag must be escaped, not present as live HTML inside the wrapper.
@@ -248,7 +248,7 @@ class TestDeliveryExecutor:
         assert "&lt;script&gt;" in html_text
 
         # JSON file must still contain the unescaped raw content (it's not HTML).
-        json_text = files["main_stuff.json"].decode("utf-8")
+        json_text = files["main_stuff.json"].data.decode("utf-8")
         assert "</pre><script>alert(1)</script><pre>" in json_text
 
     async def test_webhook_failure_raises(self, mocker: MockerFixture) -> None:

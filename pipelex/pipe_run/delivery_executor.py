@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import html
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Awaitable, NamedTuple, cast
 
 import httpx
 from kajson.exceptions import KajsonException
@@ -23,6 +23,13 @@ from pipelex.tools.misc.json_utils import clean_json_dumps
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus, StorageTarget, WebhookTarget
+
+
+class ResultFile(NamedTuple):
+    """A generated result file with its bytes and MIME type, ready to store."""
+
+    data: bytes
+    content_type: str
 
 
 class DeliveryExecutor:
@@ -48,7 +55,7 @@ class DeliveryExecutor:
 
     # ---- Result file generation ----
 
-    async def generate_result_files(self, pipe_output: PipeOutput) -> dict[str, bytes]:
+    async def generate_result_files(self, pipe_output: PipeOutput) -> dict[str, ResultFile]:
         """Generate the full set of result files from a PipeOutput.
 
         Produces: working_memory.json, main_stuff (json/md/html/viewer),
@@ -63,10 +70,13 @@ class DeliveryExecutor:
           render so built-in content types still get typed rendering and
           dynamic concepts produce a readable JSON dump.
         """
-        files: dict[str, bytes] = {}
+        files: dict[str, ResultFile] = {}
 
         if pipe_output.working_memory_raw is not None:
-            files["working_memory.json"] = clean_json_dumps(pipe_output.working_memory_raw, indent=2).encode("utf-8")
+            files["working_memory.json"] = ResultFile(
+                data=clean_json_dumps(pipe_output.working_memory_raw, indent=2).encode("utf-8"),
+                content_type="application/json",
+            )
             raw_main_stuff = self._get_raw_main_stuff_dict(pipe_output.working_memory_raw)
             main_stuff = self.try_local_hydrate_stuff(raw_main_stuff) if raw_main_stuff is not None else None
             if main_stuff is not None:
@@ -74,7 +84,10 @@ class DeliveryExecutor:
             elif raw_main_stuff is not None:
                 self._generate_main_stuff_files_from_raw(raw_main_stuff, files)
         else:
-            files["working_memory.json"] = clean_json_dumps(pipe_output.working_memory.smart_dump(), indent=2).encode("utf-8")
+            files["working_memory.json"] = ResultFile(
+                data=clean_json_dumps(pipe_output.working_memory.smart_dump(), indent=2).encode("utf-8"),
+                content_type="application/json",
+            )
             main_stuff = pipe_output.working_memory.get_optional_main_stuff()
             if main_stuff is not None:
                 await self._generate_main_stuff_files(main_stuff, files)
@@ -85,8 +98,8 @@ class DeliveryExecutor:
 
         return files
 
-    @staticmethod
-    def _get_raw_main_stuff_dict(working_memory_raw: dict[str, Any]) -> dict[str, Any] | None:
+    @classmethod
+    def _get_raw_main_stuff_dict(cls, working_memory_raw: dict[str, Any]) -> dict[str, Any] | None:
         """Extract the main stuff dict from a raw working_memory, following aliases."""
         root: dict[str, Any] = working_memory_raw.get("root", {})
         aliases: dict[str, str] = working_memory_raw.get("aliases", {})
@@ -96,8 +109,8 @@ class DeliveryExecutor:
             return cast("dict[str, Any]", candidate)
         return None
 
-    @staticmethod
-    def try_local_hydrate_stuff(stuff_raw: dict[str, Any]) -> Stuff | None:
+    @classmethod
+    def try_local_hydrate_stuff(cls, stuff_raw: dict[str, Any]) -> Stuff | None:
         """Attempt to hydrate a single Stuff dict using only globally-registered classes.
 
         Returns None when the structure class isn't available locally (typically
@@ -127,8 +140,8 @@ class DeliveryExecutor:
             log.warning(f"Local hydration failed for delivery main stuff, falling back to raw render: {exc}")
             return None
 
-    @staticmethod
-    def _generate_main_stuff_files_from_raw(raw_main_stuff: dict[str, Any], files: dict[str, bytes]) -> None:
+    @classmethod
+    def _generate_main_stuff_files_from_raw(cls, raw_main_stuff: dict[str, Any], files: dict[str, ResultFile]) -> None:
         """Generic fallback rendering of a main stuff that we couldn't locally hydrate.
 
         Produces JSON-in-markdown and `<pre>`-in-HTML so the user still gets
@@ -136,57 +149,57 @@ class DeliveryExecutor:
         """
         content_dict = raw_main_stuff.get("content", raw_main_stuff)
         json_text = clean_json_dumps(content_dict, indent=2)
-        files["main_stuff.json"] = json_text.encode("utf-8")
-        files["main_stuff.md"] = f"```json\n{json_text}\n```\n".encode()
+        files["main_stuff.json"] = ResultFile(data=json_text.encode("utf-8"), content_type="application/json")
+        files["main_stuff.md"] = ResultFile(data=f"```json\n{json_text}\n```\n".encode(), content_type="text/markdown")
         # Escape HTML-special chars: json.dumps does not escape <, >, &, so embedding
         # raw user-controlled JSON inside <pre> would allow stored XSS via strings
         # like "</pre><script>...</script>" in pipeline outputs.
-        files["main_stuff.html"] = f"<pre>{html.escape(json_text)}</pre>".encode()
+        files["main_stuff.html"] = ResultFile(data=f"<pre>{html.escape(json_text)}</pre>".encode(), content_type="text/html")
 
-    async def _generate_main_stuff_files(self, main_stuff: Stuff, files: dict[str, bytes]) -> None:
-        try:
-            files["main_stuff.json"] = (await main_stuff.content.rendered_json_async()).encode("utf-8")
-        except Exception:
-            # TODO: wip - do not catch all exceptions
-            log.warning("Failed to render main_stuff.json")
+    async def _generate_main_stuff_files(self, main_stuff: Stuff, files: dict[str, ResultFile]) -> None:
+        content = main_stuff.content
+        await self._try_add_rendered_file(files, "main_stuff.json", content.rendered_json_async(), "application/json")
+        await self._try_add_rendered_file(files, "main_stuff.md", content.rendered_markdown_async(), "text/markdown")
+        await self._try_add_rendered_file(files, "main_stuff.html", content.rendered_html_async(), "text/html")
+        await self._try_add_rendered_file(files, "main_stuff_viewer.html", render_stuff_viewer(main_stuff), "text/html")
 
-        try:
-            files["main_stuff.md"] = (await main_stuff.content.rendered_markdown_async()).encode("utf-8")
-        except Exception:
-            # TODO: wip - do not catch all exceptions
-            log.warning("Failed to render main_stuff.md")
-
-        try:
-            files["main_stuff.html"] = (await main_stuff.content.rendered_html_async()).encode("utf-8")
-        except Exception:
-            # TODO: wip - do not catch all exceptions
-            log.warning("Failed to render main_stuff.html")
-
-        try:
-            files["main_stuff_viewer.html"] = (await render_stuff_viewer(main_stuff)).encode("utf-8")
-        except Exception:
-            # TODO: wip - do not catch all exceptions
-            log.warning("Failed to render main_stuff_viewer.html")
-
-    async def _generate_graph_files(self, graph_spec: Any, files: dict[str, bytes]) -> None:
+    async def _generate_graph_files(self, graph_spec: Any, files: dict[str, ResultFile]) -> None:
         try:
             graph_config = get_config().pipelex.pipeline_execution_config.graph_config
             graph_outputs = await generate_graph_outputs(
                 graph_spec=graph_spec,
                 graph_config=graph_config,
             )
-
-            if graph_outputs.graphspec_json is not None:
-                files["graphspec.json"] = graph_outputs.graphspec_json.encode("utf-8")
-            if graph_outputs.mermaidflow_mmd is not None:
-                files["mermaidflow.mmd"] = graph_outputs.mermaidflow_mmd.encode("utf-8")
-            if graph_outputs.mermaidflow_html is not None:
-                files["mermaidflow.html"] = graph_outputs.mermaidflow_html.encode("utf-8")
-            if graph_outputs.reactflow_html is not None:
-                files["reactflow.html"] = graph_outputs.reactflow_html.encode("utf-8")
+            self._add_optional_text_file(files, "graphspec.json", graph_outputs.graphspec_json, "application/json")
+            self._add_optional_text_file(files, "mermaidflow.mmd", graph_outputs.mermaidflow_mmd, "text/plain")
+            self._add_optional_text_file(files, "mermaidflow.html", graph_outputs.mermaidflow_html, "text/html")
+            self._add_optional_text_file(files, "reactflow.html", graph_outputs.reactflow_html, "text/html")
         except Exception:
             # TODO: wip - do not catch all exceptions
             log.warning("Failed to generate graph outputs")
+
+    @classmethod
+    async def _try_add_rendered_file(
+        cls,
+        files: dict[str, ResultFile],
+        filename: str,
+        render: Awaitable[str],
+        content_type: str,
+    ) -> None:
+        """Await a render coroutine and store the encoded result; log a warning on failure."""
+        try:
+            text = await render
+        except Exception:
+            # TODO: wip - do not catch all exceptions
+            log.warning(f"Failed to render {filename}")
+            return
+        files[filename] = ResultFile(data=text.encode("utf-8"), content_type=content_type)
+
+    @classmethod
+    def _add_optional_text_file(cls, files: dict[str, ResultFile], filename: str, text: str | None, content_type: str) -> None:
+        """Encode `text` and store it under `filename`. No-op when `text` is None."""
+        if text is not None:
+            files[filename] = ResultFile(data=text.encode("utf-8"), content_type=content_type)
 
     # ---- Storage ----
 
@@ -205,11 +218,9 @@ class DeliveryExecutor:
 
             result_files = await self.generate_result_files(pipe_output)
 
-            for filename, data in result_files.items():
+            for filename, result_file in result_files.items():
                 key: str = f"{base_key}/{filename}"
-                # TODO: wip - set the content type when the files are created
-                content_type: str = _content_type_for(filename)
-                await storage_provider.store(data=data, key=key, content_type=content_type)
+                await storage_provider.store(data=result_file.data, key=key, content_type=result_file.content_type)
                 log.debug(f"Stored: {key}")
 
             # TODO: include the full S3 URI (s3://bucket/key/) so result_url is
@@ -255,16 +266,3 @@ class DeliveryExecutor:
             # TODO: wip - do not catch all exceptions
             msg = f"Webhook delivery failed for pipeline_run_id={pipeline_run_id}: {exc}"
             raise WebhookDeliveryError(msg) from exc
-
-
-def _content_type_for(filename: str) -> str:
-    """Determine content type from filename extension."""
-    if filename.endswith(".json"):
-        return "application/json"
-    if filename.endswith(".html"):
-        return "text/html"
-    if filename.endswith(".md"):
-        return "text/markdown"
-    if filename.endswith(".mmd"):
-        return "text/plain"
-    return "application/octet-stream"
