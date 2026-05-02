@@ -82,7 +82,6 @@ from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.tools.storage.storage_provider_factory import make_storage_provider_from_config
-from pipelex.tracing.event_log_protocol import EventLogProtocol
 from pipelex.types import Self
 from pipelex.urls import URLs
 
@@ -166,7 +165,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
         storage_provider: StorageProviderAbstract | None = None,
-        event_log: EventLogProtocol | None = None,
         models_manager: ModelManagerAbstract | None = None,
         inference_manager: InferenceManager | None = None,
         content_generator: ContentGeneratorProtocol | None = None,
@@ -268,7 +266,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             storage_config = get_config().pipelex.storage_config
             storage_provider = make_storage_provider_from_config(storage_config)
         self.pipelex_hub.set_storage_provider(storage_provider)
-        self.pipelex_hub.set_event_log(event_log)
 
         # Register stuff templates first (used by mermaid, reactflow, and stuff_viewer)
         stuff_name, stuff_package, stuff_templates = STUFF_TEMPLATE_SET
