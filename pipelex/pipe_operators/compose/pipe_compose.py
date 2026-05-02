@@ -185,15 +185,14 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         if self.extra_context:
             context.update(**self.extra_context)
 
-        # TODO: wip - rename to rendered_template_text
-        jinja2_text = await render_template(
+        rendered_template_text = await render_template(
             template=self.template,
             category=self.category,
             context=context,
             templating_style=self.templating_style,
         )
-        log.verbose(f"Jinja2 rendered text:\n{jinja2_text}")
-        assert isinstance(jinja2_text, str)
+        log.verbose(f"Template rendered text:\n{rendered_template_text}")
+        assert isinstance(rendered_template_text, str)
 
         # Get the structure class from the registry (might be a subclass of TextContent or HtmlContent)
         structure_class = get_class_registry().get_required_subclass(
@@ -203,9 +202,9 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
         # Construct content based on the structure class type
         if issubclass(structure_class, HtmlContent):
-            the_content = structure_class(inner_html=jinja2_text, css_class="")
+            the_content = structure_class(inner_html=rendered_template_text, css_class="")
         else:
-            the_content = structure_class(text=jinja2_text)
+            the_content = structure_class(text=rendered_template_text)
 
         output_stuff = StuffFactory.make_stuff(concept=self.output.concept, content=the_content, name=output_name)
 
@@ -217,7 +216,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         # Capture execution data for the graph tracer
         execution_data_dict: dict[str, Any] = {
             "compose_mode": "template",
-            "rendered_text": jinja2_text,
+            "rendered_text": rendered_template_text,
         }
         self._register_execution_data(job_metadata, execution_data_dict)
 
