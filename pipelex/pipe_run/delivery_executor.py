@@ -122,7 +122,7 @@ class DeliveryExecutor:
                 concept=concept,
                 content=content,
             )
-        except (PipeJobError, ValidationError, KajsonException, KeyError) as exc:
+        except (PipeJobError, ValidationError, KajsonException, KeyError, TypeError) as exc:
             log.warning(f"Local hydration failed for delivery main stuff, falling back to raw render: {exc}")
             return None
 
