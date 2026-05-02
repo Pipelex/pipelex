@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 from typing import TYPE_CHECKING, Any, cast
 
 import httpx
@@ -137,7 +138,10 @@ class DeliveryExecutor:
         json_text = clean_json_dumps(content_dict, indent=2)
         files["main_stuff.json"] = json_text.encode("utf-8")
         files["main_stuff.md"] = f"```json\n{json_text}\n```\n".encode()
-        files["main_stuff.html"] = f"<pre>{json_text}</pre>".encode()
+        # Escape HTML-special chars: json.dumps does not escape <, >, &, so embedding
+        # raw user-controlled JSON inside <pre> would allow stored XSS via strings
+        # like "</pre><script>...</script>" in pipeline outputs.
+        files["main_stuff.html"] = f"<pre>{html.escape(json_text)}</pre>".encode()
 
     async def _generate_main_stuff_files(self, main_stuff: Stuff, files: dict[str, bytes]) -> None:
         try:
