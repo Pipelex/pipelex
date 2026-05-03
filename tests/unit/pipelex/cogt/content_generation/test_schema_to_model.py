@@ -6,10 +6,7 @@ import pytest
 from pydantic import BaseModel, Field
 
 from pipelex.cogt.content_generation.exceptions import UnsafeSchemaError
-from pipelex.cogt.content_generation.schema_to_model import (
-    _exec_and_extract_class,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
-    model_class_from_json_schema,
-)
+from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
 
 
 class SimpleModel(BaseModel):
@@ -35,7 +32,7 @@ class TestSchemaToModel:
     def test_simple_model_reconstruction(self) -> None:
         """A simple model can be reconstructed from its JSON schema."""
         schema = SimpleModel.model_json_schema()
-        result_class = model_class_from_json_schema(schema, "SimpleModel")
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, "SimpleModel")
 
         assert result_class.__name__ == "SimpleModel"
         assert "name" in result_class.model_fields
@@ -44,7 +41,7 @@ class TestSchemaToModel:
     def test_reconstructed_model_can_validate(self) -> None:
         """The reconstructed model can validate data."""
         schema = SimpleModel.model_json_schema()
-        result_class = model_class_from_json_schema(schema, "SimpleModel")
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, "SimpleModel")
 
         instance = result_class(name="Alice", age=30)
         assert instance.name == "Alice"  # type: ignore[attr-defined]
@@ -53,7 +50,7 @@ class TestSchemaToModel:
     def test_nested_model_reconstruction(self) -> None:
         """A model with nested BaseModel fields (producing $defs) can be reconstructed."""
         schema = PersonWithAddress.model_json_schema()
-        result_class = model_class_from_json_schema(schema, "PersonWithAddress")
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, "PersonWithAddress")
 
         instance = result_class(
             name="Bob",
@@ -65,7 +62,7 @@ class TestSchemaToModel:
     def test_kajson_class_source_attached(self) -> None:
         """The reconstructed class has __kajson_class_source__ with the generated Python source."""
         schema = SimpleModel.model_json_schema()
-        result_class = model_class_from_json_schema(schema, "SimpleModel")
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, "SimpleModel")
 
         source = getattr(result_class, "__kajson_class_source__", None)
         assert source is not None
@@ -75,8 +72,8 @@ class TestSchemaToModel:
     def test_caching_returns_same_class(self) -> None:
         """Calling with the same schema returns the same class object (cached)."""
         schema = SimpleModel.model_json_schema()
-        class_1 = model_class_from_json_schema(schema, "SimpleModel")
-        class_2 = model_class_from_json_schema(schema, "SimpleModel")
+        class_1 = SchemaToModelFactory.make_from_json_schema(schema, "SimpleModel")
+        class_2 = SchemaToModelFactory.make_from_json_schema(schema, "SimpleModel")
 
         assert class_1 is class_2
 
@@ -85,15 +82,15 @@ class TestSchemaToModel:
         schema_simple = SimpleModel.model_json_schema()
         schema_nested = PersonWithAddress.model_json_schema()
 
-        class_simple = model_class_from_json_schema(schema_simple, "SimpleModel")
-        class_nested = model_class_from_json_schema(schema_nested, "PersonWithAddress")
+        class_simple = SchemaToModelFactory.make_from_json_schema(schema_simple, "SimpleModel")
+        class_nested = SchemaToModelFactory.make_from_json_schema(schema_nested, "PersonWithAddress")
 
         assert class_simple is not class_nested
 
     def test_json_roundtrip_with_reconstructed_class(self) -> None:
         """An instance of the reconstructed class survives JSON round-trip."""
         schema = SimpleModel.model_json_schema()
-        result_class = model_class_from_json_schema(schema, "SimpleModel")
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, "SimpleModel")
 
         instance = result_class(name="Charlie", age=25)
         json_str = instance.model_dump_json()
@@ -106,7 +103,7 @@ class TestSchemaToModel:
         schema = SimpleModel.model_json_schema()
         # Override the title to simulate a dynamic concept code like "my_namespace__Greeting"
         schema["title"] = "my_namespace__Greeting"
-        result_class = model_class_from_json_schema(schema, "my_namespace__Greeting")
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, "my_namespace__Greeting")
 
         assert "name" in result_class.model_fields
         assert "age" in result_class.model_fields
@@ -117,7 +114,7 @@ class TestSchemaToModel:
         """The restricted exec namespace blocks open(), eval(), exec(), and compile()."""
         malicious_source = "from pydantic import BaseModel\nclass Innocent(BaseModel):\n    name: str = 'ok'\nleaked = open('/etc/passwd')\n"
         with pytest.raises(NameError, match="open"):
-            _exec_and_extract_class(malicious_source, "Innocent")
+            SchemaToModelFactory._exec_and_extract_class(malicious_source, "Innocent")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
     # ---- Layer 1: schema sanitization (x-python-* extensions are rejected) ----
 
@@ -126,7 +123,7 @@ class TestSchemaToModel:
         schema = _benign_object_schema()
         schema["x-python-import"] = {"module": "subprocess", "name": "run"}
         with pytest.raises(UnsafeSchemaError) as exc_info:
-            model_class_from_json_schema(schema, "Innocent")
+            SchemaToModelFactory.make_from_json_schema(schema, "Innocent")
         assert "x-python-import" in str(exc_info.value)
 
     def test_x_python_import_in_defs_is_rejected(self) -> None:
@@ -142,7 +139,7 @@ class TestSchemaToModel:
             "$defs": {"Run": {"x-python-import": {"module": "subprocess", "name": "run"}}},
         }
         with pytest.raises(UnsafeSchemaError) as exc_info:
-            model_class_from_json_schema(schema, "Innocent")
+            SchemaToModelFactory.make_from_json_schema(schema, "Innocent")
         assert "x-python-import" in str(exc_info.value)
 
     def test_x_python_type_is_rejected(self) -> None:
@@ -150,7 +147,7 @@ class TestSchemaToModel:
         schema = _benign_object_schema()
         schema["properties"]["x"]["x-python-type"] = "subprocess.Popen"
         with pytest.raises(UnsafeSchemaError) as exc_info:
-            model_class_from_json_schema(schema, "Innocent")
+            SchemaToModelFactory.make_from_json_schema(schema, "Innocent")
         assert "x-python-type" in str(exc_info.value)
 
     @pytest.mark.parametrize(
@@ -167,7 +164,7 @@ class TestSchemaToModel:
         schema = _benign_object_schema()
         schema[extension_key] = "anything"
         with pytest.raises(UnsafeSchemaError) as exc_info:
-            model_class_from_json_schema(schema, "Innocent")
+            SchemaToModelFactory.make_from_json_schema(schema, "Innocent")
         assert extension_key in str(exc_info.value)
 
     def test_deeply_nested_x_python_import_is_rejected(self) -> None:
@@ -191,7 +188,7 @@ class TestSchemaToModel:
             },
         }
         with pytest.raises(UnsafeSchemaError) as exc_info:
-            model_class_from_json_schema(schema, "Outer")
+            SchemaToModelFactory.make_from_json_schema(schema, "Outer")
         assert "x-python-import" in str(exc_info.value)
 
     def test_unsafe_schema_error_names_the_offending_path(self) -> None:
@@ -203,7 +200,7 @@ class TestSchemaToModel:
             "$defs": {"Run": {"x-python-import": {"module": "subprocess", "name": "run"}}},
         }
         with pytest.raises(UnsafeSchemaError) as exc_info:
-            model_class_from_json_schema(schema, "Innocent")
+            SchemaToModelFactory.make_from_json_schema(schema, "Innocent")
         message = str(exc_info.value)
         assert "$defs" in message
         assert "Run" in message
@@ -219,7 +216,7 @@ class TestSchemaToModel:
             },
         }
         with pytest.raises(UnsafeSchemaError) as exc_info:
-            model_class_from_json_schema(schema, "Innocent")
+            SchemaToModelFactory.make_from_json_schema(schema, "Innocent")
         message = str(exc_info.value)
         assert "x-python-import" in message
         assert "x-python-type" in message
@@ -230,13 +227,13 @@ class TestSchemaToModel:
         """Even bypassing Layer 1, the restricted __import__ blocks `import subprocess`."""
         malicious_source = "from pydantic import BaseModel\nimport subprocess\nclass Innocent(BaseModel):\n    name: str = 'ok'\n"
         with pytest.raises(ImportError, match="subprocess"):
-            _exec_and_extract_class(malicious_source, "Innocent")
+            SchemaToModelFactory._exec_and_extract_class(malicious_source, "Innocent")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
     def test_exec_blocks_direct_dunder_import_call(self) -> None:
         """A direct __import__('subprocess') call is also blocked."""
         malicious_source = "from pydantic import BaseModel\nclass Innocent(BaseModel):\n    name: str = 'ok'\n_leak = __import__('subprocess')\n"
         with pytest.raises(ImportError, match="subprocess"):
-            _exec_and_extract_class(malicious_source, "Innocent")
+            SchemaToModelFactory._exec_and_extract_class(malicious_source, "Innocent")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
     @pytest.mark.parametrize(
         ("import_line", "expected_module"),
@@ -251,7 +248,7 @@ class TestSchemaToModel:
         """A range of dangerous stdlib imports is blocked by the allowlist."""
         malicious_source = f"from pydantic import BaseModel\n{import_line}\nclass Innocent(BaseModel):\n    name: str = 'ok'\n"
         with pytest.raises(ImportError, match=expected_module):
-            _exec_and_extract_class(malicious_source, "Innocent")
+            SchemaToModelFactory._exec_and_extract_class(malicious_source, "Innocent")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
     @pytest.mark.parametrize(
         "import_line",
@@ -271,5 +268,5 @@ class TestSchemaToModel:
     def test_exec_allowlisted_imports_succeed(self, import_line: str) -> None:
         """Allowlisted imports required by datamodel-code-generator output continue to work."""
         source = f"{import_line}\nfrom pydantic import BaseModel\nclass Innocent(BaseModel):\n    name: str = 'ok'\n"
-        result_class = _exec_and_extract_class(source, "Innocent")
+        result_class = SchemaToModelFactory._exec_and_extract_class(source, "Innocent")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
         assert result_class.__name__ == "Innocent"

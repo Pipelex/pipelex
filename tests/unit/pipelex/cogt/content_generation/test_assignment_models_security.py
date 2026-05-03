@@ -1,6 +1,6 @@
 """Wire-format perimeter tests: prove that x-python-* schema extensions survive
 serialization through ObjectAssignment / TextThenObjectAssignment, so the codegen
-boundary in schema_to_model is the only line of defense (and works).
+boundary in SchemaToModelFactory is the only line of defense (and works).
 """
 
 from typing import Any
@@ -14,7 +14,7 @@ from pipelex.cogt.content_generation.assignment_models import (
     TextThenObjectAssignment,
 )
 from pipelex.cogt.content_generation.exceptions import UnsafeSchemaError
-from pipelex.cogt.content_generation.schema_to_model import model_class_from_json_schema
+from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.llm.llm_setting import LLMSetting
@@ -58,7 +58,7 @@ class TestAssignmentModelsSecurity:
         """A malicious x-python-import in object_class_schema survives the wire format unchanged.
 
         The dict[str, Any] field is intentionally permissive — rejection happens at the
-        codegen boundary (schema_to_model), not at deserialization.
+        codegen boundary (SchemaToModelFactory), not at deserialization.
         """
         assignment = ObjectAssignment(
             object_class_name="Innocent",
@@ -90,7 +90,7 @@ class TestAssignmentModelsSecurity:
         """Closes the loop: a payload that survives the wire crossing is rejected at codegen.
 
         This is the actual contract: the wire format is permissive on purpose, the
-        boundary in schema_to_model.model_class_from_json_schema is the chokepoint.
+        boundary in SchemaToModelFactory.make_from_json_schema is the chokepoint.
         """
         assignment = ObjectAssignment(
             object_class_name="Innocent",
@@ -99,5 +99,5 @@ class TestAssignmentModelsSecurity:
         )
         restored = ObjectAssignment.model_validate_json(assignment.model_dump_json())
         with pytest.raises(UnsafeSchemaError) as exc_info:
-            model_class_from_json_schema(restored.object_class_schema, restored.object_class_name)
+            SchemaToModelFactory.make_from_json_schema(restored.object_class_schema, restored.object_class_name)
         assert "x-python-import" in str(exc_info.value)

@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import LLMAssignment, ObjectAssignment
-from pipelex.cogt.content_generation.schema_to_model import model_class_from_json_schema
+from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.hub import get_llm_worker
 
@@ -29,7 +29,7 @@ async def llm_gen_object(object_assignment: ObjectAssignment) -> BaseModel:
         llm_prompt=llm_assignment.llm_prompt,
         llm_job_params=llm_assignment.llm_job_params,
     )
-    content_class = model_class_from_json_schema(
+    content_class = SchemaToModelFactory.make_from_json_schema(
         schema=object_assignment.object_class_schema,
         class_name=object_assignment.object_class_name,
     )
@@ -50,7 +50,7 @@ async def llm_gen_object_list(object_assignment: ObjectAssignment) -> list[BaseM
         llm_job_params=llm_assignment.llm_job_params,
     )
     item_class_name = object_assignment.object_class_name
-    item_class = model_class_from_json_schema(
+    item_class = SchemaToModelFactory.make_from_json_schema(
         schema=object_assignment.object_class_schema,
         class_name=item_class_name,
     )
