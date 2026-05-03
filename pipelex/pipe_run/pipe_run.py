@@ -8,6 +8,7 @@ from pipelex import log
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus
 from pipelex.pipe_run.delivery_executor import DeliveryExecutor
+from pipelex.pipe_run.exceptions import DeliveryError
 from pipelex.pipe_run.graph_assembly import assemble_graph_on_output
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 
@@ -45,7 +46,16 @@ class PipeRun(PipeRunProtocol):
         finally:
             tracer_manager = GraphTracerManager.get_instance()
             if tracer_manager is not None:
-                tracer_manager.close_tracer(pipeline_run_id)
+                try:
+                    tracer_manager.close_tracer(pipeline_run_id)
+                except OSError as tracer_close_error:
+                    if execution_error is None:
+                        raise
+                    log.error(
+                        f"close_tracer also failed for pipeline_run_id={pipeline_run_id} "
+                        f"after pipe execution failure; raising original execution error. "
+                        f"Suppressed tracer close error: {tracer_close_error}"
+                    )
 
             if pipe_output is not None:
                 assemble_graph_on_output(
@@ -57,13 +67,22 @@ class PipeRun(PipeRunProtocol):
 
             if delivery_assignment is not None:
                 log.debug(f"Executing delivery for pipeline_run_id={pipeline_run_id}, status={status}")
-                await self._delivery_executor.execute(
-                    pipe_output=pipe_output,
-                    user_id=pipe_job.job_metadata.user_id,
-                    pipeline_run_id=pipeline_run_id,
-                    delivery_assignment=delivery_assignment,
-                    status=status,
-                )
+                try:
+                    await self._delivery_executor.execute(
+                        pipe_output=pipe_output,
+                        user_id=pipe_job.job_metadata.user_id,
+                        pipeline_run_id=pipeline_run_id,
+                        delivery_assignment=delivery_assignment,
+                        status=status,
+                    )
+                except DeliveryError as delivery_error:
+                    if execution_error is None:
+                        raise
+                    log.error(
+                        f"Delivery also failed for pipeline_run_id={pipeline_run_id} "
+                        f"after pipe execution failure; raising original execution error. "
+                        f"Suppressed delivery error: {delivery_error}"
+                    )
 
         if execution_error is not None:
             raise execution_error

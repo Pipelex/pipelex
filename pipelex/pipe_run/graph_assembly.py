@@ -5,10 +5,16 @@ Works with any event log backend (NDJSON, DynamoDB, etc.) — the backend
 is determined by the tracing config, not by the caller.
 """
 
+import json
+
+from pydantic import ValidationError
+
 from pipelex import log
+from pipelex.base_exceptions import PipelexConfigError
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.graph.graphspec import PipelineRef
+from pipelex.system.exceptions import MissingDependencyError
 from pipelex.tracing.event_log_factory import make_event_log
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
 
@@ -24,6 +30,12 @@ def assemble_graph_on_output(
     Reads all events for the pipeline_run_id from the configured event log
     backend and uses GraphSpecAssembler to build the complete cross-worker graph.
     Falls back to whatever graph_spec is already on pipe_output if assembly fails.
+
+    Tracing is observability and treated as best-effort: runtime I/O issues,
+    malformed event data, and broken tracing infrastructure (config errors,
+    missing optional dependencies) are caught and warned about, not propagated.
+    Programming bugs (KeyError, AttributeError, etc.) propagate so they surface
+    during development.
 
     Args:
         pipe_output: The pipe output to set graph_spec on.
@@ -51,6 +63,5 @@ def assemble_graph_on_output(
                 log.debug(f"Graph assembled from {len(events)} events for pipeline_run_id={pipeline_run_id}")
         finally:
             event_log.close()
-    except Exception as exc:
-        # TODO: wip - do not catch all exceptions
-        log.warning(f"Graph assembly failed, using existing graph: {exc}")
+    except (OSError, json.JSONDecodeError, ValidationError, PipelexConfigError, MissingDependencyError) as graph_assembly_error:
+        log.warning(f"Graph assembly failed, using existing graph: {graph_assembly_error}")

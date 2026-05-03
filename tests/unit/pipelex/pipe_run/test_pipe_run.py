@@ -2,7 +2,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, StorageTarget
-from pipelex.pipe_run.exceptions import PipeRouterError
+from pipelex.pipe_run.exceptions import PipeRouterError, WebhookDeliveryError
 from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 
@@ -125,3 +125,100 @@ class TestPipeRun:
             await pipe_run.run(pipe_job=mock_job, delivery_assignment=assignment)
 
         assert call_order == ["router.run", "delivery.execute"]
+
+    async def test_run_failure_then_tracer_close_oserror_raises_original_error(self, mocker: MockerFixture) -> None:
+        """When pipe fails AND close_tracer raises OSError, the original PipeRouterError is raised, not the OSError."""
+        original_error = PipeRouterError(
+            message="pipe blew up",
+            run_mode=PipeRunMode.LIVE,
+            pipe_code="test_pipe",
+            output_name=None,
+            pipe_stack=[],
+        )
+        mock_router = mocker.AsyncMock()
+        mock_router.run = mocker.AsyncMock(side_effect=original_error)
+
+        mock_tracer_manager = mocker.MagicMock()
+        mock_tracer_manager.close_tracer = mocker.MagicMock(side_effect=OSError("disk full"))
+        mocker.patch(
+            "pipelex.pipe_run.pipe_run.GraphTracerManager.get_instance",
+            return_value=mock_tracer_manager,
+        )
+
+        mock_executor = mocker.patch("pipelex.pipe_run.pipe_run.DeliveryExecutor")
+        mock_executor.return_value.execute = mocker.AsyncMock()
+
+        mock_job = mocker.MagicMock()
+        mock_job.job_metadata.pipeline_run_id = "plr-mask-tracer"
+
+        pipe_run = PipeRun(pipe_router=mock_router)
+
+        with pytest.raises(PipeRouterError) as exc_info:
+            await pipe_run.run(pipe_job=mock_job, delivery_assignment=DeliveryAssignment(storage=StorageTarget()))
+
+        assert exc_info.value is original_error
+        mock_tracer_manager.close_tracer.assert_called_once_with("plr-mask-tracer")
+
+    async def test_run_success_with_tracer_close_oserror_propagates_oserror(self, mocker: MockerFixture) -> None:
+        """When pipe succeeds but close_tracer raises OSError, OSError propagates (no prior error to preserve)."""
+        mock_output = mocker.MagicMock()
+        mock_router = mocker.AsyncMock()
+        mock_router.run = mocker.AsyncMock(return_value=mock_output)
+
+        mock_tracer_manager = mocker.MagicMock()
+        close_error = OSError("disk full")
+        mock_tracer_manager.close_tracer = mocker.MagicMock(side_effect=close_error)
+        mocker.patch(
+            "pipelex.pipe_run.pipe_run.GraphTracerManager.get_instance",
+            return_value=mock_tracer_manager,
+        )
+
+        mock_executor = mocker.patch("pipelex.pipe_run.pipe_run.DeliveryExecutor")
+        mock_executor.return_value.execute = mocker.AsyncMock()
+
+        mock_job = mocker.MagicMock()
+        mock_job.job_metadata.pipeline_run_id = "plr-tracer-only"
+
+        pipe_run = PipeRun(pipe_router=mock_router)
+
+        with pytest.raises(OSError, match="disk full") as exc_info:
+            await pipe_run.run(pipe_job=mock_job)
+
+        assert exc_info.value is close_error
+
+    async def test_run_failure_with_tracer_and_delivery_failures_raises_original(self, mocker: MockerFixture) -> None:
+        """Combined failure: pipe fails, tracer close fails, delivery fails — original PipeRouterError is raised."""
+        original_error = PipeRouterError(
+            message="pipe blew up",
+            run_mode=PipeRunMode.LIVE,
+            pipe_code="test_pipe",
+            output_name=None,
+            pipe_stack=[],
+        )
+        mock_router = mocker.AsyncMock()
+        mock_router.run = mocker.AsyncMock(side_effect=original_error)
+
+        mock_tracer_manager = mocker.MagicMock()
+        mock_tracer_manager.close_tracer = mocker.MagicMock(side_effect=OSError("disk full"))
+        mocker.patch(
+            "pipelex.pipe_run.pipe_run.GraphTracerManager.get_instance",
+            return_value=mock_tracer_manager,
+        )
+
+        mock_executor = mocker.patch("pipelex.pipe_run.pipe_run.DeliveryExecutor")
+        mock_executor.return_value.execute = mocker.AsyncMock(
+            side_effect=WebhookDeliveryError("webhook 503"),
+        )
+
+        mock_job = mocker.MagicMock()
+        mock_job.job_metadata.pipeline_run_id = "plr-triple-fail"
+
+        pipe_run = PipeRun(pipe_router=mock_router)
+        assignment = DeliveryAssignment(storage=StorageTarget())
+
+        with pytest.raises(PipeRouterError) as exc_info:
+            await pipe_run.run(pipe_job=mock_job, delivery_assignment=assignment)
+
+        assert exc_info.value is original_error
+        mock_tracer_manager.close_tracer.assert_called_once()
+        mock_executor.return_value.execute.assert_called_once()
