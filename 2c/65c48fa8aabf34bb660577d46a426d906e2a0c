@@ -1,0 +1,38 @@
+pipelex/reporting/reporting_protocol.py
+  5ab95c9211c8b48e 6,22-31,57-69
+pipelex/reporting/reporting_manager.py
+  5ab95c9211c8b48e 65,69,87
+pipelex/pipeline/runner.py
+  5ab95c9211c8b48e 202,204
+pipelex/pipeline/pipeline_run_setup.py
+  5ab95c9211c8b48e 280,282-287,343,345
+pipelex/temporal/tprl_pipe/wf_pipe_router.py
+  5ab95c9211c8b48e 104-110,125,171,173
+pipelex/kit/agent_rules/python_standards.md
+  5ab95c9211c8b48e 110-116,122-131
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "2c65c48fa8aabf34bb660577d46a426d906e2a0c",
+  "prompts": {
+    "5ab95c9211c8b48e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d39a5968-f772-43bf-a375-ce288ea10f6c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 493,
+      "total_deletions": 43,
+      "accepted_lines": 492,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}
