@@ -19,7 +19,6 @@ from tests.integration.pipelex.temporal.tracing.test_data import (
     SequenceTracingTestData,
 )
 
-
 _TRACING_DIR = Path(__file__).parent.resolve()
 
 
