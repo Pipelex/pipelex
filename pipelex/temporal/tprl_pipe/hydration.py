@@ -33,7 +33,6 @@ def _validate_as_known_class(item_class: type[StuffContent], raw_item: StuffCont
         else:
             return item_class.model_validate(raw_item.smart_dump())
     else:
-        assert isinstance(raw_item, dict)
         return item_class.model_validate(raw_item)
 
 

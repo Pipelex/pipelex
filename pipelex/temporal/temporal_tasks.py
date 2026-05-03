@@ -1,6 +1,6 @@
 from pipelex import log
 from pipelex.temporal.config_temporal import WorkerScope
-from pipelex.temporal.exceptions import WorkerScopeConfigError
+from pipelex.temporal.exceptions import TemporalConfigError, WorkerScopeConfigError
 from pipelex.temporal.temporal_types import ActivityList, ActivityType, WorkflowList, WorkflowType
 
 
@@ -50,16 +50,39 @@ class TemporalTasks:
     def _full_catalog(self) -> tuple[dict[str, WorkflowType], dict[str, ActivityType]]:
         all_workflows: dict[str, WorkflowType] = {}
         all_activities: dict[str, ActivityType] = {}
-        for task_pack in self.tasks_catalog.values():
+        for pack_name, task_pack in self.tasks_catalog.items():
+            source = f"task pack '{pack_name}'"
             for workflow in task_pack.workflow_list:
-                all_workflows[workflow.__name__] = workflow
+                self._register_workflow(all_workflows=all_workflows, workflow=workflow, source=source)
             for activity in task_pack.activity_list:
-                all_activities[activity.__name__] = activity
+                self._register_activity(all_activities=all_activities, activity=activity, source=source)
         for workflow in self.extra_workflows:
-            all_workflows[workflow.__name__] = workflow
+            self._register_workflow(all_workflows=all_workflows, workflow=workflow, source="extra_workflows")
         for activity in self.extra_activities:
-            all_activities[activity.__name__] = activity
+            self._register_activity(all_activities=all_activities, activity=activity, source="extra_activities")
         return all_workflows, all_activities
+
+    @classmethod
+    def _register_workflow(cls, all_workflows: dict[str, WorkflowType], workflow: WorkflowType, source: str) -> None:
+        existing = all_workflows.get(workflow.__name__)
+        if existing is not None and existing is not workflow:
+            msg = (
+                f"Workflow name collision: '{workflow.__name__}' is registered as two different callables "
+                f"(latest source: {source}). Temporal requires a unique name per workflow."
+            )
+            raise TemporalConfigError(msg)
+        all_workflows[workflow.__name__] = workflow
+
+    @classmethod
+    def _register_activity(cls, all_activities: dict[str, ActivityType], activity: ActivityType, source: str) -> None:
+        existing = all_activities.get(activity.__name__)
+        if existing is not None and existing is not activity:
+            msg = (
+                f"Activity name collision: '{activity.__name__}' is registered as two different callables "
+                f"(latest source: {source}). Temporal requires a unique name per activity."
+            )
+            raise TemporalConfigError(msg)
+        all_activities[activity.__name__] = activity
 
     def workflows_and_activities(
         self,

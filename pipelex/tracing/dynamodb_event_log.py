@@ -11,11 +11,12 @@ Requires: pip install "pipelex[dynamodb]"
 
 from typing import Any
 
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.system.exceptions import MissingDependencyError
+from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.tracing.event_log_protocol import EventLogProtocol
 from pipelex.tracing.trace_events import AnyTraceEvent, TraceEvent
 
@@ -114,11 +115,10 @@ class DynamoDBEventLog(EventLogProtocol):
                 continue
             try:
                 event = _any_trace_event_adapter.validate_json(payload)
-                events.append(event)
-            except Exception as exc:
-                # TODO: wip - do not catch all exceptions
-                # TODO: wip - this could leak private data
-                log.warning(f"Skipping unparseable DynamoDB item: {exc}")
+            except ValidationError as exc:
+                log.warning(f"Skipping unparseable DynamoDB item PK={item.get('PK')} SK={item.get('SK')}: {format_pydantic_validation_error(exc)}")
+                continue
+            events.append(event)
 
         return events
 

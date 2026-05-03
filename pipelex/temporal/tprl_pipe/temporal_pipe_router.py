@@ -71,6 +71,12 @@ class TemporalPipeRouter(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtoc
             log.debug(f"TemporalPipeRouter: top-level dispatch, task_queue={self.task_queue}")
             executor = WorkflowExecutorFactory[PipeJob, PipeOutput]().create_executor(
                 task_queue=self.task_queue,
+                workflow_execution_timeout=self.execution_timeout,
+                retry_policy=self.retry_policy,
+                run_timeout=self.run_timeout,
+                task_timeout=self.task_timeout,
+                start_delay=self.start_delay,
+                rpc_timeout=self.rpc_timeout,
                 should_auto_connect_temporal=self.should_auto_connect_temporal,
                 worker_environment=self.worker_environment,
             )
