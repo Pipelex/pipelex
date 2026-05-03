@@ -1,0 +1,78 @@
+pipelex/tracing/dynamodb_event_log.py
+  3322f9aac293cd7d 14,19,118,120-121
+  88b6b16a1eb55bb9 119
+tests/unit/pipelex/temporal/test_full_catalog_collisions.py
+  88b6b16a1eb55bb9 1-128
+Makefile
+  feb152a75e4d6424 441
+pipelex/temporal/tprl_pipe/temporal_pipe_router.py
+  3de44d5553bac75e 74-79
+pyproject.toml
+  feb152a75e4d6424 100
+pipelex/temporal/temporal_tasks.py
+  88b6b16a1eb55bb9 3,53-54,56,58,60,62,65-85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "497520abf1b3169da57d47580c33e9ead4b22cfd",
+  "prompts": {
+    "3322f9aac293cd7d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "658f795d-458a-4e5c-9197-06ab97c02156",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 11,
+      "total_deletions": 8,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    },
+    "3de44d5553bac75e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1e1a2eba-72f9-4db2-a3e0-bfc10f83ec9f",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 0,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    },
+    "88b6b16a1eb55bb9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6318ef7a-4ba5-4100-8ece-7b5732fca5b6",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 162,
+      "total_deletions": 14,
+      "accepted_lines": 158,
+      "overriden_lines": 0
+    },
+    "feb152a75e4d6424": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bcb7bc9a-bfbd-4b66-b031-1ad5ab162294",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 1,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}
