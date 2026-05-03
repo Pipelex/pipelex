@@ -14,7 +14,7 @@ from pipelex.hub import get_class_registry
 from pipelex.pipe_run.exceptions import PipeJobError
 
 
-def _validate_as_known_class(item_class: type[StuffContent], raw_item: Any) -> StuffContent:
+def _validate_as_known_class(item_class: type[StuffContent], raw_item: StuffContent | dict[str, Any]) -> StuffContent:
     """Validate raw_item into item_class, tolerating cross-exec instances.
 
     When a child workflow ships a ListContent back, ``dump_for_temporal`` embeds
@@ -24,15 +24,17 @@ def _validate_as_known_class(item_class: type[StuffContent], raw_item: Any) -> S
     dynamic source and replaces the class in the registry — same name, new
     Python identity. Pydantic's ``model_validate`` then rejects the old
     instance because ``type(raw_item) is not item_class``. To bridge the gap,
-    we round-trip through ``model_dump()`` when we detect a cross-exec
-    instance.
+    we round-trip through ``smart_dump()`` (serialize_as_any) when we detect a
+    cross-exec instance, so nested subclass fields survive the round-trip.
     """
-    if type(raw_item) is item_class:
-        return raw_item
     if isinstance(raw_item, StuffContent):
-        # TODO: wip - use smart_dump() instead (--> serialize_as_any=True)
-        return item_class.model_validate(raw_item.model_dump())
-    return item_class.model_validate(raw_item)
+        if type(raw_item) is item_class:
+            return raw_item
+        else:
+            return item_class.model_validate(raw_item.smart_dump())
+    else:
+        assert isinstance(raw_item, dict)
+        return item_class.model_validate(raw_item)
 
 
 def _hydrate_list_item(raw_item: dict[str, Any] | str | StuffContent) -> StuffContent:
