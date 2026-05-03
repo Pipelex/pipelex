@@ -41,8 +41,8 @@ default-large-context-code = "gemini-3.0-pro"
 default-large-context-text = "gemini-2.5-flash"
 default-small = "gpt-4o-mini"
 default-small-structured = "gpt-4o-mini"
-default-small-vision = "gemini-2.5-flash-lite"
-default-small-creative = "gemini-2.5-flash-lite"
+default-small-vision = "gemini-3.0-flash-preview"
+default-small-creative = "gemini-3.0-flash-preview"
 
 ####################################################################################################
 # LLM Presets
