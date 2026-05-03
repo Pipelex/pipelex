@@ -104,12 +104,12 @@ Verify everything is set up correctly:
 pipelex doctor
 ```
 
-## Python Package Only
+## Standalone CLI
 
-If you just need the Pipelex runtime without agent integration:
+If you just need the Pipelex CLI without agent integration:
 
 ```bash
-pip install pipelex
+uv tool install pipelex
 pipelex init
 ```
 
