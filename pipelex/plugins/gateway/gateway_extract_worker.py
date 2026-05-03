@@ -151,7 +151,10 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
                     )
         except portkey_exceptions.APIError as exc:
             error_summary = GatewayFactory.make_error_summary_from_portkey_error(exc)
-            msg = f"Web fetch service error for URL '{document_uri}' via model '{self.inference_model.tag}' after {attempt_number} attempt(s): {error_summary}"
+            msg = (
+                f"Web fetch service error for URL '{document_uri}' via model '{self.inference_model.tag}' "
+                f"after {attempt_number} attempt(s): {error_summary}"
+            )
             raise ExtractJobFailureError(msg) from exc
 
         if response is None:
@@ -233,9 +236,7 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
             return "specified deployment could not be found" in msg
         # Transient upstream gateway failures (e.g. openrouter 500s during batch fetches)
         # should be retried rather than killing the whole batch on the first hiccup.
-        if isinstance(exc, (portkey_exceptions.InternalServerError, portkey_exceptions.APITimeoutError, portkey_exceptions.APIConnectionError)):
-            return True
-        return False
+        return isinstance(exc, (portkey_exceptions.InternalServerError, portkey_exceptions.APITimeoutError, portkey_exceptions.APIConnectionError))
 
     def _log_retry(self, retry_state: RetryCallState) -> None:
         """Called before sleeping between retries."""
