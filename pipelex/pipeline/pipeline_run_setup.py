@@ -38,6 +38,7 @@ from pipelex.system.environment import get_optional_env
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.otel_factory import OtelFactory
+from pipelex.tracing.event_log_factory import make_event_log
 
 if TYPE_CHECKING:
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
@@ -218,15 +219,7 @@ async def pipeline_run_setup(
         config = get_config()
         tracing_config = config.pipelex.tracing_config
         if tracing_config.is_enabled:
-            try:
-                # TODO: wip - cleanup + can raise configuration errors that are not caught here,
-                # causing setup to fail instead of gracefully continuing without tracing.
-                from pipelex.tracing.event_log_factory import make_event_log  # noqa: PLC0415
-
-                event_log = make_event_log(tracing_config)
-            except (ImportError, OSError) as exc:
-                log.warning(f"Failed to create event log, continuing without event tracing: {exc}")
-                event_log = None
+            event_log = make_event_log(tracing_config)
 
         graph_tracer_manager = GraphTracerManager.get_or_create_instance()
         graph_context = graph_tracer_manager.open_tracer(
