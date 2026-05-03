@@ -1,9 +1,12 @@
-"""Unit tests for schema_to_model: reconstructing BaseModel classes from JSON schemas."""
+"""Unit tests for SchemaToModelFactory: reconstructing BaseModel classes from JSON schemas."""
 
+import threading
+import uuid
 from typing import Any
 
 import pytest
 from pydantic import BaseModel, Field
+from pytest_mock import MockerFixture
 
 from pipelex.cogt.content_generation.exceptions import UnsafeSchemaError
 from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
@@ -109,6 +112,42 @@ class TestSchemaToModel:
         assert "age" in result_class.model_fields
         instance = result_class(name="Ada", age=40)
         assert instance.name == "Ada"  # type: ignore[attr-defined]
+
+    def test_concurrent_first_miss_generates_source_only_once(self, mocker: MockerFixture) -> None:
+        """N threads racing on the same uncached schema must trigger codegen exactly once.
+
+        The cache is class-level state shared across tests, so we use a unique title per
+        run to guarantee a cold-cache start. Without serialization, every thread that
+        observes the empty cache pays the full _generate_source_from_schema cost.
+        """
+        schema = SimpleModel.model_json_schema()
+        unique_title = f"ConcurrentMiss_{uuid.uuid4().hex}"
+        schema["title"] = unique_title
+
+        spy = mocker.spy(SchemaToModelFactory, "_generate_source_from_schema")
+
+        thread_count = 8
+        barrier = threading.Barrier(thread_count)
+        results: list[type[BaseModel]] = []
+        results_lock = threading.Lock()
+
+        def worker() -> None:
+            barrier.wait()
+            result = SchemaToModelFactory.make_from_json_schema(schema, unique_title)
+            with results_lock:
+                results.append(result)
+
+        threads = [threading.Thread(target=worker) for _ in range(thread_count)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        assert len(results) == thread_count
+        first_class = results[0]
+        for result_class in results[1:]:
+            assert result_class is first_class
+        assert spy.call_count == 1
 
     def test_exec_blocks_dangerous_builtins(self) -> None:
         """The restricted exec namespace blocks open(), eval(), exec(), and compile()."""

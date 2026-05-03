@@ -65,17 +65,19 @@ class SchemaToModelFactory:
         """
         cache_key = hashlib.sha256(json.dumps(schema, sort_keys=True).encode()).hexdigest()
 
+        # Hold the lock for the entire call. This kills the same-schema thundering herd
+        # (N concurrent first-misses each paying a full codegen+exec round) at the cost
+        # of also serializing cache hits on other schemas behind any in-flight miss.
+        # That trade-off is acceptable because real workloads use a small bounded set
+        # of distinct schemas, each generated once and cached for the process lifetime —
+        # post-warmup, contention is limited to sub-millisecond cache lookups.
         with cls._cache_lock:
             if cache_key in cls._schema_cache:
                 return cls._schema_cache[cache_key]
 
-        source_code = cls._generate_source_from_schema(schema)
-        reconstructed_class = cls._exec_and_extract_class(source_code, class_name)
-        reconstructed_class.__kajson_class_source__ = source_code  # type: ignore[attr-defined]
-
-        with cls._cache_lock:
-            if cache_key in cls._schema_cache:
-                return cls._schema_cache[cache_key]
+            source_code = cls._generate_source_from_schema(schema)
+            reconstructed_class = cls._exec_and_extract_class(source_code, class_name)
+            reconstructed_class.__kajson_class_source__ = source_code  # type: ignore[attr-defined]
             cls._schema_cache[cache_key] = reconstructed_class
 
         return reconstructed_class
