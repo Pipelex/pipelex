@@ -18,7 +18,7 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path
 if TYPE_CHECKING:
     from pipelex.kit.index_models import Target
 
-_DEFAULT_TARGETS: list[AgentTarget] = [AgentTarget.CLAUDE]
+_DEFAULT_TARGETS: list[AgentTarget] = [AgentTarget.CLAUDE, AgentTarget.AGENTS]
 
 
 def _get_preferred_targets_from_toml() -> list[AgentTarget]:
@@ -31,9 +31,10 @@ def _get_preferred_targets_from_toml() -> list[AgentTarget]:
 
     try:
         raw_targets = config["pipelex"]["kit_config"]["preferred_agent_targets"]
-        return [AgentTarget(item) for item in raw_targets]
+        parsed_targets = [AgentTarget(item) for item in raw_targets]
     except (KeyError, ValueError, TypeError):
         return _DEFAULT_TARGETS
+    return parsed_targets or _DEFAULT_TARGETS
 
 
 def check_rules_sync_cmd(show_diff: bool = True, quiet: bool = False) -> None:
@@ -51,12 +52,15 @@ def check_rules_sync_cmd(show_diff: bool = True, quiet: bool = False) -> None:
     preferred_targets = _get_preferred_targets_from_toml()
 
     # Cursor is exclusive of the single-file targets per config validator.
-    if AgentTarget.CURSOR in preferred_targets:
+    if preferred_targets == [AgentTarget.CURSOR]:
         if quiet:
             console.print("[green]✓ Agent rules sync check: PASSED[/green] (Cursor target - skipped)")
         else:
             console.print("[dim]Cursor target selected - sync check not applicable[/dim]")
         return
+    if AgentTarget.CURSOR in preferred_targets:
+        console.print("[red]Invalid config: preferred_agent_targets cannot mix 'cursor' with other targets[/red]")
+        sys.exit(1)
 
     targets_to_check: dict[str, Target] = {}
     for target_key in preferred_targets:

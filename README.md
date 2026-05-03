@@ -109,7 +109,7 @@ pipelex doctor
 If you just need the Pipelex runtime without agent integration:
 
 ```bash
-uv tool install pipelex
+pip install pipelex
 pipelex init
 ```
 
