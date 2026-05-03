@@ -54,6 +54,10 @@
 
 - **`docs/tools/cli/update.md` no longer claims the deck advisory fires on every CLI invocation.** Clarified that it is suppressed for `login`, `init`, `doctor`, `update`, and `which`.
 
+### Security
+
+- **`schema_to_model` rejects `x-python-*` codegen extensions and restricts `__import__` to an allowlist.** `datamodel-code-generator` honors the `x-python-import` JSON Schema extension by emitting arbitrary `from <module> import <name>` statements with no sanitization. Combined with the prior gap that `_make_restricted_builtins()` did not block `__import__`, an attacker able to plant a crafted `object_class_schema` on a Temporal payload (where `ObjectAssignment.object_class_schema: dict[str, Any]` round-trips untouched) could cause arbitrary modules to be imported during `exec()` of generated code. Two-layer defense added: (1) `_reject_unsafe_schema_extensions` raises `UnsafeSchemaError` if any `x-python-*` key is present anywhere in the schema; (2) `__import__` in the exec namespace is now wrapped to allow only `pydantic`, `typing`, `typing_extensions`, `enum`, `datetime`, `decimal`, `uuid`, `__future__`, `collections`, and `re`.
+
 ## [v0.25.2] - 2026-04-30
 
 ### Fixed

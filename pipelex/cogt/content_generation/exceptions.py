@@ -7,3 +7,7 @@ class ContentGenerationError(PipelexError):
 
 class NeitherUrlNorDataError(ContentGenerationError):
     pass
+
+
+class UnsafeSchemaError(ContentGenerationError):
+    pass

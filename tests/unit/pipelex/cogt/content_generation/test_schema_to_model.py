@@ -1,8 +1,11 @@
 """Unit tests for schema_to_model: reconstructing BaseModel classes from JSON schemas."""
 
+from typing import Any
+
 import pytest
 from pydantic import BaseModel, Field
 
+from pipelex.cogt.content_generation.exceptions import UnsafeSchemaError
 from pipelex.cogt.content_generation.schema_to_model import (
     _exec_and_extract_class,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
     model_class_from_json_schema,
@@ -22,6 +25,10 @@ class Address(BaseModel):
 class PersonWithAddress(BaseModel):
     name: str
     address: Address
+
+
+def _benign_object_schema() -> dict[str, Any]:
+    return {"title": "Innocent", "type": "object", "properties": {"x": {"type": "integer"}}}
 
 
 class TestSchemaToModel:
@@ -111,3 +118,158 @@ class TestSchemaToModel:
         malicious_source = "from pydantic import BaseModel\nclass Innocent(BaseModel):\n    name: str = 'ok'\nleaked = open('/etc/passwd')\n"
         with pytest.raises(NameError, match="open"):
             _exec_and_extract_class(malicious_source, "Innocent")
+
+    # ---- Layer 1: schema sanitization (x-python-* extensions are rejected) ----
+
+    def test_x_python_import_at_top_level_is_rejected(self) -> None:
+        """A schema with x-python-import at the top level is rejected before reaching codegen."""
+        schema = _benign_object_schema()
+        schema["x-python-import"] = {"module": "subprocess", "name": "run"}
+        with pytest.raises(UnsafeSchemaError) as exc_info:
+            model_class_from_json_schema(schema, "Innocent")
+        assert "x-python-import" in str(exc_info.value)
+
+    def test_x_python_import_in_defs_is_rejected(self) -> None:
+        """Realistic exploit shape: x-python-import nested under $defs is rejected.
+
+        This is the actual attack vector — datamodel-code-generator emits
+        `from subprocess import run` from this payload with zero sanitization.
+        """
+        schema: dict[str, Any] = {
+            "title": "Innocent",
+            "type": "object",
+            "properties": {"hit": {"$ref": "#/$defs/Run"}},
+            "$defs": {"Run": {"x-python-import": {"module": "subprocess", "name": "run"}}},
+        }
+        with pytest.raises(UnsafeSchemaError) as exc_info:
+            model_class_from_json_schema(schema, "Innocent")
+        assert "x-python-import" in str(exc_info.value)
+
+    def test_x_python_type_is_rejected(self) -> None:
+        """Sibling extension x-python-type must also be rejected."""
+        schema = _benign_object_schema()
+        schema["properties"]["x"]["x-python-type"] = "subprocess.Popen"
+        with pytest.raises(UnsafeSchemaError) as exc_info:
+            model_class_from_json_schema(schema, "Innocent")
+        assert "x-python-type" in str(exc_info.value)
+
+    @pytest.mark.parametrize(
+        "extension_key",
+        [
+            "x-python-import",
+            "x-python-type",
+            "x-python-class-name",
+            "x-python-fancy-future-feature",
+        ],
+    )
+    def test_any_x_python_extension_is_rejected(self, extension_key: str) -> None:
+        """Future-proofing: any x-python-* extension in the schema is rejected."""
+        schema = _benign_object_schema()
+        schema[extension_key] = "anything"
+        with pytest.raises(UnsafeSchemaError) as exc_info:
+            model_class_from_json_schema(schema, "Innocent")
+        assert extension_key in str(exc_info.value)
+
+    def test_deeply_nested_x_python_import_is_rejected(self) -> None:
+        """The walker must recurse into deeply nested structures (arrays + $defs + properties)."""
+        schema: dict[str, Any] = {
+            "title": "Outer",
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {"$ref": "#/$defs/Inner"},
+                }
+            },
+            "$defs": {
+                "Inner": {
+                    "type": "object",
+                    "properties": {
+                        "evil": {"x-python-import": {"module": "subprocess", "name": "run"}},
+                    },
+                },
+            },
+        }
+        with pytest.raises(UnsafeSchemaError) as exc_info:
+            model_class_from_json_schema(schema, "Outer")
+        assert "x-python-import" in str(exc_info.value)
+
+    def test_unsafe_schema_error_names_the_offending_path(self) -> None:
+        """The error message points to where the violation was found, for diagnostic logs."""
+        schema: dict[str, Any] = {
+            "title": "Innocent",
+            "type": "object",
+            "properties": {"hit": {"$ref": "#/$defs/Run"}},
+            "$defs": {"Run": {"x-python-import": {"module": "subprocess", "name": "run"}}},
+        }
+        with pytest.raises(UnsafeSchemaError) as exc_info:
+            model_class_from_json_schema(schema, "Innocent")
+        message = str(exc_info.value)
+        assert "$defs" in message
+        assert "Run" in message
+
+    def test_multiple_violations_are_all_reported(self) -> None:
+        """All violations in a single schema are surfaced — incident response needs the full picture."""
+        schema: dict[str, Any] = {
+            "title": "Innocent",
+            "type": "object",
+            "properties": {
+                "a": {"x-python-import": {"module": "subprocess", "name": "run"}},
+                "b": {"x-python-type": "os.system"},
+            },
+        }
+        with pytest.raises(UnsafeSchemaError) as exc_info:
+            model_class_from_json_schema(schema, "Innocent")
+        message = str(exc_info.value)
+        assert "x-python-import" in message
+        assert "x-python-type" in message
+
+    # ---- Layer 2: __import__ allowlist (defense-in-depth at the exec boundary) ----
+
+    def test_exec_blocks_import_subprocess(self) -> None:
+        """Even bypassing Layer 1, the restricted __import__ blocks `import subprocess`."""
+        malicious_source = "from pydantic import BaseModel\nimport subprocess\nclass Innocent(BaseModel):\n    name: str = 'ok'\n"
+        with pytest.raises(ImportError, match="subprocess"):
+            _exec_and_extract_class(malicious_source, "Innocent")
+
+    def test_exec_blocks_direct_dunder_import_call(self) -> None:
+        """A direct __import__('subprocess') call is also blocked."""
+        malicious_source = "from pydantic import BaseModel\nclass Innocent(BaseModel):\n    name: str = 'ok'\n_leak = __import__('subprocess')\n"
+        with pytest.raises(ImportError, match="subprocess"):
+            _exec_and_extract_class(malicious_source, "Innocent")
+
+    @pytest.mark.parametrize(
+        ("import_line", "expected_module"),
+        [
+            ("from os import system", "os"),
+            ("from socket import socket", "socket"),
+            ("import shutil", "shutil"),
+            ("from urllib.request import urlopen", "urllib"),
+        ],
+    )
+    def test_exec_blocks_dangerous_imports(self, import_line: str, expected_module: str) -> None:
+        """A range of dangerous stdlib imports is blocked by the allowlist."""
+        malicious_source = f"from pydantic import BaseModel\n{import_line}\nclass Innocent(BaseModel):\n    name: str = 'ok'\n"
+        with pytest.raises(ImportError, match=expected_module):
+            _exec_and_extract_class(malicious_source, "Innocent")
+
+    @pytest.mark.parametrize(
+        "import_line",
+        [
+            "from pydantic import BaseModel",
+            "from typing import Optional",
+            "from typing_extensions import override",
+            "from datetime import datetime",
+            "from decimal import Decimal",
+            "from uuid import UUID",
+            "from enum import Enum",
+            "from __future__ import annotations",
+            "from collections.abc import Mapping",
+            "import re",
+        ],
+    )
+    def test_exec_allowlisted_imports_succeed(self, import_line: str) -> None:
+        """Allowlisted imports required by datamodel-code-generator output continue to work."""
+        source = f"{import_line}\nfrom pydantic import BaseModel\nclass Innocent(BaseModel):\n    name: str = 'ok'\n"
+        result_class = _exec_and_extract_class(source, "Innocent")
+        assert result_class.__name__ == "Innocent"
