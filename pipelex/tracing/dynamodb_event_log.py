@@ -116,6 +116,7 @@ class DynamoDBEventLog(EventLogProtocol):
                 event = _any_trace_event_adapter.validate_json(payload)
                 events.append(event)
             except Exception as exc:
+                # TODO: wip - do not catch all exceptions
                 # TODO: wip - this could leak private data
                 log.warning(f"Skipping unparseable DynamoDB item: {exc}")
 
