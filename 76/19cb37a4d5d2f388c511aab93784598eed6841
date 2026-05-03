@@ -1,0 +1,217 @@
+.vscode/settings.json
+  b7de33ca7eb43b16 45
+pipelex/cli/agent_cli/commands/agent_output.py
+  b7de33ca7eb43b16 9,161-179,182-187,189-190,194-201,204-205
+pipelex/graph/graphspec.py
+  b7de33ca7eb43b16 19-22,288-296
+pipelex/plugins/gateway/gateway_img_gen_worker.py
+  b7de33ca7eb43b16 84,86
+pipelex/plugins/anthropic/anthropic_factory.py
+  b7de33ca7eb43b16 23-24,168,195,197-198
+pipelex/plugins/mistral/mistral_extract_worker.py
+  b7de33ca7eb43b16 3,6,12-15,19,63-109,115-121,146-155
+pipelex/plugins/openai/openai_config.py
+  b7de33ca7eb43b16 1,10-12,31
+pipelex/system/telemetry/exception_capture.py
+  b7de33ca7eb43b16 4,8-10,21,23
+tests/unit/pipelex/cli/test_error_handlers.py
+  b7de33ca7eb43b16 1-109
+tests/unit/pipelex/plugins/anthropic/test_anthropic_worker_object_error_handling.py
+  b7de33ca7eb43b16 1-267
+tests/unit/pipelex/graph/test_graphspec_roundtrip.py
+  b7de33ca7eb43b16 62-63,166
+tests/unit/pipelex/plugins/anthropic/test_data.py
+  b7de33ca7eb43b16 1-48
+tests/unit/pipelex/plugins/fal/test_data.py
+  b7de33ca7eb43b16 1-81
+wip/worker-error-handling-review.md
+  b7de33ca7eb43b16 1-270
+pipelex/cli/dev_cli/commands/check_rules_sync_cmd.py
+  b7de33ca7eb43b16 7,18-19,21-25,28,33-37,51-70
+pipelex/cogt/content_generation/content_generator.py
+  b7de33ca7eb43b16 344-345
+pipelex/plugins/anthropic/anthropic_exceptions.py
+  b7de33ca7eb43b16 1-6
+pipelex/cogt/model_backends/backend_library.py
+  b7de33ca7eb43b16 116,131,141
+tests/unit/pipelex/cogt/test_error_classification.py
+  b7de33ca7eb43b16 1-149
+tests/unit/pipelex/plugins/pypdfium2/test_data.py
+  b7de33ca7eb43b16 1-43
+pipelex/cogt/inference/error_classification.py
+  b7de33ca7eb43b16 1-105
+wip/error-handling-phase-4-markdown-cli.md
+  b7de33ca7eb43b16 1-84
+wip/error-handling-phases-0-3-completed.md
+  b7de33ca7eb43b16 1-200
+tests/unit/pipelex/cli/test_agent_output.py
+  b7de33ca7eb43b16 11,13,20,266-373
+.github/workflows/graph-ui-check.yml
+  b7de33ca7eb43b16 19-22
+tests/unit/pipelex/plugins/azure_rest/test_data.py
+  b7de33ca7eb43b16 1-73
+tests/unit/pipelex/plugins/fal/test_fal_worker_error_handling.py
+  b7de33ca7eb43b16 1-208
+tests/unit/pipelex/plugins/pypdfium2/test_pypdfium2_worker_error_handling.py
+  b7de33ca7eb43b16 1-128
+pipelex/plugins/linkup/linkup_search_worker.py
+  b7de33ca7eb43b16 4-14,17,28,41-75,90-112,145-168
+tests/unit/pipelex/plugins/azure_rest/test_azure_worker_error_handling.py
+  b7de33ca7eb43b16 1-185
+pipelex/plugins/anthropic/anthropic_llm_worker.py
+  b7de33ca7eb43b16 3-13,19-23,37,46,227-319,346-355,410-411,423-443
+pipelex/plugins/openai/openai_completions_img_gen_worker.py
+  b7de33ca7eb43b16 4,8,13-16,24,89-106,109,111-118,120-123
+tests/unit/pipelex/plugins/openai/test_openai_worker_error_handling.py
+  b7de33ca7eb43b16 1-352
+wip/instructor-unwrap-other-workers.md
+  b7de33ca7eb43b16 1-216
+tests/unit/pipelex/graph/test_graphspec_validation.py
+  b7de33ca7eb43b16 311-343
+tests/unit/pipelex/plugins/gateway/test_data.py
+  b7de33ca7eb43b16 1-86
+tests/unit/pipelex/plugins/gateway/test_gateway_quota_detection.py
+  b7de33ca7eb43b16 1-244
+pipelex/plugins/gateway/gateway_factory.py
+  b7de33ca7eb43b16 13,16,120-144
+.gitignore
+  b7de33ca7eb43b16 66-69
+package.json
+  b7de33ca7eb43b16 10
+pipelex/cli/dev_cli/commands/kit_cmd.py
+  b7de33ca7eb43b16 41-53,55-63,70,79,81,86-87,89-90
+pipelex/plugins/pypdfium2/pypdfium2_worker.py
+  b7de33ca7eb43b16 7,82-86,88-101
+tests/unit/pipelex/cli/test_check_rules_sync_cmd.py
+  b7de33ca7eb43b16 1-109
+tests/unit/pipelex/plugins/bedrock/test_bedrock_worker_error_handling.py
+  b7de33ca7eb43b16 1-160
+pipelex/plugins/openai/openai_img_gen_worker.py
+  b7de33ca7eb43b16 5,9,15-18,25,73-118
+pipelex/cli/error_handlers.py
+  b7de33ca7eb43b16 52,59-60,73,85-86,99,109-124,209,219-220,222
+pipelex/system/configuration/configs.py
+  b7de33ca7eb43b16 2,37-54
+pipelex/plugins/fal/fal_img_gen_worker.py
+  b7de33ca7eb43b16 4-5,9,17,55-59,61-69,71-108
+pipelex/plugins/gateway/gateway_search_worker.py
+  b7de33ca7eb43b16 183,185
+pipelex/system/telemetry/telemetry_manager_abstract.py
+  b7de33ca7eb43b16 3,11-13,31,121,202
+pipelex/cogt/img_gen/img_gen_worker_factory.py
+  b7de33ca7eb43b16 124-125,198
+tests/unit/pipelex/plugins/linkup/test_linkup_worker_error_handling.py
+  b7de33ca7eb43b16 1-168
+pipelex/system/telemetry/telemetry_factory.py
+  b7de33ca7eb43b16 50
+pipelex/plugins/openai/openai_completions_llm_worker.py
+  b7de33ca7eb43b16 4,9-13,26,149-167,170,172-179,181,184,190-198,242,245-263,266,268-275,277,280
+pipelex/kit/configs/inference/backends/pipelex_gateway_models.md
+  b7de33ca7eb43b16 315,323,331,339,347,601
+tests/unit/pipelex/cogt/test_data.py
+  b7de33ca7eb43b16 1-13
+pipelex/plugins/linkup/linkup_extract_worker.py
+  b7de33ca7eb43b16 3-16,19,27,59-98
+pipelex/pipelex.toml
+  b7de33ca7eb43b16 454-458
+pipelex/plugins/gateway/gateway_completions_factory.py
+  b7de33ca7eb43b16 28-29,46-54,106-107
+pipelex/plugins/portkey/portkey_completions_factory.py
+  b7de33ca7eb43b16 20-22,37-45,97-98
+pipelex/plugins/openai/openai_completions_factory.py
+  b7de33ca7eb43b16 1,16-19,29,31-41,97
+tests/unit/pipelex/plugins/huggingface/test_data.py
+  b7de33ca7eb43b16 1-72
+tests/unit/pipelex/plugins/mistral/test_mistral_worker_error_handling.py
+  b7de33ca7eb43b16 1-204
+tests/conftest.py
+  b7de33ca7eb43b16 3,24-26,60,95-96
+AGENTS.md
+  b7de33ca7eb43b16 1-363
+tests/unit/pipelex/plugins/openai/test_data.py
+  b7de33ca7eb43b16 1-62
+wip/error-handling-review.md
+  b7de33ca7eb43b16 1-528
+tests/unit/pipelex/plugins/bedrock/test_data.py
+  b7de33ca7eb43b16 1-64
+tests/unit/pipelex/plugins/linkup/test_data.py
+  b7de33ca7eb43b16 1-157
+pipelex/cogt/model_backends/backend_factory.py
+  b7de33ca7eb43b16 51-52
+tests/unit/pipelex/plugins/google/test_google_worker_error_handling.py
+  b7de33ca7eb43b16 1-229
+pipelex/plugins/bedrock/bedrock_llm_worker.py
+  b7de33ca7eb43b16 3,7-10,19,70-120
+pipelex/plugins/huggingface/huggingface_img_gen_worker.py
+  b7de33ca7eb43b16 4,9,53-83
+pipelex/plugins/mistral/mistral_llm_worker.py
+  b7de33ca7eb43b16 3,9-13,24,63-110,162-172,217-234
+pipelex/plugins/openai/openai_responses_llm_worker.py
+  b7de33ca7eb43b16 6,11-15,21,150-167,170,172-179,181,184,225,228-249,251-258,260,263
+tests/unit/pipelex/plugins/mistral/test_data.py
+  b7de33ca7eb43b16 1-144
+wip/error-handling-phase-7-temporal-bridge.md
+  b7de33ca7eb43b16 1-38
+pipelex/system/telemetry/otel_factory.py
+  b7de33ca7eb43b16 8,22-27,153,186-187,197,199,204,230-238
+tests/unit/pipelex/plugins/docling/test_data.py
+  b7de33ca7eb43b16 1-43
+pipelex/cli/dev_cli/commands/check_urls_cmd.py
+  b7de33ca7eb43b16 26-28,77,173,175-178
+pipelex/base_exceptions.py
+  b7de33ca7eb43b16 1-29,35-43
+pipelex/plugins/docling/docling_factory.py
+  b7de33ca7eb43b16 1,6-8,18,28-29
+tests/unit/pipelex/plugins/docling/test_docling_worker_error_handling.py
+  b7de33ca7eb43b16 1-120
+pipelex/plugins/gateway/gateway_extract_worker.py
+  b7de33ca7eb43b16 184,189,251,253
+wip/error-handling-phase-5-retry-architecture.md
+  b7de33ca7eb43b16 1-107
+CHANGELOG.md
+  b7de33ca7eb43b16 17-18,27-31,41
+pipelex/plugins/docling/docling_sdk.py
+  b7de33ca7eb43b16 3-5
+tests/unit/pipelex/plugins/google/test_data.py
+  b7de33ca7eb43b16 1-85
+wip/error-handling-phase-6-error-report-everywhere.md
+  b7de33ca7eb43b16 1-82
+tests/unit/pipelex/plugins/huggingface/test_hf_worker_error_handling.py
+  b7de33ca7eb43b16 1-143
+README.md
+  b7de33ca7eb43b16 69-80,112
+pipelex/plugins/azure_rest/azure_img_gen_worker.py
+  b7de33ca7eb43b16 4,10,94-143
+pipelex/cogt/exceptions.py
+  b7de33ca7eb43b16 5-7,15-31,33-58,62,87-88,127,131,135,155-156,170-171,180-181,189-190,198-199,219,275,282-285,317-319,322,327,338
+pipelex/urls.py
+  b7de33ca7eb43b16 35-42
+pipelex/plugins/docling/docling_extract_worker.py
+  b7de33ca7eb43b16 10,92-107
+tests/unit/pipelex/cogt/test_exceptions.py
+  b7de33ca7eb43b16 1-181
+pipelex/plugins/mistral/mistral_factory.py
+  b7de33ca7eb43b16 4,21-23,123,129-138
+tests/unit/pipelex/plugins/anthropic/test_anthropic_worker_error_handling.py
+  b7de33ca7eb43b16 1-225
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "7619cb37a4d5d2f388c511aab93784598eed6841",
+  "prompts": {
+    "b7de33ca7eb43b16": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "32d9639c-3c7a-4f71-848f-1bfec5b965de",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 7729,
+      "total_deletions": 395,
+      "accepted_lines": 7729,
+      "overriden_lines": 0
+    }
+  }
+}
