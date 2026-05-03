@@ -154,7 +154,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         log.verbose(f"ContentGeneratorChild generated object direct: {obj}")
-        return object_class.model_validate(obj.model_dump(serialize_as_any=True))
+        return object_class.model_validate(obj.model_dump(mode="json", serialize_as_any=True))
 
     @override
     @update_job_metadata
@@ -204,7 +204,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         log.verbose(f"ContentGeneratorChild generated object after text: {obj}")
-        return object_class.model_validate(obj.model_dump(serialize_as_any=True))
+        return object_class.model_validate(obj.model_dump(mode="json", serialize_as_any=True))
 
     @override
     @update_job_metadata

@@ -438,7 +438,7 @@ gha-tests: env
 	@echo "• Regenerating test model fixtures with ci profile"
 	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile ci
 	@echo "• Running unit tests for github actions (excluding inference and gha_disabled)"
-	$(VENV_PYTEST) -n auto --exitfirst --quiet -m "(dry_runnable or not inference) and not (gha_disabled or pipelex_api)" || [ $$? = 5 ]
+	$(VENV_PYTEST) -n auto --max-worker-restart=2 --timeout=180 --timeout-method=thread --tb=short -m "(dry_runnable or not inference) and not (gha_disabled or pipelex_api)" || [ $$? = 5 ]
 
 run-all-tests: env
 	$(call PRINT_TITLE,"Running all unit tests")
@@ -1024,11 +1024,24 @@ TEMPORAL_BUNDLE ?= tests/integration/pipelex/pipes/controller/pipe_sequence/pipe
 TEMPORAL_PIPE ?= simple_text_sequence
 TEMPORAL_LIB ?=
 
+TEMPORAL_SCOPE ?=
+
 temporal-worker: env
-	$(call PRINT_TITLE,"Starting Temporal worker")
-	$(if $(TEMPORAL_LIB),PIPELEXPATH=$(TEMPORAL_LIB),) $(VENV_PYTHON) -m pipelex.temporal.worker_cli --is-not-sandboxed
+	$(call PRINT_TITLE,"Starting Temporal worker$(if $(TEMPORAL_SCOPE), (scope: $(TEMPORAL_SCOPE)),)")
+	$(if $(TEMPORAL_LIB),PIPELEXPATH=$(TEMPORAL_LIB),) $(VENV_PYTHON) -m pipelex.temporal.worker_cli --is-not-sandboxed \
+		$(if $(TEMPORAL_SCOPE),--scope $(TEMPORAL_SCOPE),)
 
 tw: temporal-worker
+
+temporal-worker-router: env
+	$(MAKE) temporal-worker TEMPORAL_SCOPE=router
+
+twr: temporal-worker-router
+
+temporal-worker-runner: env
+	$(MAKE) temporal-worker TEMPORAL_SCOPE=runner
+
+twn: temporal-worker-runner
 
 temporal-run: env
 	$(call PRINT_TITLE,"Running pipe through Temporal")

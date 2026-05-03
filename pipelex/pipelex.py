@@ -44,6 +44,7 @@ from pipelex.observer.multi_observer import MultiObserver
 from pipelex.observer.observer_protocol import ObserverNoOp, ObserverProtocol
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
+from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipeline.pipeline_manager import PipelineManager
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
 from pipelex.plugins.plugin_manager import PluginManager
@@ -414,13 +415,20 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         if pipe_router:
             self.pipelex_hub.set_pipe_router(pipe_router)
         elif get_config().temporal.is_enabled:
-            from pipelex.temporal.tprl_pipe.pipe_router_child import make_tprl_pipe_router_child  # noqa: PLC0415
-            from pipelex.temporal.tprl_pipe.pipe_router_top import make_tprl_pipe_router_top  # noqa: PLC0415
+            from pipelex.temporal.tprl_pipe.temporal_pipe_router import make_temporal_pipe_router  # noqa: PLC0415
 
-            self.pipelex_hub.set_pipe_router_top(make_tprl_pipe_router_top())
-            self.pipelex_hub.set_pipe_router(make_tprl_pipe_router_child())
+            self.pipelex_hub.set_pipe_router(make_temporal_pipe_router())
         else:
             self.pipelex_hub.set_pipe_router(PipeRouter(observer=multi_observer))
+
+        # --- Pipe Run --------------------------------------------------------------------------
+
+        if get_config().temporal.is_enabled:
+            from pipelex.temporal.tprl_pipe.temporal_pipe_run import make_temporal_pipe_run  # noqa: PLC0415
+
+            self.pipelex_hub.set_pipe_run(make_temporal_pipe_run())
+        else:
+            self.pipelex_hub.set_pipe_run(PipeRun(pipe_router=self.pipelex_hub.get_required_pipe_router()))
 
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done")
 

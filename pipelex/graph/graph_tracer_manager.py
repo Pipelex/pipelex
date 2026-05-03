@@ -268,20 +268,20 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def register_execution_data(
         self,
-        graph_id: str,
+        lookup_key: str,
         node_id: str | None,
         execution_data: dict[str, Any],
     ) -> None:
         """Register execution metadata for a node.
 
         Args:
-            graph_id: The graph identifier.
+            lookup_key: The tracer lookup key (graph_id or workflow_id).
             node_id: The node ID to attach execution data to.
             execution_data: Dictionary of execution metadata.
         """
         if node_id is None:
             return
-        tracer = self._get_tracer(graph_id)
+        tracer = self._get_tracer(lookup_key)
         if tracer is None:
             return
         tracer.register_execution_data(node_id=node_id, execution_data=execution_data)

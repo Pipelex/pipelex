@@ -1,6 +1,6 @@
 import asyncio
 import inspect
-from typing import Literal, cast, get_args, get_origin, get_type_hints
+from typing import Any, Literal, cast, get_args, get_origin, get_type_hints
 
 from pydantic import field_validator
 from typing_extensions import override
@@ -229,6 +229,18 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             name=output_name,
         )
 
+        # Capture execution data for the graph tracer. PipeFunc has no prompts or
+        # models to record, but the sidepanel should still show *what* function ran
+        # and what kind of content it returned — useful for debugging and for
+        # distinguishing multiple PipeFunc nodes in a graph.
+        execution_data_dict: dict[str, Any] = {
+            "function_name": self.function_name,
+            "function_module": getattr(function, "__module__", None),
+            "function_qualname": getattr(function, "__qualname__", self.function_name),
+            "output_content_type": type(the_content).__name__,
+        }
+        self._register_execution_data(job_metadata, execution_data_dict)
+
         return PipeFuncOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
@@ -276,6 +288,18 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             stuff=output_stuff,
             name=output_name,
         )
+
+        # Capture execution data for the graph tracer. Dry run does NOT invoke the
+        # real function — we flag that explicitly so the sidepanel can show a
+        # "mock output" indicator and explain why no real function_result is present.
+        execution_data_dict: dict[str, Any] = {
+            "function_name": self.function_name,
+            "function_module": getattr(function, "__module__", None),
+            "function_qualname": getattr(function, "__qualname__", self.function_name),
+            "output_content_type": type(mock_content).__name__,
+            "is_mock_output": True,
+        }
+        self._register_execution_data(job_metadata, execution_data_dict)
 
         return PipeFuncOutput(
             working_memory=working_memory,

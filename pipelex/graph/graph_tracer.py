@@ -27,6 +27,7 @@ from pipelex.tracing.trace_events import (
     BatchItemEvent,
     ControllerOutputEvent,
     EdgeEvent,
+    ExecutionDataEvent,
     ParallelCombineEvent,
     PipeEndErrorEvent,
     PipeEndSuccessEvent,
@@ -159,7 +160,13 @@ class GraphTracer(GraphTracerProtocol):
         self._event_log.emit(event)
 
     def _next_event_sequence(self) -> int:
-        """Return the next monotonic sequence number for event emission."""
+        """Return the next monotonic sequence number for event emission.
+
+        Delegates to the event log's shared counter so that all emitters
+        (GraphTracer, ReportingManager) produce unique sequences.
+        """
+        if self._event_log is not None:
+            return self._event_log.next_sequence()
         seq = self._event_sequence
         self._event_sequence += 1
         return seq
@@ -573,7 +580,19 @@ class GraphTracer(GraphTracerProtocol):
         )
         self._nodes[node_id] = node_data
 
-        # Emit PipeStartEvent
+        # Accumulate pipe and concept registry data (deduplicated)
+        if graph_context.data_inclusion.pipe_and_concept_registry:
+            if pipe_data is not None:
+                pipe_ref = f"{pipe_data.get('domain_code', '')}.{pipe_data.get('code', '')}"
+                if pipe_ref not in self._pipe_registry:
+                    self._pipe_registry[pipe_ref] = pipe_data
+            if concept_data is not None:
+                for concept_item in concept_data:
+                    concept_ref = f"{concept_item.get('domain_code', '')}.{concept_item.get('code', '')}"
+                    if concept_ref not in self._concept_registry:
+                        self._concept_registry[concept_ref] = concept_item
+
+        # Emit PipeStartEvent (after registry accumulation so fields are populated)
         if self._event_log is not None:
             self._emit_event(
                 PipeStartEvent(
@@ -587,19 +606,10 @@ class GraphTracer(GraphTracerProtocol):
                     pipe_type=pipe_type,
                     node_kind=node_kind,
                     input_specs=input_specs or [],
+                    pipe_data=pipe_data or {},
+                    concept_data=concept_data or [],
                 )
             )
-        # Accumulate pipe and concept registry data (deduplicated)
-        if graph_context.data_inclusion.pipe_and_concept_registry:
-            if pipe_data is not None:
-                pipe_ref = f"{pipe_data.get('domain_code', '')}.{pipe_data.get('code', '')}"
-                if pipe_ref not in self._pipe_registry:
-                    self._pipe_registry[pipe_ref] = pipe_data
-            if concept_data is not None:
-                for concept_item in concept_data:
-                    concept_ref = f"{concept_item.get('domain_code', '')}.{concept_item.get('code', '')}"
-                    if concept_ref not in self._concept_registry:
-                        self._concept_registry[concept_ref] = concept_item
 
         # Add containment edge from parent if this is a child pipe
         if graph_context.parent_node_id is not None:
@@ -630,6 +640,19 @@ class GraphTracer(GraphTracerProtocol):
         if node_data is None:
             return
         node_data.execution_data.update(execution_data)
+
+        # Emit ExecutionDataEvent
+        if self._event_log is not None:
+            self._emit_event(
+                ExecutionDataEvent(
+                    pipeline_run_id=self._event_pipeline_run_id,
+                    workflow_id=self._workflow_id,
+                    timestamp=datetime.now(timezone.utc),
+                    sequence=self._next_event_sequence(),
+                    node_id=node_id,
+                    execution_data=execution_data,
+                )
+            )
 
     @override
     def on_pipe_end_success(
@@ -688,6 +711,7 @@ class GraphTracer(GraphTracerProtocol):
                     ended_at=ended_at,
                     output_spec=output_spec,
                     metrics=metrics or {},
+                    output_concept_data=output_concept_data or {},
                 )
             )
 

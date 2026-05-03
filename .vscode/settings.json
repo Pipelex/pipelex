@@ -1,6 +1,11 @@
 {
     "[python]": {
-        "editor.defaultFormatter": "charliermarsh.ruff"
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit",
+            "source.fixAll": "explicit"
+        }
     },
     "ruff.configuration": "--config=pyproject.toml",
     "mypy.enabled": true,

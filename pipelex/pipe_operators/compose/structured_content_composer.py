@@ -60,6 +60,10 @@ class StructuredContentComposer:
         self.extra_context = extra_context or {}
         self.content_generator = content_generator or get_content_generator()
         self.pipe_run_params = pipe_run_params
+        # Per-field record of how each field was built. Populated as fields resolve.
+        # Shape per entry: {"method": ConstructFieldMethod, "rendered": str (templates only)}.
+        # Nested fields record only their method; their sub-fields are not surfaced.
+        self.field_resolutions: dict[str, dict[str, Any]] = {}
 
     async def compose(self) -> StuffContent:
         """Compose the StructuredContent asynchronously.
@@ -127,6 +131,7 @@ class StructuredContentComposer:
         Returns:
             The resolved value for the field
         """
+        self.field_resolutions[field_name] = {"method": field_blueprint.method}
         match field_blueprint.method:
             case ConstructFieldMethod.FIXED:
                 return field_blueprint.fixed_value
@@ -135,7 +140,9 @@ class StructuredContentComposer:
                 return self._resolve_from_var(field_blueprint=field_blueprint, field_name=field_name)
 
             case ConstructFieldMethod.TEMPLATE:
-                return await self._resolve_template(field_blueprint=field_blueprint)
+                rendered_text = await self._resolve_template(field_blueprint=field_blueprint)
+                self.field_resolutions[field_name]["rendered"] = rendered_text
+                return rendered_text
 
             case ConstructFieldMethod.NESTED:
                 return await self._resolve_nested(field_blueprint=field_blueprint, field_name=field_name)

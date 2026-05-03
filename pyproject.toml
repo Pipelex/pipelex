@@ -24,10 +24,10 @@ dependencies = [
   "datamodel-code-generator>=0.55.0",
   "filetype>=1.2.0",
   "httpx>=0.23.0,<1.0.0",
-  "instructor>=1.8.3,!=1.11.*,!=1.12.*",                # 1.11.x caused typing errors with mypy
+  "instructor>=1.8.3,!=1.11.*,!=1.12.*",                                         # 1.11.x caused typing errors with mypy
   "jinja2>=3.1.4",
   "json2html>=1.3.0",
-  "kajson==0.4.2",
+  "kajson @ git+https://github.com/Pipelex/kajson.git@fix/enum-source-registry",
   "markdown>=3.6",
   "mthds>=0.2.0",
   "networkx>=3.4.2",
@@ -44,7 +44,7 @@ dependencies = [
   "pydantic>=2.10.6,<3.0.0",
   "python-dotenv>=1.0.1",
   "PyYAML>=6.0.2",
-  "reportlab>=4.0,<5",                                  # for generating synthetic PDFs
+  "reportlab>=4.0,<5",                                                           # for generating synthetic PDFs
   "rich>=13.8.1",
   "semantic-version>=2.10.0",
   "shortuuid>=1.0.13",
@@ -72,6 +72,7 @@ google-genai = ["google-genai", "instructor[google-genai]"]
 huggingface = ["huggingface_hub>=0.23,<1.0.0"]
 linkup = ["linkup-sdk>=0.12.0"]
 mistralai = ["mistralai>=1.12.0"]
+dynamodb = ["boto3>=1.34.131"]
 s3 = ["boto3>=1.34.131", "aioboto3>=13.4.0"]
 temporal = ["temporalio==1.23.0", "aiohttp>=3.9.0"]
 docs = [
@@ -86,7 +87,7 @@ docs = [
 
 dev = [
   "boto3-stubs>=1.35.24",
-  "moto[s3]>=5.0.0",
+  "moto[dynamodb,s3]>=5.0.0",
   "mypy==1.19.1",
   "pipelex-tools>=0.3.2",
   "pyright==1.1.408",
@@ -96,6 +97,7 @@ dev = [
   "pytest-cov>=6.1.1",
   "pytest-mock>=3.14.0",
   "pytest-sugar>=1.0.0",
+  "pytest-timeout>=2.3.1",
   "pytest-xdist>= 3.6.1",
   "ruff==0.14.13",
   "types-aioboto3[bedrock,bedrock-runtime]>=13.4.0",

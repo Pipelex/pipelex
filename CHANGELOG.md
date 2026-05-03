@@ -1,5 +1,43 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **PipeRun layer**: New `PipeRunProtocol` with `PipeRun` (direct) and `TemporalPipeRun` (Temporal) implementations. Wraps pipe execution + delivery in a single orchestration unit. In Temporal mode, `WfPipeRun` workflow orchestrates `WfPipeRouter` as a child workflow followed by delivery activities.
+- **Delivery framework**: `DeliveryAssignment` model with `WebhookDeliveryAssignment` (HTTP POST) and `StorageDeliveryAssignment` (S3/local). Deliveries run as Temporal activities with automatic retry, or inline in direct mode.
+- **`TemporalPipeRun.start()`**: Non-blocking start that returns `workflow_id` + `WorkflowHandle` immediately. Replaces the former `PipeRouterTop.start_pipe_job()`.
+- **Pre-generated `pipeline_run_id` support**: `pipeline_run_setup()`, `PipelineFactory`, and `PipelineManager` accept an optional `pipeline_run_id` parameter for external run record creation.
+- **`workflow_id` in start response**: `PipelexPipelineStartResponse` includes `workflow_id`.
+- **Temporal `callbacks` passthrough**: `WorkflowExecutor.start_workflow()` accepts optional Temporal `Callback` objects.
+- **DynamoDB event log backend**: New `DynamoDBEventLog` implementation of `EventLogProtocol` for cloud-based trace event storage. Installable via `pip install "pipelex[dynamodb]"`.
+- **Event log DI**: Event log backend is now configurable via `TracingConfig.backend` (`"ndjson"` or `"dynamodb"`) and injectable via `Pipelex.setup(event_log=...)`. Factory function `make_event_log()` selects the backend from config or hub injection.
+- **Hub event_log support**: `PipelexHub.set_event_log()` / `get_event_log()` for dependency injection of custom event log backends.
+- **Environment-specific config**: `RunEnvironment` enum values updated to full names (`"development"`, `"production"`). Config loaded from `ENVIRONMENT` env var (was `ENV`).
+
+### Changed
+
+- **`PipeRouterTop` + `PipeRouterChild` merged into `TemporalPipeRouter`**: Single router that auto-detects context (top-level vs child workflow) and dispatches accordingly. Hub no longer needs `_pipe_router_top` — one `_pipe_router` field handles both modes.
+- **`PipelexRunner.execute_pipeline()` uses `get_pipe_run()`**: Runner now delegates to the PipeRun layer instead of calling `get_pipe_router()` directly.
+- **Tracing config structure**: `TracingConfig` now has `backend`, `ndjson` (with `traces_dir`), and `dynamodb` (with `table_name`, `region`) sub-configs. Tracing is enabled by default.
+- **Event log factory replaces hardcoded NdjsonEventLog**: The 3 call sites (`pipeline_run_setup.py`, `wf_pipe_router.py`, `runner.py`) now use `make_event_log()` instead of directly instantiating `NdjsonEventLog`.
+- **Tracing decoupled from Temporal**: Event log is created when `tracing_config.is_enabled`, regardless of whether Temporal is enabled.
+
+### Removed
+
+- **`PipeRouterTop`** — replaced by `TemporalPipeRouter` + `TemporalPipeRun`.
+- **`PipeRouterChild`** — merged into `TemporalPipeRouter`.
+- **`PipelexHub.set_pipe_router_top()`** — no longer needed; single `set_pipe_router()` suffices.
+
+### Fixed
+
+- **ObjectAssignment deserialization on Temporal workers**: Removed `__init__` class registry check that blocked deserialization of `ObjectAssignment` before `library_crate` was loaded. Validation moved to `validate_before_execution()` method, following the existing codebase pattern.
+- **Dynamic concept classes in Temporal activities**: `WfPipeRouter` now propagates dynamically registered concept classes from the per-workflow registry to the global registry, so child workflows and activities can access them.
+- **Temporal nondeterminism in child workflow IDs**: Replaced `shortuuid.uuid()` with `workflow.uuid4()` in `TemporalPipeRouter` for deterministic child workflow ID generation. The old code caused TMPRL1100 errors on workflow replay.
+- **Enum fields (`choices`) breaking Temporal serialization**: Concepts with `choices` fields generated `Enum` classes that couldn't be resolved during `model_rebuild` or deserialized across Temporal workflow boundaries. Fixed `_exec_and_extract_class` to include all generated types (models + enums) in the forward reference namespace.
+- **Enum serialization in `ContentGeneratorChild`**: `model_dump()` now uses `mode="json"` to serialize enum values as plain strings, preventing type mismatch when validating across different model class instances.
+- **`Anything[]` hydration in Temporal**: Working memory hydration failed for `Anything` concept lists because `AnythingContent` doesn't exist as a class. Hydration now gracefully falls back to embedded `__class__` metadata or `TextContent` for items without type information.
+
 ## [v0.23.8] - 2026-04-07
 
 ### Changed

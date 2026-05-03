@@ -77,6 +77,14 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
 <tr>
+<td>claude-4.6-sonnet</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+</tr>
+<tr>
 <td>deepseek-v3.2</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
@@ -528,6 +536,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-04-04T17:05:38Z
+> Last updated: 2026-04-14T07:26:54Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.

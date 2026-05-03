@@ -186,10 +186,54 @@ if activity-level storage isn't implemented.
 
 Same as Mode 1 Step 1.
 
-### Step 2: Start the worker process
+### Step 2: Start the worker processes
 
-The worker should NOT have test bundles in its PIPELEXPATH — the whole point is that
-bundles arrive via the LibraryCrate in the PipeJob.
+The workers should NOT have test bundles in their PIPELEXPATH — the whole point is
+that bundles arrive via the LibraryCrate in the PipeJob.
+
+**Two scoped workers (cross-process regression setup — recommended).**
+Splits responsibilities so workflows and activities run in different processes:
+- `router` worker registers all workflows (`WfPipeRouter`, `WfPipeRun`, …),
+  `disable_all_activities = true`.
+- `runner` worker registers all activities (`act_deliver`, `act_llm_*`,
+  `act_assemble_graph`, `act_flush_trace_events`, …), `disable_all_workflows = true`.
+
+This forces every activity to be picked up by a *different* Python process than the
+workflow that scheduled it. The runner process never executes `WfPipeRouter`, so it
+never loads the LibraryCrate and its global `ClassRegistry` stays cold for any
+dynamic concept defined in the bundle.
+
+> ⚠️ **Important — what this setup does NOT reproduce on its own.**
+> Plain `pipelex run bundle` (Tiers 1–3 below) does NOT trigger the runner-side
+> registry decode bug, because:
+> - `WfPipeRouter` dehydrates `pipe_output` via `prepare_for_temporal()` before
+>   returning, so workflow-level transit carries raw dicts (no class lookup).
+> - `WfPipeRun` rehydrates back on the *router* (same process that loaded the crate).
+> - Activities the runner actually executes in dry-run (`act_assemble_graph`,
+>   `act_flush_trace_events`) operate on raw event records — no dynamic class needed.
+> - `act_deliver` is **only scheduled when `delivery_assignment is not None`**
+>   (`wf_pipe_run.py:79`), and `pipelex run bundle` does not pass one.
+>
+> To deterministically force a hydrated `pipe_output` across the process boundary,
+> run **Tier 2b** below (mirrors the cloud / `start_pipeline` + webhook path).
+
+```bash
+tmux has-session -t temporal-worker-router 2>/dev/null && tmux kill-session -t temporal-worker-router
+tmux has-session -t temporal-worker-runner 2>/dev/null && tmux kill-session -t temporal-worker-runner
+tmux new-session -d -c "$PWD" -s temporal-worker-router \
+  '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope router'
+tmux new-session -d -c "$PWD" -s temporal-worker-runner \
+  '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope runner'
+sleep 4
+tmux capture-pane -t temporal-worker-router -p -S -30
+tmux capture-pane -t temporal-worker-runner -p -S -30
+```
+
+Look for `Temporal Worker started for 'temporal_task_queue'` in each session, plus
+`Temporal Worker scope: 'router'` and `'runner'` respectively.
+
+**Alternative — single full worker** (simpler, but masks distributed-execution bugs;
+use only when you don't need the regression coverage):
 
 ```bash
 tmux has-session -t temporal-worker 2>/dev/null && tmux kill-session -t temporal-worker
@@ -199,7 +243,9 @@ sleep 4
 tmux capture-pane -t temporal-worker -p -S -30
 ```
 
-Look for `Temporal Worker started for 'temporal_task_queue'`.
+When using two scoped workers, replace any later capture commands like
+`tmux capture-pane -t temporal-worker ...` with the appropriate session name
+(`temporal-worker-router` or `temporal-worker-runner`).
 
 ### Step 3: Sequential tests — run one at a time, report after each
 
@@ -220,12 +266,18 @@ them in order. This is the most basic "does Temporal work at all" test.
 
 After this completes, tell the user: PASS/FAIL, output dir, graph file path.
 
-**Tier 2 — Can the worker handle concepts it has never seen?**
+**Tier 2 — Can the worker handle concepts it has never seen? (in-process hydration)**
 
 This sends a pipeline that defines a custom concept (`Greeting` with `message` and
-`language` fields) at runtime. The worker must register this dynamic class before
-trying to deserialize the WorkingMemory that contains `Greeting` instances. If the
-hydration order is wrong, this fails with `KajsonDecoderError: Class 'Greeting' not found`.
+`language` fields) at runtime. `WfPipeRouter` must register this dynamic class
+into the per-workflow registry before hydrating the WorkingMemory. If the hydration
+order is wrong **on the router**, this fails with
+`KajsonDecoderError: Class 'Greeting' not found`.
+
+> Note: in dry-run with `pipelex run bundle` (no `delivery_assignment`), this tier
+> only exercises hydration **on the router process**, not cross-process. It will
+> pass even if the runner's registry is cold — see Tier 2b for the deterministic
+> cross-process repro.
 
 ```bash
 .venv/bin/pipelex run bundle \
@@ -235,6 +287,45 @@ hydration order is wrong, this fails with `KajsonDecoderError: Class 'Greeting' 
 ```
 
 After this completes, tell the user: PASS/FAIL, output dir, graph file path.
+
+**Tier 2b — Cross-process registry regression (deterministic, dry-run).**
+
+Same bundle as Tier 2, but submitted with a `DeliveryAssignment` attached. This
+mirrors the cloud / `start_pipeline` + webhook path: `wf_pipe_run.py:79` then
+schedules `act_deliver` on the runner with `pipe_output` carrying a hydrated
+`WorkingMemory`. Temporal's data converter on the **runner process** must decode
+the dynamic concept class — which is the exact path the `wf_pipe_router.py:71-80`
+in-process propagation hack does NOT cover.
+
+If the registry propagation across processes is broken, this fails every time with:
+
+```
+KajsonDecoderError: Class '<bundle>__<DynamicConcept>' not found
+  in module 'builtins' or global registry
+ApplicationError: Failed decoding arguments
+  → temporalio/worker/_activity.py:566 (data_converter.decode_wrapper)
+```
+
+The error surfaces on the **runner** tmux session, raised by the activity worker
+*before* the activity body runs.
+
+```bash
+.venv/bin/python .claude/skills/temporal-e2e-validate/scripts/repro_runner_registry_bug.py
+```
+
+To reproduce against a different bundle:
+
+```bash
+.venv/bin/python .claude/skills/temporal-e2e-validate/scripts/repro_runner_registry_bug.py \
+  --bundle <path/to/bundle.mthds> --pipe <pipe_code>
+```
+
+After this completes, tell the user:
+- PASS/FAIL.
+- If FAIL: capture the runner log with
+  `tmux capture-pane -t temporal-worker-runner -p -S -300 | tail -120`
+  and quote the `KajsonDecoderError` and `ApplicationError: Failed decoding arguments`
+  lines verbatim, plus the activity name (`act_deliver`).
 
 **Tier 3 — Do parallel branches execute as separate child workflows?**
 
@@ -561,6 +652,7 @@ ls results/*/reactflow.html
 |------|---------------|--------|-------|-----------------|
 | Tier 1: Sequence | Worker can unpack crate and run a pipe sequence | PASS/FAIL | path | — |
 | Tier 2: Hydration | Worker handles dynamic concepts it has never seen | PASS/FAIL | path | — |
+| Tier 2b: Cross-process registry | `act_deliver` decodes hydrated `pipe_output` on runner (forced via `delivery_assignment`) | PASS/FAIL | — | — |
 | Tier 3: Parallel | Branches execute as concurrent child workflows | PASS/FAIL | path | — |
 | Tier 4: ImgGen | Image generation pipeline works through Temporal | PASS/FAIL | path | yes/no |
 | Tier 5: Image flow | Generated image flows as input to next pipe step | PASS/FAIL | path | yes/no |

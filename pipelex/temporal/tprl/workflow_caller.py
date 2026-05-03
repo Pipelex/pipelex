@@ -1,10 +1,11 @@
+from collections.abc import Sequence
 from datetime import timedelta
 from typing import Any, Callable, Coroutine, Generic, Protocol, TypeVar, Union, cast
 
 from pydantic import BaseModel
 from temporalio import workflow
+from temporalio.client import Callback, WorkflowHandle
 from temporalio.client import Client as TemporalClient
-from temporalio.client import WorkflowHandle
 from temporalio.common import RetryPolicy
 from temporalio.exceptions import ApplicationError, ChildWorkflowError
 from temporalio.workflow import ChildWorkflowHandle
@@ -110,6 +111,7 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
                 rpc_timeout=self.rpc_timeout,
             )
         except Exception as exc:
+            # TODO: wip - do not catch all exceptions
             log.error(f"Failed to execute workflow {workflow_class.__name__}: {exc}")
             msg = f"Failed to execute workflow {workflow_class.__name__}"
             raise WorkflowExecutionError(msg) from exc
@@ -119,6 +121,7 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
         workflow_class: type[WorkflowClass[WorkflowInput, WorkflowOutput]],
         workflow_arg: WorkflowInput,
         workflow_id: str,
+        callbacks: Sequence[Callback] | None = None,
     ) -> WorkflowHandle[WorkflowClass[WorkflowInput, WorkflowOutput], WorkflowOutput]:
         """Start a workflow without waiting for its completion."""
         try:
@@ -137,6 +140,7 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
                 task_timeout=self.task_timeout,
                 start_delay=self.start_delay,
                 rpc_timeout=self.rpc_timeout,
+                callbacks=callbacks or [],
             )
         except Exception as exc:
             log.error(f"Failed to start workflow {workflow_class.__name__}: {exc}")

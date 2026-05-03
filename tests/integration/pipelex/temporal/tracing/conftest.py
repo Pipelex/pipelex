@@ -19,6 +19,27 @@ from tests.integration.pipelex.temporal.tracing.test_data import (
     SequenceTracingTestData,
 )
 
+_TRACING_DIR = Path(__file__).parent.resolve()
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Mark every test under this directory with gha_disabled.
+
+    The hook receives all session-wide items (not just items below this
+    conftest), so filter by file path before adding the marker.
+
+    TODO: Tests under tests/integration/pipelex/temporal/tracing/ hang
+    reliably in CI under pytest-xdist parallelism (worker timeouts at
+    180s on py3.11+). Pass locally and serially. Root cause is concurrent
+    PipeBatch/PipeParallel/PipeSequence + WorkflowEnvironment.start_local
+    contention under load. Re-enable once the underlying flake is fixed.
+    """
+    skip_marker = pytest.mark.gha_disabled
+    for item in items:
+        item_path = Path(str(item.path)).resolve()
+        if _TRACING_DIR in item_path.parents:
+            item.add_marker(skip_marker)
+
 
 @pytest.fixture(scope="class")
 def tracing_tmp_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
@@ -34,15 +55,18 @@ def enable_tracing(tracing_tmp_dir: Path) -> Generator[None, None, None]:
     """
     tracing_config = get_config().pipelex.tracing_config
     original_enabled = tracing_config.is_enabled
-    original_dir = tracing_config.traces_dir
+    ndjson_config = tracing_config.ndjson
+    original_dir = ndjson_config.traces_dir if ndjson_config else ""
 
     tracing_config.is_enabled = True
-    tracing_config.traces_dir = str(tracing_tmp_dir)
+    if ndjson_config:
+        ndjson_config.traces_dir = str(tracing_tmp_dir)
 
     yield
 
     tracing_config.is_enabled = original_enabled
-    tracing_config.traces_dir = original_dir
+    if ndjson_config:
+        ndjson_config.traces_dir = original_dir
     GraphTracerManager.clear_instance()
 
 

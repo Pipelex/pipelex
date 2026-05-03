@@ -64,12 +64,23 @@ theme = "dark"
 palette = "dracula"
 
 ####################################################################################################
-# Tracing Config (NDJSON event log for distributed tracing across Temporal workers)
+# Tracing Config (event log for distributed tracing across Temporal workers)
 ####################################################################################################
 
 [pipelex.tracing_config]
-is_enabled = false
+is_enabled = true
+backend = "ndjson"
+
+[pipelex.tracing_config.ndjson]
 traces_dir = ".pipelex/traces"
+
+[pipelex.tracing_config.dynamodb]
+table_name = ""
+region = ""
+
+[pipelex.tracing_config.temporal_dynamodb]
+table_name = ""
+region = ""
 
 ####################################################################################################
 # Storage Config
@@ -274,8 +285,3 @@ managed_loggers = [
   "temporalio.workflow",
   "temporalio.worker._activity",
 ]
-
-[temporal.temporal_config.temporal_tasks_config]
-required_tasks_packs = ["crafting"]
-required_workflows = []
-required_activities = []

@@ -98,7 +98,7 @@ class PipeAbstract(ABC, BaseModel):
         if tracer_manager is None or graph_context.parent_node_id is None:
             return
         tracer_manager.register_execution_data(
-            graph_id=graph_context.graph_id,
+            lookup_key=graph_context.lookup_key,
             node_id=graph_context.parent_node_id,
             execution_data=execution_data,
         )

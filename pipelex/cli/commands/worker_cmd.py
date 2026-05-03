@@ -24,6 +24,10 @@ def worker_cmd(
         str | None,
         typer.Option("--task-queue", help="Override the task queue name from config"),
     ] = None,
+    scope: Annotated[
+        str | None,
+        typer.Option("--scope", help="Worker scope name from [temporal.worker_scopes.scopes] (defaults to default_scope)"),
+    ] = None,
 ) -> None:
     """Start a Temporal worker.
 
@@ -34,6 +38,7 @@ def worker_cmd(
         pipelex worker
         pipelex worker --no-sandbox
         pipelex worker --task-queue my_queue
+        pipelex worker --scope router
     """
     make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN, temporal_enabled=True)
 
@@ -46,6 +51,7 @@ def worker_cmd(
                 is_not_sandboxed=is_not_sandboxed,
                 is_unit_testing=is_unit_testing,
                 task_queue=task_queue,
+                scope_name=scope,
             )
         )
     except KeyboardInterrupt:

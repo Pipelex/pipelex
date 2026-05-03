@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
@@ -35,7 +35,6 @@ class _EventLogContext:
     event_log: EventLogProtocol
     workflow_id: str
     pipeline_run_id: str
-    event_sequence: int = field(default=0)
 
 
 UsageRegistryRoot = list[TokensUsage]
@@ -63,10 +62,11 @@ class ReportingManager(ReportingProtocol):
     # Event log configuration
     ############################################################
 
+    @override
     def set_event_log(
         self,
         context_key: str,
-        event_log: "EventLogProtocol",
+        event_log: EventLogProtocol,
         workflow_id: str,
         pipeline_run_id: str,
     ) -> None:
@@ -84,6 +84,7 @@ class ReportingManager(ReportingProtocol):
             pipeline_run_id=pipeline_run_id,
         )
 
+    @override
     def clear_event_log(self, context_key: str) -> None:
         """Remove event log configuration for a completed workflow/run."""
         self._event_log_contexts.pop(context_key, None)
@@ -216,8 +217,7 @@ class ReportingManager(ReportingProtocol):
         if graph_context.parent_node_id is not None:
             node_id = graph_context.parent_node_id
 
-        seq = context.event_sequence
-        context.event_sequence += 1
+        seq = context.event_log.next_sequence()
 
         event = UsageReportEvent(
             pipeline_run_id=context.pipeline_run_id,
