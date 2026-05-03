@@ -20,8 +20,14 @@ from tests.integration.pipelex.temporal.tracing.test_data import (
 )
 
 
+_TRACING_DIR = Path(__file__).parent.resolve()
+
+
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
-    """Mark every test in this directory with gha_disabled.
+    """Mark every test under this directory with gha_disabled.
+
+    The hook receives all session-wide items (not just items below this
+    conftest), so filter by file path before adding the marker.
 
     TODO: Tests under tests/integration/pipelex/temporal/tracing/ hang
     reliably in CI under pytest-xdist parallelism (worker timeouts at
@@ -31,7 +37,9 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     """
     skip_marker = pytest.mark.gha_disabled
     for item in items:
-        item.add_marker(skip_marker)
+        item_path = Path(str(item.path)).resolve()
+        if _TRACING_DIR in item_path.parents:
+            item.add_marker(skip_marker)
 
 
 @pytest.fixture(scope="class")
