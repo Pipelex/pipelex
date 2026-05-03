@@ -18,7 +18,7 @@ class TestDocumentContentUrlValidation:
     def test_validate_resources_unreachable_remote_url(self, caplog: pytest.LogCaptureFixture) -> None:
         """validate_resources() does NOT raise for an unreachable HTTP URL: it logs a warning and lets the downstream extractor decide."""
         doc = DocumentContent(url="https://this-domain-cannot-exist.invalid/file.pdf")
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.WARNING, logger="pipelex"):
             doc.validate_resources()
         assert any("could not be reached" in record.message for record in caplog.records)
 

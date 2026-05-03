@@ -18,7 +18,7 @@ class TestImageContentUrlValidation:
     def test_validate_resources_unreachable_remote_url(self, caplog: pytest.LogCaptureFixture) -> None:
         """validate_resources() does NOT raise for an unreachable HTTP URL: it logs a warning and lets the downstream extractor decide."""
         img = ImageContent(url="https://this-domain-cannot-exist.invalid/image.png")
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.WARNING, logger="pipelex"):
             img.validate_resources()
         assert any("could not be reached" in record.message for record in caplog.records)
 

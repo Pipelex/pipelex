@@ -55,8 +55,13 @@ def _validate_http_url(url: str) -> None:
         else:
             response.raise_for_status()
     except httpx.HTTPStatusError as exc:
-        msg = f"Pre-flight URL check: URL '{url}' returned HTTP {exc.response.status_code} (continuing — downstream extractor will decide)"
-        log.debug(msg)
+        status_code = exc.response.status_code
+        msg = f"Pre-flight URL check: URL '{url}' returned HTTP {status_code} (continuing — downstream extractor will decide)"
+        # 401/403/429 are typical bot-block codes when servers reject HEAD/unknown User-Agents while still serving real content — keep these quiet.
+        if status_code in {401, 403, 429}:
+            log.debug(msg)
+        else:
+            log.warning(msg)
     except httpx.ConnectError:
         msg = f"Pre-flight URL check: URL '{url}' could not be reached (connection failed) (continuing — downstream extractor will decide)"
         log.warning(msg)
