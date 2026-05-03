@@ -14,7 +14,6 @@ with workflow.unsafe.imports_passed_through():
     from pipelex.graph.graph_tracer_manager import GraphTracerManager
     from pipelex.hub import get_library_manager, get_report_delegate, set_current_library, teardown_current_library
     from pipelex.pipe_run.pipe_job import PipeJob
-    from pipelex.reporting.reporting_manager import ReportingManager
     from pipelex.temporal.log_temporal import workflow_log
     from pipelex.temporal.tprl.temporal_error import TemporalError
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
@@ -102,15 +101,13 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                     workflow_arg.job_metadata = workflow_arg.job_metadata.model_copy(
                         update={"graph_context": wf_graph_context},
                     )
-                    # Configure ReportingManager for usage event emission
-                    report_delegate = get_report_delegate()
-                    if isinstance(report_delegate, ReportingManager):
-                        report_delegate.set_event_log(
-                            context_key=wf_workflow_id,
-                            event_log=event_log,
-                            workflow_id=wf_workflow_id,
-                            pipeline_run_id=pipeline_run_id,
-                        )
+                    # Configure the report delegate for usage event emission
+                    get_report_delegate().set_event_log(
+                        context_key=wf_workflow_id,
+                        event_log=event_log,
+                        workflow_id=wf_workflow_id,
+                        pipeline_run_id=pipeline_run_id,
+                    )
                 except Exception as exc:
                     workflow_log.warning(f"Failed to set up per-workflow tracing, continuing without: {exc}")
                     # Clean up partially initialized resources before nulling (the finally block
@@ -125,9 +122,7 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                             event_log.close()
                         except Exception:  # noqa: S110
                             pass
-                    report_delegate = get_report_delegate()
-                    if isinstance(report_delegate, ReportingManager):
-                        report_delegate.clear_event_log(context_key=wf_workflow_id)
+                    get_report_delegate().clear_event_log(context_key=wf_workflow_id)
                     event_log = None
                     wf_graph_tracer_manager = None
 
@@ -173,11 +168,9 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                 except Exception:  # noqa: S110
                     pass
 
-                # Clear stale event log state from ReportingManager
+                # Clear stale event log state from the report delegate
                 if wf_tracer_key is not None:
-                    report_delegate = get_report_delegate()
-                    if isinstance(report_delegate, ReportingManager):
-                        report_delegate.clear_event_log(context_key=wf_tracer_key)
+                    get_report_delegate().clear_event_log(context_key=wf_tracer_key)
 
             if wf_library_id is not None:
                 try:

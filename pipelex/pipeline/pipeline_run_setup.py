@@ -277,18 +277,14 @@ async def pipeline_run_setup(
 
         get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
 
-        # Set event log on ReportingManager for distributed usage event emission
+        # Set event log on the report delegate for distributed usage event emission
         if event_log is not None:
-            from pipelex.reporting.reporting_manager import ReportingManager  # noqa: PLC0415
-
-            report_delegate = get_report_delegate()
-            if isinstance(report_delegate, ReportingManager):
-                report_delegate.set_event_log(
-                    context_key=pipeline_run_id,
-                    event_log=event_log,
-                    workflow_id="direct",
-                    pipeline_run_id=pipeline_run_id,
-                )
+            get_report_delegate().set_event_log(
+                context_key=pipeline_run_id,
+                event_log=event_log,
+                workflow_id="direct",
+                pipeline_run_id=pipeline_run_id,
+            )
 
         # Initialize OtelContext if telemetry is enabled (not dry mode and tracer available)
         # The trace_id is computed once here; span_id uses OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID for root
@@ -344,13 +340,9 @@ async def pipeline_run_setup(
             tracer_manager = GraphTracerManager.get_instance()
             if tracer_manager is not None:
                 tracer_manager.close_tracer(pipeline_run_id)
-        # Cleanup event log state from ReportingManager
+        # Cleanup event log state from the report delegate
         if event_log is not None:
-            from pipelex.reporting.reporting_manager import ReportingManager  # noqa: PLC0415
-
-            report_delegate = get_report_delegate()
-            if isinstance(report_delegate, ReportingManager):
-                report_delegate.clear_event_log(context_key=pipeline_run_id)
+            get_report_delegate().clear_event_log(context_key=pipeline_run_id)
         # Cleanup library
         library_manager.teardown(library_id=library_id)
         teardown_current_library()

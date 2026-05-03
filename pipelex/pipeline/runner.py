@@ -199,13 +199,9 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
                 if tracer_manager is not None:
                     tracer_manager.close_tracer(pipeline_run_id)
 
-            # Clear event log state from ReportingManager (direct execution path)
+            # Clear event log state from the report delegate (direct execution path)
             if pipeline_run_id is not None:
-                from pipelex.reporting.reporting_manager import ReportingManager  # noqa: PLC0415
-
-                report_delegate = get_report_delegate()
-                if isinstance(report_delegate, ReportingManager):
-                    report_delegate.clear_event_log(context_key=pipeline_run_id)
+                get_report_delegate().clear_event_log(context_key=pipeline_run_id)
 
             # Only teardown library if it was successfully created
             if library_id_resolved is not None:

@@ -62,10 +62,11 @@ class ReportingManager(ReportingProtocol):
     # Event log configuration
     ############################################################
 
+    @override
     def set_event_log(
         self,
         context_key: str,
-        event_log: "EventLogProtocol",
+        event_log: EventLogProtocol,
         workflow_id: str,
         pipeline_run_id: str,
     ) -> None:
@@ -83,6 +84,7 @@ class ReportingManager(ReportingProtocol):
             pipeline_run_id=pipeline_run_id,
         )
 
+    @override
     def clear_event_log(self, context_key: str) -> None:
         """Remove event log configuration for a completed workflow/run."""
         self._event_log_contexts.pop(context_key, None)
