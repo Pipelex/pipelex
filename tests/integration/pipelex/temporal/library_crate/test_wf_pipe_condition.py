@@ -2,7 +2,7 @@
 
 Validates that PipeCondition controllers execute on Temporal workers via LibraryCrate propagation.
 The condition routes to different outcome pipes based on an expression — each outcome is a
-child workflow dispatched through PipeRouterChild.
+child workflow dispatched through TemporalPipeRouter.
 """
 
 import uuid

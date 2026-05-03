@@ -1,7 +1,7 @@
 """Integration tests for PipeBatch dispatch through Temporal workflows.
 
 Validates that PipeBatch controllers execute on Temporal workers via LibraryCrate propagation.
-Each batch item is dispatched as a separate child workflow through PipeRouterChild (fan-out).
+Each batch item is dispatched as a separate child workflow through TemporalPipeRouter (fan-out).
 """
 
 import uuid

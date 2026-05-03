@@ -1,7 +1,7 @@
 """Integration tests for PipeParallel dispatch through Temporal workflows.
 
 Validates that PipeParallel controllers execute on Temporal workers via LibraryCrate propagation.
-Each parallel branch is dispatched as a concurrent child workflow through PipeRouterChild.
+Each parallel branch is dispatched as a concurrent child workflow through TemporalPipeRouter.
 """
 
 import uuid

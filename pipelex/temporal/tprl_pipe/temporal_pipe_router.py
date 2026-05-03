@@ -19,9 +19,8 @@ from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 
 
 class TemporalPipeRouter(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtocol):
-    """Merged Temporal pipe router: auto-detects whether to dispatch as top-level or child workflow.
+    """Temporal pipe router: auto-detects whether to dispatch as top-level or child workflow.
 
-    Replaces the former PipeRouterTop (top-level dispatch) and PipeRouterChild (child dispatch).
     When called outside a Temporal workflow, dispatches via execute_workflow (top-level).
     When called inside a Temporal workflow, dispatches via execute_child_workflow (child).
     """
