@@ -1,0 +1,29 @@
+tests/integration/pipelex/temporal/library_crate/test_wf_pipe_condition.py
+  64f3a2c92cabe45c 5
+tests/integration/pipelex/temporal/library_crate/test_wf_pipe_batch.py
+  64f3a2c92cabe45c 4
+pipelex/temporal/temporal_workflow_utils.py
+  64f3a2c92cabe45c 9-10
+tests/integration/pipelex/temporal/library_crate/test_wf_pipe_parallel.py
+  64f3a2c92cabe45c 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "a143cb0ec2192e684ad37813580f47681754dc8a",
+  "prompts": {
+    "64f3a2c92cabe45c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a4423870-0b1c-4496-b7fb-05a4a1911fb9",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 5,
+      "total_deletions": 4,
+      "accepted_lines": 742,
+      "overriden_lines": 0
+    }
+  }
+}
