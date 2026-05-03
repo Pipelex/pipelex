@@ -20,7 +20,8 @@ jobs:
             echo "::error::Could not parse pinned mthds-ui version from package.json (regex did not match)."
             exit 1
           fi
-          SYNCED_VERSION=$(cat pipelex/graph/reactflow/assets/.graph-ui-version 2>/dev/null | tr -d '[:space:]' || echo "NONE")
+          SYNCED_VERSION=$(cat pipelex/graph/reactflow/assets/.graph-ui-version 2>/dev/null | tr -d '[:space:]')
+          SYNCED_VERSION="${SYNCED_VERSION:-NONE}"
           if [ "$PINNED_VERSION" != "$SYNCED_VERSION" ]; then
             echo "::error::Graph UI assets are out of date! Pinned: $PINNED_VERSION, Synced: $SYNCED_VERSION. Run 'make sync-graph-ui' to update."
             exit 1

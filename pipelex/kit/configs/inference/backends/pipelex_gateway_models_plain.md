@@ -31,6 +31,9 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **claude-4.6-sonnet**
   - inputs: text, images, pdf
   - outputs: text, structured
+- **claude-4.7-opus**
+  - inputs: text, images, pdf
+  - outputs: text, structured
 - **deepseek-v3.2**
   - inputs: text
   - outputs: text, structured
@@ -43,10 +46,25 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **gemini-2.5-pro**
   - inputs: text, images, pdf
   - outputs: text, structured
-- **gemini-3.0-flash-preview**
+- **gemini-3.0-flash**
   - inputs: text, images, pdf
   - outputs: text, structured
 - **gemini-3.0-pro**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gemini-3.1-flash-lite**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gemini-3.1-pro**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gemini-flash-latest**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gemini-flash-lite-latest**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gemini-pro-latest**
   - inputs: text, images, pdf
   - outputs: text, structured
 - **gpt-4.1**
@@ -98,16 +116,19 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
   - inputs: text, images, pdf
   - outputs: text, structured
 - **gpt-5.4**
-  - inputs: text, images
+  - inputs: text, images, pdf
   - outputs: text, structured
 - **gpt-5.4-mini**
-  - inputs: text, images
+  - inputs: text, images, pdf
   - outputs: text, structured
 - **gpt-5.4-nano**
-  - inputs: text, images
+  - inputs: text, images, pdf
   - outputs: text, structured
 - **gpt-5.4-pro**
-  - inputs: text, images
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gpt-5.5**
+  - inputs: text, images, pdf
   - outputs: text, structured
 - **gpt-oss-120b**
   - inputs: text
@@ -187,6 +208,9 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **gpt-image-1.5**
   - inputs: text, images
   - outputs: image
+- **gpt-image-2**
+  - inputs: text, images
+  - outputs: image
 - **nano-banana**
   - inputs: text, images
   - outputs: image
@@ -199,6 +223,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-04-14T09:23:56Z
+> Last updated: 2026-04-28T12:50:14Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.

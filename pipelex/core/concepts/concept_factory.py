@@ -214,9 +214,9 @@ class ConceptFactory:
         return f"{domain_code}.{concept_code}"
 
     @classmethod
-    def make_concept_ref_with_domain_from_concept_ref_or_code(cls, domain_code: str, concept_sring_or_code: str) -> str:
+    def make_concept_ref_with_domain_from_concept_ref_or_code(cls, domain_code: str, concept_ref_or_code: str) -> str:
         input_domain_and_code = cls.make_domain_and_concept_code_from_concept_ref_or_code(
-            concept_ref_or_code=concept_sring_or_code,
+            concept_ref_or_code=concept_ref_or_code,
             domain_code=domain_code,
         )
 

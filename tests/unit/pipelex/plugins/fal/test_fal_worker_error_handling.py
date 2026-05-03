@@ -90,7 +90,7 @@ class TestFalWorkerErrorHandling:
         mocker.patch(
             "pipelex.plugins.fal.fal_img_gen_worker.ImgGenArgsFactory.make_args_for_model",
             new_callable=mocker.AsyncMock,
-            return_value={"prompt": "test"},
+            return_value={"prompt": "test", "model": "test-model-id"},
         )
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
@@ -119,7 +119,7 @@ class TestFalWorkerErrorHandling:
         mocker.patch(
             "pipelex.plugins.fal.fal_img_gen_worker.ImgGenArgsFactory.make_args_for_model",
             new_callable=mocker.AsyncMock,
-            return_value={"prompt": "test"},
+            return_value={"prompt": "test", "model": "test-model-id"},
         )
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
@@ -148,7 +148,7 @@ class TestFalWorkerErrorHandling:
         mocker.patch(
             "pipelex.plugins.fal.fal_img_gen_worker.ImgGenArgsFactory.make_args_for_model",
             new_callable=mocker.AsyncMock,
-            return_value={"prompt": "test"},
+            return_value={"prompt": "test", "model": "test-model-id"},
         )
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
@@ -177,7 +177,7 @@ class TestFalWorkerErrorHandling:
         mocker.patch(
             "pipelex.plugins.fal.fal_img_gen_worker.ImgGenArgsFactory.make_args_for_model",
             new_callable=mocker.AsyncMock,
-            return_value={"prompt": "test"},
+            return_value={"prompt": "test", "model": "test-model-id"},
         )
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
@@ -196,7 +196,7 @@ class TestFalWorkerErrorHandling:
         mocker.patch(
             "pipelex.plugins.fal.fal_img_gen_worker.ImgGenArgsFactory.make_args_for_model",
             new_callable=mocker.AsyncMock,
-            return_value={"prompt": "test"},
+            return_value={"prompt": "test", "model": "test-model-id"},
         )
 
         with pytest.raises(ImgGenGenerationError) as exc_info:

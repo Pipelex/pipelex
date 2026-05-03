@@ -12,6 +12,7 @@ _OPENAI_LEVEL_MAP: dict[str, str] = {
     "low": "low",
     "medium": "medium",
     "high": "high",
+    "xhigh": "xhigh",
     "max": "xhigh",
 }
 
@@ -54,6 +55,7 @@ class TestOpenAIResponsesReasoning:
             (ReasoningEffort.LOW, "low"),
             (ReasoningEffort.MEDIUM, "medium"),
             (ReasoningEffort.HIGH, "high"),
+            (ReasoningEffort.XHIGH, "xhigh"),
             (ReasoningEffort.MAX, "xhigh"),
         ],
     )

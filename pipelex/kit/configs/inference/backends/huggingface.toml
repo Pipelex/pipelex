@@ -39,6 +39,7 @@ variant = "fal-ai"
 # variant = "replicate"
 
 [qwen-image.rules]
+model_choice = "model_id"
 prompt = "with_negative"
 aspect_ratio = "qwen_image"
 inference = "qwen_image"

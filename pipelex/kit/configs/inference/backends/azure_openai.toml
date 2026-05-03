@@ -190,14 +190,14 @@ thinking_mode = "manual"
 # --- GPT-5.4 Series -----------------------------------------------------------
 ["gpt-5.4"]
 model_id = "gpt-5.4-2026-03-05"
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 2.5, output = 15.0 }
 thinking_mode = "manual"
 
 ["gpt-5.4-pro"]
 model_id = "gpt-5.4-pro-2026-03-05"
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 30.0, output = 180.0 }
 valued_constraints = { fixed_temperature = 1 }
@@ -205,16 +205,25 @@ thinking_mode = "manual"
 
 ["gpt-5.4-mini"]
 model_id = "gpt-5.4-mini-2026-03-17"
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 0.75, output = 4.5 }
 thinking_mode = "manual"
 
 ["gpt-5.4-nano"]
 model_id = "gpt-5.4-nano-2026-03-17"
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 0.2, output = 1.25 }
+thinking_mode = "manual"
+
+# --- GPT-5.5 Series -----------------------------------------------------------
+["gpt-5.5"]
+model_id = "gpt-5.5-2026-04-24"
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 5.0, output = 30.0 }
+valued_constraints = { fixed_temperature = 1 }
 thinking_mode = "manual"
 
 ################################################################################
@@ -232,12 +241,14 @@ costs = { input = 10, output = 40 }
 
 [gpt-image-1.rules]
 prompt = "positive_only"
-num_images = "gpt"
-aspect_ratio = "gpt"
-background = "gpt"
-inference = "gpt"
+num_images = "gpt_image"
+aspect_ratio = "gpt_image_legacy"
+background = "available"
+inference = "gpt_image"
 safety_checker = "unavailable"
-output_format = "gpt"
+output_format = "gpt_image_legacy"
+output_compression = "gpt_image_legacy"
+input_fidelity = "gpt_image_legacy"
 
 [gpt-image-1-mini]
 sdk = "azure_rest_img_gen"
@@ -249,12 +260,14 @@ costs = { input = 2.5, output = 8 }
 
 [gpt-image-1-mini.rules]
 prompt = "positive_only"
-num_images = "gpt"
-aspect_ratio = "gpt"
-background = "gpt"
-inference = "gpt"
+num_images = "gpt_image"
+aspect_ratio = "gpt_image_legacy"
+background = "available"
+inference = "gpt_image"
 safety_checker = "unavailable"
-output_format = "gpt"
+output_format = "gpt_image_legacy"
+output_compression = "gpt_image_legacy"
+input_fidelity = "gpt_image_legacy"
 
 ["gpt-image-1.5"]
 sdk = "azure_rest_img_gen"
@@ -266,9 +279,30 @@ costs = { input = 8, output = 32 }
 
 ["gpt-image-1.5".rules]
 prompt = "positive_only"
-num_images = "gpt"
-aspect_ratio = "gpt"
-background = "gpt"
-inference = "gpt"
+num_images = "gpt_image"
+aspect_ratio = "gpt_image_legacy"
+background = "available"
+inference = "gpt_image"
 safety_checker = "unavailable"
-output_format = "gpt"
+output_format = "gpt_image_legacy"
+output_compression = "gpt_image_legacy"
+input_fidelity = "gpt_image_legacy"
+
+[gpt-image-2]
+sdk = "azure_rest_img_gen"
+model_type = "img_gen"
+inputs = ["text", "images"]
+outputs = ["image"]
+costs = { input = 8, output = 30 }
+
+[gpt-image-2.rules]
+prompt = "positive_only"
+num_images = "gpt_image"
+aspect_ratio = "gpt_image_2"
+background = "unavailable"
+inference = "gpt_image"
+safety_checker = "unavailable"
+output_format = "unavailable"
+output_compression = "unavailable"
+input_images = "gpt_image"
+input_fidelity = "unavailable"

@@ -43,9 +43,13 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
             img_gen_job=img_gen_job,
             nb_images=1,
             model_id=self.inference_model.model_id,
+            model_name=self.inference_model.name,
         )
         prompt = args_dict.pop("prompt")
-        model_id = self.inference_model.model_id
+        model_id = args_dict.pop("model", None)
+        if model_id is None:
+            msg = f"Model '{self.inference_model.name}' rules must include a 'model_choice' entry"
+            raise ImgGenParameterError(msg)
         try:
             return await self.hf_async_client.text_to_image(
                 prompt=prompt,

@@ -1,5 +1,6 @@
 import httpx
 
+from pipelex import log
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.urls import URLs
@@ -22,12 +23,16 @@ def validate_url_resource_exists(url: str) -> None:
     By the time a URL reaches DocumentContent/ImageContent, it should already
     be resolved (absolute path or fully qualified URL).
 
-    For HTTP/HTTPS URLs: performs a streaming GET request to check reachability.
+    For HTTP/HTTPS URLs: performs a HEAD request (falling back to a streaming GET
+    on 405) as a best-effort reachability probe. Failures are logged as warnings
+    but do NOT raise — the downstream extractor is the source of truth, and many
+    sites bot-block HEAD/unknown User-Agents with 403/401/429 while still serving
+    the actual content fine.
     For local file paths: checks that the file exists on disk.
     Skips validation for internal URIs (base64 data URLs, pipelex-storage://).
 
     Raises:
-        ValueError: If the resource does not exist or is unreachable.
+        ValueError: If a local file path does not exist. HTTP failures only log a warning.
     """
     if url.startswith(_SKIP_VALIDATION_PREFIXES):
         return
@@ -50,17 +55,22 @@ def _validate_http_url(url: str) -> None:
         else:
             response.raise_for_status()
     except httpx.HTTPStatusError as exc:
-        msg = f"URL '{url}' returned HTTP {exc.response.status_code}"
-        raise ValueError(msg) from exc
-    except httpx.ConnectError as exc:
-        msg = f"URL '{url}' could not be reached (connection failed)"
-        raise ValueError(msg) from exc
-    except httpx.TimeoutException as exc:
-        msg = f"URL '{url}' timed out"
-        raise ValueError(msg) from exc
-    except httpx.HTTPError as exc:
-        msg = f"URL '{url}' could not be fetched"
-        raise ValueError(msg) from exc
+        status_code = exc.response.status_code
+        msg = f"Pre-flight URL check: URL '{url}' returned HTTP {status_code} (continuing — downstream extractor will decide)"
+        # 401/403/429 are typical bot-block codes when servers reject HEAD/unknown User-Agents while still serving real content — keep these quiet.
+        if status_code in {401, 403, 429}:
+            log.debug(msg)
+        else:
+            log.warning(msg)
+    except httpx.ConnectError:
+        msg = f"Pre-flight URL check: URL '{url}' could not be reached (connection failed) (continuing — downstream extractor will decide)"
+        log.warning(msg)
+    except httpx.TimeoutException:
+        msg = f"Pre-flight URL check: URL '{url}' timed out (continuing — downstream extractor will decide)"
+        log.warning(msg)
+    except httpx.HTTPError:
+        msg = f"Pre-flight URL check: URL '{url}' could not be fetched (continuing — downstream extractor will decide)"
+        log.warning(msg)
 
 
 def _validate_local_path(url: str) -> None:

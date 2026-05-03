@@ -118,3 +118,14 @@ outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 5.0, output = 25.0 }
 thinking_mode = "adaptive"
+
+# --- Claude 4.7 Series --------------------------------------------------------
+["claude-4.7-opus"]
+model_id = "claude-opus-4-7"
+max_tokens = 128000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 5.0, output = 25.0 }
+thinking_mode = "adaptive"
+listed_constraints = ["temperature_unsupported"]

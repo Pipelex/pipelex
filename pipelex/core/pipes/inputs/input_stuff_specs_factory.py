@@ -83,7 +83,7 @@ class InputStuffSpecsFactory:
 
         concept_ref_with_domain = ConceptFactory.make_concept_ref_with_domain_from_concept_ref_or_code(
             domain_code=domain_code,
-            concept_sring_or_code=concept_ref_or_code,
+            concept_ref_or_code=concept_ref_or_code,
         )
 
         # Determine multiplicity

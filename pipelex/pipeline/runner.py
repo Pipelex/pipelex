@@ -74,7 +74,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         inputs: PipelineInputs | WorkingMemoryAbstract[Any] | None = None,
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
-        dynamic_output_concept_code: str | None = None,
+        dynamic_output_concept_ref: str | None = None,
     ) -> PipelexPipelineExecuteResponse:
         """Execute a pipeline and wait for its completion.
 
@@ -102,8 +102,8 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
             Name of the output slot to write to.
         output_multiplicity:
             Output multiplicity specification.
-        dynamic_output_concept_code:
-            Override the dynamic output concept code.
+        dynamic_output_concept_ref:
+            Override the dynamic output concept ref.
 
         Returns:
         -------
@@ -139,7 +139,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
                 inputs=pipelex_inputs,
                 output_name=output_name,
                 output_multiplicity=output_multiplicity,
-                dynamic_output_concept_code=dynamic_output_concept_code,
+                dynamic_output_concept_ref=dynamic_output_concept_ref,
                 pipe_run_mode=self.pipe_run_mode,
                 search_domain_codes=self.search_domain_codes,
                 user_id=self.user_id,
@@ -227,6 +227,6 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         inputs: PipelineInputs | WorkingMemoryAbstract[Any] | None = None,
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
-        dynamic_output_concept_code: str | None = None,
+        dynamic_output_concept_ref: str | None = None,
     ) -> PipelineStartResponse[PipeOutput]:
         raise NotImplementedError

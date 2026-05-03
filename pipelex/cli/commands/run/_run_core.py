@@ -51,6 +51,7 @@ async def _execute_run(
     dry_run: bool,
     mock_inputs: bool,
     library_dir: list[str] | None,
+    dynamic_output_concept_ref: str | None = None,
 ) -> None:
     """Core async execution logic for running a pipe.
 
@@ -127,6 +128,7 @@ async def _execute_run(
             pipe_code=pipe_code,
             mthds_contents=[mthds_content] if mthds_content else None,
             inputs=pipeline_inputs,
+            dynamic_output_concept_ref=dynamic_output_concept_ref,
         )
         pipe_output = response.pipe_output
     except PipelineExecutionError as exc:
@@ -244,6 +246,7 @@ def execute_run(
     mock_inputs: bool,
     library_dir: list[str] | None,
     telemetry_command_label: str = COMMAND,
+    dynamic_output_concept_ref: str | None = None,
 ) -> None:
     """Synchronous entry point that wraps the async execution with Pipelex setup/teardown.
 
@@ -271,6 +274,7 @@ def execute_run(
                     dry_run=dry_run,
                     mock_inputs=mock_inputs,
                     library_dir=library_dir,
+                    dynamic_output_concept_ref=dynamic_output_concept_ref,
                 )
             )
 

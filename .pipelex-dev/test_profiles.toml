@@ -68,6 +68,7 @@ anthropic = [
   "claude-4.5-opus",
   "claude-4.6-sonnet",
   "claude-4.6-opus",
+  "claude-4.7-opus",
 ]
 
 # --- DeepSeek Models ---
@@ -86,7 +87,12 @@ google = [
   "gemini-2.5-flash-lite",
   "gemini-2.5-pro",
   "gemini-3.0-pro",
-  "gemini-3.0-flash-preview",
+  "gemini-3.0-flash",
+  "gemini-3.1-flash-lite",
+  "gemini-3.1-pro",
+  "gemini-pro-latest",
+  "gemini-flash-latest",
+  "gemini-flash-lite-latest",
 ]
 
 # --- Groq Models ---
@@ -178,6 +184,7 @@ openai = [
   "gpt-5.4-pro",
   "gpt-5.4-mini",
   "gpt-5.4-nano",
+  "gpt-5.5",
 ]
 
 # --- OpenAI OSS Models ---
@@ -218,7 +225,7 @@ fal = [
 ]
 
 # --- OpenAI Models ---
-openai = ["gpt-image-1", "gpt-image-1-mini", "gpt-image-1.5"]
+openai = ["gpt-image-1", "gpt-image-1-mini", "gpt-image-1.5", "gpt-image-2"]
 
 # --- Google Models ---
 google = ["nano-banana", "nano-banana-pro", "nano-banana-2"]
@@ -278,9 +285,14 @@ search_models = []
 [profiles.dev]
 description = "Quick dev testing with fast and cheap models from key providers"
 backends = ["pipelex_gateway", "internal"]
-llm_models = ["claude-4.5-haiku", "gpt-4o-mini", "gemini-2.5-flash-lite"]
+llm_models = [
+  "claude-4.5-haiku",
+  "gpt-4o-mini",
+  "linkup",
+  "gemini-2.5-flash-lite",
+]
 img_gen_models = ["gpt-image-1-mini"]
-extract_models = ["@from_pdf"]
+extract_models = ["@from_pdf", "linkup-fetch"]
 search_models = ["linkup-standard"]
 
 ################################################################################

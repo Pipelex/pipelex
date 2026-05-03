@@ -1,14 +1,16 @@
-from typing import TYPE_CHECKING, Any
+import base64
+from typing import TYPE_CHECKING, Any, cast
 
 import openai
 from openai import APIConnectionError, APITimeoutError, AuthenticationError, BadRequestError, NotFoundError, RateLimitError
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundError, InferenceErrorCategory, SdkTypeError
+from pipelex import log
+from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundError, ImgGenParameterError, InferenceErrorCategory, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
+from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
-from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.error_classification import (
     is_content_policy_violation,
@@ -16,8 +18,10 @@ from pipelex.cogt.inference.error_classification import (
 )
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.plugins.openai.openai_img_gen_factory import OpenAIImgGenFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.tools.misc.base64_utils import extract_base64_str_from_base64_url_if_possible
+from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
+from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.urls import URLs
 
 if TYPE_CHECKING:
@@ -53,24 +57,27 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
         img_gen_job: ImgGenJob,
         nb_images: int,
     ) -> list[GeneratedImageRawDetails]:
-        image_size, width, height = OpenAIImgGenFactory.image_size_for_gpt_image_1(aspect_ratio=img_gen_job.job_params.aspect_ratio)
-        output_format = OpenAIImgGenFactory.output_format_for_gpt_image_1(output_format=img_gen_job.job_params.output_format)
-        moderation = OpenAIImgGenFactory.moderation_for_gpt_image_1(is_moderated=img_gen_job.job_params.is_moderated)
-        background = OpenAIImgGenFactory.background_for_gpt_image_1(background=img_gen_job.job_params.background)
-        quality = OpenAIImgGenFactory.quality_for_gpt_image_1(quality=img_gen_job.job_params.quality or Quality.LOW)
-        output_compression = OpenAIImgGenFactory.output_compression_for_gpt_image_1()
+        if self.inference_model.rules is None:
+            msg = f"Model '{self.inference_model.name}' does not have rules configured"
+            raise ImgGenParameterError(msg)
+
+        args_dict = await ImgGenArgsFactory.make_args_for_model(
+            model_rules=self.inference_model.rules,
+            img_gen_job=img_gen_job,
+            nb_images=nb_images,
+            model_id=self.inference_model.model_id,
+            model_name=self.inference_model.name,
+        )
+
+        images_response: ImagesResponse
         try:
-            images_response: ImagesResponse = await self.openai_client.images.generate(
-                prompt=img_gen_job.img_gen_prompt.positive_text,
-                model=self.inference_model.model_id,
-                moderation=moderation,
-                background=background,
-                quality=quality,
-                size=image_size,
-                output_format=output_format,
-                output_compression=output_compression,
-                n=nb_images,
-            )
+            if image_arg := args_dict.get("image"):
+                args_dict["image"] = self._convert_image_data_urls_for_openai_sdk(image_arg=image_arg)
+                if args_dict.pop("moderation", None) is not None:
+                    log.warning("OpenAI images.edit does not accept 'moderation'; dropping the kwarg")
+                images_response = cast("ImagesResponse", await self.openai_client.images.edit(**args_dict))
+            else:
+                images_response = cast("ImagesResponse", await self.openai_client.images.generate(**args_dict))
         except NotFoundError as not_found_error:
             msg = f"ImgGen model or deployment not found: {self.inference_model.desc}: {not_found_error}"
             raise ImgGenModelNotFoundError(message=msg, model_handle=self.inference_model.name) from not_found_error
@@ -109,15 +116,13 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
         except AuthenticationError as authentication_error:
             msg = f"ImgGen authentication error: {authentication_error}"
             raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from authentication_error
+
         if not images_response.data:
             msg = "No result from OpenAI"
             raise ImgGenGenerationError(msg)
 
         response_output_format: str | None = images_response.output_format
-        if response_output_format is None:
-            msg = "No output format received from OpenAI"
-            raise ImgGenGenerationError(msg)
-        size: str | None = images_response.size
+        size: str | None = images_response.size or self._get_requested_size(args_dict=args_dict)
         if not size:
             msg = "No size received from OpenAI"
             raise ImgGenGenerationError(msg)
@@ -148,11 +153,47 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
                 msg = "No base64 image data received from OpenAI"
                 raise ImgGenGenerationError(msg)
 
+            image_format = response_output_format
+            if image_format is None:
+                image_bytes = base64.b64decode(base64_str)
+                file_type = detect_file_type_from_bytes(image_bytes)
+                image_format = ImageFormat.from_mime_type(mime_type=file_type.mime).value
+
             generated_images.append(
                 GeneratedImageRawDetails(
                     base64_str=base64_str,
                     size=ImageSize(width=width, height=height),
-                    image_format=response_output_format,
+                    image_format=image_format,
                 ),
             )
         return generated_images
+
+    @staticmethod
+    def _convert_image_data_urls_for_openai_sdk(image_arg: Any) -> list[tuple[str, bytes, str]]:
+        """Convert shared GPT Image data URLs into the OpenAI SDK's multipart file tuples."""
+        if not isinstance(image_arg, list):
+            msg = f"OpenAI image edit expected a list of image data URLs, got '{type(image_arg).__name__}'"
+            raise ImgGenParameterError(msg)
+
+        image_data_urls = cast("list[Any]", image_arg)
+        image_files: list[tuple[str, bytes, str]] = []
+        for index, image_data_url in enumerate(image_data_urls):
+            if not isinstance(image_data_url, str):
+                msg = f"OpenAI image edit expected image #{index} to be a data URL, got '{type(image_data_url).__name__}'"
+                raise ImgGenParameterError(msg)
+            extracted = extract_base64_str_from_base64_url_if_possible(possibly_base64_url=image_data_url)
+            if extracted is None:
+                msg = "OpenAI image edit expected base64 data URLs from the shared image argument factory"
+                raise ImgGenParameterError(msg)
+            base64_str, mime_type = extracted
+            file_extension = mime_type.split("/", 1)[1].replace("jpeg", "jpg")
+            image_bytes = base64.b64decode(base64_str)
+            image_files.append((f"image_{index}.{file_extension}", image_bytes, mime_type))
+        return image_files
+
+    @staticmethod
+    def _get_requested_size(args_dict: dict[str, Any]) -> str | None:
+        requested_size = args_dict.get("size")
+        if isinstance(requested_size, str):
+            return requested_size
+        return None

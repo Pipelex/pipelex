@@ -62,12 +62,51 @@ max_prompt_images = 3000
 costs = { input = 2, output = 12.0 }
 thinking_mode = "adaptive"
 
-["gemini-3.0-flash-preview"]
+["gemini-3.0-flash"]
 model_id = "gemini-3-flash-preview"
 inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 3000
 costs = { input = 0.5, output = 3.0 }
+thinking_mode = "adaptive"
+
+# --- Gemini 3.1 Series ----------------------------------------
+["gemini-3.1-flash-lite"]
+model_id = "gemini-3.1-flash-lite-preview"
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 0.25, output = 1.50 }
+thinking_mode = "adaptive"
+
+["gemini-3.1-pro"]
+model_id = "gemini-3.1-pro-preview"
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 2, output = 12.0 }
+thinking_mode = "adaptive"
+
+# --- Latest Aliases (point to current generation, change over time) -----------
+["gemini-pro-latest"]
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 1.25, output = 10.0 }
+thinking_mode = "adaptive"
+
+["gemini-flash-latest"]
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 0.30, output = 2.50 }
+thinking_mode = "adaptive"
+
+["gemini-flash-lite-latest"]
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 0.10, output = 0.40 }
 thinking_mode = "adaptive"
 
 ################################################################################

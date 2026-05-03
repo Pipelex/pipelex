@@ -105,36 +105,18 @@ def _make_img_gen_worker(mocker: MockerFixture) -> OpenAIImgGenWorker:
     mock_model.desc = "test-model-desc"
     mock_model.model_id = "gpt-image-1"
     mock_model.name = "gpt-image-1"
+    mock_model.rules = mocker.MagicMock()
     worker.inference_model = mock_model
 
     mock_client = mocker.MagicMock()
     mock_client.images.generate = mocker.AsyncMock()
+    mock_client.images.edit = mocker.AsyncMock()
     worker.openai_client = mock_client
 
-    # Mock the factory static methods so they don't fail before the API call
     mocker.patch(
-        "pipelex.plugins.openai.openai_img_gen_worker.OpenAIImgGenFactory.image_size_for_gpt_image_1",
-        return_value=("1024x1024", 1024, 1024),
-    )
-    mocker.patch(
-        "pipelex.plugins.openai.openai_img_gen_worker.OpenAIImgGenFactory.output_format_for_gpt_image_1",
-        return_value="png",
-    )
-    mocker.patch(
-        "pipelex.plugins.openai.openai_img_gen_worker.OpenAIImgGenFactory.moderation_for_gpt_image_1",
-        return_value="auto",
-    )
-    mocker.patch(
-        "pipelex.plugins.openai.openai_img_gen_worker.OpenAIImgGenFactory.background_for_gpt_image_1",
-        return_value="auto",
-    )
-    mocker.patch(
-        "pipelex.plugins.openai.openai_img_gen_worker.OpenAIImgGenFactory.quality_for_gpt_image_1",
-        return_value="low",
-    )
-    mocker.patch(
-        "pipelex.plugins.openai.openai_img_gen_worker.OpenAIImgGenFactory.output_compression_for_gpt_image_1",
-        return_value=100,
+        "pipelex.plugins.openai.openai_img_gen_worker.ImgGenArgsFactory.make_args_for_model",
+        new_callable=mocker.AsyncMock,
+        return_value={"prompt": "a cute cat", "model": "gpt-image-1"},
     )
 
     return worker
