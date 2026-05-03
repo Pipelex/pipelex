@@ -1,0 +1,9 @@
+{
+  "files": {
+    "1_llm_deck.toml": "eb093712da6f4426ccade800c55aa3fbf64862917ec4e46c141eceb80e4ac1e8",
+    "2_img_gen_deck.toml": "63b1397f0427aada890096c7d430313f287fd613248aa1f3ab4b9e09a7f19402",
+    "3_extract_deck.toml": "560a40bd3254b1be011cfb35340fef6c40d70136e5ddce33a961899f92fd70ba",
+    "4_search_deck.toml": "08e3bd1bee0f9f8ed0ffc735a932705392d0ecfbdeefce64c9815d4b2d8d7e22"
+  },
+  "kit_version": "0.25.1"
+}

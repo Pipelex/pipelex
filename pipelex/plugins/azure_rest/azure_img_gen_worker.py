@@ -8,10 +8,12 @@ from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.hub import get_models_manager
 from pipelex.plugins.plugin import Plugin
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.exceptions import CredentialsError
+from pipelex.tools.log.log import log
 
 
 class AzureCredentialsError(CredentialsError):
@@ -75,6 +77,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
             img_gen_job=img_gen_job,
             nb_images=nb_images,
             model_id=self.inference_model.model_id,
+            model_name=self.inference_model.name,
         )
 
         args_dict["prompt"] = img_gen_job.img_gen_prompt.positive_text
@@ -95,10 +98,26 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                     "Content-Type": "application/json",
                 },
                 json=args_dict,
-                timeout=180.0,
+                timeout=600.0,
             )
             response.raise_for_status()
             response_dict = response.json()
+
+        # Extract usage tokens if available
+        if (usage_dict := response_dict.get("usage")) and (img_gen_tokens_usage := img_gen_job.job_report.img_gen_tokens_usage):
+            log.debug(usage_dict, title="Azure img gen usage")
+            nb_tokens: NbTokensByCategoryDict = {}
+            input_tokens = usage_dict.get("prompt_tokens")
+            if input_tokens is None:
+                input_tokens = usage_dict.get("input_tokens")
+            if input_tokens is not None:
+                nb_tokens[TokenCategory.INPUT] = input_tokens
+            output_tokens = usage_dict.get("completion_tokens")
+            if output_tokens is None:
+                output_tokens = usage_dict.get("output_tokens")
+            if output_tokens is not None:
+                nb_tokens[TokenCategory.OUTPUT] = output_tokens
+            img_gen_tokens_usage.nb_tokens_by_category = nb_tokens
 
         response_output_format: str | None = response_dict.get("output_format")
         if not response_output_format:

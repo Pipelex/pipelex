@@ -159,6 +159,12 @@ class ConfigLoader:
 
         copy_directory_structure(src_dir=config_template_dir, dst_dir=global_dir)
 
+        # Stamp the deck manifest so the boot-time staleness check has a baseline.
+        # Imported lazily to avoid a circular import — config_loader is loaded very early.
+        from pipelex.cogt.models.deck_manifest import compute_kit_manifest, write_manifest  # noqa: PLC0415
+
+        write_manifest(global_dir / "inference" / "deck", compute_kit_manifest())
+
     def load_config(self) -> dict[str, Any]:
         """Load and merge configurations from pipelex and local config files.
 

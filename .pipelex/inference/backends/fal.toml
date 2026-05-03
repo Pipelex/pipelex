@@ -38,6 +38,7 @@ outputs = ["image"]
 costs = { input = 0.05, output = 0.0 }
 
 [flux-pro.rules]
+model_choice = "model_id"
 prompt = "positive_only"
 num_images = "fal"
 aspect_ratio = "flux"
@@ -53,6 +54,7 @@ outputs = ["image"]
 costs = { input = 0.05, output = 0.0 }
 
 ["flux-pro/v1.1".rules]
+model_choice = "model_id"
 prompt = "positive_only"
 num_images = "fal"
 aspect_ratio = "flux"
@@ -68,6 +70,7 @@ outputs = ["image"]
 costs = { input = 0.06, output = 0.0 }
 
 ["flux-pro/v1.1-ultra".rules]
+model_choice = "model_id"
 prompt = "positive_only"
 num_images = "fal"
 aspect_ratio = "flux_11_ultra"
@@ -83,6 +86,7 @@ outputs = ["image"]
 costs = { input = 0.05, output = 0.0 }
 
 [flux-2.rules]
+model_choice = "model_id"
 prompt = "positive_only"
 num_images = "fal"
 aspect_ratio = "flux"
@@ -99,6 +103,7 @@ outputs = ["image"]
 costs = { input = 0.0003, output = 0.0 }
 
 [fast-lightning-sdxl.rules]
+model_choice = "model_id"
 prompt = "positive_only"
 num_images = "fal"
 aspect_ratio = "flux"

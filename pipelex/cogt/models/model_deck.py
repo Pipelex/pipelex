@@ -861,11 +861,14 @@ class ModelDeck(ConfigModel):
         inference_model = self.get_optional_inference_model(model_handle=model_handle, model_type=model_type)
         if inference_model is None:
             msg = (
-                f"Model handle '{model_handle}' was not found in the model deck. "
-                "Make sure it's defined in one of the model decks '.pipelex/inference/deck/*.toml'. "
-                "If the model handle is indeed in the deck, make sure the required backend for this model to run is enabled in "
-                "'.pipelex/inference/backends.toml' and that you have the necessary credentials. "
-                "To find what backend is required for this model, look at the routing profile in '.pipelex/inference/routing_profiles.toml' "
+                f"Model handle '{model_handle}' was not found in the model deck.\n"
+                "The most likely cause is that your local model deck is out of date: new aliases and presets are added to Pipelex "
+                "over time and existing '.pipelex/inference/deck/*.toml' files are not automatically refreshed (yet). "
+                "To pick up the latest definitions, delete your local deck files under '.pipelex/inference/deck/' "
+                "(or the whole '.pipelex/inference/' directory) and run 'pipelex init inference' to regenerate them.\n"
+                "If that doesn't resolve it: make sure the handle is defined in one of '.pipelex/inference/deck/*.toml', "
+                "that the backend it routes to (see '.pipelex/inference/routing_profiles.toml') is enabled in "
+                "'.pipelex/inference/backends.toml', and that you have the necessary credentials. "
                 "Learn more about the inference backend system in the Pipelex documentation: "
                 f"{URLs.backend_provider_docs}"
             )

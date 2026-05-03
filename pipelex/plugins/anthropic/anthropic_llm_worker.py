@@ -16,6 +16,7 @@ from pipelex.cogt.llm.llm_utils import (
 )
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
+from pipelex.cogt.model_backends.constraints import ListedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
 from pipelex.plugins.anthropic.anthropic_exceptions import (
@@ -193,7 +194,13 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     ) -> _ThinkingParams:
         """Build thinking params when reasoning_budget is specified."""
         match thinking_mode:
-            case ThinkingMode.ADAPTIVE | ThinkingMode.MANUAL:
+            case ThinkingMode.ADAPTIVE:
+                msg = (
+                    f"Model '{self.inference_model.desc}' uses adaptive thinking which does not support reasoning_budget. "
+                    f"Use reasoning_effort instead (e.g. reasoning_effort='high')"
+                )
+                raise LLMCapabilityError(msg)
+            case ThinkingMode.MANUAL:
                 safe_budget = min(budget, max_tokens - 1)
                 log.verbose(f"Anthropic thinking with explicit budget_tokens={safe_budget}")
                 thinking_config: ThinkingConfigParam = {"type": "enabled", "budget_tokens": safe_budget}
@@ -221,11 +228,12 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
 
         try:
             # Use streaming internally to avoid SDK long-request protection
+            temperature_unsupported = ListedConstraint.TEMPERATURE_UNSUPPORTED in self.inference_model.listed_constraints
             async with self.anthropic_async_client.messages.stream(
                 messages=[message],
                 system=llm_job.llm_prompt.system_text or omit,
                 model=self.inference_model.model_id,
-                temperature=omit if thinking_params.suppress_temperature else job_params.temperature,
+                temperature=omit if (thinking_params.suppress_temperature or temperature_unsupported) else job_params.temperature,
                 max_tokens=max_tokens,
                 thinking=thinking_params.thinking or omit,
                 output_config=thinking_params.output_config or omit,
@@ -294,13 +302,14 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
         requested_max_tokens = job_params.max_tokens or self.default_max_tokens
         effective_max_tokens = min(requested_max_tokens, safe_max_tokens)
 
+        temperature_unsupported = ListedConstraint.TEMPERATURE_UNSUPPORTED in self.inference_model.listed_constraints
         try:
             result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                 messages=messages,
                 response_model=schema,
                 max_retries=llm_job.job_config.max_retries,
                 model=self.inference_model.model_id,
-                temperature=job_params.temperature,
+                temperature=omit if temperature_unsupported else job_params.temperature,
                 max_tokens=effective_max_tokens,
                 timeout=float(timeout_seconds),  # Explicit timeout disables SDK's long-request protection
             )

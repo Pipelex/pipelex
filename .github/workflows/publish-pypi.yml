@@ -5,7 +5,7 @@ on:
     types: [closed]
     branches:
       - main
-      - 'pre-release/v*'
+      - "pre-release/v*"
 
 jobs:
   build:
@@ -55,7 +55,7 @@ jobs:
           name: python-package-distributions
           path: dist/
       - name: Publish distribution 📦 to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # release/v1
 
   github-release:
     name: >-
@@ -93,19 +93,19 @@ jobs:
         run: |
           VERSION="${{ env.VERSION }}"
           echo "Extracting changelog for version v$VERSION"
-          
+
           # Find the start of the current version section
           START_LINE=$(grep -n "## \[v$VERSION\] - " CHANGELOG.md | cut -d: -f1)
-          
+
           if [ -z "$START_LINE" ]; then
             echo "Warning: No changelog entry found for version v$VERSION"
             echo "CHANGELOG_NOTES=" >> $GITHUB_ENV
             exit 0
           fi
-          
+
           # Find the start of the next version section (previous version)
           NEXT_VERSION_LINE=$(tail -n +$((START_LINE + 1)) CHANGELOG.md | grep -n "^## \[v.*\] - " | head -1 | cut -d: -f1)
-          
+
           if [ -z "$NEXT_VERSION_LINE" ]; then
             # No next version found, extract from current version till end of file
             CHANGELOG_CONTENT=$(tail -n +$START_LINE CHANGELOG.md)
@@ -114,15 +114,15 @@ jobs:
             END_LINE=$((START_LINE + NEXT_VERSION_LINE - 1))
             CHANGELOG_CONTENT=$(sed -n "$START_LINE,$((END_LINE - 1))p" CHANGELOG.md)
           fi
-          
+
           # Clean up the content but preserve the blank line after the header
           # First, get the header line and add a blank line after it
           HEADER_LINE=$(echo "$CHANGELOG_CONTENT" | head -1)
           CONTENT_LINES=$(echo "$CHANGELOG_CONTENT" | tail -n +2 | sed '/^$/d' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
-          
+
           # Combine header + blank line + content
           CHANGELOG_CONTENT=$(printf "%s\n\n%s" "$HEADER_LINE" "$CONTENT_LINES")
-          
+
           # Escape for GitHub Actions
           echo "CHANGELOG_NOTES<<EOF" >> $GITHUB_ENV
           echo "$CHANGELOG_CONTENT" >> $GITHUB_ENV
@@ -133,7 +133,7 @@ jobs:
           name: python-package-distributions
           path: dist/
       - name: Sign the dists with Sigstore
-        uses: sigstore/gh-action-sigstore-python@v3.0.0
+        uses: sigstore/gh-action-sigstore-python@f514d46b907ebcd5bedc05145c03b69c1edd8b46 # v3.0.0
         with:
           inputs: >-
             ./dist/*.tar.gz

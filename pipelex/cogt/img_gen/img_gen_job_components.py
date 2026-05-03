@@ -2,6 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_report import ImgGenTokensUsage
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.misc.image_utils import ImageFormat
@@ -26,6 +27,11 @@ class Quality(StrEnum):
     HIGH = "high"
 
 
+class InputFidelity(StrEnum):
+    LOW = "low"
+    HIGH = "high"
+
+
 class Background(StrEnum):
     TRANSPARENT = "transparent"
     OPAQUE = "opaque"
@@ -42,8 +48,10 @@ class Background(StrEnum):
 
 class ImgGenJobParams(BaseModel):
     aspect_ratio: AspectRatio = Field(strict=False)
+    size: ImageSize | None = None
     background: Background = Field(strict=False)
     quality: Quality | None = Field(default=None, strict=False)
+    input_fidelity: InputFidelity | None = Field(default=None, strict=False)
     nb_steps: int | None = Field(default=None, gt=0)
     guidance_scale: float | None = Field(default=None, gt=0)
     is_moderated: bool | None = None
