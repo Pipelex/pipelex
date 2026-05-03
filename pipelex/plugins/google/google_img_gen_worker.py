@@ -1,21 +1,27 @@
 import asyncio
 from typing import Any
 
+from google.genai import errors as genai_errors
 from google.genai import types as genai_types
 from google.genai.client import Client as GoogleGenAiClient
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
-from pipelex.cogt.exceptions import ImgGenGenerationError, SdkTypeError
+from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategory, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
+from pipelex.cogt.inference.error_classification import (
+    is_content_policy_violation,
+    is_quota_exhaustion_google,
+)
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.google.google_factory import GoogleFactory
 from pipelex.plugins.google.google_img_gen_factory import GoogleImgGenFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.urls import URLs
 
 
 class GoogleImgGenWorkerError(PipelexError):
@@ -81,6 +87,49 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
             # Log but don't fail teardown if cleanup has issues
             log.debug(f"Error during Google async client teardown: {exc}")
 
+    def _classify_google_client_error(self, exc: genai_errors.ClientError) -> ImgGenGenerationError:
+        """Classify a Google GenAI ClientError into a categorized ImgGenGenerationError."""
+        error_message = str(exc)
+        status_code = exc.code
+
+        if status_code == 404:
+            msg = f"Google model '{self.inference_model.desc}' not found: {exc}"
+            return ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
+
+        if status_code in {401, 403}:
+            msg = f"Google API permission denied for model '{self.inference_model.desc}': {exc}"
+            return ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
+
+        if status_code == 429:
+            if is_quota_exhaustion_google(error_message):
+                msg = f"Google quota exhausted for model '{self.inference_model.desc}': {exc}"
+                return ImgGenGenerationError(
+                    msg,
+                    error_category=InferenceErrorCategory.CAPACITY,
+                    user_action=f"Your Google Cloud account has exceeded its quota — check billing at {URLs.google_billing}",
+                )
+            msg = f"Google rate limit exceeded for model '{self.inference_model.desc}': {exc}"
+            return ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                user_action="Rate limited by Google — the system will retry automatically",
+            )
+
+        if status_code == 400:
+            if is_content_policy_violation(error_message):
+                msg = f"Content rejected by safety filters for model '{self.inference_model.desc}': {exc}"
+                return ImgGenGenerationError(
+                    msg,
+                    error_category=InferenceErrorCategory.CONTENT,
+                    user_action="Content was rejected by safety filters — revise the prompt",
+                )
+            msg = f"Google bad request error for model '{self.inference_model.desc}': {exc}"
+            return ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONTENT)
+
+        # Fallback for other 4xx errors
+        msg = f"Google API client error for model '{self.inference_model.desc}': {exc}"
+        return ImgGenGenerationError(msg, error_category=InferenceErrorCategory.TRANSIENT)
+
     @override
     async def _gen_image(
         self,
@@ -108,11 +157,17 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
         )
 
         # Generate content using async client
-        response = await self.genai_async_client.models.generate_content(
-            model=self.inference_model.model_id,
-            contents=prompt_text,
-            config=generation_config,
-        )
+        try:
+            response = await self.genai_async_client.models.generate_content(
+                model=self.inference_model.model_id,
+                contents=prompt_text,
+                config=generation_config,
+            )
+        except genai_errors.ServerError as exc:
+            msg = f"Google API server error for model '{self.inference_model.desc}': {exc}"
+            raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
+        except genai_errors.ClientError as exc:
+            raise self._classify_google_client_error(exc) from exc
 
         usage_metadata: genai_types.GenerateContentResponseUsageMetadata | None = response.usage_metadata
         if not usage_metadata:

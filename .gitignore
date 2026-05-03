@@ -63,6 +63,10 @@ structures/
 .pipelex/traces
 .pipelex/temporal-payload-store
 
+# Pipelex runtime trace artifacts (workflow ndjson)
+**/traces/
+.pipelex/traces/
+
 # Generated test fixtures (regenerate with `make regenerate-test-models`)
 tests/integration/pipelex/fixtures/_generated_model_sets.py
 

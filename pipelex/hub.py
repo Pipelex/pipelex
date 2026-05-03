@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, ClassVar, Optional
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
 from kajson.kajson_manager import KajsonManager
-from opentelemetry.trace import Tracer as OTelTracer
 from rich.console import Console
 
 from pipelex import log
@@ -39,11 +38,13 @@ from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.console_target import ConsoleTarget
 from pipelex.system.environment import PIPELEXPATH_ENV_KEY, get_pipelexpath_dirs
 from pipelex.system.registries.func_registry import FuncRegistry
-from pipelex.system.telemetry.telemetry_manager import TelemetryManagerAbstract
+from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
 if TYPE_CHECKING:
+    from opentelemetry.trace import Tracer as OTelTracer
+
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 
 
@@ -401,7 +402,7 @@ def get_telemetry_manager() -> TelemetryManagerAbstract:
     return get_pipelex_hub().get_telemetry_manager()
 
 
-def get_otel_tracer() -> OTelTracer | None:
+def get_otel_tracer() -> "OTelTracer | None":
     return get_telemetry_manager().get_otel_tracer()
 
 

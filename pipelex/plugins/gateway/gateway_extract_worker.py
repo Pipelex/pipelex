@@ -181,11 +181,12 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
                     )
         except portkey_exceptions.APIError as exc:
             error_summary = GatewayFactory.make_error_summary_from_portkey_error(exc)
+            error_category = GatewayFactory.classify_error_category(exc)
             msg = (
                 f"Web fetch service error for URL '{document_uri}' via model '{self.inference_model.tag}' "
                 f"after {attempt_number} attempt(s): {error_summary}"
             )
-            raise ExtractJobFailureError(msg) from exc
+            raise ExtractJobFailureError(msg, error_category=error_category) from exc
 
         if response is None:
             msg = f"Could not get a response for model '{self.inference_model.tag}' via Portkey after {attempt_number} attempts"
@@ -247,8 +248,9 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
                     )
         except portkey_exceptions.APIError as exc:
             error_summary = GatewayFactory.make_error_summary_from_portkey_error(exc)
+            error_category = GatewayFactory.classify_error_category(exc)
             msg = f"Extract service error for model '{self.inference_model.tag}' after {attempt_number} attempt(s): {error_summary}"
-            raise ExtractJobFailureError(msg) from exc
+            raise ExtractJobFailureError(msg, error_category=error_category) from exc
 
         if response is None:
             msg = f"Could not get a response for model '{self.inference_model.tag}' via Portkey after {attempt_number} attempts"

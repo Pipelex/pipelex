@@ -10,7 +10,6 @@ from pipelex.system.pipelex_service.remote_config import RemoteConfig
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.telemetry_config import PostHogMode, TelemetryConfig, load_telemetry_config
-from pipelex.system.telemetry.telemetry_manager import TelemetryManager
 from pipelex.system.telemetry.telemetry_manager_abstract import (
     TelemetryManagerAbstract,
     TelemetryManagerNoOp,
@@ -47,6 +46,8 @@ class TelemetryFactory:
             telemetry_config = load_telemetry_config(secrets_provider=secrets_provider)
 
         allows_custom_telemetry = telemetry_config.is_custom_telemetry_allowed_for_mode(integration_mode)
+
+        from pipelex.system.telemetry.telemetry_manager import TelemetryManager  # noqa: PLC0415
 
         chosen_telemetry_manager: TelemetryManagerAbstract
         if allows_custom_telemetry or is_pipelex_telemetry_enabled:

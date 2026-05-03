@@ -113,7 +113,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 msg = f"Variable substitution failed due to a pattern error in file '{backends_library_path}':\n{var_fallback_pattern_exc}"
                 key_name = "unknown"
                 raise InferenceBackendCredentialsError(
-                    error_type=InferenceBackendCredentialsErrorType.VAR_FALLBACK_PATTERN,
+                    credentials_error_type=InferenceBackendCredentialsErrorType.VAR_FALLBACK_PATTERN,
                     backend_name=backend_name,
                     message=msg,
                     key_name=key_name,
@@ -128,7 +128,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     f"{var_not_found_exc}\nRun mode: '{runtime_manager.run_mode}'"
                 )
                 raise InferenceBackendCredentialsError(
-                    error_type=InferenceBackendCredentialsErrorType.VAR_NOT_FOUND,
+                    credentials_error_type=InferenceBackendCredentialsErrorType.VAR_NOT_FOUND,
                     backend_name=backend_name,
                     message=msg,
                     key_name=var_not_found_exc.var_name,
@@ -138,7 +138,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     log.verbose(f"Skipping backend '{backend_name}': unknown variable prefix for '{unknown_var_prefix_exc.var_name}'")
                     continue
                 raise InferenceBackendCredentialsError(
-                    error_type=InferenceBackendCredentialsErrorType.UNKNOWN_VAR_PREFIX,
+                    credentials_error_type=InferenceBackendCredentialsErrorType.UNKNOWN_VAR_PREFIX,
                     backend_name=backend_name,
                     message=(
                         f"Variable substitution failed due to an unknown variable prefix error "

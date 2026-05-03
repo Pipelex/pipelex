@@ -14,6 +14,8 @@
 - **Event log DI**: Event log backend is now configurable via `TracingConfig.backend` (`"ndjson"` or `"dynamodb"`) and injectable via `Pipelex.setup(event_log=...)`. Factory function `make_event_log()` selects the backend from config or hub injection.
 - **Hub event_log support**: `PipelexHub.set_event_log()` / `get_event_log()` for dependency injection of custom event log backends.
 - **Environment-specific config**: `RunEnvironment` enum values updated to full names (`"development"`, `"production"`). Config loaded from `ENVIRONMENT` env var (was `ENV`).
+- **Inference error classification**: New `InferenceErrorCategory` enum (`transient`, `configuration`, `content`, `capacity`) with per-provider helpers that distinguish quota exhaustion from rate limits and detect content policy violations — covers OpenAI, Anthropic, Google, Mistral, AWS Bedrock, and Gateway.
+- **Structured `ErrorReport`**: `PipelexError.to_error_report()` returns a dataclass with error type, category, retryable flag, user action hint, model, and provider.
 
 ### Changed
 
@@ -22,6 +24,11 @@
 - **Tracing config structure**: `TracingConfig` now has `backend`, `ndjson` (with `traces_dir`), and `dynamodb` (with `table_name`, `region`) sub-configs. Tracing is enabled by default.
 - **Event log factory replaces hardcoded NdjsonEventLog**: The 3 call sites (`pipeline_run_setup.py`, `wf_pipe_router.py`, `runner.py`) now use `make_event_log()` instead of directly instantiating `NdjsonEventLog`.
 - **Tracing decoupled from Temporal**: Event log is created when `tracing_config.is_enabled`, regardless of whether Temporal is enabled.
+- **`make rules` now generates both `CLAUDE.md` and `AGENTS.md` by default**: the `pipelex.kit_config.preferred_agent_target` setting has been renamed to `preferred_agent_targets` and is now a list. The default is `["claude", "agents"]`. Cursor remains exclusive (`["cursor"]`) and cannot be combined with single-file targets. Downstream projects overriding this setting must rename the key and wrap the value in a list.
+- **All inference workers attach error category and user action**: Every worker across all providers now raises exceptions with an `InferenceErrorCategory` and actionable `user_action` hint.
+- **CLI error output wired to `ErrorReport`**: Error handlers use `to_error_report()` for consistent, structured display.
+- **Graph viewer updated to mthds-ui v0.3.4**: bumped from v0.3.0 — additional polish atop the resizable detail panel, escape-to-close, sticky header, prompt expand/collapse with copy button, concept refinement display.
+- **README install instructions**: Replaced step-by-step Claude Code setup with single copy-paste messages for Claude Code and Codex, added manual install section.
 
 ### Removed
 
@@ -31,6 +38,7 @@
 
 ### Fixed
 
+- **Anthropic structured generation no longer flattens all errors to `CONTENT`.** `AnthropicLLMWorker._gen_object` runs requests through `instructor`, which wraps SDK exceptions in `InstructorRetryException`. The previous handler categorized every wrapped error as `CONTENT`, so genuine `RateLimitError`, `APITimeoutError`, `APIConnectionError`, `PermissionDeniedError`, and `AuthenticationError` cases never reached the typed branches — they were reported as content failures (non-retryable) instead of `TRANSIENT` / `CAPACITY` / `CONFIGURATION`. The handler now unwraps `InstructorRetryException.failed_attempts[-1].exception` (with a `__cause__`/`RetryError.last_attempt` fallback) and routes recognized SDK exceptions through a shared categorization helper; truly unrecognized errors keep the `CONTENT` fallback.
 - **ObjectAssignment deserialization on Temporal workers**: Removed `__init__` class registry check that blocked deserialization of `ObjectAssignment` before `library_crate` was loaded. Validation moved to `validate_before_execution()` method, following the existing codebase pattern.
 - **Dynamic concept classes in Temporal activities**: `WfPipeRouter` now propagates dynamically registered concept classes from the per-workflow registry to the global registry, so child workflows and activities can access them.
 - **Temporal nondeterminism in child workflow IDs**: Replaced `shortuuid.uuid()` with `workflow.uuid4()` in `TemporalPipeRouter` for deterministic child workflow ID generation. The old code caused TMPRL1100 errors on workflow replay.

@@ -49,16 +49,15 @@ def handle_model_choice_error(exc: PipeOperatorModelChoiceError, context: ErrorC
         exc: The model choice error exception
         context: Context for the error message
     """
+    report = exc.to_error_report()
     console = get_console()
     console.print(f"\n[bold red]❌ {context} failed because of a model choice could not be interpreted correctly[/bold red]\n")
     console.print(f"[bold cyan]Pipe:[/bold cyan]         [yellow]'{escape(exc.pipe_code)}'[/yellow] [dim]({escape(exc.pipe_type)})[/dim]")
     console.print(f"[bold cyan]Model Type:[/bold cyan]   [yellow]'{escape(exc.model_type)}'[/yellow]")
     console.print(f"[bold cyan]Model Choice:[/bold cyan] [yellow]'{escape(str(exc.model_choice))}'[/yellow]")
     console.print(f"\n[bold red]Error:[/bold red]        {escape(exc.message)}\n")
-    console.print(
-        f"[bold green]💡 Tip:[/bold green] Check your model configuration in [cyan].pipelex/inference/[/cyan] "
-        f"or specify a different model in the [yellow]'{escape(exc.pipe_code)}'[/yellow] pipe."
-    )
+    tip = report.user_action or (f"Check your model configuration in .pipelex/inference/ or specify a different model in the '{exc.pipe_code}' pipe.")
+    console.print(f"\n[bold green]💡 Tip:[/bold green] {escape(tip)}")
     console.print(f"[dim]Learn more about the inference backend system: {URLs.backend_provider_docs}[/dim]")
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
     raise typer.Exit(1) from exc
@@ -71,6 +70,7 @@ def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, con
         exc: The model availability error exception
         context: Context for the error message
     """
+    report = exc.to_error_report()
     console = get_console()
     console.print(f"\n[bold red]❌ {context} failed because a model wasn't available[/bold red]\n")
     console.print(f"[bold cyan]Pipe:[/bold cyan]         [yellow]'{escape(exc.pipe_code)}'[/yellow] [dim]({escape(exc.pipe_type)})[/dim]")
@@ -82,10 +82,8 @@ def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, con
         stack_str = " [dim]→[/dim] ".join([f"[yellow]{escape(p)}[/yellow]" for p in exc.pipe_stack])
         console.print(f"[bold cyan]Pipe Stack:[/bold cyan]   {stack_str}")
     console.print(f"\n[bold red]Error:[/bold red]        {escape(str(exc))}\n")
-    console.print(
-        f"[bold green]💡 Tip:[/bold green] Check your model configuration in [cyan].pipelex/inference/[/cyan] "
-        f"or specify a different model in the [yellow]'{escape(exc.pipe_code)}'[/yellow] pipe."
-    )
+    tip = report.user_action or (f"Check your model configuration in .pipelex/inference/ or specify a different model in the '{exc.pipe_code}' pipe.")
+    console.print(f"[bold green]💡 Tip:[/bold green] {escape(tip)}")
     console.print(f"[dim]Learn more about the inference backend system: {URLs.backend_provider_docs}[/dim]")
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
     raise typer.Exit(1) from exc
@@ -98,6 +96,7 @@ def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, context: 
         exc: The model deck preset validation error exception
         context: Context for the error message
     """
+    report = exc.to_error_report()
     console = get_console()
     console.print(f"\n[bold red]❌ {context} failed due to model deck preset validation error[/bold red]\n")
     console.print(f"[bold cyan]Preset ID:[/bold cyan]    [yellow]'{escape(exc.preset_id)}'[/yellow]")
@@ -107,19 +106,22 @@ def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, context: 
         backends_str = ", ".join([f"[yellow]{escape(b)}[/yellow]" for b in sorted(exc.enabled_backends)])
         console.print(f"[bold cyan]Enabled Backends:[/bold cyan] {backends_str}")
     console.print(f"\n[bold red]Error:[/bold red]        {escape(exc.message)}\n")
-    console.print(
-        f"[bold green]💡 Tip:[/bold green] The preset [yellow]'{escape(exc.preset_id)}'[/yellow] references model handle "
-        f"[yellow]'{escape(exc.model_handle)}'[/yellow] which is not available in any enabled backend."
-    )
-    if exc.enabled_backends:
-        backends_str = ", ".join([f"[yellow]{escape(b)}[/yellow]" for b in sorted(exc.enabled_backends)])
-        console.print(f"The enabled backends are: {backends_str}.")
-    console.print(
-        "[bold]Possible solutions:[/bold]\n"
-        "  1. Update the preset to use a different model\n"
-        f"  2. Configure model '{escape(exc.model_handle)}' in one of your enabled backends\n"
-        f"  3. Enable a backend that supports [yellow]'{escape(exc.model_handle)}'[/yellow]"
-    )
+    if report.user_action:
+        console.print(f"[bold green]💡 Tip:[/bold green] {escape(report.user_action)}")
+    else:
+        console.print(
+            f"[bold green]💡 Tip:[/bold green] The preset [yellow]'{escape(exc.preset_id)}'[/yellow] references model handle "
+            f"[yellow]'{escape(exc.model_handle)}'[/yellow] which is not available in any enabled backend."
+        )
+        if exc.enabled_backends:
+            backends_str = ", ".join([f"[yellow]{escape(b)}[/yellow]" for b in sorted(exc.enabled_backends)])
+            console.print(f"The enabled backends are: {backends_str}.")
+        console.print(
+            "[bold]Possible solutions:[/bold]\n"
+            "  1. Update the preset to use a different model\n"
+            f"  2. Configure model '{escape(exc.model_handle)}' in one of your enabled backends\n"
+            f"  3. Enable a backend that supports [yellow]'{escape(exc.model_handle)}'[/yellow]"
+        )
     console.print(f"\n[dim]Learn more about the inference backend system: {URLs.backend_provider_docs}[/dim]")
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
     raise typer.Exit(1) from exc
@@ -204,6 +206,7 @@ def handle_validate_bundle_error(exc: ValidateBundleError, bundle_path: Path | N
         exc: The bundle validation error exception
         bundle_path: Optional path to the bundle file being validated
     """
+    report = exc.to_error_report()
     console = get_console()
     console.print("\n[bold red]❌ Bundle validation failed[/bold red]\n")
 
@@ -213,10 +216,10 @@ def handle_validate_bundle_error(exc: ValidateBundleError, bundle_path: Path | N
     _display_validation_error_details(console=console, exc=exc)
 
     # Display helpful tips
-    console.print(
-        "[bold green]💡 Tip:[/bold green] Review the error messages above and check your pipeline configuration. "
-        "Make sure all required fields are present and correctly formatted."
+    tip = report.user_action or (
+        "Review the error messages above and check your pipeline configuration. Make sure all required fields are present and correctly formatted."
     )
+    console.print(f"[bold green]💡 Tip:[/bold green] {escape(tip)}")
     console.print(f"[dim]Learn more: {URLs.documentation}[/dim]")
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
     raise typer.Exit(1) from exc

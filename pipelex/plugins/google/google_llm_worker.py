@@ -1,13 +1,18 @@
 import asyncio
 from typing import TYPE_CHECKING, cast
 
+from google.genai import errors as genai_errors
 from google.genai import types as genai_types
 from google.genai.client import Client as GoogleGenAiClient
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
-from pipelex.cogt.exceptions import LLMCapabilityError
+from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError
+from pipelex.cogt.inference.error_classification import (
+    is_content_policy_violation,
+    is_quota_exhaustion_google,
+)
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
@@ -19,6 +24,7 @@ from pipelex.config import get_config
 from pipelex.plugins.google.google_factory import GoogleFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+from pipelex.urls import URLs
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
@@ -96,6 +102,53 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
         except Exception as exc:
             # Log but don't fail teardown if cleanup has issues
             log.debug(f"Error during Google async client teardown: {exc}")
+
+    #########################################################
+    # Error classification
+    #########################################################
+
+    def _classify_google_client_error(self, exc: genai_errors.ClientError) -> LLMCompletionError:
+        """Classify a Google GenAI ClientError into a categorized LLMCompletionError."""
+        error_message = str(exc)
+        status_code = exc.code
+
+        if status_code == 404:
+            msg = f"Google model '{self.inference_model.desc}' not found: {exc}"
+            return LLMCompletionError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
+
+        if status_code in {401, 403}:
+            msg = f"Google API permission denied for model '{self.inference_model.desc}': {exc}"
+            return LLMCompletionError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
+
+        if status_code == 429:
+            if is_quota_exhaustion_google(error_message):
+                msg = f"Google quota exhausted for model '{self.inference_model.desc}': {exc}"
+                return LLMCompletionError(
+                    msg,
+                    error_category=InferenceErrorCategory.CAPACITY,
+                    user_action=f"Your Google Cloud account has exceeded its quota — check billing at {URLs.google_billing}",
+                )
+            msg = f"Google rate limit exceeded for model '{self.inference_model.desc}': {exc}"
+            return LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                user_action="Rate limited by Google — the system will retry automatically",
+            )
+
+        if status_code == 400:
+            if is_content_policy_violation(error_message):
+                msg = f"Content rejected by safety filters for model '{self.inference_model.desc}': {exc}"
+                return LLMCompletionError(
+                    msg,
+                    error_category=InferenceErrorCategory.CONTENT,
+                    user_action="Content was rejected by safety filters — revise the prompt",
+                )
+            msg = f"Google bad request error for model '{self.inference_model.desc}': {exc}"
+            return LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT)
+
+        # Fallback for other 4xx errors
+        msg = f"Google API client error for model '{self.inference_model.desc}': {exc}"
+        return LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT)
 
     #########################################################
     # Reasoning helpers
@@ -205,11 +258,17 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
             generation_config.system_instruction = llm_job.llm_prompt.system_text
 
         # Generate content using async client
-        response = await self.genai_async_client.models.generate_content(
-            model=self.inference_model.model_id,
-            contents=contents,
-            config=generation_config,
-        )
+        try:
+            response = await self.genai_async_client.models.generate_content(
+                model=self.inference_model.model_id,
+                contents=contents,
+                config=generation_config,
+            )
+        except genai_errors.ServerError as exc:
+            msg = f"Google API server error for model '{self.inference_model.desc}': {exc}"
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
+        except genai_errors.ClientError as exc:
+            raise self._classify_google_client_error(exc) from exc
 
         # Extract text from response (skips thinking parts)
         text_content = GoogleFactory.extract_text_from_response(response=response, model_desc=self.inference_model.desc)
@@ -239,13 +298,27 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
             candidate_count=1,
         )
 
-        result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
-            messages=[cast("ChatCompletionMessageParam", contents)],
-            response_model=schema,
-            max_retries=llm_job.job_config.max_retries,
-            model=self.inference_model.model_id,
-            generation_config=generation_config,
-        )
+        from instructor.exceptions import InstructorRetryException  # noqa: PLC0415
+
+        try:
+            result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
+                messages=[cast("ChatCompletionMessageParam", contents)],
+                response_model=schema,
+                max_retries=llm_job.job_config.max_retries,
+                model=self.inference_model.model_id,
+                generation_config=generation_config,
+            )
+        except genai_errors.ServerError as exc:
+            msg = f"Google API server error for model '{self.inference_model.desc}': {exc}"
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
+        except genai_errors.ClientError as exc:
+            raise self._classify_google_client_error(exc) from exc
+        except LLMCompletionError:
+            raise
+        except InstructorRetryException as exc:
+            msg = f"Google structured generation failed after retries for model '{self.inference_model.desc}': {exc}"
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
+
         if not isinstance(result_object, schema):
             msg = f"Google Gemini API returned an object that is not of type {schema}: {result_object}"
             raise GoogleLLMWorkerError(msg)

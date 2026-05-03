@@ -37,36 +37,37 @@ def _sync_agent_rules(
     loaded_kit_index = load_index() if kit_index is None else kit_index
     agent_set = agent_set or loaded_kit_index.agent_rules.default_set
 
-    # Get preferred agent target from config
     config = get_config()
-    preferred_target = config.pipelex.kit_config.preferred_agent_target
+    preferred_targets: list[AgentTarget] = list(config.pipelex.kit_config.preferred_agent_targets)
 
-    match preferred_target:
-        case AgentTarget.CURSOR:
-            typer.echo("Updating Cursor rules...")
-            update_cursor_rules(resolved_repo_root, loaded_kit_index, agent_set=agent_set)
-        case AgentTarget.AGENTS | AgentTarget.CLAUDE:
-            typer.echo(f"Updating {preferred_target} rules...")
-            all_targets = loaded_kit_index.agent_rules.targets
-            if preferred_target in all_targets:
-                filtered_targets: dict[str, Target] = {preferred_target: all_targets[preferred_target]}
-                update_single_file_agent_rules(
-                    repo_root=resolved_repo_root,
-                    kit_index=loaded_kit_index,
-                    agent_set=agent_set,
-                    targets=filtered_targets,
-                )
-            else:
-                msg = f"Target '{preferred_target}' not found in index.toml"
+    # The config validator guarantees CURSOR cannot coexist with other targets,
+    # so a simple membership check is enough to pick the branch.
+    if AgentTarget.CURSOR in preferred_targets:
+        typer.echo("Updating Cursor rules...")
+        update_cursor_rules(resolved_repo_root, loaded_kit_index, agent_set=agent_set)
+    else:
+        all_targets = loaded_kit_index.agent_rules.targets
+        filtered_targets: dict[str, Target] = {}
+        for target_key in preferred_targets:
+            if target_key not in all_targets:
+                msg = f"Target '{target_key}' not found in index.toml"
                 raise PipelexCLIError(msg)
+            filtered_targets[target_key] = all_targets[target_key]
+        names = ", ".join(sorted(filtered_targets.keys()))
+        typer.echo(f"Updating {names} rules...")
+        update_single_file_agent_rules(
+            repo_root=resolved_repo_root,
+            kit_index=loaded_kit_index,
+            agent_set=agent_set,
+            targets=filtered_targets,
+        )
 
-    # Cleanup: remove rules from other targets
     if cleanup:
         typer.echo("Cleaning up rules from other targets...")
         _cleanup_other_targets(
             repo_root=resolved_repo_root,
             kit_index=loaded_kit_index,
-            preferred_target=preferred_target,
+            preferred_targets=preferred_targets,
         )
 
     typer.echo("Kit sync completed successfully")
@@ -75,30 +76,18 @@ def _sync_agent_rules(
 def _cleanup_other_targets(
     repo_root: Path,
     kit_index: KitIndex,
-    preferred_target: AgentTarget,
+    preferred_targets: list[AgentTarget],
 ) -> None:
-    """Remove Pipelex rules from all targets except the preferred one.
+    """Remove Pipelex rules from all targets except the preferred ones.
 
     For Cursor: deletes .mdc files
     For single-file targets: deletes the files entirely
     """
-    # If preferred target is NOT cursor, remove cursor rules
-    match preferred_target:
-        case AgentTarget.CURSOR:
-            pass  # Don't remove cursor rules since it's the preferred target
-        case AgentTarget.AGENTS | AgentTarget.CLAUDE:
-            # Remove cursor rules
-            remove_cursor_rules(repo_root)
+    if AgentTarget.CURSOR not in preferred_targets:
+        remove_cursor_rules(repo_root)
 
-    # For single-file targets, delete files for all except the preferred one
     all_targets = kit_index.agent_rules.targets
-    targets_to_clean: dict[str, Target] = {}
-
-    for target_key, target in all_targets.items():
-        # Skip the preferred target
-        if target_key == preferred_target:
-            continue
-        targets_to_clean[target_key] = target
+    targets_to_clean: dict[str, Target] = {target_key: target for target_key, target in all_targets.items() if target_key not in preferred_targets}
 
     if targets_to_clean:
         remove_from_targets(

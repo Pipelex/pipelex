@@ -6,10 +6,6 @@ from anthropic.types import Usage
 from anthropic.types.document_block_param import DocumentBlockParam
 from anthropic.types.image_block_param import ImageBlockParam
 from anthropic.types.message_param import MessageParam
-from openai.types.chat import (
-    ChatCompletionMessageParam,
-    ChatCompletionSystemMessageParam,
-)
 
 from pipelex.cogt.document.prompt_document_utils import prep_prompt_documents
 from pipelex.cogt.exceptions import CogtError
@@ -22,6 +18,9 @@ from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.tools.aws.aws_config import BedrockAccessVariant
 from pipelex.tools.uri.prepared_file import PreparedFile, PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
 from pipelex.types import StrEnum
+
+if TYPE_CHECKING:
+    from openai.types.chat import ChatCompletionMessageParam
 
 if TYPE_CHECKING:
     from anthropic.types.text_block_param import TextBlockParam
@@ -166,7 +165,7 @@ class AnthropicFactory:
         user_content_txt: str,
         prepped_user_images: list[PreparedFile] | None = None,
         prepped_user_documents: list[tuple[PreparedFile, str | None]] | None = None,
-    ) -> ChatCompletionMessageParam:
+    ) -> "ChatCompletionMessageParam":
         text_block_param: TextBlockParam = {"type": "text", "text": user_content_txt}
         message: MessageParam
 
@@ -193,8 +192,10 @@ class AnthropicFactory:
     async def make_simple_messages(
         cls,
         llm_job: LLMJob,
-    ) -> list[ChatCompletionMessageParam]:
+    ) -> 'list["ChatCompletionMessageParam"]':
         """Makes a list of messages with a system message (if provided) and followed by a user message."""
+        from openai.types.chat import ChatCompletionSystemMessageParam  # noqa: PLC0415
+
         llm_prompt = llm_job.llm_prompt
         messages: list[ChatCompletionMessageParam] = []
         if system_content := llm_prompt.system_text:
