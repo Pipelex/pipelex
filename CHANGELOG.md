@@ -6,11 +6,17 @@
 
 - **Inference error classification**: New `InferenceErrorCategory` enum (`transient`, `configuration`, `content`, `capacity`) with per-provider helpers that distinguish quota exhaustion from rate limits and detect content policy violations — covers OpenAI, Anthropic, Google, Mistral, AWS Bedrock, and Gateway.
 - **Structured `ErrorReport`**: `PipelexError.to_error_report()` returns a dataclass with error type, category, retryable flag, user action hint, model, and provider.
+- **Graph UI asset sync workflow**: `package.json` pins `@pipelex/mthds-ui` to a git tag, `make sync-graph-ui` clones and builds standalone assets, `make check-graph-ui-sync` verifies version alignment
+- **CI check**: `graph-ui-check.yml` workflow validates graph viewer assets match the pinned version on PRs to main
+- **`/update-graph-ui` skill**: automates bumping the mthds-ui version, syncing assets, and running tests
 
 ### Changed
 
+- **`make rules` now generates both `CLAUDE.md` and `AGENTS.md` by default**: the `pipelex.kit_config.preferred_agent_target` setting has been renamed to `preferred_agent_targets` and is now a list. The default is `["claude", "agents"]`. Cursor remains exclusive (`["cursor"]`) and cannot be combined with single-file targets. Downstream projects overriding this setting must rename the key and wrap the value in a list.
 - **All inference workers attach error category and user action**: Every worker across all providers now raises exceptions with an `InferenceErrorCategory` and actionable `user_action` hint.
 - **CLI error output wired to `ErrorReport`**: Error handlers use `to_error_report()` for consistent, structured display.
+- **Graph viewer updated to mthds-ui v0.3.4**: resizable detail panel, escape-to-close, sticky header, prompt expand/collapse with copy button, concept refinement display
+- **README install instructions**: Replaced step-by-step Claude Code setup with single copy-paste messages for Claude Code and Codex, added manual install section
 
 ## [v0.23.8] - 2026-04-07
 

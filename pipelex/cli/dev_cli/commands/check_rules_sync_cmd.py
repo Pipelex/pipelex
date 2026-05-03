@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from rich.markup import escape
 from rich.panel import Panel
@@ -14,20 +15,26 @@ from pipelex.kit.single_file_agent_rules import build_merged_rules, unified_diff
 from pipelex.system.configuration.configs import AgentTarget
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
+if TYPE_CHECKING:
+    from pipelex.kit.index_models import Target
 
-def _get_preferred_target_from_toml() -> AgentTarget:
-    """Read preferred_agent_target directly from pipelex.toml without initializing Pipelex."""
+_DEFAULT_TARGETS: list[AgentTarget] = [AgentTarget.CLAUDE, AgentTarget.AGENTS]
+
+
+def _get_preferred_targets_from_toml() -> list[AgentTarget]:
+    """Read preferred_agent_targets directly from pipelex.toml without initializing Pipelex."""
     pipelex_toml = Path("pipelex/pipelex.toml")
     if not pipelex_toml.exists():
-        return AgentTarget.CLAUDE  # Default fallback
+        return _DEFAULT_TARGETS
 
     config = load_toml_from_path(str(pipelex_toml))
 
     try:
-        target_str = config["pipelex"]["kit_config"]["preferred_agent_target"]
-        return AgentTarget(target_str)
-    except (KeyError, ValueError):
-        return AgentTarget.CLAUDE  # Default fallback
+        raw_targets = config["pipelex"]["kit_config"]["preferred_agent_targets"]
+        parsed_targets = [AgentTarget(item) for item in raw_targets]
+    except (KeyError, ValueError, TypeError):
+        return _DEFAULT_TARGETS
+    return parsed_targets or _DEFAULT_TARGETS
 
 
 def check_rules_sync_cmd(show_diff: bool = True, quiet: bool = False) -> None:
@@ -41,24 +48,26 @@ def check_rules_sync_cmd(show_diff: bool = True, quiet: bool = False) -> None:
     kit_index = load_index()
     agent_set = "all"
 
-    # Get preferred agent target from config (without initializing Pipelex)
-    preferred_target = _get_preferred_target_from_toml()
+    # Get preferred agent targets from config (without initializing Pipelex)
+    preferred_targets = _get_preferred_targets_from_toml()
 
-    # Only check single-file targets (not Cursor)
-    match preferred_target:
-        case AgentTarget.CURSOR:
-            # Cursor rules use a different mechanism, skip for now
-            if quiet:
-                console.print("[green]✓ Agent rules sync check: PASSED[/green] (Cursor target - skipped)")
-            else:
-                console.print("[dim]Cursor target selected - sync check not applicable[/dim]")
-            return
-        case AgentTarget.AGENTS | AgentTarget.CLAUDE:
-            target_key = preferred_target
-            if target_key not in kit_index.agent_rules.targets:
-                console.print(f"[red]Target '{escape(preferred_target)}' not found in index.toml[/red]")
-                sys.exit(1)
-            targets_to_check = {target_key: kit_index.agent_rules.targets[target_key]}
+    # Cursor is exclusive of the single-file targets per config validator.
+    if preferred_targets == [AgentTarget.CURSOR]:
+        if quiet:
+            console.print("[green]✓ Agent rules sync check: PASSED[/green] (Cursor target - skipped)")
+        else:
+            console.print("[dim]Cursor target selected - sync check not applicable[/dim]")
+        return
+    if AgentTarget.CURSOR in preferred_targets:
+        console.print("[red]Invalid config: preferred_agent_targets cannot mix 'cursor' with other targets[/red]")
+        sys.exit(1)
+
+    targets_to_check: dict[str, Target] = {}
+    for target_key in preferred_targets:
+        if target_key not in kit_index.agent_rules.targets:
+            console.print(f"[red]Target '{escape(target_key)}' not found in index.toml[/red]")
+            sys.exit(1)
+        targets_to_check[target_key] = kit_index.agent_rules.targets[target_key]
 
     missing_targets: list[Path] = []
     mismatches: list[tuple[Path, str, str]] = []

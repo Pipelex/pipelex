@@ -59,6 +59,8 @@ class TestGraphSpecRoundtrip:
         assert restored.nodes[0].kind == NodeKind.OPERATOR
         assert restored.nodes[0].status == NodeStatus.SUCCEEDED
         assert len(restored.edges) == 0
+        assert '"format": "mthds"' in json_str
+        assert restored.meta["format"] == "mthds"
 
     def test_roundtrip_complex_graph(self) -> None:
         """Test round-trip for a complex graph with multiple nodes, edges, and timing."""
@@ -161,7 +163,7 @@ class TestGraphSpecRoundtrip:
         assert restored.edges[0].label == "step 1"
 
         # Verify meta
-        assert restored.meta == {"run_mode": "live"}
+        assert restored.meta == {"run_mode": "live", "format": "mthds"}
 
     def test_roundtrip_with_error_spec(self) -> None:
         """Test round-trip for a graph with a failed node containing error info."""

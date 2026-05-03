@@ -1,0 +1,28 @@
+name: Graph UI asset sync check
+
+on:
+  pull_request:
+    branches:
+      - main
+      - dev
+
+jobs:
+  graph-ui-sync:
+    name: Graph UI sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check graph UI assets are in sync
+        run: |
+          PINNED_VERSION=$(grep -o '"github:Pipelex/mthds-ui#[^"]*"' package.json | sed 's/.*#//;s/"//')
+          if [ -z "$PINNED_VERSION" ]; then
+            echo "::error::Could not parse pinned mthds-ui version from package.json (regex did not match)."
+            exit 1
+          fi
+          SYNCED_VERSION=$(cat pipelex/graph/reactflow/assets/.graph-ui-version 2>/dev/null | tr -d '[:space:]' || echo "NONE")
+          if [ "$PINNED_VERSION" != "$SYNCED_VERSION" ]; then
+            echo "::error::Graph UI assets are out of date! Pinned: $PINNED_VERSION, Synced: $SYNCED_VERSION. Run 'make sync-graph-ui' to update."
+            exit 1
+          fi
+          echo "Graph UI assets are up-to-date ($SYNCED_VERSION)"
