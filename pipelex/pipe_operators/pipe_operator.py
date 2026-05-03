@@ -42,12 +42,17 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
             )
 
             main_stuff = pipe_output.main_stuff
-            output_concept_code = self.output.concept.code
+            # Read the concept from main_stuff, not self.output: when the pipe declares
+            # `Dynamic` output, the runtime-resolved concept lives on main_stuff, while
+            # self.output.concept stays Dynamic across runs.
+            output_concept_code = main_stuff.concept.code
             output_concept_with_multiplicity = f"[bold green]{output_concept_code}[/bold green]"
             if main_stuff.is_list:
                 list_content: ListContent[StuffContent] = main_stuff.as_list_content()  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
                 nb_items = len(list_content.items)
-                if nb_items == 1:
+                if nb_items == 0:
+                    output_concept_with_multiplicity += " [empty list]"
+                elif nb_items == 1:
                     output_concept_with_multiplicity += " [1 item]"
                 else:
                     output_concept_with_multiplicity += f" [{nb_items} items]"

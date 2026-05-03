@@ -85,6 +85,14 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
 <tr>
+<td>claude-4.7-opus</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+</tr>
+<tr>
 <td>deepseek-v3.2</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
@@ -117,7 +125,7 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
 <tr>
-<td>gemini-3.0-flash-preview</td>
+<td>gemini-3.0-flash</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
@@ -126,6 +134,46 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 </tr>
 <tr>
 <td>gemini-3.0-pro</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+</tr>
+<tr>
+<td>gemini-3.1-flash-lite</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+</tr>
+<tr>
+<td>gemini-3.1-pro</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+</tr>
+<tr>
+<td>gemini-flash-latest</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+</tr>
+<tr>
+<td>gemini-flash-lite-latest</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+</tr>
+<tr>
+<td>gemini-pro-latest</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
@@ -264,7 +312,7 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <td>gpt-5.4</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
@@ -272,7 +320,7 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <td>gpt-5.4-mini</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
@@ -280,7 +328,7 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <td>gpt-5.4-nano</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
@@ -288,7 +336,15 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <td>gpt-5.4-pro</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+</tr>
+<tr>
+<td>gpt-5.5</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
@@ -514,6 +570,12 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
 <tr>
+<td>gpt-image-2</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+</tr>
+<tr>
 <td>nano-banana</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
@@ -536,6 +598,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-04-14T07:26:54Z
+> Last updated: 2026-04-28T12:50:14Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.

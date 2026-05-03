@@ -1,4 +1,5 @@
 import ast
+import textwrap
 from datetime import datetime
 from enum import Enum
 from typing import Any, List, Literal, Optional
@@ -13,6 +14,11 @@ from pipelex.core.concepts.structure_generation.exceptions import ConceptStructu
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_content import StuffContent
+
+# Target line length for emitted code (matches the project's ruff config).
+# Each emitted line stays under this so ruff E501 doesn't trigger on long descriptions.
+_MAX_LINE_LENGTH = 150
+_WRAP_WIDTH = 120  # conservative: leaves headroom for indentation and syntax overhead
 
 
 def _get_class_registry() -> ClassRegistryAbstract:
@@ -193,6 +199,44 @@ class StructureGenerator:
             return self._escape_string_for_python(value)
         return repr(value)
 
+    def _format_class_docstring(self, docstring: str, indent: str = "    ") -> str:
+        """Render a class docstring, wrapping it across multiple lines when the single-line
+        form would exceed _MAX_LINE_LENGTH.
+        """
+        single_line = f'{indent}"""{docstring}"""'
+        if len(single_line) <= _MAX_LINE_LENGTH:
+            return single_line
+        # Wrap the docstring text. The first wrapped line follows """, subsequent lines are
+        # plain indented text, and the closing """ sits on its own line.
+        wrap_width = _WRAP_WIDTH
+        wrapped_lines = textwrap.wrap(docstring, width=wrap_width, break_long_words=False, break_on_hyphens=False)
+        if not wrapped_lines:
+            return single_line
+        body = "\n".join(f"{indent}{line}" for line in wrapped_lines)
+        return f'{indent}"""\n{body}\n{indent}"""'
+
+    def _format_field_description(self, description: str) -> str:
+        """Render the `description=` argument for a Field call. For short values, emit a
+        single-line `description="..."`. For long values, emit a parenthesized
+        implicit-string-concatenation block so each emitted line stays under the line limit.
+        """
+        escaped = self._escape_string_for_python(description)
+        if len(escaped) <= _WRAP_WIDTH:
+            return f"description={escaped}"
+        chunks = textwrap.wrap(description, width=_WRAP_WIDTH, break_long_words=False, break_on_hyphens=False)
+        if len(chunks) <= 1:
+            return f"description={escaped}"
+        # Join trailing space on each chunk except the last so the concatenation reads
+        # naturally; textwrap dropped the original spaces.
+        # Indent chunk literals (and the closing paren) so `ruff format` preserves the
+        # implicit-string-concat — un-indented chunks get collapsed back to a single line.
+        chunk_literals: list[str] = []
+        for index, chunk in enumerate(chunks):
+            content = chunk if index == len(chunks) - 1 else f"{chunk} "
+            chunk_literals.append(f"        {self._escape_string_for_python(content)}")
+        body = "\n".join(chunk_literals)
+        return f"description=(\n{body}\n    )"
+
     def _generate_class_source_code_from_blueprint(
         self,
         class_name: str,
@@ -231,7 +275,7 @@ class StructureGenerator:
 
         # Generate class header with docstring (use class name if no description provided)
         docstring = description or f"Generated {class_name} class"
-        class_header = f'class {class_name}({base_class}):\n    """{docstring}"""\n'
+        class_header = f"class {class_name}({base_class}):\n{self._format_class_docstring(docstring)}\n"
 
         # Generate fields
         field_definitions: list[str] = []
@@ -270,7 +314,7 @@ class StructureGenerator:
             python_type = f"Optional[{python_type}]"
 
         # Generate Field parameters
-        field_params = [f"description={self._escape_string_for_python(field_blueprint.description)}"]
+        field_params = [self._format_field_description(field_blueprint.description)]
 
         if field_blueprint.required:
             if field_blueprint.default_value is not None:
@@ -442,7 +486,7 @@ class StructureGenerator:
             python_type = f"Optional[{python_type}]"
 
         # Generate Field parameters
-        field_params = [f"description={self._escape_string_for_python(description)}"]
+        field_params = [self._format_field_description(description)]
 
         if required:
             if default_value is not None:

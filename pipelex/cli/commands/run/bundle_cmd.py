@@ -73,6 +73,14 @@ def run_bundle_cmd(
         bool | None,
         typer.Option("--temporal/--no-temporal", help="Override config: enable or disable Temporal workflow execution"),
     ] = None,
+    dynamic_output_concept_ref: Annotated[
+        str | None,
+        typer.Option(
+            "--dynamic-output-concept",
+            "-O",
+            help="Concept ref (e.g. 'document_qa.ReferenceCount') used to resolve a pipe whose output is declared as 'Dynamic'.",
+        ),
+    ] = None,
 ) -> None:
     """Run a pipeline from a bundle file (.mthds) or pipeline directory.
 
@@ -165,4 +173,5 @@ def run_bundle_cmd(
         library_dir=library_dir,
         telemetry_command_label=f"{COMMAND} bundle",
         temporal=temporal,
+        dynamic_output_concept_ref=dynamic_output_concept_ref,
     )

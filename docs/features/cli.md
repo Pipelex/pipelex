@@ -17,6 +17,7 @@ The `pipelex` CLI is the primary tool for working with Pipelex methods. It cover
 |---------|-------------|
 | **`pipelex login`** | Authenticate with Pipelex Gateway via the browser and save your API key |
 | **`pipelex init`** | Initialize configuration, backends, credentials, routing, and telemetry |
+| **`pipelex update`** | Refresh the model deck to match the installed pipelex version |
 | **`pipelex doctor`** | Check configuration health and suggest fixes |
 | **`pipelex build`** | AI-powered method generation from natural language requirements |
 | **`pipelex validate`** | Check pipeline syntax, structure, and run dry-run validation |

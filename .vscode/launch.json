@@ -100,7 +100,7 @@
             "args": [
                 "run",
                 "bundle",
-                "tests/integration/pipelex/pipes/pipelines/test_image_out_in.mthds",
+                "/Users/lchoquel/repos/Pipelex/pipelex-demos/mthds-wip/fashion_moodboard",
             ],
             "console": "integratedTerminal",
             "justMyCode": false

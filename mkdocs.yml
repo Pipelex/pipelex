@@ -259,6 +259,7 @@ plugins:
         Reference:
         - tools/cli/index.md: "CLI Reference Overview"
         - tools/cli/init.md: "CLI Init"
+        - tools/cli/update.md: "CLI Update"
         - tools/cli/validate.md: "CLI Validate"
         - tools/cli/run.md: "CLI Run"
         - tools/cli/show.md: "CLI Show"
@@ -438,6 +439,7 @@ nav:
     - CLI Reference:
       - Overview: tools/cli/index.md
       - Init: tools/cli/init.md
+      - Update: tools/cli/update.md
       - Validate: tools/cli/validate.md
       - Run: tools/cli/run.md
       - Show: tools/cli/show.md

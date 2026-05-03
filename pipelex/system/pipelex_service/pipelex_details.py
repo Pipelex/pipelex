@@ -2,7 +2,7 @@ from pipelex.tools.misc.hash_utils import hash_sha256
 
 
 class PipelexDetails:
-    REMOTE_CONFIG_URL = "https://pipelex-config.s3.eu-west-3.amazonaws.com/pipelex_remote_config_08.json"
+    REMOTE_CONFIG_URL = "https://pipelex-config.s3.eu-west-3.amazonaws.com/pipelex_remote_config_10.json"
     PIPELEX_GATEWAY_API_KEY_VAR = "PIPELEX_GATEWAY_API_KEY"
 
     @classmethod

@@ -75,6 +75,10 @@ mthds-wip
 # Derived artifacts (auto-generated, not tracked)
 derived/
 
+# Node.js (used only for syncing mthds-ui graph viewer assets)
+node_modules/
+package-lock.json
+
 # Claude plans
 .claude/plans/
 .gstack/

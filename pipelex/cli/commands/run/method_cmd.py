@@ -72,6 +72,14 @@ def run_method_cmd(
         bool | None,
         typer.Option("--temporal/--no-temporal", help="Override config: enable or disable Temporal workflow execution"),
     ] = None,
+    dynamic_output_concept_ref: Annotated[
+        str | None,
+        typer.Option(
+            "--dynamic-output-concept",
+            "-O",
+            help="Concept ref (e.g. 'document_qa.ReferenceCount') used to resolve a pipe whose output is declared as 'Dynamic'.",
+        ),
+    ] = None,
 ) -> None:
     """Run an installed method by name.
 
@@ -135,4 +143,5 @@ def run_method_cmd(
         library_dir=effective_library_dir,
         telemetry_command_label=f"{COMMAND} method",
         temporal=temporal,
+        dynamic_output_concept_ref=dynamic_output_concept_ref,
     )

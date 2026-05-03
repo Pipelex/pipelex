@@ -1,4 +1,6 @@
 {
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+    "python.analysis.extraPaths": ["./tests"],
     "[python]": {
         "editor.defaultFormatter": "charliermarsh.ruff",
         "editor.formatOnSave": true,
@@ -40,5 +42,6 @@
     "[mthds]": {
         "editor.defaultFormatter": "Pipelex.pipelex",
         "editor.formatOnSave": true
-    }
+    },
+    "pipelex.graph.direction": "left_to_right"
 }

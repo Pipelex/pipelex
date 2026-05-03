@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
 
 class GoogleThinkingLevel(StrEnum):
+    MINIMAL = "minimal"
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -42,6 +43,8 @@ class GoogleConfig(ConfigModel):
             return None
         google_level = GoogleThinkingLevel(level_str)
         match google_level:
+            case GoogleThinkingLevel.MINIMAL:
+                return genai_types.ThinkingLevel.MINIMAL
             case GoogleThinkingLevel.LOW:
                 return genai_types.ThinkingLevel.LOW
             case GoogleThinkingLevel.MEDIUM:
