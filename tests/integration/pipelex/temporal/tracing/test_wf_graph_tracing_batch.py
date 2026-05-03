@@ -21,7 +21,6 @@ from tests.integration.pipelex.temporal.tracing.test_data import BatchTracingTes
 
 
 @pytest.mark.temporal
-@pytest.mark.xdist_group("temporal_tracing_batch")
 @pytest.mark.asyncio(loop_scope="class")
 class TestWfGraphTracingBatch:
     """PipeBatch produces BATCH_ITEM and BATCH_AGGREGATE edges in GraphSpec via Temporal tracing."""
