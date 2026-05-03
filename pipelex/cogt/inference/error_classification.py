@@ -46,7 +46,10 @@ _AWS_QUOTA_PATTERNS: tuple[str, ...] = (
 _GATEWAY_QUOTA_PATTERNS: tuple[str, ...] = (
     "quota",
     "billing",
-    "insufficient",
+    "insufficient_quota",
+    "insufficient credit",
+    "insufficient funds",
+    "insufficient balance",
     "credits exhausted",
 )
 

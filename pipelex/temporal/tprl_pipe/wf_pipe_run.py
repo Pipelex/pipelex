@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
+from temporalio.exceptions import ActivityError
 from typing_extensions import override
 
 with workflow.unsafe.imports_passed_through():
@@ -73,6 +74,7 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
         # Step 3: Run delivery activity if requested — notifies the completion
         # Lambda of success or failure when a delivery_assignment was provided.
         # No assignment → no delivery (matches PipeRun direct-mode semantics).
+        delivery_error: ActivityError | None = None
         if delivery_assignment is not None:
             workflow_log.debug(f"Running delivery: pipeline_run_id={pipeline_run_id}, status={status}")
             activity_arg = DeliveryActivityArg(
@@ -85,17 +87,27 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
             if pipe_output is not None:
                 activity_arg = activity_arg.model_copy(update={"pipe_output": pipe_output})
 
-            await workflow.execute_activity(
-                act_deliver,
-                arg=activity_arg,
-                start_to_close_timeout=timedelta(seconds=60),
-                retry_policy=RetryPolicy(maximum_attempts=3),
-            )
-            workflow_log.debug("Delivery completed")
+            try:
+                await workflow.execute_activity(
+                    act_deliver,
+                    arg=activity_arg,
+                    start_to_close_timeout=timedelta(seconds=60),
+                    retry_policy=RetryPolicy(maximum_attempts=3),
+                )
+                workflow_log.debug("Delivery completed")
+            except ActivityError as activity_error:
+                # Capture but do not raise yet: when both router and delivery fail
+                # (e.g., pipe failure + webhook outage) we must preserve the original
+                # execution_error for failure attribution, matching direct-mode PipeRun.
+                delivery_error = activity_error
+                workflow_log.error(f"Delivery activity failed: {activity_error}")
 
-        # Re-raise the execution error after delivery so the workflow is marked as failed
+        # Re-raise: prefer the original execution error so failure attribution stays
+        # correct when delivery also fails. Fall back to the delivery error otherwise.
         if execution_error is not None:
             raise execution_error
+        if delivery_error is not None:
+            raise delivery_error
 
         assert pipe_output is not None
         workflow_log.debug("WfPipeRun complete")
