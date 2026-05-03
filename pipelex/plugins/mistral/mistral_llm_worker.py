@@ -214,6 +214,7 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
         job_params = llm_job.applied_job_params or llm_job.job_params
         self._validate_no_reasoning_for_structured_gen(job_params=job_params)
         messages = await self.mistral_factory.make_simple_messages_openai_typed(llm_job=llm_job)
+        # Deferred import: avoid pulling heavy SDK at module-load time
         from instructor.exceptions import InstructorRetryException  # noqa: PLC0415
 
         try:

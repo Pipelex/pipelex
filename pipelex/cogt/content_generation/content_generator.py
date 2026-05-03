@@ -341,6 +341,7 @@ class ContentGenerator(ContentGeneratorProtocol):
             raise ValueError(msg)
         job_params = extract_job_params or ExtractJobParams.make_default_extract_job_params()
         page_views_dpi = job_params.page_views_dpi or get_config().cogt.extract_config.default_page_views_dpi
+        # Deferred import: avoid pulling heavy SDK at module-load time
         from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer  # noqa: PLC0415
 
         page_view_images = await pypdfium2_renderer.render_pdf_pages_from_uri(pdf_uri=extract_input.document_uri, dpi=page_views_dpi)

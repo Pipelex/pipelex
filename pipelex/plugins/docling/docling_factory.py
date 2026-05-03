@@ -4,6 +4,7 @@ from pipelex.cogt.extract.extract_output import ExtractOutput, Page
 from pipelex.plugins.docling.docling_sdk import DoclingSdk
 
 if TYPE_CHECKING:
+    # Deferred import: avoid pulling heavy SDK at module-load time
     from docling_core.types.doc.document import DoclingDocument
 
 
@@ -25,6 +26,7 @@ class DoclingFactory:
         Returns:
             ExtractOutput with pages dict (0-indexed).
         """
+        # Deferred import: avoid pulling heavy SDK at module-load time
         from docling_core.transforms.serializer.markdown import MarkdownDocSerializer, MarkdownParams  # noqa: PLC0415
 
         pages: dict[int, Page] = {}

@@ -20,6 +20,7 @@ from pipelex.tools.uri.prepared_file import PreparedFile, PreparedFileBase64, Pr
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
+    # Deferred import: avoid pulling heavy SDK at module-load time
     from openai.types.chat import ChatCompletionMessageParam
 
 if TYPE_CHECKING:
@@ -194,6 +195,7 @@ class AnthropicFactory:
         llm_job: LLMJob,
     ) -> 'list["ChatCompletionMessageParam"]':
         """Makes a list of messages with a system message (if provided) and followed by a user message."""
+        # Deferred import: avoid pulling heavy SDK at module-load time
         from openai.types.chat import ChatCompletionSystemMessageParam  # noqa: PLC0415
 
         llm_prompt = llm_job.llm_prompt

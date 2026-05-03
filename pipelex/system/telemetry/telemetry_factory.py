@@ -47,6 +47,7 @@ class TelemetryFactory:
 
         allows_custom_telemetry = telemetry_config.is_custom_telemetry_allowed_for_mode(integration_mode)
 
+        # Deferred import: avoid pulling heavy SDK at module-load time
         from pipelex.system.telemetry.telemetry_manager import TelemetryManager  # noqa: PLC0415
 
         chosen_telemetry_manager: TelemetryManagerAbstract

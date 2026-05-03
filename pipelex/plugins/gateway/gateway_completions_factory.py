@@ -25,6 +25,7 @@ from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsF
 from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
 
 if TYPE_CHECKING:
+    # Deferred imports: avoid pulling heavy SDK at module-load time
     import openai
     from openai.types.chat import ChatCompletionMessageParam
     from portkey_ai.api_resources.utils import GenericResponse
@@ -43,6 +44,7 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
         llm_job: LLMJob,
     ) -> list[ChatCompletionMessageParam]:
         """Override to use image_url format for documents which Portkey/Gateway translates correctly."""
+        # Deferred imports: avoid pulling heavy SDK at module-load time
         from openai.types.chat import (  # noqa: PLC0415
             ChatCompletionContentPartImageParam,
             ChatCompletionContentPartParam,
@@ -103,6 +105,7 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
         plugin: Plugin,
         backend: InferenceBackend,
     ) -> openai.AsyncOpenAI:
+        # Deferred import: avoid pulling heavy SDK at module-load time
         import openai  # noqa: PLC0415
 
         is_debug_enabled = GatewayFactory.is_debug_enabled(backend=backend)

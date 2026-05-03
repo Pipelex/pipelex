@@ -9,6 +9,7 @@ from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 
 if TYPE_CHECKING:
+    # Deferred import: avoid pulling heavy SDK at module-load time
     from opentelemetry.trace import Tracer as OTelTracer
 
 

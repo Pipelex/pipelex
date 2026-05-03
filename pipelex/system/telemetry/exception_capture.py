@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from pipelex import log
 
 if TYPE_CHECKING:
+    # Deferred import: avoid pulling heavy SDK at module-load time
     from posthog import Posthog
 
 

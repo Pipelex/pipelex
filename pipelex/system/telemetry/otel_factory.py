@@ -20,6 +20,7 @@ from pipelex.tools.misc.json_utils import JsonContent, pure_json_str
 from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
+    # Deferred imports: avoid pulling heavy SDKs at module-load time
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
     from opentelemetry.sdk.trace import TracerProvider as OTelTracerProvider
     from opentelemetry.trace import Tracer as OTelTracer
@@ -183,6 +184,7 @@ class OtelFactory:
         # Build Basic auth header
         langfuse_auth = base64.b64encode(f"{public_key}:{secret_key}".encode()).decode()
 
+        # Deferred import: avoid pulling heavy SDK at module-load time
         from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter  # noqa: PLC0415
 
         return OTLPSpanExporter(
@@ -227,6 +229,7 @@ class OtelFactory:
             A tuple of (Tracer, TracerProvider). The caller should call
             provider.shutdown() during teardown to flush pending spans.
         """
+        # Deferred imports: avoid pulling heavy SDKs at module-load time
         from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter  # noqa: PLC0415
         from opentelemetry.sdk.resources import Resource as OTelResource  # noqa: PLC0415
         from opentelemetry.sdk.trace import TracerProvider as OTelTracerProvider  # noqa: PLC0415

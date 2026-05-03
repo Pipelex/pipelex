@@ -14,6 +14,7 @@ from pipelex.plugins.plugin_factory_abstract import PluginFactoryAbstract
 from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
 
 if TYPE_CHECKING:
+    # Deferred imports: avoid pulling heavy SDK at module-load time
     from openai.types.chat import ChatCompletionMessageParam
     from openai.types.completion_usage import CompletionUsage
 
@@ -28,6 +29,7 @@ class OpenAICompletionsFactory(PluginFactoryAbstract):
         llm_job: LLMJob,
     ) -> 'list["ChatCompletionMessageParam"]':
         """Makes a list of messages with a system message (if provided) and followed by a user message."""
+        # Deferred imports: avoid pulling heavy SDK at module-load time
         from openai.types.chat import (  # noqa: PLC0415
             ChatCompletionContentPartImageParam,
             ChatCompletionContentPartParam,

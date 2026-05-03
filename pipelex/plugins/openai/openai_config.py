@@ -8,6 +8,7 @@ from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
+    # Deferred import: avoid pulling heavy SDK at module-load time
     from openai.types.chat import ChatCompletionReasoningEffort
 
 

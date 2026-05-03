@@ -43,6 +43,7 @@ from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstr
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
 if TYPE_CHECKING:
+    # Deferred import: avoid pulling heavy SDK at module-load time
     from opentelemetry.trace import Tracer as OTelTracer
 
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol

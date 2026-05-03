@@ -298,6 +298,7 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
             candidate_count=1,
         )
 
+        # Deferred import: avoid pulling heavy SDK at module-load time
         from instructor.exceptions import InstructorRetryException  # noqa: PLC0415
 
         try:

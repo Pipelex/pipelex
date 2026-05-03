@@ -121,6 +121,7 @@ class ImgGenWorkerFactory:
                     ),
                 )
 
+                # Deferred import: avoid pulling heavy SDK at module-load time
                 from pipelex.plugins.blackboxai.blackboxai_completions_factory import BlackboxaiCompletionsFactory  # noqa: PLC0415
 
                 bbai_completions_factory = BlackboxaiCompletionsFactory(is_http_url_enabled=True)
@@ -195,6 +196,7 @@ class ImgGenWorkerFactory:
                     ),
                 )
 
+                # Deferred import: avoid pulling heavy SDK at module-load time
                 from pipelex.plugins.openrouter.openrouter_completions_factory import OpenRouterCompletionsFactory  # noqa: PLC0415
 
                 openrouter_completions_factory = OpenRouterCompletionsFactory(is_http_url_enabled=True)

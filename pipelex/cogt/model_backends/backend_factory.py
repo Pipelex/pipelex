@@ -48,6 +48,7 @@ class InferenceBackendFactory:
         # Deal with special authentication for some backends
         match name:
             case "vertexai":
+                # Deferred import: avoid pulling heavy SDK at module-load time
                 from pipelex.plugins.openai.vertexai_factory import VertexAIFactory  # noqa: PLC0415
 
                 endpoint, api_key = VertexAIFactory.make_endpoint_and_api_key(extra_config=extra_config)

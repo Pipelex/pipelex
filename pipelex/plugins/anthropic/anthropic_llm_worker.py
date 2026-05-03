@@ -407,6 +407,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
         requested_max_tokens = job_params.max_tokens or self.default_max_tokens
         effective_max_tokens = min(requested_max_tokens, safe_max_tokens)
 
+        # Deferred import: avoid pulling heavy SDK at module-load time
         from instructor.core import InstructorRetryException  # noqa: PLC0415
 
         temperature_unsupported = ListedConstraint.TEMPERATURE_UNSUPPORTED in self.inference_model.listed_constraints

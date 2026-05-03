@@ -20,6 +20,7 @@ from mistralai.models import (
 )
 
 if TYPE_CHECKING:
+    # Deferred import: avoid pulling heavy SDK at module-load time
     from openai.types.chat import ChatCompletionMessageParam
 
 from pipelex import log
@@ -126,6 +127,7 @@ class MistralFactory:
         Uses the unified prep_prompt_images() which supports all URI types
         including pipelex-storage://.
         """
+        # Deferred imports: avoid pulling heavy SDK at module-load time
         from openai.types.chat import (  # noqa: PLC0415
             ChatCompletionContentPartImageParam,
             ChatCompletionContentPartParam,
