@@ -1,0 +1,59 @@
+pipelex/system/telemetry/otel_factory.py
+  564e4bbc8fa6dcd0 23,187,232
+pipelex/plugins/docling/docling_sdk.py
+  564e4bbc8fa6dcd0 3
+pipelex/plugins/docling/docling_factory.py
+  564e4bbc8fa6dcd0 7,29
+pipelex/plugins/mistral/mistral_factory.py
+  564e4bbc8fa6dcd0 23,130
+pipelex/system/telemetry/telemetry_manager_abstract.py
+  564e4bbc8fa6dcd0 12
+pipelex/cogt/img_gen/img_gen_worker_factory.py
+  564e4bbc8fa6dcd0 124,199
+pipelex/plugins/openai/openai_config.py
+  564e4bbc8fa6dcd0 11
+pipelex/plugins/gateway/gateway_completions_factory.py
+  564e4bbc8fa6dcd0 28,47,108
+pipelex/plugins/anthropic/anthropic_llm_worker.py
+  564e4bbc8fa6dcd0 410
+pipelex/system/telemetry/exception_capture.py
+  564e4bbc8fa6dcd0 9
+pipelex/system/telemetry/telemetry_factory.py
+  564e4bbc8fa6dcd0 50
+pipelex/plugins/portkey/portkey_completions_factory.py
+  564e4bbc8fa6dcd0 20,38,99
+pipelex/plugins/mistral/mistral_llm_worker.py
+  564e4bbc8fa6dcd0 217
+pipelex/cogt/model_backends/backend_factory.py
+  564e4bbc8fa6dcd0 51
+pipelex/plugins/openai/openai_completions_factory.py
+  564e4bbc8fa6dcd0 17,32
+pipelex/plugins/google/google_llm_worker.py
+  564e4bbc8fa6dcd0 301
+pipelex/hub.py
+  564e4bbc8fa6dcd0 46
+pipelex/cogt/content_generation/content_generator.py
+  564e4bbc8fa6dcd0 344
+pipelex/plugins/anthropic/anthropic_factory.py
+  564e4bbc8fa6dcd0 23,198
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "5a92e08ff1ed5a66a421f30da9170c0d8fef3024",
+  "prompts": {
+    "564e4bbc8fa6dcd0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "92820013-1db0-4a37-a4c6-a732ce7f7bd4",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 30,
+      "total_deletions": 0,
+      "accepted_lines": 30,
+      "overriden_lines": 0
+    }
+  }
+}
