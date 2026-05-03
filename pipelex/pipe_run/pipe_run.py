@@ -6,7 +6,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
-from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus, StorageTarget
+from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus
 from pipelex.pipe_run.delivery_executor import DeliveryExecutor
 from pipelex.pipe_run.graph_assembly import assemble_graph_on_output
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
@@ -55,16 +55,15 @@ class PipeRun(PipeRunProtocol):
                     main_pipe_code=pipe_job.pipe.code,
                 )
 
-            if delivery_assignment is None:
-                delivery_assignment = DeliveryAssignment(storage=StorageTarget())
-            log.debug(f"Executing delivery for pipeline_run_id={pipeline_run_id}, status={status}")
-            await self._delivery_executor.execute(
-                pipe_output=pipe_output,
-                user_id=pipe_job.job_metadata.user_id,
-                pipeline_run_id=pipeline_run_id,
-                delivery_assignment=delivery_assignment,
-                status=status,
-            )
+            if delivery_assignment is not None:
+                log.debug(f"Executing delivery for pipeline_run_id={pipeline_run_id}, status={status}")
+                await self._delivery_executor.execute(
+                    pipe_output=pipe_output,
+                    user_id=pipe_job.job_metadata.user_id,
+                    pipeline_run_id=pipeline_run_id,
+                    delivery_assignment=delivery_assignment,
+                    status=status,
+                )
 
         if execution_error is not None:
             raise execution_error

@@ -32,8 +32,8 @@ class TestPipeRun:
         mock_router.run.assert_called_once()
         mock_executor_instance.execute.assert_called_once()
 
-    async def test_run_success_default_delivery(self, mocker: MockerFixture) -> None:
-        """When no delivery_assignment is provided, default storage-only delivery runs."""
+    async def test_run_success_no_delivery_when_none(self, mocker: MockerFixture) -> None:
+        """When delivery_assignment is None, the delivery executor is not called."""
         mock_output = mocker.MagicMock()
         mock_router = mocker.AsyncMock()
         mock_router.run = mocker.AsyncMock(return_value=mock_output)
@@ -45,16 +45,14 @@ class TestPipeRun:
         mock_executor_instance.execute = mocker.AsyncMock()
 
         mock_job = mocker.MagicMock()
-        mock_job.job_metadata.pipeline_run_id = "plr-default"
+        mock_job.job_metadata.pipeline_run_id = "plr-no-delivery"
 
         pipe_run = PipeRun(pipe_router=mock_router)
 
         result = await pipe_run.run(pipe_job=mock_job)
 
         assert result == mock_output
-        mock_executor_instance.execute.assert_called_once()
-        call_kwargs = mock_executor_instance.execute.call_args.kwargs
-        assert call_kwargs["delivery_assignment"].storage is not None
+        mock_executor_instance.execute.assert_not_called()
 
     async def test_run_failure_delivers_failed_status(self, mocker: MockerFixture) -> None:
         """On pipe execution failure, delivery runs with FAILED status, then error re-raises."""
@@ -79,9 +77,10 @@ class TestPipeRun:
         mock_job.job_metadata.pipeline_run_id = "plr-fail"
 
         pipe_run = PipeRun(pipe_router=mock_router)
+        assignment = DeliveryAssignment(storage=StorageTarget())
 
         with pytest.raises(PipeRouterError):
-            await pipe_run.run(pipe_job=mock_job)
+            await pipe_run.run(pipe_job=mock_job, delivery_assignment=assignment)
 
         # Delivery should still have been called with FAILED status
         mock_executor_instance.execute.assert_called_once()
@@ -120,8 +119,9 @@ class TestPipeRun:
         mock_job.job_metadata.pipeline_run_id = "plr-order"
 
         pipe_run = PipeRun(pipe_router=mock_router)
+        assignment = DeliveryAssignment(storage=StorageTarget())
 
         with pytest.raises(PipeRouterError):
-            await pipe_run.run(pipe_job=mock_job)
+            await pipe_run.run(pipe_job=mock_job, delivery_assignment=assignment)
 
         assert call_order == ["router.run", "delivery.execute"]

@@ -70,7 +70,9 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
             except Exception as graph_exc:
                 workflow_log.warning(f"Graph assembly failed, continuing with delivery: {graph_exc}")
 
-        # Step 3: Run delivery activity (always — to notify completion Lambda of success or failure)
+        # Step 3: Run delivery activity if requested — notifies the completion
+        # Lambda of success or failure when a delivery_assignment was provided.
+        # No assignment → no delivery (matches PipeRun direct-mode semantics).
         if delivery_assignment is not None:
             workflow_log.debug(f"Running delivery: pipeline_run_id={pipeline_run_id}, status={status}")
             activity_arg = DeliveryActivityArg(

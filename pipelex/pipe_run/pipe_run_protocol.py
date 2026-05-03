@@ -23,5 +23,9 @@ class PipeRunProtocol(Protocol):
         delivery_assignment: DeliveryAssignment | None = None,
         wfid: str | None = None,
     ) -> PipeOutput:
-        """Execute a pipe job and deliver the output per the assignment."""
+        """Execute a pipe job and, if `delivery_assignment` is provided, deliver the output.
+
+        When `delivery_assignment` is None, no storage or webhook delivery happens.
+        Pass `DeliveryAssignment(storage=StorageTarget())` for default storage-only delivery.
+        """
         ...
