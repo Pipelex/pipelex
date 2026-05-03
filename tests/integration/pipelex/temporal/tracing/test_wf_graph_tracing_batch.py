@@ -20,10 +20,7 @@ from tests.integration.pipelex.temporal.tracing.helpers import (
 from tests.integration.pipelex.temporal.tracing.test_data import BatchTracingTestData
 
 
-# TODO: hangs in CI under pytest-xdist (passes locally and serially); root cause is concurrent
-# PipeBatch + WorkflowEnvironment.start_local under load.
 @pytest.mark.temporal
-@pytest.mark.gha_disabled
 @pytest.mark.asyncio(loop_scope="class")
 class TestWfGraphTracingBatch:
     """PipeBatch produces BATCH_ITEM and BATCH_AGGREGATE edges in GraphSpec via Temporal tracing."""

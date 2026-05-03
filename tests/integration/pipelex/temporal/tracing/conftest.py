@@ -20,6 +20,20 @@ from tests.integration.pipelex.temporal.tracing.test_data import (
 )
 
 
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Mark every test in this directory with gha_disabled.
+
+    TODO: Tests under tests/integration/pipelex/temporal/tracing/ hang
+    reliably in CI under pytest-xdist parallelism (worker timeouts at
+    180s on py3.11+). Pass locally and serially. Root cause is concurrent
+    PipeBatch/PipeParallel/PipeSequence + WorkflowEnvironment.start_local
+    contention under load. Re-enable once the underlying flake is fixed.
+    """
+    skip_marker = pytest.mark.gha_disabled
+    for item in items:
+        item.add_marker(skip_marker)
+
+
 @pytest.fixture(scope="class")
 def tracing_tmp_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """Per-class temp directory for NDJSON trace files."""
