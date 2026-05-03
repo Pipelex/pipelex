@@ -1,0 +1,27 @@
+tests/unit/pipelex/cogt/content_generation/test_model_dump_subclass.py
+  65181e8fe9c0279d 4
+pipelex/cogt/content_generation/schema_to_model_factory.py
+  65181e8fe9c0279d 10,20,27-28,30,33-190
+tests/unit/pipelex/cogt/content_generation/test_assignment_models_security.py
+  65181e8fe9c0279d 3,61,93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "f1250af532c4354d91a6ffe20453ff228170a6db",
+  "prompts": {
+    "65181e8fe9c0279d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8a3032b7-3063-4b93-b10c-afae3046669d",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 241,
+      "total_deletions": 456,
+      "accepted_lines": 8,
+      "overriden_lines": 31
+    }
+  }
+}
