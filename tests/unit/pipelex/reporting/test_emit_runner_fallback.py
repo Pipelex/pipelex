@@ -31,6 +31,7 @@ from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.system.configuration.configs import NdjsonTracingConfig, TracingBackend
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.tracing import activity_event_log
+from pipelex.tracing.activity_event_log import ActivityEventLogCache
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog
 from pipelex.tracing.trace_events import UsageReportEvent
@@ -91,10 +92,10 @@ def _make_graph_context(
 
 @pytest.fixture(autouse=True)
 def _reset_activity_event_log_state() -> Any:  # pyright: ignore[reportUnusedFunction]
-    """Module-level state in activity_event_log persists across tests; reset it."""
-    activity_event_log._reset_for_tests()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    """Class-level state on ActivityEventLogCache persists across tests; reset it."""
+    ActivityEventLogCache.reset_for_tests()
     yield
-    activity_event_log._reset_for_tests()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    ActivityEventLogCache.reset_for_tests()
 
 
 def _enable_ndjson_tracing(mocker: MockerFixture, traces_dir: Path) -> None:
@@ -203,7 +204,7 @@ class TestEmitRunnerFallback:
 
         def call_fn() -> None:
             barrier.wait()
-            log_instance = activity_event_log.get_or_create_activity_event_log(cfg)
+            log_instance = ActivityEventLogCache.get_or_create(cfg)
             with seen_lock:
                 seen_logs.append(log_instance)
 

@@ -24,7 +24,7 @@ from pipelex.reporting.reporting_types import AnyTokensUsage, TokensUsage
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.tools.misc.file_utils import ensure_path, get_incremental_file_path
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
-from pipelex.tracing.activity_event_log import get_or_create_activity_event_log, warn_once_runner_fallback_engaged
+from pipelex.tracing.activity_event_log import ActivityEventLogCache
 from pipelex.tracing.event_log_protocol import EventLogProtocol
 from pipelex.tracing.trace_events import UsageReportEvent
 
@@ -318,7 +318,7 @@ class ReportingManager(ReportingProtocol):
             return
 
         try:
-            process_event_log = get_or_create_activity_event_log(tracing_config)
+            process_event_log = ActivityEventLogCache.get_or_create(tracing_config)
         except (OSError, MissingDependencyError, PipelexConfigError) as exc:
             log.warning(f"Runner-side activity event log construction failed; dropping usage event: {exc}")
             return
@@ -329,7 +329,7 @@ class ReportingManager(ReportingProtocol):
         workflow_id = graph_context.tracer_key or graph_context.graph_id
         node_id = graph_context.parent_node_id or "unknown"
 
-        warn_once_runner_fallback_engaged(workflow_id=workflow_id, writer_id=process_event_log.writer_id)
+        ActivityEventLogCache.warn_once_runner_fallback_engaged(workflow_id=workflow_id, writer_id=process_event_log.writer_id)
 
         seq = process_event_log.next_sequence()
         event = UsageReportEvent(

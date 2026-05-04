@@ -21,7 +21,7 @@ from pipelex.config import get_config
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
-from pipelex.tracing import activity_event_log
+from pipelex.tracing.activity_event_log import ActivityEventLogCache
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog
 from pipelex.tracing.trace_events import PipeStartEvent, UsageReportEvent
 from tests.integration.pipelex.fixtures.pipe_job_helpers import pipe_job_from_bundle
@@ -92,14 +92,14 @@ class TestSplitWorkerUsageEmission:
     def reset_activity_event_log(self) -> Generator[None, None, None]:
         """Clear the per-process activity event log cache between tests.
 
-        The cache (writer_id, event log instance, warn-once flag) is module-level
-        in `pipelex.tracing.activity_event_log`. Without this reset, two tests
-        in the same module would share a writer_id and the second test would
-        find a stale, possibly closed, event log handle.
+        The cache (writer_id, event log instance, warn-once flag) is class-level
+        on `ActivityEventLogCache`. Without this reset, two tests in the same
+        module would share a writer_id and the second test would find a stale,
+        possibly closed, event log handle.
         """
-        activity_event_log._reset_for_tests()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        ActivityEventLogCache.reset_for_tests()
         yield
-        activity_event_log._reset_for_tests()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        ActivityEventLogCache.reset_for_tests()
 
     async def _execute_split(
         self,
