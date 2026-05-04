@@ -1938,10 +1938,14 @@ wheels = [
 
 [[package]]
 name = "kajson"
-version = "0.4.2"
-source = { git = "https://github.com/Pipelex/kajson.git?rev=fix%2Fenum-source-registry#4e80ebf729e22f4f3a6a4fac846a024e38fc2fd0" }
+version = "0.5.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/91/9c/28a44cc51f328fe1076ea2114b6b7791ef49c54c24a07f11f86f83438da0/kajson-0.5.0.tar.gz", hash = "sha256:029b6a1b60ea28ec95b6f614656d1e48600e27c1f27a39c6e5681cd721854f64", size = 21969, upload-time = "2026-05-04T12:20:12.734Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2e/f4/6460fb07535ef71f87416e1d603f7eaaa9d2970161bec3e37fe08af74b45/kajson-0.5.0-py3-none-any.whl", hash = "sha256:53334fd7122e470ee560255eb5a8390b5ad60ea99bc0d6b75122b323379b553a", size = 28398, upload-time = "2026-05-04T12:20:11.202Z" },
 ]
 
 [[package]]
@@ -3626,7 +3630,7 @@ wheels = [
 
 [[package]]
 name = "pipelex"
-version = "0.25.2"
+version = "0.26.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -3774,7 +3778,7 @@ requires-dist = [
     { name = "instructor", extras = ["google-genai"], marker = "extra == 'google-genai'" },
     { name = "jinja2", specifier = ">=3.1.4" },
     { name = "json2html", specifier = ">=1.3.0" },
-    { name = "kajson", git = "https://github.com/Pipelex/kajson.git?rev=fix%2Fenum-source-registry" },
+    { name = "kajson", specifier = "==0.5.0" },
     { name = "linkup-sdk", marker = "extra == 'linkup'", specifier = ">=0.12.0" },
     { name = "lxml", marker = "extra == 'docling'", specifier = ">=6.1.0" },
     { name = "markdown", specifier = ">=3.6" },

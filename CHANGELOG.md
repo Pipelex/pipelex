@@ -1,31 +1,61 @@
 # Changelog
 
-## [Unreleased]
+## [v0.26.0] - 2026-05-04
+
+### Highlights
+
+- **Temporal distributed execution** — Pipelex pipelines can now run as Temporal workflows across worker processes. New `pipelex[temporal]` extra, `pipelex worker` CLI, `PipeRun` layer, and `LibraryCrate` IR for cross-process library propagation.
+- **Distributed tracing** — pluggable event-log backends (NDJSON, DynamoDB, in-memory, buffering) emit cross-worker `TraceEvent`s that reassemble offline into a complete `GraphSpec`. Enabled by default; works in single-process mode too.
 
 ### Added
 
-- **`PipeOutput.graph_assembly_error`**: optional `str` field set when the Temporal `act_assemble_graph` activity raises so consumers can distinguish "graph never produced" from "graph assembly failed". Previously the failure was logged as a warning and `graph_spec` silently stayed `None`.
-- **`SecurityError(PipelexError)`**: new base class in `pipelex.base_exceptions` for security-policy violations. `UnsafeSchemaError` now extends it (was `ContentGenerationError`) so security signals are not silently swallowed by domain `except` handlers.
+#### Temporal distributed execution
 
-- **PipeRun layer**: New `PipeRunProtocol` with `PipeRun` (direct) and `TemporalPipeRun` (Temporal) implementations. Wraps pipe execution + delivery in a single orchestration unit. In Temporal mode, `WfPipeRun` workflow orchestrates `WfPipeRouter` as a child workflow followed by delivery activities.
-- **Delivery framework**: `DeliveryAssignment` model with `WebhookDeliveryAssignment` (HTTP POST) and `StorageDeliveryAssignment` (S3/local). Deliveries run as Temporal activities with automatic retry, or inline in direct mode.
-- **`TemporalPipeRun.start()`**: Non-blocking start that returns `workflow_id` + `WorkflowHandle` immediately. Replaces the former `PipeRouterTop.start_pipe_job()`.
-- **Pre-generated `pipeline_run_id` support**: `pipeline_run_setup()`, `PipelineFactory`, and `PipelineManager` accept an optional `pipeline_run_id` parameter for external run record creation.
+- **`pipelex[temporal]` extra and full Temporal integration package (`pipelex/temporal/`)**: includes `temporal_manager`, `temporal_connect`, `temporal_data_converter` (kajson-based JSON), `sandbox_manager`, `task_manager`, and a `pipelex worker` CLI subcommand that boots a worker against a configured queue. Toggle via `[temporal] is_enabled` in `pipelex.toml`. Bumps `temporalio` to `1.23.0`.
+- **`PipeRun` layer (`pipelex/pipe_run/`)**: new `PipeRunProtocol` with `PipeRun` (in-process) and `TemporalPipeRun` (workflow-orchestrated) implementations. Wraps pipe execution + delivery in a single orchestration unit. In Temporal mode, `WfPipeRun` orchestrates `WfPipeRouter` as a child workflow followed by delivery activities. `TemporalPipeRun.start()` is non-blocking and returns `workflow_id` + `WorkflowHandle` immediately.
+- **`TemporalPipeRouter`**: single router that auto-detects context (top-level vs child workflow) and dispatches accordingly.
+- **Delivery framework**: `DeliveryAssignment` model with `WebhookDeliveryAssignment` (HTTP POST) and `StorageDeliveryAssignment` (S3 / local). Deliveries run as Temporal activities with automatic retry, or inline in direct mode.
+- **`LibraryCrate` IR (`pipelex/libraries/library_crate.py`, `library_crate_factory.py`)**: serializable intermediate representation that lets a Temporal worker reconstruct the exact set of libraries (concepts, pipes, structures) required to execute a job — no shared filesystem assumed.
+- **`StoragePayloadCodec`**: offloads Temporal payloads larger than a configurable threshold (default 1 MiB) to external storage (S3 or local) and replaces them with lightweight URI references. Configurable via `[temporal.payload_codec_config]`. New `pipelex codec serve` CLI launches the codec server consumed by the Temporal Web UI for payload inspection.
+- **Schema-based dynamic model construction (`pipelex/cogt/content_generation/schema_to_model_factory.py`)**: rebuilds dynamic Pydantic models on a Temporal worker from the JSON schema embedded in `ObjectAssignment`, instead of relying on cross-process class identity. Cache bounded by an LRU (`_SCHEMA_CACHE_MAX_SIZE = 1024`); codegen serialized through a file lock to kill thundering-herd duplication on long-running workers receiving many distinct schemas. Adds `datamodel-code-generator>=0.55.0` as a runtime dependency.
+- **Worker scopes**: `pipelex worker --scope ...` lets a worker subscribe to a subset of activities/workflows so deployments can specialize workers (e.g. inference workers vs orchestration workers).
+- **`WorkerConfig.inference_task_queue`**: optional task-queue override for `act_llm_gen_text` so router and inference activities can be deployed on separate worker pools.
+- **Pre-generated `pipeline_run_id` support**: `pipeline_run_setup()`, `PipelineFactory`, and `PipelineManager` accept an optional `pipeline_run_id` parameter for external run-record creation.
 - **`workflow_id` in start response**: `PipelexPipelineStartResponse` includes `workflow_id`.
 - **Temporal `callbacks` passthrough**: `WorkflowExecutor.start_workflow()` accepts optional Temporal `Callback` objects.
-- **DynamoDB event log backend**: New `DynamoDBEventLog` implementation of `EventLogProtocol` for cloud-based trace event storage. Installable via `pip install "pipelex[dynamodb]"`.
-- **Event log DI**: Event log backend is now configurable via `TracingConfig.backend` (`"ndjson"` or `"dynamodb"`) and injectable via `Pipelex.setup(event_log=...)`. Factory function `make_event_log()` selects the backend from config or hub injection.
-- **Hub event_log support**: `PipelexHub.set_event_log()` / `get_event_log()` for dependency injection of custom event log backends.
-- **`TraceEvent.writer_id` field** (default `"primary"`): identifies the emitter so standalone activity worker processes can emit into the same backend partition as workflow workers without colliding on `(workflow_id, sequence)`. Stamped at construction time (no copy-on-emit).
+
+#### Distributed tracing (`pipelex/tracing/`)
+
+- **`EventLogProtocol` with pluggable backends**: `NdjsonEventLog`, `DynamoDBEventLog`, `InMemoryEventLog`, `BufferingEventLog`. Emits `TraceEvent`s as pipes start/finish across processes. Configured via `[pipelex.tracing_config]` (`backend = "ndjson" | "dynamodb"`). Tracing is **enabled by default** and decoupled from Temporal — single-process runs also produce a trace.
+- **`pipelex[dynamodb]` extra**: `pip install "pipelex[dynamodb]"` for the DynamoDB event log backend.
+- **`writer_id` on `TraceEvent`** (default `"primary"`): every event records which writer (worker / process) produced it, propagated through every backend. Standalone activity worker processes use a distinct `writer_id` so they can emit into the same backend partition as workflow workers without colliding on `(workflow_id, sequence)`. Stamped at construction time (no copy-on-emit). Enables cross-worker dedup and per-writer aggregation.
 - **NDJSON multi-writer key scheme**: dedup key is `(workflow_id, writer_id, type, sequence)`; sort key is `(workflow_id, sequence, writer_id)` — sequence is primary so the runner's `UsageReportEvent` does not sort before the router's `PipeStartEvent`. The file-handle cache key includes `writer_id`, so two writers for the same `(pipeline_run_id, workflow_id)` cannot share a stale handle.
 - **DynamoDB sort key format**: `EVENT#{workflow_id}#{writer_id}#{sequence:010d}`.
+- **Cross-worker `UsageReportEvent` emission from runner processes**: runner processes that never execute `WfPipeRouter.run()` (so `_event_log_contexts` has no entry for the workflow's `lookup_key`) emit usage events through a process-local event log built from `tracing_config`. The fallback log is cached per process via a `threading.Lock`-guarded factory in `pipelex.tracing.activity_event_log` and keyed by a stable per-process `writer_id = f"act_{pid}_{uuid8}"`. A single one-shot warning per process records that the fallback engaged. Specific exceptions (`OSError`, `MissingDependencyError`, `PipelexConfigError`, `botocore.ClientError`) are caught and logged at WARNING — never silently dropped, never re-raised into the inference path.
 - **`ReportingManager` registry lookup split into `_get_registry_strict` and `_get_or_create_registry`**: strict raises on miss and is used by `_report_*_job`, so runner processes silently skip the registry add when `open_registry` was never called; or-create is used by `inject_tokens_usages`, the console cost-report path, and `generate_report` for never-opened runs. Activity workers do not accumulate orphan registries.
 - **`ContentGeneratorDry` emits `UsageReportEvent`s**: invokes `report_inference_job` with a synthetic `LLMTokensUsage` so dry-run mode produces real events observable through the same backend path as live runs.
-- **Temporal `WorkerConfig.inference_task_queue`**: optional task-queue override for `act_llm_gen_text` so router and inference activities can be deployed on separate worker pools.
-- **Cross-worker `UsageReportEvent` emission from runner processes.** Runner processes that never execute `WfPipeRouter.run()` (so `_event_log_contexts` has no entry for the workflow's `lookup_key`) emit usage events through a process-local event log built from `tracing_config`. The fallback log is cached per process via a `threading.Lock`-guarded factory in `pipelex.tracing.activity_event_log` and keyed by a stable per-process `writer_id = f"act_{pid}_{uuid8}"`. A single one-shot warning per process records that the fallback engaged. Specific exceptions (`OSError`, `MissingDependencyError`, `PipelexConfigError`, `botocore.ClientError`) are caught and logged at WARNING — never silently dropped, never re-raised into the inference path.
+- **`GraphSpecAssembler`**: rebuilds a complete `GraphSpec` offline from a stream of `TraceEvent`s — equivalence with the live `GraphTracer` is pinned by tests.
+- **`UsageAggregator`**: aggregates per-pipeline LLM/extract/img-gen usage across workers from the event log.
+- **Hub DI**: `PipelexHub.set_event_log()` / `get_event_log()` for dependency injection of custom event log backends. `make_event_log()` factory selects the backend from config or hub injection; the 3 prior call sites that hardcoded `NdjsonEventLog` now go through it.
+
+#### Inference error classification
+
+- **`InferenceErrorCategory` enum (`transient`, `configuration`, `content`, `capacity`)** with per-provider helpers that distinguish quota exhaustion from rate limits and detect content-policy violations — covers OpenAI, Anthropic, Google, Mistral, AWS Bedrock, and Pipelex Gateway.
+- **All inference workers attach error category + user action**: every LLM, image-gen, extract, and search worker across all providers raises exceptions with an `InferenceErrorCategory` and actionable `user_action` hint.
+- **Structured `ErrorReport`**: `PipelexError.to_error_report()` returns a dataclass with error type, category, retryable flag, user-action hint, model, and provider. CLI error handlers consume `to_error_report()` for consistent, structured display.
+- **`SecurityError(PipelexError)`**: new base class in `pipelex.base_exceptions` for security-policy violations. `UnsafeSchemaError` now extends it (was `ContentGenerationError`) so security signals are not silently swallowed by domain `except` handlers.
+
+#### Documentation
+
+- New "Under the Hood" pages: `pipe-routing-and-execution.md`, `temporal-integration.md`, `distributed-content-generation.md`. Cover routing/dispatch, Temporal architecture, and the dynamic-model + storage-codec serialization story.
+- New `AGENTS.md` at repo root, generated from the same source as `CLAUDE.md` via `make rules`.
+
+#### Other
+
+- **`PipeOutput.graph_assembly_error`**: optional `str` field set when the Temporal `act_assemble_graph` activity raises so consumers can distinguish "graph never produced" from "graph assembly failed". Previously the failure was logged as a warning and `graph_spec` silently stayed `None`.
+- **`pipe extract` web URL support** with full test coverage in `tests/integration/pipelex/pipes/pipe_operators/pipe_extract/`.
+- **`needs_inference` flag on CLI commands**: non-inference subcommands (e.g. `worker`, `doctor`) skip inference setup, shaving cold-start time.
 - **Environment-specific config**: `RunEnvironment` enum values updated to full names (`"development"`, `"production"`). Config loaded from `ENVIRONMENT` env var (was `ENV`).
-- **Inference error classification**: New `InferenceErrorCategory` enum (`transient`, `configuration`, `content`, `capacity`) with per-provider helpers that distinguish quota exhaustion from rate limits and detect content policy violations — covers OpenAI, Anthropic, Google, Mistral, AWS Bedrock, and Gateway.
-- **Structured `ErrorReport`**: `PipelexError.to_error_report()` returns a dataclass with error type, category, retryable flag, user action hint, model, and provider.
 
 ### Changed
 
@@ -33,40 +63,26 @@
   - Anthropic: bare `"credit"` token replaced with `"credit balance"`, `"out of credits"`, `"insufficient credit"`. No longer misclassifies `"your credit card was declined"` or `"we will credit your account"` as quota exhaustion.
   - Google: bare `"billing"` token replaced with `"billing limit"`, `"billing quota"`, `"billing exceeded"`, and `"billing account"`. Continues to match real 429-class messages (`"Billing account is not active"`, `"billing limit reached"`); stops matching unrelated billing-mentioning text.
   - Mistral / Gateway: bare `"billing"` likewise narrowed to `"billing limit"` / `"billing quota"`. Mistral additionally distinguishes `"out of credits"` vs `"insufficient credits"`.
-- **Schema codegen cache bounded with LRU eviction**: `SchemaToModelFactory._schema_cache` now uses an `OrderedDict` capped at `_SCHEMA_CACHE_MAX_SIZE = 1024` entries. Prevents unbounded memory growth in long-running Temporal workers receiving many distinct schemas.
 - **Removed duplicate `ContentGenerationError` class**: the unused `pipelex.cogt.content_generation.exceptions.ContentGenerationError` was deleted (had zero external imports). Its subclasses re-parented: `NeitherUrlNorDataError` → `PipelexError`, `UnsafeSchemaError` → new `SecurityError`. The temporal `pipelex.temporal.exceptions.ContentGenerationError` is now the only class with that name.
-- **Narrowed `WfPipeRun` exception handling**: `except Exception:` replaced with `ChildWorkflowError` (child-workflow path) and `ActivityError` (graph-assembly path). Real workflow bugs (TypeError, AttributeError, etc.) are no longer masked as pipe failures.
-
-- **`PipeRouterTop` + `PipeRouterChild` merged into `TemporalPipeRouter`**: Single router that auto-detects context (top-level vs child workflow) and dispatches accordingly. Hub no longer needs `_pipe_router_top` — one `_pipe_router` field handles both modes.
-- **`PipelexRunner.execute_pipeline()` uses `get_pipe_run()`**: Runner now delegates to the PipeRun layer instead of calling `get_pipe_router()` directly.
-- **Tracing config structure**: `TracingConfig` now has `backend`, `ndjson` (with `traces_dir`), and `dynamodb` (with `table_name`, `region`) sub-configs. Tracing is enabled by default.
-- **Event log factory replaces hardcoded NdjsonEventLog**: The 3 call sites (`pipeline_run_setup.py`, `wf_pipe_router.py`, `runner.py`) now use `make_event_log()` instead of directly instantiating `NdjsonEventLog`.
-- **Tracing decoupled from Temporal**: Event log is created when `tracing_config.is_enabled`, regardless of whether Temporal is enabled.
+- **Storage providers unified**: `StorageConfig` flattened to inheritance-based config so providers (`local`, `s3`) share a single shape across delivery and trace storage.
 - **`make rules` now generates both `CLAUDE.md` and `AGENTS.md` by default**: the `pipelex.kit_config.preferred_agent_target` setting has been renamed to `preferred_agent_targets` and is now a list. The default is `["claude", "agents"]`. Cursor remains exclusive (`["cursor"]`) and cannot be combined with single-file targets. Downstream projects overriding this setting must rename the key and wrap the value in a list.
-- **All inference workers attach error category and user action**: Every worker across all providers now raises exceptions with an `InferenceErrorCategory` and actionable `user_action` hint.
-- **CLI error output wired to `ErrorReport`**: Error handlers use `to_error_report()` for consistent, structured display.
+- **Cold start trimmed**: heavy SDK imports (`boto3`, `huggingface_hub`, etc.) deferred behind `TYPE_CHECKING` or function-local guards across multiple plugins.
 - **Graph viewer updated to mthds-ui v0.3.4**: bumped from v0.3.0 — additional polish atop the resizable detail panel, escape-to-close, sticky header, prompt expand/collapse with copy button, concept refinement display.
-- **README install instructions**: Replaced step-by-step Claude Code setup with single copy-paste messages for Claude Code and Codex, added manual install section.
-
-### Removed
-
-- **`PipeRouterTop`** — replaced by `TemporalPipeRouter` + `TemporalPipeRun`.
-- **`PipeRouterChild`** — merged into `TemporalPipeRouter`.
-- **`PipelexHub.set_pipe_router_top()`** — no longer needed; single `set_pipe_router()` suffices.
+- **Default models**: small-vision and creative defaults now point to `gemini-3.0-flash-preview`. Added `claude-4.6-sonnet` and Bedrock token-auth support.
+- **`kajson` upgraded** from `0.3.1` to `0.5.0`.
+- **README install instructions**: replaced step-by-step Claude Code setup with single copy-paste messages for Claude Code and Codex, added manual install section.
 
 ### Fixed
 
 - **Anthropic structured generation no longer flattens all errors to `CONTENT`.** `AnthropicLLMWorker._gen_object` runs requests through `instructor`, which wraps SDK exceptions in `InstructorRetryException`. The previous handler categorized every wrapped error as `CONTENT`, so genuine `RateLimitError`, `APITimeoutError`, `APIConnectionError`, `PermissionDeniedError`, and `AuthenticationError` cases never reached the typed branches — they were reported as content failures (non-retryable) instead of `TRANSIENT` / `CAPACITY` / `CONFIGURATION`. The handler now unwraps `InstructorRetryException.failed_attempts[-1].exception` (with a `__cause__`/`RetryError.last_attempt` fallback) and routes recognized SDK exceptions through a shared categorization helper; truly unrecognized errors keep the `CONTENT` fallback.
-- **ObjectAssignment deserialization on Temporal workers**: Removed `__init__` class registry check that blocked deserialization of `ObjectAssignment` before `library_crate` was loaded. Validation moved to `validate_before_execution()` method, following the existing codebase pattern.
-- **Dynamic concept classes in Temporal activities**: `WfPipeRouter` now propagates dynamically registered concept classes from the per-workflow registry to the global registry, so child workflows and activities can access them.
-- **Temporal nondeterminism in child workflow IDs**: Replaced `shortuuid.uuid()` with `workflow.uuid4()` in `TemporalPipeRouter` for deterministic child workflow ID generation. The old code caused TMPRL1100 errors on workflow replay.
-- **Enum fields (`choices`) breaking Temporal serialization**: Concepts with `choices` fields generated `Enum` classes that couldn't be resolved during `model_rebuild` or deserialized across Temporal workflow boundaries. Fixed `_exec_and_extract_class` to include all generated types (models + enums) in the forward reference namespace.
-- **Enum serialization in `ContentGeneratorChild`**: `model_dump()` now uses `mode="json"` to serialize enum values as plain strings, preventing type mismatch when validating across different model class instances.
-- **`Anything[]` hydration in Temporal**: Working memory hydration failed for `Anything` concept lists because `AnythingContent` doesn't exist as a class. Hydration now gracefully falls back to embedded `__class__` metadata or `TextContent` for items without type information.
 - **Managed-deck detection no longer misclassifies user TOMLs.** `_is_managed_deck_filename` previously treated any non-`x_custom_*.toml` as kit-managed, so a user file like `my_overrides.toml` dropped into the deck dir would have been reported (and on `pipelex update` overwritten) as if it were a kit file. Now requires the numbered `^\d+_.*\.toml$` prefix that the kit actually ships.
 - **`PipeLLM` output structure prompt used the unresolved concept ref.** When `is_structure_prompt_enabled`, `get_output_structure_prompt` was called with `pipe_run_params.dynamic_output_concept_ref or output_stuff_spec.concept.concept_ref`. The first form can be a bare code (no domain), which broke downstream concept resolution. Now passes the already-resolved `output_stuff_spec.concept.concept_ref` directly.
 - **`PIPELEX_NO_DECK_NOTICE` suppression was too lax.** Any non-empty value silenced the deck-staleness notice — including `PIPELEX_NO_DECK_NOTICE=0`, which users might reasonably expect to _enable_ the notice. Now requires the documented `PIPELEX_NO_DECK_NOTICE=1`.
 - **Shipped `.kit_manifest.json` carried `kit_version: "0.25.0"`** for the 0.25.1 release, which would have triggered false stale-detection on fresh installs. Bumped to `0.25.1` and re-synced into `pipelex/kit/configs/`.
+- **Stored-XSS guard**: HTML escaped in fallback `main_stuff.html`.
+- **`GatewayExtractWorker` teardown**: guarded done-callbacks against cancelled tasks to stop noisy teardown errors.
+- **URL checker**: 401/403 are now treated as OK for auth-walled URLs.
+- **Pipeline duplicate guard**: registering the same pipeline twice raises explicitly instead of silently shadowing.
 
 ### Documentation
 
@@ -75,6 +91,8 @@
 ### Security
 
 - **`schema_to_model` rejects `x-python-*` codegen extensions and restricts `__import__` to an allowlist.** `datamodel-code-generator` honors the `x-python-import` JSON Schema extension by emitting arbitrary `from <module> import <name>` statements with no sanitization. Combined with the prior gap that `_make_restricted_builtins()` did not block `__import__`, an attacker able to plant a crafted `object_class_schema` on a Temporal payload (where `ObjectAssignment.object_class_schema: dict[str, Any]` round-trips untouched) could cause arbitrary modules to be imported during `exec()` of generated code. Two-layer defense added: (1) `_reject_unsafe_schema_extensions` raises `UnsafeSchemaError` if any `x-python-*` key is present anywhere in the schema; (2) `__import__` in the exec namespace is now wrapped to allow only `pydantic`, `typing`, `typing_extensions`, `enum`, `datetime`, `decimal`, `uuid`, `__future__`, `collections`, and `re`.
+- **Restricted exec builtins, path sanitization, and atomic fingerprint caching** in the schema-to-model pipeline.
+- **CORS hardened on codec server error paths**; no leaked exception strings; prefix guards on storage URIs.
 
 ## [v0.25.2] - 2026-04-30
 
