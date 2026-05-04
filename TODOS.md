@@ -17,8 +17,8 @@ High-level tracker. Each phase has a per-phase checklist with finer-grained sub-
 - [x] **Phase 3** — `_get_registry` three-method split (5 tests)
 - [x] **Phase 4** — Split-worker integration test (2 tests + helpers, **prereq Q-Phase4**)
 - [x] **Phase 5** — Docs + changelog + cleanup (5 tasks)
-- [ ] **Phase 6** — Skill-level e2e Tier 8 (4 tasks, last 2 optional)
-- [ ] **Lint/test gate before each commit:** `make agent-check && make agent-test` green
+- [x] **Phase 6** — Skill-level e2e Tier 8 (Tier 8 added to SKILL.md; dry-run path finding documented; 6.3/6.4 deferred)
+- [x] **Lint/test gate before each commit:** `make agent-check && make agent-test` green
 - [x] **All acceptance criteria checked** (see §2)
 - [x] **Master plan updated** (P0 → Done in `wip/02-master-plan.md`)
 
@@ -506,11 +506,11 @@ Assertions:
 
 **Phase checklist:**
 
-- [ ] 6.1 — Run Tier 1 + Tier 3 in dry-run, inspect NDJSON for both writer-id'd and primary files
-- [ ] 6.2 — Add Tier 8 (Cross-worker usage emission) to `temporal-e2e-validate/SKILL.md`
-- [ ] 6.3 — (Optional sanity) Repeat `native_text_sequence` once in live mode
-- [ ] 6.4 — (Stretch / optional, P1-gated) Add Tier 9 for cost-report assembly
-- [ ] Phase 6 complete: optionally commit `docs(skills): add Tier 8 cross-worker usage emission to temporal-e2e-validate`
+- [x] 6.1 — Ran Tier 1 in dry-run with router+runner workers. **Finding:** dry-run instantiates `ContentGeneratorDry()` directly inside the workflow body (`pipe_llm.py:515`), bypassing `act_llm_gen_text` entirely. So all `usage_report` events emit on the router with `writer_id="primary"`; no `__w_act_*` files are produced in dry-run. The plan's expectation here was based on an incorrect assumption — the runner-side fallback is exercised only by (a) the Phase 4 integration test (which substitutes the inference activity to synthesize an `LLMJob` server-side), or (b) live mode where `act_llm_gen_text` is actually dispatched.
+- [x] 6.2 — Added Tier 8 (Cross-worker usage emission) to `temporal-e2e-validate/SKILL.md`. Documents the dry-run limitation, points to `TestSplitWorkerUsageEmission` for deterministic verification, and gives the live-mode CLI command + expected NDJSON file naming (`wf_*__w_act_*`).
+- [ ] 6.3 — (Optional sanity) Repeat `native_text_sequence` once in live mode — deferred, costs LLM call; covered by integration test.
+- [ ] 6.4 — (Stretch / optional, P1-gated) Add Tier 9 for cost-report assembly — deferred, blocked on P1.
+- [x] Phase 6 complete (committable as `docs(skills): add Tier 8 cross-worker usage emission to temporal-e2e-validate`)
 
 Run the existing `/temporal-e2e-validate` skill in **Mode 2 (3-process)** — `temporal-worker-router` + `temporal-worker-runner` + submitter. This is the only setup that proves "true separate Python processes; runner has its own ReportingManager that was never told about this workflow".
 
@@ -547,7 +547,7 @@ Run the existing `/temporal-e2e-validate` skill in **Mode 2 (3-process)** — `t
 | [~] | Unit | `tests/unit/pipelex/tracing/test_in_memory_event_log.py` | NOT edited — `InMemoryEventLog` writer_id property covered transitively by the writer_id schema tests; no behavior gap detected. | 1 |
 | [x] | Integration | `tests/integration/pipelex/temporal/tracing/test_split_worker_usage.py` | new (TestSplitWorkerUsageEmission, 2 cases: lands-in-same-dir, no-double-emit) | 4 |
 | [x] | Integration | `tests/integration/pipelex/temporal/tracing/helpers.py` | added `make_split_workers` (two-queue topology) + `_runner_isolated_act_llm_gen_text` substitute (clears `_event_log_contexts` and synthesizes the LLMJob so the cross-worker hop fires even in DRY mode) | 4 |
-| [ ] | E2E | `.claude/skills/temporal-e2e-validate/SKILL.md` | add Tier 8 (Tier 9 optional); update assertions to match writer_id format | 6 |
+| [x] | E2E | `.claude/skills/temporal-e2e-validate/SKILL.md` | added Tier 8 (Cross-worker usage emission) with dry-run-limitation note + live-mode command + pointer to `TestSplitWorkerUsageEmission` | 6 |
 
 **Constraint reminders (CLAUDE.md)**:
 
@@ -569,7 +569,7 @@ Each commit is independently green (`make agent-check && make agent-test`). Comm
 - [x] 4b. `feat(temporal): WorkerConfig.inference_task_queue routes act_llm_gen_text` — Phase 4 prereq (Q-Phase4). (commit 935a3022)
 - [x] 5. `test(integration): split-worker temporal test for cross-process usage emission` — Phase 4 (two-task-queue topology). (commit 06a3d26c)
 - [x] 6. `docs: changelog + as-built/master-plan updates for P0 + ndjson docstring` — Phase 5.
-- [ ] 7. (Optional, separate) `docs(skills): add Tier 8 cross-worker usage emission to temporal-e2e-validate` — Phase 6.
+- [x] 7. `docs(skills): add Tier 8 cross-worker usage emission to temporal-e2e-validate` — Phase 6.
 
 ---
 
