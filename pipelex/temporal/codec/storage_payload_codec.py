@@ -10,6 +10,8 @@ from temporalio.converter import PayloadCodec
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.tools.storage.exceptions import StorageInvalidUriError
+from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -41,6 +43,7 @@ class StoragePayloadCodec(PayloadCodec):
         self._storage = storage_provider
         self._size_threshold = size_threshold
         self._storage_prefix = f"{storage_prefix}/" if storage_prefix and not storage_prefix.endswith("/") else storage_prefix
+        self._expected_uri_prefix = f"{PIPELEX_STORAGE_SCHEME}{self._storage_prefix}"
 
     @staticmethod
     def _extract_job_routing(payload: Payload) -> tuple[str, str] | None:
@@ -110,6 +113,9 @@ class StoragePayloadCodec(PayloadCodec):
                 decoded.append(payload)
                 continue
             uri = payload.data.decode()
+            if not uri.startswith(self._expected_uri_prefix):
+                msg = f"Refusing to load storage reference '{uri}': URI does not start with expected prefix '{self._expected_uri_prefix}'"
+                raise StorageInvalidUriError(msg)
             original_bytes = await self._storage.load(uri)
             original_payload = Payload()
             original_payload.ParseFromString(original_bytes)

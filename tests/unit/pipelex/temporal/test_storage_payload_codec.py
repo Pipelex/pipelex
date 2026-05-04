@@ -4,6 +4,7 @@ import pytest
 from temporalio.api.common.v1 import Payload
 
 from pipelex.temporal.codec.storage_payload_codec import STORAGE_REF_ENCODING, StoragePayloadCodec
+from pipelex.tools.storage.exceptions import StorageInvalidUriError
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 
 TEST_THRESHOLD = 1024
@@ -274,3 +275,36 @@ class TestStoragePayloadCodec:
         assert len(segments) == 4, f"Expected routed key for {topic}, got: {key_after_scheme}"
         assert segments[1] == expected_user, f"User segment mismatch for {topic}"
         assert segments[2] == expected_run, f"Run segment mismatch for {topic}"
+
+    # -------------------------------------------------------------------
+    # decode() URI prefix guard tests
+    # -------------------------------------------------------------------
+
+    @pytest.mark.parametrize(
+        ("topic", "tampered_uri"),
+        [
+            ("foreign_prefix", "pipelex-storage://other-tenant/abc123"),
+            ("missing_scheme", "test-payloads/abc123"),
+            ("foreign_scheme", "file:///etc/passwd"),
+            ("absolute_path_no_scheme", "/etc/passwd"),
+            ("empty_uri", ""),
+        ],
+    )
+    async def test_decode_rejects_uri_outside_configured_prefix(
+        self,
+        codec: StoragePayloadCodec,
+        storage: InMemoryStorageProvider,
+        topic: str,
+        tampered_uri: str,
+    ) -> None:
+        """decode() refuses storage references whose URI does not start with the configured prefix."""
+        tampered_payload = Payload(
+            metadata={"encoding": STORAGE_REF_ENCODING},
+            data=tampered_uri.encode(),
+        )
+
+        with pytest.raises(StorageInvalidUriError, match="does not start with expected prefix"):
+            await codec.decode([tampered_payload])
+
+        # Storage must not be touched when the URI is rejected by the prefix guard
+        assert len(storage.root) == 0, f"Storage should not be accessed for tampered URI ({topic})"
