@@ -1,0 +1,38 @@
+TODOS.md
+  6a14424fe7bc09ca 16,252-254
+pipelex/tracing/activity_event_log.py
+  6a14424fe7bc09ca 1-116
+tests/unit/pipelex/reporting/test_emit_runner_fallback.py
+  6a14424fe7bc09ca 1-387
+pipelex/reporting/reporting_manager.py
+  6a14424fe7bc09ca 10,20,24,27,31-35,215-225,231-232,235-239,241-248,262-325
+pipelex/cogt/content_generation/content_generator_dry.py
+  6a14424fe7bc09ca 1,16-17,20,29,35-75,109,126
+tests/unit/pipelex/cogt/content_generation/test_content_generator_dry_reporting.py
+  6a14424fe7bc09ca 1-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "c70ed3944797cc57e1e1e84f3a80c014c5918f8e",
+  "prompts": {
+    "6a14424fe7bc09ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "44facf5b-15d2-4ee9-9969-4bac699eafd7",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 781,
+      "total_deletions": 81,
+      "accepted_lines": 712,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}
