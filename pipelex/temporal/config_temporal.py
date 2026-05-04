@@ -175,6 +175,7 @@ class WorkerConfig(ConfigModel):
     """Configuration model for workflow execution settings."""
 
     task_queue: str
+    inference_task_queue: str | None = None
     workflow_execution_timeout: timedelta = Field(strict=False)
     run_timeout: timedelta | None = Field(default=None, strict=False)
     task_timeout: timedelta | None = Field(default=None, strict=False)
