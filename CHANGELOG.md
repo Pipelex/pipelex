@@ -49,7 +49,7 @@
 - **`PipeOutput.graph_assembly_error`**: optional `str` field set when the Temporal `act_assemble_graph` activity raises so consumers can distinguish "graph never produced" from "graph assembly failed". Previously the failure was logged as a warning and `graph_spec` silently stayed `None`.
 - **`pipe extract` web URL support** with full test coverage in `tests/integration/pipelex/pipes/pipe_operators/pipe_extract/`.
 - **`needs_inference` flag on CLI commands**: non-inference subcommands (e.g. `worker`, `doctor`) skip inference setup, shaving cold-start time.
-- **Environment-specific config**: `RunEnvironment` enum values updated to full names (`"development"`, `"production"`). Config loaded from `ENVIRONMENT` env var (was `ENV`).
+- **Environment-specific config**: `RunEnvironment` is now loaded from the `ENVIRONMENT` env var (was `ENV`). Accepted values: `local`, `dev`, `staging`, `prod`.
 
 ### Changed
 
