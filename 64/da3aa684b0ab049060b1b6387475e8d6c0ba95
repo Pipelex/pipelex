@@ -1,0 +1,23 @@
+pipelex/cogt/content_generation/schema_to_model_factory.py
+  629ebc2327632fca 165,180
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "64da3aa684b0ab049060b1b6387475e8d6c0ba95",
+  "prompts": {
+    "629ebc2327632fca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "deec0ace-f19c-48c1-a67f-1636de13ddd5",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 2,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}
