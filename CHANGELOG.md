@@ -63,7 +63,7 @@
 - **Cold start trimmed**: heavy SDK imports (`boto3`, `huggingface_hub`, etc.) deferred behind `TYPE_CHECKING` or function-local guards across multiple plugins.
 - **Graph viewer updated to mthds-ui v0.3.4**: bumped from v0.3.0 — additional polish atop the resizable detail panel, escape-to-close, sticky header, prompt expand/collapse with copy button, concept refinement display.
 - **Default models**: small-vision and creative defaults now point to `gemini-3.0-flash-preview`. Added `claude-4.6-sonnet` and Bedrock token-auth support.
-- **`kajson` upgraded** from `0.3.1` to `0.4.1` (pinned via git on `fix/enum-source-registry`) — required for the dynamic-class source registry that backs schema-to-model reconstruction.
+- **`kajson` upgraded** from `0.3.1` to `0.4.2`.
 - **README install instructions**: replaced step-by-step Claude Code setup with single copy-paste messages for Claude Code and Codex, added manual install section.
 
 ### Fixed

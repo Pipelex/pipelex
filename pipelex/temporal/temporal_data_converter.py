@@ -28,6 +28,7 @@ For examples, see the tests in `test_top_crafter.py`:
 from typing import Any, cast
 
 from kajson import kajson
+from kajson.class_registry import ClassRegistry
 from pydantic import BaseModel
 from temporalio.api.common.v1 import Payload
 from temporalio.converter import (
@@ -41,6 +42,7 @@ from temporalio.converter import (
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
 from pipelex.hub import get_class_registry
 from pipelex.temporal.exceptions import TemporalFlowError
 
@@ -89,11 +91,23 @@ class BaseModelPayloadConverter(JSONPlainPayloadConverter):
         log.verbose(f"unijson_deserialize_payload — data: {data}")
         source_bytes = payload.metadata.get("kajson_class_source")
         class_source_code = source_bytes.decode() if source_bytes else None
-        pydantic_gizmo = kajson.loads(
-            data,
-            class_registry=get_class_registry(),
-            class_source_code=class_source_code,
-        )
+
+        global_registry = get_class_registry()
+        if class_source_code is not None:
+            # Build a per-call scoped registry overlaying the global one with the
+            # source-derived dynamic classes (BaseModel + Enum). Per-call so dynamic
+            # classes never persist across payloads — different schemas may reuse the
+            # same class name without collision.
+            source_types = SchemaToModelFactory.make_types_from_source(class_source_code)
+            scoped_registry = ClassRegistry()
+            if isinstance(global_registry, ClassRegistry):
+                scoped_registry.register_classes_dict(dict(global_registry.root))
+            for type_name, type_obj in source_types.items():
+                scoped_registry.register_class(type_obj, name=type_name, should_warn_if_already_registered=False)
+            pydantic_gizmo = kajson.loads(data, class_registry=scoped_registry)
+        else:
+            pydantic_gizmo = kajson.loads(data, class_registry=global_registry)
+
         if class_source_code is not None:
             if isinstance(pydantic_gizmo, BaseModel):
                 self._restore_class_source(pydantic_gizmo, class_source_code)
