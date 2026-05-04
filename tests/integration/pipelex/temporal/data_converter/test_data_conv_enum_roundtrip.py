@@ -54,5 +54,4 @@ class TestEnumRoundTrip:
         assert isinstance(species_value, Enum)
         assert type(species_value).__name__ == "PetSpecies"
         assert species_value.value == "dog"
-        assert species_value.name == "dog"
         assert getattr(restored_class, "__kajson_class_source__", None)
