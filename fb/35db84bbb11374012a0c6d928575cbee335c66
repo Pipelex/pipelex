@@ -1,0 +1,79 @@
+wip/archive/phase3-execution-plan.md
+  5f370c352d389e4c 1-329
+wip/archive/phase2-crate-propagation-rationale.md
+  5f370c352d389e4c 1-112
+wip/archive/phase3-eng-review.md
+  5f370c352d389e4c 1-301
+wip/archive/phase5-payload-codec-DONE.md
+  5f370c352d389e4c 1-177
+wip/distributed-tracing-and-reporting.md
+  5f370c352d389e4c 3-14,16
+wip/archive/tier2-live-bug-recap.md
+  5f370c352d389e4c 1-69
+wip/archive/kajson-decoder-class-registry.md
+  5f370c352d389e4c 1-63
+wip/archive/tier2-live-registry-propagation.md
+  5f370c352d389e4c 1-123
+wip/phase6a-local-cross-package-deps.md
+  5f370c352d389e4c 1-39
+wip/archive/00-master-plan.md
+  5f370c352d389e4c 1,3-6,398
+wip/archive/raw-working-memory-through-act_deliver-DONE.md
+  5f370c352d389e4c 1-143
+wip/archive/phase2-implementation-plan.md
+  5f370c352d389e4c 1-311
+wip/phase6b-remote-deps-from-github.md
+  5f370c352d389e4c 1-29
+wip/tracing-cost-reporting-as-built.md
+  5f370c352d389e4c 1-76
+wip/archive/scoped-registry-teardown.md
+  5f370c352d389e4c 1-67
+wip/archive/activity_storage-plan.md
+  5f370c352d389e4c 1-123
+wip/archive/preserved-from-registry-commits.md
+  5f370c352d389e4c 1-59
+wip/archive/phase0-pipe-namespace-fix.md
+  5f370c352d389e4c 1-195
+wip/deferred-items.md
+  5f370c352d389e4c 46-47,62-63
+wip/archive/phase4.5-distributed-tracing-implementation.md
+  5f370c352d389e4c 1-613
+wip/02-master-plan.md
+  5f370c352d389e4c 1-107
+wip/error-handling-review.md
+  5f370c352d389e4c 3-5,9,11-31,37,39-43,45,47-51,70-72,75,77,79,81,83,87,89,93,103,107,109,115,117,119,123-127,144,148,152,177-184,188-191,211,213,215,217-219,221,223,225,228-230,232,238,242-244,246-250,259-267,269,271,273,275,277,279,281,283,285,287,289,291,293,295,297,301,303-316,320,323-332
+wip/archive/01-master-plan.md
+  5f370c352d389e4c 1,3-5,7,9,11,13-16,18,20-22,24,26,28,30,32-40,42,44,116,119,124-134
+wip/archive/phase4-explicit-class-registry.md
+  5f370c352d389e4c 1-211
+wip/archive/phase3-mode2-regression.md
+  5f370c352d389e4c 1-181
+wip/archive/activity_storage.md
+  5f370c352d389e4c 1-207
+wip/archive/phase1-handoff.md
+  5f370c352d389e4c 1-380
+wip/future-crate-first-architecture.md
+  5f370c352d389e4c 5
+wip/archive/phase5-payload-codec-strategy.md
+  5f370c352d389e4c 1-230
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "fb35db84bbb11374012a0c6d928575cbee335c66",
+  "prompts": {
+    "5f370c352d389e4c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0702474b-f0b1-4957-b8e0-68c0f04b6fc7",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 4920,
+      "total_deletions": 602,
+      "accepted_lines": 4859,
+      "overriden_lines": 0
+    }
+  }
+}
