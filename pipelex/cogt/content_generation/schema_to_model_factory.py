@@ -162,7 +162,6 @@ class SchemaToModelFactory:
         """Generate Python source code from a JSON schema using datamodel-code-generator."""
         from datamodel_code_generator import InputFileType, generate  # noqa: PLC0415
         from datamodel_code_generator.enums import DataModelType  # noqa: PLC0415
-        from datamodel_code_generator.format import Formatter  # noqa: PLC0415
 
         cls._reject_unsafe_schema_extensions(schema)
 
@@ -172,12 +171,19 @@ class SchemaToModelFactory:
             output_path = Path(tmp.name)
 
         try:
+            # We pass formatters=[] (skip formatting entirely) for two reasons:
+            # 1. The output is exec()'d and also shipped verbatim as __kajson_class_source__
+            #    across Temporal payloads, so cosmetic formatting has no functional value.
+            # 2. The default formatters (black + isort) emit a FutureWarning that they'll
+            #    be replaced by ruff, but ruff isn't a runtime dep of pipelex or of
+            #    datamodel-code-generator's core install. An empty list silences the
+            #    warning without forcing a new runtime dependency on consumers.
             generate(
                 input_=schema_str,
                 input_file_type=InputFileType.JsonSchema,
                 output=output_path,
                 output_model_type=DataModelType.PydanticV2BaseModel,
-                formatters=[Formatter.RUFF_FORMAT, Formatter.RUFF_CHECK],
+                formatters=[],
             )
             return output_path.read_text(encoding="utf-8")
         finally:
