@@ -10,6 +10,10 @@ URL_MAX_LENGTH = 2048
 # URI schemes that are handled internally and should not be validated
 _SKIP_VALIDATION_PREFIXES = ("data:", "pipelex-storage://")
 
+# HTTP status codes where HEAD rejection is a known server misconfiguration
+# (CDNs, signed URLs, auth-gated endpoints) and a GET fallback is justified.
+_HEAD_REJECTED_CODES = {403, 405}
+
 
 def get_user_agent() -> str:
     version = get_package_version()
@@ -48,8 +52,8 @@ def _validate_http_url(url: str) -> None:
     headers = {"User-Agent": user_agent}
     try:
         response = httpx.head(url, timeout=10, follow_redirects=True, headers=headers)
-        if response.status_code == 405:
-            # Server doesn't support HEAD — fall back to streaming GET (read only status, not body)
+        if response.status_code in _HEAD_REJECTED_CODES:
+            log.verbose(f"HEAD request to '{url}' returned {response.status_code}, falling back to streaming GET")
             with httpx.stream("GET", url, timeout=10, follow_redirects=True, headers=headers) as stream_response:
                 stream_response.raise_for_status()
         else:

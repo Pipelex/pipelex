@@ -20,7 +20,7 @@ from pipelex.core.stuffs.mermaid_content import MermaidContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_artefact import StuffArtefact
-from pipelex.core.stuffs.stuff_content import StuffContentType
+from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract
@@ -468,3 +468,28 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
     def smart_dump(self) -> dict[str, Any]:
         """Serialize the working memory as a dictionary."""
         return self.model_dump(serialize_as_any=True)
+
+    def dump_for_temporal(self) -> dict[str, Any]:
+        """Serialize for Temporal transit with explicit ListContent representation.
+
+        Like smart_dump(), but serializes ListContent as a plain list instead of
+        ``{"items": [...]}``.  This removes the ambiguity at hydration time: a
+        ``list`` content value is always a ListContent, a ``dict`` is always a
+        single StuffContent.
+        """
+        raw = self.model_dump(serialize_as_any=True)
+        raw_root = raw.get("root", {})
+        for stuff_name, stuff in self.root.items():
+            content = stuff.content
+            if isinstance(content, ListContent) and stuff_name in raw_root:
+                list_content = cast("ListContent[StuffContent]", content)
+                serialized_items: list[dict[str, Any]] = []
+                for item in list_content.items:
+                    item_dict = item.model_dump(serialize_as_any=True)
+                    # Preserve type metadata for items under Anything concepts so
+                    # the hydration side can reconstruct the correct content class.
+                    item_dict["__class__"] = type(item).__name__
+                    item_dict["__module__"] = type(item).__module__
+                    serialized_items.append(item_dict)
+                raw_root[stuff_name]["content"] = serialized_items
+        return raw

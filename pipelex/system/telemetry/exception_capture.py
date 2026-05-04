@@ -1,10 +1,13 @@
 import sys
 import threading
 from types import TracebackType
-
-from posthog import Posthog
+from typing import TYPE_CHECKING
 
 from pipelex import log
+
+if TYPE_CHECKING:
+    # Deferred import: avoid pulling heavy SDK at module-load time
+    from posthog import Posthog
 
 
 class DualClientExceptionCapture:
@@ -16,9 +19,9 @@ class DualClientExceptionCapture:
 
     def __init__(
         self,
-        custom_posthog_client: Posthog | None,
+        custom_posthog_client: "Posthog | None",
         custom_distinct_id: str | None,
-        pipelex_posthog_client: Posthog | None,
+        pipelex_posthog_client: "Posthog | None",
         pipelex_distinct_id: str | None,
     ):
         self._custom_client = custom_posthog_client

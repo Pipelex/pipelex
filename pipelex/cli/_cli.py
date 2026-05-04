@@ -17,6 +17,7 @@ from pipelex.cli.commands.show_cmd import show_app
 from pipelex.cli.commands.update_cmd import update_cmd
 from pipelex.cli.commands.validate.app import validate_app
 from pipelex.cli.commands.which_cmd import which_cmd
+from pipelex.cli.commands.worker_cmd import worker_cmd
 from pipelex.cli.deck_notice import warn_if_deck_stale
 from pipelex.cli.readiness import check_readiness
 from pipelex.hub import get_console
@@ -29,7 +30,7 @@ class PipelexCLI(TyperGroup):
     @override
     def list_commands(self, ctx: Context) -> list[str]:
         # List the commands in the proper order because natural ordering doesn't work between Typer groups and commands
-        return ["login", "init", "doctor", "update", "build", "validate", "run", "graph", "show", "which"]
+        return ["login", "init", "doctor", "update", "build", "validate", "run", "graph", "show", "which", "worker"]
 
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
@@ -205,3 +206,4 @@ app.add_typer(run_app, name="run", help="Run a method or pipe, optionally provid
 app.add_typer(graph_app, name="graph", help="Generate and render execution graphs")
 app.add_typer(show_app, name="show", help="Show configuration, pipes, and list AI models")
 app.command(name="which", help="Locate where a pipe is defined, similar to 'which' for executables")(which_cmd)
+app.command(name="worker", help="Start a Temporal worker for distributed workflow execution")(worker_cmd)

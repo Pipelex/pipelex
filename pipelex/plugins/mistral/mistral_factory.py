@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import os
+from typing import TYPE_CHECKING
 
 import aiofiles
 import mistralai
@@ -17,15 +18,10 @@ from mistralai.models import (
     UsageInfo,
     UserMessage,
 )
-from openai.types.chat import (
-    ChatCompletionContentPartImageParam,
-    ChatCompletionContentPartParam,
-    ChatCompletionContentPartTextParam,
-    ChatCompletionMessageParam,
-    ChatCompletionSystemMessageParam,
-    ChatCompletionUserMessageParam,
-)
-from openai.types.chat.chat_completion_content_part_image_param import ImageURL as OpenAIImageURL
+
+if TYPE_CHECKING:
+    # Deferred import: avoid pulling heavy SDK at module-load time
+    from openai.types.chat import ChatCompletionMessageParam
 
 from pipelex import log
 from pipelex.cogt.document.prompt_document import PromptDocument
@@ -125,12 +121,23 @@ class MistralFactory:
     async def make_simple_messages_openai_typed(
         self,
         llm_job: LLMJob,
-    ) -> list[ChatCompletionMessageParam]:
+    ) -> 'list["ChatCompletionMessageParam"]':
         """Makes a list of messages with a system message (if provided) and followed by a user message.
 
         Uses the unified prep_prompt_images() which supports all URI types
         including pipelex-storage://.
         """
+        # Deferred imports: avoid pulling heavy SDK at module-load time
+        from openai.types.chat import (  # noqa: PLC0415
+            ChatCompletionContentPartImageParam,
+            ChatCompletionContentPartParam,
+            ChatCompletionContentPartTextParam,
+            ChatCompletionMessageParam,
+            ChatCompletionSystemMessageParam,
+            ChatCompletionUserMessageParam,
+        )
+        from openai.types.chat.chat_completion_content_part_image_param import ImageURL as OpenAIImageURL  # noqa: PLC0415
+
         llm_prompt = llm_job.llm_prompt
         messages: list[ChatCompletionMessageParam] = []
         user_contents: list[ChatCompletionContentPartParam] = []

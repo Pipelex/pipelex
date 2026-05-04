@@ -66,6 +66,18 @@ Paste this into Claude Code:
 Install mthds: run bash -c 'npm install -g mthds && mthds-agent bootstrap && claude plugin marketplace add mthds-ai/mthds-plugins && claude plugin install mthds@mthds-plugins'. Then tell me to /reload-plugins.
 ```
 
+Build your first method:
+
+```
+/mthds-build A method to summarize articles with key takeaways for different audiences
+```
+
+Run it:
+
+```
+/mthds-run
+```
+
 ## With Codex
 
 Paste this into Codex:
@@ -92,9 +104,9 @@ Verify everything is set up correctly:
 pipelex doctor
 ```
 
-## Python Package Only
+## Standalone CLI
 
-If you just need the Pipelex runtime without agent integration:
+If you just need the Pipelex CLI without agent integration:
 
 ```bash
 uv tool install pipelex

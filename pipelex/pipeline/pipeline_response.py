@@ -26,4 +26,4 @@ class PipelexPipelineExecuteResponse(PipelineExecuteResponse[PipeOutput]):
 
 
 class PipelexPipelineStartResponse(PipelineStartResponse[PipeOutput]):
-    pass
+    workflow_id: str | None = None

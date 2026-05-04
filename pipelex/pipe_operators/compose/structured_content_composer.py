@@ -7,7 +7,7 @@ from pydantic import ValidationError
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.cogt.templating.template_preprocessor import preprocess_template
+from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -60,6 +60,10 @@ class StructuredContentComposer:
         self.extra_context = extra_context or {}
         self.content_generator = content_generator or get_content_generator()
         self.pipe_run_params = pipe_run_params
+        # Per-field record of how each field was built. Populated as fields resolve.
+        # Shape per entry: {"method": ConstructFieldMethod, "rendered": str (templates only)}.
+        # Nested fields record only their method; their sub-fields are not surfaced.
+        self.field_resolutions: dict[str, dict[str, Any]] = {}
 
     async def compose(self) -> StuffContent:
         """Compose the StructuredContent asynchronously.
@@ -127,6 +131,7 @@ class StructuredContentComposer:
         Returns:
             The resolved value for the field
         """
+        self.field_resolutions[field_name] = {"method": field_blueprint.method}
         match field_blueprint.method:
             case ConstructFieldMethod.FIXED:
                 return field_blueprint.fixed_value
@@ -135,7 +140,9 @@ class StructuredContentComposer:
                 return self._resolve_from_var(field_blueprint=field_blueprint, field_name=field_name)
 
             case ConstructFieldMethod.TEMPLATE:
-                return await self._resolve_template(field_blueprint=field_blueprint)
+                rendered_text = await self._resolve_template(field_blueprint=field_blueprint)
+                self.field_resolutions[field_name]["rendered"] = rendered_text
+                return rendered_text
 
             case ConstructFieldMethod.NESTED:
                 return await self._resolve_nested(field_blueprint=field_blueprint, field_name=field_name)
@@ -650,14 +657,11 @@ class StructuredContentComposer:
         if self.extra_context:
             context.update(**self.extra_context)
 
-        # Preprocess the template (handles $ -> {{ }} conversion)
-        preprocessed = preprocess_template(field_blueprint.template)
-
-        # Render the template using the provided content generator (supports dry run mode)
-        return await self.content_generator.make_templated_text(
+        # TODO: dry-run templating is being removed — this direct render_template call is intentional
+        return await render_template(
+            template=field_blueprint.template,
+            category=TemplateCategory.BASIC,
             context=context,
-            template=preprocessed,
-            template_category=TemplateCategory.BASIC,
         )
 
     async def _resolve_nested(self, field_blueprint: ConstructFieldBlueprint, field_name: str) -> StuffContent:

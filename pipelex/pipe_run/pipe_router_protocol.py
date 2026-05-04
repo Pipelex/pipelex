@@ -47,11 +47,12 @@ class PipeRouterProtocol(Protocol):
     async def run(
         self,
         pipe_job: PipeJob,
+        wfid: str | None = None,
     ) -> PipeOutput:
         await self._before_run(pipe_job)
 
         try:
-            pipe_output = await self._run_pipe_job(pipe_job)
+            pipe_output = await self._run_pipe_job(pipe_job, wfid=wfid)
         except PipeRunError as exc:
             await self._after_failing_run(pipe_job, exc)
             raise PipeRouterError(
@@ -70,4 +71,5 @@ class PipeRouterProtocol(Protocol):
     async def _run_pipe_job(
         self,
         pipe_job: PipeJob,
+        wfid: str | None = None,
     ) -> PipeOutput: ...

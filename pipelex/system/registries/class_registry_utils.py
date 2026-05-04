@@ -3,10 +3,9 @@ import sys
 import warnings
 from typing import Any
 
-from kajson.kajson_manager import KajsonManager
-
 from pipelex import log
 from pipelex.config import get_config
+from pipelex.hub import get_class_registry
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.typing.module_inspector import (
     ModuleFileError,
@@ -34,7 +33,7 @@ class ClassRegistryUtils:
             include_imported=is_include_imported,
         )
 
-        KajsonManager.get_class_registry().register_classes(classes=classes_to_register)
+        get_class_registry().register_classes(classes=classes_to_register)
 
     @classmethod
     def register_classes_in_folder(
@@ -145,7 +144,7 @@ class ClassRegistryUtils:
 
         """
         registered_count = 0
-        class_registry = KajsonManager.get_class_registry()
+        class_registry = get_class_registry()
 
         # Create a snapshot of modules to avoid "dictionary changed size during iteration" error
         # (inspect.getmembers can trigger imports which modify sys.modules)

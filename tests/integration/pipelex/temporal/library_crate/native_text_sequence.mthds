@@ -1,0 +1,31 @@
+domain      = "native_text_test"
+description = "PipeSequence using only native Text concepts (no dynamic classes)"
+
+[pipe]
+[pipe.native_text_sequence]
+type = "PipeSequence"
+description = "Two-step text pipeline using native Text concepts"
+output = "Text"
+steps = [
+  { pipe = "step_one", result = "step_one_result" },
+  { pipe = "step_two", result = "step_two_result" },
+]
+
+[pipe.step_one]
+type        = "PipeLLM"
+description = "First step: generate text"
+output      = "Text"
+model       = "$testing-text"
+prompt      = "Write a single sentence about the color blue."
+
+[pipe.step_two]
+type = "PipeLLM"
+description = "Second step: transform text"
+inputs = { step_one_result = "Text" }
+output = "Text"
+model = "$testing-text"
+prompt = """
+Rewrite the following text in a formal tone:
+
+@step_one_result.text
+"""

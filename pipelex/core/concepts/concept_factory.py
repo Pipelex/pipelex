@@ -1,6 +1,6 @@
 from typing import cast
 
-from kajson.kajson_manager import KajsonManager
+from kajson.class_registry_abstract import ClassRegistryAbstract
 from pydantic import BaseModel
 
 from pipelex.core.concepts.concept import Concept
@@ -10,7 +10,7 @@ from pipelex.core.concepts.exceptions import (
     ConceptRefineError,
     ConceptStringError,
 )
-from pipelex.core.concepts.helpers import normalize_structure_blueprint
+from pipelex.core.concepts.helpers import make_qualified_structure_class_name, normalize_structure_blueprint
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError
 from pipelex.core.concepts.structure_generation.generator import StructureGenerator
@@ -19,6 +19,14 @@ from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.types import StrEnum
+
+
+def _get_class_registry() -> ClassRegistryAbstract:
+    """Lazy import to break circular dependency with hub.py."""
+    import importlib  # noqa: PLC0415
+
+    hub = importlib.import_module("pipelex.hub")
+    return hub.get_class_registry()  # type: ignore[no-any-return]
 
 
 class ConceptDeclarationType(StrEnum):
@@ -309,9 +317,10 @@ class ConceptFactory:
         # Normalize the structure blueprint to ensure all values are ConceptStructureBlueprint objects
         normalized_structure = normalize_structure_blueprint(blueprint.structure)
 
+        qualified_class_name = make_qualified_structure_class_name(domain_code, concept_code)
         try:
             _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
-                class_name=concept_code,
+                class_name=qualified_class_name,
                 structure_blueprint=normalized_structure,
                 description=blueprint.description,
             )
@@ -320,9 +329,9 @@ class ConceptFactory:
             raise ConceptFactoryError(msg) from exc
 
         # Register the generated class
-        KajsonManager.get_class_registry().register_class(the_generated_class)
+        _get_class_registry().register_class(the_generated_class)
 
-        return concept_code
+        return qualified_class_name
 
     @classmethod
     def _handle_basic_blueprint(
@@ -336,10 +345,15 @@ class ConceptFactory:
         Returns:
             Tuple of (structure_class_name, refine_string)
         """
-        # Generate a new class that inherits from TextContent and register it
-        # (unless a valid structure class already exists for this concept_code)
+        qualified_class_name = make_qualified_structure_class_name(domain_code, concept_code)
+
+        # Check if a valid structure class already exists — first by bare concept_code
+        # (for pre-existing Python classes registered under their own name), then by
+        # qualified name (for previously generated dynamic classes)
         if Concept.is_valid_structure_class(structure_class_name=concept_code):
             return concept_code, None
+        if Concept.is_valid_structure_class(structure_class_name=qualified_class_name):
+            return qualified_class_name, None
 
         # Because native concepts have structure class names diffrent than other (with "Content")
         if concept_code in NativeConceptCode.values_list():
@@ -347,7 +361,7 @@ class ConceptFactory:
 
         try:
             _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
-                class_name=concept_code,
+                class_name=qualified_class_name,
                 structure_blueprint={},
                 base_class_name=TextContent.__name__,
                 description=description,
@@ -356,9 +370,9 @@ class ConceptFactory:
             msg = f"Error generating structure class for concept '{concept_code}' in domain '{domain_code}': {exc}"
             raise ConceptFactoryError(msg) from exc
         # Register the generated class
-        KajsonManager.get_class_registry().register_class(the_generated_class)
+        _get_class_registry().register_class(the_generated_class)
 
-        return concept_code, NativeConceptCode.TEXT.concept_ref
+        return qualified_class_name, NativeConceptCode.TEXT.concept_ref
 
     @classmethod
     def _handle_refines(
@@ -385,13 +399,15 @@ class ConceptFactory:
             msg = f"Could not validate refine '{blueprint.refines}' for concept '{concept_code}' in domain '{domain_code}': {exc}"
             raise ConceptFactoryError(msg) from exc
 
+        qualified_class_name = make_qualified_structure_class_name(domain_code, concept_code)
+
         # Cross-package refines: base class isn't available locally, so generate
         # a standalone TextContent subclass. The refinement relationship is tracked
         # in the concept model's refines field for runtime compatibility checks.
         if QualifiedRef.has_cross_package_prefix(current_refine):
             try:
                 _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
-                    class_name=concept_code,
+                    class_name=qualified_class_name,
                     structure_blueprint={},
                     description=blueprint.description,
                 )
@@ -402,24 +418,25 @@ class ConceptFactory:
                 )
                 raise ConceptFactoryError(msg) from exc
 
-            KajsonManager.get_class_registry().register_class(the_generated_class)
-            return concept_code, current_refine
+            _get_class_registry().register_class(the_generated_class)
+            return qualified_class_name, current_refine
 
         # Get the refined concept's structure class name
         # For native concepts, the structure class name is "ConceptCode" + "Content" (e.g., TextContent)
-        # For custom concepts, the structure class name is just the concept code (e.g., Customer)
+        # For custom concepts, the structure class name is domain-qualified (e.g., my_domain__Customer)
         refined_ref = QualifiedRef.parse(current_refine)
         refined_concept_code = refined_ref.local_code
         if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=current_refine):
             refined_structure_class_name = refined_concept_code + "Content"
         else:
-            refined_structure_class_name = refined_concept_code
+            refined_domain_code = refined_ref.domain_path or domain_code
+            refined_structure_class_name = make_qualified_structure_class_name(refined_domain_code, refined_concept_code)
 
         # Generate a new class that inherits from the refined structure class
         # This creates an empty class that can be extended with additional fields in the future
         try:
             _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
-                class_name=concept_code,
+                class_name=qualified_class_name,
                 structure_blueprint={},  # Empty structure - just inherits from refined class
                 base_class_name=refined_structure_class_name,
                 description=blueprint.description,
@@ -432,9 +449,9 @@ class ConceptFactory:
             raise ConceptFactoryError(msg) from exc
 
         # Register the generated class
-        KajsonManager.get_class_registry().register_class(the_generated_class)
+        _get_class_registry().register_class(the_generated_class)
 
-        return concept_code, current_refine
+        return qualified_class_name, current_refine
 
     @classmethod
     def make_from_blueprint(

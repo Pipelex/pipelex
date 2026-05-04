@@ -23,6 +23,45 @@ def _raise_status_error(status_code: int) -> Callable[..., NoReturn]:
 
 
 class TestValidateHttpUrl:
+    """Tests for HTTP URL validation HEAD/GET fallback logic and warn-only contract."""
+
+    def test_head_success_does_not_fall_back_to_get(self, mocker: MockerFixture) -> None:
+        """When HEAD returns 200, no GET request is made."""
+        mock_head_response = mocker.MagicMock()
+        mock_head_response.status_code = 200
+        mock_head_response.raise_for_status = mocker.MagicMock()
+        mocker.patch("pipelex.tools.misc.http_utils.httpx.head", return_value=mock_head_response)
+        mock_stream = mocker.patch("pipelex.tools.misc.http_utils.httpx.stream")
+
+        validate_url_resource_exists("https://example.com/file.png")
+
+        mock_head_response.raise_for_status.assert_called_once()
+        mock_stream.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "status_code",
+        [
+            pytest.param(403, id="forbidden"),
+            pytest.param(405, id="method-not-allowed"),
+        ],
+    )
+    def test_head_rejection_falls_back_to_get(self, mocker: MockerFixture, status_code: int) -> None:
+        """When HEAD returns a rejection code (403, 405), a streaming GET is attempted."""
+        mock_head_response = mocker.MagicMock()
+        mock_head_response.status_code = status_code
+
+        mocker.patch("pipelex.tools.misc.http_utils.httpx.head", return_value=mock_head_response)
+
+        mock_get_response = mocker.MagicMock()
+        mock_get_response.raise_for_status = mocker.MagicMock()
+        mock_get_response.__enter__ = mocker.MagicMock(return_value=mock_get_response)
+        mock_get_response.__exit__ = mocker.MagicMock(return_value=False)
+        mocker.patch("pipelex.tools.misc.http_utils.httpx.stream", return_value=mock_get_response)
+
+        validate_url_resource_exists("https://example.com/file.png")
+
+        mock_get_response.raise_for_status.assert_called_once()
+
     @pytest.mark.parametrize("status_code", [401, 403, 429])
     def test_bot_block_status_codes_are_debug_only(
         self,

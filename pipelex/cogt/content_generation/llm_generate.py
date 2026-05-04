@@ -4,8 +4,9 @@ from pydantic import BaseModel
 
 from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import LLMAssignment, ObjectAssignment
+from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
-from pipelex.hub import get_class_registry, get_llm_worker
+from pipelex.hub import get_llm_worker
 
 
 async def llm_gen_text(llm_assignment: LLMAssignment) -> str:
@@ -28,8 +29,10 @@ async def llm_gen_object(object_assignment: ObjectAssignment) -> BaseModel:
         llm_prompt=llm_assignment.llm_prompt,
         llm_job_params=llm_assignment.llm_job_params,
     )
-    content_class_name = object_assignment.object_class_name
-    content_class = get_class_registry().get_required_base_model(name=content_class_name)
+    content_class = SchemaToModelFactory.make_from_json_schema(
+        schema=object_assignment.object_class_schema,
+        class_name=object_assignment.object_class_name,
+    )
     generated_object: BaseModel = await llm_worker.gen_object(
         llm_job=llm_job,
         schema=content_class,
@@ -47,7 +50,10 @@ async def llm_gen_object_list(object_assignment: ObjectAssignment) -> list[BaseM
         llm_job_params=llm_assignment.llm_job_params,
     )
     item_class_name = object_assignment.object_class_name
-    item_class = get_class_registry().get_required_class(name=item_class_name)
+    item_class = SchemaToModelFactory.make_from_json_schema(
+        schema=object_assignment.object_class_schema,
+        class_name=item_class_name,
+    )
 
     class ListSchema(BaseModel):
         items: list[item_class]  # type: ignore[valid-type] # pyright: ignore[reportInvalidTypeForm]

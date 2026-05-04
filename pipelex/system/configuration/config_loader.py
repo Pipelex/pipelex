@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any
 
 from pipelex.system.runtime import runtime_manager
+from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.toml_utils import load_toml_from_path_and_merge_with_overrides
 
 CONFIG_DIR_NAME = ".pipelex"
@@ -165,7 +166,7 @@ class ConfigLoader:
 
         write_manifest(global_dir / "inference" / "deck", compute_kit_manifest())
 
-    def load_config(self) -> dict[str, Any]:
+    def load_config(self, extra_overrides: dict[str, Any] | None = None) -> dict[str, Any]:
         """Load and merge configurations from pipelex and local config files.
 
         The configuration is loaded and merged in the following order:
@@ -176,7 +177,8 @@ class ConfigLoader:
            - pipelex_local.toml (local execution)
            - pipelex_{environment}.toml
            - pipelex_{run_mode}.toml
-           - pipelex_override.toml (final override)
+           - pipelex_override.toml (user's final override)
+           - pipelex_temporary_override.toml (ephemeral, safe for tools to create/delete)
 
         Returns:
             dict[str, Any]: The merged configuration dictionary
@@ -214,7 +216,13 @@ class ConfigLoader:
         # Final override
         list_of_configs.append(effective_config_dir / "pipelex_override.toml")
 
-        return load_toml_from_path_and_merge_with_overrides(paths=list_of_configs)
+        # Temporary override (e.g. for testing tools — safe to create/delete)
+        list_of_configs.append(effective_config_dir / "pipelex_temporary_override.toml")
+
+        merged = load_toml_from_path_and_merge_with_overrides(paths=list_of_configs)
+        if extra_overrides:
+            deep_update(merged, extra_overrides)
+        return merged
 
 
 config_manager = ConfigLoader()

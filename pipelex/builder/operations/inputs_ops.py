@@ -6,6 +6,7 @@ import json
 from typing import TYPE_CHECKING, Any
 
 from pipelex.core.pipes.inputs.input_renderer import render_inputs
+from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.hub import (
     get_library_manager,
     get_required_pipe,
@@ -51,7 +52,7 @@ async def build_inputs_for_pipe(
             main_pipe_code: str | None = None
             for blueprint in blueprints:
                 if blueprint.main_pipe:
-                    main_pipe_code = f"{blueprint.domain}.{blueprint.main_pipe}"
+                    main_pipe_code = PipeFactory.make_pipe_ref_with_domain(domain_code=blueprint.domain, pipe_code=blueprint.main_pipe)
                     break
             if not main_pipe_code:
                 msg = "Bundle does not declare a main_pipe. Specify a pipe code."
@@ -65,7 +66,7 @@ async def build_inputs_for_pipe(
             if not main_pipe_code:
                 msg = f"Bundle '{bundle_path}' does not declare a main_pipe. Specify a pipe code."
                 raise ValueError(msg)
-            pipe_code = f"{bundle_blueprint.domain}.{main_pipe_code}"
+            pipe_code = PipeFactory.make_pipe_ref_with_domain(domain_code=bundle_blueprint.domain, pipe_code=main_pipe_code)
     else:
         # No bundle - initialize the library manually
         library_manager = get_library_manager()

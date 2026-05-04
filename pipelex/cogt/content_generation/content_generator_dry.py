@@ -55,6 +55,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         job_metadata: JobMetadata,
         llm_setting_main: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
+        wfid: str | None = None,
     ) -> str:
         func_name = "make_llm_text"
         log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
@@ -69,6 +70,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         object_class: type[BaseModelTypeVar],
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_object: LLMPrompt,
+        wfid: str | None = None,
     ) -> BaseModelTypeVar:
         object_factory = DryRunFactory.make_dry_run_factory(object_class)
         # We run validators to ensure mock data is valid. Fields with format constraints
@@ -86,6 +88,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
         llm_prompt_factory_for_object: LLMPromptFactoryAbstract | None = None,
+        wfid: str | None = None,
     ) -> BaseModelTypeVar:
         func_name = "make_text_then_object"
         log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
@@ -106,6 +109,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         llm_setting_for_object_list: LLMSetting,
         llm_prompt_for_object_list: LLMPrompt,
         nb_items: int | None = None,
+        wfid: str | None = None,
     ) -> list[BaseModelTypeVar]:
         func_name = "make_object_list_direct"
         log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
@@ -136,6 +140,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         llm_prompt_for_text: LLMPrompt,
         llm_prompt_factory_for_object_list: LLMPromptFactoryAbstract | None = None,
         nb_items: int | None = None,
+        wfid: str | None = None,
     ) -> list[BaseModelTypeVar]:
         func_name = "make_text_then_object_list"
         log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
@@ -197,6 +202,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         img_gen_prompt: ImgGenPrompt,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
+        wfid: str | None = None,
     ) -> ImageContent:
         func_name = "make_single_image"
         log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
@@ -222,6 +228,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         nb_images: int,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
+        wfid: str | None = None,
     ) -> list[ImageContent]:
         func_name = "make_image_list"
         log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
@@ -243,10 +250,12 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     @override
     async def make_templated_text(
         self,
+        job_metadata: JobMetadata,
         context: dict[str, Any],
         template: str,
         templating_style: TemplatingStyle | None = None,
         template_category: TemplateCategory | None = None,
+        wfid: str | None = None,
     ) -> str:
         check_jinja2_parsing(template_source=template, template_category=template_category or TemplateCategory.BASIC)
         func_name = "make_templated_text"
@@ -265,6 +274,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         extract_handle: str,
         extract_job_params: ExtractJobParams | None = None,
         extract_job_config: ExtractJobConfig | None = None,
+        wfid: str | None = None,
     ) -> list[ImageContent]:
         if not extract_input.document_uri:
             msg = "Document URI is required to render page views"
@@ -283,6 +293,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         return page_view_images_resolved
 
     @override
+    @update_job_metadata
     async def make_extract_pages(
         self,
         job_metadata: JobMetadata,
@@ -290,6 +301,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         extract_handle: str,
         extract_job_params: ExtractJobParams | None = None,
         extract_job_config: ExtractJobConfig | None = None,
+        wfid: str | None = None,
     ) -> list[PageContent]:
         func_name = "make_extract_pages"
         log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")

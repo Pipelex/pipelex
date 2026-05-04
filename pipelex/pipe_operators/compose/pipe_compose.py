@@ -1,5 +1,6 @@
 from typing import Any, Literal
 
+from pydantic import Field
 from typing_extensions import override
 
 from pipelex import log
@@ -7,6 +8,7 @@ from pipelex.cogt.content_generation.content_generator_dry import ContentGenerat
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -40,7 +42,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     # Template mode fields (used when template is provided)
     template: str | None = None
     templating_style: TemplatingStyle | None = None
-    category: TemplateCategory = TemplateCategory.BASIC
+    category: TemplateCategory = Field(default=TemplateCategory.BASIC, strict=False)
     extra_context: dict[str, Any] | None = None
 
     # Construct mode field (used when construct is provided)
@@ -163,7 +165,6 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
                 working_memory=working_memory,
                 pipe_run_params=pipe_run_params,
                 output_name=output_name,
-                content_generator=content_generator,
             )
 
     async def _run_template_mode(
@@ -172,7 +173,6 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None,
-        content_generator: ContentGeneratorProtocol,
     ) -> PipeComposeOutput:
         """Run PipeCompose in template mode (produces Text or Html output)."""
         if self.template is None:
@@ -185,14 +185,14 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         if self.extra_context:
             context.update(**self.extra_context)
 
-        jinja2_text = await content_generator.make_templated_text(
-            context=context,
+        rendered_template_text = await render_template(
             template=self.template,
+            category=self.category,
+            context=context,
             templating_style=self.templating_style,
-            template_category=self.category,
         )
-        log.verbose(f"Jinja2 rendered text:\n{jinja2_text}")
-        assert isinstance(jinja2_text, str)
+        log.verbose(f"Template rendered text:\n{rendered_template_text}")
+        assert isinstance(rendered_template_text, str)
 
         # Get the structure class from the registry (might be a subclass of TextContent or HtmlContent)
         structure_class = get_class_registry().get_required_subclass(
@@ -202,9 +202,9 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
         # Construct content based on the structure class type
         if issubclass(structure_class, HtmlContent):
-            the_content = structure_class(inner_html=jinja2_text, css_class="")
+            the_content = structure_class(inner_html=rendered_template_text, css_class="")
         else:
-            the_content = structure_class(text=jinja2_text)
+            the_content = structure_class(text=rendered_template_text)
 
         output_stuff = StuffFactory.make_stuff(concept=self.output.concept, content=the_content, name=output_name)
 
@@ -216,7 +216,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         # Capture execution data for the graph tracer
         execution_data_dict: dict[str, Any] = {
             "compose_mode": "template",
-            "rendered_text": jinja2_text,
+            "rendered_text": rendered_template_text,
         }
         self._register_execution_data(job_metadata, execution_data_dict)
 
@@ -269,9 +269,9 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             name=output_name,
         )
 
-        # Capture execution data for the graph tracer
         execution_data_dict: dict[str, Any] = {
             "compose_mode": "construct",
+            "fields": composer.field_resolutions,
         }
         self._register_execution_data(job_metadata, execution_data_dict)
 

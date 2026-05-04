@@ -16,6 +16,10 @@ from pipelex.types import Self, StrEnum
 MAX_PREVIEW_LENGTH = 200
 MAX_STACK_LENGTH = 2000
 
+# Format tag stored in GraphSpec.meta so external tooling (e.g. the VS Code
+# graph viewer) can recognize a JSON file as a Pipelex execution graph.
+GRAPHSPEC_FORMAT = "mthds"
+
 
 class NodeKind(StrEnum):
     """Types of nodes in the execution graph."""
@@ -231,10 +235,10 @@ class NodeSpec(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, populate_by_name=True)
 
     node_id: str = Field(validation_alias="id", serialization_alias="id")
-    kind: NodeKind
+    kind: NodeKind = Field(strict=False)
     pipe_code: str | None = None
     pipe_type: str | None = None
-    status: NodeStatus
+    status: NodeStatus = Field(strict=False)
     timing: TimingSpec | None = None
     node_io: NodeIOSpec = Field(
         default_factory=NodeIOSpec,
@@ -255,7 +259,7 @@ class EdgeSpec(BaseModel):
     edge_id: str = Field(validation_alias="id", serialization_alias="id")
     source: str
     target: str
-    kind: EdgeKind
+    kind: EdgeKind = Field(strict=False)
     label: str | None = None
     # For batch edges, specify the stuff digests for renderers to connect stuff nodes directly
     source_stuff_digest: str | None = None
@@ -280,6 +284,16 @@ class GraphSpec(BaseModel):
     meta: dict[str, Any] = Field(default_factory=dict)
     pipe_registry: dict[str, dict[str, Any]] = Field(default_factory=dict)
     concept_registry: dict[str, dict[str, Any]] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def ensure_format_meta(self) -> Self:
+        existing_format = self.meta.get("format")
+        if existing_format is None:
+            self.meta["format"] = GRAPHSPEC_FORMAT
+        elif existing_format != GRAPHSPEC_FORMAT:
+            msg = f"GraphSpec.meta['format'] must be '{GRAPHSPEC_FORMAT}', got '{existing_format}'"
+            raise ValueError(msg)
+        return self
 
     def to_json(self) -> str:
         return self.model_dump_json(serialize_as_any=True, by_alias=True, indent=2)

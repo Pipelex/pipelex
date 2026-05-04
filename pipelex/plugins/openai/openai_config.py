@@ -1,12 +1,15 @@
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
-from openai.types.chat import ChatCompletionReasoningEffort
 from pydantic import field_validator
 
 from pipelex.cogt.llm.llm_job_components import ReasoningEffort
 from pipelex.cogt.llm.reasoning_config_base import EffortToLevelMap, get_reasoning_level_str, validate_effort_to_level_map
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.types import StrEnum
+
+if TYPE_CHECKING:
+    # Deferred import: avoid pulling heavy SDK at module-load time
+    from openai.types.chat import ChatCompletionReasoningEffort
 
 
 class OpenAIReasoningLevel(StrEnum):
@@ -26,7 +29,7 @@ class OpenAIConfig(ConfigModel):
     def validate_effort_map(cls, value: EffortToLevelMap) -> EffortToLevelMap:
         return validate_effort_to_level_map(value, "openai_config", level_type=OpenAIReasoningLevel)
 
-    def get_reasoning_level(self, effort: ReasoningEffort) -> ChatCompletionReasoningEffort | None:
+    def get_reasoning_level(self, effort: ReasoningEffort) -> "ChatCompletionReasoningEffort | None":
         """Resolve a ReasoningEffort to an OpenAI ChatCompletionReasoningEffort value.
 
         Returns:

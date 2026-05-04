@@ -44,6 +44,7 @@ from pipelex.observer.multi_observer import MultiObserver
 from pipelex.observer.observer_protocol import ObserverNoOp, ObserverProtocol
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
+from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipeline.pipeline_manager import PipelineManager
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
 from pipelex.plugins.plugin_manager import PluginManager
@@ -95,6 +96,7 @@ class Pipelex(metaclass=MetaSingleton):
         self,
         config_dir_path: Path | None = None,
         config_cls: type[ConfigRoot] | None = None,
+        config_overrides: dict[str, Any] | None = None,
     ) -> None:
         self.is_pipelex_service_enabled = False  # Will be set during setup
         self.config_dir_path = config_dir_path or config_manager.pipelex_config_dir
@@ -103,7 +105,7 @@ class Pipelex(metaclass=MetaSingleton):
 
         # tools
         try:
-            self.pipelex_hub.setup_config(config_cls=config_cls or PipelexConfig)
+            self.pipelex_hub.setup_config(config_cls=config_cls or PipelexConfig, config_overrides=config_overrides)
         except ValidationError as validation_error:
             validation_error_msg = report_validation_error(category="config", validation_error=validation_error)
             msg = f"Could not setup config because of: {validation_error_msg}"
@@ -158,6 +160,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self,
         integration_mode: IntegrationMode,
         needs_inference: bool = True,
+        temporal_enabled: bool | None = None,
         needs_model_specs: bool | None = None,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
@@ -178,6 +181,14 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         if kwargs:
             msg = f"The base setup method does not support any additional arguments: {kwargs}"
             raise PipelexSetupError(msg)
+
+        # Override temporal.is_enabled if temporal_enabled is explicitly provided
+        if temporal_enabled is not None:
+            config = get_config()
+            updated_temporal = config.temporal.model_copy(update={"is_enabled": temporal_enabled})
+            config.temporal = updated_temporal
+
+        self._temporal_task_manager: object | None = None
 
         # Initialize secrets provider early - needed for gateway check
         secrets_provider = secrets_provider or EnvSecretsProvider()
@@ -327,6 +338,13 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         if content_generator is None:
             if not needs_inference:
                 content_generator = ContentGeneratorDry()
+            elif get_config().temporal.is_enabled:
+                from pipelex.temporal.tprl_content_generation.content_generator_child_factory import ContentGeneratorChildFactory  # noqa: PLC0415
+
+                generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
+                content_generator = ContentGeneratorChildFactory.make_content_generator_child(
+                    generated_content_factory=generated_content_factory,
+                )
             else:
                 generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
                 content_generator = ContentGenerator(generated_content_factory=generated_content_factory)
@@ -375,13 +393,55 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         multi_observer = MultiObserver(observers=observers)
         self.pipelex_hub.set_observer(observer=multi_observer)
 
+        # --- Temporal --------------------------------------------------------------------------
+
+        if get_config().temporal.is_enabled:
+            from pipelex.temporal.tasks import Tasks  # noqa: PLC0415
+            from pipelex.temporal.temporal_hub import temporal_hub  # noqa: PLC0415
+            from pipelex.temporal.temporal_task_manager import TemporalTaskManager  # noqa: PLC0415
+
+            temporal_task_manager = TemporalTaskManager()
+            temporal_hub.set_task_manager(temporal_task_manager)
+            temporal_task_manager.complement_catalog(
+                extra_catalog=Tasks.TASK_PACKS,
+                extra_workflows=[],
+                extra_activities=[],
+            )
+            temporal_task_manager.setup()
+            self._temporal_task_manager = temporal_task_manager
+
         # --- Pipe Router -----------------------------------------------------------------------
 
-        self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter(observer=multi_observer))
+        if pipe_router:
+            self.pipelex_hub.set_pipe_router(pipe_router)
+        elif get_config().temporal.is_enabled:
+            from pipelex.temporal.tprl_pipe.temporal_pipe_router import make_temporal_pipe_router  # noqa: PLC0415
+
+            self.pipelex_hub.set_pipe_router(make_temporal_pipe_router())
+        else:
+            self.pipelex_hub.set_pipe_router(PipeRouter(observer=multi_observer))
+
+        # --- Pipe Run --------------------------------------------------------------------------
+
+        if get_config().temporal.is_enabled:
+            from pipelex.temporal.tprl_pipe.temporal_pipe_run import make_temporal_pipe_run  # noqa: PLC0415
+
+            self.pipelex_hub.set_pipe_run(make_temporal_pipe_run())
+        else:
+            self.pipelex_hub.set_pipe_run(PipeRun(pipe_router=self.pipelex_hub.get_required_pipe_router()))
 
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done")
 
     def teardown(self):
+        # temporal
+        if self._temporal_task_manager is not None:
+            from pipelex.temporal.temporal_hub import temporal_hub  # noqa: PLC0415
+            from pipelex.temporal.temporal_task_manager import TemporalTaskManager  # noqa: PLC0415
+
+            if isinstance(self._temporal_task_manager, TemporalTaskManager):
+                self._temporal_task_manager.teardown()
+            temporal_hub.reset()
+
         # pipelex
         self.pipeline_manager.teardown()
         if self.telemetry_manager:
@@ -418,6 +478,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         cls,
         integration_mode: IntegrationMode = IntegrationMode.PYTHON,
         needs_inference: bool = True,
+        temporal_enabled: bool | None = None,
         needs_model_specs: bool | None = None,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
@@ -432,6 +493,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         telemetry_manager: TelemetryManagerAbstract | None = None,
         observers: dict[str, ObserverProtocol] | None = None,
         library_dirs: list[str] | list[Path] | None = None,
+        config_overrides: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Self:
         """Create and initialize a Pipelex singleton instance.
@@ -446,6 +508,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 content generator and loading backends leniently (skipping those with missing
                 credentials). This skips gateway terms check and model deck validation.
                 Useful for commands like validate/show that don't call inference APIs.
+            temporal_enabled: When provided, overrides the temporal.is_enabled config value.
+                True forces Temporal workflow execution, False forces direct execution.
             needs_model_specs: When True, load real model specs even if needs_inference
                 is False. When None (default), follows needs_inference. Useful for validate
                 commands that need gateway-provided model specs without enabling full inference.
@@ -464,6 +528,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             library_dirs: Default library directories for pipeline execution. If provided, these
                 directories will be used instead of the PIPELEXPATH environment variable.
                 Per-call library_dirs in execute_pipeline/start_pipeline will override this default.
+            config_overrides: Optional dict deep-merged on top of all TOML config layers
+                as the highest-priority override. Useful for tests that need specific
+                config without editing TOML files.
             **kwargs: Additional configuration options, only supported by your own subclass of Pipelex if you really need one
 
         Returns:
@@ -477,11 +544,12 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             msg = "Pipelex is already initialized"
             raise PipelexSetupError(msg)
 
-        pipelex_instance = cls()
+        pipelex_instance = cls(config_overrides=config_overrides)
         try:
             pipelex_instance.setup(
                 integration_mode=integration_mode,
                 needs_inference=needs_inference,
+                temporal_enabled=temporal_enabled,
                 needs_model_specs=needs_model_specs,
                 class_registry=class_registry,
                 secrets_provider=secrets_provider,

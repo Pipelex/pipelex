@@ -4,9 +4,11 @@ from typing import TYPE_CHECKING
 from mthds.models.pipeline_inputs import PipelineInputs
 
 from pipelex import log
+from pipelex.config import get_config
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import (
     get_library_manager,
@@ -36,11 +38,13 @@ from pipelex.system.environment import get_optional_env
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.otel_factory import OtelFactory
+from pipelex.tracing.event_log_factory import make_event_log
 
 if TYPE_CHECKING:
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
     from pipelex.core.pipes.pipe_abstract import PipeAbstract
     from pipelex.graph.graph_context import GraphContext
+    from pipelex.tracing.event_log_protocol import EventLogProtocol
 
 
 async def pipeline_run_setup(
@@ -57,6 +61,7 @@ async def pipeline_run_setup(
     pipe_run_mode: PipeRunMode | None = None,
     search_domain_codes: list[str] | None = None,
     user_id: str | None = None,
+    pipeline_run_id: str | None = None,
 ) -> tuple[PipeJob, str, str]:
     """Set up a pipeline for execution.
 
@@ -111,6 +116,10 @@ async def pipeline_run_setup(
         added if not already present.
     user_id:
         Unique identifier for the user (optional).
+    pipeline_run_id:
+        Pre-generated pipeline run ID. If provided, this ID is used instead of
+        generating a new one. Use this when the run record has already been created
+        externally (e.g., by an API Gateway).
 
     Returns:
     -------
@@ -124,7 +133,7 @@ async def pipeline_run_setup(
         msg = "Either pipe_code or mthds_contents must be provided to the pipeline API."
         raise ValueError(msg)
 
-    pipeline = get_pipeline_manager().add_new_pipeline(pipe_code=pipe_code)
+    pipeline = get_pipeline_manager().add_new_pipeline(pipe_code=pipe_code, pipeline_run_id=pipeline_run_id)
     pipeline_run_id = pipeline.pipeline_run_id
 
     if not library_id:
@@ -183,7 +192,7 @@ async def pipeline_run_setup(
             qualified_main_pipe: str | None = None
             for blueprint in all_blueprints:
                 if blueprint.main_pipe:
-                    qualified_main_pipe = f"{blueprint.domain}.{blueprint.main_pipe}"
+                    qualified_main_pipe = PipeFactory.make_pipe_ref_with_domain(domain_code=blueprint.domain, pipe_code=blueprint.main_pipe)
                     break
             if not qualified_main_pipe:
                 msg = "No pipe_code provided and no main_pipe found in any of the MTHDS contents."
@@ -204,13 +213,23 @@ async def pipeline_run_setup(
 
     # Initialize graph tracing if requested (after pipe is loaded so we have domain info)
     graph_context: GraphContext | None = None
+    event_log: EventLogProtocol | None = None
     if execution_config.is_generate_graph:
+        # Create event log when tracing is enabled
+        config = get_config()
+        tracing_config = config.pipelex.tracing_config
+        if tracing_config.is_enabled:
+            event_log = make_event_log(tracing_config)
+
         graph_tracer_manager = GraphTracerManager.get_or_create_instance()
         graph_context = graph_tracer_manager.open_tracer(
             graph_id=pipeline_run_id,
             data_inclusion=execution_config.graph_config.data_inclusion,
             pipeline_ref_domain=pipe.domain_code,
             pipeline_ref_main_pipe=pipe_code,
+            event_log=event_log,
+            workflow_id="direct",
+            pipeline_run_id=pipeline_run_id,
         )
 
     try:
@@ -258,6 +277,15 @@ async def pipeline_run_setup(
 
         get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
 
+        # Set event log on the report delegate for distributed usage event emission
+        if event_log is not None:
+            get_report_delegate().set_event_log(
+                context_key=pipeline_run_id,
+                event_log=event_log,
+                workflow_id="direct",
+                pipeline_run_id=pipeline_run_id,
+            )
+
         # Initialize OtelContext if telemetry is enabled (not dry mode and tracer available)
         # The trace_id is computed once here; span_id uses OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID for root
         otel_context: OtelContext | None = None
@@ -287,12 +315,16 @@ async def pipeline_run_setup(
             pipe_run_mode=pipe_run_mode,
         )
 
+        # Build the library crate from all accumulated blueprints for Temporal dispatch
+        library_crate = library_manager.get_crate(library_id=library_id)
+
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=pipe,
             pipe_run_params=pipe_run_params,
             job_metadata=job_metadata,
             working_memory=working_memory,
             output_name=output_name,
+            library_crate=library_crate,
         )
 
         properties = {
@@ -308,6 +340,9 @@ async def pipeline_run_setup(
             tracer_manager = GraphTracerManager.get_instance()
             if tracer_manager is not None:
                 tracer_manager.close_tracer(pipeline_run_id)
+        # Cleanup event log state from the report delegate
+        if event_log is not None:
+            get_report_delegate().clear_event_log(context_key=pipeline_run_id)
         # Cleanup library
         library_manager.teardown(library_id=library_id)
         teardown_current_library()

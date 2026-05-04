@@ -129,7 +129,6 @@ outputs = ["image"]
 thinking_mode = "none"
 costs = { input = 2.0, output = 120 }
 
-
 [nano-banana-2]
 model_type = "img_gen"
 model_id = "gemini-3.1-flash-image-preview"
