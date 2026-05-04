@@ -18,9 +18,15 @@ class BufferingEventLog(EventLogProtocol):
     flush them to the real backend via act_flush_trace_events.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, writer_id: str = "primary") -> None:
         self._buffer: list[TraceEvent] = []
         self._sequence: int = 0
+        self._writer_id = writer_id
+
+    @property
+    @override
+    def writer_id(self) -> str:
+        return self._writer_id
 
     @override
     def next_sequence(self) -> int:

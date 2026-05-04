@@ -11,8 +11,8 @@
 
 High-level tracker. Each phase has a per-phase checklist with finer-grained sub-tasks; see §4. Test-file-level tracking lives in §5; commit-level tracking lives in §6.
 
-- [ ] **Phase 0** — Pin baseline (1 test)
-- [ ] **Phase 1** — Writer-id schema (8 tests + propagation)
+- [x] **Phase 0** — Pin baseline (1 test)
+- [x] **Phase 1** — Writer-id schema (8 tests + propagation)
 - [ ] **Phase 2** — Activity-side fallback (11 tests + new module + dry-run hook)
 - [ ] **Phase 3** — `_get_registry` three-method split (5 tests)
 - [ ] **Phase 4** — Split-worker integration test (2 tests + helpers, **prereq Q-Phase4**)
@@ -212,8 +212,8 @@ Each step lists: tests to write **first** (red), then the change that turns them
 
 **Phase checklist:**
 
-- [ ] 0.1 — Add `test_no_emit_when_no_event_log_set_and_no_fallback_yet`
-- [ ] Phase 0 complete: `make agent-check && make agent-test` green
+- [x] 0.1 — Add `test_no_emit_when_no_event_log_set_and_no_fallback_yet`
+- [x] Phase 0 complete: `make agent-check && make agent-test` green
 
 **0.1** Add `tests/unit/pipelex/reporting/test_reporting_event_emission.py::test_no_emit_when_no_event_log_set_and_no_fallback_yet`. This is a one-liner pin of *today's* behavior: `ReportingManager` with `set_event_log` never called, `tracing_config.is_enabled = False` (so no fallback path engages even after Phase 2 lands). Asserts no event written anywhere. Pins the "tracing-disabled is silent" baseline that the fallback in Phase 2 must respect.
 
@@ -225,10 +225,10 @@ The fresh fallback test (`test_fallback_engages_when_context_missing_and_tracing
 
 **Phase checklist:**
 
-- [ ] 1.1 — Red: write `TestWriterIdSchema` (8 cases below)
-- [ ] 1.2 — Green: thread `writer_id` through all event log backends + emitters
-- [ ] 1.3 — Regression check: all existing tracing/reporting tests pass
-- [ ] Phase 1 complete: commit `feat: add writer_id field to TraceEvent and propagate through event log backends`
+- [x] 1.1 — Red: write `TestWriterIdSchema` (8 cases below)
+- [x] 1.2 — Green: thread `writer_id` through all event log backends + emitters
+- [x] 1.3 — Regression check: all existing tracing/reporting tests pass
+- [x] Phase 1 complete: commit `feat: add writer_id field to TraceEvent and propagate through event log backends`
 
 **1.1** *Red.* `tests/unit/pipelex/tracing/test_writer_id_schema.py::TestWriterIdSchema`:
 

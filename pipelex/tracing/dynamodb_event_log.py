@@ -2,8 +2,10 @@
 
 Stores trace events in a DynamoDB table with the schema:
     PK: PIPELINE_RUN#{pipeline_run_id}
-    SK: EVENT#{workflow_id}#{sequence:010d}
+    SK: EVENT#{workflow_id}#{writer_id}#{sequence:010d}
     payload: dict (full event via model_dump)
+
+Legacy emissions write writer_id="primary" so existing rows remain valid.
 
 Compatible with the pipelex-api-infra TraceEventDynamoDBAdapter schema.
 Requires: pip install "pipelex[dynamodb]"
@@ -43,7 +45,7 @@ class DynamoDBEventLog(EventLogProtocol):
     the deadlock detector. Use BufferingEventLog + act_flush_trace_events instead.
     """
 
-    def __init__(self, table_name: str, region: str) -> None:
+    def __init__(self, table_name: str, region: str, writer_id: str = "primary") -> None:
         if boto3 is None:
             lib_name = "boto3"
             lib_extra_name = "dynamodb"
@@ -52,9 +54,15 @@ class DynamoDBEventLog(EventLogProtocol):
 
         self._table_name = table_name
         self._region = region
+        self._writer_id = writer_id
         self._sequence: int = 0
         dynamodb: Any = boto3.resource("dynamodb", region_name=self._region)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         self._table: Any = dynamodb.Table(self._table_name)  # pyright: ignore[reportUnknownMemberType]
+
+    @property
+    @override
+    def writer_id(self) -> str:
+        return self._writer_id
 
     @override
     def next_sequence(self) -> int:
@@ -68,8 +76,8 @@ class DynamoDBEventLog(EventLogProtocol):
         return f"PIPELINE_RUN#{pipeline_run_id}"
 
     @staticmethod
-    def _make_sk(workflow_id: str, sequence: int) -> str:
-        return f"EVENT#{workflow_id}#{sequence:010d}"
+    def _make_sk(workflow_id: str, writer_id: str, sequence: int) -> str:
+        return f"EVENT#{workflow_id}#{writer_id}#{sequence:010d}"
 
     def _key_condition(self, pipeline_run_id: str) -> Any:
         """Build a KeyConditionExpression for querying by pipeline_run_id."""
@@ -80,9 +88,10 @@ class DynamoDBEventLog(EventLogProtocol):
         """Write a single event to DynamoDB. Synchronous and idempotent."""
         item: dict[str, Any] = {
             "PK": self._make_pk(event.pipeline_run_id),
-            "SK": self._make_sk(event.workflow_id, event.sequence),
+            "SK": self._make_sk(event.workflow_id, event.writer_id, event.sequence),
             "pipeline_run_id": event.pipeline_run_id,
             "workflow_id": event.workflow_id,
+            "writer_id": event.writer_id,
             "sequence": event.sequence,
             "payload": event.model_dump_json(),
         }

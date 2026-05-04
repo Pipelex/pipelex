@@ -16,14 +16,31 @@ class EventLogProtocol(Protocol):
     Implementations must guarantee that emit() is synchronous and durable:
     when emit() returns, the event must be persisted. This invariant ensures
     all events from a child workflow are flushed before it returns to its parent.
+
+    Each event log instance carries an immutable `writer_id` that emitters
+    stamp on every TraceEvent they construct via this log. Two writers
+    sharing the same (pipeline_run_id, workflow_id) partition must use
+    distinct writer_ids so the read-side dedup key
+    (workflow_id, writer_id, type, sequence) keeps their events apart.
     """
+
+    @property
+    def writer_id(self) -> str:
+        """Stable identifier for this event log instance.
+
+        Emitters read this to stamp every constructed TraceEvent. Defaults
+        to "primary" for the legacy single-writer path so existing NDJSON
+        files / DDB rows are not invalidated by code change.
+        """
+        ...
 
     def next_sequence(self) -> int:
         """Return the next monotonically increasing sequence number.
 
         All emitters sharing the same event log must use this method to
-        obtain sequence numbers, ensuring events never collide on the
-        (workflow_id, sequence) key regardless of storage backend.
+        obtain sequence numbers. Combined with writer_id, this guarantees
+        events never collide on the (workflow_id, writer_id, sequence) key
+        regardless of storage backend.
         """
         ...
 

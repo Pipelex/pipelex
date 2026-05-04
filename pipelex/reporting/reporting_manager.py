@@ -222,6 +222,7 @@ class ReportingManager(ReportingProtocol):
         event = UsageReportEvent(
             pipeline_run_id=context.pipeline_run_id,
             workflow_id=context.workflow_id,
+            writer_id=context.event_log.writer_id,
             timestamp=datetime.now(timezone.utc),
             sequence=seq,
             node_id=node_id,
