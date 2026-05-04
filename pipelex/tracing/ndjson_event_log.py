@@ -46,6 +46,7 @@ class NdjsonEventLog(EventLogProtocol):
         self._file_handles: dict[tuple[str, str, str], IO[str]] = {}
         self._sequence: int = 0
         self._sequence_lock = threading.Lock()
+        self._handles_lock = threading.Lock()
         self._writer_id = writer_id
 
     @property
@@ -96,11 +97,14 @@ class NdjsonEventLog(EventLogProtocol):
         handle = self._file_handles.get(cache_key)
 
         if handle is None:
-            run_dir = os.path.join(self._traces_dir, event.pipeline_run_id)
-            os.makedirs(run_dir, exist_ok=True)
-            file_path = os.path.join(run_dir, self._file_name_for(event.workflow_id, event.writer_id))
-            handle = open(file_path, "a", encoding="utf-8")  # noqa: SIM115
-            self._file_handles[cache_key] = handle
+            with self._handles_lock:
+                handle = self._file_handles.get(cache_key)
+                if handle is None:
+                    run_dir = os.path.join(self._traces_dir, event.pipeline_run_id)
+                    os.makedirs(run_dir, exist_ok=True)
+                    file_path = os.path.join(run_dir, self._file_name_for(event.workflow_id, event.writer_id))
+                    handle = open(file_path, "a", encoding="utf-8")  # noqa: SIM115
+                    self._file_handles[cache_key] = handle
 
         handle.write(event.model_dump_json() + "\n")
         handle.flush()
