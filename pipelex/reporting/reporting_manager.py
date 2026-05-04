@@ -116,15 +116,42 @@ class ReportingManager(ReportingProtocol):
     # Private methods
     ############################################################
 
-    def _get_registry(self, pipeline_run_id: str) -> UsageRegistry:
-        if pipeline_run_id not in self._usage_registries:
-            # Auto-create registry for unknown pipeline IDs. This happens when
-            # Activities report inference jobs on a Temporal worker where
-            # open_registry() was never called (it runs on the API process).
+    def _get_registry_strict(self, pipeline_run_id: str) -> UsageRegistry:
+        """Return the registry for ``pipeline_run_id`` or raise ``KeyError`` on miss.
 
-            # TODO: replace with proper distributed reporting system
+        Used by ``_report_*_job``: on the runner, the registry is never opened
+        because ``open_registry`` runs on the API process. Callers swallow
+        ``KeyError`` and skip the local-add — the runner-side
+        ``UsageReportEvent`` emission (Phase 2 fallback) is independent of
+        the registry, so distributed reassembly still gets the data.
+        """
+        return self._usage_registries[pipeline_run_id]
+
+    def _get_or_create_registry(self, pipeline_run_id: str) -> UsageRegistry:
+        """Return the registry for ``pipeline_run_id``, creating it on miss.
+
+        Used by ``inject_tokens_usages`` (the P1 cross-worker assembly path),
+        the console cost-report path, and ``generate_report`` when called for
+        a specific run that wasn't opened on this process.
+        """
+        if pipeline_run_id not in self._usage_registries:
             self._usage_registries[pipeline_run_id] = UsageRegistry()
         return self._usage_registries[pipeline_run_id]
+
+    def _try_add_to_registry(self, pipeline_run_id: str, tokens_usage: AnyTokensUsage) -> None:
+        """Add to the registry if it exists; silently skip if not.
+
+        Skipping on miss is the runner-process behavior — the registry was
+        never opened here. The local-skip is intentional: the
+        ``UsageReportEvent`` emitted by ``_emit_usage_event`` carries the
+        data into the shared backend partition, and the P1 readback path
+        will assemble it on the process that owns ``inject_tokens_usages``.
+        """
+        try:
+            registry = self._get_registry_strict(pipeline_run_id)
+        except KeyError:
+            return
+        registry.add_tokens_usage(tokens_usage)
 
     def _report_llm_job(self, llm_job: LLMJob):
         llm_tokens_usage = llm_job.job_report.llm_tokens_usage
@@ -134,7 +161,7 @@ class ReportingManager(ReportingProtocol):
             return
 
         pipeline_run_id = llm_job.job_metadata.pipeline_run_id
-        self._get_registry(pipeline_run_id).add_tokens_usage(llm_tokens_usage)
+        self._try_add_to_registry(pipeline_run_id, llm_tokens_usage)
         self._emit_usage_event(llm_job, llm_tokens_usage)
 
         if self._reporting_config.is_log_costs_to_console:
@@ -149,7 +176,7 @@ class ReportingManager(ReportingProtocol):
             return
 
         pipeline_run_id = img_gen_job.job_metadata.pipeline_run_id
-        self._get_registry(pipeline_run_id).add_tokens_usage(img_gen_tokens_usage)
+        self._try_add_to_registry(pipeline_run_id, img_gen_tokens_usage)
         self._emit_usage_event(img_gen_job, img_gen_tokens_usage)
 
         if self._reporting_config.is_log_costs_to_console:
@@ -164,7 +191,7 @@ class ReportingManager(ReportingProtocol):
             return
 
         pipeline_run_id = extract_job.job_metadata.pipeline_run_id
-        self._get_registry(pipeline_run_id).add_tokens_usage(extract_tokens_usage)
+        self._try_add_to_registry(pipeline_run_id, extract_tokens_usage)
         self._emit_usage_event(extract_job, extract_tokens_usage)
 
         if self._reporting_config.is_log_costs_to_console:
@@ -179,7 +206,7 @@ class ReportingManager(ReportingProtocol):
             return
 
         pipeline_run_id = search_job.job_metadata.pipeline_run_id
-        self._get_registry(pipeline_run_id).add_tokens_usage(search_tokens_usage)
+        self._try_add_to_registry(pipeline_run_id, search_tokens_usage)
         self._emit_usage_event(search_job, search_tokens_usage)
 
         if self._reporting_config.is_log_costs_to_console:
@@ -207,7 +234,7 @@ class ReportingManager(ReportingProtocol):
             pipeline_run_id: The pipeline run to add usage data to.
             tokens_usages: Token usage records to inject.
         """
-        registry = self._get_registry(pipeline_run_id)
+        registry = self._get_or_create_registry(pipeline_run_id)
         for tokens_usage in tokens_usages:
             registry.add_tokens_usage(tokens_usage)
 
@@ -351,7 +378,7 @@ class ReportingManager(ReportingProtocol):
 
         registries_to_process: dict[str, UsageRegistry] = {}
         if pipeline_run_id:
-            registries_to_process = {pipeline_run_id: self._get_registry(pipeline_run_id)}
+            registries_to_process = {pipeline_run_id: self._get_or_create_registry(pipeline_run_id)}
         else:
             registries_to_process = self._usage_registries
 

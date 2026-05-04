@@ -162,7 +162,7 @@ class TestReportingEventEmission:
             tokens_usages=[tokens_usage],
         )
 
-        registry = manager._get_registry(self.PIPELINE_RUN_ID)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        registry = manager._get_or_create_registry(self.PIPELINE_RUN_ID)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
         usages = registry.get_current_tokens_usage()
         assert len(usages) == 1
         assert usages[0].nb_tokens_by_category[TokenCategory.INPUT] == 200
@@ -185,7 +185,7 @@ class TestReportingEventEmission:
             tokens_usages=[tokens_usage],
         )
 
-        registry = manager._get_registry("new_run")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        registry = manager._get_or_create_registry("new_run")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
         usages = registry.get_current_tokens_usage()
         assert len(usages) == 1
 

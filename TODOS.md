@@ -14,7 +14,7 @@ High-level tracker. Each phase has a per-phase checklist with finer-grained sub-
 - [x] **Phase 0** — Pin baseline (1 test)
 - [x] **Phase 1** — Writer-id schema (8 tests + propagation)
 - [x] **Phase 2** — Activity-side fallback (11 tests + new module + dry-run hook)
-- [ ] **Phase 3** — `_get_registry` three-method split (5 tests)
+- [x] **Phase 3** — `_get_registry` three-method split (5 tests)
 - [ ] **Phase 4** — Split-worker integration test (2 tests + helpers, **prereq Q-Phase4**)
 - [ ] **Phase 5** — Docs + changelog + cleanup (5 tasks)
 - [ ] **Phase 6** — Skill-level e2e Tier 8 (4 tasks, last 2 optional)
@@ -345,17 +345,17 @@ The fallback method:
 
 **Phase checklist:**
 
-- [ ] 3.1 — Red: write `TestNoOrphanRegistries` (5 cases below)
-- [ ] 3.2 — Green: split `_get_registry` into `_get_registry_strict` + `_get_or_create_registry`; update all callers; remove orphan auto-create branch + TODO comment
-- [ ] Phase 3 complete: commit `refactor: split _get_registry into strict and or_create variants`
+- [x] 3.1 — Red: write `TestNoOrphanRegistries` (5 cases below)
+- [x] 3.2 — Green: split `_get_registry` into `_get_registry_strict` + `_get_or_create_registry`; update all callers; remove orphan auto-create branch + TODO comment
+- [x] Phase 3 complete: commit `refactor: split _get_registry into strict and or_create variants`
 
 **3.1** *Red.* `tests/unit/pipelex/reporting/test_no_orphan_registries.py::TestNoOrphanRegistries`:
 
-- [ ] `test_runner_does_not_accumulate_registries` — Build a `ReportingManager`, do **not** call `open_registry`. Call `report_inference_job` with `pipeline_run_id="never_opened"`. Assert `_usage_registries` does **not** contain `"never_opened"` afterwards (no orphan accumulation on runner). The usage event still emitted via the fallback (Phase 2), but no registry sat behind.
-- [ ] `test_direct_mode_still_accumulates_registry` — `open_registry("run_x")` then `report_inference_job` with `pipeline_run_id="run_x"`, assert registry has the usage record.
-- [ ] `test_inject_tokens_usages_still_creates_on_miss` — pin existing behavior: `inject_tokens_usages("never_opened", [...])` works, registry is created. (Updates the existing `test_inject_tokens_usages_auto_creates_registry` to call through `_get_or_create_registry`.)
-- [ ] `test_get_registry_strict_raises_when_missing` — direct unit test of `_get_registry_strict("never_opened")`, asserts `KeyError`.
-- [ ] `test_generate_report_for_unopened_run_creates_empty_registry_and_renders` — `generate_report("never_opened")` should not crash; it goes through `_get_or_create_registry`, finds nothing, renders an empty cost report. (Documents the P1 readback path's interaction with on-the-fly run IDs.)
+- [x] `test_runner_does_not_accumulate_registries` — Build a `ReportingManager`, do **not** call `open_registry`. Call `report_inference_job` with `pipeline_run_id="never_opened"`. Assert `_usage_registries` does **not** contain `"never_opened"` afterwards (no orphan accumulation on runner). The usage event still emitted via the fallback (Phase 2), but no registry sat behind.
+- [x] `test_direct_mode_still_accumulates_registry` — `open_registry("run_x")` then `report_inference_job` with `pipeline_run_id="run_x"`, assert registry has the usage record.
+- [x] `test_inject_tokens_usages_still_creates_on_miss` — pin existing behavior: `inject_tokens_usages("never_opened", [...])` works, registry is created. (Updates the existing `test_inject_tokens_usages_auto_creates_registry` to call through `_get_or_create_registry`.)
+- [x] `test_get_registry_strict_raises_when_missing` — direct unit test of `_get_registry_strict("never_opened")`, asserts `KeyError`.
+- [x] `test_generate_report_for_unopened_run_creates_empty_registry_and_renders` — `generate_report("never_opened")` should not crash; it goes through `_get_or_create_registry`, finds nothing, renders an empty cost report. (Documents the P1 readback path's interaction with on-the-fly run IDs.)
 
 **3.2** *Green.* Replace `_get_registry` with three explicit methods:
 
