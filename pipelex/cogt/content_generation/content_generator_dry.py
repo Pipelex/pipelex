@@ -46,11 +46,14 @@ def _report_dry_llm_job(job_metadata: JobMetadata, llm_setting: LLMSetting, llm_
 
     The synthetic job_metadata copy gets completed_at set so report_inference_job
     can format the duration without crashing on None — matching what
-    LLMJob.llm_job_after_complete does in the live path. The default factory on
-    JobMetadata.started_at uses offset-naive datetime.now(), so we must use
-    offset-naive here too — mixing aware/naive raises TypeError on subtraction.
+    LLMJob.llm_job_after_complete does in the live path. JobMetadata.started_at
+    can arrive either offset-naive (from the default factory) or offset-aware
+    (e.g. callers in pipe_abstract.py use datetime.now(timezone.utc)), so we
+    build the synthetic ``now`` with the same tzinfo as the incoming started_at
+    — mixing aware/naive raises TypeError when JobMetadata.duration subtracts.
     """
-    now = datetime.now()
+    tz = job_metadata.started_at.tzinfo if job_metadata.started_at is not None else None
+    now = datetime.now(tz)
     synthetic_metadata = job_metadata.model_copy(
         update={
             "started_at": job_metadata.started_at or now,

@@ -7,6 +7,7 @@ One JSON event per line, one file per workflow, organized by pipeline run:
 import json
 import os
 import shutil
+import threading
 from pathlib import Path
 from typing import IO
 
@@ -44,6 +45,7 @@ class NdjsonEventLog(EventLogProtocol):
         self._traces_dir = traces_dir
         self._file_handles: dict[tuple[str, str, str], IO[str]] = {}
         self._sequence: int = 0
+        self._sequence_lock = threading.Lock()
         self._writer_id = writer_id
 
     @property
@@ -53,10 +55,19 @@ class NdjsonEventLog(EventLogProtocol):
 
     @override
     def next_sequence(self) -> int:
-        """Return the next sequence number. Shared by all emitters."""
-        seq = self._sequence
-        self._sequence += 1
-        return seq
+        """Return the next sequence number. Shared by all emitters.
+
+        The increment is guarded by a per-instance lock so concurrent activity
+        threads sharing this backend (via ``get_or_create_activity_event_log``)
+        cannot read the same value before either increments — duplicate
+        sequence numbers would collide on the
+        ``(workflow_id, writer_id, type, sequence)`` dedup key and silently
+        drop one event.
+        """
+        with self._sequence_lock:
+            seq = self._sequence
+            self._sequence += 1
+            return seq
 
     @staticmethod
     def _file_name_for(workflow_id: str, writer_id: str) -> str:

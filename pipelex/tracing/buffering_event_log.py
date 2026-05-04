@@ -4,6 +4,8 @@ Collects trace events in a list with zero I/O. Events are flushed to the
 real backend (DynamoDB) via a Temporal activity after pipe execution.
 """
 
+import threading
+
 from typing_extensions import override
 
 from pipelex.tracing.event_log_protocol import EventLogProtocol
@@ -21,6 +23,7 @@ class BufferingEventLog(EventLogProtocol):
     def __init__(self, writer_id: str = "primary") -> None:
         self._buffer: list[TraceEvent] = []
         self._sequence: int = 0
+        self._sequence_lock = threading.Lock()
         self._writer_id = writer_id
 
     @property
@@ -30,10 +33,17 @@ class BufferingEventLog(EventLogProtocol):
 
     @override
     def next_sequence(self) -> int:
-        """Return the next sequence number. Shared by all emitters."""
-        seq = self._sequence
-        self._sequence += 1
-        return seq
+        """Return the next sequence number. Shared by all emitters.
+
+        The Temporal workflow sandbox is single-threaded so this lock is
+        practically uncontended, but the contract — "implementations must be
+        safe under concurrent emitters" — is the same for every backend, so
+        we keep the guard for symmetry.
+        """
+        with self._sequence_lock:
+            seq = self._sequence
+            self._sequence += 1
+            return seq
 
     @override
     def emit(self, event: TraceEvent) -> None:

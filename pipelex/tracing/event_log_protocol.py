@@ -41,6 +41,12 @@ class EventLogProtocol(Protocol):
         obtain sequence numbers. Combined with writer_id, this guarantees
         events never collide on the (workflow_id, writer_id, sequence) key
         regardless of storage backend.
+
+        Implementations MUST be safe to call from multiple threads
+        concurrently — the runner-side activity event log is cached
+        per-process and shared by every activity thread on the worker, so
+        unguarded reads/writes of the underlying counter would cause
+        duplicate sequence numbers and silent dedup-key collisions.
         """
         ...
 

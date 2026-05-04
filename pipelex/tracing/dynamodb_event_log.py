@@ -11,6 +11,7 @@ Compatible with the pipelex-api-infra TraceEventDynamoDBAdapter schema.
 Requires: pip install "pipelex[dynamodb]"
 """
 
+import threading
 from typing import Any
 
 from pydantic import TypeAdapter, ValidationError
@@ -56,6 +57,7 @@ class DynamoDBEventLog(EventLogProtocol):
         self._region = region
         self._writer_id = writer_id
         self._sequence: int = 0
+        self._sequence_lock = threading.Lock()
         dynamodb: Any = boto3.resource("dynamodb", region_name=self._region)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         self._table: Any = dynamodb.Table(self._table_name)  # pyright: ignore[reportUnknownMemberType]
 
@@ -66,10 +68,15 @@ class DynamoDBEventLog(EventLogProtocol):
 
     @override
     def next_sequence(self) -> int:
-        """Return the next sequence number. Shared by all emitters."""
-        seq = self._sequence
-        self._sequence += 1
-        return seq
+        """Return the next sequence number. Shared by all emitters.
+
+        Guarded by a per-instance lock so concurrent activity threads
+        sharing this backend cannot collide on the dedup key.
+        """
+        with self._sequence_lock:
+            seq = self._sequence
+            self._sequence += 1
+            return seq
 
     @staticmethod
     def _make_pk(pipeline_run_id: str) -> str:

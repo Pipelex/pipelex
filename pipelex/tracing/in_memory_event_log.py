@@ -1,5 +1,7 @@
 """In-memory event log implementation for unit tests and direct mode."""
 
+import threading
+
 from typing_extensions import override
 
 from pipelex.tracing.event_log_protocol import EventLogProtocol
@@ -16,6 +18,7 @@ class InMemoryEventLog(EventLogProtocol):
     def __init__(self, writer_id: str = "primary") -> None:
         self._events: list[TraceEvent] = []
         self._sequence: int = 0
+        self._sequence_lock = threading.Lock()
         self._writer_id = writer_id
 
     @property
@@ -25,10 +28,15 @@ class InMemoryEventLog(EventLogProtocol):
 
     @override
     def next_sequence(self) -> int:
-        """Return the next sequence number. Shared by all emitters."""
-        seq = self._sequence
-        self._sequence += 1
-        return seq
+        """Return the next sequence number. Shared by all emitters.
+
+        Guarded by a per-instance lock so concurrent emitters cannot
+        collide on the dedup key.
+        """
+        with self._sequence_lock:
+            seq = self._sequence
+            self._sequence += 1
+            return seq
 
     @override
     def emit(self, event: TraceEvent) -> None:

@@ -25,6 +25,9 @@ allowed-tools:
   - Bash(open *)
   - Bash(cat *)
   - Bash(.venv/bin/python *)
+  - Bash(grep *)
+  - Bash(sort *)
+  - Bash(head *)
 ---
 
 # Temporal E2E Validation Suite
