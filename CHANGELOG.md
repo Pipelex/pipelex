@@ -19,6 +19,7 @@
 - **`StoragePayloadCodec`**: offloads Temporal payloads larger than a configurable threshold (default 1 MiB) to external storage (S3 or local) and replaces them with lightweight URI references. Configurable via `[temporal.payload_codec_config]`. New `pipelex codec serve` CLI launches the codec server consumed by the Temporal Web UI for payload inspection.
 - **Schema-based dynamic model construction (`pipelex/cogt/content_generation/schema_to_model_factory.py`)**: rebuilds dynamic Pydantic models on a Temporal worker from the JSON schema embedded in `ObjectAssignment`, instead of relying on cross-process class identity. Cache bounded by an LRU (`_SCHEMA_CACHE_MAX_SIZE = 1024`); codegen serialized through a file lock to kill thundering-herd duplication on long-running workers receiving many distinct schemas. Adds `datamodel-code-generator>=0.55.0` as a runtime dependency.
 - **Worker scopes**: `pipelex worker --scope ...` lets a worker subscribe to a subset of activities/workflows so deployments can specialize workers (e.g. inference workers vs orchestration workers).
+- **`WorkerConfig.inference_task_queue`**: optional task-queue override for `act_llm_gen_text` so router and inference activities can be deployed on separate worker pools.
 - **Pre-generated `pipeline_run_id` support**: `pipeline_run_setup()`, `PipelineFactory`, and `PipelineManager` accept an optional `pipeline_run_id` parameter for external run-record creation.
 - **`workflow_id` in start response**: `PipelexPipelineStartResponse` includes `workflow_id`.
 - **Temporal `callbacks` passthrough**: `WorkflowExecutor.start_workflow()` accepts optional Temporal `Callback` objects.
@@ -27,7 +28,12 @@
 
 - **`EventLogProtocol` with pluggable backends**: `NdjsonEventLog`, `DynamoDBEventLog`, `InMemoryEventLog`, `BufferingEventLog`. Emits `TraceEvent`s as pipes start/finish across processes. Configured via `[pipelex.tracing_config]` (`backend = "ndjson" | "dynamodb"`). Tracing is **enabled by default** and decoupled from Temporal — single-process runs also produce a trace.
 - **`pipelex[dynamodb]` extra**: `pip install "pipelex[dynamodb]"` for the DynamoDB event log backend.
-- **`writer_id` on `TraceEvent`**: every event records which writer (worker / process) produced it, propagated through every backend. Enables proper cross-worker dedup and per-writer aggregation.
+- **`writer_id` on `TraceEvent`** (default `"primary"`): every event records which writer (worker / process) produced it, propagated through every backend. Standalone activity worker processes use a distinct `writer_id` so they can emit into the same backend partition as workflow workers without colliding on `(workflow_id, sequence)`. Stamped at construction time (no copy-on-emit). Enables cross-worker dedup and per-writer aggregation.
+- **NDJSON multi-writer key scheme**: dedup key is `(workflow_id, writer_id, type, sequence)`; sort key is `(workflow_id, sequence, writer_id)` — sequence is primary so the runner's `UsageReportEvent` does not sort before the router's `PipeStartEvent`. The file-handle cache key includes `writer_id`, so two writers for the same `(pipeline_run_id, workflow_id)` cannot share a stale handle.
+- **DynamoDB sort key format**: `EVENT#{workflow_id}#{writer_id}#{sequence:010d}`.
+- **Cross-worker `UsageReportEvent` emission from runner processes**: runner processes that never execute `WfPipeRouter.run()` (so `_event_log_contexts` has no entry for the workflow's `lookup_key`) emit usage events through a process-local event log built from `tracing_config`. The fallback log is cached per process via a `threading.Lock`-guarded factory in `pipelex.tracing.activity_event_log` and keyed by a stable per-process `writer_id = f"act_{pid}_{uuid8}"`. A single one-shot warning per process records that the fallback engaged. Specific exceptions (`OSError`, `MissingDependencyError`, `PipelexConfigError`, `botocore.ClientError`) are caught and logged at WARNING — never silently dropped, never re-raised into the inference path.
+- **`ReportingManager` registry lookup split into `_get_registry_strict` and `_get_or_create_registry`**: strict raises on miss and is used by `_report_*_job`, so runner processes silently skip the registry add when `open_registry` was never called; or-create is used by `inject_tokens_usages`, the console cost-report path, and `generate_report` for never-opened runs. Activity workers do not accumulate orphan registries.
+- **`ContentGeneratorDry` emits `UsageReportEvent`s**: invokes `report_inference_job` with a synthetic `LLMTokensUsage` so dry-run mode produces real events observable through the same backend path as live runs.
 - **`GraphSpecAssembler`**: rebuilds a complete `GraphSpec` offline from a stream of `TraceEvent`s — equivalence with the live `GraphTracer` is pinned by tests.
 - **`UsageAggregator`**: aggregates per-pipeline LLM/extract/img-gen usage across workers from the event log.
 - **Hub DI**: `PipelexHub.set_event_log()` / `get_event_log()` for dependency injection of custom event log backends. `make_event_log()` factory selects the backend from config or hub injection; the 3 prior call sites that hardcoded `NdjsonEventLog` now go through it.
@@ -63,7 +69,7 @@
 - **Cold start trimmed**: heavy SDK imports (`boto3`, `huggingface_hub`, etc.) deferred behind `TYPE_CHECKING` or function-local guards across multiple plugins.
 - **Graph viewer updated to mthds-ui v0.3.4**: bumped from v0.3.0 — additional polish atop the resizable detail panel, escape-to-close, sticky header, prompt expand/collapse with copy button, concept refinement display.
 - **Default models**: small-vision and creative defaults now point to `gemini-3.0-flash-preview`. Added `claude-4.6-sonnet` and Bedrock token-auth support.
-- **`kajson` upgraded** from `0.3.1` to `0.4.2`.
+- **`kajson` upgraded** from `0.3.1` to `0.5.0`.
 - **README install instructions**: replaced step-by-step Claude Code setup with single copy-paste messages for Claude Code and Codex, added manual install section.
 
 ### Fixed

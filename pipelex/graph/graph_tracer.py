@@ -171,6 +171,17 @@ class GraphTracer(GraphTracerProtocol):
         self._event_sequence += 1
         return seq
 
+    def _event_writer_id(self) -> str:
+        """Writer-id to stamp on every constructed TraceEvent.
+
+        Must only be called when self._event_log is not None. Reading from
+        the event log instance keeps the writer_id invariant local to the
+        emit site and avoids drift between the log's writer_id and the
+        events it stores.
+        """
+        assert self._event_log is not None
+        return self._event_log.writer_id
+
     def _make_node_id(self) -> str:
         """Generate a node ID, including workflow_id when in Temporal mode."""
         if self._workflow_id != "direct":
@@ -453,6 +464,7 @@ class GraphTracer(GraphTracerProtocol):
             self._emit_event(
                 BatchItemEvent(
                     pipeline_run_id=self._event_pipeline_run_id,
+                    writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
                     timestamp=datetime.now(timezone.utc),
                     sequence=self._next_event_sequence(),
@@ -495,6 +507,7 @@ class GraphTracer(GraphTracerProtocol):
             self._emit_event(
                 BatchAggregateEvent(
                     pipeline_run_id=self._event_pipeline_run_id,
+                    writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
                     timestamp=datetime.now(timezone.utc),
                     sequence=self._next_event_sequence(),
@@ -536,6 +549,7 @@ class GraphTracer(GraphTracerProtocol):
             self._emit_event(
                 ParallelCombineEvent(
                     pipeline_run_id=self._event_pipeline_run_id,
+                    writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
                     timestamp=datetime.now(timezone.utc),
                     sequence=self._next_event_sequence(),
@@ -597,6 +611,7 @@ class GraphTracer(GraphTracerProtocol):
             self._emit_event(
                 PipeStartEvent(
                     pipeline_run_id=self._event_pipeline_run_id,
+                    writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
                     timestamp=started_at,
                     sequence=self._next_event_sequence(),
@@ -646,6 +661,7 @@ class GraphTracer(GraphTracerProtocol):
             self._emit_event(
                 ExecutionDataEvent(
                     pipeline_run_id=self._event_pipeline_run_id,
+                    writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
                     timestamp=datetime.now(timezone.utc),
                     sequence=self._next_event_sequence(),
@@ -704,6 +720,7 @@ class GraphTracer(GraphTracerProtocol):
             self._emit_event(
                 PipeEndSuccessEvent(
                     pipeline_run_id=self._event_pipeline_run_id,
+                    writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
                     timestamp=ended_at,
                     sequence=self._next_event_sequence(),
@@ -747,6 +764,7 @@ class GraphTracer(GraphTracerProtocol):
             self._emit_event(
                 ControllerOutputEvent(
                     pipeline_run_id=self._event_pipeline_run_id,
+                    writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
                     timestamp=datetime.now(timezone.utc),
                     sequence=self._next_event_sequence(),
@@ -786,6 +804,7 @@ class GraphTracer(GraphTracerProtocol):
             self._emit_event(
                 PipeEndErrorEvent(
                     pipeline_run_id=self._event_pipeline_run_id,
+                    writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
                     timestamp=ended_at,
                     sequence=self._next_event_sequence(),
@@ -827,6 +846,7 @@ class GraphTracer(GraphTracerProtocol):
             self._emit_event(
                 EdgeEvent(
                     pipeline_run_id=self._event_pipeline_run_id,
+                    writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
                     timestamp=datetime.now(timezone.utc),
                     sequence=self._next_event_sequence(),

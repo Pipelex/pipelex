@@ -25,6 +25,9 @@ allowed-tools:
   - Bash(open *)
   - Bash(cat *)
   - Bash(.venv/bin/python *)
+  - Bash(grep *)
+  - Bash(sort *)
+  - Bash(head *)
 ---
 
 # Temporal E2E Validation Suite
@@ -532,6 +535,69 @@ wait $PID_BETA && echo "Beta: PASS" || echo "Beta: FAIL"
 
 After this, tell the user both results.
 
+### Step 5b: Tier 8 — Cross-worker usage emission (writer_id fallback)
+
+This validates that `UsageReportEvent`s emitted from inference activities running on
+the runner process land in the same NDJSON partition as the router-side trace events,
+stamped with a runner-process `writer_id` (`act_{pid}_{uuid8}`). It's the e2e
+counterpart to the Phase 4 integration test
+`tests/integration/pipelex/temporal/tracing/test_split_worker_usage.py`.
+
+**Important — dry-run does NOT exercise this path.** In dry-run mode, `PipeLLM`
+(and friends) instantiate `ContentGeneratorDry()` directly inside the workflow
+body — on the router process — and never dispatch `act_llm_gen_text` to the
+runner. So a vanilla `pipelex run bundle --temporal --dry-run` against
+router+runner workers will emit ALL `usage_report` events with
+`writer_id="primary"`, never `act_*`. To deterministically observe runner-side
+fallback in dry-run, run the Phase 4 integration test, which substitutes the
+inference activity with a wrapper that synthesizes a real `LLMJob` server-side:
+
+```bash
+.venv/bin/pytest -x -v \
+  tests/integration/pipelex/temporal/tracing/test_split_worker_usage.py \
+  -m temporal --temporal-server local 2>&1
+```
+
+Expected: both test cases pass —
+`test_runner_usage_event_lands_in_same_ndjson_dir` (lands in same dir, with an
+`__w_act_*` file) and `test_no_double_emit_in_split_worker_pool` (no
+double-counting between fast path and fallback).
+
+**To observe `act_*` writer files via the CLI**, run live mode (real LLM call —
+costs money) so `act_llm_gen_text` is actually dispatched to the runner:
+
+```bash
+.venv/bin/pipelex run bundle \
+  tests/integration/pipelex/temporal/library_crate/native_text_sequence.mthds \
+  --pipe native_text_sequence \
+  --temporal --no-logo --graph
+```
+
+After completion, list the trace files for the run:
+
+```bash
+RUN_ID=$(ls -t .pipelex/traces/ | head -1)
+ls -la .pipelex/traces/$RUN_ID/
+grep -l '"event_kind":"usage_report"' .pipelex/traces/$RUN_ID/*.ndjson
+grep -hoE '"writer_id":"[^"]+"' .pipelex/traces/$RUN_ID/*.ndjson | sort -u
+```
+
+Expect:
+
+- At least one `wf_*__w_act_{pid}_{uuid}.ndjson` file alongside the
+  router-side `wf_*.ndjson` files.
+- The runner-side file contains `usage_report` events with
+  `writer_id` starting `act_`.
+- Router-side files contain `pipe_start` / `pipe_end_success` events with
+  `writer_id="primary"`.
+
+If only `writer_id="primary"` appears, the inference activity ran in the
+router process — check `worker_config.inference_task_queue` and confirm both
+workers are running with the latest code (restart them if they predate the
+Phase 2 runner-side fallback commit).
+
+---
+
 ### Step 6: StoragePayloadCodec tests — does the codec work end-to-end?
 
 These tests validate Phase 5: large payloads are transparently offloaded to external
@@ -658,6 +724,7 @@ ls results/*/reactflow.html
 | Tier 5: Image flow | Generated image flows as input to next pipe step | PASS/FAIL | path | yes/no |
 | Tier 6: Codec transparency | Existing pipelines work unchanged with codec enabled | PASS/FAIL | path | — |
 | Tier 7: Large payload | Multi-step pipeline with codec stress test | PASS/FAIL | path | — |
+| Tier 8: Cross-worker usage | Runner-side `UsageReportEvent` lands in same NDJSON dir with `act_*` writer_id (live mode or integration test) | PASS/FAIL | — | — |
 | Concept isolation (alpha) | Conflicting `Result` concepts don't cross-contaminate | PASS/FAIL | path | — |
 | Concept isolation (beta) | (same test, other side) | PASS/FAIL | path | — |
 | Pipe isolation (alpha) | Conflicting `shared_step` pipes use correct version | PASS/FAIL | path | — |
