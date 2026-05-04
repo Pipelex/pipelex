@@ -15,7 +15,7 @@ High-level tracker. Each phase has a per-phase checklist with finer-grained sub-
 - [x] **Phase 1** — Writer-id schema (8 tests + propagation)
 - [x] **Phase 2** — Activity-side fallback (11 tests + new module + dry-run hook)
 - [x] **Phase 3** — `_get_registry` three-method split (5 tests)
-- [ ] **Phase 4** — Split-worker integration test (2 tests + helpers, **prereq Q-Phase4**)
+- [x] **Phase 4** — Split-worker integration test (2 tests + helpers, **prereq Q-Phase4**)
 - [ ] **Phase 5** — Docs + changelog + cleanup (5 tasks)
 - [ ] **Phase 6** — Skill-level e2e Tier 8 (4 tasks, last 2 optional)
 - [ ] **Lint/test gate before each commit:** `make agent-check && make agent-test` green
@@ -398,10 +398,10 @@ This kills the silent orphan-registry accumulation and the TODO comment without 
 
 **Phase checklist:**
 
-- [ ] Q-Phase4 prereq confirmed: router can dispatch activities to a different task queue (or the plumbing is added in this PR — see open question below)
-- [ ] 4.1 — Red: write `TestSplitWorkerUsageEmission` (2 cases) + `make_split_workers` + `_simulate_runner_isolation` helpers
-- [ ] 4.2 — Green: Phases 1–3 should be sufficient; tighten simulator if exactly-once invariant fails
-- [ ] Phase 4 complete: commit `test(integration): split-worker temporal test for cross-process usage emission`
+- [x] Q-Phase4 prereq confirmed: router can dispatch activities to a different task queue (`WorkerConfig.inference_task_queue` plumbing landed in commit 935a3022)
+- [x] 4.1 — Red: write `TestSplitWorkerUsageEmission` (2 cases) + `make_split_workers` + `_simulate_runner_isolation` helpers
+- [x] 4.2 — Green: Phases 1–3 were sufficient; substitute synthesizes the `LLMJob` so the cross-worker hop fires even in DRY mode
+- [x] Phase 4 complete: commit `test(integration): split-worker temporal test for cross-process usage emission`
 
 This phase opens **two pure-scope workers on two task queues** in the same pytest process: `q_router` runs a router-scope worker (`disable_all_activities=True`), `q_runner` runs a runner-scope worker (`disable_all_workflows=True`). The router dispatches inference activities to `q_runner` via Temporal's `task_queue=...` argument. This is the production deployment topology: router and runner are physically separated.
 
@@ -566,7 +566,7 @@ Each commit is independently green (`make agent-check && make agent-test`). Comm
 - [ ] 2. `feat: add writer_id field to TraceEvent and propagate through event log backends` — Phase 1, all unit tests for writer_id pass (including legacy backwards-read, two-writers-separate-handles, sort-order-sequence-primary), all existing tracing tests pass.
 - [ ] 3. `feat: runner-side usage event emission via per-process activity event log` — Phase 2, fallback path covered, threading.Lock pinned, ContentGeneratorDry hooked into reporting.
 - [ ] 4. `refactor: split _get_registry into strict and or_create variants` — Phase 3, removes the TODO at `reporting_manager.py:116`, preserves inject_tokens_usages auto-create.
-- [ ] 5. `test(integration): split-worker temporal test for cross-process usage emission` — Phase 4 (two-task-queue topology).
+- [x] 5. `test(integration): split-worker temporal test for cross-process usage emission` — Phase 4 (two-task-queue topology).
 - [ ] 6. `docs: changelog + as-built/master-plan updates for P0 + ndjson docstring` — Phase 5.
 - [ ] 7. (Optional, separate) `docs(skills): add Tier 8 cross-worker usage emission to temporal-e2e-validate` — Phase 6.
 
