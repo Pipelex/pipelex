@@ -3,6 +3,7 @@
 > **Source plan**: [`wip/02-master-plan.md`](wip/02-master-plan.md) §P0 (lines 25–51).
 > **As-built reference**: [`wip/tracing-cost-reporting-as-built.md`](wip/tracing-cost-reporting-as-built.md) (issues T1, T2, T3).
 > **Mode**: TDD — every behavioural change starts with a failing test.
+> **Last reviewed**: 2026-05-04 via `/plan-eng-review`. Decisions logged: A1=sequence-primary sort, A3=two-task-queue split-worker test, A5=ContentGeneratorDry hooked to reporting, A6=threading.Lock for activity event log, C1=three-method registry split, C2=emitter constructs writer_id, T1=fresh tests (no xfail flip), T2=concurrency barrier test, T3=R2 retry over-counting pinned. Three new follow-on TODOs filed under §8.
 
 ---
 
@@ -44,6 +45,69 @@ Make activities deployed on **standalone worker pools** (separate processes from
 
 ## 3. Design — JobMetadata-driven, writer-id disambiguated
 
+### 3.0 Data flow (after fix, ASCII)
+
+```
+┌──────────────────────────── Workflow Worker (router) ──────────────────────────────┐
+│                                                                                    │
+│  WfPipeRouter.run                                                                  │
+│   ├─ tracing_config.is_enabled = true                                              │
+│   ├─ event_log = BufferingEventLog(writer_id="primary")                            │
+│   ├─ get_report_delegate().set_event_log(                                          │
+│   │      context_key=wf_workflow_id, event_log=…, workflow_id=wf_workflow_id, …)   │
+│   ├─ wf_graph_context.tracer_key = wf_workflow_id  ───────────────┐                │
+│   │                                                               │ tracer_key on  │
+│   ├─ pipe.run_pipe(job_metadata=…, …)  ───────► dispatches ───────┼─► JobMetadata  │
+│   │     buffers PipeStartEvent / EdgeEvent / … via emit()         │                │
+│   │     (writer_id="primary", per-writer seq 0,1,2…)              │                │
+│   │                                                               │                │
+│   └─ finally: drain() → act_flush_trace_events(events=[…])        │                │
+│                                                                   │                │
+└───────────────────────────────────────────────────────────────────┼────────────────┘
+                                                                    │
+                                                                    ▼
+┌──────────────────────────── Activity Runner Pool (separate process) ───────────────┐
+│                                                                                    │
+│  act_llm_gen_text(arg=LLMJob(job_metadata=… graph_context.tracer_key=wf_xyz, …))   │
+│   └─ LLMWorker.work()                                                              │
+│       ├─ HTTP to OpenAI / Anthropic / …                                            │
+│       └─ self.reporting_delegate.report_inference_job(llm_job)                     │
+│            └─ ReportingManager._report_llm_job                                     │
+│                ├─ try: _get_registry_strict(run).add_tokens_usage(…)               │
+│                │      except KeyError: pass    ← runner case (registry not opened) │
+│                └─ self._emit_usage_event(llm_job, llm_tokens_usage)                │
+│                     ├─ context = _event_log_contexts.get(graph_context.lookup_key) │
+│                     ├─ if context is not None: emit fast path                      │
+│                     │      (router process; never reached here on the runner)      │
+│                     └─ else: _emit_usage_event_runner_fallback                     │
+│                           ├─ tracing_config.is_enabled? → no? return               │
+│                           ├─ event_log = get_or_create_activity_event_log(cfg)     │
+│                           │     │                                                  │
+│                           │     ├─ first call: with _lock → check → make_event_log │
+│                           │     │     (cfg, writer_id="act_{pid}_{uuid8}") → cache │
+│                           │     └─ subsequent: cached instance (lock-free fast path)│
+│                           ├─ workflow_id = ctx.tracer_key or ctx.graph_id          │
+│                           ├─ event = UsageReportEvent(workflow_id=workflow_id,     │
+│                           │            writer_id=event_log.writer_id, … )          │
+│                           │   ← emitter constructs event with writer_id; no copy   │
+│                           └─ try: event_log.emit(event)                            │
+│                                except OSError | ClientError | … : log WARNING     │
+│                                ├─ NDJSON: appends to                               │
+│                                │   {traces_dir}/{run}/wf_{wf_id}__w_act_*.ndjson   │
+│                                │   (file-handle cache key = (run, wf, writer_id))  │
+│                                └─ DDB: PutItem                                     │
+│                                    PK=PIPELINE_RUN#{run}                           │
+│                                    SK=EVENT#{wf_id}#{writer_id}#{seq:010d}         │
+│                                                                                    │
+└────────────────────────────────────────────────────────────────────────────────────┘
+
+  Read path (same partition assumption):
+    NdjsonEventLog.read_events(run_id) globs *.ndjson under {traces_dir}/{run_id}/
+       → reads both wf_{wf_id}.ndjson AND wf_{wf_id}__w_act_*.ndjson
+       → dedup key  = (workflow_id, writer_id, type, sequence)
+       → sort key   = (workflow_id, sequence, writer_id)   ← seq primary, writer tiebreaks
+```
+
 ### 3.1 What changes conceptually
 
 The fix has two independent parts. Keep them separate in commits and tests.
@@ -83,15 +147,15 @@ class TraceEvent(BaseModel):
 
 Backend changes:
 
-- NDJSON: file path becomes `wf_{workflow_id}__w_{writer_id}.ndjson` (when `writer_id != "primary"`, append `__w_{writer_id}` to keep existing file naming for the legacy single-writer case).
+- NDJSON: file path becomes `wf_{workflow_id}__w_{writer_id}.ndjson` (when `writer_id != "primary"`, append `__w_{writer_id}` to keep existing file naming for the legacy single-writer case). **The `NdjsonEventLog` file-handle cache key must be `(pipeline_run_id, workflow_id, writer_id)`** — a 2-tuple key would cause two writers with the same `(run, wf)` to share a stale handle, silently writing one writer's events into the other writer's file.
 - DynamoDB: SK becomes `EVENT#{workflow_id}#{writer_id}#{sequence:010d}` (always include writer_id; use `"primary"` for the legacy path so existing rows are not invalidated by code change — separate migration concern but pragmatic default).
 - Read-side dedup key: `(workflow_id, writer_id, type, sequence)`.
-- Sort key: `(workflow_id, writer_id, sequence)`.
+- **Sort key: `(workflow_id, sequence, writer_id)`** — sequence is primary; writer_id only tiebreaks. Sorting writer_id first would put `act_*` events lexicographically before `primary` events for the same workflow, ordering the runner's `UsageReportEvent` *before* the router's `PipeStartEvent`. Cross-writer sequence numbers are independent counters so this is best-effort, but it degrades to today's behavior when only one writer exists, which is strictly better than the writer-first ordering.
 
-Each `EventLogProtocol` instance carries an immutable `writer_id`:
+Each `EventLogProtocol` instance carries an immutable `writer_id`. **The emitter constructs every `TraceEvent` with `writer_id` read from the event log instance it's about to emit through** — no copy-on-emit. This keeps `BufferingEventLog`'s zero-copy semantic, avoids a per-event `model_copy()` allocation, and keeps the writer_id invariant local to the emit site (every place that builds a `TraceEvent` already has access to the event log it's pushing into).
 
 - `BufferingEventLog(writer_id="primary")` — legacy, used by the workflow body (router process).
-- New `make_event_log_for_activity(tracing_config, writer_id=...)` factory used by the activity-side fallback in (A). The runner generates a stable per-process `writer_id = f"act_{os.getpid()}_{uuid4().hex[:8]}"` once at module-import time and reuses it for every emit on that process.
+- New `make_event_log_for_activity(tracing_config, writer_id=...)` factory used by the activity-side fallback in (A). The runner generates a stable per-process `writer_id = f"act_{os.getpid()}_{uuid4().hex[:8]}"` lazily on first use, **protected by a module-level `threading.Lock`** (double-checked locking) so 1000 concurrent activities first-emitting in parallel observe the same writer_id and reuse the same event log instance. Eager init at import time is rejected because `DynamoDBEventLog.__init__` opens a boto3 resource — undesirable on workers that have tracing disabled at runtime.
 
 This decouples sequence counters: each process has its own monotonic counter inside its own writer namespace, and dedup is correct.
 
@@ -99,16 +163,17 @@ This decouples sequence counters: each process has its own monotonic counter ins
 
 | File | Change |
 |---|---|
-| `pipelex/tracing/trace_events.py` | Add `writer_id: str = "primary"` to `TraceEvent` base. |
-| `pipelex/tracing/event_log_protocol.py` | Add `writer_id: str` property (read-only) and document the `(workflow_id, writer_id, sequence)` uniqueness contract. |
-| `pipelex/tracing/buffering_event_log.py` | Add `writer_id` ctor arg, default `"primary"`. Stamp it on every emitted event. |
-| `pipelex/tracing/ndjson_event_log.py` | (a) Add `writer_id` ctor arg. (b) File name becomes `wf_{workflow_id}__w_{writer_id}.ndjson` when `writer_id != "primary"`. (c) Read-side dedup key adds writer_id; sort key adds writer_id. |
-| `pipelex/tracing/dynamodb_event_log.py` | (a) Add `writer_id` ctor arg. (b) SK becomes `EVENT#{workflow_id}#{writer_id}#{sequence:010d}`. (c) Item stores `writer_id` for query convenience. |
+| `pipelex/tracing/trace_events.py` | Add `writer_id: str = "primary"` to `TraceEvent` base. Default ensures legacy NDJSON files (events serialized before this field existed) read back as `writer_id="primary"` via Pydantic default. |
+| `pipelex/tracing/event_log_protocol.py` | Add `writer_id: str` property (read-only) and document the `(workflow_id, writer_id, sequence)` uniqueness contract. The protocol guarantee is "every event emitted through this log carries this writer_id" — which the *emitter* enforces, not the log. |
+| `pipelex/tracing/buffering_event_log.py` | Add `writer_id` ctor arg, default `"primary"`. Read-only property exposed to emitters. (Emitters construct events with the right writer_id; the buffer itself does not mutate events.) |
+| `pipelex/tracing/ndjson_event_log.py` | (a) Add `writer_id` ctor arg. (b) File name becomes `wf_{workflow_id}__w_{writer_id}.ndjson` when `writer_id != "primary"`. (c) **File-handle cache key becomes `(pipeline_run_id, workflow_id, writer_id)`** — covers the silent cross-writer write bug. (d) Read-side dedup key becomes `(workflow_id, writer_id, type, sequence)`; sort key becomes `(workflow_id, sequence, writer_id)`. (e) One-line docstring note: "For multi-process / multi-host deployments, traces_dir must be a filesystem visible to all writer processes (NFS/EFS); use the DynamoDB backend for fully separated hosts." |
+| `pipelex/tracing/dynamodb_event_log.py` | (a) Add `writer_id` ctor arg. (b) SK becomes `EVENT#{workflow_id}#{writer_id}#{sequence:010d}`. (c) Item stores `writer_id` for query convenience. (d) On `ProvisionedThroughputExceededException` / `ClientError` from PutItem, log WARNING and drop (do not raise — failing the inference for a logging error is wrong; see R6). |
 | `pipelex/tracing/event_log_factory.py` | New `make_event_log(tracing_config, writer_id="primary") -> EventLogProtocol`. Existing callers default to `"primary"` (zero behaviour change). |
-| `pipelex/tracing/activity_event_log.py` (new) | Process-local cache: `get_or_create_activity_event_log(tracing_config) -> EventLogProtocol`. Generates a stable per-process `writer_id` once, reuses the backend instance. Closes on `atexit`. |
-| `pipelex/reporting/reporting_manager.py` | `_emit_usage_event` fallback path: when context lookup misses, if `tracing_config.is_enabled` and `graph_context.tracer_key` is set, emit via `get_or_create_activity_event_log` using `tracer_key` as `workflow_id`. Log a single one-shot warning the first time the fallback fires (so we know it engaged in production). |
-| `pipelex/reporting/reporting_manager.py` | Replace the `_get_registry` auto-create branch with: log a single warning, return a transient `UsageRegistry` that is **not** stored in `_usage_registries`, so direct-mode and the router still work but the runner doesn't accumulate orphan registries. (P1 will then read events back, aggregate, and `inject_tokens_usages` on the API process — no registry churn on workers.) |
-| `pipelex/reporting/reporting_protocol.py` | Document that `_get_registry`'s auto-create behaviour is gone for the runner; the protocol surface is unchanged. |
+| `pipelex/tracing/activity_event_log.py` (new) | Process-local cache: `get_or_create_activity_event_log(tracing_config) -> EventLogProtocol \| None`. Generates a stable per-process `writer_id = f"act_{os.getpid()}_{uuid4().hex[:8]}"` once, reuses the backend instance. **Wraps cache check + creation in a module-level `threading.Lock` (double-checked locking)** so concurrent first-emitters from N activity threads agree on a single writer_id. Returns `None` when tracing is disabled. Closes on `atexit`. |
+| `pipelex/reporting/reporting_manager.py` | `_emit_usage_event` fallback path: when context lookup misses, if `tracing_config.is_enabled` and `graph_context.tracer_key` is set, emit via `get_or_create_activity_event_log` using `tracer_key` (or `graph_id` if `tracer_key` is None) as `workflow_id`. Log a single one-shot warning the first time the fallback fires per process (so we know it engaged in production). The fallback method is named `_emit_usage_event_runner_fallback` (NOT `_distributed`; the emit is local-to-the-runner-process, the *partition* is shared). On `OSError` / `botocore.exceptions.ClientError` / `MissingDependencyError` / `PipelexConfigError`, log WARNING and drop. **Never `except Exception`.** |
+| `pipelex/reporting/reporting_manager.py` | **Replace `_get_registry` with a three-method split** (covers C1 in the eng review): `_get_registry_strict(pipeline_run_id) -> UsageRegistry` raises `KeyError` if missing — used by `_report_*_job` paths which now silently skip add when the registry is absent (runner case); `_get_or_create_registry(pipeline_run_id) -> UsageRegistry` creates on miss — used by `inject_tokens_usages` (P1 cross-worker assembly), the console-cost path, and `generate_report` when called for a specific run that wasn't opened. Removes the orphan-accumulation branch entirely. The existing test `test_inject_tokens_usages_auto_creates_registry` continues to pass through `_get_or_create_registry`. |
+| `pipelex/reporting/reporting_protocol.py` | No surface change. Implementation notes docstring updated to describe the "register registry first via `open_registry` for runners that own a pipeline" expectation. |
+| `pipelex/cogt/content_generation/content_generator_dry.py` | **Hook `report_inference_job` into the dry path** (covers A5 in the eng review): when a `make_*` method completes, build a synthetic `LLMTokensUsage` (zero tokens, dry-run model id) and call `get_report_delegate().report_inference_job(...)`. This makes the cross-worker emission path observable through the existing dry-run e2e harness without forcing every Phase 6 assertion to run live LLM. Add a unit test pinning that this generator emits a usage event. |
 
 ### 3.3 Why not `TracingActivityInboundInterceptor`
 
@@ -126,9 +191,11 @@ If we later want the cleanliness of an interceptor, it's an additive change on t
 
 Each step lists: tests to write **first** (red), then the change that turns them green. Run `make agent-check` after every step. Run `make agent-test` at the end of each phase.
 
-### Phase 0 — Reproduce the bug
+### Phase 0 — Pin baseline (no xfail)
 
-**0.1** Write `tests/unit/pipelex/reporting/test_emit_distributed_fallback.py::TestEmitDistributedFallback::test_runner_with_no_context_drops_silently_today`. Build a `ReportingManager`, do **not** call `set_event_log`, build an `LLMJob` with a populated `graph_context` (with `tracer_key="wf_xyz"`, `parent_node_id="...:node_3"`), call `report_inference_job`, assert nothing was emitted anywhere. This documents current behaviour and pins it. Mark with `xfail(reason="bug T1, fix in step 1.x")` and flip to `assert "fallback emitted"` once the fix lands.
+**0.1** Add `tests/unit/pipelex/reporting/test_reporting_event_emission.py::test_no_emit_when_no_event_log_set_and_no_fallback_yet`. This is a one-liner pin of *today's* behavior: `ReportingManager` with `set_event_log` never called, `tracing_config.is_enabled = False` (so no fallback path engages even after Phase 2 lands). Asserts no event written anywhere. Pins the "tracing-disabled is silent" baseline that the fallback in Phase 2 must respect.
+
+The fresh fallback test (`test_fallback_engages_when_context_missing_and_tracing_enabled`) is added in Phase 2 directly as a green test; we don't use the xfail-flip pattern (it adds commit choreography for no real benefit).
 
 (One test, no LLM, sub-second.)
 
@@ -137,40 +204,69 @@ Each step lists: tests to write **first** (red), then the change that turns them
 **1.1** *Red.* `tests/unit/pipelex/tracing/test_writer_id_schema.py::TestWriterIdSchema`:
 
 - `test_trace_event_has_writer_id_default_primary` — round-trip JSON of a hand-built event, assert `"writer_id": "primary"`.
+- `test_legacy_ndjson_without_writer_id_field_reads_as_primary` — pre-populate a `wf_W.ndjson` file by hand with a JSON line missing the `writer_id` field, call `read_events`, assert the parsed event has `writer_id == "primary"` (Pydantic default kicks in). Pins backwards-read invariant.
 - `test_two_writers_same_workflow_dedup_keeps_both` — emit `UsageReportEvent(workflow_id="W", writer_id="a", sequence=0)` and `(... writer_id="b", sequence=0)` to an `InMemoryEventLog`, read back, assert two events. (Currently dedup would keep them because type+seq differ across emits, but harden the contract.)
 - `test_ndjson_writer_id_in_filename_for_non_primary` — emit to `NdjsonEventLog(traces_dir=tmp, writer_id="act_pid42")`, assert file `wf_W__w_act_pid42.ndjson` exists; emit again with `writer_id="primary"`, assert legacy file name `wf_W.ndjson` exists (no breaking change).
+- **`test_two_writers_same_workflow_get_separate_handles`** — instantiate two `NdjsonEventLog`s with different `writer_id`, emit `(W, sequence=0)` from each into the same `traces_dir`/`pipeline_run_id`, assert two distinct files exist with one event each. Pins the `(run, wf, writer_id)` cache-key fix (covers A2 in the eng review).
 - `test_ndjson_dedup_uses_writer_id` — write two events to two different writer files for same `(workflow_id, sequence)`, read back, assert both present.
+- `test_ndjson_sort_order_is_sequence_primary_writer_id_secondary` — emit `(W, primary, PipeStart, seq=2)` then `(W, act_x, UsageReport, seq=0)` then `(W, primary, PipeStart, seq=1)`, read back, assert order `[seq=0, seq=1, seq=2]`. Pins the sort-key correction (covers A1).
 - `test_dynamodb_sk_includes_writer_id` — unit test against a stubbed boto3 table (`pytest-mock` MockerFixture, not unittest.mock), assert PutItem SK is `EVENT#W#act_pid42#0000000000`.
 
-**1.2** *Green.* Add `writer_id: str = "primary"` to `TraceEvent`. Thread it through `BufferingEventLog`, `NdjsonEventLog`, `DynamoDBEventLog`, `InMemoryEventLog`, `event_log_factory.make_event_log`. Update read-side dedup key to `(workflow_id, writer_id, type, sequence)` and sort key to `(workflow_id, writer_id, sequence)`. Default `"primary"` keeps every existing test green.
+**1.2** *Green.* Add `writer_id: str = "primary"` to `TraceEvent`. Thread it through `BufferingEventLog`, `NdjsonEventLog`, `DynamoDBEventLog`, `InMemoryEventLog`, `event_log_factory.make_event_log`. Update read-side dedup key to `(workflow_id, writer_id, type, sequence)`, sort key to `(workflow_id, sequence, writer_id)`, and `NdjsonEventLog._file_handles` cache key to `(pipeline_run_id, workflow_id, writer_id)`. Default `"primary"` keeps every existing test green. Update emitters (`GraphTracer`, `_emit_usage_event` fast path, every test fixture that builds a `TraceEvent`) to construct events with `writer_id` from the event log instance.
 
 **1.3** *Regression check.* Re-run `tests/unit/pipelex/tracing/`, `tests/unit/pipelex/reporting/`, `tests/integration/pipelex/temporal/tracing/` — all must still pass. NDJSON files for the legacy path keep their old names, DDB rows for legacy path get `"primary"` in their SK (one-time schema bump documented in CHANGELOG.md `[Unreleased]`).
 
 ### Phase 2 — Activity-side fallback in `_emit_usage_event`
 
-**2.1** *Red.* `tests/unit/pipelex/reporting/test_emit_distributed_fallback.py::TestEmitDistributedFallback`:
+**2.1** *Red.* `tests/unit/pipelex/reporting/test_emit_runner_fallback.py::TestEmitRunnerFallback`:
 
-- `test_fallback_engages_when_context_missing_and_tracing_enabled` — `ReportingManager` with no `set_event_log` call. Mock `get_config().pipelex.tracing_config.is_enabled=True` and point NDJSON traces_dir to `tmp_path`. Build an `LLMJob` with `graph_context.tracer_key="wf_xyz"`, `pipeline_run_id="run_abc"`, `parent_node_id="g:node_2"`. Call `report_inference_job`. Assert one NDJSON file under `tmp_path/run_abc/wf_wf_xyz__w_act_*.ndjson` containing one `UsageReportEvent` with the right node_id, workflow_id, pipeline_run_id, tokens_usage.
+- `test_fallback_engages_when_context_missing_and_tracing_enabled` — `ReportingManager` with no `set_event_log` call. Mock `get_config().pipelex.tracing_config.is_enabled=True` and point NDJSON traces_dir to `tmp_path`. Build an `LLMJob` with `graph_context.tracer_key="wf_xyz"`, `pipeline_run_id="run_abc"`, `parent_node_id="g:node_2"`. Call `report_inference_job`. Assert one NDJSON file under `tmp_path/run_abc/wf_wf_xyz__w_act_*.ndjson` containing one `UsageReportEvent` with the right node_id, workflow_id, pipeline_run_id, tokens_usage, and `writer_id` matching the file name.
+- `test_runner_fallback_uses_tracer_key_when_set` — pin the load-bearing assumption that `tracer_key` is what becomes `workflow_id` on the runner side. Build context with `graph_id="run_abc"`, `tracer_key="wf_xyz"`; assert emitted event's `workflow_id == "wf_xyz"`. Then build context with `graph_id="run_abc"`, `tracer_key=None`; assert emitted event's `workflow_id == "run_abc"`. (Replaces the old `test_no_tracer_key_skips_fallback` — that name was misleading; the fallback always emits when tracing is enabled, just with a different workflow_id.)
 - `test_fallback_caches_event_log_per_process` — call `report_inference_job` twice; assert only one event log instance was constructed (use `mocker.spy` on `make_event_log`).
-- `test_disabled_tracing_skips_emit` — `is_enabled=False`, no event log file is created, no warning raised, registry still gets the usage (so the "console cost report" still works in dev).
+- **`test_concurrent_first_call_yields_single_writer_id`** — spawn N=16 threads on a `threading.Barrier`; each calls `get_or_create_activity_event_log(cfg)` once; assert all observe the same `writer_id` and the same event log instance. Pins the `threading.Lock` fix (covers A6 / T2).
+- `test_disabled_tracing_skips_emit` — `is_enabled=False`, no event log file is created, no warning raised. (Note: in the runner case the `_report_*_job` paths now skip `add_tokens_usage` because `_get_registry_strict` raises and is caught — see Phase 3. The console cost-report path still works in dev because direct-mode opens the registry first.)
 - `test_no_graph_context_skips_emit` — `graph_context=None`, no fallback. Existing test already covers this with context registered; add the no-context-no-fallback variant.
-- `test_no_tracer_key_skips_fallback` — `graph_context.tracer_key=None` (i.e. an old-style direct-mode context where the lookup key is `graph_id` itself). Falls back to graph_id as workflow_id (so we don't lose events).
-- `test_explicit_log_when_emit_path_unavailable` — `tracing_config.is_enabled=True` but `make_event_log` raises (e.g., NDJSON dir is unwritable). Assert exception propagates *or* gets logged loudly (decision: log + drop with WARNING; raising would tank the inference response. **Single warning** so we don't spam.)
-- `test_warning_emitted_once_per_process_when_fallback_engages` — call 100 times, assert only the first call emitted the "fallback engaged" warning.
+- `test_explicit_log_when_emit_path_unavailable` — `tracing_config.is_enabled=True` but `make_event_log` raises a **specific** exception type. Parametrize over `OSError` (NDJSON dir unwritable), `MissingDependencyError` (boto3 missing for DDB), `PipelexConfigError` (factory misconfigured), and `botocore.exceptions.ClientError` (DDB throttle / auth fail at PutItem time). Assert each is caught, logged at WARNING, and dropped — never re-raised. **Implementation must NOT use `except Exception`**; it must catch each specific type. (Covers C3 in the eng review.)
+- `test_warning_emitted_once_per_process_when_fallback_engages` — call 100 times, assert only the first call emitted the "fallback engaged" warning. Use module-level state for the once-flag so it survives multiple `ReportingManager` instances within a test process.
+- `test_warning_emitted_once_even_with_multiple_managers` — instantiate two `ReportingManager`s in sequence, both fallback once each, assert only one warning total (covers the "module-level once" implementation choice).
+- **`test_retried_activity_emits_duplicate_usage_event_documenting_R2`** — call `report_inference_job` twice from the same process for the same workflow; assert both events present in the log with sequences 0 and 1. Pins R2's documented over-counting behavior (covers T3).
+- **`test_dry_generator_invokes_report_inference_job`** — placed in `tests/unit/pipelex/cogt/content_generation/test_content_generator_dry_reporting.py`. Build a `ContentGeneratorDry`, configure a stub `ReportingManager`, call `make_llm_text(...)`, assert `report_inference_job` was called once with a synthetic `LLMJob` whose `job_report.llm_tokens_usage` is non-None. Pins the A5 hook so dry-run emission doesn't decay later.
 
 (All sub-second; no LLM.)
 
 **2.2** *Green.* Implement `pipelex/tracing/activity_event_log.py` with:
 
 ```python
+import threading
+from uuid import uuid4
+
+_lock = threading.Lock()
+_cached_event_log: EventLogProtocol | None = None
+_writer_id: str | None = None
+
+
 def get_or_create_activity_event_log(
     tracing_config: TracingConfig,
 ) -> EventLogProtocol | None:
     """Process-local cached event log for runner-side activity emission.
 
     Returns None when tracing is disabled. Generates a stable
-    per-process writer_id once and reuses it for every emit.
+    per-process writer_id once and reuses it for every emit. Thread-safe:
+    concurrent first-callers from N activity threads observe the same
+    writer_id and the same backend instance.
     """
+    global _cached_event_log, _writer_id
+    if not tracing_config.is_enabled:
+        return None
+    if _cached_event_log is not None:
+        return _cached_event_log
+    with _lock:
+        if _cached_event_log is not None:
+            return _cached_event_log
+        _writer_id = f"act_{os.getpid()}_{uuid4().hex[:8]}"
+        _cached_event_log = make_event_log(tracing_config, writer_id=_writer_id)
+        atexit.register(_cached_event_log.close)
+        return _cached_event_log
 ```
 
 Implement the fallback inside `_emit_usage_event`:
@@ -190,7 +286,7 @@ def _emit_usage_event(self, inference_job, tokens_usage):
 
     # Fallback: runner process — context was never registered here.
     # Emit through a process-local event log built from tracing_config.
-    self._emit_usage_event_distributed(
+    self._emit_usage_event_runner_fallback(
         inference_job=inference_job,
         tokens_usage=tokens_usage,
         graph_context=graph_context,
@@ -201,30 +297,45 @@ The fallback method:
 
 - Reads `tracing_config = get_config().pipelex.tracing_config`.
 - If not enabled → return.
-- `event_log = get_or_create_activity_event_log(tracing_config)` → if None, return.
+- `process_event_log = get_or_create_activity_event_log(tracing_config)` → if None, return.
 - `workflow_id = graph_context.tracer_key or graph_context.graph_id`.
 - `node_id = graph_context.parent_node_id or "unknown"`.
-- Build `UsageReportEvent(pipeline_run_id=job_metadata.pipeline_run_id, workflow_id=workflow_id, writer_id=event_log.writer_id, sequence=event_log.next_sequence(), node_id=node_id, tokens_usage=tokens_usage, timestamp=...)`.
-- `event_log.emit(event)`.
-- One-shot warning logged the first time per process.
+- Build `UsageReportEvent(pipeline_run_id=job_metadata.pipeline_run_id, workflow_id=workflow_id, writer_id=process_event_log.writer_id, sequence=process_event_log.next_sequence(), node_id=node_id, tokens_usage=tokens_usage, timestamp=...)`. **The emitter constructs the event with writer_id; no copy-on-emit happens later.**
+- Wrap `process_event_log.emit(event)` in a try/except catching the specific exception types (`OSError`, `botocore.exceptions.ClientError`, `MissingDependencyError`, `PipelexConfigError`); on catch, log WARNING and drop. **Never `except Exception`.**
+- One-shot warning logged the first time per process via a module-level boolean guarded by the same `_lock`.
 
-Flip the `xfail` from Phase 0 to a real assertion.
+(No xfail to flip — Phase 0 only pinned the tracing-disabled baseline; the fallback test in Phase 2 is fresh and ships green.)
 
-### Phase 3 — Replace `_get_registry` orphan auto-create
+### Phase 3 — Replace `_get_registry` orphan auto-create (three-method split)
 
 **3.1** *Red.* `tests/unit/pipelex/reporting/test_no_orphan_registries.py::TestNoOrphanRegistries`:
 
 - `test_runner_does_not_accumulate_registries` — Build a `ReportingManager`, do **not** call `open_registry`. Call `report_inference_job` with `pipeline_run_id="never_opened"`. Assert `_usage_registries` does **not** contain `"never_opened"` afterwards (no orphan accumulation on runner). The usage event still emitted via the fallback (Phase 2), but no registry sat behind.
 - `test_direct_mode_still_accumulates_registry` — `open_registry("run_x")` then `report_inference_job` with `pipeline_run_id="run_x"`, assert registry has the usage record.
+- `test_inject_tokens_usages_still_creates_on_miss` — pin existing behavior: `inject_tokens_usages("never_opened", [...])` works, registry is created. (Updates the existing `test_inject_tokens_usages_auto_creates_registry` to call through `_get_or_create_registry`.)
+- `test_get_registry_strict_raises_when_missing` — direct unit test of `_get_registry_strict("never_opened")`, asserts `KeyError`.
+- `test_generate_report_for_unopened_run_creates_empty_registry_and_renders` — `generate_report("never_opened")` should not crash; it goes through `_get_or_create_registry`, finds nothing, renders an empty cost report. (Documents the P1 readback path's interaction with on-the-fly run IDs.)
 
-**3.2** *Green.* Refactor `_get_registry` (`reporting_manager.py:110-118`) into:
+**3.2** *Green.* Replace `_get_registry` with three explicit methods:
 
 ```python
-def _get_registry(self, pipeline_run_id: str) -> UsageRegistry:
+def _get_registry_strict(self, pipeline_run_id: str) -> UsageRegistry:
+    """Raises KeyError if the registry was never opened.
+
+    Used by _report_*_job: on the runner, the registry is never opened,
+    so callers swallow KeyError and skip add_tokens_usage. The runner-side
+    UsageReportEvent emission is independent of the registry.
+    """
     return self._usage_registries[pipeline_run_id]
 
-def _get_or_create_local_registry_for_console(self, pipeline_run_id: str) -> UsageRegistry:
-    """For the local 'log_costs_to_console' path only."""
+
+def _get_or_create_registry(self, pipeline_run_id: str) -> UsageRegistry:
+    """Returns the registry, creating it on miss.
+
+    Used by inject_tokens_usages (P1 cross-worker assembly path), the
+    console cost-report path, and generate_report when called for a
+    specific run that wasn't opened on this process.
+    """
     if pipeline_run_id not in self._usage_registries:
         self._usage_registries[pipeline_run_id] = UsageRegistry()
     return self._usage_registries[pipeline_run_id]
@@ -233,14 +344,22 @@ def _get_or_create_local_registry_for_console(self, pipeline_run_id: str) -> Usa
 Update `_report_llm_job` / `_report_img_gen_job` / `_report_extract_job` / `_report_search_job` to:
 
 - Always emit the usage event (fallback covers runner).
-- Only `add_tokens_usage` to the local registry **if the registry exists** (i.e. `open_registry` was called on this process — direct mode or router). Don't auto-create.
-- Keep the console cost-report path unchanged for dev ergonomics.
+- Try `_get_registry_strict(pipeline_run_id).add_tokens_usage(...)` and on `KeyError` skip the add silently (this is the runner-process case). Don't auto-create.
+- The console cost-report path uses `_get_or_create_registry` for dev ergonomics.
 
-This kills the silent orphan-registry accumulation and the TODO comment.
+`inject_tokens_usages(pipeline_run_id, ...)` switches its internal `_get_registry(pipeline_run_id)` call to `_get_or_create_registry(pipeline_run_id)` — preserves the existing test `test_inject_tokens_usages_auto_creates_registry`.
 
-### Phase 4 — Integration: split-worker temporal test (in-process, scoped workers)
+`generate_report(pipeline_run_id=...)` uses `_get_or_create_registry` for the targeted-run path so it doesn't crash on never-opened runs.
 
-This phase uses the **worker-scopes mechanism** to run two `Worker` instances inside the same pytest process — one with `disable_all_activities=true` (router) and one with `disable_all_workflows=true` (runner) — both polling the same task queue. Within a single process the singleton `ReportingManager` is shared, so the runner-side activity would **normally** still see the context the router populated, masking the bug. We deliberately defeat that by substituting the inference activity with a wrapper that clears `_event_log_contexts` on the way in (simulating a cold runner process).
+This kills the silent orphan-registry accumulation and the TODO comment without breaking the P1 distributed assembly path.
+
+### Phase 4 — Integration: split-worker temporal test (two task queues)
+
+This phase opens **two pure-scope workers on two task queues** in the same pytest process: `q_router` runs a router-scope worker (`disable_all_activities=True`), `q_runner` runs a runner-scope worker (`disable_all_workflows=True`). The router dispatches inference activities to `q_runner` via Temporal's `task_queue=...` argument. This is the production deployment topology: router and runner are physically separated.
+
+Within the single pytest process the `ReportingManager` is still a process singleton, so the router's `set_event_log` populates `_event_log_contexts` for the workflow's `lookup_key`. The runner's activity then runs in the same process and would *also* see that context — masking the bug. We deliberately defeat that by substituting the inference activity on the runner with a wrapper that clears `_event_log_contexts` on the way in (simulates a cold runner process).
+
+This replaces the original Phase 4.2 "three-worker on one queue" design, which Temporal SDK rejects because of overlapping task-type registrations (per `WorkerScope` docstring at `config_temporal.py:60-62`).
 
 **4.1** *Red.* `tests/integration/pipelex/temporal/tracing/test_split_worker_usage.py::TestSplitWorkerUsageEmission`:
 
@@ -252,69 +371,100 @@ class TestSplitWorkerUsageEmission:
 
     async def test_runner_usage_event_lands_in_same_ndjson_dir(
         self,
-        sequence_tracing_job: PipeJob,    # already exists, dry_run friendly
+        sequence_tracing_job: PipeJob,
         temporal_client: TemporalClient,
         tracing_tmp_dir: Path,
     ):
-        """Activity running on a 'runner' scope (no router context registered
-        for this workflow) still emits its UsageReportEvent into the same
-        traces_dir partition as the workflow-side events.
+        """Router on q_router dispatches inference activity to q_runner.
+        The runner — with no _event_log_contexts entry — emits its
+        UsageReportEvent into the same traces_dir partition via the fallback.
+        """
+        ...
+
+    async def test_no_double_emit_in_split_worker_pool(
+        self,
+        sequence_tracing_job: PipeJob,
+        temporal_client: TemporalClient,
+        tracing_tmp_dir: Path,
+    ):
+        """Exactly-once invariant: _emit_usage_event takes either the fast path
+        OR the fallback path, never both. Submit one workflow; assert exactly
+        one UsageReportEvent per inference call across all NDJSON files.
         """
         ...
 ```
 
 The fixture work this needs:
 
-- `make_split_workers(temporal_client, task_queue) -> AsyncContextManager` helper in `tests/integration/pipelex/temporal/tracing/helpers.py` that opens **two** workers on the same task queue: one with `WorkerScope(required_tasks_packs=["pipe","crafting"], disable_all_activities=True)` and one with `disable_all_workflows=True`. Reuses `get_task_manager().make_worker(...)` with `scope=...` and `substitute_activities=...`.
-- `_simulate_runner_isolation(real_activity)` decorator that wraps an `@activity.defn` to clear `get_report_delegate()._event_log_contexts` at the start of each invocation (only when called from the runner-scope worker — keyed off Temporal's `activity.info().workflow_id` not being in the dict). The substitution is wired only on the runner-scope worker.
+- `make_split_workers(temporal_client, q_router, q_runner) -> AsyncContextManager` helper in `tests/integration/pipelex/temporal/tracing/helpers.py` that opens two workers on two distinct task queues: one router-scope on `q_router`, one runner-scope on `q_runner` (with `substitute_activities` for `_simulate_runner_isolation`).
+- The router workflow must be configured to dispatch inference activities to `q_runner` — likely via a config plumbing that adds an "activity_task_queue" to the activity options used by `WfMakeLLMText` / `act_llm_gen_text`. **If that plumbing does not yet exist**, this is a small adjacent change (one config field + one read site) that needs to land in this same PR; capture it as TODOS-internal "Phase 4 prereq" if absent. (See open question Q-Phase4 below.)
+- `_simulate_runner_isolation(real_activity)` decorator that wraps an `@activity.defn` to clear `get_report_delegate()._event_log_contexts` at the start of each invocation. Use `monkeypatch.setattr(get_report_delegate(), "_event_log_contexts", {})` scoped to the test class to avoid cross-test bleed.
 
 Assertions:
 
 - `ndjson_files_for_run(traces_dir, run_id)` returns ≥ 2 files: the router-side `wf_{wf_id}.ndjson` (from `act_flush_trace_events`) **and** at least one `wf_{wf_id}__w_act_*.ndjson` from the runner.
-- `read_events(run_id)` contains both `PipeStartEvent`s and `UsageReportEvent`s, no duplicates.
+- `read_events(run_id)` contains `PipeStartEvent`s (`writer_id="primary"`) and `UsageReportEvent`s (`writer_id="act_*"`), with no duplicates after dedup.
+- For the exactly-once test: count `UsageReportEvent`s per `(node_id, workflow_id)` and assert == 1.
 
-**4.2** *Red.* `test_mixed_pool_no_duplicate_usage_events`: open three workers on the same queue — `full` scope, `router` scope, `runner` scope. Submit one workflow, assert exactly one `UsageReportEvent` per inference call (the `full` worker's local context plus the runner's fallback must not double-emit).
+**4.2** *Green.* Phases 1–3 should be enough. If `test_no_double_emit_in_split_worker_pool` fails because the substitute didn't actually clear `_event_log_contexts` before the runner emit, tighten the simulator (use a `Lock` to make the clear atomic with respect to the activity entry).
 
-The key invariant: `_emit_usage_event` takes the fast path *or* the fallback path, never both.
-
-**4.3** *Green.* Phases 1–3 should be enough. If `test_mixed_pool_no_duplicate_usage_events` fails because the in-process `full` worker registers the context for one workflow id but the runner-scope substitute happens to clear it after it was registered, tighten the simulator.
+**Open question — Q-Phase4:** does the router currently know how to dispatch the inference activities to a different task queue from itself? If yes, this phase is straightforward; if no, the pre-work is "expose `activity_task_queue` on `act_llm_gen_text`-and-friends scheduling options." Confirm before starting Phase 4.
 
 ### Phase 5 — Removed clutter & docs
 
-**5.1** Remove the `_get_registry` TODO comment at `reporting_manager.py:110-118` (no longer applies).
+**5.1** Remove the `_get_registry` TODO comment at `reporting_manager.py:110-118` (no longer applies — the three-method split eliminates the orphan auto-create branch entirely).
 **5.2** Add CHANGELOG.md entry under `[Unreleased]`:
    ```
    ### Changed
    - Tracing: `TraceEvent` gains a `writer_id` field (default `"primary"`) so
      standalone activity workers can emit into the same backend partition as
-     workflow workers without colliding on `(workflow_id, sequence)`.
+     workflow workers without colliding on `(workflow_id, sequence)`. Emitters
+     stamp writer_id at construction time (no copy-on-emit).
+   - NDJSON read-side dedup key is now `(workflow_id, writer_id, type, sequence)`;
+     sort key is `(workflow_id, sequence, writer_id)` — sequence stays primary
+     so the runner's UsageReportEvent doesn't get sorted before the router's
+     PipeStartEvent.
    - DynamoDB sort key format updated to `EVENT#{workflow_id}#{writer_id}#{sequence:010d}`.
      Existing rows are unaffected (legacy emissions write `writer_id="primary"`).
+   - `ReportingManager._get_registry` replaced with `_get_registry_strict`
+     (raises on miss, used by `_report_*_job`) and `_get_or_create_registry`
+     (creates on miss, used by `inject_tokens_usages`, console cost path,
+     `generate_report`).
+   - `ContentGeneratorDry` now invokes `report_inference_job` with a synthetic
+     `LLMTokensUsage`, so dry-run mode produces real `UsageReportEvent`s
+     observable through the same backend path as live runs.
    ### Fixed
    - `ReportingManager` now emits `UsageReportEvent`s from activities running on
      standalone worker processes (fixes silent drop on runner scope).
+   - `NdjsonEventLog` file-handle cache no longer collides between two writers
+     for the same `(pipeline_run_id, workflow_id)` — cache key now includes
+     `writer_id`, preventing one writer's events from leaking into another
+     writer's file.
    ```
-**5.3** Update `wip/tracing-cost-reporting-as-built.md` "What is broken or missing" → mark T1 as fixed (with a forward link to this work). Leave T2 (P1) and T3 (T1 partially mitigates T3 — fully resolved when P1 lands).
-**5.4** Update `wip/02-master-plan.md` Priority order table: P0 → "In progress" → "Done" once Phase 6 passes.
+**5.3** Add a one-line note to the `NdjsonEventLog` class docstring: "For multi-process / multi-host deployments, traces_dir must be a filesystem visible to all writer processes (NFS/EFS); use the DynamoDB backend for fully separated hosts."
+**5.4** Update `wip/tracing-cost-reporting-as-built.md` "What is broken or missing" → mark T1 as fixed (with a forward link to this work). Leave T2 (P1) and T3 (T1 partially mitigates T3 — fully resolved when P1 lands).
+**5.5** Update `wip/02-master-plan.md` Priority order table: P0 → "In progress" → "Done" once Phase 6 passes.
 
 ### Phase 6 — End-to-end validation via the temporal-e2e-validate skill
 
 Run the existing `/temporal-e2e-validate` skill in **Mode 2 (3-process)** — `temporal-worker-router` + `temporal-worker-runner` + submitter. This is the only setup that proves "true separate Python processes; runner has its own ReportingManager that was never told about this workflow".
 
+**Prerequisite, covered by Phase 2 of this plan:** `ContentGeneratorDry` now invokes `report_inference_job` with a synthetic `LLMTokensUsage`, so dry-run mode produces real `UsageReportEvent`s observable via NDJSON. This unblocks dry-runnable e2e assertions for the cross-worker usage path.
+
 **6.1** Run Tier 1 (`native_text_sequence`) and Tier 3 (`temporal_parallel`) in dry-run mode with tracing enabled. Inspect `.pipelex/traces/{run_id}/`:
 
-- Expect ≥ 2 NDJSON files per run: `wf_{router_wf_id}.ndjson` and `wf_{router_wf_id}__w_act_{runner_pid}_{uuid}.ndjson`.
-- Expect at least one `UsageReportEvent` from the runner file (PipeLLM dispatches inference activities even in dry-run; the dry-run worker still calls `reporting_delegate.report_inference_job` with mock usage).
-
-If the dry-run path doesn't actually call `report_inference_job` (worth checking — `content_generator_dry.py` may skip reporting), repeat in **live mode** for one canonical test (`native_text_sequence` is cheap — one cheap LLM call).
+- Expect ≥ 2 NDJSON files per run: `wf_{router_wf_id}.ndjson` (router-side, `writer_id="primary"`) and `wf_{router_wf_id}__w_act_{runner_pid}_{uuid}.ndjson` (runner-side).
+- Expect at least one `UsageReportEvent` from the runner file with `writer_id` starting `act_`. The mock `LLMTokensUsage` injected by `ContentGeneratorDry` carries zero token counts and a `dry_run` model id — assert that's what's in the event payload.
 
 **6.2** Add a new tier "Tier 8 — Cross-worker usage emission" to `.claude/skills/temporal-e2e-validate/SKILL.md`. Document:
 
-- Run the Tier 8 command (the existing `native_text_sequence` is fine, just `--temporal --no-logo --graph` in live mode against router+runner workers).
+- Run the Tier 8 command (`native_text_sequence` in dry mode against router+runner workers).
 - After the run, `ls .pipelex/traces/{run_id}/` should show both writer-id'd and primary NDJSON files.
-- `grep '"event_kind":"usage_report"' .pipelex/traces/{run_id}/*.ndjson` should return the inference's usage events; assert the writer_id field on those events is `act_*`, not `primary`.
+- `grep '"event_kind":"usage_report"' .pipelex/traces/{run_id}/*.ndjson` should return the inference's usage events; assert the `writer_id` field on those events is `act_*`, not `primary`.
 
-**6.3** (Stretch / optional, gated on P1 readiness) Add a Tier 9 that asserts the cost report is now non-empty for the cross-worker run by running `pipelex run bundle ... --no-logo --graph` and inspecting the auto-generated cost report file under `cost_report_dir_path`.
+**6.3** (Optional sanity) Repeat `native_text_sequence` once in **live mode** to confirm the same path with real `LLMTokensUsage` from the actual provider. One cheap LLM call. Distinguishes "dry-mock plumbing works" from "real-inference plumbing works."
+
+**6.4** (Stretch / optional, gated on P1 readiness) Add a Tier 9 that asserts the cost report is now non-empty for the cross-worker run by running `pipelex run bundle ... --no-logo --graph` and inspecting the auto-generated cost report file under `cost_report_dir_path`.
 
 ---
 
@@ -322,16 +472,17 @@ If the dry-run path doesn't actually call `report_inference_job` (worth checking
 
 | Layer | File | New / changed | Phases |
 |---|---|---|---|
-| Unit | `tests/unit/pipelex/tracing/test_writer_id_schema.py` | new (TestWriterIdSchema, ~6 cases) | 1 |
-| Unit | `tests/unit/pipelex/reporting/test_emit_distributed_fallback.py` | new (TestEmitDistributedFallback, ~7 cases) | 0 + 2 |
-| Unit | `tests/unit/pipelex/reporting/test_no_orphan_registries.py` | new (TestNoOrphanRegistries, ~3 cases) | 3 |
-| Unit | `tests/unit/pipelex/reporting/test_reporting_event_emission.py` | edit — add writer_id assertions to existing tests; verify per-context isolation still holds | 1 |
-| Unit | `tests/unit/pipelex/tracing/test_ndjson_event_log.py` | edit — file naming / dedup / sort tests for writer_id | 1 |
+| Unit | `tests/unit/pipelex/tracing/test_writer_id_schema.py` | new (TestWriterIdSchema, includes legacy-without-writer_id read, two-writers-separate-handles, sort-order-sequence-primary) | 1 |
+| Unit | `tests/unit/pipelex/reporting/test_emit_runner_fallback.py` | new (TestEmitRunnerFallback, includes concurrent-first-call, retry-over-counting, parametric specific-exception coverage) | 0 + 2 |
+| Unit | `tests/unit/pipelex/reporting/test_no_orphan_registries.py` | new (TestNoOrphanRegistries, includes get_or_create-keeps-inject_tokens_usages-working, get_registry_strict-raises) | 3 |
+| Unit | `tests/unit/pipelex/cogt/content_generation/test_content_generator_dry_reporting.py` | new — pin that dry generator invokes `report_inference_job` with mock usage | 2 + 6 |
+| Unit | `tests/unit/pipelex/reporting/test_reporting_event_emission.py` | edit — add writer_id assertions to existing tests; verify per-context isolation still holds; update `test_inject_tokens_usages_auto_creates_registry` to call through `_get_or_create_registry` | 1 + 3 |
+| Unit | `tests/unit/pipelex/tracing/test_ndjson_event_log.py` | edit — file naming / dedup / sort tests for writer_id; cache-key separation test | 1 |
 | Unit | `tests/unit/pipelex/tracing/test_ndjson_dedup_assembly.py` | edit — dedup key includes writer_id | 1 |
 | Unit | `tests/unit/pipelex/tracing/test_in_memory_event_log.py` | edit — InMemoryEventLog gains writer_id | 1 |
-| Integration | `tests/integration/pipelex/temporal/tracing/test_split_worker_usage.py` | new (TestSplitWorkerUsageEmission, 2 cases) | 4 |
-| Integration | `tests/integration/pipelex/temporal/tracing/helpers.py` | add `make_split_workers`, `simulate_runner_isolation` | 4 |
-| E2E | `.claude/skills/temporal-e2e-validate/SKILL.md` | add Tier 8 (Tier 9 optional) | 6 |
+| Integration | `tests/integration/pipelex/temporal/tracing/test_split_worker_usage.py` | new (TestSplitWorkerUsageEmission, 2 cases: lands-in-same-dir, no-double-emit) | 4 |
+| Integration | `tests/integration/pipelex/temporal/tracing/helpers.py` | add `make_split_workers` (two-queue topology), `simulate_runner_isolation` (monkeypatch-scoped clear of `_event_log_contexts`) | 4 |
+| E2E | `.claude/skills/temporal-e2e-validate/SKILL.md` | add Tier 8 (Tier 9 optional); update assertions to match writer_id format | 6 |
 
 **Constraint reminders (CLAUDE.md)**:
 
@@ -346,12 +497,12 @@ If the dry-run path doesn't actually call `report_inference_job` (worth checking
 
 Each commit is independently green (`make agent-check && make agent-test`). Commit messages follow the existing conventional style.
 
-1. `test: pin current runner-side silent-drop behaviour (xfail)` — Phase 0.
-2. `feat: add writer_id field to TraceEvent and propagate through event log backends` — Phase 1, all unit tests for writer_id pass, all existing tracing tests pass.
-3. `feat: runner-side usage event emission via per-process activity event log` — Phase 2, flips the xfail to green, fallback path covered.
-4. `refactor: stop auto-creating orphan UsageRegistry on runner processes` — Phase 3, removes the TODO at `reporting_manager.py:116`.
-5. `test(integration): split-worker temporal test for cross-process usage emission` — Phase 4.
-6. `docs: changelog + as-built/master-plan updates for P0` — Phase 5.
+1. `test: pin tracing-disabled silent-baseline before fallback lands` — Phase 0.
+2. `feat: add writer_id field to TraceEvent and propagate through event log backends` — Phase 1, all unit tests for writer_id pass (including legacy backwards-read, two-writers-separate-handles, sort-order-sequence-primary), all existing tracing tests pass.
+3. `feat: runner-side usage event emission via per-process activity event log` — Phase 2, fallback path covered, threading.Lock pinned, ContentGeneratorDry hooked into reporting.
+4. `refactor: split _get_registry into strict and or_create variants` — Phase 3, removes the TODO at `reporting_manager.py:116`, preserves inject_tokens_usages auto-create.
+5. `test(integration): split-worker temporal test for cross-process usage emission` — Phase 4 (two-task-queue topology).
+6. `docs: changelog + as-built/master-plan updates for P0 + ndjson docstring` — Phase 5.
 7. (Optional, separate) `docs(skills): add Tier 8 cross-worker usage emission to temporal-e2e-validate` — Phase 6.
 
 ---
@@ -362,7 +513,7 @@ Each commit is independently green (`make agent-check && make agent-test`). Comm
 Per-process is right when the runner pool is stable. If the runner is killed and restarted mid-pipeline, a fresh writer_id is generated on the new process and we keep two writer files for the same workflow_id. That's the *correct* behaviour (no collision) and the assembler handles the union fine.
 
 **R2 — Temporal activity retries.**
-A retried activity re-emits the `UsageReportEvent`. Today's NDJSON dedup is `(workflow_id, sequence)`; with `writer_id` added we get `(workflow_id, writer_id, sequence)`. As long as the same process retries (same writer_id) the dedup still works because the sequence is reused — **except** the per-process counter increments on every emit, even retries. So a retry would emit at sequence N+1 instead of N, and dedup wouldn't fire. This is identical to today's behaviour for `BufferingEventLog` (fresh buffer on each replay; sequence resets), and the read-side already accepts duplicates from retries because the underlying tokens were really billed twice. **Decision**: keep current behaviour, document the over-counting risk in the docstring of `_emit_usage_event_distributed`. Suppression of retried-emit duplicates is a separate, harder problem (T3 / future).
+A retried activity re-emits the `UsageReportEvent`. Today's NDJSON dedup is `(workflow_id, sequence)`; with `writer_id` added we get `(workflow_id, writer_id, sequence)`. As long as the same process retries (same writer_id) the dedup still works because the sequence is reused — **except** the per-process counter increments on every emit, even retries. So a retry would emit at sequence N+1 instead of N, and dedup wouldn't fire. This is identical to today's behaviour for `BufferingEventLog` (fresh buffer on each replay; sequence resets), and the read-side already accepts duplicates from retries because the underlying tokens were really billed twice. **Decision**: keep current behaviour, document the over-counting risk in the docstring of `_emit_usage_event_runner_fallback`, AND pin it with `test_retried_activity_emits_duplicate_usage_event_documenting_R2` so the documented behavior is reified as a test (per eng review T3). Suppression of retried-emit duplicates is a separate, harder problem (future).
 
 **R3 — Boto3 inside an activity.**
 The DynamoDB backend uses synchronous boto3. An activity is allowed to do synchronous I/O (unlike a workflow), so this is fine, but each activity invocation that emits a usage event makes one PutItem (or one NDJSON file write). For high-throughput runners this is non-trivial. We accept the cost in this round; batching is an obvious follow-up if the runner becomes a bottleneck.
@@ -371,7 +522,7 @@ The DynamoDB backend uses synchronous boto3. An activity is allowed to do synchr
 Direct mode populates `_event_log_contexts` via `pipeline_run_setup.py:282`, so the fallback in `_emit_usage_event` should *never* engage in direct mode. Phase 2's `test_fallback_caches_event_log_per_process` is the canary — if direct mode tests start touching the per-process activity event log, that's the bug.
 
 **R5 — DynamoDB SK schema migration.**
-The new SK includes `writer_id`. New rows under `"primary"` are still queryable by old readers that only `Query` on PK (the SK is part of the row but not part of the KeyConditionExpression in `read_events`). External consumers (e.g. `pipelex-api-infra`'s `TraceEventDynamoDBAdapter`) need a heads-up. **Decision**: document in CHANGELOG; if the api-infra side hard-codes the SK pattern, file a separate issue and do not block this PR on it (we own both repos).
+The new SK includes `writer_id`. New rows under `"primary"` are still queryable by old readers that only `Query` on PK (the SK is part of the row but not part of the KeyConditionExpression in `read_events`). External consumers were grepped for during eng review: `pipelex-api-infra/src/` has **no** `TraceEventDynamoDBAdapter`-style code reading this DDB table — the docstring claim in `dynamodb_event_log.py` is aspirational, not a live consumer dependency. So R5's risk is lower than originally feared. **Decision**: document in CHANGELOG; if `pipelex-back-office` or any other repo hard-codes the SK pattern (worth a quick grep at PR time), coordinate accordingly. Do not block this PR on a hypothetical consumer.
 
 **R6 — Why not raise in the silent-drop case?**
 Today it's silent. We could raise instead. Raising inside `report_inference_job` would tank the calling pipe — the LLM call already succeeded, the user paid for tokens, it would be perverse to fail the pipeline because we couldn't log the cost. **Decision**: log a single warning per process when the fallback engages, and a WARNING (not ERROR) when even the fallback path can't emit (e.g. NDJSON path unwritable). Add a `tracing_config.strict_mode: bool` later if anyone wants raise-on-emit-failure semantics.
@@ -386,5 +537,25 @@ Today it's silent. We could raise instead. Raising inside `report_inference_job`
 - **P1 (cost report assembly wiring)**: read events → `UsageAggregator.aggregate()` → `ReportingManager.inject_tokens_usages()` → `generate_report()`. Listed at master plan §P1. This work makes that one-step plumbing change possible — do it next, in a separate PR.
 - **Real-time consumer / live progress** (Step 5 of the original `distributed-tracing-and-reporting.md`).
 - **Phase 6a / 6b crate dependencies** — independent track.
-- **Strict-mode raise-on-emit-failure** — flag for future.
 - **Retried-activity duplicate suppression** — see R2; needs a deeper rethink of the sequence space.
+
+### TODOs added during eng review (deferred follow-ons, all out of scope for P0)
+
+- **`tracing_config.strict_mode: bool`** — opt-in flag that raises (instead of WARNING + drop) when the runner-side emit path fails. Useful for compliance/audit deployments where missing trace data is a hard error. Keep the option open; no users today. (Eng review TODO-3 / R6.)
+- **DynamoDB `BatchWriteItem` for runner emission** — current path does one `PutItem` per usage event. At 1000 concurrent activities per process, that's 1000 boto3 calls per pipeline run. `BatchWriteItem` batches up to 25 per call. Add when actual runner throughput shows it matters; until then a plain `PutItem` is fine. (Eng review TODO-1 / R3.)
+- **NDJSON shared-filesystem invariant enforcement** — The NDJSON backend assumes `traces_dir` is visible to all writer processes (router pool + runner pool + `act_flush_trace_events`). For multi-host deployments this means an NFS/EFS mount or equivalent. The plan adds a one-line `NdjsonEventLog` docstring spelling this out. The follow-up TODO is "add a startup check that warns if `traces_dir` looks like a local-only path on a multi-worker deployment" — non-trivial because there's no clean cross-process detection signal. (Eng review TODO-2.)
+
+---
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | not run |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | not run |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | 18 issues across architecture/code-quality/tests, 9 decisions resolved via AskUserQuestion, 2 critical failure-mode gaps flagged (DDB throttle exception type + multi-host NDJSON visibility), 3 follow-on TODOs filed |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | not applicable (backend infra) |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | not run |
+
+- **UNRESOLVED:** 0 decisions left open.
+- **VERDICT:** ENG CLEARED — ready to implement. Critical gaps are documented in §7 / TODO follow-ons; not blockers for P0.
