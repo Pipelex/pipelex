@@ -1,0 +1,23 @@
+TODOS.md
+  c9479dc48c3cd4b0 1-390
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "fc42e5a5aab0098f6a16ec768b8df93044e48420",
+  "prompts": {
+    "c9479dc48c3cd4b0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ddab5410-4f86-477a-b23b-3e8426b659d2",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 390,
+      "total_deletions": 0,
+      "accepted_lines": 390,
+      "overriden_lines": 0
+    }
+  }
+}
