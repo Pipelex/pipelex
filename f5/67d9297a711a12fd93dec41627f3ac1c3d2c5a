@@ -1,0 +1,23 @@
+tests/unit/pipelex/reporting/test_reporting_event_emission.py
+  6a14424fe7bc09ca 10-11,18,310-331
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "f567d9297a711a12fd93dec41627f3ac1c3d2c5a",
+  "prompts": {
+    "6a14424fe7bc09ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "44facf5b-15d2-4ee9-9969-4bac699eafd7",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 25,
+      "total_deletions": 0,
+      "accepted_lines": 25,
+      "overriden_lines": 0
+    }
+  }
+}
