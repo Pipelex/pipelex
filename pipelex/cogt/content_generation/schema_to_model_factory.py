@@ -5,9 +5,26 @@ BaseModel class that can be used as a structured output schema for LLM generatio
 The generated class carries its own source code as __kajson_class_source__, enabling
 kajson to deserialize it across process boundaries without a class registry.
 
-Security: this module exec()'s code generated from an attacker-influenceable JSON schema
-when schemas cross a process boundary (e.g. Temporal payloads), so two layers of defense
-are applied — see SchemaToModelFactory._reject_unsafe_schema_extensions and SchemaToModelFactory._make_restricted_builtins below.
+Security model: this module exec()'s code generated from an attacker-influenceable JSON
+schema when schemas cross a process boundary (e.g. Temporal payloads). Two layers
+narrow the attack surface, but Layer 2 is defense-in-depth, NOT a sandbox:
+
+- Layer 1 — `_reject_unsafe_schema_extensions`: rejects `x-python-*` codegen extensions,
+  the only currently-known primitive that lets a JSON schema influence emitted imports.
+  This is the real defense.
+- Layer 2 — `_make_restricted_builtins`: removes a small allowlist of dangerous builtins
+  (eval/exec/compile/open/...) and restricts `__import__` to a fixed top-level allowlist.
+  This narrows the surface but does NOT contain a determined attacker: `__build_class__`,
+  `getattr`, `type`, and `object` remain reachable, so `().__class__.__base__.__subclasses__()`
+  can enumerate all loaded classes from inside the exec'd namespace. Any future codegen
+  vector that emits arbitrary Python (beyond the schema-driven `from X import Y`
+  statements we already block) would let an attacker pivot via that enumeration.
+
+Operationally: if Pipelex's threat model ever shifts to fully untrusted schemas (e.g.
+multi-tenant where one tenant can submit arbitrary schemas that another tenant's worker
+will codegen), replace exec() with a real sandbox (subprocess + seccomp) or migrate to
+programmatic class construction via `pydantic.create_model()` — see the TODO inside
+`_exec_and_extract_class`.
 """
 
 import builtins
@@ -16,6 +33,7 @@ import json
 import re
 import tempfile
 import threading
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any, ClassVar, cast
 
@@ -49,7 +67,9 @@ class SchemaToModelFactory:
         }
     )
 
-    _schema_cache: ClassVar[dict[str, type[BaseModel]]] = {}
+    _SCHEMA_CACHE_MAX_SIZE: ClassVar[int] = 1024
+
+    _schema_cache: ClassVar[OrderedDict[str, type[BaseModel]]] = OrderedDict()
     _cache_lock: ClassVar[threading.Lock] = threading.Lock()
 
     @classmethod
@@ -73,11 +93,14 @@ class SchemaToModelFactory:
         # post-warmup, contention is limited to sub-millisecond cache lookups.
         with cls._cache_lock:
             if cache_key in cls._schema_cache:
+                cls._schema_cache.move_to_end(cache_key)
                 return cls._schema_cache[cache_key]
 
             source_code = cls._generate_source_from_schema(schema)
             reconstructed_class = cls._exec_and_extract_class(source_code, class_name)
             reconstructed_class.__kajson_class_source__ = source_code  # type: ignore[attr-defined]
+            if len(cls._schema_cache) >= cls._SCHEMA_CACHE_MAX_SIZE:
+                cls._schema_cache.popitem(last=False)
             cls._schema_cache[cache_key] = reconstructed_class
 
         return reconstructed_class
@@ -180,7 +203,14 @@ class SchemaToModelFactory:
 
     @classmethod
     def _make_restricted_builtins(cls) -> dict[str, Any]:
-        """Build a builtins dict that blocks dangerous functions and restricts __import__ to an allowlist."""
+        """Build a builtins dict that blocks dangerous functions and restricts __import__ to an allowlist.
+
+        This is defense-in-depth, not a sandbox. `__build_class__`, `getattr`, `type`,
+        and `object` remain reachable, so `().__class__.__base__.__subclasses__()` can
+        enumerate all loaded classes from inside the exec'd namespace. The real defense
+        is `_reject_unsafe_schema_extensions` (Layer 1), which prevents the codegen
+        from emitting attacker-controlled imports in the first place.
+        """
         safe_builtins = {name: obj for name, obj in vars(builtins).items() if name not in cls._BLOCKED_BUILTINS}
         safe_builtins["__import__"] = cls._restricted_import
         return safe_builtins
@@ -188,6 +218,11 @@ class SchemaToModelFactory:
     @classmethod
     def _exec_and_extract_class(cls, source_code: str, class_name: str) -> type[BaseModel]:
         """Execute source code and extract the named BaseModel class."""
+        # TODO: replace exec() with programmatic construction via pydantic.create_model().
+        # Eliminates the exec primitive entirely, removes the need for both security
+        # layers, and lets us delete _make_restricted_builtins/_restricted_import.
+        # Non-trivial because nested models, enums, and forward references currently
+        # rely on datamodel-code-generator's output structure.
         namespace: dict[str, Any] = {"__builtins__": cls._make_restricted_builtins()}
         exec(compile(source_code, "<schema_to_model_factory>", "exec"), namespace)
 

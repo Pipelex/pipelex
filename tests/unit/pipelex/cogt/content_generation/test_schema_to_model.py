@@ -149,6 +149,45 @@ class TestSchemaToModel:
             assert result_class is first_class
         assert spy.call_count == 1
 
+    def test_cache_bounded_size_evicts_lru(self, mocker: MockerFixture) -> None:
+        """The schema cache caps at _SCHEMA_CACHE_MAX_SIZE and evicts least-recently-used entries.
+
+        Lowers the bound to 3, inserts 4 distinct schemas, and asserts: (1) cache size never
+        exceeds the bound, (2) the oldest schema was evicted (re-requesting it triggers
+        fresh codegen). Saves and restores the class-level cache to keep the test isolated.
+        """
+        # Snapshot then clear class-level state so this test is hermetic.
+        saved_cache = SchemaToModelFactory._schema_cache.copy()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        SchemaToModelFactory._schema_cache.clear()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        mocker.patch.object(SchemaToModelFactory, "_SCHEMA_CACHE_MAX_SIZE", 3)
+        spy = mocker.spy(SchemaToModelFactory, "_generate_source_from_schema")
+
+        try:
+            schemas: list[tuple[str, dict[str, Any]]] = []
+            for index in range(4):
+                schema = SimpleModel.model_json_schema()
+                title = f"BoundedCacheTest_{uuid.uuid4().hex}_{index}"
+                schema["title"] = title
+                schemas.append((title, schema))
+                SchemaToModelFactory.make_from_json_schema(schema, title)
+                assert len(SchemaToModelFactory._schema_cache) <= 3  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+            assert spy.call_count == 4
+            assert len(SchemaToModelFactory._schema_cache) == 3  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+            # Oldest schema (index 0) must have been evicted: re-requesting it triggers fresh codegen.
+            oldest_title, oldest_schema = schemas[0]
+            SchemaToModelFactory.make_from_json_schema(oldest_schema, oldest_title)
+            assert spy.call_count == 5
+
+            # Most-recently-used schema (index 3) must still be cached: no fresh codegen.
+            recent_title, recent_schema = schemas[3]
+            SchemaToModelFactory.make_from_json_schema(recent_schema, recent_title)
+            assert spy.call_count == 5
+        finally:
+            SchemaToModelFactory._schema_cache.clear()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            SchemaToModelFactory._schema_cache.update(saved_cache)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
     def test_exec_blocks_dangerous_builtins(self) -> None:
         """The restricted exec namespace blocks open(), eval(), exec(), and compile()."""
         malicious_source = "from pydantic import BaseModel\nclass Innocent(BaseModel):\n    name: str = 'ok'\nleaked = open('/etc/passwd')\n"

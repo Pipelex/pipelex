@@ -1,13 +1,9 @@
-from pipelex.base_exceptions import PipelexError
+from pipelex.base_exceptions import PipelexError, SecurityError
 
 
-class ContentGenerationError(PipelexError):
+class NeitherUrlNorDataError(PipelexError):
     pass
 
 
-class NeitherUrlNorDataError(ContentGenerationError):
-    pass
-
-
-class UnsafeSchemaError(ContentGenerationError):
+class UnsafeSchemaError(SecurityError):
     pass

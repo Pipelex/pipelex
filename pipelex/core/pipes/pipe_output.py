@@ -23,6 +23,7 @@ class PipeOutput(PipeOutputAbstract[WorkingMemory]):
     working_memory_raw: dict[str, Any] | None = None
     pipeline_run_id: str = Field(default=SpecialPipelineId.UNTITLED)
     graph_spec: GraphSpec | None = None
+    graph_assembly_error: str | None = None
 
     def prepare_for_temporal(self, library_crate: LibraryCrate | None = None) -> "PipeOutput":
         """Dehydrate WorkingMemory to raw dict for Temporal transit.

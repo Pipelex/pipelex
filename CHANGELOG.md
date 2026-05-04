@@ -4,6 +4,9 @@
 
 ### Added
 
+- **`PipeOutput.graph_assembly_error`**: optional `str` field set when the Temporal `act_assemble_graph` activity raises so consumers can distinguish "graph never produced" from "graph assembly failed". Previously the failure was logged as a warning and `graph_spec` silently stayed `None`.
+- **`SecurityError(PipelexError)`**: new base class in `pipelex.base_exceptions` for security-policy violations. `UnsafeSchemaError` now extends it (was `ContentGenerationError`) so security signals are not silently swallowed by domain `except` handlers.
+
 - **PipeRun layer**: New `PipeRunProtocol` with `PipeRun` (direct) and `TemporalPipeRun` (Temporal) implementations. Wraps pipe execution + delivery in a single orchestration unit. In Temporal mode, `WfPipeRun` workflow orchestrates `WfPipeRouter` as a child workflow followed by delivery activities.
 - **Delivery framework**: `DeliveryAssignment` model with `WebhookDeliveryAssignment` (HTTP POST) and `StorageDeliveryAssignment` (S3/local). Deliveries run as Temporal activities with automatic retry, or inline in direct mode.
 - **`TemporalPipeRun.start()`**: Non-blocking start that returns `workflow_id` + `WorkflowHandle` immediately. Replaces the former `PipeRouterTop.start_pipe_job()`.
@@ -18,6 +21,14 @@
 - **Structured `ErrorReport`**: `PipelexError.to_error_report()` returns a dataclass with error type, category, retryable flag, user action hint, model, and provider.
 
 ### Changed
+
+- **Tightened inference quota classification patterns** to reduce false positives on auth/setup errors:
+  - Anthropic: bare `"credit"` token replaced with `"credit balance"`, `"out of credits"`, `"insufficient credit"`. No longer misclassifies `"your credit card was declined"` or `"we will credit your account"` as quota exhaustion.
+  - Google: bare `"billing"` token replaced with `"billing limit"`, `"billing quota"`, `"billing exceeded"`, and `"billing account"`. Continues to match real 429-class messages (`"Billing account is not active"`, `"billing limit reached"`); stops matching unrelated billing-mentioning text.
+  - Mistral / Gateway: bare `"billing"` likewise narrowed to `"billing limit"` / `"billing quota"`. Mistral additionally distinguishes `"out of credits"` vs `"insufficient credits"`.
+- **Schema codegen cache bounded with LRU eviction**: `SchemaToModelFactory._schema_cache` now uses an `OrderedDict` capped at `_SCHEMA_CACHE_MAX_SIZE = 1024` entries. Prevents unbounded memory growth in long-running Temporal workers receiving many distinct schemas.
+- **Removed duplicate `ContentGenerationError` class**: the unused `pipelex.cogt.content_generation.exceptions.ContentGenerationError` was deleted (had zero external imports). Its subclasses re-parented: `NeitherUrlNorDataError` → `PipelexError`, `UnsafeSchemaError` → new `SecurityError`. The temporal `pipelex.temporal.exceptions.ContentGenerationError` is now the only class with that name.
+- **Narrowed `WfPipeRun` exception handling**: `except Exception:` replaced with `ChildWorkflowError` (child-workflow path) and `ActivityError` (graph-assembly path). Real workflow bugs (TypeError, AttributeError, etc.) are no longer masked as pipe failures.
 
 - **`PipeRouterTop` + `PipeRouterChild` merged into `TemporalPipeRouter`**: Single router that auto-detects context (top-level vs child workflow) and dispatches accordingly. Hub no longer needs `_pipe_router_top` — one `_pipe_router` field handles both modes.
 - **`PipelexRunner.execute_pipeline()` uses `get_pipe_run()`**: Runner now delegates to the PipeRun layer instead of calling `get_pipe_router()` directly.

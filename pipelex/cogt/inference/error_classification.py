@@ -12,7 +12,9 @@ _OPENAI_QUOTA_PATTERNS: tuple[str, ...] = (
 _ANTHROPIC_QUOTA_PATTERNS: tuple[str, ...] = (
     "quota exceeded",
     "quota has been",
-    "credit",
+    "credit balance",
+    "out of credits",
+    "insufficient credit",
     "billing limit",
     "billing issue",
 )
@@ -26,15 +28,20 @@ _CONTENT_POLICY_PATTERNS: tuple[str, ...] = (
 )
 
 _GOOGLE_QUOTA_PATTERNS: tuple[str, ...] = (
-    "billing",
     "quota exceeded",
     "resource has been exhausted",
+    "billing limit",
+    "billing quota",
+    "billing exceeded",
+    "billing account",
 )
 
 _MISTRAL_QUOTA_PATTERNS: tuple[str, ...] = (
     "quota",
-    "billing",
-    "credits",
+    "billing limit",
+    "billing quota",
+    "out of credits",
+    "insufficient credits",
 )
 
 _AWS_QUOTA_PATTERNS: tuple[str, ...] = (
@@ -45,7 +52,8 @@ _AWS_QUOTA_PATTERNS: tuple[str, ...] = (
 
 _GATEWAY_QUOTA_PATTERNS: tuple[str, ...] = (
     "quota",
-    "billing",
+    "billing limit",
+    "billing quota",
     "insufficient_quota",
     "insufficient credit",
     "insufficient funds",

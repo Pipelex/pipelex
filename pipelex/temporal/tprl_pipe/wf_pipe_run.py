@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
-from temporalio.exceptions import ActivityError
+from temporalio.exceptions import ActivityError, ChildWorkflowError
 from typing_extensions import override
 
 with workflow.unsafe.imports_passed_through():
@@ -37,7 +37,7 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
         workflow_log.debug(f"Starting child WfPipeRouter for pipe '{pipe_job.pipe.code}'")
         status: DeliveryStatus = DeliveryStatus.COMPLETED
         pipe_output: PipeOutput | None = None
-        execution_error: Exception | None = None
+        execution_error: ChildWorkflowError | None = None
 
         try:
             pipe_output = await workflow.execute_child_workflow(
@@ -46,8 +46,7 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
                 id=f"{workflow.info().workflow_id}-pipe-router",
             )
             workflow_log.debug("WfPipeRouter completed successfully")
-        except Exception as exc:
-            # TODO: wip - do not catch all exceptions
+        except ChildWorkflowError as exc:
             status = DeliveryStatus.FAILED
             execution_error = exc
             workflow_log.error(f"WfPipeRouter failed: {exc}")
@@ -68,8 +67,9 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
                 )
                 if graph_spec is not None:
                     pipe_output.graph_spec = graph_spec
-            except Exception as graph_exc:
+            except ActivityError as graph_exc:
                 workflow_log.warning(f"Graph assembly failed, continuing with delivery: {graph_exc}")
+                pipe_output.graph_assembly_error = str(graph_exc)
 
         # Step 3: Run delivery activity if requested — notifies the completion
         # Lambda of success or failure when a delivery_assignment was provided.

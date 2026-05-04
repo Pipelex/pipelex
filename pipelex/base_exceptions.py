@@ -53,3 +53,11 @@ class PipelexConfigError(PipelexError):
 
 class PipelexSetupError(PipelexError):
     pass
+
+
+class SecurityError(PipelexError):
+    """Base for security-policy violations.
+
+    Kept distinct from domain errors so security signals are not silently
+    swallowed by domain-level `except` handlers (e.g. `except PipelexError`).
+    """

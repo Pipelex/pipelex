@@ -30,20 +30,33 @@ class _TestCases:
         ("quota_in_message", "Your account quota has been exceeded", True),
         ("billing_limit", "You have reached your billing limit", True),
         ("billing_issue", "There is a billing issue with your account", True),
+        ("credit_balance", "Your credit balance is too low to make this request", True),
+        ("out_of_credits", "Account is out of credits", True),
+        ("insufficient_credit", "Insufficient credit on this API key", True),
         ("generic_rate_limit", "rate_limit_error: Number of request tokens has exceeded your per-minute limit", False),
         ("empty_message", "", False),
         ("unrelated_error", "Invalid API key", False),
         ("billing_word_alone_not_matched", "Please check your billing dashboard", False),
+        ("credit_card_declined_not_matched", "Your credit card was declined, please update payment method", False),
+        ("credit_account_not_matched", "We will credit your account within 24 hours", False),
+        ("no_credit_check_not_matched", "No credit check required", False),
         ("case_insensitive", "Account Billing Issue detected", True),
     ]
 
     GOOGLE_QUOTA_CASES: ClassVar[list[tuple[str, str, bool]]] = [
-        ("billing_disabled", "billing account is disabled for project", True),
         ("quota_exceeded", "Quota exceeded for aiplatform.googleapis.com", True),
         ("resource_exhausted", "Resource has been exhausted (e.g. check quota)", True),
+        ("billing_quota_exceeded", "Billing quota exceeded for project foo", True),
+        ("billing_limit_reached", "Billing limit reached on this account", True),
+        ("billing_exceeded", "Billing exceeded for the current period", True),
+        ("billing_account_not_active", "Billing account is not active", True),
+        ("billing_account_disabled", "billing account is disabled for project", True),
         ("generic_rate_limit", "Rate limit exceeded per minute", False),
         ("empty_message", "", False),
         ("unrelated_error", "Model not found", False),
+        ("billing_setup_not_quota", "billing project not configured", False),
+        ("billing_enable_not_quota", "Please enable billing for this project to use this API", False),
+        ("billing_api_not_enabled_not_quota", "billing API not enabled", False),
     ]
 
     # (topic, error_message, status_code, expected_result)
