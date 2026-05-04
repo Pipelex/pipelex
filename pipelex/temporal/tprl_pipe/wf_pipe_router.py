@@ -52,10 +52,7 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                 # 1. Create per-workflow ClassRegistry pre-seeded from global
                 global_registry = KajsonManager.get_class_registry()
                 workflow_registry = ClassRegistry()
-                if isinstance(global_registry, ClassRegistry):
-                    workflow_registry.register_classes_dict(dict(global_registry.root))
-                else:
-                    workflow_log.warning("Global registry is not a ClassRegistry, cannot pre-seed workflow registry")
+                workflow_registry.register_classes_dict(global_registry.get_classes_dict())
 
                 # 2. Open library and attach registry to it
                 library_manager = get_library_manager()

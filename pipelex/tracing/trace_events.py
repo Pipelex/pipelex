@@ -37,6 +37,12 @@ class TraceEvent(BaseModel):
     Shared fields:
     - pipeline_run_id: identifies the pipeline execution
     - workflow_id: Temporal workflow ID or "direct" for in-process mode
+    - writer_id: identifies the emitting event-log instance, so two writers
+        sharing the same (pipeline_run_id, workflow_id) partition can emit
+        independent sequence streams without colliding. Defaults to "primary",
+        which preserves the legacy single-writer NDJSON file naming and DDB
+        sort-key shape; non-default values come from the per-process activity
+        event log used by separate-process workers.
     - event_kind: discriminator for the event subclass (defined on each subclass as Literal)
     - timestamp: UTC, for display/debugging only
     - sequence: per-writer monotonic counter, for ordering and deduplication
@@ -44,6 +50,7 @@ class TraceEvent(BaseModel):
 
     pipeline_run_id: str
     workflow_id: str
+    writer_id: str = "primary"
     timestamp: datetime
     sequence: int
 

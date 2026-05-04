@@ -12,7 +12,9 @@ The big direction now is to actually run **activities on standalone Worker pools
 
 | # | Item | Status | Owner file |
 |---|---|---|---|
-| **P0** | **Tracing & cost reporting across separate-process workers** | Not started — top priority | this file (problem statement) |
+| **P0** | **Tracing & cost reporting across separate-process workers** | Done — shipped on `fix/Tracing-across-workers`; see [tracing-cost-reporting-as-built.md](tracing-cost-reporting-as-built.md) (T1 marked fixed) | this file (problem statement) |
+| **P0.1** | **Dry-run through activity dispatch (testing affordance)** | Not started — surfaced during P0 Phase 6 validation | this file (problem statement) |
+| **P0.2** | **Deferred follow-ons from P0** | Not started — surfaced during P0 eng review + PR #860 SWE-agent review | this file (problem statement) |
 | **P1** | **Cross-worker cost report assembly wiring** | Not started — depends on P0 design | this file (problem statement) |
 | **P2** | Phase 6a — Local cross-package dependencies in crate | Not started | [phase6a-local-cross-package-deps.md](phase6a-local-cross-package-deps.md) |
 | **P3** | Phase 6b — Remote dependencies from GitHub | Not started — needs P2 | [phase6b-remote-deps-from-github.md](phase6b-remote-deps-from-github.md) |
@@ -23,7 +25,9 @@ Sibling tracks (separate branches, not in this plan): worker error-handling Phas
 
 ---
 
-## P0 — Tracing & cost reporting across separate-process workers
+## P0 — Tracing & cost reporting across separate-process workers — DONE
+
+Shipped on `fix/Tracing-across-workers`. The full implementation history (six phases, eng-review notes, decisions, test inventory, atomic-commit list) is preserved in the branch's git log and summarized in [tracing-cost-reporting-as-built.md](tracing-cost-reporting-as-built.md). The architectural notes below are kept for context. Follow-ons that were explicitly deferred during implementation are tracked under §P0.2.
 
 ### Why this is top priority
 
@@ -41,13 +45,56 @@ The whole point of the distributed-execution work is to allow **activities on st
 
 We're not designing the fix yet — that comes when we pick up P0. The two natural starting points are (a) the original Phase 4.5 Step 6 `TracingActivityInboundInterceptor` design (now in `archive/00-master-plan.md` and `archive/01-master-plan.md`), and (b) plumbing tracing config + workflow id through `JobMetadata` so each activity can construct its own event log directly. Either way the activity needs request-scoped tracing data, not process-scoped state.
 
-### Acceptance criteria (sketch — refine when planning)
+### Acceptance criteria — all met
 
-- [ ] Activities deployed on standalone Worker pools (separate process from workflow Workers) emit `UsageReportEvent`s that land in the same backend partition as the rest of the run.
-- [ ] No reliance on `WfPipeRouter` having executed in the activity's process.
-- [ ] No silent drops — if tracing is enabled, an activity that fails to emit raises or logs explicitly.
-- [ ] Direct mode and the current single-bundle Worker mode keep working unchanged.
-- [ ] Tests covering: (1) standalone activity Worker, (2) mixed worker pool, (3) tracing disabled, (4) backend = NDJSON, (5) backend = DynamoDB.
+- [x] Activities deployed on standalone Worker pools (separate process from workflow Workers) emit `UsageReportEvent`s that land in the same backend partition as the rest of the run.
+- [x] No reliance on `WfPipeRouter` having executed in the activity's process.
+- [x] No silent drops — if tracing is enabled, an activity that fails to emit raises or logs explicitly.
+- [x] Direct mode and the current single-bundle Worker mode keep working unchanged.
+- [x] Tests covering: standalone activity Worker, mixed worker pool, tracing disabled, NDJSON backend, DynamoDB backend (unit-level via stubbed boto3; full DDB e2e gated on `pytest -m dynamodb`).
+
+---
+
+## P0.1 — Dry-run through activity dispatch (testing affordance)
+
+Today, `--dry-run` instantiates `ContentGeneratorDry()` directly inside the workflow body (`pipe_llm.py:515`, and similar sites in `pipe_extract.py`, `pipe_compose.py`, `pipe_img_gen.py`). The activity (`act_llm_gen_text` etc.) is never dispatched. As a result, the cross-worker `UsageReportEvent` emission path that P0 ships cannot be exercised in dry-run mode against router+runner workers — the runner-side fallback only fires when the activity actually dispatches across processes.
+
+This was discovered while validating P0 Phase 6.1: a vanilla `pipelex run bundle --temporal --dry-run --mock-inputs` against a 2-worker (router+runner) topology produces only `writer_id="primary"` events; no `wf_*__w_act_*.ndjson` files appear. The Phase 4 integration test (`TestSplitWorkerUsageEmission`) works around this by substituting `act_llm_gen_text` with a wrapper that synthesizes an `LLMJob` server-side, but that's test-internal scaffolding, not a general-purpose mode.
+
+### What's needed
+
+A run mode that combines "no real LLM call" with "still go through the activity dispatch path", so a `pipelex run bundle` against router+runner workers exercises the same code path as live mode, just with mocked inference inside the activity. Concretely:
+
+- `act_llm_gen_text` is dispatched to the runner as in live mode.
+- Inside the activity, the inference is mocked (use `ContentGeneratorDry` *inside* the activity body, not in place of dispatching it).
+- All cross-process surfaces — `_event_log_contexts` lookup miss, runner-side fallback, `writer_id="act_*"` emission — fire normally.
+
+### Why this matters beyond P0
+
+Same affordance unlocks dry-run e2e for any future cross-process work (P1 cost report assembly, distributed graph assembly, payload codec stress testing, etc.) without needing real LLM spend.
+
+### Acceptance criteria (sketch)
+
+- [ ] A `--mock-inference` (or similar) flag — distinct from `--dry-run` — that keeps activity dispatch but mocks inside the activity. Or: redefine `--dry-run` to mean "dispatch activities, mock inside" and rename the current behavior.
+- [ ] `temporal-e2e-validate` Tier 8 can run in this mode and surface `wf_*__w_act_*.ndjson` files deterministically.
+- [ ] Equivalent mocking sites in `pipe_extract.py`, `pipe_compose.py`, `pipe_img_gen.py` updated.
+
+---
+
+## P0.2 — Deferred follow-ons from P0
+
+Items surfaced during the P0 eng review and the post-merge SWE-agent review of PR #860. Each is independently scoped and not blocking for P0.1 / P1 / P2 / P3. Pick up individually as priorities and signals dictate.
+
+### From eng review (logged at the time of P0 implementation)
+
+- [ ] **`tracing_config.strict_mode: bool`** — opt-in flag that raises (instead of WARNING + drop) when the runner-side emit path fails. Useful for compliance/audit deployments where missing trace data is a hard error. (Eng review R6.)
+- [ ] **DynamoDB `BatchWriteItem` for runner emission** — current path does one `PutItem` per usage event. At high-concurrency runners that's one boto3 call per emit; `BatchWriteItem` batches up to 25. Defer until actual throughput shows it matters. (Eng review R3.)
+- [ ] **NDJSON shared-filesystem invariant enforcement** — the NDJSON backend assumes `traces_dir` is visible to all writer processes (router pool + runner pool + `act_flush_trace_events`). For multi-host deployments this needs NFS/EFS or equivalent. Follow-up: a startup check that warns if `traces_dir` looks like a local-only path on a multi-worker deployment. (Eng review TODO-2.)
+
+### From PR #860 SWE-agent review (post-merge triage of `fix/Tracing-across-workers`)
+
+- [ ] **Per-thread `writer_id` for activity event log** — the surgical lock fix from PR #860 closes the duplicate-sequence race on `next_sequence()`, but a per-thread writer_id would eliminate the contention entirely and align the design with how Temporal's worker pool already partitions activities. Each thread would emit into its own writer namespace; dedup naturally drops to per-thread, no lock needed in the hot path.
+- [ ] **Project-wide migration of `JobMetadata.started_at` to timezone-aware datetimes** — the PR #860 patch builds the synthetic `now` with the same `tzinfo` as the incoming `started_at`, which removes the immediate `TypeError` crash but doesn't fix the underlying inconsistency: `JobMetadata.started_at` default factory is naive (`datetime.now`) while several callers (e.g. `pipe_abstract.py:428`) construct aware datetimes (`datetime.now(timezone.utc)`). A clean migration would standardize on `datetime.now(timezone.utc)` everywhere, document the tz contract on `JobMetadata`, and let `duration` subtract without defensive tzinfo matching at every site.
 
 ---
 
@@ -95,6 +142,9 @@ In one line: extend the blueprint collector from P2 with a remote (GitHub) resol
 ```
 P0 (Tracing across separate workers)
    │
+   ├─► P0.1 (Dry-run through activity dispatch — testing affordance)
+   ├─► P0.2 (Deferred follow-ons — independent, pick up individually)
+   │
    ▼
 P1 (Cross-worker cost report assembly)
 
@@ -104,4 +154,4 @@ P2 (Phase 6a — local cross-package deps)
 P3 (Phase 6b — remote deps from GitHub)
 ```
 
-P0/P1 and P2/P3 are independent tracks; P0 blocks P1, P2 blocks P3.
+P0/P0.1/P0.2/P1 and P2/P3 are independent tracks; P0 unlocks P0.1, P0.2, and P1; P2 blocks P3. P0.1 is a parallel testing affordance that improves P0 / P1 / future cross-process work confidence. P0.2 items are independent of each other — pick them up individually as needs and signals dictate.

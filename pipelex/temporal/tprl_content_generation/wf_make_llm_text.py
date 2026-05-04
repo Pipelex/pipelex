@@ -27,6 +27,7 @@ class WfMakeLLMText(WorkflowClass[LLMAssignment, str]):
                 arg=workflow_arg,
                 start_to_close_timeout=worker_config.workflow_execution_timeout,
                 retry_policy=worker_config.retry_policy,
+                task_queue=worker_config.inference_task_queue,
             )
         except ActivityError as exc:
             if isinstance(exc.cause, ApplicationError):
