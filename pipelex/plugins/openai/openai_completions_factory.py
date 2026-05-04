@@ -1,16 +1,5 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from openai.types.chat import (
-    ChatCompletionContentPartImageParam,
-    ChatCompletionContentPartParam,
-    ChatCompletionContentPartTextParam,
-    ChatCompletionMessageParam,
-    ChatCompletionSystemMessageParam,
-    ChatCompletionUserMessageParam,
-)
-from openai.types.chat.chat_completion_content_part_image_param import ImageURL as OpenAIImageURL
-from openai.types.chat.chat_completion_content_part_param import File as ChatCompletionContentPartFileParam
-from openai.types.completion_usage import CompletionUsage
 from typing_extensions import override
 
 from pipelex.cogt.document.prompt_document import PromptDocument
@@ -24,6 +13,11 @@ from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCateg
 from pipelex.plugins.plugin_factory_abstract import PluginFactoryAbstract
 from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
 
+if TYPE_CHECKING:
+    # Deferred imports: avoid pulling heavy SDK at module-load time
+    from openai.types.chat import ChatCompletionMessageParam
+    from openai.types.completion_usage import CompletionUsage
+
 
 class OpenAICompletionsFactory(PluginFactoryAbstract):
     def __init__(self, is_http_url_enabled: bool):
@@ -33,8 +27,20 @@ class OpenAICompletionsFactory(PluginFactoryAbstract):
     async def make_simple_messages(
         self,
         llm_job: LLMJob,
-    ) -> list[ChatCompletionMessageParam]:
+    ) -> 'list["ChatCompletionMessageParam"]':
         """Makes a list of messages with a system message (if provided) and followed by a user message."""
+        # Deferred imports: avoid pulling heavy SDK at module-load time
+        from openai.types.chat import (  # noqa: PLC0415
+            ChatCompletionContentPartImageParam,
+            ChatCompletionContentPartParam,
+            ChatCompletionContentPartTextParam,
+            ChatCompletionMessageParam,
+            ChatCompletionSystemMessageParam,
+            ChatCompletionUserMessageParam,
+        )
+        from openai.types.chat.chat_completion_content_part_image_param import ImageURL as OpenAIImageURL  # noqa: PLC0415
+        from openai.types.chat.chat_completion_content_part_param import File as ChatCompletionContentPartFileParam  # noqa: PLC0415
+
         llm_prompt = llm_job.llm_prompt
         messages: list[ChatCompletionMessageParam] = []
         user_contents: list[ChatCompletionContentPartParam] = []
@@ -90,7 +96,7 @@ class OpenAICompletionsFactory(PluginFactoryAbstract):
         # Note: we hardocde the extension to pdf because OpenAI Chat Completions API only supports PDF files at this stage
         return f"document_{prompt_document.get_content_hash(length=12)}.pdf"
 
-    def make_nb_tokens_by_category(self, usage: CompletionUsage) -> NbTokensByCategoryDict:
+    def make_nb_tokens_by_category(self, usage: "CompletionUsage") -> NbTokensByCategoryDict:
         nb_tokens_by_category: NbTokensByCategoryDict = {
             TokenCategory.INPUT: usage.prompt_tokens,
             TokenCategory.OUTPUT: usage.completion_tokens,

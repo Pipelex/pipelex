@@ -2,16 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-import openai
-from openai.types.chat import (
-    ChatCompletionContentPartImageParam,
-    ChatCompletionContentPartParam,
-    ChatCompletionContentPartTextParam,
-    ChatCompletionMessageParam,
-    ChatCompletionSystemMessageParam,
-    ChatCompletionUserMessageParam,
-)
-from openai.types.chat.chat_completion_content_part_image_param import ImageURL as OpenAIImageURL
 from portkey_ai import (
     createHeaders,  # type: ignore[reportUnknownVariableType]
 )
@@ -27,6 +17,10 @@ from pipelex.plugins.portkey.portkey_factory import PortkeyFactory
 from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
 
 if TYPE_CHECKING:
+    # Deferred imports: avoid pulling heavy SDK at module-load time
+    import openai
+    from openai.types.chat import ChatCompletionMessageParam
+
     from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
     from pipelex.cogt.llm.llm_job import LLMJob
     from pipelex.cogt.model_backends.backend import InferenceBackend
@@ -41,6 +35,16 @@ class PortkeyCompletionsFactory(OpenAICompletionsFactory):
         llm_job: LLMJob,
     ) -> list[ChatCompletionMessageParam]:
         """Override to use image_url format for documents which Portkey translates correctly."""
+        # Deferred imports: avoid pulling heavy SDK at module-load time
+        from openai.types.chat import (  # noqa: PLC0415
+            ChatCompletionContentPartImageParam,
+            ChatCompletionContentPartParam,
+            ChatCompletionContentPartTextParam,
+            ChatCompletionSystemMessageParam,
+            ChatCompletionUserMessageParam,
+        )
+        from openai.types.chat.chat_completion_content_part_image_param import ImageURL as OpenAIImageURL  # noqa: PLC0415
+
         llm_prompt = llm_job.llm_prompt
         messages: list[ChatCompletionMessageParam] = []
         user_contents: list[ChatCompletionContentPartParam] = []
@@ -92,6 +96,9 @@ class PortkeyCompletionsFactory(OpenAICompletionsFactory):
         plugin: Plugin,
         backend: InferenceBackend,
     ) -> openai.AsyncOpenAI:
+        # Deferred import: avoid pulling heavy SDK at module-load time
+        import openai  # noqa: PLC0415
+
         is_debug_enabled = PortkeyFactory.is_debug_enabled(backend=backend)
         endpoint = PortkeyFactory.get_endpoint(backend=backend)
         api_key = PortkeyFactory.get_api_key(backend=backend)

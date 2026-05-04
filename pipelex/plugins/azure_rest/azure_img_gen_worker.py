@@ -1,12 +1,13 @@
 import httpx
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import CogtError, ImgGenGenerationError, ImgGenParameterError
+from pipelex.cogt.exceptions import CogtError, ImgGenGenerationError, ImgGenParameterError, InferenceErrorCategory
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
+from pipelex.cogt.inference.error_classification import is_content_policy_violation
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.hub import get_models_manager
@@ -90,18 +91,56 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
         params = f"?api-version={self.api_version}"
         generation_url = f"{self.endpoint}/{base_path}/generations{params}"
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                generation_url,
-                headers={
-                    "Api-Key": self.api_key,
-                    "Content-Type": "application/json",
-                },
-                json=args_dict,
-                timeout=600.0,
-            )
-            response.raise_for_status()
-            response_dict = response.json()
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    generation_url,
+                    headers={
+                        "Api-Key": self.api_key,
+                        "Content-Type": "application/json",
+                    },
+                    json=args_dict,
+                    timeout=600.0,
+                )
+                response.raise_for_status()
+                response_dict = response.json()
+        except httpx.HTTPStatusError as exc:
+            status_code = exc.response.status_code
+            error_body = exc.response.text
+            if status_code == 429:
+                msg = f"Azure rate limit exceeded for model '{self.inference_model.desc}': {error_body}"
+                raise ImgGenGenerationError(
+                    msg,
+                    error_category=InferenceErrorCategory.TRANSIENT,
+                    user_action="Rate limited by Azure — the system will retry automatically",
+                ) from exc
+            if status_code == 402:
+                msg = f"Azure quota exhausted for model '{self.inference_model.desc}': {error_body}"
+                raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CAPACITY) from exc
+            if status_code in {401, 403}:
+                msg = f"Azure authentication error for model '{self.inference_model.desc}': {error_body}"
+                raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from exc
+            if status_code == 400:
+                if is_content_policy_violation(error_body):
+                    msg = f"Content rejected by safety filters for model '{self.inference_model.desc}': {error_body}"
+                    raise ImgGenGenerationError(
+                        msg,
+                        error_category=InferenceErrorCategory.CONTENT,
+                        user_action="Content was rejected by safety filters — revise the prompt",
+                    ) from exc
+                msg = f"Azure bad request for model '{self.inference_model.desc}': {error_body}"
+                raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
+            if status_code >= 500:
+                msg = f"Azure server error ({status_code}) for model '{self.inference_model.desc}': {error_body}"
+                raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
+            msg = f"Azure API error ({status_code}) for model '{self.inference_model.desc}': {error_body}"
+            raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from exc
+        except httpx.ConnectError as exc:
+            msg = f"Azure connection error for model '{self.inference_model.desc}': {exc}"
+            raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
+        except httpx.TimeoutException as exc:
+            msg = f"Azure request timed out for model '{self.inference_model.desc}': {exc}"
+            raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
 
         # Extract usage tokens if available
         if (usage_dict := response_dict.get("usage")) and (img_gen_tokens_usage := img_gen_job.job_report.img_gen_tokens_usage):

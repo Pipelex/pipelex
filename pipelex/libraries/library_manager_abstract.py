@@ -2,8 +2,11 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from kajson.class_registry import ClassRegistry
+
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.libraries.library_crate import LibraryCrate
 
 if TYPE_CHECKING:
     from pipelex.core.concepts.concept import Concept
@@ -35,6 +38,13 @@ class LibraryManagerAbstract(ABC):
     def get_current_library(self) -> "Library":
         """Get the Library object for the current library."""
 
+    def get_library_class_registry(self, library_id: str) -> ClassRegistry | None:  # noqa: ARG002
+        """Get the ClassRegistry associated with a library, if any.
+
+        Returns None by default. Overridden by LibraryManager.
+        """
+        return None
+
     def get_pipe_source(self, pipe_code: str) -> Path | None:  # noqa: ARG002
         """Get the source file path for a pipe.
 
@@ -45,6 +55,31 @@ class LibraryManagerAbstract(ABC):
             Path to the .mthds file the pipe was loaded from, or None if unknown.
         """
         return None
+
+    @abstractmethod
+    def get_crate(self, library_id: str) -> LibraryCrate | None:
+        """Build a LibraryCrate from all accumulated blueprints for a given library_id.
+
+        Returns None if the library_id is unknown or no blueprints were loaded.
+
+        Args:
+            library_id: The library to get the crate for
+
+        Returns:
+            A LibraryCrate built from all accumulated blueprints, or None
+        """
+
+    @abstractmethod
+    def load_from_crate(self, library_id: str, crate: LibraryCrate) -> list[PipeAbstract]:
+        """Load a LibraryCrate into a live Library.
+
+        Note: This method does NOT resolve cross-package address-based dependencies.
+        Callers must handle dependency loading before calling this method.
+
+        Args:
+            library_id: The library to load into
+            crate: The LibraryCrate containing qualified blueprints, domain metadata, and source info
+        """
 
     @abstractmethod
     def load_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:

@@ -357,6 +357,25 @@ theme = "dark"
 palette = "dracula"
 
 ####################################################################################################
+# Tracing config (event log for distributed tracing across Temporal workers)
+####################################################################################################
+
+[pipelex.tracing_config]
+is_enabled = true
+backend = "ndjson"
+
+[pipelex.tracing_config.ndjson]
+traces_dir = ".pipelex/traces"
+
+[pipelex.tracing_config.dynamodb]
+table_name = ""
+region = ""
+
+[pipelex.tracing_config.temporal_dynamodb]
+table_name = ""
+region = ""
+
+####################################################################################################
 # Dry run config
 ####################################################################################################
 
@@ -432,10 +451,117 @@ parallels = "branches"
 ####################################################################################################
 
 [pipelex.kit_config]
-# Preferred agent for rules installation (used by `pipelex kit rules`)
-# Options: "cursor", "agents", "claude"
-# - "cursor" installs .cursor/rules/*.mdc files
-# - Other options install a single markdown file for that agent
-preferred_agent_target = "claude"
+# Agent rule files to install (used by `pipelex-dev kit rules`)
+# Each entry is one of: "cursor", "agents", "claude"
+# - "cursor" installs .cursor/rules/*.mdc files (cannot be combined with others)
+# - "agents" / "claude" install AGENTS.md / CLAUDE.md respectively — both can be listed together
+preferred_agent_targets = ["claude", "agents"]
 
 [migration.migration_maps.telemetry]
+
+####################################################################################################
+# Temporal Config
+####################################################################################################
+
+[temporal]
+is_enabled = false
+
+[temporal.payload_codec_config]
+is_enabled = false
+size_threshold = 1_048_576
+storage_prefix = "temporal-payloads/"
+
+[temporal.payload_codec_config.storage_provider_config]
+method = "local"
+
+[temporal.payload_codec_config.storage_provider_config.local]
+uri_format = "{hash}"
+local_storage_path = ".pipelex/temporal-payload-store"
+
+[temporal.worker_config]
+task_queue = "temporal_task_queue"
+workflow_execution_timeout = "1:00:00"
+run_timeout = "1:00:00"
+task_timeout = "0:00:10"
+start_delay = "0:00:00"
+rpc_timeout = "1:00:00"
+
+[temporal.worker_config.retry_policy_config]
+initial_interval = "0:00:03"
+backoff_coefficient = 2.0
+maximum_interval = "unlimited"
+maximum_attempts = 3
+non_retryable_error_types = [
+  "ExtractHandleNotFoundError",
+  "FileNotFoundError",
+  "ImgGenHandleNotFoundError",
+  "LLMHandleNotFoundError",
+  "ModelNotFoundError",
+  "ValidationError",
+]
+
+[temporal.temporal_config]
+selected_server = "local"
+
+[temporal.temporal_config.temporal_server_configs.local]
+description = "default localhost"
+target_host = "localhost:7233"
+namespace = "default"
+api_key_method = "none"
+api_key_id = ""
+
+[temporal.temporal_config.temporal_server_configs.testing]
+description = "Temporal server for testing"
+target_host = "${TESTING_TEMPORAL_TARGET_HOST}"
+namespace = "${TESTING_TEMPORAL_NAMESPACE}"
+api_key_method = "secret_provider"
+api_key_id = "${TESTING_TEMPORAL_MAIN_API_KEY}"
+
+[temporal.temporal_config.temporal_log_config]
+is_workflow_info_on_message = false
+is_workflow_info_on_extra = true
+is_full_workflow_info_on_extra = false
+is_activity_info_on_message = false
+is_activity_info_on_extra = true
+is_full_activity_info_on_extra = false
+is_formatter_enabled = true
+is_prefix_enabled = true
+managed_loggers = [
+  "temporalio.activity",
+  "temporalio.workflow",
+  "temporalio.worker._activity",
+]
+
+[temporal.worker_scopes]
+default_scope = "full"
+
+# Default — single worker handling everything.
+[temporal.worker_scopes.scopes.full]
+required_tasks_packs = ["crafting", "pipe"]
+required_workflows = []
+required_activities = []
+excluded_workflows = []
+excluded_activities = []
+disable_all_workflows = false
+disable_all_activities = false
+
+# Workflow-only worker. Pair with `runner` on the same task queue to force
+# activity dispatch to a different process (deterministic cross-worker hops).
+[temporal.worker_scopes.scopes.router]
+required_tasks_packs = ["crafting", "pipe"]
+required_workflows = []
+required_activities = []
+excluded_workflows = []
+excluded_activities = []
+disable_all_workflows = false
+disable_all_activities = true
+
+# Activity-only worker. Counterpart to `router`.
+[temporal.worker_scopes.scopes.runner]
+required_tasks_packs = ["crafting", "pipe"]
+required_workflows = []
+required_activities = []
+excluded_workflows = []
+excluded_activities = []
+disable_all_workflows = true
+disable_all_activities = false

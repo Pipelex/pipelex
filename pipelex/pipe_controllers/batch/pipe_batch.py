@@ -9,9 +9,10 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
-from pipelex.hub import get_required_pipe
+from pipelex.hub import get_pipe_router, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_run.exceptions import PipeRunError
+from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 
@@ -19,6 +20,7 @@ if TYPE_CHECKING:
     from collections.abc import Coroutine
 
     from pipelex.core.stuffs.stuff_content import StuffContent
+    from pipelex.libraries.library_crate import LibraryCrate
 
 
 class PipeBatch(PipeController):
@@ -98,6 +100,7 @@ class PipeBatch(PipeController):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
+        library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
         batch_params = pipe_run_params.batch_params or self.batch_params or BatchParams.make_default()
         input_item_stuff_name = batch_params.input_item_stuff_name
@@ -133,7 +136,7 @@ class PipeBatch(PipeController):
                     # Pass this PipeBatch's node_id so BATCH_ITEM edges can source from the controller
                     batch_controller_node_id = job_metadata.graph_context.parent_node_id
                     tracer_manager.register_batch_item_extraction(
-                        graph_id=job_metadata.graph_context.graph_id,
+                        lookup_key=job_metadata.graph_context.lookup_key,
                         list_stuff_code=input_stuff.stuff_code,
                         item_stuff_code=branch_input_item_code,
                         item_index=branch_index,
@@ -156,11 +159,15 @@ class PipeBatch(PipeController):
                 },
             )
             branch_pipe_run_params.run_mode = pipe_run_params.run_mode
-            task = sub_pipe.run_pipe(
-                job_metadata=job_metadata,
-                working_memory=branch_memory,
-                output_name=None,
-                pipe_run_params=branch_pipe_run_params,
+            task = get_pipe_router().run(
+                pipe_job=PipeJobFactory.make_pipe_job(
+                    pipe=sub_pipe,
+                    job_metadata=job_metadata,
+                    working_memory=branch_memory,
+                    pipe_run_params=branch_pipe_run_params,
+                    output_name=None,
+                    library_crate=library_crate,
+                ),
             )
             tasks.append(task)
 
@@ -191,7 +198,7 @@ class PipeBatch(PipeController):
                 batch_controller_node_id = job_metadata.graph_context.parent_node_id
                 for agg_index, item_stuff_code in enumerate(branch_output_stuff_codes):
                     tracer_manager.register_batch_aggregation(
-                        graph_id=job_metadata.graph_context.graph_id,
+                        lookup_key=job_metadata.graph_context.lookup_key,
                         output_list_stuff_code=output_stuff.stuff_code,
                         item_stuff_code=item_stuff_code,
                         item_index=agg_index,
@@ -222,12 +229,14 @@ class PipeBatch(PipeController):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
+        library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
         pipe_output = await self._live_run_controller_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=pipe_run_params,
             output_name=output_name,
+            library_crate=library_crate,
         )
         # For dry run coordination: set the first item's pipe_code to "mock_main"
         # to match the BundleHeaderSpec.main_pipe examples=["mock_main"]

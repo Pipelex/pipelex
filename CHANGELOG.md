@@ -1,5 +1,99 @@
 # Changelog
 
+## [v0.26.0] - 2026-05-04
+
+### Highlights
+
+- **Temporal distributed execution** — Pipelex pipelines can now run as Temporal workflows across worker processes. New `pipelex[temporal]` extra, `pipelex worker` CLI, `PipeRun` layer, and `LibraryCrate` IR for cross-process library propagation.
+- **Distributed tracing** — pluggable event-log backends (NDJSON, DynamoDB, in-memory, buffering) emit cross-worker `TraceEvent`s that reassemble offline into a complete `GraphSpec`. Enabled by default; works in single-process mode too.
+
+### Added
+
+#### Temporal distributed execution
+
+- **`pipelex[temporal]` extra and full Temporal integration package (`pipelex/temporal/`)**: includes `temporal_manager`, `temporal_connect`, `temporal_data_converter` (kajson-based JSON), `sandbox_manager`, `task_manager`, and a `pipelex worker` CLI subcommand that boots a worker against a configured queue. Toggle via `[temporal] is_enabled` in `pipelex.toml`. Bumps `temporalio` to `1.23.0`.
+- **`PipeRun` layer (`pipelex/pipe_run/`)**: new `PipeRunProtocol` with `PipeRun` (in-process) and `TemporalPipeRun` (workflow-orchestrated) implementations. Wraps pipe execution + delivery in a single orchestration unit. In Temporal mode, `WfPipeRun` orchestrates `WfPipeRouter` as a child workflow followed by delivery activities. `TemporalPipeRun.start()` is non-blocking and returns `workflow_id` + `WorkflowHandle` immediately.
+- **`TemporalPipeRouter`**: single router that auto-detects context (top-level vs child workflow) and dispatches accordingly.
+- **Delivery framework**: `DeliveryAssignment` model with `WebhookDeliveryAssignment` (HTTP POST) and `StorageDeliveryAssignment` (S3 / local). Deliveries run as Temporal activities with automatic retry, or inline in direct mode.
+- **`LibraryCrate` IR (`pipelex/libraries/library_crate.py`, `library_crate_factory.py`)**: serializable intermediate representation that lets a Temporal worker reconstruct the exact set of libraries (concepts, pipes, structures) required to execute a job — no shared filesystem assumed.
+- **`StoragePayloadCodec`**: offloads Temporal payloads larger than a configurable threshold (default 1 MiB) to external storage (S3 or local) and replaces them with lightweight URI references. Configurable via `[temporal.payload_codec_config]`. New `pipelex codec serve` CLI launches the codec server consumed by the Temporal Web UI for payload inspection.
+- **Schema-based dynamic model construction (`pipelex/cogt/content_generation/schema_to_model_factory.py`)**: rebuilds dynamic Pydantic models on a Temporal worker from the JSON schema embedded in `ObjectAssignment`, instead of relying on cross-process class identity. Cache bounded by an LRU (`_SCHEMA_CACHE_MAX_SIZE = 1024`); codegen serialized through a file lock to kill thundering-herd duplication on long-running workers receiving many distinct schemas. Adds `datamodel-code-generator>=0.55.0` as a runtime dependency.
+- **Worker scopes**: `pipelex worker --scope ...` lets a worker subscribe to a subset of activities/workflows so deployments can specialize workers (e.g. inference workers vs orchestration workers).
+- **`WorkerConfig.inference_task_queue`**: optional task-queue override for `act_llm_gen_text` so router and inference activities can be deployed on separate worker pools.
+- **Pre-generated `pipeline_run_id` support**: `pipeline_run_setup()`, `PipelineFactory`, and `PipelineManager` accept an optional `pipeline_run_id` parameter for external run-record creation.
+- **`workflow_id` in start response**: `PipelexPipelineStartResponse` includes `workflow_id`.
+- **Temporal `callbacks` passthrough**: `WorkflowExecutor.start_workflow()` accepts optional Temporal `Callback` objects.
+
+#### Distributed tracing (`pipelex/tracing/`)
+
+- **`EventLogProtocol` with pluggable backends**: `NdjsonEventLog`, `DynamoDBEventLog`, `InMemoryEventLog`, `BufferingEventLog`. Emits `TraceEvent`s as pipes start/finish across processes. Configured via `[pipelex.tracing_config]` (`backend = "ndjson" | "dynamodb"`). Tracing is **enabled by default** and decoupled from Temporal — single-process runs also produce a trace.
+- **`pipelex[dynamodb]` extra**: `pip install "pipelex[dynamodb]"` for the DynamoDB event log backend.
+- **`writer_id` on `TraceEvent`** (default `"primary"`): every event records which writer (worker / process) produced it, propagated through every backend. Standalone activity worker processes use a distinct `writer_id` so they can emit into the same backend partition as workflow workers without colliding on `(workflow_id, sequence)`. Stamped at construction time (no copy-on-emit). Enables cross-worker dedup and per-writer aggregation.
+- **NDJSON multi-writer key scheme**: dedup key is `(workflow_id, writer_id, type, sequence)`; sort key is `(workflow_id, sequence, writer_id)` — sequence is primary so the runner's `UsageReportEvent` does not sort before the router's `PipeStartEvent`. The file-handle cache key includes `writer_id`, so two writers for the same `(pipeline_run_id, workflow_id)` cannot share a stale handle.
+- **DynamoDB sort key format**: `EVENT#{workflow_id}#{writer_id}#{sequence:010d}`.
+- **Cross-worker `UsageReportEvent` emission from runner processes**: runner processes that never execute `WfPipeRouter.run()` (so `_event_log_contexts` has no entry for the workflow's `lookup_key`) emit usage events through a process-local event log built from `tracing_config`. The fallback log is cached per process via a `threading.Lock`-guarded factory in `pipelex.tracing.activity_event_log` and keyed by a stable per-process `writer_id = f"act_{pid}_{uuid8}"`. A single one-shot warning per process records that the fallback engaged. Specific exceptions (`OSError`, `MissingDependencyError`, `PipelexConfigError`, `botocore.ClientError`) are caught and logged at WARNING — never silently dropped, never re-raised into the inference path.
+- **`ReportingManager` registry lookup split into `_get_registry_strict` and `_get_or_create_registry`**: strict raises on miss and is used by `_report_*_job`, so runner processes silently skip the registry add when `open_registry` was never called; or-create is used by `inject_tokens_usages`, the console cost-report path, and `generate_report` for never-opened runs. Activity workers do not accumulate orphan registries.
+- **`ContentGeneratorDry` emits `UsageReportEvent`s**: invokes `report_inference_job` with a synthetic `LLMTokensUsage` so dry-run mode produces real events observable through the same backend path as live runs.
+- **`GraphSpecAssembler`**: rebuilds a complete `GraphSpec` offline from a stream of `TraceEvent`s — equivalence with the live `GraphTracer` is pinned by tests.
+- **`UsageAggregator`**: aggregates per-pipeline LLM/extract/img-gen usage across workers from the event log.
+- **Hub DI**: `PipelexHub.set_event_log()` / `get_event_log()` for dependency injection of custom event log backends. `make_event_log()` factory selects the backend from config or hub injection; the 3 prior call sites that hardcoded `NdjsonEventLog` now go through it.
+
+#### Inference error classification
+
+- **`InferenceErrorCategory` enum (`transient`, `configuration`, `content`, `capacity`)** with per-provider helpers that distinguish quota exhaustion from rate limits and detect content-policy violations — covers OpenAI, Anthropic, Google, Mistral, AWS Bedrock, and Pipelex Gateway.
+- **All inference workers attach error category + user action**: every LLM, image-gen, extract, and search worker across all providers raises exceptions with an `InferenceErrorCategory` and actionable `user_action` hint.
+- **Structured `ErrorReport`**: `PipelexError.to_error_report()` returns a dataclass with error type, category, retryable flag, user-action hint, model, and provider. CLI error handlers consume `to_error_report()` for consistent, structured display.
+- **`SecurityError(PipelexError)`**: new base class in `pipelex.base_exceptions` for security-policy violations. `UnsafeSchemaError` now extends it (was `ContentGenerationError`) so security signals are not silently swallowed by domain `except` handlers.
+
+#### Documentation
+
+- New "Under the Hood" pages: `pipe-routing-and-execution.md`, `temporal-integration.md`, `distributed-content-generation.md`. Cover routing/dispatch, Temporal architecture, and the dynamic-model + storage-codec serialization story.
+- New `AGENTS.md` at repo root, generated from the same source as `CLAUDE.md` via `make rules`.
+
+#### Other
+
+- **`PipeOutput.graph_assembly_error`**: optional `str` field set when the Temporal `act_assemble_graph` activity raises so consumers can distinguish "graph never produced" from "graph assembly failed". Previously the failure was logged as a warning and `graph_spec` silently stayed `None`.
+- **`pipe extract` web URL support** with full test coverage in `tests/integration/pipelex/pipes/pipe_operators/pipe_extract/`.
+- **`needs_inference` flag on CLI commands**: non-inference subcommands (e.g. `worker`, `doctor`) skip inference setup, shaving cold-start time.
+- **Environment-specific config**: `RunEnvironment` is now loaded from the `ENVIRONMENT` env var (was `ENV`). Accepted values: `local`, `dev`, `staging`, `prod`.
+
+### Changed
+
+- **Tightened inference quota classification patterns** to reduce false positives on auth/setup errors:
+  - Anthropic: bare `"credit"` token replaced with `"credit balance"`, `"out of credits"`, `"insufficient credit"`. No longer misclassifies `"your credit card was declined"` or `"we will credit your account"` as quota exhaustion.
+  - Google: bare `"billing"` token replaced with `"billing limit"`, `"billing quota"`, `"billing exceeded"`, and `"billing account"`. Continues to match real 429-class messages (`"Billing account is not active"`, `"billing limit reached"`); stops matching unrelated billing-mentioning text.
+  - Mistral / Gateway: bare `"billing"` likewise narrowed to `"billing limit"` / `"billing quota"`. Mistral additionally distinguishes `"out of credits"` vs `"insufficient credits"`.
+- **Removed duplicate `ContentGenerationError` class**: the unused `pipelex.cogt.content_generation.exceptions.ContentGenerationError` was deleted (had zero external imports). Its subclasses re-parented: `NeitherUrlNorDataError` → `PipelexError`, `UnsafeSchemaError` → new `SecurityError`. The temporal `pipelex.temporal.exceptions.ContentGenerationError` is now the only class with that name.
+- **Storage providers unified**: `StorageConfig` flattened to inheritance-based config so providers (`local`, `s3`) share a single shape across delivery and trace storage.
+- **`make rules` now generates both `CLAUDE.md` and `AGENTS.md` by default**: the `pipelex.kit_config.preferred_agent_target` setting has been renamed to `preferred_agent_targets` and is now a list. The default is `["claude", "agents"]`. Cursor remains exclusive (`["cursor"]`) and cannot be combined with single-file targets. Downstream projects overriding this setting must rename the key and wrap the value in a list.
+- **Cold start trimmed**: heavy SDK imports (`boto3`, `huggingface_hub`, etc.) deferred behind `TYPE_CHECKING` or function-local guards across multiple plugins.
+- **Graph viewer updated to mthds-ui v0.3.4**: bumped from v0.3.0 — additional polish atop the resizable detail panel, escape-to-close, sticky header, prompt expand/collapse with copy button, concept refinement display.
+- **Default models**: small-vision and creative defaults now point to `gemini-3.0-flash-preview`. Added `claude-4.6-sonnet` and Bedrock token-auth support.
+- **`kajson` upgraded** from `0.3.1` to `0.5.0` — required for the dynamic-class source registry that backs schema-to-model reconstruction.
+- **README install instructions**: replaced step-by-step Claude Code setup with single copy-paste messages for Claude Code and Codex, added manual install section.
+
+### Fixed
+
+- **Anthropic structured generation no longer flattens all errors to `CONTENT`.** `AnthropicLLMWorker._gen_object` runs requests through `instructor`, which wraps SDK exceptions in `InstructorRetryException`. The previous handler categorized every wrapped error as `CONTENT`, so genuine `RateLimitError`, `APITimeoutError`, `APIConnectionError`, `PermissionDeniedError`, and `AuthenticationError` cases never reached the typed branches — they were reported as content failures (non-retryable) instead of `TRANSIENT` / `CAPACITY` / `CONFIGURATION`. The handler now unwraps `InstructorRetryException.failed_attempts[-1].exception` (with a `__cause__`/`RetryError.last_attempt` fallback) and routes recognized SDK exceptions through a shared categorization helper; truly unrecognized errors keep the `CONTENT` fallback.
+- **Managed-deck detection no longer misclassifies user TOMLs.** `_is_managed_deck_filename` previously treated any non-`x_custom_*.toml` as kit-managed, so a user file like `my_overrides.toml` dropped into the deck dir would have been reported (and on `pipelex update` overwritten) as if it were a kit file. Now requires the numbered `^\d+_.*\.toml$` prefix that the kit actually ships.
+- **`PipeLLM` output structure prompt used the unresolved concept ref.** When `is_structure_prompt_enabled`, `get_output_structure_prompt` was called with `pipe_run_params.dynamic_output_concept_ref or output_stuff_spec.concept.concept_ref`. The first form can be a bare code (no domain), which broke downstream concept resolution. Now passes the already-resolved `output_stuff_spec.concept.concept_ref` directly.
+- **`PIPELEX_NO_DECK_NOTICE` suppression was too lax.** Any non-empty value silenced the deck-staleness notice — including `PIPELEX_NO_DECK_NOTICE=0`, which users might reasonably expect to _enable_ the notice. Now requires the documented `PIPELEX_NO_DECK_NOTICE=1`.
+- **Shipped `.kit_manifest.json` carried `kit_version: "0.25.0"`** for the 0.25.1 release, which would have triggered false stale-detection on fresh installs. Bumped to `0.25.1` and re-synced into `pipelex/kit/configs/`.
+- **Stored-XSS guard**: HTML escaped in fallback `main_stuff.html`.
+- **`GatewayExtractWorker` teardown**: guarded done-callbacks against cancelled tasks to stop noisy teardown errors.
+- **URL checker**: 401/403 are now treated as OK for auth-walled URLs.
+- **Pipeline duplicate guard**: registering the same pipeline twice raises explicitly instead of silently shadowing.
+
+### Documentation
+
+- **`docs/tools/cli/update.md` no longer claims the deck advisory fires on every CLI invocation.** Clarified that it is suppressed for `login`, `init`, `doctor`, `update`, and `which`.
+
+### Security
+
+- **`schema_to_model` rejects `x-python-*` codegen extensions and restricts `__import__` to an allowlist.** `datamodel-code-generator` honors the `x-python-import` JSON Schema extension by emitting arbitrary `from <module> import <name>` statements with no sanitization. Combined with the prior gap that `_make_restricted_builtins()` did not block `__import__`, an attacker able to plant a crafted `object_class_schema` on a Temporal payload (where `ObjectAssignment.object_class_schema: dict[str, Any]` round-trips untouched) could cause arbitrary modules to be imported during `exec()` of generated code. Two-layer defense added: (1) `_reject_unsafe_schema_extensions` raises `UnsafeSchemaError` if any `x-python-*` key is present anywhere in the schema; (2) `__import__` in the exec namespace is now wrapped to allow only `pydantic`, `typing`, `typing_extensions`, `enum`, `datetime`, `decimal`, `uuid`, `__future__`, `collections`, and `re`.
+- **Restricted exec builtins, path sanitization, and atomic fingerprint caching** in the schema-to-model pipeline.
+- **CORS hardened on codec server error paths**; no leaked exception strings; prefix guards on storage URIs.
+
 ## [v0.25.2] - 2026-04-30
 
 ### Fixed
@@ -203,7 +297,6 @@
 - **`library_dirs` passthrough**: Fixed `library_dirs` not being forwarded in builder operations (`inputs_ops`, `validate_ops`).
 - **Dry-run status**: Fixed validation status reporting for dry-run results.
 
-
 ## [v0.22.0] - 2026-03-25
 
 ### Added
@@ -365,14 +458,16 @@
 ## [v0.19.0] - 2026-03-02
 
 ### Added
- - **Web Search Integration**: Introduced a new `PipeSearch` operator, native support for Linkup as a search backend provider, `SearchResult` and `SearchResultContent` concepts for handling answers with citations, and Model Deck support for search models.
- - **Graph View Generation**: Added a `--view` option to `pipelex validate bundle` that generates a `ViewSpec` JSON (compatible with ReactFlow) for client-side graph rendering without writing files to disk.
+
+- **Web Search Integration**: Introduced a new `PipeSearch` operator, native support for Linkup as a search backend provider, `SearchResult` and `SearchResultContent` concepts for handling answers with citations, and Model Deck support for search models.
+- **Graph View Generation**: Added a `--view` option to `pipelex validate bundle` that generates a `ViewSpec` JSON (compatible with ReactFlow) for client-side graph rendering without writing files to disk.
 
 ### Changed
- - **Test Configuration**: Added a `search` pytest marker, excluded from default test runs.
- - `mthds` bumped to `>=0.1.0`.
- - `pipelex-tools` bumped to `>=0.2.3`.
- - `linkup-sdk>=0.12.0` added as optional dependency for the Linkup search provider.
+
+- **Test Configuration**: Added a `search` pytest marker, excluded from default test runs.
+- `mthds` bumped to `>=0.1.0`.
+- `pipelex-tools` bumped to `>=0.2.3`.
+- `linkup-sdk>=0.12.0` added as optional dependency for the Linkup search provider.
 
 ## [v0.18.6] - 2026-03-01
 
@@ -439,50 +534,48 @@
 
 - **Pipelex Gateway** — The deprecated `pipelex_inference` backend is now replaced by `pipelex_gateway`, featuring remote model configuration fetching so you always have access to the latest models without updating Pipelex.
 
-    **Getting your API key:**
+  **Getting your API key:**
+  1. Get your API key at [app.pipelex.com](https://app.pipelex.com/)
+  2. Add it to your `.env` file: `PIPELEX_GATEWAY_API_KEY=your-key-here`
 
-    1. Get your API key at [app.pipelex.com](https://app.pipelex.com/)
-    2. Add it to your `.env` file: `PIPELEX_GATEWAY_API_KEY=your-key-here`
+  **Gateway Supported models — included with the Free API Key**
+  - **Language Models (LLM):**
+    - OpenAI: all models up to GPT-5.2 and Codex
+    - Anthropic: Claude 3.7 Sonnet through Claude 4.5 Haiku/Sonnet/Opus
+    - Google: Gemini 2.0/2.5 Flash, Gemini 2.5 Pro, Gemini 3.0 Flash/Pro
+    - xAI: Grok 3/mini, Grok 4 (+ fast reasoning variants)
+    - Open-source: Mistral Large 3, DeepSeek v3.1/3.2/Speciale, GPT-OSS 20B/120B1, Kimi K2, Phi-4, Qwen3-VL 235B
+  - **Document Extraction:** Mistral Document AI, Azure Document Intelligence, DeepSeek OCR
+  - **Image Generation:** GPT-Image 1/1.5, Flux 2 Pro, Nano Banana/Pro
 
-    **Gateway Supported models — included with the Free API Key**
+  **Accepting the Terms of Service:**
 
-    - **Language Models (LLM):**
-        - OpenAI: all models up to GPT-5.2 and Codex
-        - Anthropic: Claude 3.7 Sonnet through Claude 4.5 Haiku/Sonnet/Opus
-        - Google: Gemini 2.0/2.5 Flash, Gemini 2.5 Pro, Gemini 3.0 Flash/Pro
-        - xAI: Grok 3/mini, Grok 4 (+ fast reasoning variants)
-        - Open-source: Mistral Large 3, DeepSeek v3.1/3.2/Speciale, GPT-OSS 20B/120B1, Kimi K2, Phi-4, Qwen3-VL 235B
-    - **Document Extraction:** Mistral Document AI, Azure Document Intelligence, DeepSeek OCR
-    - **Image Generation:** GPT-Image 1/1.5, Flux 2 Pro, Nano Banana/Pro
+  When you run `pipelex init`, you'll be prompted to accept the Gateway terms of service. By using Pipelex Gateway, telemetry is automatically enabled and identified by your API key (hashed for security) to monitor service quality and enforce fair usage. **We only collect technical data** (model names, token counts, latency, error rates)—never your prompts, completions, or business data. See our [Privacy Policy](https://go.pipelex.com/privacy-policy).
 
-    **Accepting the Terms of Service:**
-
-    When you run `pipelex init`, you'll be prompted to accept the Gateway terms of service. By using Pipelex Gateway, telemetry is automatically enabled and identified by your API key (hashed for security) to monitor service quality and enforce fair usage. **We only collect technical data** (model names, token counts, latency, error rates)—never your prompts, completions, or business data. See our [Privacy Policy](https://go.pipelex.com/privacy-policy).
-
-    **⚠️ Migration deadline:** If you were using `pipelex_inference`, please migrate soon—the legacy service will be shut down within few days. Get your new Gateway key at [app.pipelex.com](https://app.pipelex.com/).
+  **⚠️ Migration deadline:** If you were using `pipelex_inference`, please migrate soon—the legacy service will be shut down within few days. Get your new Gateway key at [app.pipelex.com](https://app.pipelex.com/).
 
 - **Execution Graph Visualization System** (preview feature) — Comprehensive tracing and visualization for pipeline executions.
 
-    **CLI:** `--graph` flag on `pipelex run` generates execution graphs. New `pipelex graph render <graph.json>` command for post-run rendering.
+  **CLI:** `--graph` flag on `pipelex run` generates execution graphs. New `pipelex graph render <graph.json>` command for post-run rendering.
 
-    **Viewers:** Interactive ReactFlow viewer (`reactflow.html`) with pan/zoom and node inspector. Mermaid diagrams (`mermaidflow.html`) with subgraphs and clickable nodes.
+  **Viewers:** Interactive ReactFlow viewer (`reactflow.html`) with pan/zoom and node inspector. Mermaid diagrams (`mermaidflow.html`) with subgraphs and clickable nodes.
 
-    **Makefile:** `make view-graph` (`vg`) and `make serve-graph` (`sg`) to start a local graph viewer.
+  **Makefile:** `make view-graph` (`vg`) and `make serve-graph` (`sg`) to start a local graph viewer.
 
 - **Pydantic Structure Generation** — Two new CLI commands bridge Pipelex's declarative concepts with your Python code:
 
-    **`pipelex build structures /library_dir/`** — Generates Pydantic models from all concept definitions found in the specified library directory. Now you have your structures as Python code: you can iterate on them, add custom validation functions, or use them as type hints in your code.
+  **`pipelex build structures /library_dir/`** — Generates Pydantic models from all concept definitions found in the specified library directory. Now you have your structures as Python code: you can iterate on them, add custom validation functions, or use them as type hints in your code.
 
-    **`pipelex build runner`** — Now automatically generates both the Python runner file AND the required Pydantic structures. When you run this command, it creates a complete, ready-to-execute Python script that imports the generated structures, so you can immediately use typed objects in your pipeline code.
+  **`pipelex build runner`** — Now automatically generates both the Python runner file AND the required Pydantic structures. When you run this command, it creates a complete, ready-to-execute Python script that imports the generated structures, so you can immediately use typed objects in your pipeline code.
 
-    See the [Build Commands documentation](https://docs.pipelex.com/latest/tools/cli/build/) for usage examples.
+  See the [Build Commands documentation](https://docs.pipelex.com/latest/tools/cli/build/) for usage examples.
 
 - **New Backends & Models**:
-    - **Hugging Face Inference** — Support for Hugging Face Inference API, including `qwen-image` text-to-image model.
-    - Google `gemini-3.0-flash-preview`
-    - Mistral OCR latest model `mistral-ocr-2512`
-    - **Scaleway** inference provider support for open-source models
-    - **Portkey AI** backend integration for unified access to multiple models through a single API key
+  - **Hugging Face Inference** — Support for Hugging Face Inference API, including `qwen-image` text-to-image model.
+  - Google `gemini-3.0-flash-preview`
+  - Mistral OCR latest model `mistral-ocr-2512`
+  - **Scaleway** inference provider support for open-source models
+  - **Portkey AI** backend integration for unified access to multiple models through a single API key
 
 - **Document Support in `PipeLLM`** — Include `Document` objects (like PDFs) directly in prompts using `@variable` or `$variable` syntax. Supports single documents, multiple documents, and lists, combinable with text and image inputs.
 
@@ -548,9 +641,9 @@
 - **Configurable Retry Logic**: Exponential backoff for inference API calls, configurable in `pipelex.toml` under `[cogt.tenacity_config]`
 - **Context Manager Support**: The `Pipelex` class now supports `with Pipelex.make(): ...` for graceful shutdown
 - **Validation Improvements**:
-    - Pipelex Bundle concept keys: prevent bundles from re-creating a native concept
-    - `PipeSequence`: output multiplicity must match the last step's output multiplicity
-    - `PipeFunc`: output multiplicity must match the function return type (`ListContent` subclass for multiplicity=true)
+  - Pipelex Bundle concept keys: prevent bundles from re-creating a native concept
+  - `PipeSequence`: output multiplicity must match the last step's output multiplicity
+  - `PipeFunc`: output multiplicity must match the function return type (`ListContent` subclass for multiplicity=true)
 - **Rendering Protocols**: Three new `@runtime_checkable` protocols (`ImageRenderable`, `TagRenderable`, `TextFormatRenderable`) to formalize the interaction between data types and Jinja2 filters.
 - **Unified URI Handling System**: New `pipelex.tools.uri` module providing type-safe parsing for HTTP/HTTPS URLs, local file paths, file URIs, `pipelex-storage://` URIs, and base64 data URLs.
 - **Automatic Input Data Storage**: Pipeline pre-processing step that converts large `data:` URLs in an `ImageContent` or `DocumentContent` into `pipelex-storage://` URIs for improved performance, by storing the data with the configured storage provider. Configurable via `is_normalize_data_urls_to_storage` in `pipelex.toml`.
@@ -592,15 +685,17 @@
 - **Default Model Change**: `extract_text_from_visuals` deck now defaults to `azure-document-intelligence`
 - **`pipelex_inference` replaced by `pipelex_gateway`**: See Highlights for migration details. New `PIPELEX_GATEWAY_API_KEY` environment variable; default routing profiles updated to `pipelex_gateway_first`.
 - **Telemetry System Split**: Now two separate streams:
-    1. Pipelex Gateway telemetry for service monitoring (never collects prompts/completions/business data)
-    2. Custom telemetry to user-configured backends
-    3. Config updated accordingly (`telemetry.toml`):
+  1. Pipelex Gateway telemetry for service monitoring (never collects prompts/completions/business data)
+  2. Custom telemetry to user-configured backends
+  3. Config updated accordingly (`telemetry.toml`):
+
+
       - Renamed `[posthog]` to `[custom_posthog]` to distinguish user's PostHog from Pipelex Gateway telemetry
       - Added new `[custom_portkey]` section with `force_debug_enabled` and `force_tracing_enabled` settings
 - **Main Configuration Overrides Updated** (`.pipelex/pipelex.toml`):
-    - `pipelex_override.toml` (final override) renamed from `pipelex_super.toml` to `pipelex_override.toml` and moved from repo root to `.pipelex/` directory
-    - `telemetry_override.toml` (personal telemetry settings)
-    - `is_generate_cost_report_file_enabled` default changed from `true` to `false`
+  - `pipelex_override.toml` (final override) renamed from `pipelex_super.toml` to `pipelex_override.toml` and moved from repo root to `.pipelex/` directory
+  - `telemetry_override.toml` (personal telemetry settings)
+  - `is_generate_cost_report_file_enabled` default changed from `true` to `false`
 
 - **Documentation**:
   - Clarified **Setup (first run)** vs **Configuration (TOML reference)**, added a Setup overview page, and added contributor docs for configuration defaults/overrides.
@@ -682,10 +777,10 @@
 ### Migration Notes
 
 - **Telemetry configuration migration**: If you have an existing `telemetry.toml`, rename:
-    - `[posthog]` → `[custom_posthog]`
-    - `[posthog.tracing]` → `[custom_posthog.tracing]`
-    - `[posthog.tracing.capture]` → `[custom_posthog.tracing.capture]`
-    - Or run `pipelex init telemetry --reset` to regenerate the file with the new structure
+  - `[posthog]` → `[custom_posthog]`
+  - `[posthog.tracing]` → `[custom_posthog.tracing]`
+  - `[posthog.tracing.capture]` → `[custom_posthog.tracing.capture]`
+  - Or run `pipelex init telemetry --reset` to regenerate the file with the new structure
 
 ### Refactored
 
@@ -741,69 +836,73 @@
 
 **Highlights:**
 
- - **Agent CLI (`pipelex-agent`)**: New machine-first CLI for AI agents with structured JSON output for all commands (`build`, `run`, `validate`, `inputs`, `concept`, `pipe`, `assemble`, `graph`, `models`, `doctor`).
- - **LLM Reasoning Controls**: Unified support for "Thinking" models (Chain of Thought) with `reasoning_effort`, `reasoning_budget`, and `thinking_mode` parameters. Supports Anthropic Extended Thinking, Google Gemini Thinking, OpenAI Reasoning (`o1`/`o3`), and Mistral/Magistral models. Includes new presets: `$deep-analysis` and `$quick-reasoning`.
- - **Image-to-Image Generation**: `PipeImgGen` now supports input images via `input_images` field, with `InputImagesTaxonomy` for provider-specific handling and variable reference detection (`{{ var }}`, `$var`, `@var`) in prompts.
- - **PipeCompose "Construct" Mode**: New `construct` mode for building structured objects (dictionaries/Pydantic models) directly from variables.
- - **Nested concepts in inline structures**: You can now define nested structures for your concepts in your `.plx` files. Learn more here: [Nested Concepts in Inline Structures](https://docs.pipelex.com/latest/building-methods/concepts/inline-structures).
+- **Agent CLI (`pipelex-agent`)**: New machine-first CLI for AI agents with structured JSON output for all commands (`build`, `run`, `validate`, `inputs`, `concept`, `pipe`, `assemble`, `graph`, `models`, `doctor`).
+- **LLM Reasoning Controls**: Unified support for "Thinking" models (Chain of Thought) with `reasoning_effort`, `reasoning_budget`, and `thinking_mode` parameters. Supports Anthropic Extended Thinking, Google Gemini Thinking, OpenAI Reasoning (`o1`/`o3`), and Mistral/Magistral models. Includes new presets: `$deep-analysis` and `$quick-reasoning`.
+- **Image-to-Image Generation**: `PipeImgGen` now supports input images via `input_images` field, with `InputImagesTaxonomy` for provider-specific handling and variable reference detection (`{{ var }}`, `$var`, `@var`) in prompts.
+- **PipeCompose "Construct" Mode**: New `construct` mode for building structured objects (dictionaries/Pydantic models) directly from variables.
+- **Nested concepts in inline structures**: You can now define nested structures for your concepts in your `.plx` files. Learn more here: [Nested Concepts in Inline Structures](https://docs.pipelex.com/latest/building-methods/concepts/inline-structures).
 
 ### Added
- - **Builder Auto-Repair**: Self-healing capabilities including auto-generation of undeclared concepts, multiplicity mismatch fixes, and pruning of unreachable pipes/unused concepts.
- - **Concept Field Features**: Added `choices` support (compiles to `Literal` types/Enums) and explicit `list` type with `item_type`/`item_concept_ref`.
- - **PipeFunc Execution Error Context**: When a `@pipe_func` function fails during execution, the error message now includes detailed context: the function name, actual input values from working memory, expected output type, and the original error with its type. This makes debugging PipeFunc errors much easier.
- - **`pipelex build output` CLI Command**: New command to generate example output JSON for a pipe, complementing the existing `pipelex build inputs` command. Shows the expected output structure based on the pipe's output concept type, with multiplicity support. For pipes with `native.Anything` output (e.g., `PipeCondition` with different mapped pipe outputs), displays all possible outputs from mapped pipes.
- - **Telemetry System**: Introduced anonymous usage tracking and exception capture for CLI commands (`graph render`), reporting to both user-configured and Pipelex analytics endpoints.
- - **PipeExtract Operator Validation**: Added strict input validation that raises configuration errors for incompatible input types or when document-specific parameters are used with image inputs.
- - **PipeCondition Output Auto-Fix in Builder Loop**: The pipe builder now automatically fixes `PipeCondition` output concept errors during validation. If all mapped pipes have the same output, the `PipeCondition` output is set to that concept; otherwise it's set to `native.Anything`.
- - **PipeFunc Return Type Validation**: Added validation to ensure that a `PipeFunc` function's return type matches the output concept's structure class.
- - **URL Validation on `ImageContent` and `DocumentContent`**: Both models validate external resources (HTTP/HTTPS URLs via HEAD request, local file paths via existence check) through a `validate_resources()` method called during pipeline execution (`validate_before_run`) rather than at model instantiation. Internal URIs (`data:`, `pipelex-storage://`) skip validation entirely. Validation is skipped in dry-run mode where inputs use mock URLs.
- - **Literal Type Support in Dry Run Mocks**: `DryRunFactory` now detects `Literal` type annotations (including `Optional[Literal[...]]`) and generates valid mock values by randomly picking from the allowed choices instead of producing invalid random strings.
- - **Literal Type Support in `pipelex build inputs`/`pipelex build output`**: The concept representation generator now handles `Literal` fields by picking a random value from the allowed choices, and generates mock URL patterns for `url` fields.
- - **Literal Error Handling in Validation Messages**: Pydantic validation error formatting now recognizes `literal_error` types and displays them as "Invalid choice errors" with the actual value and expected options.
- - **`PipeRunError` Catching in Bundle Validation**: `validate_bundle` now catches `PipeRunError` during dry run and wraps it in `ValidateBundleError` with a clear message.
- - **`ValidationError` Catching in Pipeline Execution**: `execute_pipeline` now catches Pydantic `ValidationError` from input construction, formats the errors, and raises a `PipeExecutionError` with a clear message.
- - **Broader Error Handling in CLI `pipelex run`**: The CLI run command now catches `PipelexError` in addition to `PipelineExecutionError`, providing better error messages for failures that occur outside the pipeline execution itself.
- - **Content Filenames:** Added `filename` field to `ImageContent` and `DocumentContent`, with auto-population from local file paths via new `extract_filename_from_uri` helper.
- - **Batch Validation Error Type:** Introduced `PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION` for naming conflicts in batch operations.
- - **Documentation:** Added naming convention rules to `builder.plx` and `pipe_design.plx` (batch input lists should be plural, item names singular).
+
+- **Builder Auto-Repair**: Self-healing capabilities including auto-generation of undeclared concepts, multiplicity mismatch fixes, and pruning of unreachable pipes/unused concepts.
+- **Concept Field Features**: Added `choices` support (compiles to `Literal` types/Enums) and explicit `list` type with `item_type`/`item_concept_ref`.
+- **PipeFunc Execution Error Context**: When a `@pipe_func` function fails during execution, the error message now includes detailed context: the function name, actual input values from working memory, expected output type, and the original error with its type. This makes debugging PipeFunc errors much easier.
+- **`pipelex build output` CLI Command**: New command to generate example output JSON for a pipe, complementing the existing `pipelex build inputs` command. Shows the expected output structure based on the pipe's output concept type, with multiplicity support. For pipes with `native.Anything` output (e.g., `PipeCondition` with different mapped pipe outputs), displays all possible outputs from mapped pipes.
+- **Telemetry System**: Introduced anonymous usage tracking and exception capture for CLI commands (`graph render`), reporting to both user-configured and Pipelex analytics endpoints.
+- **PipeExtract Operator Validation**: Added strict input validation that raises configuration errors for incompatible input types or when document-specific parameters are used with image inputs.
+- **PipeCondition Output Auto-Fix in Builder Loop**: The pipe builder now automatically fixes `PipeCondition` output concept errors during validation. If all mapped pipes have the same output, the `PipeCondition` output is set to that concept; otherwise it's set to `native.Anything`.
+- **PipeFunc Return Type Validation**: Added validation to ensure that a `PipeFunc` function's return type matches the output concept's structure class.
+- **URL Validation on `ImageContent` and `DocumentContent`**: Both models validate external resources (HTTP/HTTPS URLs via HEAD request, local file paths via existence check) through a `validate_resources()` method called during pipeline execution (`validate_before_run`) rather than at model instantiation. Internal URIs (`data:`, `pipelex-storage://`) skip validation entirely. Validation is skipped in dry-run mode where inputs use mock URLs.
+- **Literal Type Support in Dry Run Mocks**: `DryRunFactory` now detects `Literal` type annotations (including `Optional[Literal[...]]`) and generates valid mock values by randomly picking from the allowed choices instead of producing invalid random strings.
+- **Literal Type Support in `pipelex build inputs`/`pipelex build output`**: The concept representation generator now handles `Literal` fields by picking a random value from the allowed choices, and generates mock URL patterns for `url` fields.
+- **Literal Error Handling in Validation Messages**: Pydantic validation error formatting now recognizes `literal_error` types and displays them as "Invalid choice errors" with the actual value and expected options.
+- **`PipeRunError` Catching in Bundle Validation**: `validate_bundle` now catches `PipeRunError` during dry run and wraps it in `ValidateBundleError` with a clear message.
+- **`ValidationError` Catching in Pipeline Execution**: `execute_pipeline` now catches Pydantic `ValidationError` from input construction, formats the errors, and raises a `PipeExecutionError` with a clear message.
+- **Broader Error Handling in CLI `pipelex run`**: The CLI run command now catches `PipelexError` in addition to `PipelineExecutionError`, providing better error messages for failures that occur outside the pipeline execution itself.
+- **Content Filenames:** Added `filename` field to `ImageContent` and `DocumentContent`, with auto-population from local file paths via new `extract_filename_from_uri` helper.
+- **Batch Validation Error Type:** Introduced `PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION` for naming conflicts in batch operations.
+- **Documentation:** Added naming convention rules to `builder.plx` and `pipe_design.plx` (batch input lists should be plural, item names singular).
 
 ### Changed
- - **Model Deck Updates**: Default premium model now `claude-4.6-opus`; added Mistral models (`mistral-small-3.2`, `mistral-large`, `magistral` series) and `gpt-5` placeholders.
- - **Jinja2 Rendering**: Image objects now replaced with placeholders (e.g., `[Image 1]`) during text generation; async filters only registered in async environments.
- - **Backend Configurations**: Added `effort_to_level_map` and `effort_to_budget_maps` for reasoning translation; disabled Google Vertex AI by default.
- - **Dependencies**: Updated `pypdfium2`, `anthropic`, and `mistralai` version constraints.
- - **`pipelex run --dry-run`**: No longer pretty prints the main_stuff output, matching the expected behavior for dry runs where no actual inference occurs.
- - **`pipelex build structures` Command**: Now uses a lightweight loading mechanism that only processes domains and concepts, skipping pipe loading and validation entirely. This fixes the chicken-and-egg problem where structure generation would fail due to pipe validation errors before the structures were even created. Added `--force` / `-f` flag to regenerate all structures without checking if classes already exist.
- - **Test Profile System**: Refactored integration tests to use a new configuration system (`.pipelex/test_profiles.toml`) with `dev`, `ci`, and `full` profiles for controlling which AI models are used in parametrized tests, replacing runtime filtering and hardcoded model lists.
- - **`pipelex run --graph` Flag**: Now acts as an override for `pipelex.toml` settings instead of defaulting to `true`.
- - **Default Image Generation Models**: Updated in `base_deck.toml`: `base-img-gen`: `flux-2-pro`, `best-img-gen`: `nano-banana-pro`, `fast-img-gen`: `gpt-image-1-mini`
- - **Remote Configuration**: Updated service URL to version 3.
- - **GatewayExtractWorker**: Now checks model capabilities before attempting image captioning.
- - Change the output validation of `PipeCondition`: If all mapped pipes have the same output concept, `PipeCondition`'s output MUST be that same concept. If mapped pipes have different output concepts, `PipeCondition`'s output MUST be the native concept `Anything`.
- - **CLI**: Changed `pipelex validate all` to `pipelex validate --all` (or `-a`).
- - **StructuredContent.rendered_html()**: Now recursively calls `rendered_html()` on nested `StuffContent` fields instead of using json2html conversion. Also skips `None` values and uses HTML table format.
- - **Batch Pipe Validation:** Enforced stricter naming rules for batch specs—`input_item_name` must differ from `input_list_name` and not shadow existing input keys, with clearer error messages suggesting plural/singular conventions.
+
+- **Model Deck Updates**: Default premium model now `claude-4.6-opus`; added Mistral models (`mistral-small-3.2`, `mistral-large`, `magistral` series) and `gpt-5` placeholders.
+- **Jinja2 Rendering**: Image objects now replaced with placeholders (e.g., `[Image 1]`) during text generation; async filters only registered in async environments.
+- **Backend Configurations**: Added `effort_to_level_map` and `effort_to_budget_maps` for reasoning translation; disabled Google Vertex AI by default.
+- **Dependencies**: Updated `pypdfium2`, `anthropic`, and `mistralai` version constraints.
+- **`pipelex run --dry-run`**: No longer pretty prints the main_stuff output, matching the expected behavior for dry runs where no actual inference occurs.
+- **`pipelex build structures` Command**: Now uses a lightweight loading mechanism that only processes domains and concepts, skipping pipe loading and validation entirely. This fixes the chicken-and-egg problem where structure generation would fail due to pipe validation errors before the structures were even created. Added `--force` / `-f` flag to regenerate all structures without checking if classes already exist.
+- **Test Profile System**: Refactored integration tests to use a new configuration system (`.pipelex/test_profiles.toml`) with `dev`, `ci`, and `full` profiles for controlling which AI models are used in parametrized tests, replacing runtime filtering and hardcoded model lists.
+- **`pipelex run --graph` Flag**: Now acts as an override for `pipelex.toml` settings instead of defaulting to `true`.
+- **Default Image Generation Models**: Updated in `base_deck.toml`: `base-img-gen`: `flux-2-pro`, `best-img-gen`: `nano-banana-pro`, `fast-img-gen`: `gpt-image-1-mini`
+- **Remote Configuration**: Updated service URL to version 3.
+- **GatewayExtractWorker**: Now checks model capabilities before attempting image captioning.
+- Change the output validation of `PipeCondition`: If all mapped pipes have the same output concept, `PipeCondition`'s output MUST be that same concept. If mapped pipes have different output concepts, `PipeCondition`'s output MUST be the native concept `Anything`.
+- **CLI**: Changed `pipelex validate all` to `pipelex validate --all` (or `-a`).
+- **StructuredContent.rendered_html()**: Now recursively calls `rendered_html()` on nested `StuffContent` fields instead of using json2html conversion. Also skips `None` values and uses HTML table format.
+- **Batch Pipe Validation:** Enforced stricter naming rules for batch specs—`input_item_name` must differ from `input_list_name` and not shadow existing input keys, with clearer error messages suggesting plural/singular conventions.
 
 ### Fixed
- - **Helpful Error for `get_stuff_as(ListContent[T])`**: When users incorrectly call `get_stuff_as("name", ListContent[Something])` instead of `get_stuff_as_list("name", Something)`, the error message now explicitly suggests using `get_stuff_as_list()`.
- - **PipeFunc `ListContent[T]` Validation**: Fixed validation rejecting valid `ListContent[T]` return types for array outputs (`T[]`). Previously, a function returning `ListContent[Expense]` would fail validation for `output = "Expense[]"` with a misleading error. The validation now correctly extracts and validates the generic type parameter from Pydantic's metadata.
- - **PipeFunc Class Name Matching**: Fixed validation failing when the return type class and concept structure class are logically the same but loaded from different contexts. The validation now uses class name matching as a fallback, allowing `ListContent[Expense]` to match `Expense[]` even if the `Expense` class objects differ.
- - Fixed `PipeImgGen` not properly converting `ImageContent` to custom subclasses (e.g., `Receipt(ImageContent)`). The pipe now uses `smart_dump()` before `model_validate()` to correctly instantiate the output concept's structure class.
- - Corrected output directory creation logic in `pipelex run` to properly respect the `--no-graph` flag and configuration settings.
- - Fixed a bug when trying to print HTML content in a TextContent object.
- - Fixed the Pipelex CLI for generating structures, inputs, runner files.
- - Fixed `@pipe_func` decorated functions showing "function not found" instead of explaining why the function is ineligible (e.g., missing return type annotation).
- - Fixed PipeLLM with list output (e.g., `output = "Item[]"`) not producing `ListContent` when run inside a nested PipeSequence with `batch_over`.
- - **Duplicate Pipe Error Message**: When a pipe code is declared in multiple `.plx` files (or twice in the same file), the error message now shows which bundle file(s) contain the conflicting declarations instead of a misleading message about "running the same pipe twice in the same pipeline".
- - Fixed `pipelex build runner` and `pipelex build inputs` generating string placeholders (e.g., `"number_int | float"`) instead of numeric values for Number concepts with `int | float` union type fields.
- - Fixed structure generation failing with `PydanticUserError` when a concept structure references native concepts (e.g., `native.Html`). The generator now properly resolves native concept refs to their content classes (e.g., `HtmlContent`) with correct imports.
+
+- **Helpful Error for `get_stuff_as(ListContent[T])`**: When users incorrectly call `get_stuff_as("name", ListContent[Something])` instead of `get_stuff_as_list("name", Something)`, the error message now explicitly suggests using `get_stuff_as_list()`.
+- **PipeFunc `ListContent[T]` Validation**: Fixed validation rejecting valid `ListContent[T]` return types for array outputs (`T[]`). Previously, a function returning `ListContent[Expense]` would fail validation for `output = "Expense[]"` with a misleading error. The validation now correctly extracts and validates the generic type parameter from Pydantic's metadata.
+- **PipeFunc Class Name Matching**: Fixed validation failing when the return type class and concept structure class are logically the same but loaded from different contexts. The validation now uses class name matching as a fallback, allowing `ListContent[Expense]` to match `Expense[]` even if the `Expense` class objects differ.
+- Fixed `PipeImgGen` not properly converting `ImageContent` to custom subclasses (e.g., `Receipt(ImageContent)`). The pipe now uses `smart_dump()` before `model_validate()` to correctly instantiate the output concept's structure class.
+- Corrected output directory creation logic in `pipelex run` to properly respect the `--no-graph` flag and configuration settings.
+- Fixed a bug when trying to print HTML content in a TextContent object.
+- Fixed the Pipelex CLI for generating structures, inputs, runner files.
+- Fixed `@pipe_func` decorated functions showing "function not found" instead of explaining why the function is ineligible (e.g., missing return type annotation).
+- Fixed PipeLLM with list output (e.g., `output = "Item[]"`) not producing `ListContent` when run inside a nested PipeSequence with `batch_over`.
+- **Duplicate Pipe Error Message**: When a pipe code is declared in multiple `.plx` files (or twice in the same file), the error message now shows which bundle file(s) contain the conflicting declarations instead of a misleading message about "running the same pipe twice in the same pipeline".
+- Fixed `pipelex build runner` and `pipelex build inputs` generating string placeholders (e.g., `"number_int | float"`) instead of numeric values for Number concepts with `int | float` union type fields.
+- Fixed structure generation failing with `PydanticUserError` when a concept structure references native concepts (e.g., `native.Html`). The generator now properly resolves native concept refs to their content classes (e.g., `HtmlContent`) with correct imports.
 
 ### Removed
- - **`pipelex kit` Command**: The kit commands have been removed from the main CLI. They are now internal tools for Pipelex contributors only, available via `pipelex-dev kit rules`.
- - **`pipelex kit migrations` Command**: Removed entirely.
- - **`pipelex kit remove-rules` Command**: Removed entirely.
- - **PLX Syntax Agent Rules**: Removed `write_pipelex.md` and `run_pipelex.md` agent rules. These PLX syntax guides are no longer installed in client projects.
- - **`[pipelex.kit_config]` Configuration**: Removed from client project configuration (`.pipelex/pipelex.toml`).
+
+- **`pipelex kit` Command**: The kit commands have been removed from the main CLI. They are now internal tools for Pipelex contributors only, available via `pipelex-dev kit rules`.
+- **`pipelex kit migrations` Command**: Removed entirely.
+- **`pipelex kit remove-rules` Command**: Removed entirely.
+- **PLX Syntax Agent Rules**: Removed `write_pipelex.md` and `run_pipelex.md` agent rules. These PLX syntax guides are no longer installed in client projects.
+- **`[pipelex.kit_config]` Configuration**: Removed from client project configuration (`.pipelex/pipelex.toml`).
 
 ## [v0.18.0b2] - 2026-01-20
 
@@ -811,50 +910,48 @@
 
 - **Pipelex Gateway** — The deprecated `pipelex_inference` backend is now replaced by `pipelex_gateway`, featuring remote model configuration fetching so you always have access to the latest models without updating Pipelex.
 
-    **Getting your API key:**
+  **Getting your API key:**
+  1. Get your API key at [app.pipelex.com](https://app.pipelex.com/)
+  2. Add it to your `.env` file: `PIPELEX_GATEWAY_API_KEY=your-key-here`
 
-    1. Get your API key at [app.pipelex.com](https://app.pipelex.com/)
-    2. Add it to your `.env` file: `PIPELEX_GATEWAY_API_KEY=your-key-here`
+  **Gateway Supported models — included with the Free API Key**
+  - **Language Models (LLM):**
+    - OpenAI: all models up to GPT-5.2 and Codex
+    - Anthropic: Claude 3.7 Sonnet through Claude 4.5 Haiku/Sonnet/Opus
+    - Google: Gemini 2.0/2.5 Flash, Gemini 2.5 Pro, Gemini 3.0 Flash/Pro
+    - xAI: Grok 3/mini, Grok 4 (+ fast reasoning variants)
+    - Open-source: Mistral Large 3, DeepSeek v3.1/3.2/Speciale, GPT-OSS 20B/120B1, Kimi K2, Phi-4, Qwen3-VL 235B
+  - **Document Extraction:** Mistral Document AI, Azure Document Intelligence, DeepSeek OCR
+  - **Image Generation:** GPT-Image 1/1.5, Flux 2 Pro, Nano Banana/Pro
 
-    **Gateway Supported models — included with the Free API Key**
+  **Accepting the Terms of Service:**
 
-    - **Language Models (LLM):**
-        - OpenAI: all models up to GPT-5.2 and Codex
-        - Anthropic: Claude 3.7 Sonnet through Claude 4.5 Haiku/Sonnet/Opus
-        - Google: Gemini 2.0/2.5 Flash, Gemini 2.5 Pro, Gemini 3.0 Flash/Pro
-        - xAI: Grok 3/mini, Grok 4 (+ fast reasoning variants)
-        - Open-source: Mistral Large 3, DeepSeek v3.1/3.2/Speciale, GPT-OSS 20B/120B1, Kimi K2, Phi-4, Qwen3-VL 235B
-    - **Document Extraction:** Mistral Document AI, Azure Document Intelligence, DeepSeek OCR
-    - **Image Generation:** GPT-Image 1/1.5, Flux 2 Pro, Nano Banana/Pro
+  When you run `pipelex init`, you'll be prompted to accept the Gateway terms of service. By using Pipelex Gateway, telemetry is automatically enabled and identified by your API key (hashed for security) to monitor service quality and enforce fair usage. **We only collect technical data** (model names, token counts, latency, error rates)—never your prompts, completions, or business data. See our [Privacy Policy](https://go.pipelex.com/privacy-policy).
 
-    **Accepting the Terms of Service:**
-
-    When you run `pipelex init`, you'll be prompted to accept the Gateway terms of service. By using Pipelex Gateway, telemetry is automatically enabled and identified by your API key (hashed for security) to monitor service quality and enforce fair usage. **We only collect technical data** (model names, token counts, latency, error rates)—never your prompts, completions, or business data. See our [Privacy Policy](https://go.pipelex.com/privacy-policy).
-
-    **⚠️ Migration deadline:** If you were using `pipelex_inference`, please migrate soon—the legacy service will be shut down within few days. Get your new Gateway key at [app.pipelex.com](https://app.pipelex.com/).
+  **⚠️ Migration deadline:** If you were using `pipelex_inference`, please migrate soon—the legacy service will be shut down within few days. Get your new Gateway key at [app.pipelex.com](https://app.pipelex.com/).
 
 - **Execution Graph Visualization System** (preview feature) — Comprehensive tracing and visualization for pipeline executions.
 
-    **CLI:** `--graph` flag on `pipelex run` generates execution graphs. New `pipelex graph render <graph.json>` command for post-run rendering.
+  **CLI:** `--graph` flag on `pipelex run` generates execution graphs. New `pipelex graph render <graph.json>` command for post-run rendering.
 
-    **Viewers:** Interactive ReactFlow viewer (`reactflow.html`) with pan/zoom and node inspector. Mermaid diagrams (`mermaidflow.html`) with subgraphs and clickable nodes.
+  **Viewers:** Interactive ReactFlow viewer (`reactflow.html`) with pan/zoom and node inspector. Mermaid diagrams (`mermaidflow.html`) with subgraphs and clickable nodes.
 
-    **Makefile:** `make view-graph` (`vg`) and `make serve-graph` (`sg`) to start a local graph viewer.
+  **Makefile:** `make view-graph` (`vg`) and `make serve-graph` (`sg`) to start a local graph viewer.
 
 - **Pydantic Structure Generation** — Two new CLI commands bridge Pipelex's declarative concepts with your Python code:
 
-    **`pipelex build structures /library_dir/`** — Generates Pydantic models from all concept definitions found in the specified library directory. Now you have your structures as Python code: you can iterate on them, add custom validation functions, or use them as type hints in your code.
+  **`pipelex build structures /library_dir/`** — Generates Pydantic models from all concept definitions found in the specified library directory. Now you have your structures as Python code: you can iterate on them, add custom validation functions, or use them as type hints in your code.
 
-    **`pipelex build runner`** — Now automatically generates both the Python runner file AND the required Pydantic structures. When you run this command, it creates a complete, ready-to-execute Python script that imports the generated structures, so you can immediately use typed objects in your pipeline code.
+  **`pipelex build runner`** — Now automatically generates both the Python runner file AND the required Pydantic structures. When you run this command, it creates a complete, ready-to-execute Python script that imports the generated structures, so you can immediately use typed objects in your pipeline code.
 
-    See the [Build Commands documentation](https://docs.pipelex.com/latest/tools/cli/build/) for usage examples.
+  See the [Build Commands documentation](https://docs.pipelex.com/latest/tools/cli/build/) for usage examples.
 
 - **New Backends & Models**:
-    - **Hugging Face Inference** — Support for Hugging Face Inference API, including `qwen-image` text-to-image model.
-    - Google `gemini-3.0-flash-preview`
-    - Mistral OCR latest model `mistral-ocr-2512`
-    - **Scaleway** inference provider support for open-source models
-    - **Portkey AI** backend integration for unified access to multiple models through a single API key
+  - **Hugging Face Inference** — Support for Hugging Face Inference API, including `qwen-image` text-to-image model.
+  - Google `gemini-3.0-flash-preview`
+  - Mistral OCR latest model `mistral-ocr-2512`
+  - **Scaleway** inference provider support for open-source models
+  - **Portkey AI** backend integration for unified access to multiple models through a single API key
 
 - **Document Support in `PipeLLM`** — Include `Document` objects (like PDFs) directly in prompts using `@variable` or `$variable` syntax. Supports single documents, multiple documents, and lists, combinable with text and image inputs.
 
@@ -878,9 +975,9 @@
 - **Configurable Retry Logic**: Exponential backoff for inference API calls, configurable in `pipelex.toml` under `[cogt.tenacity_config]`
 - **Context Manager Support**: The `Pipelex` class now supports `with Pipelex.make(): ...` for graceful shutdown
 - **Validation Improvements**:
-    - Pipelex Bundle concept keys: prevent bundles from re-creating a native concept
-    - `PipeSequence`: output multiplicity must match the last step's output multiplicity
-    - `PipeFunc`: output multiplicity must match the function return type (`ListContent` subclass for multiplicity=true)
+  - Pipelex Bundle concept keys: prevent bundles from re-creating a native concept
+  - `PipeSequence`: output multiplicity must match the last step's output multiplicity
+  - `PipeFunc`: output multiplicity must match the function return type (`ListContent` subclass for multiplicity=true)
 - **Rendering Protocols**: Three new `@runtime_checkable` protocols (`ImageRenderable`, `TagRenderable`, `TextFormatRenderable`) to formalize the interaction between data types and Jinja2 filters.
 - **Unified URI Handling System**: New `pipelex.tools.uri` module providing type-safe parsing for HTTP/HTTPS URLs, local file paths, file URIs, `pipelex-storage://` URIs, and base64 data URLs.
 - **Automatic Input Data Storage**: Pipeline pre-processing step that converts large `data:` URLs in an `ImageContent` or `DocumentContent` into `pipelex-storage://` URIs for improved performance, by storing the data with the configured storage provider. Configurable via `is_normalize_data_urls_to_storage` in `pipelex.toml`.
@@ -907,15 +1004,17 @@
 - **Default Model Change**: `extract_text_from_visuals` deck now defaults to `azure-document-intelligence`
 - **`pipelex_inference` replaced by `pipelex_gateway`**: See Highlights for migration details. New `PIPELEX_GATEWAY_API_KEY` environment variable; default routing profiles updated to `pipelex_gateway_first`.
 - **Telemetry System Split**: Now two separate streams:
-    1. Pipelex Gateway telemetry for service monitoring (never collects prompts/completions/business data)
-    2. Custom telemetry to user-configured backends
-    3. Config updated accordingly (`telemetry.toml`):
+  1. Pipelex Gateway telemetry for service monitoring (never collects prompts/completions/business data)
+  2. Custom telemetry to user-configured backends
+  3. Config updated accordingly (`telemetry.toml`):
+
+
       - Renamed `[posthog]` to `[custom_posthog]` to distinguish user's PostHog from Pipelex Gateway telemetry
       - Added new `[custom_portkey]` section with `force_debug_enabled` and `force_tracing_enabled` settings
 - **Main Configuration Overrides Updated** (`.pipelex/pipelex.toml`):
-    - `pipelex_override.toml` (final override) renamed from `pipelex_super.toml` to `pipelex_override.toml` and moved from repo root to `.pipelex/` directory
-    - `telemetry_override.toml` (personal telemetry settings)
-    - `is_generate_cost_report_file_enabled` default changed from `true` to `false`
+  - `pipelex_override.toml` (final override) renamed from `pipelex_super.toml` to `pipelex_override.toml` and moved from repo root to `.pipelex/` directory
+  - `telemetry_override.toml` (personal telemetry settings)
+  - `is_generate_cost_report_file_enabled` default changed from `true` to `false`
 
 - **Documentation**:
   - Clarified **Setup (first run)** vs **Configuration (TOML reference)**, added a Setup overview page, and added contributor docs for configuration defaults/overrides.
@@ -961,10 +1060,10 @@
 ### Migration Notes
 
 - **Telemetry configuration migration**: If you have an existing `telemetry.toml`, rename:
-    - `[posthog]` → `[custom_posthog]`
-    - `[posthog.tracing]` → `[custom_posthog.tracing]`
-    - `[posthog.tracing.capture]` → `[custom_posthog.tracing.capture]`
-    - Or run `pipelex init telemetry --reset` to regenerate the file with the new structure
+  - `[posthog]` → `[custom_posthog]`
+  - `[posthog.tracing]` → `[custom_posthog.tracing]`
+  - `[posthog.tracing.capture]` → `[custom_posthog.tracing.capture]`
+  - Or run `pipelex init telemetry --reset` to regenerate the file with the new structure
 
 ### Refactored
 
@@ -1044,7 +1143,7 @@
 ## [v0.16.0] - 2025-11-25
 
 **Highlights:** - Library manager now supports multiple libraries. You can now have multiple libraries in your project, each with its own set of concepts, pipes, and stuffs.
-You can run the same pipe at the same times as much as you want, with different inputs. 
+You can run the same pipe at the same times as much as you want, with different inputs.
 Side effets: Unit tests now run in 30s.
 
 ### Fixed
@@ -1070,73 +1169,85 @@ Side effets: Unit tests now run in 30s.
 ## [v0.15.7] - 2025-11-18
 
 ### Fixed
- - Fixed issue with `get_console()` function returning `None` if Pipelex is not initialized. Now always defaults to `stderr` if not set.
+
+- Fixed issue with `get_console()` function returning `None` if Pipelex is not initialized. Now always defaults to `stderr` if not set.
 
 ## [v0.15.6] - 2025-11-18
 
 ### Contributors
- - Welcome to our new contributor @0x090909 (yup, that's his github username) for his work on Groq support in PR #445! 🎉
+
+- Welcome to our new contributor @0x090909 (yup, that's his github username) for his work on Groq support in PR #445! 🎉
 
 ### Added
- - **Improved configuration repair**: New `--fix` option for `pipelex doctor` command that interactively detects and repairs outdated or invalid backend configuration files using latest templates from the Pipelex kit.
- - **Developer CLI & tooling**: New internal `pipelex-dev` CLI for project maintenance with `check-config-sync` command to verify user-facing configuration templates (`.pipelex/`) are synchronized with package's internal kit configs. Includes `make check-config-sync` command and CI check (`lint-check.yml`) to enforce synchronization.
- - **Enhanced test infrastructure**: Integration tests now automatically parameterized to run against all supported backend routing profiles. Tests are intelligently skipped at collection time if a model is not supported by the active backend profile, with a summary of skipped tests provided at session end.
- - **New routing profiles**: Added `all_groq` and `all_pipelex_inference` routing profiles.
- - **Vision support flag**: Added `is_vision_supported` property to `LLMWorkerAbstract` class for explicit checks of model vision capabilities.
+
+- **Improved configuration repair**: New `--fix` option for `pipelex doctor` command that interactively detects and repairs outdated or invalid backend configuration files using latest templates from the Pipelex kit.
+- **Developer CLI & tooling**: New internal `pipelex-dev` CLI for project maintenance with `check-config-sync` command to verify user-facing configuration templates (`.pipelex/`) are synchronized with package's internal kit configs. Includes `make check-config-sync` command and CI check (`lint-check.yml`) to enforce synchronization.
+- **Enhanced test infrastructure**: Integration tests now automatically parameterized to run against all supported backend routing profiles. Tests are intelligently skipped at collection time if a model is not supported by the active backend profile, with a summary of skipped tests provided at session end.
+- **New routing profiles**: Added `all_groq` and `all_pipelex_inference` routing profiles.
+- **Vision support flag**: Added `is_vision_supported` property to `LLMWorkerAbstract` class for explicit checks of model vision capabilities.
 - **New type of `StuffContent`**: `JSONContent` to support an arbitrary JSON object as input or output of a pipe.
- - **Azure image generation**: Support for image generation models via Azure OpenAI backend using `gpt-image-1`.
+- **Azure image generation**: Support for image generation models via Azure OpenAI backend using `gpt-image-1`.
 
 ### Changed
- - **Unified structured output**: Complete overhaul of structured generation settings. Replaced global configuration setting with new `structure_method` parameter in backend `.toml` files (configurable at backend level in `[defaults]` or per individual model). Expanded `StructureMethod` enum to include dozens of modes supported by `instructor`, enabling fine-grained control over provider-specific features like OpenAI Structured Outputs or Anthropic Tools, and various JSON-based modes.
- - **Groq integration**: Updated to use standard `openai` SDK, simplifying integration.
- - **Default configurations**: All official backend providers now enabled by default after `pipelex init`. Default prompting style changed from `ticks` to `xml`.
- - **Code & test organization**: Unit test suite reorganized from `tests/unit/core` and other directories into unified `tests/unit/pipelex/` structure. Integration test fixtures modularized from `conftest.py` into separate files within `tests/integration/pipelex/fixtures/`.
- - **Console output settings**: Added `console_print_target` and `console_log_target` settings in `pipelex.toml` for redirecting output to `stdout` or `stderr`, with CLI and logging refactored to use centralized console instance. This makes it easier to support MCP communication based on stdio.
+
+- **Unified structured output**: Complete overhaul of structured generation settings. Replaced global configuration setting with new `structure_method` parameter in backend `.toml` files (configurable at backend level in `[defaults]` or per individual model). Expanded `StructureMethod` enum to include dozens of modes supported by `instructor`, enabling fine-grained control over provider-specific features like OpenAI Structured Outputs or Anthropic Tools, and various JSON-based modes.
+- **Groq integration**: Updated to use standard `openai` SDK, simplifying integration.
+- **Default configurations**: All official backend providers now enabled by default after `pipelex init`. Default prompting style changed from `ticks` to `xml`.
+- **Code & test organization**: Unit test suite reorganized from `tests/unit/core` and other directories into unified `tests/unit/pipelex/` structure. Integration test fixtures modularized from `conftest.py` into separate files within `tests/integration/pipelex/fixtures/`.
+- **Console output settings**: Added `console_print_target` and `console_log_target` settings in `pipelex.toml` for redirecting output to `stdout` or `stderr`, with CLI and logging refactored to use centralized console instance. This makes it easier to support MCP communication based on stdio.
 
 ### Fixed
- - Improved Pydantic validation error messages when loading backend configurations to clearly indicate the specific file and model containing the error.
+
+- Improved Pydantic validation error messages when loading backend configurations to clearly indicate the specific file and model containing the error.
 
 ### Removed
- - **Perplexity backend**: Default configuration for Perplexity AI backend (`perplexity.toml`) removed from kit (it was obsolete, it will come back).
- - **Groq plugin**: Dedicated `pipelex/plugins/groq` plugin removed (now uses standard `openai` SDK).
- - **Global instructor config**: Global `is_openai_structured_output_enabled` setting, replaced by per-model `structure_method` approach.
+
+- **Perplexity backend**: Default configuration for Perplexity AI backend (`perplexity.toml`) removed from kit (it was obsolete, it will come back).
+- **Groq plugin**: Dedicated `pipelex/plugins/groq` plugin removed (now uses standard `openai` SDK).
+- **Global instructor config**: Global `is_openai_structured_output_enabled` setting, replaced by per-model `structure_method` approach.
 
 ## [v0.15.4] - 2025-11-12
 
 ### Added
- - **Enhanced `pipelex build` Command**: Now generates a self-contained directory (e.g., `results/pipeline_01/`) containing `bundle.plx`, `inputs.json`, `run_{pipe_code}.py`, `bundle_view.html`, and `bundle_view.svg`. New CLI options: `--output-name (-o)` for custom base name, `--output-dir` for custom directory, and `--no-extras` to generate only the `.plx` file.
- - **CLI Readiness Check**: Verifies that a virtual environment is active for development installations.
- - **Model Deck Presets**: Added `llm_for_creativity` and `cheap_llm_for_creativity` model waterfalls, plus `[cogt.model_deck_config]` section in `pipelex.toml` for configuring model fallback behavior.
- - WIP: **Groq Inference Backend Support**: Integrated full support for the Groq API with configuration file (`.pipelex/inference/backends/groq.toml`), model specifications, costs, capabilities, new model aliases (`base-groq`, `fast-groq`, `vision-groq`), and routing profile (`all_groq`).
+
+- **Enhanced `pipelex build` Command**: Now generates a self-contained directory (e.g., `results/pipeline_01/`) containing `bundle.plx`, `inputs.json`, `run_{pipe_code}.py`, `bundle_view.html`, and `bundle_view.svg`. New CLI options: `--output-name (-o)` for custom base name, `--output-dir` for custom directory, and `--no-extras` to generate only the `.plx` file.
+- **CLI Readiness Check**: Verifies that a virtual environment is active for development installations.
+- **Model Deck Presets**: Added `llm_for_creativity` and `cheap_llm_for_creativity` model waterfalls, plus `[cogt.model_deck_config]` section in `pipelex.toml` for configuring model fallback behavior.
+- WIP: **Groq Inference Backend Support**: Integrated full support for the Groq API with configuration file (`.pipelex/inference/backends/groq.toml`), model specifications, costs, capabilities, new model aliases (`base-groq`, `fast-groq`, `vision-groq`), and routing profile (`all_groq`).
 
 ### Changed
- - **CLI Output and Visualization**: Overhauled command-line output with rich, table-based layouts for pipeline components. Final output of `pipelex run` is now pretty-printed and adapts to content type.
- - **Documentation**: Updated "Get Started" and "Build Reliable AI Workflows" to reflect new directory-based build output and CLI options.
- - **Internal Code Refactoring**: Reorganized exception hierarchy into dedicated `exceptions.py` files per module, centralized validation logic into `validation.py` modules, added `ValueError` to blueprints, and removed unused exceptions for improved maintainability.
+
+- **CLI Output and Visualization**: Overhauled command-line output with rich, table-based layouts for pipeline components. Final output of `pipelex run` is now pretty-printed and adapts to content type.
+- **Documentation**: Updated "Get Started" and "Build Reliable AI Workflows" to reflect new directory-based build output and CLI options.
+- **Internal Code Refactoring**: Reorganized exception hierarchy into dedicated `exceptions.py` files per module, centralized validation logic into `validation.py` modules, added `ValueError` to blueprints, and removed unused exceptions for improved maintainability.
 - Updated pytest to `>=9.0.1` to support their new `pyproject.toml` config format.
 
 ### Fixed
- - Adjusted default temperature for `llm_for_testing_gen_object` preset from `0.5` to `0.1` for more deterministic structured data generation.
- - Corrected `LLM_FOR_VISUAL_DESIGN` skill in `pipe_llm_spec` to point to `cheap_llm_for_creativity` preset.
- - Standardized input variable names in `pipe_llm_vision.plx` from `imageA`/`imageB` to `image_a`/`image_b`.
+
+- Adjusted default temperature for `llm_for_testing_gen_object` preset from `0.5` to `0.1` for more deterministic structured data generation.
+- Corrected `LLM_FOR_VISUAL_DESIGN` skill in `pipe_llm_spec` to point to `cheap_llm_for_creativity` preset.
+- Standardized input variable names in `pipe_llm_vision.plx` from `imageA`/`imageB` to `image_a`/`image_b`.
 
 ### Removed
- - Deleted `pipelex/core/validation_errors.py` file as part of exception hierarchy refactoring.
 
+- Deleted `pipelex/core/validation_errors.py` file as part of exception hierarchy refactoring.
 
 ## [v0.15.3] - 2025-11-07
 
 ### Fixed
+
 - Fixed weird import issues with `posthog` and `StrEnum`
 
 ## [v0.15.2] - 2025-11-07
 
 ### Fixed
+
 - Fixed resetting routing profile when calling with `--reset` flag in `pipelex init`
 
 ## [v0.15.1] - 2025-11-07
 
 ### Fixed
+
 - Bumped OpenAI dependency to `>=1.108.1` to support their breaking change: "change optional parameter type from `NotGiven` to `Omit`"
 - `get_selected_backend_keys()` now correctly considers backends enabled by default (like before v0.15.0)
 
@@ -1145,73 +1256,84 @@ Side effets: Unit tests now run in 30s.
 **Highlights:** This release dramatically simplifies onboarding with interactive CLI setup, comprehensive documentation relaunch, and intelligent model fallbacks, making Pipelex more accessible and resilient than ever.
 
 ### Added
- - Model Waterfalls: Define prioritized model lists in `base_deck.toml` (e.g., `smart_llm = ["gpt-4o", "claude-4.5-sonnet", "grok-3"]`). Pipelex automatically falls back to the next model if the preferred one is unavailable.
- - Advanced Routing Profiles: New capabilities in `routing_profiles.toml`: `fallback_order` (Global fallback sequence specifying which backends to try if a model isn't found) and `optional_routes` (Routes that activate only when their target backend is enabled)
- - New Models: Anthropic `claude-4.5-haiku` (Pipelex Inference, Anthropic, and Bedrock backends) and Azure OpenAI `o3`
- - Comprehensive Documentation Relaunch: Complete restructure under `/home/` with new "Get Started" guides for `pipelex build` and manual workflows, plus in-depth sections on Domains, Bundles, Concepts, and Pipe lifecycle.
- - Enhanced CLI: `pipelex init` now interactively guides backend selection and automatically configures routing profiles, including primary backend and fallback order. Added `pipelex init routing` focus.
- - Enhanced CLI: Improved error reporting across all commands (`build`, `validate`, `run`, `show`) with clear, actionable feedback for configuration errors, missing models, and invalid presets.
- - Enhanced CLI: `pipelex doctor` now validates model deck configuration.
- - New Routing Profiles: Full suite of `all_*` profiles (e.g., `all_openai`, `all_anthropic`, `all_google`) to route all requests to a single provider.
+
+- Model Waterfalls: Define prioritized model lists in `base_deck.toml` (e.g., `smart_llm = ["gpt-4o", "claude-4.5-sonnet", "grok-3"]`). Pipelex automatically falls back to the next model if the preferred one is unavailable.
+- Advanced Routing Profiles: New capabilities in `routing_profiles.toml`: `fallback_order` (Global fallback sequence specifying which backends to try if a model isn't found) and `optional_routes` (Routes that activate only when their target backend is enabled)
+- New Models: Anthropic `claude-4.5-haiku` (Pipelex Inference, Anthropic, and Bedrock backends) and Azure OpenAI `o3`
+- Comprehensive Documentation Relaunch: Complete restructure under `/home/` with new "Get Started" guides for `pipelex build` and manual workflows, plus in-depth sections on Domains, Bundles, Concepts, and Pipe lifecycle.
+- Enhanced CLI: `pipelex init` now interactively guides backend selection and automatically configures routing profiles, including primary backend and fallback order. Added `pipelex init routing` focus.
+- Enhanced CLI: Improved error reporting across all commands (`build`, `validate`, `run`, `show`) with clear, actionable feedback for configuration errors, missing models, and invalid presets.
+- Enhanced CLI: `pipelex doctor` now validates model deck configuration.
+- New Routing Profiles: Full suite of `all_*` profiles (e.g., `all_openai`, `all_anthropic`, `all_google`) to route all requests to a single provider.
 
 ### Changed
- - BREAKING: for inline concept structures, the fields are now optional by default: the `required` property defaults to `false`. Explicitly set `required = true` to make fields mandatory, which we discourage as it increases risks of hallucinations.
- - LLM Presets Overhaul: Rationalized and renamed default presets in `base_deck.toml`. Single-model aliases replaced with waterfall aliases. Key renames: `llm_for_complex_reasoning` → `engineering-structured`, `llm_to_answer_hard_questions` → `llm_to_answer_questions`, `llm_to_write_questions` → `llm_for_writing_cheap`. Removed redundant older presets.
- - Stricter Configuration Validation: Pipelex validates model deck on startup and raises errors if presets reference unavailable models.
+
+- BREAKING: for inline concept structures, the fields are now optional by default: the `required` property defaults to `false`. Explicitly set `required = true` to make fields mandatory, which we discourage as it increases risks of hallucinations.
+- LLM Presets Overhaul: Rationalized and renamed default presets in `base_deck.toml`. Single-model aliases replaced with waterfall aliases. Key renames: `llm_for_complex_reasoning` → `engineering-structured`, `llm_to_answer_hard_questions` → `llm_to_answer_questions`, `llm_to_write_questions` → `llm_for_writing_cheap`. Removed redundant older presets.
+- Stricter Configuration Validation: Pipelex validates model deck on startup and raises errors if presets reference unavailable models.
 
 ### Fixed
- - Local OpenAI-Compatible Endpoints: OpenAI plugin now handles empty API keys, enabling seamless integration with local servers like Ollama.
+
+- Local OpenAI-Compatible Endpoints: OpenAI plugin now handles empty API keys, enabling seamless integration with local servers like Ollama.
 
 ### Removed
- - Old Documentation Structure: Previous `/pages/` directory documentation removed in favor of new structure.
+
+- Old Documentation Structure: Previous `/pages/` directory documentation removed in favor of new structure.
 
 ## [v0.14.3] - 2025-10-29
 
 ### Added
- - Image generation models via BlackBoxAI backend: `flux-pro`, `flux-pro/v1.1`, `flux-pro/v1.1-ultra` (Black Forest Labs), `fast-lightning-sdxl` (ByteDance), and `nano-banana` (Google). Implemented using new `openai_alt_img_gen` SDK worker with chat completion-style API.
- - Language model: `claude-4.5-sonnet` (Anthropic) via BlackBoxAI backend.
- - Routing profile: `all_blackboxai` profile routes all supported model requests to BlackBoxAI backend.
+
+- Image generation models via BlackBoxAI backend: `flux-pro`, `flux-pro/v1.1`, `flux-pro/v1.1-ultra` (Black Forest Labs), `fast-lightning-sdxl` (ByteDance), and `nano-banana` (Google). Implemented using new `openai_alt_img_gen` SDK worker with chat completion-style API.
+- Language model: `claude-4.5-sonnet` (Anthropic) via BlackBoxAI backend.
+- Routing profile: `all_blackboxai` profile routes all supported model requests to BlackBoxAI backend.
 
 ### Changed
- - Model aliases in `base_deck.toml`: `base-img-gen` → `flux-pro/v1.1-ultra`, `best-img-gen` → `nano-banana`, `llm_for_large_codebase` now includes `claude-4.5-sonnet`.
- - Configuration file: `BLACKBOX_RULES.md` renamed to `.blackboxrules`.
+
+- Model aliases in `base_deck.toml`: `base-img-gen` → `flux-pro/v1.1-ultra`, `best-img-gen` → `nano-banana`, `llm_for_large_codebase` now includes `claude-4.5-sonnet`.
+- Configuration file: `BLACKBOX_RULES.md` renamed to `.blackboxrules`.
 
 ### Fixed
- - Image generation schema: `ImgGenJobParams.seed` field now explicitly defined with `default=None`.
- - CLI bundle validation: `pipelex validate` command now accepts bundle path (`.plx` file) which are in the package and already loaded and performs dry run on all pipes in the bundle.
 
+- Image generation schema: `ImgGenJobParams.seed` field now explicitly defined with `default=None`.
+- CLI bundle validation: `pipelex validate` command now accepts bundle path (`.plx` file) which are in the package and already loaded and performs dry run on all pipes in the bundle.
 
 ## [v0.14.2] - 2025-10-29
 
 ### Chaged
+
 - Improved pipe builder.
 
 ### Added
+
 - CLI to generate inputs JSON.
 
 ## [v0.14.1] - 2025-10-27
 
 ### Added
+
 - Tutorial GIF on the README.md file.
 
 ## [v0.14.0] - 2025-10-27
 
 ### Added
- - **`pipelex doctor` command**: Diagnoses and fixes common configuration issues including missing files, invalid telemetry settings, and unset environment variables for enabled backends.
- - **Interactive backend selection in `pipelex init`**: Multi-select menu for enabling/disabling inference backends (OpenAI, Anthropic, Amazon Bedrock, etc.).
- - **JSON input support**: `pipelex run --inputs` flag accepts a JSON file path for passing structured data to pipelines.
- - **`pretty_print` methods**: Added to `PipeSpec`, `ConceptSpec`, and `Stuff` objects for readable debugging output.
- - **VS Code debug configuration**: "Debug run pipe" launch configuration for debugging pipeline executions.
- - **`display_name` attribute**: Added to all inference backends in `backends.toml` for better UI presentation.
- - **Documentation headers**: All default `.toml` configuration files now include headers with links to documentation and support channels.
+
+- **`pipelex doctor` command**: Diagnoses and fixes common configuration issues including missing files, invalid telemetry settings, and unset environment variables for enabled backends.
+- **Interactive backend selection in `pipelex init`**: Multi-select menu for enabling/disabling inference backends (OpenAI, Anthropic, Amazon Bedrock, etc.).
+- **JSON input support**: `pipelex run --inputs` flag accepts a JSON file path for passing structured data to pipelines.
+- **`pretty_print` methods**: Added to `PipeSpec`, `ConceptSpec`, and `Stuff` objects for readable debugging output.
+- **VS Code debug configuration**: "Debug run pipe" launch configuration for debugging pipeline executions.
+- **`display_name` attribute**: Added to all inference backends in `backends.toml` for better UI presentation.
+- **Documentation headers**: All default `.toml` configuration files now include headers with links to documentation and support channels.
 
 ### Changed
- - **`pipelex init` redesign**: Transformed into a unified, interactive setup wizard with rich terminal UI for configuration files, backend selection, and telemetry preferences. Telemetry is now configured here instead of via first-run prompt.
- - **`README.md` rewrite**: Complete overhaul featuring a simplified 5-step quick-start guide highlighting the `pipelex build` command.
- - **Documentation updates**: "Quick Start" guide renamed to "Writing Workflows" with simplified content. Python examples updated to use JSON input method, removing manual `Stuff` and `WorkingMemory` object creation boilerplate. Developer guides and AI assistant rules now recommend `pipelex validate` over `make validate`. Added instructions emphasizing `.venv` activation before running commands.
- - **Error handling improvements**: Pipelines now validate required inputs upfront and fail early with `PipeRunInputsError`. `pipelex run` prints full rich-formatted exception tracebacks on error.
- - **Default enabled backends**: Amazon Bedrock, Google AI, and Google Vertex AI are now enabled by default.
- - **Naming consistency**: "AWS Bedrock" renamed to "Amazon Bedrock" throughout codebase, configuration, and documentation.
+
+- **`pipelex init` redesign**: Transformed into a unified, interactive setup wizard with rich terminal UI for configuration files, backend selection, and telemetry preferences. Telemetry is now configured here instead of via first-run prompt.
+- **`README.md` rewrite**: Complete overhaul featuring a simplified 5-step quick-start guide highlighting the `pipelex build` command.
+- **Documentation updates**: "Quick Start" guide renamed to "Writing Workflows" with simplified content. Python examples updated to use JSON input method, removing manual `Stuff` and `WorkingMemory` object creation boilerplate. Developer guides and AI assistant rules now recommend `pipelex validate` over `make validate`. Added instructions emphasizing `.venv` activation before running commands.
+- **Error handling improvements**: Pipelines now validate required inputs upfront and fail early with `PipeRunInputsError`. `pipelex run` prints full rich-formatted exception tracebacks on error.
+- **Default enabled backends**: Amazon Bedrock, Google AI, and Google Vertex AI are now enabled by default.
+- **Naming consistency**: "AWS Bedrock" renamed to "Amazon Bedrock" throughout codebase, configuration, and documentation.
 
 ### Fixed
 
@@ -1323,7 +1445,7 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
   - renamed `ocr_model` to `model` for choice of model, preset, or explicit setting and introduced `base_ocr_mistral` as an alias to `mistral-ocr`
 
 - **PipeLLM** field renames
-  - image inputs must now be tagged in the prompt like all other inputs; you can just drop their names at the beginning or end of the prompt, or you can reference them in meaningful sentences to guide the Visual LLM, e.g. "Analyze the colors in $some_photo and the shapes in $some_painting." 
+  - image inputs must now be tagged in the prompt like all other inputs; you can just drop their names at the beginning or end of the prompt, or you can reference them in meaningful sentences to guide the Visual LLM, e.g. "Analyze the colors in $some_photo and the shapes in $some_painting."
   - renamed `prompt_template` field to `prompt`
   - renamed `llm` field to `model`
   - renamed `llm_to_structure` field to `model_to_structure`
@@ -1349,106 +1471,110 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
   - Updated pytest marker from 'ocr' to 'extract'
 
 ### Added
- - Added `cheap-gpt` model alias for `gpt-4o-mini`
- - Added `cheap_llm_for_vision` preset using `gemini-2.5-flash-lite`
- - Added `llm_for_testing_vision` and `llm_for_testing_vision_structured` presets for vision testing
- - Added `is_dump_text_prompts_enabled` and `is_dump_response_text_enabled` configuration flags to have the console display everything that goes in and out of the LLMs
- - Added `generic_templates` section in `llm_config` with structure extraction prompts
- - Added useful error messages with migration configuration maps pin-pointing the fields to rename for config and plx files
- - Added improved error message for `PipeFunc` when function not found in registry, mentioning `@pipe_func()` decorator requirement since v0.12.0
- - Added pytest filterwarnings to ignore deprecated class-based config warnings
- - Added `Flow` class that represents the flow of pipe signatures
- - Added `pipe-builder` command `flow` to generate flow view from pipeline brief
- - Added `FlowFactory` class to create Flow from PipelexBundleSpec or PLX files
- - Added `sort_pipes_by_dependencies()` function for topological sorting of pipes
- - Added `pipe_sorter.py` module for pipe dependency sorting utilities
- - Added `search_for_nested_image_fields_in_structure_class()` method to Concept class
- - Added `image_field_search.py` module with utilities to search for image fields in structure classes
- - Added `pipe_dependencies` property to PipeBlueprint and controller blueprints
- - Added `ordered_pipe_dependencies` property to PipeBlueprint for ordered dependencies
- - Added `get_native_concept()` function to hub
- - Added `get_pipes()` function to hub
- - Added `remove_concepts_by_codes()` method to ConceptLibraryAbstract
- - Added `remove_pipes_by_codes()` method to PipeLibraryAbstract
- - Added template preprocessing with `preprocess_template()` function
- - Added better dependency checking for optional SDK packages (anthropic, mistralai, boto3, aioboto3)
- - Added `MissingDependencyError` exception for missing optional dependencies
- - Added `library_utils.py` module with utility functions for PLX file discovery using `importlib.resources`
- - Added `class_utils.py` module with `are_classes_equivalent()` and `has_compatible_field()` functions
- - Added comprehensive unit tests for `CostRegistry`, `WorkingMemory`, and `ModuleInspector`
- - Added `ScanConfig` class with configurable excluded directories for library scanning
- - Added CSV export capabilities to `CostRegistry` with `save_to_csv()` and `to_records()` methods
- - Added default configuration template in `pipelex/kit/configs/pipelex.toml`
+
+- Added `cheap-gpt` model alias for `gpt-4o-mini`
+- Added `cheap_llm_for_vision` preset using `gemini-2.5-flash-lite`
+- Added `llm_for_testing_vision` and `llm_for_testing_vision_structured` presets for vision testing
+- Added `is_dump_text_prompts_enabled` and `is_dump_response_text_enabled` configuration flags to have the console display everything that goes in and out of the LLMs
+- Added `generic_templates` section in `llm_config` with structure extraction prompts
+- Added useful error messages with migration configuration maps pin-pointing the fields to rename for config and plx files
+- Added improved error message for `PipeFunc` when function not found in registry, mentioning `@pipe_func()` decorator requirement since v0.12.0
+- Added pytest filterwarnings to ignore deprecated class-based config warnings
+- Added `Flow` class that represents the flow of pipe signatures
+- Added `pipe-builder` command `flow` to generate flow view from pipeline brief
+- Added `FlowFactory` class to create Flow from PipelexBundleSpec or PLX files
+- Added `sort_pipes_by_dependencies()` function for topological sorting of pipes
+- Added `pipe_sorter.py` module for pipe dependency sorting utilities
+- Added `search_for_nested_image_fields_in_structure_class()` method to Concept class
+- Added `image_field_search.py` module with utilities to search for image fields in structure classes
+- Added `pipe_dependencies` property to PipeBlueprint and controller blueprints
+- Added `ordered_pipe_dependencies` property to PipeBlueprint for ordered dependencies
+- Added `get_native_concept()` function to hub
+- Added `get_pipes()` function to hub
+- Added `remove_concepts_by_codes()` method to ConceptLibraryAbstract
+- Added `remove_pipes_by_codes()` method to PipeLibraryAbstract
+- Added template preprocessing with `preprocess_template()` function
+- Added better dependency checking for optional SDK packages (anthropic, mistralai, boto3, aioboto3)
+- Added `MissingDependencyError` exception for missing optional dependencies
+- Added `library_utils.py` module with utility functions for PLX file discovery using `importlib.resources`
+- Added `class_utils.py` module with `are_classes_equivalent()` and `has_compatible_field()` functions
+- Added comprehensive unit tests for `CostRegistry`, `WorkingMemory`, and `ModuleInspector`
+- Added `ScanConfig` class with configurable excluded directories for library scanning
+- Added CSV export capabilities to `CostRegistry` with `save_to_csv()` and `to_records()` methods
+- Added default configuration template in `pipelex/kit/configs/pipelex.toml`
 
 ### Changed
- - Replaced package `toml` by `tomli` which is more modern and faster
- - Updated Gemini 2.0 model from `gemini-2.0-flash-exp` to `gemini-2.0-flash` with new pricing (input: $0.10, output: $0.40 per million tokens)
- - Updated Gemini 2.5 Series comment from '(when available)' to stable release
- - Updated `best-claude` from `claude-4-sonnet` to `claude-4.5-sonnet` across all presets
- - Updated kajson dependency from version `0.3.0` to `0.3.1`
- - Updated httpx dependency to `>=0.23.0,<1.0.0` for broader compatibility
- - Cleanup env example and better explain how to set up keys in README and docs
- - Changed Gemini routing from `google` backend to `pipelex_inference` backend
- - **BREAKING:** Major module reorganization - moved `tools/config/`, `tools/exceptions.py`, `tools/environment.py`, `tools/runtime_manager.py` to `system/` package structure (`system/configuration/`, `system/exceptions.py`, `system/environment.py`, `system/runtime.py`)
- - **BREAKING:** Reorganized registry modules from `tools/` to `system/registries/` (affects `class_registry_utils`, `func_registry`, `func_registry_utils`, `registry_models`)
- - **BREAKING:** Split `pipelex.core.stuffs.stuff_content` module into individual files per content type (affects imports: `StructuredContent`, `TextContent`, `ImageContent`, `ListContent`, `PDFContent`, `PageContent`, `NumberContent`, `HtmlContent`, `MermaidContent`, `TextAndImagesContent`)
- - **BREAKING:** Renamed package `pipelex.pipe_works` to `pipelex.pipe_run` and moved `PipeRunParams` classes into it
- - **BREAKING:** Cost reporting changed from Excel (xlsx) to CSV format using native Python csv module instead of pandas
- - Renamed `ConfigManager` to `ConfigLoader`
- - Renamed `PipelexRegistryModels` to `CoreRegistryModels`
- - Renamed `PipelexTestModels` to `TestRegistryModels`
- - Renamed `generate_jinja2_context()` to `generate_context()` in `WorkingMemory` and `ContextProviderAbstract`
- - Renamed `ConceptProviderAbstract` to `ConceptLibraryAbstract`
- - Renamed `DomainProviderAbstract` to `DomainLibraryAbstract`
- - Renamed `PipeProviderAbstract` to `PipeLibraryAbstract`
- - Renamed `PipeInputSpec` to `InputRequirements`
- - Renamed `PipeInputSpecFactory` to `InputRequirementsFactory`
- - Renamed `pipe_input.py` to `input_requirements.py`
- - Renamed `pipe_input_factory.py` to `input_requirements_factory.py`
- - Renamed `pipe_input_blueprint.py` to `input_requirement_blueprint.py`
- - Changed hub methods from `get_*_provider()` to `get_*_library()` pattern
- - Changed hub methods from `set_*_provider()` to `set_*_library()` pattern
- - Changed `PipeLLM` validation to check all inputs are in required variables
- - Updated `LLMPromptSpec` to handle image collections (lists/tuples) in addition to single images
- - Changed Mermaid diagram URL generation from `/img/` to `/svg/` endpoint
- - Changed `PipeLLMPromptTemplate.make_llm_prompt()` to private method `_make_llm_prompt()`
- - Updated pipe-builder prompts to include concept specs for better context
- - Updated `PipelexBundleSpec.to_blueprint()` to sort pipes by dependencies before creating bundle
- - Changed exception base class from `PipelexError` to `PipelexError` throughout codebase
- - Updated Makefile pyright target to use `--pythonpath` flag correctly
- - Enhanced `LibraryManager` to use `importlib.resources` for reliable PLX file discovery across all installation modes (wheel, source, relative path)
- - Simplified `FuncRegistryUtils` to exclusively register functions with `@pipe_func` decorator (removed `decorator_names` and `require_decorator` parameters)
- - Updated `ReportingManager` to get config directly instead of via constructor parameter
- - Updated PipeFunc documentation to reflect `@pipe_func()` decorator requirement and auto-discovery from anywhere in project
- - Added warnings about module-level code execution during auto-discovery to PipeFunc and StructuredContent documentation
+
+- Replaced package `toml` by `tomli` which is more modern and faster
+- Updated Gemini 2.0 model from `gemini-2.0-flash-exp` to `gemini-2.0-flash` with new pricing (input: $0.10, output: $0.40 per million tokens)
+- Updated Gemini 2.5 Series comment from '(when available)' to stable release
+- Updated `best-claude` from `claude-4-sonnet` to `claude-4.5-sonnet` across all presets
+- Updated kajson dependency from version `0.3.0` to `0.3.1`
+- Updated httpx dependency to `>=0.23.0,<1.0.0` for broader compatibility
+- Cleanup env example and better explain how to set up keys in README and docs
+- Changed Gemini routing from `google` backend to `pipelex_inference` backend
+- **BREAKING:** Major module reorganization - moved `tools/config/`, `tools/exceptions.py`, `tools/environment.py`, `tools/runtime_manager.py` to `system/` package structure (`system/configuration/`, `system/exceptions.py`, `system/environment.py`, `system/runtime.py`)
+- **BREAKING:** Reorganized registry modules from `tools/` to `system/registries/` (affects `class_registry_utils`, `func_registry`, `func_registry_utils`, `registry_models`)
+- **BREAKING:** Split `pipelex.core.stuffs.stuff_content` module into individual files per content type (affects imports: `StructuredContent`, `TextContent`, `ImageContent`, `ListContent`, `PDFContent`, `PageContent`, `NumberContent`, `HtmlContent`, `MermaidContent`, `TextAndImagesContent`)
+- **BREAKING:** Renamed package `pipelex.pipe_works` to `pipelex.pipe_run` and moved `PipeRunParams` classes into it
+- **BREAKING:** Cost reporting changed from Excel (xlsx) to CSV format using native Python csv module instead of pandas
+- Renamed `ConfigManager` to `ConfigLoader`
+- Renamed `PipelexRegistryModels` to `CoreRegistryModels`
+- Renamed `PipelexTestModels` to `TestRegistryModels`
+- Renamed `generate_jinja2_context()` to `generate_context()` in `WorkingMemory` and `ContextProviderAbstract`
+- Renamed `ConceptProviderAbstract` to `ConceptLibraryAbstract`
+- Renamed `DomainProviderAbstract` to `DomainLibraryAbstract`
+- Renamed `PipeProviderAbstract` to `PipeLibraryAbstract`
+- Renamed `PipeInputSpec` to `InputRequirements`
+- Renamed `PipeInputSpecFactory` to `InputRequirementsFactory`
+- Renamed `pipe_input.py` to `input_requirements.py`
+- Renamed `pipe_input_factory.py` to `input_requirements_factory.py`
+- Renamed `pipe_input_blueprint.py` to `input_requirement_blueprint.py`
+- Changed hub methods from `get_*_provider()` to `get_*_library()` pattern
+- Changed hub methods from `set_*_provider()` to `set_*_library()` pattern
+- Changed `PipeLLM` validation to check all inputs are in required variables
+- Updated `LLMPromptSpec` to handle image collections (lists/tuples) in addition to single images
+- Changed Mermaid diagram URL generation from `/img/` to `/svg/` endpoint
+- Changed `PipeLLMPromptTemplate.make_llm_prompt()` to private method `_make_llm_prompt()`
+- Updated pipe-builder prompts to include concept specs for better context
+- Updated `PipelexBundleSpec.to_blueprint()` to sort pipes by dependencies before creating bundle
+- Changed exception base class from `PipelexError` to `PipelexError` throughout codebase
+- Updated Makefile pyright target to use `--pythonpath` flag correctly
+- Enhanced `LibraryManager` to use `importlib.resources` for reliable PLX file discovery across all installation modes (wheel, source, relative path)
+- Simplified `FuncRegistryUtils` to exclusively register functions with `@pipe_func` decorator (removed `decorator_names` and `require_decorator` parameters)
+- Updated `ReportingManager` to get config directly instead of via constructor parameter
+- Updated PipeFunc documentation to reflect `@pipe_func()` decorator requirement and auto-discovery from anywhere in project
+- Added warnings about module-level code execution during auto-discovery to PipeFunc and StructuredContent documentation
 
 ### Fixed
- - Fixed Makefile target `pyright` to use correct pythonpath flag
- - Fixed bug with inputs of the `PipeLLM` where image inputs couldn't be used and tagged in prompts
- - Fixed image input handling in `LLMPromptSpec` to support both single images and image collections
- - Fixed template preprocessing to handle jinja2 templates correctly
- - Fixed hard dependencies by moving imports to function scope in model_lists.py
- - Updated README badge URL to point to main branch instead of feature/pipe-builder branch
+
+- Fixed Makefile target `pyright` to use correct pythonpath flag
+- Fixed bug with inputs of the `PipeLLM` where image inputs couldn't be used and tagged in prompts
+- Fixed image input handling in `LLMPromptSpec` to support both single images and image collections
+- Fixed template preprocessing to handle jinja2 templates correctly
+- Fixed hard dependencies by moving imports to function scope in model_lists.py
+- Updated README badge URL to point to main branch instead of feature/pipe-builder branch
 
 ### Removed
- - Removed centralized `pipelex_libraries` folder system and `pipelex init libraries` command
- - Removed config path parameters from `Pipelex.make()` (`relative_config_folder_path`, `config_folder_path`, `from_file`)
- - Removed Gemini 1.5 series models: `gemini-1.5-pro`, `gemini-1.5-flash`, and `gemini-1.5-flash-8b`
- - Removed `base_templates.toml` file (generic prompts moved to `pipelex.toml`)
- - Removed `gpt-5-mini` from possible models in pipe-builder
- - Removed useless functions in `LLMJobFactory`: `make_llm_job_from_prompt_factory()`, `make_llm_job_from_prompt_template()`, `make_llm_job_from_prompt_contents()`
- - Removed `add_or_update_pipe()` method from PipeLibrary
- - Removed `get_optional_library_manager()` method from PipelexHub
- - Removed `get_optional_domain_provider()` and `get_optional_concept_provider()` methods from hub
- - Removed unused test fixtures (apple, cherry, blueberry, concept_provider, pretty) from conftest.py
- - Removed some Vision/Image description pipes from the base library, because we doubt they were useful as they were
- - Removed pandas and openpyxl dependencies (including stubs: pandas-stubs, types-openpyxl)
- - Removed Excel file generation for cost reports and `to_dataframe()` method from `CostRegistry`
- - Removed `should_warn_if_already_registered` parameter from `func_registry.register_function()`
- - Removed `decorator_names` and `require_decorator` parameters from `FuncRegistryUtils` methods
- - Removed `_find_plx_files_in_dir()` and `_get_pipelex_plx_files_from_dirs()` methods from `LibraryManager` (refactored to `library_utils` module)
- - Removed hardcoded excluded directories from `ClassRegistryUtils` and `FuncRegistryUtils` (now use `ScanConfig`)
- - Removed `are_classes_equivalent()` and `has_compatible_field()` methods from `ClassRegistryUtils` (moved to `class_utils` module)
+
+- Removed centralized `pipelex_libraries` folder system and `pipelex init libraries` command
+- Removed config path parameters from `Pipelex.make()` (`relative_config_folder_path`, `config_folder_path`, `from_file`)
+- Removed Gemini 1.5 series models: `gemini-1.5-pro`, `gemini-1.5-flash`, and `gemini-1.5-flash-8b`
+- Removed `base_templates.toml` file (generic prompts moved to `pipelex.toml`)
+- Removed `gpt-5-mini` from possible models in pipe-builder
+- Removed useless functions in `LLMJobFactory`: `make_llm_job_from_prompt_factory()`, `make_llm_job_from_prompt_template()`, `make_llm_job_from_prompt_contents()`
+- Removed `add_or_update_pipe()` method from PipeLibrary
+- Removed `get_optional_library_manager()` method from PipelexHub
+- Removed `get_optional_domain_provider()` and `get_optional_concept_provider()` methods from hub
+- Removed unused test fixtures (apple, cherry, blueberry, concept_provider, pretty) from conftest.py
+- Removed some Vision/Image description pipes from the base library, because we doubt they were useful as they were
+- Removed pandas and openpyxl dependencies (including stubs: pandas-stubs, types-openpyxl)
+- Removed Excel file generation for cost reports and `to_dataframe()` method from `CostRegistry`
+- Removed `should_warn_if_already_registered` parameter from `func_registry.register_function()`
+- Removed `decorator_names` and `require_decorator` parameters from `FuncRegistryUtils` methods
+- Removed `_find_plx_files_in_dir()` and `_get_pipelex_plx_files_from_dirs()` methods from `LibraryManager` (refactored to `library_utils` module)
+- Removed hardcoded excluded directories from `ClassRegistryUtils` and `FuncRegistryUtils` (now use `ScanConfig`)
+- Removed `are_classes_equivalent()` and `has_compatible_field()` methods from `ClassRegistryUtils` (moved to `class_utils` module)
 
 ## [v0.11.0] - 2025-10-01
 
@@ -1460,37 +1586,39 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
 
 ### Added
 
- - Added `claude-4.5-sonnet` to the model deck.
- - Added a badge on the `README.md` to display the number of tests.
- - Added new test cases for environment variable functions
- - Added new documentation for `PipeFunc` on how to register functions.
- - Added `pipelex show models [BACKEND_NAME]` command to list available models from a specific backend.
+- Added `claude-4.5-sonnet` to the model deck.
+- Added a badge on the `README.md` to display the number of tests.
+- Added new test cases for environment variable functions
+- Added new documentation for `PipeFunc` on how to register functions.
+- Added `pipelex show models [BACKEND_NAME]` command to list available models from a specific backend.
 
-### Changed 
+### Changed
 
- - Renamed `llm_deck` terminology to `model_deck` throughout codebase and documentation, now that it's also used for OCR and Image Generation models
- - Renamed `is_gha_testing` property to `is_ci_testing` in RuntimeManager
- - Refactored `all_env_vars_are_set()` function to only accept a list of keys, single string support now uses `is_env_var_set()`
- - Modified `any_env_var_is_placeholder()` to use new placeholder detection logic
- - Updated test environment setup to use dynamic placeholder generation instead of hardcoded values
+- Renamed `llm_deck` terminology to `model_deck` throughout codebase and documentation, now that it's also used for OCR and Image Generation models
+- Renamed `is_gha_testing` property to `is_ci_testing` in RuntimeManager
+- Refactored `all_env_vars_are_set()` function to only accept a list of keys, single string support now uses `is_env_var_set()`
+- Modified `any_env_var_is_placeholder()` to use new placeholder detection logic
+- Updated test environment setup to use dynamic placeholder generation instead of hardcoded values
 
 ### Fixed
- - Fixed logic error in `any_env_var_is_placeholder()` function - now correctly returns False when no placeholders are found
+
+- Fixed logic error in `any_env_var_is_placeholder()` function - now correctly returns False when no placeholders are found
 
 ### Removed
- - Removed `get_rooted_path()` and `get_env_rooted_path()` utility functions which were not used
- - Removed hardcoded placeholder dictionary and `ENV_DUMMY_PLACEHOLDER_VALUE` constant in test setup
- - Removed function `run_pipe_code` in pipe router because it was not relevant (used mostly in tests)
- - Remove the use of `PipeCompose` in `PipeCondition`, to only use jinja2 directly, through the `ContentGenerator`
- - Remove the template libraries from the pipelex libraries.
- - Removed `claude-3.5-sonnet` and `claude-3.5-sonnet-v2` from the model deck.
+
+- Removed `get_rooted_path()` and `get_env_rooted_path()` utility functions which were not used
+- Removed hardcoded placeholder dictionary and `ENV_DUMMY_PLACEHOLDER_VALUE` constant in test setup
+- Removed function `run_pipe_code` in pipe router because it was not relevant (used mostly in tests)
+- Remove the use of `PipeCompose` in `PipeCondition`, to only use jinja2 directly, through the `ContentGenerator`
+- Remove the template libraries from the pipelex libraries.
+- Removed `claude-3.5-sonnet` and `claude-3.5-sonnet-v2` from the model deck.
 
 ## [v0.10.2] - 2025-09-18
 
 ### Added
 
 - Unified OCR system using model handles instead of separate OcrHandle enum
-- ModelType enum supporting LLM and TEXT_EXTRACTOR types  
+- ModelType enum supporting LLM and TEXT_EXTRACTOR types
 - Enhanced error handling in library loading with better validation messages
 - Config template management with `config-template` and `cft` Makefile targets to update templates from the `.pipelex/` directory
 
@@ -1511,7 +1639,6 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
 - Legacy OCR classes: OcrHandle, OcrPlatform, OcrEngine, OcrEngineFactory
 - Obsolete configuration fields and setup methods
 - PipelexFileError exception class
-
 
 ## [v0.10.1] - 2025-09-17
 
@@ -1578,29 +1705,33 @@ For complete details, see the [Inference Backend Configuration](configuration/co
 ## [v0.9.5] - 2025-09-12
 
 ### Highlight
- - Pinned `instructor` to version `<1.10.0` to avoid errors with `mypy`
+
+- Pinned `instructor` to version `<1.10.0` to avoid errors with `mypy`
 
 ### Added
- - Added `PIPELEX_INFERENCE` LLM family enum value
- - Added support for `PIPELEX_INFERENCE` in OpenAI LLM worker
- - Added Azure OpenAI platform support for Grok models (`grok-3` and `grok-3-mini`)
- - Added debug logging for `PipeParallel` output contents
- - Added `TOML` file filtering in LLM model library loading
- - Added error handling for Unicode decode errors in LLM model library
- - Added new test model configurations for `pipelex` and `vertex_ai` platforms
+
+- Added `PIPELEX_INFERENCE` LLM family enum value
+- Added support for `PIPELEX_INFERENCE` in OpenAI LLM worker
+- Added Azure OpenAI platform support for Grok models (`grok-3` and `grok-3-mini`)
+- Added debug logging for `PipeParallel` output contents
+- Added `TOML` file filtering in LLM model library loading
+- Added error handling for Unicode decode errors in LLM model library
+- Added new test model configurations for `pipelex` and `vertex_ai` platforms
 
 ### Changed
- - Improved error messages in `StuffFactory` to include concept code and stuff name
- - Disabled `is_gen_object_supported` for all Grok models (`grok-3`, `grok-3-mini`, `grok-3-fast`)
- - Updated test configurations to use different LLM models and platforms
- - Modified `Jinja2` filter to use default `TagStyle.TICKS` instead of raising error
- - Added proper error handling for Unicode decode errors when loading model libraries
- - Improved error handling in Anthropic plugin tests with specific `AuthenticationError` handling
- - Image handling in `AnthropicFactory` now converts image URLs to `base64` data URLs with proper MIME type prefix
- - Put back Discord link in `README.md`
+
+- Improved error messages in `StuffFactory` to include concept code and stuff name
+- Disabled `is_gen_object_supported` for all Grok models (`grok-3`, `grok-3-mini`, `grok-3-fast`)
+- Updated test configurations to use different LLM models and platforms
+- Modified `Jinja2` filter to use default `TagStyle.TICKS` instead of raising error
+- Added proper error handling for Unicode decode errors when loading model libraries
+- Improved error handling in Anthropic plugin tests with specific `AuthenticationError` handling
+- Image handling in `AnthropicFactory` now converts image URLs to `base64` data URLs with proper MIME type prefix
+- Put back Discord link in `README.md`
 
 ### Fixed
- - Pinned `instructor` to version `<1.10.0` to avoid errors with `mypy`
+
+- Pinned `instructor` to version `<1.10.0` to avoid errors with `mypy`
 
 ## [v0.9.4] - 2025-09-06
 
@@ -1612,9 +1743,9 @@ For complete details, see the [Inference Backend Configuration](configuration/co
 
 ### Added
 
- - Better support for BlackboxAI IDE
- - VS Code extensions recommendations file with Pipelex, Ruff, and MyPy extensions
- - File association for .plx files in VS Code settings
+- Better support for BlackboxAI IDE
+- VS Code extensions recommendations file with Pipelex, Ruff, and MyPy extensions
+- File association for .plx files in VS Code settings
 
 ## [v0.9.2] - 2025-09-05
 
@@ -1630,6 +1761,7 @@ For complete details, see the [Inference Backend Configuration](configuration/co
 ## [v0.9.1] - 2025-09-05
 
 ### Fixed
+
 - Fixed many inconsistencies in the documentation.
 
 ## [v0.9.0] - 2025-09-02
@@ -1690,7 +1822,7 @@ For complete details, see the [Inference Backend Configuration](configuration/co
   - **`pipelex init`** - Initialization commands
     - `pipelex init libraries [DIRECTORY]` - Initialize pipelex libraries (creates `pipelex_libraries` folder)
     - `pipelex init config` - Initialize pipelex configuration (creates `pipelex.toml`)
-  - **`pipelex validate`** - Validation and dry-run commands  
+  - **`pipelex validate`** - Validation and dry-run commands
     - `pipelex validate all -c pipelex/libraries` - Validate all libraries and dry-run all pipes
     - `pipelex validate pipe PIPE_CODE` - Dry run a single pipe by its code
   - **`pipelex show`** - Show and list commands
@@ -1721,25 +1853,28 @@ For complete details, see the [Inference Backend Configuration](configuration/co
 ## [v0.6.10] - 2025-08-02
 
 ### Added
- - New test file for source code manipulation functions (tests/cases/source_code.py)
- - New integration test for PipeFunc functionality (tests/integration/pipelex/pipes/pipe_operator/pipe_func/test_pipe_func.py)
- - New package structure file for pipe_func tests (__init__.py)
- - Simplified input memory creation for native concepts (Text, Image, PDF) in pipeline execution
- - Added Pipeline requests link to GitHub issue template config
+
+- New test file for source code manipulation functions (tests/cases/source_code.py)
+- New integration test for PipeFunc functionality (tests/integration/pipelex/pipes/pipe_operator/pipe_func/test_pipe_func.py)
+- New package structure file for pipe_func tests (**init**.py)
+- Simplified input memory creation for native concepts (Text, Image, PDF) in pipeline execution
+- Added Pipeline requests link to GitHub issue template config
 
 ### Changed
- - Updated pipeline execution documentation and examples to use input_memory instead of working_memory
- - Renamed pipeline from 'extract_page_contents_from_pdf' to 'ocr_page_contents_from_pdf'
- - Renamed pipeline from 'extract_page_contents_and_views_from_pdf' to 'ocr_page_contents_and_views_from_pdf'
- - Updated cocode dependency from version 0.0.6 to 0.0.9
+
+- Updated pipeline execution documentation and examples to use input_memory instead of working_memory
+- Renamed pipeline from 'extract_page_contents_from_pdf' to 'ocr_page_contents_from_pdf'
+- Renamed pipeline from 'extract_page_contents_and_views_from_pdf' to 'ocr_page_contents_and_views_from_pdf'
+- Updated cocode dependency from version 0.0.6 to 0.0.9
 
 ### Fixed
- - Fixed typo in pipeline description ('aspage views' to 'as full page views')
+
+- Fixed typo in pipeline description ('aspage views' to 'as full page views')
 
 ### Removed
- - Removed WorkingMemoryFactory and StuffFactory imports from pipeline execution examples
- - Removed working memory creation code from pipeline examples
 
+- Removed WorkingMemoryFactory and StuffFactory imports from pipeline execution examples
+- Removed working memory creation code from pipeline examples
 
 ## [v0.6.9] - 2025-07-26
 
@@ -1750,16 +1885,17 @@ Simplified input memory:
 - The concept code can now be provided with arg named `concept` in addition to `concept_code`
 - You can pass a simple string to create a `Text` stuff
 
-
 ## [v0.6.8] - 2025-07-25
 
 ### Added
+
 - New method `make_stuff_using_concept_name_and_search_domains` in `StuffFactory` for creating stuff using concept names and search domains.
 - New method `make_stuff_from_stuff_content_using_search_domains` in `StuffFactory` for creating stuff from stuff content using search domains.
 - New method `make_from_implicit_memory` in `WorkingMemoryFactory` for creating working memory from implicit memory.
 - New method `create_mock_content` in `WorkingMemoryFactory` for creating mock content for requirements.
 
 ### Changed
+
 - Refactored `PipeInput` to use `InputRequirement` and `TypedNamedInputRequirement` classes instead of plain strings for input specifications.
 - Updated `WorkingMemoryFactory` to handle `PipelineInputs` instead of `CompactMemory`.
 - Replaced `ExecutePipelineException` with `PipelineInputError` in `execute_pipeline` function.
@@ -1769,24 +1905,29 @@ Simplified input memory:
 - Updated `Jinja2TemplateCategory` to handle HTML and Markdown templates differently.
 
 ### Fixed
+
 - Corrected error messages in `StuffFactory` and `StuffContentFactory` to provide more detailed information about exceptions.
 
 ## [v0.6.7] - 2025-07-24
 
 ### Removed
+
 - Removed the `structure_classes` parameter from the `Pipelex` class.
 
 ## [v0.6.6] - 2025-07-24
 
 ### Added
+
 - Added a new method `verify_content_type` in the `Stuff` class to verify and convert content to the expected type.
 - Added `cocode==0.0.6` to the development dependencies in `pyproject.toml`.
 
 ### Changed
+
 - Updated `Stuff` class methods to use the new `verify_content_type` method for content verification.
 - Updated `vertexai.toml` to change LLM IDs from preview models to released models: `gemini-2.5-pro` and `gemini-2.5-flash`.
 
 ### Removed
+
 - Removed `reinitlibraries`, `rl`, `v`, and `init` targets from the Makefile.
 
 ## [v0.6.5] - 2025-07-21
@@ -1802,16 +1943,19 @@ Simplified input memory:
 ## [v0.6.3] - 2025-07-18
 
 ### Changed
+
 - Enhanced `Stuff.content_as()` method with improved type validation logic - now attempts model validation when `isinstance` check fails
 
 ## [v0.6.2] - 2025-07-18
 
 ### Added
+
 - New `dry-run-pipe` cli command to dry run a single pipe by its code
 - New `show-pipe` cli command to display pipe definitions from the pipe library
 - New `dry_run_single_pipe()` function for running individual pipe dry runs
 
 ### Changed
+
 - Updated `init-libraries` command to accept a directory argument and create `pipelex_libraries` folder in specified location
 - Updated `validate` command to use `-c` flag for the config folder path
 
@@ -1821,13 +1965,15 @@ Simplified input memory:
 
 ## [v0.6.0] - 2025-07-15
 
-### Changed 
+### Changed
+
 - **Enhanced `Pipelex.make()` method**: Complete overhaul of the initialization method with new path configuration options and robust validation:
   - Added `relative_config_folder_path` and `absolute_config_folder_path` parameters for flexible config folder specification
   - The `from_file` parameter controls path resolution: if `True` (default), relative paths are resolved relative to the caller's file location; if `False`, relative to the current working directory (useful for CLI scenarios)
 - Renamed Makefile targets like `make doc` to `make docs` for consistency
 
 ### Added
+
 - Added github action for inference tests
 - `load_json_list_from_path` function in `pipelex.tools.misc.file_utils`: Loads a JSON file and ensures it contains a list.
 - Added issue templates
@@ -1928,6 +2074,7 @@ Simplified input memory:
 ## [v0.4.5] - 2025-06-23
 
 ### Changed
+
 - **Test structure overhaul**: Reorganized test directory structure for better organization:
   - Tests now separated into `unit/`, `integration/`, and `e2e/` directories
   - Created `tests/cases/` package for pure test data and constants
@@ -1938,6 +2085,7 @@ Simplified input memory:
   - Added pytest-mock to dev dependencies for improved unit testing
 
 ### Added
+
 - **Coverage commands**: New Makefile targets for test coverage analysis:
   - `make cov`: Run tests with coverage report
   - `make cov-missing` (or `make cm`): Show coverage with missing lines
@@ -1945,46 +2093,55 @@ Simplified input memory:
 - **Pydantic validation errors**: Enhanced error formatting to properly handle model_type errors
 
 ### Fixed
-- **External links**: Removed broken Markdown target="_blank" syntax from MANIFESTO.md links
+
+- **External links**: Removed broken Markdown target="\_blank" syntax from MANIFESTO.md links
 - **Variable naming consistency**: Fixed redundant naming in OpenAI config (openai_openai_config → openai_config)
 - **Makefile optimization**: Removed parallel test execution (`-n auto`) from codex-tests, works better now
 
 ### Tests
+
 - **Unit tests added**: New comprehensive unit tests for:
   - `ClassRegistryUtils`
-  - `FuncRegistry` 
+  - `FuncRegistry`
   - `ModuleInspector`
   - File finding utilities
 
 ## [v0.4.4] - 2025-06-20
 
 ### Fixed
+
 - Changed the allowed base branch names in the GHA `guard-branches.yml`: `doc` -> `docs`
 - Fixed `kajson` dependency (see [kajson v0.1.6 changelog](https://github.com/Pipelex/kajson/blob/main/CHANGELOG.md))
 
 ### Cursor rules
+
 - Added Cursor rules for coding best practices and standards (including linting methods). Added TDD (Test Driven Development) rule on demand.
 - Various changes
 
 ### Documentation
+
 - Added documentation for referencing images in PipeLLM.
 - Fixed typos
 
 ### Refactor
+
 - Removed the `images` field from PipeLLM - images can now be referenced directly in the `inputs`
 - Moved the list-pipes CLI function to the `PipeLibrary` class.
 
 ## [v0.4.3] - 2025-06-19
 
 ### Fixed
+
 - **Removed deprecated Gemini 1.5 models**: Removed `gemini-1.5-flash` and `gemini-1.5-pro` from the VertexAI integration as they are no longer supported
 - Fixed multiple import statements across the codebase
 
 ### Documentation
+
 - **Enhanced MkDocs search**: Added search functionality to the documentation site
 - **Proofreading improvements**: Fixed various typos and improved clarity across documentation
 
 ### Refactor
+
 - Mini refactor: changed kajson dependency to `kajson==0.1.5` (instead of `>=`) to tolerate temporary breaking changes from kajson
 
 ## [v0.4.2] - 2025-06-17
@@ -2003,15 +2160,15 @@ Simplified input memory:
 ### Highlight: Complete documentation overhaul
 
 - **MkDocs** setup for static web docs generation
-    - **Material** for MkDocs theme, custom styling and navigation
-    - Other plugins: meta-manager, glightbox
-    - **GitHub Pages** deployment, mapped to [docs.pipelex.com](http://docs.pipelex.com)
-    - Added GHA workflows for documentation deployment and validation
+  - **Material** for MkDocs theme, custom styling and navigation
+  - Other plugins: meta-manager, glightbox
+  - **GitHub Pages** deployment, mapped to [docs.pipelex.com](http://docs.pipelex.com)
+  - Added GHA workflows for documentation deployment and validation
 - **Added to docs:**
-    - [**Manifesto**](https://docs.pipelex.com/manifesto/) explaining the Pipelex viewpoint
-    - [**The Pipelex Paradigm**](https://docs.pipelex.com/pages/pipelex-paradigm-for-repeatable-ai-workflows/) explaining the fundamentals of Pipelex's solution
-    - [**Cookbook examples](https://docs.pipelex.com/pages/cookbook-examples/)** presented and explained, commented code, some event with [mermaid](https://docs.pipelex.com/pages/cookbook-examples/invoice-extractor/) [flow](https://docs.pipelex.com/pages/cookbook-examples/extract-gantt/) [charts](https://docs.pipelex.com/pages/cookbook-examples/write-tweet/)
-    - And plenty of details about **using Pipelex** and **developing for Pipelex,** from **structured generation** to PipeOperators (**LLM**, **Image generation**, **OCR**…) to PipeControllers (**Sequence**, **Parallel**, **Batch**, **Condition**…), workflow **optimization**, workflow static **validation** and dry run… there's still work to do, but we move fast!
+  - [**Manifesto**](https://docs.pipelex.com/manifesto/) explaining the Pipelex viewpoint
+  - [**The Pipelex Paradigm**](https://docs.pipelex.com/pages/pipelex-paradigm-for-repeatable-ai-workflows/) explaining the fundamentals of Pipelex's solution
+  - [\*\*Cookbook examples](https://docs.pipelex.com/pages/cookbook-examples/)\*\* presented and explained, commented code, some event with [mermaid](https://docs.pipelex.com/pages/cookbook-examples/invoice-extractor/) [flow](https://docs.pipelex.com/pages/cookbook-examples/extract-gantt/) [charts](https://docs.pipelex.com/pages/cookbook-examples/write-tweet/)
+  - And plenty of details about **using Pipelex** and **developing for Pipelex,** from **structured generation** to PipeOperators (**LLM**, **Image generation**, **OCR**…) to PipeControllers (**Sequence**, **Parallel**, **Batch**, **Condition**…), workflow **optimization**, workflow static **validation** and dry run… there's still work to do, but we move fast!
 - **Also a major update of Cursor rules**
 
 ### Tooling Improvements
@@ -2050,6 +2207,7 @@ Simplified input memory:
 ## [v0.3.1] - 2025-06-10
 
 ### Added
+
 - New pytest marker `dry_runnable` for tests that can run without inference.
 - Enhanced `make` targets with dry-run capabilities for improved test coverage:
   - `make test-xdist` (or `make t`): Runs all non-inference tests **plus inference tests** that support dry-runs - fast and resource-efficient
@@ -2057,8 +2215,9 @@ Simplified input memory:
 - Parallel test execution using `pytest-xdist` (`-n auto`) enabled for:
   - GitHub Actions workflows
   - Codex test targets
-  
+
 ### Changed
+
 - Domain validation is now less restrictive in pipeline TOML: the `description` attribute is now `Optional`
 
 ## [v0.3.0] - 2025-06-09
@@ -2066,13 +2225,13 @@ Simplified input memory:
 ### Highlights
 
 - **Structured Input Specifications**: Pipe inputs are now defined as a dictionary mapping a required variable name to a concept code (`required_variable` -> `concept_code`). This replaces the previous single `input` field and allows for multiple, named inputs, making pipes more powerful and explicit. This is a **breaking change**.
-- **Static Validation for Inference Pipes**: You can now catch configuration and input mistakes in your pipelines *before* running any operations. This static validation checks `PipeLLM`, `PipeExtract`, and `PipeImgGen`. Static validation for controller pipes (PipeSequence, PipeParallel…) will come in a future release.
-    - Configure the behavior for different error types using the `static_validation_config` section in your settings. For each error type, choose to `raise`, `log`, or `ignore`.
+- **Static Validation for Inference Pipes**: You can now catch configuration and input mistakes in your pipelines _before_ running any operations. This static validation checks `PipeLLM`, `PipeExtract`, and `PipeImgGen`. Static validation for controller pipes (PipeSequence, PipeParallel…) will come in a future release.
+  - Configure the behavior for different error types using the `static_validation_config` section in your settings. For each error type, choose to `raise`, `log`, or `ignore`.
 - **Dry Run Mode for Zero-Cost Pipeline Validation**: A powerful dry-run mode allows you to test entire pipelines without making any actual inference calls. It's fast, costs nothing, works offline, and is perfect for linting and validating pipeline logic.
-    - The new `dry_run_config` lets you control settings, like disabling Jinja2 rendering during a dry run.
-    - This feature leverages `polyfactory` to generate mock Pydantic models for simulated outputs.
-    - Error handling for bad inputs during `run_pipe` has been improved and is fully effective in dry-run mode.
-    - One limitation: currently, dry running doesn't work when the pipeline uses a PipeCondition. This will be fixed in a future release.
+  - The new `dry_run_config` lets you control settings, like disabling Jinja2 rendering during a dry run.
+  - This feature leverages `polyfactory` to generate mock Pydantic models for simulated outputs.
+  - Error handling for bad inputs during `run_pipe` has been improved and is fully effective in dry-run mode.
+  - One limitation: currently, dry running doesn't work when the pipeline uses a PipeCondition. This will be fixed in a future release.
 
 ### Added
 
@@ -2101,12 +2260,14 @@ Simplified input memory:
 
 ## [v0.2.14] - 2025-06-06
 
-- Added a feature flag for the `ReportingManager` in the config: 
+- Added a feature flag for the `ReportingManager` in the config:
+
 ```bash
 [pipelex]
 [pipelex.feature_config]
 is_reporting_enabled = true
 ```
+
 - Moved the reporting config form the `cogt`config to the Pipelex config.
 
 ## [v0.2.13] - 2025-06-06
@@ -2143,13 +2304,14 @@ is_reporting_enabled = true
 **Major Model Additions** - Claude 4 (Opus & Sonnet), Grok-3, and GPT-4 image generation are now in the house.
 
 ### Pipeline Base Library update
+
 - **New pipe** - `ocr_page_contents_and_views_from_pdf` transferred from cookbook to base library (congrats on the promotion!). This pipe extracts text, linked images, **AND** page_view images (rendered pages) - it's very useful if you want to use Vision in follow-up pipes
 
 ### Added
 
 - **Template preprocessor** - New `@?` token prefix for optional variable insertion - if a variable doesn't exist, we gracefully skip it instead of throwing exceptions
 - **Claude 4 support** - Both Opus and Sonnet variants, available through Anthropic SDK (direct & Bedrock) plus Bedrock SDK. Includes specific max_tokens limit reduction to prevent timeout/streaming issues (temporary workaround)
-- **Grok-3 family support** - Full support via OpenAI SDK for X.AI's latest models  
+- **Grok-3 family support** - Full support via OpenAI SDK for X.AI's latest models
 - **GPT-4 image generation** - New `gpt-image-1` model through OpenAI SDK, available via PipeImgGen. Currently saves local files (addressing in next release)
 - **Gemini update** - Added latest `gemini-2.5-pro` to the lineup
 - **Image generation enhancements** - Better quality controls, improved background handling options, auto-adapts to different models: Flux, SDXL and now gpt-image-1
@@ -2162,14 +2324,13 @@ is_reporting_enabled = true
 - Added `make test-quiet` (shorthand `tq`) to Makefile to run tests without capturing outputs (i.e. without pytest `-s` option)
 - Stopped using Fixtures for `pipe_router` and `content_generator`: we're now always getting the singleton from `pipelex.hub`
 
-
 ### Fixed
 
 - **Perplexity integration** - Fixed breaking changes from recent updates
 
 ### Dependencies
 
-- Added **pytest-xdist** to run unit tests in parallel on multiple CPUs. Not yet integrated into the Makefile, so run it manually with `pytest -n auto` (without inference) or `pytest -n auto -m "inference"` (inference only). 
+- Added **pytest-xdist** to run unit tests in parallel on multiple CPUs. Not yet integrated into the Makefile, so run it manually with `pytest -n auto` (without inference) or `pytest -n auto -m "inference"` (inference only).
 - Swapped pytest-pretty for pytest-sugar - because readable test names > pretty tables
 - Updated instructor to v1.8.3
 - All dependencies tested against Python 3.10, 3.11, 3.12, and 3.13
@@ -2180,7 +2341,6 @@ is_reporting_enabled = true
 - TestImgGenByOpenAIGpt
 - TestImageGeneration
 - TestPipeImgGen
-
 
 ## [v0.2.9] - 2025-05-30
 

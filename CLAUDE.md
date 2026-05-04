@@ -30,9 +30,9 @@
 
 ### Running Tests
 
-   After making code changes, run **targeted tests** based on what you changed. See `tests/CLAUDE.md` for the source-to-test mapping and the pytest command template.
+   `make agent-test` runs the test suite and is **critical at the end of a coding session** to verify everything is good before wrapping up.
 
-   Fall back to the full suite when changes are broad (3+ areas), touch shared infrastructure, or when preparing a release/push/commit to remote:
+   At intermediate steps during LOCAL development, it's OK to run only the tests relevant to your changes — either by calling pytest directly from the `.venv` (e.g. `.venv/bin/pytest -x -q tests/unit/path/to/test_module.py`) or using `make t TEST=TestClassName`. This applies only to local setups, not cloud agents.
 
    ```bash
    make agent-test
@@ -75,6 +75,28 @@
    make t TEST=LF
    ```
    Note: `TEST=LF` (or `TEST=lf`) will use pytest's `--lf` flag instead of name filtering.
+
+### Temporal Integration Test Options
+
+   The Temporal integration tests support different server modes via the `--temporal-server` pytest CLI option:
+
+   - `--temporal-server`: Which Temporal server to use
+     - `none` (default): in-process test server — no external dependencies, used in CI
+     - `time-skipping`: in-process server with deterministic time control
+     - A profile name from `temporal_server_configs` in `pipelex.toml` (e.g. `local`, `testing`): connects to a real Temporal server using the profile's host, namespace, and API key settings
+
+   ```bash
+   # CI default: in-process server
+   .venv/bin/pytest tests/integration/pipelex/temporal/
+
+   # Dev with local Temporal server
+   .venv/bin/pytest tests/integration/pipelex/temporal/ \
+     --temporal-server local
+
+   # Dev with cloud/testing server
+   .venv/bin/pytest tests/integration/pipelex/temporal/ \
+     --temporal-server testing
+   ```
 
 ---
 
@@ -216,12 +238,28 @@ This document outlines the core coding standards, best practices, and quality co
     - Use factory pattern for object creation when dealing with multiple implementations
     - Our factory methods are named `make_from_...` and such
 
+### Protocols and Interfaces
+
+    - When a getter (e.g. `get_report_delegate()`, `get_library_manager()`) returns a `Protocol` type, callers must only rely on methods declared on that `Protocol`. If you need to call a method that lives on a concrete implementation, **extend the `Protocol`** — do not work around it with `isinstance(...)` checks, `cast(...)`, or inline imports of the concrete class.
+    - When extending the `Protocol`, also update every implementation (including no-op / null implementations) so structural typing is satisfied. For implementations where the method has nothing to do, give it a `pass` body — that is the whole point of having a `Protocol` rather than a concrete base class.
+    - Smell to watch for: an inline `from ... import ConcreteImpl  # noqa: PLC0415` followed by `if isinstance(delegate, ConcreteImpl): delegate.some_method(...)`. This is almost always a missing method on the `Protocol`. Promote it.
+    - Use `@override` (from `typing_extensions`) on every implementation of a `Protocol` method, so that signature drift between the `Protocol` and its implementations is caught by the type checker.
+
 ### Error Handling
 
     - Always catch exceptions at the place where you can add useful context to it.
     - Use try/except blocks with specific exceptions
     - Convert third-party exceptions to our custom ones except in pydantic validators where you can raise a ValueError or a TypeError
-    - NEVER catch the generic Exception, only catch specific exceptions, except at the root of CLI commands
+    - **NEVER write `except Exception:` (or bare `except:`).** Catching the generic `Exception` is FORBIDDEN everywhere except at the absolute root of a CLI command or an API endpoint handler. There are NO other exceptions to this rule. The following are NOT valid justifications and the agent must reject them when tempted:
+        - "I want to log and re-raise" → just let it propagate; logging happens at the root.
+        - "I want to swallow it just in case" → don't. Unknown failures must surface.
+        - "I want to convert it to our error type" → only if you know which specific exception(s) the call can raise; catch those explicitly.
+        - "The third-party lib isn't well typed" → look up the actual exceptions it raises and catch those by name.
+        - "It's safer this way" → it isn't. It hides bugs. Crashing loudly on an unexpected exception is the desired behavior.
+        If you find yourself writing `except Exception`, STOP and ask the user before proceeding.
+    - **Do NOT add try/except speculatively.** Only add a `try`/`except` when (a) a specific exception type is documented or known to be raised by the call, AND (b) you have a concrete recovery path or a meaningful context to attach. Otherwise, let the error bubble up — that is the correct behavior, not a gap to fill.
+    - **Use `try`/`finally` (without `except`) for required cleanup.** When a piece of code MUST run on the way out — releasing a resource, closing a tracer, tearing down a library, clearing per-context state on a manager — put it in a `finally` block (or a `with`/context manager). This is the correct way to guarantee cleanup on both the happy path and the error path: it does NOT suppress the exception, it just ensures cleanup happens before the exception propagates. Do not invent an `except Exception` just to attach cleanup; use `finally` instead. Conversely, do not move cleanup into the success path "to keep things simple" — if it must run on errors too, it belongs in `finally`.
+    - When reviewing existing code, treat any `except Exception` you encounter as a bug to fix (replace it with the specific exception(s) actually raised, or remove the try/except entirely), not as a precedent to follow.
     - Always add `from exc` to the exception raise statements
     - Always write the error message as a variable before raising it, for cleaner error traces
    

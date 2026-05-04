@@ -285,9 +285,14 @@ search_models = []
 [profiles.dev]
 description = "Quick dev testing with fast and cheap models from key providers"
 backends = ["pipelex_gateway", "internal"]
-llm_models = ["claude-4.5-haiku", "gpt-4o-mini", "gemini-2.5-flash-lite"]
+llm_models = [
+  "claude-4.5-haiku",
+  "gpt-4o-mini",
+  "linkup",
+  "gemini-2.5-flash-lite",
+]
 img_gen_models = ["gpt-image-1-mini"]
-extract_models = ["@from_pdf"]
+extract_models = ["@from_pdf", "linkup-fetch"]
 search_models = ["linkup-standard"]
 
 ################################################################################

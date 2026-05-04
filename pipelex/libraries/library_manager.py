@@ -3,7 +3,7 @@ from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from kajson.kajson_manager import KajsonManager
+from kajson.class_registry import ClassRegistry
 from mthds.package.dependency_resolver import ResolvedDependency, determine_exported_pipes, resolve_all_dependencies
 from mthds.package.discovery import find_package_manifest
 from mthds.package.exceptions import DependencyResolveError, ManifestError
@@ -15,9 +15,9 @@ import pipelex.builder as builder_pkg  # package import — used for __file__ pa
 from pipelex import log
 from pipelex.cli.installed_methods import find_method_by_full_address
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.domains.domain import Domain
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
@@ -27,13 +27,15 @@ from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.validation import report_validation_error
-from pipelex.hub import get_current_library
+from pipelex.hub import get_class_registry, get_current_library
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.exceptions import (
     LibraryError,
     LibraryLoadingError,
 )
 from pipelex.libraries.library import Library
+from pipelex.libraries.library_crate import LibraryCrate
+from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.library_utils import (
@@ -46,8 +48,9 @@ from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
 from pipelex.tools.misc.semver import SemVerError, parse_constraint, parse_version, version_satisfies
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from pipelex.core.concepts.concept import Concept
-    from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
     from pipelex.core.domains.domain import Domain
 
 MTHDS_METHODS_DIRNAME = ".mthds/methods"
@@ -93,6 +96,9 @@ class LibraryManager(LibraryManagerAbstract):
         # UNTITLED library is the fallback library for all others
         self._libraries: dict[str, Library] = {}
         self._pipe_source_map: dict[str, Path] = {}  # pipe_ref (domain.pipe_code) -> source .mthds file
+        self._blueprints: dict[str, list[PipelexBundleBlueprint]] = {}  # library_id -> accumulated blueprints
+        self._crate_cache: dict[str, LibraryCrate] = {}  # library_id -> cached crate from get_crate()
+        self._loaded_fingerprints: dict[str, set[str]] = {}  # library_id -> set of loaded crate fingerprints
 
     ############################################################
     # Manager lifecycle
@@ -116,12 +122,18 @@ class LibraryManager(LibraryManagerAbstract):
                 self._pipe_source_map.pop(pipe_ref, None)
             library.teardown()
             del self._libraries[library_id]
+            self._blueprints.pop(library_id, None)
+            self._crate_cache.pop(library_id, None)
+            self._loaded_fingerprints.pop(library_id, None)
             return
 
         for library in self._libraries.values():
             library.teardown()
         self._libraries = {}
         self._pipe_source_map = {}
+        self._blueprints = {}
+        self._crate_cache = {}
+        self._loaded_fingerprints = {}
 
     @override
     def reset(self) -> None:
@@ -144,6 +156,14 @@ class LibraryManager(LibraryManagerAbstract):
     ############################################################
     # Public library accessors
     ############################################################
+
+    @override
+    def get_library_class_registry(self, library_id: str) -> ClassRegistry | None:
+        """Get the ClassRegistry associated with a library, if any."""
+        library = self._libraries.get(library_id)
+        if library is not None:
+            return library.get_class_registry()
+        return None
 
     @override
     def get_library(self, library_id: str) -> Library:
@@ -181,6 +201,18 @@ class LibraryManager(LibraryManagerAbstract):
             if len(matches) == 1:
                 return matches[0]
         return None
+
+    @override
+    def get_crate(self, library_id: str) -> LibraryCrate | None:
+        cached = self._crate_cache.get(library_id)
+        if cached is not None:
+            return cached
+        accumulated = self._blueprints.get(library_id)
+        if not accumulated:
+            return None
+        crate = LibraryCrateFactory.make_from_blueprints(blueprints=accumulated)
+        self._crate_cache[library_id] = crate
+        return crate
 
     ############################################################
     # Private methods
@@ -335,41 +367,41 @@ class LibraryManager(LibraryManagerAbstract):
         return all_concepts
 
     @override
-    def load_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
-        """Load domains, concepts, and pipes from a list of blueprints.
+    def load_from_crate(self, library_id: str, crate: LibraryCrate) -> list[PipeAbstract]:
+        """Load a LibraryCrate into a live Library.
+
+        Fingerprint idempotency: if a crate with the same fingerprint was already loaded
+        into this library_id, the load is skipped and an empty list is returned.
+
+        Note: This method does NOT resolve cross-package address-based dependencies.
+        Callers must handle dependency loading before calling this method (e.g. via
+        _load_address_based_dependencies). The load_from_blueprints method does this
+        automatically before delegating here.
 
         Args:
-            library_id: The ID of the library to load into
-            blueprints: List of parsed MTHDS blueprints to load
+            library_id: The library to load into
+            crate: The LibraryCrate containing qualified blueprints, domain metadata, and source info
 
         Returns:
-            List of all pipes that were loaded
+            List of all pipes that were loaded, or empty list if already loaded
         """
-        # Discover and load address-based cross-package dependencies before loading pipes
-        self._load_address_based_dependencies(
-            library_id=library_id,
-            blueprints=blueprints,
-        )
-
+        # Fingerprint idempotency: skip if this crate was already loaded into this library
+        fingerprint = crate.fingerprint
+        loaded_set = self._loaded_fingerprints.setdefault(library_id, set())
+        if fingerprint in loaded_set:
+            log.verbose(f"Crate with fingerprint {fingerprint[:12]}... already loaded into '{library_id}', skipping")
+            return []
         library = self.get_library(library_id=library_id)
-        all_pipes: list[PipeAbstract] = []
 
-        # Load all domains first
+        # Load domains from crate metadata
         all_domains: list[Domain] = []
-        for blueprint in blueprints:
-            domain = DomainFactory.make_from_blueprint(
-                blueprint=DomainBlueprint(
-                    source=blueprint.source,
-                    code=blueprint.domain,
-                    description=blueprint.description or "",
-                    system_prompt=blueprint.system_prompt,
-                ),
-            )
+        for domain_blueprint in crate.domains.values():
+            domain = DomainFactory.make_from_blueprint(blueprint=domain_blueprint)
             all_domains.append(domain)
         library.domain_library.add_domains(domains=all_domains)
 
-        # Load concepts (forward references resolved after all are loaded)
-        all_concepts = self._load_concepts_from_blueprints(blueprints)
+        # Load concepts in topological order
+        all_concepts = self._load_concepts_from_crate(crate.concepts)
         library.concept_library.add_concepts(concepts=all_concepts)
 
         # Resolve forward references in dynamically generated structure classes
@@ -378,46 +410,76 @@ class LibraryManager(LibraryManagerAbstract):
         # Detect cycles in concept references (A -> B -> A is forbidden)
         self._detect_concept_cycles(all_concepts)
 
-        # Load all pipes, detecting duplicate declarations across bundles in this library
-        pipe_source_in_this_load: dict[str, Path | None] = {}
-        for blueprint in blueprints:
-            pipes: list[PipeAbstract] = []
-            new_source = Path(blueprint.source) if blueprint.source else None
-            if blueprint.pipe is not None:
-                for pipe_code, pipe_blueprint in blueprint.pipe.items():
-                    pipe_ref = f"{blueprint.domain}.{pipe_code}"
-                    # Detect duplicate pipe declarations across different bundles in the same library
-                    if pipe_ref in pipe_source_in_this_load:
-                        existing_source = pipe_source_in_this_load[pipe_ref]
-                        if existing_source == new_source:
-                            msg = (
-                                f"Pipe '{pipe_ref}' is declared twice in the same bundle file: '{existing_source}'. "
-                                "Please remove the duplicate declaration."
-                            )
-                        else:
-                            msg = (
-                                f"Pipe '{pipe_ref}' is declared in two different bundle files: "
-                                f"'{existing_source}' and '{new_source}'. "
-                                "Please remove one of the declarations or rename one of the pipes."
-                            )
-                        raise PipeLibraryError(msg)
-                    pipe_source_in_this_load[pipe_ref] = new_source
-                    pipe = PipeFactory[PipeAbstract].make_from_blueprint(
-                        domain_code=blueprint.domain,
-                        pipe_code=pipe_code,
-                        blueprint=pipe_blueprint,
-                        concept_codes_from_the_same_domain=[the_concept.code for the_concept in all_concepts],
-                    )
-                    pipes.append(pipe)
-                    # Track source file for this pipe (used by get_pipe_source)
-                    if new_source:
-                        self._pipe_source_map[pipe_ref] = new_source
-            all_pipes.extend(pipes)
+        # Precompute domain -> concept local codes mapping (avoids O(N*M) re-parsing per pipe)
+        domain_concept_codes: dict[str, list[str]] = {}
+        for concept_ref in crate.concepts:
+            parsed_concept = QualifiedRef.parse_concept_ref(raw=concept_ref)
+            if parsed_concept.domain_path is not None:
+                domain_concept_codes.setdefault(parsed_concept.domain_path, []).append(parsed_concept.local_code)
+
+        # Load pipes with domain-filtered concept codes
+        all_pipes: list[PipeAbstract] = []
+        for pipe_ref, pipe_blueprint in crate.pipes.items():
+            parsed = QualifiedRef.parse_pipe_ref(raw=pipe_ref)
+            if parsed.domain_path is None:
+                msg = f"Crate pipe_ref '{pipe_ref}' must be domain-qualified"
+                raise PipeLibraryError(msg)
+            domain_code = parsed.domain_path
+            pipe_code = parsed.local_code
+
+            concept_codes_for_domain = domain_concept_codes.get(domain_code, [])
+
+            pipe = PipeFactory[PipeAbstract].make_from_blueprint(
+                domain_code=domain_code,
+                pipe_code=pipe_code,
+                blueprint=pipe_blueprint,
+                concept_codes_from_the_same_domain=concept_codes_for_domain,
+            )
+            all_pipes.append(pipe)
+
+            # Track source file for this pipe (used by get_pipe_source)
+            source = crate.source_map.get(pipe_ref)
+            if source:
+                self._pipe_source_map[pipe_ref] = Path(source)
 
         library.pipe_library.add_pipes(pipes=all_pipes)
 
         library.validate_library()
+
+        # Only cache fingerprint after the entire load succeeds — if loading fails
+        # with an exception, subsequent retries must not be skipped.
+        loaded_set.add(fingerprint)
         return all_pipes
+
+    @override
+    def load_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
+        """Load domains, concepts, and pipes from a list of blueprints.
+
+        Delegates through LibraryCrate: builds a crate from blueprints, then loads from the crate.
+        Also accumulates blueprints for later crate retrieval via get_crate().
+
+        Args:
+            library_id: The ID of the library to load into
+            blueprints: List of parsed MTHDS blueprints to load
+
+        Returns:
+            List of all pipes that were loaded
+        """
+        # Accumulate blueprints for later crate construction via get_crate()
+        self._blueprints.setdefault(library_id, []).extend(blueprints)
+        self._crate_cache.pop(library_id, None)
+
+        # Discover and load address-based cross-package dependencies before loading pipes
+        self._load_address_based_dependencies(
+            library_id=library_id,
+            blueprints=blueprints,
+        )
+
+        # Build the crate (merges, qualifies, detects duplicates)
+        crate = LibraryCrateFactory.make_from_blueprints(blueprints=blueprints)
+
+        # Load from crate (domains, concepts, pipes, validation)
+        return self.load_from_crate(library_id=library_id, crate=crate)
 
     @override
     def load_concepts_only_from_blueprints(
@@ -449,6 +511,7 @@ class LibraryManager(LibraryManagerAbstract):
                     code=blueprint.domain,
                     description=blueprint.description or "",
                     system_prompt=blueprint.system_prompt,
+                    main_pipe=blueprint.main_pipe,
                 ),
             )
             all_domains.append(domain)
@@ -520,7 +583,53 @@ class LibraryManager(LibraryManagerAbstract):
                         concept_blueprint,
                     )
 
-        # Step 2: Build dependency graph and topologically sort using graphlib
+        return self._topological_load_concepts(ref_to_entry)
+
+    def _load_concepts_from_crate(
+        self,
+        concepts: dict[str, ConceptBlueprint | str],
+    ) -> list["Concept"]:
+        """Load concepts from a crate's flat concept dict in topological order.
+
+        Builds the entry map from the crate's flat dict, then delegates to
+        _topological_load_concepts for sorting and instantiation.
+        Duplicate detection is already done by LibraryCrateFactory.
+
+        Args:
+            concepts: Flat dict mapping concept_ref to ConceptBlueprint or string description
+
+        Returns:
+            List of loaded concepts in topological order
+        """
+        ref_to_entry: dict[str, tuple[str, str, ConceptBlueprint | str]] = {}
+        for concept_ref, concept_blueprint in concepts.items():
+            parsed = QualifiedRef.parse_concept_ref(raw=concept_ref)
+            if parsed.domain_path is None:
+                msg = f"Crate concept_ref '{concept_ref}' must be domain-qualified"
+                raise ConceptLibraryError(msg)
+            ref_to_entry[concept_ref] = (
+                parsed.domain_path,
+                parsed.local_code,
+                concept_blueprint,
+            )
+
+        return self._topological_load_concepts(ref_to_entry)
+
+    def _topological_load_concepts(
+        self,
+        ref_to_entry: "Mapping[str, tuple[str, str, ConceptBlueprint | str]]",
+    ) -> list["Concept"]:
+        """Sort concepts by refines dependencies and instantiate them.
+
+        Shared helper used by both _load_concepts_from_blueprints (blueprint path)
+        and _load_concepts_from_crate (crate path).
+
+        Args:
+            ref_to_entry: Mapping of concept_ref to (domain_code, concept_code, blueprint_or_string)
+
+        Returns:
+            List of loaded concepts in topological order
+        """
         sorter: TopologicalSorter[str] = TopologicalSorter()
 
         for concept_ref, (
@@ -548,14 +657,12 @@ class LibraryManager(LibraryManagerAbstract):
 
             sorter.add(concept_ref, *dependencies)
 
-        # Step 3: Get sorted order (raises CycleError if cycles detected)
         try:
             sorted_refs = list(sorter.static_order())
         except CycleError as exc:
             msg = f"Cycle detected in concept refines dependencies: {exc.args[1]}"
             raise LibraryLoadingError(msg) from exc
 
-        # Step 4: Load concepts in topological order
         all_concepts: list[Concept] = []
         for concept_ref in sorted_refs:
             domain_code, concept_code, concept_blueprint = ref_to_entry[concept_ref]
@@ -997,7 +1104,9 @@ class LibraryManager(LibraryManagerAbstract):
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
         library = self.get_current_library()
         if blueprint.pipe is not None:
-            pipe_refs_to_remove = [f"{blueprint.domain}.{pipe_code}" for pipe_code in blueprint.pipe]
+            pipe_refs_to_remove = [
+                PipeFactory.make_pipe_ref_with_domain(domain_code=blueprint.domain, pipe_code=pipe_code) for pipe_code in blueprint.pipe
+            ]
             library.pipe_library.remove_pipes_by_refs(pipe_refs=pipe_refs_to_remove)
 
     def _remove_concepts_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
@@ -1032,7 +1141,7 @@ class LibraryManager(LibraryManagerAbstract):
         """
         # Build namespace with all structure class names
         namespace: dict[str, type] = {}
-        class_registry = KajsonManager.get_class_registry()
+        class_registry = get_class_registry()
 
         for concept in concepts:
             structure_class = class_registry.get_class(name=concept.structure_class_name)
@@ -1063,7 +1172,7 @@ class LibraryManager(LibraryManagerAbstract):
         # TODO: Refactor to inspect ConceptStructureBlueprint directly (concept_ref and item_concept_ref fields)
         # instead of the generated Python types. This would be more direct and wouldn't depend on
         # how types are generated (e.g., Optional wrappers for non-required fields).
-        class_registry = KajsonManager.get_class_registry()
+        class_registry = get_class_registry()
 
         # Build mappings from class names to concept refs
         class_to_concept: dict[str, str] = {}

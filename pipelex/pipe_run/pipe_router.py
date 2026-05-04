@@ -14,10 +14,12 @@ class PipeRouter(PipeRouterProtocol):
     async def _run_pipe_job(
         self,
         pipe_job: PipeJob,
+        wfid: str | None = None,
     ) -> PipeOutput:
         return await pipe_job.pipe.run_pipe(
             job_metadata=pipe_job.job_metadata,
-            working_memory=pipe_job.working_memory,
+            working_memory=pipe_job.get_working_memory(),
             output_name=pipe_job.output_name,
             pipe_run_params=pipe_job.pipe_run_params,
+            library_crate=pipe_job.library_crate,
         )

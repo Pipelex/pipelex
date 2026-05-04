@@ -1,5 +1,5 @@
 import shortuuid
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cogt.config_cogt import Cogt
@@ -9,6 +9,7 @@ from pipelex.graph.graph_config import GraphConfig
 from pipelex.language.mthds_config import MthdsConfig
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.configuration.config_root import ConfigRoot
+from pipelex.temporal.config_temporal import Temporal
 from pipelex.tools.aws.aws_config import AwsConfig
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.storage.storage_config import StorageConfig
@@ -33,7 +34,24 @@ class AgentTarget(StrEnum):
 
 
 class KitConfig(ConfigModel):
-    preferred_agent_target: AgentTarget = Field(strict=False)
+    preferred_agent_targets: list[AgentTarget] = Field(strict=False)
+
+    @field_validator("preferred_agent_targets", mode="before")
+    @classmethod
+    def _coerce_targets(cls, value: object) -> object:
+        if isinstance(value, list):
+            return [AgentTarget(item) if isinstance(item, str) else item for item in value]  # pyright: ignore[reportUnknownVariableType]
+        return value
+
+    @model_validator(mode="after")
+    def _validate_targets(self) -> Self:
+        if not self.preferred_agent_targets:
+            msg = "preferred_agent_targets must contain at least one target"
+            raise ValueError(msg)
+        if AgentTarget.CURSOR in self.preferred_agent_targets and len(self.preferred_agent_targets) > 1:
+            msg = "preferred_agent_targets cannot mix 'cursor' with other targets (cursor uses a separate mechanism)"
+            raise ValueError(msg)
+        return self
 
 
 class PipeRunConfig(ConfigModel):
@@ -82,6 +100,34 @@ class ReportingConfig(ConfigModel):
     cost_report_base_name: str
     cost_report_extension: str
     cost_report_unit_scale: float
+
+
+class TracingBackend(StrEnum):
+    NDJSON = "ndjson"
+    DYNAMODB = "dynamodb"
+    TEMPORAL_DYNAMODB = "temporal_dynamodb"
+
+
+class NdjsonTracingConfig(ConfigModel):
+    traces_dir: str
+
+
+class DynamoDBTracingConfig(ConfigModel):
+    table_name: str
+    region: str
+
+
+class TemporalDynamoDBTracingConfig(ConfigModel):
+    table_name: str
+    region: str
+
+
+class TracingConfig(ConfigModel):
+    is_enabled: bool
+    backend: TracingBackend = Field(strict=False)
+    ndjson: NdjsonTracingConfig | None = None
+    dynamodb: DynamoDBTracingConfig | None = None
+    temporal_dynamodb: TemporalDynamoDBTracingConfig | None = None
 
 
 class ObserverConfig(ConfigModel):
@@ -168,6 +214,7 @@ class Pipelex(ConfigModel):
     pipe_run_config: PipeRunConfig
     pipeline_execution_config: PipelineExecutionConfig
     reporting_config: ReportingConfig
+    tracing_config: TracingConfig
     observer_config: ObserverConfig
     scan_config: ScanConfig
     builder_config: BuilderConfig
@@ -193,5 +240,6 @@ class MigrationConfig(ConfigModel):
 class PipelexConfig(ConfigRoot):
     session_id: str = shortuuid.uuid()
     cogt: Cogt
+    temporal: Temporal
     pipelex: Pipelex
     migration: MigrationConfig

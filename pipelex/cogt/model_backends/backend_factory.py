@@ -5,7 +5,6 @@ from pydantic import Field, field_validator
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.plugins.openai.vertexai_factory import VertexAIFactory
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.typing.pydantic_utils import empty_dict_factory_of, empty_list_factory_of
 
@@ -49,6 +48,9 @@ class InferenceBackendFactory:
         # Deal with special authentication for some backends
         match name:
             case "vertexai":
+                # Deferred import: avoid pulling heavy SDK at module-load time
+                from pipelex.plugins.openai.vertexai_factory import VertexAIFactory  # noqa: PLC0415
+
                 endpoint, api_key = VertexAIFactory.make_endpoint_and_api_key(extra_config=extra_config)
             case _:
                 pass

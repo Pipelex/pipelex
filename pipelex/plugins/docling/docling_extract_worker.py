@@ -7,7 +7,7 @@ from typing import Any
 import aiofiles
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import SdkTypeError
+from pipelex.cogt.exceptions import ExtractJobFailureError, InferenceErrorCategory, SdkTypeError
 from pipelex.cogt.extract.extract_input import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput
@@ -89,6 +89,22 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
             # Run synchronous Docling conversion in a thread pool to avoid blocking
             conversion_result = await asyncio.to_thread(self.docling_sdk.document_converter.convert, docling_source)
             return DoclingFactory.make_extract_output_from_docling_document(doc=conversion_result.document)
+        except ExtractJobFailureError:
+            raise
+        # The exceptions below are raised by docling's document_converter.convert() for
+        # corrupt/unreadable documents, unsupported formats, or file system issues.
+        except FileNotFoundError as exc:
+            msg = f"Document file not found for Docling extraction: {exc}"
+            raise ExtractJobFailureError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from exc
+        except ValueError as exc:
+            msg = f"Invalid document format for Docling extraction: {exc}"
+            raise ExtractJobFailureError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
+        except RuntimeError as exc:
+            msg = f"Docling conversion failed: {exc}"
+            raise ExtractJobFailureError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
+        except OSError as exc:
+            msg = f"I/O error during Docling extraction: {exc}"
+            raise ExtractJobFailureError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
         finally:
             if temp_path:
                 temp_path.unlink(missing_ok=True)

@@ -5,8 +5,6 @@ from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.exceptions import MissingDependencyError
 from pipelex.hub import get_models_manager, get_plugin_manager
-from pipelex.plugins.blackboxai.blackboxai_completions_factory import BlackboxaiCompletionsFactory
-from pipelex.plugins.openrouter.openrouter_completions_factory import OpenRouterCompletionsFactory
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.exceptions import CredentialsError
@@ -123,6 +121,9 @@ class ImgGenWorkerFactory:
                     ),
                 )
 
+                # Deferred import: avoid pulling heavy SDK at module-load time
+                from pipelex.plugins.blackboxai.blackboxai_completions_factory import BlackboxaiCompletionsFactory  # noqa: PLC0415
+
                 bbai_completions_factory = BlackboxaiCompletionsFactory(is_http_url_enabled=True)
 
                 img_gen_worker = OpenAICompletionsImgGenWorker(
@@ -194,6 +195,9 @@ class ImgGenWorkerFactory:
                         backend=backend,
                     ),
                 )
+
+                # Deferred import: avoid pulling heavy SDK at module-load time
+                from pipelex.plugins.openrouter.openrouter_completions_factory import OpenRouterCompletionsFactory  # noqa: PLC0415
 
                 openrouter_completions_factory = OpenRouterCompletionsFactory(is_http_url_enabled=True)
 

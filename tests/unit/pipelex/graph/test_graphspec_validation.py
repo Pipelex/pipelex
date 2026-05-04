@@ -308,6 +308,39 @@ class TestGraphSpecValidation:
         # Should not raise
         validate_graphspec(graph)
 
+    def test_meta_format_injected_when_missing(self) -> None:
+        graph = GraphSpec(
+            graph_id="test_graph",
+            created_at=ValidGraphData.CREATED_AT,
+            pipeline_ref=PipelineRef(),
+            nodes=[],
+            edges=[],
+        )
+        assert graph.meta["format"] == "mthds"
+
+    def test_meta_format_preserved_when_correct(self) -> None:
+        graph = GraphSpec(
+            graph_id="test_graph",
+            created_at=ValidGraphData.CREATED_AT,
+            pipeline_ref=PipelineRef(),
+            nodes=[],
+            edges=[],
+            meta={"format": "mthds", "extra": "value"},
+        )
+        assert graph.meta["format"] == "mthds"
+        assert graph.meta["extra"] == "value"
+
+    def test_meta_format_rejected_when_wrong(self) -> None:
+        with pytest.raises(ValidationError):
+            GraphSpec(
+                graph_id="test_graph",
+                created_at=ValidGraphData.CREATED_AT,
+                pipeline_ref=PipelineRef(),
+                nodes=[],
+                edges=[],
+                meta={"format": "other"},
+            )
+
     def test_reject_extra_fields_on_load(self) -> None:
         """Test that extra/unknown fields in JSON are rejected."""
         graph = GraphSpec(

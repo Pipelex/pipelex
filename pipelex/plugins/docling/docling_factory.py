@@ -1,8 +1,11 @@
-from docling_core.transforms.serializer.markdown import MarkdownDocSerializer, MarkdownParams
-from docling_core.types.doc.document import DoclingDocument
+from typing import TYPE_CHECKING
 
 from pipelex.cogt.extract.extract_output import ExtractOutput, Page
 from pipelex.plugins.docling.docling_sdk import DoclingSdk
+
+if TYPE_CHECKING:
+    # Deferred import: avoid pulling heavy SDK at module-load time
+    from docling_core.types.doc.document import DoclingDocument
 
 
 class DoclingFactory:
@@ -13,7 +16,7 @@ class DoclingFactory:
     @classmethod
     def make_extract_output_from_docling_document(
         cls,
-        doc: DoclingDocument,
+        doc: "DoclingDocument",
     ) -> ExtractOutput:
         """Convert a Docling document to ExtractOutput with markdown text per page.
 
@@ -23,6 +26,9 @@ class DoclingFactory:
         Returns:
             ExtractOutput with pages dict (0-indexed).
         """
+        # Deferred import: avoid pulling heavy SDK at module-load time
+        from docling_core.transforms.serializer.markdown import MarkdownDocSerializer, MarkdownParams  # noqa: PLC0415
+
         pages: dict[int, Page] = {}
 
         # doc.pages is a dictionary where keys are page numbers (1-based in Docling)

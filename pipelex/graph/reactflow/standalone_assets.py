@@ -5,12 +5,13 @@ in Jinja2 templates via the standard template rendering pipeline.
 """
 
 import importlib.resources
-from functools import cache
+from functools import lru_cache
 
 _ASSET_PACKAGE = "pipelex.graph.reactflow.assets"
 
 
-@cache
+# @lru_cache(maxsize=1) memoizes the no-arg call: file is read once, then served from cache.
+@lru_cache(maxsize=1)
 def get_standalone_js() -> str:
     """Load the pre-built GraphViewer JS bundle (IIFE).
 
@@ -21,7 +22,7 @@ def get_standalone_js() -> str:
     return (package_files / "graph-viewer.js").read_text(encoding="utf-8")
 
 
-@cache
+@lru_cache(maxsize=1)
 def get_standalone_css() -> str:
     """Load the pre-built GraphViewer CSS bundle.
 

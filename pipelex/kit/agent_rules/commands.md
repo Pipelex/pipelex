@@ -28,9 +28,9 @@
 
 ## Running Tests
 
-   After making code changes, run **targeted tests** based on what you changed. See `tests/CLAUDE.md` for the source-to-test mapping and the pytest command template.
+   `make agent-test` runs the test suite and is **critical at the end of a coding session** to verify everything is good before wrapping up.
 
-   Fall back to the full suite when changes are broad (3+ areas), touch shared infrastructure, or when preparing a release/push/commit to remote:
+   At intermediate steps during LOCAL development, it's OK to run only the tests relevant to your changes — either by calling pytest directly from the `.venv` (e.g. `.venv/bin/pytest -x -q tests/unit/path/to/test_module.py`) or using `make t TEST=TestClassName`. This applies only to local setups, not cloud agents.
 
    ```bash
    make agent-test
@@ -73,6 +73,28 @@
    make t TEST=LF
    ```
    Note: `TEST=LF` (or `TEST=lf`) will use pytest's `--lf` flag instead of name filtering.
+
+## Temporal Integration Test Options
+
+   The Temporal integration tests support different server modes via the `--temporal-server` pytest CLI option:
+
+   - `--temporal-server`: Which Temporal server to use
+     - `none` (default): in-process test server — no external dependencies, used in CI
+     - `time-skipping`: in-process server with deterministic time control
+     - A profile name from `temporal_server_configs` in `pipelex.toml` (e.g. `local`, `testing`): connects to a real Temporal server using the profile's host, namespace, and API key settings
+
+   ```bash
+   # CI default: in-process server
+   .venv/bin/pytest tests/integration/pipelex/temporal/
+
+   # Dev with local Temporal server
+   .venv/bin/pytest tests/integration/pipelex/temporal/ \
+     --temporal-server local
+
+   # Dev with cloud/testing server
+   .venv/bin/pytest tests/integration/pipelex/temporal/ \
+     --temporal-server testing
+   ```
 
 ---
 

@@ -1,8 +1,7 @@
 import asyncio
 import inspect
-from typing import Literal, cast, get_args, get_origin, get_type_hints
+from typing import Any, Literal, cast, get_args, get_origin, get_type_hints
 
-from kajson.kajson_manager import KajsonManager
 from pydantic import field_validator
 from typing_extensions import override
 
@@ -16,6 +15,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.hub import get_class_registry
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
@@ -101,7 +101,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             raise TypeError(msg)
 
         # Validate that the function's return type matches the concept's structure class
-        concept_structure_class = KajsonManager.get_class_registry().get_class(name=self.output.concept.structure_class_name)
+        concept_structure_class = get_class_registry().get_class(name=self.output.concept.structure_class_name)
         if concept_structure_class is None:
             msg = (
                 f"PipeFunc '{self.code}' failed to validate output with library: "
@@ -229,6 +229,18 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             name=output_name,
         )
 
+        # Capture execution data for the graph tracer. PipeFunc has no prompts or
+        # models to record, but the sidepanel should still show *what* function ran
+        # and what kind of content it returned — useful for debugging and for
+        # distinguishing multiple PipeFunc nodes in a graph.
+        execution_data_dict: dict[str, Any] = {
+            "function_name": self.function_name,
+            "function_module": getattr(function, "__module__", None),
+            "function_qualname": getattr(function, "__qualname__", self.function_name),
+            "output_content_type": type(the_content).__name__,
+        }
+        self._register_execution_data(job_metadata, execution_data_dict)
+
         return PipeFuncOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
@@ -276,6 +288,18 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             stuff=output_stuff,
             name=output_name,
         )
+
+        # Capture execution data for the graph tracer. Dry run does NOT invoke the
+        # real function — we flag that explicitly so the sidepanel can show a
+        # "mock output" indicator and explain why no real function_result is present.
+        execution_data_dict: dict[str, Any] = {
+            "function_name": self.function_name,
+            "function_module": getattr(function, "__module__", None),
+            "function_qualname": getattr(function, "__qualname__", self.function_name),
+            "output_content_type": type(mock_content).__name__,
+            "is_mock_output": True,
+        }
+        self._register_execution_data(job_metadata, execution_data_dict)
 
         return PipeFuncOutput(
             working_memory=working_memory,

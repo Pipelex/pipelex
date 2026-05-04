@@ -9,6 +9,7 @@ from pipelex.types import Traversable
 # - telemetry_override.toml: Personal telemetry settings
 GIT_IGNORED_CONFIG_FILES: frozenset[str] = frozenset(
     {
+        ".DS_Store",
         "pipelex_service.toml",
         "pipelex_override.toml",
         "telemetry_override.toml",
@@ -29,9 +30,12 @@ CONFIG_SYNC_EXCLUDED_FILES: frozenset[str] = GIT_IGNORED_CONFIG_FILES
 # Directories that should not be synced between .pipelex and kit/configs.
 # These are runtime directories created locally:
 # - storage: Local storage directory for runtime data
+# - traces: Local directory for execution traces
 GIT_IGNORED_CONFIG_DIRS: frozenset[str] = frozenset(
     {
         "storage",
+        "temporal-payload-store",
+        "traces",
     }
 )
 

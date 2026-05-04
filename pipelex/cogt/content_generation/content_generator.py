@@ -1,4 +1,4 @@
-from typing import Any, cast
+from typing import Any
 
 from typing_extensions import override
 
@@ -35,7 +35,6 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.image_utils import ImageFormat
-from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
@@ -50,6 +49,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         job_metadata: JobMetadata,
         llm_setting_main: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
+        wfid: str | None = None,
     ) -> str:
         log.verbose(f"{self.__class__.__name__} make_llm_text: {llm_prompt_for_text}")
         log.verbose(f"llm_setting_main: {llm_setting_main}")
@@ -71,6 +71,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         object_class: type[BaseModelTypeVar],
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_object: LLMPrompt,
+        wfid: str | None = None,
     ) -> BaseModelTypeVar:
         log.verbose(f"{self.__class__.__name__} make_object_direct: {llm_prompt_for_object}")
         llm_assignment_for_object = LLMAssignment.make_from_prompt(
@@ -82,9 +83,12 @@ class ContentGenerator(ContentGeneratorProtocol):
             object_class=object_class,
             llm_assignment=llm_assignment_for_object,
         )
-        obj = await llm_gen_object(object_assignment=object_assignment)
-        log.verbose(f"{self.__class__.__name__} generated object direct: {obj}")
-        return cast("BaseModelTypeVar", obj)
+        raw_obj = await llm_gen_object(object_assignment=object_assignment)
+        log.verbose(f"{self.__class__.__name__} generated object direct: {raw_obj}")
+        # llm_gen_object returns a plain BaseModel reconstructed from the JSON schema.
+        # Validate its data against the original class so the result is a proper subtype
+        # (e.g. StructuredContent) expected by the caller.
+        return object_class.model_validate(raw_obj.model_dump(serialize_as_any=True))
 
     @override
     @update_job_metadata
@@ -96,6 +100,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
         llm_prompt_factory_for_object: LLMPromptFactoryAbstract | None = None,
+        wfid: str | None = None,
     ) -> BaseModelTypeVar:
         log.verbose(llm_prompt_for_text.user_text, title="llm_prompt_for_text")
         llm_assignment_for_text = LLMAssignment.make_from_prompt(
@@ -110,8 +115,10 @@ class ContentGenerator(ContentGeneratorProtocol):
             llm_prompt_factory=llm_prompt_factory_for_object or LLMPromptTemplate.make_for_structuring_from_preliminary_text(),
         )
 
+        object_class_schema = object_class.model_json_schema()
         workflow_arg = TextThenObjectAssignment(
             object_class_name=object_class.__name__,
+            object_class_schema=object_class_schema,
             llm_assignment_for_text=llm_assignment_for_text,
             llm_assignment_factory_to_object=llm_assignment_factory_to_object,
         )
@@ -127,11 +134,12 @@ class ContentGenerator(ContentGeneratorProtocol):
         fup_obj_assignment = ObjectAssignment(
             llm_assignment_for_object=fup_llm_assignment,
             object_class_name=object_class.__name__,
+            object_class_schema=object_class_schema,
         )
 
-        obj = await llm_gen_object(object_assignment=fup_obj_assignment)
-        log.verbose(f"{self.__class__.__name__} generated object after text: {obj}")
-        return cast("BaseModelTypeVar", obj)
+        raw_obj = await llm_gen_object(object_assignment=fup_obj_assignment)
+        log.verbose(f"{self.__class__.__name__} generated object after text: {raw_obj}")
+        return object_class.model_validate(raw_obj.model_dump(serialize_as_any=True))
 
     @override
     @update_job_metadata
@@ -142,6 +150,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         llm_setting_for_object_list: LLMSetting,
         llm_prompt_for_object_list: LLMPrompt,
         nb_items: int | None = None,
+        wfid: str | None = None,
     ) -> list[BaseModelTypeVar]:
         llm_assignment_for_object = LLMAssignment.make_from_prompt(
             job_metadata=job_metadata,
@@ -152,9 +161,9 @@ class ContentGenerator(ContentGeneratorProtocol):
             object_class=object_class,
             llm_assignment=llm_assignment_for_object,
         )
-        obj_list = await llm_gen_object_list(object_assignment=object_assignment)
-        log.verbose(f"{self.__class__.__name__} generated object list direct: {obj_list}")
-        return cast("list[BaseModelTypeVar]", obj_list)
+        raw_list = await llm_gen_object_list(object_assignment=object_assignment)
+        log.verbose(f"{self.__class__.__name__} generated object list direct: {raw_list}")
+        return [object_class.model_validate(raw_obj.model_dump(serialize_as_any=True)) for raw_obj in raw_list]
 
     @override
     @update_job_metadata
@@ -167,6 +176,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         llm_prompt_for_text: LLMPrompt,
         llm_prompt_factory_for_object_list: LLMPromptFactoryAbstract | None = None,
         nb_items: int | None = None,
+        wfid: str | None = None,
     ) -> list[BaseModelTypeVar]:
         llm_assignment_for_text = LLMAssignment.make_from_prompt(
             job_metadata=job_metadata,
@@ -179,8 +189,10 @@ class ContentGenerator(ContentGeneratorProtocol):
             llm_setting=llm_setting_for_object_list,
             llm_prompt_factory=llm_prompt_factory_for_object_list or LLMPromptTemplate.make_for_structuring_from_preliminary_text(),
         )
+        object_class_schema = object_class.model_json_schema()
         workflow_arg = TextThenObjectAssignment(
             object_class_name=object_class.__name__,
+            object_class_schema=object_class_schema,
             llm_assignment_for_text=llm_assignment_for_text,
             llm_assignment_factory_to_object=llm_assignment_factory_to_object,
         )
@@ -196,11 +208,12 @@ class ContentGenerator(ContentGeneratorProtocol):
         fup_obj_assignment = ObjectAssignment(
             llm_assignment_for_object=fup_llm_assignment,
             object_class_name=object_class.__name__,
+            object_class_schema=object_class_schema,
         )
 
-        obj_list = await llm_gen_object_list(object_assignment=fup_obj_assignment)
-        log.verbose(f"{self.__class__.__name__} generated object list after text: {obj_list}")
-        return cast("list[BaseModelTypeVar]", obj_list)
+        raw_list = await llm_gen_object_list(object_assignment=fup_obj_assignment)
+        log.verbose(f"{self.__class__.__name__} generated object list after text: {raw_list}")
+        return [object_class.model_validate(raw_obj.model_dump(serialize_as_any=True)) for raw_obj in raw_list]
 
     @override
     async def make_image_content(
@@ -240,6 +253,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         img_gen_prompt: ImgGenPrompt,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
+        wfid: str | None = None,
     ) -> ImageContent:
         img_gen_config = get_config().cogt.img_gen_config
         img_gen_job_params = img_gen_job_params or img_gen_config.make_default_img_gen_job_params()
@@ -270,6 +284,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         nb_images: int,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
+        wfid: str | None = None,
     ) -> list[ImageContent]:
         img_gen_config = get_config().cogt.img_gen_config
         img_gen_assignment = ImgGenAssignment(
@@ -294,12 +309,15 @@ class ContentGenerator(ContentGeneratorProtocol):
     @override
     async def make_templated_text(
         self,
+        job_metadata: JobMetadata,
         context: dict[str, Any],
         template: str,
         templating_style: TemplatingStyle | None = None,
         template_category: TemplateCategory | None = None,
+        wfid: str | None = None,
     ) -> str:
         templating_assignment = TemplatingAssignment(
+            job_metadata=job_metadata,
             context=context,
             template=template,
             templating_style=templating_style,
@@ -308,6 +326,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         return await templating_gen_text(templating_assignment=templating_assignment)
 
     @override
+    @update_job_metadata
     async def make_render_page_views(
         self,
         job_metadata: JobMetadata,
@@ -315,12 +334,16 @@ class ContentGenerator(ContentGeneratorProtocol):
         extract_handle: str,
         extract_job_params: ExtractJobParams | None = None,
         extract_job_config: ExtractJobConfig | None = None,
+        wfid: str | None = None,
     ) -> list[ImageContent]:
         if not extract_input.document_uri:
             msg = "PDF URI is required to render page views"
             raise ValueError(msg)
         job_params = extract_job_params or ExtractJobParams.make_default_extract_job_params()
         page_views_dpi = job_params.page_views_dpi or get_config().cogt.extract_config.default_page_views_dpi
+        # Deferred import: avoid pulling heavy SDK at module-load time
+        from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer  # noqa: PLC0415
+
         page_view_images = await pypdfium2_renderer.render_pdf_pages_from_uri(pdf_uri=extract_input.document_uri, dpi=page_views_dpi)
         page_view_images_resolved: list[ImageContent] = []
         for page_view_image in page_view_images:
@@ -337,6 +360,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         return page_view_images_resolved
 
     @override
+    @update_job_metadata
     async def make_extract_pages(
         self,
         job_metadata: JobMetadata,
@@ -344,6 +368,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         extract_handle: str,
         extract_job_params: ExtractJobParams | None = None,
         extract_job_config: ExtractJobConfig | None = None,
+        wfid: str | None = None,
     ) -> list[PageContent]:
         extract_job_params = extract_job_params or ExtractJobParams.make_default_extract_job_params()
         extract_job_config = extract_job_config or ExtractJobConfig()

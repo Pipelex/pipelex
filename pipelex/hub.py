@@ -2,10 +2,10 @@ import sys
 from collections.abc import Sequence
 from contextvars import ContextVar
 from pathlib import Path
-from typing import ClassVar, Optional
+from typing import TYPE_CHECKING, Any, ClassVar, Optional
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
-from opentelemetry.trace import Tracer as OTelTracer
+from kajson.kajson_manager import KajsonManager
 from rich.console import Console
 
 from pipelex import log
@@ -38,9 +38,15 @@ from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.console_target import ConsoleTarget
 from pipelex.system.environment import PIPELEXPATH_ENV_KEY, get_pipelexpath_dirs
 from pipelex.system.registries.func_registry import FuncRegistry
-from pipelex.system.telemetry.telemetry_manager import TelemetryManagerAbstract
+from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
+
+if TYPE_CHECKING:
+    # Deferred import: avoid pulling heavy SDK at module-load time
+    from opentelemetry.trace import Tracer as OTelTracer
+
+    from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 
 
 class PipelexHub:
@@ -74,6 +80,7 @@ class PipelexHub:
         self._concept_library: ConceptLibraryAbstract | None = None
         self._pipe_library: PipeLibraryAbstract | None = None
         self._pipe_router: PipeRouterProtocol | None = None
+        self._pipe_run: PipeRunProtocol | None = None
 
         # pipeline
         self._pipeline_manager: PipelineManagerAbstract | None = None
@@ -104,13 +111,16 @@ class PipelexHub:
 
     # tools
 
-    def setup_config(self, config_cls: type[ConfigRoot]):
+    def setup_config(self, config_cls: type[ConfigRoot], config_overrides: dict[str, Any] | None = None):
         """Set the global configuration instance.
 
-        # Args:
-        #     config (Config): The configuration instance to set.
+        Args:
+            config_cls: The config root class to validate against.
+            config_overrides: Optional dict deep-merged on top of all TOML layers
+                as the highest-priority override. Useful for tests that need
+                specific config without editing TOML files.
         """
-        config_dict = config_manager.load_config()
+        config_dict = config_manager.load_config(extra_overrides=config_overrides)
         self.set_config(config=config_cls.model_validate(config_dict))
 
     def set_config(self, config: ConfigRoot):
@@ -179,6 +189,9 @@ class PipelexHub:
 
     def set_pipe_router(self, pipe_router: PipeRouterProtocol):
         self._pipe_router = pipe_router
+
+    def set_pipe_run(self, pipe_run: "PipeRunProtocol") -> None:
+        self._pipe_run = pipe_run
 
     def set_pipeline_manager(self, pipeline_manager: PipelineManagerAbstract):
         self._pipeline_manager = pipeline_manager
@@ -297,6 +310,12 @@ class PipelexHub:
             raise RuntimeError(msg)
         return self._pipe_router
 
+    def get_required_pipe_run(self) -> "PipeRunProtocol":
+        if self._pipe_run is None:
+            msg = "PipeRun is not initialized"
+            raise RuntimeError(msg)
+        return self._pipe_run
+
     def get_required_pipeline_manager(self) -> PipelineManagerAbstract:
         if self._pipeline_manager is None:
             msg = "PipelineManager is not initialized"
@@ -363,7 +382,17 @@ def get_storage_provider() -> StorageProviderAbstract:
 
 
 def get_class_registry() -> ClassRegistryAbstract:
-    return get_pipelex_hub().get_required_class_registry()
+    """Return the active class registry, respecting per-workflow library scoping.
+
+    When a library_id is set in the current async context (e.g. inside a Temporal workflow),
+    returns the library's scoped ClassRegistry. Otherwise, returns the global registry.
+    """
+    library_id = _library_id.get()
+    if library_id is not None:
+        registry = get_library_manager().get_library_class_registry(library_id)
+        if registry is not None:
+            return registry
+    return KajsonManager.get_class_registry()
 
 
 def get_func_registry() -> FuncRegistry:
@@ -374,7 +403,7 @@ def get_telemetry_manager() -> TelemetryManagerAbstract:
     return get_pipelex_hub().get_telemetry_manager()
 
 
-def get_otel_tracer() -> OTelTracer | None:
+def get_otel_tracer() -> "OTelTracer | None":
     return get_telemetry_manager().get_otel_tracer()
 
 
@@ -538,6 +567,10 @@ def get_required_concept(concept_ref: str) -> Concept:
 
 def get_pipe_router() -> PipeRouterProtocol:
     return get_pipelex_hub().get_required_pipe_router()
+
+
+def get_pipe_run() -> "PipeRunProtocol":
+    return get_pipelex_hub().get_required_pipe_run()
 
 
 def get_pipeline_manager() -> PipelineManagerAbstract:

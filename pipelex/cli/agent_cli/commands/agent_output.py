@@ -6,6 +6,7 @@ from typing import Any, NoReturn
 
 import typer
 
+from pipelex.base_exceptions import PipelexError
 from pipelex.pipeline.validate_bundle import ValidateBundleError
 from pipelex.tools.misc.json_utils import clean_json_dumps
 from pipelex.types import StrEnum
@@ -157,16 +158,51 @@ def agent_error(message: str, error_type: str, cause: BaseException | None = Non
         "error_type": error_type,
         "message": message,
     }
-    hint = AGENT_ERROR_HINTS.get(error_type)
+
+    # Extract structured data from PipelexError.to_error_report() when available
+    report_hint: str | None = None
+    report_retryable: bool | None = None
+    report_category: str | None = None
+    report_extras: dict[str, Any] = {}
+
+    if isinstance(cause, PipelexError):
+        report = cause.to_error_report()
+        report_hint = report.user_action
+        report_retryable = report.retryable
+        report_category = report.error_category
+        if report.model:
+            report_extras["model"] = report.model
+        if report.provider:
+            report_extras["provider"] = report.provider
+
+    # hint: report-first, fallback to lookup dict
+    hint = report_hint or AGENT_ERROR_HINTS.get(error_type)
     if hint:
         error_json["hint"] = hint
-    if error_type in RETRYABLE_ERROR_TYPES:
+
+    # retryable: report takes precedence, fallback to lookup set (only emit when True)
+    if report_retryable is not None:
+        if report_retryable:
+            error_json["retryable"] = True
+    elif error_type in RETRYABLE_ERROR_TYPES:
         error_json["retryable"] = True
+
+    # error_domain: always from lookup dict (independent of error_category)
     domain = AGENT_ERROR_DOMAINS.get(error_type)
     if domain:
         error_json["error_domain"] = domain
+
+    # error_category: from report when available
+    if report_category:
+        error_json["error_category"] = report_category
+
+    # model/provider from report
+    error_json.update(report_extras)
+
     if cause is not None:
         error_json["error_source"] = _build_error_source(cause)
+
+    # **extra overrides everything
     error_json.update(extra)
     print(clean_json_dumps(error_json, indent=2), file=sys.stderr)
     raise typer.Exit(1) from cause

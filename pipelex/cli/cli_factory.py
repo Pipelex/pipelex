@@ -31,6 +31,7 @@ def make_pipelex_for_cli(
     context: ErrorContext,
     library_dirs: list[str] | list[Path] | None = None,
     needs_inference: bool = True,
+    temporal_enabled: bool | None = None,
     needs_model_specs: bool | None = None,
 ) -> Pipelex:
     """Initialize Pipelex for CLI commands with proper error handling.
@@ -42,6 +43,7 @@ def make_pipelex_for_cli(
         context: The CLI context for error messages.
         library_dirs: The library directories to use for the Pipelex instance.
         needs_inference: When False, skip inference setup (credentials, gateway, telemetry).
+        temporal_enabled: When provided, overrides the temporal.is_enabled config value.
         needs_model_specs: When True, load real model specs even without inference.
 
     Returns:
@@ -52,7 +54,11 @@ def make_pipelex_for_cli(
     """
     try:
         return Pipelex.make(
-            integration_mode=IntegrationMode.CLI, library_dirs=library_dirs, needs_inference=needs_inference, needs_model_specs=needs_model_specs
+            integration_mode=IntegrationMode.CLI,
+            library_dirs=library_dirs,
+            needs_inference=needs_inference,
+            temporal_enabled=temporal_enabled,
+            needs_model_specs=needs_model_specs,
         )
     except InferenceSetupRequiredError as exc:
         handle_inference_setup_required_error(exc)

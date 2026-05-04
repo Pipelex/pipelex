@@ -70,7 +70,7 @@ class RunEnvironment(StrEnum):
 
     @classmethod
     def get_from_env_var(cls) -> "RunEnvironment":
-        return RunEnvironment(get_optional_env("ENV") or RunEnvironment.DEV)
+        return RunEnvironment(get_optional_env("ENVIRONMENT") or RunEnvironment.DEV)
 
 
 class ProblemReaction(StrEnum):

@@ -26,9 +26,15 @@ class GraphContext(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     graph_id: str = Field(description="Unique identifier for the execution graph")
+    tracer_key: str | None = Field(default=None, description="Lookup key in GraphTracerManager. Defaults to graph_id when None.")
     parent_node_id: str | None = Field(default=None, description="Node ID of the parent pipe, None for root")
     node_sequence: int = Field(default=0, description="Monotonic counter for generating node IDs")
     data_inclusion: DataInclusionConfig = Field(description="Controls which data formats to capture")
+
+    @property
+    def lookup_key(self) -> str:
+        """Key for looking up the tracer in GraphTracerManager."""
+        return self.tracer_key or self.graph_id
 
     def make_node_id(self) -> str:
         """Generate a unique node ID within this graph.
@@ -50,6 +56,7 @@ class GraphContext(BaseModel):
         """
         return GraphContext(
             graph_id=self.graph_id,
+            tracer_key=self.tracer_key,
             parent_node_id=child_node_id,
             node_sequence=next_sequence,
             data_inclusion=self.data_inclusion,

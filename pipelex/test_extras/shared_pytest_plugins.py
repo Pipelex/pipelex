@@ -10,6 +10,14 @@ from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.system.environment import is_env_var_set, is_env_var_truthy, set_env
 from pipelex.system.runtime import CODEX_CLOUD_ENV_VAR_KEY, RunMode, runtime_manager
 from pipelex.tools.misc.placeholder import make_placeholder_value, value_is_placeholder
+from pipelex.types import StrEnum
+
+
+class ClassRegistryMode(StrEnum):
+    SHARED = "shared"
+    ISOLATED = "isolated"
+    BOTH = "both"
+
 
 # List of environment variables that may need placeholders in CI
 ENV_VAR_KEYS_WHICH_MAY_NEED_PLACEHOLDERS_IN_CI = [
@@ -73,6 +81,13 @@ def pytest_addoption(parser: Parser):
         help="Disable inference for this test session. Uses mock content generator, "
         "skips gateway terms check, and auto-skips tests marked with @pytest.mark.inference.",
     )
+    parser.addoption(
+        "--class-registry",
+        default=ClassRegistryMode.BOTH,
+        choices=list(ClassRegistryMode),
+        help="Class registry mode: 'both' runs tests in shared and isolated modes (default), "
+        "'shared' leaks dynamic classes to global, 'isolated' scopes them to the library registry",
+    )
 
 
 def pytest_configure(config: Config) -> None:
@@ -124,7 +139,7 @@ def pytest_configure(config: Config) -> None:
         pytest.exit("Service terms not accepted - run 'pipelex init agreement' first", returncode=1)
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def pipe_run_mode(request: FixtureRequest) -> PipeRunMode:
     # Force dry mode when inference is disabled
     if request.config.getoption("--disable-inference", default=False):

@@ -13,7 +13,8 @@ from pipelex.config import get_config
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import (
     get_library_manager,
-    get_pipe_router,
+    get_pipe_run,
+    get_report_delegate,
     get_telemetry_manager,
     teardown_current_library,
 )
@@ -34,8 +35,10 @@ if TYPE_CHECKING:
 
     from pipelex.core.memory.working_memory import WorkingMemory
     from pipelex.core.pipes.pipe_output import PipeOutput
+    from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
     from pipelex.pipe_run.pipe_job import PipeJob
     from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+    from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
     from pipelex.system.configuration.configs import PipelineExecutionConfig
 
 
@@ -56,6 +59,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         search_domain_codes: list[str] | None = None,
         user_id: str | None = None,
         execution_config: PipelineExecutionConfig | None = None,
+        pipe_run: PipeRunProtocol | None = None,
     ):
         self.library_id = library_id
         self.library_dirs = library_dirs
@@ -64,6 +68,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         self.search_domain_codes = search_domain_codes
         self.user_id = user_id
         self.execution_config = execution_config
+        self._pipe_run = pipe_run
         self._running_tasks: dict[str, asyncio.Task[PipeOutput]] = {}
 
     @override
@@ -75,6 +80,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
         dynamic_output_concept_ref: str | None = None,
+        delivery_assignment: DeliveryAssignment | None = None,
     ) -> PipelexPipelineExecuteResponse:
         """Execute a pipeline and wait for its completion.
 
@@ -123,7 +129,6 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         pipelex_inputs: PipelineInputs | WorkingMemory | None = cast("PipelineInputs | WorkingMemory | None", inputs)
 
         properties: dict[EventProperty, Any]
-        graph_spec_result = None
         # These variables are set in pipeline_run_setup and needed in finally/except blocks
         pipeline_run_id: str | None = None
         library_id_resolved: str | None = None
@@ -144,9 +149,10 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
                 search_domain_codes=self.search_domain_codes,
                 user_id=self.user_id,
             )
-            pipe_output = await get_pipe_router().run(pipe_job)
+            effective_pipe_run = self._pipe_run or get_pipe_run()
+            pipe_output = await effective_pipe_run.run(pipe_job, delivery_assignment=delivery_assignment)
         except PipeRouterError as exc:
-            # PipeRouterError can only be raised by get_pipe_router().run(), so pipe_job is guaranteed to exist
+            # PipeRouterError can only be raised by get_pipe_run().run(), so pipe_job is guaranteed to exist
             assert pipe_job is not None  # for type checker
             properties = {
                 EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
@@ -186,23 +192,23 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
             msg = f"Input validation failed for '{model_name}': {formatted_error}"
             raise PipeExecutionError(message=msg) from exc
         finally:
-            # Close graph tracer if it was opened (capture graph even on failure)
-            # pipeline_run_id may be None if pipeline_run_setup failed early
+            # Close graph tracer if it was opened (cleanup only — the PipeRun is
+            # responsible for capturing the graph spec on pipe_output)
             if execution_config.is_generate_graph and pipeline_run_id is not None:
                 tracer_manager = GraphTracerManager.get_instance()
                 if tracer_manager is not None:
-                    graph_spec_result = tracer_manager.close_tracer(pipeline_run_id)
+                    tracer_manager.close_tracer(pipeline_run_id)
+
+            # Clear event log state from the report delegate (direct execution path)
+            if pipeline_run_id is not None:
+                get_report_delegate().clear_event_log(context_key=pipeline_run_id)
 
             # Only teardown library if it was successfully created
             if library_id_resolved is not None:
-                library = get_library_manager().get_library(library_id=library_id_resolved)
-                library.teardown()
+                get_library_manager().teardown(library_id=library_id_resolved)
                 teardown_current_library()
 
-        # Assign graph spec to output (only reached on success, when pipe_output is bound)
-        if graph_spec_result is not None:
-            pipe_output.graph_spec = graph_spec_result
-
+        assert pipe_job is not None  # for type checker, success path requires a resolved job
         properties = {
             EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
             EventProperty.PIPE_TYPE: pipe_job.pipe.pipe_type,

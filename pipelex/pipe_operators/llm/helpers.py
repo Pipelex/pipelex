@@ -1,9 +1,9 @@
 from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.config import get_config
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.hub import (
     get_class_registry,
-    get_content_generator,
     get_required_concept,
 )
 from pipelex.tools.typing.structure_printer import StructurePrinter
@@ -26,10 +26,10 @@ async def get_output_structure_prompt(concept_ref: str, is_with_preliminary_text
     else:
         template_source = llm_config.get_template(template_name="output_structure_prompt_no_preliminary_text")
 
-    return await get_content_generator().make_templated_text(
+    return await render_template(
+        template=template_source,
+        category=TemplateCategory.LLM_PROMPT,
         context={
             "class_structure_str": class_structure_str,
         },
-        template=template_source,
-        template_category=TemplateCategory.LLM_PROMPT,
     )

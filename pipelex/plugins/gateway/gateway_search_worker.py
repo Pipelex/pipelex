@@ -180,8 +180,9 @@ class GatewaySearchWorker(SearchWorkerAbstract):
                     )
         except portkey_exceptions.APIError as exc:
             error_summary = GatewayFactory.make_error_summary_from_portkey_error(exc)
+            error_category = GatewayFactory.classify_error_category(exc)
             msg = f"Search service error for model '{model}' after {attempt_number} attempt(s): {error_summary}"
-            raise GatewaySearchResponseError(msg) from exc
+            raise GatewaySearchResponseError(msg, error_category=error_category) from exc
 
         if response is None:
             msg = f"Could not get a response for model '{model}' via Portkey after {attempt_number} attempts"

@@ -45,6 +45,7 @@ results/
 # personnal pipelex config files that overrides the default one
 pipelex_super.toml
 pipelex_override.toml
+pipelex_temporary_override.toml
 telemetry_override.toml
 
 # local pipelex service configuration
@@ -59,6 +60,12 @@ gcp_credentials.json
 settings.local.json
 structures/
 .pipelex/storage
+.pipelex/traces
+.pipelex/temporal-payload-store
+
+# Pipelex runtime trace artifacts (workflow ndjson)
+**/traces/
+.pipelex/traces/
 
 # Generated test fixtures (regenerate with `make regenerate-test-models`)
 tests/integration/pipelex/fixtures/_generated_model_sets.py
@@ -78,4 +85,5 @@ package-lock.json
 
 # Claude plans
 .claude/plans/
+.claude/scheduled_tasks.lock
 .gstack/

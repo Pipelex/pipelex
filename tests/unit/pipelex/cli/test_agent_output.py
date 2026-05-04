@@ -8,13 +8,16 @@ import json
 import pytest
 import typer
 
+from pipelex.base_exceptions import PipelexError
 from pipelex.cli.agent_cli.commands.agent_output import (
+    AGENT_ERROR_DOMAINS,
     AGENT_ERROR_HINTS,
     _build_error_source,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
     agent_error,
     agent_success,
     extract_validation_errors,
 )
+from pipelex.cogt.exceptions import CogtError, InferenceBackendCredentialsError, InferenceBackendCredentialsErrorType, InferenceErrorCategory
 from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
@@ -260,3 +263,111 @@ class TestAgentOutput:
         assert "error_source" in parsed
         assert len(parsed["error_source"]) == 1
         assert "no traceback" in parsed["error_source"][0]
+
+    # -------------------------------------------------------------------------
+    # to_error_report() integration tests
+    # -------------------------------------------------------------------------
+
+    def test_agent_error_uses_report_hint_from_cogt_error(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """agent_error should use user_action from to_error_report() as the hint field."""
+        cause = CogtError("inference failed", user_action="Check your API key and try again")
+        with pytest.raises(typer.Exit):
+            agent_error("inference failed", "CogtError", cause=cause)
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert parsed["hint"] == "Check your API key and try again"
+
+    def test_agent_error_uses_report_retryable_from_cogt_error(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """agent_error should set retryable=True when error_category is TRANSIENT."""
+        cause = CogtError("rate limited", error_category=InferenceErrorCategory.TRANSIENT)
+        with pytest.raises(typer.Exit):
+            agent_error("rate limited", "CogtError", cause=cause)
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert parsed["retryable"] is True
+
+    def test_agent_error_uses_report_error_category(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """agent_error should include error_category from to_error_report()."""
+        cause = CogtError("bad config", error_category=InferenceErrorCategory.CONFIGURATION)
+        with pytest.raises(typer.Exit):
+            agent_error("bad config", "CogtError", cause=cause)
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert parsed["error_category"] == "configuration"
+
+    def test_agent_error_falls_back_to_lookup_for_non_pipelex_error(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """agent_error should use lookup dicts when cause is not a PipelexError."""
+        cause = FileNotFoundError("missing.mthds")
+        with pytest.raises(typer.Exit):
+            agent_error("file not found", "FileNotFoundError", cause=cause)
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert parsed["hint"] == AGENT_ERROR_HINTS["FileNotFoundError"]
+        assert "error_category" not in parsed
+
+    def test_agent_error_falls_back_to_lookup_when_report_fields_none(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """agent_error should fall back to lookup when PipelexError has no category/user_action."""
+        cause = PipelexError("something failed")
+        with pytest.raises(typer.Exit):
+            agent_error("something failed", "ValidateBundleError", cause=cause)
+
+        parsed = json.loads(capsys.readouterr().err)
+        # hint should come from AGENT_ERROR_HINTS since PipelexError has no user_action
+        assert parsed["hint"] == AGENT_ERROR_HINTS["ValidateBundleError"]
+
+    def test_agent_error_report_hint_overrides_lookup(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """When cause has user_action, it should override the lookup dict hint."""
+        # Use an error_type that exists in AGENT_ERROR_HINTS
+        cause = CogtError("model not found", user_action="Use pipelex-agent models to list available models")
+        with pytest.raises(typer.Exit):
+            agent_error("model not found", "ModelChoiceNotFoundError", cause=cause)
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert parsed["hint"] == "Use pipelex-agent models to list available models"
+        assert parsed["hint"] != AGENT_ERROR_HINTS["ModelChoiceNotFoundError"]
+
+    def test_agent_error_extra_still_overrides_report(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Explicit **extra kwargs should override report-derived fields."""
+        cause = CogtError("failed", user_action="from report")
+        with pytest.raises(typer.Exit):
+            agent_error("failed", "CogtError", cause=cause, hint="custom override")
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert parsed["hint"] == "custom override"
+
+    def test_agent_error_includes_model_and_provider_from_report(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """agent_error should include model and provider from to_error_report()."""
+        cause = InferenceBackendCredentialsError(
+            credentials_error_type=InferenceBackendCredentialsErrorType.VAR_NOT_FOUND,
+            backend_name="openai",
+            message="OPENAI_API_KEY not set",
+            key_name="OPENAI_API_KEY",
+        )
+        with pytest.raises(typer.Exit):
+            agent_error("OPENAI_API_KEY not set", "InferenceBackendCredentialsError", cause=cause)
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert parsed["provider"] == "openai"
+
+    def test_agent_error_non_retryable_not_in_output(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Non-retryable errors should not include retryable field in JSON output."""
+        cause = CogtError("bad config", error_category=InferenceErrorCategory.CONFIGURATION)
+        with pytest.raises(typer.Exit):
+            agent_error("bad config", "CogtError", cause=cause)
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert "retryable" not in parsed
+
+    def test_agent_error_error_domain_and_category_coexist(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """error_domain (from lookup) and error_category (from report) should both appear."""
+        # Use an error_type that is in AGENT_ERROR_DOMAINS
+        error_type = "ModelChoiceNotFoundError"
+        assert error_type in AGENT_ERROR_DOMAINS, "precondition: error_type must be in AGENT_ERROR_DOMAINS"
+
+        cause = CogtError("model not found", error_category=InferenceErrorCategory.CONFIGURATION)
+        with pytest.raises(typer.Exit):
+            agent_error("model not found", error_type, cause=cause)
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert parsed["error_domain"] == AGENT_ERROR_DOMAINS[error_type]
+        assert parsed["error_category"] == "configuration"

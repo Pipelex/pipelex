@@ -4,6 +4,7 @@ from typing import Any
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.exceptions import ExtractJobFailureError, InferenceErrorCategory
 from pipelex.cogt.extract.extract_input import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput, Page
@@ -78,12 +79,26 @@ class Pypdfium2Worker(ExtractWorkerAbstract):
         max_nb_images = extract_job.job_params.max_nb_images
         should_extract_images = max_nb_images is None or max_nb_images > 0
 
-        if should_extract_images:
-            all_page_images = await pypdfium2_renderer.extract_embedded_images_from_pdf(pdf_input=pdf_input)
-        else:
-            all_page_images = {}
+        try:
+            if should_extract_images:
+                all_page_images = await pypdfium2_renderer.extract_embedded_images_from_pdf(pdf_input=pdf_input)
+            else:
+                all_page_images = {}
 
-        all_page_texts = await pypdfium2_renderer.extract_text_from_pdf_pages(pdf_input=pdf_input)
+            all_page_texts = await pypdfium2_renderer.extract_text_from_pdf_pages(pdf_input=pdf_input)
+        # The exceptions below are raised by pypdfium2_renderer for corrupt/invalid PDFs or file system issues.
+        except FileNotFoundError as exc:
+            msg = f"PDF file not found: {exc}"
+            raise ExtractJobFailureError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from exc
+        except ValueError as exc:
+            msg = f"Invalid PDF format: {exc}"
+            raise ExtractJobFailureError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
+        except RuntimeError as exc:
+            msg = f"PDF extraction failed: {exc}"
+            raise ExtractJobFailureError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
+        except OSError as exc:
+            msg = f"I/O error during PDF extraction: {exc}"
+            raise ExtractJobFailureError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
         pages: dict[int, Page] = {}
         total_images_count = 0
 

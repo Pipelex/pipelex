@@ -13,6 +13,10 @@ class PipelineManagerNotFoundError(PipelexError):
     pass
 
 
+class PipelineManagerAlreadyExistsError(PipelexError):
+    pass
+
+
 class PipelineManager(PipelineManagerAbstract, RootModel[PipelineManagerRoot]):
     root: PipelineManagerRoot = Field(default_factory=dict)
 
@@ -41,7 +45,10 @@ class PipelineManager(PipelineManagerAbstract, RootModel[PipelineManagerRoot]):
         return pipeline
 
     @override
-    def add_new_pipeline(self, pipe_code: str | None) -> Pipeline:
-        pipeline = PipelineFactory.make_pipeline()
+    def add_new_pipeline(self, pipe_code: str | None, pipeline_run_id: str | None = None) -> Pipeline:
+        if pipeline_run_id is not None and pipeline_run_id in self.root:
+            msg = f"Pipeline {pipeline_run_id} already exists"
+            raise PipelineManagerAlreadyExistsError(msg)
+        pipeline = PipelineFactory.make_pipeline(pipeline_run_id=pipeline_run_id)
         self._set_pipeline(pipeline_run_id=pipeline.pipeline_run_id, pipeline=pipeline)
         return pipeline

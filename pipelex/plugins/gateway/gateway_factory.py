@@ -10,8 +10,10 @@ from portkey_ai import (
 from portkey_ai.api_resources import exceptions as portkey_exc
 
 from pipelex import log
+from pipelex.cogt.exceptions import InferenceErrorCategory
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
+from pipelex.cogt.inference.error_classification import is_quota_exhaustion_gateway
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.hub import get_telemetry_manager
@@ -114,6 +116,32 @@ class GatewayFactory:
             extra_headers[PortkeyHeaderKey.SPAN_NAME] = f"{unit_job_id} -> {display_output}"
 
         return extra_headers, extra_body
+
+    @classmethod
+    def classify_error_category(cls, exc: portkey_exceptions.APIError) -> InferenceErrorCategory:
+        """Classify a Portkey API error into an InferenceErrorCategory.
+
+        Args:
+            exc: The Portkey API error
+
+        Returns:
+            The appropriate InferenceErrorCategory for retry decisions and error reporting
+        """
+        if isinstance(exc, portkey_exc.APIStatusError):
+            status_code = exc.status_code
+            if is_quota_exhaustion_gateway(str(exc), status_code):
+                return InferenceErrorCategory.CAPACITY
+            if isinstance(exc, portkey_exc.RateLimitError):
+                return InferenceErrorCategory.TRANSIENT
+            if isinstance(exc, (portkey_exc.AuthenticationError, portkey_exc.PermissionDeniedError)):
+                return InferenceErrorCategory.CONFIGURATION
+            if isinstance(exc, portkey_exc.BadRequestError):
+                return InferenceErrorCategory.CONTENT
+            if isinstance(exc, portkey_exc.NotFoundError):
+                return InferenceErrorCategory.CONFIGURATION
+        if isinstance(exc, (portkey_exc.APITimeoutError, portkey_exc.APIConnectionError)):
+            return InferenceErrorCategory.TRANSIENT
+        return InferenceErrorCategory.TRANSIENT
 
     @classmethod
     def make_error_summary_from_portkey_error(cls, exc: portkey_exceptions.APIError) -> str:
