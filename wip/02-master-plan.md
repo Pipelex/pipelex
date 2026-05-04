@@ -13,6 +13,7 @@ The big direction now is to actually run **activities on standalone Worker pools
 | # | Item | Status | Owner file |
 |---|---|---|---|
 | **P0** | **Tracing & cost reporting across separate-process workers** | Done — shipped on `fix/Tracing-across-workers`; see [TODOS.md](../TODOS.md) and [tracing-cost-reporting-as-built.md](tracing-cost-reporting-as-built.md) (T1 marked fixed) | this file (problem statement) |
+| **P0.1** | **Dry-run through activity dispatch (testing affordance)** | Not started — surfaced during P0 Phase 6 validation | this file (problem statement) |
 | **P1** | **Cross-worker cost report assembly wiring** | Not started — depends on P0 design | this file (problem statement) |
 | **P2** | Phase 6a — Local cross-package dependencies in crate | Not started | [phase6a-local-cross-package-deps.md](phase6a-local-cross-package-deps.md) |
 | **P3** | Phase 6b — Remote dependencies from GitHub | Not started — needs P2 | [phase6b-remote-deps-from-github.md](phase6b-remote-deps-from-github.md) |
@@ -50,6 +51,32 @@ We're not designing the fix yet — that comes when we pick up P0. The two natur
 - [x] No silent drops — if tracing is enabled, an activity that fails to emit raises or logs explicitly.
 - [x] Direct mode and the current single-bundle Worker mode keep working unchanged.
 - [x] Tests covering: standalone activity Worker, mixed worker pool, tracing disabled, NDJSON backend, DynamoDB backend (unit-level via stubbed boto3; full DDB e2e gated on `pytest -m dynamodb`).
+
+---
+
+## P0.1 — Dry-run through activity dispatch (testing affordance)
+
+Today, `--dry-run` instantiates `ContentGeneratorDry()` directly inside the workflow body (`pipe_llm.py:515`, and similar sites in `pipe_extract.py`, `pipe_compose.py`, `pipe_img_gen.py`). The activity (`act_llm_gen_text` etc.) is never dispatched. As a result, the cross-worker `UsageReportEvent` emission path that P0 ships cannot be exercised in dry-run mode against router+runner workers — the runner-side fallback only fires when the activity actually dispatches across processes.
+
+This was discovered while validating P0 Phase 6.1: a vanilla `pipelex run bundle --temporal --dry-run --mock-inputs` against a 2-worker (router+runner) topology produces only `writer_id="primary"` events; no `wf_*__w_act_*.ndjson` files appear. The Phase 4 integration test (`TestSplitWorkerUsageEmission`) works around this by substituting `act_llm_gen_text` with a wrapper that synthesizes an `LLMJob` server-side, but that's test-internal scaffolding, not a general-purpose mode.
+
+### What's needed
+
+A run mode that combines "no real LLM call" with "still go through the activity dispatch path", so a `pipelex run bundle` against router+runner workers exercises the same code path as live mode, just with mocked inference inside the activity. Concretely:
+
+- `act_llm_gen_text` is dispatched to the runner as in live mode.
+- Inside the activity, the inference is mocked (use `ContentGeneratorDry` *inside* the activity body, not in place of dispatching it).
+- All cross-process surfaces — `_event_log_contexts` lookup miss, runner-side fallback, `writer_id="act_*"` emission — fire normally.
+
+### Why this matters beyond P0
+
+Same affordance unlocks dry-run e2e for any future cross-process work (P1 cost report assembly, distributed graph assembly, payload codec stress testing, etc.) without needing real LLM spend.
+
+### Acceptance criteria (sketch)
+
+- [ ] A `--mock-inference` (or similar) flag — distinct from `--dry-run` — that keeps activity dispatch but mocks inside the activity. Or: redefine `--dry-run` to mean "dispatch activities, mock inside" and rename the current behavior.
+- [ ] `temporal-e2e-validate` Tier 8 can run in this mode and surface `wf_*__w_act_*.ndjson` files deterministically.
+- [ ] Equivalent mocking sites in `pipe_extract.py`, `pipe_compose.py`, `pipe_img_gen.py` updated.
 
 ---
 
@@ -97,6 +124,8 @@ In one line: extend the blueprint collector from P2 with a remote (GitHub) resol
 ```
 P0 (Tracing across separate workers)
    │
+   ├─► P0.1 (Dry-run through activity dispatch — testing affordance)
+   │
    ▼
 P1 (Cross-worker cost report assembly)
 
@@ -106,4 +135,4 @@ P2 (Phase 6a — local cross-package deps)
 P3 (Phase 6b — remote deps from GitHub)
 ```
 
-P0/P1 and P2/P3 are independent tracks; P0 blocks P1, P2 blocks P3.
+P0/P0.1/P1 and P2/P3 are independent tracks; P0 blocks both P0.1 and P1, P2 blocks P3. P0.1 is a parallel testing affordance that improves P0 / P1 / future cross-process work confidence.

@@ -508,7 +508,7 @@ Assertions:
 
 - [x] 6.1 — Ran Tier 1 in dry-run with router+runner workers. **Finding:** dry-run instantiates `ContentGeneratorDry()` directly inside the workflow body (`pipe_llm.py:515`), bypassing `act_llm_gen_text` entirely. So all `usage_report` events emit on the router with `writer_id="primary"`; no `__w_act_*` files are produced in dry-run. The plan's expectation here was based on an incorrect assumption — the runner-side fallback is exercised only by (a) the Phase 4 integration test (which substitutes the inference activity to synthesize an `LLMJob` server-side), or (b) live mode where `act_llm_gen_text` is actually dispatched.
 - [x] 6.2 — Added Tier 8 (Cross-worker usage emission) to `temporal-e2e-validate/SKILL.md`. Documents the dry-run limitation, points to `TestSplitWorkerUsageEmission` for deterministic verification, and gives the live-mode CLI command + expected NDJSON file naming (`wf_*__w_act_*`).
-- [ ] 6.3 — (Optional sanity) Repeat `native_text_sequence` once in live mode — deferred, costs LLM call; covered by integration test.
+- [x] 6.3 — Live `native_text_sequence` against router+runner (run `4b36fb35-9905-474d-af07-f5e8a0ae9f78`). Produced 5 NDJSON files: 3 router-side (`writer_id="primary"`) + 2 runner-side (`__w_act_24785_eb5f7f4b.ndjson`). Both runner files contain exactly one `usage_report` event with real `gpt-4o-mini-2024-07-18` token counts. Confirms AC1, AC2, AC5a end-to-end on the actual router+runner topology, not just the integration test substitute.
 - [ ] 6.4 — (Stretch / optional, P1-gated) Add Tier 9 for cost-report assembly — deferred, blocked on P1.
 - [x] Phase 6 complete (committable as `docs(skills): add Tier 8 cross-worker usage emission to temporal-e2e-validate`)
 
