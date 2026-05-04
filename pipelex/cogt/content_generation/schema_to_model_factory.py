@@ -162,6 +162,7 @@ class SchemaToModelFactory:
         """Generate Python source code from a JSON schema using datamodel-code-generator."""
         from datamodel_code_generator import InputFileType, generate  # noqa: PLC0415
         from datamodel_code_generator.enums import DataModelType  # noqa: PLC0415
+        from datamodel_code_generator.format import Formatter  # noqa: PLC0415
 
         cls._reject_unsafe_schema_extensions(schema)
 
@@ -176,6 +177,7 @@ class SchemaToModelFactory:
                 input_file_type=InputFileType.JsonSchema,
                 output=output_path,
                 output_model_type=DataModelType.PydanticV2BaseModel,
+                formatters=[Formatter.RUFF_FORMAT, Formatter.RUFF_CHECK],
             )
             return output_path.read_text(encoding="utf-8")
         finally:
