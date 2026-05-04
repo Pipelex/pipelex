@@ -67,8 +67,7 @@ def pipe_job_from_library(
         # this scoped registry instead of the global, keeping the global clean.
         global_registry = KajsonManager.get_class_registry()
         scoped_registry = ClassRegistry()
-        if isinstance(global_registry, ClassRegistry):
-            scoped_registry.register_classes_dict(dict(global_registry.root))
+        scoped_registry.register_classes_dict(global_registry.get_classes_dict())
         library.set_class_registry(scoped_registry)
     set_current_library(library_id=library_id)
 
