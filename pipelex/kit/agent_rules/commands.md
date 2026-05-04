@@ -28,7 +28,7 @@
 
 ## Running Tests
 
-   `make agent-test` runs the full test suite and is **critical at the end of a coding session** to verify everything is good before wrapping up.
+   `make agent-test` runs the test suite and is **critical at the end of a coding session** to verify everything is good before wrapping up.
 
    At intermediate steps during LOCAL development, it's OK to run only the tests relevant to your changes — either by calling pytest directly from the `.venv` (e.g. `.venv/bin/pytest -x -q tests/unit/path/to/test_module.py`) or using `make t TEST=TestClassName`. This applies only to local setups, not cloud agents.
 

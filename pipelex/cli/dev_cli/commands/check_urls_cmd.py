@@ -26,6 +26,12 @@ HTTP_LIMITS = httpx.Limits(max_connections=20, max_keepalive_connections=10)
 # Status codes treated as OK: the URL exists but requires authentication (e.g. billing dashboards).
 AUTH_REQUIRED_STATUS_CODES = {401, 403}
 
+# Status codes treated as OK: the URL is reachable but the probe was rate-limited or bot-blocked.
+RATE_LIMITED_STATUS_CODES = {429}
+
+# All status codes that indicate a reachable URL despite being non-2xx.
+REACHABLE_STATUS_CODES = AUTH_REQUIRED_STATUS_CODES | RATE_LIMITED_STATUS_CODES
+
 
 class URLCheckResult(BaseModel):
     """Result of checking a single URL."""
@@ -74,7 +80,7 @@ async def check_single_url_async(
         # Some servers don't support HEAD, fallback to GET
         if response.status_code == 405:
             response = await client.get(url)
-        is_ok = response.status_code < 400 or response.status_code in AUTH_REQUIRED_STATUS_CODES
+        is_ok = response.status_code < 400 or response.status_code in REACHABLE_STATUS_CODES
         return URLCheckResult(
             name=name,
             url=url,
@@ -174,6 +180,8 @@ def check_urls_cmd(quiet: bool = False, timeout: int = DEFAULT_TIMEOUT) -> None:
                 console.print(f"  [dim]{escape(result.name)}[/dim] [red]✗[/red] {escape(result.error_message or '')}")
             elif result.status_code in AUTH_REQUIRED_STATUS_CODES:
                 console.print(f"  [dim]{escape(result.name)}[/dim] [yellow]✓[/yellow] {result.status_code} (auth required)")
+            elif result.status_code in RATE_LIMITED_STATUS_CODES:
+                console.print(f"  [dim]{escape(result.name)}[/dim] [yellow]✓[/yellow] {result.status_code} (rate limited)")
             else:
                 console.print(f"  [dim]{escape(result.name)}[/dim] [green]✓[/green] {result.status_code}")
 
