@@ -38,7 +38,7 @@ The original Step 6 plan called for a `TracingActivityInboundInterceptor` to set
 
 **Severity (was)**: Blocked the whole point of distributed activity workers.
 
-**Status**: Resolved on `fix/Tracing-across-workers` (P0 in [02-master-plan.md](02-master-plan.md)). See [TODOS.md](../TODOS.md) for the full plan.
+**Status**: Resolved on `fix/Tracing-across-workers` (P0 in [02-master-plan.md](02-master-plan.md)). The full implementation history (six phases, eng-review notes, decisions, test inventory, atomic-commit list) is preserved in the branch's git log.
 
 The fix has two independent parts that ship together:
 
@@ -47,7 +47,7 @@ The fix has two independent parts that ship together:
 
 The `_get_registry` orphan-accumulation TODO at `reporting_manager.py` is gone: the method was split into `_get_registry_strict` (used by `_report_*_job` — runner processes silently skip the registry add) and `_get_or_create_registry` (used by `inject_tokens_usages`, the console cost-report path, and `generate_report`).
 
-The known retry-related over-counting case (R2) is documented and pinned by `test_retried_activity_emits_duplicate_usage_event_documenting_r2`. A `tracing_config.strict_mode` flag (raise instead of WARNING + drop) is deferred — see TODOS.md §8.
+The known retry-related over-counting case (R2) is documented and pinned by `test_retried_activity_emits_duplicate_usage_event_documenting_r2`. A `tracing_config.strict_mode` flag (raise instead of WARNING + drop) is deferred — see [02-master-plan.md §P0.2](02-master-plan.md).
 
 ### Issue T2 — Cross-worker cost report assembly is not wired
 

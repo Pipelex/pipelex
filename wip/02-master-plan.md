@@ -12,8 +12,9 @@ The big direction now is to actually run **activities on standalone Worker pools
 
 | # | Item | Status | Owner file |
 |---|---|---|---|
-| **P0** | **Tracing & cost reporting across separate-process workers** | Done — shipped on `fix/Tracing-across-workers`; see [TODOS.md](../TODOS.md) and [tracing-cost-reporting-as-built.md](tracing-cost-reporting-as-built.md) (T1 marked fixed) | this file (problem statement) |
+| **P0** | **Tracing & cost reporting across separate-process workers** | Done — shipped on `fix/Tracing-across-workers`; see [tracing-cost-reporting-as-built.md](tracing-cost-reporting-as-built.md) (T1 marked fixed) | this file (problem statement) |
 | **P0.1** | **Dry-run through activity dispatch (testing affordance)** | Not started — surfaced during P0 Phase 6 validation | this file (problem statement) |
+| **P0.2** | **Deferred follow-ons from P0** | Not started — surfaced during P0 eng review + PR #860 SWE-agent review | this file (problem statement) |
 | **P1** | **Cross-worker cost report assembly wiring** | Not started — depends on P0 design | this file (problem statement) |
 | **P2** | Phase 6a — Local cross-package dependencies in crate | Not started | [phase6a-local-cross-package-deps.md](phase6a-local-cross-package-deps.md) |
 | **P3** | Phase 6b — Remote dependencies from GitHub | Not started — needs P2 | [phase6b-remote-deps-from-github.md](phase6b-remote-deps-from-github.md) |
@@ -26,7 +27,7 @@ Sibling tracks (separate branches, not in this plan): worker error-handling Phas
 
 ## P0 — Tracing & cost reporting across separate-process workers — DONE
 
-Shipped on `fix/Tracing-across-workers`. The full plan (six phases, eng-review notes, decisions) lives in [TODOS.md](../TODOS.md); the architectural notes below are kept for context.
+Shipped on `fix/Tracing-across-workers`. The full implementation history (six phases, eng-review notes, decisions, test inventory, atomic-commit list) is preserved in the branch's git log and summarized in [tracing-cost-reporting-as-built.md](tracing-cost-reporting-as-built.md). The architectural notes below are kept for context. Follow-ons that were explicitly deferred during implementation are tracked under §P0.2.
 
 ### Why this is top priority
 
@@ -80,6 +81,23 @@ Same affordance unlocks dry-run e2e for any future cross-process work (P1 cost r
 
 ---
 
+## P0.2 — Deferred follow-ons from P0
+
+Items surfaced during the P0 eng review and the post-merge SWE-agent review of PR #860. Each is independently scoped and not blocking for P0.1 / P1 / P2 / P3. Pick up individually as priorities and signals dictate.
+
+### From eng review (logged at the time of P0 implementation)
+
+- [ ] **`tracing_config.strict_mode: bool`** — opt-in flag that raises (instead of WARNING + drop) when the runner-side emit path fails. Useful for compliance/audit deployments where missing trace data is a hard error. (Eng review R6.)
+- [ ] **DynamoDB `BatchWriteItem` for runner emission** — current path does one `PutItem` per usage event. At high-concurrency runners that's one boto3 call per emit; `BatchWriteItem` batches up to 25. Defer until actual throughput shows it matters. (Eng review R3.)
+- [ ] **NDJSON shared-filesystem invariant enforcement** — the NDJSON backend assumes `traces_dir` is visible to all writer processes (router pool + runner pool + `act_flush_trace_events`). For multi-host deployments this needs NFS/EFS or equivalent. Follow-up: a startup check that warns if `traces_dir` looks like a local-only path on a multi-worker deployment. (Eng review TODO-2.)
+
+### From PR #860 SWE-agent review (post-merge triage of `fix/Tracing-across-workers`)
+
+- [ ] **Per-thread `writer_id` for activity event log** — the surgical lock fix from PR #860 closes the duplicate-sequence race on `next_sequence()`, but a per-thread writer_id would eliminate the contention entirely and align the design with how Temporal's worker pool already partitions activities. Each thread would emit into its own writer namespace; dedup naturally drops to per-thread, no lock needed in the hot path.
+- [ ] **Project-wide migration of `JobMetadata.started_at` to timezone-aware datetimes** — the PR #860 patch builds the synthetic `now` with the same `tzinfo` as the incoming `started_at`, which removes the immediate `TypeError` crash but doesn't fix the underlying inconsistency: `JobMetadata.started_at` default factory is naive (`datetime.now`) while several callers (e.g. `pipe_abstract.py:428`) construct aware datetimes (`datetime.now(timezone.utc)`). A clean migration would standardize on `datetime.now(timezone.utc)` everywhere, document the tz contract on `JobMetadata`, and let `duration` subtract without defensive tzinfo matching at every site.
+
+---
+
 ## P1 — Cross-worker cost report assembly wiring
 
 ### Why this is second, not first
@@ -125,6 +143,7 @@ In one line: extend the blueprint collector from P2 with a remote (GitHub) resol
 P0 (Tracing across separate workers)
    │
    ├─► P0.1 (Dry-run through activity dispatch — testing affordance)
+   ├─► P0.2 (Deferred follow-ons — independent, pick up individually)
    │
    ▼
 P1 (Cross-worker cost report assembly)
@@ -135,4 +154,4 @@ P2 (Phase 6a — local cross-package deps)
 P3 (Phase 6b — remote deps from GitHub)
 ```
 
-P0/P0.1/P1 and P2/P3 are independent tracks; P0 blocks both P0.1 and P1, P2 blocks P3. P0.1 is a parallel testing affordance that improves P0 / P1 / future cross-process work confidence.
+P0/P0.1/P0.2/P1 and P2/P3 are independent tracks; P0 unlocks P0.1, P0.2, and P1; P2 blocks P3. P0.1 is a parallel testing affordance that improves P0 / P1 / future cross-process work confidence. P0.2 items are independent of each other — pick them up individually as needs and signals dictate.
