@@ -16,11 +16,11 @@ High-level tracker. Each phase has a per-phase checklist with finer-grained sub-
 - [x] **Phase 2** — Activity-side fallback (11 tests + new module + dry-run hook)
 - [x] **Phase 3** — `_get_registry` three-method split (5 tests)
 - [x] **Phase 4** — Split-worker integration test (2 tests + helpers, **prereq Q-Phase4**)
-- [ ] **Phase 5** — Docs + changelog + cleanup (5 tasks)
+- [x] **Phase 5** — Docs + changelog + cleanup (5 tasks)
 - [ ] **Phase 6** — Skill-level e2e Tier 8 (4 tasks, last 2 optional)
 - [ ] **Lint/test gate before each commit:** `make agent-check && make agent-test` green
-- [ ] **All acceptance criteria checked** (see §2)
-- [ ] **Master plan updated** (P0 → Done in `wip/02-master-plan.md`)
+- [x] **All acceptance criteria checked** (see §2)
+- [x] **Master plan updated** (P0 → Done in `wip/02-master-plan.md`)
 
 ---
 
@@ -462,12 +462,12 @@ Assertions:
 
 **Phase checklist:**
 
-- [ ] 5.1 — Remove `_get_registry` TODO comment at `reporting_manager.py:110-118`
-- [ ] 5.2 — Add CHANGELOG.md entry under `[Unreleased]`
-- [ ] 5.3 — Add `NdjsonEventLog` shared-FS docstring note
-- [ ] 5.4 — Update `wip/tracing-cost-reporting-as-built.md` (mark T1 fixed)
-- [ ] 5.5 — Update `wip/02-master-plan.md` (P0 → Done once Phase 6 passes)
-- [ ] Phase 5 complete: commit `docs: changelog + as-built/master-plan updates for P0 + ndjson docstring`
+- [x] 5.1 — Remove `_get_registry` TODO comment at `reporting_manager.py:110-118` (already gone after Phase 3)
+- [x] 5.2 — Add CHANGELOG.md entry under `[Unreleased]`
+- [x] 5.3 — Add `NdjsonEventLog` shared-FS docstring note (already in place from Phase 1)
+- [x] 5.4 — Update `wip/tracing-cost-reporting-as-built.md` (mark T1 fixed)
+- [x] 5.5 — Update `wip/02-master-plan.md` (P0 → Done once Phase 6 passes)
+- [x] Phase 5 complete: commit `docs: changelog + as-built/master-plan updates for P0 + ndjson docstring`
 
 **5.1** Remove the `_get_registry` TODO comment at `reporting_manager.py:110-118` (no longer applies — the three-method split eliminates the orphan auto-create branch entirely).
 **5.2** Add CHANGELOG.md entry under `[Unreleased]`:
@@ -568,7 +568,7 @@ Each commit is independently green (`make agent-check && make agent-test`). Comm
 - [x] 4. `refactor: split _get_registry into strict and or_create variants` — Phase 3. (commit c73e44a5)
 - [x] 4b. `feat(temporal): WorkerConfig.inference_task_queue routes act_llm_gen_text` — Phase 4 prereq (Q-Phase4). (commit 935a3022)
 - [x] 5. `test(integration): split-worker temporal test for cross-process usage emission` — Phase 4 (two-task-queue topology). (commit 06a3d26c)
-- [ ] 6. `docs: changelog + as-built/master-plan updates for P0 + ndjson docstring` — Phase 5.
+- [x] 6. `docs: changelog + as-built/master-plan updates for P0 + ndjson docstring` — Phase 5.
 - [ ] 7. (Optional, separate) `docs(skills): add Tier 8 cross-worker usage emission to temporal-e2e-validate` — Phase 6.
 
 ---

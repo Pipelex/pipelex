@@ -12,7 +12,7 @@ The big direction now is to actually run **activities on standalone Worker pools
 
 | # | Item | Status | Owner file |
 |---|---|---|---|
-| **P0** | **Tracing & cost reporting across separate-process workers** | Not started — top priority | this file (problem statement) |
+| **P0** | **Tracing & cost reporting across separate-process workers** | Done — shipped on `fix/Tracing-across-workers`; see [TODOS.md](../TODOS.md) and [tracing-cost-reporting-as-built.md](tracing-cost-reporting-as-built.md) (T1 marked fixed) | this file (problem statement) |
 | **P1** | **Cross-worker cost report assembly wiring** | Not started — depends on P0 design | this file (problem statement) |
 | **P2** | Phase 6a — Local cross-package dependencies in crate | Not started | [phase6a-local-cross-package-deps.md](phase6a-local-cross-package-deps.md) |
 | **P3** | Phase 6b — Remote dependencies from GitHub | Not started — needs P2 | [phase6b-remote-deps-from-github.md](phase6b-remote-deps-from-github.md) |
@@ -23,7 +23,9 @@ Sibling tracks (separate branches, not in this plan): worker error-handling Phas
 
 ---
 
-## P0 — Tracing & cost reporting across separate-process workers
+## P0 — Tracing & cost reporting across separate-process workers — DONE
+
+Shipped on `fix/Tracing-across-workers`. The full plan (six phases, eng-review notes, decisions) lives in [TODOS.md](../TODOS.md); the architectural notes below are kept for context.
 
 ### Why this is top priority
 
@@ -41,13 +43,13 @@ The whole point of the distributed-execution work is to allow **activities on st
 
 We're not designing the fix yet — that comes when we pick up P0. The two natural starting points are (a) the original Phase 4.5 Step 6 `TracingActivityInboundInterceptor` design (now in `archive/00-master-plan.md` and `archive/01-master-plan.md`), and (b) plumbing tracing config + workflow id through `JobMetadata` so each activity can construct its own event log directly. Either way the activity needs request-scoped tracing data, not process-scoped state.
 
-### Acceptance criteria (sketch — refine when planning)
+### Acceptance criteria — all met
 
-- [ ] Activities deployed on standalone Worker pools (separate process from workflow Workers) emit `UsageReportEvent`s that land in the same backend partition as the rest of the run.
-- [ ] No reliance on `WfPipeRouter` having executed in the activity's process.
-- [ ] No silent drops — if tracing is enabled, an activity that fails to emit raises or logs explicitly.
-- [ ] Direct mode and the current single-bundle Worker mode keep working unchanged.
-- [ ] Tests covering: (1) standalone activity Worker, (2) mixed worker pool, (3) tracing disabled, (4) backend = NDJSON, (5) backend = DynamoDB.
+- [x] Activities deployed on standalone Worker pools (separate process from workflow Workers) emit `UsageReportEvent`s that land in the same backend partition as the rest of the run.
+- [x] No reliance on `WfPipeRouter` having executed in the activity's process.
+- [x] No silent drops — if tracing is enabled, an activity that fails to emit raises or logs explicitly.
+- [x] Direct mode and the current single-bundle Worker mode keep working unchanged.
+- [x] Tests covering: standalone activity Worker, mixed worker pool, tracing disabled, NDJSON backend, DynamoDB backend (unit-level via stubbed boto3; full DDB e2e gated on `pytest -m dynamodb`).
 
 ---
 

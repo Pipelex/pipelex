@@ -34,20 +34,24 @@ The original Step 6 plan called for a `TracingActivityInboundInterceptor` to set
 
 ## What is broken or missing
 
-### Issue T1 — Activities on standalone (separate-process) workers lose usage events
+### Issue T1 — Activities on standalone (separate-process) workers lose usage events — **FIXED (P0)**
 
-**Severity**: Blocks the whole point of distributed activity workers.
+**Severity (was)**: Blocked the whole point of distributed activity workers.
 
-`tasks.py` currently bundles workflows + activities into the same `TaskPack`, so this issue is latent. But the explicit design intent is to split activities onto standalone Worker pools (separate processes from the workflow Worker pool). When that split happens:
+**Status**: Resolved on `fix/Tracing-across-workers` (P0 in [02-master-plan.md](02-master-plan.md)). See [TODOS.md](../TODOS.md) for the full plan.
 
-- The activity's process never runs `WfPipeRouter.run()`, so its `ReportingManager` has no entry in `_event_log_contexts` for the workflow's `lookup_key`.
-- `ReportingManager._emit_usage_event` returns silently when the context lookup misses (`reporting_manager.py:211-213`).
-- `ReportingManager._get_registry` auto-creates a worker-local `UsageRegistry` (with the explicit TODO at `reporting_manager.py:111-117`: *"Auto-create registry for unknown pipeline IDs. This happens when Activities report inference jobs on a Temporal worker where open_registry() was never called (it runs on the API process). TODO: replace with proper distributed reporting system"*).
-- The worker-local registry is never read back by anyone — usage data is lost on the activity worker.
+The fix has two independent parts that ship together:
 
-**Note**: The `BufferingEventLog` + `act_flush_trace_events` pattern is structurally tied to a workflow lifecycle; it cannot serve standalone activity workers as-is. A different mechanism is needed (the original interceptor design, or per-activity event log construction from tracing config + JobMetadata).
+- **Runner-side fallback in `_emit_usage_event`.** When the activity's `ReportingManager` has no entry in `_event_log_contexts` for the workflow's `lookup_key`, it now falls back to a process-local event log built from `tracing_config`. The event log is cached per process via `pipelex.tracing.activity_event_log.get_or_create_activity_event_log` (guarded by a module-level `threading.Lock` so concurrent first-emitters from multiple activity threads agree on a single writer_id and instance). The fallback uses `graph_context.tracer_key or graph_context.graph_id` as `workflow_id` (no new `JobMetadata` field needed — `tracer_key` is already populated by `WfPipeRouter.run`). Specific exceptions (`OSError`, `MissingDependencyError`, `PipelexConfigError`, `botocore.ClientError`) are caught at WARNING — never silently dropped, never `except Exception`. A one-shot warning per process records that the fallback engaged.
+- **Writer-id disambiguation in `TraceEvent`.** A new `writer_id: str = "primary"` field makes `(workflow_id, sequence)` collisions impossible across writers. NDJSON file naming becomes `wf_{workflow_id}__w_{writer_id}.ndjson` for non-primary writers; the `(pipeline_run_id, workflow_id, writer_id)` cache key prevents two writers from sharing a stale file handle. Read-side dedup key is `(workflow_id, writer_id, type, sequence)`; sort key is `(workflow_id, sequence, writer_id)` — sequence primary so a runner-side `UsageReportEvent` does not sort before earlier router events. DynamoDB SK becomes `EVENT#{workflow_id}#{writer_id}#{sequence:010d}`.
+
+The `_get_registry` orphan-accumulation TODO at `reporting_manager.py` is gone: the method was split into `_get_registry_strict` (used by `_report_*_job` — runner processes silently skip the registry add) and `_get_or_create_registry` (used by `inject_tokens_usages`, the console cost-report path, and `generate_report`).
+
+The known retry-related over-counting case (R2) is documented and pinned by `test_retried_activity_emits_duplicate_usage_event_documenting_r2`. A `tracing_config.strict_mode` flag (raise instead of WARNING + drop) is deferred — see TODOS.md §8.
 
 ### Issue T2 — Cross-worker cost report assembly is not wired
+
+**Status**: Still open. P0 (T1 above) ensures the events now land in the same backend partition from every worker; P1 is the remaining plumbing change to read them back into a cost report.
 
 **Severity**: High — events are persisted but never turned into a report.
 
@@ -63,6 +67,8 @@ Net effect: even when usage events ARE captured (i.e., the same-worker case in t
 
 ### Issue T3 — `set_event_log` is on a process-singleton `ReportingManager`
 
+**Status**: Partially mitigated by P0. The runner-side fallback now bypasses `_event_log_contexts` entirely when the lookup misses, so the singleton-+-context-dict pattern no longer blocks standalone activity workers. The deeper "request-scoped tracing data instead of process-scoped state" refactor remains open and is the natural follow-up alongside P1.
+
 **Severity**: Design smell that magnifies T1.
 
 `ReportingManager` is a process-singleton accessed via `hub.get_report_delegate()`. The per-context `_event_log_contexts` dict + `lookup_key` scheme works because the workflow process is the same process that emits events from activities (today). The moment activity execution moves off-process, the singleton + context-dict pattern stops being the right shape — the activity needs to pull its event log from request-scoped data (e.g., `JobMetadata` / `TracingContext`), not from a process-local dict that was never populated on its process.
@@ -71,6 +77,6 @@ Net effect: even when usage events ARE captured (i.e., the same-worker case in t
 
 ## How this connects to 02-master-plan
 
-- T1 is the **top priority** in [02-master-plan.md](02-master-plan.md) — the whole point of distributed execution is to allow activities on standalone Worker pools.
-- T2 is the **second priority** — once T1 is solved, the assembly wiring is the small remaining step that makes cost reporting actually report.
-- T3 is the architectural shape that the T1 + T2 work will refactor.
+- T1 was the **top priority** in [02-master-plan.md](02-master-plan.md) — now resolved on `fix/Tracing-across-workers`.
+- T2 is the **next priority** — events now land in the same partition from every worker; the small remaining step is wiring `read events → UsageAggregator → inject_tokens_usages → generate_report`.
+- T3 is the architectural shape; the T1 fix mitigates the immediate impact, the deeper refactor will land alongside T2 / further follow-ups.
