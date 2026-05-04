@@ -20,7 +20,7 @@ jobs:
         with:
           fetch-depth: 0  # Required for mike to access git history
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.x'
 
