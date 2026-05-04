@@ -64,13 +64,13 @@ class WorkerMode(StrEnum):
 
 class RunEnvironment(StrEnum):
     LOCAL = "local"
-    DEVELOPMENT = "development"
+    DEV = "dev"
     STAGING = "staging"
-    PRODUCTION = "production"
+    PROD = "prod"
 
     @classmethod
     def get_from_env_var(cls) -> "RunEnvironment":
-        return RunEnvironment(get_optional_env("ENVIRONMENT") or RunEnvironment.DEVELOPMENT)
+        return RunEnvironment(get_optional_env("ENVIRONMENT") or RunEnvironment.DEV)
 
 
 class ProblemReaction(StrEnum):
