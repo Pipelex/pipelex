@@ -7,12 +7,15 @@ isolation for concurrent workflows.
 
 from datetime import datetime, timedelta, timezone
 
+from pytest_mock import MockerFixture
+
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobParams, LLMJobReport
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
+from pipelex.config import get_config
 from pipelex.graph.graph_config import DataInclusionConfig
 from pipelex.graph.graph_context import GraphContext
 from pipelex.pipeline.job_metadata import JobMetadata, UnitJobId
@@ -304,3 +307,25 @@ class TestReportingEventEmission:
         events_b = [evt for evt in event_log_b.read_events("run_b") if isinstance(evt, UsageReportEvent)]
         assert [evt.sequence for evt in events_a] == [0, 1, 2]
         assert [evt.sequence for evt in events_b] == [0]
+
+    def test_no_emit_when_no_event_log_set_and_no_fallback_yet(self, mocker: MockerFixture) -> None:
+        """Pin the tracing-disabled silent baseline.
+
+        When set_event_log is never called and tracing_config.is_enabled=False,
+        report_inference_job must not write any event anywhere — even after the
+        Phase 2 fallback lands. The fallback path is only allowed to engage when
+        tracing is enabled.
+        """
+        # Force tracing to disabled regardless of process config.
+        mocker.patch.object(get_config().pipelex.tracing_config, "is_enabled", False)
+
+        manager = ReportingManager()
+        manager.setup()
+        manager.open_registry("run_silent")
+
+        graph_context = _make_graph_context(graph_id="run_silent", tracer_key="wf_silent", parent_node_id="g:node_0")
+        llm_job = _make_test_llm_job("run_silent", graph_context=graph_context)
+        manager.report_inference_job(llm_job)
+
+        # No event log was ever set; no event should have been emitted anywhere.
+        assert len(manager._event_log_contexts) == 0  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
