@@ -1,0 +1,29 @@
+pipelex/temporal/temporal_data_converter.py
+  d6204d04a9b0cfca 103
+pipelex/temporal/tprl_pipe/wf_pipe_router.py
+  d6204d04a9b0cfca 55
+pipelex/temporal/tprl_pipe/submitter_hydration.py
+  d6204d04a9b0cfca 68
+tests/integration/pipelex/fixtures/pipe_job_helpers.py
+  d6204d04a9b0cfca 70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "ecbe8da51874db1baf3fdd1da51d89c03e521483",
+  "prompts": {
+    "d6204d04a9b0cfca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "713a2e84-30e1-4c82-bc88-c006633a58f0",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 13,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}
