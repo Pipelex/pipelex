@@ -13,7 +13,7 @@ High-level tracker. Each phase has a per-phase checklist with finer-grained sub-
 
 - [x] **Phase 0** — Pin baseline (1 test)
 - [x] **Phase 1** — Writer-id schema (8 tests + propagation)
-- [ ] **Phase 2** — Activity-side fallback (11 tests + new module + dry-run hook)
+- [x] **Phase 2** — Activity-side fallback (11 tests + new module + dry-run hook)
 - [ ] **Phase 3** — `_get_registry` three-method split (5 tests)
 - [ ] **Phase 4** — Split-worker integration test (2 tests + helpers, **prereq Q-Phase4**)
 - [ ] **Phase 5** — Docs + changelog + cleanup (5 tasks)
@@ -249,9 +249,9 @@ The fresh fallback test (`test_fallback_engages_when_context_missing_and_tracing
 
 **Phase checklist:**
 
-- [ ] 2.1 — Red: write `TestEmitRunnerFallback` (11 cases below) + `test_dry_generator_invokes_report_inference_job`
-- [ ] 2.2 — Green: implement `pipelex/tracing/activity_event_log.py` + fallback in `_emit_usage_event` + `ContentGeneratorDry` reporting hook
-- [ ] Phase 2 complete: commit `feat: runner-side usage event emission via per-process activity event log`
+- [x] 2.1 — Red: write `TestEmitRunnerFallback` (11 cases below) + `test_dry_generator_invokes_report_inference_job`
+- [x] 2.2 — Green: implement `pipelex/tracing/activity_event_log.py` + fallback in `_emit_usage_event` + `ContentGeneratorDry` reporting hook
+- [x] Phase 2 complete: commit `feat: runner-side usage event emission via per-process activity event log`
 
 **2.1** *Red.* `tests/unit/pipelex/reporting/test_emit_runner_fallback.py::TestEmitRunnerFallback`:
 

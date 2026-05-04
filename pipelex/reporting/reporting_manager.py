@@ -7,6 +7,7 @@ from pydantic import Field, RootModel
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cogt.exceptions import ReportingManagerError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
@@ -16,13 +17,21 @@ from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.search.search_job import SearchJob
 from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.config import get_config
+from pipelex.graph.graph_context import GraphContext
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.reporting.reporting_types import AnyTokensUsage, TokensUsage
+from pipelex.system.exceptions import MissingDependencyError
 from pipelex.tools.misc.file_utils import ensure_path, get_incremental_file_path
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
+from pipelex.tracing.activity_event_log import get_or_create_activity_event_log, warn_once_runner_fallback_engaged
 from pipelex.tracing.event_log_protocol import EventLogProtocol
 from pipelex.tracing.trace_events import UsageReportEvent
+
+try:
+    from botocore.exceptions import ClientError as _BotoClientError  # type: ignore[import-untyped]
+except ImportError:
+    _BotoClientError = None  # type: ignore[assignment, misc]
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -203,20 +212,40 @@ class ReportingManager(ReportingProtocol):
             registry.add_tokens_usage(tokens_usage)
 
     def _emit_usage_event(self, inference_job: InferenceJobAbstract, tokens_usage: AnyTokensUsage) -> None:
-        """Emit a UsageReportEvent if event log is configured for this job's context."""
+        """Emit a UsageReportEvent for this job.
+
+        Fast path: when set_event_log was registered for this graph context's
+        lookup_key (router process or direct mode), emit through the cached
+        per-context event log.
+
+        Fallback: when context lookup misses (runner process — set_event_log
+        was never called here), emit through the per-process activity event
+        log so the event still lands in the same backend partition as the
+        rest of the run. See _emit_usage_event_runner_fallback for details.
+        """
         graph_context = inference_job.job_metadata.graph_context
         if graph_context is None:
             return
 
         context = self._event_log_contexts.get(graph_context.lookup_key)
-        if context is None:
+        if context is not None:
+            self._emit_via_registered_context(context, graph_context, tokens_usage)
             return
 
-        # Determine the node_id from graph context (the pipe that dispatched this inference)
-        node_id: str = "unknown"
-        if graph_context.parent_node_id is not None:
-            node_id = graph_context.parent_node_id
+        self._emit_usage_event_runner_fallback(
+            inference_job=inference_job,
+            tokens_usage=tokens_usage,
+            graph_context=graph_context,
+        )
 
+    @staticmethod
+    def _emit_via_registered_context(
+        context: _EventLogContext,
+        graph_context: GraphContext,
+        tokens_usage: AnyTokensUsage,
+    ) -> None:
+        """Fast-path emit through a context registered via set_event_log."""
+        node_id = graph_context.parent_node_id or "unknown"
         seq = context.event_log.next_sequence()
 
         event = UsageReportEvent(
@@ -229,6 +258,71 @@ class ReportingManager(ReportingProtocol):
             tokens_usage=tokens_usage,
         )
         context.event_log.emit(event)
+
+    def _emit_usage_event_runner_fallback(
+        self,
+        inference_job: InferenceJobAbstract,
+        tokens_usage: AnyTokensUsage,
+        graph_context: GraphContext,
+    ) -> None:
+        """Emit through a per-process activity event log when no context was registered.
+
+        On the runner, ``set_event_log`` was never called — the workflow only
+        registered a context on the router process. We fall back to a
+        process-local event log built from ``tracing_config``, stamped with a
+        stable per-process writer_id of the form ``act_{pid}_{uuid8}``.
+
+        Documented over-counting risk (R2): retried activities re-emit a fresh
+        event at sequence N+1 instead of overwriting the original at N, so the
+        same usage may be counted twice if the activity is retried by Temporal.
+        Suppression of retried-emit duplicates is a separate, harder problem
+        (deferred follow-up).
+
+        Specific exceptions caught and dropped with WARNING:
+        - ``OSError``: NDJSON dir unwritable, file system errors.
+        - ``MissingDependencyError``: ``boto3`` missing for the DynamoDB backend.
+        - ``PipelexConfigError``: factory misconfigured.
+        - ``botocore.exceptions.ClientError`` (when boto3 is installed):
+            DynamoDB throttle / auth fail at PutItem time.
+        Other exceptions propagate.
+        """
+        tracing_config = get_config().pipelex.tracing_config
+        if not tracing_config.is_enabled:
+            return
+
+        try:
+            process_event_log = get_or_create_activity_event_log(tracing_config)
+        except (OSError, MissingDependencyError, PipelexConfigError) as exc:
+            log.warning(f"Runner-side activity event log construction failed; dropping usage event: {exc}")
+            return
+
+        if process_event_log is None:
+            return
+
+        workflow_id = graph_context.tracer_key or graph_context.graph_id
+        node_id = graph_context.parent_node_id or "unknown"
+
+        warn_once_runner_fallback_engaged(workflow_id=workflow_id, writer_id=process_event_log.writer_id)
+
+        seq = process_event_log.next_sequence()
+        event = UsageReportEvent(
+            pipeline_run_id=inference_job.job_metadata.pipeline_run_id,
+            workflow_id=workflow_id,
+            writer_id=process_event_log.writer_id,
+            timestamp=datetime.now(timezone.utc),
+            sequence=seq,
+            node_id=node_id,
+            tokens_usage=tokens_usage,
+        )
+
+        emit_exceptions: tuple[type[BaseException], ...] = (OSError,)
+        if _BotoClientError is not None:
+            emit_exceptions = (*emit_exceptions, _BotoClientError)
+
+        try:
+            process_event_log.emit(event)
+        except emit_exceptions as exc:
+            log.warning(f"Runner-side usage event emit failed; dropping: {exc}")
 
     @override
     def report_inference_job(self, inference_job: InferenceJobAbstract):
