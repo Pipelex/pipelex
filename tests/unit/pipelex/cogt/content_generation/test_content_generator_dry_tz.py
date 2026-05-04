@@ -23,8 +23,8 @@ class TestContentGeneratorDryTimezone:
     @pytest.mark.parametrize(
         "started_at",
         [
-            pytest.param(datetime(2026, 5, 4, 10, 0, 0), id="naive"),
-            pytest.param(datetime(2026, 5, 4, 10, 0, 0, tzinfo=timezone.utc), id="aware_utc"),
+            pytest.param(datetime(2020, 1, 1, 10, 0, 0), id="naive"),
+            pytest.param(datetime(2020, 1, 1, 10, 0, 0, tzinfo=timezone.utc), id="aware_utc"),
             pytest.param(None, id="none_uses_default_factory"),
         ],
     )
