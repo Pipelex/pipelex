@@ -1,0 +1,23 @@
+TODOS.md
+  dd4e62bce76d15f7 10-26,49-59,213-217,226-232,235-242,250-255,258-268,346-351,354-358,399-405,463-471,507-514,538-550,565-571,609-611
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "2fae39e177dda626d0848a0969d09e6de5835ff4",
+  "prompts": {
+    "dd4e62bce76d15f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6350a1d-69f7-407f-af9c-efacd016ee07",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 123,
+      "total_deletions": 58,
+      "accepted_lines": 123,
+      "overriden_lines": 0
+    }
+  }
+}
