@@ -1,8 +1,19 @@
 # Distributed Tracing & Reporting Architecture
 
-> **Status**: Pre-planning analysis — decision gates marked with ❓
+> **Status (2026-05-04): SUPERSEDED — kept as historical analysis.**
+> The implementation shipped via `feature/dynamodb-tracer` and chose **NDJSON** locally + **DynamoDB** in the cloud, **not** SQLite or Redis Streams as recommended below. Inside Temporal workflows, events are buffered in a `BufferingEventLog` and flushed to the real backend via the `act_flush_trace_events` activity — not via a workflow-side interceptor.
+>
+> See:
+> - `pipelex/tracing/event_log_protocol.py`, `ndjson_event_log.py`, `dynamodb_event_log.py`, `buffering_event_log.py`, `event_log_factory.py`
+> - `pipelex/temporal/tprl_pipe/wf_pipe_router.py` (per-workflow `set_event_log` + flush)
+> - `pipelex/temporal/tprl_pipe/act_flush_trace_events.py` (off-thread persistence)
+> - [01-master-plan.md](01-master-plan.md) "Phase 4.5 Step 6 — as built"
+>
+> Decisions from this doc that no longer apply: SQLite local backend (Decision 2), Redis Streams cloud backend, ContextVar for the event log client (the implementation keys per-workflow inside `ReportingManager`). The high-level event-log architecture (event types, assembler, fire-and-forget emit, durability-on-emit) all match what shipped.
+>
+> **Original metadata:** Pre-planning analysis — decision gates marked with ❓
 > **Date**: 2026-03-29
-> **Related**: [00-master-plan.md](00-master-plan.md), [phase2-crate-propagation-rationale.md](phase2-crate-propagation-rationale.md)
+> **Related**: [archive/00-master-plan.md](archive/00-master-plan.md), [archive/phase2-crate-propagation-rationale.md](archive/phase2-crate-propagation-rationale.md)
 > **Scope**: GraphTracer (execution graph capture) + ReportingManager (AI usage/cost tracking) in Temporal distributed execution
 
 ---

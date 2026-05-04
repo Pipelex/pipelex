@@ -1,8 +1,9 @@
-# Master Plan v2: LibraryCrate & Distributed Execution
+# Master Plan v2: LibraryCrate & Distributed Execution — SHIPPED
 
-> **Status**: Master plan for phased implementation
-> **Date**: 2026-03-23
-> **Related**: [archive/early-library-as-execution-context.md](archive/early-library-as-execution-context.md), [phase0-pipe-namespace-fix.md](phase0-pipe-namespace-fix.md), [phase4-explicit-class-registry.md](phase4-explicit-class-registry.md), [phase5-payload-codec-strategy.md](phase5-payload-codec-strategy.md), [phase2-crate-propagation-rationale.md](phase2-crate-propagation-rationale.md)
+> **Status**: Archived (2026-05-04). All phases complete and merged.
+> **Date**: 2026-03-23 (originally drafted)
+> **Successor**: [../01-master-plan.md](../01-master-plan.md) (Phase 4.5 Step 6 + Phase 6 — next phases)
+> **Related**: [early-library-as-execution-context.md](early-library-as-execution-context.md), [phase0-pipe-namespace-fix.md](phase0-pipe-namespace-fix.md), [phase4-explicit-class-registry.md](phase4-explicit-class-registry.md), [phase5-payload-codec-strategy.md](phase5-payload-codec-strategy.md), [phase2-crate-propagation-rationale.md](phase2-crate-propagation-rationale.md)
 
 ---
 
@@ -394,7 +395,7 @@ return WorkingMemory (50MB)       reconstruct original payload        Event Hist
 
 ---
 
-**Next phases**: See [01-master-plan.md](01-master-plan.md) for Phase 4.5 Step 6 (Standalone Activity Tracing), Phase 6 (Cross-Package Dependencies), and Future Phases.
+**Next phases**: See [../01-master-plan.md](../01-master-plan.md) for Phase 4.5 Step 6 (Standalone Activity Tracing), Phase 6 (Cross-Package Dependencies), and Future Phases.
 
 ---
 

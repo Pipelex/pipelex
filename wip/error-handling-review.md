@@ -1,37 +1,54 @@
 # Pipelex Error Handling Review
 
-**Date:** 2026-04-12
-**Branch:** `refactor/Inference-error-handling`
-**Scope:** Full codebase error handling audit
+**Original review:** 2026-04-12 (branch `refactor/Inference-error-handling`)
+**Refreshed:** 2026-05-04 (branch `feature/Temporal-merge-2`, after Phase 0–3 merged)
+**Scope:** Full codebase error handling audit, plus status of the active improvement plans
 
 ---
 
-## Table of Contents
+## What changed since the original review
 
-1. [Executive Summary](#1-executive-summary)
-2. [Axis 1 -- Error Flow: Catch, Enrich, Bubble, Deliver](#2-axis-1----error-flow)
-3. [Axis 2 -- Error Class Architecture](#3-axis-2----error-class-architecture)
-4. [Centralized Error Codes Assessment](#4-centralized-error-codes-assessment)
-5. [Findings and Recommendations](#5-findings-and-recommendations)
+| Original Issue | Status |
+|---|---|
+| Issue 1 — `ErrorReport` is inference-only | **In progress.** `to_error_report()` is now wired into `agent_error()` (Phase 1 done). Class-level `error_domain` / `user_action` on non-CogtError exceptions is the **Phase 6** scope. |
+| Issue 2 — many CogtError subclasses have no `error_category` | **Mostly resolved.** `CONFIGURATION` defaults are set on the routing/backend/model-deck/handle-not-found/spec families. Remaining unset (intentionally — workers set per-instance) and the proposed CONTENT defaults are the **Phase 6** scope. |
+| Issue 3 — dict-based classification in `agent_output.py` is fragile | **Open.** `AGENT_ERROR_HINTS`, `AGENT_ERROR_DOMAINS`, `RETRYABLE_ERROR_TYPES` still live in `pipelex/cli/agent_cli/commands/agent_output.py`. Drift-detection test + migration onto classes is **Phase 6**. |
+| Issue 4 — `ToolError` sits outside `PipelexError` | **Resolved.** `class ToolError(PipelexError)` in `pipelex/system/exceptions.py:8`. |
+| Issue 5 — `TracebackMessageError` separate lifecycle | **Open (low priority).** Still inherits from `PipelexError` indirectly via its own subclass chain; logging mechanism unchanged. Same recommendation: leave as-is unless it gets in the way. |
+| Issue 6 — repetitive Rich error handler functions | **Open.** `cli/error_handlers.py` is still 434 lines with 11 near-identical handlers; helper extraction not done. |
+| Issue 7 — no full-chain error serialization integration test | **Open.** Worker-level classification tests are in great shape; the runner→CLI→JSON e2e snapshot test is still missing. |
+
+**Worker coverage** (the Tier 1/2/3 ranking from `worker-error-handling-review.md`): all Tier 3 workers were brought up in Phase 3 (full SDK exception handling, quota/credits detection, content-policy detection where relevant). Reading `error_classification.py` is now the canonical place to see provider-specific quota/content patterns.
+
+**Active follow-on work** (separate files):
+
+- [error-handling-phases-0-3-completed.md](error-handling-phases-0-3-completed.md) — record of what Phases 0–3 shipped.
+- [error-handling-phase-4-markdown-cli.md](error-handling-phase-4-markdown-cli.md) — markdown-default agent CLI output (run/validate/init/error).
+- [error-handling-phase-5-retry-architecture.md](error-handling-phase-5-retry-architecture.md) — move retries from gateway workers to PipeRouter.
+- [error-handling-phase-6-error-report-everywhere.md](error-handling-phase-6-error-report-everywhere.md) — class-level domain/user_action everywhere; eliminate dict drift.
+- [error-handling-phase-7-temporal-bridge.md](error-handling-phase-7-temporal-bridge.md) — wire `error_category.is_retryable` into `TemporalError`.
+- [worker-error-handling-review.md](worker-error-handling-review.md) — original tier inventory that drives the phase plans.
+- [instructor-unwrap-other-workers.md](instructor-unwrap-other-workers.md) — port the Anthropic `InstructorRetryException` unwrap fix to OpenAI Completions/Responses, Mistral, Google.
 
 ---
 
 ## 1. Executive Summary
 
-The Pipelex error handling system is **mature and well-structured** for a project at this stage. Key strengths:
+The Pipelex error handling system is **mature and well-structured**. Key strengths (unchanged):
 
-- Single-rooted exception hierarchy (`PipelexError`) with consistent patterns
-- Clean separation between human CLI (Rich), agent CLI (JSON), and internal propagation
-- The inference layer refactor (`CogtError` + `InferenceErrorCategory` + `ErrorReport`) sets a strong standard
-- Consistent `msg = "..."; raise XError(msg) from exc` pattern throughout
-- No bare `except:` clauses; broad `Exception` catches only at CLI entry points
+- Single-rooted exception hierarchy (`PipelexError`, with `ToolError` now inside it) — consistent patterns.
+- Clean separation between human CLI (Rich), agent CLI (JSON / markdown), and internal propagation.
+- The inference layer (`CogtError` + `InferenceErrorCategory` + `ErrorReport` + per-provider `error_classification.py`) sets the standard the rest of the hierarchy is migrating toward.
+- Consistent `msg = "..."; raise XError(msg) from exc` pattern.
+- No bare `except:` clauses; broad `Exception` catches only at CLI entry points.
 
-Key areas for improvement:
+Remaining work (all tracked in active phase files):
 
-- **Inconsistent structured data**: Only inference exceptions carry `ErrorReport` metadata; core/pipeline exceptions are message-only
-- **Parallel classification systems**: `AGENT_ERROR_HINTS`, `AGENT_ERROR_DOMAINS`, `RETRYABLE_ERROR_TYPES` live as string-keyed dicts disconnected from the class hierarchy
-- **No error codes**: Errors are identified by class name strings, not stable codes
-- **Missing categories on many CogtError subclasses**: ~20 CogtError subclasses have no `error_category` default
+- **Class-level error metadata for non-CogtError** exceptions is still partial (Phase 6).
+- **Dict-based agent classification** still parallels `to_error_report()` (Phase 6).
+- **Retry logic** is still per-worker (gateway uses tenacity); needs to move to PipeRouter (Phase 5).
+- **Markdown-default agent CLI output** is still missing for `run` / `validate` / `init` (Phase 4).
+- **Temporal bridge** for `error_category.is_retryable` → `non_retryable` mapping (Phase 7).
 
 ---
 
@@ -50,36 +67,30 @@ Layer 0: Third-party SDKs          (raw OpenAI/Anthropic/Google/etc. exceptions)
 
 ### 2.2 Layer 0 -> 1: Third-Party Error Transformation
 
-**Location:** `pipelex/plugins/*/` worker files
+**Location:** `pipelex/plugins/*/` worker files.
 
-Every provider worker catches SDK-specific exceptions and transforms them into `CogtError` subclasses with:
+After Phase 2 + Phase 3, **every** provider worker catches SDK-specific exceptions and transforms them into `CogtError` subclasses with:
+
 - `error_category` (TRANSIENT / CONFIGURATION / CONTENT / CAPACITY)
-- `user_action` (actionable hint with billing links)
+- `user_action` (actionable hint with billing links where applicable)
 - Model descriptor in the message
+- `from exc` chaining preserved
 
-**Example (OpenAI)** at `plugins/openai/openai_completions_llm_worker.py:145-182`:
-```
-openai.NotFoundError(404)         -> LLMCompletionError(CONFIGURATION)
-openai.RateLimitError(429)+quota  -> LLMCompletionError(CAPACITY, billing_link)
-openai.RateLimitError(429)        -> LLMCompletionError(TRANSIENT)
-openai.APITimeoutError            -> LLMCompletionError(TRANSIENT)
-openai.BadRequestError+content    -> LLMCompletionError(CONTENT)
-openai.AuthenticationError(401)   -> LLMCompletionError(CONFIGURATION)
-```
+Classification logic is centralized in `pipelex/cogt/inference/error_classification.py` (pure functions: `is_quota_exhaustion_*`, `is_content_policy_violation`, etc.). Per-provider pattern tuples live alongside.
 
-Classification logic is centralized in `cogt/inference/error_classification.py` -- pure functions that inspect error messages to distinguish quota exhaustion from rate limiting, with per-provider pattern tuples.
+**Assessment:** This layer is the strongest part of the system. Consistent, well-tested (parametrized classification tests + per-worker error-path tests), provider-agnostic.
 
-**Assessment:** This layer is the strongest part of the system. Consistent, well-tested (60+ parametrized test cases), and provider-agnostic classification.
+**Caveat — `instructor` wrapping.** Only Anthropic currently unwraps `InstructorRetryException` to recover the underlying SDK error before classification. OpenAI Completions/Responses, Mistral, and Google still mis-classify wrapped quota/timeout/auth as `CONTENT`. Tracked in [instructor-unwrap-other-workers.md](instructor-unwrap-other-workers.md).
 
 ### 2.3 Layer 1 -> 2: Pipe Operators
 
-**Location:** `pipelex/pipe_operators/*/`
+**Location:** `pipelex/pipe_operators/*/`.
 
-Pipe operators define thin wrapper exceptions (`PipeLLMFactoryError`, `PipeImgGenRunError`, etc.) and add pipe-level context (pipe_code, pipe_type, model_handle). The `PipeOperatorModelAvailabilityError` at `pipe_operators/exceptions.py:5` is the richest -- carries `run_mode`, `pipe_type`, `pipe_code`, `pipe_stack`, `model_handle`, `fallback_list`.
+Pipe operators define thin wrapper exceptions (`PipeLLMFactoryError`, `PipeImgGenRunError`, etc.) and add pipe-level context (pipe_code, pipe_type, model_handle). The richest is `PipeOperatorModelAvailabilityError` at `pipe_operators/exceptions.py` — carries `run_mode`, `pipe_type`, `pipe_code`, `pipe_stack`, `model_handle`, `fallback_list`.
 
 ### 2.4 Layer 2 -> 3: Pipeline Runner
 
-**Location:** `pipelex/pipeline/runner.py:131-187`
+**Location:** `pipelex/pipeline/runner.py`.
 
 The `PipelexRunner.execute_pipeline()` method catches three exception types:
 
@@ -89,34 +100,32 @@ The `PipelexRunner.execute_pipeline()` method catches three exception types:
 | `PipelexError` (other) | `PipelineExecutionError` | run_mode, pipe_code, output_name, pipe_stack |
 | `ValidationError` (Pydantic) | `PipeExecutionError` | formatted validation message |
 
-The original exception is always chained via `from exc`, so the full cause chain is preserved. Telemetry events are tracked on failure.
+The original exception is always chained via `from exc`. Telemetry events tracked on failure.
 
 ### 2.5 Layer 3 -> 4: CLI Factories
 
-**Location:** `pipelex/cli/cli_factory.py` (human) and `pipelex/cli/agent_cli/commands/agent_cli_factory.py` (agent)
+**Location:** `pipelex/cli/cli_factory.py` (human) and `pipelex/cli/agent_cli/commands/agent_cli_factory.py` (agent).
 
-These catch initialization errors from `Pipelex.make()` and route to the appropriate handler. The agent factory catches 7+ specific exception types and sends each through `agent_error()`. The human factory delegates to dedicated `handle_*_error()` functions in `error_handlers.py`.
+These catch initialization errors from `Pipelex.make()` and route to the appropriate handler. The agent factory catches several specific exception types and sends each through `agent_error()`. The human factory delegates to dedicated `handle_*_error()` functions in `error_handlers.py`.
 
 ### 2.6 Layer 4 -> 5: CLI Entry Points -- Delivery
 
 #### Human CLI (Rich Console)
 
-**Location:** `pipelex/cli/error_handlers.py`
+**Location:** `pipelex/cli/error_handlers.py` (434 lines, 11 handler functions).
 
-Each error type has a dedicated handler function with:
-- Red error banner with context label
-- Structured fields (Pipe, Model, Fallbacks, Pipe Stack)
-- Actionable tip (from `ErrorReport.user_action` or hardcoded fallback)
-- Documentation and Discord links
-- `raise typer.Exit(1) from exc`
+Each error type has a dedicated handler function with: red banner, structured fields, actionable tip, doc/Discord links, `raise typer.Exit(1) from exc`.
 
-**Assessment:** Well-crafted, but handler functions are verbose and repetitive. Each handler follows the same structure (banner -> fields -> tip -> links -> exit) with minor variations.
+**Assessment:** Well-crafted, but verbose and repetitive. Helper extraction is Issue 6 / open.
 
 #### Agent CLI (Structured JSON)
 
-**Location:** `pipelex/cli/agent_cli/commands/agent_output.py`
+**Location:** `pipelex/cli/agent_cli/commands/agent_output.py`.
 
-The `agent_error()` function produces:
+`agent_error()` now (Phase 1) prefers `cause.to_error_report()` and only falls back to the dicts when the report has no `user_action` / `retryable`. The dicts (`AGENT_ERROR_HINTS`, `AGENT_ERROR_DOMAINS`, `RETRYABLE_ERROR_TYPES`) are still the source for `error_domain` and for non-PipelexError exceptions (FileNotFoundError, JSONDecodeError, ValidationError, etc.).
+
+Output JSON shape:
+
 ```json
 {
   "error": true,
@@ -132,23 +141,15 @@ The `agent_error()` function produces:
 }
 ```
 
-The hint, domain, and retryable are resolved from three parallel sources:
-1. `ErrorReport` (from `cause.to_error_report()`) -- preferred
-2. `AGENT_ERROR_HINTS` dict -- fallback lookup by class name string
-3. `AGENT_ERROR_DOMAINS` dict -- always from lookup
-4. `RETRYABLE_ERROR_TYPES` set -- fallback when report doesn't have retryable
-
-**Assessment:** This works but has a dual-source problem. The `ErrorReport` mechanism (class-level metadata) and the dict-based lookups (string-keyed) can drift. Adding a new error class requires updating both the class hierarchy AND the agent_output.py dicts.
+**Assessment:** Phase 1 cut the dual-source problem in half. Phase 6 is what eliminates the remaining dict drift by moving `error_domain` / `user_action` onto the exception classes.
 
 #### Validation Errors (Flattened)
 
-**Location:** `agent_output.py:220-301` (`extract_validation_errors()`)
-
-`ValidateBundleError` aggregates errors from different validation phases. The `extract_validation_errors()` function flattens them into a uniform list with `category` tags (blueprint_validation, pipe_factory, pipe_validation, instantiation). This is the most structured error delivery in the codebase.
+**Location:** `agent_output.py:extract_validation_errors`. Unchanged. Still the most structured error delivery in the codebase.
 
 #### Markdown Output (Special Case)
 
-`InferenceSetupRequiredError` is rendered as markdown to stdout (not JSON) with exit code 0. This is used by agent skills to display setup guidance directly.
+`InferenceSetupRequiredError` is rendered as markdown to stdout (exit 0). Used by agent skills to display setup guidance. Phase 4 generalizes markdown delivery to `run` / `validate` / `init` and to the error path.
 
 ### 2.7 Error Flow Summary
 
@@ -173,30 +174,21 @@ Exception
     PipelexUnexpectedError
     PipelexConfigError
     PipelexSetupError
-    CogtError                          cogt/exceptions.py
-      [49 inference-related subclasses]
+    SecurityError
+    ToolError                          system/exceptions.py   (now under PipelexError)
+      NestedKeyConflictError
+      StorageError
+      Jinja2TemplateSyntaxError
+      SecretNotFoundError
+      ...
+    CogtError                          cogt/exceptions.py     (~50 subclasses)
     PipeExecutionError                 pipeline/exceptions.py
     PipelineExecutionError
     PipeStackOverflowError
-    ConceptError                       core/concepts/exceptions.py
-      ConceptCodeError
-      ConceptRefineError
-      ConceptStringError
-    StuffError                         core/stuffs/exceptions.py
-      StuffFactoryError
-      StuffContentFactoryError
-      StuffContentTypeError
-      ...
-    WorkingMemoryError                 core/memory/exceptions.py
-      WorkingMemoryConsistencyError
-      WorkingMemoryVariableError
-        WorkingMemoryTypeError
-        WorkingMemoryStuffNotFoundError
-    LibraryError                       libraries/exceptions.py
-      LibraryLoadingError
-        DomainLoadingError
-        ConceptLoadingError
-        PipeLoadingError
+    ConceptError                       core/concepts/exceptions.py (+ children)
+    StuffError                         core/stuffs/exceptions.py (+ children)
+    WorkingMemoryError                 core/memory/exceptions.py (+ children)
+    LibraryError                       libraries/exceptions.py (+ children)
     PipeControllerError                pipe_controllers/exceptions.py
     PipeRunError                       pipe_run/exceptions.py
       PipeRouterError
@@ -208,10 +200,6 @@ Exception
     PipelexInterpreterError            core/interpreter/exceptions.py
     GraphSpecError                     graph/exceptions.py
     KitError                           kit/exceptions.py
-  ToolError                            system/exceptions.py
-    StorageError                       tools/storage/exceptions.py
-    Jinja2TemplateSyntaxError          tools/jinja2/jinja2_errors.py
-    SecretNotFoundError                tools/secrets/secrets_errors.py
   TracebackMessageError                system/exceptions.py
     FatalError
       ConfigValidationError
@@ -220,116 +208,46 @@ Exception
 
 ### 3.2 Exception Module Organization
 
-**Pattern: One `exceptions.py` per package.** This is followed consistently:
+**Pattern: One `exceptions.py` per package** — followed consistently across **49 files** holding **~218 custom exception classes** (codebase has grown since the original review's "~130 across ~25 files").
 
-| Package | Exception File | Exception Count |
-|---------|---------------|-----------------|
-| `cogt/` | `exceptions.py` | 49 classes + 2 enums |
-| `core/pipes/` | `exceptions.py` | 4 classes + 2 enums |
-| `core/concepts/` | `exceptions.py` | 7 classes |
-| `core/stuffs/` | `exceptions.py` | 7 classes |
-| `core/memory/` | `exceptions.py` | 7 classes |
-| `pipeline/` | `exceptions.py` | 4 classes |
-| `pipe_run/` | `exceptions.py` | 4 classes |
-| `pipe_operators/` | `exceptions.py` | 1 class |
-| `pipe_controllers/` | `exceptions.py` | 2 classes |
-| `libraries/` | `exceptions.py` | 5 classes |
-| `system/` | `exceptions.py` | 9 classes |
-| `cli/` | `exceptions.py` | 2 classes |
-| Each plugin | `*_exceptions.py` | 2-6 classes |
+### 3.3 Exception Class Patterns
 
-**Total: ~130 custom exception classes across ~25 files.**
+Three patterns, unchanged:
 
-### 3.3 Actual Exception Subclasses vs. Data-Carrying Classes
+- **Pattern A — Plain message-only exception** (~70%): exists for type-based catching.
+- **Pattern B — Exception with structured fields** (~25%): carries context as instance attributes (e.g., `PipelineExecutionError`, `ModelChoiceNotFoundError`, `PipeValidationError`, `InferenceBackendCredentialsError`).
+- **Pattern C — Non-exception structured error data** (BaseModel/dataclass): `ErrorReport`, `PipelexBundleBlueprintValidationErrorData`, `PipesAndConceptValidationErrorData`, `PipeFactoryErrorData`, `SyntaxErrorData`. These are aggregated into raised exceptions, not raised themselves.
 
-Most exception classes fall into one of three patterns:
+`ErrorReport` is now a Pydantic dataclass (`base_exceptions.py:7`) with `extra="forbid"`, fields: `error_type`, `message`, `error_category`, `retryable`, `user_action`, `model`, `provider`. The `to_dict()` helper drops `None` fields.
 
-#### Pattern A: Plain message-only exception (grouping/categorization)
+### 3.4 Two Error Reporting Systems (still parallel)
 
-```python
-class LLMPromptSpecError(CogtError):
-    pass
-```
-
-~70% of all exception classes. They exist solely for type-based catching and identification. No additional structured data.
-
-#### Pattern B: Exception with structured fields
-
-```python
-class PipelineExecutionError(PipelexError):
-    def __init__(self, message, run_mode, pipe_code, output_name, pipe_stack):
-        ...
-```
-
-~25% of classes. Carry context fields as instance attributes. Notable examples:
-- `PipelineExecutionError` (pipe_code, run_mode, pipe_stack, output_name)
-- `ModelChoiceNotFoundError` (model_type, model_choice, suggestions, available_options)
-- `PipeValidationError` (error_type enum, domain_code, pipe_code, variable_names, file_path)
-- `InferenceBackendCredentialsError` (credentials_error_type, backend_name, key_name)
-
-#### Pattern C: Non-exception structured error data (BaseModel/dataclass)
-
-```python
-@dataclass(frozen=True)
-class ErrorReport:
-    error_type: str
-    message: str
-    error_category: str | None = None
-    ...
-```
-
-These are **not raised** -- they are data containers:
-- `ErrorReport` (dataclass) -- serialization target for `to_error_report()`
-- `PipelexBundleBlueprintValidationErrorData` (BaseModel) -- aggregated in `ValidateBundleError`
-- `PipesAndConceptValidationErrorData` (BaseModel) -- aggregated in `ValidateBundleError`
-- `PipeFactoryErrorData` (BaseModel) -- aggregated in `ValidateBundleError`
-- `SyntaxErrorData` (BaseModel) -- wraps Python SyntaxError fields
-
-### 3.4 Key Observation: Two Error Reporting Systems
-
-The codebase has **two parallel error reporting mechanisms**:
+Phase 1 wired `to_error_report()` into `agent_error()`, but the dicts in `agent_output.py` still hold:
 
 | Mechanism | Where Used | Metadata Source |
-|-----------|-----------|-----------------|
-| `to_error_report()` | Inference layer (CogtError hierarchy) | Class-level attributes (`error_category`, `user_action`) |
-| Dict lookups | Agent CLI output (`agent_output.py`) | String-keyed dicts (`AGENT_ERROR_HINTS`, `AGENT_ERROR_DOMAINS`, `RETRYABLE_ERROR_TYPES`) |
+|---|---|---|
+| `to_error_report()` | All `PipelexError` (only `CogtError` subclasses currently override it with metadata) | Class-level attributes (`error_category`, `user_action`) |
+| Dict lookups | `agent_output.py` — `error_domain`, hints/retryable for non-CogtError and non-PipelexError types | String-keyed dicts |
 
-The `agent_error()` function merges both: it calls `to_error_report()` first, then falls back to dict lookups. This means:
-
-- Inference errors (CogtError) get metadata from the class hierarchy -- **self-describing**
-- Non-inference errors (pipeline, validation, setup) get metadata from the dicts -- **externally described**
+Inference errors (CogtError) now self-describe at the class level. Non-inference errors (pipeline, validation, setup, library) still depend on the dicts. Phase 6 closes the gap.
 
 ---
 
 ## 4. Centralized Error Codes Assessment
 
-### 4.1 Current State
-
-There are **no stable error codes** in the system. Errors are identified by:
-
-1. **Class name** (e.g., `"PipelineExecutionError"`) -- used in `AGENT_ERROR_HINTS`, `AGENT_ERROR_DOMAINS`, `error_type` field in JSON
-2. **Error type enums** (e.g., `PipeValidationErrorType.MISSING_INPUT_VARIABLE`) -- used within specific domains
-3. **Error category enum** (`InferenceErrorCategory`) -- used for retry decisions
-
-### 4.2 Should We Add Error Codes?
-
-**Recommendation: Not now, but prepare the ground.**
-
-Error codes (like `PPLX-1001`) make sense when:
-- External consumers need stable identifiers across versions (public API)
-- Errors need to be documented in a searchable knowledge base
-- Programmatic consumers need to match on something more stable than class names
+**Recommendation unchanged: not now, but keep preparing the ground.**
 
 For Pipelex today:
-- The agent CLI is the primary programmatic consumer, and it already has good classification via `error_domain` + `error_category` + `error_type`
-- Class names are fairly stable and descriptive
-- Adding error codes to 130+ exceptions is high effort for low immediate value
 
-**Instead, consider these incremental steps:**
+- The agent CLI is the primary programmatic consumer; it already has good classification via `error_domain` + `error_category` + `error_type`.
+- Class names are stable and descriptive.
+- Adding error codes to ~218 exceptions is high effort for low immediate value.
 
-1. **Extend `ErrorReport` to all PipelexError subclasses** (not just CogtError) -- this is the highest-value change
-2. **Move `AGENT_ERROR_HINTS` and `AGENT_ERROR_DOMAINS` into the class hierarchy** -- eliminate the parallel dict system
-3. **Add error codes only when shipping a public API** -- at that point, auto-generate a code from the class path (e.g., `cogt.LLMCompletionError` -> `COGT-001`)
+Incremental steps that help and are already on the roadmap:
+
+1. **Extend `to_error_report()` metadata to all PipelexError subclasses** — Phase 6.
+2. **Move `AGENT_ERROR_HINTS` / `AGENT_ERROR_DOMAINS` into the class hierarchy** — Phase 6.
+3. **Add error codes only when shipping a public API** — at that point, auto-generate from class path (e.g., `cogt.LLMCompletionError` → `COGT-001`).
 
 ---
 
@@ -338,191 +256,77 @@ For Pipelex today:
 ### 5.1 Strengths (Keep Doing)
 
 | # | What | Evidence |
-|---|------|----------|
-| S1 | Single-rooted hierarchy | All custom exceptions inherit from `PipelexError` or `ToolError` |
-| S2 | Consistent `from exc` chaining | Every re-raise preserves the cause chain |
-| S3 | Message-before-raise pattern | `msg = "..."; raise XError(msg) from exc` throughout |
-| S4 | No broad Exception catches in business logic | Only at CLI entry points |
-| S5 | Structured inference error classification | `InferenceErrorCategory` + per-provider classifiers + `ErrorReport` |
-| S6 | Dual CLI delivery | Rich for humans, JSON for agents -- same errors, different rendering |
-| S7 | Validation error aggregation | `ValidateBundleError` collects all validation issues before reporting |
-| S8 | Good test coverage on inference errors | 60+ parametrized classification tests + worker error handling tests |
+|---|---|---|
+| S1 | Single-rooted hierarchy | All custom exceptions inherit from `PipelexError` (including `ToolError` since this review was first written). |
+| S2 | Consistent `from exc` chaining | Every re-raise preserves the cause chain. |
+| S3 | Message-before-raise pattern | `msg = "..."; raise XError(msg) from exc` throughout. |
+| S4 | No broad Exception catches in business logic | Only at CLI entry points. |
+| S5 | Structured inference error classification | `InferenceErrorCategory` + per-provider classifiers + `ErrorReport`. |
+| S6 | Dual CLI delivery | Rich for humans, JSON for agents — same errors, different rendering. |
+| S7 | Validation error aggregation | `ValidateBundleError` collects all validation issues before reporting. |
+| S8 | Worker error coverage | All inference workers (LLM/extract/img-gen/search) catch SDK exceptions and assign `error_category` after Phase 3. |
 
-### 5.2 Issues and Improvement Proposals
+### 5.2 Open Issues — Status & Owner
 
-#### Issue 1: `ErrorReport` is inference-only
+#### Issue 1: `ErrorReport` is inference-only — **In progress (Phase 6)**
 
-**Problem:** `PipelexError.to_error_report()` returns a bare `ErrorReport(error_type, message)` with no category, retryability, or user_action. Only `CogtError` overrides this to include metadata. Non-inference errors (pipeline, validation, setup, library) produce empty reports.
+`PipelexError.to_error_report()` returns a bare report (`error_type`, `message`) for non-CogtError exceptions. Phase 6 adds `error_domain` and class-level `user_action` to `PipeExecutionError`, `PipelineExecutionError`, `ValidateBundleError`, `PipelexInterpreterError`, `PipelexSetupError`, `PipelexConfigError`, and the `PipelexService` family.
 
-**Impact:** The agent CLI falls back to hardcoded dicts for non-inference errors. The two systems can drift.
+#### Issue 2: ~20 CogtError subclasses had no `error_category` — **Mostly resolved**
 
-**Proposal:** Add `error_category` and `user_action` to key non-inference exceptions:
+After Phase 2/3, the routing/backend/model-deck/handle/spec families now default to `CONFIGURATION`. `LLMCompletionError`, `ImgGenGenerationError`, `ExtractJobFailureError`, `SearchJobFailureError` are intentionally left dynamic (workers set per-instance). Remaining defaults to add (CONTENT-y prompt-related errors) are Phase 6.1 in [error-handling-phase-6-error-report-everywhere.md](error-handling-phase-6-error-report-everywhere.md).
 
-```python
-class PipelineExecutionError(PipelexError):
-    error_category = "runtime"
-    user_action = "Check 'pipe_stack' to identify which pipe failed"
-```
+#### Issue 3: Dict-based classification in `agent_output.py` is fragile — **Open (Phase 6)**
 
-This would let `to_error_report()` carry the metadata that currently lives in `AGENT_ERROR_HINTS` and `AGENT_ERROR_DOMAINS`.
+The dicts still exist (`AGENT_ERROR_HINTS`, `AGENT_ERROR_DOMAINS`, `RETRYABLE_ERROR_TYPES`). Phase 6.5 adds a drift-detection unit test; Phase 6.3/6.4 migrate the entries onto the exception classes themselves.
 
-**Files to modify:** `pipeline/exceptions.py`, `pipe_run/exceptions.py`, `core/pipes/exceptions.py`, `system/pipelex_service/exceptions.py`, `libraries/exceptions.py`
+#### Issue 4: `ToolError` sits outside `PipelexError` — **Resolved**
 
----
+`class ToolError(PipelexError)` in `pipelex/system/exceptions.py:8`. All `except PipelexError` blocks now catch `ToolError` subclasses (storage, Jinja2, secrets) too.
 
-#### Issue 2: ~20 CogtError subclasses have no error_category
+#### Issue 5: `TracebackMessageError` separate lifecycle — **Open (low priority)**
 
-**Problem:** These classes inherit `CogtError.error_category = None`:
+Still uses its own logging mechanism (`error_mode: TracebackMessageErrorMode`). No real cost; works fine for fatal startup errors.
 
-- `ImageContentError`, `CostRegistryError`, `ReportingManagerError`, `SdkTypeError`
-- `LLMCompletionError`, `LLMAssignmentError`, `LLMPromptSpecError`, `LLMPromptTemplateInputsError`, `LLMPromptParameterError`
-- `PromptImageFactoryError`, `PromptImageFormatError`, `PromptDocumentFactoryError`
-- `ImgGenPromptError`, `ImgGenParameterError`, `ImgGenGenerationError`
-- `ExtractOutputError`, `GeneratedImageError`, `ExtractJobFailureError`, `SearchJobFailureError`
-- `RoutingProfileLibraryNotFoundError`, `RoutingProfileLibraryError`, `InferenceModelSpecError`
-- `InferenceBackendLibraryNotFoundError`, `InferenceBackendLibraryValidationError`
-- `InferenceBackendLibraryError`, `ModelManagerError`, `ModelDeckNotFoundError`, `ModelDeckValidationError`
+#### Issue 6: Repetitive Rich error handler functions — **Open**
 
-**Impact:** When these are raised without an instance-level category override (which only happens in workers), `ErrorReport.error_category` and `retryable` are `None`. The agent gets no classification guidance.
+`error_handlers.py` is still 434 lines / 11 handlers / one shape repeated. Helper extraction (`display_error_panel(...)`) would cut it roughly in half. Not on a phase plan yet — would land best as a tidy-up after Phase 6.
 
-**Proposal:** Set sensible class-level defaults. Most of these fall into obvious categories:
+#### Issue 7: No full-chain error serialization integration test — **Open**
 
-| Class | Proposed Category |
-|-------|------------------|
-| `LLMCompletionError` | Leave as None (set per-instance by workers -- this is correct) |
-| `LLMPromptSpecError`, `LLMPromptTemplateInputsError`, `LLMPromptParameterError` | CONTENT |
-| `PromptImageFactoryError`, `PromptDocumentFactoryError` | CONTENT |
-| `ImgGenPromptError`, `ImgGenParameterError` | CONTENT |
-| `RoutingProfileLibraryNotFoundError`, `InferenceBackendLibraryNotFoundError` | CONFIGURATION |
-| `ModelManagerError`, `ModelDeckNotFoundError`, `ModelDeckValidationError` | CONFIGURATION |
-| `CostRegistryError`, `ReportingManagerError` | TRANSIENT |
-
-`LLMCompletionError` and `ImgGenGenerationError` correctly have no default because workers set the category dynamically based on the actual SDK error.
+Inference layer has 60+ classification tests. The runner→CLI→JSON e2e snapshot is still missing. Would cover: pipeline failure with a known inference error → assert JSON has expected `error_category`, `retryable`, `model`, `provider`, `error_source`. Not on a phase plan yet — minimal effort, high signal.
 
 ---
 
-#### Issue 3: Dict-based classification in agent_output.py is fragile
+### 5.3 Priority Matrix (refreshed)
 
-**Problem:** `AGENT_ERROR_HINTS`, `AGENT_ERROR_DOMAINS`, and `RETRYABLE_ERROR_TYPES` use string keys matching class names. Adding a new exception class requires remembering to update these dicts. There is no compile-time check.
-
-**Proposal (short-term):** Add a unit test that verifies every PipelexError subclass that appears in the agent CLI error handlers also has an entry in these dicts. This catches drift.
-
-**Proposal (medium-term):** Move domain and hint onto the exception classes themselves:
-
-```python
-class PipelexError(Exception):
-    error_domain: str | None = None     # "input", "config", "runtime"
-    user_action: str | None = None      # hint text
-
-    def to_error_report(self) -> ErrorReport:
-        return ErrorReport(
-            error_type=type(self).__name__,
-            message=self.message,
-            error_domain=self.error_domain,
-            user_action=self.user_action,
-        )
-```
-
-Then `agent_error()` reads from the report instead of the dicts. The dicts become the fallback for third-party exceptions only.
+| # | Issue | Effort | Impact | Status / Phase |
+|---|---|---|---|---|
+| I2 | Defaults on remaining uncategorized CogtError subclasses | Small | Medium | Phase 6.1 |
+| I3-short | Drift-detection test for agent_output dicts | Small | Medium | Phase 6.5 |
+| I1 | Extend ErrorReport metadata to non-inference exceptions | Medium | High | Phase 6.2 |
+| I3-medium | Move hints/domains onto exception classes | Medium | Medium | Phase 6.3 / 6.4 |
+| I4 | Make ToolError inherit from PipelexError | — | — | **Done** |
+| Phase 4 | Markdown-default agent CLI output | Medium | Medium | [error-handling-phase-4-markdown-cli.md](error-handling-phase-4-markdown-cli.md) |
+| Phase 5 | Move retry from gateway workers to PipeRouter | Medium | High | [error-handling-phase-5-retry-architecture.md](error-handling-phase-5-retry-architecture.md) |
+| Phase 7 | Temporal bridge (`error_category.is_retryable` → `non_retryable`) | Small | Medium | [error-handling-phase-7-temporal-bridge.md](error-handling-phase-7-temporal-bridge.md) — Temporal branch |
+| Instructor unwrap | Port Anthropic fix to OpenAI/Mistral/Google | Small per worker | High | [instructor-unwrap-other-workers.md](instructor-unwrap-other-workers.md) |
+| I6 | Extract generic Rich error display helper | Medium | Low | Open — no phase plan |
+| I7 | Full-chain error serialization integration test | Small | Medium | Open — no phase plan |
+| I5 | Unify TracebackMessageError with PipelexError | Small | Low | Open — no phase plan |
 
 ---
 
-#### Issue 4: `ToolError` sits outside `PipelexError`
-
-**Problem:** `ToolError` (base for storage, Jinja2, secrets errors) inherits from `Exception`, not `PipelexError`. This means `ToolError` subclasses:
-- Don't have `to_error_report()`
-- Aren't caught by `except PipelexError` blocks
-- Don't participate in the structured error reporting pipeline
-
-**Impact:** A `StorageError` raised deep in the stack would bypass `PipelexError` catches in the pipeline runner and bubble up as an unhandled exception.
-
-**Proposal:** Make `ToolError` inherit from `PipelexError`:
-
-```python
-class ToolError(PipelexError):
-    pass
-```
-
-This is a safe change -- `ToolError` subclasses already follow the same patterns (message string, specific catches). The only risk is that existing `except PipelexError` catches would now also catch `ToolError`, which is actually the desired behavior.
-
----
-
-#### Issue 5: `TracebackMessageError` has a separate lifecycle
-
-**Problem:** `TracebackMessageError` and its children (`FatalError`, `ConfigValidationError`, `ConfigModelError`) inherit from `Exception` and have their own logging mechanism via `TracebackMessageErrorMode`. They don't participate in `ErrorReport` serialization.
-
-**Impact:** Limited. These are only used during app startup for fatal configuration errors. But it's a separate error path that doesn't benefit from the structured reporting.
-
-**Proposal:** Low priority. Consider eventually making `FatalError` inherit from `PipelexError` + adding `error_category = "configuration"`. But the startup path works fine as-is.
-
----
-
-#### Issue 6: Repetitive Rich error handler functions
-
-**Problem:** `error_handlers.py` has 10 handler functions that all follow the same pattern:
-1. Get report
-2. Print red banner
-3. Print structured fields
-4. Print tip
-5. Print links
-6. `raise typer.Exit(1) from exc`
-
-Each is 20-40 lines. The total file is 434 lines.
-
-**Proposal:** Extract a generic `display_error_panel()` helper:
-
-```python
-def display_error_panel(
-    exc: PipelexError,
-    title: str,
-    fields: dict[str, str],
-    context_lines: list[str] | None = None,
-) -> NoReturn:
-    report = exc.to_error_report()
-    console = get_console()
-    console.print(f"\n[bold red]{title}[/bold red]\n")
-    for label, value in fields.items():
-        console.print(f"[bold cyan]{label}:[/bold cyan] [yellow]{escape(value)}[/yellow]")
-    ...
-```
-
-This would cut the file roughly in half and make the pattern explicit.
-
----
-
-#### Issue 7: No error serialization test for the full chain
-
-**Problem:** Tests exist for `ErrorReport` serialization and for individual worker error classification. But there is no integration test that verifies the full path: worker exception -> pipeline runner -> CLI agent_error() -> JSON output.
-
-**Proposal:** Add an integration test that simulates a pipeline execution failure with a known inference error and verifies the JSON output contains the expected `error_category`, `retryable`, `model`, `provider`, and `error_source` fields.
-
----
-
-### 5.3 Priority Matrix
-
-| # | Issue | Effort | Impact | Priority |
-|---|-------|--------|--------|----------|
-| I2 | Set default categories on uncategorized CogtError subclasses | Small | Medium | **P1** |
-| I3-short | Add drift-detection test for agent_output dicts | Small | Medium | **P1** |
-| I4 | Make ToolError inherit from PipelexError | Small | Medium | **P2** |
-| I1 | Extend ErrorReport to non-inference exceptions | Medium | High | **P2** |
-| I6 | Extract generic Rich error display helper | Medium | Low | **P3** |
-| I3-medium | Move hints/domains onto exception classes | Medium | Medium | **P3** |
-| I7 | Full-chain error serialization integration test | Medium | Medium | **P3** |
-| I5 | Unify TracebackMessageError with PipelexError | Small | Low | **P4** |
-
----
-
-### 5.4 Maturity Assessment
+### 5.4 Maturity Assessment (refreshed)
 
 | Dimension | Rating | Notes |
-|-----------|--------|-------|
-| Exception hierarchy | 8/10 | Clean, single-rooted, well-organized by package |
-| Error context preservation | 9/10 | Consistent `from exc`, structured fields on key exceptions |
-| Third-party error transformation | 9/10 | Excellent inference layer with classification + tests |
-| Human-facing error delivery | 8/10 | Rich formatting with actionable tips, slightly verbose |
-| Agent-facing error delivery | 7/10 | Good JSON structure, but dual-source metadata is fragile |
-| Error codes / stable identifiers | 4/10 | No codes, relies on class name strings |
-| Validation error aggregation | 9/10 | ValidateBundleError with flattened extraction is well done |
-| Test coverage | 7/10 | Inference layer excellent, other layers less covered |
-| **Overall** | **7.5/10** | Strong foundation, inference refactor sets the right pattern to extend |
+|---|---|---|
+| Exception hierarchy | 9/10 | Single-rooted, well-organized; ToolError fold-in closed the last gap. |
+| Error context preservation | 9/10 | Consistent `from exc`, structured fields on key exceptions. |
+| Third-party error transformation | 9/10 | All inference workers covered after Phase 3; `error_classification.py` is the source of truth. Modest deduction for the unfixed `instructor` unwrap on OpenAI/Mistral/Google. |
+| Human-facing error delivery | 8/10 | Rich formatting with actionable tips; verbose handlers are an aesthetic, not a correctness, problem. |
+| Agent-facing error delivery | 8/10 | `to_error_report()` is now the primary source; dual-source narrows further with Phase 6. |
+| Error codes / stable identifiers | 4/10 | No codes yet; correctly deferred until a public API exists. |
+| Validation error aggregation | 9/10 | `ValidateBundleError` + flattened extraction unchanged and still excellent. |
+| Test coverage | 7/10 | Inference layer excellent; full-chain agent-output snapshot test still missing. |
+| **Overall** | **8/10** | Up from 7.5. Phase 0–3 closed real gaps; the remaining work is well-scoped in Phase 4–7. |

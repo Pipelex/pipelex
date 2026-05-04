@@ -1,0 +1,107 @@
+# Master Plan v3 — Distributed Workers
+
+> **Status**: Live plan — drives the next round of distributed-execution work.
+> **Date**: 2026-05-04
+> **Predecessors**: [archive/00-master-plan.md](archive/00-master-plan.md) (Phases 0–5, shipped) · [archive/01-master-plan.md](archive/01-master-plan.md) (interim plan, now split into per-topic files).
+
+The big direction now is to actually run **activities on standalone Worker pools** — separate processes from the workflow Worker pool — so we can scale workflow orchestration and inference activity execution independently. Today's tracing / cost-reporting design was built for the single-bundle-per-Worker case and breaks the moment activities move off-process. That has to be fixed before anything else.
+
+---
+
+## Priority order
+
+| # | Item | Status | Owner file |
+|---|---|---|---|
+| **P0** | **Tracing & cost reporting across separate-process workers** | Not started — top priority | this file (problem statement) |
+| **P1** | **Cross-worker cost report assembly wiring** | Not started — depends on P0 design | this file (problem statement) |
+| **P2** | Phase 6a — Local cross-package dependencies in crate | Not started | [phase6a-local-cross-package-deps.md](phase6a-local-cross-package-deps.md) |
+| **P3** | Phase 6b — Remote dependencies from GitHub | Not started — needs P2 | [phase6b-remote-deps-from-github.md](phase6b-remote-deps-from-github.md) |
+
+What's already shipped on this front: see [tracing-cost-reporting-as-built.md](tracing-cost-reporting-as-built.md). It also enumerates the open issues (T1, T2, T3) that motivate P0 and P1.
+
+Sibling tracks (separate branches, not in this plan): worker error-handling Phases 4–7 (`error-handling-phase-{4,5,6,7}-*.md`), instructor-unwrap port (`instructor-unwrap-other-workers.md`).
+
+---
+
+## P0 — Tracing & cost reporting across separate-process workers
+
+### Why this is top priority
+
+The whole point of the distributed-execution work is to allow **activities on standalone Worker pools** (separate processes from the workflow Worker pool). The current tracing implementation cannot serve that topology — it relies on the activity sharing the workflow's process so the singleton `ReportingManager` already has `set_event_log` configured. Until P0 is solved, splitting activities off is a regression on observability and cost reporting, not a feature.
+
+### Problems with the current implementation
+
+(All concretely enumerated in [tracing-cost-reporting-as-built.md](tracing-cost-reporting-as-built.md). Summarized here so the priority is legible.)
+
+1. **Standalone activity workers lose usage events.** When an activity runs on a process that never executed `WfPipeRouter.run()`, that process's `ReportingManager._event_log_contexts` is empty for the workflow's `lookup_key`. `_emit_usage_event` returns silently; usage data is dropped. The `_get_registry` TODO at `reporting_manager.py:111-117` ("Auto-create registry for unknown pipeline IDs ... TODO: replace with proper distributed reporting system") confirms this is a known gap.
+2. **`BufferingEventLog` + `act_flush_trace_events` is workflow-scoped.** Both pieces are tied to the workflow lifecycle (buffer in workflow context, flush after pipe execution). They cannot serve a standalone activity Worker that has no enclosing workflow process.
+3. **`set_event_log` lives on a process-singleton `ReportingManager`.** The per-context `_event_log_contexts` dict pattern relies on the activity emitting from the same process that configured the event log. The moment activity execution moves off-process, the activity has no way to discover its event log without something flowing in via request data (`JobMetadata` / a new `TracingContext`) instead of via a process-local dict.
+
+### Design discussion (deferred)
+
+We're not designing the fix yet — that comes when we pick up P0. The two natural starting points are (a) the original Phase 4.5 Step 6 `TracingActivityInboundInterceptor` design (now in `archive/00-master-plan.md` and `archive/01-master-plan.md`), and (b) plumbing tracing config + workflow id through `JobMetadata` so each activity can construct its own event log directly. Either way the activity needs request-scoped tracing data, not process-scoped state.
+
+### Acceptance criteria (sketch — refine when planning)
+
+- [ ] Activities deployed on standalone Worker pools (separate process from workflow Workers) emit `UsageReportEvent`s that land in the same backend partition as the rest of the run.
+- [ ] No reliance on `WfPipeRouter` having executed in the activity's process.
+- [ ] No silent drops — if tracing is enabled, an activity that fails to emit raises or logs explicitly.
+- [ ] Direct mode and the current single-bundle Worker mode keep working unchanged.
+- [ ] Tests covering: (1) standalone activity Worker, (2) mixed worker pool, (3) tracing disabled, (4) backend = NDJSON, (5) backend = DynamoDB.
+
+---
+
+## P1 — Cross-worker cost report assembly wiring
+
+### Why this is second, not first
+
+Even if P0 ships, the events still need to be turned into a cost report. Today the read-back path exists for the **graph** (`assemble_graph_on_output` / `act_assemble_graph` → `GraphSpecAssembler`) but not for **usage**. The pieces all exist on the manager side:
+
+- `UsageAggregator.aggregate(events) → list[AnyTokensUsage]` (`pipelex/tracing/usage_aggregator.py`).
+- `ReportingManager.inject_tokens_usages(pipeline_run_id, tokens_usages)` (`reporting_manager.py:191`) — docstring: *"Used after assembling usage data from distributed trace events, so that generate_report() can produce a complete cost report across all workers."*
+- `ReportingManager.generate_report(pipeline_run_id)` (`reporting_manager.py:247`).
+
+Nothing in the runtime calls these. `generate_report()` has zero runtime callers; only integration tests invoke it. Captured events sit in the backend and never become a cost report.
+
+This is a small piece of plumbing once P0's design is settled — the same place that calls the graph assembler can call the usage aggregator and inject the result into the report delegate before `generate_report` runs.
+
+### Acceptance criteria (sketch)
+
+- [ ] Runtime path: read events for `pipeline_run_id` → `UsageAggregator.aggregate()` → `ReportingManager.inject_tokens_usages()` → `generate_report()`.
+- [ ] Wired in both direct mode (in `pipelex/pipeline/runner.py`) and Temporal mode (alongside or inside the existing graph-assembly hook).
+- [ ] Cross-worker case verified: parent workflow on Worker A, child workflow on Worker B, activity on Worker C — single end-of-run cost report contains usage from all three.
+- [ ] Replace / remove the `_get_registry` TODO at `reporting_manager.py:111-117` since the proper distributed path now exists.
+
+---
+
+## P2 — Phase 6a: Local cross-package dependencies in crate
+
+Detailed plan: [phase6a-local-cross-package-deps.md](phase6a-local-cross-package-deps.md).
+
+In one line: ship dependency blueprints inside the `LibraryCrate` so workers don't need the dependency packages on PIPELEXPATH. Prerequisite for P3.
+
+---
+
+## P3 — Phase 6b: Remote dependencies from GitHub
+
+Detailed plan: [phase6b-remote-deps-from-github.md](phase6b-remote-deps-from-github.md).
+
+In one line: extend the blueprint collector from P2 with a remote (GitHub) resolver so the crate can carry deps fetched from external addresses, making workers fully stateless.
+
+---
+
+## Dependencies between items
+
+```
+P0 (Tracing across separate workers)
+   │
+   ▼
+P1 (Cross-worker cost report assembly)
+
+P2 (Phase 6a — local cross-package deps)
+   │
+   ▼
+P3 (Phase 6b — remote deps from GitHub)
+```
+
+P0/P1 and P2/P3 are independent tracks; P0 blocks P1, P2 blocks P3.

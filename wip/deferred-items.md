@@ -43,8 +43,8 @@ Items related to the event log and graph tracing system (Phase 4.5). Also docume
 
 | Item | Status | Context |
 |---|---|---|
-| DynamoDB backend | **Deferred** — build when deploying to AWS with remote workers | Cloud-only. The `EventLogProtocol` abstraction allows swapping the backend without changing the rest of the system. |
-| SQLite backend | **Deferred** — NDJSON is sufficient for local dev | SQLite could replace NDJSON if deduplication at write time or queryability becomes important. |
+| DynamoDB backend | **Shipped** (2026, `feature/dynamodb-tracer`) | `pipelex/tracing/dynamodb_event_log.py` (+ `TEMPORAL_DYNAMODB` variant). Schema-compatible with `pipelex-api-infra`'s `TraceEventDynamoDBAdapter`. Selected via `[pipelex.tracing] backend = "dynamodb"`. |
+| SQLite backend | **Not planned** — NDJSON + DynamoDB cover the matrix | Listed in the original analysis (`distributed-tracing-and-reporting.md`); not built. Re-evaluate only if a use case appears that NDJSON can't serve and DynamoDB is overkill. |
 
 ### Event Log Protocol Extensions
 
@@ -59,8 +59,8 @@ Items related to the event log and graph tracing system (Phase 4.5). Also docume
 
 | Item | Status | Context |
 |---|---|---|
-| Unified code path (event log everywhere) | **Deferred** — two paths for now | Direct mode uses in-memory `GraphTracer` only; event log is Temporal-only. Unify if the assembler proves reliable and the dual-path maintenance cost becomes painful. |
-| Auto-cleanup of traces | **Deferred** — manual cleanup is safer for now | Traces persist on disk until manually deleted. Safer for debugging and allows usage reporting to run after graph generation. |
+| Unified code path (event log everywhere) | **Effectively unified** | `pipeline_run_setup.py:282` wires `set_event_log()` on the report delegate for direct mode too (using `workflow_id="direct"`). The same `EventLogProtocol` machinery runs in both modes; only the in-process vs. Temporal lifecycle differs. |
+| Auto-cleanup of traces | **Deferred** — manual cleanup is safer for now | NDJSON traces persist on disk until manually deleted. Safer for debugging and allows usage reporting to run after graph generation. DynamoDB cleanup follows TTL on the table. |
 
 ### Known Issues
 
