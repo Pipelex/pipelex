@@ -100,8 +100,7 @@ class BaseModelPayloadConverter(JSONPlainPayloadConverter):
             # same class name without collision.
             source_types = SchemaToModelFactory.make_types_from_source(class_source_code)
             scoped_registry = ClassRegistry()
-            if isinstance(global_registry, ClassRegistry):
-                scoped_registry.register_classes_dict(dict(global_registry.root))
+            scoped_registry.register_classes_dict(global_registry.get_classes_dict())
             for type_name, type_obj in source_types.items():
                 scoped_registry.register_class(type_obj, name=type_name, should_warn_if_already_registered=False)
             pydantic_gizmo = kajson.loads(data, class_registry=scoped_registry)

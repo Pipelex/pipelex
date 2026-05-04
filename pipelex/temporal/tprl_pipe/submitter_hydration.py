@@ -23,7 +23,6 @@ from typing import TYPE_CHECKING
 from kajson.class_registry import ClassRegistry
 from kajson.kajson_manager import KajsonManager
 
-from pipelex import log
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.hub import get_current_library, get_library_manager, set_current_library, teardown_current_library
 from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
@@ -66,10 +65,7 @@ def rehydrate_pipe_output_with_crate(
 
         global_registry = KajsonManager.get_class_registry()
         scoped_registry = ClassRegistry()
-        if isinstance(global_registry, ClassRegistry):
-            scoped_registry.register_classes_dict(dict(global_registry.root))
-        else:
-            log.warning(f"Global registry is {type(global_registry).__name__}, not ClassRegistry — cannot pre-seed rehydration registry")
+        scoped_registry.register_classes_dict(global_registry.get_classes_dict())
         rehydration_library.set_class_registry(scoped_registry)
 
         set_current_library(library_id=rehydration_library_id)
