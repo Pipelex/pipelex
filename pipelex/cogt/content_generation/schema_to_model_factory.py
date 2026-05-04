@@ -272,6 +272,16 @@ class SchemaToModelFactory:
 
         Cached by sha256(source_code) so repeated payloads carrying the same dynamic
         class don't re-exec. Returns a shallow copy so callers can mutate freely.
+
+        Security note: this path takes pre-generated Python source (typically delivered
+        via `__kajson_class_source__` on a Temporal payload) and exec()'s it directly.
+        Layer 1 (`_reject_unsafe_schema_extensions`) does NOT apply here — only Layer 2
+        (`_make_restricted_builtins`) does, so the attack surface is materially wider
+        than the sender path in `make_from_json_schema`. An attacker who can inject a
+        crafted `__kajson_class_source__` string into a cross-process payload bypasses
+        the JSON-schema extension check entirely. The TODO in `_exec_source_to_types`
+        to migrate to `pydantic.create_model()` would close this gap by removing the
+        exec primitive on both paths.
         """
         cache_key = hashlib.sha256(source_code.encode()).hexdigest()
         with cls._source_cache_lock:
