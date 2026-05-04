@@ -85,4 +85,5 @@ package-lock.json
 
 # Claude plans
 .claude/plans/
+.claude/scheduled_tasks.lock
 .gstack/
