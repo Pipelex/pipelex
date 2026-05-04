@@ -8990,7 +8990,7 @@ When a new `pipelex` release ships changes to the model deck — new models, new
 
 ## When to run it
 
-Pipelex prints a one-line yellow advisory at the top of every CLI invocation when it detects that the installed deck is older than the running package, or when no deck manifest is present yet:
+Pipelex prints a one-line yellow advisory on most CLI invocations when it detects that the installed deck is older than the running package, or when no deck manifest is present yet (it is suppressed for `login`, `init`, `doctor`, `update`, and `which`):
 
 ```text
 ⚠ Pipelex model deck may be out of date — run pipelex update to refresh
@@ -13484,6 +13484,7 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - **Test Profile Configuration** - How to configure which models are used in tests
 - **Dry Run Mock Generation** - How mock objects satisfy field validation constraints
 - **Init CLI Flows** - How `pipelex init` sets up the configuration directory
+- **Distributed Content Generation** - How dynamic classes and large payloads cross Temporal boundaries
 - **Technical Design Decisions** - Why we chose X over Y
 - **Module Deep-Dives** - Detailed explanations of specific subsystems
 
@@ -13502,6 +13503,9 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - [:material-test-tube: Test Profile Configuration](./test-profile-configuration.md){ .md-button }
 - [:material-flask-outline: Dry Run Mock Generation](./dry-run-mock-generation.md){ .md-button }
 - [:material-console: Init CLI Flows](./init-cli-flows.md){ .md-button }
+- [:material-pipe: Pipe Routing & Execution](./pipe-routing-and-execution.md){ .md-button }
+- [:material-cloud-sync: Temporal Integration](./temporal-integration.md){ .md-button }
+- [:material-swap-horizontal: Distributed Content Generation](./distributed-content-generation.md){ .md-button }
 
 
 ## Architecture Overview
@@ -16537,6 +16541,841 @@ This ensures the fix targets the same directory where the issue was found — if
 
 - [:material-cog: Configuration Internals](../contribute/configuration-defaults-and-overrides.md){ .md-button }
 - [:material-sitemap: Architecture Overview](./architecture-overview.md){ .md-button }
+
+
+## Pipe Routing & Execution
+
+# Pipe Routing & Execution
+
+Pipelex supports two execution modes for running pipes: **direct execution** (single-process) and **distributed execution** (via Temporal workers). Both modes share the same pipe definitions, library loading, and controller logic. The key difference is *where* the pipe runs and how the PipeJob travels to get there.
+
+---
+
+## Terminology
+
+| Term | Meaning |
+|------|---------|
+| **Direct execution** | All pipes run in the same Python process. Library, class registry, and pipe resolution are shared in-memory. |
+| **Distributed execution** | PipeJob is serialized and sent to a remote Temporal worker. The worker is a separate process (potentially on a different machine). |
+
+---
+
+## Design Principle
+
+Every pipe execution — regardless of mode — follows the same pattern:
+
+1. **Setup**: `pipeline_run_setup()` loads the library, resolves the pipe, initializes working memory, and creates a `PipeJob`
+2. **Route**: A router (`PipeRouter` or `PipeRouterTop`) receives the PipeJob and dispatches it
+3. **Execute**: The pipe's `run_pipe()` method runs, potentially resolving and executing child pipes
+
+The `PipeJob` is the universal unit of execution. It carries everything needed to run a single pipe.
+
+---
+
+## The PipeJob Model
+
+`PipeJob` encapsulates all information needed to execute a pipe.
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `pipe` | `PipeAbstract` | The resolved pipe object (concrete operator or controller) |
+| `working_memory` | `WorkingMemory \| None` | Runtime data store — typed `Stuff` objects keyed by variable name |
+| `working_memory_raw` | `dict \| None` | Raw JSON dict of WorkingMemory for deferred hydration (Temporal only) |
+| `pipe_run_params` | `PipeRunParams` | Execution config: run mode (LIVE/DRY), output multiplicity, pipe stack for cycle detection |
+| `job_metadata` | `JobMetadata` | Pipeline run ID, user ID, OTel tracing context, graph tracing context |
+| `output_name` | `str \| None` | Override for the output variable name |
+| `library_crate` | `LibraryCrate \| None` | Serializable library snapshot for distributed execution |
+
+`PipeJob` is created by `pipeline_run_setup()`, which handles library loading, pipe resolution, working memory initialization, and telemetry setup. For Temporal dispatch, `prepare_for_temporal()` moves `working_memory` to `working_memory_raw` (deferred hydration) and ensures the crate is attached.
+
+---
+
+## Library Loading
+
+Before a pipe can execute, the **library** must be loaded. The library contains:
+
+- **Pipes** — all pipe definitions (operators and controllers), resolved by code via `get_required_pipe()`
+- **Concepts** — semantic type definitions that determine what data a `Stuff` object holds
+- **Domains** — namespaces that group related pipes and concepts
+
+### Base vs Custom Libraries
+
+- **Base libraries** are loaded from directories listed in `PIPELEXPATH`. They contain shared pipe/concept definitions available to all executions.
+- **Custom bundles** are per-request `mthds_content` strings. Each API call can bring its own definitions.
+
+### Dynamic Class Generation
+
+When a `.mthds` file declares a concept like `RawText = "Raw input text..."`, the library loading process:
+
+1. `ConceptFactory._handle_basic_blueprint()` detects the concept declaration
+2. `StructureGenerator.generate_from_structure_blueprint()` dynamically creates a Python class (e.g., `RawText` inheriting from `TextContent`)
+3. The class is registered with the active `ClassRegistry` (accessed via `hub.get_class_registry()`) so it can be serialized/deserialized
+
+These dynamically-generated classes become the `content` type of `Stuff` objects in `WorkingMemory`.
+
+!!! info "Why Dynamic Classes Matter"
+    When a PipeJob is serialized (e.g., for Temporal transport), Kajson embeds `__class__` and `__module__` metadata. The receiving process must have these classes registered in its class registry to deserialize the payload.
+
+---
+
+## Direct Execution
+
+In direct execution, everything runs in a single Python process. This is the default mode when Temporal is not enabled.
+
+### Flow
+
+```
+pipeline_run_setup()
+  ├── Load library (library_manager singleton)
+  ├── Generate dynamic concept classes
+  ├── Register classes with Kajson
+  ├── Resolve pipe via get_required_pipe(pipe_code)
+  ├── Initialize WorkingMemory from inputs
+  └── Return PipeJob
+
+PipeRouter.run(pipe_job)
+  ├── Notify observers (before)
+  ├── _run_pipe_job(pipe_job)
+  │   └── pipe_job.pipe.run_pipe(...)     ← delegates directly to the pipe
+  │       ├── Concrete pipe: execute operator logic (LLM call, template, etc.)
+  │       └── Controller: resolve child pipes via get_required_pipe(),
+  │           then recursively call child.run_pipe()
+  ├── Notify observers (after)
+  └── Return PipeOutput
+```
+
+### Router Selection
+
+The router is selected during `Pipelex.setup()`:
+
+```python
+if get_config().temporal.is_enabled:
+    effective_pipe_router = make_tprl_pipe_router_top()   # Distributed
+else:
+    effective_pipe_router = PipeRouter(observer=...)       # Direct
+```
+
+### How PipeRouter Works
+
+`PipeRouter` implements `PipeRouterProtocol` with a minimal `_run_pipe_job()`:
+
+```python
+async def _run_pipe_job(self, pipe_job, wfid=None):
+    return await pipe_job.pipe.run_pipe(
+        job_metadata=pipe_job.job_metadata,
+        working_memory=pipe_job.working_memory,
+        output_name=pipe_job.output_name,
+        pipe_run_params=pipe_job.pipe_run_params,
+    )
+```
+
+The router does not route by pipe type — it delegates to the pipe itself. Controllers handle their own orchestration internally.
+
+---
+
+## Pipe Controllers
+
+Controllers are pipes that orchestrate the execution of other pipes. They resolve child pipes at runtime via `get_required_pipe()` from the library.
+
+| Controller | Behavior |
+|------------|----------|
+| **PipeSequence** | Executes `sequential_sub_pipes` one after another. Each step receives working memory with outputs from previous steps. |
+| **PipeBatch** | Iterates over a `ListContent` input. For each item, loads `branch_pipe` and executes it with a deep copy of working memory. Items run concurrently via asyncio. |
+| **PipeCondition** | Evaluates a Jinja2 `expression` against working memory, maps the result via `outcome_map` to a pipe code, and executes that pipe. |
+| **PipeParallel** | Loads multiple child pipes and executes them concurrently, each with its own working memory copy. |
+
+All controllers follow the same pattern:
+
+1. Call `get_required_pipe(child_pipe_code)` to resolve the child pipe from the library
+2. Route through `get_pipe_router().run(PipeJob(...))` — the hub auto-selects the right router
+3. Aggregate results into working memory or output
+
+### Auto-Switching Router
+
+The hub (`get_pipe_router()`) automatically returns the correct router based on context:
+
+- **Direct execution**: Returns `PipeRouter` — child pipes run in-process
+- **Distributed execution, outside workflow** (submitter side): Returns `PipeRouterTop` — submits a top-level Temporal workflow
+- **Distributed execution, inside workflow** (worker side): Returns `PipeRouterChild` — creates a Temporal child workflow via `execute_child_workflow()`
+
+This means each child pipe in a controller gets its own Temporal workflow boundary in distributed mode — enabling independent retries, separate worker assignment, and per-pipe visibility in the Temporal UI.
+
+!!! note "Library Dependency"
+    Controllers depend on the library being loaded in the current process. `get_required_pipe()` queries the library scoped to the current workflow via `ContextVar`, which must have been populated by loading a `LibraryCrate`. In distributed execution, each `WfPipeRouter` loads the crate from the `PipeJob` into a per-workflow `Library` instance. Controllers call `get_required_pipe()` inside Temporal workflow code — accessing per-workflow state via ContextVar. The Temporal sandbox is disabled (`--is-not-sandboxed`) because library loading is a side effect incompatible with replay semantics.
+
+---
+
+## Distributed Execution
+
+In distributed execution, the PipeJob is serialized and sent to a Temporal worker for execution.
+
+### Flow
+
+```mermaid
+sequenceDiagram
+    participant S as Submitter (API/CLI)
+    participant T as Temporal Server
+    participant W as Worker
+
+    Note over S: pipeline_run_setup()
+    S->>S: Load library, generate dynamic classes
+    S->>S: Resolve pipe, build LibraryCrate
+    S->>S: Create PipeJob (crate attached)
+
+    Note over S: PipeRouterTop.run()
+    S->>S: prepare_for_temporal()<br/>(WM → working_memory_raw)
+    S->>T: Submit WfPipeRouter(PipeJob)
+    T->>W: Dispatch workflow
+
+    Note over W: WfPipeRouter.run()
+    W->>W: Create per-workflow ClassRegistry
+    W->>W: Load LibraryCrate (register classes)
+    W->>W: Hydrate working_memory_raw → WM
+    W->>W: pipe.run_pipe()
+
+    alt Concrete pipe
+        W->>W: Execute via Activity
+    else Controller pipe
+        W->>T: Child workflow (crate propagates)
+        T->>W: Child result
+    end
+
+    W->>W: Dehydrate PipeOutput<br/>(WM → working_memory_raw)
+    W->>T: Return dehydrated PipeOutput
+    T->>S: Workflow result
+    S->>S: Hydrate PipeOutput<br/>(working_memory_raw → WM)
+```
+
+### Key Components
+
+**PipeRouterTop** (`pipelex/temporal/tprl_pipe/pipe_router_top.py`)
+
+Implements `PipeRouterProtocol` like `PipeRouter`, but dispatches via Temporal instead of direct execution. Uses `WorkflowExecutor` to submit `WfPipeRouter` workflows.
+
+**WfPipeRouter** (`pipelex/temporal/tprl_pipe/wf_pipe_router.py`)
+
+The Temporal workflow that runs on the worker. Receives a deserialized `PipeJob` and calls `pipe.run_pipe()` — exactly like the direct router.
+
+**Kajson Data Converter** (`pipelex/temporal/temporal_data_converter.py`)
+
+Custom Temporal payload converter that uses Kajson for serializing/deserializing Pydantic models. Preserves subclass types during transport, which is critical because `PipeJob.pipe` is a `PipeAbstract` subclass and `WorkingMemory` contains `Stuff` objects with concept-specific content classes.
+
+**Worker CLI** (`pipelex/temporal/worker_cli.py`)
+
+Entry point for the worker process. Calls `Pipelex.make(temporal_enabled=True)` to initialize the framework, then starts the Temporal worker with registered workflows and activities.
+
+### Content Generation Workflows
+
+Concrete pipe operators (PipeLLM, PipeCompose, PipeExtract, PipeImgGen) use dedicated Temporal workflows and activities for their actual work:
+
+| Workflow | Activity | Purpose |
+|----------|----------|---------|
+| `wf_make_llm_text` | `act_llm_gen_text` | LLM text generation |
+| `wf_make_object` | `act_llm_gen_object` | LLM structured output |
+| `wf_make_jinja2_text` | `act_jinja2_gen_text` | Jinja2 template rendering |
+| `wf_make_extract` | `act_extract_gen_extract_pages` | Document extraction |
+| `wf_make_image` | `act_img_gen_images` | Image generation |
+
+### Worker Environment
+
+The `@with_conditional_worker` decorator on `PipeRouterTop._run_pipe_job()` supports two environments:
+
+- **EXTERNAL** (production) — assumes a worker is already running, submits the workflow directly
+- **INTERNAL** (testing) — spins up an embedded worker for the duration of the execution
+
+!!! note "Future Improvement: Per-Pipe Routing"
+    Router selection is currently global and binary: either all pipes go through Temporal, or none do. A simple `PipeCompose` (microseconds of Jinja2 rendering) gets the same Temporal overhead as a `PipeLLM` (minutes of API call time). Per-pipe or per-type routing decisions could improve efficiency.
+
+---
+
+## LibraryCrate, Deferred Hydration, and Per-Workflow Isolation
+
+Distributed execution introduces three mechanisms that don't exist in direct mode. These solve the fundamental challenge: the worker is a separate process that doesn't share the submitter's library, class registry, or working memory state.
+
+For a detailed walkthrough of these mechanisms, see [Temporal Integration](./temporal-integration.md).
+
+### LibraryCrate Propagation
+
+The submitter builds a `LibraryCrate` — a serializable snapshot of all pipes and concepts — and attaches it to the `PipeJob`. Each `WfPipeRouter` on the worker loads the crate into a per-workflow scoped library, making all pipes resolvable via `get_required_pipe()`.
+
+### Deferred Hydration (Input and Output)
+
+Deferred hydration applies to both **PipeJob inputs** and **PipeOutput return values**. In both cases, `WorkingMemory` is serialized as a raw JSON dict (`working_memory_raw`) instead of a typed object, avoiding deserialization failures when dynamic concept classes aren't registered in the receiving process's class registry.
+
+- **Input**: `PipeJob.prepare_for_temporal()` moves `working_memory` to `working_memory_raw` before dispatch. The worker hydrates it after loading the crate.
+- **Output**: `PipeOutput.prepare_for_temporal()` does the same before returning from a child workflow. The parent (`PipeRouterChild` or `PipeRouterTop`) hydrates after receiving.
+
+### Per-Workflow ClassRegistry and Library Scoping
+
+Each workflow creates its own `ClassRegistry` (pre-seeded from the global registry) and its own `Library` instance, both scoped via `ContextVar`. This ensures concurrent workflows with conflicting concept names (e.g., two bundles that both define `Result` with different fields) don't cross-contaminate.
+
+### Known Limitation: StuffArtefact Serialization in Dry-Run
+
+PipeCondition and PipeCompose dispatch internal `WfMakeJinja2Text` sub-workflows that serialize working memory contents through the Temporal data converter. In dry-run mode, working memory contains `StuffArtefact` debug objects that are not JSON-serializable, causing these internal workflows to fail. PipeBatch also fails in dry-run (likely a related serialization issue in child PipeJob creation). PipeSequence and PipeParallel are unaffected — they dispatch child pipes through `SubPipe.run_pipe()` without internal templating workflows. See [Temporal Integration](./temporal-integration.md#known-limitation-stuffartefact-serialization-in-dry-run) for details and fix direction.
+
+---
+
+## Architecture Diagram
+
+```mermaid
+flowchart TB
+    subgraph Setup["Pipeline Setup (API / CLI Process)"]
+        S1["pipeline_run_setup()"]
+        S2["Load library"]
+        S3["Generate dynamic classes"]
+        S4["Resolve pipe"]
+        S5["Build LibraryCrate"]
+        S6["Create PipeJob (with crate)"]
+        S1 --> S2 --> S3 --> S4 --> S5 --> S6
+    end
+
+    S6 --> Decision{temporal.is_enabled?}
+
+    subgraph Direct["Direct Execution"]
+        D1["PipeRouter._run_pipe_job()"]
+        D2["pipe.run_pipe()"]
+        D3["Controller: get_required_pipe()"]
+        D4["Recursive child execution"]
+        D1 --> D2
+        D2 --> D3
+        D3 --> D4
+    end
+
+    subgraph Distributed["Distributed Execution (Temporal)"]
+        T1["PipeRouterTop: prepare_for_temporal()"]
+        T2["Kajson serialize PipeJob + crate"]
+        T3["Temporal Server"]
+        T4["Worker: Kajson deserialize"]
+        T5["WfPipeRouter: load crate, hydrate WM"]
+        T6["pipe.run_pipe()"]
+        T1 --> T2 --> T3 --> T4 --> T5 --> T6
+    end
+
+    Decision -- No --> D1
+    Decision -- Yes --> T1
+
+    D4 --> Result["PipeOutput"]
+    T6 --> Result
+```
+
+---
+
+## File Reference
+
+| Component | File |
+|-----------|------|
+| PipeJob model | `pipelex/pipe_run/pipe_job.py` |
+| Pipeline setup | `pipelex/pipeline/pipeline_run_setup.py` |
+| PipeRouter (direct) | `pipelex/pipe_run/pipe_router.py` |
+| PipeRouterProtocol | `pipelex/pipe_run/pipe_router_protocol.py` |
+| PipeRouterTop (distributed, outside workflow) | `pipelex/temporal/tprl_pipe/pipe_router_top.py` |
+| PipeRouterChild (distributed, inside workflow) | `pipelex/temporal/tprl_pipe/pipe_router_child.py` |
+| Auto-switch utility | `pipelex/temporal/temporal_workflow_utils.py` |
+| WfPipeRouter workflow | `pipelex/temporal/tprl_pipe/wf_pipe_router.py` |
+| Kajson data converter | `pipelex/temporal/temporal_data_converter.py` |
+| Worker CLI | `pipelex/temporal/worker_cli.py` |
+| Library manager | `pipelex/libraries/library_manager.py` |
+| ConceptFactory | `pipelex/core/concepts/concept_factory.py` |
+| StructureGenerator | `pipelex/core/concepts/structure_generation/generator.py` |
+| LibraryCrate model | `pipelex/libraries/library_crate.py` |
+| LibraryCrate factory | `pipelex/libraries/library_crate_factory.py` |
+| Deferred hydration utility | `pipelex/temporal/tprl_pipe/hydration.py` |
+| Hub (get_required_pipe, get_class_registry) | `pipelex/hub.py` |
+| PipeSequence | `pipelex/pipe_controllers/sequence/pipe_sequence.py` |
+| PipeCondition | `pipelex/pipe_controllers/condition/pipe_condition.py` |
+| PipeBatch | `pipelex/pipe_controllers/batch/pipe_batch.py` |
+| PipeParallel | `pipelex/pipe_controllers/parallel/pipe_parallel.py` |
+| Router selection | `pipelex/pipelex.py` (in `Pipelex.setup()`) |
+
+
+## Temporal Integration
+
+# Temporal Integration
+
+This page covers the Temporal-specific mechanisms that enable distributed pipe execution. For the general pipe routing architecture (shared between direct and distributed modes), see [Pipe Routing & Execution](./pipe-routing-and-execution.md).
+
+---
+
+## The Three Challenges
+
+Distributing pipe execution across separate worker processes introduces three challenges that don't exist in direct (single-process) mode:
+
+1. **Pipe resolution** — Controllers call `get_required_pipe()` to resolve child pipes. The worker's library must contain those pipes.
+2. **Dynamic class deserialization** — `.mthds` bundles generate Python classes at runtime (e.g., `RawText` inheriting from `TextContent`). The worker must have those classes registered before deserializing `WorkingMemory`.
+3. **Concurrent isolation** — Multiple workflows running on the same worker may define conflicting class/pipe names. Each workflow needs its own scoped registry and library.
+
+These are solved by three mechanisms: LibraryCrate propagation, deferred hydration, and per-workflow scoping.
+
+---
+
+## LibraryCrate
+
+A `LibraryCrate` is a serializable snapshot of the library — two flat dicts of blueprints:
+
+```python
+class LibraryCrate(BaseModel):
+    concepts: dict[str, ConceptBlueprint | str]  # concept_ref -> blueprint or description
+    pipes: dict[str, PipeBlueprintUnion]          # pipe_ref -> blueprint
+    domains: dict[str, DomainBlueprint]           # domain_code -> domain metadata
+    source_map: dict[str, str]                    # ref -> source file (error traceability)
+    fingerprint: str                              # SHA256 of serialized content
+```
+
+Domain is encoded in the dictionary keys (e.g., `scoring.WeightedScore`, `scoring.compute_score`), not in a structural container. `domains` carries per-domain metadata (description, system prompt). `source_map` enables error messages that trace back to origin files. The `fingerprint` enables idempotent loading — if a worker already loaded a crate with the same fingerprint, it skips the reload.
+
+### How it propagates
+
+```mermaid
+sequenceDiagram
+    participant S as Submitter
+    participant W as Worker
+
+    S->>S: Load library, build LibraryCrate
+    S->>W: PipeJob (crate attached)
+
+    Note over W: WfPipeRouter.run()
+    W->>W: load_from_crate(crate)
+    W->>W: pipe.run_pipe()
+
+    Note over W: Controller dispatches child
+    W->>W: PipeRouterChild → child workflow
+    Note over W: Child WfPipeRouter.run()
+    W->>W: load_from_crate(same crate)
+    W->>W: child pipe.run_pipe()
+
+    W->>S: PipeOutput (dehydrated)
+    S->>S: Hydrate PipeOutput
+```
+
+Every child workflow receives the crate through its `PipeJob`. Each `WfPipeRouter` loads the crate into its own scoped library. This ensures every workflow — parent or child, on any worker — can resolve all pipes.
+
+### Visibility
+
+The `LibraryCrate` is a Pydantic model. Temporal serializes it as structured JSON in the workflow input, making it fully visible in the Temporal dashboard — not opaque bytes.
+
+---
+
+## Deferred Hydration
+
+### The chicken-and-egg problem
+
+Temporal's data converter deserializes payloads (workflow inputs and return values) using Kajson, which needs dynamic concept classes registered to reconstruct typed `WorkingMemory`. But those classes only get registered when the `LibraryCrate` is loaded inside the workflow. This creates two deserialization gaps:
+
+1. **Input**: The `PipeJob` workflow input contains `WorkingMemory` with dynamic classes that don't exist yet on the worker.
+2. **Output**: A child workflow's `PipeOutput` return value contains `WorkingMemory` with dynamic classes. The parent's data converter runs in the Temporal SDK's event processing context (outside the workflow coroutine's `ContextVar` scope), so it can't access the parent's per-workflow class registry.
+
+### The solution
+
+Both `PipeJob` and `PipeOutput` carry a `working_memory_raw` field for deferred hydration:
+
+```python
+class PipeJob(BaseModel):
+    working_memory: WorkingMemory | None = None
+    working_memory_raw: dict[str, Any] | None = None
+    library_crate: LibraryCrate | None = None
+
+class PipeOutput(PipeOutputAbstract[WorkingMemory]):
+    working_memory: WorkingMemory = Field(default_factory=WorkingMemory)
+    working_memory_raw: dict[str, Any] | None = None
+```
+
+**Input dehydration/hydration cycle:**
+
+- Before dispatch, `PipeJob.prepare_for_temporal()` moves `working_memory` to `working_memory_raw` (a plain dict via `dump_for_temporal()`).
+- After the worker loads the crate, `WfPipeRouter` hydrates the raw dict back to typed `WorkingMemory`.
+
+**Output dehydration/hydration cycle:**
+
+- Before returning from a workflow, `WfPipeRouter` calls `PipeOutput.prepare_for_temporal()` to dehydrate `WorkingMemory` to `working_memory_raw`.
+- The raw dict flows **end-to-end**: child workflow → parent `WfPipeRun` → `act_deliver` activity, all without intermediate rehydration. Parents do not own a per-workflow registry that would let them rehydrate the child's output, and the activity worker is typically a different process that has not loaded the crate.
+- Only the **top-level submitter** rehydrates, via `rehydrate_pipe_output_with_crate()` (`pipelex/temporal/tprl_pipe/submitter_hydration.py`). When the submitter has not loaded the bundle locally (e.g., a remote API client that built the `PipeJob` from a serialized `LibraryCrate`), this function opens a fresh per-call scoped Library, loads the crate into a scoped `ClassRegistry` pre-seeded from the global, hydrates inside the scope, then tears down — leaving the submitter's global registry untouched.
+
+The hydration function (`pipelex/temporal/tprl_pipe/hydration.py`) iterates the raw dict, uses `StuffContentFactory` to reconstruct typed content objects using the registered classes, and preserves aliases. It also includes a small but unintuitive guard (`_validate_as_known_class`) that round-trips items through `model_dump()` to defeat cross-exec class-identity mismatches: kajson may eagerly rebuild instances using one class identity, then `load_from_crate` re-execs the source and replaces the registry entry with a new identity (same name, different `id()`), which would otherwise cause Pydantic's `model_validate` to reject the older instance.
+
+### Why output dehydration goes end-to-end
+
+Earlier designs had the parent `WfPipeRun` rehydrate the child's `PipeOutput` before scheduling `act_deliver`, then propagated dynamic classes from the per-workflow registry into the worker's global `KajsonManager` registry so the activity worker could decode the typed payload. This worked on a single worker but broke under distributed Temporal: any worker polling the task queue can pick up the activity, and `ContextVars` / per-worker globals do not cross processes. The current design eliminates that hack — `act_deliver` receives the raw dict directly, never needs class resolution for transport, and the activity worker does not need the crate loaded.
+
+### Activity-side rendering of the raw working memory
+
+`act_deliver` cannot assume dynamic concept classes are registered on its worker. `DeliveryExecutor.generate_result_files()` (`pipelex/pipe_run/delivery_executor.py`) therefore branches on which field is populated:
+
+- **Typed path** (`working_memory` set, in-process / same-worker): existing typed renderers run unchanged.
+- **Raw path** (`working_memory_raw` set, cross-process Temporal): `working_memory.json` is written directly from the raw dict; for the main stuff, `try_local_hydrate_stuff()` attempts a single-Stuff hydration using only globally registered classes (built-in `StuffContent` subclasses are always present). On success, typed renderers produce `main_stuff.{md,html}` and the viewer; on miss (dynamic concept class not registered locally), a generic field-walking fallback renders JSON-in-markdown and `<pre>`-in-HTML so users still get readable output. Misses log a warning so silent regressions on built-in hydration surface.
+
+Tradeoff: dynamic concepts lose typed rendering on the activity worker, but the activity worker no longer needs the crate, which is the precondition for true distributed execution.
+
+### Boundary-by-boundary summary
+
+| Boundary | Direction | What crosses | Hydration on receive? |
+|----------|-----------|--------------|------------------------|
+| Submitter → top `WfPipeRouter` | input | `PipeJob` with `working_memory_raw` + `library_crate` | Yes — worker loads crate, then hydrates inside scope |
+| Parent `WfPipeRouter` → child `WfPipeRouter` | input | Same `PipeJob` shape (crate re-loaded idempotently via fingerprint) | Yes — child worker loads crate, hydrates inside its own scope |
+| Child `WfPipeRouter` → parent `WfPipeRun` | output | `PipeOutput` with `working_memory_raw` | **No** — parent forwards raw dict |
+| Parent `WfPipeRun` → `act_deliver` | activity arg | `PipeOutput` with `working_memory_raw` (no crate) | **No** — activity renders from raw, with best-effort local hydration of the main stuff using only globally registered classes |
+| Top `WfPipeRouter` → submitter | output | `PipeOutput` with `working_memory_raw` | Yes — `rehydrate_pipe_output_with_crate()` opens a fresh scoped Library if a crate is available, otherwise falls back to the global registry |
+
+### Dashboard visibility
+
+`working_memory_raw` is a plain JSON dict — fully readable in the Temporal dashboard without needing class resolution.
+
+---
+
+## Per-Workflow Scoping
+
+### Why per-workflow isolation matters
+
+A single Temporal worker may process multiple concurrent workflows. If two workflows define a concept named `Result` with different structures (e.g., `Result(score, label)` vs `Result(value, confidence, is_valid)`), they must not share the same `ClassRegistry` or `Library`. Without isolation, the second workflow's class registration would overwrite the first's, causing silent data corruption.
+
+### How it works
+
+Each `WfPipeRouter.run()` creates its own scoped state:
+
+1. **ClassRegistry**: A new `ClassRegistry` pre-seeded from the global registry (which has base classes from `PIPELEXPATH`). Dynamic classes from the crate are registered here — not in the global registry.
+
+2. **Library**: A new `Library` instance opened via `library_manager.open_library()`, with the `ClassRegistry` attached as a `PrivateAttr`. The library is set as the current library via the `_library_id` `ContextVar`.
+
+3. **ClassRegistry lookup chain**: `hub.get_class_registry()` reads `_library_id` from the `ContextVar`, gets the library's attached `ClassRegistry`. Falls back to the global registry if no library is set.
+
+4. **Cleanup**: `library_manager.teardown(library_id)` deletes the library and its `ClassRegistry`. The `ContextVar` is reset via `teardown_current_library()`. No manual GC needed — the `ClassRegistry` is garbage-collected with the `Library`.
+
+### Kajson integration
+
+The Temporal data converter passes the active `ClassRegistry` to `kajson.loads()`:
+
+```python
+pydantic_gizmo = kajson.loads(data, class_registry=get_class_registry())
+```
+
+Inside a workflow coroutine, `get_class_registry()` returns the per-workflow scoped registry (via `_library_id` ContextVar). However, the data converter is also called from the Temporal SDK's event processing context (e.g., when deserializing child workflow return values), where the ContextVar is not set. In that case, it falls back to the global registry. This is why PipeOutput uses deferred hydration — the `working_memory_raw` dict doesn't require class resolution during deserialization.
+
+---
+
+## Workflow Topology
+
+A single pipe execution can create many Temporal workflows. Each level of nesting dispatches child workflows:
+
+```
+PipeSequence (3 steps)
+  → 1 parent WfPipeRouter
+  → 3 child WfPipeRouters (one per step)
+  Each child step (if PipeLLM):
+    → 1 child WfMakeLLMText + 1 ActLLMGenText activity
+
+PipeParallel (2 branches, then summary)
+  → 1 parent WfPipeRouter
+  → 3 child WfPipeRouters (2 branches concurrent + 1 summary)
+
+PipeBatch (3 items)
+  → 1 parent WfPipeRouter
+  → 1 child WfPipeRouter for the PipeBatch controller
+  → 3 child WfPipeRouters (one per item)
+```
+
+Each `WfPipeRouter` loads the `LibraryCrate` (idempotent via fingerprint), so pipe resolution works at every level.
+
+---
+
+## Controller Dispatch Patterns on Temporal
+
+Each controller type creates a different child workflow pattern:
+
+| Controller | Dispatch pattern | Child workflows |
+|------------|-----------------|----------------|
+| **PipeSequence** | Sequential: each step via `SubPipe.run_pipe()` → `PipeRouterChild` | N children (one per step), executed sequentially |
+| **PipeParallel** | Concurrent: all branches via `SubPipe.run_pipe()` + `asyncio.gather()` | N children (one per branch), executed concurrently |
+| **PipeBatch** | Fan-out: each list item via `SubPipe.run_pipe()` | N children (one per item), executed concurrently |
+| **PipeCondition** | Conditional: evaluates expression, dispatches selected outcome via `SubPipe.run_pipe()` | 1 child (the chosen outcome pipe), plus internal `WfMakeJinja2Text` for expression evaluation |
+
+### Internal sub-workflows
+
+Some controllers dispatch internal sub-workflows in addition to pipe routing:
+
+- **PipeCondition**: `WfMakeJinja2Text` to evaluate the expression template against working memory
+- **PipeCompose**: `WfMakeJinja2Text` to resolve construct field references (e.g., `{ from = "title_text.text" }`)
+
+These internal workflows carry working memory contents through the Temporal data converter, which creates a serialization dependency on working memory content types.
+
+---
+
+## Known Limitation: StuffArtefact Serialization in Dry-Run
+
+In dry-run mode, PipeLLM produces `StuffArtefact` debug objects as working memory content. When controllers dispatch internal sub-workflows that carry working memory contents through the Temporal data converter, Kajson fails with `TypeError: Type <class 'StuffArtefact'> is not JSON serializable`.
+
+`StuffArtefact` is not a Pydantic model — it's a plain object used for dry-run tracing that was never designed for cross-process serialization.
+
+**Confirmed affected**:
+
+- **PipeCondition**: expression evaluation dispatches `WfMakeJinja2Text`, which serializes working memory to evaluate the Jinja2 expression. Fails with `StuffArtefact` TypeError.
+- **PipeCompose**: construct field resolution dispatches `WfMakeJinja2Text` similarly.
+
+**Likely affected** (hangs in testing, root cause not fully diagnosed):
+
+- **PipeBatch**: fan-out creates child PipeJobs with copies of working memory. The hang may be caused by `StuffArtefact` in the serialized child PipeJob, or by a different serialization issue in the list content extraction.
+
+**Not affected**:
+
+- **PipeSequence**: no internal sub-workflows — child pipes are dispatched via `SubPipe.run_pipe()` → `PipeRouterChild`, which creates clean child PipeJobs.
+- **PipeParallel**: same dispatch pattern as PipeSequence — branches go through `SubPipe.run_pipe()` without internal templating workflows.
+- **All controllers in live mode**: `StuffArtefact` is only produced in dry-run. Live execution uses real content objects that serialize correctly.
+
+**Fix direction**: Either make `StuffArtefact` serializable (implement `__json__` or convert to Pydantic), or strip non-serializable objects from working memory before passing to internal sub-workflows.
+
+---
+
+## File Reference
+
+| Component | File |
+|-----------|------|
+| LibraryCrate model | `pipelex/libraries/library_crate.py` |
+| LibraryCrate factory | `pipelex/libraries/library_crate_factory.py` |
+| PipeJob (crate + raw WM fields) | `pipelex/pipe_run/pipe_job.py` |
+| PipeOutput (raw WM for deferred hydration) | `pipelex/core/pipes/pipe_output.py` |
+| PipeRouterTop (submitter-side dispatch) | `pipelex/temporal/tprl_pipe/pipe_router_top.py` |
+| PipeRouterChild (worker-side child dispatch) | `pipelex/temporal/tprl_pipe/pipe_router_child.py` |
+| WfPipeRouter (workflow entry point) | `pipelex/temporal/tprl_pipe/wf_pipe_router.py` |
+| Deferred hydration (worker-side) | `pipelex/temporal/tprl_pipe/hydration.py` |
+| Submitter-side rehydration | `pipelex/temporal/tprl_pipe/submitter_hydration.py` |
+| Activity-side delivery rendering (typed/raw dual path) | `pipelex/pipe_run/delivery_executor.py` |
+| WorkingMemory dehydration helper | `pipelex/core/memory/working_memory.py` (`dump_for_temporal`) |
+| Kajson data converter | `pipelex/temporal/temporal_data_converter.py` |
+| Hub (ClassRegistry + Library scoping) | `pipelex/hub.py` |
+| Library (PrivateAttr ClassRegistry) | `pipelex/libraries/library.py` |
+| Worker CLI | `pipelex/temporal/worker_cli.py` |
+| Temporal task manager | `pipelex/temporal/temporal_task_manager.py` |
+
+
+## Distributed Content Generation
+
+# Distributed Content Generation
+
+This page covers the serialization mechanisms that enable content generation (LLM structured output, image generation, PDF extraction) to run across Temporal worker processes. For the broader Temporal architecture — LibraryCrate propagation, deferred hydration, per-workflow scoping — see [Temporal Integration](./temporal-integration.md).
+
+---
+
+## The Two Serialization Challenges
+
+Content generation introduces two cross-cutting problems that don't exist in single-process mode:
+
+| Challenge | Trigger | Root cause | Solution |
+|-----------|---------|------------|----------|
+| **Dynamic class propagation** | LLM structured output (`PipeLLM` with object concept) | Submitter creates a Pydantic model at runtime from `.mthds` concept definitions; the worker process has no such class | Embed JSON schema in assignment, reconstruct class on worker, carry source code through Temporal payload metadata |
+| **Large payload management** | Image generation (`PipeImgGen`), PDF extraction (`PipeExtract`) | Binary data (base64 images, rendered pages) exceeds Temporal's ~2MB payload limit | Activities store binary data to external storage, return lightweight URI references |
+
+---
+
+## Dynamic Class Propagation
+
+### Schema embedding
+
+When a pipe produces structured output, the caller captures the Pydantic model's JSON schema into the assignment — a serializable Temporal argument that carries everything the worker needs:
+
+```python
+class ObjectAssignment(BaseModel):
+    object_class_name: str
+    object_class_schema: dict[str, Any]
+    llm_assignment_for_object: LLMAssignment
+
+    @staticmethod
+    def make_for_class(
+        object_class: type[BaseModel],
+        llm_assignment: LLMAssignment,
+    ) -> "ObjectAssignment":
+        return ObjectAssignment(
+            object_class_name=object_class.__name__,
+            object_class_schema=object_class.model_json_schema(),
+            llm_assignment_for_object=llm_assignment,
+        )
+```
+
+The schema is a plain `dict` — fully serializable, visible in the Temporal dashboard, and self-contained. No class reference crosses the process boundary.
+
+### Schema-to-model reconstruction
+
+On the worker, `model_class_from_json_schema()` rebuilds a live Pydantic class from the embedded schema:
+
+```python
+source_code = _generate_source_from_schema(schema)        # datamodel-code-generator
+reconstructed_class = _exec_and_extract_class(source_code, class_name)  # exec()
+reconstructed_class.__kajson_class_source__ = source_code  # attached for downstream use
+```
+
+The reconstruction pipeline:
+
+1. **Generate** — `datamodel-code-generator` converts the JSON schema into Python source code defining a `BaseModel` subclass.
+2. **Execute** — `exec()` compiles the source in an isolated namespace and extracts the named class.
+3. **Cache** — A thread-safe SHA-256 hash cache (with double-check locking) avoids redundant generation for the same schema.
+4. **Tag** — The generated source code is attached as `__kajson_class_source__` on the class, enabling Kajson to carry it through Temporal payloads.
+
+!!! warning "Class name normalization"
+    `datamodel-code-generator` normalizes schema titles to PascalCase (e.g., `dynamic_concept_test__Greeting` becomes `DynamicConceptTestGreeting`). The code tries both the original and normalized names. If neither matches, it raises `ValueError` listing the available classes.
+
+### Source code injection into Temporal payloads
+
+When the activity returns a `BaseModel` whose class has `__kajson_class_source__`, the custom `BaseModelPayloadConverter` injects it into the Temporal payload metadata:
+
+**Serialization** (`to_payload`):
+
+```python
+class_source = getattr(type(value), "__kajson_class_source__", None)
+if class_source is not None:
+    metadata["kajson_class_source"] = class_source.encode()
+```
+
+**Deserialization** (`from_payload`):
+
+```python
+source_bytes = payload.metadata.get("kajson_class_source")
+class_source_code = source_bytes.decode() if source_bytes else None
+pydantic_gizmo = kajson.loads(
+    data,
+    class_registry=get_class_registry(),
+    class_source_code=class_source_code,
+)
+# Re-attach source so it survives further Temporal hops
+if class_source_code is not None:
+    if isinstance(pydantic_gizmo, BaseModel):
+        type(pydantic_gizmo).__kajson_class_source__ = class_source_code
+    elif isinstance(pydantic_gizmo, list):
+        for item in pydantic_gizmo:
+            if isinstance(item, BaseModel):
+                type(item).__kajson_class_source__ = class_source_code
+```
+
+The source code rides in Temporal metadata (not the payload data itself), keeping the JSON payload clean and the class reconstruction transparent. After `kajson.loads()` reconstructs the object, the converter re-attaches `__kajson_class_source__` to the deserialized class — this ensures the source survives if the object crosses another Temporal boundary (e.g. workflow returning a result to a parent activity that forwards it elsewhere).
+
+### The type bridge
+
+The class reconstructed on the worker is a structural match to the original, but it is a different Python class in memory. Standard `isinstance()` checks would fail. The caller bridges this gap with a `model_validate` round-trip:
+
+```python
+raw_obj = await llm_gen_object(object_assignment=object_assignment)
+return object_class.model_validate(raw_obj.model_dump(serialize_as_any=True))
+```
+
+`model_dump(serialize_as_any=True)` produces a plain dict from the reconstructed object, and `model_validate()` rebuilds it as a proper instance of the original class. This restores type safety for downstream code.
+
+### End-to-end flow
+
+```mermaid
+sequenceDiagram
+    participant S as Submitter
+    participant W as Worker Activity
+    participant LLM as LLM Provider
+
+    S->>S: object_class.model_json_schema()
+    S->>W: ObjectAssignment (class_name + schema)
+
+    Note over W: model_class_from_json_schema()
+    W->>W: datamodel-code-generator → source
+    W->>W: exec() → class + __kajson_class_source__
+
+    W->>LLM: gen_object(schema=reconstructed_class)
+    LLM-->>W: structured JSON
+
+    W-->>S: BaseModel result<br/>(metadata: kajson_class_source)
+
+    Note over S: kajson.loads(class_source_code=...)
+    S->>S: model_validate() → original type
+```
+
+---
+
+## Large Payload Management
+
+### The payload size constraint
+
+Temporal payloads have a practical limit around 2MB. A single generated image can exceed this in base64 encoding. PDF extraction produces multiple page images. Sending raw binary through Temporal would either fail with a `DataConverterError` or severely degrade workflow history performance.
+
+### The store-then-reference pattern
+
+Activities handle the full binary lifecycle internally — generate, store, return a lightweight reference:
+
+```python
+@activity.defn
+async def act_img_gen_images(img_gen_assignment: ImgGenAssignment) -> list[ImageContent]:
+    """Generate images and store them, returning lightweight ImageContent references.
+
+    Large binary data (base64/bytes) is stored within the activity and never crosses
+    the Temporal workflow boundary — only URLs are returned.
+    """
+    storage_provider = get_storage_provider()
+    generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
+    return await img_gen_image_list_and_store(
+        img_gen_assignment=img_gen_assignment,
+        generated_content_factory=generated_content_factory,
+    )
+```
+
+`GeneratedContentFactory` uploads binary data via the configured `StorageProviderAbstract` (S3, local filesystem, etc.) and returns `ImageContent` or `PageContent` — Pydantic models carrying URIs, MIME types, and metadata, but never raw bytes.
+
+!!! info "What crosses the boundary"
+    `ImageContent` carries `url` (storage URI), `public_url`, `mime_type`, `size`, `caption` — but never raw bytes. The `url` can be an S3 URI, HTTP URL, or local file path depending on storage configuration.
+
+### Content type scenarios
+
+| Content type | Activity | What gets stored | What crosses the Temporal boundary |
+|-------------|----------|-----------------|-----------------------------------|
+| Generated image | `act_img_gen_images` | Base64/bytes → S3 via `GeneratedContentFactory` | `list[ImageContent]` with URIs |
+| Extracted pages | `act_extract_gen_extract_pages` | Extracted page images → S3 | `list[PageContent]` with URI references |
+| Rendered page views | `act_render_page_views` | PDF page renders → S3 | `list[ImageContent]` with URIs |
+| LLM text | `act_llm_gen_text` | Nothing stored (text is small) | Plain `str` |
+| LLM object | `act_llm_gen_object` | Nothing stored (JSON is small) | `BaseModel` + `__kajson_class_source__` in metadata |
+
+---
+
+## Kajson Class Resolution
+
+When `kajson.loads()` receives both a `class_registry` and `class_source_code`, the resolution follows a priority chain:
+
+```python
+if class_source_code is not None:
+    source_registry = _build_registry_from_source(class_source_code)
+    if class_registry is not None:
+        # Source-derived classes fill gaps; explicit registry takes priority
+        for name, cls in source_registry.root.items():
+            if not class_registry.has_class(name):
+                class_registry.register_class(cls, name=name, ...)
+    else:
+        class_registry = source_registry
+```
+
+Resolution order:
+
+1. **Explicit `class_registry`** — the per-workflow scoped registry (see [Temporal Integration](./temporal-integration.md#per-workflow-scoping))
+2. **Source-derived classes** — from `class_source_code`, filling gaps in the explicit registry
+3. **`sys.modules`** — already-imported classes
+4. **Dynamic import** — last resort, importing the module path from `__module__` metadata
+
+!!! note "exec() safety"
+    `_build_registry_from_source()` uses `exec()` internally. The source code originates from `datamodel-code-generator` running against the same JSON schema the submitter used — it is never user-supplied arbitrary code.
+
+---
+
+## File Reference
+
+| Component | File |
+|-----------|------|
+| Assignment models (schema embedding) | `pipelex/cogt/content_generation/assignment_models.py` |
+| Schema-to-model reconstruction | `pipelex/cogt/content_generation/schema_to_model.py` |
+| Content generator (type bridge) | `pipelex/cogt/content_generation/content_generator.py` |
+| LLM generation functions | `pipelex/cogt/content_generation/llm_generate.py` |
+| Generated content factory (storage) | `pipelex/cogt/content_generation/generated_content_factory.py` |
+| Temporal data converter | `pipelex/temporal/temporal_data_converter.py` |
+| Image generation activity | `pipelex/temporal/tprl_content_generation/act_img_gen_generate.py` |
+| Extract activity | `pipelex/temporal/tprl_content_generation/act_extract_generate.py` |
+| Page view rendering activity | `pipelex/temporal/tprl_content_generation/act_render_page_views.py` |
+| Kajson serialization | `kajson` (external PyPI package) |
+| ImageContent model | `pipelex/core/stuffs/image_content.py` |
+| PageContent model | `pipelex/core/stuffs/page_content.py` |
+
+---
+
+## Next Steps
+
+- [Temporal Integration](./temporal-integration.md) — LibraryCrate propagation, deferred hydration, per-workflow scoping
+- [Pipe Routing & Execution](./pipe-routing-and-execution.md) — how PipeJobs travel through the system
+- [Architecture Overview](./architecture-overview.md) — the two-layer design and how components fit together
 
 
 # Project
