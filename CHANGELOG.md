@@ -4,7 +4,7 @@
 
 ### Changed
 
-- **Live-run graph output**: `pipelex run` now emits the assembled `GraphSpec` as `live_run_graph.json` alongside `live_run.json` and the ReactFlow HTML, so live runs produce the same machine-readable graph artifact as dry runs.
+- **Live-run graph output**: `pipelex-agent run` now emits the assembled `GraphSpec` as `live_run_graph.json` alongside `live_run.json` and the ReactFlow HTML.
 
 ## [v0.26.0] - 2026-05-04
 
