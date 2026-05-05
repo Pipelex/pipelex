@@ -114,7 +114,7 @@ async def run_pipeline_core(
                 ),
                 "graphs_inclusion": graph_config.graphs_inclusion.model_copy(
                     update={
-                        "graphspec_json": False,
+                        "graphspec_json": True,
                         "mermaidflow_html": False,
                         "reactflow_html": True,
                     }
@@ -137,6 +137,13 @@ async def run_pipeline_core(
             final_path = reactflow_path.parent / graph_filename
             shutil.move(str(reactflow_path), str(final_path))
             side_effects["graph_files"] = {"graph_html": str(final_path)}
+
+        # On live runs only, rename graphspec.json to live_run_graph.json
+        graphspec_path = saved_files.get("graphspec_json")
+        if graphspec_path and not dry_run:
+            final_graphspec_path = graphspec_path.parent / "live_run_graph.json"
+            shutil.move(str(graphspec_path), str(final_graphspec_path))
+            side_effects.setdefault("graph_files", {})["graph_spec"] = str(final_graphspec_path)
 
     # Save output JSON (includes side-effect paths for on-disk reference)
     output_filename = "dry_run.json" if dry_run else "live_run.json"
