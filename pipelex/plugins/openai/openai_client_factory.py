@@ -41,8 +41,9 @@ class OpenAIClientFactory:
         # We have a workaround here:
         # OpenAI can be used without any API key (for instance when pointing to local Ollama) but the SDK,
         # as it is, raises if there is no API key (api_key is None and there is no env var).
-        # But it works fine with an empty string.
-        api_key = backend.api_key or ""
+        # Since openai>=2.34.0, an empty string is rejected too, so we pass a non-empty placeholder
+        # which the local server (Ollama, etc.) ignores.
+        api_key = backend.api_key or "unused-no-auth-needed"
 
         the_client: openai.AsyncOpenAI
         match sdk_variant:

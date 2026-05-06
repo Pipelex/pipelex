@@ -36,7 +36,10 @@ class GatewayResponsesFactory(OpenAIResponsesFactory):
 
         return openai.AsyncOpenAI(
             base_url=endpoint,
-            api_key="",
+            # Auth is handled via Portkey headers (x-portkey-api-key, x-portkey-config),
+            # not the OpenAI Authorization header. The SDK rejects an empty api_key since
+            # 2.34.0, so we pass a non-empty placeholder; the gateway ignores it.
+            api_key="unused-auth-via-portkey-headers",
             default_headers=createHeaders(
                 api_key=api_key,
                 debug=is_debug_enabled,
