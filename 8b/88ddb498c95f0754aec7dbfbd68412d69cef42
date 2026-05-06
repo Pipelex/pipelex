@@ -1,0 +1,48 @@
+pipelex/plugins/portkey/portkey_responses_factory.py
+  69642c985483bb82 39-42
+pyproject.toml
+  69642c985483bb82 3
+pipelex/plugins/gateway/gateway_completions_factory.py
+  69642c985483bb82 121-124
+pipelex/plugins/portkey/portkey_completions_factory.py
+  69642c985483bb82 112-115
+pipelex/plugins/openai/openai_client_factory.py
+  69642c985483bb82 44-46
+CHANGELOG.md
+  69642c985483bb82 3-8
+pipelex/plugins/gateway/gateway_responses_factory.py
+  69642c985483bb82 39-42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "8b88ddb498c95f0754aec7dbfbd68412d69cef42",
+  "prompts": {
+    "0c255f110e832e81": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "355b8b24-a82f-4c43-b9f2-c20de1387768",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 3,
+      "accepted_lines": 5,
+      "overriden_lines": 3
+    },
+    "69642c985483bb82": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7bd6b910-4d3f-481e-876c-a09026005020",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 36,
+      "total_deletions": 11,
+      "accepted_lines": 32,
+      "overriden_lines": 0
+    }
+  }
+}
