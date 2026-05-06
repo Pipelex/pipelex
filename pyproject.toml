@@ -31,7 +31,7 @@ dependencies = [
   "markdown>=3.6",
   "mthds>=0.3.0",
   "networkx>=3.4.2",
-  "openai>=1.108.1",
+  "openai>=1.108.1,<2.30.0",
   "opentelemetry-api",
   "opentelemetry-exporter-otlp-proto-http",
   "opentelemetry-semantic-conventions",
