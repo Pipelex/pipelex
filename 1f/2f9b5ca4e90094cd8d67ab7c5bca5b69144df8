@@ -1,0 +1,55 @@
+TODOS.md
+  s_f6a7aa40548ad0::t_421aa9b4b21115 173-178
+  s_bd2bcd103eec5c::t_17ba5c9ce40f96 6-11,14-41,43,45,47-48,50-57,59,63-79,83,87-99,102-108,111,114-118,129,131-132,134-135,137-154,156-172,179-184,188-235,239,241-247,251-272
+  s_294e098cf6553d::t_69c0b34259a57e 119
+tests/integration/pipelex/plugins/mistralai_workflows/test_data/bridge_test.mthds
+  s_bd2bcd103eec5c::t_8faefc01b331c9 4-10,23-32
+docs/under-the-hood/mistralai-workflows-recipes.md
+  s_bd2bcd103eec5c::t_6bf2fdc03b8794 54-109
+tests/integration/pipelex/plugins/mistralai_workflows/test_activities_offloaded.py
+  s_bd2bcd103eec5c::t_dd539fb1e761ad 59-60
+  s_bd2bcd103eec5c::t_7d88bf2246443d 1-58,61-117
+pipelex/plugins/mistralai_workflows/activities.py
+  s_bd2bcd103eec5c::t_52b987e8f65a8b 6-15,29,39-58,72-94
+tests/integration/pipelex/plugins/mistralai_workflows/test_bridge_direct.py
+  s_bd2bcd103eec5c::t_38043755ad04f4 86-118
+CHANGELOG.md
+  s_bd2bcd103eec5c::t_41de896c85a878 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "1f2f9b5ca4e90094cd8d67ab7c5bca5b69144df8",
+  "prompts": {},
+  "humans": {
+    "h_39660369d4ad8c": {
+      "author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  },
+  "sessions": {
+    "s_294e098cf6553d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "49435a4b-0351-4dc0-9f32-bb380ac05b5a",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    },
+    "s_bd2bcd103eec5c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "78887b8a-1fb3-4c0a-a828-225a51acd4d0",
+        "model": "unknown"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    },
+    "s_f6a7aa40548ad0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "50292df4-e694-42cc-a2b0-3ae4379ea3de",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  }
+}
