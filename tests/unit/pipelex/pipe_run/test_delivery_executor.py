@@ -251,6 +251,55 @@ class TestDeliveryExecutor:
         json_text = files["main_stuff.json"].data.decode("utf-8")
         assert "</pre><script>alert(1)</script><pre>" in json_text
 
+    async def test_generate_result_files_with_pydantic_instances_in_raw(self, mocker: MockerFixture) -> None:
+        """working_memory_raw can contain hydrated Pydantic instances after Temporal transit.
+
+        When `dump_for_temporal()` runs in a child workflow, it embeds `__class__` metadata
+        on ListContent items so the parent can reconstruct them. Kajson's Temporal data
+        converter then eagerly rehydrates those dicts back into BaseModel instances on the
+        activity worker that runs delivery — even though the typed slot is `dict[str, Any]`.
+
+        `clean_json_dumps()` does not know how to serialize a Pydantic BaseModel, so the
+        delivery activity blows up with `TypeError: Object of type PageContent is not JSON
+        serializable`. This test pins that scenario.
+        """
+        from pipelex.core.stuffs.image_content import ImageContent  # noqa: PLC0415
+        from pipelex.core.stuffs.page_content import PageContent  # noqa: PLC0415
+        from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent  # noqa: PLC0415
+        from pipelex.core.stuffs.text_content import TextContent  # noqa: PLC0415
+
+        page = PageContent(
+            text_and_images=TextAndImagesContent(
+                text=TextContent(text="Page 1 contents"),
+                images=[ImageContent(url="https://example.com/img.png")],
+            ),
+        )
+
+        mock_output = mocker.MagicMock()
+        mock_output.working_memory_raw = {
+            "root": {
+                "cv_pages": {
+                    "stuff_code": "cv_pages",
+                    "stuff_name": "cv_pages",
+                    "concept": {
+                        "code": "Page",
+                        "domain_code": "native",
+                        "description": "A page",
+                        "structure_class_name": "PageContent",
+                    },
+                    "content": [page],
+                }
+            },
+            "aliases": {},
+        }
+        mock_output.graph_spec = None
+
+        files = await DeliveryExecutor().generate_result_files(mock_output)
+
+        json_text = files["working_memory.json"].data.decode("utf-8")
+        assert "Page 1 contents" in json_text
+        assert "https://example.com/img.png" in json_text
+
     async def test_webhook_failure_raises(self, mocker: MockerFixture) -> None:
         import httpx  # noqa: PLC0415
 
