@@ -38,7 +38,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, ClassVar, Literal, cast
 
-from pydantic import BaseModel
+from pydantic import BaseModel, RootModel
 
 from pipelex.cogt.content_generation.exceptions import UnsafeSchemaError
 
@@ -260,6 +260,7 @@ class SchemaToModelFactory:
             and not name.startswith("_")
             and (issubclass(obj, BaseModel) or issubclass(obj, Enum))
             and obj is not BaseModel
+            and obj is not RootModel
             and obj is not Enum
         }
 
