@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.26.3] - 2026-05-06
+
+### Fixed
+
+- **OpenAI SDK 2.34.0 compatibility for Portkey/Gateway clients.** The new SDK adds both a constructor-time check (`_enforce_credentials`) and a request-time `_validate_headers` guard that reject an empty `api_key`. Pipelex's gateway and Portkey factories were passing `api_key=""` because auth is delivered via `x-portkey-api-key` and `x-portkey-config` headers, not the OpenAI `Authorization` header. Replaced the empty string with a non-empty placeholder (`"unused-auth-via-portkey-headers"`) in `gateway_completions_factory`, `gateway_responses_factory`, `portkey_completions_factory`, and `portkey_responses_factory`. Same fix applied to `openai_client_factory` for the no-auth case (e.g. local Ollama backends), where `backend.api_key` is intentionally unset. Bumps the `openai` requirement to `>=2.0.0`.
+
 ## [v0.26.2] - 2026-05-06
 
 ### Fixed
