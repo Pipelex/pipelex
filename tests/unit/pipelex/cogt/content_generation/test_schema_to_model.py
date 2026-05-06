@@ -81,8 +81,7 @@ class TestSchemaToModel:
         recommendation_field = result_class.model_fields["recommendation"]
         annotation = recommendation_field.annotation
         assert get_origin(annotation) is Literal, (
-            f"Expected the round-tripped 'recommendation' field annotation to be Literal[...], "
-            f"got {annotation!r}. Source:\n{source}"
+            f"Expected the round-tripped 'recommendation' field annotation to be Literal[...], got {annotation!r}. Source:\n{source}"
         )
         assert set(get_args(annotation)) == {
             "Strong Match",

@@ -1,4 +1,3 @@
-from enum import Enum
 from typing import cast
 
 import pytest
@@ -26,10 +25,10 @@ class TestEnumRoundTrip:
         self,
         payload_converter: BaseModelPayloadConverter,
     ):
-        """A class with an Enum field generated via SchemaToModelFactory must survive a
-        full payload round-trip. Exercises the receiver-side exec path that registers
-        Enum subclasses in the per-call scoped ClassRegistry — without it the
-        deserializer cannot resolve the dynamic enum class and the round-trip fails.
+        """A class with an enum-shaped field generated via SchemaToModelFactory must
+        survive a full payload round-trip. Exercises the receiver-side exec path that
+        rebuilds the dynamic class from `__kajson_class_source__` — without it the
+        deserializer cannot resolve the dynamic class and the round-trip fails.
         """
         schema = Pet.model_json_schema()
         dynamic_pet_cls = SchemaToModelFactory.make_from_json_schema(schema, "Pet")
@@ -46,12 +45,10 @@ class TestEnumRoundTrip:
 
         restored_class: type[BaseModel] = type(restored)
         assert restored_class.__name__ == "Pet"
-        assert restored.name == "Rex"  # type: ignore[attr-defined]
-        # datamodel-code-generator emits `class PetSpecies(Enum)` (not StrEnum), so the
-        # dynamic enum is a distinct class from the static PetSpecies above. Assert on
-        # class name + value instead of identity equality.
-        species_value: Enum = restored.species  # type: ignore[attr-defined]
-        assert isinstance(species_value, Enum)
-        assert type(species_value).__name__ == "PetSpecies"
-        assert species_value.value == "dog"
+        # datamodel-code-generator now emits enum-shaped `$defs` as
+        # `RootModel[Literal[...]]` (since `enum_field_as_literal=LiteralType.All` is
+        # set in `_generate_source_from_schema`), so `restored.species` is a
+        # `RootModel` wrapping the value, not a Python `Enum` instance. Assert on the
+        # serialized data — that is what actually crosses the Temporal payload boundary.
+        assert restored.model_dump() == {"name": "Rex", "species": "dog"}
         assert getattr(restored_class, "__kajson_class_source__", None)
