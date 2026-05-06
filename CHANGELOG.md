@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.26.2] - 2026-05-06
+
+### Fixed
+
+- **`choices` fields no longer fail validation with `'EnumName.MEMBER_NAME'` errors.** A concept declared with `choices = [...]` produces a `Literal[...]` field on the dynamic Pydantic class. That schema is round-tripped through `SchemaToModelFactory.make_from_json_schema` (used to rebuild dynamic models on Temporal workers and to feed structured-output schemas to LLM providers). Previously the round-trip silently re-emitted the field as a plain Python `Enum` class — e.g. `Literal["Strong Match", "Good Match", "Partial Match", "Poor Match"]` became `class Recommendation(Enum): Poor_Match = "Poor Match"; ...`. LLMs filling that schema then returned the enum's Python repr (`"Recommendation.Poor_Match"`) instead of the literal string (`"Poor Match"`), which failed Pydantic validation against the original choice set with errors like `Invalid choice errors: 'recommendation': got 'Recommendation.Poor_Match', expected one of 'Strong Match', 'Good Match', 'Partial Match' or 'Poor Match'`. `_generate_source_from_schema` now passes `enum_field_as_literal=LiteralType.All` to `datamodel-code-generator`, so `enum: [strings]` schema nodes round-trip as `Literal[...]` instead of being regenerated as `Enum` classes. `_exec_source_to_types` now also exposes `Literal` in the rebuild namespace so `model_rebuild` resolves the deferred annotations.
+
 ## [v0.26.0] - 2026-05-04
 
 ### Highlights
