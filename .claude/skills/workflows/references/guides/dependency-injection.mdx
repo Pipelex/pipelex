@@ -1,0 +1,185 @@
+---
+id: dependency-injection
+title: Dependency Injection
+sidebar_position: 6
+---
+
+# Dependency Injection in Workflows
+
+Dependency injection provides a clean way to access shared resources in your workflows and activities. It automatically handles the creation and management of resources like database connections, API clients, or configuration objects, so you don't have to manually create and pass these around in your code.
+
+## How It Works
+
+The system supports multiple ways to provide dependencies, allowing you to choose the approach that best fits your resource's requirements:
+
+1. **Synchronous functions** - Ideal for simple configuration values or in-memory objects
+2. **Asynchronous functions** - Perfect for I/O-bound dependencies like database connections
+3. **Context managers** - Best for resources that require cleanup operations
+4. **Generators** - Useful for streaming data or complex resource management
+
+When you declare a dependency in your activity or workflow, the system automatically provides that resource when needed, handling all the lifecycle management for you.
+
+### Dependency Lifecycle and Resource Sharing
+
+**Important**: All dependencies defined with `Depends()` are initialized once when the worker starts up and then shared across all activity executions. This means:
+
+- **Single Instance**: The same instance is reused for every activity call
+- **Resource Efficiency**: Reduces connection overhead and resource consumption
+- **Connection Pooling**: Database connections, API clients, and other resources are maintained and reused
+
+This approach is particularly beneficial for:
+
+- **Database connections**: Avoids creating new connections for each query
+- **API clients**: Maintains persistent connections and authentication
+- **Configuration objects**: Loads configuration once and shares it across all activities
+
+## Defining Dependencies
+
+### Synchronous Function Provider
+
+For simple configuration values or objects that don't require async initialization:
+
+```python
+def get_config() -> dict:
+    """Provides application configuration"""
+    return {
+        "timeout": 30,
+        "retries": 3,
+        "api_url": "https://api.example.com"
+    }
+```
+
+### Asynchronous Function Provider
+
+For dependencies that require async initialization, like database connections:
+
+```python
+async def get_db_connection() -> DatabaseConnection:
+    """Creates and returns a database connection"""
+    conn = await DatabaseConnection.create("postgres://user:pass@localhost/db")
+    return conn
+```
+
+### Context Manager Provider
+
+For resources that need proper cleanup, like sessions that require logout:
+
+```python
+from contextlib import contextmanager
+
+@contextmanager
+def get_logged_in_session():
+    """Provides a session with automatic login/logout"""
+    session = Session()
+    session.login()
+    try:
+        yield session
+    finally:
+        session.logout()
+```
+
+### Async Context Manager Provider
+
+For async resources that need cleanup, like database connections:
+
+```python
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def get_db_connection_with_cleanup():
+    """Provides a database connection with proper cleanup"""
+    conn = await DatabaseConnection.create("postgres://...")
+    try:
+        yield conn
+    finally:
+        await conn.close()
+```
+
+### Generator Provider
+
+For streaming data or complex resource management:
+
+```python
+def get_data_stream():
+    """Provides a stream of data"""
+    with open("data.txt") as f:
+        for line in f:
+            yield line.strip()
+```
+
+### Async Generator Provider
+
+For async streaming data sources:
+
+```python
+async def get_async_data_stream():
+    """Provides an async stream of data"""
+    async with aiofiles.open("data.txt") as f:
+        async for line in f:
+            yield line.strip()
+```
+
+## Using Dependencies in Activities
+
+Activities can declare their dependencies using the `Depends()` marker. The system will automatically provide these dependencies when the activity executes:
+
+```python
+import mistralai.workflows as workflows
+from mistralai.workflows import Depends
+
+@workflows.activity()
+async def create_user(
+    name: str,
+    db: DatabaseConnection = Depends(get_db_connection),
+    config: dict = Depends(get_config),
+    session: Session = Depends(get_logged_in_session)
+):
+    """Creates a new user with all required dependencies"""
+    timeout = config["timeout"]
+    db.query(
+        "INSERT INTO users (name) VALUES ($1)",
+        name
+    )
+    session.track_event("user_created", {"user_id": name})
+    return {"status": "success", "timeout_used": timeout}
+```
+
+## Common Use Cases
+
+### Database Connections
+
+A more complete database connection example with proper session management:
+
+```python
+async def get_db_connection():
+    """Provides a database connection with proper cleanup"""
+    engine = await create_db_engine("postgres://...")
+    SessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
+
+    @asynccontextmanager
+    async def get_session() -> AsyncIterator[AsyncSession]:
+        async with SessionLocal() as session:
+            try:
+                yield session
+            finally:
+                await session.close()
+
+    return get_session
+```
+
+### API Clients
+
+Example of a payment service client with initialization:
+
+```python
+async def get_payment_client() -> PaymentServiceClient:
+    """Creates and initializes a payment service client"""
+    client = PaymentServiceClient(api_key="your_key")
+    await client.initialize()
+    return client
+```
+
+## Next Steps
+
+- [Workflow Guide](workflows) - Learn more about workflow fundamentals
+- [Activity Guide](activities) - Understand how activities complement workflows

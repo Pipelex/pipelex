@@ -1,0 +1,202 @@
+---
+id: signals-queries-updates
+title: Signals, Queries & Updates
+sidebar_position: 4
+---
+
+# Signals, Queries & Updates: Workflow Communication Mechanisms
+
+These features enable interaction with running workflows from external systems.
+
+## Signals
+
+Signals allow external systems to send messages to running workflows.
+
+### Key Characteristics:
+
+- Asynchronous communication
+- Can be sent at any time during workflow execution
+- Workflows must explicitly handle signals
+- Can carry payload data
+
+### Basic Example
+
+```python
+import mistralai.workflows as workflows
+
+@workflows.workflow.define()
+class NotificationWorkflow:
+    def __init__(self):
+        self.notifications = []
+
+    @workflows.workflow.signal(name="add_notification")
+    async def add_notification(self, message: str, priority: int = 1):
+        self.notifications.append(message)
+        print(f"Received notification: {message} (Priority: {priority})")
+
+    @workflows.workflow.entrypoint
+    async def run(self):
+        print("Workflow started, waiting for notifications...")
+        while True:
+            await workflows.workflow.wait_condition(lambda: len(self.notifications) > 0)
+            print(f"Processing {len(self.notifications)} notifications")
+            self.notifications.clear()
+```
+
+## Queries
+
+Queries allow external systems to get the current state of a workflow.
+
+### Key Characteristics:
+
+- Synchronous communication
+- Read-only operations (should not modify workflow state)
+- Can be called at any time during workflow execution
+- Must return quickly (not for long-running operations)
+
+### Basic Example
+
+```python
+import mistralai.workflows as workflows
+
+@workflows.workflow.define()
+class ProcessingWorkflow:
+    def __init__(self):
+        self.progress = 0.0
+        self.completed = False
+
+    @workflows.workflow.query(name="get_status")
+    def get_status(self) -> dict:
+        return {
+            "progress": self.progress,
+            "completed": self.completed
+        }
+
+    @workflows.workflow.entrypoint
+    async def run(self):
+        # Simulate work
+        for i in range(1, 11):
+            self.progress = i * 10
+            await asyncio.sleep(1)
+        self.completed = True
+```
+
+## Updates
+
+Updates allow external systems to modify workflow state and get a response. Unlike signals, updates can return values and can also execute activities.
+
+### Key Characteristics:
+
+- Synchronous communication (with response)
+- Can modify workflow state
+- Can return values to the caller
+- Can execute activities
+- More structured than signals
+
+### Basic Example with Activity Execution
+
+```python
+import mistralai.workflows as workflows
+import asyncio
+
+## Activity definition
+@workflows.activity()
+async def process_update_data(data: str) -> str:
+    # Simulate processing
+    await asyncio.sleep(0.5)
+    return f"Processed: {data.upper()}"
+
+@workflows.workflow.define()
+class DataProcessingWorkflow:
+    def __init__(self):
+        self.current_value = "default"
+
+    @workflows.workflow.update(name="update_data")
+    async def update_data(self, new_value: str) -> dict:
+        # Execute an activity as part of the update
+        processed = await process_update_data(new_value)
+
+        # Update workflow state
+        old_value = self.current_value
+        self.current_value = processed
+
+        return {
+            "success": True,
+            "processed_value": processed,
+            "message": f"Updated from '{old_value}' to '{processed}'"
+        }
+
+    @workflows.workflow.entrypoint
+    async def run(self):
+        print(f"Workflow started with value: {self.current_value}")
+        # Workflow continues running...
+```
+
+## Comparison Table
+
+| Feature | Communication Type | Modifies State | Returns Value | Can Execute Activities |
+| ------- | ------------------ | -------------- | ------------- | ---------------------- |
+| Signal  | Asynchronous       | Yes            | No            | No                     |
+| Query   | Synchronous        | No             | Yes           | No                     |
+| Update  | Synchronous        | Yes            | Yes           | Yes                    |
+
+## Input Validation
+
+Signals, queries, and updates validate incoming payloads against their declared parameters. This ensures type safety and prevents unexpected data from reaching your handlers.
+
+### Automatic Schema Enforcement
+
+When you declare parameters with type annotations, the system automatically:
+
+- Validates incoming payloads match the expected types
+- **Rejects extra fields** not declared in the handler signature
+- Returns HTTP 422 (Unprocessable Entity) with descriptive error messages on validation failure
+
+```python
+@workflows.workflow.signal(name="add_notification")
+async def add_notification(self, message: str, priority: int = 1):
+    # Only 'message' and 'priority' fields are accepted
+    # Extra fields like {"message": "hi", "extra": "bad"} will be rejected
+    ...
+```
+
+### Using Pydantic Models for Complex Inputs
+
+For handlers with complex or nested input structures, define a Pydantic model:
+
+```python
+import pydantic
+
+class Address(pydantic.BaseModel):
+    street: str
+    city: str
+
+class UserProfile(pydantic.BaseModel):
+    name: str
+    address: Address
+
+@workflows.workflow.signal(name="update_profile")
+async def update_profile(self, profile: UserProfile) -> None:
+    self._profile = profile
+```
+
+When using Pydantic models, their configuration is preserved:
+
+- If you set `model_config = pydantic.ConfigDict(extra="allow")`, extra fields will be accepted
+- If you set `model_config = pydantic.ConfigDict(extra="forbid")`, extra fields are rejected (this is the default behavior for auto-generated schemas)
+
+### Validation Error Responses
+
+When validation fails, the API returns HTTP 422 with details about what went wrong:
+
+```json
+{
+  "detail": "Invalid input: Additional properties are not allowed ('unexpected_field' was unexpected)"
+}
+```
+
+## Next Steps
+
+- [Workflow Guide](workflows) - Learn more about workflow fundamentals
+- [Activity Guide](activities) - Understand how activities complement workflows
+- [Observability Guide](observability) - Monitor your workflow interactions

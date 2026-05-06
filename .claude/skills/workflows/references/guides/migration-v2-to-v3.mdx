@@ -1,0 +1,213 @@
+# Migrating from v2.0 to v3.0
+
+## Package Namespace Migration
+
+The SDK package namespace has changed from `mistralai_workflows` to `mistralai.workflows`. Update all imports:
+
+```python
+# ❌ OLD
+from mistralai_workflows import workflow, activity, run_worker
+from mistralai_workflows.task import task
+
+# ✅ NEW
+from mistralai.workflows import workflow, activity, run_worker
+from mistralai.workflows.task import task
+```
+
+This applies to all submodules (plugins, models, core, etc.).
+
+## Removed Deprecated APIs
+
+The following deprecated APIs have been removed. Code using them will fail at import or runtime.
+
+| Removed | Replacement |
+|---------|-------------|
+| `@activity(activity_name="...")` | `@activity(name="...")` |
+| `@activity(display_name="...")` | Remove (no replacement) |
+| `@activity(_extends=...)` | Remove (singledispatch extension mechanism removed) |
+| `@workflow.define(workflow_name="...")` | `@workflow.define(name="...")` (`name` is now a required positional argument) |
+| `record_event()` | Use the `task` context manager from `mistralai.workflows.task` |
+| `record_event_progress()` | Use the `task` context manager |
+| `record_event_progress_function()` | Use the `task` context manager |
+
+### `@workflow.define` — `name` is now required
+
+```python
+# ❌ OLD
+@workflow.define(workflow_name="my-workflow")
+
+# ❌ ALSO BROKEN (name was optional before)
+@workflow.define()
+
+# ✅ NEW
+@workflow.define("my-workflow")
+# or
+@workflow.define(name="my-workflow")
+```
+
+## Default Execution Timeout
+
+Workflow executions now have a **default timeout of 1 hour**. Previously there was no default, which could cause infinite retries when no workers were active.
+
+If your workflows run longer than 1 hour, set an explicit timeout:
+
+```python
+@workflow.define("my-long-workflow", execution_timeout=timedelta(hours=4))
+```
+
+This also applies to child workflows:
+
+```python
+await execute_workflow(MyChildWorkflow, params, execution_timeout=timedelta(hours=2))
+```
+
+## Determinism Enforcement Enabled by Default
+
+The Temporal sandbox is now enabled by default to catch non-deterministic workflow code (e.g., using `datetime.now()`, `random`, or unrestricted imports in workflow methods).
+
+If your workflows are not yet determinism-safe, you can disable enforcement:
+
+**Per-workflow:**
+```python
+@workflow.define("my-workflow", enforce_determinism=False)
+```
+
+**Globally (environment variable):**
+```bash
+DEFAULT_ENFORCE_DETERMINISM=0
+```
+
+For workflows that need to opt out of the sandbox for specific imports, use the re-exported Temporal utilities on `workflow.unsafe`:
+```python
+from mistralai.workflows import workflow
+
+with workflow.unsafe.imports_passed_through():
+    import some_non_deterministic_module
+```
+
+## Child Workflow `execution_timeout` Fix
+
+The `execution_timeout` parameter on `execute_workflow()` was previously incorrectly passed as `task_timeout` to Temporal, meaning it limited a single task rather than the full execution. This is now fixed — `execution_timeout` controls the total execution time including retries and continue-as-new.
+
+**Action required:** If you were relying on the old (incorrect) behavior where `execution_timeout` acted as a per-task timeout, adjust your timeout values accordingly.
+
+## `WorkflowVersion` Renamed to `WorkflowRegistration`
+
+The `WorkflowVersion` model has been renamed to `WorkflowRegistration` across the SDK. The server accepts both old and new field names during a transition period, but SDK code should be updated:
+
+| v2 | v3 |
+|----|-----|
+| `WorkflowVersion` | `WorkflowRegistration` |
+| `workflow_version_id` | `workflow_registration_id` |
+| `workflow_version_ids` | `workflow_registration_ids` |
+
+## Deployment-Based Task Queue Routing
+
+Workers now use `DEPLOYMENT_NAME` as the Temporal task queue name. The old `TEMPORAL_TASK_QUEUE` environment variable is kept for backwards compatibility but raises an error if it conflicts with `DEPLOYMENT_NAME`.
+
+**Versioned workers** (with `deployment_name` and `build_id`) are forbidden from using the `default` task queue to prevent Temporal versioning conflicts.
+
+---
+
+
+## `WorkflowsClient` Removed
+
+`WorkflowsClient` has been removed entirely. All workflow operations now go through the Mistral SDK client (`mistral_client`).
+
+### Creating a client
+
+```python
+# ❌ OLD
+from mistralai.workflows import WorkflowsClient
+
+client = WorkflowsClient(
+    base_url="https://api.mistral.ai",
+    api_version="v1",
+    api_key="your-key",
+)
+
+# ✅ NEW
+from mistralai.workflows.client import get_mistral_client
+
+mistral_client = get_mistral_client()
+```
+
+### Executing a workflow
+
+```python
+# ❌ OLD
+async with WorkflowsClient(base_url=..., api_key=...) as client:
+    await client.execute_workflow(
+        workflow_identifier="my-workflow",
+        input_data=params,
+        execution_id=exec_id,
+        task_queue=task_queue,
+    )
+
+# ✅ NEW
+mistral_client = get_mistral_client()
+await mistral_client.workflows.execute_workflow_async(
+    workflow_identifier="my-workflow",
+    input=params.model_dump(mode="json"),
+    execution_id=exec_id,
+    task_queue=task_queue,
+)
+```
+
+### Waiting for workflow completion
+
+```python
+# ❌ OLD
+result = await client.execute_workflow_and_wait(
+    workflow_identifier="my-workflow",
+    input_data=params,
+)
+
+# ✅ NEW
+result = await mistral_client.workflows.execute_workflow_and_wait_async(
+    workflow_identifier="my-workflow",
+    input=params.model_dump(mode="json"),
+)
+```
+
+### Scheduling a workflow
+
+```python
+# ❌ OLD
+await client.schedule_workflow(
+    schedule=schedule_def,
+    workflow_identifier="my-workflow",
+)
+
+# ✅ NEW
+await mistral_client.workflows.schedule_workflow_async(
+    schedule=schedule_def.model_dump(mode="json"),
+    workflow_identifier="my-workflow",
+)
+```
+
+### Streaming workflow events
+
+```python
+# ❌ OLD
+async for event in client.stream_events(execution_id=exec_id):
+    ...
+
+# ✅ NEW
+from mistralai.workflows.client import stream_workflow_events
+
+async for event in stream_workflow_events(mistral_client, execution_id=exec_id):
+    ...
+```
+
+### Import changes
+
+| v2 | v3 |
+|----|-----|
+| `from mistralai.workflows import WorkflowsClient` | `from mistralai.workflows.client import get_mistral_client` |
+| `WorkflowsClient(base_url=..., api_key=...)` | `get_mistral_client(server_url=..., api_key=...)` |
+| `client.execute_workflow(...)` | `mistral_client.workflows.execute_workflow_async(...)` |
+| `client.execute_workflow_and_wait(...)` | `mistral_client.workflows.execute_workflow_and_wait_async(...)` |
+| `client.schedule_workflow(...)` | `mistral_client.workflows.schedule_workflow_async(...)` |
+| `client.stream_events(...)` | `stream_workflow_events(mistral_client, ...)` |
+

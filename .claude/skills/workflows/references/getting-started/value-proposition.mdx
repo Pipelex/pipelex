@@ -1,0 +1,333 @@
+---
+id: value-proposition
+title: "Value Proposition: Why Mistral Workflows?"
+sidebar_position: 2
+---
+
+# Mistral Workflows: Value Proposition
+
+Mistral Workflows (SDK + control plane) is our orchestration platform for building production grade AI workflows. It combines the reliability of Temporal with a developer-friendly Python SDK and native Mistral AI integrations.
+
+---
+
+## Why We Built This (vs. Using Raw Temporal)
+
+Temporal is excellent infrastructure. We extend it with AI-specific features:
+
+| What Temporal Provides | What We Add |
+|------------------------|-------------|
+| Verbose SDK patterns | **Simpler DX**: direct activity calls, config on decorators, auto-schemas |
+| No LLM-specific features | Native Mistral AI plugin (Agents, Tools, Sessions) |
+| **No streaming** | **NATS-backed real-time event/token streaming** |
+| Temporal UI (cluster-level view) | Native integration with AI Studio + Le Chat |
+| No chat/interaction primitives | Primitives for building interactive chat experiences |
+| No builtin interactivity | **HITL (Human-in-the-Loop)** interactive workflows with `wait_for_input()` |
+| Basic tracing support | Pre-configured OpenTelemetry + Tempo + Grafana |
+| Manual worker registration | Auto-registration with Workflows control plane |
+| Temporal gRPC API | **Higher-level REST API** for workflows, executions, events, schedules |
+| Manual namespace management | **Automatic namespace isolation** per org+workspace (`{org_id}:{workspace_id}`) |
+
+---
+
+## Core Temporal Features We Leverage
+
+Temporal provides battle-tested distributed systems primitives:
+
+- **Fault Tolerance**: Workflows survive process crashes, network failures, infrastructure outages
+- **Exactly-Once Execution**: Activities execute exactly once despite retries
+- **Durability**: Full execution history persisted; workflows can run for months
+- **Deterministic Replay**: Workflow state reconstructed from event history
+- **Automatic Retries**: Configurable retry policies with exponential backoff
+- **Signals & Queries**: External interaction with running workflows
+- **Child Workflows**: Compose complex workflows from smaller units
+- **Schedules**: Cron-like scheduled executions
+
+---
+
+## Simpler Developer Experience
+
+Our SDK reduces boilerplate while adding capabilities. Here's why it's simpler:
+
+### 1. Direct Activity Calls
+
+**Raw Temporal:** Every activity call requires `execute_activity()` with explicit timeout/retry:
+```python
+result = await workflow.execute_activity(
+    my_activity, name,
+    start_to_close_timeout=timedelta(minutes=5),
+    retry_policy=RetryPolicy(maximum_attempts=3),
+)
+```
+
+**Our SDK:** Call activities directly — config lives on the decorator:
+```python
+@workflows.activity(start_to_close_timeout=timedelta(minutes=5), retry_policy_max_attempts=3)
+async def my_activity(name: str) -> str: ...
+
+## In workflow:
+result = await my_activity(name)  # Just call it
+```
+
+### 2. Configuration on Decorators
+
+| Raw Temporal | Our SDK |
+|--------------|---------|
+| `@activity.defn` (no config) | `@activity(timeout=..., retry=..., rate_limit=..., display_name=...)` |
+| `@workflow.defn` (no config) | `@workflow.define(name=..., display_name=..., description=...)` |
+| Config at every call site | Config once on the decorator |
+
+### 3. Auto-Generated Schemas
+
+| Raw Temporal | Our SDK |
+|--------------|---------|
+| No schema export | **Auto-generates JSON schemas** from signatures |
+| Manual UI integration | Schemas registered → AI Studio input forms |
+
+### 4. Built-in Dependency Injection
+
+```python
+@workflows.activity()
+async def my_activity(
+    db: Database = Depends(get_database),      # Injected
+    client: MistralClient = Depends(get_client) # Injected
+) -> Result: ...
+```
+
+📖 **Full comparison:** See code examples in [Workflows Guide](../guides/workflows) and [Activities Guide](../guides/activities)
+
+---
+
+## Complete Feature List (What We Add on Top of Temporal)
+
+### 1. Real-Time Streaming
+
+Temporal workflows return results only when complete—no way to stream intermediate outputs.
+
+- Token-by-token LLM output in AI Studio and Le Chat
+- Progress updates via observable tasks
+- 15-minute message persistence with replay
+- NATS JetStream → Abraxas SSE → Client
+
+📖 **Docs:** [Streaming Guide](../guides/streaming) | [Streaming Architecture](../appendices/streaming)
+
+### 2. Dependency Injection
+
+FastAPI-style `Depends()` pattern for activities:
+- Sync/async functions, context managers, generators
+- Single instance per worker (shared across executions)
+- Automatic lifecycle management
+
+📖 **Docs:** [Dependency Injection Guide](../guides/dependency-injection)
+
+### 3. Distributed Rate Limiting
+
+- Rate limits shared across **all workers** in the workspace
+- Per-activity or shared via `key` parameter
+- Prevents API quota exhaustion
+
+📖 **Docs:** [Rate Limiting Guide](../guides/rate-limiting)
+
+### 4. Concurrency Framework
+
+`execute_activities_in_parallel()` with 3 patterns:
+- **List Executor**: Known collection of items
+- **Chain Executor**: Token-based pagination (S3, DynamoDB)
+- **Offset Pagination**: Index-based pagination
+
+Includes automatic continue-as-new for large datasets.
+
+📖 **Docs:** [Concurrency Guide](../guides/concurrency)
+
+### 5. Large Payload Handling
+
+Temporal has a 2MB limit and supports custom codecs for encryption. We add:
+- **Built-in Payload Offloading**: Auto-offload to S3/GCS/Azure (Temporal requires third-party solutions)
+- **Offloadable Fields**: Per-field offloading in activities
+- **Pre-configured Encryption**: AES-GCM + key rotation out of the box
+
+📖 **Docs:** [Handling Large Data](../guides/handling-large-data) | [Payload Encoding](../appendices/payload-encoding)
+
+### 6. Observability / Task System
+
+- Observable `task()` context manager with state updates
+- Automatic lifecycle events (started, completed, failed)
+- OpenTelemetry tracing across workflows and activities
+- Tempo integration for distributed trace queries
+- Prometheus metrics + Grafana dashboards
+
+📖 **Docs:** [Observability Guide](../guides/observability) | [Streaming Guide](../guides/streaming)
+
+### 7. UI Metadata & Discovery
+
+- `workflow_display_name`, `workflow_description` for AI Studio
+- Auto-generated JSON schemas → UI input forms
+- `available_in_chat_assistant` flag for Le Chat
+
+📖 **Docs:** [Workflows Guide](../guides/workflows)
+
+### 8. Durable Agents (Mistral Plugin)
+
+LLM agents with Temporal's durability guarantees:
+- Activities as agent tools
+- Multi-agent handoffs
+- MCP support (stdio/SSE)
+- Built-in tools: WebSearch, CodeInterpreter, ImageGeneration, DocumentLibrary
+
+📖 **Docs:** [Durable Agents Guide](../guides/durable-agents)
+
+### 9. HITL (Human-in-the-Loop) Interactive Workflows
+
+Temporal workflows run autonomously with no built-in support for human interaction. We add **interactive workflow primitives** for pausing workflows and collecting human input:
+
+**Core Capability:**
+- **`InteractiveWorkflow` base class**: Workflows that can pause and resume based on human input
+- **`wait_for_input()`**: Pause workflow execution until user provides input
+- **Durability guarantee**: Workflows survive crashes while waiting for input (full Temporal durability)
+
+📖 **Docs:** [Conversational Workflows Guide](../guides/assist-workflows)
+
+### 10. Local Execution Mode
+
+Temporal has a test environment, but requires spinning up a test server. We add:
+- Run workflows/activities as plain Python functions (no server)
+- Automatic retries via tenacity
+- Dependency injection works locally
+- **Limitations**: No durability, streaming, or human-in-the-loop
+
+📖 **Docs:** [Local Execution Guide](../guides/local-execution)
+
+### 11. Simplified Worker Versioning (Experimental)
+
+Temporal has worker versioning with PINNED behavior. We simplify it:
+- Auto-registration as current version on startup
+- No manual version management required
+- Temporal Worker Controller integration for Kubernetes
+
+📖 **Docs:** [Worker Versioning](../appendices/worker-versioning)
+
+### 12. Simplified Sticky Sessions
+
+Temporal has Sessions for activity affinity. We simplify the API:
+- Single decorator flag: `sticky_to_worker=True`
+- No manual session management
+- Works with dependency injection for state reuse
+
+📖 **Docs:** [Activities Guide](../guides/activities#sticky-worker-sessions)
+
+### 13. Simplified Worker Setup
+
+- Single `run_worker()` call
+- Auto-discovery of decorated activities
+- Auto-registration with control plane
+
+📖 **Docs:** [Your First Workflow](./your-first-workflow)
+
+### 14. Higher-Level REST API
+
+| Endpoint | Purpose |
+|----------|---------|
+| `/v1/workflows` | Lifecycle management, registry |
+| `/v1/executions` | Monitoring, control, history |
+| `/v1/events` | Event querying, SSE streaming |
+| `/v1/schedules` | Cron and one-time schedules |
+| `/v1/workers` | Worker capability discovery |
+
+### 15. Namespace Isolation
+
+Multi-tenant isolation built on Temporal namespaces:
+
+- **Namespace Format**: `{customer_id}:{workspace_id}` — Each org+workspace combination gets a dedicated Temporal namespace
+- **Complete isolation**: Workflows, activities, schedules, and workers are isolated per namespace
+- **Automatic resolution**: SDK and API automatically resolve namespace from authenticated context
+- **Access control**: Namespace-level authentication and authorization via Kong/Albe
+- **Independent scaling**: Each namespace can scale workers independently
+- **Shared workflows**: Special handling for workflows owned by reserved namespaces that can be called across workspaces
+- **Easy management**: Create and manage organizations and workspaces directly from AI Studio
+
+This enables:
+- **SaaS multi-tenancy**: Complete isolation between organizations and their workspaces
+- **Team/project isolation**: Different workspaces within the same organization are isolated
+- **Cross-workspace sharing**: Opt-in shared workflows for common utilities
+
+### 16. AI Studio Integration
+
+- Timeline visualization with zoom/pan
+- Input forms from Pydantic schemas
+- Live execution status, signal sending
+
+### 17. Conversational Workflows and Le Chat integration
+
+Native integration with Le Chat (Mistral's chat interface):
+
+**Workflow Invocation:**
+- Workflows appear as callable assistants in Le Chat
+- LLM can invoke workflows as tools during conversations
+- Automatic parameter validation from workflow schemas
+
+**Available Inputs:**
+- **`ChatInput`**: Free-form conversational input for approvals, decisions, or feedback
+- **`FormInput`**: Structured forms with typed fields and validation
+  - `TextField` (with regex validation), `NumberField` (min/max constraints)
+  - `DateTimeField`, `SingleChoice` (dropdown/select)
+  - Custom UI rendering in Le Chat
+
+**Rich Outputs:**
+- **`TodoList`**: Real-time progress tracking with step-by-step status updates
+  - Three states: `todo`, `in_progress`, `done`
+  - Context manager support for automatic status transitions
+- **Canvas outputs**: Rich content rendering
+  - Markdown, code with syntax highlighting, mermaid diagrams
+  - SVG, HTML, React components, presentation slides
+- **Streaming agent responses**: Token-by-token LLM output streamed in real-time via tRPC
+
+📖 **Docs:** [Conversational Workflows Guide](../guides/assist-workflows)
+
+---
+
+## Coming Soon
+
+Check the Milestones page for our roadmap:
+https://www.notion.so/mistralai/Workflows-Milestones-2996ba59a7fe80719b9dd731ecbd380e?source=copy_link
+
+---
+
+## Architecture at a Glance
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                          Clients                                 │
+│   MistralClient (SDK)    │  AI Studio  │  Le Chat  │  HTTP      │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────────────┐
+│                    API Gateway (Kong)                            │
+│                    + Auth (Albe/JWT)                             │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────────────┐
+│                Workflows Control Plane (FastAPI)                 │
+│  /workflows  /executions  /events  /schedules  /workers          │
+└───────┬─────────────────────────────────────────────────────────┘
+        │
+        ├──────────────────┬──────────────────┬───────────────────┐
+        ▼                  ▼                  ▼                   ▼
+┌───────────────┐  ┌───────────────┐  ┌───────────────┐  ┌────────────┐
+│ Temporal      │  │ PostgreSQL    │  │ NATS          │  │ Tempo      │
+│ Server        │  │ (state)       │  │ (streaming)   │  │ (traces)   │
+└───────────────┘  └───────────────┘  └───────────────┘  └────────────┘
+        ▲
+        │
+┌───────┴─────────────────────────────────────────────────────────┐
+│                     Workflow Workers                             │
+│  @workflow.define  │  @activity  │  Mistral Plugin              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Next Steps
+
+- [Core Concepts](./core-concepts) — Understand workflows, activities, and workers
+- [Your First Workflow](./your-first-workflow) — Build and run a workflow
+- [Workflows Guide](../guides/workflows) — Deep dive into workflow patterns
+- [Activities Guide](../guides/activities) — Learn about activity best practices

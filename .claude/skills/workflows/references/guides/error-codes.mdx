@@ -1,0 +1,219 @@
+---
+id: error-codes
+title: API Error Codes
+sidebar_position: 3
+---
+
+# API Error Codes
+
+When a request to the Workflows API fails, the response includes a structured error code in `WF_XXXX` format:
+
+```json
+{
+  "detail": "Workflow execution not found",
+  "code": "WF_1100"
+}
+```
+
+For **4xx** errors, `detail` contains a specific message describing what went wrong. For **5xx** errors, `detail` is always `"An error occurred"` — the actual cause is logged server-side.
+
+## Quick Lookup
+
+| Code | Name | HTTP Status | Category |
+|------|------|-------------|----------|
+| [WF_1000](#wf_1000) | Unknown Error | 500 | General |
+| [WF_1001](#wf_1001) | Invalid Request | 422 | General |
+| [WF_1100](#wf_1100) | Workflow Not Found | 404 | Workflow |
+| [WF_1101](#wf_1101) | Workflow Already Started | 409 | Workflow |
+| [WF_1102](#wf_1102) | Workflow Not Running | 409 | Workflow |
+| [WF_1103](#wf_1103) | Temporal Request Failed | 500 / 504 | Workflow |
+| [WF_1104](#wf_1104) | Workflow Registration Failed | 500 | Workflow |
+| [WF_1105](#wf_1105) | Execution Not Found | 500 | Workflow |
+| [WF_1200](#wf_1200) | Schedule Failed | 422 / 500 / 503 | Schedule |
+| [WF_1201](#wf_1201) | Schedule Not Found | 404 | Schedule |
+| [WF_1300](#wf_1300) | Temporal Client Creation Failed | 500 | Temporal |
+| [WF_1301](#wf_1301) | Temporal Initialization Failed | 500 | Temporal |
+| [WF_1302](#wf_1302) | Temporal Payload Encoding Required | 500 | Temporal |
+| [WF_1400](#wf_1400) | NATS Error | 500 | Streaming |
+| [WF_1500](#wf_1500) | Trace Error | 500 | Tracing |
+| [WF_1600](#wf_1600) | Event Store Error | 500 | Event Store |
+
+---
+
+## General Errors (1000–1099)
+
+### WF_1000
+
+**Unknown Error** · `500 Internal Server Error`
+
+A catch-all for errors that don't map to a specific code. If you see this, check server logs or contact the platform team.
+
+### WF_1001
+
+**Invalid Request** · `422 Unprocessable Entity`
+
+The request was well-formed but contained invalid data. Currently returned when providing an invalid event ID during a workflow reset — the response includes a `valid_reset_events` field listing valid alternatives.
+
+```json
+{
+  "detail": "Invalid event ID for reset",
+  "code": "WF_1001",
+  "valid_reset_events": [3, 7, 12]
+}
+```
+
+---
+
+## Workflow Errors (1100–1199)
+
+### WF_1100
+
+**Workflow Not Found** · `404 Not Found`
+
+The workflow execution does not exist in Temporal. This usually means the execution ID is wrong or the workflow has been purged.
+
+**Resolution:** Verify the execution ID. Check the [Workflows Dashboard](https://workflows.mistral.ai) for the correct ID.
+
+### WF_1101
+
+**Workflow Already Started** · `409 Conflict`
+
+A workflow execution with the same ID is already running. Workflow IDs must be unique within a namespace.
+
+**Resolution:** Use a different execution ID, or wait for the existing execution to complete. If you need to restart it, terminate the running execution first.
+
+### WF_1102
+
+**Workflow Not Running** · `409 Conflict`
+
+You attempted an action (signal, query, update, or terminate) on a workflow that is no longer running. The response includes the current workflow status.
+
+```json
+{
+  "detail": "Workflow not running",
+  "code": "WF_1102",
+  "status": "COMPLETED"
+}
+```
+
+**Resolution:** Check the workflow's current status. If it completed or failed, start a new execution instead.
+
+### WF_1103
+
+**Temporal Request Failed** · `500 Internal Server Error` or `504 Gateway Timeout`
+
+The underlying Temporal RPC call failed. This covers connection issues, timeouts, and unexpected Temporal errors. A `504` specifically indicates a deadline exceeded (the operation took too long).
+
+**Resolution:** Retry the request. If the issue persists, check Temporal cluster health.
+
+### WF_1104
+
+**Workflow Registration Failed** · `500 Internal Server Error`
+
+Worker registration failed — the system could not register workflow definitions. This typically indicates a mismatch between workflow specs and version identifiers during worker startup.
+
+**Resolution:** Check worker logs for registration errors. Verify that workflow definitions are valid and that the worker can reach the API.
+
+### WF_1105
+
+**Execution Not Found** · `500 Internal Server Error`
+
+An execution that was expected to exist could not be found. Unlike `WF_1100` (which is a 404 for user-facing lookups), this indicates an internal inconsistency — the execution should have existed at this point in the flow.
+
+**Resolution:** This is an internal error. If it persists, report it to the platform team.
+
+---
+
+## Schedule Errors (1200–1299)
+
+### WF_1200
+
+**Schedule Failed** · `422` / `500` / `503`
+
+Schedule creation or management failed. The HTTP status varies by cause:
+
+| Status | Cause |
+|--------|-------|
+| **422** | Invalid schedule specification (bad cron expression, invalid arguments) or attempting to schedule a workflow with offloaded payloads |
+| **503** | Search attributes not yet available for the namespace — a transient error during namespace setup |
+| **500** | Other internal failures during schedule creation or deletion |
+
+**Resolution:** For `422`, check your cron expression and input payload size. For `503`, retry after a few seconds. For `500`, check server logs.
+
+### WF_1201
+
+**Schedule Not Found** · `404 Not Found`
+
+The schedule ID does not exist. It may have already been deleted or never created.
+
+**Resolution:** List existing schedules to find the correct ID.
+
+---
+
+## Temporal Errors (1300–1399)
+
+### WF_1300
+
+**Temporal Client Creation Failed** · `500 Internal Server Error`
+
+The system failed to construct a Temporal client, usually due to configuration issues (bad address, invalid credentials).
+
+**Resolution:** Check Temporal connection configuration (host, port, TLS settings, namespace).
+
+### WF_1301
+
+**Temporal Initialization Failed** · `500 Internal Server Error`
+
+Namespace creation or search attribute registration failed during Temporal initialization. This happens during system startup.
+
+**Resolution:** Verify Temporal cluster health and that the namespace configuration is valid.
+
+### WF_1302
+
+**Temporal Payload Encoding Required** · `500 Internal Server Error`
+
+Payload encoding is enforced but the input data was not encoded. This occurs in deployments where `temporal.enforce_payload_encoding` is enabled (typically hybrid deployments where data must stay encrypted).
+
+**Resolution:** Ensure your client is using the payload codec. See [Payload Encoding](../appendices/payload-encoding) for details.
+
+---
+
+## Streaming Errors (1400–1499)
+
+### WF_1400
+
+**NATS Error** · `500 Internal Server Error`
+
+A NATS operation failed — connection, publishing, or reading from a stream.
+
+**Resolution:** Check NATS connectivity and that `NATS_ENABLED=true` and `NATS_HOST` are set correctly. See [Streaming](streaming) for configuration details.
+
+---
+
+## Tracing Errors (1500–1599)
+
+### WF_1500
+
+**Trace Error** · `500 Internal Server Error`
+
+Failed to retrieve or parse traces from the Tempo backend. This can mean missing spans, malformed trace data, or connectivity issues with the trace provider.
+
+**Resolution:** Check Tempo/tracing backend health. If traces are missing, the workflow may not have emitted spans yet — wait and retry.
+
+---
+
+## Event Store Errors (1600–1699)
+
+### WF_1600
+
+**Event Store Error** · `500 Internal Server Error`
+
+A database consistency error in the event store, typically when an expected event cannot be found after a conflict.
+
+**Resolution:** This is an internal error. Retry the operation. If it persists, report it to the platform team.
+
+---
+
+## SDK Error Codes
+
+The Python SDK (`mistralai-workflows`) has its own set of error codes for worker-side errors (invalid workflow definitions, activity configuration issues, etc.). These are different from the API error codes above and are documented in the [Workflows Exception](workflows-exception) guide.

@@ -1,0 +1,78 @@
+---
+id: deployment-patterns
+title: Deployment Patterns
+sidebar_position: 4
+---
+
+*Four deployment strategies for different environments and use cases*
+
+# Overview
+- Four distinct deployment patterns
+- Kubernetes-native with Helm charts
+- Local development options
+- Hybrid cloud strategies
+
+## 1. Remote Fully (Production)
+- **Components**: Temporal + Workflows API + Workers all on Kubernetes
+- **Helm charts**: mistral-temporal, mistralai-workflows, mistralai-workflows-worker
+- **Use case**: Production deployments, full observability, auto-scaling
+- **Benefits**: High availability, resource isolation, operational visibility
+
+## 2. Hybrid (Development/Testing)
+- **Components**: Temporal + Workflows API on Kubernetes, Workers local/elsewhere
+- **Use case**: Development against production data, distributed teams
+- **Benefits**: Local debugging, production-like environment, flexible scaling
+
+## 3. Local Passthru (Development)
+- **Components**: Direct activity execution without Temporal orchestration
+- **Implementation**: Activities detect `not temporalio.workflow.in_workflow()` and execute directly
+- **Use case**: Fast iteration, debugging, unit testing
+- **Benefits**: No infrastructure overhead, immediate execution, debugging-friendly
+
+## 4. Local with Temporal (Development)
+- **Components**: `temporal server start-dev` + local API + local workers
+- **Use case**: Full-stack local development, integration testing
+- **Benefits**: Complete workflow testing, offline development, learning
+
+## Kubernetes Deployment
+
+### Helm Chart Structure
+- mistral-ai-suite umbrella chart
+- `global.mistral.apps.workflows.enabled` flag
+- Component dependencies and ordering
+- Configuration management
+
+### Configuration Management
+- Environment-specific values
+- Secret management strategies
+- Resource limits and requests
+- Scaling policies
+
+### Monitoring and Observability
+- OpenTelemetry integration
+- Grafana dashboards
+- Alerting strategies
+- Log aggregation
+
+## Local Development Setup
+
+### Prerequisites and Installation
+- uv and Python environment setup
+- Temporal server installation
+- Development configuration
+
+### Switching Between Patterns
+- Configuration changes for different patterns
+- Environment variable management
+- Testing strategies per pattern
+
+## Production Considerations
+- Security and authentication
+- Scaling worker pools
+- Resource management
+- Disaster recovery
+- Multi-region deployments
+
+## Next Steps
+- [Observability](observability) - Monitor your deployments
+- [Configuration Reference](../appendices/configuration-reference) - All config options

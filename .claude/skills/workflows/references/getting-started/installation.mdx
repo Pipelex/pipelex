@@ -1,0 +1,93 @@
+---
+id: installation
+title: Installation Guide
+sidebar_position: 2
+---
+
+# Installation
+
+This guide will walk you through setting up Workflows and verifying your installation.
+
+## Prerequisites
+
+Before installing the Workflows SDK, ensure you have:
+
+1. Python 3.12 or later installed
+2. [uv](https://docs.astral.sh/uv/getting-started/installation/) package manager installed
+
+## Install Workflows
+
+Install the Workflows package from PyPI using uv:
+
+```bash
+uv add mistralai-workflows
+```
+
+This will create a virtual environment (if one doesn't exist) and install Workflows along with its core dependencies.
+
+## Scaffold a Project with the CLI
+
+If you want to start from a ready-to-run Python project instead of wiring the SDK manually, use `mistralai-workflows-cli`:
+
+```bash
+uvx mistralai-workflows-cli setup
+```
+
+This scaffolds a ready-to-run Python project with the Workflows SDK already configured, a minimal example workflow, and helper commands to register and execute workflows.
+
+The generated project also includes an embedded Workflows skill at `.agents/skills/workflows/SKILL.md`, so coding agents already have the project-specific guidance needed to work with the SDK.
+
+### Installing with Optional Dependencies
+
+The Workflows SDK provides optional extras for specific features. Install only what you need:
+
+#### Cloud Storage Providers
+
+For handling large payloads with [payload offloading](../../appendices/payload_encoding#payload-offloading):
+
+```bash
+## AWS S3 support
+uv add "mistralai-workflows[s3]"
+
+## Azure Blob Storage support
+uv add "mistralai-workflows[azure]"
+
+## Google Cloud Storage support
+uv add "mistralai-workflows[gcs]"
+
+## All storage providers
+uv add "mistralai-workflows[storage]"
+```
+
+#### Mistral AI Integration
+
+For using Mistral AI models in your workflows:
+
+```bash
+uv add "mistralai-workflows[mistralai]"
+```
+
+#### All Optional Features
+
+To install all optional dependencies:
+
+```bash
+uv add "mistralai-workflows[all]"
+```
+
+## Verify Installation
+
+To verify your installation was successful, run the following command:
+
+```bash
+uv run python -c "import mistralai.workflows; print('Workflows is installed successfully!')"
+```
+
+If you encounter any errors during this step, please check that your Python environment is properly configured.
+
+## Next Steps
+
+Now that you have Workflows installed, you can proceed to:
+
+- [Your First Workflow](your-first-workflow) - Create and run your first workflow
+- [Core Concepts](core-concepts) - Understand the fundamental concepts

@@ -1,0 +1,140 @@
+---
+id: ha
+title: How to handle large data
+sidebar_position: 9
+---
+
+# Handling Large Payloads with Offloaded Attributes in Workflows
+
+This guide explains how to use the **offloaded attribute** feature in Workflows to handle large payloads efficiently between activities, especially when dealing with Temporal's 2MB payload limit.
+
+## **Why Use Offloaded Attributes?**
+
+Temporal enforces a **2MB payload limit** for workflows and activities. To work around this, Workflows allows you to **offload large payloads** to blob storage. This ensures that your activities can handle large data without hitting Temporal's size restrictions.
+
+Offloaded attributes is the preferred way to handle large payloads in your activities.
+Note that this differs from payload offloading which makes the payload available within the workflow itself, but is far less efficient.
+
+**Key Points:**
+
+- Offloaded values are **not accessible** in the workflow context (e.g., during workflow runs, signals, updates, or queries).
+- Upload and download of offloaded data happen **within the activity context**, so timeouts are governed by the activity's own timeout settings.
+- Each `OffloadableField` is stored as a separate blob. For performance, **group related fields** in a single Pydantic class if they are always used together.
+
+## Prerequisites
+
+To use offloaded attributes, you need to install the Workflows SDK with the appropriate cloud storage provider:
+
+```bash
+## For AWS S3
+uv add "mistralai-workflows[s3]"
+
+## For Azure Blob Storage
+uv add "mistralai-workflows[azure]"
+
+## For Google Cloud Storage
+uv add "mistralai-workflows[gcs]"
+
+## Or install all storage providers
+uv add "mistralai-workflows[storage]"
+```
+
+See the [installation guide](../getting-started/installation#cloud-storage-providers) for more details.
+
+## Config
+
+:::info
+Blob storage bucket/container must have an **expiry policy** as Workflows does not automatically delete payloads.
+
+Align the expiry with your Temporal workflow retention period (default: 30 days).
+
+Blobs are prefixed by `temporal-activity-payload/<URL ENCODED NAMESPACE>`, allowing per-namespace policies.
+:::
+
+If you use the **starter-app**, use these environment variables to configure blob storage:
+
+```
+## Azure:
+ACTIVITY_ATTRIBUTES_OFFLOADING__ENABLED=true
+ACTIVITY_ATTRIBUTES_OFFLOADING__MIN_SIZE_BYTES=1048576 # 1MB
+ACTIVITY_ATTRIBUTES_OFFLOADING__STORAGE_CONFIG__STORAGE_PROVIDER=azure
+ACTIVITY_ATTRIBUTES_OFFLOADING__STORAGE_CONFIG__CONTAINER_NAME=XXX
+ACTIVITY_ATTRIBUTES_OFFLOADING__STORAGE_CONFIG__AZURE_CONNECTION_STRING=XXX
+```
+
+## **How to Define Offloadable Fields**
+
+To define a field as offloadable, use the `OffloadableField` type in your Pydantic model:
+
+```python
+from mistralai.workflows.core.encoding.fields_offloader import OffloadableModel, OffloadableField
+
+class MyPayload(OffloadableModel):
+    random_field: str  # Regular field (not offloaded)
+    large_field: OffloadableField[str] = OffloadableField(value="Hello World")  # Offloadable
+```
+
+## **Using Offloadable Fields in Activities**
+
+In your activity, access the offloaded value using the `get_value()` method.
+The system handles offloading and restoration automatically:
+
+```python
+@workflows.activity(display_name="Append string to file")
+async def my_activity(params: MyPayload) -> MyPayload:
+    # Access the offloaded value using get_value()
+    logger.info("Large field value", value=params.large_field.get_value())
+
+    # Return a new payload with the updated value
+    return MyPayload(
+        random_field="activity_return",
+        large_field=OffloadableField(value=params.large_field.get_value() + "_updated")
+    )
+```
+
+## **Using Offloadable Fields in Workflows**
+
+In the workflow context, **do not** access the `get_value()` method of offloaded fields. Instead, pass the `OffloadableField` object directly to the next activity:
+
+```python
+@workflows.workflow.define(name="sub-workflow")
+def my_workflow(...):
+    # Call an activity with an offloadable field
+    activity_result = await my_activity(
+        MyPayload(
+            random_field="activity_param",
+            large_field=OffloadableField(value="initial_small_value")
+        )
+    )
+
+    # Pass the offloaded field to the next activity
+    next_activity_params = MyPayload(
+        random_field="second_activity_param",
+        # OK: Pass the OffloadableField object directly
+        large_field=activity_result.large_field
+    )
+
+    # DO NOT: Try to access the value in the workflow context as it could be offloaded
+    # large_field=OffloadableField(value=activity_result.large_field.get_value())
+
+    await my_activity(next_activity_params)
+```
+
+## **Performance Optimization: Grouping Offloadable Fields**
+
+Each `OffloadableField` is stored as a **separate blob** in blob storage. To optimize performance, especially when multiple fields are always used together, **group them into a single Pydantic class**. This reduces the number of blob storage operations and improves efficiency.
+
+**Example:**
+
+```python
+from mistralai.workflows.core.encoding.fields_offloader import OffloadableModel, OffloadableField
+from pydantic import BaseModel
+
+class LargeDataGroup(BaseModel):
+    field1: str
+    field2: bytes
+    field3: dict[str, str]
+
+class MyPayload(OffloadableModel):
+    large_data: OffloadableField[LargeDataGroup]  # Single offloaded group
+```

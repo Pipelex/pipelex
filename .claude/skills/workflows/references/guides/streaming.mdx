@@ -1,0 +1,148 @@
+---
+id: streaming
+title: Streaming Events
+sidebar_position: 7
+---
+
+# Streaming: Real-Time Events from Workflows
+
+Stream events in real-time from your workflows and activities to power live UIs, progress indicators, and token-by-token LLM responses.
+
+## Quick Start
+
+### 1. Enable NATS
+
+```bash
+NATS_ENABLED=true
+NATS_HOST="nats://localhost:4222"
+```
+
+### 2. Publish from an Activity
+
+```python
+import mistralai.workflows as workflows
+from mistralai.workflows.core.task import Task
+
+@workflows.activity()
+async def chat_activity(messages: list) -> dict:
+    initial_state = {"tokens": []}
+
+    async with Task(type="token-stream", state=initial_state) as task:
+
+        async for chunk in llm.stream(messages):
+            token = chunk.choices[0].delta.content
+            if token:
+                await task.update_state({"tokens": task.state["tokens"] + [token]})
+
+    return {"response": "".join(task.state["tokens"])}
+```
+
+### 3. Consume Events
+
+See [Consuming Streaming Events](streaming-consumption) for details on subscribing to events.
+
+## Publishing Patterns
+
+### Token Streaming (LLM)
+
+The most common pattern - stream tokens as they're generated:
+
+```python
+@workflows.activity()
+async def chat_activity(messages: list) -> dict:
+    initial_state = {"tokens": []}
+
+    async with Task(type="token-stream", state=initial_state) as task:
+
+        async for chunk in llm.stream(messages):
+            token = chunk.choices[0].delta.content
+            if token:
+                await task.update_state({"tokens": task.state["tokens"] + [token]})
+
+    return {"response": "".join(task.state["tokens"])}
+```
+
+### Progress Updates
+
+Report progress during long operations:
+
+```python
+@workflows.activity(display_name="Processing text with explicit control")
+async def streaming_tokens_with_progress_activity(text: str) -> dict:
+    """
+    Example of explicit progress tracking with Task API.
+
+    This pattern gives you full control over state updates and progress tracking.
+    """
+    words = text.split()
+    initial_state = {"processed_words": [], "progress_idx": 0, "progress_total": len(words)}
+
+    async with Task(type="progress-stream", state=initial_state) as task:
+        state = task.state
+        for i, word in enumerate(words):
+            await task.update_state({
+                "processed_words": state["processed_words"] + [word],
+                "progress_idx": i + 1,
+            })
+            state = task.state
+            await asyncio.sleep(0.1)
+
+    final_state = task.state
+    return {"processed_text": " ".join(final_state["processed_words"]), "token_count": len(words)}
+```
+
+## Task Type Names
+
+The `type` parameter is a topic name you define. Best practices:
+
+| Good            | Bad        |
+| --------------- | ---------- |
+| `token`         | `data`     |
+| `progress`      | `Stream1`  |
+| `search_result` | `myStream` |
+
+- Use lowercase with underscores
+- Keep names short and descriptive
+- Use consistent naming across your app
+
+## Payload Limits
+
+NATS has a **1MB message limit**. For large data:
+
+```python
+## Bad: Don't stream large payloads
+## await task.update_state(large_document)
+
+## Good: Store large data externally, stream a reference
+url = await storage.upload(large_document)
+await task.update_state({"url": url, "size": len(large_document)})
+```
+
+## Event Schema
+
+Each published event is wrapped with context:
+
+```python
+{
+    "stream": "token",              # Your stream name
+    "sequence": 42,                 # Monotonic sequence number
+    "timestamp_unix_nano": ...,
+    "data": "Hello",                # Your payload
+    "workflow_context": {
+        "namespace": "...",
+        "workflow_name": "my-workflow",
+        "workflow_exec_id": "abc123",
+        "parent_workflow_exec_id": null
+    },
+    "activity_context": {           # Only for activity events
+        "activity_name": "chat_activity",
+        "activity_exec_id": "1",
+        "activity_attempt_number": 1
+    }
+}
+```
+
+## Next Steps
+
+- [Consuming Streaming Events](streaming-consumption) - Subscribe and filter events
+- [Streaming Architecture](../appendices/streaming) - Technical implementation details

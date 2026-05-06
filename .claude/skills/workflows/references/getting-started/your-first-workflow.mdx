@@ -1,0 +1,93 @@
+---
+id: your-first-workflow
+title: Your First Workflow
+sidebar_position: 3
+---
+
+# Your First Workflow
+
+We'll walk through creating a simple workflow that executes a single activity.
+
+## Prerequisites
+
+First, follow the [installation instructions](./installation) to set up Workflows.
+Before running your workflow, you'll need to:
+
+1. Connect to the console with your Mistral account
+2. **Create a dedicated workspace** in the [Mistral Console](https://console.mistral.ai/) (requires admin permissions - if you're not an admin, ask your admin to create one for you) - this gives you an isolated namespace where you can safely run workers without conflicts
+3. Create a new API key in that workspace (the namespace is automatically derived as `customer_id:workspace_id` from your API key)
+4. Create a `.env` file with the following content:
+
+```bash
+MISTRAL_API_KEY=<YOUR_API_KEY>
+DEPLOYMENT_NAME=<NAME_TO_IDENTIFY_YOUR_MACHINE>
+```
+
+## Step 1: Define Your Workflow and Worker
+
+Create a file `my_workflow.py`
+
+```python
+import mistralai.workflows as workflows
+
+## Activities are async functions that can take any JSON-serializable types
+@workflows.activity()
+async def hello_world(name: str) -> dict:
+    """Activities are the building blocks of workflows.
+    1. It's the place where you do the actual work
+       (e.g. call an API, process data, CPU intensive tasks, etc.)
+    2. It must be async
+    3. Parameters can be any JSON-serializable type (str, int, dict, list, etc.)
+    """
+    return {"message": f"Hello, {name}!"}
+
+## Workflows orchestrate activities
+@workflows.workflow.define(name="simple_example_workflow")
+class SimpleExampleWorkflow:
+    @workflows.workflow.entrypoint
+    async def run(self, name: str) -> dict:
+        """Workflow entry point.
+        1. It coordinate multiple activities
+        2. It may need to wait for external events
+        """
+        return await hello_world(name)
+
+## The Worker runs your workflows and activities
+async def main() -> None:
+    await workflows.run_worker([SimpleExampleWorkflow])
+
+if __name__ == "__main__":
+    import asyncio
+
+    asyncio.run(main())
+```
+
+## Step 2: Run Your Worker with the `simple_example_workflow` Workflow
+
+```bash
+uv run python my_workflow.py
+```
+
+The worker will start, connect to the Mistral API, and register your workflow and wait for any task to do.
+At that point you should already see your workflow registered in [AI studio](https://console.mistral.ai/build/workflows).
+
+Next step is now execute your workflow.
+
+## Step 3: Trigger execution of Your Workflow
+
+1. Visit [https://console.mistral.ai/](https://console.mistral.ai/) (make sure you are located in the same workspace than the one you created your API key in)
+1. Click `Workflows` in the left sidebar
+1. Select `simple_example_workflow`
+1. Launch the workflow using the `Start Workflow` button and the input `{"name": <your_name>}`
+1. Find your execution in the `Executions` list
+1. Make sure the workflow ran until the end by checking if the output is correct, like in this example: ![expected_workflow_output](expected_workflow_output.png)
+
+## Multi-Worker Setup
+
+For scaling patterns and running multiple workers, see [Core Concepts - Scaling with Multiple Workers](./core-concepts#scaling-with-multiple-workers).
+
+## Next Steps
+
+- [Core Concepts](core-concepts) - Understand the fundamentals
+- [Workflows](../guides/workflows) - Deep dive in workflows
+- [Activities](../guides/activities) - Deep dive in activities

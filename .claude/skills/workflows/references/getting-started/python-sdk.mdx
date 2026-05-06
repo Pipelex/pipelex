@@ -1,0 +1,257 @@
+---
+id: python-sdk
+title: Python SDK
+sidebar_position: 5
+---
+
+# Python SDK Guide
+
+The Workflows Python SDK provides a convenient way to interact with the Workflows platform programmatically, allowing you to execute workflows, monitor their progress, and manage workflow definitions.
+
+## Prerequisites
+
+Before using the SDK, ensure you have:
+
+1. Followed the [installation instructions](./installation) to set up Workflows
+2. Completed the [your first workflow](./your-first-workflow) guide to run a worker with your first workflow
+
+## Getting Started
+
+### Basic Setup
+
+Initialize the client with your API credentials and namespace:
+
+```python
+from mistralai.workflows.client import get_mistral_client
+
+## Initialize client
+client = get_mistral_client(
+    server_url="https://api.mistral.ai",
+    api_key="your-api-key",     # Should match your worker's `MISTRAL_API_KEY`
+)
+```
+
+## Core Workflow Operations
+
+### 1. Executing Workflows
+
+Start a workflow execution with optional input data and custom execution ID:
+
+```python
+from pydantic import BaseModel
+
+class InputData(BaseModel):
+    name: str
+
+execution_id = "custom-id-123"
+execution = await client.workflows.execute_workflow_async(
+    workflow_identifier="simple_example_workflow",
+    input=InputData(name="MyName").model_dump(mode="json"),
+    execution_id=execution_id  # Optional
+)
+```
+
+### 2. Execute and Wait for Results
+
+For workflows where you need immediate results, use the synchronous execution method:
+
+```python
+from pydantic import BaseModel
+
+class InputData(BaseModel):
+    name: str
+
+result = await client.workflows.execute_workflow_async(
+    workflow_identifier="simple_example_workflow",
+    input=InputData(name="MyName").model_dump(mode="json"),
+)
+```
+
+### 3. Checking Execution Status
+
+Monitor the progress of your workflow executions:
+
+```python
+status = await client.workflows.executions.get_workflow_execution_async(execution_id=execution_id)
+print(f"Current status: {status.status}")
+```
+
+## Advanced Workflow Interactions
+
+### Signaling Workflows
+
+Send signals to running workflows to trigger specific behaviors:
+
+```python
+from pydantic import BaseModel
+
+class SignalData(BaseModel):
+    new_value: int
+
+await client.workflows.executions.signal_workflow_execution_async(
+    execution_id="your-execution-id", # Execution id of the running workflow with signal method
+    name="update_config", # Name of the signal method
+    input=SignalData(new_value=42).model_dump(mode="json")
+)
+```
+
+### Querying Workflow State
+
+Retrieve information from running workflows without modifying their state:
+
+```python
+response = await client.workflows.executions.query_workflow_execution_async(
+    execution_id="your-execution-id", # Execution id of the running workflow with query method
+    name="get_status" # Name of the query method
+)
+print(response.result)
+```
+
+### Updating Running Workflows
+
+Modify workflow behavior during execution:
+
+```python
+from pydantic import BaseModel
+
+class UpdateData(BaseModel):
+    timeout: int
+
+response = await client.workflows.executions.update_workflow_execution_async(
+    execution_id="your-execution-id",
+    name="change_settings",
+    input=UpdateData(timeout=300).model_dump(mode="json")
+)
+```
+
+### Terminating Running Workflows
+
+Terminate a workflow during execution:
+
+```python
+await client.workflows.executions.terminate_workflow_execution_async(execution_id=execution_id)
+```
+
+## Workflow Management
+
+### Listing Available Workflows
+
+Discover all registered workflows in your namespace:
+
+```python
+response = await client.workflows.get_workflows_async()
+print(f"These are all the available workflows: {response.workflows}")
+```
+
+### Retrieving Workflow Definitions
+
+Get detailed information about a specific workflow:
+
+```python
+response = await client.workflows.get_workflow_async(workflow_identifier="simple_example_workflow")
+print(f"The definition of this workflow is: {response.workflow}.")
+```
+
+## Execution Monitoring
+
+### Viewing Execution Traces
+
+Get detailed OpenTelemetry traces for debugging and analysis:
+
+```python
+trace = await client.workflows.executions.get_workflow_execution_trace_otel_async(execution_id)
+```
+
+### Getting Trace Summaries
+
+Retrieve condensed information about workflow executions:
+
+```python
+summary = await client.workflows.executions.get_workflow_execution_trace_summary_async(execution_id)
+```
+
+### Accessing Trace Events
+
+Examine individual events in a workflow execution:
+
+```python
+events = await client.workflows.executions.get_workflow_execution_trace_events_async(
+    execution_id,
+    merge_same_id_events=True  # Combines events with the same ID
+)
+```
+
+## Scheduling Workflows
+
+### Creating Recurring Executions
+
+Set up workflows to run on a schedule:
+
+```python
+from mistralai.workflows.models import ScheduleDefinition
+schedule_id = "daily-name-schedule"
+schedule = await client.workflows.schedules.schedule_workflow_async(
+    workflow_identifier="simple_example_workflow",
+    schedule=ScheduleDefinition(
+        input={"name": "MyName"},
+        cron_expressions=["0 0 * * *"] # Runs daily at midnight
+    ),
+    schedule_id=schedule_id,
+)
+```
+
+### Managing Schedules
+
+View and manage all your scheduled workflows:
+
+```python
+## List all schedules
+response = await client.workflows.schedules.get_schedules_async()
+print(f"Here are all the defined schedules: {response.schedules}")
+## Remove a schedule
+await client.workflows.schedules.unschedule_workflow_async(schedule_id=schedule_id)
+```
+
+## Complete Example
+
+Here's a complete example showing workflow execution and result retrieval:
+
+```python
+from dotenv import load_dotenv
+
+load_dotenv()
+
+async def main() -> None:
+    from mistralai.workflows.client import get_mistral_client
+    from pydantic import BaseModel
+
+    class InputData(BaseModel):
+        report_type: str
+
+    client = get_mistral_client(
+        server_url="https://api.mistral.ai",
+        api_key=os.environ["MISTRAL_API_KEY"],
+    )
+
+    # Execute workflow
+    result = await client.workflows.execute_workflow_async(
+        workflow_identifier="report_generator",
+        input=InputData(report_type="weekly").model_dump(mode="json"),
+    )
+
+    print(f"Workflow completed with result: {result}")
+
+if __name__ == "__main__":
+
+    import asyncio
+    asyncio.run(main())
+```
+
+## Next Steps
+
+Explore these related topics to deepen your understanding:
+
+- [Workflows Guide](../guides/workflows) - Learn about workflow fundamentals and design patterns
+- [Activities Guide](../guides/activities) - Learn about activity functions and their usage
+- [Scheduling](../guides/scheduling) - Advanced scheduling techniques and cron expressions
+- [Signals, Queries & Updates](../guides/signals-queries-updates) - Advanced workflow interaction patterns

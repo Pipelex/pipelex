@@ -1,0 +1,176 @@
+---
+id: workflows-exception
+title: Workflows Exception
+sidebar_position: 2
+---
+
+# WorkflowsException: Structured Error Handling
+
+Workflows provides a structured exception system through `WorkflowsException` for consistent error handling across workflows and activities.
+
+## Overview
+
+`WorkflowsException` is the standard exception class for handling errors in workflows. It provides:
+
+- Structured error codes via `ErrorCode` enum
+- HTTP status code mapping
+- Serialization to JSON responses
+- Factory methods for common error scenarios
+
+## Basic Usage
+
+```python
+from mistralai.workflows.exceptions import WorkflowsException, ErrorCode
+from http import HTTPStatus
+
+## Raise a custom exception
+raise WorkflowsException(
+    code=ErrorCode.WORKFLOW_DEFINITION_ERROR,
+    message=f"{workflow} class must be decorated with @workflows.workflow.define",
+    status=http.HTTPStatus.INTERNAL_SERVER_ERROR
+)
+```
+
+## Constructor Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `message` | `str` | required | Human-readable error message |
+| `status` | `HTTPStatus` | `INTERNAL_SERVER_ERROR` | HTTP status code |
+| `code` | `ErrorCode` | `TEMPORAL_SERVICE_ERROR` | Structured error code |
+| `type` | `str` | `"invalid_request_error"` | Error type string |
+## Error Codes
+
+The `ErrorCode` enum provides structured error codes organized by category:
+
+### General Errors (40**)
+
+| Code | Description |
+|------|-------------|
+| `execution_error` | General execution error |
+| `temporal_error` | Temporal-related error |
+| `temporal_service_error` | Temporal service error |
+| `temporal_connection_error` | Connection to Temporal failed |
+| `temporal_client_creation_error` | Failed to create Temporal client |
+| `search_attributes_creation_error` | Failed to create search attributes |
+
+### Activity Errors (41**)
+
+| Code | Description |
+|------|-------------|
+| `activity_definition_error` | Activity incorrectly defined |
+| `activity_not_found_error` | Activity not found |
+| `invalid_arguments_error` | Invalid arguments provided |
+| `activity_not_module_level` | Activity must be at module level |
+| `tool_argument_error` | Tool argument error |
+| `rate_limit_error` | Rate limit exceeded |
+
+### Workflow Errors (42**)
+
+| Code | Description |
+|------|-------------|
+| `workflow_definition_error` | Workflow incorrectly defined |
+| `workflow_description_error` | Workflow description error |
+| `workflow_already_started` | Workflow already running |
+| `workflow_not_found` | Workflow not found |
+| `invalid_params_error` | Invalid parameters |
+| `workflow_timeout_error` | Workflow timed out |
+| `workflow_signal_definition_error` | Signal incorrectly defined |
+| `workflow_update_definition_error` | Update incorrectly defined |
+| `workflow_query_error` | Fail to query a workflow |
+
+### Worker Errors (43**)
+
+| Code | Description |
+|------|-------------|
+| `worker_registration_error` | Worker registration failed |
+| `worker_runtime_config_error` | Worker runtime configuration error |
+
+### Durable Agent Errors (44**)
+
+| Code | Description |
+|------|-------------|
+| `agent_execution_error` | Agent Execution Error |
+
+### Infrastructure Errors (45**)
+
+| Code | Description |
+|------|-------------|
+| `namespace_already_used` | Namespace already in use |
+| `in_memory_cache_error` | In-memory cache error |
+| `rejected_query_error` | Query was rejected |
+| `unserializable_payload_error` | Payload cannot be serialized |
+| `blob_storage_config_error` | Blob storage configuration error |
+
+### API Endpoint Errors (46**)
+
+The following error codes are used to identify specific errors that can occur when interacting with the workflow API. These codes follow the `{HTTP_METHOD}_{ENDPOINT}_ERROR` naming convention and are returned in the `code` field of error responses.
+
+| Code | Description |
+|------|--------------------------------------------------|
+| `get_workflows_error` | Error when retrieving workflows |
+| `get_workflows_versions_error` | Error when retrieving workflow versions |
+| `get_workers_whoami_error` | Error when retrieving worker identity |
+| `post_workflows_register_error` | Error when registering a workflow |
+| `post_workflows_execute_error` | Error when executing a workflow |
+| `post_executions_terminate_error` | Error when terminating an execution |
+| `get_executions_error` | Error when retrieving executions |
+| `get_executions_trace_otel_error` | Error when retrieving execution OTEL trace |
+| `get_executions_trace_summary_error` | Error when retrieving execution trace summary |
+| `get_executions_trace_events_error` | Error when retrieving execution trace events |
+| `post_executions_signals_error` | Error when sending a signal to an execution |
+| `post_executions_queries_error` | Error when querying an execution |
+| `post_executions_updates_error` | Error when updating an execution |
+| `post_schedules_error` | Error when creating a schedule |
+| `delete_schedules_error` | Error when deleting a schedule |
+| `get_schedules_error` | Error when retrieving schedules |
+| `post_executions_stream_error` | Error when streaming execution results |
+| `get_events_stream_error` | Error when streaming events |
+| `post_events_error` | Error when posting events |
+
+## Exception Properties and Methods
+
+### `from_temporal_error()`
+
+Create an exception from Temporal errors:
+
+```python
+from temporalio.exceptions import TemporalError
+
+try:
+    await client.workflows.execute_workflow_async(...)
+except TemporalError as e:
+    raise WorkflowsException.from_temporal_error(
+        temporal_error=e,
+        message_override="Failed to execute workflow",
+        status_override=HTTPStatus.SERVICE_UNAVAILABLE
+    )
+```
+
+Handles specific Temporal error types:
+- `RPCError` → Maps to appropriate error code based on RPC status
+- `WorkflowQueryRejectedError` → `REJECTED_QUERY_ERROR`
+- `WorkflowAlreadyStartedError` → `WORKFLOW_ALREADY_STARTED`
+
+### `from_api_client_error()`
+
+Create an exception from HTTP client errors:
+
+```python
+import httpx
+
+try:
+    response = await client.get("https://api.example.com")
+except httpx.HTTPError as e:
+    raise WorkflowsException.from_api_client_error(
+        exc=e,
+        message="External API call failed",
+        code=ErrorCode.EXECUTION_ERROR,
+    )
+```
+
+## Next Steps
+
+- [Workflows Guide](workflows) - Learn about workflow fundamentals
+- [Activities Guide](activities) - Learn how to implement activities
+- [Observability Guide](observability) - Monitor and trace your workflows

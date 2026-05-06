@@ -1,0 +1,172 @@
+---
+id: local-execution
+title: Local Execution
+sidebar_position: 10
+---
+
+# Local Execution
+
+Run workflows and activities directly without infrastructure. Useful for quick iteration during development.
+
+## Why Use Local Execution
+
+Local execution enables running workflow code without deploying infrastructure:
+
+- **Rapid prototyping** - Iterate on activity/workflow logic before infrastructure is ready
+- **Pure logic validation** - Verify business logic in isolation
+- **CI checks** - Run lightweight tests that don't need durability guarantees
+
+:::warning
+Local execution is limited to prototyping. It cannot replicate distributed capabilities like durability, streaming, or human-in-the-loop patterns. Move to full deployment as soon as possible.
+:::
+
+## Executing Workflows Locally
+
+Use `workflows.execute_workflow()` to run workflows locally:
+
+```python
+import mistralai.workflows as workflows
+from pydantic import BaseModel
+
+@workflows.activity()
+async def validate_data(data_id: str) -> bool:
+    return True
+
+@workflows.activity()
+async def process_data(data_id: str) -> dict:
+    return {"processed_id": data_id, "status": "done"}
+
+class DataProcessingParams(BaseModel):
+    data_id: str
+    validate_first: bool = True
+
+@workflows.workflow.define(name="data-processing")
+class DataProcessingWorkflow:
+    @workflows.workflow.entrypoint
+    async def run(self, data_id: str, validate_first: bool = True) -> dict:
+        if validate_first and not await validate_data(data_id):
+            raise ValueError("Validation failed")
+        return await process_data(data_id)
+
+## Local execution — params must be a Pydantic model, not a dict
+result = await workflows.execute_workflow(
+    DataProcessingWorkflow,
+    params=DataProcessingParams(data_id="item-123", validate_first=True)
+)
+```
+
+### Nested Workflows
+
+Child workflows via `workflows.execute_workflow()` execute directly in local mode:
+
+```python
+import mistralai.workflows as workflows
+from pydantic import BaseModel
+
+class ChildParams(BaseModel):
+    value: str
+
+class ParentParams(BaseModel):
+    data: str
+
+@workflows.workflow.define(name="child")
+class ChildWorkflow:
+    @workflows.workflow.entrypoint
+    async def run(self, value: str) -> str:
+        return f"Child: {value}"
+
+@workflows.workflow.define(name="parent")
+class ParentWorkflow:
+    @workflows.workflow.entrypoint
+    async def run(self, data: str) -> str:
+        child_result = await workflows.execute_workflow(
+            ChildWorkflow, params=ChildParams(value=data)
+        )
+        return f"Parent got: {child_result}"
+
+## Full chain executes locally
+result = await workflows.execute_workflow(ParentWorkflow, params=ParentParams(data="test"))
+```
+
+## Executing Activities Locally
+
+Activities called outside workflows execute directly with:
+
+- **Automatic retries** via tenacity (respects `retry_policy_max_attempts`, `retry_policy_backoff_coefficient`)
+- **Dependency injection** - `Depends()` resolved automatically
+- **Type validation** - Input/output types are validated
+- **Nested calls** - Only outermost activity applies retry logic
+
+```python
+import mistralai.workflows as workflows
+from mistralai.workflows import Depends
+
+class HttpClient:
+    def __init__(self, timeout: int):
+        self.timeout = timeout
+
+    async def get(self, path: str) -> dict:
+        return {"id": "123", "name": "Test User"}
+
+async def get_client() -> HttpClient:
+    return HttpClient(timeout=30)
+
+@workflows.activity(retry_policy_max_attempts=3)
+async def fetch_user(
+    user_id: str,
+    client: HttpClient = Depends(get_client)
+) -> dict:
+    return await client.get(f"/users/{user_id}")
+
+## Retries and DI work locally
+user = await fetch_user("123")
+```
+
+## Tradeoffs: What You Lose
+
+Local execution cannot replicate distributed capabilities:
+
+| Feature                      | Local            | Full Deployment     | Impact                                 |
+| ---------------------------- | ---------------- | ------------------- | -------------------------------------- |
+| **Durability**               | ❌ None          | ✅ Full history     | Crash = lost state, no replay          |
+| **Streaming**                | ❌ No events     | ✅ Real-time events | No `Task` events, no progress tracking |
+| **HITL (Human-in-the-Loop)** | ❌ Not supported | ✅ Signals/Updates  | Cannot pause for human input           |
+| **Signals**                  | ❌               | ✅                  | No external event injection            |
+| **Queries**                  | ❌               | ✅                  | Cannot inspect running state           |
+| **Updates**                  | ❌               | ✅                  | No synchronous state mutations         |
+| **Scheduling**               | ❌               | ✅                  | No cron/interval triggers              |
+| **`wait_condition`**         | ❌ Throws        | ✅ Works            | Workflow primitives fail locally       |
+| **Failure Recovery**         | ❌               | ✅                  | No automatic checkpoint resume         |
+| **Event History**            | ❌               | ✅                  | No UI debugging                        |
+| **Rate Limiting**            | ⚠️ Local only    | ✅ Distributed      | No cross-worker coordination           |
+| **Worker Stickiness**        | ⚠️ No-op         | ✅ Works            | Always same "worker"                   |
+
+### Critical Limitations
+
+**No Streaming/Observability**: The `Task` system emits events to the Workflows API. Locally, `should_publish_event()` returns false—no events are published. Progress tracking, custom task states, and real-time updates don't work.
+
+**No Human-in-the-Loop**: Patterns relying on signals (`workflow.signal`), updates (`workflow.update`), or external triggers cannot run locally. The workflow runs to completion without pause points.
+
+**No Timeout Enforcement**: `start_to_close_timeout` is respected but not enforced at system level. Runaway activities won't be killed.
+
+## How It Works
+
+The SDK detects execution context via `temporalio.workflow.in_workflow()`. Outside a workflow context, activities and workflows execute as regular Python async functions with retry wrappers.
+
+```python
+import mistralai.workflows as workflows
+
+@workflows.activity()
+async def send_email(to: str, subject: str, body: str) -> dict:
+    return {"message_id": "msg-123"}
+
+## Direct call - executes locally with retry logic
+result = await send_email("user@example.com", "Hello", "Test message")
+```
+
+## Next Steps
+
+- [Activities](./activities) - Activity patterns and configuration
+- [Workflows](./workflows) - Workflow fundamentals
+- [Signals & Queries](./signals-queries-updates) - External interaction (requires deployment)
+- [Streaming](./streaming) - Real-time event streaming (requires deployment)

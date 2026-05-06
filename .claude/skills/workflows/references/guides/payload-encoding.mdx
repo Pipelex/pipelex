@@ -1,0 +1,251 @@
+---
+id: payload-encoding
+title: Payload encoding
+sidebar_position: 4
+---
+
+# Payload Encoding
+
+## Overview
+
+The **payload encoding process** enables seamless processing of payloads before they are sent to the Temporal server and after they are received. This process leverages **Temporal payload converters, codecs, and interceptors** to provide a transparent experience for developers.
+
+### Key Features
+
+- **Payload Offloading**: Temporal imposes a 2MB limit on payload size. The encoding process automatically offloads large payloads to a blob storage service and retrieves them during decoding.
+- **Encryption/Decryption**: Payloads can be encrypted before being sent to the Orchestration Layer and decrypted by the worker allowing data to stay in the user’s infrastructure even in hybrid deployments.
+
+### Architecture Context
+
+Mistral workflows are designed to operate in a **hybrid mode**:
+
+- The **orchestration layer (Workflows API)** runs on Mistral infrastructure.
+- The **code (workers/clients)** runs in the user’s infrastructure.
+
+To ensure data remains within the user’s infrastructure, the encoding/decoding process is implemented in the **Workflows SDK** and not in the Workflows API.
+
+## Architecture
+
+### PayloadEncoder
+
+The **PayloadEncoder** (`mistralai/workflows/worker`) is the core component for payload encoding/decoding.
+It manages offloading, encryption, and other payload transformations, and is used by both the and **Temporal Worker**.
+
+### Temporal Components
+
+To allow a seemless integration, Mistral Workflows rely on three Temporal key components: **Payload Converter**, **Codec**, and **Interceptor**.
+
+<custom-element data-json="%7B%22type%22%3A%22table-metadata%22%2C%22attributes%22%3A%7B%22title%22%3A%22Temporal%20Components%22%7D%7D" />
+
+| Component             | Description                                                                    | Constraints                                                 |
+| --------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------- |
+| **Payload Converter** | Converts between application-specific payloads and Temporal’s internal format. | No access to workflow context. Must use deterministic code. |
+| **Codec**             | Encodes/decodes payloads (serialization, compression, encryption).             | No access to workflow context.                              |
+| **Interceptor**       | Intercepts payloads before/after Temporal server communication.                | Can access workflow context. Must use deterministic code.   |
+
+### Workflow
+
+The diagram below illustrates the end-to-end flow of payload encoding, from the client SDK to the Temporal server and back to the worker. It highlights the key steps: encoding/offloading, API orchestration, and decoding/context propagation.
+
+![Payload encoding design diagram](/img/payload-encoding-scheme.svg)
+
+---
+
+#### 1. API Client (User Side / Application Layer)
+
+The user start a workflow using the execute_workflow method of the API Client.
+
+#### `execute_workflow` Process:
+
+1. **Encode the payload** using `PayloadEncoder`:
+   - Offloads large payloads to blob storage.
+   - _(Future: Encrypts the payload.)_
+2. **Transform the payload** into a `NetworkEncodedInput` (base64-encoded string with encoding options).
+3. **Call the Workflows API** with the `NetworkEncodedInput` to start the workflow.
+
+#### `NetworkEncodedInput` Structure:
+
+```json
+{
+  "b64payload": "<BASE64_ENCODED_PAYLOAD>",
+  "encoding_options": ["BLOB_STORAGE", "..."],
+  "empty": false
+}
+```
+
+---
+
+#### 2. Workflows API (Server Side / Orchestration Layer)
+
+**Receive** the `NetworkEncodedInput` from the client and forwards it to temporal.
+
+#### Temporal Payload structure:
+
+```json
+{
+  "metadata": {
+    "encoding": "json/wf_v1",
+    "namespace": "XXX",
+    "execution_id": "XXX",
+    "offloaded": true
+  },
+  "data": "<ENCODED_PAYLOAD_BYTES>"
+}
+```
+
+---
+
+#### 3. Workflows Worker (User Side / Application Layer)
+
+1. **Receive** the Temporal `Payload` from the Temporal server.
+2. **Decode the payload**:
+
+   - **Codec (`MistralWorkflowsPayloadCodec`)**:
+     - Uses `PayloadEncoder` to decode the payload.
+     - Fetches offloaded payloads from blob storage if needed.
+     - _(Future: Decrypts the payload.)_
+   - **Payload Converter (`MistralWorkflowsPayloadConverter`)**:
+     - Transforms the Temporal `Payload` into a `PayloadWithContext`.
+     - `PayloadWithContext` contains the decoded payload and context (e.g., `execution_id`, `namespace`).
+   - **Interceptor (`WorkflowContextWorkflowInboundInterceptor`)**:
+     - Sets the context in `contextvar` for later use when calling activities/sub-workflows.
+     - Unwraps the payload from `PayloadWithContext` to send only the payload content as param to the workflow code.
+     - Execute the workflow code with the decoded payload.
+
+3. **Calling Activities/Sub-Workflows**:
+   - The process is reversed:
+     - **Interceptor**: Wraps the payload in `PayloadWithContext` to forward the context.
+     - **Payload Converter**: Transforms `PayloadWithContext` into a Temporal `Payload`.
+     - **Codec**: Uses `PayloadEncoder` to encode the payload (offloads/encrypts as needed).
+     - **Sends** the Temporal `Payload` to the Temporal server.
+     - The Temporal server forwards the `Payload` to the activity/sub-workflow worker and repeat the step 3.
+
+## Configuration
+
+### Base Encoding
+
+Payload encoding is **always enabled** by default. This ensures proper context propagation across workflows, activities, and workers. No configuration is needed for base encoding.
+
+The encoding system provides:
+
+- Workflow context propagation (namespace, execution ID, parent workflow tracking)
+- Support for streaming events with correct lineage
+- Foundation for optional offloading and encryption features
+
+---
+
+### Payload Offloading
+
+Payload offloading allows seamless transmission of payloads larger than 2MB by configuring a blob storage (e.g., Azure Blob Storage, S3, or GCP Cloud Storage) accessible to both client and worker code.
+
+**Prerequisites**
+
+To use payload offloading, you need to install the Workflows SDK with the appropriate cloud storage provider:
+
+```bash
+## For AWS S3
+uv add "mistralai-workflows[s3]"
+
+## For Azure Blob Storage
+uv add "mistralai-workflows[azure]"
+
+## For Google Cloud Storage
+uv add "mistralai-workflows[gcs]"
+
+## Or install all storage providers
+uv add "mistralai-workflows[storage]"
+```
+
+See the [installation guide](../getting-started/installation#cloud-storage-providers) for more details.
+
+**Limitations :warning:**
+
+- **Workflow Replay Overhead**: When replaying a workflow, all payloads are downloaded again. This can lead to:
+  - **Timeout issues** during task execution.
+  - **Worker stalls** while rebuilding history.
+- **Not for Generic Data Exchange**: This system is **not designed** for general-purpose data exchange due to the above limitations.
+
+**Use Case**
+This feature is intended only for edge cases where large payloads are uncommon but may occasionally occur in very rare situations.
+
+For a more robust approach to handling large data exchange, prefer using the [activity field offloader](../guides/handling-large-data).
+
+:::info
+Blob storage bucket/container must have an **expiry policy** as payloads are not automatically deleted.
+
+Align the expiry with your Temporal workflow retention period (default: 30 days).
+
+Blobs are prefixed by `temporal-payload/<URL ENCODED NAMESPACE>`, allowing per-namespace policies.
+:::
+
+If you use the **starter-app**, use these environment variables to configure blob storage:
+
+```
+TEMPORAL_PAYLOAD_OFFLOADING__ENABLED=true
+
+## Azure:
+TEMPORAL_PAYLOAD_OFFLOADING__STORAGE_CONFIG__STORAGE_PROVIDER=azure
+TEMPORAL_PAYLOAD_OFFLOADING__STORAGE_CONFIG__CONTAINER_NAME=abraxas-temporal-payloads
+TEMPORAL_PAYLOAD_OFFLOADING__STORAGE_CONFIG__AZURE_CONNECTION_STRING="XXX"
+```
+
+---
+
+### Encryption
+
+Encryption allows you to encrypt the data sent to the Mistral API and through the Temporal server.
+Encrypted data will show up as **encrypted** in traces as well.
+
+To enable it, you must generate a cryptographic key and configure the API Client and workers to use it.
+Use the following Python code to generate a 256-bit AES-GCM key:
+
+```python
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+## Generate a 256-bit (32-byte) key
+key = AESGCM.generate_key(bit_length=256)
+print(f"Generated key: {key.hex()}")
+```
+
+There are two modes:
+`full`: Encrypts every payload.
+`partial`: Encrypt only `EncryptedStrField` fields (see: `mistralai.workflows.models`)
+
+Set the following environment variables in your .env:
+
+```
+TEMPORAL_PAYLOAD_ENCRYPTION__MODE=full # or partial
+TEMPORAL_PAYLOAD_ENCRYPTION__MAIN_KEY=<YOUR_KEY_IN_HEX>
+```
+
+#### Key Rotation
+
+To handle key rotation, follow these steps:
+
+#### 1. Create a New Key
+
+Create a new key using the same method as above.
+
+#### 2. Update Your Settings
+
+Add the new key as the `MAIN_KEY` and keep the old key as the `SECONDARY_KEY`. This lets the system decrypt older data while using the new key for encryption.
+
+```
+TEMPORAL_PAYLOAD_ENCRYPTION__MODE=full
+TEMPORAL_PAYLOAD_ENCRYPTION__MAIN_KEY=<NEW_KEY_HERE>
+TEMPORAL_PAYLOAD_ENCRYPTION__SECONDARY_KEY=<OLD_KEY_HERE>
+```
+
+#### 3. Wait for old workflows to Finish
+
+Allow sufficient time (days or weeks, depending on your workflows) for all data encrypted with the old key to be fully processed.
+
+#### 4. Remove the old Key
+
+Once you're sure no old data needs decrypting, delete the `SECONDARY_KEY` from your settings:
+
+```
+TEMPORAL_PAYLOAD_ENCRYPTION__MODE=full
+TEMPORAL_PAYLOAD_ENCRYPTION__MAIN_KEY=<NEW_KEY_HERE>
+## TEMPORAL_PAYLOAD_ENCRYPTION__SECONDARY_KEY=
+```

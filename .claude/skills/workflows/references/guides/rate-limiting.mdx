@@ -1,0 +1,58 @@
+---
+id: rate-limiting
+title: Rate Limiting
+sidebar_position: 7
+---
+
+# Rate Limiting in Workflows
+
+Rate limiting is a crucial aspect of workflow management that helps control resource consumption and prevent any single workflow or activity from monopolizing shared resources.
+
+## How Rate Limiting Works
+
+Rate limits are always shared across all workers and workflows in the same task workspace (or `TEMPORAL_TASK_QUEUE` if configured). The `key` parameter controls how activities share these limits:
+
+### Case 1: Rate Limit Per Activity (No Key Provided)
+
+When **no key is provided**, the rate limit applies to the activity itself and is shared across all workers and workflows that use it.
+
+**Use this when:** You want to protect a shared resource (like an API client) that should have a global rate limit regardless of which workflow is using it.
+
+### Case 2: Rate Limit Across Activities (Key Provided)
+
+When **a key is provided**, multiple different activities that use the same key share a single rate limit pool across all workers and workflows.
+
+**Use this when:** You need to coordinate rate limits across multiple different activities (e.g., limiting total API calls across read, write, and delete operations using the same external service).
+
+### Example: Shared Rate-Limited API Client (No Key)
+
+```python
+import mistralai.workflows as workflows
+from mistralai import Mistral, Messages, Depends
+from pydantic import BaseModel
+
+def get_mistral_client() -> Mistral:
+    """Creates a shared chat completion client with rate limiting"""
+    client = Mistral(
+        api_key="your_api_key",
+    )
+    return client
+
+class CompletionParams(BaseModel):
+    model: str
+    messages: Messages
+
+@workflows.activity(rate_limit=workflows.RateLimit(time_window_in_sec=1, max_calls=100))
+async def generate_chat_response(
+    params: CompletionParams,
+    client: Mistral = Depends(get_mistral_client)
+):
+    """Generates a chat response using a shared client"""
+    # This activity can be called from multiple workflows
+    # but will share the same rate limit across all of them
+    return await client.chat.complete_async(model=params.model, messages=params.messages)
+```
+
+**Behavior**: All workflows calling `generate_chat_response` share the same 100 calls/sec limit. If Workflow A makes 60 calls and Workflow B makes 50 calls in the same second, they compete for the same pool.
+
+**With a key**: Add `key="mistral_api"` to share this limit across multiple activities (e.g., `generate_chat_response`, `generate_embeddings`, `moderate_content`).

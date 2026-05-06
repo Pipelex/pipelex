@@ -1,0 +1,45 @@
+---
+id: observabilities
+title: Workflow Observability
+sidebar_position: 6
+---
+
+# Workflow Observability
+
+This guide focuses on OpenTelemetry traces for execution-level diagnostics. If you need custom lifecycle and progress events emitted into workflow history for external consumers, see the [Task Events](../task-events) guide.
+
+## Traces (OpenTelemetry)
+
+Traces capture execution details (spans, timings, errors) and are optimized for debugging and performance analysis. They are independent from custom task events.
+
+### Activity Observability
+
+Activities automatically generate spans. Use the `name` parameter to make them more readable:
+
+```python
+@workflows.activity(name="Processing customer emails")
+async def process_emails(params: ActivityParams) -> ActivityResult:
+    # Your activity code
+```
+
+### Trace Sampling
+
+Trace collection is sampled. By default the worker uses a parent-based sampler with a configurable sample rate, so upstream decisions can be honored.
+
+**TL;DR:** For the finest control of sampling, pass a `traceparent` header at your workflow entry point (or API edge). This lets you force sampling on or off and propagate the parent trace consistently.
+
+### Fetching Workflow Traces
+
+```python
+## Get trace data
+trace = await client.workflows.executions.get_workflow_execution_trace_otel_async(execution_id)
+
+## Get trace summary
+summary = await client.workflows.executions.get_workflow_execution_trace_summary_async(execution_id)
+
+## Get detailed events
+events = await client.workflows.executions.get_workflow_execution_trace_events_async(
+    execution_id,
+    include_internal_events=False  # Hide system events
+)
+```
