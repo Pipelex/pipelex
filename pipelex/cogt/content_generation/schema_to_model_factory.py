@@ -36,7 +36,7 @@ import threading
 from collections import OrderedDict
 from enum import Enum
 from pathlib import Path
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar, Literal, cast
 
 from pydantic import BaseModel
 
@@ -160,7 +160,7 @@ class SchemaToModelFactory:
     @classmethod
     def _generate_source_from_schema(cls, schema: dict[str, Any]) -> str:
         """Generate Python source code from a JSON schema using datamodel-code-generator."""
-        from datamodel_code_generator import InputFileType, generate  # noqa: PLC0415
+        from datamodel_code_generator import InputFileType, LiteralType, generate  # noqa: PLC0415
         from datamodel_code_generator.enums import DataModelType  # noqa: PLC0415
 
         cls._reject_unsafe_schema_extensions(schema)
@@ -178,11 +178,19 @@ class SchemaToModelFactory:
             #    be replaced by ruff, but ruff isn't a runtime dep of pipelex or of
             #    datamodel-code-generator's core install. An empty list silences the
             #    warning without forcing a new runtime dependency on consumers.
+            # `enum_field_as_literal=LiteralType.All` keeps `enum: [strings]` schema
+            # nodes as Python `Literal[...]` annotations instead of regenerating a
+            # named `Enum` class. Without it, a `Literal[...]` field round-trips into
+            # a plain `Enum` (e.g. `class Recommendation(Enum): Poor_Match = "Poor Match"`),
+            # and an LLM filling that schema returns the Python repr
+            # `"Recommendation.Poor_Match"` instead of the value `"Poor Match"`,
+            # which then fails Pydantic validation against the original choice set.
             generate(
                 input_=schema_str,
                 input_file_type=InputFileType.JsonSchema,
                 output=output_path,
                 output_model_type=DataModelType.PydanticV2BaseModel,
+                enum_field_as_literal=LiteralType.All,
                 formatters=[],
             )
             return output_path.read_text(encoding="utf-8")
@@ -257,11 +265,12 @@ class SchemaToModelFactory:
 
         # datamodel-code-generator uses `from __future__ import annotations` which turns
         # type annotations into strings. Rebuild every BaseModel so forward refs (including
-        # references to generated Enum classes for choices fields) resolve against the
-        # full type namespace.
+        # references to generated Enum classes for choices fields, and Literal annotations
+        # produced by `enum_field_as_literal=All`) resolve against the full type namespace.
+        rebuild_namespace: dict[str, Any] = {**all_user_types, "Literal": Literal}
         for candidate in all_user_types.values():
             if issubclass(candidate, BaseModel):
-                candidate.model_rebuild(_types_namespace=all_user_types)
+                candidate.model_rebuild(_types_namespace=rebuild_namespace)
 
         return all_user_types
 

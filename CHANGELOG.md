@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **`choices` fields no longer fail validation with `'EnumName.MEMBER_NAME'` errors.** A concept declared with `choices = [...]` produces a `Literal[...]` field on the dynamic Pydantic class. That schema is round-tripped through `SchemaToModelFactory.make_from_json_schema` (used to rebuild dynamic models on Temporal workers and to feed structured-output schemas to LLM providers). Previously the round-trip silently re-emitted the field as a plain Python `Enum` class — e.g. `Literal["Strong Match", "Good Match", "Partial Match", "Poor Match"]` became `class Recommendation(Enum): Poor_Match = "Poor Match"; ...`. LLMs filling that schema then returned the enum's Python repr (`"Recommendation.Poor_Match"`) instead of the literal string (`"Poor Match"`), which failed Pydantic validation against the original choice set with errors like `Invalid choice errors: 'recommendation': got 'Recommendation.Poor_Match', expected one of 'Strong Match', 'Good Match', 'Partial Match' or 'Poor Match'`. `_generate_source_from_schema` now passes `enum_field_as_literal=LiteralType.All` to `datamodel-code-generator`, so `enum: [strings]` schema nodes round-trip as `Literal[...]` instead of being regenerated as `Enum` classes. `_exec_source_to_types` now also exposes `Literal` in the rebuild namespace so `model_rebuild` resolves the deferred annotations.
+
 ## [v0.26.1] - 2026-05-05
 
 ### Changed
@@ -694,10 +700,9 @@
   1. Pipelex Gateway telemetry for service monitoring (never collects prompts/completions/business data)
   2. Custom telemetry to user-configured backends
   3. Config updated accordingly (`telemetry.toml`):
+     - Renamed `[posthog]` to `[custom_posthog]` to distinguish user's PostHog from Pipelex Gateway telemetry
+     - Added new `[custom_portkey]` section with `force_debug_enabled` and `force_tracing_enabled` settings
 
-
-      - Renamed `[posthog]` to `[custom_posthog]` to distinguish user's PostHog from Pipelex Gateway telemetry
-      - Added new `[custom_portkey]` section with `force_debug_enabled` and `force_tracing_enabled` settings
 - **Main Configuration Overrides Updated** (`.pipelex/pipelex.toml`):
   - `pipelex_override.toml` (final override) renamed from `pipelex_super.toml` to `pipelex_override.toml` and moved from repo root to `.pipelex/` directory
   - `telemetry_override.toml` (personal telemetry settings)
@@ -1013,10 +1018,9 @@
   1. Pipelex Gateway telemetry for service monitoring (never collects prompts/completions/business data)
   2. Custom telemetry to user-configured backends
   3. Config updated accordingly (`telemetry.toml`):
+     - Renamed `[posthog]` to `[custom_posthog]` to distinguish user's PostHog from Pipelex Gateway telemetry
+     - Added new `[custom_portkey]` section with `force_debug_enabled` and `force_tracing_enabled` settings
 
-
-      - Renamed `[posthog]` to `[custom_posthog]` to distinguish user's PostHog from Pipelex Gateway telemetry
-      - Added new `[custom_portkey]` section with `force_debug_enabled` and `force_tracing_enabled` settings
 - **Main Configuration Overrides Updated** (`.pipelex/pipelex.toml`):
   - `pipelex_override.toml` (final override) renamed from `pipelex_super.toml` to `pipelex_override.toml` and moved from repo root to `.pipelex/` directory
   - `telemetry_override.toml` (personal telemetry settings)
