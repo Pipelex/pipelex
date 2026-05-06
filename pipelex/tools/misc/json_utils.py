@@ -33,6 +33,7 @@ def clean_json_content(content: Any) -> Any:
     Removes kajson metadata fields (``__class__``, ``__module__``) and converts
     non-JSON-native types to their JSON-safe equivalents:
 
+    - ``BaseModel`` -> ``model_dump(serialize_as_any=True)`` (then cleaned recursively)
     - ``datetime.datetime`` / ``datetime.date`` / ``datetime.time`` -> ISO-format string
     - ``Enum`` -> its ``.value``
     - ``Decimal`` -> ``float``
@@ -44,6 +45,12 @@ def clean_json_content(content: Any) -> Any:
     Returns:
         A cleaned copy of *content* that ``json.dumps`` can serialize directly.
     """
+    if isinstance(content, BaseModel):
+        # Pydantic models can land inside otherwise plain dicts when kajson's
+        # Temporal data converter eagerly rehydrates `__class__` markers on the
+        # receiving worker. Reduce them to dicts via the canonical smart_dump
+        # path (model_dump(serialize_as_any=True)) before continuing the walk.
+        return clean_json_content(content.model_dump(serialize_as_any=True))
     if isinstance(content, dict):
         cleaned: dict[str, Any] = {}
         content_dict = cast("dict[str, Any]", content)

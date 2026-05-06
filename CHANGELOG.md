@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.26.4] - 2026-05-06
+
+### Fixed
+
+- **Temporal storage delivery no longer fails when `working_memory_raw` contains rehydrated Pydantic instances.** `WorkingMemory.dump_for_temporal()` embeds `__class__`/`__module__` markers on `ListContent` items so the receiving workflow can hydrate them. Kajson's Temporal data converter then eagerly rebuilds those dicts back into `BaseModel` instances (e.g. `PageContent` from `Page[]` outputs) on the activity worker that runs delivery — even though `working_memory_raw` is typed as `dict[str, Any]`. `clean_json_content()` previously walked only dicts/lists/scalars and let `BaseModel` instances reach `json.dumps`, which raised `TypeError: Object of type PageContent is not JSON serializable` and aborted `act_deliver`. `clean_json_content` now reduces any `BaseModel` it encounters via `model_dump(serialize_as_any=True)` (the canonical `smart_dump` path) before continuing the recursive walk.
+
 ## [v0.26.3] - 2026-05-06
 
 ### Fixed
