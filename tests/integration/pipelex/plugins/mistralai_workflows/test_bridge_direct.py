@@ -83,3 +83,36 @@ class TestBridgeDirect:
 
         assert result.is_completed is True
         assert result.pipeline_run_id == caller_run_id
+
+    async def test_direct_mode_dynamic_concept_round_trips_via_library_crate_dump(
+        self,
+        bridge_test_library: str,
+    ) -> None:
+        """A concept with an inline structure round-trips through ``library_crate_dump``.
+
+        ``EchoEnvelope`` is defined inline in the bridge_test bundle. The bridge
+        dehydrates the library to a JSON-safe crate dump, opens a per-call
+        scoped library on the receiving side, and re-hydrates the concept so
+        ``PipeCompose`` can construct a ``StructuredContent`` matching the
+        dynamic shape.
+        """
+        envelope_pipe_ref = "mistralai_workflows_bridge_test.bridge_envelope_pipe"
+        crate = get_library_manager().get_crate(library_id=bridge_test_library)
+        assert crate is not None
+        crate_dump: dict[str, Any] = crate.model_dump(mode="json")
+
+        result = await run_pipe_via_bridge(
+            PipelexPipeRunInput(
+                pipe_code=envelope_pipe_ref,
+                inputs={"input_text": "wrapped"},
+                library_crate_dump=crate_dump,
+                execution_mode=PipelexExecutionMode.DIRECT,
+            )
+        )
+
+        assert result.is_completed is True
+        assert result.main_stuff_name is not None
+        main_stuff = result.output_dict["root"][result.main_stuff_name]
+        content = main_stuff["content"]
+        assert content["text"] == "wrapped"
+        assert content["origin"] == "mistralai_workflows_bridge"

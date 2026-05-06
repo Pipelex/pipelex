@@ -51,6 +51,62 @@ The activity has sensible defaults (10 minute timeout, 3 retries). When you need
 
 ---
 
+## Large payloads — `pipelex_run_pipe_offloaded`
+
+Temporal's per-event payload limit is around 2 MiB. When a pipe input or output approaches that ceiling — large documents, accumulated transcripts, image bytes — the activity rejects with `MessageTooLarge`. Mistral Workflows ships an `ActivityInOutOffloadingInterceptor` that streams oversized payloads through blob storage (S3/GCS/Azure) automatically, and Pipelex provides an offload-capable activity to plug into it.
+
+```python
+from mistralai import workflows
+from mistralai.workflows.core.encoding.fields_offloader import OffloadableField
+
+from pipelex.plugins.mistralai_workflows.activities import (
+    PipelexPipeRunInputOffloaded,
+    PipelexPipeRunOutputOffloaded,
+    pipelex_run_pipe_offloaded,
+)
+from pipelex.plugins.mistralai_workflows.bridge import PipelexPipeRunInput
+
+
+@workflows.workflow.define(name="extract-large-doc-flow")
+class ExtractLargeDocFlow:
+    @workflows.workflow.entrypoint
+    async def run(self, doc_bytes: bytes) -> dict:
+        wrapped_input = PipelexPipeRunInputOffloaded(
+            payload=OffloadableField(
+                value=PipelexPipeRunInput(
+                    pipe_code="finance.extract_large_invoice",
+                    inputs={"doc_bytes": doc_bytes.hex()},
+                ),
+            ),
+        )
+        wrapped_output: PipelexPipeRunOutputOffloaded = await pipelex_run_pipe_offloaded(wrapped_input)
+        return wrapped_output.payload.get_value().output_dict
+```
+
+The wrapping/unwrapping is a no-op when the payload fits inline. Offloading only kicks in when the worker is configured with the interceptor:
+
+```python
+from mistralai import workflows
+from mistralai.workflows.core.config.config import config
+from mistralai.workflows.core.encoding.fields_offloader import FieldsOffloader
+from mistralai.workflows.core.temporal.activity_offloading_interceptor import (
+    ActivityInOutOffloadingInterceptor,
+)
+
+offloader = FieldsOffloader(offloading_config=config.payload_offloading)
+interceptor = ActivityInOutOffloadingInterceptor(offloader)
+
+await workflows.run_worker(
+    [ExtractLargeDocFlow],
+    activities=[pipelex_run_pipe_offloaded],
+    interceptors=[interceptor],
+)
+```
+
+Trade-off: offloaded payloads live in the blob storage you configure (S3 by default in Mistral's example) for the lifetime of the workflow run. They incur storage cost and add an extra round-trip per offloaded field. Reach for the offloaded variant only when you actually need the size headroom.
+
+---
+
 ## Tier 2 — helper inside your own typed activity
 
 Wrap `run_pipe_via_bridge` in your own `@activity`-decorated function so you control all activity options and the input/output types.
