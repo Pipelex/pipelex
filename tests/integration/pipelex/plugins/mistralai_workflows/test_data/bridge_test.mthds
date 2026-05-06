@@ -3,6 +3,13 @@ description = "Test pipes for the mistralai_workflows plugin bridge"
 
 [pipe.bridge_func_pipe]
 type          = "PipeFunc"
-description   = "Echoes the input text back as output"
+description   = "Echoes the input text back as output (DIRECT mode only — PipeFunc is not Temporal-compatible)"
 output        = "Text"
 function_name = "mistralai_workflows_bridge_echo"
+
+[pipe.bridge_compose_pipe]
+type        = "PipeCompose"
+description = "Echoes the input_text via a Jinja2 template (Temporal-compatible)"
+inputs      = { input_text = "Text" }
+output      = "Text"
+template    = "{{ input_text.text }}"

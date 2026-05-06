@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Pipelex pipes can now be invoked from inside Mistral Workflows activities** via the new `pipelex.plugins.mistralai_workflows` plugin (optional dep `pipelex[mistralai-workflows]`). The plugin offers three usage tiers: a pre-decorated `pipelex_run_pipe` activity, a `run_pipe_via_bridge` helper to wrap in your own typed activity, and a low-level `build_pipe_job_from_input` / `serialize_pipe_output` API. Three execution modes via `PipelexExecutionMode`: `DIRECT` (in-process inside the activity), `TEMPORAL_BLOCKING` (dispatch to Pipelex's Temporal cluster, wait for result), and `TEMPORAL_FIRE_AND_FORGET` (dispatch and return immediately with a workflow id; completion delivered out-of-band via `DeliveryAssignment`). The boundary is JSON-only — no internal Pipelex types cross the activity surface — and per-call library scoping via `library_crate_dump` lets activities run pipes from bundles that aren't pre-loaded into the worker's global registry. See `docs/under-the-hood/mistralai-workflows-plugin.md` for the architecture and `docs/under-the-hood/mistralai-workflows-recipes.md` for worked examples.
+
 ## [v0.26.4] - 2026-05-06
 
 ### Fixed
