@@ -19,7 +19,6 @@ import asyncio
 import importlib.util
 import inspect
 import json
-import os
 import sys
 import traceback
 from pathlib import Path
@@ -66,11 +65,7 @@ def _import_module(file_path: Path) -> Any:
 
 def _find_workflow_classes(module: Any) -> list[type]:
     """Return all @workflow.define classes in *module*."""
-    return [
-        obj
-        for _, obj in inspect.getmembers(module, inspect.isclass)
-        if hasattr(obj, "__workflows_workflow_def")
-    ]
+    return [obj for _, obj in inspect.getmembers(module, inspect.isclass) if hasattr(obj, "__workflows_workflow_def")]
 
 
 def _workflow_name(cls: type) -> str:
@@ -81,33 +76,25 @@ def _is_interactive(cls: type) -> bool:
     return issubclass(cls, workflows.InteractiveWorkflow)
 
 
-def _discover_workflow(
-    workflow_file: Path, name_override: str | None
-) -> tuple[type, str, bool]:
+def _discover_workflow(workflow_file: Path, name_override: str | None) -> tuple[type, str, bool]:
     """Find and select the workflow class.  Returns (cls, name, interactive)."""
     module = _import_module(workflow_file)
     found = _find_workflow_classes(module)
 
     if not found:
-        raise SystemExit(
-            f"No workflow classes found in {workflow_file}. "
-            "Ensure the file has a class decorated with @workflow.define."
-        )
+        raise SystemExit(f"No workflow classes found in {workflow_file}. Ensure the file has a class decorated with @workflow.define.")
 
     if name_override:
         matches = [w for w in found if _workflow_name(w) == name_override]
         if not matches:
             available = ", ".join(_workflow_name(w) for w in found)
-            raise SystemExit(
-                f"Workflow '{name_override}' not found. Available: {available}"
-            )
+            raise SystemExit(f"Workflow '{name_override}' not found. Available: {available}")
         cls = matches[0]
     else:
         if len(found) > 1:
             names = ", ".join(_workflow_name(w) for w in found)
             print(
-                f"Multiple workflows found: {names}. Using the first one. "
-                "Pass --workflow-name to select.",
+                f"Multiple workflows found: {names}. Using the first one. Pass --workflow-name to select.",
                 file=sys.stderr,
             )
         cls = found[0]
@@ -146,9 +133,7 @@ async def _poll_and_submit_interactions(
         input: dict
 
     for i, response_data in enumerate(interactions, 1):
-        task_id = await _wait_for_pending_input(
-            client, execution_id, i, poll_timeout, poll_interval
-        )
+        task_id = await _wait_for_pending_input(client, execution_id, i, poll_timeout, poll_interval)
 
         print(f"  Interaction {i}: submitting {json.dumps(response_data)}")
         try:
@@ -161,10 +146,9 @@ async def _poll_and_submit_interactions(
                 ),
                 timeout=30,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             print(
-                f"  Interaction {i}: update timed out "
-                "(workflow may have failed to process the input)",
+                f"  Interaction {i}: update timed out (workflow may have failed to process the input)",
                 file=sys.stderr,
             )
             raise
@@ -186,25 +170,18 @@ async def _wait_for_pending_input(
     start = asyncio.get_event_loop().time()
     while True:
         try:
-            resp = await client.workflows.executions.query_workflow_execution_async(
-                execution_id=execution_id, name="__get_pending_inputs"
-            )
+            resp = await client.workflows.executions.query_workflow_execution_async(execution_id=execution_id, name="__get_pending_inputs")
             pending = resp.result.get("pending_inputs", [])
             if pending:
                 task_id = pending[0]["task_id"]
                 label = pending[0].get("label", "")
-                print(
-                    f"  Interaction {index}: pending input found "
-                    f"(task={task_id[:8]}..., label={label!r})"
-                )
+                print(f"  Interaction {index}: pending input found (task={task_id[:8]}..., label={label!r})")
                 return task_id
         except Exception:
             pass
 
         if asyncio.get_event_loop().time() - start > timeout:
-            raise TimeoutError(
-                f"Timeout waiting for pending input #{index} ({timeout}s)"
-            )
+            raise TimeoutError(f"Timeout waiting for pending input #{index} ({timeout}s)")
         await asyncio.sleep(interval)
 
 
@@ -213,9 +190,7 @@ async def _wait_for_pending_input(
 # ---------------------------------------------------------------------------
 
 
-async def _execute_with_retry(
-    client: Any, wf_name: str, input_dict: dict | None, retries: int = 10
-) -> Any:
+async def _execute_with_retry(client: Any, wf_name: str, input_dict: dict | None, retries: int = 10) -> Any:
     """Start the workflow, retrying on registration-propagation errors."""
     for attempt in range(retries):
         try:
@@ -244,24 +219,14 @@ async def _await_result(
     """
     if not (interactive and interactions):
         final = await asyncio.wait_for(
-            client.workflows.wait_for_workflow_completion_async(
-                execution_id, polling_interval=2
-            ),
+            client.workflows.wait_for_workflow_completion_async(execution_id, polling_interval=2),
             timeout=timeout,
         )
         return final.result
 
     # Run interactions and completion polling concurrently.
-    interaction_task = asyncio.create_task(
-        _poll_and_submit_interactions(
-            client, execution_id, interactions, poll_timeout=timeout
-        )
-    )
-    completion_task = asyncio.create_task(
-        client.workflows.wait_for_workflow_completion_async(
-            execution_id, polling_interval=2
-        )
-    )
+    interaction_task = asyncio.create_task(_poll_and_submit_interactions(client, execution_id, interactions, poll_timeout=timeout))
+    completion_task = asyncio.create_task(client.workflows.wait_for_workflow_completion_async(execution_id, polling_interval=2))
 
     done, pending = await asyncio.wait(
         [interaction_task, completion_task],
@@ -277,7 +242,7 @@ async def _await_result(
             pass
 
     if not done:
-        raise asyncio.TimeoutError()
+        raise TimeoutError
 
     # Surface errors -- interaction errors take priority.
     if interaction_task in done and interaction_task.exception():
@@ -288,7 +253,7 @@ async def _await_result(
     if completion_task in done:
         return completion_task.result().result
 
-    raise asyncio.TimeoutError()
+    raise TimeoutError
 
 
 # ---------------------------------------------------------------------------
@@ -312,9 +277,7 @@ async def run_workflow(
     _ensure_sdk()
 
     # -- discover --
-    workflow_cls, wf_name, interactive = _discover_workflow(
-        workflow_file, workflow_name_override
-    )
+    workflow_cls, wf_name, interactive = _discover_workflow(workflow_file, workflow_name_override)
 
     print(f"Workflow:      {wf_name} ({workflow_cls.__name__})")
     print(f"Interactive:   {interactive}")
@@ -326,8 +289,7 @@ async def run_workflow(
 
     if interactive and not interactions:
         print(
-            "WARNING: Interactive workflow but no --interactions provided.\n"
-            "         The workflow will hang at wait_for_input().\n",
+            "WARNING: Interactive workflow but no --interactions provided.\n         The workflow will hang at wait_for_input().\n",
             file=sys.stderr,
         )
 
@@ -348,25 +310,19 @@ async def run_workflow(
     execution_id: str | None = None
     try:
         # -- execute --
-        execution = await _execute_with_retry(
-            client, wf_name, _build_input(input_data)
-        )
+        execution = await _execute_with_retry(client, wf_name, _build_input(input_data))
         execution_id = execution.execution_id
         print(f"Execution:     {execution_id}")
         print(f"Status:        {execution.status}\n")
 
         # -- wait for result --
-        return await _await_result(
-            client, execution_id, interactions, interactive, timeout_seconds
-        )
+        return await _await_result(client, execution_id, interactions, interactive, timeout_seconds)
 
-    except asyncio.TimeoutError:
+    except TimeoutError:
         if execution_id:
             print(f"\nTerminating execution {execution_id}...", file=sys.stderr)
             try:
-                await client.workflows.executions.terminate_workflow_execution_async(
-                    execution_id=execution_id
-                )
+                await client.workflows.executions.terminate_workflow_execution_async(execution_id=execution_id)
                 print("Execution terminated.", file=sys.stderr)
             except Exception as e:
                 print(f"Failed to terminate: {e}", file=sys.stderr)
@@ -393,27 +349,32 @@ def _parse_args() -> argparse.Namespace:
         epilog=__doc__,
     )
     parser.add_argument(
-        "workflow_file", type=Path,
+        "workflow_file",
+        type=Path,
         help="Path to the Python file containing the workflow.",
     )
     parser.add_argument(
-        "--input", required=True, dest="input_json",
+        "--input",
+        required=True,
+        dest="input_json",
         help="JSON string with the workflow input.",
     )
     parser.add_argument(
-        "--timeout", type=int, default=30,
+        "--timeout",
+        type=int,
+        default=30,
         help="Max seconds before the workflow is killed (default: 30).",
     )
     parser.add_argument(
-        "--workflow-name", default=None,
+        "--workflow-name",
+        default=None,
         help="Workflow name (if the file contains multiple workflows).",
     )
     parser.add_argument(
-        "--interactions", default=None, dest="interactions_json",
-        help=(
-            "JSON array of interaction responses for interactive workflows. "
-            'Example: \'[{"choice": "WFL"}]\''
-        ),
+        "--interactions",
+        default=None,
+        dest="interactions_json",
+        help=('JSON array of interaction responses for interactive workflows. Example: \'[{"choice": "WFL"}]\''),
     )
     return parser.parse_args()
 
@@ -445,6 +406,7 @@ def main() -> None:
     # Load .env if present.
     try:
         from dotenv import load_dotenv
+
         load_dotenv(override=True)
     except ImportError:
         pass
@@ -468,7 +430,7 @@ def main() -> None:
         print(json.dumps(result, indent=2, default=str))
     except SystemExit:
         raise
-    except asyncio.TimeoutError:
+    except TimeoutError:
         print("FAILED: workflow timed out", file=sys.stderr)
         raise SystemExit(1)
     except Exception:

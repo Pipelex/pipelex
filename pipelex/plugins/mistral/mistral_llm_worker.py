@@ -1,8 +1,9 @@
 from typing import TYPE_CHECKING, Any
 
-from mistralai import Mistral, MistralError
-from mistralai.models import MistralPromptMode, TextChunk, ThinkChunk
-from mistralai.types import UNSET
+from mistralai.client import Mistral
+from mistralai.client.errors import MistralError
+from mistralai.client.models import MistralPromptMode, TextChunk, ThinkChunk
+from mistralai.client.types import UNSET
 from typing_extensions import override
 
 from pipelex import log
@@ -24,8 +25,8 @@ from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 from pipelex.urls import URLs
 
 if TYPE_CHECKING:
-    from mistralai.models import ChatCompletionResponse
-    from mistralai.types import OptionalNullable
+    from mistralai.client.models import ChatCompletionResponse
+    from mistralai.client.types import OptionalNullable
 
 
 class MistralLLMWorker(LLMWorkerInternalAbstract):
@@ -176,7 +177,11 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
         if not response.choices:
             msg = "Mistral response.choices is None"
             raise LLMCompletionError(msg)
-        mistral_response_content = response.choices[0].message.content
+        message = response.choices[0].message
+        if message is None:
+            msg = "Mistral response.choices[0].message is None"
+            raise LLMCompletionError(msg)
+        mistral_response_content = message.content
         result_text: str
         if isinstance(mistral_response_content, str):
             result_text = mistral_response_content

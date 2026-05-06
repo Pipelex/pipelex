@@ -1,0 +1,8 @@
+domain      = "mistralai_workflows_bridge_test"
+description = "Test pipes for the mistralai_workflows plugin bridge"
+
+[pipe.bridge_func_pipe]
+type          = "PipeFunc"
+description   = "Echoes the input text back as output"
+output        = "Text"
+function_name = "mistralai_workflows_bridge_echo"
