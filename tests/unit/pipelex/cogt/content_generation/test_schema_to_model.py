@@ -2,7 +2,7 @@
 
 import threading
 import uuid
-from typing import Any
+from typing import Any, Literal, get_args, get_origin
 
 import pytest
 from pydantic import BaseModel, Field
@@ -15,6 +15,17 @@ from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToMode
 class SimpleModel(BaseModel):
     name: str = Field(description="The name")
     age: int = Field(description="The age")
+
+
+class ModelWithLiteralChoices(BaseModel):
+    """A model whose ``recommendation`` field is a ``Literal`` over string choices.
+
+    Mirrors the shape a `.mthds` ``choices = [...]`` declaration produces: the
+    field's JSON schema contains an inline ``enum: [strings]`` array, and the
+    Python annotation is ``Literal[...]`` — NOT a named Python enum class.
+    """
+
+    recommendation: Literal["Strong Match", "Good Match", "Partial Match", "Poor Match"]
 
 
 class Address(BaseModel):
@@ -32,6 +43,53 @@ def _benign_object_schema() -> dict[str, Any]:
 
 
 class TestSchemaToModel:
+    def test_literal_choices_field_round_trips_as_literal_not_enum(self) -> None:
+        """Round-tripping a ``Literal[str-set]`` field through ``make_from_json_schema``
+        must keep it as a ``Literal[...]`` annotation in the reconstructed class.
+
+        Bug repro: today the round-trip silently re-emits the field as a generated
+        ``Enum`` class (e.g. ``class Recommendation(Enum)`` with members like
+        ``Poor_Match = "Poor Match"``). When this reconstructed class is handed to
+        an LLM as the structured-output target, the LLM tends to fill it with the
+        Python enum repr (``"Recommendation.Poor_Match"``) instead of the literal
+        string (``"Poor Match"``), which then fails Pydantic validation against the
+        original choice set.
+
+        We assert two things:
+          1. the generated Python source code does NOT introduce an ``Enum`` class
+             named after the field (``class Recommendation(Enum)``);
+          2. the reconstructed model's ``recommendation`` field annotation is a
+             ``Literal[...]`` whose args are exactly the original string choices.
+        """
+        # Use a unique title so the class-level schema cache never short-circuits
+        # this test with a stale (already-correct or already-buggy) result from
+        # another test run.
+        schema = ModelWithLiteralChoices.model_json_schema()
+        unique_title = f"LiteralChoicesRepro_{uuid.uuid4().hex}"
+        schema["title"] = unique_title
+
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, unique_title)
+        source = getattr(result_class, "__kajson_class_source__", "")
+
+        assert "class Recommendation(Enum)" not in source, (
+            "Bug: Literal[...] choices were re-emitted as a generated Enum class. "
+            "An LLM targeting this Enum returns 'Recommendation.Poor_Match' (Python "
+            "enum repr) instead of the literal 'Poor Match', which fails validation "
+            "against the original choice set.\n\nGenerated source:\n" + source
+        )
+
+        recommendation_field = result_class.model_fields["recommendation"]
+        annotation = recommendation_field.annotation
+        assert get_origin(annotation) is Literal, (
+            f"Expected the round-tripped 'recommendation' field annotation to be Literal[...], got {annotation!r}. Source:\n{source}"
+        )
+        assert set(get_args(annotation)) == {
+            "Strong Match",
+            "Good Match",
+            "Partial Match",
+            "Poor Match",
+        }, f"Literal args drifted during round-trip: {get_args(annotation)!r}"
+
     def test_simple_model_reconstruction(self) -> None:
         """A simple model can be reconstructed from its JSON schema."""
         schema = SimpleModel.model_json_schema()
