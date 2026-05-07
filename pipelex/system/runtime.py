@@ -5,6 +5,7 @@ from pipelex.types import StrEnum
 
 RUN_MODE_ENV_VAR_KEY = "RUN_MODE"
 CODEX_CLOUD_ENV_VAR_KEY = "CODEX_CLOUD"
+RUN_ENVIRONMENT_ENV_VAR_KEY = "PIPELEX_ENV"
 
 
 class IntegrationMode(StrEnum):
@@ -70,7 +71,7 @@ class RunEnvironment(StrEnum):
 
     @classmethod
     def get_from_env_var(cls) -> "RunEnvironment":
-        return RunEnvironment(get_optional_env("PIPELEX_ENV") or RunEnvironment.DEV)
+        return RunEnvironment(get_optional_env(RUN_ENVIRONMENT_ENV_VAR_KEY) or RunEnvironment.DEV)
 
 
 class ProblemReaction(StrEnum):
