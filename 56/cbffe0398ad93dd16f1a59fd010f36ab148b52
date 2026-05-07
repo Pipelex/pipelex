@@ -1,0 +1,24 @@
+CHANGELOG.md
+  s_3e7e9ddd3904f8::t_a7d74c1f537f4d 3-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "56cbffe0398ad93dd16f1a59fd010f36ab148b52",
+  "prompts": {},
+  "humans": {
+    "h_39660369d4ad8c": {
+      "author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  },
+  "sessions": {
+    "s_3e7e9ddd3904f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d8da009d-86eb-4f86-b0f2-845613d009a0",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  }
+}
