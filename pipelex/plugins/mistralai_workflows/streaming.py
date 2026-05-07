@@ -179,7 +179,6 @@ async def _run_streaming_with_per_step_events(
                 ),
                 name=f"pipelex-streaming-forwarder-{pipeline_run_id}",
             )
-            output: PipelexPipeRunOutput | None = None
             try:
                 output = await run_pipe_via_bridge(input_payload, graph_context=graph_context)
             finally:
@@ -187,15 +186,14 @@ async def _run_streaming_with_per_step_events(
                 # "completed" state. If we wrote phase="completed" first, the
                 # forwarder's still-pending pipe_end_success patches would race
                 # the snapshot and the captured CustomTaskCompleted event would
-                # read phase="in_progress".
+                # read phase="in_progress". On the failure path, the drain
+                # also lets pending in-progress events publish before the
+                # surrounding ``async with Task`` emits CustomTaskFailed.
                 event_queue.put_nowait(SHUTDOWN_SENTINEL)
                 try:
                     await asyncio.wait_for(forwarder_task, timeout=get_drain_timeout_seconds())
                 except TimeoutError:
                     forwarder_task.cancel()
-            # Bridge either returned (output is non-None) or raised inside the
-            # try block above and we never reach this line.
-            assert output is not None
             await streaming_task.update_state(
                 {
                     "phase": "completed",
