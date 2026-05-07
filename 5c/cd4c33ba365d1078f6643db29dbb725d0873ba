@@ -1,0 +1,19 @@
+TODOS.md
+  s_6eb1cedfd99d1b::t_e2d13b87759f8c 3,5,7-12,14-15,17,19-27,31-113,115,124-138,151-160,172-179
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "5ccd4c33ba365d1078f6643db29dbb725d0873ba",
+  "prompts": {},
+  "sessions": {
+    "s_6eb1cedfd99d1b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "aa32ead0-a830-45de-86b5-e533db27635d",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  }
+}
