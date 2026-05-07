@@ -307,8 +307,6 @@ plugins:
         - under-the-hood/pipe-routing-and-execution.md: "Pipe Routing & Execution"
         - under-the-hood/temporal-integration.md: "Temporal Integration"
         - under-the-hood/distributed-content-generation.md: "Distributed Content Generation"
-        - under-the-hood/mistralai-workflows-plugin.md: "Mistral Workflows Plugin"
-        - under-the-hood/mistralai-workflows-recipes.md: "Mistral Workflows Recipes"
         Project:
         - contributing.md: "Contributing"
         - contribute/configuration-defaults-and-overrides.md: "Configuration Internals"
@@ -497,8 +495,6 @@ nav:
       - Pipe Routing & Execution: under-the-hood/pipe-routing-and-execution.md
       - Temporal Integration: under-the-hood/temporal-integration.md
       - Distributed Content Generation: under-the-hood/distributed-content-generation.md
-      - Mistral Workflows Plugin: under-the-hood/mistralai-workflows-plugin.md
-      - Mistral Workflows Recipes: under-the-hood/mistralai-workflows-recipes.md
   - Project:
     - Contributing: contributing.md
     - Configuration Internals: contribute/configuration-defaults-and-overrides.md

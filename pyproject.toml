@@ -85,7 +85,6 @@ google-genai = [
 huggingface = ["huggingface_hub>=0.23,<1.0.0"]
 linkup = ["linkup-sdk>=0.12.0"]
 mistralai = ["mistralai>=2.4.4"]
-mistralai-workflows = ["mistralai-workflows>=3.3.0"]
 dynamodb = ["boto3>=1.34.131"]
 s3 = ["boto3>=1.34.131", "aioboto3>=13.4.0"]
 temporal = ["temporalio==1.24.0", "aiohttp>=3.9.0"]
@@ -149,18 +148,6 @@ module = [
   "json2html",
   "pypdfium2",
   "pypdfium2.raw",
-]
-
-[[tool.mypy.overrides]]
-# Mistral Workflows uses PEP 695 type-parameter syntax that mypy rejects under
-# python_version=3.11 even though our runtime supports 3.10+. Skip following
-# imports into this third-party package so its source files don't leak into
-# our type-check.
-follow_imports = "skip"
-ignore_errors = true
-module = [
-  "mistralai.workflows.*",
-  "mistralai.workflows",
 ]
 
 [tool.pyright]
