@@ -30,3 +30,27 @@ output      = "EchoEnvelope"
 [pipe.bridge_envelope_pipe.construct]
 text   = { from = "input_text.text" }
 origin = "mistralai_workflows_bridge"
+
+[pipe.bridge_seq_step_one]
+type        = "PipeCompose"
+description = "First step of bridge_sequence_pipe — uppercases the input text"
+inputs      = { input_text = "Text" }
+output      = "Text"
+template    = "{{ input_text.text | upper }}"
+
+[pipe.bridge_seq_step_two]
+type        = "PipeCompose"
+description = "Second step of bridge_sequence_pipe — wraps the result with markers"
+inputs      = { uppercased = "Text" }
+output      = "Text"
+template    = "[STEP2:{{ uppercased.text }}]"
+
+[pipe.bridge_sequence_pipe]
+type = "PipeSequence"
+description = "Two-step sequence used by Phase 2.1 streaming tests to assert per-step events"
+inputs = { input_text = "Text" }
+output = "Text"
+steps = [
+  { pipe = "bridge_seq_step_one", result = "uppercased" },
+  { pipe = "bridge_seq_step_two", result = "final_text" },
+]

@@ -147,13 +147,31 @@ The events carry a small JSON payload identifying the run:
 | Event                    | Payload                                                                       |
 | ------------------------ | ----------------------------------------------------------------------------- |
 | `CustomTaskStarted`      | `phase="started"`, `pipe_code`, `execution_mode`, `pipeline_run_id` (if set)  |
-| `CustomTaskInProgress`   | JSON-patch transition to `phase="completed"` with `pipeline_run_id` filled    |
-| `CustomTaskCompleted`    | Final state — same shape as the InProgress payload                            |
+| `CustomTaskInProgress`   | JSON-patch updates: per-step boundaries (DIRECT mode) and the final transition to `phase="completed"` |
+| `CustomTaskCompleted`    | Final full-state snapshot with `phase="completed"` and `main_stuff_name`      |
 | `CustomTaskFailed`       | The original exception message (emitted by `Task.__aexit__` on failure)       |
 
 `custom_task_type` is always `"pipelex.pipe_run"`, so subscribers can filter on it without parsing the payload.
 
-For the silent path (no observability, no event publishing overhead per activity) keep using `pipelex_run_pipe` — the streaming variant is opt-in. Per-step granularity (one event per pipe sub-step, driven by Pipelex's `report_delegate`) is on the roadmap as Phase 2.1.
+### Per-step events for `DIRECT` mode
+
+When `execution_mode=PipelexExecutionMode.DIRECT`, the streaming activity publishes one `CustomTaskInProgress` event per Pipelex pipe boundary in addition to the final completed-state push. Each pipe-step event carries a JSON-patch update to the streaming state with the following fields:
+
+| Field                       | Description                                                                  |
+| --------------------------- | ---------------------------------------------------------------------------- |
+| `phase`                     | `"in_progress"` (transition from `"started"` on the very first patch)        |
+| `current_step_pipe_code`    | The pipe code for the most recent `PipeStartEvent`                           |
+| `current_step_node_id`      | The graph node id for that pipe                                              |
+| `last_event_kind`           | `"pipe_start"` / `"pipe_end_success"` / `"pipe_end_error"`                   |
+| `started_steps`             | Cumulative count of pipe-step starts (1-indexed, monotonic)                  |
+| `completed_steps`           | Cumulative count of successful pipe-step completions                         |
+| `last_output_stuff_name`    | The output IOSpec name for the most recent successful step (or `null`)       |
+
+A field only appears in a given `CustomTaskInProgress` JSON-patch when its value actually changed — for example, `last_event_kind` won't appear in two consecutive `pipe_start` events. Use `started_steps` / `completed_steps` (always changing) as discriminators when you need to count or order step events.
+
+`TEMPORAL_BLOCKING` and `TEMPORAL_FIRE_AND_FORGET` modes keep the simpler "one started + one completed" semantics — per-step streaming across the Temporal worker boundary is not supported in this release.
+
+For the silent path (no observability, no event publishing overhead per activity) keep using `pipelex_run_pipe` — the streaming variant is opt-in.
 
 ---
 

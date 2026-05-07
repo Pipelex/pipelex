@@ -47,6 +47,7 @@ from pipelex.system.telemetry.otel_constants import OTelConstants
 if TYPE_CHECKING:
     from pipelex.core.memory.working_memory import WorkingMemory
     from pipelex.core.pipes.pipe_output import PipeOutput
+    from pipelex.graph.graph_context import GraphContext
     from pipelex.pipe_run.pipe_job import PipeJob
 
 
@@ -78,12 +79,23 @@ class PipelexPipeRunOutput(BaseModel):
     graph_spec_dump: dict[str, Any] | None = None
 
 
-async def run_pipe_via_bridge(input_payload: PipelexPipeRunInput) -> PipelexPipeRunOutput:
+async def run_pipe_via_bridge(
+    input_payload: PipelexPipeRunInput,
+    graph_context: GraphContext | None = None,
+) -> PipelexPipeRunOutput:
     """Run a Pipelex pipe from inside a Mistral Workflows activity.
 
     Booting Pipelex on first call (no-op if already initialized); validating
     the input; opening a per-call scoped library if a ``library_crate_dump``
     is provided; then dispatching to the requested execution mode.
+
+    The optional ``graph_context`` is plumbed into ``JobMetadata`` so callers
+    (e.g. the streaming activity) that already opened a
+    ``GraphTracerManager`` tracer for this pipeline run get per-step trace
+    events flowing through the configured event log. ``graph_context`` is
+    only honored for ``DIRECT`` execution mode — TEMPORAL modes already
+    have their own event-log infrastructure via ``pipeline_run_setup`` and
+    a passed-in context would be ignored anyway.
     """
     ensure_pipelex_booted()
     _validate_input(input_payload)
@@ -92,7 +104,11 @@ async def run_pipe_via_bridge(input_payload: PipelexPipeRunInput) -> PipelexPipe
     delivery_assignment = _decode_delivery_assignment(input_payload.delivery_assignment_dump)
 
     async with _scoped_library_for_crate(library_crate):
-        pipe_job = build_pipe_job_from_input(input_payload=input_payload, library_crate=library_crate)
+        pipe_job = build_pipe_job_from_input(
+            input_payload=input_payload,
+            library_crate=library_crate,
+            graph_context=graph_context,
+        )
 
         match input_payload.execution_mode:
             case PipelexExecutionMode.DIRECT:
@@ -108,12 +124,19 @@ async def run_pipe_via_bridge(input_payload: PipelexPipeRunInput) -> PipelexPipe
 def build_pipe_job_from_input(
     input_payload: PipelexPipeRunInput,
     library_crate: LibraryCrate | None,
+    graph_context: GraphContext | None = None,
 ) -> PipeJob:
     """Hydrate a PipeJob from JSON-safe input.
 
     Looks up the pipe in the active library; the caller is responsible for
     making sure the active library contains the pipe (by passing a
     ``library_crate_dump`` or pre-loading the library at boot).
+
+    The optional ``graph_context`` is plumbed into ``JobMetadata`` so a
+    caller (e.g. the streaming activity) that has already opened a
+    ``GraphTracerManager`` tracer for this pipeline run can have per-step
+    ``PipeStartEvent`` / ``PipeEndSuccessEvent`` events flow through the
+    pipe execution. When ``None``, no tracing happens (current default).
     """
     pipe = get_required_pipe(pipe_code=input_payload.pipe_code)
 
@@ -131,6 +154,7 @@ def build_pipe_job_from_input(
     job_metadata = JobMetadata(
         user_id=input_payload.user_id or OTelConstants.DEFAULT_USER_ID,
         pipeline_run_id=pipeline_run_id,
+        graph_context=graph_context,
     )
     pipe_run_params = PipeRunParamsFactory.make_run_params()
 

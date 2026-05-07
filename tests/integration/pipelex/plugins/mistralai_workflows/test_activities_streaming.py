@@ -9,7 +9,7 @@ were published with the expected ``custom_task_type`` and payload shape.
 Skipped when ``mistralai-workflows`` is not installed.
 """
 
-from typing import Any
+from typing import Any, cast
 
 import pytest
 import pytest_asyncio
@@ -43,6 +43,7 @@ with mistralai_workflows.workflow.unsafe.imports_passed_through():
     )
 
 PIPE_REF = "mistralai_workflows_bridge_test.bridge_func_pipe"
+PIPE_REF_SEQUENCE = "mistralai_workflows_bridge_test.bridge_sequence_pipe"
 TEST_TASK_QUEUE = "pipelex-mistralai-workflows-streaming-test"
 
 
@@ -143,3 +144,116 @@ class TestPipelexRunPipeStreamingActivity:
         assert completed_payload["phase"] == "completed"
         assert completed_payload["pipeline_run_id"] == result.pipeline_run_id
         assert completed_payload["main_stuff_name"] == result.main_stuff_name
+
+    async def test_multistep_pipe_emits_per_step_events(
+        self,
+        workflow_env: WorkflowEnvironment,
+        bridge_test_library: str,  # noqa: ARG002
+    ) -> None:
+        """A two-step PipeSequence produces one CustomTaskInProgress per pipe boundary."""
+        captured_events: list[WorkflowEvent] = []
+        mock_events_client = create_capturing_mock_events_client(captured_events)
+
+        payload = PipelexPipeRunInput(
+            pipe_code=PIPE_REF_SEQUENCE,
+            inputs={"input_text": "step events"},
+            execution_mode=PipelexExecutionMode.DIRECT,
+        )
+
+        async with (
+            EventContext(events_client=mock_events_client),
+            create_test_worker_with_events(
+                workflow_env,
+                workflows=[PipelexBridgeStreamingTestWorkflow],
+                activities=[pipelex_run_pipe_streaming],
+                task_queue=TEST_TASK_QUEUE,
+            ),
+        ):
+            result_dict = await workflow_env.client.execute_workflow(
+                PipelexBridgeStreamingTestWorkflow.run,
+                {"payload_dict": payload.model_dump(mode="json")},
+                id="pipelex-bridge-streaming-multistep-test-workflow",
+                task_queue=TEST_TASK_QUEUE,
+            )
+
+        result = PipelexPipeRunOutput.model_validate(result_dict)
+        assert result.is_completed is True
+        assert result.main_stuff_name is not None
+        # Both steps must have run in declaration order: upper("step events") wrapped with [STEP2:...]
+        assert result.output_dict["root"][result.main_stuff_name]["content"]["text"] == "[STEP2:STEP EVENTS]"
+
+        custom_task_events = [
+            event
+            for event in captured_events
+            if isinstance(event, (CustomTaskStarted, CustomTaskInProgress, CustomTaskCompleted))
+            and event.attributes.custom_task_type == PIPELEX_PIPE_RUN_TASK_TYPE
+        ]
+        started_events = [event for event in custom_task_events if isinstance(event, CustomTaskStarted)]
+        in_progress_events = [event for event in custom_task_events if isinstance(event, CustomTaskInProgress)]
+        completed_events = [event for event in custom_task_events if isinstance(event, CustomTaskCompleted)]
+
+        assert len(started_events) == 1, f"expected 1 CustomTaskStarted, got {len(started_events)}"
+        assert len(completed_events) == 1, f"expected 1 CustomTaskCompleted, got {len(completed_events)}"
+
+        # CustomTaskInProgress carries a JSONPatchPayload — value is a list of JSON Patch operations
+        # (one per field that *changed* between previous and new state). Flatten each event's patches
+        # into a {field: value} dict.
+        #
+        # Important: a field only appears in the patch when its value actually changed. If two
+        # consecutive update_state calls write the same value to a field (e.g. last_event_kind back
+        # to "pipe_start" without a "pipe_end_success" in between), that field is absent from the
+        # second patch. We therefore key on /started_steps (strictly monotonic on every pipe_start)
+        # and /completed_steps (strictly monotonic on every pipe_end_success).
+        patches_per_event = [_patches_to_changes(event) for event in in_progress_events]
+
+        pipe_start_changes = [changes for changes in patches_per_event if "started_steps" in changes]
+        pipe_end_success_changes = [changes for changes in patches_per_event if "completed_steps" in changes]
+        assert len(pipe_start_changes) >= 3, f"expected >=3 pipe_start in_progress events, got {len(pipe_start_changes)}"
+        assert len(pipe_end_success_changes) >= 3, f"expected >=3 pipe_end_success in_progress events, got {len(pipe_end_success_changes)}"
+
+        # Order: outer PipeSequence first, then step_one, then step_two. /current_step_pipe_code
+        # changes on every pipe_start (each pipe has a distinct code) so it always appears in the patch.
+        step_codes_in_order = [changes["current_step_pipe_code"] for changes in pipe_start_changes]
+        assert step_codes_in_order[0].endswith("bridge_sequence_pipe")
+        assert step_codes_in_order[1].endswith("bridge_seq_step_one")
+        assert step_codes_in_order[2].endswith("bridge_seq_step_two")
+
+        # started_steps counter is monotonic 1, 2, 3 across the first three pipe_start events.
+        started_steps_seq = [changes["started_steps"] for changes in pipe_start_changes[:3]]
+        assert started_steps_seq == [1, 2, 3]
+
+        # completed_steps reaches at least 3 by the end.
+        max_completed = max(changes["completed_steps"] for changes in pipe_end_success_changes)
+        assert max_completed >= 3
+
+        # Phase 2.0 fields still surfaced on the final completed event (a JSONPayload — full state snapshot).
+        completed_payload = completed_events[0].attributes.payload.value
+        assert completed_payload["phase"] == "completed"
+        assert completed_payload["pipeline_run_id"] == result.pipeline_run_id
+        assert completed_payload["main_stuff_name"] == result.main_stuff_name
+
+
+def _patches_to_changes(event: CustomTaskInProgress) -> dict[str, Any]:
+    """Flatten a CustomTaskInProgress JSON Patch list into a {field: value} dict.
+
+    Each ``update_state`` call produces a single ``CustomTaskInProgress`` with
+    a list of root-level "add"/"replace" patches (paths look like ``/field``).
+    Returns a dict of just the fields that changed in this event.
+    """
+    changes: dict[str, Any] = {}
+    payload_value: Any = event.attributes.payload.value
+    if not isinstance(payload_value, list):
+        return changes
+    raw_patches = cast("list[Any]", payload_value)
+    for raw_patch in raw_patches:
+        if isinstance(raw_patch, dict):
+            patch_dict = cast("dict[str, Any]", raw_patch)
+        else:
+            patch_dict = cast("dict[str, Any]", raw_patch.model_dump())
+        op = patch_dict.get("op")
+        path = patch_dict.get("path", "")
+        if op in {"add", "replace"} and isinstance(path, str) and path.startswith("/"):
+            field = path[1:]
+            if field:
+                changes[field] = patch_dict.get("value")
+    return changes

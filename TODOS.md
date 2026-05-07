@@ -21,7 +21,7 @@ user-facing reference lives at
 | 1.3   | Docs + CHANGELOG (mkdocs nav wired)                    | ✅ done¹ |
 | 1.5   | Large-payload `pipelex_run_pipe_offloaded` variant     | ✅ done |
 | 2.0   | Streaming v1 — one Mistral `task()` per activity       | ✅ done |
-| 2.1   | Streaming v2 — per-step `task.update()` (conditional)  | ⏳ next, conditional on demand |
+| 2.1   | Streaming v2 — per-step `task.update()` (DIRECT only)  | ✅ done |
 
 ¹ Cookbook example deferred to a follow-up PR in the sibling
 `pipelex-cookbook/` repo (suggested entry:
@@ -223,21 +223,45 @@ granularity. Cheapest path to "the user sees something happen."
       `CustomTaskCompleted` are emitted with the right `custom_task_type`
       (`pipelex.pipe_run`) and payload shape.
 
-### Phase 2.1 — Per-step granularity (only if 2.0 is too coarse)
+### Phase 2.1 — Per-step granularity (DIRECT mode only) ✅
 
-- [ ] Subscribe to Pipelex's `report_delegate` event stream from inside
-      the activity.
-- [ ] Map Pipelex events to Mistral `task.update(...)` calls:
-      - pipe sub-step started → `in_progress` with description
-      - stuff added to working memory → `in_progress` with new key
-      - pipe step completed → progress %
-- [ ] Forwarder side-task drains the event log and terminates cleanly on
-      both success and failure. Use `try` / `finally` (NOT `try` /
-      `except Exception`) for cleanup, per Pipelex standards.
-- [ ] Test asserts per-step events emitted in correct order for a
-      multi-step pipe. The current `bridge_test.mthds` has only single-
-      step pipes — Phase 2.1 needs a multi-step fixture (e.g. a
-      `PipeSequence` chaining two `PipeCompose`s).
+- [x] Subscribe to Pipelex's trace event channel from inside the
+      activity. Implemented as a queue-backed `EventLogProtocol`
+      (`QueueEventLog` in `streaming_event_forwarder.py`) injected into a
+      per-call `GraphTracerManager` tracer. Note: `ReportingProtocol`
+      itself has no observer methods — the right abstraction is the
+      event log, not the reporting delegate.
+- [x] Map Pipelex events to Mistral `task.update_state(...)` calls:
+      - `PipeStartEvent` → `in_progress` with `current_step_pipe_code`,
+        `current_step_node_id`, `last_event_kind="pipe_start"`,
+        `started_steps`.
+      - `PipeEndSuccessEvent` → `in_progress` with
+        `last_event_kind="pipe_end_success"`, `completed_steps`,
+        `last_output_stuff_name`.
+      - `PipeEndErrorEvent` → `in_progress` with
+        `last_event_kind="pipe_end_error"`. The activity's
+        `Task.__aexit__` then emits `CustomTaskFailed` with the
+        propagated exception.
+      - Other `TraceEventKind`s (edges, batch fan-out, controller
+        outputs, execution data, usage reports) intentionally suppressed
+        — too noisy for state updates, already captured by Pipelex's
+        own reporting / graph infrastructure.
+- [x] Forwarder side-task drains the event log and terminates cleanly
+      on both success and failure. Uses `try` / `finally` (no
+      `except Exception`); the forwarder is fully drained *before*
+      writing the final `phase="completed"` state so the snapshot
+      reflects the right phase.
+- [x] Multi-step test fixture: `bridge_sequence_pipe` (PipeSequence)
+      chaining `bridge_seq_step_one` and `bridge_seq_step_two`
+      (PipeCompose). Test asserts ≥3 pipe_start + ≥3 pipe_end_success
+      `CustomTaskInProgress` events with `started_steps` monotonic
+      `[1, 2, 3]` and per-step pipe codes in declaration order.
+
+Scope: DIRECT mode only. TEMPORAL_BLOCKING / TEMPORAL_FIRE_AND_FORGET
+keep Phase 2.0 single-pair semantics — per-step streaming across the
+Temporal worker boundary would need cross-process tee logic on top of
+the existing `pipeline_run_setup` event log infra, deferred until demand
+surfaces.
 
 ---
 
