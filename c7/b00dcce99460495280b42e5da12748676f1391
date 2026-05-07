@@ -1,0 +1,24 @@
+pipelex/plugins/mistralai_workflows/streaming.py
+  s_b791f75f09d339::t_a35f966f70421e 189-191
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "c7b00dcce99460495280b42e5da12748676f1391",
+  "prompts": {},
+  "humans": {
+    "h_39660369d4ad8c": {
+      "author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  },
+  "sessions": {
+    "s_b791f75f09d339": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "12f228c7-0a22-49ba-b4c6-aaeb1e9eee1b",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  }
+}
