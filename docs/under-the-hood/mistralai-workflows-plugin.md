@@ -25,7 +25,7 @@ For the `TEMPORAL_BLOCKING` and `TEMPORAL_FIRE_AND_FORGET` execution modes, also
 pip install 'pipelex[mistralai-workflows,temporal]'
 ```
 
-The framework-agnostic core (`bridge.py`, `execution_mode.py`, `bootstrap.py`, `exceptions.py`) is importable on a venv that does NOT have `mistralai-workflows` installed. The optional-dep guard fires only when you import `pipelex.plugins.mistralai_workflows.activities` (or `streaming` once shipped).
+The framework-agnostic core (`bridge.py`, `execution_mode.py`, `bootstrap.py`, `exceptions.py`) is importable on a venv that does NOT have `mistralai-workflows` installed. The optional-dep guard fires only when you import `pipelex.plugins.mistralai_workflows.activities` or `pipelex.plugins.mistralai_workflows.streaming`.
 
 ---
 
@@ -45,6 +45,7 @@ from pipelex.plugins.mistralai_workflows.bootstrap import (
     ensure_pipelex_booted,
     get_pipelex_dependency,
 )
+from pipelex.plugins.mistralai_workflows.streaming import pipelex_run_pipe_streaming
 ```
 
 ---

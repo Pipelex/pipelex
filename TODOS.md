@@ -20,8 +20,8 @@ user-facing reference lives at
 | 1.2   | `TEMPORAL_BLOCKING` + `TEMPORAL_FIRE_AND_FORGET` modes | ✅ done |
 | 1.3   | Docs + CHANGELOG (mkdocs nav wired)                    | ✅ done¹ |
 | 1.5   | Large-payload `pipelex_run_pipe_offloaded` variant     | ✅ done |
-| 2.0   | Streaming v1 — one Mistral `task()` per activity       | ⏳ next |
-| 2.1   | Streaming v2 — per-step `task.update()` (conditional)  | ⏳ after 2.0 |
+| 2.0   | Streaming v1 — one Mistral `task()` per activity       | ✅ done |
+| 2.1   | Streaming v2 — per-step `task.update()` (conditional)  | ⏳ next, conditional on demand |
 
 ¹ Cookbook example deferred to a follow-up PR in the sibling
 `pipelex-cookbook/` repo (suggested entry:
@@ -90,7 +90,7 @@ pipelex/plugins/mistralai_workflows/
 ├── bridge.py          # framework-agnostic core (NO mistralai imports)
 ├── bootstrap.py       # ensure_pipelex_booted() + DI helper
 ├── activities.py      # Tier-1 wrappers + offloaded variant
-└── streaming.py       # Phase 2 — NOT YET CREATED
+└── streaming.py       # Phase 2.0 — pipelex_run_pipe_streaming sibling activity
 
 tests/unit/pipelex/plugins/mistralai_workflows/
 ├── test_input_models.py     # boundary BaseModels
@@ -104,6 +104,7 @@ tests/integration/pipelex/plugins/mistralai_workflows/
 ├── test_bridge_direct.py                    # layer 1 (no optional dep)
 ├── test_activities_direct.py                # layer 2 (Mistral test worker)
 ├── test_activities_offloaded.py             # layer 2 — offloaded variant
+├── test_activities_streaming.py             # layer 2 — Phase 2.0 streaming variant
 ├── test_bridge_temporal_blocking.py         # layer 3 (+ temporal extra)
 └── test_bridge_temporal_fire_and_forget.py  # layer 3 (+ temporal extra)
 ```
@@ -122,6 +123,11 @@ from pipelex.plugins.mistralai_workflows.bridge import (
 )
 from pipelex.plugins.mistralai_workflows.execution_mode import PipelexExecutionMode
 from pipelex.plugins.mistralai_workflows.bootstrap import ensure_pipelex_booted
+from pipelex.plugins.mistralai_workflows.streaming import (
+    pipelex_run_pipe_streaming,
+    PipelexPipeRunStreamingState,
+    PIPELEX_PIPE_RUN_TASK_TYPE,
+)
 ```
 
 ---
@@ -191,32 +197,31 @@ Goal: surface live progress events from Pipelex pipes through Mistral's
 `task()` event API so users can subscribe via
 `create_capturing_mock_events_client` and friends.
 
-### Phase 2.0 — One task per activity (started / completed / failed)
+### Phase 2.0 — One task per activity (started / completed / failed) ✅
 
 A single Mistral task wraps the whole activity body — no per-step
 granularity. Cheapest path to "the user sees something happen."
 
-- [ ] Create `pipelex/plugins/mistralai_workflows/streaming.py`. Top-of-
-      file imports `mistralai.workflows` — reuse the same optional-dep
-      guard pattern as `activities.py`.
-- [ ] **Decision (open):** wrap `pipelex_run_pipe` directly, OR ship a
-      sibling activity `pipelex_run_pipe_streaming`?
-      - Wrapping the existing one is one fewer activity to register but
-        forces every caller to pay the Mistral `task()` overhead.
-      - A sibling activity keeps the silent path silent. Leaning toward
-        **sibling**; revisit when we measure the overhead.
-- [ ] Inside the wrapper: `async with workflows.task(...) as t:`, then:
-      - emit `started` with `pipe_code` + `pipeline_run_id`
-      - emit `completed` with an output summary on success
-      - emit `failed` with exception details on error
-      - catch the same specific exceptions `bridge.py::_run_*` already
-        catches (`PipeRunError`, `PipeJobError`, `PipeRouterError`,
-        `PipeExecutionError`, `PipelineExecutionError`) — never catch
-        generic `Exception` per Pipelex standards.
-- [ ] New layer-4 integration test
+- [x] Created `pipelex/plugins/mistralai_workflows/streaming.py`. Reuses
+      the same optional-dep guard pattern as `activities.py` (top-level
+      `try`/`except ImportError` re-raising `MistralWorkflowsNotInstalledError`).
+- [x] **Decision: sibling activity** `pipelex_run_pipe_streaming`. Reasons:
+      - Keeps the silent path silent — Tier-1 users without observability
+        needs don't pay event publishing overhead.
+      - Mirrors the `pipelex_run_pipe_offloaded` sibling pattern.
+      - Workers register only the variant they actually use.
+- [x] Inside the activity: `async with Task[PipelexPipeRunStreamingState](...)`
+      then call `run_pipe_via_bridge`, then `update_state` to `phase="completed"`.
+      `Task.__aexit__` automatically emits `CustomTaskFailed` on exception
+      and the original exception propagates — no extra `try`/`except`
+      needed (per Pipelex "don't catch Exception speculatively" rule).
+- [x] Layer-2 integration test
       `tests/integration/pipelex/plugins/mistralai_workflows/test_activities_streaming.py`
-      using `create_test_worker_with_events` +
-      `create_capturing_mock_events_client`. Re-apply gotchas §4.1–4.4.
+      uses `create_test_worker_with_events` + `EventContext` + a
+      `create_capturing_mock_events_client` to assert that exactly one
+      `CustomTaskStarted`, ≥1 `CustomTaskInProgress`, and one
+      `CustomTaskCompleted` are emitted with the right `custom_task_type`
+      (`pipelex.pipe_run`) and payload shape.
 
 ### Phase 2.1 — Per-step granularity (only if 2.0 is too coarse)
 

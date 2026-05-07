@@ -107,6 +107,56 @@ Trade-off: offloaded payloads live in the blob storage you configure (S3 by defa
 
 ---
 
+## Live progress events — `pipelex_run_pipe_streaming`
+
+When a UI subscribes to a Mistral Workflow execution and needs to "see something happen" while a Pipelex pipe runs, use the streaming variant. It wraps the same bridge call in a single Mistral `Task` whose lifecycle (`CustomTaskStarted` → `CustomTaskInProgress` → `CustomTaskCompleted` / `CustomTaskFailed`) is published to whatever events client your worker is configured with.
+
+```python
+from mistralai import workflows
+
+from pipelex.plugins.mistralai_workflows.bridge import (
+    PipelexPipeRunInput,
+    PipelexPipeRunOutput,
+)
+from pipelex.plugins.mistralai_workflows.execution_mode import PipelexExecutionMode
+from pipelex.plugins.mistralai_workflows.streaming import pipelex_run_pipe_streaming
+
+
+@workflows.workflow.define(name="extract-invoice-streaming-flow")
+class ExtractInvoiceStreamingFlow:
+    @workflows.workflow.entrypoint
+    async def run(self, doc_url: str) -> dict:
+        result: PipelexPipeRunOutput = await pipelex_run_pipe_streaming(
+            PipelexPipeRunInput(
+                pipe_code="finance.extract_invoice",
+                inputs={"doc_url": doc_url},
+                execution_mode=PipelexExecutionMode.DIRECT,
+            )
+        )
+        return result.output_dict
+
+
+await workflows.run_worker(
+    [ExtractInvoiceStreamingFlow],
+    activities=[pipelex_run_pipe_streaming],
+)
+```
+
+The events carry a small JSON payload identifying the run:
+
+| Event                    | Payload                                                                       |
+| ------------------------ | ----------------------------------------------------------------------------- |
+| `CustomTaskStarted`      | `phase="started"`, `pipe_code`, `execution_mode`, `pipeline_run_id` (if set)  |
+| `CustomTaskInProgress`   | JSON-patch transition to `phase="completed"` with `pipeline_run_id` filled    |
+| `CustomTaskCompleted`    | Final state — same shape as the InProgress payload                            |
+| `CustomTaskFailed`       | The original exception message (emitted by `Task.__aexit__` on failure)       |
+
+`custom_task_type` is always `"pipelex.pipe_run"`, so subscribers can filter on it without parsing the payload.
+
+For the silent path (no observability, no event publishing overhead per activity) keep using `pipelex_run_pipe` — the streaming variant is opt-in. Per-step granularity (one event per pipe sub-step, driven by Pipelex's `report_delegate`) is on the roadmap as Phase 2.1.
+
+---
+
 ## Tier 2 — helper inside your own typed activity
 
 Wrap `run_pipe_via_bridge` in your own `@activity`-decorated function so you control all activity options and the input/output types.
