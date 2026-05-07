@@ -1,5 +1,159 @@
 # Mistral Workflows ↔ Pipelex — Plugin Extraction TODOs
 
+> **Session pause notes (2026-05-07).** Stream A is partially executed,
+> Stream B is partially executed, Stream C has not yet been written.
+> See **§Progress snapshot** below before resuming. Do NOT delete the
+> source files in `pipelex/plugins/mistralai_workflows/` or the layer-2/3
+> tests yet — Stream C still depends on them. The source has not been
+> deleted; only the layer-1 tests have been duplicated, and the new repo
+> has been partially scaffolded. Resume guide is at the bottom of this
+> file; the §Progress snapshot is the resume entry point.
+
+---
+
+## Progress snapshot — what was done this session
+
+**Files written / moved (Stream A inside `_workflows/`):**
+
+- `pipelex/runtime_bridge/__init__.py` (empty) — created.
+- `pipelex/runtime_bridge/exceptions.py` — created with
+  `PipelexRuntimeBridgeError` (new base), `MissingPipelexTemporalExtraError`,
+  `PipelexBridgeRuntimeError`. `MistralWorkflowsNotInstalledError` was
+  intentionally NOT carried over.
+- `pipelex/runtime_bridge/execution_mode.py` — verbatim copy of the
+  original (no edits needed inside the file).
+- `pipelex/runtime_bridge/bootstrap.py` — kept `ensure_pipelex_booted`,
+  rewrote module docstring, **deleted** `get_pipelex_dependency` (will be
+  reimplemented in `pipelex_mistralai_workflows/dependency.py` per Stream C
+  task C4).
+- `pipelex/runtime_bridge/bridge.py` — moved with imports rewritten
+  (`pipelex.plugins.mistralai_workflows.*` → `pipelex.runtime_bridge.*`),
+  library-id prefix changed to `runtime_bridge_`, install hint changed to
+  `pip install 'pipelex[temporal]'`, module docstring rewritten as
+  framework-agnostic.
+
+**Tests moved (Stream A task A8 — layer-1 only):**
+
+- `tests/unit/pipelex/plugins/mistralai_workflows/test_input_models.py`
+  → `tests/unit/pipelex/runtime_bridge/test_input_models.py` (imports
+  rewritten).
+- `tests/unit/pipelex/plugins/mistralai_workflows/test_execution_mode.py`
+  → `tests/unit/pipelex/runtime_bridge/test_execution_mode.py`.
+- `tests/unit/pipelex/plugins/mistralai_workflows/test_validation.py`
+  → `tests/unit/pipelex/runtime_bridge/test_validation.py`.
+- `tests/unit/pipelex/plugins/mistralai_workflows/test_dispatch.py`
+  → `tests/unit/pipelex/runtime_bridge/test_dispatch.py`.
+- `tests/integration/pipelex/plugins/mistralai_workflows/test_bridge_direct.py`
+  → `tests/integration/pipelex/runtime_bridge/test_bridge_direct.py`.
+- `tests/integration/pipelex/runtime_bridge/conftest.py` — new copy with
+  rewritten test_data import path
+  (`from tests.integration.pipelex.runtime_bridge.test_data.bridge_funcs ...`).
+- `tests/integration/pipelex/runtime_bridge/test_data/bridge_funcs.py` —
+  copy with updated docstring path.
+- `tests/integration/pipelex/runtime_bridge/test_data/bridge_test.mthds`
+  — verbatim copy (`domain = "mistralai_workflows_bridge_test"` kept
+  unchanged to minimize churn).
+
+**The originals at `pipelex/plugins/mistralai_workflows/` and
+`tests/{unit,integration}/pipelex/plugins/mistralai_workflows/` HAVE NOT
+BEEN DELETED.** They still exist and tests would currently fail with
+duplicate-collection / domain conflicts if run as-is. See "What's blocking
+right now" below.
+
+**Files written in `../pipelex-mistralai-workflows/` (Stream B partial):**
+
+- `pyproject.toml` — fully rewritten per task B2 (version `0.1.0`,
+  description, authors, urls, deps slimmed to `pipelex>=0.27.0` +
+  `mistralai-workflows>=3.3.0`, `[project.optional-dependencies] temporal`,
+  `[[tool.mypy.overrides]]` for `mistralai.workflows.*`, dev extras with
+  `pytest-mock`, markers slimmed to `gha_disabled` / `dry_runnable` /
+  `temporal`, `[tool.uv.sources] pipelex = { path = "../_workflows", editable = true }`).
+- `CLAUDE.md` — fully rewritten per task B4.
+- `README.md` — fully rewritten per task B3.
+
+## What's blocking right now
+
+1. **Stream C has not been written.** The new repo's
+   `pipelex_mistralai_workflows/` still contains the starter
+   `hello_world.{py,mthds}`. The runtime files (`activities.py`,
+   `streaming.py`, `streaming_event_forwarder.py`, `dependency.py`) and
+   the layer-2/3 integration tests + fixtures still need to be created
+   in the new repo.
+2. **Old source not yet deleted in `_workflows/`.** Layer-2/3 tests still
+   reference `pipelex.plugins.mistralai_workflows.*`. If you run tests
+   now you'll get collection errors / domain conflicts on the duplicated
+   `bridge_test.mthds` (same `domain = "mistralai_workflows_bridge_test"`
+   loaded twice — once from each location). Resolution: delete the old
+   plugin dir + old tests dir AFTER Stream C copies layer-2/3 over.
+3. **`make agent-check` / `make agent-test` not yet run.** Pyright will
+   currently complain about both `pipelex.runtime_bridge.*` (cache
+   staleness — files exist) and the still-present old plugin dir. Run
+   `make cleanderived` first when resuming.
+
+## What to do next, in order
+
+1. **Stream C — write the runtime files in the new repo.** Use the file
+   contents already in this conversation (or read from
+   `pipelex/plugins/mistralai_workflows/{activities,streaming,streaming_event_forwarder}.py`)
+   and write them to `pipelex_mistralai_workflows/`, dropping the optional-dep
+   guard and rewriting Pipelex imports to `pipelex.runtime_bridge.*`. Add
+   `pipelex_mistralai_workflows/dependency.py` (task C4) with the
+   `pipelex_dependency` callable shaped for `mistralai.workflows.Depends(...)`.
+2. **Stream C — write the layer-2/3 integration tests + fixtures in the
+   new repo.** Read sources and write to
+   `pipelex-mistralai-workflows/tests/integration/{test_*.py,conftest.py,test_data/}`
+   with rewritten imports per TODOS task C5/C6. The new repo's existing
+   `tests/integration/conftest.py` (with `check_pipelex_initialized`,
+   `reset_pipelex_config_fixture`) needs to be merged with a new
+   `bridge_test_library` fixture pulled from the pipelex conftest.
+3. **Stream B finish-up.**
+   - B1: delete `pipelex_mistralai_workflows/hello_world.py`,
+     `pipelex_mistralai_workflows/hello_world.mthds`,
+     `tests/test_pipelines/`, `tests/e2e/test_pipelex_mistralai_workflows.py`.
+   - B5: rewrite `CHANGELOG.md` (currently still the starter's `[v0.8.0]`
+     placeholder).
+   - B6: audit `.github/workflows/tests-check.yml` — install step needs
+     to also install the `[temporal]` extra so layer-3 tests run.
+   - B7: audit `Makefile`. Default decision per TODOS: keep as-is.
+   - B8: `uv lock` + `uv sync --all-extras` and commit `uv.lock`.
+4. **Stream A finish-up (in `_workflows/`).**
+   - A6: delete `pipelex/plugins/mistralai_workflows/` ENTIRELY (only
+     after Stream C has copied `activities.py` / `streaming.py` /
+     `streaming_event_forwarder.py` to the new repo).
+   - A8 finish: delete the now-redundant
+     `tests/{unit,integration}/pipelex/plugins/mistralai_workflows/` dirs
+     entirely.
+   - A7: `pyproject.toml` — drop the `mistralai-workflows = [...]` entry
+     in `[project.optional-dependencies]` (currently line 88) AND the
+     `[[tool.mypy.overrides]]` block for `mistralai.workflows.*` (currently
+     lines 154–164).
+   - A9: delete `docs/under-the-hood/mistralai-workflows-plugin.md` and
+     `docs/under-the-hood/mistralai-workflows-recipes.md`. Remove the four
+     `mkdocs.yml` lines (currently at lines 310, 311, 500, 501).
+   - A10: rewrite the `[Unreleased]` section of `CHANGELOG.md` per
+     existing TODOS task A10.
+   - A11: run `make cleanderived && make agent-check && make agent-test`.
+     Verify the four `git grep` invariants in TODOS A11.
+
+## Open questions / decisions the next session should NOT re-derive
+
+- **Pre-decisions §0.1 / §0.4 are locked.** The framework-agnostic core
+  lives at `pipelex.runtime_bridge.*`; pipelex-mistralai-workflows pins
+  `pipelex>=0.27.0`; the editable `[tool.uv.sources]` override is in place.
+- **§0.3 is implemented.** New repo version is now `0.1.0`.
+- **§0.2 is locked** but the splits in `pipelex_mistralai_workflows/` (the
+  Mistral-shaped DI helper, etc.) are NOT yet realized in code — that's
+  Stream C task C4.
+- **§0.5 (Mistral component / dependency wrapper shape)** is still
+  unresolved. Read `mistralai.workflows.plugins.mistralai` before writing
+  C4. The placeholder is just a callable returning
+  `Pipelex.get_instance()` after `ensure_pipelex_booted()`.
+- **§0.6 (cookbook entry timing).** Deferred — do not block on it.
+
+---
+
+## Original execution plan (unchanged below this line)
+
 Concrete execution plan for the migration described in
 `wip/mistral-workflows-plugin-extract.md`. Read that file plus the
 binding design decisions in `wip/mistral-workflows-sub-module.md` §2 and §4
@@ -115,56 +269,60 @@ framework-agnostic core lives at `pipelex.runtime_bridge.*`.
 
 ### A1. Create the new package
 
-- [ ] Create `pipelex/runtime_bridge/` with an empty `__init__.py` (no
+- [x] Create `pipelex/runtime_bridge/` with an empty `__init__.py` (no
       re-exports — Pipelex rule).
 
 ### A2. Move `bridge.py`
 
-- [ ] Move `pipelex/plugins/mistralai_workflows/bridge.py` →
-      `pipelex/runtime_bridge/bridge.py`.
-- [ ] Rewrite imports inside `bridge.py`:
+- [x] Move `pipelex/plugins/mistralai_workflows/bridge.py` →
+      `pipelex/runtime_bridge/bridge.py`. **(Done as a copy — original
+      not yet deleted; A6 deletes the source dir.)**
+- [x] Rewrite imports inside `bridge.py`:
   - `from pipelex.plugins.mistralai_workflows.bootstrap import ensure_pipelex_booted`
     → `from pipelex.runtime_bridge.bootstrap import ensure_pipelex_booted`
   - `from pipelex.plugins.mistralai_workflows.exceptions import (MissingPipelexTemporalExtraError, PipelexBridgeRuntimeError)`
     → `from pipelex.runtime_bridge.exceptions import (MissingPipelexTemporalExtraError, PipelexBridgeRuntimeError)`
   - `from pipelex.plugins.mistralai_workflows.execution_mode import PipelexExecutionMode`
     → `from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode`
-- [ ] Rename the per-call library id prefix on line 222:
+- [x] Rename the per-call library id prefix on line 222:
       `f"mistralai_workflows_{uuid4().hex[:8]}"` →
       `f"runtime_bridge_{uuid4().hex[:8]}"`.
-- [ ] Update the install hint in `_require_pipelex_temporal_extra` (line 336):
+- [x] Update the install hint in `_require_pipelex_temporal_extra`:
       `"pip install 'pipelex[temporal,mistralai-workflows]'"` →
       `"pip install 'pipelex[temporal]'"`.
-- [ ] Update the module docstring: drop "of the mistralai_workflows plugin",
+- [x] Update the module docstring: drop "of the mistralai_workflows plugin",
       reframe as "framework-agnostic Pipelex runtime-bridge surface for
       host runtimes (Mistral Workflows, raw Temporal, future plugins)".
 
 ### A3. Move `execution_mode.py`
 
-- [ ] Move `pipelex/plugins/mistralai_workflows/execution_mode.py` →
+- [x] Move `pipelex/plugins/mistralai_workflows/execution_mode.py` →
       `pipelex/runtime_bridge/execution_mode.py`. No import changes inside the
-      file.
+      file. Docstring slightly reframed away from Mistral-specific wording.
+      **(Done as a copy — original not yet deleted.)**
 
 ### A4. Move `bootstrap.py` (split — keep agnostic, drop Mistral-shaped)
 
-- [ ] Move `pipelex/plugins/mistralai_workflows/bootstrap.py` →
-      `pipelex/runtime_bridge/bootstrap.py`.
-- [ ] Keep `ensure_pipelex_booted(...)` verbatim. Update the module
+- [x] Move `pipelex/plugins/mistralai_workflows/bootstrap.py` →
+      `pipelex/runtime_bridge/bootstrap.py`. **(Done as a copy — original
+      not yet deleted.)**
+- [x] Keep `ensure_pipelex_booted(...)` verbatim. Update the module
       docstring: drop "for use inside Mistral Workflows activities", reframe
       as "for use inside any host runtime that embeds Pipelex".
-- [ ] **Delete** `get_pipelex_dependency()` from `pipelex/runtime_bridge/bootstrap.py`
+- [x] **Delete** `get_pipelex_dependency()` from `pipelex/runtime_bridge/bootstrap.py`
       — it returns a callable explicitly shaped for `mistralai.workflows.Depends`
       and belongs in the new repo. Its replacement lives in
       `pipelex_mistralai_workflows/dependency.py` (Stream C, task C4).
+      **(The new file omits the function entirely.)**
 
 ### A5. Split `exceptions.py`
 
-- [ ] Create `pipelex/runtime_bridge/exceptions.py` with:
+- [x] Create `pipelex/runtime_bridge/exceptions.py` with:
   - `PipelexRuntimeBridgeError(PipelexError)` — new base (replaces
     `MistralWorkflowsPluginError`).
   - `MissingPipelexTemporalExtraError(PipelexRuntimeBridgeError)`.
   - `PipelexBridgeRuntimeError(PipelexRuntimeBridgeError)`.
-- [ ] **Do NOT** carry `MistralWorkflowsNotInstalledError` over — it goes
+- [x] **Do NOT** carry `MistralWorkflowsNotInstalledError` over — it goes
       away entirely (the new repo has `mistralai-workflows>=3.3.0` as a
       hard dep, so the optional-dep guard pattern is obsolete).
 
@@ -195,7 +353,7 @@ Layer-1 (framework-agnostic) tests follow the runtime-bridge core into pipelex.
 Layer-2 / layer-3 tests (which actually instantiate Mistral
 `WorkflowEnvironment` / activities) go to the new repo via Stream C.
 
-- [ ] **Move** `tests/unit/pipelex/plugins/mistralai_workflows/` →
+- [x] **Move** `tests/unit/pipelex/plugins/mistralai_workflows/` →
       `tests/unit/pipelex/runtime_bridge/`:
   - `test_input_models.py`
   - `test_execution_mode.py`
@@ -203,11 +361,13 @@ Layer-2 / layer-3 tests (which actually instantiate Mistral
   - `test_dispatch.py`
   - In each, rewrite `pipelex.plugins.mistralai_workflows.*` imports →
     `pipelex.runtime_bridge.*`.
-- [ ] **Move** the layer-1 integration test:
+  **(Done as copies — originals not yet deleted; deletion is the bullet
+  below.)**
+- [x] **Move** the layer-1 integration test:
       `tests/integration/pipelex/plugins/mistralai_workflows/test_bridge_direct.py`
       → `tests/integration/pipelex/runtime_bridge/test_bridge_direct.py`.
-      Rewrite imports.
-- [ ] **Move the conftest + test_data with it.** They are needed by the
+      Rewrite imports. **(Done as copy — original not yet deleted.)**
+- [x] **Move the conftest + test_data with it.** They are needed by the
       layer-1 test that stays in pipelex AND will be copied to the new repo
       (Stream C, C6) for the layer-2 / layer-3 tests:
   - `tests/integration/pipelex/plugins/mistralai_workflows/conftest.py`
@@ -216,21 +376,19 @@ Layer-2 / layer-3 tests (which actually instantiate Mistral
     → `from tests.integration.pipelex.runtime_bridge.test_data.bridge_funcs`).
   - `tests/integration/pipelex/plugins/mistralai_workflows/test_data/`
     → `tests/integration/pipelex/runtime_bridge/test_data/` (`bridge_test.mthds`
-    + `bridge_funcs.py`).
-  - Update the `domain` in `bridge_test.mthds` if the prefix
-    `mistralai_workflows_bridge_test` reads weirdly post-move; suggest
-    keeping the existing domain string for the move PR to minimize churn,
-    rename in a follow-up if needed. Tests reference the literal pipe
-    refs so any rename must be coordinated.
+    + `bridge_funcs.py`). **(Domain string `mistralai_workflows_bridge_test`
+    kept verbatim per default in this section.)**
 - [ ] **Delete** the layer-2 / layer-3 integration tests (they move to the
-      new repo via Stream C):
+      new repo via Stream C — DO NOT delete until Stream C has copied them
+      over):
   - `test_activities_direct.py`
   - `test_activities_offloaded.py`
   - `test_activities_streaming.py`
   - `test_bridge_temporal_blocking.py`
   - `test_bridge_temporal_fire_and_forget.py`
 - [ ] Delete the now-empty
-      `tests/{unit,integration}/pipelex/plugins/mistralai_workflows/` dirs.
+      `tests/{unit,integration}/pipelex/plugins/mistralai_workflows/` dirs
+      (do this together with the layer-2/3 deletion above).
 
 ### A9. Move docs
 
@@ -315,60 +473,34 @@ to a library distribution.
 
 ### B2. Rewrite `pyproject.toml`
 
-- [ ] `version = "0.1.0"` (currently `0.8.0`).
-- [ ] `description = "Mistral Workflows plugin for Pipelex — invoke Pipelex pipes from inside Mistral Workflows activities."`
-      (currently a placeholder).
-- [ ] Uncomment `authors` and set to
-      `[{ name = "Evotis S.A.S.", email = "oss@pipelex.com" }]` (matching
-      pipelex).
-- [ ] Update `[project.urls]`:
+- [x] `version = "0.1.0"` (currently `0.8.0`).
+- [x] `description = "Mistral Workflows plugin for Pipelex — invoke Pipelex pipes from inside Mistral Workflows activities."`
+- [x] `authors = [{ name = "Evotis S.A.S.", email = "oss@pipelex.com" }]`.
+- [x] Update `[project.urls]`:
   - `Homepage = "https://pipelex.com"`
   - `Repository = "https://github.com/Pipelex/pipelex-mistralai-workflows"`
   - `Documentation = "https://docs.pipelex.com/"`
-- [ ] Replace `dependencies = ["pipelex[mistralai,anthropic,...]>=0.26.4"]`
-      with the slim library shape:
-
-      ```toml
-      dependencies = [
-        "pipelex>=0.27.0",               # 0.27.0 is the version that ships pipelex.runtime_bridge
-        "mistralai-workflows>=3.3.0",
-      ]
-      ```
-
-      No inference / cloud extras. This is a library, not an app.
-- [ ] Add an optional extra for the Temporal layer-3 tests:
-
-      ```toml
-      [project.optional-dependencies]
-      temporal = ["pipelex[temporal]>=0.27.0"]
-      ```
-- [ ] Add the PEP 695 mypy override that pipelex used to carry — Mistral's
-      source still uses PEP 695 type parameters mypy rejects under the
-      project's `python_version`. Copy the block (lines 154–164 in
-      pipelex's old `pyproject.toml` — moved here in Stream A task A7):
-
-      ```toml
-      [[tool.mypy.overrides]]
-      follow_imports = "skip"
-      ignore_errors = true
-      module = ["mistralai.workflows.*", "mistralai.workflows"]
-      ```
-- [ ] Add `pytest-asyncio>=0.24.0`, `pytest-mock>=3.14.0` to the `dev`
+- [x] Replace `dependencies` with the slim library shape (`pipelex>=0.27.0`
+      + `mistralai-workflows>=3.3.0`). No inference / cloud extras.
+- [x] Add the `[temporal]` optional extra
+      (`pipelex[temporal]>=0.27.0`).
+- [x] Add the PEP 695 mypy override for `mistralai.workflows.*` /
+      `mistralai.workflows`.
+- [x] Add `pytest-asyncio>=0.24.0`, `pytest-mock>=3.14.0` to the `dev`
       extra.
-- [ ] **Pytest markers** — keep only the markers the test suite actually
-      uses. Drop `inference` / `llm` / `img_gen` / `extract` / `pipelex_api`
-      (the layer-2/3 tests don't call inference). Keep:
-  - `gha_disabled`
-  - `dry_runnable`
-  - `temporal: tests that require a Temporal server` (mirror pipelex's)
-- [ ] Reconsider `requires-python`. The scaffold is `>=3.12,<3.15` (because
-      `mistralai-workflows` requires 3.12+). pipelex itself targets 3.10+.
-      Keep `>=3.12,<3.15` here — Mistral Workflows is the binding floor.
-      Confirm by checking `mistralai-workflows` PyPI metadata.
+- [x] **Pytest markers** — keep only `gha_disabled`, `dry_runnable`,
+      `temporal: tests that require a Temporal server`. Dropped
+      `inference` / `llm` / `img_gen` / `extract` / `pipelex_api` /
+      `needs_output` / `codex_disabled`.
+- [x] `requires-python = ">=3.12,<3.15"` (kept from scaffold — Mistral
+      Workflows is the binding floor).
+- [x] `[tool.uv.sources] pipelex = { path = "../_workflows", editable = true }`
+      — temporary editable override per §0.4. Strip before publishing
+      v0.1.0.
 
 ### B3. Replace the README
 
-- [ ] Replace `README.md` (currently the starter's) with a library-style
+- [x] Replace `README.md` (currently the starter's) with a library-style
       README. Sections:
   - Title + one-paragraph pitch ("Invoke Pipelex pipes from inside Mistral
     Workflows activities").
@@ -388,7 +520,7 @@ to a library distribution.
 
 ### B4. Replace `CLAUDE.md`
 
-- [ ] Replace with a short repo-specific CLAUDE.md:
+- [x] Replace with a short repo-specific CLAUDE.md:
   - Point at workspace `CLAUDE.md` for global rules.
   - Note: do NOT depend on internal `pipelex` paths (e.g. anything under
     `pipelex.pipe_run`, `pipelex.libraries`, etc.). Only depend on the

@@ -1,0 +1,56 @@
+domain      = "mistralai_workflows_bridge_test"
+description = "Test pipes for the mistralai_workflows plugin bridge"
+
+[concept.EchoEnvelope]
+description = "Custom dynamic concept used to exercise library_crate_dump round-trip for inline-structured concepts."
+
+[concept.EchoEnvelope.structure]
+text   = { type = "text", required = true, description = "The echoed text" }
+origin = { type = "text", required = true, description = "Origin marker for the echo" }
+
+[pipe.bridge_func_pipe]
+type          = "PipeFunc"
+description   = "Echoes the input text back as output (DIRECT mode only — PipeFunc is not Temporal-compatible)"
+output        = "Text"
+function_name = "mistralai_workflows_bridge_echo"
+
+[pipe.bridge_compose_pipe]
+type        = "PipeCompose"
+description = "Echoes the input_text via a Jinja2 template (Temporal-compatible)"
+inputs      = { input_text = "Text" }
+output      = "Text"
+template    = "{{ input_text.text }}"
+
+[pipe.bridge_envelope_pipe]
+type        = "PipeCompose"
+description = "Composes the input_text into a structured EchoEnvelope, exercising dynamic-concept round-trip via library_crate_dump"
+inputs      = { input_text = "Text" }
+output      = "EchoEnvelope"
+
+[pipe.bridge_envelope_pipe.construct]
+text   = { from = "input_text.text" }
+origin = "mistralai_workflows_bridge"
+
+[pipe.bridge_seq_step_one]
+type        = "PipeCompose"
+description = "First step of bridge_sequence_pipe — uppercases the input text"
+inputs      = { input_text = "Text" }
+output      = "Text"
+template    = "{{ input_text.text | upper }}"
+
+[pipe.bridge_seq_step_two]
+type        = "PipeCompose"
+description = "Second step of bridge_sequence_pipe — wraps the result with markers"
+inputs      = { uppercased = "Text" }
+output      = "Text"
+template    = "[STEP2:{{ uppercased.text }}]"
+
+[pipe.bridge_sequence_pipe]
+type = "PipeSequence"
+description = "Two-step sequence used by Phase 2.1 streaming tests to assert per-step events"
+inputs = { input_text = "Text" }
+output = "Text"
+steps = [
+  { pipe = "bridge_seq_step_one", result = "uppercased" },
+  { pipe = "bridge_seq_step_two", result = "final_text" },
+]
