@@ -70,24 +70,29 @@ class TestStructureGeneratorCLI:
             assert customer_file.exists(), f"Customer structure file not generated: {customer_file}"
             assert invoice_file.exists(), f"Invoice structure file not generated: {invoice_file}"
 
-            # Read and verify the generated code contains proper structure
+            # Read and verify the generated code contains proper structure.
+            # Class names are domain-qualified (e.g. "nested_concepts_test__LineItem") so
+            # they match what ConceptFactory registers in the class registry.
             line_item_code = line_item_file.read_text()
             customer_code = customer_file.read_text()
             invoice_code = invoice_file.read_text()
 
-            # Verify basic structure in generated code
-            assert "class LineItem(StructuredContent):" in line_item_code
-            assert "class Customer(StructuredContent):" in customer_code
-            assert "class Invoice(StructuredContent):" in invoice_code
+            line_item_class_name = "nested_concepts_test__LineItem"
+            customer_class_name = "nested_concepts_test__Customer"
+            invoice_class_name = "nested_concepts_test__Invoice"
 
-            # Verify Invoice has forward references to Customer and LineItem
-            assert '"Customer"' in invoice_code or "Customer" in invoice_code
-            assert '"LineItem"' in invoice_code or "LineItem" in invoice_code
+            assert f"class {line_item_class_name}(StructuredContent):" in line_item_code
+            assert f"class {customer_class_name}(StructuredContent):" in customer_code
+            assert f"class {invoice_class_name}(StructuredContent):" in invoice_code
+
+            # Verify Invoice has forward references to the qualified Customer and LineItem names
+            assert customer_class_name in invoice_code
+            assert line_item_class_name in invoice_code
 
             # Dynamically import the generated modules
             # Import order matters: dependencies first
-            line_item_class = self._import_class_from_file(line_item_file, "LineItem")
-            customer_class = self._import_class_from_file(customer_file, "Customer")
+            line_item_class = self._import_class_from_file(line_item_file, line_item_class_name)
+            customer_class = self._import_class_from_file(customer_file, customer_class_name)
 
             # Now import Invoice - it has forward references to LineItem and Customer
             # We need to add LineItem and Customer to the namespace for forward reference resolution
@@ -97,18 +102,18 @@ class TestStructureGeneratorCLI:
             invoice_module = importlib.util.module_from_spec(invoice_spec)
 
             # Add the dependencies to the module's globals for forward reference resolution
-            invoice_module.__dict__["LineItem"] = line_item_class
-            invoice_module.__dict__["Customer"] = customer_class
+            invoice_module.__dict__[line_item_class_name] = line_item_class
+            invoice_module.__dict__[customer_class_name] = customer_class
 
             sys.modules["invoice_module"] = invoice_module
             invoice_spec.loader.exec_module(invoice_module)
-            invoice_class: Any = invoice_module.Invoice
+            invoice_class: Any = getattr(invoice_module, invoice_class_name)
 
             # Rebuild the model to resolve forward references
             invoice_class.model_rebuild(
                 _types_namespace={
-                    "LineItem": line_item_class,
-                    "Customer": customer_class,
+                    line_item_class_name: line_item_class,
+                    customer_class_name: customer_class,
                 }
             )
 
