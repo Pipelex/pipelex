@@ -456,7 +456,7 @@ required-version = ">=0.7.2"
 [tool.uv.sources]
 # Temporary: pin to fork that adds mistralai 2.x support. Revert to PyPI release once
 # https://github.com/567-labs/instructor/pull/2298 is merged and published.
-instructor = { git = "https://github.com/Ian321/instructor.git", rev = "0efd9c09b05ef561defff3a8b86fe86e5e61214c" }
+instructor = { git = "https://github.com/Ian321/instructor.git", rev = "4ea22d2396ca35514929f27faed866115e8b3583" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["pipelex"]
