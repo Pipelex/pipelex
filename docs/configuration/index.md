@@ -106,9 +106,6 @@ Set it the way you set any other env var — for example, in your shell, your `.
 export PIPELEX_ENV=staging
 ```
 
-!!! warning "Renamed in a recent release"
-    This variable used to be called `ENVIRONMENT`. It was renamed to `PIPELEX_ENV` to avoid colliding with unrelated `ENVIRONMENT` variables that some deployment platforms set automatically. Update any shell, CI, or container config that exported `ENVIRONMENT=...` to export `PIPELEX_ENV=...` instead.
-
 ### Best Practices for Overrides
 
 1. Use the base `pipelex.toml` for default settings
