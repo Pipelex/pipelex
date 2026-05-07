@@ -231,7 +231,7 @@ def generate_structures_from_blueprints(
                 # For custom concepts, the structure class name is the domain-qualified name
                 # (e.g., other_domain__Customer) so it matches what ConceptFactory registers.
                 if current_refine:
-                    refined_ref = QualifiedRef.parse(current_refine)
+                    refined_ref = QualifiedRef.parse_stripping_cross_package(current_refine)
                     refined_concept_code = refined_ref.local_code
                     if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=current_refine):
                         refined_structure_class_name = refined_concept_code + "Content"
