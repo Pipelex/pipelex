@@ -35,6 +35,13 @@ real release of this project.
 - Mistral docs: <https://docs.mistral.ai/studio-api/workflows/building-workflows/plugins>
   — official plugin authoring guide.
 
+**Line numbers in this file are hints, not anchors.** When this doc cites
+`pyproject.toml` line 88 or `mkdocs.yml` lines 310–311, those numbers
+reflect the state at write-time. If unrelated PRs land first, the lines
+shift. The **descriptive text** (e.g. "the
+`mistralai-workflows = [...]` entry under `[project.optional-dependencies]`")
+is the source of truth — grep for it, don't jump to a stale line number.
+
 ---
 
 ## 0. Pre-decisions (lock these before writing code)
@@ -65,11 +72,13 @@ reason; otherwise proceed.
 - [ ] **0.3 — Reset `pipelex-mistralai-workflows` to `0.1.0`.** Currently
       `0.8.0` (starter inheritance) — that version space is wrong for a
       brand-new project. First release ships as `v0.1.0`.
-- [ ] **0.4 — Pin `pipelex>=NEXT` in the new repo, plus an editable
-      `[tool.uv.sources]` override for local dev.** `NEXT` is whatever
-      pipelex version lands the `pipelex.runtime_bridge` package. Bump the
-      minimum on every pipelex release that touches the bridge surface.
-      Independent SemVer for the plugin pkg.
+- [x] **0.4 — Pin `pipelex>=0.27.0` in the new repo, plus an editable
+      `[tool.uv.sources]` override for local dev.** `0.27.0` is the
+      pipelex release that lands `pipelex.runtime_bridge` (chosen as a
+      minor bump because the extraction is a breaking change for users
+      of the old `pipelex.plugins.mistralai_workflows.*` import path).
+      Bump the minimum on every pipelex release that touches the bridge
+      surface. Independent SemVer for the plugin pkg.
 
       Until `v0.1.0` ships, `pipelex-mistralai-workflows` must consume
       `pipelex` from this worktree so edits to `pipelex/runtime_bridge/`
@@ -321,7 +330,7 @@ to a library distribution.
 
       ```toml
       dependencies = [
-        "pipelex>=NEXT",                 # NEXT = the version that ships pipelex.runtime_bridge
+        "pipelex>=0.27.0",               # 0.27.0 is the version that ships pipelex.runtime_bridge
         "mistralai-workflows>=3.3.0",
       ]
       ```
@@ -331,7 +340,7 @@ to a library distribution.
 
       ```toml
       [project.optional-dependencies]
-      temporal = ["pipelex[temporal]>=NEXT"]
+      temporal = ["pipelex[temporal]>=0.27.0"]
       ```
 - [ ] Add the PEP 695 mypy override that pipelex used to carry — Mistral's
       source still uses PEP 695 type parameters mypy rejects under the
@@ -650,7 +659,7 @@ For each, rewrite imports:
       (containing the `pipelex.runtime_bridge` package and the migration
       paragraph in CHANGELOG).
 - [ ] On the same day, push `pipelex-mistralai-workflows==0.1.0` to PyPI
-      pinning `pipelex>=NEXT` to the freshly-released pipelex version.
+      pinning `pipelex>=0.27.0` to match the freshly-released pipelex.
 
 ### D2. Cookbook entry (deferred from Phase 1.3)
 
