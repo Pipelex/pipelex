@@ -9,11 +9,16 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import ErrorContext
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.helpers import get_structure_class_name_from_blueprint, normalize_structure_blueprint
+from pipelex.core.concepts.helpers import (
+    get_structure_class_name_from_blueprint,
+    make_qualified_structure_class_name,
+    normalize_structure_blueprint,
+)
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError
 from pipelex.core.concepts.structure_generation.generator import ConceptClassInfo, StructureGenerator
 from pipelex.core.interpreter.helpers import is_pipelex_file
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_class_registry, get_func_registry, resolve_library_dirs
@@ -69,14 +74,22 @@ def _build_concept_ref_to_class_info(
             # Build the concept ref (domain.ConceptCode)
             concept_ref = f"{blueprint.domain}.{concept_code}"
 
-            # Get the class name from the blueprint
-            class_name = get_structure_class_name_from_blueprint(concept_blueprint, concept_code)
+            # Get the class name from the blueprint. When the helper returns the bare
+            # concept_code (i.e. no user-supplied structure class reference), qualify
+            # it with the domain so cross-class imports/types match the qualified
+            # class definitions emitted below.
+            raw_class_name = get_structure_class_name_from_blueprint(concept_blueprint, concept_code)
+            if raw_class_name == concept_code:
+                class_name = make_qualified_structure_class_name(blueprint.domain, concept_code)
+                file_stem_snake_case = pascal_case_to_snake_case(concept_code)
+            else:
+                class_name = raw_class_name
+                file_stem_snake_case = pascal_case_to_snake_case(raw_class_name)
 
             # Build the module path for this concept's structure file
-            class_name_snake_case = pascal_case_to_snake_case(class_name)
             if base_relative_path:
                 base_module_path = ".".join(base_relative_path.parts)
-                module_path = f"{base_module_path}.{blueprint.domain}__{class_name_snake_case}"
+                module_path = f"{base_module_path}.{blueprint.domain}__{file_stem_snake_case}"
             else:
                 module_path = None
 
@@ -152,7 +165,7 @@ def generate_structures_from_blueprints(
             if isinstance(concept_blueprint, str):
                 try:
                     generated_code, _ = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info).generate_from_structure_blueprint(
-                        class_name=concept_code,
+                        class_name=make_qualified_structure_class_name(blueprint.domain, concept_code),
                         structure_blueprint={},
                         base_class_name=TextContent.__name__,
                         description=concept_blueprint,
@@ -181,7 +194,7 @@ def generate_structures_from_blueprints(
                     generated_code, the_generated_class = StructureGenerator(
                         concept_ref_to_class_info=concept_ref_to_class_info
                     ).generate_from_structure_blueprint(
-                        class_name=concept_code,
+                        class_name=make_qualified_structure_class_name(blueprint.domain, concept_code),
                         structure_blueprint=normalized_structure,
                         description=concept_blueprint.description,
                     )
@@ -212,13 +225,16 @@ def generate_structures_from_blueprints(
                     raise PipelexError(msg) from exc
 
                 # For native concepts, the structure class name is "ConceptCode" + "Content" (e.g., TextContent)
-                # For custom concepts, the structure class name is just the concept code (e.g., Customer)
+                # For custom concepts, the structure class name is the domain-qualified name
+                # (e.g., other_domain__Customer) so it matches what ConceptFactory registers.
                 if current_refine:
-                    refined_concept_code = current_refine.split(".")[1]
+                    refined_ref = QualifiedRef.parse(current_refine)
+                    refined_concept_code = refined_ref.local_code
                     if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=current_refine):
                         refined_structure_class_name = refined_concept_code + "Content"
                     else:
-                        refined_structure_class_name = refined_concept_code
+                        refined_domain_code = refined_ref.domain_path or blueprint.domain
+                        refined_structure_class_name = make_qualified_structure_class_name(refined_domain_code, refined_concept_code)
                 else:
                     refined_structure_class_name = TextContent.__name__
 
@@ -226,7 +242,7 @@ def generate_structures_from_blueprints(
                     generated_code, the_generated_class = StructureGenerator(
                         concept_ref_to_class_info=concept_ref_to_class_info
                     ).generate_from_structure_blueprint(
-                        class_name=concept_code,
+                        class_name=make_qualified_structure_class_name(blueprint.domain, concept_code),
                         structure_blueprint={},
                         base_class_name=refined_structure_class_name,
                         description=concept_blueprint.description,
@@ -256,7 +272,7 @@ def generate_structures_from_blueprints(
                     generated_code, the_generated_class = StructureGenerator(
                         concept_ref_to_class_info=concept_ref_to_class_info
                     ).generate_from_structure_blueprint(
-                        class_name=concept_code,
+                        class_name=make_qualified_structure_class_name(blueprint.domain, concept_code),
                         structure_blueprint={},
                         base_class_name=TextContent.__name__,
                         description=concept_blueprint.description,
