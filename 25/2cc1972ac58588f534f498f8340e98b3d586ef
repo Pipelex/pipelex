@@ -1,0 +1,56 @@
+docs/under-the-hood/mistralai-workflows-plugin.md
+  s_e4caaa6b9cbae4::t_bcfa35c862defd 48
+  s_e4caaa6b9cbae4::t_32dc6e5e6ef669 28
+tests/integration/pipelex/plugins/mistralai_workflows/test_activities_streaming.py
+  s_e4caaa6b9cbae4::t_72d7f5db4aaa81 19
+  s_e4caaa6b9cbae4::t_9d49a96fd7ee4d 1-11,13-18,20-26,31-98,112,114-145
+  s_e4caaa6b9cbae4::t_97c5789604189c 27
+  s_e4caaa6b9cbae4::t_2f77d5baba8451 99-106
+  s_4789a601ec972a::t_d0f0eb1401b6e0 12
+  s_e4caaa6b9cbae4::t_17489717eaf8c0 28-30
+  s_e4caaa6b9cbae4::t_a4f69afc7d1b60 107-111,113
+TODOS.md
+  s_e4caaa6b9cbae4::t_18757119c4884e 200,205-218,220-224
+  s_e4caaa6b9cbae4::t_d6b3fa61248e89 23
+  s_e4caaa6b9cbae4::t_3e7c6fb4d6b00a 93,107
+  s_e4caaa6b9cbae4::t_511fa1cb4a667e 126-130
+  s_4789a601ec972a::t_80fbd8fef7f252 24
+docs/under-the-hood/mistralai-workflows-recipes.md
+  s_e4caaa6b9cbae4::t_8d33cdf0f02ef5 110-149,152-155
+  s_4789a601ec972a::t_069f9dc79a028c 150-151,156-159
+pipelex/plugins/mistralai_workflows/streaming.py
+  s_4789a601ec972a::t_ad1120409c7f6b 1-14,30,51-61,63-71
+  s_e4caaa6b9cbae4::t_4fe58a5cd86209 15-29,32-50,72-97
+  s_4789a601ec972a::t_37c9889e23d808 31,62
+CHANGELOG.md
+  s_4789a601ec972a::t_d6e0e83a2d5d25 8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "252cc1972ac58588f534f498f8340e98b3d586ef",
+  "prompts": {},
+  "humans": {
+    "h_39660369d4ad8c": {
+      "author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  },
+  "sessions": {
+    "s_4789a601ec972a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "899ae1ef-876c-45c0-91e0-80fb78f2d802",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    },
+    "s_e4caaa6b9cbae4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "457557e5-88b1-4d9c-9863-337e09d6bcc7",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  }
+}
