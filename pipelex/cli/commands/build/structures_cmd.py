@@ -164,7 +164,9 @@ def generate_structures_from_blueprints(
             # Handle simple string concept definitions (description only, refines Text by default)
             if isinstance(concept_blueprint, str):
                 try:
-                    generated_code, _ = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info).generate_from_structure_blueprint(
+                    generated_code, _ = StructureGenerator(
+                        concept_ref_to_class_info=concept_ref_to_class_info, local_domain=blueprint.domain
+                    ).generate_from_structure_blueprint(
                         class_name=make_qualified_structure_class_name(blueprint.domain, concept_code),
                         structure_blueprint={},
                         base_class_name=TextContent.__name__,
@@ -192,7 +194,8 @@ def generate_structures_from_blueprints(
 
                 try:
                     generated_code, the_generated_class = StructureGenerator(
-                        concept_ref_to_class_info=concept_ref_to_class_info
+                        concept_ref_to_class_info=concept_ref_to_class_info,
+                        local_domain=blueprint.domain,
                     ).generate_from_structure_blueprint(
                         class_name=make_qualified_structure_class_name(blueprint.domain, concept_code),
                         structure_blueprint=normalized_structure,
@@ -240,7 +243,8 @@ def generate_structures_from_blueprints(
 
                 try:
                     generated_code, the_generated_class = StructureGenerator(
-                        concept_ref_to_class_info=concept_ref_to_class_info
+                        concept_ref_to_class_info=concept_ref_to_class_info,
+                        local_domain=blueprint.domain,
                     ).generate_from_structure_blueprint(
                         class_name=make_qualified_structure_class_name(blueprint.domain, concept_code),
                         structure_blueprint={},
@@ -270,7 +274,8 @@ def generate_structures_from_blueprints(
             else:
                 try:
                     generated_code, the_generated_class = StructureGenerator(
-                        concept_ref_to_class_info=concept_ref_to_class_info
+                        concept_ref_to_class_info=concept_ref_to_class_info,
+                        local_domain=blueprint.domain,
                     ).generate_from_structure_blueprint(
                         class_name=make_qualified_structure_class_name(blueprint.domain, concept_code),
                         structure_blueprint={},
