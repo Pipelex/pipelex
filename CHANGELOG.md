@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **`RunEnvironment` env var renamed from `ENVIRONMENT` to `PIPELEX_ENV`.** The variable that selects the environment-specific `pipelex_<env>.toml` overlay (and is stamped on OTel spans as `deployment.environment`) is now namespaced to avoid collisions with unrelated `ENVIRONMENT` variables already set in deployment environments. Update any shell, CI, or container config that exported `ENVIRONMENT=...` to export `PIPELEX_ENV=...` instead.
+
 ## [v0.26.4] - 2026-05-06
 
 ### Fixed
