@@ -17,7 +17,7 @@ Pipelex uses a layered TOML configuration system that lets you define sensible d
 2. **Global overrides** — `~/.pipelex/pipelex.toml` for user-wide settings
 3. **Project overrides** — `{project_root}/.pipelex/pipelex.toml` for project-specific settings
 4. **Local overrides** — `pipelex_local.toml` (git-ignored) for machine-specific values
-5. **Environment / run-mode-specific** — `pipelex_dev.toml`, `pipelex_prod.toml`, `pipelex_testing.toml`, etc.
+5. **Environment / run-mode-specific** — `pipelex_dev.toml`, `pipelex_prod.toml`, `pipelex_testing.toml`, etc. The environment overlay is selected by the `PIPELEX_ENV` environment variable (accepted values: `local`, `dev`, `staging`, `prod`; defaults to `dev`).
 
 A final `pipelex_override.toml` file can be used for last-resort overrides.
 
