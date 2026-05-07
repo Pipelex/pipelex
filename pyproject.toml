@@ -40,7 +40,7 @@ dependencies = [
   "polyfactory>=2.21.0",
   "portkey-ai>=2.1.0",
   "posthog>=6.7.0",
-  "pypdfium2>=4.30.0,!=4.30.1,<5.0.0",
+  "pypdfium2>=4.30.0,!=4.30.1,<6.0.0",
   "pydantic>=2.10.6,<3.0.0",
   "python-dotenv>=1.0.1",
   "PyYAML>=6.0.2",
