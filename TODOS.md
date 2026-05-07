@@ -18,6 +18,23 @@ PyPI name is `pipelex-mistralai-workflows`. The scaffold version sits at
 `0.8.0` (inherited from the starter); we will reset to `0.1.0` as the first
 real release of this project.
 
+**Reference docs (consult these before writing Mistral-facing code)**
+
+- Mistral Workflows skill (this repo): `.claude/skills/workflows/SKILL.md`.
+  Especially:
+  - `references/guides/workflows-plugins.mdx` — the plugin contract (most
+    relevant to §0.5 and Stream C, task C4).
+  - `references/guides/dependency-injection.mdx` — `Depends(...)` shape
+    (relevant to C4).
+  - `references/guides/streaming.mdx` + `references/guides/streaming-consumption.mdx`
+    — Task API, `update_state`, event subscription (relevant to Stream C,
+    task C2).
+  - `references/guides/handling-large-data.mdx` — `OffloadableField` and
+    the offloading interceptor (relevant to C1 and the open
+    `OffloadableField` import-drift risk in §D3).
+- Mistral docs: <https://docs.mistral.ai/studio-api/workflows/building-workflows/plugins>
+  — official plugin authoring guide.
+
 ---
 
 ## 0. Pre-decisions (lock these before writing code)
@@ -25,15 +42,15 @@ real release of this project.
 Defaults below are the recommended path. Override only if there's a concrete
 reason; otherwise proceed.
 
-- [ ] **0.1 — Where the framework-agnostic core lives.** Default: `pipelex/embedding/`.
-      Free package name (verified — no clash with existing modules; the
-      "embedding" hits in pipelex are unrelated HTML / jinja2 string usages).
-      The name communicates *embedding the Pipelex runtime into another
-      host runtime*. If the vector-embedding overlap feels confusing later,
-      `pipelex.runtime_bridge` is the fallback.
+- [x] **0.1 — Framework-agnostic core lives at `pipelex/runtime_bridge/`**
+      (decision locked). The earlier `pipelex.embedding` proposal was
+      rejected: "embedding" overlaps too heavily with vector embeddings
+      and is misleading from the first read. `runtime_bridge` says what
+      the package actually does — bridge the Pipelex runtime into a host
+      runtime (Mistral Workflows, raw Temporal, future plugins).
 - [ ] **0.2 — Mistral-specific bits stay in the new repo, agnostic bits move
-      to `pipelex.embedding`.** Concrete split:
-  - **Move to `pipelex/embedding/`:** `bridge.py`, `execution_mode.py`,
+      to `pipelex.runtime_bridge`.** Concrete split:
+  - **Move to `pipelex/runtime_bridge/`:** `bridge.py`, `execution_mode.py`,
     `bootstrap.py::ensure_pipelex_booted`, the agnostic exceptions
     (`PipelexBridgeRuntimeError`, `MissingPipelexTemporalExtraError`).
   - **Move to `pipelex_mistralai_workflows/`:** `activities.py`,
@@ -48,13 +65,33 @@ reason; otherwise proceed.
 - [ ] **0.3 — Reset `pipelex-mistralai-workflows` to `0.1.0`.** Currently
       `0.8.0` (starter inheritance) — that version space is wrong for a
       brand-new project. First release ships as `v0.1.0`.
-- [ ] **0.4 — Pin `pipelex>=NEXT` in the new repo.** `NEXT` is whatever
-      pipelex version lands the `pipelex.embedding` package. Bump the
-      minimum on every pipelex release that touches the embedding surface.
+- [ ] **0.4 — Pin `pipelex>=NEXT` in the new repo, plus an editable
+      `[tool.uv.sources]` override for local dev.** `NEXT` is whatever
+      pipelex version lands the `pipelex.runtime_bridge` package. Bump the
+      minimum on every pipelex release that touches the bridge surface.
       Independent SemVer for the plugin pkg.
-- [ ] **0.5 — Mistral component / dependency wrapper shape.** Open: read
-      `mistralai.workflows.plugins.mistralai` (the reference plugin) before
-      committing to a shape. Stream C task C4 below holds the placeholder.
+
+      Until `v0.1.0` ships, `pipelex-mistralai-workflows` must consume
+      `pipelex` from this worktree so edits to `pipelex/runtime_bridge/`
+      are picked up immediately by the plugin's tests:
+
+      ```toml
+      # ../pipelex-mistralai-workflows/pyproject.toml
+      [tool.uv.sources]
+      pipelex = { path = "../_workflows", editable = true }
+      ```
+
+      Strip this override before publishing `v0.1.0` — PyPI builds must
+      resolve `pipelex` from PyPI, not a relative path. (Add the override
+      back on the next dev cycle when the next breaking change to
+      `pipelex.runtime_bridge` lands.)
+- [ ] **0.5 — Mistral component / dependency wrapper shape.** Read the
+      Mistral plugin docs first:
+      `.claude/skills/workflows/references/guides/workflows-plugins.mdx`
+      and <https://docs.mistral.ai/studio-api/workflows/building-workflows/plugins>.
+      Cross-check `references/guides/dependency-injection.mdx` for the
+      `Depends(...)` shape. Stream C task C4 below holds the
+      implementation placeholder.
 - [ ] **0.6 — Cookbook entry timing.** Defer
       `pipelex-cookbook/examples/c_advanced/mistral-workflows/` until after
       `pipelex-mistralai-workflows==0.1.0` is on PyPI (Stream D).
@@ -65,59 +102,59 @@ reason; otherwise proceed.
 
 Goal: end state where `git grep mistralai_workflows` and `git grep
 mistralai-workflows` both return zero hits inside `pipelex/`, and the
-framework-agnostic core lives at `pipelex.embedding.*`.
+framework-agnostic core lives at `pipelex.runtime_bridge.*`.
 
 ### A1. Create the new package
 
-- [ ] Create `pipelex/embedding/` with an empty `__init__.py` (no
+- [ ] Create `pipelex/runtime_bridge/` with an empty `__init__.py` (no
       re-exports — Pipelex rule).
 
 ### A2. Move `bridge.py`
 
 - [ ] Move `pipelex/plugins/mistralai_workflows/bridge.py` →
-      `pipelex/embedding/bridge.py`.
+      `pipelex/runtime_bridge/bridge.py`.
 - [ ] Rewrite imports inside `bridge.py`:
   - `from pipelex.plugins.mistralai_workflows.bootstrap import ensure_pipelex_booted`
-    → `from pipelex.embedding.bootstrap import ensure_pipelex_booted`
+    → `from pipelex.runtime_bridge.bootstrap import ensure_pipelex_booted`
   - `from pipelex.plugins.mistralai_workflows.exceptions import (MissingPipelexTemporalExtraError, PipelexBridgeRuntimeError)`
-    → `from pipelex.embedding.exceptions import (MissingPipelexTemporalExtraError, PipelexBridgeRuntimeError)`
+    → `from pipelex.runtime_bridge.exceptions import (MissingPipelexTemporalExtraError, PipelexBridgeRuntimeError)`
   - `from pipelex.plugins.mistralai_workflows.execution_mode import PipelexExecutionMode`
-    → `from pipelex.embedding.execution_mode import PipelexExecutionMode`
+    → `from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode`
 - [ ] Rename the per-call library id prefix on line 222:
       `f"mistralai_workflows_{uuid4().hex[:8]}"` →
-      `f"embedding_{uuid4().hex[:8]}"`.
+      `f"runtime_bridge_{uuid4().hex[:8]}"`.
 - [ ] Update the install hint in `_require_pipelex_temporal_extra` (line 336):
       `"pip install 'pipelex[temporal,mistralai-workflows]'"` →
       `"pip install 'pipelex[temporal]'"`.
 - [ ] Update the module docstring: drop "of the mistralai_workflows plugin",
-      reframe as "framework-agnostic Pipelex embedding surface for host
-      runtimes (Mistral Workflows, raw Temporal, future plugins)".
+      reframe as "framework-agnostic Pipelex runtime-bridge surface for
+      host runtimes (Mistral Workflows, raw Temporal, future plugins)".
 
 ### A3. Move `execution_mode.py`
 
 - [ ] Move `pipelex/plugins/mistralai_workflows/execution_mode.py` →
-      `pipelex/embedding/execution_mode.py`. No import changes inside the
+      `pipelex/runtime_bridge/execution_mode.py`. No import changes inside the
       file.
 
 ### A4. Move `bootstrap.py` (split — keep agnostic, drop Mistral-shaped)
 
 - [ ] Move `pipelex/plugins/mistralai_workflows/bootstrap.py` →
-      `pipelex/embedding/bootstrap.py`.
+      `pipelex/runtime_bridge/bootstrap.py`.
 - [ ] Keep `ensure_pipelex_booted(...)` verbatim. Update the module
       docstring: drop "for use inside Mistral Workflows activities", reframe
       as "for use inside any host runtime that embeds Pipelex".
-- [ ] **Delete** `get_pipelex_dependency()` from `pipelex/embedding/bootstrap.py`
+- [ ] **Delete** `get_pipelex_dependency()` from `pipelex/runtime_bridge/bootstrap.py`
       — it returns a callable explicitly shaped for `mistralai.workflows.Depends`
       and belongs in the new repo. Its replacement lives in
       `pipelex_mistralai_workflows/dependency.py` (Stream C, task C4).
 
 ### A5. Split `exceptions.py`
 
-- [ ] Create `pipelex/embedding/exceptions.py` with:
-  - `PipelexEmbeddingError(PipelexError)` — new base (replaces
+- [ ] Create `pipelex/runtime_bridge/exceptions.py` with:
+  - `PipelexRuntimeBridgeError(PipelexError)` — new base (replaces
     `MistralWorkflowsPluginError`).
-  - `MissingPipelexTemporalExtraError(PipelexEmbeddingError)`.
-  - `PipelexBridgeRuntimeError(PipelexEmbeddingError)`.
+  - `MissingPipelexTemporalExtraError(PipelexRuntimeBridgeError)`.
+  - `PipelexBridgeRuntimeError(PipelexRuntimeBridgeError)`.
 - [ ] **Do NOT** carry `MistralWorkflowsNotInstalledError` over — it goes
       away entirely (the new repo has `mistralai-workflows>=3.3.0` as a
       hard dep, so the optional-dep guard pattern is obsolete).
@@ -145,31 +182,31 @@ framework-agnostic core lives at `pipelex.embedding.*`.
 
 ### A8. Move/delete tests
 
-Layer-1 (framework-agnostic) tests follow the embedding core into pipelex.
+Layer-1 (framework-agnostic) tests follow the runtime-bridge core into pipelex.
 Layer-2 / layer-3 tests (which actually instantiate Mistral
 `WorkflowEnvironment` / activities) go to the new repo via Stream C.
 
 - [ ] **Move** `tests/unit/pipelex/plugins/mistralai_workflows/` →
-      `tests/unit/pipelex/embedding/`:
+      `tests/unit/pipelex/runtime_bridge/`:
   - `test_input_models.py`
   - `test_execution_mode.py`
   - `test_validation.py`
   - `test_dispatch.py`
   - In each, rewrite `pipelex.plugins.mistralai_workflows.*` imports →
-    `pipelex.embedding.*`.
+    `pipelex.runtime_bridge.*`.
 - [ ] **Move** the layer-1 integration test:
       `tests/integration/pipelex/plugins/mistralai_workflows/test_bridge_direct.py`
-      → `tests/integration/pipelex/embedding/test_bridge_direct.py`.
+      → `tests/integration/pipelex/runtime_bridge/test_bridge_direct.py`.
       Rewrite imports.
 - [ ] **Move the conftest + test_data with it.** They are needed by the
       layer-1 test that stays in pipelex AND will be copied to the new repo
       (Stream C, C6) for the layer-2 / layer-3 tests:
   - `tests/integration/pipelex/plugins/mistralai_workflows/conftest.py`
-    → `tests/integration/pipelex/embedding/conftest.py`. Update the import
+    → `tests/integration/pipelex/runtime_bridge/conftest.py`. Update the import
     path inside (`from tests.integration.pipelex.plugins.mistralai_workflows.test_data.bridge_funcs`
-    → `from tests.integration.pipelex.embedding.test_data.bridge_funcs`).
+    → `from tests.integration.pipelex.runtime_bridge.test_data.bridge_funcs`).
   - `tests/integration/pipelex/plugins/mistralai_workflows/test_data/`
-    → `tests/integration/pipelex/embedding/test_data/` (`bridge_test.mthds`
+    → `tests/integration/pipelex/runtime_bridge/test_data/` (`bridge_test.mthds`
     + `bridge_funcs.py`).
   - Update the `domain` in `bridge_test.mthds` if the prefix
     `mistralai_workflows_bridge_test` reads weirdly post-move; suggest
@@ -218,10 +255,10 @@ landing. Replace with the migration story.
       > `pipelex.plugins.mistralai_workflows.*` modules have been removed
       > from `pipelex`. Install the new package instead:
       > `pip install pipelex-mistralai-workflows`, and import from
-      > `pipelex_mistralai_workflows.*`. The framework-agnostic embedding
+      > `pipelex_mistralai_workflows.*`. The framework-agnostic runtime-bridge
       > core (boundary types, `run_pipe_via_bridge`, `PipelexExecutionMode`,
       > `ensure_pipelex_booted`) has been promoted from
-      > `pipelex.plugins.mistralai_workflows.*` to `pipelex.embedding.*` so
+      > `pipelex.plugins.mistralai_workflows.*` to `pipelex.runtime_bridge.*` so
       > any host runtime — not just Mistral Workflows — can embed Pipelex.
       > No behavior changes; activities, boundary types, and execution
       > modes are identical.
@@ -238,7 +275,7 @@ landing. Replace with the migration story.
 - [ ] `git grep mistralai-workflows pipelex/ tests/ pyproject.toml` returns
       only the migration paragraph in `CHANGELOG.md` and the install hint
       in `_require_pipelex_temporal_extra` (now removed per A2 — verify).
-- [ ] `git grep "pipelex.embedding" pipelex/ tests/` finds the new package
+- [ ] `git grep "pipelex.runtime_bridge" pipelex/ tests/` finds the new package
       paths.
 
 ### A12. (Out-of-scope reminder) Verify "make agent-check passes without optional dep"
@@ -284,7 +321,7 @@ to a library distribution.
 
       ```toml
       dependencies = [
-        "pipelex>=NEXT",                 # NEXT = the version that ships pipelex.embedding
+        "pipelex>=NEXT",                 # NEXT = the version that ships pipelex.runtime_bridge
         "mistralai-workflows>=3.3.0",
       ]
       ```
@@ -346,7 +383,7 @@ to a library distribution.
   - Point at workspace `CLAUDE.md` for global rules.
   - Note: do NOT depend on internal `pipelex` paths (e.g. anything under
     `pipelex.pipe_run`, `pipelex.libraries`, etc.). Only depend on the
-    public `pipelex.embedding.*` surface.
+    public `pipelex.runtime_bridge.*` surface.
   - List the same `make agent-check` / `make agent-test` / `cleanderived`
     workflow used in pipelex.
   - Mirror pipelex's "No backward compatibility" rule.
@@ -368,7 +405,7 @@ to a library distribution.
       ### Added
 
       - `pipelex_mistralai_workflows.activities.pipelex_run_pipe` — pre-decorated
-        Mistral Workflows activity wrapping `pipelex.embedding.run_pipe_via_bridge`.
+        Mistral Workflows activity wrapping `pipelex.runtime_bridge.run_pipe_via_bridge`.
       - `pipelex_mistralai_workflows.activities.pipelex_run_pipe_offloaded` —
         offload-capable variant for payloads that exceed Temporal's per-event
         size limit.
@@ -389,7 +426,7 @@ to a library distribution.
         `pipelex_mistralai_workflows.*`. Framework-agnostic types
         (`PipelexPipeRunInput`, `PipelexPipeRunOutput`,
         `run_pipe_via_bridge`, `PipelexExecutionMode`,
-        `ensure_pipelex_booted`) now imported from `pipelex.embedding.*`.
+        `ensure_pipelex_booted`) now imported from `pipelex.runtime_bridge.*`.
       ```
 
       Carry the three original landing-narrative bullets from the old
@@ -467,7 +504,7 @@ Stream C's first commit in lockstep so `git bisect` always builds.
       ```
 - [ ] Rewrite Pipelex imports:
   - `from pipelex.plugins.mistralai_workflows.bridge import (PipelexPipeRunInput, PipelexPipeRunOutput, run_pipe_via_bridge)`
-    → `from pipelex.embedding.bridge import (PipelexPipeRunInput, PipelexPipeRunOutput, run_pipe_via_bridge)`
+    → `from pipelex.runtime_bridge.bridge import (PipelexPipeRunInput, PipelexPipeRunOutput, run_pipe_via_bridge)`
   - Drop the `from pipelex.plugins.mistralai_workflows.exceptions import MistralWorkflowsNotInstalledError` import (exception deleted).
 
 ### C2. Move `streaming.py`
@@ -476,8 +513,8 @@ Stream C's first commit in lockstep so `git bisect` always builds.
       `pipelex_mistralai_workflows/streaming.py`.
 - [ ] Drop the optional-dep guard (same pattern as C1).
 - [ ] Rewrite imports:
-  - `pipelex.plugins.mistralai_workflows.bridge` → `pipelex.embedding.bridge`
-  - `pipelex.plugins.mistralai_workflows.execution_mode` → `pipelex.embedding.execution_mode`
+  - `pipelex.plugins.mistralai_workflows.bridge` → `pipelex.runtime_bridge.bridge`
+  - `pipelex.plugins.mistralai_workflows.execution_mode` → `pipelex.runtime_bridge.execution_mode`
   - `pipelex.plugins.mistralai_workflows.streaming_event_forwarder` → `pipelex_mistralai_workflows.streaming_event_forwarder`
   - Drop the `MistralWorkflowsNotInstalledError` import.
 
@@ -500,7 +537,7 @@ Stream C's first commit in lockstep so `git bisect` always builds.
 - [ ] Provide at minimum:
   - `pipelex_dependency` — a callable shaped for
     `mistralai.workflows.Depends(...)`. Body wraps
-    `ensure_pipelex_booted()` (imported from `pipelex.embedding.bootstrap`)
+    `ensure_pipelex_booted()` (imported from `pipelex.runtime_bridge.bootstrap`)
     and returns `Pipelex.get_instance()`. This is the function previously
     living as `get_pipelex_dependency()` in
     `pipelex.plugins.mistralai_workflows.bootstrap` (deleted in Stream A,
@@ -525,9 +562,9 @@ to `pipelex-mistralai-workflows/tests/integration/`.
 For each, rewrite imports:
 
 - `from pipelex.plugins.mistralai_workflows.bridge import ...`
-  → `from pipelex.embedding.bridge import ...`
+  → `from pipelex.runtime_bridge.bridge import ...`
 - `from pipelex.plugins.mistralai_workflows.execution_mode import ...`
-  → `from pipelex.embedding.execution_mode import ...`
+  → `from pipelex.runtime_bridge.execution_mode import ...`
 - `from pipelex.plugins.mistralai_workflows.activities import ...`
   → `from pipelex_mistralai_workflows.activities import ...`
 - `from pipelex.plugins.mistralai_workflows.streaming import ...`
@@ -554,7 +591,7 @@ For each, rewrite imports:
   - `bridge_funcs.py`
 
   Note: the same files also live in pipelex at
-  `tests/integration/pipelex/embedding/test_data/` (per Stream A, A8) for
+  `tests/integration/pipelex/runtime_bridge/test_data/` (per Stream A, A8) for
   the layer-1 bridge test. This is intentional duplication: both repos
   exercise the same fixture against different layers. If divergence
   becomes a maintenance problem later, factor into a tiny shared package;
@@ -587,9 +624,9 @@ For each, rewrite imports:
       ```python
       from pipelex_mistralai_workflows.activities import pipelex_run_pipe, pipelex_run_pipe_offloaded
       from pipelex_mistralai_workflows.streaming import pipelex_run_pipe_streaming
-      from pipelex.embedding.bridge import PipelexPipeRunInput, PipelexPipeRunOutput, run_pipe_via_bridge
-      from pipelex.embedding.execution_mode import PipelexExecutionMode
-      from pipelex.embedding.bootstrap import ensure_pipelex_booted
+      from pipelex.runtime_bridge.bridge import PipelexPipeRunInput, PipelexPipeRunOutput, run_pipe_via_bridge
+      from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
+      from pipelex.runtime_bridge.bootstrap import ensure_pipelex_booted
       ```
       All six imports succeed without warnings.
 
@@ -610,7 +647,7 @@ For each, rewrite imports:
 ### D1. Coordinated land
 
 - [ ] Land Stream A's PR on `pipelex` and ship the matching pipelex release
-      (containing the `pipelex.embedding` package and the migration
+      (containing the `pipelex.runtime_bridge` package and the migration
       paragraph in CHANGELOG).
 - [ ] On the same day, push `pipelex-mistralai-workflows==0.1.0` to PyPI
       pinning `pipelex>=NEXT` to the freshly-released pipelex version.
@@ -628,7 +665,7 @@ For each, rewrite imports:
 
 ### D3. Watch the open risks
 
-- [ ] **Version coupling.** Document the `pipelex.embedding` public surface
+- [ ] **Version coupling.** Document the `pipelex.runtime_bridge` public surface
       as stable in pipelex docs. A breaking change to that surface is a
       breaking change for the plugin pkg.
 - [ ] **OffloadableField import drift.** `activities.py` (now in the new
