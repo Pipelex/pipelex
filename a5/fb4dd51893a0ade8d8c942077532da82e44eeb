@@ -1,0 +1,27 @@
+pyproject.toml
+  ai_agent 3
+pipelex/system/runtime.py
+  ai_agent 8,74
+pipelex/cli/commands/build/structures_cmd.py
+  ai_agent 12-16,21,77-87,92,167-170,197-198,200,231-232,234-235,239-240,246-247,249,277-278,280
+tests/unit/pipelex/cli/commands/build/test_structures_cmd_cross_package_refines.py
+  ai_agent 1-80
+uv.lock
+  ai_agent 3124
+pipelex/core/concepts/structure_generation/generator.py
+  ai_agent 54,62-64,74,440-447
+docs/configuration/index.md
+  ai_agent 39,66,88-107
+docs/features/configuration.md
+  ai_agent 20
+pipelex/core/concepts/concept_factory.py
+  ai_agent 322
+tests/e2e/pipelex/concepts/nested_concepts/test_structure_generator_cli.py
+  ai_agent 73-75,80-82,84-90,94-95,105-106,110,115-116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "a5fb4dd51893a0ade8d8c942077532da82e44eeb",
+  "prompts": {}
+}
