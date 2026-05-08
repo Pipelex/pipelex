@@ -6,6 +6,16 @@
 
 - **Mistral Workflows integration extracted into a dedicated package.** The optional `pipelex[mistralai-workflows]` extra and the `pipelex.plugins.mistralai_workflows.*` modules have been removed from `pipelex`. Install the new package instead: `pip install pipelex-mistralai-workflows`, and import from `pipelex_mistralai_workflows.*`. The framework-agnostic runtime-bridge core (boundary types, `run_pipe_via_bridge`, `PipelexExecutionMode`, `ensure_pipelex_booted`) has been promoted from `pipelex.plugins.mistralai_workflows.*` to `pipelex.runtime_bridge.*` so any host runtime — not just Mistral Workflows — can embed Pipelex. No behavior changes; activities, boundary types, and execution modes are identical.
 
+### Fixed
+
+- **`pipelex build structures` now emits domain-qualified class names and cross-references.** `ConceptFactory` registers each concept's structure class under `make_qualified_structure_class_name(domain, concept_code)` (e.g. `expense_validator__SpendingLimitCheck`), but the CLI generator was passing the bare `concept_code` to `StructureGenerator`. Generated files therefore contained `class ConceptCode(StructuredContent)` and unqualified cross-imports/types, while the registry expected the qualified name. `PipeFunc` validation against `concept.structure_class_name` then rejected the mismatch with `output concept expects structure class 'domain__X', but the function return type is 'X'`, breaking library load for any project that had regenerated structures. Fixed in `pipelex/cli/commands/build/structures_cmd.py`: the class-definition call sites now call `make_qualified_structure_class_name(blueprint.domain, concept_code)`; `_build_concept_ref_to_class_info` qualifies cross-reference class names while keeping the file stem unqualified so output filenames stay `domain__concept_code.py`; the `refines:` branch resolves the refined concept's domain via `QualifiedRef.parse_stripping_cross_package` and qualifies the base-class name for non-native refines, mirroring `ConceptFactory._handle_refines`.
+
+## [v0.27.0] - 2026-05-07
+
+### Changed
+
+- **`RunEnvironment` env var renamed from `ENVIRONMENT` to `PIPELEX_ENV`.** The variable that selects the environment-specific `pipelex_<env>.toml` overlay (and is stamped on OTel spans as `deployment.environment`) is now namespaced to avoid collisions with unrelated `ENVIRONMENT` variables already set in deployment environments. Update any shell, CI, or container config that exported `ENVIRONMENT=...` to export `PIPELEX_ENV=...` instead.
+
 ## [v0.26.4] - 2026-05-06
 
 ### Fixed

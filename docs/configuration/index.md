@@ -36,7 +36,7 @@ The main project configuration files are:
 In addition to `.pipelex/pipelex.toml`, Pipelex can apply override files at the **project root** (not in `.pipelex/`) for machine- and environment-specific settings:
 
 1. `pipelex_local.toml`
-2. `pipelex_{environment}.toml` (example: `pipelex_dev.toml`)
+2. `pipelex_{environment}.toml` (example: `pipelex_dev.toml`) — selected by the `PIPELEX_ENV` environment variable (see [Selecting the environment](#selecting-the-environment))
 3. `pipelex_{run_mode}.toml` (example: `pipelex_normal.toml`; unit tests may use `tests/pipelex_unit_test.toml`)
 4. `pipelex_override.toml` (recommended to gitignore)
 
@@ -63,7 +63,7 @@ The exact loading sequence is:
 2. Your project's base configuration (`pipelex.toml` in your project root)
 3. Local overrides (`pipelex_local.toml`)
 4. Environment-specific overrides (`pipelex_{environment}.toml`)
-   - Example environments: dev, staging, prod -> based on the environment variable `ENV` in your .env file
+   - Example environments: `local`, `dev`, `staging`, `prod` — selected by the `PIPELEX_ENV` environment variable (see [Selecting the environment](#selecting-the-environment))
 5. Run mode overrides (`pipelex_{run_mode}.toml`)
    - Example run modes: normal, unit_test
 6. Final overrides (`pipelex_override.toml`) (recommended to put in .gitignore)
@@ -84,6 +84,27 @@ Each subsequent configuration file in this sequence can override settings from t
 - Final overrides: `pipelex_override.toml`
 
 NB: The run_mode unit_test is used for testing purposes.
+
+### Selecting the environment
+
+The `pipelex_{environment}.toml` overlay is picked at runtime from the `PIPELEX_ENV` environment variable.
+
+| Value     | Overlay file loaded   |
+| --------- | --------------------- |
+| `local`   | `pipelex_local.toml` *(also loaded as the local override layer; see above)* |
+| `dev`     | `pipelex_dev.toml`     |
+| `staging` | `pipelex_staging.toml` |
+| `prod`    | `pipelex_prod.toml`    |
+
+If `PIPELEX_ENV` is unset, Pipelex defaults to `dev`. Any other value raises an error at startup — the accepted values are defined by the `RunEnvironment` enum in `pipelex/system/runtime.py`.
+
+The selected environment is also stamped on OpenTelemetry spans as `deployment.environment`, so it doubles as the environment label for traces and metrics.
+
+Set it the way you set any other env var — for example, in your shell, your `.env` file, your CI configuration, or your container runtime:
+
+```bash
+export PIPELEX_ENV=staging
+```
 
 ### Best Practices for Overrides
 
