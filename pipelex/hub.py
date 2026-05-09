@@ -565,7 +565,31 @@ def get_required_concept(concept_ref: str) -> Concept:
     return get_pipelex_hub().get_library().concept_library.get_required_concept(concept_ref=concept_ref)
 
 
+_current_pipe_router: ContextVar[PipeRouterProtocol | None] = ContextVar("current_pipe_router", default=None)
+
+
+def set_pipe_router(pipe_router: PipeRouterProtocol) -> None:
+    """Override the active pipe router for the current async context.
+
+    Used by host runtimes that want controllers to dispatch sub-pipes
+    through their own router (e.g. Mistral-native mode swaps in a router
+    that turns sub-pipe calls into child workflows / activities). The
+    override is contextvar-scoped, so concurrent runs on the same hub
+    don't leak into each other. Pass ``None`` via
+    ``teardown_current_pipe_router()`` to restore the hub default.
+    """
+    _current_pipe_router.set(pipe_router)
+
+
+def teardown_current_pipe_router() -> None:
+    """Clear any contextvar-scoped router override set by ``set_pipe_router``."""
+    _current_pipe_router.set(None)
+
+
 def get_pipe_router() -> PipeRouterProtocol:
+    override = _current_pipe_router.get()
+    if override is not None:
+        return override
     return get_pipelex_hub().get_required_pipe_router()
 
 
