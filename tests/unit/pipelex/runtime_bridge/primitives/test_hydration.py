@@ -10,7 +10,7 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_class_registry
 from pipelex.pipe_run.exceptions import PipeJobError
-from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
+from pipelex.runtime_bridge.primitives.hydration import hydrate_working_memory
 
 
 def _make_text_concept() -> Concept:

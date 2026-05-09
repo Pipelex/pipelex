@@ -8,11 +8,11 @@ from typing_extensions import override
 with workflow.unsafe.imports_passed_through():
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryStatus
+    from pipelex.runtime_bridge.primitives.pipe_run_arg import PipeRunArg
     from pipelex.temporal.log_temporal import workflow_log
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
     from pipelex.temporal.tprl_pipe.act_assemble_graph import AssembleGraphArg, act_assemble_graph
     from pipelex.temporal.tprl_pipe.act_deliver import DeliveryActivityArg, act_deliver
-    from pipelex.temporal.tprl_pipe.pipe_run_arg import PipeRunArg
     from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 
 

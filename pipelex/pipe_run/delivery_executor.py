@@ -17,7 +17,7 @@ from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
 from pipelex.graph.graph_factory import generate_graph_outputs
 from pipelex.hub import get_class_registry, get_storage_provider
 from pipelex.pipe_run.exceptions import PipeJobError, StorageDeliveryError, WebhookDeliveryError
-from pipelex.temporal.tprl_pipe.hydration import hydrate_content
+from pipelex.runtime_bridge.primitives.hydration import hydrate_content
 from pipelex.tools.misc.json_utils import clean_json_dumps
 
 if TYPE_CHECKING:

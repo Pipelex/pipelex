@@ -25,7 +25,7 @@ from kajson.kajson_manager import KajsonManager
 
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.hub import get_current_library, get_library_manager, set_current_library, teardown_current_library
-from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
+from pipelex.runtime_bridge.primitives.hydration import hydrate_working_memory
 
 if TYPE_CHECKING:
     from pipelex.libraries.library_crate import LibraryCrate
