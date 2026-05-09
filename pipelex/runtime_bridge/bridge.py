@@ -15,7 +15,7 @@ The Temporal extra is lazy-imported only inside the temporal-mode branches.
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any, AsyncGenerator
+from typing import TYPE_CHECKING, Any, AsyncGenerator, Callable, cast
 from uuid import uuid4
 
 import shortuuid
@@ -40,6 +40,7 @@ from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionErr
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.runtime_bridge.bootstrap import ensure_pipelex_booted
 from pipelex.runtime_bridge.exceptions import (
+    MissingMistralWorkflowsPluginError,
     MissingPipelexTemporalExtraError,
     PipelexBridgeRuntimeError,
 )
@@ -51,6 +52,7 @@ if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.graph.graph_context import GraphContext
     from pipelex.pipe_run.pipe_job import PipeJob
+    from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 
 
 class PipelexPipeRunInput(BaseModel):
@@ -121,6 +123,8 @@ async def run_pipe_via_bridge(
             case PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET:
                 _require_pipelex_temporal_extra()
                 return await _run_temporal_fire_and_forget(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
+            case PipelexExecutionMode.MISTRAL_NATIVE:
+                return await _run_mistral_native(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
 
 
 def build_pipe_job_from_input(
@@ -337,3 +341,33 @@ def _require_pipelex_temporal_extra() -> None:
     except ImportError as exc:
         msg = "TEMPORAL_* execution modes require the pipelex[temporal] extra. Install with: pip install 'pipelex[temporal]'"
         raise MissingPipelexTemporalExtraError(msg) from exc
+
+
+async def _run_mistral_native(
+    pipe_job: PipeJob,
+    delivery_assignment: DeliveryAssignment | None,
+) -> PipelexPipeRunOutput:
+    try:
+        from pipelex_mistralai_workflows.primitives.pipe_run import (  # type: ignore[import-not-found]  # noqa: PLC0415  # pyright: ignore[reportMissingImports]
+            make_mistral_workflows_pipe_run as _make_pipe_run_untyped,  # pyright: ignore[reportUnknownVariableType]
+        )
+    except ImportError as exc:
+        msg = (
+            "PipelexExecutionMode.MISTRAL_NATIVE requires the pipelex-mistralai-workflows "
+            "package. Install with: pip install pipelex-mistralai-workflows"
+        )
+        raise MissingMistralWorkflowsPluginError(msg) from exc
+
+    make_pipe_run = cast("Callable[[], PipeRunProtocol]", _make_pipe_run_untyped)
+    pipe_run = make_pipe_run()
+    try:
+        pipe_output = await pipe_run.run(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
+    except (PipeRunError, PipeJobError, PipeRouterError, PipeExecutionError, PipelineExecutionError) as exc:
+        msg = f"Pipe execution failed in MISTRAL_NATIVE mode for pipe '{pipe_job.pipe.code}': {exc}"
+        raise PipelexBridgeRuntimeError(msg) from exc
+
+    return _serialize_completed_output(
+        pipe_output=pipe_output,
+        pipe_job=pipe_job,
+        workflow_id=pipe_output.pipeline_run_id,
+    )

@@ -9,5 +9,9 @@ class MissingPipelexTemporalExtraError(PipelexRuntimeBridgeError):
     """Raised when a TEMPORAL_* execution mode is requested without the pipelex[temporal] extra."""
 
 
+class MissingMistralWorkflowsPluginError(PipelexRuntimeBridgeError):
+    """Raised when MISTRAL_NATIVE mode is requested without ``pipelex-mistralai-workflows`` installed."""
+
+
 class PipelexBridgeRuntimeError(PipelexRuntimeBridgeError):
     """Raised when a pipe execution dispatched through the bridge fails."""

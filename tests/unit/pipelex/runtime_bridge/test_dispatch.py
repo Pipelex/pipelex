@@ -1,3 +1,5 @@
+import builtins
+
 import pytest
 from pytest_mock import MockerFixture
 
@@ -8,6 +10,7 @@ from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.runtime_bridge.bridge import PipelexPipeRunInput, run_pipe_via_bridge
+from pipelex.runtime_bridge.exceptions import MissingMistralWorkflowsPluginError
 from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
 
 
@@ -119,3 +122,34 @@ class TestDispatch:
         assert result.workflow_id == "wf-id-42"
         assert result.pipeline_run_id == "caller-run-id"
         assert result.output_dict == {}
+
+    async def test_mistral_native_without_plugin_raises_with_install_hint(self, mocker: MockerFixture) -> None:
+        fake_job = _make_fake_pipe_job(mocker=mocker, pipe_code="fake_pipe", pipeline_run_id="caller-run-id")
+        mocker.patch(
+            "pipelex.runtime_bridge.bridge.build_pipe_job_from_input",
+            return_value=fake_job,
+        )
+
+        # Simulate the plugin not being installed by stubbing __import__ to fail on the
+        # plugin's primitives.pipe_run module. The bridge does the import lazily inside
+        # _run_mistral_native, so this only fires when MISTRAL_NATIVE is selected.
+        real_import = builtins.__import__
+
+        def fake_import(name: str, *args: object, **kwargs: object) -> object:
+            if name.startswith("pipelex_mistralai_workflows.primitives.pipe_run"):
+                msg = f"No module named {name!r}"
+                raise ImportError(msg)
+            return real_import(name, *args, **kwargs)  # type: ignore[arg-type]
+
+        mocker.patch.object(builtins, "__import__", side_effect=fake_import)
+
+        with pytest.raises(MissingMistralWorkflowsPluginError) as exc_info:
+            await run_pipe_via_bridge(
+                PipelexPipeRunInput(
+                    pipe_code="fake_pipe",
+                    execution_mode=PipelexExecutionMode.MISTRAL_NATIVE,
+                )
+            )
+
+        assert "pipelex-mistralai-workflows" in str(exc_info.value)
+        assert "pip install" in str(exc_info.value)
