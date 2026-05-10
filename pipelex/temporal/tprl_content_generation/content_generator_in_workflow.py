@@ -30,6 +30,7 @@ from pipelex.config import get_config
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.temporal.config_temporal import WorkerConfig
 from pipelex.temporal.exceptions import ContentGenerationError
 from pipelex.temporal.tprl.temporal_error import TemporalError
 from pipelex.temporal.tprl_content_generation.act_extract_generate import act_extract_gen_extract_pages
@@ -42,6 +43,25 @@ from pipelex.temporal.tprl_content_generation.act_llm_generate import (
 )
 from pipelex.temporal.tprl_content_generation.act_render_page_views import act_render_page_views
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+
+
+def _inference_dispatch_kwargs(worker_config: WorkerConfig) -> dict[str, Any]:
+    """Provisional split-worker stopgap.
+
+    Returns the ``execute_activity`` kwargs that route an inference activity
+    onto ``worker_config.inference_task_queue`` so split-worker deployments
+    can run inference on a dedicated runner pool. Today it is the single
+    place that knows about the binary "LLM goes to inference_task_queue,
+    everything else goes to default" model.
+
+    The proper general design is in
+    ``wip/temporal-primitives/per-activity-queue-routing-v1.md``: per-
+    activity, per-handle routing covering LLM + image-gen + extract under
+    one config table. Do NOT extend this helper to image-gen, extract, or
+    any other activity — those will be folded into the new routing system.
+    This helper exists so the future migration is a single deletion point.
+    """
+    return {"task_queue": worker_config.inference_task_queue}
 
 
 class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
@@ -112,14 +132,15 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
             # All other activities below run on the workflow's own queue (no
             # ``task_queue=`` kwarg passed) — copy-pasting that kwarg to img-gen,
             # extract, jinja2, etc. would break runners that don't register those
-            # activities.
+            # activities. ``_inference_dispatch_kwargs`` is the single deletion
+            # point when per-activity-queue routing lands (see helper docstring).
             generated_text: str = await workflow.execute_activity(
                 act_llm_gen_text,
                 arg=llm_assignment,
                 start_to_close_timeout=worker_config.workflow_execution_timeout,
                 retry_policy=worker_config.retry_policy,
-                task_queue=worker_config.inference_task_queue,
                 activity_id=activity_id,
+                **_inference_dispatch_kwargs(worker_config),
             )
         except ActivityError as exc:
             log.error(f"ActivityError caused by: {exc.cause}")

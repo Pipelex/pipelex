@@ -25,7 +25,10 @@ from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.temporal.exceptions import ContentGenerationError
-from pipelex.temporal.tprl_content_generation.content_generator_in_workflow import ContentGeneratorInWorkflow
+from pipelex.temporal.tprl_content_generation.content_generator_in_workflow import (
+    ContentGeneratorInWorkflow,
+    _inference_dispatch_kwargs,  # pyright: ignore[reportPrivateUsage]  # noqa: PLC2701  # deliberate pin on the helper symbol — see Phase 7 stopgap
+)
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 
 
@@ -97,7 +100,13 @@ class TestContentGeneratorInWorkflow:
     """Per-method assertions on the activity-dispatch kwargs and the runtime uniqueness check."""
 
     async def test_make_llm_text_passes_inference_task_queue(self, mocker: MockerFixture) -> None:
-        """make_llm_text must route to ``worker_config.inference_task_queue``."""
+        """make_llm_text must route to ``worker_config.inference_task_queue``.
+
+        Pinned to the ``_inference_dispatch_kwargs`` helper so that the future
+        per-activity routing migration (see
+        ``wip/temporal-primitives/per-activity-queue-routing-v1.md``) shows up
+        as a clear test diff at the single deletion point.
+        """
         mock_execute = mocker.patch("temporalio.workflow.execute_activity", new_callable=mocker.AsyncMock)
         mock_execute.return_value = "stub text"
         generator = _make_generator()
@@ -111,7 +120,8 @@ class TestContentGeneratorInWorkflow:
         assert result == "stub text"
         kwargs = mock_execute.call_args.kwargs
         worker_config = get_config().temporal.worker_config
-        assert kwargs.get("task_queue") == worker_config.inference_task_queue
+        expected_inference_kwargs = _inference_dispatch_kwargs(worker_config)
+        assert kwargs.get("task_queue") == expected_inference_kwargs["task_queue"]
         assert kwargs.get("activity_id") == "craft-text"
 
     async def test_make_llm_text_threads_explicit_wfid(self, mocker: MockerFixture) -> None:
@@ -145,9 +155,16 @@ class TestContentGeneratorInWorkflow:
         method_default_id: str,
         caller: str,
     ) -> None:
-        """Each non-LLM-text method must NOT pass ``task_queue=`` so its activity runs
-        on the workflow's own queue (mis-routing image-gen to the inference queue would
-        break split-worker production where the runner doesn't register the activity).
+        """Each non-LLM-text method must NOT receive the kwargs from
+        ``_inference_dispatch_kwargs`` so its activity runs on the workflow's own
+        queue. Mis-routing image-gen / extract / jinja2 to the inference queue
+        would break split-worker production where the runner doesn't register
+        the activity.
+
+        Pinned to the helper symbol: any future expansion of
+        ``_inference_dispatch_kwargs`` to non-LLM-text activities (which the
+        helper docstring explicitly forbids) would silently change the contract
+        unless this assertion catches it.
         """
         mock_execute = mocker.patch("temporalio.workflow.execute_activity", new_callable=mocker.AsyncMock)
         mock_execute.return_value = self._stub_for(caller)
@@ -157,6 +174,10 @@ class TestContentGeneratorInWorkflow:
 
         kwargs = mock_execute.call_args.kwargs
         assert kwargs.get("task_queue") is None, f"{caller} must not pass task_queue= (got {kwargs.get('task_queue')!r})"
+        for inference_kwarg in _inference_dispatch_kwargs(get_config().temporal.worker_config):
+            assert inference_kwarg not in kwargs or kwargs[inference_kwarg] is None, (
+                f"{caller} unexpectedly received inference dispatch kwarg '{inference_kwarg}'"
+            )
         assert kwargs.get("activity_id") == method_default_id
 
     async def test_make_extract_pages_dispatches_extract_only_when_no_page_views(self, mocker: MockerFixture) -> None:

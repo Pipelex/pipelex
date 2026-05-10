@@ -1,8 +1,10 @@
 # Per-activity, per-handle Temporal queue routing
 
-> **Status:** WIP design — out of scope for the `tprl_content_generation/` collapse PR (see [`TODOS.md`](../../TODOS.md) Phase 7). Filed as a follow-up after the design conversation that produced it.
+> **Status:** Ready to implement. The predecessor `tprl_content_generation/` collapse PR has landed (Phases 0–6) and Phase 7 added the stopgap deletion point: `pipelex/temporal/tprl_content_generation/content_generator_in_workflow.py::_inference_dispatch_kwargs`. Implementing this design replaces that helper.
 >
 > **Predecessor context:** `inference_task_queue` was introduced as a quick split-worker test ("LLM goes here, everything else goes to default"). That two-queue model is provisional. This doc proposes the proper general design that supersedes it.
+>
+> **Pin for whoever picks this up:** see [§ Tests to upgrade when v1 lands](#tests-to-upgrade-when-v1-lands) — Phase 7 shipped two pytest files (`test_split_worker_object_gen.py`, `test_split_worker_extract_pages.py`) that deliberately use a single-worker setup because object/extract activities have no `inference_task_queue` analog today. Those tests are the primary callers of the upgrade and the easiest way to validate v1 end-to-end.
 
 ## Problem
 
@@ -226,10 +228,32 @@ The change surface is concentrated in:
 
 ## Test plan (sketch)
 
+New tests added by this work:
+
 - **Unit:** `resolve_queue` covers all three layers — unmapped activity → default; mapped activity, unmapped handle → activity default; mapped activity, mapped handle → per-handle queue.
-- **Integration:** a split-worker setup with two named runners (e.g. `openai_runner` listening on `openai_q`, `anthropic_runner` listening on `anthropic_q`). Submit a workflow that dispatches an LLM call with each handle and assert via `WorkflowHandle.fetch_history()` that the activity landed on the expected queue.
-- **Negative:** the boot-time validators catch (a) a queue with no listeners and (b) an unknown activity name in `activity_queues`.
+- **Integration (positive):** a split-worker setup with two named runners (e.g. `openai_runner` listening on `openai_q`, `anthropic_runner` listening on `anthropic_q`). Submit a workflow that dispatches an LLM call with each handle and assert via `WorkflowHandle.fetch_history()` that the activity landed on the expected queue. Mirror the structure of `tests/integration/pipelex/temporal/tracing/test_split_worker_usage.py` (which currently exercises the legacy `inference_task_queue` path).
+- **Integration (negative):** the boot-time validators catch (a) a queue with no listeners and (b) an unknown activity name in `activity_queues`.
 
-## Relationship to current PR (`refactor/Temporal-primitives`)
+## Tests to upgrade when v1 lands
 
-Strictly out of scope. The current PR collapses `tprl_content_generation/` workflow types to direct activity dispatch — that surface is exactly the place where this routing change will land, but the routing change itself is a separate concern with its own design and migration story. The current PR survives with a tiny `_inference_dispatch_kwargs(worker_config)` helper that isolates the existing two-queue logic to a single deletion point (see `TODOS.md` Phase 7 — "Stopgap for this PR").
+Phase 7 of the `tprl_content_generation/` collapse landed three new pytest files. Two of them deliberately use a single-worker setup because the per-activity routing this design proposes did not yet exist. When v1 ships, upgrade these tests to true split-worker setups so they exercise the cross-process activity boundary the way `test_split_worker_usage.py` does for LLM-text. The data-converter round-trip aspect they test today is real, but they do NOT test cross-process registry decode (the bug class that surfaces in Tier 2b of `temporal-e2e-validate/SKILL.md` — runner with cold `sys.modules` / `ClassRegistry`).
+
+| Test file | Today's setup (single worker) | Upgrade target (true split worker) |
+| --- | --- | --- |
+| `tests/integration/pipelex/temporal/tracing/test_split_worker_object_gen.py` | Substitute activities for `act_llm_gen_object` / `act_llm_gen_object_list` register on the workflow's own queue. Temporal's data converter still serializes the `FixtureInvoice` round-trip (nested `FixtureCustomer` + `list[FixtureLineItem]`), so the `model_dump(mode="json", serialize_as_any=True)` ↔ `model_validate(...)` contract IS validated. What's NOT validated: the activity executing in a separate Python process with its own `sys.modules` and class registry. | Run the workflow on `q_router` and route `act_llm_gen_object*` to `q_runner` via the new `activity_queues` config. The substitutes register on `q_runner` only. This exercises the same cross-process registry decode path that surfaces real bugs for dynamic concept classes. |
+| `tests/integration/pipelex/temporal/tracing/test_split_worker_extract_pages.py` | Substitutes for `act_extract_gen_extract_pages` and `act_render_page_views` register on the workflow's own queue. The activity_id contract (`-pages` / `-render-page-views` via `fetch_history()`) IS validated regardless of worker count. | Route both extract activities to a runner queue. Activity_id assertion stays; cross-process dispatch is now genuinely exercised. |
+
+Both files contain a `Note on "split worker"` block in their module docstrings that records the deviation explicitly. Remove those blocks during the upgrade — they exist to prevent the next reader from assuming the test does more than it does.
+
+The third file from Phase 7 (`test_split_worker_usage.py` for LLM-text) does NOT need an upgrade; it already runs split workers via the legacy `inference_task_queue` routing. Migrating it to the new resolver is a one-line change (replace the `worker_config.inference_task_queue = q_runner` fixture with an `activity_queues[act_llm_gen_text].default = q_runner` override).
+
+Adjacent surfaces to revisit at the same time:
+
+- `.claude/skills/temporal-e2e-validate/SKILL.md` — Tier 10 (image-gen negative-routing, "`grep -c "act_img_gen"` on the runner pool must return 0") becomes config-driven post-v1: a scope's `listen_queues` plus the activity's resolver entry are enough to enforce it without ad-hoc `excluded_activities` lists. Update the Tier 4/5/10 instructions accordingly.
+- `pipelex/temporal/test_extras/temporal_registry_test_models.py` — `FixtureInvoice` / `FixtureCustomer` / `FixtureLineItem` registrations stay; the cross-process upgrade only changes who runs the activity, not the model shape.
+- `pipelex/temporal/tprl_content_generation/content_generator_in_workflow.py::_inference_dispatch_kwargs` — the deletion point. Remove it in the same change that introduces `resolve_queue`.
+- `tests/unit/pipelex/temporal/test_content_generator_in_workflow.py` — the positive/negative `task_queue` assertions are pinned to `_inference_dispatch_kwargs` as a single-deletion-point sentinel. They will need to be rewritten for the new resolver: positive assertion becomes "every inference dispatch site passes `task_queue=<resolved>`" (uniform across activities), negative becomes "non-inference dispatches pass the default queue". The asymmetric kwarg disappears — that's the whole point.
+
+## Relationship to predecessor PR (`refactor/Temporal-primitives`)
+
+The predecessor collapsed `tprl_content_generation/` workflow types to direct activity dispatch — that surface is exactly the place where this routing change lands. The predecessor shipped with a tiny `_inference_dispatch_kwargs(worker_config)` helper that isolates the existing two-queue logic to a single deletion point (see `TODOS.md` Phase 7 — "Stopgap for this PR"). This v1 design replaces the helper with a real per-activity resolver.
