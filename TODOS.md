@@ -6,7 +6,7 @@
 
 **Branch:** `feature/Text-then-object` (worktree at `_tto/`).
 
-**Last verified:** `make agent-check` clean (ruff/plxt/pyright/mypy all 0 errors, 0 warnings) and `make agent-test` green (full suite). Targeted run: `1687 passed, 1 xfailed` for the touched source areas.
+**Last verified:** `make agent-check` clean (ruff/plxt/pyright/mypy all 0 errors, 0 warnings). Targeted run for the touched source areas: `1503 passed, 1 xfailed`. PipeStructure-focused subset (`tests/unit/pipelex/pipe_operators/pipe_structure/ tests/unit/pipelex/core/interpreter/ tests/integration/pipelex/pipes/operator/pipe_structure/`): `89 passed`.
 
 ### Status by phase
 
@@ -22,7 +22,14 @@
   - `PipeLLMSpec` exposes `structuring_method: StructuringMethod | None = None` (plain `Field`, not `SkipJsonSchema`) and forwards it in `to_blueprint()`.
   - Deleted obsolete `test_pipe_llm_preliminary_text_raises_not_implemented` integration test.
   - Updated `tests/unit/pipelex/language/test_mthds_schema.py::test_all_pipe_types_present` to derive expected blueprint names from `PipeType.value_list()` instead of hardcoding the count (the count test was failing once `PipeStructure` was added).
-- [ ] **Phase 8 — round-out tests.** Not started. (Phase 7 intentionally skipped per the plan.)
+- [x] **Phase 8 — round-out tests.** Done. (Phase 7 intentionally skipped per the plan.) Files added:
+  - `tests/unit/pipelex/pipe_operators/pipe_structure/test_pipe_structure_kajson.py` — kajson round-trip for `PipeStructureBlueprint`, `PipeLLMBlueprint` with `structuring_method = preliminary_text`, every blueprint in an elaborated bundle, and `ElaborationMetadata`.
+  - `tests/unit/pipelex/core/interpreter/test_interpreter_preliminary_text.py` — `PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=...)` end-to-end, both with and without `structuring_method = "preliminary_text"`.
+  - `tests/integration/pipelex/pipes/operator/pipe_structure/test_pipe_structure_in_sequence.py` + `text_then_structure_helpers.mthds` — hand-authored `PipeSequence` wrapping a PipeLLM (text) + a `PipeStructure` step (no elaboration sugar). Dry-run passes.
+  - `tests/integration/pipelex/pipes/operator/pipe_structure/test_pipe_structure_in_batch.py` — `PipeBatch` iterating a `PipeStructure` over a list of texts. Dry-run passes.
+  - `tests/integration/pipelex/pipes/operator/pipe_structure/test_preliminary_text_e2e.py` + `preliminary_text_e2e.mthds` — runs the full `preliminary_text` elaboration via the library loader, asserts the wrapping pipe is a `PipeSequence` and step-2 is a `PipeStructure`, then runs end-to-end (real-LLM under `inference`/`llm` markers; dry-run also exercised).
+  - **PipeStructure in MTHDS not yet supported by `plxt`.** Authoring `type = "PipeStructure"` directly in a `.mthds` file fails plxt schema validation (the bundled schema in `vscode-pipelex/crates/taplo-common/schemas/mthds_schema.json` is from before this PR). The `preliminary_text` path works because the synthesized `PipeStructure` is built in-memory after plxt parsing. Phase 8.3 / 8.4 therefore exercise PipeStructure programmatically. **Follow-up:** ship a plxt release with the regenerated schema so users can author `PipeStructure` directly in MTHDS. Captured in the follow-up TODOs.
+  - **Note on the previously-listed Temporal test.** The original Phase 8 bullet for "preliminary_text via Temporal" is dropped: with the runtime change in Phase 6, Temporal sees only the elaborated form (PipeSequence + PipeLLM + PipeStructure), and Temporal's PipeStructure handling rides on the existing PipeOperator path that the Temporal data converter / class registry already cover. Re-add a dedicated Temporal smoke test only if a Temporal-specific bug surfaces.
 - [ ] **Phase 9 — docs & changelog.** Not started.
 - [ ] **Phase 10 — final validation.** Not started.
 
@@ -42,14 +49,27 @@
 
 ### How to resume
 
-1. `git status` to see uncommitted state — Phase 1–6 changes all live in the working tree of `_tto/`. Decide whether to commit before Phase 8.
-2. Move on to **Phase 8 (round-out tests)**. Suggested order:
-   - kajson round-trip for `PipeStructureBlueprint` and elaborated `PipeLLMBlueprint`.
-   - MTHDS fixture file with `structuring_method = "preliminary_text"` parsed end-to-end through `PipelexInterpreter`.
-   - PipeStructure inside a hand-written `PipeSequence` (no elaboration sugar).
-   - PipeStructure inside a `PipeBatch`.
-   - Real-LLM integration test for the full elaborated path (heaviest — last).
-3. Then **Phase 9 (docs)**, then **Phase 10 (final validation)**.
+1. `git status` to see uncommitted state — Phase 8 added test modules + two MTHDS fixtures under `tests/integration/pipelex/pipes/operator/pipe_structure/`. Decide whether to commit before Phase 9.
+2. Move on to **Phase 9 (docs & changelog)**:
+   - Restore / rewrite the structuring docs deleted in `16b775b8` (the old runtime mechanism is gone — the new docs explain the build-time elaboration).
+   - Add a `PipeStructure` operator page (mirror the `PipeLLM` page).
+   - Document the trade-off: `preliminary_text` produces 2 LLM calls per invocation.
+   - Add a `[Unreleased]` entry in `CHANGELOG.md`.
+   - Reconcile with the partial docs work already on this branch in commits `bb9bdb32` and `fabb22a2` — review them before adding new content.
+3. Then **Phase 10 (final validation)**.
+4. **Cross-repo follow-up (out of scope for this PR):** open a PR on `vscode-pipelex` to refresh `crates/taplo-common/schemas/mthds_schema.json` from `derived/mthds_schema.json` (regenerate via `pipelex-dev generate-mthds-schema`) and ship a new `pipelex-tools` release. Without this, `plxt lint` rejects MTHDS files that author `PipeStructure` directly.
+
+---
+
+### CHECKPOINT 3 — end of Phase 8
+
+`structuring_method = preliminary_text` is now exercised end-to-end via the library loader (real-LLM-capable), `PipeStructure` is exercised inside both `PipeSequence` and `PipeBatch`, and kajson round-tripping holds for the synthesized blueprints. Runtime has no knowledge of `structuring_method`. Tests green, lint/types clean.
+
+State to capture for the next session:
+
+- New MTHDS fixtures under `tests/integration/pipelex/pipes/operator/pipe_structure/`: `text_then_structure_helpers.mthds`, `preliminary_text_e2e.mthds`. The earlier `test_structures_basic.mthds` is unchanged.
+- All synthetic-pipe assertions reference codes `<parent>__draft_text` / `<parent>__structure` (still the working naming convention — revisit only if length pressure surfaces).
+- One ergonomics gap surfaced: the bundled plxt schema (in `vscode-pipelex/crates/taplo-common/schemas/mthds_schema.json`) does not yet include `PipeStructure`. The `preliminary_text` path is unaffected because the synthesized `PipeStructure` lives in-memory only. Captured as a Phase 9 cross-repo follow-up.
 
 ---
 

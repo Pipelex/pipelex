@@ -1,0 +1,20 @@
+domain      = "test_preliminary_text_e2e"
+description = "Real-LLM end-to-end test of preliminary_text elaboration"
+
+# The SimpleResult Python structure class is declared in test_structures_basic.py
+# in this same directory. Auto-registered via StructuredContent discovery on library load.
+[concept]
+SimpleResult = "A simple structured result"
+
+[pipe.make_simple_result]
+type = "PipeLLM"
+description = "Make a SimpleResult via preliminary_text elaboration"
+inputs = { topic = "Text" }
+output = "SimpleResult"
+model = "$testing-text"
+model_to_structure = "$testing-text"
+structuring_method = "preliminary_text"
+prompt = """
+Write a single sentence about $topic that mentions a title (use exactly the topic
+as the title) and an integer score between 1 and 10.
+"""

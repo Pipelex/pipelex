@@ -1,0 +1,14 @@
+domain      = "test_pipe_structure_seq"
+description = "Helpers for PipeStructure-in-PipeSequence tests"
+
+# The SimpleResult Python structure class is declared in test_structures_basic.py
+# in this same directory. Auto-registered via StructuredContent discovery on library load.
+[concept]
+SimpleResult = "A simple structured result"
+
+[pipe.write_draft_about_topic]
+type        = "PipeLLM"
+description = "Write a single sentence about a topic that mentions a title and a numeric score"
+inputs      = { topic = "Text" }
+output      = "Text"
+prompt      = "Write a single sentence about $topic that mentions a title and a numeric score."
