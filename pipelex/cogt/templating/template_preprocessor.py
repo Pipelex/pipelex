@@ -73,18 +73,22 @@ def preprocess_template(template: str) -> str:
     # TODO: allow escape patterns
 
     # Replace @?variable patterns (optional insertion) - must come before @variable
-    new_template = re.sub(r"@\?(?![0-9])([a-zA-Z0-9_.]+)", replace_optional_at_variable, processed_template)
+    # Negative lookbehind: `@` only counts as a variable prefix when not glued to a preceding
+    # word character — so `alice@example.com` stays literal but ` @var` / `(@var` / start-of-string `@var` still match.
+    new_template = re.sub(r"(?<![A-Za-z0-9_])@\?(?![0-9])([a-zA-Z0-9_.]+)", replace_optional_at_variable, processed_template)
     if new_template != processed_template:
         changes_made = True
         processed_template = new_template
 
     # Replace @variable patterns
-    new_template = re.sub(r"@(?![0-9])([a-zA-Z0-9_.]+)", replace_at_variable, processed_template)
+    new_template = re.sub(r"(?<![A-Za-z0-9_])@(?![0-9])([a-zA-Z0-9_.]+)", replace_at_variable, processed_template)
     if new_template != processed_template:
         changes_made = True
         processed_template = new_template
 
     # Replace $variable patterns
+    # Unlike `@`, `$` keeps the original behavior of matching even when glued to a preceding word
+    # character — templates intentionally rely on patterns like `Q$quarter` to inline-substitute.
     new_template = re.sub(r"\$(?![0-9])([a-zA-Z0-9_.]+)", replace_dollar_variable, processed_template)
     if new_template != processed_template:
         changes_made = True
