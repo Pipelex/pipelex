@@ -19,7 +19,7 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
-from tests.integration.pipelex.pipes.operator.pipe_structure.test_structures_basic import SimpleResult
+from tests.integration.pipelex.pipes.operator.pipe_structure.test_structures_basic import RestaurantReview
 
 
 @pytest.mark.dry_runnable
@@ -41,32 +41,32 @@ class TestPipeStructureInSequence:
         # The structuring step is authored explicitly here — no preliminary_text elaboration is involved,
         # so this test covers the path where users compose PipeStructure into a PipeSequence by hand.
         structure_blueprint = PipeStructureBlueprint(
-            description="Turn the draft text into a SimpleResult",
+            description="Turn the draft restaurant review text into a RestaurantReview",
             inputs={"draft_text": NativeConceptCode.TEXT},
-            output="SimpleResult",
+            output="RestaurantReview",
         )
         structure_pipe = PipeFactory[PipeStructure].make_from_blueprint(
             domain_code=domain_code,
-            pipe_code="structure_simple_result",
+            pipe_code="structure_restaurant_review",
             blueprint=structure_blueprint,
-            concept_codes_from_the_same_domain=["SimpleResult"],
+            concept_codes_from_the_same_domain=["RestaurantReview"],
         )
         get_pipe_library().add_new_pipe(structure_pipe)
 
         sequence_blueprint = PipeSequenceBlueprint(
-            description="Draft text via PipeLLM, then structure via PipeStructure",
-            inputs={"topic": NativeConceptCode.TEXT},
-            output="SimpleResult",
+            description="Draft a free-form review via PipeLLM, then structure it via PipeStructure",
+            inputs={"restaurant_brief": NativeConceptCode.TEXT},
+            output="RestaurantReview",
             steps=[
-                SubPipeBlueprint(pipe="write_draft_about_topic", result="draft_text"),
-                SubPipeBlueprint(pipe="structure_simple_result", result="result"),
+                SubPipeBlueprint(pipe="draft_restaurant_review_text", result="draft_text"),
+                SubPipeBlueprint(pipe="structure_restaurant_review", result="restaurant_review"),
             ],
         )
         sequence_pipe = PipeFactory[PipeSequence].make_from_blueprint(
             domain_code=domain_code,
-            pipe_code="text_then_structure_sequence",
+            pipe_code="text_then_structure_restaurant_review",
             blueprint=sequence_blueprint,
-            concept_codes_from_the_same_domain=["SimpleResult"],
+            concept_codes_from_the_same_domain=["RestaurantReview"],
         )
         get_pipe_library().add_new_pipe(sequence_pipe)
         assert len(sequence_pipe.sequential_sub_pipes) == 2
@@ -74,8 +74,8 @@ class TestPipeStructureInSequence:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(
             stuff=StuffFactory.make_stuff(
                 concept=get_native_concept(NativeConceptCode.TEXT),
-                content=TextContent(text="The book 'The Pipelex Way' deserves a score of 9 out of 10."),
-                name="topic",
+                content=TextContent(text="A bustling sushi counter in San Francisco's Mission district, popular for its omakase."),
+                name="restaurant_brief",
             ),
         )
 
@@ -91,8 +91,14 @@ class TestPipeStructureInSequence:
         assert pipe_output is not None
         assert pipe_output.main_stuff is not None
         assert pipe_output.working_memory.get_stuff("draft_text") is not None
-        assert pipe_output.working_memory.get_stuff("result") is not None
+        assert pipe_output.working_memory.get_stuff("restaurant_review") is not None
         if pipe_run_mode.is_live:
-            assert isinstance(pipe_output.main_stuff.content, SimpleResult)
-            assert pipe_output.main_stuff.content.title
-            assert isinstance(pipe_output.main_stuff.content.score, int)
+            review = pipe_output.main_stuff_as(content_type=RestaurantReview)
+            assert review.name
+            assert review.cuisine
+            assert review.city
+            assert isinstance(review.overall_rating, int)
+            assert review.price_range
+            assert isinstance(review.standout_dishes, list)
+            assert isinstance(review.caveats, list)
+            assert review.one_line_take

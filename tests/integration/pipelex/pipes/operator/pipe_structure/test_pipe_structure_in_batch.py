@@ -20,7 +20,7 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
-from tests.integration.pipelex.pipes.operator.pipe_structure.test_structures_basic import SimpleResult
+from tests.integration.pipelex.pipes.operator.pipe_structure.test_structures_basic import RestaurantReview
 
 
 @pytest.mark.dry_runnable
@@ -28,7 +28,7 @@ from tests.integration.pipelex.pipes.operator.pipe_structure.test_structures_bas
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeStructureInBatch:
-    """PipeBatch iterating PipeStructure over a list of texts."""
+    """PipeBatch iterating PipeStructure over a list of free-form review texts."""
 
     async def test_batch_with_pipe_structure(
         self,
@@ -37,46 +37,65 @@ class TestPipeStructureInBatch:
         load_test_library: Callable[[list[Path]], None],
     ) -> None:
         load_test_library([Path("tests/integration/pipelex/pipes/operator/pipe_structure")])
-        domain_code = "test_pipe_structure"
+        # RestaurantReview is declared in text_then_structure_helpers.mthds under this domain.
+        domain_code = "test_pipe_structure_seq"
 
         structure_blueprint = PipeStructureBlueprint(
-            description="Structure draft text into a SimpleResult",
-            inputs={"draft_item": NativeConceptCode.TEXT},
-            output="SimpleResult",
+            description="Structure a free-form restaurant review text into a RestaurantReview",
+            inputs={"review_text": NativeConceptCode.TEXT},
+            output="RestaurantReview",
         )
         structure_pipe = PipeFactory[PipeStructure].make_from_blueprint(
             domain_code=domain_code,
-            pipe_code="structure_one_simple_result",
+            pipe_code="structure_one_restaurant_review",
             blueprint=structure_blueprint,
-            concept_codes_from_the_same_domain=["SimpleResult"],
+            concept_codes_from_the_same_domain=["RestaurantReview"],
         )
         get_pipe_library().add_new_pipe(structure_pipe)
 
         batch_blueprint = PipeBatchBlueprint(
-            description="Run PipeStructure over a list of draft texts",
-            branch_pipe_code="structure_one_simple_result",
-            inputs={"draft_texts": NativeConceptCode.TEXT},
-            output="SimpleResult",
-            input_list_name="draft_texts",
-            input_item_name="draft_item",
+            description="Run PipeStructure over a list of free-form review texts",
+            branch_pipe_code="structure_one_restaurant_review",
+            inputs={"review_texts": NativeConceptCode.TEXT},
+            output="RestaurantReview",
+            input_list_name="review_texts",
+            input_item_name="review_text",
         )
         batch_pipe = PipeFactory[PipeBatch].make_from_blueprint(
             domain_code=domain_code,
-            pipe_code="batch_structure_simple_results",
+            pipe_code="batch_structure_restaurant_reviews",
             blueprint=batch_blueprint,
-            concept_codes_from_the_same_domain=["SimpleResult"],
+            concept_codes_from_the_same_domain=["RestaurantReview"],
         )
         get_pipe_library().add_new_pipe(batch_pipe)
 
-        draft_items = [
-            TextContent(text="Title 'Alpha' got a score of 7."),
-            TextContent(text="Title 'Beta' got a score of 8."),
-            TextContent(text="Title 'Gamma' got a score of 9."),
+        review_texts = [
+            TextContent(
+                text=(
+                    "La Petite Marmite is a tiny family-run bistro in Paris's 11th. The duck confit "
+                    "and the leeks vinaigrette are excellent; service is slow on busy nights. About "
+                    "$$ for two. Solid 8 out of 10 — a neighbourhood gem."
+                ),
+            ),
+            TextContent(
+                text=(
+                    "Hopdoddy on King Street is the best burger I've had in Charleston. The wagyu "
+                    "with caramelised onions stands out, fries are crisp, and a milkshake rounds it "
+                    "off. Loud at peak hours. Maybe a 7. Counts as $$."
+                ),
+            ),
+            TextContent(
+                text=(
+                    "Don't miss Trattoria Sole in Bologna for the tagliatelle al ragù — pure comfort "
+                    "in a bowl. Tortellini in brodo also wonderful. Tiny dining room means you'll "
+                    "wait. Easy 9. Pricing leans $$$."
+                ),
+            ),
         ]
         list_stuff = StuffFactory.make_stuff(
             concept=get_native_concept(NativeConceptCode.TEXT),
-            content=ListContent[StuffContent](items=cast("list[StuffContent]", draft_items)),
-            name="draft_texts",
+            content=ListContent[StuffContent](items=cast("list[StuffContent]", review_texts)),
+            name="review_texts",
         )
         working_memory = WorkingMemoryFactory.make_from_single_stuff(list_stuff)
 
@@ -97,6 +116,12 @@ class TestPipeStructureInBatch:
         assert len(result_list.items) == 3
         if pipe_run_mode.is_live:
             for item in result_list.items:
-                assert isinstance(item, SimpleResult)
-                assert item.title
-                assert isinstance(item.score, int)
+                assert isinstance(item, RestaurantReview)
+                assert item.name
+                assert item.cuisine
+                assert item.city
+                assert isinstance(item.overall_rating, int)
+                assert item.price_range
+                assert isinstance(item.standout_dishes, list)
+                assert isinstance(item.caveats, list)
+                assert item.one_line_take

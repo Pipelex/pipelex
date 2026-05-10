@@ -6,7 +6,7 @@
 
 **Branch:** `feature/Text-then-object` (worktree at `_tto/`).
 
-**Last verified:** `make agent-check` clean (ruff/plxt/pyright/mypy all 0 errors, 0 warnings). Targeted run for the touched source areas: `1503 passed, 1 xfailed`. PipeStructure-focused subset (`tests/unit/pipelex/pipe_operators/pipe_structure/ tests/unit/pipelex/core/interpreter/ tests/integration/pipelex/pipes/operator/pipe_structure/`): `89 passed`.
+**Last verified:** `make agent-check` clean (ruff/plxt/pyright/mypy all 0 errors, 0 warnings). Targeted run for the touched source areas: `1506 passed, 1 xfailed`. PipeStructure-focused subset (`tests/unit/pipelex/pipe_operators/pipe_structure/ tests/unit/pipelex/core/interpreter/ tests/integration/pipelex/pipes/operator/pipe_structure/`): `92 passed`.
 
 ### Status by phase
 
@@ -23,11 +23,14 @@
   - Deleted obsolete `test_pipe_llm_preliminary_text_raises_not_implemented` integration test.
   - Updated `tests/unit/pipelex/language/test_mthds_schema.py::test_all_pipe_types_present` to derive expected blueprint names from `PipeType.value_list()` instead of hardcoding the count (the count test was failing once `PipeStructure` was added).
 - [x] **Phase 8 — round-out tests.** Done. (Phase 7 intentionally skipped per the plan.) Files added:
-  - `tests/unit/pipelex/pipe_operators/pipe_structure/test_pipe_structure_kajson.py` — kajson round-trip for `PipeStructureBlueprint`, `PipeLLMBlueprint` with `structuring_method = preliminary_text`, every blueprint in an elaborated bundle, and `ElaborationMetadata`.
+  - `tests/unit/pipelex/pipe_operators/pipe_structure/test_pipe_structure_kajson.py` — kajson round-trip for `PipeStructureBlueprint`, `PipeLLMBlueprint` with `structuring_method = preliminary_text`, and every blueprint in an elaborated bundle. (The dedicated `ElaborationMetadata` round-trip case was dropped after review — already covered by `tests/unit/pipelex/core/bundles/test_elaboration_metadata.py`.)
   - `tests/unit/pipelex/core/interpreter/test_interpreter_preliminary_text.py` — `PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=...)` end-to-end, both with and without `structuring_method = "preliminary_text"`.
-  - `tests/integration/pipelex/pipes/operator/pipe_structure/test_pipe_structure_in_sequence.py` + `text_then_structure_helpers.mthds` — hand-authored `PipeSequence` wrapping a PipeLLM (text) + a `PipeStructure` step (no elaboration sugar). Dry-run passes.
-  - `tests/integration/pipelex/pipes/operator/pipe_structure/test_pipe_structure_in_batch.py` — `PipeBatch` iterating a `PipeStructure` over a list of texts. Dry-run passes.
-  - `tests/integration/pipelex/pipes/operator/pipe_structure/test_preliminary_text_e2e.py` + `preliminary_text_e2e.mthds` — runs the full `preliminary_text` elaboration via the library loader, asserts the wrapping pipe is a `PipeSequence` and step-2 is a `PipeStructure`, then runs end-to-end (real-LLM under `inference`/`llm` markers; dry-run also exercised).
+  - `tests/integration/pipelex/pipes/operator/pipe_structure/test_pipe_structure_in_sequence.py` + `text_then_structure_helpers.mthds` — hand-authored `PipeSequence` wrapping a PipeLLM (text) + a `PipeStructure` step (no elaboration sugar). Live-mode shape assertions on the structured `RestaurantReview` output.
+  - `tests/integration/pipelex/pipes/operator/pipe_structure/test_pipe_structure_in_batch.py` — `PipeBatch` iterating a `PipeStructure` over three free-form review texts; live-mode per-item shape assertions on `RestaurantReview`.
+  - `tests/integration/pipelex/pipes/operator/pipe_structure/test_preliminary_text_e2e.py` + `preliminary_text_e2e.mthds` — Python-class case. Parametrized over **all three multiplicity forms** (`RestaurantReview`, `RestaurantReview[]`, `RestaurantReview[2]`). Asserts the wrapping pipe is a `PipeSequence`, step-2 is a `PipeStructure`, the run produces a populated typed result, and **exactly two LLM calls are issued** in live mode (one for the draft text, one for the structuring step) via a private-registry helper.
+  - `tests/integration/pipelex/pipes/operator/pipe_structure/test_preliminary_text_inline_e2e.py` + `preliminary_text_inline_e2e.mthds` — **Inline-structure case**. Declares a richer `HikingTripReport` concept (12 fields including numbers, integers and several lists of text) entirely via `[concept.HikingTripReport.structure]` — no Python class file. Pipelex generates the backing class at library load. Parametrized over single + dynamic-list output, same 2-LLM-call assertion.
+  - **Concept richness.** `RestaurantReview` (Python class in `test_structures_basic.py`) has 8 fields including two `list[str]`. `HikingTripReport` (inline) has 12 fields. The pre-existing `SimpleResult` (title + score) is untouched and still backs the original `test_pipe_structure.py` integration test.
+  - **Prompt topics.** All Phase-8 prompts use everyday non-AI topics (restaurants, hiking trails) — no self-references to Pipelex.
   - **PipeStructure in MTHDS not yet supported by `plxt`.** Authoring `type = "PipeStructure"` directly in a `.mthds` file fails plxt schema validation (the bundled schema in `vscode-pipelex/crates/taplo-common/schemas/mthds_schema.json` is from before this PR). The `preliminary_text` path works because the synthesized `PipeStructure` is built in-memory after plxt parsing. Phase 8.3 / 8.4 therefore exercise PipeStructure programmatically. **Follow-up:** ship a plxt release with the regenerated schema so users can author `PipeStructure` directly in MTHDS. Captured in the follow-up TODOs.
   - **Note on the previously-listed Temporal test.** The original Phase 8 bullet for "preliminary_text via Temporal" is dropped: with the runtime change in Phase 6, Temporal sees only the elaborated form (PipeSequence + PipeLLM + PipeStructure), and Temporal's PipeStructure handling rides on the existing PipeOperator path that the Temporal data converter / class registry already cover. Re-add a dedicated Temporal smoke test only if a Temporal-specific bug surfaces.
 - [ ] **Phase 9 — docs & changelog.** Not started.
@@ -63,12 +66,14 @@
 
 ### CHECKPOINT 3 — end of Phase 8
 
-`structuring_method = preliminary_text` is now exercised end-to-end via the library loader (real-LLM-capable), `PipeStructure` is exercised inside both `PipeSequence` and `PipeBatch`, and kajson round-tripping holds for the synthesized blueprints. Runtime has no knowledge of `structuring_method`. Tests green, lint/types clean.
+`structuring_method = preliminary_text` is now exercised end-to-end via the library loader (real-LLM-capable), across all three output multiplicities and across both Python-class and inline-structure concept declarations. `PipeStructure` is also exercised inside hand-authored `PipeSequence` and `PipeBatch`. Kajson round-tripping holds for the synthesized blueprints. Each elaborated run is asserted to issue exactly two LLM calls in live mode. Runtime has no knowledge of `structuring_method`. Tests green, lint/types clean.
 
 State to capture for the next session:
 
-- New MTHDS fixtures under `tests/integration/pipelex/pipes/operator/pipe_structure/`: `text_then_structure_helpers.mthds`, `preliminary_text_e2e.mthds`. The earlier `test_structures_basic.mthds` is unchanged.
+- New MTHDS fixtures under `tests/integration/pipelex/pipes/operator/pipe_structure/`: `text_then_structure_helpers.mthds`, `preliminary_text_e2e.mthds`, `preliminary_text_inline_e2e.mthds`. The earlier `test_structures_basic.mthds` is unchanged.
+- New Python concept class `RestaurantReview` (added to `test_structures_basic.py`) is shared by all Python-class Phase-8 tests; the inline `HikingTripReport` is exercised in the inline-structure test.
 - All synthetic-pipe assertions reference codes `<parent>__draft_text` / `<parent>__structure` (still the working naming convention — revisit only if length pressure surfaces).
+- LLM-call counting uses `ReportingManager._get_or_create_registry(pipeline_run_id).get_current_tokens_usage()` filtered to `LLMTokensUsage`. Helper duplicated across the two e2e test files; if a third consumer appears, hoist it to a shared fixture / utility.
 - One ergonomics gap surfaced: the bundled plxt schema (in `vscode-pipelex/crates/taplo-common/schemas/mthds_schema.json`) does not yet include `PipeStructure`. The `preliminary_text` path is unaffected because the synthesized `PipeStructure` lives in-memory only. Captured as a Phase 9 cross-repo follow-up.
 
 ---

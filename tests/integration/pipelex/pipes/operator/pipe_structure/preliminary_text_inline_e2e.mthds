@@ -1,0 +1,60 @@
+domain      = "test_preliminary_text_inline_e2e"
+description = "Real-LLM end-to-end test of preliminary_text elaboration with an inline-declared concept"
+
+# HikingTripReport is declared entirely inline below: no Python class file backs it,
+# so this fixture exercises the runtime structure-generation path that turns the
+# `[concept.<Name>.structure]` table into a dynamically-registered Pydantic class.
+[concept.HikingTripReport]
+description = "A structured trip report for a hiking outing"
+
+[concept.HikingTripReport.structure]
+trail_name       = { type = "text", description = "Name of the trail or route", required = true }
+location         = { type = "text", description = "Region or park where the trail is located", required = true }
+distance_km      = { type = "number", description = "Round-trip distance in kilometres", required = true }
+elevation_gain_m = { type = "integer", description = "Total elevation gain in metres", required = true }
+difficulty       = { type = "text", description = "Subjective difficulty: 'easy', 'moderate', 'hard', or 'very hard'", required = true }
+duration_hours   = { type = "number", description = "Approximate round-trip duration in hours", required = true }
+best_season      = { type = "text", description = "Best season or months to do the trip", required = true }
+gear_essentials  = { type = "list", item_type = "text", description = "Pieces of gear that are non-negotiable for this trail", required = true }
+trail_highlights = { type = "list", item_type = "text", description = "Specific moments or views worth the effort", required = true }
+warnings         = { type = "list", item_type = "text", description = "Risks, hazards, or annoyances to plan for", required = true }
+recommended_for  = { type = "list", item_type = "text", description = "Types of hikers this trail suits well", required = true }
+final_verdict    = { type = "text", description = "A single-sentence wrap-up of the trip", required = true }
+
+[pipe.report_one_hike]
+type = "PipeLLM"
+description = "Produce a HikingTripReport via the preliminary_text elaboration"
+inputs = { hike_brief = "Text" }
+output = "HikingTripReport"
+model = "$testing-text"
+model_to_structure = "$testing-text"
+structuring_method = "preliminary_text"
+prompt = """
+Write a vivid, opinionated trip report based on this brief: $hike_brief
+
+Cover at least: a believable trail name and location, the round-trip distance
+in kilometres and elevation gain in metres, a difficulty rating ('easy',
+'moderate', 'hard', or 'very hard'), how many hours it takes, the best season,
+two or three pieces of gear that are non-negotiable, two or three highlights,
+a couple of warnings, the kinds of hikers it suits, and a one-sentence verdict.
+"""
+
+[pipe.report_weekend_hikes]
+type = "PipeLLM"
+description = "Produce a list of HikingTripReport via the preliminary_text elaboration"
+inputs = { hike_brief = "Text" }
+output = "HikingTripReport[]"
+model = "$testing-text"
+model_to_structure = "$testing-text"
+structuring_method = "preliminary_text"
+prompt = """
+Sketch trip reports for two or three different hikes related to this brief:
+
+$hike_brief
+
+For each hike, give a believable trail name and location, the round-trip
+distance in kilometres and elevation gain in metres, a difficulty rating
+('easy', 'moderate', 'hard', or 'very hard'), the duration in hours, the best
+season, gear essentials, highlights, warnings, who it suits, and a one-sentence
+verdict.
+"""
