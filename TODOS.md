@@ -10,7 +10,7 @@ Replace `WfMake*` child-workflow dispatch with direct `workflow.execute_activity
 
 ## Status
 
-- [ ] **Phase 0 — Pre-flight audit** (uniqueness invariants for `activity_id`)
+- [x] **Phase 0 — Pre-flight audit** (uniqueness invariants for `activity_id`)
 - [ ] **Phase 1 — Build new generator** (no wiring)
 - [ ] **Phase 2 — Wire behind feature flag** (default old)
 - [ ] **Phase 3 — Re-point `WfTestContentGeneratorChild`**
@@ -30,7 +30,12 @@ Each phase ends with `make agent-check && make agent-test` (or, during local dev
 
 - **Generator class name:** `ContentGeneratorInWorkflow`. The `InWorkflow` suffix flags the load-bearing constraint at every import site — this class only works when called from inside a workflow's `run()` (because each method calls `workflow.execute_activity(…)`, which hard-fails outside a workflow context).
 - **`activity_id=` for observability:** Thread `wfid` into `activity_id=` at every `workflow.execute_activity(…)` call. Preserves the Temporal Web UI per-step breadcrumb that ops use to triage failures. Uniqueness strategy depends on the Phase 0 audit outcome — see Phase 0 for the two branches.
-- **Activity-id uniqueness strategy:** *To be filled in by Phase 0.* Either (i) "default-`wfid`-is-unique-per-workflow" (rely on today's invariant — at most one call per `ContentGeneratorProtocol` method per `WfPipeRouter` execution), or (ii) "per-method counter" (suffix `wfid` with an instance-level counter to disambiguate repeated calls). Phase 0 records the choice here.
+- **Activity-id uniqueness strategy:** **Strategy (i) — "default-`wfid`-is-unique-per-workflow"**, with two mitigations recorded in Phase 0. Today's invariant is "at most one call per `ContentGeneratorProtocol` method per `WfPipeRouter` execution"; the audit (see Phase 0 below) confirms it. Phase 1 must:
+    1. Use distinct method-default `wfid`s, FIXING the pre-existing duplicate where both `make_single_image` and `make_image_list` default to `"craft-image"` — split into `"craft-image-single"` and `"craft-image-list"` so the strategy is robust if a future site ever calls both within one execution.
+    2. Inside `make_extract_pages` (which post-Phase-4 dispatches TWO activities), explicitly construct distinct activity_ids for the inner calls (e.g. `f"{wfid}-extract-pages"` for `act_extract_gen_extract_pages` and `f"{wfid}-render-page-views"` for the conditional `act_render_page_views`). Do not rely on the inbound single `wfid` for both.
+    3. Add a code comment in the new generator stating the invariant: "callers must pass distinct `wfid` values when invoking the same method twice within a single workflow execution; default values disambiguate by method but not by call-count."
+
+  Strategy (ii) (per-method counter) was considered and rejected — adds complexity to solve a problem we don't have today, and would be replay-stable but harder to read in the Temporal UI.
 
 ---
 
@@ -40,24 +45,44 @@ The `activity_id=wfid` strategy depends on activity-ids being unique within each
 
 **Cost of skipping:** a duplicate-`activity_id` runtime error on the second call. Cost of doing the audit: ~30 minutes.
 
-- [ ] Grep operator call sites for `ContentGeneratorProtocol` method calls:
+- [x] Grep operator call sites for `ContentGeneratorProtocol` method calls:
     ```bash
     grep -rn "content_generator\.\(make_llm_text\|make_object\|make_object_list\|make_single_image\|make_image_list\|make_templated_text\|make_render_page_views\|make_extract_pages\)" pipelex/pipe_operators/ pipelex/pipe_controllers/ pipelex/temporal/test_extras/
     ```
-- [ ] For each match, inspect surrounding control flow. Flag any:
-    - calls inside a `for` / `while` loop (would repeat with same default `wfid`)
-    - the same method called more than once per `_live_run_operator_pipe` invocation (or per test-workflow `run()`)
-    - calls without an explicit `wfid=` argument that share a `WfPipeRouter` execution with another call to the same method
-- [ ] Specifically confirm:
-    - [ ] `PipeLLM._live_run_operator_pipe` calls at most one of `make_llm_text` / `make_object` / `make_object_list` per execution (today's branching at `pipe_llm.py:265, 374, 392` is mutually exclusive — verify still true).
-    - [ ] `PipeImgGen` calls `make_single_image` / `make_image_list` at most once per execution.
-    - [ ] `PipeExtract` calls `make_extract_pages` at most once per execution.
-    - [ ] `PipeCompose` and `structured_content_composer` consume `content_generator` — confirm their loop structure if any.
-    - [ ] `WfTestContentGeneratorChild` (`pipelex/temporal/test_extras/wf_test_content_generator_child.py`) calls each method at most once with the default `wfid`. Distinct method-defaults (`"craft-text"` vs `"craft-object-direct"` etc.) keep the test workflow safe — confirm no method is invoked twice without a distinct `wfid=`.
-- [ ] Record the result in **Decisions** above:
-    - **(i) Findings clean — invariant holds:** proceed with the simple `activity_id=wfid` strategy. Add a code comment in the new generator stating "callers must pass distinct `wfid` values when invoking the same method twice within a single workflow execution; default values disambiguate by method but not by call-count."
-    - **(ii) Findings show repeated calls:** the new generator adds an instance-level per-method counter. Build the activity-id as `f"{wfid}-{count}"` where `count` increments on every call. (This is replay-stable: Temporal replays workflow code deterministically, so the counter walks the same values on replay. Document this property.)
-- [ ] Note: `make_extract_pages` post-Phase-4 dispatches TWO activities (`act_extract_gen_extract_pages` + optionally `act_render_page_views`). These have different `act_*` names but share the same wrapper method. Plan their `activity_id`s explicitly: e.g. `f"{wfid}-extract"` and `f"{wfid}-render-page-views"`, or pass `wfid=` for the first and `wfid=f"{wfid}-pageviews"` for the second.
+    Result — six operator-side matches (no `pipe_controllers/` matches), plus six in `wf_test_content_generator_child.py`:
+    - `pipe_operators/llm/pipe_llm.py:265` — `make_llm_text`
+    - `pipe_operators/llm/pipe_llm.py:374` — `make_object_list`
+    - `pipe_operators/llm/pipe_llm.py:392` — `make_object`
+    - `pipe_operators/extract/pipe_extract.py:158` — `make_extract_pages`
+    - `pipe_operators/img_gen/pipe_img_gen.py:237` — `make_image_list`
+    - `pipe_operators/img_gen/pipe_img_gen.py:254` — `make_single_image`
+    - `temporal/test_extras/wf_test_content_generator_child.py:64, 72, 80, 88, 98, 105` — one call per method (six methods)
+- [x] For each match, inspect surrounding control flow. Findings: no call site is inside a `for`/`while` loop; no method is invoked more than once per `_live_run_operator_pipe`; the only shared default is `"craft-image"` between `make_single_image` and `make_image_list` (mitigation in Decisions).
+- [x] Specifically confirm:
+    - [x] `PipeLLM._live_run_operator_pipe` calls at most one of `make_llm_text` / `make_object` / `make_object_list` per execution. **Confirmed.** `pipe_llm.py:253-317`: the outer `if (text concept and not multiple) … else …` branch goes to `make_llm_text` xor `_llm_gen_object_stuff_content`; inside `_llm_gen_object_stuff_content` (`pipe_llm.py:354-402`), the `if is_multiple_output / else` branch goes to `make_object_list` xor `make_object`. The three methods are mutually exclusive within one execution.
+    - [x] `PipeImgGen` calls `make_single_image` / `make_image_list` at most once per execution. **Confirmed.** `pipe_img_gen.py:236-260`: `if nb_images > 1 → make_image_list; else → make_single_image`. Mutually exclusive.
+    - [x] `PipeExtract` calls `make_extract_pages` at most once per execution. **Confirmed.** `pipe_extract.py:158` is the sole, unconditional call inside `_live_run_operator_pipe`.
+    - [x] `PipeCompose` and `structured_content_composer` consume `content_generator`. **Confirmed pure plumbing — no protocol-method invocation.** `pipe_compose.py` accepts `content_generator` and passes it down to `StructuredContentComposer` (line 255) and recursively to nested composers (`structured_content_composer.py:691`), but neither calls any `make_*` method on it. `_resolve_template`-style flows call `render_template(...)` directly (`structured_content_composer.py:660-665`), bypassing `make_templated_text`. So `make_templated_text` and `make_render_page_views` have NO operator-side call sites today.
+    - [x] `WfTestContentGeneratorChild` calls each method at most once with the default `wfid`. **Confirmed.** Six calls (`wf_test_content_generator_child.py:64, 72, 80, 88, 98, 105`) cover six methods, each once. Method-specific defaults are pairwise distinct (`"craft-text"`, `"craft-object-direct"`, `"craft-object-list-direct"`, `"craft-image"`, `"jinja2-text"`, `"extract"`) — safe for this test workflow.
+- [x] Record the result in **Decisions** above. **Strategy (i) chosen** — see Decisions section.
+- [x] Note: `make_extract_pages` post-Phase-4 dispatches TWO activities (`act_extract_gen_extract_pages` + optionally `act_render_page_views`). These have different `act_*` names but share the same wrapper method. Plan their `activity_id`s explicitly: e.g. `f"{wfid}-extract"` and `f"{wfid}-render-page-views"`, or pass `wfid=` for the first and `wfid=f"{wfid}-pageviews"` for the second. **Recorded as Decisions item (2).**
+
+**Audit result summary:**
+
+| Method | Operator site(s) | Branch | Per-execution count | Default `wfid` |
+|---|---|---|---|---|
+| `make_llm_text` | `pipe_llm.py:265` | text-concept and not multiple | ≤1 | `"craft-text"` |
+| `make_object` | `pipe_llm.py:392` | `not is_multiple_output` (object branch) | ≤1 | `"craft-object-direct"` |
+| `make_object_list` | `pipe_llm.py:374` | `is_multiple_output` (object branch) | ≤1 | `"craft-object-list-direct"` |
+| `make_single_image` | `pipe_img_gen.py:254` | `nb_images == 1` | ≤1 | `"craft-image"` ⚠ |
+| `make_image_list` | `pipe_img_gen.py:237` | `nb_images > 1` | ≤1 | `"craft-image"` ⚠ |
+| `make_extract_pages` | `pipe_extract.py:158` | unconditional | exactly 1 | `"extract"` |
+| `make_templated_text` | (none in operators — only test workflow) | — | — | `"jinja2-text"` |
+| `make_render_page_views` | (none in operators — only invoked internally from `make_extract_pages`) | — | — | `"render-page-views"` |
+
+⚠ Pre-existing duplicate default `"craft-image"` shared by `make_single_image` and `make_image_list`. They never run together today (mutually exclusive in `PipeImgGen`; `WfTestContentGeneratorChild` only calls `make_single_image`). Phase 1 must split them into `"craft-image-single"` / `"craft-image-list"` — see Decisions.
+
+**Conclusion:** Today's per-workflow uniqueness invariant **holds** for Strategy (i). Strategy (i) is adopted, with the two mitigations documented in Decisions.
 
 **Verification:** no code changes. This phase produces an entry in **Decisions** and unblocks Phase 1.
 
