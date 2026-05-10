@@ -1,10 +1,10 @@
 # Per-activity, per-handle Temporal queue routing
 
-> **Status:** Ready to implement. The predecessor `tprl_content_generation/` collapse PR has landed (Phases 0–6) and Phase 7 added the stopgap deletion point: `pipelex/temporal/tprl_content_generation/content_generator_in_workflow.py::_inference_dispatch_kwargs`. Implementing this design replaces that helper.
+> **Status:** Shipped (v1 implementation landed on `feature/Per-activity-queue`). `WorkerConfig.resolve_queue(activity_name, routing_key)` is now the single dispatch site; `_inference_dispatch_kwargs` and `WorkerConfig.inference_task_queue` are deleted. Open Question #1 resolved by keeping `task_queue` as the worker-wide default field name. Open Question #5 resolved by putting the resolver as a method on `WorkerConfig`. Open Questions #2 (scope-declared listen_queues), #3 (per-pipe override), and #4 (dynamic hook) deferred — not required for v1. The two startup validators in § Validation are deferred to a follow-up.
 >
-> **Predecessor context:** `inference_task_queue` was introduced as a quick split-worker test ("LLM goes here, everything else goes to default"). That two-queue model is provisional. This doc proposes the proper general design that supersedes it.
+> **Predecessor context:** `inference_task_queue` was introduced as a quick split-worker test ("LLM goes here, everything else goes to default"). That two-queue model is now superseded by per-activity routing.
 >
-> **Pin for whoever picks this up:** see [§ Tests to upgrade when v1 lands](#tests-to-upgrade-when-v1-lands) — Phase 7 shipped two pytest files (`test_split_worker_object_gen.py`, `test_split_worker_extract_pages.py`) that deliberately use a single-worker setup because object/extract activities have no `inference_task_queue` analog today. Those tests are the primary callers of the upgrade and the easiest way to validate v1 end-to-end.
+> **Test upgrade follow-up:** the two deferred tests (`test_split_worker_object_gen.py`, `test_split_worker_extract_pages.py`) were patched in v1 with `route_activities_to(...)` so they exercise the new resolver but still run on a single worker. Upgrading them to true split workers (router queue + runner queue with the substitutes registered only on the runner) is the remaining piece of § Tests to upgrade when v1 lands.
 
 ## First actions (cold-start checklist)
 

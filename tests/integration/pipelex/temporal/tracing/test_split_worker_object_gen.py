@@ -19,11 +19,12 @@ real Temporal data converter (kajson encoder/decoder).
 Note on "split worker": single-worker setup is sufficient for the data
 converter round-trip — Temporal still serializes/deserializes the activity
 return value across the activity boundary even when the same Python process
-hosts both the workflow and the activity. A true cross-process test would
-require routing object-gen activities to a separate task queue; that
-routing does not exist today (only LLM-text consults
-``inference_task_queue``) and is deferred to the per-activity-routing
-follow-up at ``wip/temporal-primitives/per-activity-queue-routing-v1.md``.
+hosts both the workflow and the activity. A true cross-process upgrade is
+now possible via ``worker_config.activity_queues`` (per-activity routing
+shipped in v1; see ``wip/temporal-primitives/per-activity-queue-routing-v1.md``
+§"Tests to upgrade when v1 lands"): route ``act_llm_gen_object*`` to a
+runner queue and register the substitutes only on that queue. Tracked as a
+follow-up — this file is the primary caller of that upgrade.
 """
 
 import uuid
@@ -38,6 +39,7 @@ from pipelex.temporal.test_extras.temporal_registry_test_models import FixtureCu
 from pipelex.temporal.test_extras.temporal_test_tasks import TEMPORAL_TEST_WORKFLOWS
 from pipelex.temporal.test_extras.wf_test_structured_output_cross_process import WfTestStructuredOutputCrossProcess
 from pipelex.temporal.tprl_content_generation.act_llm_generate import act_llm_gen_object, act_llm_gen_object_list
+from tests.integration.pipelex.temporal.tracing.helpers import route_activities_to
 
 
 def _make_canonical_invoice() -> FixtureInvoice:
@@ -109,19 +111,23 @@ class TestSplitWorkerObjectGen:
         task_queue = f"q_obj_{uuid.uuid4().hex[:8]}"
         workflow_id = f"wf_obj_{'list' if is_list else 'single'}_{uuid.uuid4().hex[:8]}"
 
-        async with get_task_manager().make_worker(
-            temporal_client,
-            task_queue=task_queue,
-            is_not_sandboxed=True,
-            test_workflows=TEMPORAL_TEST_WORKFLOWS,
-            substitute_activities={
-                act_llm_gen_object: _stub_act_llm_gen_object,
-                act_llm_gen_object_list: _stub_act_llm_gen_object_list,
-            },
-        ):
-            await temporal_client.execute_workflow(  # pyright: ignore[reportUnknownMemberType]
-                workflow=WfTestStructuredOutputCrossProcess.run,
-                arg=is_list,
-                id=workflow_id,
+        # Route the substituted object-gen activities to this test's UUID queue
+        # so the in-workflow dispatcher (which now passes ``task_queue=resolved``
+        # for every activity) lands them on the worker registered here.
+        with route_activities_to(task_queue, [act_llm_gen_object.__name__, act_llm_gen_object_list.__name__]):
+            async with get_task_manager().make_worker(
+                temporal_client,
                 task_queue=task_queue,
-            )
+                is_not_sandboxed=True,
+                test_workflows=TEMPORAL_TEST_WORKFLOWS,
+                substitute_activities={
+                    act_llm_gen_object: _stub_act_llm_gen_object,
+                    act_llm_gen_object_list: _stub_act_llm_gen_object_list,
+                },
+            ):
+                await temporal_client.execute_workflow(  # pyright: ignore[reportUnknownMemberType]
+                    workflow=WfTestStructuredOutputCrossProcess.run,
+                    arg=is_list,
+                    id=workflow_id,
+                    task_queue=task_queue,
+                )

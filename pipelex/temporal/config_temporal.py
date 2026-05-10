@@ -171,11 +171,24 @@ class RetryPolicyConfig(ConfigModel):
 #         return self.jinja2_retry_policy_config.make_retry_policy()
 
 
+class ActivityRouteConfig(ConfigModel):
+    """Per-activity routing entry.
+
+    Args:
+        default: The task queue used when no per-handle override matches.
+        by_handle: Optional mapping from runtime handle (e.g. ``llm_handle``,
+            ``img_gen_handle``, ``extract_handle``) to a dedicated task queue.
+    """
+
+    default: str
+    by_handle: dict[str, str] = Field(default_factory=dict)
+
+
 class WorkerConfig(ConfigModel):
     """Configuration model for workflow execution settings."""
 
     task_queue: str
-    inference_task_queue: str | None = None
+    activity_queues: dict[str, ActivityRouteConfig] = Field(default_factory=dict)
     workflow_execution_timeout: timedelta = Field(strict=False)
     run_timeout: timedelta | None = Field(default=None, strict=False)
     task_timeout: timedelta | None = Field(default=None, strict=False)
@@ -191,6 +204,30 @@ class WorkerConfig(ConfigModel):
             RetryPolicy: A configured RetryPolicy object.
         """
         return self.retry_policy_config.make_retry_policy()
+
+    def resolve_queue(self, activity_name: str, routing_key: str | None = None) -> str:
+        """Resolve which task queue an activity should dispatch to.
+
+        Args:
+            activity_name: The Temporal activity ``__name__`` (e.g. ``"act_llm_gen_text"``).
+            routing_key: Optional per-activity handle (model handle, img-gen
+                handle, extract handle). Activities without a meaningful
+                routing dimension pass ``None``.
+
+        Returns:
+            The task queue name. Resolution order:
+              1. ``activity_queues[activity_name].by_handle[routing_key]``
+              2. ``activity_queues[activity_name].default``
+              3. ``self.task_queue`` (worker-wide default)
+        """
+        activity_route = self.activity_queues.get(activity_name)
+        if activity_route is None:
+            return self.task_queue
+        if routing_key is not None:
+            per_handle = activity_route.by_handle.get(routing_key)
+            if per_handle is not None:
+                return per_handle
+        return activity_route.default
 
 
 class PayloadCodecConfig(ConfigModel):

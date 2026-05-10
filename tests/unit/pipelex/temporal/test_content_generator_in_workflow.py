@@ -1,9 +1,9 @@
 """Unit tests for ContentGeneratorInWorkflow.
 
 Validates that each protocol method dispatches the correct activity with the
-expected kwargs, including the asymmetric ``task_queue=worker_config.inference_task_queue``
-rule for ``make_llm_text`` only, the per-method default ``activity_id``, and the
-runtime uniqueness check on activity_ids.
+expected kwargs, including the uniform ``task_queue`` routing via
+``WorkerConfig.resolve_queue``, the per-method default ``activity_id``, and
+the runtime uniqueness check on activity_ids.
 """
 
 from typing import Any
@@ -25,10 +25,7 @@ from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.temporal.exceptions import ContentGenerationError
-from pipelex.temporal.tprl_content_generation.content_generator_in_workflow import (
-    ContentGeneratorInWorkflow,
-    _inference_dispatch_kwargs,  # pyright: ignore[reportPrivateUsage]  # noqa: PLC2701  # deliberate pin on the helper symbol — see Phase 7 stopgap
-)
+from pipelex.temporal.tprl_content_generation.content_generator_in_workflow import ContentGeneratorInWorkflow
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 
 
@@ -100,29 +97,27 @@ def patch_workflow_info(mocker: MockerFixture) -> str:
 class TestContentGeneratorInWorkflow:
     """Per-method assertions on the activity-dispatch kwargs and the runtime uniqueness check."""
 
-    async def test_make_llm_text_passes_inference_task_queue(self, mocker: MockerFixture) -> None:
-        """make_llm_text must route to ``worker_config.inference_task_queue``.
-
-        Pinned to the ``_inference_dispatch_kwargs`` helper so that the future
-        per-activity routing migration (see
-        ``wip/temporal-primitives/per-activity-queue-routing-v1.md``) shows up
-        as a clear test diff at the single deletion point.
+    async def test_every_dispatch_passes_resolved_task_queue(self, mocker: MockerFixture) -> None:
+        """Every ``execute_activity`` call must pass ``task_queue`` resolved by
+        ``WorkerConfig.resolve_queue``. With an empty ``activity_queues`` (default
+        config), every call resolves to the worker-wide default ``task_queue``,
+        producing a uniform contract across LLM, image-gen, extract, jinja2 and
+        render-page-views.
         """
         mock_execute = mocker.patch("temporalio.workflow.execute_activity", new_callable=mocker.AsyncMock)
         mock_execute.return_value = "stub text"
         generator = _make_generator()
 
-        result = await generator.make_llm_text(
+        await generator.make_llm_text(
             job_metadata=_make_job_metadata(),
             llm_setting_main=_make_llm_setting(),
             llm_prompt_for_text=LLMPrompt(user_text="hello"),
         )
 
-        assert result == "stub text"
-        kwargs = mock_execute.call_args.kwargs
         worker_config = get_config().temporal.worker_config
-        expected_inference_kwargs = _inference_dispatch_kwargs(worker_config)
-        assert kwargs.get("task_queue") == expected_inference_kwargs["task_queue"]
+        expected_queue = worker_config.task_queue
+        kwargs = mock_execute.call_args.kwargs
+        assert kwargs.get("task_queue") == expected_queue
         assert kwargs.get("activity_id") == "craft-text"
 
     async def test_make_llm_text_threads_explicit_wfid(self, mocker: MockerFixture) -> None:
@@ -150,22 +145,18 @@ class TestContentGeneratorInWorkflow:
             ("render-page-views", "make_render_page_views"),
         ],
     )
-    async def test_non_llm_methods_omit_inference_task_queue(
+    async def test_non_llm_text_methods_pass_default_task_queue(
         self,
         mocker: MockerFixture,
         method_default_id: str,
         caller: str,
     ) -> None:
-        """Each non-LLM-text method must NOT receive the kwargs from
-        ``_inference_dispatch_kwargs`` so its activity runs on the workflow's own
-        queue. Mis-routing image-gen / extract / jinja2 to the inference queue
-        would break split-worker production where the runner doesn't register
-        the activity.
+        """Every non-llm-text method must also pass ``task_queue=<resolved>``.
 
-        Pinned to the helper symbol: any future expansion of
-        ``_inference_dispatch_kwargs`` to non-LLM-text activities (which the
-        helper docstring explicitly forbids) would silently change the contract
-        unless this assertion catches it.
+        With default config (empty ``activity_queues``), the resolved queue
+        equals ``worker_config.task_queue`` — the workflow's own queue. The
+        asymmetric "no ``task_queue`` kwarg" contract that existed pre-v1 is
+        gone: dispatch is uniform across all activities.
         """
         mock_execute = mocker.patch("temporalio.workflow.execute_activity", new_callable=mocker.AsyncMock)
         mock_execute.return_value = self._stub_for(caller)
@@ -174,11 +165,10 @@ class TestContentGeneratorInWorkflow:
         await self._invoke(generator, caller)
 
         kwargs = mock_execute.call_args.kwargs
-        assert kwargs.get("task_queue") is None, f"{caller} must not pass task_queue= (got {kwargs.get('task_queue')!r})"
-        for inference_kwarg in _inference_dispatch_kwargs(get_config().temporal.worker_config):
-            assert inference_kwarg not in kwargs or kwargs[inference_kwarg] is None, (
-                f"{caller} unexpectedly received inference dispatch kwarg '{inference_kwarg}'"
-            )
+        worker_config = get_config().temporal.worker_config
+        assert kwargs.get("task_queue") == worker_config.task_queue, (
+            f"{caller} did not pass the resolved default task_queue (got {kwargs.get('task_queue')!r})"
+        )
         assert kwargs.get("activity_id") == method_default_id
 
     async def test_make_extract_pages_dispatches_extract_only_when_no_page_views(self, mocker: MockerFixture) -> None:
@@ -197,7 +187,8 @@ class TestContentGeneratorInWorkflow:
 
         assert mock_execute.call_count == 1
         kwargs = mock_execute.call_args.kwargs
-        assert kwargs.get("task_queue") is None
+        worker_config = get_config().temporal.worker_config
+        assert kwargs.get("task_queue") == worker_config.task_queue
         assert kwargs.get("activity_id") == "extract-pages"
 
     async def test_make_extract_pages_image_uri_with_page_views_skips_render_activity(self, mocker: MockerFixture) -> None:
@@ -256,9 +247,9 @@ class TestContentGeneratorInWorkflow:
         assert mock_execute.call_count == 2
         observed_activity_ids = [call.kwargs.get("activity_id") for call in mock_execute.call_args_list]
         assert observed_activity_ids == ["extract-pages", "extract-render-page-views"]
-        # Both activities must run on the workflow's own queue, not inference_task_queue.
+        worker_config = get_config().temporal.worker_config
         for call in mock_execute.call_args_list:
-            assert call.kwargs.get("task_queue") is None
+            assert call.kwargs.get("task_queue") == worker_config.task_queue
         assert result[0].page_view is page_view
 
     async def test_duplicate_wfid_raises_content_generation_error(self, mocker: MockerFixture) -> None:

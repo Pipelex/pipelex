@@ -17,11 +17,12 @@ contract, not the OCR backend itself (already covered by the in-process test).
 Note on "split worker": single-worker setup is sufficient for the activity
 dispatch contract — Temporal still serializes/deserializes activity payloads
 across the activity boundary even when the same Python process hosts both
-the workflow and the activities. A true cross-process test would require
-routing extract activities to a separate task queue; that routing does not
-exist today (only LLM-text consults ``inference_task_queue``) and is
-deferred to the per-activity-routing follow-up at
-``wip/temporal-primitives/per-activity-queue-routing-v1.md``.
+the workflow and the activities. A true cross-process upgrade is now
+possible via ``worker_config.activity_queues`` (per-activity routing shipped
+in v1; see ``wip/temporal-primitives/per-activity-queue-routing-v1.md``
+§"Tests to upgrade when v1 lands"): route the extract activities to a
+runner queue and register the substitutes only on that queue. Tracked as a
+follow-up — this file is the primary caller of that upgrade.
 """
 
 import uuid
@@ -39,6 +40,7 @@ from pipelex.temporal.test_extras.temporal_test_tasks import TEMPORAL_TEST_WORKF
 from pipelex.temporal.test_extras.wf_test_content_generator_pdf_page_views import WfTestContentGeneratorPdfPageViews
 from pipelex.temporal.tprl_content_generation.act_extract_generate import act_extract_gen_extract_pages
 from pipelex.temporal.tprl_content_generation.act_render_page_views import act_render_page_views
+from tests.integration.pipelex.temporal.tracing.helpers import route_activities_to
 
 _PAGE_VIEW_URLS = ("test://page-view-0.png", "test://page-view-1.png")
 
@@ -91,24 +93,28 @@ class TestSplitWorkerExtractPages:
         task_queue = f"q_extract_{uuid.uuid4().hex[:8]}"
         workflow_id = f"wf_extract_{uuid.uuid4().hex[:8]}"
 
-        async with get_task_manager().make_worker(
-            temporal_client,
-            task_queue=task_queue,
-            is_not_sandboxed=True,
-            test_workflows=TEMPORAL_TEST_WORKFLOWS,
-            substitute_activities={
-                act_extract_gen_extract_pages: _stub_act_extract_gen_extract_pages,
-                act_render_page_views: _stub_act_render_page_views,
-            },
-        ):
-            handle = await temporal_client.start_workflow(  # pyright: ignore[reportUnknownMemberType]
-                workflow=WfTestContentGeneratorPdfPageViews.run,
-                arg=False,
-                id=workflow_id,
+        # Route the substituted extract activities to this test's UUID queue
+        # so the in-workflow dispatcher (which now passes ``task_queue=resolved``
+        # for every activity) lands them on the worker registered here.
+        with route_activities_to(task_queue, [act_extract_gen_extract_pages.__name__, act_render_page_views.__name__]):
+            async with get_task_manager().make_worker(
+                temporal_client,
                 task_queue=task_queue,
-            )
-            await handle.result()
-            history = await handle.fetch_history()
+                is_not_sandboxed=True,
+                test_workflows=TEMPORAL_TEST_WORKFLOWS,
+                substitute_activities={
+                    act_extract_gen_extract_pages: _stub_act_extract_gen_extract_pages,
+                    act_render_page_views: _stub_act_render_page_views,
+                },
+            ):
+                handle = await temporal_client.start_workflow(  # pyright: ignore[reportUnknownMemberType]
+                    workflow=WfTestContentGeneratorPdfPageViews.run,
+                    arg=False,
+                    id=workflow_id,
+                    task_queue=task_queue,
+                )
+                await handle.result()
+                history = await handle.fetch_history()
 
         # Filter by activity_type (not by activity_id suffix): a future test that
         # passes a wfid like "my-pages" to make_object would otherwise pollute this

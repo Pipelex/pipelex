@@ -30,7 +30,6 @@ from pipelex.config import get_config
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.temporal.config_temporal import WorkerConfig
 from pipelex.temporal.exceptions import ContentGenerationError
 from pipelex.temporal.tprl.temporal_error import TemporalError
 from pipelex.temporal.tprl_content_generation.act_extract_generate import act_extract_gen_extract_pages
@@ -43,31 +42,6 @@ from pipelex.temporal.tprl_content_generation.act_llm_generate import (
 )
 from pipelex.temporal.tprl_content_generation.act_render_page_views import act_render_page_views
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
-
-
-def _inference_dispatch_kwargs(worker_config: WorkerConfig) -> dict[str, Any]:
-    """Provisional split-worker stopgap.
-
-    Returns the ``execute_activity`` kwargs that route an inference activity
-    onto ``worker_config.inference_task_queue`` so split-worker deployments
-    can run inference on a dedicated runner pool. Today this helper is wired
-    only at the ``make_llm_text`` dispatch site — ``act_llm_gen_object`` and
-    ``act_llm_gen_object_list`` deliberately stay on the workflow's own queue
-    because their cross-pool test coverage (registry decode of dynamic
-    classes) has not been built yet (see
-    ``wip/temporal-primitives/per-activity-queue-routing-v1.md`` §"Tests to
-    upgrade when v1 lands"). All other activities (image-gen, extract, jinja2,
-    render-page-views) are non-inference and route to the workflow's own
-    queue.
-
-    The proper general design is in
-    ``wip/temporal-primitives/per-activity-queue-routing-v1.md``: per-
-    activity, per-handle routing covering LLM + image-gen + extract under
-    one config table. Do NOT extend this helper to image-gen, extract, or
-    any other activity — those will be folded into the new routing system.
-    This helper exists so the future migration is a single deletion point.
-    """
-    return {"task_queue": worker_config.inference_task_queue}
 
 
 class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
@@ -137,20 +111,13 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
         )
         log.verbose(llm_assignment.desc, title="llm_assignment")
         try:
-            # Asymmetric routing: LLM text dispatches to ``inference_task_queue`` so
-            # split-worker deployments can run inference on a dedicated runner queue.
-            # All other activities below run on the workflow's own queue (no
-            # ``task_queue=`` kwarg passed) — copy-pasting that kwarg to img-gen,
-            # extract, jinja2, etc. would break runners that don't register those
-            # activities. ``_inference_dispatch_kwargs`` is the single deletion
-            # point when per-activity-queue routing lands (see helper docstring).
             generated_text: str = await workflow.execute_activity(
                 act_llm_gen_text,
                 arg=llm_assignment,
+                task_queue=worker_config.resolve_queue(act_llm_gen_text.__name__, llm_assignment.llm_handle),
                 start_to_close_timeout=worker_config.workflow_execution_timeout,
                 retry_policy=worker_config.retry_policy,
                 activity_id=activity_id,
-                **_inference_dispatch_kwargs(worker_config),
             )
         except ActivityError as exc:
             log.error(f"ActivityError caused by: {exc.cause}")
@@ -187,6 +154,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
             obj: BaseModel = await workflow.execute_activity(
                 act_llm_gen_object,
                 arg=object_assignment,
+                task_queue=worker_config.resolve_queue(act_llm_gen_object.__name__, llm_assignment_for_object.llm_handle),
                 start_to_close_timeout=worker_config.workflow_execution_timeout,
                 retry_policy=worker_config.retry_policy,
                 activity_id=activity_id,
@@ -229,6 +197,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
             obj_list: list[BaseModel] = await workflow.execute_activity(
                 act_llm_gen_object_list,
                 arg=object_assignment,
+                task_queue=worker_config.resolve_queue(act_llm_gen_object_list.__name__, llm_assignment_for_object.llm_handle),
                 start_to_close_timeout=worker_config.workflow_execution_timeout,
                 retry_policy=worker_config.retry_policy,
                 activity_id=activity_id,
@@ -297,6 +266,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
             image_content_list: list[ImageContent] = await workflow.execute_activity(
                 act_img_gen_images,
                 arg=img_gen_assignment,
+                task_queue=worker_config.resolve_queue(act_img_gen_images.__name__, img_gen_assignment.img_gen_handle),
                 start_to_close_timeout=worker_config.workflow_execution_timeout,
                 retry_policy=worker_config.retry_policy,
                 activity_id=activity_id,
@@ -341,6 +311,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
             image_content_list: list[ImageContent] = await workflow.execute_activity(
                 act_img_gen_images,
                 arg=img_gen_assignment,
+                task_queue=worker_config.resolve_queue(act_img_gen_images.__name__, img_gen_assignment.img_gen_handle),
                 start_to_close_timeout=worker_config.workflow_execution_timeout,
                 retry_policy=worker_config.retry_policy,
                 activity_id=activity_id,
@@ -378,6 +349,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
             jinja2_text: str = await workflow.execute_activity(
                 act_jinja2_gen_text,
                 arg=templating_assignment,
+                task_queue=worker_config.resolve_queue(act_jinja2_gen_text.__name__),
                 start_to_close_timeout=worker_config.workflow_execution_timeout,
                 retry_policy=worker_config.retry_policy,
                 activity_id=activity_id,
@@ -418,6 +390,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
             image_content_list: list[ImageContent] = await workflow.execute_activity(
                 act_render_page_views,
                 arg=render_assignment,
+                task_queue=worker_config.resolve_queue(act_render_page_views.__name__),
                 start_to_close_timeout=worker_config.workflow_execution_timeout,
                 retry_policy=worker_config.retry_policy,
                 activity_id=activity_id,
@@ -456,6 +429,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
             page_contents: list[PageContent] = await workflow.execute_activity(
                 act_extract_gen_extract_pages,
                 arg=extract_assignment,
+                task_queue=worker_config.resolve_queue(act_extract_gen_extract_pages.__name__, extract_assignment.extract_handle),
                 start_to_close_timeout=worker_config.workflow_execution_timeout,
                 retry_policy=worker_config.retry_policy,
                 activity_id=extract_activity_id,
@@ -482,6 +456,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
                     page_view_contents = await workflow.execute_activity(
                         act_render_page_views,
                         arg=render_assignment,
+                        task_queue=worker_config.resolve_queue(act_render_page_views.__name__),
                         start_to_close_timeout=worker_config.workflow_execution_timeout,
                         retry_policy=worker_config.retry_policy,
                         activity_id=render_activity_id,
