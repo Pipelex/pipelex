@@ -23,10 +23,10 @@ Each phase ends with `make agent-check && make agent-test` (or, during local dev
 
 ---
 
-## Open decisions to resolve before starting
+## Decisions
 
-- [ ] **Generator class name.** v2 suggested `ContentGeneratorInWorkflow`. Confirm or pick a better name (alternatives: `ContentGeneratorActivities`, `ContentGeneratorTemporal`).
-- [ ] **`activity_id=` for observability.** Today, child workflows get a Temporal-UI-visible name from the parent's `wfid`. After collapse, only `activity_id` remains (auto-assigned). Decision: (a) reproduce the per-step naming by passing `activity_id=` from the `wfid` arg, or (b) accept logs + `JobMetadata.content_generation_job_id` as sufficient. If (a), thread `wfid` into every `workflow.execute_activity(…)` call in Phase 1.
+- **Generator class name:** `ContentGeneratorInWorkflow`. The `InWorkflow` suffix flags the load-bearing constraint at every import site — this class only works when called from inside a workflow's `run()` (because each method calls `workflow.execute_activity(…)`, which hard-fails outside a workflow context).
+- **`activity_id=` for observability:** Thread `wfid` into `activity_id=` at every `workflow.execute_activity(…)` call. Preserves the Temporal Web UI per-step breadcrumb that ops use to triage failures. Uniqueness strategy: when `wfid is None`, omit `activity_id=` and let the SDK auto-assign; when `wfid` is set, the call site is responsible for uniqueness within the workflow (today's `make_child_workflow_id` proves callers already keep step names distinct — the same discipline carries over).
 
 ---
 
@@ -35,7 +35,7 @@ Each phase ends with `make agent-check && make agent-test` (or, during local dev
 Add the new generator next to the existing files. No wiring yet — just code.
 
 - [ ] Create `pipelex/temporal/tprl_content_generation/content_generator_in_workflow.py`.
-- [ ] Define the class (resolved name from open decisions) implementing `ContentGeneratorProtocol` with the nine current methods:
+- [ ] Define class `ContentGeneratorInWorkflow` implementing `ContentGeneratorProtocol` with the nine current methods:
     - [ ] `make_llm_text` → `act_llm_gen_text`, with `task_queue=worker_config.inference_task_queue`
     - [ ] `make_object` → `act_llm_gen_object`, plus `model_validate(obj.model_dump(mode="json", serialize_as_any=True))` round-trip
     - [ ] `make_object_list` → `act_llm_gen_object_list`, plus per-item `model_validate(...)` round-trip
@@ -47,11 +47,12 @@ Add the new generator next to the existing files. No wiring yet — just code.
     - [ ] `make_render_page_views` → `act_render_page_views`
     - [ ] `make_extract_pages` → see Phase 4 (sequenced two-activity path)
 - [ ] At every `workflow.execute_activity(…)` site, pass `start_to_close_timeout=worker_config.workflow_execution_timeout` and `retry_policy=worker_config.retry_policy`.
+- [ ] Thread `wfid` into `activity_id=` at every `workflow.execute_activity(…)` site: when `wfid is not None`, pass `activity_id=wfid`; when `wfid is None`, omit the kwarg and let the SDK auto-assign. Today's defaults (e.g. `wfid or "craft-text"` in `ContentGeneratorChild.make_llm_text`) ensure callers always have a value, so the `None` branch is mostly defensive.
 - [ ] Wrap each method body in `try/except ActivityError` to translate `ApplicationError → TemporalError.from_app_error(...)`, mirroring `wf_make_llm_text.py:32-35`.
 - [ ] Keep the `@update_job_metadata` decorator on each method (matches `ContentGeneratorChild`).
 - [ ] Add an inline comment at the LLM-text site stating the asymmetric routing rule (`task_queue=inference_task_queue` here only; other activities run on the workflow's own queue).
 - [ ] Create a factory module `content_generator_in_workflow_factory.py` with a `make_content_generator_in_workflow(...)` classmethod that takes `generated_content_factory` and returns the instance. (Don't plumb `task_queue` / `workflow_execution_timeout` etc. — those are read from config inside each method.)
-- [ ] Add a unit test that mocks `workflow.execute_activity` and asserts the `task_queue=` kwarg per method (LLM-text only sets it; the other eight don't).
+- [ ] Add a unit test that mocks `workflow.execute_activity` and asserts the `task_queue=` kwarg per method (LLM-text only sets it; the other eight don't) plus the `activity_id=` kwarg threading.
 
 **Verification:** `make agent-check`. Nothing is wired yet — full test suite must still pass against the existing `ContentGeneratorChild` path.
 
@@ -179,7 +180,7 @@ Per the project's "no backward compatibility" rule, delete in a single commit:
     ```bash
     grep -rn "WfMake\|wf_make_" docs/
     ```
-- [ ] Update CHANGELOG under `[Unreleased]`: brief note that `tprl_content_generation/` workflow layer was collapsed; durability semantics unchanged; observability note about per-call workflow IDs no longer appearing in Temporal UI.
+- [ ] Update CHANGELOG under `[Unreleased]`: brief note that `tprl_content_generation/` workflow layer was collapsed; durability semantics unchanged; per-step naming preserved as `activity_id` (instead of as a child workflow id).
 
 **Verification:** `make agent-check`. Docs-only changes don't need a full test run, but rerun `make agent-test` if any docs are imported by tests (they aren't, currently).
 
@@ -196,7 +197,6 @@ State at this checkpoint:
 
 Open questions / decisions for next session:
 - [ ] Is the deploy ready (drain-before-deploy enforced)? See Phase 8.
-- [ ] Did the `activity_id=` decision land — and if not, file a follow-up issue?
 
 ---
 
