@@ -30,10 +30,10 @@ Each phase ends with `make agent-check && make agent-test` (or, during local dev
 
 - **Generator class name:** `ContentGeneratorInWorkflow`. The `InWorkflow` suffix flags the load-bearing constraint at every import site — this class only works when called from inside a workflow's `run()` (because each method calls `workflow.execute_activity(…)`, which hard-fails outside a workflow context).
 - **`activity_id=` for observability:** Thread `wfid` into `activity_id=` at every `workflow.execute_activity(…)` call. Preserves the Temporal Web UI per-step breadcrumb that ops use to triage failures. Uniqueness strategy depends on the Phase 0 audit outcome — see Phase 0 for the two branches.
-- **Activity-id uniqueness strategy:** **Strategy (i) — "default-`wfid`-is-unique-per-workflow"**, with two mitigations recorded in Phase 0. Today's invariant is "at most one call per `ContentGeneratorProtocol` method per `WfPipeRouter` execution"; the audit (see Phase 0 below) confirms it. Phase 1 must:
+- **Activity-id uniqueness strategy:** **Strategy (i) — "default-`wfid`-is-unique-per-workflow"**, with three mitigations recorded in Phase 0. Today's invariant is "at most one call per `ContentGeneratorProtocol` method per `WfPipeRouter` execution"; the audit (see Phase 0 below) confirms it. Phase 1 must:
     1. Use distinct method-default `wfid`s, FIXING the pre-existing duplicate where both `make_single_image` and `make_image_list` default to `"craft-image"` — split into `"craft-image-single"` and `"craft-image-list"` so the strategy is robust if a future site ever calls both within one execution.
     2. Inside `make_extract_pages` (which post-Phase-4 dispatches TWO activities), explicitly construct distinct activity_ids for the inner calls (e.g. `f"{wfid}-extract-pages"` for `act_extract_gen_extract_pages` and `f"{wfid}-render-page-views"` for the conditional `act_render_page_views`). Do not rely on the inbound single `wfid` for both.
-    3. Add a code comment in the new generator stating the invariant: "callers must pass distinct `wfid` values when invoking the same method twice within a single workflow execution; default values disambiguate by method but not by call-count."
+    3. **Runtime-check the invariant**, don't just comment it. The new generator carries a per-instance `self._seen_activity_ids: set[str]` (initialized in `__init__`); each `make_*` method adds its computed `activity_id` to the set and raises `ContentGenerationError` on duplicate insert with a message naming the offending id and method. The audit proves no current call site triggers this, so the check is a regression guard, not a runtime cost. A code comment explaining the invariant lives next to the set declaration.
 
   Strategy (ii) (per-method counter) was considered and rejected — adds complexity to solve a problem we don't have today, and would be replay-stable but harder to read in the Temporal UI.
 
@@ -82,7 +82,7 @@ The `activity_id=wfid` strategy depends on activity-ids being unique within each
 
 ⚠ Pre-existing duplicate default `"craft-image"` shared by `make_single_image` and `make_image_list`. They never run together today (mutually exclusive in `PipeImgGen`; `WfTestContentGeneratorChild` only calls `make_single_image`). Phase 1 must split them into `"craft-image-single"` / `"craft-image-list"` — see Decisions.
 
-**Conclusion:** Today's per-workflow uniqueness invariant **holds** for Strategy (i). Strategy (i) is adopted, with the two mitigations documented in Decisions.
+**Conclusion:** Today's per-workflow uniqueness invariant **holds** for Strategy (i). Strategy (i) is adopted, with the mitigations documented in Decisions (distinct method-default `wfid`s including the `craft-image` split, distinct activity_ids inside `make_extract_pages`, and a runtime uniqueness check in the new generator).
 
 **Verification:** no code changes. This phase produces an entry in **Decisions** and unblocks Phase 1.
 
@@ -95,8 +95,8 @@ Add the new generator next to the existing files. No wiring yet — just code.
 - [ ] Create `pipelex/temporal/tprl_content_generation/content_generator_in_workflow.py`.
 - [ ] Define class `ContentGeneratorInWorkflow` implementing `ContentGeneratorProtocol` with the nine current methods:
     - [ ] `make_llm_text` → `act_llm_gen_text`, with `task_queue=worker_config.inference_task_queue`
-    - [ ] `make_object` → `act_llm_gen_object`, plus `model_validate(obj.model_dump(mode="json", serialize_as_any=True))` round-trip
-    - [ ] `make_object_list` → `act_llm_gen_object_list`, plus per-item `model_validate(...)` round-trip
+    - [ ] `make_object` → `act_llm_gen_object`, plus `object_class.model_validate(obj.model_dump(mode="json", serialize_as_any=True))` round-trip
+    - [ ] `make_object_list` → `act_llm_gen_object_list`, plus per-item `object_class.model_validate(raw_obj.model_dump(mode="json", serialize_as_any=True))` round-trip. **Note:** `mode="json"` is required on BOTH methods. `ContentGeneratorChild.make_object_list` (`content_generator_child.py:189`) currently omits `mode="json"` — pre-existing asymmetry vs. `make_object` at `:148`. Fix it here, do not propagate the bug into the new generator.
     - [ ] `make_image_content` → unchanged from `ContentGeneratorChild` (no activity hop; uses `_generated_content_factory`)
     - [ ] `make_page_contents` → unchanged from `ContentGeneratorChild` (no activity hop)
     - [ ] `make_single_image` → `act_img_gen_images` with `nb_images=1`, then assert `len == 1`
@@ -105,17 +105,17 @@ Add the new generator next to the existing files. No wiring yet — just code.
     - [ ] `make_render_page_views` → `act_render_page_views`
     - [ ] `make_extract_pages` → see Phase 4 (sequenced two-activity path)
 - [ ] At every `workflow.execute_activity(…)` site, pass `start_to_close_timeout=worker_config.workflow_execution_timeout` and `retry_policy=worker_config.retry_policy`.
-- [ ] Thread `wfid` into `activity_id=` at every `workflow.execute_activity(…)` site, applying the strategy decided in Phase 0:
-    - **Strategy (i):** `activity_id=wfid` when `wfid is not None`; omit when `None`.
-    - **Strategy (ii):** instance-level `dict[str, int]` counter keyed by method name; activity_id is `f"{wfid}-{counter[method]}"`; increment after use.
-- [ ] Wrap each method body in `try/except ActivityError` to translate `ApplicationError → TemporalError.from_app_error(...)`, mirroring `wf_make_llm_text.py:32-35`.
+- [ ] Thread `wfid` into `activity_id=` at every `workflow.execute_activity(…)` site per **Strategy (i)** (locked in Phase 0): `activity_id=wfid` when `wfid is not None`; omit otherwise. For `make_extract_pages` (two activities), construct distinct `activity_id`s as per Decisions item (2).
+- [ ] Implement the runtime uniqueness check from Decisions item (3): each `make_*` records its computed `activity_id` into `self._seen_activity_ids` (initialized in `__init__`) and raises `ContentGenerationError` on duplicate. Place the comment explaining the invariant next to the set declaration.
+- [ ] Wrap each method body in `try/except ActivityError` to translate `ApplicationError → TemporalError.from_app_error(...)`, mirroring `wf_make_llm_text.py:32-35`. **Do NOT carry over the `except PipelexError → TemporalError.from_message_exception(...)` clause from `ContentGeneratorChild`.** That translation existed because the child-workflow boundary could surface `PipelexError` directly; the new generator only sees `ActivityError`. Confirm via grep that no operator path relies on `from_message_exception` translation flowing back from these methods.
 - [ ] Keep the `@update_job_metadata` decorator on each method (matches `ContentGeneratorChild`).
 - [ ] Add an inline comment at the LLM-text site stating the asymmetric routing rule (`task_queue=inference_task_queue` here only; other activities run on the workflow's own queue).
 - [ ] Create a factory module `content_generator_in_workflow_factory.py` with a `make_content_generator_in_workflow(...)` classmethod that takes `generated_content_factory` and returns the instance. (Don't plumb `task_queue` / `workflow_execution_timeout` etc. — those are read from config inside each method.)
-- [ ] Add a unit test that mocks `workflow.execute_activity` and asserts:
-    - `task_queue=` kwarg per method (LLM-text only sets it; the other eight don't)
-    - `activity_id=` kwarg threading per method
-    - (if Strategy (ii)) repeated calls to the same method produce distinct activity_ids
+- [ ] Add a unit test that mocks `workflow.execute_activity` and asserts (one parametrized test per method, or one test with explicit cases per method):
+    - `task_queue=worker_config.inference_task_queue` is passed for `make_llm_text`.
+    - **Negative case (the high-blast-radius assertion):** for each of the eight non-LLM-text methods, `task_queue` is **absent** from the kwargs (i.e. `"task_queue" not in mock.call_args.kwargs`, or `kwargs.get("task_queue") is None`). A copy-paste error that adds `task_queue=` to `act_img_gen_images` would route image gen to the inference queue and break split-worker production where the runner doesn't register the image-gen activity.
+    - `activity_id=` kwarg threading per method (matches the wfid passed in, or the method-default if `wfid is None`).
+    - Calling the same method twice with the same `wfid` raises `ContentGenerationError` with a message naming the duplicate id (validates the runtime check from Decisions item (3)).
 
 **Verification:** `make agent-check`. Nothing is wired yet — full test suite must still pass against the existing `ContentGeneratorChild` path.
 
@@ -125,9 +125,12 @@ Add the new generator next to the existing files. No wiring yet — just code.
 
 - [ ] In `pipelex/pipelex.py:338-351`, add an env-flag-gated branch (e.g. `os.environ.get("PIPELEX_USE_IN_WORKFLOW_CONTENT_GENERATOR")`) that picks the new generator when `temporal.is_enabled` is true. Default OFF — `ContentGeneratorChild` remains the production path.
     - [ ] Do NOT add this flag to `pipelex.toml`. It's transient.
+- [ ] **Mirror the env-flag branch in the test infrastructure** so that flipping it actually exercises the new code path. The `pipelex.py` branch is bypassed by both temporal test conftests, which explicitly call `pipelex_hub.set_content_generator(...)` after `Pipelex.make()`. Without these matching gates, Phase 2 validates only type-correctness, not behavior:
+    - [ ] `tests/integration/pipelex/temporal/conftest.py:62-78` — gate the `ContentGeneratorChildFactory.make_content_generator_child(...)` wiring (line 75) on the same env flag; pick the new in-workflow generator when ON.
+    - [ ] `tests/integration/pipelex/temporal/test_payload_codec_pipeline.py:70-82` — same env-flag branch.
 - [ ] Run locally with the flag ON:
     - [ ] `tests/integration/pipelex/temporal/library_crate/`
-    - [ ] `tests/integration/pipelex/temporal/tracing/`
+    - [ ] `tests/integration/pipelex/temporal/tracing/` — including `test_split_worker_usage.py`. This is the test that validates the asymmetric `task_queue=worker_config.inference_task_queue` rule actually routes the LLM activity to the runner queue. After the collapse, the read site moves from `WfMakeLLMText.start_activity` to the new `workflow.execute_activity` site inside `ContentGeneratorInWorkflow.make_llm_text`. Same worker process, same mutation timing — but this is the only test that proves the routing works, so it must run under flag ON, not just in Phase 7's docstring rewrite.
     - [ ] `tests/integration/pipelex/temporal/content_generation/test_tprl_content_generator_child.py`
 - [ ] Run with the flag OFF (default): full Temporal subset must pass identically to main.
 
@@ -153,6 +156,7 @@ This validates the round-trips through the new generator. The feature flag is st
 
 `ContentGenerator.make_extract_pages` (`content_generator.py:259-300`) augments page contents with page views when `extract_job_params.should_include_page_views` is true. `ContentGeneratorChild.make_extract_pages` (`content_generator_child.py:386-422`) does not — pre-existing bug.
 
+- [ ] **Signature decision:** the new generator's `make_extract_pages` follows the `ContentGeneratorProtocol` signature (non-None `extract_job_params: ExtractJobParams` and `extract_job_config: ExtractJobConfig`), matching `ContentGeneratorChild.make_extract_pages`. Do NOT replicate the `extract_job_params or ExtractJobParams.make_default_extract_job_params()` fallback that `ContentGenerator.make_extract_pages` (`content_generator.py:268-269`) uses — the direct generator's `| None = None` defaults are a pre-existing Protocol-violation; callers (`pipe_extract.py:158`) always pass non-None. Fixing `ContentGenerator`'s signature is filed as a follow-up TODO; do not bundle it here.
 - [ ] In the new generator's `make_extract_pages`, dispatch `act_extract_gen_extract_pages` first.
 - [ ] If `extract_job_params.should_include_page_views` is true:
     - [ ] If `extract_input.document_uri` is set → dispatch `act_render_page_views` and use its return as `page_view_contents`.
@@ -221,8 +225,10 @@ Per the project's "no backward compatibility" rule, delete in a single commit:
 
 **Edits:**
 
-- [ ] `pipelex/temporal/tasks.py:1-49` — drop the seven `WfMake*` import lines and remove them from the `crafting.workflow_list`. Activity list unchanged.
+- [ ] `pipelex/temporal/tasks.py:1-49` — drop the `WfMake*` / `WfRenderPageViews` import lines and remove them from the `crafting.workflow_list`. Activity list unchanged.
 - [ ] `pipelex/pipelex.py:338-351` — remove the feature-flag branch added in Phase 2; the new generator is now unconditional under `temporal.is_enabled`.
+- [ ] `tests/integration/pipelex/temporal/conftest.py:62-78` — drop the env-flag branch added in Phase 2; the parent conftest unconditionally constructs the new in-workflow generator via `ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow(...)`. **Without this edit every Temporal integration test breaks at fixture setup with an ImportError on the deleted `ContentGeneratorChildFactory`.**
+- [ ] `tests/integration/pipelex/temporal/test_payload_codec_pipeline.py:70-82` — same: drop the env-flag branch and replace with the new factory.
 - [ ] `tests/integration/pipelex/temporal/content_generation/conftest.py:18-20, 46-73` — delete the imports of `ContentGeneratorChild` / `ContentGeneratorChildFactory` / `ContentGeneratorTopFactory` and the `top_crafter` and `child_crafter` fixtures.
 - [ ] If `test_tprl_content_generator_child.py` referenced any deleted import, update accordingly.
 
@@ -271,7 +277,10 @@ Open questions / decisions for next session:
 - [ ] `make agent-check && make agent-test` — full suite green.
 - [ ] `.venv/bin/pytest tests/integration/pipelex/temporal/ --temporal-server local` — against a real Temporal server.
 - [ ] Manual smoke: run a multi-step `PipeSequence` end-to-end and confirm via Temporal UI that activities appear directly under `WfPipeRouter`.
-- [ ] Replay-history check: confirm no test fixtures pickle old `WfMake*` history. (Spot-check: `grep -rn "WfMake" tests/` should return nothing in the resulting tree.)
+- [ ] Replay-history check: confirm no test fixtures depend on old `WfMake*` history.
+    - [ ] `grep -rn "WfMake\|wf_make_\|WfRenderPageViews\|wf_render_page_views" tests/` returns nothing in the resulting tree.
+    - [ ] No binary or JSON replay fixture references the old workflow types: `find tests/ \( -name "*.bin" -o -name "*history*" -o -name "*replay*" \) -type f`. Inspect any hits — if pickled `WorkflowEvent` data exists, attempt replay against the new tree to confirm break.
+    - [ ] If no replay fixtures exist (expected per v2 §6 "Replay-history compatibility: none"), state so explicitly in the deploy notes.
 
 **Deploy operations:**
 
@@ -303,7 +312,17 @@ Open questions / decisions for next session:
 
 ## Where bugs are likely to hide (from v2 §6)
 
-- **Asymmetric `task_queue=worker_config.inference_task_queue` rule.** Easy to forget at the LLM-text site or to over-apply elsewhere. Covered by the unit test added in Phase 1.
-- **`activity_id` collisions** under repeated calls — see Phase 0. The default `wfid` values are method-specific constants; they do NOT disambiguate repeated calls to the same method. If Phase 0 found this risk in any operator, Strategy (ii) (counter) is mandatory.
-- **`model_validate(obj.model_dump(mode="json", serialize_as_any=True))` round-trips** for `make_object` / `make_object_list`. Required because the activity boundary returns a generic `BaseModel`. Don't drop these.
+- **Asymmetric `task_queue=worker_config.inference_task_queue` rule.** Easy to forget at the LLM-text site or to over-apply elsewhere. Covered by the unit test added in Phase 1 — including the negative assertion that non-LLM-text methods must NOT pass `task_queue=`. Mis-routing image-gen to the inference queue would break split-worker production where the runner doesn't register the image-gen activity.
+- **`activity_id` collisions** under repeated calls — see Phase 0. The default `wfid` values are method-specific constants; they do NOT disambiguate repeated calls to the same method. The Phase 1 runtime check (per-instance `_seen_activity_ids` set) converts this from a documented invariant to a checked one.
+- **`model_validate(obj.model_dump(mode="json", serialize_as_any=True))` round-trips** for `make_object` / `make_object_list`. Required because the activity boundary returns a generic `BaseModel`. Don't drop these. **Use `mode="json"` on BOTH** — `ContentGeneratorChild.make_object_list:189` omits it today (pre-existing asymmetry vs. `make_object:148`).
 - **Page-views augmentation** in `make_extract_pages` (Phase 4). Mirror the direct generator's branching exactly: don't double-emit when `should_include_page_views` is false; handle both `document_uri` (multi-page render) and `image_uri` (single-image) inputs; assert length match.
+- **Test infrastructure bypass.** Both `tests/integration/pipelex/temporal/conftest.py` and `test_payload_codec_pipeline.py` explicitly call `pipelex_hub.set_content_generator(...)` after `Pipelex.make()`, so the env-flag branch in `pipelex.py` is bypassed in tests. Phase 2 must mirror the env flag in both conftests; Phase 6 must update both as part of cleanup.
+
+---
+
+## Follow-up TODOs (out of scope for this PR)
+
+- **Watch task-queue saturation post-deploy.** Today, a `PipeSequence` of N inference calls schedules N child workflows, decoupling activity scheduling across child task lists. Post-collapse, all N activities run through the parent's task list (or `inference_task_queue` for LLM-text). For deep pipelines (N > 50), single-queue QPS could spike. After the first production deploy after this lands, watch `ScheduleToStartLatency` on the parent worker queue and on `inference_task_queue`. If it rises, investigate batching or per-pipe queue assignment. Not blocking; upside (history-event reduction) dominates.
+- **Drop `make_render_page_views` from `ContentGeneratorProtocol`** if no operator caller emerges within one release cycle. Today it's only invoked internally from `make_extract_pages`; post-Phase-4 the same is true. The Protocol method becomes dead code from the operator side. Inline its behavior into `make_extract_pages` and remove from the Protocol + every implementation. Estimated savings: ~50 lines across four files.
+- **Fix `ContentGenerator.make_extract_pages` Protocol-violating signature.** `content_generator.py:259-267` declares `extract_job_params: ExtractJobParams | None = None` and `extract_job_config: ExtractJobConfig | None = None`, while the Protocol requires non-None. Tighten the signature to match the Protocol; default-construct at the operator boundary instead. Pre-existing divergence; project's "flag and fix" rule applies, but bundling into this refactor would expand the diff for marginal gain.
+- **Update v2 doc claim.** `wip/temporal-primitives/collapse-content-generation-workflow-layer-v2.md` §5 step 3 says image-gen path in `wf_test_content_generator_child.py:87-92` is commented out. It is not — the path is live. Doc-only fix.
