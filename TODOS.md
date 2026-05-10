@@ -18,9 +18,10 @@ Replace `WfMake*` child-workflow dispatch with direct `workflow.execute_activity
 - [x] ✅ **Checkpoint A** — new generator validated end-to-end, ready to flip
 - [x] **Phase 5 — Flip default to new generator**
 - [x] **Phase 6 — Delete old surface** (one commit)
-- [ ] **Phase 7 — Update docstrings and docs**
+- [ ] **Phase 7 — Strengthen cross-process e2e coverage** (object/object-list, image-gen split-worker, extract page-views; isolate `inference_task_queue` to a single stopgap helper, pending the per-activity-routing follow-up at `wip/temporal-primitives/per-activity-queue-routing-v1.md`)
+- [ ] **Phase 8 — Update docstrings and docs**
 - [ ] ✅ **Checkpoint B** — old surface gone, codebase in target state
-- [ ] **Phase 8 — Final verification**
+- [ ] **Phase 9 — Final verification**
 
 Each phase ends with `make agent-check && make agent-test` (or, during local dev, the `tests/integration/pipelex/temporal/` subset). If a phase reveals a hidden divergence, stop and update this doc + the v2 analysis before proceeding.
 
@@ -237,14 +238,74 @@ Per the project's "no backward compatibility" rule, deleted in a single commit:
 - [x] `make agent-test` — full suite passes.
 - [x] `make tb` — boot test passes.
 
-**Notes / known follow-ups handed to Phase 7:**
+**Notes / known follow-ups handed to Phase 8:**
 
-- Three stale references to `WfMakeLLMText` survive in `tests/integration/pipelex/temporal/tracing/test_split_worker_usage.py` (lines 3, 63, 80). These are docstrings/comments; Phase 7 explicitly owns this rewrite together with `tracing/helpers.py` and `docs/under-the-hood/`.
+- Three stale references to `WfMakeLLMText` survive in `tests/integration/pipelex/temporal/tracing/test_split_worker_usage.py` (lines 3, 63, 80). These are docstrings/comments; Phase 8 explicitly owns this rewrite together with `tracing/helpers.py` and `docs/under-the-hood/`.
 - The `WfTestContentGeneratorChild` test fixture workflow (in `pipelex/temporal/test_extras/`) is intentionally kept — it was re-pointed in Phase 3 to use the new in-workflow generator and is the only thing Phase 6 leaves with "Child" in the name.
 
 ---
 
-## Phase 7 — Update docstrings and docs
+## Phase 7 — Strengthen cross-process e2e coverage
+
+Goal: bring the post-collapse code paths (object/object-list, image-gen across split workers, extract page-views) up to the cross-process coverage level that `make_llm_text` already has via `tracing/test_split_worker_usage.py`. Also isolate the provisional `inference_task_queue` two-queue logic to a single deletion point, so the future per-activity routing migration (designed in `wip/temporal-primitives/per-activity-queue-routing-v1.md`) is mechanical rather than archeology.
+
+### Coverage gap analysis
+
+After Phase 6, the six `ContentGeneratorProtocol` methods have wildly different e2e coverage levels:
+
+| Method | In-process worker | Cross-process / split-worker |
+|---|---|---|
+| `make_llm_text` → `act_llm_gen_text` | ✅ `WfTestContentGeneratorChild` | ✅ `tracing/test_split_worker_usage.py` |
+| `make_object` → `act_llm_gen_object_direct` | ✅ same | ❌ none — biggest gap |
+| `make_object_list` → `act_llm_gen_object_list_direct` | ✅ same | ❌ none |
+| `make_single_image` / `make_image_list` → `act_img_gen` | ✅ same | ⚠ skill Tier 4/5 default to single worker |
+| `make_extract_pages` (one-activity branch) | ✅ same | ❌ none |
+| `make_extract_pages` (two-activity, real PDF) | ✅ `TestTprlContentGeneratorPdfPageViews` | ❌ none |
+
+Every existing `library_crate/*.mthds` bundle outputs `Text`, so `act_llm_gen_object_direct` and `act_llm_gen_object_list_direct` never go through the real Temporal data converter cross-process. The pre-existing serialization asymmetry between `make_object` (uses `model_dump(mode="json", serialize_as_any=True)`) and `make_object_list` (omits `mode="json"` — see v2 §6 and Phase 0 audit) survived the collapse and is still untested at the cross-process boundary. The two-activity `make_extract_pages` branch is the most fragile post-collapse: it's the only method that dispatches more than one activity, and so the only one whose `activity_id` uniqueness mitigation (`f"{base_id}-pages"` and `f"{base_id}-render-page-views"`) actually matters in production.
+
+### The `inference_task_queue` asymmetry is provisional
+
+The current binary model — "LLM goes to `inference_task_queue`, everything else goes to default" — was introduced as a quick split-worker test setup. It is NOT the long-term design. Real deployments will want per-provider, per-model, per-activity-class routing (one worker pool per AI provider, or per model, or per activity type), covering LLM + image-gen + extract under the same routing system.
+
+The proper general design is documented in [`wip/temporal-primitives/per-activity-queue-routing-v1.md`](wip/temporal-primitives/per-activity-queue-routing-v1.md) and is **out of scope for this PR**. Implementing it is a follow-up with its own branch, CHANGELOG entry, and migration story.
+
+What this PR needs is to survive the two-queue model cleanly: centralize the one place that knows about it, mark it as provisional, and pin tests so the future migration is mechanical.
+
+### Stopgap for this PR
+
+The proper design (linked above) deletes everything below. Until it lands, do the minimum to keep the current 2-queue model from rotting:
+
+- [ ] In `pipelex/temporal/tprl_content_generation/content_generator_in_workflow.py`, extract a tiny module-private helper `_inference_dispatch_kwargs(worker_config) -> dict[str, Any]` that returns `{"task_queue": worker_config.inference_task_queue}`. Call it at the single LLM-text dispatch site by `**`-unpacking. This is a clearly-marked stopgap, not a long-term abstraction — its only purpose is to give the future per-activity-routing migration a single deletion point.
+- [ ] Add a docstring (or named-comment block) on `_inference_dispatch_kwargs` that says: *"Provisional split-worker stopgap. The proper design is in `wip/temporal-primitives/per-activity-queue-routing-v1.md`. Do NOT extend this helper to image-gen, extract, or any other activity — those will be folded into the new routing system."*
+- [ ] Update `tests/unit/pipelex/temporal/test_content_generator_in_workflow.py` — pin the existing positive (LLM-text passes `task_queue=worker_config.inference_task_queue`) and negative (other methods do NOT pass `task_queue=`) assertions to the helper symbol so a future rename or deletion shows up immediately in the test diff.
+- [ ] In `.claude/skills/temporal-e2e-validate/SKILL.md`, promote split workers from "recommended setup" to **required** for Tiers 4 and 5 (image gen and image flow). On a single worker, image-gen routing accidents are silently masked. (This is independent of the routing rewrite — it stays useful after the migration.)
+- [ ] Add an entry to the "Follow-up TODOs (out of scope for this PR)" section at the bottom of this doc pointing at `wip/temporal-primitives/per-activity-queue-routing-v1.md`.
+
+### New tests — pytest and skill side-by-side
+
+Each tier ships with a **pytest integration test** (CI-runnable via `make agent-test`, optionally against `--temporal-server local`) and, where applicable, a **skill artifact** (a bundle or SKILL.md edit, for manual tmux-driven verification). Tier 10 is skill-only — it's a tightening of existing instructions, not new code.
+
+The pytest tests follow the existing pattern in `tests/integration/pipelex/temporal/tracing/test_split_worker_usage.py` (two scope-bound workers, submission via `TemporalClient`, assertions on workflow history or output).
+
+- [ ] **Tier 9 — Object generation through Temporal cross-process** (highest priority).
+  - **pytest:** new `tests/integration/pipelex/temporal/tracing/test_split_worker_object_gen.py`. Mirror `test_split_worker_usage.py`'s split-worker setup. Submit two workflows: one exercising `act_llm_gen_object` (`make_object` → single-output), one exercising `act_llm_gen_object_list` (`make_object_list` → multiple-output), with a custom output concept that has at least one nested field. Assert the generated object survives the `model_dump(mode="json", serialize_as_any=True)` → cross-process transport → `model_validate(...)` round-trip with all fields intact. Marked `@temporal`.
+  - **skill bundle:** new `tests/integration/pipelex/temporal/library_crate/structured_output_sequence.mthds` defining the same custom concept and PipeLLM emitting it (single + list variants — two pipes in one bundle is fine). Add a Tier 9 entry to SKILL.md so it can be smoke-run via `pipelex run bundle --temporal --dry-run --mock-inputs --no-logo --graph` against the tmux router/runner setup.
+
+- [ ] **Tier 10 — Image generation across split workers** (skill-only — negative-routing assertion).
+  Edit `.claude/skills/temporal-e2e-validate/SKILL.md`: promote split workers from "recommended setup" to **required** for Tiers 4 and 5 (image gen and image flow). Add a post-run assertion to both: `tmux capture-pane -t temporal-worker-runner -p -S -200 | grep -c "act_img_gen"` must return 0 — the runner pool must NOT have executed image-gen (it's not registered there). If image-gen ever got the wrong `task_queue=` kwarg by accident, the activity would either hang (no worker picks it up from `inference_task_queue`) or get registered on both pools and run on the wrong one — a subtle production-only bug. No new pytest file for this tier; the negative-routing check belongs in the manual flow where you can see worker logs.
+
+- [ ] **Tier 11 — `make_extract_pages` two-activity cross-process** (regression guard for the most fragile path).
+  - **pytest:** new `tests/integration/pipelex/temporal/tracing/test_split_worker_extract_pages.py`. Mirror `tests/integration/pipelex/temporal/content_generation/test_tprl_content_generator_pdf_page_views.py:TestTprlContentGeneratorPdfPageViews` (reuse the same 2-page `Job-Offer.pdf` fixture via `PipeTestCases.JOB_OFFER_PDF_LOCAL`) but submit through real Temporal with the split-worker setup. Assert via `temporalio.client.WorkflowHandle.fetch_history()` that two `ActivityTaskScheduled` events appear with `activity_id=<wfid>-pages` and `activity_id=<wfid>-render-page-views`. Marked `@extract @temporal`.
+  - **skill:** add a Tier 11 entry to SKILL.md describing how to run the same scenario via `pipelex run bundle --temporal` against tmux router/runner workers, for manual Temporal Web UI inspection.
+
+- [ ] **Optional — activity_id observability contract test.** New `tests/integration/pipelex/temporal/content_generation/test_activity_id_contract.py`. Run a workflow exercising each of the six `ContentGeneratorProtocol` methods (the existing `WfTestContentGeneratorChild` is the natural fixture), fetch history via `WorkflowHandle.fetch_history()`, and assert the expected `activity_id` strings appear (`craft-text`, `craft-object-direct`, `craft-object-list-direct`, `craft-image-single`, `craft-image-list`, `jinja2-text`, `extract`, plus the `-pages` / `-render-page-views` suffixes for the two-activity branch). Pins the contract that ops uses for triage in the Temporal Web UI so a future rename can't silently break it. Pytest-only — no skill counterpart needed.
+
+**Verification:** `make agent-check && make agent-test` runs all the new pytest tests (the integration tests run against the in-process server with two scope-bound workers, the same harness `test_split_worker_usage.py` already uses, so no external Temporal server required for CI). Run the skill tiers manually after the pytest suite passes for cross-process Web UI inspection.
+
+---
+
+## Phase 8 — Update docstrings and docs
 
 - [ ] `tests/integration/pipelex/temporal/tracing/test_split_worker_usage.py` — rewrite the module docstring and surrounding fixture comments to describe the direct-activity-call topology (no more `WfMakeLLMText` child workflow; the activity is now dispatched from `ContentGeneratorInWorkflow.make_llm_text` inside `WfPipeRouter`).
 - [ ] `tests/integration/pipelex/temporal/tracing/helpers.py` — update the comments around `make_split_workers` and `_runner_isolated_act_llm_gen_text` for the same topology change.
@@ -270,7 +331,7 @@ State at this checkpoint:
 
 ---
 
-## Phase 8 — Final verification
+## Phase 9 — Final verification
 
 - [ ] `make agent-check && make agent-test` — full suite green.
 - [ ] `.venv/bin/pytest tests/integration/pipelex/temporal/ --temporal-server local` — against a real Temporal server.
@@ -295,14 +356,15 @@ State at this checkpoint:
 | 4 | `make agent-check && make agent-test` |
 | 5 | `make agent-test`; `--temporal-server local`; manual UI inspection |
 | 6 | `make cleanderived && make agent-check && make agent-test && make tb` |
-| 7 | `make agent-check` |
-| 8 | full suite + real-server suite + manual smoke + replay-history check |
+| 7 | `make agent-check && make agent-test`; e2e skill Tiers 9-11 against `--temporal-server local` with split workers |
+| 8 | `make agent-check` |
+| 9 | full suite + real-server suite + manual smoke + replay-history check |
 
 ---
 
 ## Where bugs are likely to hide (from v2 §6)
 
-- **Asymmetric `task_queue=worker_config.inference_task_queue` rule.** Easy to forget at the LLM-text site or to over-apply elsewhere. Covered by the unit test added in Phase 1 — including the negative assertion that non-LLM-text methods must NOT pass `task_queue=`. Mis-routing image-gen to the inference queue would break split-worker production where the runner doesn't register the image-gen activity.
+- **Asymmetric `task_queue=worker_config.inference_task_queue` rule.** Easy to forget at the LLM-text site or to over-apply elsewhere. Covered by the unit test added in Phase 1 — including the negative assertion that non-LLM-text methods must NOT pass `task_queue=`. Mis-routing image-gen to the inference queue would break split-worker production where the runner doesn't register the image-gen activity. Note: this rule is *provisional* — Phase 7 isolates it to the `_inference_dispatch_kwargs` helper, and the proper general design (per-activity, per-handle routing covering LLM + image-gen + extract) is in `wip/temporal-primitives/per-activity-queue-routing-v1.md`.
 - **`activity_id` collisions** under repeated calls — see Phase 0. The default `wfid` values are method-specific constants; they do NOT disambiguate repeated calls to the same method. The Phase 1 runtime check (`dict[workflow_id, set[str]]` on the singleton generator, gated by `workflow.unsafe.is_replaying()`) converts this from a documented invariant to a checked one and is replay-safe (cache-eviction replays do not raise spurious duplicates).
 - **`model_validate(obj.model_dump(mode="json", serialize_as_any=True))` round-trips** for `make_object` / `make_object_list`. Required because the activity boundary returns a generic `BaseModel`. Don't drop these. **Use `mode="json"` on BOTH** — `ContentGeneratorChild.make_object_list:189` omits it today (pre-existing asymmetry vs. `make_object:148`).
 - **Page-views augmentation** in `make_extract_pages` (Phase 4). Mirror the direct generator's branching exactly: don't double-emit when `should_include_page_views` is false; handle both `document_uri` (multi-page render) and `image_uri` (single-image) inputs; assert length match. Both branches are covered by unit tests; the `document_uri` branch additionally has a real-PDF end-to-end integration test (`TestTprlContentGeneratorPdfPageViews`).
@@ -312,6 +374,7 @@ State at this checkpoint:
 
 ## Follow-up TODOs (out of scope for this PR)
 
+- **Per-activity, per-handle Temporal queue routing.** Replace the provisional `inference_task_queue` binary model with a general routing system covering LLM, image-gen, and extract activities — keyed by `(activity_name, runtime_handle)`. Full design in [`wip/temporal-primitives/per-activity-queue-routing-v1.md`](wip/temporal-primitives/per-activity-queue-routing-v1.md). Enables per-provider and per-model worker pools. The Phase 7 stopgap helper (`_inference_dispatch_kwargs`) is the deletion point when this lands.
 - **Watch task-queue saturation post-deploy.** Today, a `PipeSequence` of N inference calls schedules N child workflows, decoupling activity scheduling across child task lists. Post-collapse, all N activities run through the parent's task list (or `inference_task_queue` for LLM-text). For deep pipelines (N > 50), single-queue QPS could spike. After the first production deploy after this lands, watch `ScheduleToStartLatency` on the parent worker queue and on `inference_task_queue`. If it rises, investigate batching or per-pipe queue assignment. Not blocking; upside (history-event reduction) dominates.
 - **Drop `make_render_page_views` from `ContentGeneratorProtocol`** if no operator caller emerges within one release cycle. Today it's only invoked internally from `make_extract_pages`; post-Phase-4 the same is true. The Protocol method becomes dead code from the operator side. Inline its behavior into `make_extract_pages` and remove from the Protocol + every implementation. Estimated savings: ~50 lines across four files.
 - **Fix `ContentGenerator.make_extract_pages` Protocol-violating signature.** `content_generator.py:259-267` declares `extract_job_params: ExtractJobParams | None = None` and `extract_job_config: ExtractJobConfig | None = None`, while the Protocol requires non-None. Tighten the signature to match the Protocol; default-construct at the operator boundary instead. Pre-existing divergence; project's "flag and fix" rule applies, but bundling into this refactor would expand the diff for marginal gain.
