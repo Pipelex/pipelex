@@ -683,14 +683,16 @@ is also the only method whose `activity_id` uniqueness mitigation
 production.
 
 The test fixture workflow `WfTestContentGeneratorPdfPageViews` (registered in
-`TEMPORAL_TEST_WORKFLOWS`) exercises this flow against the local 2-page
-`tests/data/documents/Job-Offer.pdf`. Run it through Temporal with split
-workers active so both activities get scheduled cross-process:
+`TEMPORAL_TEST_WORKFLOWS`) exercises this flow. The pytest counterpart
+substitutes both activities with canonical fixtures so it runs without Azure
+Document Intelligence credentials or pypdfium2 — the goal is to pin the
+activity_id contract, not to re-validate the OCR backend (already covered by
+`content_generation/test_tprl_content_generator_pdf_page_views.py`):
 
 ```bash
 .venv/bin/pytest -x -v \
   tests/integration/pipelex/temporal/tracing/test_split_worker_extract_pages.py \
-  -m "extract and temporal" --temporal-server local 2>&1
+  -m temporal --temporal-server local 2>&1
 ```
 
 After this completes, tell the user: PASS/FAIL. The test asserts via
