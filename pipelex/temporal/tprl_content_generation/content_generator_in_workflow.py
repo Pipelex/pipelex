@@ -50,9 +50,15 @@ def _inference_dispatch_kwargs(worker_config: WorkerConfig) -> dict[str, Any]:
 
     Returns the ``execute_activity`` kwargs that route an inference activity
     onto ``worker_config.inference_task_queue`` so split-worker deployments
-    can run inference on a dedicated runner pool. Today it is the single
-    place that knows about the binary "LLM goes to inference_task_queue,
-    everything else goes to default" model.
+    can run inference on a dedicated runner pool. Today this helper is wired
+    only at the ``make_llm_text`` dispatch site — ``act_llm_gen_object`` and
+    ``act_llm_gen_object_list`` deliberately stay on the workflow's own queue
+    because their cross-pool test coverage (registry decode of dynamic
+    classes) has not been built yet (see
+    ``wip/temporal-primitives/per-activity-queue-routing-v1.md`` §"Tests to
+    upgrade when v1 lands"). All other activities (image-gen, extract, jinja2,
+    render-page-views) are non-inference and route to the workflow's own
+    queue.
 
     The proper general design is in
     ``wip/temporal-primitives/per-activity-queue-routing-v1.md``: per-
@@ -74,18 +80,21 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
 
     def __init__(self, generated_content_factory: GeneratedContentFactory) -> None:
         self._generated_content_factory = generated_content_factory
-        # Per-workflow uniqueness invariant for activity_ids. Today no operator call site
+        # Per-run uniqueness invariant for activity_ids. Today no operator call site
         # invokes the same protocol method twice within one ``WfPipeRouter`` execution
         # (audit recorded in TODOS.md / collapse-content-generation-workflow-layer-v2.md
         # §0). This dict is a runtime guard so a future regression surfaces as a clear
         # ``ContentGenerationError`` instead of an opaque Temporal duplicate-activity-id
-        # failure. Keyed by ``workflow.info().workflow_id`` because the generator
-        # instance is set once on the hub and reused across many workflow runs.
+        # failure. Keyed by ``(workflow_id, run_id)`` so retries, ``continue_as_new``,
+        # and id-reuse policies (which keep ``workflow_id`` but produce a new ``run_id``)
+        # do not inherit the prior run's seen ids — that would raise spurious duplicates
+        # on the new run's first default activity_id. The generator instance is set once
+        # on the hub and reused across many workflow runs.
         # Replay-safety: ``_record_activity_id`` short-circuits during replay so a
         # cached set on this same worker process does not produce false-positive
         # duplicates after cache eviction. The dict otherwise grows unboundedly across
         # workflow runs — accepted for now; cleanup is a follow-up tracked in TODOS.md.
-        self._seen_activity_ids: dict[str, set[str]] = {}
+        self._seen_activity_ids: dict[tuple[str, str], set[str]] = {}
 
     def _record_activity_id(self, activity_id: str, method_name: str) -> None:
         # Skip the check on replay. After cache eviction, Temporal replays the
@@ -95,8 +104,9 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
         # replay — duplicates can only be introduced on a fresh execution.
         if workflow.unsafe.is_replaying():
             return
-        workflow_id = workflow.info().workflow_id
-        seen = self._seen_activity_ids.setdefault(workflow_id, set())
+        info = workflow.info()
+        run_key = (info.workflow_id, info.run_id)
+        seen = self._seen_activity_ids.setdefault(run_key, set())
         if activity_id in seen:
             msg = (
                 f"Duplicate activity_id '{activity_id}' for method '{method_name}'. "
@@ -344,6 +354,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
         return image_content_list
 
     @override
+    @update_job_metadata
     async def make_templated_text(
         self,
         job_metadata: JobMetadata,

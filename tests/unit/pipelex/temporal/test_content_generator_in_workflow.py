@@ -77,14 +77,15 @@ def patch_workflow_info(mocker: MockerFixture) -> str:
     """Patch ``temporalio.workflow.info()`` and ``workflow.unsafe.is_replaying()``
     so the generator's runtime checks can be exercised outside a real workflow.
 
-    The new generator calls ``workflow.info().workflow_id`` to scope its per-run
-    activity-id uniqueness set, and ``workflow.unsafe.is_replaying()`` to skip
-    the check during replay. Without these patches every test would run outside
-    a workflow context and the calls would error out.
+    The new generator calls ``workflow.info().workflow_id`` / ``run_id`` to scope
+    its per-run activity-id uniqueness set, and ``workflow.unsafe.is_replaying()``
+    to skip the check during replay. Without these patches every test would run
+    outside a workflow context and the calls would error out.
     """
     workflow_id = "test-workflow"
     fake_info = mocker.MagicMock()
     fake_info.workflow_id = workflow_id
+    fake_info.run_id = "test-run-id-1"
     mocker.patch("temporalio.workflow.info", return_value=fake_info)
     mocker.patch("temporalio.workflow.unsafe.is_replaying", return_value=False)
     # ``temporal_error.from_app_error`` calls ``workflow_log`` which itself checks
@@ -317,6 +318,63 @@ class TestContentGeneratorInWorkflow:
         )
 
         assert mock_execute.call_count == 2
+
+    async def test_activity_id_cache_is_scoped_by_run_id(self, mocker: MockerFixture) -> None:
+        """A second run of the same workflow_id (different run_id) must not inherit
+        seen activity_ids from the prior run.
+
+        Temporal retry policies, ``continue_as_new``, and id-reuse policies all
+        produce a new ``run_id`` under the same ``workflow_id``. Keying the seen
+        set only by ``workflow_id`` would cause the new run's first default
+        activity_id ("craft-text") to collide with the prior run's entry and
+        raise ``ContentGenerationError`` spuriously.
+        """
+        mock_execute = mocker.patch("temporalio.workflow.execute_activity", new_callable=mocker.AsyncMock)
+        mock_execute.return_value = "stub text"
+        generator = _make_generator()
+
+        # Run 1 populates the per-run set.
+        await generator.make_llm_text(
+            job_metadata=_make_job_metadata(),
+            llm_setting_main=_make_llm_setting(),
+            llm_prompt_for_text=LLMPrompt(user_text="hello"),
+        )
+
+        # Same workflow_id, new run_id — must NOT collide.
+        fake_info = mocker.MagicMock()
+        fake_info.workflow_id = "test-workflow"
+        fake_info.run_id = "test-run-id-2"
+        mocker.patch("temporalio.workflow.info", return_value=fake_info)
+
+        await generator.make_llm_text(
+            job_metadata=_make_job_metadata(),
+            llm_setting_main=_make_llm_setting(),
+            llm_prompt_for_text=LLMPrompt(user_text="hello again"),
+        )
+
+        assert mock_execute.call_count == 2
+
+    async def test_make_templated_text_updates_content_generation_job_id(self, mocker: MockerFixture) -> None:
+        """``make_templated_text`` must set ``job_metadata.content_generation_job_id``
+        consistently with every other activity-dispatching method.
+
+        Without the ``@update_job_metadata`` decorator, downstream reporting and
+        tracing that reads ``content_generation_job_id`` would see whatever value
+        was last set by a previous operation (e.g. ``"make_llm_text"``) rather
+        than ``"make_templated_text"``.
+        """
+        mock_execute = mocker.patch("temporalio.workflow.execute_activity", new_callable=mocker.AsyncMock)
+        mock_execute.return_value = "rendered"
+        generator = _make_generator()
+        job_metadata = _make_job_metadata()
+
+        await generator.make_templated_text(
+            job_metadata=job_metadata,
+            context={"key": "value"},
+            template="{{ key }}",
+        )
+
+        assert job_metadata.content_generation_job_id == "make_templated_text"
 
     async def test_activity_error_with_application_error_translates_to_temporal_error(self, mocker: MockerFixture) -> None:
         """``ActivityError(cause=ApplicationError)`` must be translated to ``TemporalError``

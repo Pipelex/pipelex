@@ -62,7 +62,8 @@ For failures, include the error message and what it means:
 Tier 2 FAIL
   KajsonDecoderError: Class 'Greeting' not found
   The worker tried to deserialize WorkingMemory before registering dynamic concepts.
-  Check worker output: tmux capture-pane -t temporal-worker -p -S -200
+  Check worker output: tmux capture-pane -t temporal-worker-router -p -S -200
+  (or tmux capture-pane -t temporal-worker-runner / temporal-worker depending on setup)
 ```
 
 ---
@@ -472,9 +473,16 @@ else
 fi
 ```
 
-If any tier hangs for more than 30 seconds, check worker output:
+If any tier hangs for more than 30 seconds, check worker output. With the
+recommended split workers (Step 2), capture both sessions; for the alternative
+single full worker setup, capture `temporal-worker` instead:
 
 ```bash
+# Split workers (default setup from Step 2)
+tmux capture-pane -t temporal-worker-router -p -S -100
+tmux capture-pane -t temporal-worker-runner -p -S -100
+
+# Single full worker (alternative setup)
 tmux capture-pane -t temporal-worker -p -S -100
 ```
 
@@ -848,10 +856,13 @@ After reporting, propose opening the PipeParallel graph (most interesting cross-
 open results/temporal_parallel_sequence_output_01/reactflow.html
 ```
 
-If any concurrent tests fail, capture worker output for diagnosis:
+If any concurrent tests fail, capture worker output for diagnosis (split workers
+from Step 2 are the default — fall back to `temporal-worker` only if you used the
+single full worker setup):
 
 ```bash
-tmux capture-pane -t temporal-worker -p -S -200
+tmux capture-pane -t temporal-worker-router -p -S -200
+tmux capture-pane -t temporal-worker-runner -p -S -200
 ```
 
 ---
@@ -860,7 +871,7 @@ tmux capture-pane -t temporal-worker -p -S -200
 
 Propose these to the user — do NOT run them automatically:
 
-- Kill tmux sessions: `tmux kill-session -t temporal-worker` / `tmux kill-session -t temporal-server`
+- Kill tmux sessions: `tmux kill-session -t temporal-worker-router` / `tmux kill-session -t temporal-worker-runner` (or `tmux kill-session -t temporal-worker` if you used the single full worker) / `tmux kill-session -t temporal-server`
 - Clean results directory: `rm -rf results/`
 - Clean trace files: `rm -rf .pipelex/traces/`
 - Remove temporary override if still present: `.venv/bin/python -c "from pathlib import Path; Path('.pipelex/pipelex_temporary_override.toml').unlink(missing_ok=True)"`
@@ -878,7 +889,7 @@ Leave the server running if the user plans to iterate.
 | `RuntimeError: Failed decoding arguments` | Temporal's data converter can't deserialize the PipeJob on the worker — usually a serialization format issue |
 | `WorkflowFailureError` wrapping `TemporalError` | The pipe itself failed during execution — read the inner error for the real cause |
 | `AssertionError: StructuredContent missing field` | Per-workflow ClassRegistry isolation failed — the worker used the wrong concept class (from another workflow's definitions) |
-| Submitter hangs indefinitely | The worker crashed during deserialization — check `tmux capture-pane -t temporal-worker -p -S -200` |
+| Submitter hangs indefinitely | The worker crashed during deserialization — check `tmux capture-pane -t temporal-worker-router -p -S -200` (and the runner session, or `temporal-worker` for the single-worker setup) |
 | Both concurrent jobs succeed but wrong data | ContextVar leak between workflows — per-workflow scoping is broken, one workflow's class definitions bled into the other |
 | No `reactflow.html` generated | GraphSpec assembly failed — either tracing is disabled in `pipelex.toml` or NDJSON events weren't emitted by the worker |
 | `PayloadSizeWarning` in worker logs | Image data (base64) is being passed inline through Temporal payloads instead of being stored at the activity level — the fix is to call storage in the image generation activity before returning results |
