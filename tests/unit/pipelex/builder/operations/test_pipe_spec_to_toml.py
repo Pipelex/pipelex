@@ -63,6 +63,67 @@ class TestPipeSpecToToml:
         assert 'text = "Text"' in toml
         assert 'context = "Document"' in toml
 
+    def test_llm_structuring_method_preliminary_text_in_toml(self) -> None:
+        spec = parse_pipe_spec("PipeLLM", {**_BASE_LLM, "structuring_method": "preliminary_text"})
+        toml = pipe_spec_to_toml(spec)
+        assert 'structuring_method = "preliminary_text"' in toml
+
+    def test_llm_structuring_method_direct_in_toml(self) -> None:
+        spec = parse_pipe_spec("PipeLLM", {**_BASE_LLM, "structuring_method": "direct"})
+        toml = pipe_spec_to_toml(spec)
+        assert 'structuring_method = "direct"' in toml
+
+    def test_llm_no_structuring_method_omits_field(self) -> None:
+        spec = parse_pipe_spec("PipeLLM", {**_BASE_LLM})
+        toml = pipe_spec_to_toml(spec)
+        assert "structuring_method" not in toml
+
+    # -- PipeStructure ----------------------------------------------------
+
+    def test_structure_basic_structure(self) -> None:
+        spec = parse_pipe_spec(
+            "PipeStructure",
+            {
+                "pipe_code": "structure_review",
+                "description": "Structure a review",
+                "inputs": {"draft_text": "Text"},
+                "output": "RestaurantReview",
+            },
+        )
+        toml = pipe_spec_to_toml(spec)
+        assert "[pipe.structure_review]" in toml
+        assert 'type = "PipeStructure"' in toml
+        assert 'description = "Structure a review"' in toml
+        assert 'output = "RestaurantReview"' in toml
+
+    def test_structure_model_in_toml(self) -> None:
+        spec = parse_pipe_spec(
+            "PipeStructure",
+            {
+                "pipe_code": "structure_review",
+                "description": "Structure a review",
+                "inputs": {"draft_text": "Text"},
+                "output": "RestaurantReview",
+                "model": "$structuring-fast",
+            },
+        )
+        toml = pipe_spec_to_toml(spec)
+        assert 'model = "$structuring-fast"' in toml
+
+    def test_structure_no_model_omits_field(self) -> None:
+        spec = parse_pipe_spec(
+            "PipeStructure",
+            {
+                "pipe_code": "structure_review",
+                "description": "Structure a review",
+                "inputs": {"draft_text": "Text"},
+                "output": "RestaurantReview",
+            },
+        )
+        toml = pipe_spec_to_toml(spec)
+        assert "model" not in toml
+        assert 'type = "PipeStructure"' in toml
+
     # -- PipeFunc ---------------------------------------------------------
 
     def test_func_function_name_in_toml(self) -> None:

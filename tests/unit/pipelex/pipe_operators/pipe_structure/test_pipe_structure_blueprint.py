@@ -61,3 +61,22 @@ class TestPipeStructureBlueprint:
                 inputs={"a": "native.Text", "b": "native.Text"},
                 output="Foo",
             )
+
+    @pytest.mark.parametrize("input_spec", ["Text[]", "Text[2]", "native.Text[]", "native.Text[5]"])
+    def test_rejects_multiplicity_input(self, input_spec: str):
+        """A PipeStructure input carrying multiplicity is rejected at construction time."""
+        with pytest.raises(ValueError, match="carries multiplicity"):
+            PipeStructureBlueprint(
+                description="Bad",
+                inputs={"draft_text": input_spec},
+                output="Foo",
+            )
+
+    def test_accepts_single_text_input(self):
+        """A single non-bracketed Text input is accepted."""
+        blueprint = PipeStructureBlueprint(
+            description="Structure the text into a Foo",
+            inputs={"draft_text": "Text"},
+            output="Foo",
+        )
+        assert blueprint.input_names == ["draft_text"]

@@ -56,3 +56,31 @@ class TestElaborationMetadata:
             },
         )
         assert bundle.get_elaboration_for(pipe_code="my_pipe") is None
+
+    def test_bundle_round_trip_drops_elaboration_metadata(self):
+        # Codifies the current contract: `elaboration_metadata` is process-local. Round-tripping
+        # through `model_dump` + `model_validate` must yield a bundle where the side-table is
+        # gone. When a downstream consumer (graph viewer, Temporal, library cache) needs the
+        # metadata after rehydration, this test will be the first to flip — see follow-up
+        # in TODOS.md.
+        bundle = PipelexBundleBlueprint(
+            domain="my_domain",
+            description="A bundle for testing",
+            concept={},
+            pipe={
+                "my_pipe": PipeLLMBlueprint(
+                    type="PipeLLM",
+                    description="A pipe",
+                    output="Text",
+                    prompt="Hello",
+                ),
+            },
+            elaboration_metadata={
+                "my_pipe__draft_text": ElaborationMetadata(parent_pipe_code="my_pipe", step_role=StepRole.DRAFT_TEXT),
+            },
+        )
+        rehydrated = PipelexBundleBlueprint.model_validate(bundle.model_dump())
+        assert rehydrated.elaboration_metadata is None
+        # Sanity: pipes survive the round-trip even though metadata doesn't.
+        assert rehydrated.pipe is not None
+        assert "my_pipe" in rehydrated.pipe

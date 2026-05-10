@@ -73,7 +73,10 @@ class PipelexBundleBlueprint(BaseModel):
 
     pipe: dict[str, PipeBlueprintUnion] | None = Field(default_factory=dict)
 
-    # exclude=True keeps the elaboration side-table internal: MTHDS / TOML / JSON export drops it.
+    # Process-local side-table populated by `BundleElaborator`. Survives `model_copy` but is
+    # dropped by any `model_dump` / `model_validate` round-trip (exclude=True keeps MTHDS /
+    # TOML / JSON exports clean). Persisting it for downstream consumers — graph viewer,
+    # Temporal payload, library cache — is captured as a follow-up in TODOS.md.
     elaboration_metadata: dict[str, ElaborationMetadata] | None = Field(default=None, exclude=True)
 
     @field_validator("domain", mode="before")

@@ -47,6 +47,18 @@ The two synthetic codes are recorded in `bundle.elaboration_metadata`, a side-ta
 
 The side-table is the durable source of truth that downstream tools (graph viewer, CLI listings, distributed traces) can consult to render synthetic pipes specially. Today they don't — synthetic pipes appear as regular pipes in logs and traces — but the metadata is in place so that opt-in can land later without another round of plumbing.
 
+### Lifetime
+
+`elaboration_metadata` is **process-local**. It survives `model_copy` (used by the elaborator itself), but any `model_dump` → `model_validate` round-trip drops the side-table — that is what `exclude=True` buys us. The elaborator's own re-validate pass (`model_validate(elaborated.model_dump(by_alias=True))`) discards the rehydrated bundle and returns the original `model_copy`-built one with metadata intact, precisely because of this.
+
+Practical consequences:
+
+- Within a single process, after `BundleElaborator.elaborate(...)`, the metadata is available everywhere the bundle goes.
+- Across any serialization boundary — kajson dump, library cache, Temporal payload, MTHDS export — the metadata is gone. Downstream consumers that need it today have to re-elaborate.
+- The dependency loader handles one specific consequence: when a manifest restricts exports, synthetic helpers of exported parents are still loaded, even though they are never named in the manifest. This is implemented inline in `LibraryManager._load_single_dependency`.
+
+When a future consumer (graph viewer, persistent observability store) wants the metadata across boundaries, dropping `exclude=True` is the deliberate next step — captured as a follow-up in `TODOS.md`.
+
 ## Multiplicity rule
 
 Step 1 always produces a single `Text`, even when the original output was `Foo[]` or `Foo[3]`. Step 2 is the one that fans out: `PipeStructure` inspects its declared `output` and either calls `make_object` (single) or `make_object_list` (list, with optional fixed `nb_items`). This matches the deleted `make_text_then_object_list` behavior verbatim — one preliminary text, structured into N objects.
@@ -57,10 +69,11 @@ The original `inputs` dict (including any image variables) flows through to step
 
 ## Pre-checks and validation
 
-Two layers guard against authoring mistakes:
+Three layers guard against authoring mistakes around the output concept:
 
-1. **Construction-time** — `PipeLLMBlueprint.validate_preliminary_text_output` (a `model_validator(mode="after")`) rejects a `Text`-compatible output combined with `structuring_method = "preliminary_text"`. This fires during `model_validate`, before the elaborator runs, so the user gets the error at parse time with a normal Pydantic validation failure.
-2. **Defense-in-depth** — the elaborator re-checks the same condition. This is only reachable if a caller bypasses validation via `model_construct`, which is a code-path our tests exercise but nothing in the framework relies on.
+1. **Construction-time (string)** — `PipeLLMBlueprint.validate_preliminary_text_output` (a `model_validator(mode="after")`) rejects a literal Text output (`"Text"`, `"native.Text"`, `"Text[]"`, `"Text[N]"`) combined with `structuring_method = "preliminary_text"`. This fires during `model_validate`, before the elaborator runs, so the user gets the error at parse time with a normal Pydantic validation failure.
+2. **Defense-in-depth (string)** — `BundleElaborator._elaborate_preliminary_text` re-runs the same string check. Only reachable if a caller bypasses validation via `model_construct`; the test suite exercises it, but nothing in the framework relies on the bypass.
+3. **Library-time (concept)** — `PipeStructure.validate_output_with_library` runs once the elaborated `PipeStructure` resolves its concept against the loaded library. This is the only layer that catches a *domain concept* that `refines = "Text"` — those slip past the string-level guards because they don't read as `Text` in the bundle source. A clean separation: string-level guards run at parse time; concept-level guards run at library load.
 
 The elaborator additionally:
 
