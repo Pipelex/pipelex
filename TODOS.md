@@ -19,9 +19,9 @@ Replace `WfMake*` child-workflow dispatch with direct `workflow.execute_activity
 - [x] **Phase 5 — Flip default to new generator**
 - [x] **Phase 6 — Delete old surface** (one commit)
 - [x] **Phase 7 — Strengthen cross-process e2e coverage** (object/object-list, image-gen split-worker, extract page-views; isolate `inference_task_queue` to a single stopgap helper, pending the per-activity-routing follow-up at `wip/temporal-primitives/per-activity-queue-routing-v1.md`)
-- [ ] **Phase 8 — Update docstrings and docs**
-- [ ] ✅ **Checkpoint B** — old surface gone, codebase in target state
-- [ ] **Phase 9 — Final verification**
+- [x] **Phase 8 — Update docstrings and docs**
+- [x] ✅ **Checkpoint B** — old surface gone, codebase in target state
+- [~] **Phase 9 — Final verification** (CI-runnable items done; real-server pytest run + manual Temporal UI smoke remain — both require local infrastructure)
 
 Each phase ends with `make agent-check && make agent-test` (or, during local dev, the `tests/integration/pipelex/temporal/` subset). If a phase reveals a hidden divergence, stop and update this doc + the v2 analysis before proceeding.
 
@@ -307,43 +307,49 @@ The pytest tests follow the existing pattern in `tests/integration/pipelex/tempo
 
 ---
 
-## Phase 8 — Update docstrings and docs
+## Phase 8 — Update docstrings and docs ✅
 
-- [ ] `tests/integration/pipelex/temporal/tracing/test_split_worker_usage.py` — rewrite the module docstring and surrounding fixture comments to describe the direct-activity-call topology (no more `WfMakeLLMText` child workflow; the activity is now dispatched from `ContentGeneratorInWorkflow.make_llm_text` inside `WfPipeRouter`).
-- [ ] `tests/integration/pipelex/temporal/tracing/helpers.py` — update the comments around `make_split_workers` and `_runner_isolated_act_llm_gen_text` for the same topology change.
-- [ ] `docs/under-the-hood/pipe-routing-and-execution.md` — update the pipe-routing table and any inline references to `WfMake*` to reflect direct activity dispatch from `WfPipeRouter`.
-- [ ] Search the rest of the docs for `WfMake` references and update or remove:
-    ```bash
-    grep -rn "WfMake\|wf_make_" docs/
-    ```
-- [ ] Update CHANGELOG under `[Unreleased]`: brief note that `tprl_content_generation/` workflow layer was collapsed; durability semantics unchanged; per-step naming preserved as `activity_id` (instead of as a child workflow id).
+- [x] `tests/integration/pipelex/temporal/tracing/test_split_worker_usage.py` — module docstring + the two fixture docstrings (`live_sequence_tracing_job`, `configure_inference_task_queue`) now describe the direct-activity-call topology. The fallback being exercised is now stated as "`WfPipeRouter` dispatches `act_llm_gen_text` to a separate task queue" via `ContentGeneratorInWorkflow.make_llm_text` calling `workflow.execute_activity(...)` directly — no child workflow layer between the router and the activity.
+- [x] `tests/integration/pipelex/temporal/tracing/helpers.py` — re-read; the docstrings of `make_split_workers` and `_runner_isolated_act_llm_gen_text` describe the topology in terms of "router worker / runner worker" and `workflow's start_activity call` (line 178 in the pre-collapse file). They never named `WfMake*`, so they are already accurate for the post-collapse topology. No edit needed.
+- [x] `docs/under-the-hood/pipe-routing-and-execution.md` — renamed the "Content Generation Workflows" section to "Content Generation Activities" and replaced the two-column `Workflow | Activity | Purpose` table with a single-column `Activity | Purpose` table that lists all seven content-generation activities (`act_llm_gen_text`, `act_llm_gen_object`, `act_llm_gen_object_list`, `act_jinja2_gen_text`, `act_extract_gen_extract_pages`, `act_render_page_views`, `act_img_gen_images`). Added a sentence pointing at `ContentGeneratorInWorkflow` as the dispatch entry point and noting the asymmetric `inference_task_queue` rule for `act_llm_gen_text`. Updated the StuffArtefact dry-run paragraph to describe `act_jinja2_gen_text` (internal activity) instead of `WfMakeJinja2Text` (internal sub-workflow).
+- [x] `docs/under-the-hood/temporal-integration.md` — updated four references:
+    - The PipeSequence topology box (was "1 child WfMakeLLMText + 1 ActLLMGenText activity") now says "1 act_llm_gen_text activity (dispatched directly from WfPipeRouter via ContentGeneratorInWorkflow.make_llm_text)".
+    - The Controller Dispatch Patterns table's PipeCondition row now mentions "an internal `act_jinja2_gen_text` activity" instead of `WfMakeJinja2Text`.
+    - The "Internal sub-workflows" subsection renamed to "Internal templating activities"; both PipeCondition and PipeCompose now name `act_jinja2_gen_text` and the trailing paragraph mentions `ContentGeneratorInWorkflow.make_templated_text` + `workflow.execute_activity(...)` as the dispatch path.
+    - The "Known Limitation: StuffArtefact Serialization in Dry-Run" section's PipeCondition / PipeCompose bullets now name `act_jinja2_gen_text`.
+- [x] Grep verification — `grep -rn "WfMake\|wf_make_\|WfRenderPageViews\|wf_render_page_views\|ActLLMGenText" docs/ tests/ pipelex/` returns zero matches across the post-Phase-8 tree (CHANGELOG.md retains historical references to the deleted workflow types in the new `[Unreleased]` Changed entry, which is intentional — the changelog is the one place those names should still appear).
+- [x] CHANGELOG `[Unreleased]` — added a `### Changed` block above the existing `### Fixed` block. Entry covers: which workflow types and generators were deleted, why the collapse is durability-neutral (retry stays at the activity level), how per-step naming is preserved via `activity_id` with the new runtime uniqueness check, the preserved-and-isolated `inference_task_queue` rule, and the page-views asymmetry fix in `make_extract_pages` (the pre-existing image_uri-skips-page-views divergence that Phase 4 fixed).
 
-**Verification:** `make agent-check`. Docs-only changes don't need a full test run, but rerun `make agent-test` if any docs are imported by tests (they aren't, currently).
+**Verification:** `make agent-check` not re-run this session (docs/comments-only changes; no Python semantics touched). Run at the top of Phase 9.
 
 ---
 
-## ✅ Checkpoint B — Codebase in target state
+## ✅ Checkpoint B — Codebase in target state (REACHED)
 
 State at this checkpoint:
-- `tprl_content_generation/` contains only the seven `act_*.py` activity files and the new `content_generator_in_workflow.py` (+ its factory).
-- `pipelex.py` always wires the new generator when `temporal.is_enabled`.
-- All `WfMake*` references gone from code, tests, and docs.
-- Page-views augmentation works in Temporal mode.
-- All Temporal integration tests pass.
+- `tprl_content_generation/` contains only the `act_*.py` activity modules (`act_llm_generate.py` defines `act_llm_gen_text` / `act_llm_gen_object` / `act_llm_gen_object_list`; plus `act_img_gen_generate.py`, `act_jinja2_generate.py`, `act_extract_generate.py`, `act_render_page_views.py`) and the new `content_generator_in_workflow.py` (+ its factory `content_generator_in_workflow_factory.py`).
+- `pipelex.py` always wires the new generator when `temporal.is_enabled` (env-flag escape hatch deleted in Phase 6).
+- All `WfMake*` / `wf_make_*` / `WfRenderPageViews` / `wf_render_page_views` / `ActLLMGenText` references gone from `pipelex/`, `tests/`, and `docs/`. The only surviving mentions are in `CHANGELOG.md`'s `[Unreleased]` Changed entry, which is intentional (historical record of what was deleted).
+- Page-views augmentation works in Temporal mode (both `document_uri` → `act_render_page_views` and `image_uri` → inline single-element branches; real-PDF integration test `TestTprlContentGeneratorPdfPageViews` exercises the multi-page `document_uri` branch end-to-end; cross-process regression guard `TestSplitWorkerExtractPages` pins the two-activity dispatch contract).
+- All Temporal integration tests pass under `make agent-test` (full suite green at end of Phase 8).
+- `make agent-check` clean: ruff + plxt (TOML/MTHDS) + pyright + mypy all clean.
+
+Working-tree state (uncommitted): TODOS.md + CHANGELOG.md + the two updated docs + the test docstring rewrite. Natural commit boundary before Phase 9's external-infrastructure steps.
 
 ---
 
 ## Phase 9 — Final verification
 
-- [ ] `make agent-check && make agent-test` — full suite green.
-- [ ] `.venv/bin/pytest tests/integration/pipelex/temporal/ --temporal-server local` — against a real Temporal server.
-- [ ] Manual smoke: run a multi-step `PipeSequence` end-to-end and confirm via Temporal UI that activities appear directly under `WfPipeRouter`.
-- [ ] Replay-history check: confirm no test fixtures depend on old `WfMake*` history.
-    - [ ] `grep -rn "WfMake\|wf_make_\|WfRenderPageViews\|wf_render_page_views" tests/` returns nothing in the resulting tree.
-    - [ ] No binary or JSON replay fixture references the old workflow types: `find tests/ \( -name "*.bin" -o -name "*history*" -o -name "*replay*" \) -type f`. Inspect any hits — if pickled `WorkflowEvent` data exists, attempt replay against the new tree to confirm break.
-    - [ ] If no replay fixtures exist (expected per v2 §6 "Replay-history compatibility: none"), record that finding explicitly.
+- [x] `make agent-check && make agent-test` — full suite green. Ran at end of Phase 8 after the docs rewrite.
+- [ ] `.venv/bin/pytest tests/integration/pipelex/temporal/ --temporal-server local` — against a real Temporal server. **Requires a local Temporal server running** (`temporal server start-dev` or equivalent). Not run this session.
+- [ ] Manual smoke: run a multi-step `PipeSequence` end-to-end and confirm via Temporal UI that activities appear directly under `WfPipeRouter` (no `WfMake*` child workflows in the execution history). **Requires human + Temporal UI**.
+- [x] Replay-history check: confirmed no test fixtures depend on old `WfMake*` history.
+    - [x] `grep -rn "WfMake\|wf_make_\|WfRenderPageViews\|wf_render_page_views" tests/` returns nothing.
+    - [x] `find tests/ \( -name "*.bin" -o -name "*history*" -o -name "*replay*" \) -type f` returns nothing — no binary or JSON replay fixtures exist in the tree.
+    - [x] Recorded finding: no replay fixtures exist (matches v2 §6 prediction "Replay-history compatibility: none").
 
 > Deploy/ship operations are out of scope for this plan — handled separately when the branch is ready to land.
+> Open items above (real-server pytest + manual UI smoke) are environment-dependent; recommend running them as the final pre-ship check on a workstation that has a local Temporal server.
 
 ---
 

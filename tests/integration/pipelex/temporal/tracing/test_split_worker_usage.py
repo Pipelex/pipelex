@@ -1,11 +1,16 @@
 """Integration tests for cross-worker UsageReportEvent emission via two task queues.
 
-Validates the Phase 2 runner-side fallback: when `WfMakeLLMText` dispatches
+Validates the Phase 2 runner-side fallback: when `WfPipeRouter` dispatches
 `act_llm_gen_text` to a separate task queue (the production deployment topology
 where router and runner are physically separated), the runner-side worker —
 with no `_event_log_contexts` entry registered for the workflow — emits its
 `UsageReportEvent` into the same `traces_dir` partition via the per-process
 activity event log, stamped with a stable `act_*` `writer_id`.
+
+`ContentGeneratorInWorkflow.make_llm_text` calls
+`workflow.execute_activity(act_llm_gen_text, ..., task_queue=worker_config.inference_task_queue)`
+directly from inside the workflow — there is no child workflow layer
+between the router and the activity.
 """
 
 import uuid
@@ -60,9 +65,10 @@ class TestSplitWorkerUsageEmission:
         DRY mode short-circuits the `act_llm_gen_text` activity dispatch
         (`ContentGeneratorDry` reports inline inside the workflow), so the
         cross-worker activity hop never fires. LIVE mode forces the workflow
-        to dispatch through `WfMakeLLMText` → `act_llm_gen_text`, which is
-        what the runner-side fallback pinned in this suite is supposed to
-        exercise. The fake `act_llm_gen_text` substitute installed by
+        to dispatch `act_llm_gen_text` directly via
+        `ContentGeneratorInWorkflow.make_llm_text`, which is what the
+        runner-side fallback pinned in this suite is supposed to exercise.
+        The fake `act_llm_gen_text` substitute installed by
         `make_split_workers` returns a stub string and synthesizes the
         usage report, so no real LLM call is made.
         """
@@ -77,9 +83,10 @@ class TestSplitWorkerUsageEmission:
     def configure_inference_task_queue(self, split_queues: tuple[str, str]) -> Generator[None, None, None]:
         """Route `act_llm_gen_text` to `q_runner` for the duration of the test.
 
-        Without this override, `WfMakeLLMText` would dispatch the activity to
-        whichever task queue the workflow is running on (the router queue),
-        defeating the split-worker topology this suite is supposed to exercise.
+        Without this override, `ContentGeneratorInWorkflow.make_llm_text` would
+        dispatch the activity to whichever task queue the workflow is running on
+        (the router queue), defeating the split-worker topology this suite is
+        supposed to exercise.
         """
         _q_router, q_runner = split_queues
         worker_config = get_config().temporal.worker_config
