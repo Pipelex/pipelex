@@ -2,7 +2,7 @@ from temporalio import workflow
 
 # All imports below run inside ``workflow.unsafe.imports_passed_through()``: they
 # must stay at runtime (not under ``TYPE_CHECKING``) so the workflow body can
-# reference them when Temporal replays history. The ``# noqa: TC001`` on the
+# reference them when Temporal replays history. The ``noqa: TC001`` on the
 # protocol is therefore deliberate — moving it under ``TYPE_CHECKING`` would
 # break replay because the symbol is type-annotated on a runtime variable.
 with workflow.unsafe.imports_passed_through():
