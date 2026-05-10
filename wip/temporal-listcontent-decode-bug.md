@@ -340,3 +340,80 @@ After the fix:
 ## Open question for the implementer
 
 The `__pipelex_class__` / `__pipelex_module__` names are placeholders chosen to make this proposal concrete. A more domain-specific name (`__listcontent_item_class__`, `__concept_item_type__`, …) might be worth a moment of consideration if pipelex plans to use this mechanism in more places. The key requirement is just: **not `__class__`** (or any name kajson reserves now or in the future).
+
+---
+
+## Fix recap (2026-05-10) — Option A, shipped TDD
+
+**Decision:** kept the proposed names `__pipelex_class__` / `__pipelex_module__`. Direct symmetry with kajson's protocol keeps the role obvious to a future reader; no need to bikeshed a more domain-specific name.
+
+**Out-of-scope choices we deliberately did NOT take:**
+
+- **Option B (kajson skip-on-unresolvable).** Would re-couple the two protocols and convert a loud failure (unknown class) into a silent one (typo → plain dict). Skipped.
+- **Concept-aware optimization** (skip markers when the concept already pins the item class). Tiny payload win, breaks the symmetry of the `dump_for_temporal` / `hydrate_working_memory` pair. Skipped.
+- **Subprocess-based pytest regression fixture.** Brittle to add; the structural kajson-isolation unit test plus the CLI-level repro give stronger evidence. Skipped.
+
+### TDD sequence that landed
+
+**Phase 1 — RED (tests first):**
+
+- `tests/unit/pipelex/temporal/tprl_pipe/test_hydration.py` — added two tests in the existing `TestHydrateWorkingMemory` class and extended `test_hydrate_list_content_round_trip`:
+  - `test_dump_for_temporal_list_items_carry_pipelex_markers_only` — asserts `__pipelex_class__` is present and `__class__` / `__module__` are absent on every dumped item.
+  - `test_hydrate_list_item_reads_pipelex_markers` — uses `NumberContent` (not `TextContent`) so the legacy "`text` in raw_item" fallback cannot accidentally satisfy the test. Forces the rename to actually be read.
+  - Extended round-trip test: same per-item marker assertion + existing typed assertions stay.
+- `tests/unit/pipelex/temporal/tprl_pipe/test_marker_isolation.py` (new) — `TestKajsonMarkerIsolation` with a parametrized-ish pair:
+  - `test_pipelex_markers_pass_through_unchanged` — pipelex-namespaced markers must NOT trigger kajson resolution, even pointing at a non-existent class. Pins the wire-format contract without needing a Temporal server.
+  - `test_kajson_markers_raise_for_unknown_class` — inverse oracle: `__class__` / `__module__` for an unknown class MUST raise. So any future re-collision shows up immediately.
+- `tests/unit/pipelex/tools/misc/test_clean_json.py` (new) — `TestCleanJsonContent::test_strips_marker_pair_at_all_depths` parametrized over `("__class__", "__module__")` and `("__pipelex_class__", "__pipelex_module__")`.
+
+Confirmed RED: 4 failing tests, 2 invariants already passing (the isolation tests, which is correct — they document the contract the rename leans on).
+
+**Phase 2 — GREEN (minimum implementation):**
+
+- `pipelex/core/memory/working_memory.py:491-492` — write `__pipelex_class__` / `__pipelex_module__` instead of `__class__` / `__module__`. Inline comment updated to explain the private-namespace rationale.
+- `pipelex/temporal/tprl_pipe/hydration.py:58, 61` — `_hydrate_list_item` reads `raw_item.get("__pipelex_class__")` and strips `{"__pipelex_class__", "__pipelex_module__"}` before `model_validate`.
+- `pipelex/tools/misc/json_utils.py:27` — `CLEAN_JSON_FIELDS_TO_SKIP` extended to `("__class__", "__module__", "__pipelex_class__", "__pipelex_module__")`. Both families stripped from user-facing JSON output — defense in depth, zero cost.
+
+All 12 tests in the bundle green after the edits.
+
+**Phase 3 — Refactor & docs (still green):**
+
+- Docstrings on `dump_for_temporal`, `_validate_as_known_class`, `_hydrate_list_item`, `hydrate_content` rewritten to reference the new keys and explain *why* the private namespace exists (not just *what* it is). `_validate_as_known_class` got an extra paragraph noting the `isinstance(raw_item, StuffContent)` branch is now defensive (kajson never rehydrates list items into instances on the Temporal hot path) — kept for direct callers and future regressions.
+- `CHANGELOG.md` `[Unreleased] > Fixed` entry added with the full diagnosis and fix description.
+
+### Verification
+
+| Layer | Result |
+|-------|--------|
+| Unit (renamed-marker emit/read/round-trip) | 4 RED → GREEN |
+| Unit (kajson isolation contract) | GREEN both directions |
+| Unit (`clean_json_content` strip) | RED on pipelex pair → GREEN |
+| Integration (`tests/integration/pipelex/temporal/` + `tests/integration/pipelex/tools/`) | 1499 passed, 1 unrelated skip, 2 baseline xpasses unchanged |
+| Cross-process CLI (`generate_invoice_list --temporal`) | Previously hung with `KajsonDecoderError`; now `✓ Dry run completed successfully` |
+| Cross-process CLI (`generate_invoice_single --temporal`) | Still passes (regression check) |
+| `make agent-check` | 0 errors, 0 warnings |
+
+### Files actually changed
+
+| File | Edit |
+|------|------|
+| `pipelex/core/memory/working_memory.py` | Emit `__pipelex_class__` / `__pipelex_module__`; docstring rewrite |
+| `pipelex/temporal/tprl_pipe/hydration.py` | Read `__pipelex_class__`; strip both renamed keys; docstring rewrites on three functions |
+| `pipelex/tools/misc/json_utils.py` | `CLEAN_JSON_FIELDS_TO_SKIP` extended to both marker families |
+| `CHANGELOG.md` | New `[Unreleased] > Fixed` entry |
+| `tests/unit/pipelex/temporal/tprl_pipe/test_hydration.py` | 2 new tests + extended round-trip; autouse fixture now registers `NumberContent` too |
+| `tests/unit/pipelex/temporal/tprl_pipe/test_marker_isolation.py` | New file |
+| `tests/unit/pipelex/tools/misc/test_clean_json.py` | New file |
+
+### No changes outside pipelex
+
+- `kajson/` — no edits (the rename leans on kajson's existing strict gate at `json_decoder.py:132`).
+- `pipelex/temporal/temporal_data_converter.py` — no edits.
+- `pipelex/core/pipes/pipe_output.py` — no edits.
+- Integration tests under `tests/integration/pipelex/temporal/` — no edits; `test_split_worker_object_gen.py` keeps passing as the in-process baseline.
+
+### Notes for a future reader
+
+- The `_validate_as_known_class` `isinstance(raw_item, StuffContent)` branch is now dead on the Temporal hot path. Kept defensively for direct callers; if a future audit confirms no such callers exist, the branch can be deleted and the function simplified to dict-only handling.
+- If you ever extend pipelex's deferred-binding protocol beyond ListContent items (e.g. nested in single-stuff dicts), reuse the `__pipelex_*` namespace — don't invent a third family.
+- The two-test pair in `test_marker_isolation.py` is the structural net. If kajson ever changes the gating key (or pipelex stops respecting it), one of those two tests fails immediately, no Temporal server required.

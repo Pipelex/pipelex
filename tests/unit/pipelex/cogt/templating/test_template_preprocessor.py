@@ -426,7 +426,8 @@ Line after"""
 
     def test_dollar_prefix_matches_even_after_word_char(self):
         """`$var` keeps matching even when glued to a preceding word character —
-        construct-field templates intentionally rely on patterns like `Q$quarter`."""
+        construct-field templates intentionally rely on patterns like `Q$quarter`.
+        """
         assert preprocess_template("$var") == "{{ var|format() }}"
         assert preprocess_template(" $var") == " {{ var|format() }}"
         assert preprocess_template("Q$quarter") == "Q{{ quarter|format() }}"
