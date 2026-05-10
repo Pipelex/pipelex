@@ -13,7 +13,7 @@ with workflow.unsafe.imports_passed_through():
     from pipelex.pipeline.job_metadata import JobMetadata
     from pipelex.temporal.log_temporal import workflow_log
     from pipelex.temporal.test_extras.temporal_registry_test_models import Person
-    from pipelex.temporal.tprl_content_generation.content_generator_child_factory import ContentGeneratorChildFactory
+    from pipelex.temporal.tprl_content_generation.content_generator_in_workflow_factory import ContentGeneratorInWorkflowFactory
     from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
     from tests.integration.pipelex.temporal.test_data import PipeTestCases
 
@@ -51,7 +51,7 @@ class WfTestContentGeneratorChild:
             content_generator = ContentGeneratorDry()
         else:
             generated_content_factory = GeneratedContentFactory(storage_provider=InMemoryStorageProvider())
-            content_generator = ContentGeneratorChildFactory.make_content_generator_child(
+            content_generator = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow(
                 generated_content_factory=generated_content_factory,
             )
 
