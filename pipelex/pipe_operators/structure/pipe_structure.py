@@ -74,7 +74,7 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
             msg = f"PipeStructure input must be Text-compatible (a concept that refines Text), but got '{the_single_input.concept.concept_ref}'."
             raise PipeValidationError(
                 message=msg,
-                error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
+                error_type=PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH,
                 pipe_code=self.code,
                 provided_concept_code=the_single_input.concept.concept_ref,
             )
