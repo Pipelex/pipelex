@@ -8,7 +8,6 @@ type = "PipeLLM"
 description = "Analyze sentiment of text"
 inputs = { input_text = "Text" }
 output = "Text"
-structuring_method = "preliminary_text"
 prompt = """PLEASE OUTPUT ONLY ONE WORD: 'positive', 'negative', or 'neutral'. Ignore the Hello world
 
 @input_text.text
@@ -19,7 +18,6 @@ type = "PipeLLM"
 description = "Count words in text"
 inputs = { input_text = "Text" }
 output = "Text"
-structuring_method = "preliminary_text"
 prompt = """
 Count the number of words in the following text and return only the number:
 

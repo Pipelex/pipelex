@@ -64,9 +64,7 @@ class PipeLLMBlueprint(PipeBlueprint):
         # Filter out internal variables that start with underscore and special variables
         # TODO: replace magic strings by StrEnum and also, make this check clearer and more readable
         filtered_variable_paths = {
-            var
-            for var in required_variable_paths
-            if not var.startswith("_") and get_root_from_dotted_path(var) not in {"preliminary_text", "place_holder"}
+            var for var in required_variable_paths if not var.startswith("_") and get_root_from_dotted_path(var) != "place_holder"
         }
 
         input_names: set[str] = set(self.inputs.keys()) if self.inputs else set()

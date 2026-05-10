@@ -117,7 +117,7 @@ class PipeComposeBlueprint(PipeBlueprint):
         required_variables: set[str] = set()
         for path in full_paths:
             root = get_root_from_dotted_path(path)
-            if not root.startswith("_") and root not in {"preliminary_text", "place_holder"}:
+            if not root.startswith("_") and root != "place_holder":
                 required_variables.add(root)
         for required_variable_name in required_variables:
             if required_variable_name not in self.input_names:

@@ -9,30 +9,10 @@ from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJ
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.pipeline.job_metadata import JobMetadata
-
-
-class LLMAssignmentFactory(BaseModel):
-    job_metadata: JobMetadata
-    llm_setting: LLMSetting
-    llm_prompt_factory: LLMPromptFactoryAbstract
-
-    async def make_llm_assignment(
-        self,
-        job_metadata: JobMetadata | None = None,
-        llm_setting: LLMSetting | None = None,
-        **prompt_arguments: Any,
-    ) -> "LLMAssignment":
-        llm_prompt = await self.llm_prompt_factory.make_llm_prompt_from_args(**prompt_arguments)
-        return LLMAssignment(
-            job_metadata=job_metadata or self.job_metadata,
-            llm_setting=llm_setting or self.llm_setting,
-            llm_prompt=llm_prompt,
-        )
 
 
 class LLMAssignment(BaseModel):
@@ -96,13 +76,6 @@ class ObjectAssignment(BaseModel):
             object_class_schema=object_class.model_json_schema(),
             llm_assignment_for_object=llm_assignment,
         )
-
-
-class TextThenObjectAssignment(BaseModel):
-    object_class_name: str
-    object_class_schema: dict[str, Any]
-    llm_assignment_for_text: LLMAssignment
-    llm_assignment_factory_to_object: LLMAssignmentFactory
 
 
 class ImgGenAssignment(BaseModel):

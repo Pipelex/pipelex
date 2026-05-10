@@ -126,13 +126,13 @@ class TestPipeLLMBlueprint:
         # Should not raise error even though _internal_var is not in inputs
         assert blueprint.inputs is None
 
-    def test_validate_inputs_ignores_special_variables(self):
-        """Test that special variables like preliminary_text are ignored."""
+    def test_validate_inputs_ignores_place_holder(self):
+        """Test that the special variable place_holder is ignored."""
         blueprint = PipeLLMBlueprint(
             description="lorem ipsum",
             inputs=None,
             output="native.Text",
-            prompt="Use @preliminary_text and @place_holder",
+            prompt="Use @place_holder",
         )
-        # Should not raise error even though these special variables are not in inputs
+        # Should not raise error even though this special variable is not in inputs
         assert blueprint.inputs is None

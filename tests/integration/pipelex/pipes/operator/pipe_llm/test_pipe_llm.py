@@ -59,6 +59,46 @@ class TestPipeLLMBasic:
         llm_generated_text = pipe_llm_output.main_stuff_as_text
         pretty_print(llm_generated_text, title="llm_generated_text")
 
+    async def test_pipe_llm_preliminary_text_raises_not_implemented(
+        self,
+        job_metadata: JobMetadata,
+        pipe_run_mode: PipeRunMode,
+        load_test_library: Callable[[list[Path]], None],
+    ):
+        """structuring_method=PRELIMINARY_TEXT must raise NotImplementedError at runtime."""
+        load_test_library([Path("tests/integration/pipelex/pipes/operator/pipe_llm")])
+        pipe_llm_blueprint = PipeLLMBlueprint(
+            description="Unsupported structuring_method should raise",
+            inputs={"data": "Text"},
+            output="test_structured_generations.ConceptWithSimpleStructure",
+            prompt=BasicStructuredDataTestCases.EXTRACTION_PROMPT,
+            structuring_method=StructuringMethod.PRELIMINARY_TEXT,
+        )
+        pipe = PipeFactory[PipeLLM].make_from_blueprint(
+            domain_code="test_structured_generations",
+            pipe_code="adhoc_for_test_pipe_llm_preliminary_text_not_implemented",
+            blueprint=pipe_llm_blueprint,
+        )
+        pipe_library = get_pipe_library()
+        pipe_library.add_new_pipe(pipe)
+
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(
+            stuff=StuffFactory.make_stuff(
+                concept=get_native_concept(NativeConceptCode.TEXT),
+                content=TextContent(text="any input"),
+                name="data",
+            ),
+        )
+        pipe_job = PipeJobFactory.make_pipe_job(
+            pipe=pipe,
+            working_memory=working_memory,
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+            job_metadata=job_metadata,
+        )
+
+        with pytest.raises(NotImplementedError, match="preliminary_text"):
+            await get_pipe_router().run(pipe_job=pipe_job)
+
     @pytest.mark.parametrize(
         ("topic", "data", "concept"),
         BasicStructuredDataTestCases.STRUCTURE_TEST_CASES,
@@ -67,8 +107,7 @@ class TestPipeLLMBasic:
     @pytest.mark.parametrize(
         "structuring_method",
         [
-            # StructuringMethod.DIRECT,
-            StructuringMethod.PRELIMINARY_TEXT,
+            StructuringMethod.DIRECT,
         ],
     )
     @pytest.mark.parametrize(

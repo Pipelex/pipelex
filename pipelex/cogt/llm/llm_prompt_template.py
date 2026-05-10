@@ -12,7 +12,6 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle
 from pipelex.cogt.templating.text_format import TextFormat
-from pipelex.config import get_config
 from pipelex.tools.misc.string_utils import is_none_or_has_text
 
 
@@ -110,12 +109,3 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
             )
 
         return llm_prompt
-
-    @classmethod
-    def make_for_structuring_from_preliminary_text(cls) -> "LLMPromptTemplate":
-        llm_config = get_config().cogt.llm_config
-        proto_prompt = LLMPrompt(
-            system_text=llm_config.get_template("structure_from_preliminary_text_system"),
-            user_text=llm_config.get_template("structure_from_preliminary_text_user"),
-        )
-        return cls(proto_prompt=proto_prompt)

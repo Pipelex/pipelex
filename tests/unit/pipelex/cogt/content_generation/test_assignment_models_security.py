@@ -1,22 +1,16 @@
 """Wire-format perimeter tests: prove that x-python-* schema extensions survive
-serialization through ObjectAssignment / TextThenObjectAssignment, so the codegen
-boundary in SchemaToModelFactory is the only line of defense (and works).
+serialization through ObjectAssignment, so the codegen boundary in
+SchemaToModelFactory is the only line of defense (and works).
 """
 
 from typing import Any
 
 import pytest
 
-from pipelex.cogt.content_generation.assignment_models import (
-    LLMAssignment,
-    LLMAssignmentFactory,
-    ObjectAssignment,
-    TextThenObjectAssignment,
-)
+from pipelex.cogt.content_generation.assignment_models import LLMAssignment, ObjectAssignment
 from pipelex.cogt.content_generation.exceptions import UnsafeSchemaError
 from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.pipeline.job_metadata import JobMetadata
 
@@ -33,14 +27,6 @@ def _make_stub_llm_assignment() -> LLMAssignment:
         job_metadata=_make_stub_job_metadata(),
         llm_setting=LLMSetting(model="test-model", temperature=0.7),
         llm_prompt=LLMPrompt(user_text="test prompt"),
-    )
-
-
-def _make_stub_llm_assignment_factory() -> LLMAssignmentFactory:
-    return LLMAssignmentFactory(
-        job_metadata=_make_stub_job_metadata(),
-        llm_setting=LLMSetting(model="test-model", temperature=0.7),
-        llm_prompt_factory=LLMPromptTemplate.make_for_structuring_from_preliminary_text(),
     )
 
 
@@ -69,19 +55,6 @@ class TestAssignmentModelsSecurity:
         restored = ObjectAssignment.model_validate_json(json_str)
         assert restored.object_class_schema == _malicious_schema()
         assert restored.object_class_schema["$defs"]["Run"]["x-python-import"] == {
-            "module": "subprocess",
-            "name": "run",
-        }
-
-    def test_text_then_object_assignment_carries_unsafe_schema_unchanged(self) -> None:
-        """TextThenObjectAssignment also carries x-python-* extensions verbatim — same threat surface."""
-        assignment = TextThenObjectAssignment(
-            object_class_name="Innocent",
-            object_class_schema=_malicious_schema(),
-            llm_assignment_for_text=_make_stub_llm_assignment(),
-            llm_assignment_factory_to_object=_make_stub_llm_assignment_factory(),
-        )
-        assert assignment.object_class_schema["$defs"]["Run"]["x-python-import"] == {
             "module": "subprocess",
             "name": "run",
         }

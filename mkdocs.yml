@@ -118,7 +118,6 @@ plugins:
         'home/6-build-reliable-ai-workflows/domain.md': 'building-methods/domain.md'
         'home/6-build-reliable-ai-workflows/kick-off-a-methods-project.md': 'building-methods/kick-off-a-methods-project.md'
         'home/6-build-reliable-ai-workflows/libraries.md': 'building-methods/libraries.md'
-        'home/6-build-reliable-ai-workflows/llm-structured-generation-config.md': 'building-methods/llm-structured-generation-config.md'
         'home/6-build-reliable-ai-workflows/packages.md': 'building-methods/packages.md'
         'home/6-build-reliable-ai-workflows/pipelex-bundle-specification.md': 'building-methods/pipelex-bundle-specification.md'
         'home/6-build-reliable-ai-workflows/pipes/executing-pipelines.md': 'building-methods/pipes/executing-pipelines.md'
@@ -254,7 +253,6 @@ plugins:
         - building-methods/pipes/pipe-controllers/PipeBatch.md: "PipeBatch"
         - building-methods/pipes/pipe-controllers/PipeCondition.md: "PipeCondition"
         - building-methods/configure-ai-llm-to-optimize-methods.md: "Optimize Cost & Quality"
-        - building-methods/llm-structured-generation-config.md: "LLM Structured Generation"
         - building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md: "LLM Prompting Style"
         Reference:
         - tools/cli/index.md: "CLI Reference Overview"
@@ -433,7 +431,6 @@ nav:
           - PipeBatch: building-methods/pipes/pipe-controllers/PipeBatch.md
           - PipeCondition: building-methods/pipes/pipe-controllers/PipeCondition.md
       - Optimize Cost & Quality: building-methods/configure-ai-llm-to-optimize-methods.md
-      - LLM Structured Generation: building-methods/llm-structured-generation-config.md
       - LLM Prompting Style: building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
   - Reference:
     - CLI Reference:

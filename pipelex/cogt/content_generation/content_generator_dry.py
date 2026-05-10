@@ -16,7 +16,6 @@ from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobReport
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.templating.template_category import TemplateCategory
@@ -114,7 +113,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
 
     @override
     @update_job_metadata
-    async def make_object_direct(
+    async def make_object(
         self,
         job_metadata: JobMetadata,
         object_class: type[BaseModelTypeVar],
@@ -131,29 +130,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
 
     @override
     @update_job_metadata
-    async def make_text_then_object(
-        self,
-        job_metadata: JobMetadata,
-        object_class: type[BaseModelTypeVar],
-        llm_setting_main: LLMSetting,
-        llm_setting_for_object: LLMSetting,
-        llm_prompt_for_text: LLMPrompt,
-        llm_prompt_factory_for_object: LLMPromptFactoryAbstract | None = None,
-        wfid: str | None = None,
-    ) -> BaseModelTypeVar:
-        func_name = "make_text_then_object"
-        log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
-
-        return await self.make_object_direct(
-            job_metadata=job_metadata,
-            object_class=object_class,
-            llm_setting_for_object=llm_setting_for_object,
-            llm_prompt_for_object=llm_prompt_for_text,
-        )
-
-    @override
-    @update_job_metadata
-    async def make_object_list_direct(
+    async def make_object_list(
         self,
         job_metadata: JobMetadata,
         object_class: type[BaseModelTypeVar],
@@ -162,12 +139,12 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         nb_items: int | None = None,
         wfid: str | None = None,
     ) -> list[BaseModelTypeVar]:
-        func_name = "make_object_list_direct"
+        func_name = "make_object_list"
         log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         nb_list_items = nb_items or get_config().pipelex.dry_run_config.nb_list_items
         items: list[BaseModelTypeVar] = []
         for idx in range(nb_list_items):
-            item = await self.make_object_direct(
+            item = await self.make_object(
                 job_metadata=job_metadata,
                 object_class=object_class,
                 llm_setting_for_object=llm_setting_for_object_list,
@@ -179,29 +156,6 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
                 item.pipe_code = "mock_main"  # pyright: ignore[reportAttributeAccessIssue]
             items.append(item)
         return items
-
-    @override
-    @update_job_metadata
-    async def make_text_then_object_list(
-        self,
-        job_metadata: JobMetadata,
-        object_class: type[BaseModelTypeVar],
-        llm_setting_main: LLMSetting,
-        llm_setting_for_object_list: LLMSetting,
-        llm_prompt_for_text: LLMPrompt,
-        llm_prompt_factory_for_object_list: LLMPromptFactoryAbstract | None = None,
-        nb_items: int | None = None,
-        wfid: str | None = None,
-    ) -> list[BaseModelTypeVar]:
-        func_name = "make_text_then_object_list"
-        log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
-        return await self.make_object_list_direct(
-            job_metadata=job_metadata,
-            object_class=object_class,
-            llm_setting_for_object_list=llm_setting_for_object_list,
-            llm_prompt_for_object_list=llm_prompt_for_text,
-            nb_items=nb_items,
-        )
 
     @override
     async def make_image_content(

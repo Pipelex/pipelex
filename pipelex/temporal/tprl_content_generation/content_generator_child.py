@@ -11,11 +11,9 @@ from pipelex.cogt.content_generation.assignment_models import (
     ExtractAssignment,
     ImgGenAssignment,
     LLMAssignment,
-    LLMAssignmentFactory,
     ObjectAssignment,
     RenderPageViewsAssignment,
     TemplatingAssignment,
-    TextThenObjectAssignment,
 )
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
@@ -26,8 +24,6 @@ from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
-from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
@@ -44,12 +40,7 @@ from pipelex.temporal.tprl_content_generation.wf_make_extract import WfMakeExtra
 from pipelex.temporal.tprl_content_generation.wf_make_images import WfMakeImages
 from pipelex.temporal.tprl_content_generation.wf_make_jinja2_text import WfMakeJinja2Text
 from pipelex.temporal.tprl_content_generation.wf_make_llm_text import WfMakeLLMText
-from pipelex.temporal.tprl_content_generation.wf_make_object import (
-    WfMakeObject,
-    WfMakeObjectList,
-    WfMakeTextThenObject,
-    WfMakeTextThenObjectList,
-)
+from pipelex.temporal.tprl_content_generation.wf_make_object import WfMakeObject, WfMakeObjectList
 from pipelex.temporal.tprl_content_generation.wf_render_page_views import WfRenderPageViews
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
@@ -117,7 +108,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
 
     @override
     @update_job_metadata
-    async def make_object_direct(
+    async def make_object(
         self,
         job_metadata: JobMetadata,
         object_class: type[BaseModelTypeVar],
@@ -125,7 +116,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
         llm_prompt_for_object: LLMPrompt,
         wfid: str | None = None,
     ) -> BaseModelTypeVar:
-        log.verbose(f"ContentGeneratorChild make_object_direct: {llm_prompt_for_object}")
+        log.verbose(f"ContentGeneratorChild make_object: {llm_prompt_for_object}")
         try:
             llm_assignment_for_object = LLMAssignment(
                 job_metadata=job_metadata,
@@ -158,57 +149,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
 
     @override
     @update_job_metadata
-    async def make_text_then_object(
-        self,
-        job_metadata: JobMetadata,
-        object_class: type[BaseModelTypeVar],
-        llm_setting_main: LLMSetting,
-        llm_setting_for_object: LLMSetting,
-        llm_prompt_for_text: LLMPrompt,
-        llm_prompt_factory_for_object: LLMPromptFactoryAbstract | None = None,
-        wfid: str | None = None,
-    ) -> BaseModelTypeVar:
-        try:
-            llm_assignment_for_text = LLMAssignment(
-                job_metadata=job_metadata,
-                llm_setting=llm_setting_main,
-                llm_prompt=llm_prompt_for_text,
-            )
-
-            llm_assignment_factory_to_object = LLMAssignmentFactory(
-                job_metadata=job_metadata,
-                llm_setting=llm_setting_for_object,
-                llm_prompt_factory=llm_prompt_factory_for_object or LLMPromptTemplate.make_for_structuring_from_preliminary_text(),
-            )
-            tto_assignment = TextThenObjectAssignment(
-                object_class_name=object_class.__name__,
-                object_class_schema=object_class.model_json_schema(),
-                llm_assignment_for_text=llm_assignment_for_text,
-                llm_assignment_factory_to_object=llm_assignment_factory_to_object,
-            )
-
-            obj = (
-                await WorkflowExecutorFactory[TextThenObjectAssignment, BaseModel]
-                .create_executor()
-                .execute_child_workflow(
-                    workflow_class=WfMakeTextThenObject,
-                    workflow_arg=tto_assignment,
-                    workflow_id=make_child_workflow_id(base_id=wfid or "craft-text-then-object"),
-                )
-            )
-        except PipelexError as exc:
-            raise TemporalError.from_message_exception(exc) from exc
-        except ChildWorkflowError as exc:
-            log.error(f"ChildWorkflowError caused by: {exc.cause}")
-            if isinstance(exc.cause, ApplicationError):
-                raise TemporalError.from_app_error(exc=exc.cause) from exc
-            raise
-        log.verbose(f"ContentGeneratorChild generated object after text: {obj}")
-        return object_class.model_validate(obj.model_dump(mode="json", serialize_as_any=True))
-
-    @override
-    @update_job_metadata
-    async def make_object_list_direct(
+    async def make_object_list(
         self,
         job_metadata: JobMetadata,
         object_class: type[BaseModelTypeVar],
@@ -245,57 +186,6 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         log.verbose(f"ContentGeneratorChild generated object list direct: {obj_list}")
-        return [object_class.model_validate(raw_obj.model_dump(serialize_as_any=True)) for raw_obj in obj_list]
-
-    @override
-    @update_job_metadata
-    async def make_text_then_object_list(
-        self,
-        job_metadata: JobMetadata,
-        object_class: type[BaseModelTypeVar],
-        llm_setting_main: LLMSetting,
-        llm_setting_for_object_list: LLMSetting,
-        llm_prompt_for_text: LLMPrompt,
-        llm_prompt_factory_for_object_list: LLMPromptFactoryAbstract | None = None,
-        nb_items: int | None = None,
-        wfid: str | None = None,
-    ) -> list[BaseModelTypeVar]:
-        try:
-            llm_assignment_for_text = LLMAssignment(
-                job_metadata=job_metadata,
-                llm_setting=llm_setting_main,
-                llm_prompt=llm_prompt_for_text,
-            )
-
-            llm_assignment_factory_to_object = LLMAssignmentFactory(
-                job_metadata=job_metadata,
-                llm_setting=llm_setting_for_object_list,
-                llm_prompt_factory=llm_prompt_factory_for_object_list or LLMPromptTemplate.make_for_structuring_from_preliminary_text(),
-            )
-            tto_assignment = TextThenObjectAssignment(
-                object_class_name=object_class.__name__,
-                object_class_schema=object_class.model_json_schema(),
-                llm_assignment_for_text=llm_assignment_for_text,
-                llm_assignment_factory_to_object=llm_assignment_factory_to_object,
-            )
-
-            obj_list = (
-                await WorkflowExecutorFactory[TextThenObjectAssignment, list[BaseModel]]
-                .create_executor()
-                .execute_child_workflow(
-                    workflow_class=WfMakeTextThenObjectList,
-                    workflow_arg=tto_assignment,
-                    workflow_id=make_child_workflow_id(base_id=wfid or "craft-text-then-object-list"),
-                )
-            )
-        except PipelexError as exc:
-            raise TemporalError.from_message_exception(exc) from exc
-        except ChildWorkflowError as exc:
-            log.error(f"ChildWorkflowError caused by: {exc.cause}")
-            if isinstance(exc.cause, ApplicationError):
-                raise TemporalError.from_app_error(exc=exc.cause) from exc
-            raise
-        log.verbose(f"ContentGeneratorChild generated object list after text: {obj_list}")
         return [object_class.model_validate(raw_obj.model_dump(serialize_as_any=True)) for raw_obj in obj_list]
 
     @override

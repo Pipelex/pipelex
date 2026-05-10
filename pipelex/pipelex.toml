@@ -207,33 +207,7 @@ xhigh = 32768
 max = 65536
 
 [cogt.llm_config.generic_templates]
-structure_from_preliminary_text_system = """
-You are a data modeling expert specialized in extracting structure from text.
-"""
-
-structure_from_preliminary_text_user = """
-Extract and structure information from this text:
-
-{{ preliminary_text | tag }}
-
-Now generate the JSON in the required format.
-Do not create information that is not in the text.
-"""
-
 output_structure_prompt = """
-
-
----
-The instance we want to generate will be for the following class:
-{{ class_structure_str }}
-
-Don't bother with JSON formatting, we'll do that as a second step.
-For now, just output markdown with the details of the instance.
-DO NOT create new information.
-If some information is not present for an attribute, output the default value or None according to the field definition.
-"""
-
-output_structure_prompt_no_preliminary_text = """
 
 
 ---
@@ -294,9 +268,6 @@ openai = { tag_style = "ticks" }
 anthropic = { tag_style = "xml" }
 mistral = { tag_style = "square_brackets" }
 gemini = { tag_style = "xml" }
-
-[pipelex.structure_config]
-is_default_text_then_structure = false # turn this to true to get better results: generates text before structuring
 
 ####################################################################################################
 # Pipe run config

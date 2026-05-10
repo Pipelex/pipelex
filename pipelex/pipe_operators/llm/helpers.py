@@ -9,7 +9,7 @@ from pipelex.hub import (
 from pipelex.tools.typing.structure_printer import StructurePrinter
 
 
-async def get_output_structure_prompt(concept_ref: str, is_with_preliminary_text: bool) -> str | None:
+async def get_output_structure_prompt(concept_ref: str) -> str | None:
     concept = get_required_concept(concept_ref=concept_ref)
     output_class = get_class_registry().get_class(concept.structure_class_name)
     if not output_class:
@@ -21,10 +21,7 @@ async def get_output_structure_prompt(concept_ref: str, is_with_preliminary_text
         return None
     class_structure_str = "\n".join(class_structure)
     llm_config = get_config().cogt.llm_config
-    if is_with_preliminary_text:
-        template_source = llm_config.get_template(template_name="output_structure_prompt")
-    else:
-        template_source = llm_config.get_template(template_name="output_structure_prompt_no_preliminary_text")
+    template_source = llm_config.get_template(template_name="output_structure_prompt")
 
     return await render_template(
         template=template_source,
