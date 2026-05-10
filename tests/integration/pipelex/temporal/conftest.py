@@ -73,26 +73,26 @@ def boot_temporal(reset_pipelex_config_fixture: None) -> Generator[None, None, N
     pipelex_hub.set_pipe_router(make_temporal_pipe_router())
 
     generated_content_factory = GeneratedContentFactory(storage_provider=get_storage_provider())
-    # Transient feature flag — see pipelex.py for the matching gate. Both must be set
+    # Transient escape hatch — see pipelex.py for the matching gate. Both must be set
     # consistently or this conftest's explicit ``set_content_generator(...)`` will
-    # bypass the production gate and tests will validate only the legacy path.
-    if os.environ.get("PIPELEX_USE_IN_WORKFLOW_CONTENT_GENERATOR"):
-        from pipelex.temporal.tprl_content_generation.content_generator_in_workflow_factory import (  # noqa: PLC0415
-            ContentGeneratorInWorkflowFactory,
-        )
-
-        pipelex_hub.set_content_generator(
-            ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow(
-                generated_content_factory=generated_content_factory,
-            )
-        )
-    else:
+    # bypass the production gate and tests will validate only the non-default path.
+    if os.environ.get("PIPELEX_USE_LEGACY_CONTENT_GENERATOR"):
         from pipelex.temporal.tprl_content_generation.content_generator_child_factory import (  # noqa: PLC0415
             ContentGeneratorChildFactory,
         )
 
         pipelex_hub.set_content_generator(
             ContentGeneratorChildFactory.make_content_generator_child(
+                generated_content_factory=generated_content_factory,
+            )
+        )
+    else:
+        from pipelex.temporal.tprl_content_generation.content_generator_in_workflow_factory import (  # noqa: PLC0415
+            ContentGeneratorInWorkflowFactory,
+        )
+
+        pipelex_hub.set_content_generator(
+            ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow(
                 generated_content_factory=generated_content_factory,
             )
         )

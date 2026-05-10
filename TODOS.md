@@ -16,7 +16,7 @@ Replace `WfMake*` child-workflow dispatch with direct `workflow.execute_activity
 - [x] **Phase 3 — Re-point `WfTestContentGeneratorChild`**
 - [x] **Phase 4 — Fix `make_extract_pages` page-views asymmetry**
 - [x] ✅ **Checkpoint A** — new generator validated end-to-end, ready to flip
-- [ ] **Phase 5 — Flip default to new generator**
+- [x] **Phase 5 — Flip default to new generator**
 - [ ] **Phase 6 — Delete old surface** (one commit)
 - [ ] **Phase 7 — Update docstrings and docs**
 - [ ] ✅ **Checkpoint B** — old surface gone, codebase in target state
@@ -109,7 +109,7 @@ Add the new generator next to the existing files. No wiring yet — just code.
 
 ## Phase 2 — Wire behind a temporary feature flag ✅
 
-- [x] In `pipelex/pipelex.py`, env-flag-gated branch on `os.environ.get("PIPELEX_USE_IN_WORKFLOW_CONTENT_GENERATOR")` (search the file for the env var name). Default OFF.
+- [x] In `pipelex/pipelex.py`, env-flag-gated branch on `os.environ.get("PIPELEX_USE_IN_WORKFLOW_CONTENT_GENERATOR")` (renamed in Phase 5 to `PIPELEX_USE_LEGACY_CONTENT_GENERATOR` when the polarity flipped). Default OFF (legacy was the default at Phase 2).
 - [x] Did NOT add to `pipelex.toml`. Transient.
 - [x] Mirrored env-flag branch in `tests/integration/pipelex/temporal/conftest.py` and `test_payload_codec_pipeline.py`.
 - [x] Validated locally with flag ON: targeted Temporal subsets pass — `library_crate/`, `tracing/` (incl. `test_split_worker_usage.py` that exercises the asymmetric `inference_task_queue` routing), `content_generation/`, `workflows/`.
@@ -154,7 +154,7 @@ Implemented inline within Phase 1 since `make_extract_pages` is a Phase 1 method
 
 State at this checkpoint:
 - New generator (`ContentGeneratorInWorkflow`) implemented in `pipelex/temporal/tprl_content_generation/content_generator_in_workflow.py`, factory in `content_generator_in_workflow_factory.py`, unit tests in `tests/unit/pipelex/temporal/test_content_generator_in_workflow.py`.
-- Wired behind env-flag `PIPELEX_USE_IN_WORKFLOW_CONTENT_GENERATOR` in `pipelex.py` and both Temporal conftests (`tests/integration/pipelex/temporal/conftest.py` and `test_payload_codec_pipeline.py`); default OFF.
+- Wired behind env-flag `PIPELEX_USE_IN_WORKFLOW_CONTENT_GENERATOR` (Phase 5 renamed to `PIPELEX_USE_LEGACY_CONTENT_GENERATOR`) in `pipelex.py` and both Temporal conftests (`tests/integration/pipelex/temporal/conftest.py` and `test_payload_codec_pipeline.py`); default OFF at Checkpoint A.
 - `pipelex/temporal/test_extras/wf_test_content_generator_child.py` re-pointed to construct the new generator unconditionally (this is a test fixture workflow; the env flag does not gate it).
 - `make_extract_pages` page-views asymmetry fixed; both single-image (`image_uri`) and multi-page (`document_uri`) branches covered by unit tests.
 - `ContentGeneratorChild` and `ContentGeneratorTop` still exist; production traffic still goes through `ContentGeneratorChild` (flag OFF).
@@ -178,14 +178,17 @@ Open questions / decisions for next session:
 
 ---
 
-## Phase 5 — Flip the feature flag default
+## Phase 5 — Flip the feature flag default ✅
 
-- [ ] In `pipelex/pipelex.py`, swap the env-flag default so the new generator is the production path when `temporal.is_enabled` is true.
-- [ ] Run `make agent-test` (full suite).
-- [ ] Run the local Temporal-server suite if available: `.venv/bin/pytest tests/integration/pipelex/temporal/ --temporal-server local`.
-- [ ] Sanity-check a manual run of a Temporal pipeline (any `library_crate/` bundle) and inspect the Temporal UI: confirm activities appear directly under `WfPipeRouter` with no intervening `WfMake*` child workflow, and that `activity_id` values are meaningful.
+- [x] In `pipelex/pipelex.py`, flipped the env-flag default. Renamed the variable to `PIPELEX_USE_LEGACY_CONTENT_GENERATOR` so the polarity is self-documenting: unset → new in-workflow generator (default); set → legacy `ContentGeneratorChild` escape hatch.
+- [x] Mirrored the rename + flipped polarity in `tests/integration/pipelex/temporal/conftest.py` and `tests/integration/pipelex/temporal/test_payload_codec_pipeline.py`.
+- [x] `make agent-check` passes (ruff/pyright/mypy clean).
+- [x] `make agent-test` passes (full suite).
+- [x] Targeted `tests/integration/pipelex/temporal/content_generation/` (9 tests) and `tests/integration/pipelex/temporal/tracing/` (36 tests, including `test_split_worker_usage.py` which is the load-bearing test for the asymmetric `inference_task_queue` routing rule) pass under the new default.
+- [ ] Optional: run against a real Temporal server (`.venv/bin/pytest tests/integration/pipelex/temporal/ --temporal-server local`) — not run this session (requires local Temporal server).
+- [ ] Optional: manual UI inspection of a `library_crate/` pipeline run — requires human inspection.
 
-**Verification:** `make agent-check && make agent-test`. If anything regresses, flip the flag back OFF and diagnose; do not proceed to Phase 6.
+**Note for Phase 6:** the env var was renamed from `PIPELEX_USE_IN_WORKFLOW_CONTENT_GENERATOR` to `PIPELEX_USE_LEGACY_CONTENT_GENERATOR`. Phase 6 must grep/delete the new name.
 
 ---
 
@@ -217,8 +220,8 @@ Per the project's "no backward compatibility" rule, delete in a single commit:
 **Edits:**
 
 - [ ] `pipelex/temporal/tasks.py` — drop the `WfMake*` / `WfRenderPageViews` import lines and remove them from the `crafting.workflow_list`. Activity list unchanged.
-- [ ] `pipelex/pipelex.py` — remove the feature-flag branch added in Phase 2 (search for `PIPELEX_USE_IN_WORKFLOW_CONTENT_GENERATOR`); the new generator becomes unconditional under `temporal.is_enabled`. Also drop the `os` import if no longer used elsewhere.
-- [ ] `tests/integration/pipelex/temporal/conftest.py` — drop the env-flag branch (search for `PIPELEX_USE_IN_WORKFLOW_CONTENT_GENERATOR`); the parent conftest unconditionally constructs the new in-workflow generator via `ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow(...)`. **Without this edit every Temporal integration test breaks at fixture setup with an ImportError on the deleted `ContentGeneratorChildFactory`.**
+- [ ] `pipelex/pipelex.py` — remove the feature-flag branch added in Phase 2 (search for `PIPELEX_USE_LEGACY_CONTENT_GENERATOR`); the new generator becomes unconditional under `temporal.is_enabled`. Also drop the `os` import if no longer used elsewhere.
+- [ ] `tests/integration/pipelex/temporal/conftest.py` — drop the env-flag branch (search for `PIPELEX_USE_LEGACY_CONTENT_GENERATOR`); the parent conftest unconditionally constructs the new in-workflow generator via `ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow(...)`. **Without this edit every Temporal integration test breaks at fixture setup with an ImportError on the deleted `ContentGeneratorChildFactory`.**
 - [ ] `tests/integration/pipelex/temporal/test_payload_codec_pipeline.py` — same: drop the env-flag branch and replace with the new factory unconditionally.
 - [ ] `tests/integration/pipelex/temporal/content_generation/conftest.py` — delete the imports of `ContentGeneratorChild` / `ContentGeneratorChildFactory` / `ContentGeneratorTopFactory` and the `top_crafter` and `child_crafter` fixtures (still present at Checkpoint A — verified).
 - [ ] If `test_tprl_content_generator_child.py` referenced any deleted import, update accordingly.

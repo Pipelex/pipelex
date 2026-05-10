@@ -341,25 +341,25 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 content_generator = ContentGeneratorDry()
             elif get_config().temporal.is_enabled:
                 generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
-                # Transient feature flag for the tprl_content_generation/ collapse
-                # (TODOS.md). Default OFF: production still flows through the legacy
+                # Transient escape hatch for the tprl_content_generation/ collapse
+                # (TODOS.md). Default = new direct-activity dispatch path. Set
+                # ``PIPELEX_USE_LEGACY_CONTENT_GENERATOR=1`` to fall back to the legacy
                 # ``ContentGeneratorChild`` (one child workflow per inference call).
-                # Flip the env var to opt into the new direct-activity dispatch path.
-                # Removed once Phase 5 lands.
-                if os.environ.get("PIPELEX_USE_IN_WORKFLOW_CONTENT_GENERATOR"):
-                    from pipelex.temporal.tprl_content_generation.content_generator_in_workflow_factory import (  # noqa: PLC0415
-                        ContentGeneratorInWorkflowFactory,
-                    )
-
-                    content_generator = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow(
-                        generated_content_factory=generated_content_factory,
-                    )
-                else:
+                # Removed once Phase 6 lands.
+                if os.environ.get("PIPELEX_USE_LEGACY_CONTENT_GENERATOR"):
                     from pipelex.temporal.tprl_content_generation.content_generator_child_factory import (  # noqa: PLC0415
                         ContentGeneratorChildFactory,
                     )
 
                     content_generator = ContentGeneratorChildFactory.make_content_generator_child(
+                        generated_content_factory=generated_content_factory,
+                    )
+                else:
+                    from pipelex.temporal.tprl_content_generation.content_generator_in_workflow_factory import (  # noqa: PLC0415
+                        ContentGeneratorInWorkflowFactory,
+                    )
+
+                    content_generator = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow(
                         generated_content_factory=generated_content_factory,
                     )
             else:
