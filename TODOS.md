@@ -1,5 +1,58 @@
 # Plan: Reintroduce `structuring_method = preliminary_text` via blueprint elaboration + a new `PipeStructure` operator
 
+---
+
+## CHECKPOINT — current state (resume here)
+
+**Branch:** `feature/Text-then-object` (worktree at `_tto/`).
+
+**Last verified:** `make agent-check` clean (ruff/plxt/pyright/mypy all 0 errors, 0 warnings) and `make agent-test` green (full suite). Targeted run: `1687 passed, 1 xfailed` for the touched source areas.
+
+### Status by phase
+
+- [x] **Phase 1 — bundle elaboration metadata.** `StepRole`, `ElaborationMetadata`, and the `elaboration_metadata: dict[str, ElaborationMetadata] | None = Field(default=None, exclude=True)` side-table live on `PipelexBundleBlueprint` (`pipelex/core/bundles/pipelex_bundle_blueprint.py`). Accessor `get_elaboration_for(pipe_code)` added. Unit tests in `tests/unit/pipelex/core/bundles/test_elaboration_metadata.py`.
+- [x] **Phase 2 — PipeStructure operator.** Module at `pipelex/pipe_operators/structure/` with `__init__.py`, `pipe_structure_blueprint.py`, `pipe_structure.py`, `pipe_structure_factory.py` (no `exceptions.py` — neither operator-level nor factory-level errors had call sites, so the file was deleted per "no half-finished implementations"). Registered in `PipeBlueprintUnion`, `PipeType.PIPE_STRUCTURE`, `CoreRegistryModels.PIPE_OPERATORS{,_FACTORY}`. Added `PipeType.PIPE_STRUCTURE` arm to the `match` in `pipelex/core/pipes/output/output_renderer.py:_collect_possible_outputs` and to `_PIPE_DEFINITION_NAMES` in `pipelex/language/mthds_schema_generator.py`. New `structuring_prompt` template under `[cogt.llm_config.generic_templates]` in `pipelex/pipelex.toml`. Unit tests in `tests/unit/pipelex/pipe_operators/pipe_structure/` + dry-run integration test in `tests/integration/pipelex/pipes/operator/pipe_structure/`. Regenerated `derived/mthds_schema.json` via `pipelex-dev generate-mthds-schema`.
+- [x] **Phase 3 — PipeStructureSpec.** `pipelex/builder/pipe/pipe_structure_spec.py`, registered in `pipe_spec_union.py` and `pipe_spec_map.py`. Tests in `tests/unit/pipelex/builder/pipe/pipe_operator/pipe_structure/test_pipe_structure_spec.py`.
+- [x] **Phase 4 — bundle elaboration framework.** `pipelex/core/interpreter/bundle_elaborator.py` with `BundleElaborator.elaborate()`, `BundleElaboratorError(PipelexInterpreterError)`, fast-path short-circuit (identity-preserving), recursive-elaboration guard, post-elaboration `model_validate` re-run. Wired into `PipelexInterpreter.make_pipelex_bundle_blueprint`. Uses a module-level `TypeGuard` (`_is_preliminary_text_pipe`) so callers narrow `PipeBlueprintUnion → PipeLLMBlueprint` without casts.
+- [x] **Phase 5 — preliminary_text elaboration.** Synthesizes step-1 (`<code>__draft_text` PipeLLM, output always literal `Text`), step-2 (`<code>__structure` PipeStructure, original output preserved), and replaces the original `<code>` with a `PipeSequence` wrapping both. `elaboration_metadata` populated for the two synthetic codes. Tests in `tests/unit/pipelex/core/interpreter/test_bundle_elaborator.py` cover: short-circuit identity, empty bundle, three-pipe rewrite shape, multiplicity preservation (`Foo` / `Foo[]` / `Foo[3]`), Text-output rejection (incl. `native.Text` and bracketed forms — gated by both the blueprint validator at construction time AND the elaborator's defense-in-depth check via `model_construct`), synthetic-name collision, image-input only on step-1, `main_pipe` regression, model + `model_to_structure` propagation. **Integration test against a real LLM is deferred to Phase 8.**
+- [x] **Phase 6 — remove `structuring_method` from runtime PipeLLM.** Done.
+  - Removed field, validator, NotImplementedError block, and `execution_data_dict` line from `PipeLLM`. Factory no longer forwards the field.
+  - Added `model_validator(mode="after")` `validate_preliminary_text_output` on `PipeLLMBlueprint` — rejects `preliminary_text + Text output` at construction time, before the elaborator runs. The elaborator's matching pre-check stays as defense-in-depth (only reachable via `model_construct`).
+  - Added `is_preliminary_text` `@property` on `StructuringMethod` (project rule: never `==` against an enum value).
+  - `PipeLLMSpec` exposes `structuring_method: StructuringMethod | None = None` (plain `Field`, not `SkipJsonSchema`) and forwards it in `to_blueprint()`.
+  - Deleted obsolete `test_pipe_llm_preliminary_text_raises_not_implemented` integration test.
+  - Updated `tests/unit/pipelex/language/test_mthds_schema.py::test_all_pipe_types_present` to derive expected blueprint names from `PipeType.value_list()` instead of hardcoding the count (the count test was failing once `PipeStructure` was added).
+- [ ] **Phase 8 — round-out tests.** Not started. (Phase 7 intentionally skipped per the plan.)
+- [ ] **Phase 9 — docs & changelog.** Not started.
+- [ ] **Phase 10 — final validation.** Not started.
+
+### Code-quality decisions made during implementation (audit notes)
+
+- **No premature error types.** `pipe_operators/structure/exceptions.py` was deleted — the operator/factory had no call site that distinguished from generic `PipeRunError` / Pydantic `ValidationError`. Easy to add back when a real raise site appears.
+- **No speculative `try/except`.** `pipe_structure.py` initially caught `ValidationError` around `make_object`. PipeLLM's parallel path doesn't catch it (the cogt layer wraps any underlying validation error in `LLMCompletionError`), so the catch was speculative — removed per CLAUDE.md "do not add try/except speculatively."
+- **No duplicated factory-level input validation.** `PipeStructureFactory` no longer re-checks `len(blueprint.inputs) == 1`. The blueprint's `model_validator` runs unconditionally on construction; the factory trusts it.
+- **`QualifiedRef.parse(...).local_code`** is used in three places (`pipe_structure_blueprint.py`, `pipe_llm_blueprint.py`, `bundle_elaborator.py`) instead of inline `split(".")` — consolidates "extract the local code from a possibly qualified ref" through the existing helper.
+- **`StructuringMethod.is_preliminary_text` property** added so call sites read as `method.is_preliminary_text` rather than `method == StructuringMethod.PRELIMINARY_TEXT`.
+- **`TypeGuard[PipeLLMBlueprint]`** on `_is_preliminary_text_pipe` eliminates the `# type: ignore[arg-type]` that was bridging `PipeBlueprintUnion → PipeLLMBlueprint` at the elaborator's iteration site.
+- **Bundle re-validation pattern.** `BundleElaborator.elaborate` round-trips the new bundle through `model_validate(elaborated.model_dump(by_alias=True))` purely for error detection — the validate result is discarded and the original `model_copy`-built bundle (with its side-table intact) is returned.
+
+### Open questions / observations
+
+- **`StructuringMethod.DIRECT`** kept in the enum per original plan decision. No functional difference from `None` today. Revisit if no second method materializes.
+
+### How to resume
+
+1. `git status` to see uncommitted state — Phase 1–6 changes all live in the working tree of `_tto/`. Decide whether to commit before Phase 8.
+2. Move on to **Phase 8 (round-out tests)**. Suggested order:
+   - kajson round-trip for `PipeStructureBlueprint` and elaborated `PipeLLMBlueprint`.
+   - MTHDS fixture file with `structuring_method = "preliminary_text"` parsed end-to-end through `PipelexInterpreter`.
+   - PipeStructure inside a hand-written `PipeSequence` (no elaboration sugar).
+   - PipeStructure inside a `PipeBatch`.
+   - Real-LLM integration test for the full elaborated path (heaviest — last).
+3. Then **Phase 9 (docs)**, then **Phase 10 (final validation)**.
+
+---
+
 ## Goal
 
 Bring back the "text-then-object" capability that was removed in `16b775b8`, but in a fundamentally different shape:

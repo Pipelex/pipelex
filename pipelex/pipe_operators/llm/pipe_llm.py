@@ -1,6 +1,6 @@
 from typing import Any, Literal
 
-from pydantic import ValidationError, model_validator
+from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex import log
@@ -37,7 +37,6 @@ from pipelex.hub import (
 )
 from pipelex.pipe_operators.llm.helpers import get_output_structure_prompt
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
-from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import (
@@ -47,7 +46,6 @@ from pipelex.pipe_run.pipe_run_params import (
 )
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
-from pipelex.types import Self
 
 
 class PipeLLMOutput(PipeOutput):
@@ -58,18 +56,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     type: Literal["PipeLLM"] = "PipeLLM"
     llm_prompt_spec: LLMPromptBlueprint
     llm_choices: LLMSettingChoices | None = None
-    structuring_method: StructuringMethod | None = None
     output_multiplicity: VariableMultiplicity | None = None
-
-    @model_validator(mode="after")
-    def validate_output_concept_consistency(self) -> Self:
-        if self.structuring_method is not None and self.output.concept.structure_class_name == NativeConceptCode.TEXT:
-            msg = (
-                f"Output concept '{self.output.concept.code}' is considered a Text concept, "
-                f"so it cannot be structured. Maybe you forgot to add '{NativeConceptCode.TEXT}' to the class registry?"
-            )
-            raise ValueError(msg)
-        return self
 
     @override
     def validate_inputs_static(self):
@@ -187,16 +174,6 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         content_generator: ContentGeneratorProtocol | None = None,
     ) -> PipeLLMOutput:
         content_generator = content_generator or get_content_generator()
-        if self.structuring_method is not None:
-            match self.structuring_method:
-                case StructuringMethod.PRELIMINARY_TEXT:
-                    msg = (
-                        f"PipeLLM '{self.code}': structuring_method='preliminary_text' is not currently supported. "
-                        "The text-then-object mechanism was removed; a new implementation is planned."
-                    )
-                    raise NotImplementedError(msg)
-                case StructuringMethod.DIRECT:
-                    pass
         # interpret / unwrap the arguments
         output_stuff_spec = self.resolve_dynamic_output_stuff_spec(pipe_run_params=pipe_run_params)
 
@@ -335,8 +312,6 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         }
         execution_data_dict["rendered_system_prompt"] = rendered_llm_prompt.system_text
         execution_data_dict["rendered_user_prompt"] = rendered_llm_prompt.user_text
-        if self.structuring_method is not None:
-            execution_data_dict["structuring_method"] = self.structuring_method
         if is_multiple_output:
             execution_data_dict["structuring_path"] = "object_list"
         else:
