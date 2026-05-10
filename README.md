@@ -522,6 +522,101 @@ Install all extras:
 uv pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal,linkup,docling]"
 ```
 
+
+## FAQ
+
+### What is Pipelex?
+
+Pipelex is a declarative language for building and running AI methods. A method is a reusable, typed AI procedure — declared in a `.mthds` file and executed by Pipelex. Each step is explicit, each output is structured, and every run is repeatable.
+
+### What are methods?
+
+Methods are typed, reusable AI procedures defined in `.mthds` files. They can be:
+- **PipeLLM** — LLM text generation with structured output
+- **PipeSequence** — Chain multiple pipes together
+- **PipeExtract** — Document extraction (PDF, images, etc.)
+- **PipeBatch** — Process multiple items in parallel
+
+### How is Pipelex different from other AI frameworks?
+
+Pipelex uses a declarative `.mthds` format that is:
+- **Typed** — Semantic types for every input/output
+- **Repeatable** — Deterministic orchestration
+- **Composable** — Chain and nest methods freely
+- **Sharable** — Share methods via [mthds.sh](https://mthds.sh) hub
+
+### How do I install Pipelex?
+
+**With Claude Code (Recommended):**
+```bash
+npm install -g mthds && mthds-agent bootstrap && claude plugin marketplace add mthds-ai/mthds-plugins && claude plugin install mthds@mthds-plugins
+```
+
+**Standalone CLI:**
+```bash
+uv tool install pipelex
+pipelex init
+```
+
+### What LLM providers does Pipelex support?
+
+Pipelex routes across 60+ models. Configure via:
+- **Pipelex Gateway (Recommended)** — Free credits, single API key for all providers. Get your key at [app.pipelex.com](https://app.pipelex.com/)
+- **Bring Your Own Keys** — OpenAI, Anthropic, Google, Mistral, etc.
+- **Local AI** — Ollama, vLLM, LM Studio, llama.cpp (no API keys required)
+
+### What is the `.mthds` file format?
+
+`.mthds` files are TOML-based declarations:
+
+```toml
+[pipe.summarize_article]
+type    = "PipeLLM"
+inputs  = { article = "Text", audience = "Text" }
+output  = "Text"
+prompt  = "Summarize $article in three bullet points for $audience."
+```
+
+### How do I use Pipelex with Claude Code or Codex?
+
+Pipelex integrates with Claude Code via the mthds plugin:
+- `/mthds-build` — Build methods from descriptions
+- `/mthds-run` — Run methods interactively
+
+For Codex: `mthds-agent codex install-hook && mthds-agent codex apply-config`
+
+### What optional features can I install?
+
+Pipelex extras include:
+- `anthropic` — Claude support
+- `google` — Vertex AI/Google models
+- `mistralai` — Mistral AI text and OCR
+- `bedrock` — Amazon Bedrock
+- `fal` — Image generation
+- `linkup` — Web search
+- `docling` — OCR
+
+Install: `uv pip install "pipelex[anthropic,google,mistralai,bedrock,fal,linkup,docling]"
+
+### What is the Pipelex Cookbook?
+
+The [Cookbook](https://github.com/Pipelex/pipelex-cookbook) contains production-ready methods for various use cases. Clone it, fork it, and experiment with real-world examples.
+
+### How do I troubleshoot issues?
+
+1. Run `pipelex doctor` to verify setup
+2. Check API keys in `~/.pipelex/.env`
+3. Consult [docs.pipelex.com](https://docs.pipelex.com/)
+4. Join [Discord](https://go.pipelex.com/discord) for help
+
+### Where can I get help?
+
+- [Discord](https://go.pipelex.com/discord)
+- [GitHub Issues](https://github.com/Pipelex/pipelex/issues)
+- [Discussions](https://github.com/Pipelex/pipelex/discussions)
+- [Documentation](https://docs.pipelex.com/)
+
+
 ---
 
 **Privacy & Telemetry** — Pipelex Gateway collects only technical data (model names, token counts, latency) — never prompts or business data. If you want to avoid Gateway telemetry, disable `pipelex_gateway` and use your own provider keys or local AI instead. [Learn more](https://docs.pipelex.com/latest/setup/telemetry/)
@@ -539,3 +634,4 @@ This project is licensed under the [MIT license](LICENSE). Runtime dependencies 
 "Pipelex" is a trademark of Evotis S.A.S.
 
 © 2025-2026 Evotis S.A.S.
+
