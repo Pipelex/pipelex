@@ -173,7 +173,8 @@ PipeSequence (3 steps)
   → 1 parent WfPipeRouter
   → 3 child WfPipeRouters (one per step)
   Each child step (if PipeLLM):
-    → 1 child WfMakeLLMText + 1 ActLLMGenText activity
+    → 1 act_llm_gen_text activity (dispatched directly from WfPipeRouter
+       via ContentGeneratorInWorkflow.make_llm_text)
 
 PipeParallel (2 branches, then summary)
   → 1 parent WfPipeRouter
@@ -198,29 +199,29 @@ Each controller type creates a different child workflow pattern:
 | **PipeSequence** | Sequential: each step via `SubPipe.run_pipe()` → `PipeRouterChild` | N children (one per step), executed sequentially |
 | **PipeParallel** | Concurrent: all branches via `SubPipe.run_pipe()` + `asyncio.gather()` | N children (one per branch), executed concurrently |
 | **PipeBatch** | Fan-out: each list item via `SubPipe.run_pipe()` | N children (one per item), executed concurrently |
-| **PipeCondition** | Conditional: evaluates expression, dispatches selected outcome via `SubPipe.run_pipe()` | 1 child (the chosen outcome pipe), plus internal `WfMakeJinja2Text` for expression evaluation |
+| **PipeCondition** | Conditional: evaluates expression, dispatches selected outcome via `SubPipe.run_pipe()` | 1 child (the chosen outcome pipe), plus an internal `act_jinja2_gen_text` activity for expression evaluation |
 
-### Internal sub-workflows
+### Internal templating activities
 
-Some controllers dispatch internal sub-workflows in addition to pipe routing:
+Some controllers dispatch internal `act_jinja2_gen_text` activities in addition to pipe routing:
 
-- **PipeCondition**: `WfMakeJinja2Text` to evaluate the expression template against working memory
-- **PipeCompose**: `WfMakeJinja2Text` to resolve construct field references (e.g., `{ from = "title_text.text" }`)
+- **PipeCondition**: `act_jinja2_gen_text` to evaluate the expression template against working memory
+- **PipeCompose**: `act_jinja2_gen_text` to resolve construct field references (e.g., `{ from = "title_text.text" }`)
 
-These internal workflows carry working memory contents through the Temporal data converter, which creates a serialization dependency on working memory content types.
+Both call `ContentGeneratorInWorkflow.make_templated_text` from inside `WfPipeRouter`, which dispatches the activity directly via `workflow.execute_activity(act_jinja2_gen_text, ...)`. These activities carry working memory contents through the Temporal data converter, which creates a serialization dependency on working memory content types.
 
 ---
 
 ## Known Limitation: StuffArtefact Serialization in Dry-Run
 
-In dry-run mode, PipeLLM produces `StuffArtefact` debug objects as working memory content. When controllers dispatch internal sub-workflows that carry working memory contents through the Temporal data converter, Kajson fails with `TypeError: Type <class 'StuffArtefact'> is not JSON serializable`.
+In dry-run mode, PipeLLM produces `StuffArtefact` debug objects as working memory content. When controllers dispatch internal templating activities that carry working memory contents through the Temporal data converter, Kajson fails with `TypeError: Type <class 'StuffArtefact'> is not JSON serializable`.
 
 `StuffArtefact` is not a Pydantic model — it's a plain object used for dry-run tracing that was never designed for cross-process serialization.
 
 **Confirmed affected**:
 
-- **PipeCondition**: expression evaluation dispatches `WfMakeJinja2Text`, which serializes working memory to evaluate the Jinja2 expression. Fails with `StuffArtefact` TypeError.
-- **PipeCompose**: construct field resolution dispatches `WfMakeJinja2Text` similarly.
+- **PipeCondition**: expression evaluation dispatches `act_jinja2_gen_text`, which serializes working memory to evaluate the Jinja2 expression. Fails with `StuffArtefact` TypeError.
+- **PipeCompose**: construct field resolution dispatches `act_jinja2_gen_text` similarly.
 
 **Likely affected** (hangs in testing, root cause not fully diagnosed):
 
@@ -228,11 +229,11 @@ In dry-run mode, PipeLLM produces `StuffArtefact` debug objects as working memor
 
 **Not affected**:
 
-- **PipeSequence**: no internal sub-workflows — child pipes are dispatched via `SubPipe.run_pipe()` → `PipeRouterChild`, which creates clean child PipeJobs.
-- **PipeParallel**: same dispatch pattern as PipeSequence — branches go through `SubPipe.run_pipe()` without internal templating workflows.
+- **PipeSequence**: no internal templating activities — child pipes are dispatched via `SubPipe.run_pipe()` → `PipeRouterChild`, which creates clean child PipeJobs.
+- **PipeParallel**: same dispatch pattern as PipeSequence — branches go through `SubPipe.run_pipe()` without internal templating activities.
 - **All controllers in live mode**: `StuffArtefact` is only produced in dry-run. Live execution uses real content objects that serialize correctly.
 
-**Fix direction**: Either make `StuffArtefact` serializable (implement `__json__` or convert to Pydantic), or strip non-serializable objects from working memory before passing to internal sub-workflows.
+**Fix direction**: Either make `StuffArtefact` serializable (implement `__json__` or convert to Pydantic), or strip non-serializable objects from working memory before passing to internal templating activities.
 
 ---
 

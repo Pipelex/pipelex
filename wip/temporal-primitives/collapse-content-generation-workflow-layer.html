@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Collapsing the tprl_content_generation workflow layer</title>
+<style>
+  :root {
+    --fg: #1f2328;
+    --muted: #57606a;
+    --border: #d0d7de;
+    --bg-soft: #f6f8fa;
+    --bg-info: #ddf4ff;
+    --bg-warn: #fff8c5;
+    --bg-ok: #dafbe1;
+    --add-bg: #e6ffec;
+    --add-fg: #1a7f37;
+    --del-bg: #ffebe9;
+    --del-fg: #cf222e;
+    --accent: #0969da;
+    --kept: #1a7f37;
+    --gone: #cf222e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    max-width: 1040px;
+    margin: 2.5rem auto;
+    padding: 0 1.5rem;
+    line-height: 1.55;
+  }
+  h1 { font-size: 1.9rem; margin-bottom: 0.25rem; }
+  h2 { font-size: 1.4rem; margin-top: 2.5rem; padding-bottom: 0.25rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.1rem; margin-top: 1.5rem; }
+  p { margin: 0.6rem 0; }
+  code { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 0.9em; background: var(--bg-soft); padding: 0.1em 0.35em; border-radius: 4px; }
+  pre { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 0.85em; background: var(--bg-soft); padding: 1rem 1.2rem; border-radius: 6px; overflow-x: auto; line-height: 1.45; }
+  pre.diagram { background: #f6f8fa; border-left: 3px solid var(--accent); }
+  .meta { color: var(--muted); font-size: 0.92rem; margin-top: 0; }
+  .tldr {
+    background: var(--bg-info);
+    border-left: 4px solid var(--accent);
+    padding: 0.9rem 1.2rem;
+    border-radius: 0 6px 6px 0;
+    margin: 1rem 0 2rem;
+  }
+  .tldr p { margin: 0.3rem 0; }
+  .pill { display: inline-block; padding: 0.1em 0.6em; border-radius: 999px; font-size: 0.78em; font-weight: 600; }
+  .pill-keep { background: #dafbe1; color: var(--kept); }
+  .pill-drop { background: #ffebe9; color: var(--gone); }
+  .pill-modify { background: #ddf4ff; color: var(--accent); }
+  .pill-new { background: #fff8c5; color: #9a6700; }
+  table { border-collapse: collapse; margin: 0.8rem 0; width: 100%; }
+  th, td { padding: 0.55rem 0.85rem; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--bg-soft); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  /* unified diff */
+  .diff { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 0.82em; background: #fff; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; margin: 0.7rem 0; }
+  .diff-header { background: var(--bg-soft); padding: 0.35rem 0.85rem; color: var(--muted); border-bottom: 1px solid var(--border); font-size: 0.85em; }
+  .diff pre { margin: 0; background: transparent; padding: 0.5rem 0; border-radius: 0; }
+  .diff .line { display: block; padding: 0 0.85rem; white-space: pre; }
+  .diff .add { background: var(--add-bg); color: var(--add-fg); }
+  .diff .del { background: var(--del-bg); color: var(--del-fg); }
+  .diff .ctx { color: var(--fg); }
+  .diff .hunk { color: var(--muted); background: var(--bg-soft); padding: 0.15em 0.85rem; }
+  /* side-by-side */
+  .side {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 0.8rem 0;
+  }
+  .side > div { background: var(--bg-soft); border-radius: 6px; padding: 0.9rem 1.1rem; }
+  .side h4 { margin: 0 0 0.5rem; font-size: 0.92rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .side pre { background: #fff; padding: 0.7rem 0.9rem; font-size: 0.82em; }
+  .layer {
+    border-left: 3px solid var(--border);
+    padding: 0.4rem 0 0.4rem 1rem;
+    margin: 0.6rem 0;
+  }
+  .layer.l1 { border-left-color: #0969da; }
+  .layer.l2 { border-left-color: #1a7f37; }
+  .layer.l3 { border-left-color: #d4a72c; }
+  .layer.l4 { border-left-color: #bf3989; }
+  .layer.l5 { border-left-color: #cf222e; }
+  .layer h3 { margin-top: 0; }
+  ul.tight { margin: 0.3rem 0 0.6rem 1.4rem; }
+  ul.tight li { margin: 0.15rem 0; }
+  details { margin: 0.5rem 0; }
+  summary { cursor: pointer; font-weight: 600; color: var(--accent); }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.7rem;
+    margin: 1rem 0;
+  }
+  .stat { background: var(--bg-soft); border-radius: 6px; padding: 0.7rem 0.9rem; text-align: center; }
+  .stat .num { font-size: 1.6rem; font-weight: 700; color: var(--accent); display: block; }
+  .stat .lbl { font-size: 0.8rem; color: var(--muted); }
+  .note {
+    background: var(--bg-warn);
+    border-left: 4px solid #d4a72c;
+    padding: 0.7rem 1rem;
+    border-radius: 0 6px 6px 0;
+    margin: 1rem 0;
+    font-size: 0.93em;
+  }
+  .ok {
+    background: var(--bg-ok);
+    border-left: 4px solid var(--kept);
+    padding: 0.7rem 1rem;
+    border-radius: 0 6px 6px 0;
+    margin: 1rem 0;
+    font-size: 0.93em;
+  }
+  .gridcards {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.8rem;
+    margin: 0.8rem 0;
+  }
+  .card { background: var(--bg-soft); border-radius: 6px; padding: 0.9rem 1.1rem; }
+  .card h4 { margin: 0 0 0.4rem; font-size: 0.95rem; }
+  .small { font-size: 0.85em; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Collapsing the <code>tprl_content_generation/</code> workflow layer</h1>
+  <p class="meta">Branch <code>refactor/Temporal-primitives</code> · 9 phases, 2 checkpoints · companion to <code>collapse-content-generation-workflow-layer-v2.md</code></p>
+</header>
+
+<div class="tldr">
+  <p><strong>What.</strong> Replaced seven near-identical <code>WfMake*</code> child workflows with direct <code>workflow.execute_activity(act_*, …)</code> calls inside <code>WfPipeRouter</code>. Deleted two near-duplicate generator implementations (<code>ContentGeneratorTop</code> + <code>ContentGeneratorChild</code>) and their factories, and a small assignment-types models file. Added one new in-workflow generator: <code>ContentGeneratorInWorkflow</code>.</p>
+  <p><strong>Why.</strong> Every surviving <code>WfMake*</code> was a structurally identical 5-line wrapper around a single <code>start_activity(…)</code> call. The child-workflow indirection added ≈9 Temporal history events per content-generation call with zero behavioral payoff. On deep <code>PipeSequence</code>s this was the dominant factor approaching the 10K-event soft limit.</p>
+  <p><strong>Impact.</strong> History events per content-generation call drop from <strong>≈12 → 3</strong>. Per-LLM-call durability is preserved — the activity boundary is unchanged. Retry policy, timeouts, and the asymmetric <code>inference_task_queue</code> routing rule are re-applied at the new dispatch site. Net deletion is concentrated and mechanical: 11 files gone, 1 file added.</p>
+</div>
+
+<div class="stats">
+  <div class="stat"><span class="num">12 → 3</span><span class="lbl">history events / call</span></div>
+  <div class="stat"><span class="num">−11</span><span class="lbl">files deleted</span></div>
+  <div class="stat"><span class="num">+1</span><span class="lbl">file added</span></div>
+  <div class="stat"><span class="num">9</span><span class="lbl">phases shipped</span></div>
+</div>
+
+<h2>1 — The shape of the problem (before)</h2>
+
+<p>When a <code>PipeLLM</code> operator inside <code>WfPipeRouter</code> needed to generate text, the call path went through three execution levels: router workflow, content-generation workflow, activity.</p>
+
+<pre class="diagram">
+WfPipeRouter  (parent workflow)
+    │
+    ├─ pipe_llm._live_run_operator_pipe(...)
+    │     └─ get_content_generator()           ◄── returns ContentGeneratorChild
+    │     └─ content_generator.make_llm_text(...)
+    │            │
+    │            ▼
+    │     ContentGeneratorChild.make_llm_text(...)
+    │            │
+    │            └─ WorkflowExecutorFactory[...].execute_child_workflow(WfMakeLLMText, ...)
+    │                        │
+    │                        ▼
+    │              ┌───────────────────────────────────────────────┐
+    │              │  WfMakeLLMText  (child workflow)              │
+    │              │                                               │
+    │              │   workflow.start_activity(                    │
+    │              │     activity=act_llm_gen_text,                │
+    │              │     arg=llm_assignment,                       │
+    │              │     start_to_close_timeout=...,               │
+    │              │     retry_policy=...,                         │
+    │              │     task_queue=inference_task_queue,  ◄── LLM-text only
+    │              │   )                                           │
+    │              │                                               │
+    │              │   try / except ActivityError →                │
+    │              │     TemporalError.from_app_error(...)         │
+    │              └───────────────────────────────────────────────┘
+    │                        │
+    │                        ▼
+    │                act_llm_gen_text  (activity)
+    │                        │
+    └───── result ◄──────────┘
+</pre>
+
+<p>Every <code>WfMake*</code> workflow had the exact same shape:</p>
+
+<pre class="diagram">
+@workflow.defn(name="wf_…")
+class WfMakeXxx(WorkflowClass[XxxAssignment, ResultType]):
+    @workflow.run
+    async def run(self, workflow_arg: XxxAssignment) -> ResultType:
+        worker_config = get_config().temporal.worker_config
+        try:
+            result = await workflow.start_activity(
+                activity=act_xxx,
+                arg=workflow_arg,
+                start_to_close_timeout=worker_config.workflow_execution_timeout,
+                retry_policy=worker_config.retry_policy,
+                # task_queue=worker_config.inference_task_queue  ← LLM-text only
+            )
+        except ActivityError as exc:
+            if isinstance(exc.cause, ApplicationError):
+                raise TemporalError.from_app_error(exc=exc.cause) from exc
+            raise
+        return result
+</pre>
+
+<p>Seven copies of the same template, one per content-generation activity:</p>
+
+<table>
+  <thead><tr><th>Workflow</th><th>Activity</th><th>Special routing</th></tr></thead>
+  <tbody>
+    <tr><td><code>WfMakeLLMText</code></td><td><code>act_llm_gen_text</code></td><td><code>task_queue=inference_task_queue</code></td></tr>
+    <tr><td><code>WfMakeObject</code></td><td><code>act_llm_gen_object</code></td><td>—</td></tr>
+    <tr><td><code>WfMakeObjectList</code></td><td><code>act_llm_gen_object_list</code></td><td>—</td></tr>
+    <tr><td><code>WfMakeImages</code></td><td><code>act_img_gen_images</code></td><td>—</td></tr>
+    <tr><td><code>WfMakeJinja2Text</code></td><td><code>act_jinja2_gen_text</code></td><td>—</td></tr>
+    <tr><td><code>WfMakeExtract</code></td><td><code>act_extract_gen_extract_pages</code></td><td>—</td></tr>
+    <tr><td><code>WfRenderPageViews</code></td><td><code>act_render_page_views</code></td><td>—</td></tr>
+  </tbody>
+</table>
+
+<p>There was no remaining workflow body that did anything between activities. The previous text-then-object stack — the one nontrivial case in the v1 plan — had already been removed in commit <code>16b775b8</code>. Every surviving <code>WfMake*</code> was just <code>1 activity = 1 result</code>.</p>
+
+<h2>2 — The Temporal history cost</h2>
+
+<p>A single <code>make_llm_text</code> from inside <code>WfPipeRouter</code> produced this event chain in the parent's history:</p>
+
+<pre class="diagram">
+[parent: WfPipeRouter]
+  StartChildWorkflowExecutionInitiated
+  ChildWorkflowExecutionStarted        ◄── child framing
+  ChildWorkflowExecutionCompleted/Failed
+
+[child: WfMakeLLMText]
+  WorkflowExecutionStarted
+  WorkflowTaskScheduled/Started/Completed
+  ActivityTaskScheduled
+  ActivityTaskStarted
+  ActivityTaskCompleted/Failed
+  WorkflowTaskScheduled/Started/Completed
+  WorkflowExecutionCompleted
+
+≈ 12 events per LLM call
+</pre>
+
+<p>After the collapse, the same call inside the parent is just:</p>
+
+<pre class="diagram">
+[parent: WfPipeRouter]
+  ActivityTaskScheduled
+  ActivityTaskStarted
+  ActivityTaskCompleted/Failed
+
+3 events per LLM call
+</pre>
+
+<p>For a long <code>PipeSequence</code> of N LLM steps, the history goes from "N child-workflow scheduling pairs in the parent + N small child histories" to "N activity scheduling pairs in the parent". <strong>Per-LLM-call durability is preserved</strong> — the activity boundary is unchanged, so the retry semantics and the durable-checkpoint guarantee on each LLM call are unaffected.</p>
+
+<h2>3 — The after picture</h2>
+
+<pre class="diagram">
+WfPipeRouter  (parent workflow)
+    │
+    ├─ pipe_llm._live_run_operator_pipe(...)
+    │     └─ get_content_generator()           ◄── returns ContentGeneratorInWorkflow
+    │     └─ content_generator.make_llm_text(...)
+    │            │
+    │            ▼
+    │     ContentGeneratorInWorkflow.make_llm_text(...)
+    │            │
+    │            └─ workflow.execute_activity(             ◄── one frame, not two
+    │                   act_llm_gen_text,
+    │                   llm_assignment,
+    │                   start_to_close_timeout=...,
+    │                   retry_policy=...,
+    │                   task_queue=inference_task_queue,   ◄── LLM-text only
+    │                   activity_id=wfid,                  ◄── for Temporal UI
+    │               )
+    │
+    └───── result
+</pre>
+
+<p>The activities themselves (<code>act_llm_gen_text</code>, <code>act_llm_gen_object</code>, …) are unchanged. The worker registration is unchanged (the seven <code>act_*</code> functions still live in the <code>crafting</code> <code>TaskPack</code>). The only thing that disappears is the layer between the router and the activity.</p>
+
+<h2>4 — Why this is a good trade</h2>
+
+<div class="gridcards">
+  <div class="card">
+    <h4>History-event reduction</h4>
+    <p>≈12 → 3 events per content-generation call. On deep <code>PipeSequence</code>s this is the dominant factor approaching Temporal's 10K-event soft limit. The router's history stays compact.</p>
+  </div>
+  <div class="card">
+    <h4>Durability preserved</h4>
+    <p>The activity boundary is where retries and durable checkpoints live. We collapsed the workflow wrapper above it, not the activity below it. <code>retry_policy</code> and <code>start_to_close_timeout</code> are re-applied at the new dispatch site.</p>
+  </div>
+  <div class="card">
+    <h4>Less code to maintain</h4>
+    <p>Two near-duplicate generator implementations (<code>ContentGeneratorTop</code> + <code>ContentGeneratorChild</code>, ≈770 lines combined — the only real difference was <code>execute_workflow</code> vs <code>execute_child_workflow</code>) collapse into one in-workflow generator.</p>
+  </div>
+  <div class="card">
+    <h4>One fewer indirection in the UI</h4>
+    <p>Before: <code>WfPipeRouter → WfMakeLLMText → act_llm_gen_text</code>. After: <code>WfPipeRouter → act_llm_gen_text</code>. The activity now sits one level below the controller it belongs to — matching the actual semantics.</p>
+  </div>
+  <div class="card">
+    <h4>One source of truth for dispatch config</h4>
+    <p>Today's retry / timeout / task-queue knobs were spread across the <code>WfMake*</code> body, <code>ContentGeneratorChildFactory</code> plumbing, and a test that mutates <code>worker_config.inference_task_queue</code>. Post-collapse, all of it applies at the single <code>execute_activity(…)</code> call site.</p>
+  </div>
+  <div class="card">
+    <h4>No new abstractions</h4>
+    <p>The activities, the <code>act_*</code> functions, the <code>crafting</code> pack registration — all already existed. The refactor is largely deletion: 11 files out, 1 file in.</p>
+  </div>
+</div>
+
+<h2>5 — Key design decisions</h2>
+
+<div class="layer l1">
+  <h3>5.1 · Class name: <code>ContentGeneratorInWorkflow</code></h3>
+  <p>The <code>InWorkflow</code> suffix flags a load-bearing constraint at every import site: <strong>this class only works when called from inside a workflow's <code>run()</code></strong>, because each method calls <code>workflow.execute_activity(…)</code>, which hard-fails outside a workflow context. The previous <code>ContentGeneratorChild</code> had the same constraint but the name didn't reflect it — easy to misuse from a test that tried to construct one and call its methods directly.</p>
+</div>
+
+<div class="layer l2">
+  <h3>5.2 · <code>activity_id=</code> for Temporal UI observability</h3>
+  <p>Today, <code>ContentGeneratorChild</code> builds a <code>child_workflow_id</code> from the parent's id plus a <code>wfid</code> kwarg (e.g. <code>"craft-text"</code>, <code>"craft-object-direct"</code>, <code>"extract"</code>). Operators and tests pass <code>wfid=</code> to give a Temporal-UI-visible name to a specific content-generation step. After the collapse, child workflow IDs are gone, but the <code>activity_id=</code> kwarg on <code>execute_activity</code> serves the same role — Temporal Web UI shows it as the per-step breadcrumb that ops use to triage failures.</p>
+  <p>We thread <code>wfid</code> into <code>activity_id=</code> at every dispatch site. Default <code>wfid</code> values are method-specific constants (<code>"craft-text"</code>, <code>"craft-object-direct"</code>, <code>"craft-image-single"</code>, …), so the breadcrumb survives intact for ops triage.</p>
+</div>
+
+<div class="layer l3">
+  <h3>5.3 · Activity-id uniqueness: Strategy (i)</h3>
+  <p>Today's <code>WfMake*</code> child workflows get globally-unique IDs because <code>make_child_workflow_id</code> prepends the parent's workflow_id. After collapse, activity_ids only get the workflow's own scope — no parent prefix to fall back on. Temporal requires <code>activity_id</code>s to be unique within a workflow execution.</p>
+  <p>A <strong>Phase 0 audit</strong> confirmed today's invariant: <em>at most one call per <code>ContentGeneratorProtocol</code> method per <code>WfPipeRouter</code> execution</em>. <code>PipeLLM._live_run_operator_pipe</code>'s branching ensures <code>make_llm_text</code> / <code>make_object</code> / <code>make_object_list</code> are mutually exclusive; <code>PipeImgGen</code> branches between <code>make_single_image</code> and <code>make_image_list</code>; <code>PipeExtract</code> calls <code>make_extract_pages</code> exactly once.</p>
+  <p><strong>Strategy (i)</strong> — "default <code>wfid</code> is unique per workflow" — was chosen over Strategy (ii) (per-method counter) because the latter adds complexity for a problem we don't have today and would be harder to read in the Temporal UI. Three mitigations bolt the invariant down:</p>
+  <ul class="tight">
+    <li><strong>Distinct method-default <code>wfid</code>s</strong>, fixing the pre-existing duplicate <code>"craft-image"</code> shared by <code>make_single_image</code> and <code>make_image_list</code> — split into <code>"craft-image-single"</code> / <code>"craft-image-list"</code>.</li>
+    <li><strong>Distinct activity_ids inside <code>make_extract_pages</code></strong>: this is the only method that dispatches two activities, so we explicitly construct <code>f"{wfid}-pages"</code> for <code>act_extract_gen_extract_pages</code> and <code>f"{wfid}-render-page-views"</code> for the conditional <code>act_render_page_views</code>.</li>
+    <li><strong>Runtime check the invariant</strong> — see below.</li>
+  </ul>
+</div>
+
+<div class="layer l4">
+  <h3>5.4 · Runtime uniqueness check, replay-safe</h3>
+  <p>The generator carries a <code>self._seen_activity_ids: dict[str, set[str]]</code> keyed by <code>workflow.info().workflow_id</code>. Each <code>make_*</code> method adds its computed <code>activity_id</code> to the per-workflow set and raises <code>ContentGenerationError</code> on duplicate insert. Two non-obvious choices:</p>
+  <ul class="tight">
+    <li><strong>Keyed by workflow_id, not a flat set.</strong> The generator instance is set once on the hub and reused across many workflow runs (<code>pipelex.py</code> wires it once). A flat <code>set[str]</code> would produce cross-run false positives the second time any workflow hits the same default <code>wfid</code>.</li>
+    <li><strong>Gated by <code>workflow.unsafe.is_replaying()</code>.</strong> During replay, the check short-circuits. Without this, a cache-eviction replay on the same worker process would raise a spurious "duplicate activity_id" against the populated set from the original execution — the worker process holds the set in memory across replays of the same workflow_id.</li>
+  </ul>
+  <p>The audit proves no current call site triggers this, so the check is a regression guard, not a runtime cost. (Follow-up: the dict has no eviction — see Follow-up TODOs.)</p>
+</div>
+
+<div class="layer l5">
+  <h3>5.5 · Asymmetric <code>inference_task_queue</code> rule — provisional, isolated</h3>
+  <p>Today's routing rule: <strong>LLM-text goes to <code>inference_task_queue</code>, everything else goes to the workflow's default queue.</strong> This was introduced as a quick split-worker test setup; it is NOT the long-term design. Real deployments will want per-provider, per-model, per-activity-class routing (full design in <code>per-activity-queue-routing-v1.md</code>, out of scope for this PR).</p>
+  <p>To survive cleanly until that lands, we extracted a tiny module-private helper:</p>
+  <div class="diff">
+    <div class="diff-header">pipelex/temporal/tprl_content_generation/content_generator_in_workflow.py</div>
+    <pre><span class="line ctx">def _inference_dispatch_kwargs(worker_config) -&gt; dict[str, Any]:</span>
+<span class="line ctx">    """Stopgap. Single deletion point when per-activity routing lands.</span>
+<span class="line ctx">    See wip/temporal-primitives/per-activity-queue-routing-v1.md."""</span>
+<span class="line ctx">    return {"task_queue": worker_config.inference_task_queue}</span></pre>
+  </div>
+  <p>Called at the single LLM-text dispatch site by <code>**</code>-unpacking. Unit tests pin both directions: LLM-text passes <code>task_queue=worker_config.inference_task_queue</code>, every other method must NOT pass <code>task_queue=</code> (over-routing would break split-worker production where the runner doesn't register image-gen / extract on the inference queue).</p>
+</div>
+
+<h2>6 — Code: the LLM-text dispatch, before vs after</h2>
+
+<p>The whole refactor boils down to substituting one Temporal SDK call for another. Below is the LLM-text path. The other six methods follow the identical pattern.</p>
+
+<div class="side">
+  <div>
+    <h4>Before — ContentGeneratorChild + WfMakeLLMText</h4>
+<pre># content_generator_child.py
+async def make_llm_text(
+    self,
+    llm_assignment: LLMAssignment,
+    wfid: str = "craft-text",
+    ...
+) -&gt; str:
+    child_workflow_id = make_child_workflow_id(
+        parent_id=workflow.info().workflow_id,
+        wfid=wfid,
+    )
+    return await self._workflow_executor \
+        .execute_child_workflow(
+            WfMakeLLMText,
+            arg=llm_assignment,
+            id=child_workflow_id,
+            ...
+        )
+
+# wf_make_llm_text.py
+@workflow.defn(name="wf_make_llm_text")
+class WfMakeLLMText(
+    WorkflowClass[LLMAssignment, str]
+):
+    @workflow.run
+    async def run(
+        self, arg: LLMAssignment
+    ) -&gt; str:
+        wc = get_config().temporal.worker_config
+        try:
+            return await workflow.start_activity(
+                activity=act_llm_gen_text,
+                arg=arg,
+                start_to_close_timeout=
+                    wc.workflow_execution_timeout,
+                retry_policy=wc.retry_policy,
+                task_queue=wc.inference_task_queue,
+            )
+        except ActivityError as exc:
+            if isinstance(exc.cause, ApplicationError):
+                raise TemporalError.from_app_error(
+                    exc=exc.cause
+                ) from exc
+            raise</pre>
+  </div>
+  <div>
+    <h4>After — ContentGeneratorInWorkflow only</h4>
+<pre># content_generator_in_workflow.py
+async def make_llm_text(
+    self,
+    llm_assignment: LLMAssignment,
+    wfid: str = "craft-text",
+    ...
+) -&gt; str:
+    self._check_activity_id_unique(wfid)
+    wc = get_config().temporal.worker_config
+    try:
+        # LLM-text only: route to inference queue.
+        # See _inference_dispatch_kwargs docstring.
+        return await workflow.execute_activity(
+            act_llm_gen_text,
+            llm_assignment,
+            start_to_close_timeout=
+                wc.workflow_execution_timeout,
+            retry_policy=wc.retry_policy,
+            activity_id=wfid,
+            **_inference_dispatch_kwargs(wc),
+        )
+    except ActivityError as exc:
+        if isinstance(exc.cause, ApplicationError):
+            raise TemporalError.from_app_error(
+                exc=exc.cause
+            ) from exc
+        raise
+
+# wf_make_llm_text.py
+#  ──────── DELETED ────────</pre>
+  </div>
+</div>
+
+<p>Notice what stayed identical: the <code>try/except ActivityError → TemporalError.from_app_error(…)</code> translation, the <code>start_to_close_timeout</code> + <code>retry_policy</code> values, and the asymmetric <code>task_queue</code> routing. The behavioral surface is preserved; only the indirection is gone.</p>
+
+<h2>7 — The runtime uniqueness check, in code</h2>
+
+<div class="diff">
+  <div class="diff-header">pipelex/temporal/tprl_content_generation/content_generator_in_workflow.py</div>
+  <pre><span class="line ctx">class ContentGeneratorInWorkflow:</span>
+<span class="line ctx">    def __init__(self):</span>
+<span class="line ctx">        # Keyed by workflow_id because this generator instance is set once on</span>
+<span class="line ctx">        # the hub and reused across many workflow runs. A flat set[str] would</span>
+<span class="line ctx">        # produce cross-run false positives.</span>
+<span class="line ctx">        self._seen_activity_ids: dict[str, set[str]] = {}</span>
+<span class="line ctx"> </span>
+<span class="line ctx">    def _check_activity_id_unique(self, activity_id: str) -&gt; None:</span>
+<span class="line ctx">        # During replay, Temporal re-walks the history. The set is already</span>
+<span class="line ctx">        # populated from the original execution; without this guard, a</span>
+<span class="line ctx">        # cache-eviction replay would raise a spurious duplicate.</span>
+<span class="line ctx">        if workflow.unsafe.is_replaying():</span>
+<span class="line ctx">            return</span>
+<span class="line ctx">        wf_id = workflow.info().workflow_id</span>
+<span class="line ctx">        seen = self._seen_activity_ids.setdefault(wf_id, set())</span>
+<span class="line ctx">        if activity_id in seen:</span>
+<span class="line ctx">            msg = f"Duplicate activity_id {activity_id!r} in workflow {wf_id!r}"</span>
+<span class="line ctx">            raise ContentGenerationError(msg)</span>
+<span class="line ctx">        seen.add(activity_id)</span></pre>
+</div>
+
+<div class="note">
+  <strong>Why this is a guard, not a hot-path cost.</strong> The Phase 0 audit proved no current call site can trigger this (every protocol method is mutually exclusive within one <code>PipeOperator</code> execution). The check is here to catch <em>future</em> regressions: a new operator call site that calls the same protocol method twice would silently break on Temporal's "duplicate activity_id" error; instead it now fails fast with a typed Pipelex error and a clear message.
+</div>
+
+<h2>8 — The <code>make_extract_pages</code> page-views fix</h2>
+
+<p>This is the one place where the refactor isn't pure deletion — it fixes a pre-existing behavioral divergence between the direct-mode and Temporal-mode generators.</p>
+
+<p>The <strong>direct-mode</strong> <code>ContentGenerator.make_extract_pages</code> augments its return when <code>extract_job_params.should_include_page_views</code> is true: it calls <code>make_render_page_views(…)</code> for multi-page <code>document_uri</code> inputs, or constructs a single-element page view inline for <code>image_uri</code> inputs.</p>
+
+<p>The <strong>Temporal-mode</strong> <code>ContentGeneratorChild.make_extract_pages</code> did NOT. It just dispatched <code>WfMakeExtract</code> and returned the page contents as-is, missing both augmentations. Per the project's "flag and fix existing bugs" rule, the collapse is the right moment to fix it.</p>
+
+<p>The new <code>make_extract_pages</code> mirrors the direct generator exactly — and it is the only protocol method that dispatches more than one activity, so it earns special handling for activity_id uniqueness:</p>
+
+<div class="diff">
+  <div class="diff-header">ContentGeneratorInWorkflow.make_extract_pages</div>
+  <pre><span class="line ctx">async def make_extract_pages(self, ...) -&gt; ExtractPagesOutput:</span>
+<span class="line ctx">    base_id = wfid  # e.g. "extract"</span>
+<span class="line ctx">    pages_id = f"{base_id}-pages"</span>
+<span class="line ctx">    page_views_id = f"{base_id}-render-page-views"</span>
+<span class="line ctx">    self._check_activity_id_unique(pages_id)</span>
+<span class="line ctx"> </span>
+<span class="line ctx">    # First activity: real extraction.</span>
+<span class="line ctx">    output = await workflow.execute_activity(</span>
+<span class="line ctx">        act_extract_gen_extract_pages, ...,</span>
+<span class="line ctx">        activity_id=pages_id,</span>
+<span class="line ctx">    )</span>
+<span class="line ctx"> </span>
+<span class="line ctx">    if not extract_job_params.should_include_page_views:</span>
+<span class="line ctx">        return output  # no double-emit when false</span>
+<span class="line ctx"> </span>
+<span class="line add">+    if extract_input.document_uri is not None:</span>
+<span class="line add">+        # Second activity: render page views from the document.</span>
+<span class="line add">+        self._check_activity_id_unique(page_views_id)</span>
+<span class="line add">+        page_views = await workflow.execute_activity(</span>
+<span class="line add">+            act_render_page_views, ...,</span>
+<span class="line add">+            activity_id=page_views_id,</span>
+<span class="line add">+        )</span>
+<span class="line add">+    elif extract_input.image_uri is not None:</span>
+<span class="line add">+        # Single image → single-element page view, no second activity.</span>
+<span class="line add">+        page_views = [ImageContent(url=extract_input.image_uri)]</span>
+<span class="line add">+    else:</span>
+<span class="line add">+        page_views = []</span>
+<span class="line add">+</span>
+<span class="line add">+    if len(page_views) != len(output.page_contents):</span>
+<span class="line add">+        raise ContentGenerationError("page_views length mismatch")</span>
+<span class="line add">+</span>
+<span class="line add">+    for page_content in output.page_contents:</span>
+<span class="line add">+        page_content.page_view = page_views.pop(0)</span>
+<span class="line ctx">    return output</span></pre>
+</div>
+
+<p>The two-activity branch is the most fragile post-collapse path — it's the only place where the activity_id uniqueness mitigation actually matters in production. It's covered three ways:</p>
+
+<ul class="tight">
+  <li><strong>Unit tests</strong> (Phase 1): all three branches — no-page-views, <code>image_uri</code>, <code>document_uri</code>.</li>
+  <li><strong>Real-PDF integration test</strong> (Phase 4): <code>TestTprlContentGeneratorPdfPageViews</code> exercises the multi-page <code>document_uri</code> branch end-to-end through real Temporal, against a local 2-page PDF (multi-page catches <code>pop(0)</code> ordering bugs that a 1-page PDF would not).</li>
+  <li><strong>Cross-process regression guard</strong> (Phase 7): <code>TestSplitWorkerExtractPages</code> asserts via <code>WorkflowHandle.fetch_history()</code> that two <code>ActivityTaskScheduled</code> events appear with activity_ids <code>"extract-pages"</code> and <code>"extract-render-page-views"</code> — pins the contract.</li>
+</ul>
+
+<h2>9 — File-level inventory</h2>
+
+<div class="layer l5">
+  <h3>Deleted <span class="pill pill-drop">−11 files</span></h3>
+  <p>All under <code>pipelex/temporal/tprl_content_generation/</code>:</p>
+  <ul class="tight">
+    <li><code>wf_make_llm_text.py</code></li>
+    <li><code>wf_make_object.py</code> (held both <code>WfMakeObject</code> and <code>WfMakeObjectList</code>)</li>
+    <li><code>wf_make_images.py</code></li>
+    <li><code>wf_make_jinja2_text.py</code></li>
+    <li><code>wf_make_extract.py</code></li>
+    <li><code>wf_render_page_views.py</code></li>
+    <li><code>content_generator_top.py</code> + <code>content_generator_top_factory.py</code> (test-only, dispatched <code>WfMake*</code> from the submitter side)</li>
+    <li><code>content_generator_child.py</code> + <code>content_generator_child_factory.py</code></li>
+    <li><code>content_generator_models.py</code> (the <code>AssignmentType</code> / <code>ResultType</code> unions, only consumed by the two deleted generators)</li>
+  </ul>
+  <p>Plus four test files: <code>test_tprl_content_generator_top.py</code>, <code>test_tprl_make_content_generator.py</code>, and two already-commented historical files <code>test_wf_gen_text.py</code> + <code>test_wf_jinja2.py</code>.</p>
+</div>
+
+<div class="layer l3">
+  <h3>Added <span class="pill pill-new">+1 file</span></h3>
+  <ul class="tight">
+    <li><code>content_generator_in_workflow.py</code> — the single new generator implementing <code>ContentGeneratorProtocol</code>, one method per activity, ~300 lines.</li>
+    <li><code>content_generator_in_workflow_factory.py</code> — its producer.</li>
+    <li><code>tests/unit/pipelex/temporal/test_content_generator_in_workflow.py</code> — covers task_queue positive/negative, activity_id threading, the <code>craft-image-single</code> / <code>craft-image-list</code> split, the two-activity branch in <code>make_extract_pages</code>, the runtime duplicate check, replay-safety of the check, and <code>ActivityError → TemporalError</code> translation (both branches).</li>
+  </ul>
+</div>
+
+<div class="layer l2">
+  <h3>Modified <span class="pill pill-modify">touched</span></h3>
+  <ul class="tight">
+    <li><code>pipelex/temporal/tasks.py</code> — dropped the <code>WfMake*</code> + <code>WfRenderPageViews</code> imports; <code>crafting</code> <code>TaskPack</code>'s <code>workflow_list</code> is now empty. Activity list unchanged.</li>
+    <li><code>pipelex/pipelex.py</code> — when <code>temporal.is_enabled</code>, constructs <code>ContentGeneratorInWorkflowFactory</code> unconditionally. The feature flag (briefly named <code>PIPELEX_USE_IN_WORKFLOW_CONTENT_GENERATOR</code>, then flipped and renamed to <code>PIPELEX_USE_LEGACY_CONTENT_GENERATOR</code>) was deleted at Phase 6.</li>
+    <li><code>pipelex/temporal/test_extras/wf_test_content_generator_child.py</code> — re-pointed to construct the new generator.</li>
+    <li>Test conftests (parent + <code>content_generation/</code>) — removed the <code>top_crafter</code> / <code>child_crafter</code> fixtures and their imports.</li>
+    <li>Tracing docs in <code>test_split_worker_usage.py</code> and <code>helpers.py</code> — describe the direct-activity-call topology.</li>
+    <li><code>docs/under-the-hood/pipe-routing-and-execution.md</code> — renamed "Content Generation Workflows" section to "Content Generation Activities"; replaced the two-column workflow|activity table with a single activity table.</li>
+    <li><code>docs/under-the-hood/temporal-integration.md</code> — four reference updates (PipeSequence topology box, Controller Dispatch Patterns table, "Internal sub-workflows" subsection renamed, Known Limitation section).</li>
+    <li><code>CHANGELOG.md</code> <code>[Unreleased]</code> — a new <code>Changed</code> entry covering the deletions, durability invariant, activity_id naming, the isolated <code>inference_task_queue</code> rule, and the page-views fix.</li>
+  </ul>
+</div>
+
+<h2>10 — Phase-by-phase landing plan</h2>
+
+<p>Each phase ends with <code>make agent-check &amp;&amp; make agent-test</code>. Two checkpoints — natural commit boundaries — are placed at A (ready to flip the flag) and B (codebase in target state).</p>
+
+<table>
+  <thead><tr><th>Phase</th><th>What lands</th><th>Risk gate</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>Pre-flight audit: confirm per-workflow uniqueness invariant for Strategy (i). No code changes — produces an entry in <strong>Decisions</strong>.</td><td>30 min audit vs. duplicate-activity_id runtime errors later.</td></tr>
+    <tr><td>1</td><td>Build the new <code>ContentGeneratorInWorkflow</code> + factory + unit tests. No wiring.</td><td>Compile-only.</td></tr>
+    <tr><td>2</td><td>Wire behind env-flag <code>PIPELEX_USE_IN_WORKFLOW_CONTENT_GENERATOR</code> in <code>pipelex.py</code> + both Temporal conftests. Default OFF.</td><td>Both flag values pass the targeted Temporal subsets.</td></tr>
+    <tr><td>3</td><td>Re-point <code>WfTestContentGeneratorChild</code> to the new generator (test fixture; exercises new code regardless of flag).</td><td><code>content_generation/</code> integration suite green.</td></tr>
+    <tr><td>4</td><td>Fix the <code>make_extract_pages</code> page-views asymmetry (folded into Phase 1 since it's a Phase 1 method).</td><td>Unit tests cover all three branches.</td></tr>
+    <tr><td><strong>✅ A</strong></td><td><strong>Checkpoint A</strong> — new generator validated end-to-end, ready to flip. Commit boundary.</td><td></td></tr>
+    <tr><td>5</td><td>Flip the env-flag default. Rename to <code>PIPELEX_USE_LEGACY_CONTENT_GENERATOR</code> so polarity is self-documenting.</td><td>Full <code>make agent-test</code> green under new default.</td></tr>
+    <tr><td>6</td><td>Delete the old surface in one commit: 11 source files, 4 test files, plus the env-flag branch. Re-generate <code>_generated_model_sets.py</code> after <code>make cleanderived</code>.</td><td><code>make tb</code> + <code>make agent-test</code> green.</td></tr>
+    <tr><td>7</td><td>Cross-process coverage: <code>TestSplitWorkerObjectGen</code> (Tier 9), Tier 10 image-gen split-worker negative-routing assertion, <code>TestSplitWorkerExtractPages</code> (Tier 11). Extract <code>_inference_dispatch_kwargs</code> helper to isolate the provisional 2-queue model.</td><td>Three new tests pass.</td></tr>
+    <tr><td>8</td><td>Update docstrings + docs in <code>docs/under-the-hood/</code>, the tracing docstrings, and CHANGELOG.</td><td>Grep verifies no stale <code>WfMake*</code> / <code>wf_make_*</code> references outside CHANGELOG.</td></tr>
+    <tr><td><strong>✅ B</strong></td><td><strong>Checkpoint B</strong> — codebase in target state. Commit boundary.</td><td></td></tr>
+    <tr><td>9</td><td>Final verification: full real-server pytest run + Temporal history smoke against split workers + replay-history grep.</td><td>Zero <code>wf_make_*</code> / <code>wf_render_page_views</code> workflow types observed in <code>temporal workflow list</code>.</td></tr>
+  </tbody>
+</table>
+
+<h2>11 — Where bugs are most likely to hide</h2>
+
+<div class="note">
+  <strong>1. The asymmetric <code>task_queue=inference_task_queue</code> rule.</strong> Easy to forget at the LLM-text site or to over-apply elsewhere. Mis-routing image-gen to the inference queue would break split-worker production where the runner doesn't register the image-gen activity. Covered by the unit test pinning the helper symbol on both positive (LLM-text) and negative (other methods) assertions.
+</div>
+
+<div class="note">
+  <strong>2. <code>activity_id</code> collisions under repeated calls.</strong> The default <code>wfid</code> values are method-specific constants; they do NOT disambiguate repeated calls to the same method. The Phase 1 runtime check (<code>dict[workflow_id, set[str]]</code>, gated by <code>workflow.unsafe.is_replaying()</code>) converts this from a documented invariant to a checked one and is replay-safe.
+</div>
+
+<div class="note">
+  <strong>3. <code>model_validate(obj.model_dump(mode="json", serialize_as_any=True))</code> round-trips</strong> for <code>make_object</code> / <code>make_object_list</code>. Required because the activity boundary returns a generic <code>BaseModel</code>. Use <code>mode="json"</code> on BOTH — <code>ContentGeneratorChild.make_object_list</code> omitted it (pre-existing asymmetry). Tier 9 cross-process test (<code>TestSplitWorkerObjectGen</code>) validates the nested-field round-trip through Temporal's data converter.
+</div>
+
+<div class="note">
+  <strong>4. Page-views augmentation in <code>make_extract_pages</code>.</strong> Mirror the direct generator's branching exactly: no double-emit when <code>should_include_page_views</code> is false; handle both <code>document_uri</code> (multi-page render) and <code>image_uri</code> (single-image) inputs; assert length match. Triple-covered (unit + real-PDF + cross-process).
+</div>
+
+<div class="note">
+  <strong>5. Test infrastructure bypass.</strong> Both <code>tests/integration/pipelex/temporal/conftest.py</code> and <code>test_payload_codec_pipeline.py</code> explicitly call <code>pipelex_hub.set_content_generator(...)</code> after <code>Pipelex.make()</code>, so the env-flag branch in <code>pipelex.py</code> was bypassed in tests during Phase 2. Both conftests had to mirror the flag, then drop the branch at Phase 6.
+</div>
+
+<h2>12 — Follow-up TODOs (out of scope)</h2>
+
+<ul class="tight">
+  <li><strong>Per-activity, per-handle Temporal queue routing.</strong> Replace the provisional <code>inference_task_queue</code> binary model with a general routing system covering LLM, image-gen, and extract — keyed by <code>(activity_name, runtime_handle)</code>. Full design in <code>wip/temporal-primitives/per-activity-queue-routing-v1.md</code>. The Phase 7 stopgap helper <code>_inference_dispatch_kwargs</code> is the single deletion point when this lands.</li>
+  <li><strong>Watch task-queue saturation post-deploy.</strong> Today a <code>PipeSequence</code> of N inference calls schedules N child workflows, decoupling activity scheduling across child task lists. Post-collapse, all N activities run through the parent's task list (or <code>inference_task_queue</code> for LLM-text). For deep pipelines (N &gt; 50), single-queue QPS could spike. Watch <code>ScheduleToStartLatency</code> on both queues. Not blocking; upside dominates.</li>
+  <li><strong>Drop <code>make_render_page_views</code> from <code>ContentGeneratorProtocol</code></strong> if no operator caller emerges within one release cycle. Today it's only invoked internally from <code>make_extract_pages</code>; the Protocol method is dead code from the operator side. Estimated savings: ~50 lines across four files.</li>
+  <li><strong>Fix <code>make_extract_pages</code> Protocol-violating signature</strong> in the direct generator (defaults <code>extract_job_params</code> / <code>extract_job_config</code> to <code>None</code> while the Protocol requires non-None).</li>
+  <li><strong>Bound <code>_seen_activity_ids</code> growth.</strong> The dict never evicts. A long-running worker accumulates one entry per processed workflow_id over its lifetime. Add an eviction hook on workflow completion, or move the set into workflow-local state via a contextvar set at the start of <code>WfPipeRouter.run</code>.</li>
+</ul>
+
+<h2>13 — TL;DR for the reviewer</h2>
+
+<div class="ok">
+  <ol style="margin: 0.3rem 0 0.3rem 1.2rem;">
+    <li>Seven <code>WfMake*</code> child workflows were structurally identical 5-line wrappers around one activity each. Gone.</li>
+    <li>Two near-duplicate generators (<code>ContentGeneratorTop</code>, <code>ContentGeneratorChild</code>) collapse into one <code>ContentGeneratorInWorkflow</code> that calls <code>workflow.execute_activity(…)</code> directly.</li>
+    <li>History events per content-generation call: ≈12 → 3. Per-LLM-call durability preserved (activity boundary unchanged).</li>
+    <li>The asymmetric <code>inference_task_queue</code> rule survives — isolated in <code>_inference_dispatch_kwargs</code>, marked provisional, single deletion point when per-activity routing lands.</li>
+    <li>Activity_id observability preserved via <code>activity_id=wfid</code>; runtime uniqueness check is replay-safe and per-workflow.</li>
+    <li>The <code>make_extract_pages</code> page-views asymmetry between direct-mode and Temporal-mode is fixed in passing (project's "flag and fix" rule).</li>
+    <li>Net: 11 files deleted, 1 added; behavior preserved on every covered path; tests strengthened cross-process for the post-collapse paths.</li>
+  </ol>
+</div>
+
+<p class="small">Companion docs: <code>collapse-content-generation-workflow-layer-v2.md</code> (the why), <code>TODOS.md</code> (the executable plan), <code>per-activity-queue-routing-v1.md</code> (the deletion target for the provisional queue rule).</p>
+
+</body>
+</html>

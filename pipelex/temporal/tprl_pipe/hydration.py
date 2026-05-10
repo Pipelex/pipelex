@@ -17,15 +17,15 @@ from pipelex.pipe_run.exceptions import PipeJobError
 def _validate_as_known_class(item_class: type[StuffContent], raw_item: StuffContent | dict[str, Any]) -> StuffContent:
     """Validate raw_item into item_class, tolerating cross-exec instances.
 
-    When a child workflow ships a ListContent back, ``dump_for_temporal`` embeds
-    ``__class__`` metadata on each item. kajson (in the Temporal data converter)
-    eagerly rebuilds class instances from that metadata *before* the parent
-    workflow runs ``load_from_crate``. That later crate load re-execs the
-    dynamic source and replaces the class in the registry — same name, new
-    Python identity. Pydantic's ``model_validate`` then rejects the old
-    instance because ``type(raw_item) is not item_class``. To bridge the gap,
-    we round-trip through ``smart_dump()`` (serialize_as_any) when we detect a
-    cross-exec instance, so nested subclass fields survive the round-trip.
+    The Temporal hot path now ships ListContent items as plain dicts with
+    pipelex-private ``__pipelex_class__`` / ``__pipelex_module__`` markers
+    (see ``WorkingMemory.dump_for_temporal``), so kajson never eagerly rehydrates
+    them — the ``isinstance(raw_item, StuffContent)`` branch below is defensive,
+    kept for direct (non-Temporal) callers and for any future path where kajson
+    might still produce an instance whose class identity drifted across execs.
+    In that drift case, ``model_validate`` would reject the old instance because
+    ``type(raw_item) is not item_class``, so we round-trip through
+    ``smart_dump()`` (serialize_as_any) to let nested subclass fields survive.
     """
     if isinstance(raw_item, StuffContent):
         if type(raw_item) is item_class:
@@ -39,8 +39,10 @@ def _validate_as_known_class(item_class: type[StuffContent], raw_item: StuffCont
 def _hydrate_list_item(raw_item: dict[str, Any] | str | StuffContent) -> StuffContent:
     """Hydrate a single list item for Anything[] results.
 
-    Tries __class__ metadata first, falls back to TextContent for plain text or
-    dicts with a 'text' key (the common case for Anything outputs).
+    Resolves the item class from the pipelex-private ``__pipelex_class__`` /
+    ``__pipelex_module__`` markers written by ``dump_for_temporal``. Falls back
+    to TextContent for plain text or dicts with a 'text' key (the common case
+    for Anything outputs without explicit type metadata).
     """
     if isinstance(raw_item, str):
         return TextContent(text=raw_item)
@@ -55,10 +57,10 @@ def _hydrate_list_item(raw_item: dict[str, Any] | str | StuffContent) -> StuffCo
             return _validate_as_known_class(item_class_or_none, raw_item)
         return raw_item
 
-    class_name = raw_item.get("__class__")
+    class_name = raw_item.get("__pipelex_class__")
     if class_name is not None:
         item_class = get_class_registry().get_required_subclass(name=class_name, base_class=StuffContent)
-        clean_item = {key: val for key, val in raw_item.items() if key not in {"__class__", "__module__"}}
+        clean_item = {key: val for key, val in raw_item.items() if key not in {"__pipelex_class__", "__pipelex_module__"}}
         return cast("StuffContent", item_class.model_validate(clean_item))
 
     # No __class__ metadata — fall back to TextContent for simple text dicts.
@@ -76,7 +78,9 @@ def hydrate_content(concept: Concept, raw_content: list[Any] | dict[str, Any] | 
     Handles both plain content and ListContent.  The Temporal serialization
     format (produced by ``WorkingMemory.dump_for_temporal()``) encodes
     ListContent as a plain JSON list and single StuffContent as a dict,
-    so the type check is unambiguous — no heuristic required.
+    so the type check is unambiguous — no heuristic required.  ListContent
+    items carry pipelex-private ``__pipelex_class__`` / ``__pipelex_module__``
+    markers so kajson's universal decoder leaves them alone in transit.
 
     The concept's ``structure_class_name`` always refers to the *item* type,
     even when the stuff holds a list of those items.

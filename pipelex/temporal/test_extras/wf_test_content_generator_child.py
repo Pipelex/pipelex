@@ -7,12 +7,13 @@ with workflow.unsafe.imports_passed_through():
     from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
     from pipelex.cogt.extract.extract_input import ExtractInput
     from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
+    from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
     from pipelex.cogt.llm.llm_prompt import LLMPrompt
     from pipelex.hub import get_model_deck
     from pipelex.pipeline.job_metadata import JobMetadata
     from pipelex.temporal.log_temporal import workflow_log
     from pipelex.temporal.test_extras.temporal_registry_test_models import Person
-    from pipelex.temporal.tprl_content_generation.content_generator_child_factory import ContentGeneratorChildFactory
+    from pipelex.temporal.tprl_content_generation.content_generator_in_workflow_factory import ContentGeneratorInWorkflowFactory
     from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
     from tests.integration.pipelex.temporal.test_data import PipeTestCases
 
@@ -50,7 +51,7 @@ class WfTestContentGeneratorChild:
             content_generator = ContentGeneratorDry()
         else:
             generated_content_factory = GeneratedContentFactory(storage_provider=InMemoryStorageProvider())
-            content_generator = ContentGeneratorChildFactory.make_content_generator_child(
+            content_generator = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow(
                 generated_content_factory=generated_content_factory,
             )
 
@@ -84,12 +85,13 @@ class WfTestContentGeneratorChild:
         )
         pretty_print(crafted_object_list_direct, title="make_object_list")
 
-        # TODO: fix this
-        # crafted_image = await content_generator.craft_image(
-        #     job_metadata=job_metadata,
-        #     img_gen_prompt=ImgGenPrompt(positive_text=POSITIVE_TEXT_FOR_IMAGE),
-        # )
-        # pretty_print(crafted_image, title="craft_image")
+        crafted_image = await content_generator.make_single_image(
+            img_gen_handle="gpt-image-1-mini",
+            job_metadata=job_metadata,
+            img_gen_prompt=ImgGenPrompt(positive_text=POSITIVE_TEXT_FOR_IMAGE),
+        )
+        pretty_print(crafted_image, title="make_single_image")
+
         context = {
             "the_answer": "elementary, my dear Watson",
         }

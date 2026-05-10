@@ -222,17 +222,21 @@ Custom Temporal payload converter that uses Kajson for serializing/deserializing
 
 Entry point for the worker process. Calls `Pipelex.make(temporal_enabled=True)` to initialize the framework, then starts the Temporal worker with registered workflows and activities.
 
-### Content Generation Workflows
+### Content Generation Activities
 
-Concrete pipe operators (PipeLLM, PipeCompose, PipeExtract, PipeImgGen) use dedicated Temporal workflows and activities for their actual work:
+Concrete pipe operators (PipeLLM, PipeCompose, PipeExtract, PipeImgGen) dispatch dedicated Temporal activities for their actual work. Activities are invoked directly from inside `WfPipeRouter` via `ContentGeneratorInWorkflow` (`pipelex/temporal/tprl_content_generation/content_generator_in_workflow.py`), which calls `workflow.execute_activity(act_*, ...)` — there is no intermediate child workflow per content-generation call.
 
-| Workflow | Activity | Purpose |
-|----------|----------|---------|
-| `wf_make_llm_text` | `act_llm_gen_text` | LLM text generation |
-| `wf_make_object` | `act_llm_gen_object` | LLM structured output |
-| `wf_make_jinja2_text` | `act_jinja2_gen_text` | Jinja2 template rendering |
-| `wf_make_extract` | `act_extract_gen_extract_pages` | Document extraction |
-| `wf_make_image` | `act_img_gen_images` | Image generation |
+| Activity | Purpose |
+|----------|---------|
+| `act_llm_gen_text` | LLM text generation |
+| `act_llm_gen_object` | LLM structured output (single object) |
+| `act_llm_gen_object_list` | LLM structured output (list) |
+| `act_jinja2_gen_text` | Jinja2 template rendering |
+| `act_extract_gen_extract_pages` | Document extraction (OCR) |
+| `act_render_page_views` | PDF page rendering (page-views) |
+| `act_img_gen_images` | Image generation |
+
+`act_llm_gen_text` is the one activity that supports task-queue routing today: `ContentGeneratorInWorkflow.make_llm_text` passes `task_queue=worker_config.inference_task_queue` so inference can be deployed on a separate worker pool from the router. All other activities run on the workflow's own task queue. General per-activity routing is on the roadmap.
 
 ### Worker Environment
 
@@ -269,7 +273,7 @@ Each workflow creates its own `ClassRegistry` (pre-seeded from the global regist
 
 ### Known Limitation: StuffArtefact Serialization in Dry-Run
 
-PipeCondition and PipeCompose dispatch internal `WfMakeJinja2Text` sub-workflows that serialize working memory contents through the Temporal data converter. In dry-run mode, working memory contains `StuffArtefact` debug objects that are not JSON-serializable, causing these internal workflows to fail. PipeBatch also fails in dry-run (likely a related serialization issue in child PipeJob creation). PipeSequence and PipeParallel are unaffected — they dispatch child pipes through `SubPipe.run_pipe()` without internal templating workflows. See [Temporal Integration](./temporal-integration.md#known-limitation-stuffartefact-serialization-in-dry-run) for details and fix direction.
+PipeCondition and PipeCompose dispatch the `act_jinja2_gen_text` activity (via `ContentGeneratorInWorkflow.make_templated_text`) to render their expression / construct templates. The activity serializes working memory contents through the Temporal data converter. In dry-run mode, working memory contains `StuffArtefact` debug objects that are not JSON-serializable, causing these internal activities to fail. PipeBatch also fails in dry-run (likely a related serialization issue in child PipeJob creation). PipeSequence and PipeParallel are unaffected — they dispatch child pipes through `SubPipe.run_pipe()` without internal templating activities. See [Temporal Integration](./temporal-integration.md#known-limitation-stuffartefact-serialization-in-dry-run) for details and fix direction.
 
 ---
 

@@ -24,7 +24,7 @@ class JsonTypeError(ToolError):
     pass
 
 
-CLEAN_JSON_FIELDS_TO_SKIP = ("__class__", "__module__")
+CLEAN_JSON_FIELDS_TO_SKIP = ("__class__", "__module__", "__pipelex_class__", "__pipelex_module__")
 
 
 def clean_json_content(content: Any) -> Any:
