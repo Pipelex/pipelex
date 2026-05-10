@@ -6,6 +6,16 @@
 >
 > **Pin for whoever picks this up:** see [§ Tests to upgrade when v1 lands](#tests-to-upgrade-when-v1-lands) — Phase 7 shipped two pytest files (`test_split_worker_object_gen.py`, `test_split_worker_extract_pages.py`) that deliberately use a single-worker setup because object/extract activities have no `inference_task_queue` analog today. Those tests are the primary callers of the upgrade and the easiest way to validate v1 end-to-end.
 
+## First actions (cold-start checklist)
+
+To orient yourself in a new session, in this order:
+
+1. Work happens on `feature/Per-activity-queue`, branched off `feature/Temporal-primitives-tto-merge` (the integration branch where the predecessor `refactor/Temporal-primitives` is merged in alongside the TTO work). Confirm with `git branch --show-current`.
+2. Map the deletion point and its pins: `grep -rn "_inference_dispatch_kwargs\|inference_task_queue" pipelex/ tests/`. Expect ~5 source hits (the helper itself, its single caller in `make_llm_text`, the config field on `WorkerConfig`) and ~10 test hits (the two unit-test pin sites in `tests/unit/pipelex/temporal/test_content_generator_in_workflow.py` and the integration fixture in `tests/integration/pipelex/temporal/tracing/test_split_worker_usage.py`).
+3. Read the current `WorkerConfig` shape (`pipelex/temporal/config_temporal.py` around line 175) and the default values in `pipelex/pipelex.toml` under `[temporal.worker_config]`. The schema change lands in both.
+4. Verify the assignment-model handles still expose what § Per-activity routing keys claims: `grep -n "llm_handle\|img_gen_handle\|extract_handle" pipelex/cogt/content_generation/assignment_models.py`. The doc is dated against today's tree; re-verify in case anyone renamed since.
+5. Gates: `make agent-check` (lint/types) and `make agent-test` (silent on success) after each phase. Follow CLAUDE.md.
+
 ## Problem
 
 Pipelex deployments need worker-pool granularity beyond the current binary "inference / default" split:
@@ -257,3 +267,5 @@ Adjacent surfaces to revisit at the same time:
 ## Relationship to predecessor PR (`refactor/Temporal-primitives`)
 
 The predecessor collapsed `tprl_content_generation/` workflow types to direct activity dispatch — that surface is exactly the place where this routing change lands. The predecessor shipped with a tiny `_inference_dispatch_kwargs(worker_config)` helper that isolates the existing two-queue logic to a single deletion point (see `TODOS.md` Phase 7 — "Stopgap for this PR"). This v1 design replaces the helper with a real per-activity resolver.
+
+The text-then-object (TTO) merge that landed alongside the predecessor is orthogonal to this change: TTO's `BundleElaborator` rewrites `structuring_method = "preliminary_text"` into a `PipeSequence(PipeLLM → PipeStructure)` at parse time, and the synthesized `PipeStructure` step dispatches `act_llm_gen_object` through the same `ContentGeneratorInWorkflow` surface as any user-authored PipeStructure. It will be routed by the new resolver identically — no special-casing required.
