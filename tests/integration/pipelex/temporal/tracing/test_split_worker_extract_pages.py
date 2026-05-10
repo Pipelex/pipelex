@@ -110,13 +110,20 @@ class TestSplitWorkerExtractPages:
             await handle.result()
             history = await handle.fetch_history()
 
-        scheduled_activity_ids = [
+        # Filter by activity_type (not by activity_id suffix): a future test that
+        # passes a wfid like "my-pages" to make_object would otherwise pollute this
+        # assertion. Pinning to the activity name is strict.
+        extract_activity_names = {"act_extract_gen_extract_pages", "act_render_page_views"}
+        extract_ids = [
             event.activity_task_scheduled_event_attributes.activity_id
+            for event in history.events
+            if event.activity_task_scheduled_event_attributes.activity_type.name in extract_activity_names
+        ]
+        all_scheduled = [
+            (event.activity_task_scheduled_event_attributes.activity_type.name, event.activity_task_scheduled_event_attributes.activity_id)
             for event in history.events
             if event.activity_task_scheduled_event_attributes.activity_id
         ]
-        # Filter to extract/render only — act_flush_trace_events also schedules.
-        extract_ids = [activity_id for activity_id in scheduled_activity_ids if activity_id.endswith(("-pages", "-render-page-views"))]
         assert extract_ids == ["extract-pages", "extract-render-page-views"], (
-            f"Unexpected extract activity_ids in history: {extract_ids!r} (full history activity_ids: {scheduled_activity_ids!r})"
+            f"Unexpected extract activity_ids in history: {extract_ids!r} (full scheduled (type, id) pairs: {all_scheduled!r})"
         )

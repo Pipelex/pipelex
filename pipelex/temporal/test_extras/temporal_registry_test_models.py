@@ -21,14 +21,12 @@ class FixtureLineItem(BaseModel):
     does not try to collect it as a test class.
     """
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
     product_name: str
     quantity: int
     unit_price: float
 
 
 class FixtureCustomer(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
     name: str
     email: str
 
@@ -40,7 +38,6 @@ class FixtureInvoice(BaseModel):
     Temporal data converter → ``model_validate(...)``).
     """
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
     invoice_number: str
     customer: FixtureCustomer
     line_items: list[FixtureLineItem] = Field(default_factory=empty_list_factory_of(FixtureLineItem))
