@@ -460,5 +460,9 @@ class LLMAssignmentFactory(BaseModel):
   <li><strong>Investigate the kajson class-registry race</strong> in <code>test_wf_pipe_batch.py::test_batch_sequence_via_temporal[isolated]</code> when run with pytest-xdist.</li>
 </ul>
 
+<h2>10 — How this sets up the next Temporal refactor</h2>
+
+<p>The next step on this branch is the <code>collapse-content-generation-workflow-layer</code> refactor (see <code>wip/temporal-primitives/collapse-content-generation-workflow-layer-v2.md</code>): delete the <code>WfMake*</code> child-workflow wrappers entirely and have the in-workflow content generator call <code>workflow.execute_activity(act_*, …)</code> directly from inside <code>WfPipeRouter</code>. That cuts ≈12 history events per content-generation call down to 3, while keeping the per-LLM-call activity boundary (so durability is preserved). This text-then-object cleanup was the prerequisite: <code>WfMakeTextThenObject</code> / <code>WfMakeTextThenObjectList</code> were the only <code>WfMake*</code> workflows that ran two activities with non-trivial Python glue between them — exactly the case that would have made the collapse risky to do in a single shot. With them gone, every surviving <code>WfMake*</code> is now a structurally identical single-activity wrapper, and the collapse becomes pure mechanical deletion.</p>
+
 </body>
 </html>
