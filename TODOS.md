@@ -33,8 +33,19 @@
   - **Prompt topics.** All Phase-8 prompts use everyday non-AI topics (restaurants, hiking trails) — no self-references to Pipelex.
   - **PipeStructure in MTHDS not yet supported by `plxt`.** Authoring `type = "PipeStructure"` directly in a `.mthds` file fails plxt schema validation (the bundled schema in `vscode-pipelex/crates/taplo-common/schemas/mthds_schema.json` is from before this PR). The `preliminary_text` path works because the synthesized `PipeStructure` is built in-memory after plxt parsing. Phase 8.3 / 8.4 therefore exercise PipeStructure programmatically. **Follow-up:** ship a plxt release with the regenerated schema so users can author `PipeStructure` directly in MTHDS. Captured in the follow-up TODOs.
   - **Note on the previously-listed Temporal test.** The original Phase 8 bullet for "preliminary_text via Temporal" is dropped: with the runtime change in Phase 6, Temporal sees only the elaborated form (PipeSequence + PipeLLM + PipeStructure), and Temporal's PipeStructure handling rides on the existing PipeOperator path that the Temporal data converter / class registry already cover. Re-add a dedicated Temporal smoke test only if a Temporal-specific bug surfaces.
-- [ ] **Phase 9 — docs & changelog.** Not started.
-- [ ] **Phase 10 — final validation.** Not started.
+- [x] **Phase 9 — docs & changelog.** Done.
+  - New page `docs/building-methods/pipes/pipe-operators/PipeStructure.md` covering the standalone operator (mirrors the PipeLLM page shape).
+  - New page `docs/under-the-hood/build-time-elaboration.md` explaining the `BundleElaborator` mechanism (mechanism, multiplicity rule, image-input flow, pre-checks, runtime semantics).
+  - `docs/building-methods/pipes/pipe-operators/PipeLLM.md` — replaced the legacy "Direct/Preliminary Text Mode" prose with a concise overview pointing at PipeStructure; updated the `structuring_method` and `model_to_structure` rows in the parameters table; added a new "Structuring Method (preliminary_text)" section (with explicit anchor `#structuring-method-preliminary-text`) that describes the build-time elaboration, trade-offs, and when to use what.
+  - `docs/features/llm-integration.md` and `docs/building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md` — relinked references that previously pointed to the deleted `llm-structured-generation-config.md`.
+  - `mkdocs.yml` — added PipeStructure.md and build-time-elaboration.md to both the `llmstxt-md` sections list AND the `nav` tree; added redirect entries from the deleted `llm-structured-generation-config.md` paths to the new under-the-hood page.
+  - `docs/under-the-hood/index.md` — added the new page to the bullet list and the button row.
+  - `CHANGELOG.md` `[Unreleased]` — Added section for `PipeStructure`; Changed section for `structuring_method = "preliminary_text"` working again (build-time elaboration) and the runtime simplification on `PipeLLM`.
+- [x] **Phase 10 — final validation.** Done.
+  - `make agent-check` — clean (ruff, plxt, pyright, mypy all 0 errors / 0 warnings).
+  - `make docs-check` — clean under `mkdocs build --strict` (only the harmless info note about `docs/CLAUDE.md` being outside nav, which is intentional).
+  - `make agent-test` — clean (silent-on-success target).
+  - The previously-listed Phase 10 manual smoke is covered end-to-end by the Phase 8 integration tests (`test_preliminary_text_e2e.py`, `test_preliminary_text_inline_e2e.py`) — both run real LLM calls, assert exactly two `LLMTokensUsage` records per invocation, and verify the elaborated `PipeSequence` shape. No additional manual run was performed.
 
 ### Code-quality decisions made during implementation (audit notes)
 

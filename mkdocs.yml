@@ -117,6 +117,8 @@ plugins:
         'home/6-build-reliable-ai-workflows/configure-ai-llm-to-optimize-methods.md': 'building-methods/configure-ai-llm-to-optimize-methods.md'
         'home/6-build-reliable-ai-workflows/domain.md': 'building-methods/domain.md'
         'home/6-build-reliable-ai-workflows/kick-off-a-methods-project.md': 'building-methods/kick-off-a-methods-project.md'
+        'home/6-build-reliable-ai-workflows/llm-structured-generation-config.md': 'under-the-hood/build-time-elaboration.md'
+        'building-methods/llm-structured-generation-config.md': 'under-the-hood/build-time-elaboration.md'
         'home/6-build-reliable-ai-workflows/libraries.md': 'building-methods/libraries.md'
         'home/6-build-reliable-ai-workflows/packages.md': 'building-methods/packages.md'
         'home/6-build-reliable-ai-workflows/pipelex-bundle-specification.md': 'building-methods/pipelex-bundle-specification.md'
@@ -242,6 +244,7 @@ plugins:
         - building-methods/pipes/understanding-multiplicity.md: "Understanding Multiplicity"
         - building-methods/pipes/pipe-operators/index.md: "Pipe Operators Overview"
         - building-methods/pipes/pipe-operators/PipeLLM.md: "PipeLLM"
+        - building-methods/pipes/pipe-operators/PipeStructure.md: "PipeStructure"
         - building-methods/pipes/pipe-operators/PipeExtract.md: "PipeExtract"
         - building-methods/pipes/pipe-operators/PipeImgGen.md: "PipeImgGen"
         - building-methods/pipes/pipe-operators/PipeSearch.md: "PipeSearch"
@@ -295,6 +298,7 @@ plugins:
         Under the Hood:
         - under-the-hood/index.md: "Under the Hood Overview"
         - under-the-hood/architecture-overview.md: "Architecture Overview"
+        - under-the-hood/build-time-elaboration.md: "Build-time Elaboration"
         - under-the-hood/dry-run-mock-generation.md: "Dry Run Mock Generation"
         - under-the-hood/execution-graph-tracing.md: "Execution Graph Tracing"
         - under-the-hood/image-handling-in-llm-prompts.md: "Image Handling in LLM Prompts"
@@ -419,6 +423,7 @@ nav:
         - Pipe Operators:
           - Overview: building-methods/pipes/pipe-operators/index.md
           - PipeLLM: building-methods/pipes/pipe-operators/PipeLLM.md
+          - PipeStructure: building-methods/pipes/pipe-operators/PipeStructure.md
           - PipeExtract: building-methods/pipes/pipe-operators/PipeExtract.md
           - PipeImgGen: building-methods/pipes/pipe-operators/PipeImgGen.md
           - PipeSearch: building-methods/pipes/pipe-operators/PipeSearch.md
@@ -482,6 +487,7 @@ nav:
     - Under the Hood:
       - Overview: under-the-hood/index.md
       - Architecture Overview: under-the-hood/architecture-overview.md
+      - Build-time Elaboration: under-the-hood/build-time-elaboration.md
       - Dry Run Mock Generation: under-the-hood/dry-run-mock-generation.md
       - Execution Graph Tracing: under-the-hood/execution-graph-tracing.md
       - Image Handling in LLM Prompts: under-the-hood/image-handling-in-llm-prompts.md

@@ -10,6 +10,7 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 ## What You'll Find Here
 
 - **Architecture Overview** - The two-layer design and how components fit together
+- **Build-time Elaboration** - How shorthand directives like `structuring_method = "preliminary_text"` are rewritten into concrete pipe trees before any pipe runs
 - **Execution Graph Tracing** - How pipeline executions are captured as graphs for visualization
 - **Image Handling in LLM Prompts** - How images flow from inputs to LLM calls
 - **Reasoning Controls** - How reasoning effort/budget flows to each provider's SDK
@@ -29,6 +30,7 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 ## Start Exploring
 
 - [:material-sitemap: Architecture Overview](./architecture-overview.md){ .md-button .md-button--primary }
+- [:material-source-branch: Build-time Elaboration](./build-time-elaboration.md){ .md-button }
 - [:material-graph: Execution Graph Tracing](./execution-graph-tracing.md){ .md-button }
 - [:material-image-multiple: Image Handling in LLM Prompts](./image-handling-in-llm-prompts.md){ .md-button }
 - [:material-brain: Reasoning Controls](./reasoning-controls.md){ .md-button }

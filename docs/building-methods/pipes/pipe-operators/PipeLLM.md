@@ -11,12 +11,12 @@ description: "PipeLLM is Pipelex's core operator for calling LLMs — supports t
 
 At its core, `PipeLLM` constructs a detailed prompt from various inputs and templates, sends it to a specified LLM, and processes the output. It can produce simple text or complex structured data (in the form of Pydantic models).
 
-For structured data output, `PipeLLM` employs two main strategies:
+For structured outputs, you have two options:
 
-1.  **Direct Mode**: The LLM is prompted to directly generate a JSON object that conforms to the target Pydantic model's schema. This is fast but relies on the LLM's ability to generate well-formed JSON.
-2.  **Preliminary Text Mode**: This is a more robust two-step process:
-    a. First, the LLM generates a free-form text based on the initial prompt.
-    b. Second, another LLM call is made with a specific prompt designed to extract and structure the information from the generated text into the target Pydantic model.
+1. **Direct (default)** — `PipeLLM` asks the LLM to fill the target Pydantic schema in a single call. Fast and cheap; relies on the model's structured-output quality.
+2. **Preliminary text** — set `structuring_method = "preliminary_text"`. Pipelex rewrites the pipe at load time into a `PipeSequence` of two pipes: a `PipeLLM` that produces free-form text, then a [`PipeStructure`](./PipeStructure.md) that turns that text into the target concept. Two LLM calls per invocation, but the prose stage is unconstrained by JSON. See [Structuring Method (preliminary_text)](#structuring-method-preliminary-text) below.
+
+If you already have text from elsewhere (a PDF extraction, a search result, an upstream pipe), call [`PipeStructure`](./PipeStructure.md) directly — there's no need to wrap a `PipeLLM` around it.
 
 ## Working with Images (Vision Language Models)
 
@@ -220,10 +220,10 @@ Analyze the document and explain how it relates to the context: $reference_doc
 | `inputs`                    | dictionary          | The input concept(s) for the LLM operation, as a dictionary mapping input names to concept codes. For images within structured content, use dot notation (e.g., `"page.image_argurment"`)
 | `output`                    | string              | The output concept produced by the LLM operation with multiplicity notation using brackets (e.g., `"Text"`, `"Text[]"`, `"Text[3]"`).                                                | Yes      |
 | `model`                       | string or table     | Specifies the LLM choice by name, setting, or preset to use.              | No       |
-| `model_to_structure`                       | string or table     | Specifies the LLM choice by name, setting, or preset to use for structuring after preliminary text generation.              | No       |
+| `model_to_structure`                       | string or table     | LLM choice used whenever this `PipeLLM` produces a structured output. Applies both to direct structured generation and to the structuring step when `structuring_method = "preliminary_text"` is set. | No       |
 | `system_prompt`             | string              | A system-level prompt to guide the LLM's behavior (e.g., "You are a helpful assistant"). Supports the same variable syntax as `prompt`, including image and document references.  | No       |
 | `prompt`           | string              | A template for the user prompt. Use `$` for inline variables (e.g., `$topic`) and `@` to insert the content of an entire input (e.g., `@text_to_summarize`). Image and document variables should also be tagged with `$` or `@`.                 | No       |
-| `structuring_method`        | string              | The method for generating structured output. Can be `direct` or `preliminary_text`. Defaults to the global configuration.                                                      | No       |
+| `structuring_method`        | string              | `"direct"` (default) generates the structured output in one LLM call. `"preliminary_text"` expands the pipe at load time into a `PipeLLM` (text) + [`PipeStructure`](./PipeStructure.md) sequence — two LLM calls. Cannot be combined with a `Text` output. | No       |
 
 ### LLM Setting Fields
 
@@ -264,6 +264,46 @@ output = "Headline[3]"
 
 !!! info "Learn More About Multiplicity"
     For a comprehensive guide on output multiplicity, input multiplicity, and the philosophy behind how Pipelex handles single items versus collections, see [Understanding Multiplicity](../understanding-multiplicity.md).
+
+## Structuring Method (preliminary_text) { #structuring-method-preliminary-text }
+
+By default, `PipeLLM` asks the LLM to produce the target structured output in a single call. For some tasks — especially complex extractions from images or documents where the model thinks better in prose than in JSON — you can opt into a two-stage approach:
+
+```toml
+[pipe.review_restaurant]
+type = "PipeLLM"
+description = "Write a structured review of a restaurant from a transcript"
+inputs = { transcript = "Text" }
+output = "RestaurantReview"
+structuring_method = "preliminary_text"
+prompt = """
+Write a thorough review of this restaurant based on the transcript:
+
+@transcript
+"""
+```
+
+### What happens at load time
+
+When Pipelex parses a `.mthds` file with `structuring_method = "preliminary_text"`, it rewrites the pipe **before any execution** into a [`PipeSequence`](../pipe-controllers/PipeSequence.md):
+
+1. **Step 1 — `<pipe_code>__draft_text`**: a `PipeLLM` that inherits your original `inputs`, `system_prompt`, `prompt`, and `model`. Its output is always a single `Text`. This is the "write the prose" call.
+2. **Step 2 — `<pipe_code>__structure`**: a [`PipeStructure`](./PipeStructure.md) that takes the draft text and produces your declared output (preserving multiplicity — `Foo`, `Foo[]`, or `Foo[N]`). It uses `model_to_structure` if set, otherwise the default LLM choice for object generation.
+
+The wrapping `PipeSequence` keeps your original `pipe_code`, so anything that calls or references your pipe (other pipes, `main_pipe`, the run API) keeps working unchanged.
+
+### Trade-offs
+
+- **Two LLM calls per invocation** instead of one — slower and more expensive.
+- **Better quality on complex schemas**, especially with vision models: the prose stage isn't constrained by the JSON schema, then a focused structuring call extracts the typed result.
+- **Independent model choice for the structuring step** via `model_to_structure` — pair an expensive vision model for step 1 with a cheap fast model for step 2.
+- **Output cannot be `Text`** — there's nothing to structure. Pipelex rejects this at load time.
+
+### When to choose what
+
+- **Stick with `direct`** for most structured outputs — modern models handle them well and one call is always cheaper.
+- **Switch to `preliminary_text`** when you're extracting from images or PDFs and a single-call structured output keeps missing fields, or when your schema is deep and the model produces better content in prose first.
+- **Use [`PipeStructure`](./PipeStructure.md) directly** when the text already exists (extracted, searched, generated upstream).
 
 ## Examples
 
