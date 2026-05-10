@@ -13,12 +13,7 @@ Pipelex provides a unified interface for working with LLMs across providers. Wri
 
 ## Structured Output Generation
 
-Two approaches for structured outputs:
-
-- **Two-step** — Generate text first, then parse into a structured concept. More reliable for complex schemas.
-- **Direct JSON** — Generate structured JSON directly from the LLM using provider-native structured output features.
-
-See [LLM Structured Generation](../building-methods/llm-structured-generation-config.md).
+Generate structured JSON directly from the LLM using provider-native structured output features. Pipelex derives the JSON schema from your target concept and routes it to each provider's structured output API, so the same `.mthds` definition works across models.
 
 ## Vision Language Models
 

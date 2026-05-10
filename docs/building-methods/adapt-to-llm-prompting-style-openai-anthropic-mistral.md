@@ -63,6 +63,5 @@ This allows for:
 
 ## Related Documentation
 
-- [LLM Structured Generation Configuration](./llm-structured-generation-config.md) - Control text-then-structure behavior
 - [PipeLLM](./pipes/pipe-operators/PipeLLM.md) - Pipe-level prompting and output controls
 - [LLM Integration](../features/llm-integration.md) - High-level LLM capability overview
