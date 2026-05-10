@@ -208,8 +208,6 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         log.verbose(f"ContentGeneratorInWorkflow generated object list direct: {obj_list}")
-        # ``mode="json"`` matches make_object above — the legacy ContentGeneratorChild
-        # variant omitted it on the list path; this implementation aligns both.
         return [object_class.model_validate(raw_obj.model_dump(mode="json", serialize_as_any=True)) for raw_obj in obj_list]
 
     @override

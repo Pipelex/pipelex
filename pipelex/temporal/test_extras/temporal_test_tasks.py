@@ -1,8 +1,9 @@
 from pipelex.temporal.temporal_types import ActivityList, WorkflowList
 from pipelex.temporal.test_extras.wf_test_child_pipe import WfTestChildPipeLLMObject, WfTestChildPipeLLMText
 from pipelex.temporal.test_extras.wf_test_content_generator_child import WfTestContentGeneratorChild
+from pipelex.temporal.test_extras.wf_test_content_generator_pdf_page_views import WfTestContentGeneratorPdfPageViews
 
-TEMPORAL_TEST_WORKFLOWS: WorkflowList = [WfTestContentGeneratorChild]
+TEMPORAL_TEST_WORKFLOWS: WorkflowList = [WfTestContentGeneratorChild, WfTestContentGeneratorPdfPageViews]
 TEMPORAL_TEST_ACTIVITIES: ActivityList = []
 
 

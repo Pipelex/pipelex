@@ -17,10 +17,10 @@ Replace `WfMake*` child-workflow dispatch with direct `workflow.execute_activity
 - [x] **Phase 4 — Fix `make_extract_pages` page-views asymmetry**
 - [x] ✅ **Checkpoint A** — new generator validated end-to-end, ready to flip
 - [x] **Phase 5 — Flip default to new generator**
-- [ ] **Phase 6 — Delete old surface** (one commit)
+- [x] **Phase 6 — Delete old surface** (one commit)
 - [ ] **Phase 7 — Update docstrings and docs**
 - [ ] ✅ **Checkpoint B** — old surface gone, codebase in target state
-- [ ] **Phase 8 — Final verification and ship**
+- [ ] **Phase 8 — Final verification**
 
 Each phase ends with `make agent-check && make agent-test` (or, during local dev, the `tests/integration/pipelex/temporal/` subset). If a phase reveals a hidden divergence, stop and update this doc + the v2 analysis before proceeding.
 
@@ -144,7 +144,11 @@ Implemented inline within Phase 1 since `make_extract_pages` is a Phase 1 method
 - [x] Attaches via `pop(0)` loop.
 - [x] No double-emit when false.
 - [x] Distinct `activity_id`s: `f"{base_id}-pages"` and `f"{base_id}-render-page-views"`.
-- [x] Unit tests cover all branches (no-page-views, image_uri, document_uri+document branch). Integration test with a real PDF document is deferred to a follow-up since it requires real extract API access (would need `extract`/`inference` markers).
+- [x] Unit tests cover all branches (no-page-views, image_uri, document_uri+document branch).
+- [x] Real-PDF integration coverage added (post Phase 6):
+    - New test fixture workflow `pipelex/temporal/test_extras/wf_test_content_generator_pdf_page_views.py` (`WfTestContentGeneratorPdfPageViews`) registered in `TEMPORAL_TEST_WORKFLOWS`.
+    - New test class `tests/integration/pipelex/temporal/content_generation/test_tprl_content_generator_pdf_page_views.py:TestTprlContentGeneratorPdfPageViews` exercises the `document_uri` + `should_include_page_views=True` branch end-to-end through real Temporal: `act_extract_gen_extract_pages` for OCR + `act_render_page_views` for pypdfium2 rendering, with the in-workflow page_view attachment loop asserted page-by-page. Marked `@extract @inference @dry_runnable @temporal`.
+    - Uses local 2-page `tests/data/documents/Job-Offer.pdf` (added as `PipeTestCases.JOB_OFFER_PDF_LOCAL` in `tests/integration/pipelex/temporal/test_data.py`) — multi-page catches `pop(0)` ordering bugs that a 1-page PDF would not.
 
 **Verification:** `make agent-check` passes; unit tests verify all branches.
 
@@ -174,7 +178,6 @@ Working-tree state (uncommitted):
 
 Open questions / decisions for next session:
 - [ ] Land Checkpoint A as a standalone commit before Phase 5 (strongly recommended).
-- [ ] Optional: add a heavyweight integration test for the page-views augmentation with `document_uri` (would need real extract API access; would carry `extract`/`inference` markers — currently only mocked unit-test coverage).
 
 ---
 
@@ -192,46 +195,52 @@ Open questions / decisions for next session:
 
 ---
 
-## Phase 6 — Delete the old surface (one commit)
+## Phase 6 — Delete the old surface (one commit) ✅
 
-Per the project's "no backward compatibility" rule, delete in a single commit:
+Per the project's "no backward compatibility" rule, deleted in a single commit:
 
 **Files deleted under `pipelex/temporal/tprl_content_generation/`:**
 
-- [ ] `wf_make_llm_text.py`
-- [ ] `wf_make_object.py`
-- [ ] `wf_make_images.py`
-- [ ] `wf_make_jinja2_text.py`
-- [ ] `wf_make_extract.py`
-- [ ] `wf_render_page_views.py`
-- [ ] `content_generator_top.py`
-- [ ] `content_generator_top_factory.py`
-- [ ] `content_generator_child.py`
-- [ ] `content_generator_child_factory.py`
-- [ ] `content_generator_models.py`
+- [x] `wf_make_llm_text.py`
+- [x] `wf_make_object.py`
+- [x] `wf_make_images.py`
+- [x] `wf_make_jinja2_text.py`
+- [x] `wf_make_extract.py`
+- [x] `wf_render_page_views.py`
+- [x] `content_generator_top.py`
+- [x] `content_generator_top_factory.py`
+- [x] `content_generator_child.py`
+- [x] `content_generator_child_factory.py`
+- [x] `content_generator_models.py`
 
 **Test files deleted:**
 
-- [ ] `tests/integration/pipelex/temporal/content_generation/test_tprl_content_generator_top.py`
-- [ ] `tests/integration/pipelex/temporal/content_generation/test_tprl_make_content_generator.py`
-- [ ] `tests/integration/pipelex/temporal/workflows/test_wf_gen_text.py` (already commented-out)
-- [ ] `tests/integration/pipelex/temporal/workflows/test_wf_jinja2.py` (already commented-out)
+- [x] `tests/integration/pipelex/temporal/content_generation/test_tprl_content_generator_top.py`
+- [x] `tests/integration/pipelex/temporal/content_generation/test_tprl_make_content_generator.py`
+- [x] `tests/integration/pipelex/temporal/workflows/test_wf_gen_text.py` (already commented-out)
+- [x] `tests/integration/pipelex/temporal/workflows/test_wf_jinja2.py` (already commented-out)
 
 **Edits:**
 
-- [ ] `pipelex/temporal/tasks.py` — drop the `WfMake*` / `WfRenderPageViews` import lines and remove them from the `crafting.workflow_list`. Activity list unchanged.
-- [ ] `pipelex/pipelex.py` — remove the feature-flag branch added in Phase 2 (search for `PIPELEX_USE_LEGACY_CONTENT_GENERATOR`); the new generator becomes unconditional under `temporal.is_enabled`. Also drop the `os` import if no longer used elsewhere.
-- [ ] `tests/integration/pipelex/temporal/conftest.py` — drop the env-flag branch (search for `PIPELEX_USE_LEGACY_CONTENT_GENERATOR`); the parent conftest unconditionally constructs the new in-workflow generator via `ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow(...)`. **Without this edit every Temporal integration test breaks at fixture setup with an ImportError on the deleted `ContentGeneratorChildFactory`.**
-- [ ] `tests/integration/pipelex/temporal/test_payload_codec_pipeline.py` — same: drop the env-flag branch and replace with the new factory unconditionally.
-- [ ] `tests/integration/pipelex/temporal/content_generation/conftest.py` — delete the imports of `ContentGeneratorChild` / `ContentGeneratorChildFactory` / `ContentGeneratorTopFactory` and the `top_crafter` and `child_crafter` fixtures (still present at Checkpoint A — verified).
-- [ ] If `test_tprl_content_generator_child.py` referenced any deleted import, update accordingly.
+- [x] `pipelex/temporal/tasks.py` — dropped the `WfMake*` / `WfRenderPageViews` import lines; the `crafting` `TaskPack` now has `workflow_list=[]`. Activity list unchanged.
+- [x] `pipelex/pipelex.py` — removed the feature-flag branch (`PIPELEX_USE_LEGACY_CONTENT_GENERATOR` and the surrounding `if/else`); when `temporal.is_enabled` is true, `ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow(...)` is now constructed unconditionally. Dropped the `os` import (no longer used).
+- [x] `tests/integration/pipelex/temporal/conftest.py` — dropped the env-flag branch and inline `import os`; conftest now imports `ContentGeneratorInWorkflowFactory` at the top of the function and constructs it unconditionally.
+- [x] `tests/integration/pipelex/temporal/test_payload_codec_pipeline.py` — same pattern as the parent conftest.
+- [x] `tests/integration/pipelex/temporal/content_generation/conftest.py` — removed the `ContentGeneratorChild` / `ContentGeneratorChildFactory` / `ContentGeneratorTopFactory` imports along with the `top_crafter` and `child_crafter` fixtures and their now-unused supporting imports (`AsyncGenerator`, `pytest_asyncio`, `TemporalClient`, `ContentGeneratorDry`, `ContentGeneratorProtocol`, `GeneratedContentFactory`, `PipeRunMode`, `TemporalWorkerEnvironment`).
+- [x] `test_tprl_content_generator_child.py` — no edit needed; only imports the surviving `WfTestContentGeneratorChild` test fixture workflow.
+- [x] **Bonus:** removed the now-stale code comment in `pipelex/temporal/tprl_content_generation/content_generator_in_workflow.py:211` that referenced the deleted `ContentGeneratorChild`.
 
 **Verification:**
 
-- [ ] `make cleanderived` (linters / pytest collection get confused by deleted files otherwise).
-- [ ] `make agent-check`.
-- [ ] `make agent-test`.
-- [ ] `make tb` (boot test — config and registration sanity).
+- [x] `make cleanderived` (regenerated `_generated_model_sets.py` afterwards via `pipelex-dev preprocess-test-models --generate-fixtures --profile ci`, otherwise pyright fails on the missing-import).
+- [x] `make agent-check` — ruff + plxt + pyright + mypy clean.
+- [x] `make agent-test` — full suite passes.
+- [x] `make tb` — boot test passes.
+
+**Notes / known follow-ups handed to Phase 7:**
+
+- Three stale references to `WfMakeLLMText` survive in `tests/integration/pipelex/temporal/tracing/test_split_worker_usage.py` (lines 3, 63, 80). These are docstrings/comments; Phase 7 explicitly owns this rewrite together with `tracing/helpers.py` and `docs/under-the-hood/`.
+- The `WfTestContentGeneratorChild` test fixture workflow (in `pipelex/temporal/test_extras/`) is intentionally kept — it was re-pointed in Phase 3 to use the new in-workflow generator and is the only thing Phase 6 leaves with "Child" in the name.
 
 ---
 
@@ -259,14 +268,9 @@ State at this checkpoint:
 - Page-views augmentation works in Temporal mode.
 - All Temporal integration tests pass.
 
-Open questions / decisions for next session:
-- [ ] Is the deploy ready (drain-before-deploy enforced)? See Phase 8.
-
 ---
 
-## Phase 8 — Final verification and ship
-
-**Pre-ship verification:**
+## Phase 8 — Final verification
 
 - [ ] `make agent-check && make agent-test` — full suite green.
 - [ ] `.venv/bin/pytest tests/integration/pipelex/temporal/ --temporal-server local` — against a real Temporal server.
@@ -274,17 +278,9 @@ Open questions / decisions for next session:
 - [ ] Replay-history check: confirm no test fixtures depend on old `WfMake*` history.
     - [ ] `grep -rn "WfMake\|wf_make_\|WfRenderPageViews\|wf_render_page_views" tests/` returns nothing in the resulting tree.
     - [ ] No binary or JSON replay fixture references the old workflow types: `find tests/ \( -name "*.bin" -o -name "*history*" -o -name "*replay*" \) -type f`. Inspect any hits — if pickled `WorkflowEvent` data exists, attempt replay against the new tree to confirm break.
-    - [ ] If no replay fixtures exist (expected per v2 §6 "Replay-history compatibility: none"), state so explicitly in the deploy notes.
+    - [ ] If no replay fixtures exist (expected per v2 §6 "Replay-history compatibility: none"), record that finding explicitly.
 
-**Deploy operations:**
-
-- [ ] **Drain-before-deploy.** No in-flight Pipelex workflows may be running during the deploy. Any history that references a deleted `WfMake*` workflow type will fail to replay. Confirm with ops that the drain is enforced.
-- [ ] If drain cannot be enforced, STOP and add `workflow.patched("collapse-content-generation-layer")` at every `make_*` site in the new generator with a fallback to the legacy `WfMake*` dispatch. (Recommendation: enforce the drain instead.)
-
-**Ship:**
-
-- [ ] Commit per phase boundary (Phases 1, 2, 3, 4, 5, 6, 7 each as separate commits where reasonable; Phase 6 is intentionally one commit).
-- [ ] Use `/release` for the version bump and CHANGELOG finalization.
+> Deploy/ship operations are out of scope for this plan — handled separately when the branch is ready to land.
 
 ---
 
@@ -300,7 +296,7 @@ Open questions / decisions for next session:
 | 5 | `make agent-test`; `--temporal-server local`; manual UI inspection |
 | 6 | `make cleanderived && make agent-check && make agent-test && make tb` |
 | 7 | `make agent-check` |
-| 8 | full suite + real-server suite + manual smoke + drain confirmation |
+| 8 | full suite + real-server suite + manual smoke + replay-history check |
 
 ---
 
@@ -309,7 +305,7 @@ Open questions / decisions for next session:
 - **Asymmetric `task_queue=worker_config.inference_task_queue` rule.** Easy to forget at the LLM-text site or to over-apply elsewhere. Covered by the unit test added in Phase 1 — including the negative assertion that non-LLM-text methods must NOT pass `task_queue=`. Mis-routing image-gen to the inference queue would break split-worker production where the runner doesn't register the image-gen activity.
 - **`activity_id` collisions** under repeated calls — see Phase 0. The default `wfid` values are method-specific constants; they do NOT disambiguate repeated calls to the same method. The Phase 1 runtime check (`dict[workflow_id, set[str]]` on the singleton generator, gated by `workflow.unsafe.is_replaying()`) converts this from a documented invariant to a checked one and is replay-safe (cache-eviction replays do not raise spurious duplicates).
 - **`model_validate(obj.model_dump(mode="json", serialize_as_any=True))` round-trips** for `make_object` / `make_object_list`. Required because the activity boundary returns a generic `BaseModel`. Don't drop these. **Use `mode="json"` on BOTH** — `ContentGeneratorChild.make_object_list:189` omits it today (pre-existing asymmetry vs. `make_object:148`).
-- **Page-views augmentation** in `make_extract_pages` (Phase 4). Mirror the direct generator's branching exactly: don't double-emit when `should_include_page_views` is false; handle both `document_uri` (multi-page render) and `image_uri` (single-image) inputs; assert length match.
+- **Page-views augmentation** in `make_extract_pages` (Phase 4). Mirror the direct generator's branching exactly: don't double-emit when `should_include_page_views` is false; handle both `document_uri` (multi-page render) and `image_uri` (single-image) inputs; assert length match. Both branches are covered by unit tests; the `document_uri` branch additionally has a real-PDF end-to-end integration test (`TestTprlContentGeneratorPdfPageViews`).
 - **Test infrastructure bypass.** Both `tests/integration/pipelex/temporal/conftest.py` and `test_payload_codec_pipeline.py` explicitly call `pipelex_hub.set_content_generator(...)` after `Pipelex.make()`, so the env-flag branch in `pipelex.py` is bypassed in tests. Phase 2 must mirror the env flag in both conftests; Phase 6 must update both as part of cleanup.
 
 ---

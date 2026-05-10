@@ -26,6 +26,7 @@ class PipeTestCases:
 
     IMG_EXPENSE_REPORT_1 = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/invoices/invoice_1.png"
     IMG_FASHION_PHOTO_1 = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg"
+    JOB_OFFER_PDF_LOCAL = "tests/data/documents/Job-Offer.pdf"
     SIMPLE_STUFF_TEXT = StuffFactory.make_stuff(
         name="text",
         concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
