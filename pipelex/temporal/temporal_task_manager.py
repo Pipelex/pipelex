@@ -29,6 +29,7 @@ from pipelex.temporal.temporal_types import (
     WorkflowType,
 )
 from pipelex.temporal.test_extras.temporal_registry_test_models import TemporalTestModels
+from pipelex.temporal.tprl.namespace_check import check_required_search_attributes
 
 
 def is_in_temporal_sandbox() -> bool:
@@ -180,6 +181,13 @@ class TemporalTaskManager(TaskManager):
             # so programmatic callers of ``run_worker`` (tests, library code)
             # also fast-fail on typos rather than polling an idle queue.
             get_config().temporal.validate_task_queue_known(task_queue)
+            # One-shot soft-fail check that the namespace has the required
+            # custom search attributes registered. Warns only — dev environments
+            # without registration still run; only the dashboard is degraded.
+            await check_required_search_attributes(
+                temporal_client=temporal_client,
+                namespace=temporal_client.namespace,
+            )
             scope = self._resolve_scope_by_name(scope_name=scope_name)
             runtime_profile = self._resolve_runtime_profile_by_name(profile_name=profile_name)
             effective_scope_name = scope_name or get_config().temporal.worker_scopes.default_scope

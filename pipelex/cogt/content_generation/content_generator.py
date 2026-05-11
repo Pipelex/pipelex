@@ -45,7 +45,6 @@ class ContentGenerator(ContentGeneratorProtocol):
         job_metadata: JobMetadata,
         llm_setting_main: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
-        wfid: str | None = None,
     ) -> str:
         log.verbose(f"{self.__class__.__name__} make_llm_text: {llm_prompt_for_text}")
         log.verbose(f"llm_setting_main: {llm_setting_main}")
@@ -67,7 +66,6 @@ class ContentGenerator(ContentGeneratorProtocol):
         object_class: type[BaseModelTypeVar],
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_object: LLMPrompt,
-        wfid: str | None = None,
     ) -> BaseModelTypeVar:
         log.verbose(f"{self.__class__.__name__} make_object: {llm_prompt_for_object}")
         llm_assignment_for_object = LLMAssignment.make_from_prompt(
@@ -95,7 +93,6 @@ class ContentGenerator(ContentGeneratorProtocol):
         llm_setting_for_object_list: LLMSetting,
         llm_prompt_for_object_list: LLMPrompt,
         nb_items: int | None = None,
-        wfid: str | None = None,
     ) -> list[BaseModelTypeVar]:
         llm_assignment_for_object = LLMAssignment.make_from_prompt(
             job_metadata=job_metadata,
@@ -148,7 +145,6 @@ class ContentGenerator(ContentGeneratorProtocol):
         img_gen_prompt: ImgGenPrompt,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
-        wfid: str | None = None,
     ) -> ImageContent:
         img_gen_config = get_config().cogt.img_gen_config
         img_gen_job_params = img_gen_job_params or img_gen_config.make_default_img_gen_job_params()
@@ -179,7 +175,6 @@ class ContentGenerator(ContentGeneratorProtocol):
         nb_images: int,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
-        wfid: str | None = None,
     ) -> list[ImageContent]:
         img_gen_config = get_config().cogt.img_gen_config
         img_gen_assignment = ImgGenAssignment(
@@ -209,7 +204,6 @@ class ContentGenerator(ContentGeneratorProtocol):
         template: str,
         templating_style: TemplatingStyle | None = None,
         template_category: TemplateCategory | None = None,
-        wfid: str | None = None,
     ) -> str:
         templating_assignment = TemplatingAssignment(
             job_metadata=job_metadata,
@@ -229,7 +223,6 @@ class ContentGenerator(ContentGeneratorProtocol):
         extract_handle: str,
         extract_job_params: ExtractJobParams | None = None,
         extract_job_config: ExtractJobConfig | None = None,
-        wfid: str | None = None,
     ) -> list[ImageContent]:
         if not extract_input.document_uri:
             msg = "PDF URI is required to render page views"
@@ -263,7 +256,6 @@ class ContentGenerator(ContentGeneratorProtocol):
         extract_handle: str,
         extract_job_params: ExtractJobParams | None = None,
         extract_job_config: ExtractJobConfig | None = None,
-        wfid: str | None = None,
     ) -> list[PageContent]:
         extract_job_params = extract_job_params or ExtractJobParams.make_default_extract_job_params()
         extract_job_config = extract_job_config or ExtractJobConfig()

@@ -13,6 +13,7 @@ from pipelex.temporal.temporal_connect import connect_to_temporal_selected_serve
 from pipelex.temporal.temporal_data_converter import data_converter
 from pipelex.temporal.temporal_hub import temporal_hub
 from pipelex.temporal.temporal_task_manager import TemporalTaskManager
+from pipelex.temporal.tprl.namespace_check import ensure_required_search_attributes_registered
 from pipelex.test_extras.shared_pytest_plugins import ClassRegistryMode
 
 TEMPORAL_SERVER_NONE = "none"
@@ -112,8 +113,20 @@ async def env(request: FixtureRequest) -> AsyncGenerator[WorkflowEnvironment, No
     workflow_env: WorkflowEnvironment
     if server_option == TEMPORAL_SERVER_NONE:
         workflow_env = await WorkflowEnvironment.start_local(data_converter=data_converter)  # pyright: ignore[reportUnknownMemberType]
+        # The in-process server starts with no custom search attributes registered;
+        # the cluster's StartWorkflowExecution RPC rejects every workflow that sets
+        # one until they exist. Register the five Pipelex attributes here so all
+        # temporal tests can start workflows without per-test bootstrap.
+        await ensure_required_search_attributes_registered(
+            temporal_client=workflow_env.client,
+            namespace=workflow_env.client.namespace,
+        )
     elif server_option == TEMPORAL_SERVER_TIME_SKIPPING:
         workflow_env = await WorkflowEnvironment.start_time_skipping(data_converter=data_converter)
+        await ensure_required_search_attributes_registered(
+            temporal_client=workflow_env.client,
+            namespace=workflow_env.client.namespace,
+        )
     else:
         # Bootstrap Pipelex temporarily to read server connection config.
         # If a module-scoped fixture already initialized Pipelex (happens when

@@ -22,6 +22,7 @@ from pipelex.temporal.tasks import Tasks
 from pipelex.temporal.temporal_data_converter import make_data_converter
 from pipelex.temporal.temporal_hub import get_task_manager, temporal_hub
 from pipelex.temporal.temporal_task_manager import TemporalTaskManager
+from pipelex.temporal.tprl.namespace_check import ensure_required_search_attributes_registered
 from pipelex.tools.storage.local_storage_provider import LocalStorageProvider
 from tests.integration.pipelex.fixtures.pipe_job_helpers import pipe_job_from_bundle
 from tests.integration.pipelex.temporal.library_crate.helpers import assert_stuff_names, assert_text_stuff_names, execute_workflow
@@ -116,6 +117,10 @@ async def codec_env(tmp_path_factory: pytest.TempPathFactory) -> AsyncGenerator[
     )
     converter = make_data_converter(payload_codec=codec)
     async with await WorkflowEnvironment.start_local(data_converter=converter) as env:  # pyright: ignore[reportUnknownMemberType]
+        # The in-process server rejects workflows that set custom search attributes
+        # until they are registered. Pipelex sets five on every workflow start; register
+        # them here so this module's class-scoped server accepts dispatches.
+        await ensure_required_search_attributes_registered(temporal_client=env.client, namespace=env.client.namespace)
         yield env, storage_root
 
 

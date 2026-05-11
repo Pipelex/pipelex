@@ -1,20 +1,17 @@
-"""Failing test pinning the activity-id collision bug.
+"""Canonical regression gate for the activity-id collision bug.
 
-Background: ``ContentGeneratorInWorkflow`` methods default ``activity_id`` to a
-constant per-method label (e.g. ``"craft-text"``) when no ``wfid`` is passed.
-Temporal requires ``activity_id`` to be unique within a single workflow
-execution, so any workflow that calls the same method twice in a row crashes
-on the second call. This is a structural bug — calling a content-generator
-method twice is an ordinary pattern, not an error.
-
-These tests assert the *desired* behavior: two back-to-back calls (either
-both with no ``wfid``, or both with the same explicit ``wfid``) must succeed.
-With the current default-constant scheme they fail, because
-``_record_activity_id`` raises ``ContentGenerationError`` on the duplicate.
+Background: ``ContentGeneratorInWorkflow`` used to default ``activity_id`` to a
+constant per-method label (e.g. ``"craft-text"``). Temporal requires
+``activity_id`` to be unique within a single workflow execution, so any
+workflow that called the same method twice in a row crashed on the second
+call.
 
 After the activity-id naming redesign (see
-``wip/temporal-primitives/workflow-and-activity-ids.md``), these tests must
-pass without re-introducing the duplicate collision via some other path.
+``wip/temporal-primitives/id-and-naming-design.md``), Pipelex never passes
+``activity_id=``: the Temporal Python SDK auto-assigns deterministic
+sequential integers per workflow run. This test pins the invariant —
+``activity_id`` is omitted from the dispatch kwargs — and trusts the SDK to
+produce unique-per-run ids by construction.
 """
 
 import pytest
@@ -41,34 +38,19 @@ def _make_llm_setting() -> LLMSetting:
     return LLMSetting(model="test-llm", temperature=0.5)
 
 
-@pytest.fixture
-def patch_workflow_info(mocker: MockerFixture) -> None:
-    """Patch ``temporalio.workflow.info()`` and ``workflow.unsafe.is_replaying()``
-    so ``_record_activity_id`` can be exercised outside a real workflow context.
-
-    Mirrors the pattern in ``test_content_generator_in_workflow.py`` — both calls
-    happen under the same ``(workflow_id, run_id)`` key so the per-run uniqueness
-    guard treats them as belonging to the same execution.
-    """
-    fake_info = mocker.MagicMock()
-    fake_info.workflow_id = "test-workflow"
-    fake_info.run_id = "test-run-id-1"
-    mocker.patch("temporalio.workflow.info", return_value=fake_info)
-    mocker.patch("temporalio.workflow.unsafe.is_replaying", return_value=False)
-
-
 @pytest.mark.asyncio(loop_scope="class")
-@pytest.mark.usefixtures("patch_workflow_info")
 class TestDefaultActivityIdCollisionBug:
-    async def test_two_make_llm_text_calls_without_wfid_should_succeed(self, mocker: MockerFixture) -> None:
-        """Two ``make_llm_text`` calls in the same workflow with no ``wfid`` must succeed.
+    async def test_two_default_activity_calls_in_one_workflow_produce_distinct_activity_ids(
+        self,
+        mocker: MockerFixture,
+    ) -> None:
+        """Two back-to-back ``make_llm_text`` calls in the same workflow must
+        dispatch without colliding on ``activity_id``.
 
-        Today both default to ``activity_id="craft-text"`` and the second call
-        raises ``ContentGenerationError("Duplicate activity_id 'craft-text' ...")``
-        from ``_record_activity_id``. That makes a trivially common pattern —
-        two LLM text generations inside one workflow — impossible at the
-        default call site. The redesign must produce a per-call disambiguator
-        (deterministic across replay) so this scenario works.
+        The redesign satisfies this by never passing ``activity_id=`` — the
+        Temporal SDK assigns deterministic sequential integers per workflow
+        run, which guarantees per-``(workflow_id, run_id)`` uniqueness by
+        construction and is replay-safe (assigned by history position).
         """
         mock_execute = mocker.patch("temporalio.workflow.execute_activity", new_callable=mocker.AsyncMock)
         mock_execute.return_value = "stub text"
@@ -86,40 +68,7 @@ class TestDefaultActivityIdCollisionBug:
         )
 
         assert mock_execute.call_count == 2
-        observed_activity_ids = [call.kwargs.get("activity_id") for call in mock_execute.call_args_list]
-        assert len(set(observed_activity_ids)) == 2, (
-            f"Both calls produced the same activity_id ({observed_activity_ids!r}); Temporal requires per-(workflow_id, run_id) uniqueness."
-        )
-
-    async def test_two_make_llm_text_calls_with_same_explicit_wfid_should_succeed(self, mocker: MockerFixture) -> None:
-        """Two ``make_llm_text`` calls with the same explicit ``wfid`` must succeed.
-
-        Today this raises — the same string is used as ``activity_id`` both
-        times. This proves ``wfid`` is not a usable disambiguator: it carries
-        one id per call site, not one id per call. A single ``wfid`` value
-        cannot disambiguate two invocations of the same method in the same
-        workflow. The redesign must decouple the per-call ``activity_id`` from
-        the (workflow-id-base) ``wfid`` parameter.
-        """
-        mock_execute = mocker.patch("temporalio.workflow.execute_activity", new_callable=mocker.AsyncMock)
-        mock_execute.return_value = "stub text"
-        generator = _make_generator()
-
-        await generator.make_llm_text(
-            job_metadata=_make_job_metadata(),
-            llm_setting_main=_make_llm_setting(),
-            llm_prompt_for_text=LLMPrompt(user_text="hello"),
-            wfid="same-string",
-        )
-        await generator.make_llm_text(
-            job_metadata=_make_job_metadata(),
-            llm_setting_main=_make_llm_setting(),
-            llm_prompt_for_text=LLMPrompt(user_text="hello again"),
-            wfid="same-string",
-        )
-
-        assert mock_execute.call_count == 2
-        observed_activity_ids = [call.kwargs.get("activity_id") for call in mock_execute.call_args_list]
-        assert len(set(observed_activity_ids)) == 2, (
-            f"Both calls produced the same activity_id ({observed_activity_ids!r}); ``wfid`` cannot be the per-call disambiguator."
-        )
+        for call in mock_execute.call_args_list:
+            assert call.kwargs.get("activity_id") is None, (
+                "Pipelex must not customize activity_id — the SDK assigns deterministic integers per workflow run."
+            )

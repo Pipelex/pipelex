@@ -12,6 +12,11 @@ from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.temporal.temporal_manager import TemporalWorkerEnvironment
 from pipelex.temporal.tprl.conditional_worker import with_conditional_worker
+from pipelex.temporal.tprl.observability import (
+    build_search_attributes,
+    build_static_details,
+    build_static_summary,
+)
 from pipelex.temporal.tprl.workflow_caller import WorkflowClass, WorkflowExecutor, WorkflowExecutorFactory
 from pipelex.temporal.tprl_pipe.pipe_run_arg import PipeRunArg
 from pipelex.temporal.tprl_pipe.submitter_hydration import rehydrate_pipe_output_with_crate
@@ -44,7 +49,6 @@ class TemporalPipeRun(WorkflowExecutor[PipeRunArg, PipeOutput], PipeRunProtocol)
         self,
         pipe_job: PipeJob,
         delivery_assignment: DeliveryAssignment | None = None,
-        wfid: str | None = None,
     ) -> PipeOutput:
         """Execute a pipe run via Temporal (blocking — waits for completion)."""
         pipe_run_arg = PipeRunArg(
@@ -60,8 +64,11 @@ class TemporalPipeRun(WorkflowExecutor[PipeRunArg, PipeOutput], PipeRunProtocol)
         )
         pipe_output = await executor.execute_workflow(
             workflow_class=WfPipeRun,
-            workflow_id=self.make_workflow_id(base_id=wfid or self.class_name),
+            workflow_id=self.make_workflow_id(pipeline_run_id=pipe_job.job_metadata.pipeline_run_id),
             workflow_arg=pipe_run_arg,
+            search_attributes=dict(build_search_attributes(pipe_job)),
+            static_summary=build_static_summary(pipe_job.pipe),
+            static_details=build_static_details(pipe_job),
         )
 
         # Rehydrate PipeOutput on the submitter. When the pipe_job carries a crate,
@@ -74,7 +81,6 @@ class TemporalPipeRun(WorkflowExecutor[PipeRunArg, PipeOutput], PipeRunProtocol)
         self,
         pipe_job: PipeJob,
         delivery_assignment: DeliveryAssignment | None = None,
-        wfid: str | None = None,
     ) -> tuple[str, WorkflowHandle[WorkflowClass[PipeRunArg, PipeOutput], PipeOutput]]:
         """Start a pipe run without waiting for completion.
 
@@ -92,11 +98,14 @@ class TemporalPipeRun(WorkflowExecutor[PipeRunArg, PipeOutput], PipeRunProtocol)
             should_auto_connect_temporal=self.should_auto_connect_temporal,
             worker_environment=self.worker_environment,
         )
-        workflow_id = self.make_workflow_id(base_id=wfid or self.class_name)
+        workflow_id = self.make_workflow_id(pipeline_run_id=pipe_job.job_metadata.pipeline_run_id)
         handle = await executor.start_workflow(
             workflow_class=WfPipeRun,
             workflow_id=workflow_id,
             workflow_arg=pipe_run_arg,
+            search_attributes=dict(build_search_attributes(pipe_job)),
+            static_summary=build_static_summary(pipe_job.pipe),
+            static_details=build_static_details(pipe_job),
         )
         return workflow_id, handle
 

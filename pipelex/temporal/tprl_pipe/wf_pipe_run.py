@@ -9,6 +9,7 @@ with workflow.unsafe.imports_passed_through():
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryStatus
     from pipelex.temporal.log_temporal import workflow_log
+    from pipelex.temporal.tprl.observability import build_search_attributes
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
     from pipelex.temporal.tprl_pipe.act_assemble_graph import AssembleGraphArg, act_assemble_graph
     from pipelex.temporal.tprl_pipe.act_deliver import DeliveryActivityArg, act_deliver
@@ -39,11 +40,14 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
         pipe_output: PipeOutput | None = None
         execution_error: ChildWorkflowError | None = None
 
+        # The wf_pipe_router child runs the same pipe as wf_pipe_run, so its
+        # search attributes are identical — re-derive them from the same pipe_job.
         try:
             pipe_output = await workflow.execute_child_workflow(
                 WfPipeRouter.run,
                 arg=pipe_job,
-                id=f"{workflow.info().workflow_id}-pipe-router",
+                id=f"{workflow.info().workflow_id}/pipe-router",
+                search_attributes=dict(build_search_attributes(pipe_job)),
             )
             workflow_log.debug("WfPipeRouter completed successfully")
         except ChildWorkflowError as exc:

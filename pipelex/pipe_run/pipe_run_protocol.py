@@ -21,7 +21,6 @@ class PipeRunProtocol(Protocol):
         self,
         pipe_job: PipeJob,
         delivery_assignment: DeliveryAssignment | None = None,
-        wfid: str | None = None,
     ) -> PipeOutput:
         """Execute a pipe job and, if `delivery_assignment` is provided, deliver the output.
 

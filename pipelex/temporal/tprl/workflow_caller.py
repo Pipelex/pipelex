@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import timedelta
 from typing import Any, Callable, Coroutine, Generic, Protocol, TypeVar, Union, cast
 
@@ -81,8 +81,8 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
                 raise WorkflowExecutionError(msg)
         return self._temporal_client
 
-    def make_workflow_id(self, base_id: str) -> str:
-        workflow_id = get_temporal_manager().make_top_workflow_id(base_id=base_id)
+    def make_workflow_id(self, pipeline_run_id: str) -> str:
+        workflow_id = get_temporal_manager().make_top_workflow_id(pipeline_run_id=pipeline_run_id)
         log.debug(f"Top workflow_id: {workflow_id}")
         return workflow_id
 
@@ -91,6 +91,10 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
         workflow_class: type[WorkflowClass[WorkflowInput, WorkflowOutput]],
         workflow_arg: WorkflowInput,
         workflow_id: str,
+        search_attributes: Mapping[str, list[str]] | None = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        memo: Mapping[str, Any] | None = None,
     ) -> WorkflowOutput:
         """Execute a workflow and wait for its completion."""
         try:
@@ -109,6 +113,10 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
                 task_timeout=self.task_timeout,
                 start_delay=self.start_delay,
                 rpc_timeout=self.rpc_timeout,
+                search_attributes=search_attributes,
+                static_summary=static_summary,
+                static_details=static_details,
+                memo=memo,
             )
         except Exception as exc:
             # TODO: wip - do not catch all exceptions
@@ -122,6 +130,10 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
         workflow_arg: WorkflowInput,
         workflow_id: str,
         callbacks: Sequence[Callback] | None = None,
+        search_attributes: Mapping[str, list[str]] | None = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        memo: Mapping[str, Any] | None = None,
     ) -> WorkflowHandle[WorkflowClass[WorkflowInput, WorkflowOutput], WorkflowOutput]:
         """Start a workflow without waiting for its completion."""
         try:
@@ -141,6 +153,10 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
                 start_delay=self.start_delay,
                 rpc_timeout=self.rpc_timeout,
                 callbacks=callbacks or [],
+                search_attributes=search_attributes,
+                static_summary=static_summary,
+                static_details=static_details,
+                memo=memo,
             )
         except Exception as exc:
             log.error(f"Failed to start workflow {workflow_class.__name__}: {exc}")
@@ -153,6 +169,10 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
         workflow_arg: WorkflowInput,
         workflow_id: str,
         child_task_queue: str | None = None,
+        search_attributes: Mapping[str, list[str]] | None = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        memo: Mapping[str, Any] | None = None,
     ) -> WorkflowOutput:
         """Execute a child workflow and wait for its completion."""
         try:
@@ -168,6 +188,10 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
                 retry_policy=self.retry_policy,
                 run_timeout=self.run_timeout,
                 task_timeout=self.task_timeout,
+                search_attributes=search_attributes,
+                static_summary=static_summary,
+                static_details=static_details,
+                memo=memo,
             )
         except ChildWorkflowError as exc:
             log.error(f"ChildWorkflowError in {workflow_class.__name__} caused by: {exc.cause}")
@@ -187,6 +211,10 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
         workflow_arg: WorkflowInput,
         workflow_id: str,
         child_task_queue: str | None = None,
+        search_attributes: Mapping[str, list[str]] | None = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        memo: Mapping[str, Any] | None = None,
     ) -> ChildWorkflowHandle[WorkflowClass[WorkflowInput, WorkflowOutput], WorkflowOutput]:
         """Start a child workflow without waiting for its completion."""
         try:
@@ -202,6 +230,10 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
                 retry_policy=self.retry_policy,
                 run_timeout=self.run_timeout,
                 task_timeout=self.task_timeout,
+                search_attributes=search_attributes,
+                static_summary=static_summary,
+                static_details=static_details,
+                memo=memo,
             )
         except ChildWorkflowError as exc:
             log.error(f"ChildWorkflowError in {workflow_class.__name__} caused by: {exc.cause}")

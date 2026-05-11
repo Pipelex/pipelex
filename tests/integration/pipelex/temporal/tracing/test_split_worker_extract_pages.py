@@ -79,8 +79,7 @@ class TestSplitWorkerExtractPages:
     (``document_uri`` + ``should_include_page_views=True``). Substitutes return
     canonical 2-page outputs so the in-workflow attachment loop succeeds; the
     test then inspects history to confirm Temporal scheduled both activities
-    with the expected ``f"{base_id}-pages"`` / ``f"{base_id}-render-page-views"``
-    activity_ids.
+    (filtered by activity type) with distinct SDK-assigned activity_ids.
     """
 
     @pytest.mark.timeout(60)
@@ -89,9 +88,10 @@ class TestSplitWorkerExtractPages:
         temporal_client: TemporalClient,
     ) -> None:
         """Both ``act_extract_gen_extract_pages`` and ``act_render_page_views``
-        must appear in workflow history with the activity_ids constructed by
-        ``make_extract_pages`` (``"extract-pages"`` / ``"extract-render-page-views"``
-        when no ``wfid`` is passed at the call site).
+        must appear in workflow history with distinct activity_ids. Pipelex
+        does not customize ``activity_id``; the Temporal SDK assigns
+        deterministic sequential integers per workflow run, which is sufficient
+        to guarantee per-``(workflow_id, run_id)`` uniqueness.
         """
         task_queue = f"q_extract_{uuid.uuid4().hex[:8]}"
         workflow_id = f"wf_extract_{uuid.uuid4().hex[:8]}"
@@ -119,23 +119,23 @@ class TestSplitWorkerExtractPages:
                 await handle.result()
                 history = await handle.fetch_history()
 
-        # Filter by activity_type (not by activity_id suffix): a future test that
-        # passes a wfid like "my-pages" to make_object would otherwise pollute this
-        # assertion. Pinning to the activity name is strict.
+        # Filter by activity_type and confirm both activities scheduled with
+        # distinct activity_ids. The exact id strings are SDK-assigned integers
+        # (`"1"`, `"2"`, ...) determined by history position — we assert
+        # uniqueness, not the specific values, so the test stays robust if the
+        # SDK ever reformats them.
         extract_activity_names = {"act_extract_gen_extract_pages", "act_render_page_views"}
-        extract_ids = [
-            event.activity_task_scheduled_event_attributes.activity_id
+        scheduled = [
+            (event.activity_task_scheduled_event_attributes.activity_type.name, event.activity_task_scheduled_event_attributes.activity_id)
             for event in history.events
             if event.activity_task_scheduled_event_attributes.activity_type.name in extract_activity_names
         ]
-        all_scheduled = [
-            (event.activity_task_scheduled_event_attributes.activity_type.name, event.activity_task_scheduled_event_attributes.activity_id)
-            for event in history.events
-            if event.activity_task_scheduled_event_attributes.activity_id
-        ]
-        assert extract_ids == ["extract-pages", "extract-render-page-views"], (
-            f"Unexpected extract activity_ids in history: {extract_ids!r} (full scheduled (type, id) pairs: {all_scheduled!r})"
+        scheduled_types = [activity_type for activity_type, _ in scheduled]
+        scheduled_ids = [activity_id for _, activity_id in scheduled]
+        assert scheduled_types == ["act_extract_gen_extract_pages", "act_render_page_views"], (
+            f"Expected the extract + render activities to be scheduled in order; got {scheduled!r}"
         )
+        assert len(set(scheduled_ids)) == 2, f"Expected distinct activity_ids for the two activities; got {scheduled!r}"
 
     @pytest.mark.timeout(60)
     async def test_queue_options_start_to_close_timeout_flows_to_dispatch(

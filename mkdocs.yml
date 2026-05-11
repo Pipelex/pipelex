@@ -308,6 +308,7 @@ plugins:
         - under-the-hood/init-cli-flows.md: "Init CLI Flows"
         - under-the-hood/pipe-routing-and-execution.md: "Pipe Routing & Execution"
         - under-the-hood/temporal-integration.md: "Temporal Integration"
+        - under-the-hood/temporal-deployment.md: "Temporal Deployment"
         - under-the-hood/distributed-content-generation.md: "Distributed Content Generation"
         Project:
         - contributing.md: "Contributing"
@@ -497,6 +498,7 @@ nav:
       - Init CLI Flows: under-the-hood/init-cli-flows.md
       - Pipe Routing & Execution: under-the-hood/pipe-routing-and-execution.md
       - Temporal Integration: under-the-hood/temporal-integration.md
+      - Temporal Deployment: under-the-hood/temporal-deployment.md
       - Distributed Content Generation: under-the-hood/distributed-content-generation.md
   - Project:
     - Contributing: contributing.md
