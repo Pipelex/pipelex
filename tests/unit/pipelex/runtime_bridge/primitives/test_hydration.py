@@ -1,4 +1,4 @@
-from typing import cast
+from typing import Any, cast
 
 import pytest
 
@@ -6,11 +6,12 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_class_registry
 from pipelex.pipe_run.exceptions import PipeJobError
-from pipelex.runtime_bridge.primitives.hydration import hydrate_working_memory
+from pipelex.runtime_bridge.primitives.hydration import _hydrate_list_item, hydrate_working_memory  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
 
 
 def _make_text_concept() -> Concept:
@@ -35,11 +36,13 @@ def _make_text_stuff(name: str, text: str) -> Stuff:
 
 class TestHydrateWorkingMemory:
     @pytest.fixture(autouse=True)
-    def _register_text_content(self) -> None:
-        """Ensure TextContent is registered in the ClassRegistry for hydration tests."""
+    def _register_content_classes(self) -> None:
+        """Ensure TextContent and NumberContent are registered for hydration tests."""
         registry = get_class_registry()
         if not registry.has_class(name="TextContent"):
             registry.register_class(TextContent)
+        if not registry.has_class(name="NumberContent"):
+            registry.register_class(NumberContent)
 
     def test_hydrate_with_native_text(self) -> None:
         """A raw dict containing TextContent stuff hydrates to typed TextContent."""
@@ -99,6 +102,15 @@ class TestHydrateWorkingMemory:
         # Verify the Temporal format uses a plain list, not {"items": [...]}
         assert isinstance(raw["root"]["colors"]["content"], list)
 
+        # Per-item type markers must use the pipelex-private namespace and must NOT
+        # use kajson's __class__/__module__ keys — the rename is what prevents
+        # kajson's universal decoder from trying to eagerly resolve the class
+        # during Temporal payload conversion.
+        for item_dict in cast("list[dict[str, Any]]", raw["root"]["colors"]["content"]):
+            assert "__class__" not in item_dict
+            assert "__module__" not in item_dict
+            assert item_dict["__pipelex_class__"] == "TextContent"
+
         hydrated = hydrate_working_memory(raw)
 
         assert "colors" in hydrated.root
@@ -111,6 +123,52 @@ class TestHydrateWorkingMemory:
         assert list_content.items[0].text == "blue"
         assert list_content.items[1].text == "red"
         assert list_content.items[2].text == "green"
+
+    def test_dump_for_temporal_list_items_carry_pipelex_markers_only(self) -> None:
+        """dump_for_temporal must emit pipelex-private type markers, never kajson's __class__/__module__.
+
+        This is the structural guard against the cross-process decode bug: if these
+        items carried __class__ keys, kajson's universal decoder would try to bind
+        the class at the Temporal data-converter boundary, before pipelex's
+        per-workflow ClassRegistry is loaded.
+        """
+        working_memory = WorkingMemory()
+        list_stuff = Stuff(
+            stuff_code="test",
+            stuff_name="items",
+            concept=_make_text_concept(),
+            content=ListContent(items=[TextContent(text="one"), TextContent(text="two")]),
+        )
+        working_memory.root["items"] = list_stuff
+
+        raw = working_memory.dump_for_temporal()
+
+        serialized_items = cast("list[dict[str, Any]]", raw["root"]["items"]["content"])
+        assert isinstance(serialized_items, list)
+        assert len(serialized_items) == 2
+        for item_dict in serialized_items:
+            assert "__class__" not in item_dict
+            assert "__module__" not in item_dict
+            assert item_dict["__pipelex_class__"] == "TextContent"
+            assert item_dict["__pipelex_module__"] == "pipelex.core.stuffs.text_content"
+
+    def test_hydrate_list_item_reads_pipelex_markers(self) -> None:
+        """_hydrate_list_item must resolve the per-item class from __pipelex_class__.
+
+        Uses NumberContent (no 'text' field) so the legacy text-fallback path at
+        the bottom of _hydrate_list_item cannot accidentally satisfy the test —
+        the only way to return a NumberContent here is via the marker lookup.
+        """
+        raw_item = {
+            "number": 42,
+            "__pipelex_class__": "NumberContent",
+            "__pipelex_module__": "pipelex.core.stuffs.number_content",
+        }
+
+        result = _hydrate_list_item(raw_item)
+
+        assert isinstance(result, NumberContent)
+        assert result.number == 42
 
     def test_hydrate_raises_on_missing_registry_class(self) -> None:
         """Hydration raises PipeJobError when the concept's structure_class_name is not in the registry."""

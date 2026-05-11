@@ -1,15 +1,9 @@
-"""Unit tests for object_class_schema field on ObjectAssignment and TextThenObjectAssignment."""
+"""Unit tests for object_class_schema field on ObjectAssignment."""
 
 from pydantic import BaseModel
 
-from pipelex.cogt.content_generation.assignment_models import (
-    LLMAssignment,
-    LLMAssignmentFactory,
-    ObjectAssignment,
-    TextThenObjectAssignment,
-)
+from pipelex.cogt.content_generation.assignment_models import LLMAssignment, ObjectAssignment
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.pipeline.job_metadata import JobMetadata
 
@@ -31,14 +25,6 @@ def _make_stub_llm_assignment() -> LLMAssignment:
         job_metadata=_make_stub_job_metadata(),
         llm_setting=LLMSetting(model="test-model", temperature=0.7),
         llm_prompt=LLMPrompt(user_text="test prompt"),
-    )
-
-
-def _make_stub_llm_assignment_factory() -> LLMAssignmentFactory:
-    return LLMAssignmentFactory(
-        job_metadata=_make_stub_job_metadata(),
-        llm_setting=LLMSetting(model="test-model", temperature=0.7),
-        llm_prompt_factory=LLMPromptTemplate.make_for_structuring_from_preliminary_text(),
     )
 
 
@@ -65,14 +51,3 @@ class TestAssignmentModelsSchema:
         restored = ObjectAssignment.model_validate_json(json_str)
         assert restored.object_class_schema == assignment.object_class_schema
         assert restored.object_class_name == "SampleOutputModel"
-
-    def test_text_then_object_assignment_carries_schema(self) -> None:
-        """TextThenObjectAssignment can carry an object_class_schema."""
-        schema = SampleOutputModel.model_json_schema()
-        assignment = TextThenObjectAssignment(
-            object_class_name="SampleOutputModel",
-            object_class_schema=schema,
-            llm_assignment_for_text=_make_stub_llm_assignment(),
-            llm_assignment_factory_to_object=_make_stub_llm_assignment_factory(),
-        )
-        assert assignment.object_class_schema["title"] == "SampleOutputModel"

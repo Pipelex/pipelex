@@ -1,21 +1,33 @@
 from typing import Literal
 
+from pydantic import model_validator
 from typing_extensions import override
 
 from pipelex.cogt.llm.llm_setting import LLMModelChoice
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.validation import is_input_used_by_variables, is_variable_satisfied_by_inputs
+from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
-from pipelex.types import StrEnum
+from pipelex.types import Self, StrEnum
 
 
 class StructuringMethod(StrEnum):
     DIRECT = "direct"
     PRELIMINARY_TEXT = "preliminary_text"
+
+    @property
+    def is_preliminary_text(self) -> bool:
+        match self:
+            case StructuringMethod.PRELIMINARY_TEXT:
+                return True
+            case StructuringMethod.DIRECT:
+                return False
 
 
 class PipeLLMBlueprint(PipeBlueprint):
@@ -29,6 +41,21 @@ class PipeLLMBlueprint(PipeBlueprint):
     prompt: str | None = None
 
     structuring_method: StructuringMethod | None = None
+
+    @model_validator(mode="after")
+    def validate_preliminary_text_output(self) -> Self:
+        # Same string-level guard the elaborator runs — surfaced at authoring time so
+        # ValidationError is raised before bundle elaboration runs.
+        if self.structuring_method is None or not self.structuring_method.is_preliminary_text:
+            return self
+        output_parse_result = parse_concept_with_multiplicity(self.output)
+        if QualifiedRef.parse(output_parse_result.concept_ref_or_code).local_code == NativeConceptCode.TEXT:
+            msg = (
+                f"PipeLLM with `structuring_method = preliminary_text` cannot have output `{self.output}`. "
+                "The output must be a structured concept, not Text."
+            )
+            raise ValueError(msg)
+        return self
 
     @override
     def validate_inputs(self):
@@ -64,9 +91,7 @@ class PipeLLMBlueprint(PipeBlueprint):
         # Filter out internal variables that start with underscore and special variables
         # TODO: replace magic strings by StrEnum and also, make this check clearer and more readable
         filtered_variable_paths = {
-            var
-            for var in required_variable_paths
-            if not var.startswith("_") and get_root_from_dotted_path(var) not in {"preliminary_text", "place_holder"}
+            var for var in required_variable_paths if not var.startswith("_") and get_root_from_dotted_path(var) != "place_holder"
         }
 
         input_names: set[str] = set(self.inputs.keys()) if self.inputs else set()

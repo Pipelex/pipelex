@@ -409,18 +409,28 @@ Line after"""
     # Edge cases with @ symbol in non-variable contexts
     # =========================================================================
 
-    def test_email_address_partially_processed(self):
-        """Test that email-like patterns are partially processed (after @).
-
-        The regex pattern [a-zA-Z0-9_.] matches 'example.com' as a single variable
-        name since dots are allowed in variable names.
+    def test_email_address_not_treated_as_variable(self):
+        """Email-like patterns must be left literal: `@` glued to a preceding
+        word character is not a variable prefix.
         """
-        # Note: user@domain.ext will match 'domain.ext' as variable after @
         template = "Contact: someone@example.com"
         result = preprocess_template(template)
-        # After @ we have example.com which matches entirely as variable name
-        expected = 'Contact: someone{{ example.com|tag("example.com") }}'
-        assert result == expected
+        assert result == template
+
+    def test_at_prefix_requires_non_word_boundary_on_left(self):
+        """`@var` is rewritten only when not preceded by a word char."""
+        assert preprocess_template("@var") == '{{ var|tag("var") }}'
+        assert preprocess_template(" @var") == ' {{ var|tag("var") }}'
+        assert preprocess_template("(@var)") == '({{ var|tag("var") }})'
+        assert preprocess_template("foo@var") == "foo@var"
+
+    def test_dollar_prefix_matches_even_after_word_char(self):
+        """`$var` keeps matching even when glued to a preceding word character —
+        construct-field templates intentionally rely on patterns like `Q$quarter`.
+        """
+        assert preprocess_template("$var") == "{{ var|format() }}"
+        assert preprocess_template(" $var") == " {{ var|format() }}"
+        assert preprocess_template("Q$quarter") == "Q{{ quarter|format() }}"
 
     def test_at_sign_alone(self):
         """Test @ sign alone (not followed by valid variable name char)."""

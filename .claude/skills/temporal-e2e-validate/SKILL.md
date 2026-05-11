@@ -62,7 +62,8 @@ For failures, include the error message and what it means:
 Tier 2 FAIL
   KajsonDecoderError: Class 'Greeting' not found
   The worker tried to deserialize WorkingMemory before registering dynamic concepts.
-  Check worker output: tmux capture-pane -t temporal-worker -p -S -200
+  Check worker output: tmux capture-pane -t temporal-worker-router -p -S -200
+  (or tmux capture-pane -t temporal-worker-runner / temporal-worker depending on setup)
 ```
 
 ---
@@ -349,6 +350,14 @@ After this completes, tell the user: PASS/FAIL, output dir, graph file path.
 
 **Tier 4 — Can the worker handle image generation pipelines?**
 
+**Important — split workers REQUIRED for this tier.** Run Tier 4 only when the
+two scoped workers from "Step 2" above are alive (`temporal-worker-router` and
+`temporal-worker-runner`). On a single full worker, image-gen routing accidents
+are silently masked: every activity ends up on one process so a stray
+`task_queue=` kwarg pointing at the wrong queue would still execute correctly.
+Split workers are the only way to surface that class of bug as a hang or
+wrong-pool execution.
+
 **Important:** This tier only catches payload size bugs in **live mode**. In dry-run,
 mock images are tiny and will pass even without activity-level storage. If the user
 wants to validate image payload handling, they must run live.
@@ -386,10 +395,20 @@ After this completes, tell the user: PASS/FAIL, output dir, graph file path.
 Also check worker logs for `PayloadSizeWarning`:
 
 ```bash
-tmux capture-pane -t temporal-worker -p -S -50 | grep -i "payload\|warning\|size" || echo "No payload warnings"
+tmux capture-pane -t temporal-worker-router -p -S -50 | grep -i "payload\|warning\|size" || echo "No payload warnings (router)"
+tmux capture-pane -t temporal-worker-runner -p -S -50 | grep -i "payload\|warning\|size" || echo "No payload warnings (runner)"
 ```
 
+> For per-activity routing validation that proves image-gen lands on a
+> dedicated worker pool (via `activity_queues` override), see **Step 8 —
+> Routing validation battery** below.
+
 **Tier 5 — Can generated images flow between pipes in a sequence?**
+
+**Important — split workers REQUIRED for this tier.** Same as Tier 4 — the
+mis-routing of image-gen across worker pools is only observable when router and
+runner run as separate processes. On a single full worker, the bug surfaces as
+"works on my machine" but breaks in production.
 
 **Important:** Like Tier 4, this only catches real payload bugs in **live mode**.
 
@@ -424,15 +443,27 @@ Live (real image generation + vision — required to catch payload size bugs):
 ```
 
 After this completes, tell the user: PASS/FAIL, output dir, graph file path.
-Also check for payload warnings:
+Also check for payload warnings on both workers:
 
 ```bash
-tmux capture-pane -t temporal-worker -p -S -50 | grep -i "payload\|warning\|size" || echo "No payload warnings"
+tmux capture-pane -t temporal-worker-router -p -S -50 | grep -i "payload\|warning\|size" || echo "No payload warnings (router)"
+tmux capture-pane -t temporal-worker-runner -p -S -50 | grep -i "payload\|warning\|size" || echo "No payload warnings (runner)"
 ```
 
-If any tier hangs for more than 30 seconds, check worker output:
+> For per-activity routing validation across the image-gen + LLM-text
+> activities exercised here, see **Step 8 — Routing validation battery**
+> below.
+
+If any tier hangs for more than 30 seconds, check worker output. With the
+recommended split workers (Step 2), capture both sessions; for the alternative
+single full worker setup, capture `temporal-worker` instead:
 
 ```bash
+# Split workers (default setup from Step 2)
+tmux capture-pane -t temporal-worker-router -p -S -100
+tmux capture-pane -t temporal-worker-runner -p -S -100
+
+# Single full worker (alternative setup)
 tmux capture-pane -t temporal-worker -p -S -100
 ```
 
@@ -592,9 +623,75 @@ Expect:
   `writer_id="primary"`.
 
 If only `writer_id="primary"` appears, the inference activity ran in the
-router process — check `worker_config.inference_task_queue` and confirm both
-workers are running with the latest code (restart them if they predate the
-Phase 2 runner-side fallback commit).
+router process. Check `worker_config.activity_queues` (and the workflow's
+own `task_queue`) so that `act_llm_gen_text` resolves to a queue the runner
+listens on, and confirm both workers are running with the latest code
+(restart them if they predate the Phase 2 runner-side fallback commit).
+
+### Step 5c: Tier 9 — Object generation through Temporal cross-process
+
+Validates that `act_llm_gen_object` and `act_llm_gen_object_list` survive a
+cross-process round-trip. Every existing `library_crate/*.mthds` outputs `Text`,
+so the structured-output activities never go through the real Temporal data
+converter cross-process — Tier 9 closes that gap. The `make_object` /
+`make_object_list` round-trip uses
+`model_dump(mode="json", serialize_as_any=True)` and `model_validate(...)` on
+the activity boundary; if either side regresses, nested fields silently drop
+or fail to validate.
+
+The `structured_output_sequence` bundle defines an `Invoice` concept with a
+nested `Customer` concept and a `LineItem` list — at least one nested field
+is required so the test exercises non-trivial JSON serialization.
+
+```bash
+.venv/bin/pipelex run bundle \
+  tests/integration/pipelex/temporal/library_crate/structured_output_sequence.mthds \
+  --pipe generate_invoice_single \
+  --temporal --dry-run --mock-inputs --no-logo --graph
+```
+
+```bash
+.venv/bin/pipelex run bundle \
+  tests/integration/pipelex/temporal/library_crate/structured_output_sequence.mthds \
+  --pipe generate_invoice_list \
+  --temporal --dry-run --mock-inputs --no-logo --graph
+```
+
+After each completes, tell the user: PASS/FAIL, output dir, graph file path.
+The pytest counterpart in `tests/integration/pipelex/temporal/tracing/test_split_worker_object_gen.py`
+runs the same scenario through the in-process server with split workers and
+asserts the round-trip preserves nested field values exactly.
+
+### Step 5d: Tier 11 — `make_extract_pages` two-activity cross-process
+
+Validates the most fragile post-collapse path: the only `ContentGeneratorProtocol`
+method that dispatches more than one activity. `make_extract_pages` runs
+`act_extract_gen_extract_pages` then conditionally `act_render_page_views`,
+attaching each rendered page to the corresponding `PageContent.page_view`. This
+is also the only method whose `activity_id` uniqueness mitigation
+(`f"{base_id}-pages"` and `f"{base_id}-render-page-views"`) actually matters in
+production.
+
+The test fixture workflow `WfTestContentGeneratorPdfPageViews` (registered in
+`TEMPORAL_TEST_WORKFLOWS`) exercises this flow. The pytest counterpart
+substitutes both activities with canonical fixtures so it runs without Azure
+Document Intelligence credentials or pypdfium2 — the goal is to pin the
+activity_id contract, not to re-validate the OCR backend (already covered by
+`content_generation/test_tprl_content_generator_pdf_page_views.py`):
+
+```bash
+.venv/bin/pytest -x -v \
+  tests/integration/pipelex/temporal/tracing/test_split_worker_extract_pages.py \
+  -m temporal --temporal-server local 2>&1
+```
+
+After this completes, tell the user: PASS/FAIL. The test asserts via
+`WorkflowHandle.fetch_history()` that exactly two `ActivityTaskScheduled`
+events appear with `activity_id` ending in `-pages` and `-render-page-views`.
+For manual Temporal Web UI inspection, point `temporal-worker-router` /
+`temporal-worker-runner` at the same dev server and inspect the workflow's
+event timeline — the two scheduled activities should be visible with their
+distinct activity_ids.
 
 ---
 
@@ -725,6 +822,11 @@ ls results/*/reactflow.html
 | Tier 6: Codec transparency | Existing pipelines work unchanged with codec enabled | PASS/FAIL | path | — |
 | Tier 7: Large payload | Multi-step pipeline with codec stress test | PASS/FAIL | path | — |
 | Tier 8: Cross-worker usage | Runner-side `UsageReportEvent` lands in same NDJSON dir with `act_*` writer_id (live mode or integration test) | PASS/FAIL | — | — |
+| Tier 9: Object gen cross-process | `act_llm_gen_object` / `act_llm_gen_object_list` survive the JSON round-trip with nested fields intact | PASS/FAIL | path | — |
+| Tier 10a: Multi-activity routing | `activity_queues.default` routes both `act_llm_gen_text` and `act_img_gen_images` to their dedicated worker pools; default runner sees 0 hits for either | PASS/FAIL/SKIPPED | — | — |
+| Tier 10b: Per-handle routing | `activity_queues.by_handle` overrides the activity default per model handle — two distinct handles in one workflow land on two distinct workers | PASS/FAIL/SKIPPED | path | — |
+| Tier 10c: Two activities, one route | `act_extract_gen_extract_pages` + `act_render_page_views` (no routing key) both land on a shared dedicated queue via Azure Doc Intel through Pipelex Gateway | PASS/FAIL | — | — |
+| Tier 11: Extract two-activity | `act_extract_gen_extract_pages` + `act_render_page_views` dispatched cross-process with distinct activity_ids | PASS/FAIL | — | — |
 | Concept isolation (alpha) | Conflicting `Result` concepts don't cross-contaminate | PASS/FAIL | path | — |
 | Concept isolation (beta) | (same test, other side) | PASS/FAIL | path | — |
 | Pipe isolation (alpha) | Conflicting `shared_step` pipes use correct version | PASS/FAIL | path | — |
@@ -738,11 +840,243 @@ After reporting, propose opening the PipeParallel graph (most interesting cross-
 open results/temporal_parallel_sequence_output_01/reactflow.html
 ```
 
-If any concurrent tests fail, capture worker output for diagnosis:
+If any concurrent tests fail, capture worker output for diagnosis (split workers
+from Step 2 are the default — fall back to `temporal-worker` only if you used the
+single full worker setup):
 
 ```bash
-tmux capture-pane -t temporal-worker -p -S -200
+tmux capture-pane -t temporal-worker-router -p -S -200
+tmux capture-pane -t temporal-worker-runner -p -S -200
 ```
+
+---
+
+### Step 8: Routing validation battery — does `activity_queues` actually isolate workers?
+
+This step validates the v1 per-activity, per-handle routing (PR #879) end-to-end
+against a real Temporal server. It is **opt-in** — Tiers 1–11 above all run with
+the default empty `activity_queues`, where every activity lands on
+`worker_config.task_queue` and either of the split workers picks it up. Step 8
+proves the routing feature works as advertised when operators actually configure
+it: each activity (and, in Tier 10b, each model handle) lands on its dedicated
+worker pool, never on the fallback runner.
+
+Step 8 is **live-only**. The routing decision happens in the workflow regardless
+of dry/live, but the only way to prove a routed activity wasn't picked up by the
+wrong worker is to actually dispatch it and watch where it executes. Dry-run
+short-circuits LLM calls inside the workflow process (`ContentGeneratorDry`),
+so no `act_*` ever gets scheduled and the routing assertion is meaningless.
+
+**Step 8.0 — Preflight + setup**
+
+Verify base split workers from Step 2 are still alive (router + runner). If not,
+go back and start them.
+
+Write the routing override:
+
+```bash
+cat > .pipelex/pipelex_temporary_override.toml << 'EOF'
+[temporal.worker_config.activity_queues.act_llm_gen_text]
+default = "q_inference"
+by_handle = { "claude-4.6-sonnet" = "q_handle_a", "gemini-flash-latest" = "q_handle_b" }
+
+[temporal.worker_config.activity_queues.act_img_gen_images]
+default = "q_image_gen"
+
+[temporal.worker_config.activity_queues.act_extract_gen_extract_pages]
+default = "q_extract"
+
+[temporal.worker_config.activity_queues.act_render_page_views]
+default = "q_extract"
+EOF
+```
+
+The override needs to be visible to the **router** process (where `resolve_queue`
+runs inside the workflow). The dedicated activity workers don't read this config
+— they just listen on the queue named in their `--task-queue` flag. Restart the
+router so it reloads config:
+
+```bash
+tmux kill-session -t temporal-worker-router
+tmux new-session -d -c "$PWD" -s temporal-worker-router \
+  '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope router'
+sleep 4
+tmux capture-pane -t temporal-worker-router -p -S -30 | grep "Temporal Worker started"
+```
+
+Spawn the five dedicated activity workers, one per named queue:
+
+```bash
+for q in q_inference q_handle_a q_handle_b q_image_gen q_extract; do
+  session="temporal-worker-${q//_/-}"
+  tmux has-session -t "$session" 2>/dev/null && tmux kill-session -t "$session"
+  tmux new-session -d -c "$PWD" -s "$session" \
+    ".venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope runner --task-queue $q"
+done
+sleep 5
+for q in q_inference q_handle_a q_handle_b q_image_gen q_extract; do
+  session="temporal-worker-${q//_/-}"
+  echo "=== $session ==="
+  tmux capture-pane -t "$session" -p -S -20 | grep -B 1 -A 1 "started for"
+done
+```
+
+Each session should report `Temporal Worker started for '<queue>'`. If any
+worker failed to start, stop and diagnose before running the sub-tiers.
+
+**Tier 10a — Multi-activity isolation (live)**
+
+Runs an image-generation pipeline that dispatches `act_llm_gen_text` (handle
+resolves to `gpt-4o-mini` via `@default-small` — not in `by_handle`, falls through
+to activity default `q_inference`) AND `act_img_gen_images` (default → `q_image_gen`).
+Both activities must land on their dedicated workers; the inference runner from
+Step 2 must see 0 hits for either.
+
+```bash
+.venv/bin/pipelex run bundle \
+  tests/integration/pipelex/pipes/pipelines/crazy_image_generation.mthds \
+  --pipe generate_crazy_image \
+  --temporal --no-logo --graph
+```
+
+After completion:
+
+```bash
+INF=$(tmux capture-pane -t temporal-worker-q-inference -p -S -500 | grep -c "act_llm_gen_text")
+IMG=$(tmux capture-pane -t temporal-worker-q-image-gen -p -S -500 | grep -c "act_img_gen_images")
+INF_IMG=$(tmux capture-pane -t temporal-worker-q-inference -p -S -500 | grep -c "act_img_gen_images")
+IMG_LLM=$(tmux capture-pane -t temporal-worker-q-image-gen -p -S -500 | grep -c "act_llm_gen_text")
+RUN_LLM=$(tmux capture-pane -t temporal-worker-runner -p -S -500 | grep -c "act_llm_gen_text")
+RUN_IMG=$(tmux capture-pane -t temporal-worker-runner -p -S -500 | grep -c "act_img_gen_images")
+echo "q_inference   llm=$INF        img=$INF_IMG (want llm≥1, img=0)"
+echo "q_image_gen   llm=$IMG_LLM    img=$IMG     (want llm=0,  img≥1)"
+echo "runner        llm=$RUN_LLM    img=$RUN_IMG (want llm=0,  img=0)"
+if [ "$INF" -ge 1 ] && [ "$IMG" -ge 1 ] && [ "$INF_IMG" -eq 0 ] && [ "$IMG_LLM" -eq 0 ] && [ "$RUN_LLM" -eq 0 ] && [ "$RUN_IMG" -eq 0 ]; then
+  echo "Tier 10a PASS: multi-activity isolation verified"
+else
+  echo "Tier 10a FAIL — see hit table above"
+fi
+```
+
+**Tier 10b — Per-handle routing (live)**
+
+Runs `per_handle_routing.mthds`, a 2-step PipeSequence that dispatches `act_llm_gen_text`
+twice — step 1 with `model = "claude-4.6-sonnet"`, step 2 with `model = "gemini-flash-latest"`.
+The override maps each handle to its own queue via `by_handle`. After execution,
+each per-handle worker should show exactly 1 hit for `act_llm_gen_text`, and
+`q_inference` (the activity default) should see 0 — proving the per-handle layer
+wins over the activity default.
+
+```bash
+.venv/bin/pipelex run bundle \
+  tests/integration/pipelex/temporal/library_crate/per_handle_routing.mthds \
+  --pipe per_handle_routing_sequence \
+  --temporal --no-logo --graph
+```
+
+After completion:
+
+```bash
+HA=$(tmux capture-pane -t temporal-worker-q-handle-a -p -S -500 | grep -c "act_llm_gen_text")
+HB=$(tmux capture-pane -t temporal-worker-q-handle-b -p -S -500 | grep -c "act_llm_gen_text")
+INF=$(tmux capture-pane -t temporal-worker-q-inference -p -S -500 | grep -c "act_llm_gen_text")
+RUN=$(tmux capture-pane -t temporal-worker-runner -p -S -500 | grep -c "act_llm_gen_text")
+echo "q_handle_a (claude)  hits=$HA  (want ≥1)"
+echo "q_handle_b (gemini)  hits=$HB  (want ≥1)"
+echo "q_inference          hits=$INF (want delta=0 from Tier 10a baseline — by_handle wins)"
+echo "runner               hits=$RUN (want delta=0 from Tier 10a baseline)"
+if [ "$HA" -ge 1 ] && [ "$HB" -ge 1 ]; then
+  echo "Tier 10b PASS: per-handle routing verified (both handles landed on their dedicated workers)"
+else
+  echo "Tier 10b FAIL — see hit table above"
+fi
+```
+
+Note: `q_inference` and `runner` hit counts include Tier 10a's `act_llm_gen_text`
+dispatch (1 from Tier 10a's `@default-small` → `gpt-4o-mini` call landing on
+`q_inference`). The Tier 10b assertion is that neither counter incremented after
+this run — i.e. both Tier 10b dispatches landed on their per-handle workers.
+If you ran Step 8 from a fresh session restart, `q_inference` should be exactly
+1 (from Tier 10a) and `runner` should be 0.
+
+**Tier 10c — Two activities, one route (live)**
+
+**Credentials note.** This repo's `.env` provides `PIPELEX_GATEWAY_API_KEY`
+and `PIPELEX_INFERENCE_API_KEY` — the Pipelex Gateway proxies extract
+backends (including Azure Document Intelligence) without needing direct
+`AZURE_DOCUMENT_INTELLIGENCE_*` env vars. Use the
+`azure-document-intelligence` handle directly; do **NOT** substitute
+`mistral-ocr` or `deepseek-ocr` even when those handles seem available.
+User preference: extract = Azure Doc Intel via the gateway, period. (The
+`mistral-ocr` handle defined in `mistral.toml` is not auto-registered in
+the deck on this setup — `is_model_handle_defined` returns False — so
+trying it produces `Extract choice '...mistral-ocr...' was not found in the
+model deck`. Skip that path.)
+
+The existing bundle at
+`tests/integration/pipelex/temporal/library_crate/pdf_extract_page_views.mthds`
+already references `@default-extract-document` (→ `azure-document-intelligence`)
+and sets `page_views = true`, exercising both activities. There is no
+matching inputs JSON for the CLI run — write one at `/tmp/pdf_extract_inputs.json`
+pointing at any `tests/data/documents/*.pdf` (e.g. `Job-Offer.pdf`):
+
+```bash
+cat > /tmp/pdf_extract_inputs.json << EOF
+{
+  "source_pdf": {
+    "concept": "native.Document",
+    "content": {
+      "url": "$PWD/tests/data/documents/Job-Offer.pdf"
+    }
+  }
+}
+EOF
+
+.venv/bin/pipelex run bundle \
+  tests/integration/pipelex/temporal/library_crate/pdf_extract_page_views.mthds \
+  --pipe pdf_extract_with_page_views \
+  --inputs /tmp/pdf_extract_inputs.json \
+  --temporal --no-logo --graph
+```
+
+After completion:
+
+```bash
+EXTR=$(tmux capture-pane -t temporal-worker-q-extract -p -S -500 | grep -c "act_extract_gen_extract_pages")
+RNDR=$(tmux capture-pane -t temporal-worker-q-extract -p -S -500 | grep -c "act_render_page_views")
+RUN_EXTR=$(tmux capture-pane -t temporal-worker-runner -p -S -500 | grep -c "act_extract_gen_extract_pages")
+RUN_RNDR=$(tmux capture-pane -t temporal-worker-runner -p -S -500 | grep -c "act_render_page_views")
+echo "q_extract: extract=$EXTR (want ≥1)  render=$RNDR (want ≥1)"
+echo "runner:    extract=$RUN_EXTR        render=$RUN_RNDR (want both 0)"
+if [ "$EXTR" -ge 1 ] && [ "$RNDR" -ge 1 ] && [ "$RUN_EXTR" -eq 0 ] && [ "$RUN_RNDR" -eq 0 ]; then
+  echo "Tier 10c PASS: both extract activities routed to q_extract (activity-default fallback for routing_key=None works)"
+else
+  echo "Tier 10c FAIL — see hit table above"
+fi
+```
+
+If the pipeline ever errors with `Extract choice '...' was not found in the
+model deck`, the deck is not loading Azure Doc Intel — fix the deck before
+falling back to a different handle; do not substitute another OCR backend.
+
+**Step 8.d — Teardown**
+
+Restore the default empty `activity_queues` and kill the dedicated workers:
+
+```bash
+rm -f .pipelex/pipelex_temporary_override.toml
+for q in q_inference q_handle_a q_handle_b q_image_gen q_extract; do
+  tmux kill-session -t "temporal-worker-${q//_/-}" 2>/dev/null
+done
+# Restart the router so it reverts to empty activity_queues
+tmux kill-session -t temporal-worker-router
+tmux new-session -d -c "$PWD" -s temporal-worker-router \
+  '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope router'
+sleep 4
+tmux capture-pane -t temporal-worker-router -p -S -10 | grep "Temporal Worker started"
+```
+
+Optionally re-run Tier 1 (default routing) to confirm the baseline is restored.
 
 ---
 
@@ -750,7 +1084,7 @@ tmux capture-pane -t temporal-worker -p -S -200
 
 Propose these to the user — do NOT run them automatically:
 
-- Kill tmux sessions: `tmux kill-session -t temporal-worker` / `tmux kill-session -t temporal-server`
+- Kill tmux sessions: `tmux kill-session -t temporal-worker-router` / `tmux kill-session -t temporal-worker-runner` (or `tmux kill-session -t temporal-worker` if you used the single full worker) / `tmux kill-session -t temporal-server`
 - Clean results directory: `rm -rf results/`
 - Clean trace files: `rm -rf .pipelex/traces/`
 - Remove temporary override if still present: `.venv/bin/python -c "from pathlib import Path; Path('.pipelex/pipelex_temporary_override.toml').unlink(missing_ok=True)"`
@@ -768,7 +1102,7 @@ Leave the server running if the user plans to iterate.
 | `RuntimeError: Failed decoding arguments` | Temporal's data converter can't deserialize the PipeJob on the worker — usually a serialization format issue |
 | `WorkflowFailureError` wrapping `TemporalError` | The pipe itself failed during execution — read the inner error for the real cause |
 | `AssertionError: StructuredContent missing field` | Per-workflow ClassRegistry isolation failed — the worker used the wrong concept class (from another workflow's definitions) |
-| Submitter hangs indefinitely | The worker crashed during deserialization — check `tmux capture-pane -t temporal-worker -p -S -200` |
+| Submitter hangs indefinitely | The worker crashed during deserialization — check `tmux capture-pane -t temporal-worker-router -p -S -200` (and the runner session, or `temporal-worker` for the single-worker setup) |
 | Both concurrent jobs succeed but wrong data | ContextVar leak between workflows — per-workflow scoping is broken, one workflow's class definitions bled into the other |
 | No `reactflow.html` generated | GraphSpec assembly failed — either tracing is disabled in `pipelex.toml` or NDJSON events weren't emitted by the worker |
 | `PayloadSizeWarning` in worker logs | Image data (base64) is being passed inline through Temporal payloads instead of being stored at the activity level — the fix is to call storage in the image generation activity before returning results |

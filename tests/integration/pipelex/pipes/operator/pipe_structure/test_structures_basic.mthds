@@ -1,0 +1,5 @@
+domain      = "test_pipe_structure"
+description = "Concepts used by PipeStructure integration tests"
+
+[concept]
+SimpleResult = "A simple structured result"

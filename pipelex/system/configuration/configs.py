@@ -75,10 +75,6 @@ class DryRunConfig(ConfigModel):
         return value
 
 
-class StructureConfig(ConfigModel):
-    is_default_text_then_structure: bool
-
-
 class PromptingConfig(ConfigModel):
     default_prompting_style: TemplatingStyle
     prompting_styles: dict[str, TemplatingStyle]
@@ -206,7 +202,6 @@ class Pipelex(ConfigModel):
     log_config: LogConfig
     aws_config: AwsConfig
 
-    structure_config: StructureConfig
     prompting_config: PromptingConfig
     mthds_config: MthdsConfig
 

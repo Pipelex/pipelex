@@ -962,6 +962,24 @@ class LibraryManager(LibraryManagerAbstract):
             # Manifest exists: filter to exported pipes + main_pipes
             has_exports = True
             all_exported = resolved_dep.exported_pipe_codes | main_pipes
+            # Synthetic helpers from build-time elaboration (e.g. `<code>__draft_text` and
+            # `<code>__structure` produced by `structuring_method = preliminary_text`) are
+            # private to their parent pipe and never listed in the manifest. When the parent
+            # is exported, its helpers must travel with it — otherwise the wrapping
+            # PipeSequence references unresolved pipe codes at runtime.
+            # Note: `parent_pipe_code` and `synthetic_code` are bare codes within a single
+            # bundle — `BundleElaborator` writes them that way today. If two bundles in the
+            # same dep ever ship the same bare pipe code, this lookup would conflate their
+            # helpers. The downstream factory would then fail on duplicate registration, so
+            # the failure mode is loud rather than silent.
+            synthetic_helpers: set[str] = set()
+            for blueprint in dep_blueprints:
+                if not blueprint.elaboration_metadata:
+                    continue
+                for synthetic_code, meta in blueprint.elaboration_metadata.items():
+                    if meta.parent_pipe_code in all_exported:
+                        synthetic_helpers.add(synthetic_code)
+            all_exported |= synthetic_helpers
 
         # Temporarily register dep concepts in main library for pipe construction
         # (PipeFactory resolves concepts through the hub's current library)

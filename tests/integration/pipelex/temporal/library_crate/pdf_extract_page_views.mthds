@@ -1,0 +1,11 @@
+domain      = "pdf_extract_routing_test"
+description = "PDF extraction with page_views — exercises act_extract_gen_extract_pages + act_render_page_views"
+
+[pipe]
+[pipe.pdf_extract_with_page_views]
+type        = "PipeExtract"
+description = "Extract pages from a PDF and render each page as an image (two activities dispatched)"
+inputs      = { source_pdf = "Document" }
+output      = "Page[]"
+model       = "@default-extract-document"
+page_views  = true

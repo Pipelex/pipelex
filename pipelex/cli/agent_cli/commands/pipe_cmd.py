@@ -24,6 +24,7 @@ from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.builder.pipe.pipe_spec import PipeSpec
+from pipelex.builder.pipe.pipe_structure_spec import PipeStructureSpec
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
 from pipelex.core.pipes.pipe_blueprint import PipeType
 from pipelex.language.toml_string_utils import format_toml_string
@@ -82,6 +83,12 @@ def _add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDocum
             pipe_table.add("system_prompt", format_toml_string(pipe_spec.system_prompt))
         if pipe_spec.prompt:
             pipe_table.add("prompt", format_toml_string(pipe_spec.prompt))
+        if pipe_spec.structuring_method is not None:
+            pipe_table.add("structuring_method", pipe_spec.structuring_method)
+
+    elif isinstance(pipe_spec, PipeStructureSpec):
+        if pipe_spec.model:
+            pipe_table.add("model", pipe_spec.model)
 
     elif isinstance(pipe_spec, PipeComposeSpec):
         if pipe_spec.construct_spec is not None:

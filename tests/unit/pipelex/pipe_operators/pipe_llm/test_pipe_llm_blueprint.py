@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
+from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, StructuringMethod
 
 
 class TestPipeLLMBlueprint:
@@ -126,13 +126,46 @@ class TestPipeLLMBlueprint:
         # Should not raise error even though _internal_var is not in inputs
         assert blueprint.inputs is None
 
-    def test_validate_inputs_ignores_special_variables(self):
-        """Test that special variables like preliminary_text are ignored."""
+    def test_validate_inputs_ignores_place_holder(self):
+        """Test that the special variable place_holder is ignored."""
         blueprint = PipeLLMBlueprint(
             description="lorem ipsum",
             inputs=None,
             output="native.Text",
-            prompt="Use @preliminary_text and @place_holder",
+            prompt="Use @place_holder",
         )
-        # Should not raise error even though these special variables are not in inputs
+        # Should not raise error even though this special variable is not in inputs
         assert blueprint.inputs is None
+
+    @pytest.mark.parametrize("bad_output", ["Text", "Text[]", "Text[2]", "native.Text"])
+    def test_preliminary_text_rejects_text_compatible_output(self, bad_output: str):
+        """`structuring_method = preliminary_text` is rejected at blueprint construction when paired with a Text-shaped output."""
+        with pytest.raises(ValidationError, match="cannot have output"):
+            PipeLLMBlueprint(
+                description="Bad",
+                output=bad_output,
+                prompt="hello",
+                structuring_method=StructuringMethod.PRELIMINARY_TEXT,
+            )
+
+    def test_preliminary_text_accepts_structured_output(self):
+        """`preliminary_text` paired with a non-Text output passes validation."""
+        blueprint = PipeLLMBlueprint(
+            description="OK",
+            output="Foo",
+            prompt="hello",
+            structuring_method=StructuringMethod.PRELIMINARY_TEXT,
+        )
+        assert blueprint.structuring_method is StructuringMethod.PRELIMINARY_TEXT
+        assert blueprint.output == "Foo"
+
+    def test_direct_method_does_not_trigger_text_check(self):
+        """`StructuringMethod.DIRECT` does not trigger the Text-output check, even when output is Text."""
+        blueprint = PipeLLMBlueprint(
+            description="OK",
+            output="Text",
+            prompt="hello",
+            structuring_method=StructuringMethod.DIRECT,
+        )
+        assert blueprint.structuring_method is StructuringMethod.DIRECT
+        assert blueprint.output == "Text"

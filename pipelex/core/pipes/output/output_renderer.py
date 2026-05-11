@@ -99,6 +99,7 @@ def _collect_possible_outputs(
             | PipeType.PIPE_LLM
             | PipeType.PIPE_EXTRACT
             | PipeType.PIPE_SEARCH
+            | PipeType.PIPE_STRUCTURE
             | PipeType.PIPE_BATCH
             | PipeType.PIPE_PARALLEL
         ):

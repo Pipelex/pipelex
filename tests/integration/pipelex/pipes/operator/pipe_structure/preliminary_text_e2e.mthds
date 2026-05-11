@@ -1,0 +1,63 @@
+domain      = "test_preliminary_text_e2e"
+description = "Real-LLM end-to-end test of preliminary_text elaboration (single + multiplicity variants)"
+
+# The RestaurantReview Python structure class is declared in test_structures_basic.py
+# in this same directory. Auto-registered via StructuredContent discovery on library load.
+[concept]
+RestaurantReview = "A structured review of a restaurant"
+
+[pipe.review_one_restaurant]
+type = "PipeLLM"
+description = "Review a single restaurant via the preliminary_text elaboration"
+inputs = { restaurant_brief = "Text" }
+output = "RestaurantReview"
+model = "$testing-text"
+model_to_structure = "$testing-text"
+structuring_method = "preliminary_text"
+prompt = """
+Imagine you are a seasoned local food critic. Write a short, opinionated review
+based on this brief: $restaurant_brief
+
+Cover at least: the restaurant's name (invent a believable one if it isn't in
+the brief), the type of cuisine, the city, an overall rating from 1 to 10, the
+price range using '$' to '$$$$' symbols, two or three standout dishes, one or
+two caveats, and a one-sentence take.
+"""
+
+[pipe.review_neighborhood_restaurants]
+type = "PipeLLM"
+description = "Review a dynamic-length list of restaurants in a neighborhood"
+inputs = { restaurant_brief = "Text" }
+output = "RestaurantReview[]"
+model = "$testing-text"
+model_to_structure = "$testing-text"
+structuring_method = "preliminary_text"
+prompt = """
+You are writing a short neighborhood guide. From this brief, draft compact
+reviews of two or three different restaurants worth visiting:
+
+$restaurant_brief
+
+For each, give the restaurant's name (invent reasonable ones), the cuisine,
+the city or neighborhood, an overall rating from 1 to 10, the price range
+using '$' to '$$$$' symbols, the standout dishes, any caveats, and a
+one-sentence take.
+"""
+
+[pipe.review_two_restaurants]
+type = "PipeLLM"
+description = "Review exactly two restaurants via the preliminary_text elaboration"
+inputs = { restaurant_brief = "Text" }
+output = "RestaurantReview[2]"
+model = "$testing-text"
+model_to_structure = "$testing-text"
+structuring_method = "preliminary_text"
+prompt = """
+Write a head-to-head comparison of two restaurants based on this brief:
+
+$restaurant_brief
+
+For each restaurant, give a believable name, the cuisine, the city, an overall
+rating from 1 to 10, the price range using '$' to '$$$$' symbols, the standout
+dishes, any caveats, and a one-sentence take.
+"""

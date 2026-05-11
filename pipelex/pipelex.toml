@@ -207,33 +207,7 @@ xhigh = 32768
 max = 65536
 
 [cogt.llm_config.generic_templates]
-structure_from_preliminary_text_system = """
-You are a data modeling expert specialized in extracting structure from text.
-"""
-
-structure_from_preliminary_text_user = """
-Extract and structure information from this text:
-
-{{ preliminary_text | tag }}
-
-Now generate the JSON in the required format.
-Do not create information that is not in the text.
-"""
-
 output_structure_prompt = """
-
-
----
-The instance we want to generate will be for the following class:
-{{ class_structure_str }}
-
-Don't bother with JSON formatting, we'll do that as a second step.
-For now, just output markdown with the details of the instance.
-DO NOT create new information.
-If some information is not present for an attribute, output the default value or None according to the field definition.
-"""
-
-output_structure_prompt_no_preliminary_text = """
 
 
 ---
@@ -242,6 +216,13 @@ The instance we want to generate will be for the following class:
 
 DO NOT create information.
 If some information is not present for an attribute, output the default value or None according to the attribute definition.
+"""
+
+structuring_prompt = """
+Read the following text carefully and produce the requested structured output from it.
+
+---
+{{ text }}
 """
 
 ####################################################################################################
@@ -294,9 +275,6 @@ openai = { tag_style = "ticks" }
 anthropic = { tag_style = "xml" }
 mistral = { tag_style = "square_brackets" }
 gemini = { tag_style = "xml" }
-
-[pipelex.structure_config]
-is_default_text_then_structure = false # turn this to true to get better results: generates text before structuring
 
 ####################################################################################################
 # Pipe run config
@@ -485,6 +463,31 @@ run_timeout = "1:00:00"
 task_timeout = "0:00:10"
 start_delay = "0:00:00"
 rpc_timeout = "1:00:00"
+
+# Per-activity, per-handle routing. Each entry declares:
+#   default   = the queue used when no per-handle override matches
+#   by_handle = optional { handle_name -> queue }
+# Activities not listed here resolve to `task_queue` above. Empty by default
+# means every activity lands on `temporal_task_queue` — same as legacy behavior.
+#
+# Example: route OpenAI vs Anthropic to separate worker pools, send image
+# generation to a dedicated heavy-payload pool, and isolate Mistral OCR:
+#
+# [temporal.worker_config.activity_queues.act_llm_gen_text]
+# default = "inference_q"
+# by_handle = { "claude-opus-4-7" = "anthropic_q", "gpt-5" = "openai_q" }
+#
+# [temporal.worker_config.activity_queues.act_llm_gen_object]
+# default = "inference_q"
+# by_handle = { "claude-opus-4-7" = "anthropic_q", "gpt-5" = "openai_q" }
+#
+# [temporal.worker_config.activity_queues.act_img_gen_images]
+# default = "image_gen_q"
+# by_handle = { "flux-1.1-pro" = "fal_q", "dall-e-3" = "openai_image_q" }
+#
+# [temporal.worker_config.activity_queues.act_extract_gen_extract_pages]
+# default = "extract_q"
+# by_handle = { "mistral-ocr" = "mistral_extract_q" }
 
 [temporal.worker_config.retry_policy_config]
 initial_interval = "0:00:03"

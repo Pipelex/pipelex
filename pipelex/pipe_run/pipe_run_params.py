@@ -137,7 +137,6 @@ class BatchParams(BaseModel):
 class PipeRunParams(BaseModel):
     run_mode: PipeRunMode = PipeRunMode.LIVE
     final_stuff_code: str | None = None
-    is_with_preliminary_text: bool | None = None
     output_multiplicity: VariableMultiplicity | None = None
     dynamic_output_concept_ref: str | None = None
     batch_params: BatchParams | None = None
@@ -171,7 +170,6 @@ class PipeRunParams(BaseModel):
         cls,
         pipe_run_params: Self,
         applied_output_multiplicity: VariableMultiplicity | None,
-        is_with_preliminary_text: bool | None = None,
     ) -> Self:
         """Copy the run params the nb_output into the params, and remove the attribute.
         This is useful to make a single prompt with multiple outputs.
@@ -184,8 +182,6 @@ class PipeRunParams(BaseModel):
         elif isinstance(applied_output_multiplicity, int):
             new_run_params.output_multiplicity = False
             new_run_params.params[PipeRunParamKey.NB_OUTPUT] = applied_output_multiplicity
-        if is_with_preliminary_text is not None:
-            new_run_params.is_with_preliminary_text = is_with_preliminary_text
         return new_run_params
 
     @property
