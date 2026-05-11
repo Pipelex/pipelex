@@ -417,7 +417,6 @@ cleanderived:
 
 cleanenv:
 	$(call PRINT_TITLE,"Erasing virtual environment")
-	find . -name 'uv.lock' -delete && \
 	rm -rf "$(VIRTUAL_ENV)" && \
 	echo "Cleaned up virtual env and dependency lock files";
 

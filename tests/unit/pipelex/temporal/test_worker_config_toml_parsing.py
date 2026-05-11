@@ -16,8 +16,9 @@ schema change ever breaks how operators are invited to override routing
 in their projects, this test fails before the broken config reaches them.
 """
 
-import tomllib
 from datetime import timedelta
+
+import tomli
 
 from pipelex.temporal.config_temporal import ActivityRouteConfig, HandleOptions, WorkerConfig
 
@@ -61,7 +62,7 @@ class TestWorkerConfigTomlParsing:
     """
 
     def test_activity_queues_parse_into_typed_models(self) -> None:
-        worker_config = WorkerConfig.model_validate(tomllib.loads(_TOML_FRAGMENT))
+        worker_config = WorkerConfig.model_validate(tomli.loads(_TOML_FRAGMENT))
 
         assert worker_config.default_task_queue == "temporal_task_queue"
         assert set(worker_config.activity_queues.keys()) == {
@@ -93,7 +94,7 @@ class TestWorkerConfigTomlParsing:
 
     def test_resolve_queue_works_on_parsed_config(self) -> None:
         """End-to-end: parse the TOML, then dispatch through ``resolve_queue``."""
-        worker_config = WorkerConfig.model_validate(tomllib.loads(_TOML_FRAGMENT))
+        worker_config = WorkerConfig.model_validate(tomli.loads(_TOML_FRAGMENT))
 
         # Layer 3: per-handle override wins.
         assert worker_config.resolve_queue("act_llm_gen_text", routing_key="claude-opus-4-7") == "anthropic_q"
