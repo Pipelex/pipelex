@@ -52,7 +52,6 @@ backoff_coefficient = 2.0
 maximum_interval = "unlimited"
 maximum_attempts = 3
 non_retryable_error_types = []
-non_retryable_error_types_extra = []
 """
 
 

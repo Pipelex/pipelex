@@ -293,10 +293,10 @@ non_retryable_error_types = [
   "ModelNotFoundError",
   "ValidationError",
 ]
-# Per-queue / per-handle layers contribute additive entries to this list at
-# dispatch time (e.g. AnthropicBadRequestError on the anthropic_q). Baseline
-# entries are always kept; this list is purely additive.
-non_retryable_error_types_extra = []
+# Per-queue / per-handle overlays add to the list above via the layer-specific
+# `non_retryable_error_types_extra` field (see the commented example below).
+# That field belongs only on overlays — the baseline schema deliberately does
+# not accept it.
 
 # Per-queue submitter options. Layer on top of worker_config defaults at
 # dispatch time. Set timeouts to match each backend pool's latency profile

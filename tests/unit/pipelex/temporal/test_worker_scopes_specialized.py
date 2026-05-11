@@ -10,7 +10,7 @@ full ``runner`` registration with no orphan activities.
 import pytest
 
 from pipelex.config import get_config
-from pipelex.temporal.tasks import Tasks
+from pipelex.temporal.tasks import PackName, Tasks
 from pipelex.temporal.temporal_tasks import TemporalTasks
 
 
@@ -66,19 +66,14 @@ class TestSpecializedWorkerScopes:
             _, scope_activities = tasks.workflows_and_activities(scope=scope)
             specialized_union.update(activity.__name__ for activity in scope_activities)
 
-        # The pipe task pack also registers control-plane activities (assemble_graph,
-        # deliver, flush_trace_events) that are wf_pipe_router / wf_pipe_run plumbing
-        # and not "content-generation" activities. Specialized runner scopes are
-        # only meant to cover the user-activity surface. Compare on that subset.
-        content_gen_runner_names = {
-            "act_llm_gen_text",
-            "act_llm_gen_object",
-            "act_llm_gen_object_list",
-            "act_img_gen_images",
-            "act_extract_gen_extract_pages",
-            "act_render_page_views",
-            "act_jinja2_gen_text",
-        }
+        # Derive the content-generation set from the CRAFTING task pack — the
+        # single source of truth. The PIPE pack contributes control-plane
+        # activities (assemble_graph, deliver, flush_trace_events) that are
+        # wf_pipe_router / wf_pipe_run plumbing, not user content. Specialized
+        # runner scopes are only meant to cover the user-activity surface, so
+        # we compare on that subset. Adding a new activity to CRAFTING is now
+        # automatically tracked here without editing this test.
+        content_gen_runner_names = {activity.__name__ for activity in Tasks.TASK_PACKS[PackName.CRAFTING].activity_list}
         # Every user-activity registered by `runner` must appear in at least
         # one specialized scope.
         orphans = content_gen_runner_names & runner_names - specialized_union

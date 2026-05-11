@@ -1,8 +1,13 @@
 """Unit tests for ``WorkerConfig.resolve_queue`` — the per-activity, per-handle
-routing resolver introduced in v1.
+routing resolver introduced in v1, with the hybrid empty-routing fallback
+added in v2.
 
-Covers the three resolution layers:
-  1. Unmapped activity → worker-wide default ``task_queue``.
+Covers the resolution layers:
+  0. Empty ``activity_queues`` (no routing configured) → ``None``, signalling
+     the dispatch path to omit ``task_queue`` so Temporal uses the workflow's
+     own queue (supports ``with_conditional_worker`` test isolation).
+  1. Non-empty ``activity_queues``, unmapped activity → worker-wide
+     ``default_task_queue``.
   2. Mapped activity, unmapped handle (or ``routing_key=None``) → activity ``default``.
   3. Mapped activity, mapped handle → per-handle queue.
 """
@@ -36,11 +41,29 @@ def _make_worker_config(activity_queues: dict[str, ActivityRouteConfig] | None =
 
 
 class TestWorkerConfigResolveQueue:
-    """Three-layer resolution: per-handle → per-activity default → worker default."""
+    """Hybrid empty-routing fallback + three-layer resolution when routing is configured."""
 
-    def test_unmapped_activity_falls_back_to_default_task_queue(self) -> None:
-        """An activity not present in ``activity_queues`` must use ``task_queue``."""
+    def test_empty_activity_queues_returns_none_for_workflow_local_dispatch(self) -> None:
+        """When ``activity_queues`` is fully empty (default config, no routing
+        configured), ``resolve_queue`` returns ``None`` so the dispatch path
+        omits ``task_queue`` and Temporal routes the activity to the workflow's
+        own queue. Required by ``with_conditional_worker`` and by the pre-v1
+        default behavior.
+        """
         worker_config = _make_worker_config()
+        assert worker_config.resolve_queue("act_llm_gen_text", routing_key="claude-opus-4-7") is None
+        assert worker_config.resolve_queue("act_some_unknown_activity") is None
+
+    def test_unmapped_activity_with_non_empty_routing_falls_back_to_default_task_queue(self) -> None:
+        """When the operator has configured routing for some activity, an
+        unmapped activity still falls back explicitly to ``default_task_queue``.
+        The empty-vs-non-empty distinction is the hybrid fallback hinge.
+        """
+        worker_config = _make_worker_config(
+            {
+                "act_img_gen_images": ActivityRouteConfig(default="img_q"),
+            },
+        )
         assert worker_config.resolve_queue("act_llm_gen_text", routing_key="claude-opus-4-7") == "default_q"
         assert worker_config.resolve_queue("act_some_unknown_activity") == "default_q"
 

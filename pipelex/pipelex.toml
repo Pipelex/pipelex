@@ -482,8 +482,10 @@ non_retryable_error_types = [
   "ValidationError",
 ]
 # Per-queue and per-handle overlays contribute `non_retryable_error_types_extra`
-# lists; the dispatch resolver unions them on top of the baseline above.
-non_retryable_error_types_extra = []
+# lists; the dispatch resolver unions them on top of the baseline above. That
+# field belongs only on overlays — adding it here would be silently dropped by
+# the resolver, so the baseline schema (RetryPolicyConfig) deliberately does
+# not accept it.
 
 # Per-queue submitter options. Empty by default — every activity uses the
 # worker_config baselines. Operators populate this when a backend pool needs

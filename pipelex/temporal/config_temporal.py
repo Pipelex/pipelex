@@ -1,14 +1,17 @@
+from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Literal, Union
+from typing import TYPE_CHECKING, Any, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-from temporalio.common import RetryPolicy
+from pydantic import Field, model_validator
 
 from pipelex import log
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.temporal.exceptions import TemporalConfigError
 from pipelex.tools.storage.storage_config import StorageProviderConfig
 from pipelex.types import Self, StrEnum
+
+if TYPE_CHECKING:
+    from temporalio.common import RetryPolicy
 
 
 class SecretMethod(StrEnum):
@@ -114,31 +117,26 @@ class TemporalConfig(ConfigModel):
         return self
 
 
-class RetryPolicyConfig(ConfigModel):
-    """Configuration model for retry policy settings."""
+class RetryPolicyConfigBase(ConfigModel):
+    """Shared retry policy scalars. Layer-specific subclasses add the appropriate
+    non-retryable-types field: ``RetryPolicyConfig`` (baseline) owns the main
+    list, ``RetryPolicyConfigOverlay`` (queue / handle) owns the additive
+    ``_extra`` list. ``ConfigModel`` is ``extra="forbid"``, so the layer
+    asymmetry is enforced by Pydantic at config load — no runtime validator
+    needed.
+    """
 
     initial_interval: timedelta = Field(strict=False)
     backoff_coefficient: float
     maximum_interval: Union[timedelta, Literal["unlimited"]]
     maximum_attempts: Union[int, Literal["unlimited"]]
-    non_retryable_error_types: list[str] = Field(default_factory=list)
-    # Additive list contributed by per-queue and per-handle overlays. The merged
-    # set is built at dispatch time (Phase 2 resolver) — never substituted.
-    non_retryable_error_types_extra: list[str] = Field(default_factory=list)
 
-    def make_retry_policy(self, merged_non_retryable_types: list[str] | None = None) -> RetryPolicy:
-        """Create a RetryPolicy instance based on the configuration.
-
-        Args:
-            merged_non_retryable_types: When provided, used as the policy's
-                ``non_retryable_error_types``. Callers building a final retry
-                policy after additive composition across baseline/queue/handle
-                layers pass this list. When ``None``, the policy uses this
-                config's own ``non_retryable_error_types`` (baseline-only).
-
-        Returns:
-            RetryPolicy: A configured RetryPolicy object.
+    def make_retry_policy(self, merged_non_retryable_types: list[str]) -> "RetryPolicy":
+        """Create a RetryPolicy instance from these scalars + the merged
+        non-retryable list assembled by the dispatch resolver across layers.
         """
+        from temporalio.common import RetryPolicy as _RetryPolicy  # noqa: PLC0415
+
         maximum_attempts: int
         if self.maximum_attempts == "unlimited":
             # This is according to the Temporal SDK's documentation
@@ -153,15 +151,34 @@ class RetryPolicyConfig(ConfigModel):
         else:
             maximum_interval = self.maximum_interval
 
-        non_retryable = merged_non_retryable_types if merged_non_retryable_types is not None else self.non_retryable_error_types
-
-        return RetryPolicy(
+        return _RetryPolicy(
             initial_interval=self.initial_interval,
             backoff_coefficient=self.backoff_coefficient,
             maximum_interval=maximum_interval,
             maximum_attempts=maximum_attempts,
-            non_retryable_error_types=non_retryable,
+            non_retryable_error_types=merged_non_retryable_types,
         )
+
+
+class RetryPolicyConfig(RetryPolicyConfigBase):
+    """Baseline retry policy on ``worker_config.retry_policy_config``. Owns the
+    main non-retryable list — the dispatch resolver seeds the merged set from
+    here and extends with overlay ``_extra`` lists.
+    """
+
+    non_retryable_error_types: list[str] = Field(default_factory=list)
+
+
+class RetryPolicyConfigOverlay(RetryPolicyConfigBase):
+    """Per-queue / per-handle overlay retry policy. Contributes additively via
+    ``non_retryable_error_types_extra``; the baseline main list always rides
+    through. The baseline class's ``non_retryable_error_types`` field is
+    deliberately absent here — setting it on an overlay would silently bypass
+    the additive composition rule. ``ConfigModel``'s ``extra="forbid"`` raises
+    ``ValidationError`` if a user supplies the disallowed field.
+    """
+
+    non_retryable_error_types_extra: list[str] = Field(default_factory=list)
 
 
 class QueueOptions(ConfigModel):
@@ -182,31 +199,10 @@ class QueueOptions(ConfigModel):
     schedule_to_close_timeout: timedelta | None = Field(default=None, strict=False)
     schedule_to_start_timeout: timedelta | None = Field(default=None, strict=False)
     heartbeat_timeout: timedelta | None = Field(default=None, strict=False)
-    retry_policy_config: RetryPolicyConfig | None = None
+    retry_policy_config: RetryPolicyConfigOverlay | None = None
     # Cluster-wide queue rate limit, conveyed to the Temporal server by every
     # worker on this queue. The latest value to be sent by a worker wins.
     max_task_queue_activities_per_second: float | None = None
-
-    @model_validator(mode="after")
-    def reject_baseline_non_retryable_on_overlay(self) -> Self:
-        """Overlay layers MUST contribute non-retryable types via
-        ``non_retryable_error_types_extra``, not ``non_retryable_error_types``.
-
-        The baseline list lives on ``worker_config.retry_policy_config`` and is
-        always included in the additive composition. If a user sets
-        ``non_retryable_error_types = [...]`` on a queue-level overlay, the
-        resolver would silently ignore it (the dispatch path only reads
-        ``_extra`` from overlay layers). Fail loudly instead so the user
-        switches to the correct field name.
-        """
-        if self.retry_policy_config is not None and self.retry_policy_config.non_retryable_error_types:
-            msg = (
-                "queue_options retry_policy_config: 'non_retryable_error_types' is not allowed on overlay layers. "
-                "Use 'non_retryable_error_types_extra' instead — the dispatch resolver composes layers additively "
-                "on top of the worker_config baseline."
-            )
-            raise TemporalConfigError(msg)
-        return self
 
 
 class HandleOptions(ConfigModel):
@@ -217,22 +213,7 @@ class HandleOptions(ConfigModel):
     """
 
     start_to_close_timeout: timedelta | None = Field(default=None, strict=False)
-    retry_policy_config: RetryPolicyConfig | None = None
-
-    @model_validator(mode="after")
-    def reject_baseline_non_retryable_on_overlay(self) -> Self:
-        """Same invariant as ``QueueOptions``: overlays contribute via
-        ``non_retryable_error_types_extra`` so the additive composition rule
-        is unambiguous from the config alone.
-        """
-        if self.retry_policy_config is not None and self.retry_policy_config.non_retryable_error_types:
-            msg = (
-                "handle_options retry_policy_config: 'non_retryable_error_types' is not allowed on overlay layers. "
-                "Use 'non_retryable_error_types_extra' instead — the dispatch resolver composes layers additively "
-                "on top of the worker_config baseline."
-            )
-            raise TemporalConfigError(msg)
-        return self
+    retry_policy_config: RetryPolicyConfigOverlay | None = None
 
 
 # class PipelexWorkflowsConfig(ConfigModel):
@@ -327,31 +308,37 @@ class WorkerRuntimeProfilesConfig(ConfigModel):
         return self
 
 
-class DispatchOptions(BaseModel):
+@dataclass
+class DispatchOptions:
     """Resolved per-call dispatch bundle returned by ``WorkerConfig.resolve_dispatch``.
 
     Splat ``to_execute_kwargs()`` into ``workflow.execute_activity(...)`` to
-    set queue + timeouts + retry consistently. Optional timeouts are omitted
-    from the kwargs dict when unset so the Temporal SDK applies its own
-    defaults (rather than ``None``, which the SDK rejects).
+    set queue + timeouts + retry consistently. ``task_queue`` is ``None`` when
+    no routing is configured (``activity_queues`` empty) — ``to_execute_kwargs``
+    then omits the key so Temporal routes to the workflow's own queue. Optional
+    timeouts are likewise omitted when unset so the Temporal SDK applies its
+    own defaults (rather than ``None``, which the SDK rejects).
+
+    Implemented as a dataclass (not a Pydantic BaseModel) so the module can be
+    imported without ``temporalio`` installed — the ``RetryPolicy`` annotation
+    is a forward reference resolved only at attribute access.
     """
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    task_queue: str
+    task_queue: str | None
     start_to_close_timeout: timedelta
+    retry_policy: "RetryPolicy"
     schedule_to_close_timeout: timedelta | None = None
     schedule_to_start_timeout: timedelta | None = None
     heartbeat_timeout: timedelta | None = None
-    retry_policy: RetryPolicy
 
     def to_execute_kwargs(self) -> dict[str, Any]:
         """Return a kwargs dict to splat into ``workflow.execute_activity``."""
         kwargs: dict[str, Any] = {
-            "task_queue": self.task_queue,
             "start_to_close_timeout": self.start_to_close_timeout,
             "retry_policy": self.retry_policy,
         }
+        if self.task_queue is not None:
+            kwargs["task_queue"] = self.task_queue
         if self.schedule_to_close_timeout is not None:
             kwargs["schedule_to_close_timeout"] = self.schedule_to_close_timeout
         if self.schedule_to_start_timeout is not None:
@@ -388,13 +375,22 @@ class WorkerConfig(ConfigModel):
         Returns:
             RetryPolicy: A configured RetryPolicy object built from the baseline.
         """
-        return self.retry_policy_config.make_retry_policy()
+        return self.retry_policy_config.make_retry_policy(merged_non_retryable_types=list(self.retry_policy_config.non_retryable_error_types))
 
-    def resolve_queue(self, activity_name: str, routing_key: str | None = None) -> str:
+    def resolve_queue(self, activity_name: str, routing_key: str | None = None) -> str | None:
         """Resolve which task queue an activity should dispatch to.
 
-        Thin delegate to ``resolve_dispatch(...).task_queue`` so the v1 resolver
-        keeps working for any caller that only needs the queue name.
+        Hybrid fallback semantic. When ``activity_queues`` is fully empty
+        (default config, no routing configured), returns ``None`` — the dispatch
+        path then omits ``task_queue`` so Temporal routes the activity to the
+        workflow's own queue. This preserves the ``with_conditional_worker``
+        test pattern (workflow on a random queue, activities ride along) and
+        the pre-v1 default behavior for installs that haven't opted into
+        per-activity routing.
+
+        When ``activity_queues`` has any entry, the operator has opted into
+        routing topology and unmapped activities still fall back explicitly to
+        ``default_task_queue``.
 
         Args:
             activity_name: The Temporal activity ``__name__`` (e.g. ``"act_llm_gen_text"``).
@@ -403,11 +399,14 @@ class WorkerConfig(ConfigModel):
                 routing dimension pass ``None``.
 
         Returns:
-            The task queue name. Resolution order:
+            The task queue name, or ``None`` when no routing is configured.
+            Resolution order when ``activity_queues`` is non-empty:
               1. ``activity_queues[activity_name].by_handle[routing_key]``
               2. ``activity_queues[activity_name].default``
               3. ``self.default_task_queue`` (worker-wide default)
         """
+        if not self.activity_queues:
+            return None
         activity_route = self.activity_queues.get(activity_name)
         if activity_route is None:
             return self.default_task_queue
@@ -456,7 +455,7 @@ class WorkerConfig(ConfigModel):
         resolved_queue = self.resolve_queue(activity_name=activity_name, routing_key=routing_key)
 
         queue_opts: QueueOptions | None = None
-        if queue_options_by_queue is not None:
+        if queue_options_by_queue is not None and resolved_queue is not None:
             queue_opts = queue_options_by_queue.get(resolved_queue)
 
         handle_opts: HandleOptions | None = None
@@ -487,8 +486,10 @@ class WorkerConfig(ConfigModel):
 
         # Pick the deepest retry policy config to seed the build (intervals,
         # backoff, attempts come from the most-specific layer). Then compose
-        # non_retryable_error_types additively across all three layers.
-        retry_base: RetryPolicyConfig = self.retry_policy_config
+        # non_retryable_error_types additively across all three layers. The
+        # common ancestor RetryPolicyConfigBase lets us type the seed uniformly
+        # while keeping baseline vs overlay separated at the schema level.
+        retry_base: RetryPolicyConfigBase = self.retry_policy_config
         retry_source = "baseline"
         if queue_opts is not None and queue_opts.retry_policy_config is not None:
             retry_base = queue_opts.retry_policy_config

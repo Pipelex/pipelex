@@ -47,7 +47,13 @@ class TestDispatchResolutionTracing:
         assert not trace_records, f"trace log fired when is_traced=False: {[r.message for r in trace_records]!r}"
 
     def test_baseline_source_when_no_overrides(self, caplog: pytest.LogCaptureFixture) -> None:
-        """No queue_options / no handle_options → ``from=baseline`` on every scalar."""
+        """No queue_options / no handle_options → ``from=baseline`` on every scalar.
+
+        With an empty ``activity_queues`` (no routing configured), the hybrid
+        fallback resolves the queue to ``None`` — the trace surfaces that
+        explicitly as ``queue=None`` so operators can see when dispatch will
+        ride on the workflow's own queue.
+        """
         worker_config = _make_worker_config()
         with caplog.at_level(logging.INFO):
             worker_config.resolve_dispatch(activity_name="act_llm_gen_text", routing_key="claude-opus-4-7", is_traced=True)
@@ -56,7 +62,8 @@ class TestDispatchResolutionTracing:
         line = trace_records[0].message
         assert "act=act_llm_gen_text" in line
         assert "handle=claude-opus-4-7" in line
-        assert "queue=default_q" in line
+        # Empty activity_queues → hybrid fallback returns None (workflow-local dispatch).
+        assert "queue=None" in line
         # Baseline 10-minute timeout = 600s.
         assert "timeout=600.0s" in line
         assert "(from=baseline)" in line
