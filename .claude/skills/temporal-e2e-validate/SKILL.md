@@ -354,9 +354,9 @@ After this completes, tell the user: PASS/FAIL, output dir, graph file path.
 two scoped workers from "Step 2" above are alive (`temporal-worker-router` and
 `temporal-worker-runner`). On a single full worker, image-gen routing accidents
 are silently masked: every activity ends up on one process so a stray
-`task_queue=worker_config.inference_task_queue` kwarg on `act_img_gen_images`
-would still execute correctly. Split workers are the only way to surface that
-class of bug as a hang or wrong-pool execution.
+`task_queue=` kwarg pointing at the wrong queue would still execute correctly.
+Split workers are the only way to surface that class of bug as a hang or
+wrong-pool execution.
 
 **Important:** This tier only catches payload size bugs in **live mode**. In dry-run,
 mock images are tiny and will pass even without activity-level storage. If the user
@@ -399,20 +399,9 @@ tmux capture-pane -t temporal-worker-router -p -S -50 | grep -i "payload\|warnin
 tmux capture-pane -t temporal-worker-runner -p -S -50 | grep -i "payload\|warning\|size" || echo "No payload warnings (runner)"
 ```
 
-**Negative-routing assertion (Tier 10).** With the runner registered for inference
-activities only, `act_img_gen_images` must NOT have run on the runner pool. If
-image-gen ever got the wrong `task_queue=` kwarg by accident, the activity would
-either hang (no worker picks it up from `inference_task_queue`) or get registered
-on both pools and run on the wrong one — a subtle production-only bug.
-
-```bash
-RUNNER_HITS=$(tmux capture-pane -t temporal-worker-runner -p -S -200 | grep -c "act_img_gen")
-if [ "$RUNNER_HITS" -eq 0 ]; then
-  echo "Tier 10 PASS: act_img_gen did NOT execute on the runner pool"
-else
-  echo "Tier 10 FAIL: act_img_gen executed on the runner pool ($RUNNER_HITS hits) — image-gen is mis-routed"
-fi
-```
+> For per-activity routing validation that proves image-gen lands on a
+> dedicated worker pool (via `activity_queues` override), see **Step 8 —
+> Routing validation battery** below.
 
 **Tier 5 — Can generated images flow between pipes in a sequence?**
 
@@ -461,17 +450,9 @@ tmux capture-pane -t temporal-worker-router -p -S -50 | grep -i "payload\|warnin
 tmux capture-pane -t temporal-worker-runner -p -S -50 | grep -i "payload\|warning\|size" || echo "No payload warnings (runner)"
 ```
 
-Apply the **Tier 10 negative-routing assertion** here too — `act_img_gen` must
-not appear on the runner pool:
-
-```bash
-RUNNER_HITS=$(tmux capture-pane -t temporal-worker-runner -p -S -200 | grep -c "act_img_gen")
-if [ "$RUNNER_HITS" -eq 0 ]; then
-  echo "Tier 10 (image flow) PASS: act_img_gen did NOT execute on the runner pool"
-else
-  echo "Tier 10 (image flow) FAIL: act_img_gen executed on the runner pool ($RUNNER_HITS hits)"
-fi
-```
+> For per-activity routing validation across the image-gen + LLM-text
+> activities exercised here, see **Step 8 — Routing validation battery**
+> below.
 
 If any tier hangs for more than 30 seconds, check worker output. With the
 recommended split workers (Step 2), capture both sessions; for the alternative
@@ -642,9 +623,10 @@ Expect:
   `writer_id="primary"`.
 
 If only `writer_id="primary"` appears, the inference activity ran in the
-router process — check `worker_config.inference_task_queue` and confirm both
-workers are running with the latest code (restart them if they predate the
-Phase 2 runner-side fallback commit).
+router process. Check `worker_config.activity_queues` (and the workflow's
+own `task_queue`) so that `act_llm_gen_text` resolves to a queue the runner
+listens on, and confirm both workers are running with the latest code
+(restart them if they predate the Phase 2 runner-side fallback commit).
 
 ### Step 5c: Tier 9 — Object generation through Temporal cross-process
 
@@ -841,7 +823,9 @@ ls results/*/reactflow.html
 | Tier 7: Large payload | Multi-step pipeline with codec stress test | PASS/FAIL | path | — |
 | Tier 8: Cross-worker usage | Runner-side `UsageReportEvent` lands in same NDJSON dir with `act_*` writer_id (live mode or integration test) | PASS/FAIL | — | — |
 | Tier 9: Object gen cross-process | `act_llm_gen_object` / `act_llm_gen_object_list` survive the JSON round-trip with nested fields intact | PASS/FAIL | path | — |
-| Tier 10: Image-gen routing | `act_img_gen` does NOT execute on the runner pool (negative-routing assertion) | PASS/FAIL | — | — |
+| Tier 10a: Multi-activity routing | `activity_queues.default` routes both `act_llm_gen_text` and `act_img_gen_images` to their dedicated worker pools; default runner sees 0 hits for either | PASS/FAIL/SKIPPED | — | — |
+| Tier 10b: Per-handle routing | `activity_queues.by_handle` overrides the activity default per model handle — two distinct handles in one workflow land on two distinct workers | PASS/FAIL/SKIPPED | path | — |
+| Tier 10c: Two activities, one route | `act_extract_gen_extract_pages` + `act_render_page_views` (no routing key) both land on a shared dedicated queue, exercising activity-default fallback for non-handle activities | PASS/FAIL/SKIPPED | — | — |
 | Tier 11: Extract two-activity | `act_extract_gen_extract_pages` + `act_render_page_views` dispatched cross-process with distinct activity_ids | PASS/FAIL | — | — |
 | Concept isolation (alpha) | Conflicting `Result` concepts don't cross-contaminate | PASS/FAIL | path | — |
 | Concept isolation (beta) | (same test, other side) | PASS/FAIL | path | — |
@@ -864,6 +848,199 @@ single full worker setup):
 tmux capture-pane -t temporal-worker-router -p -S -200
 tmux capture-pane -t temporal-worker-runner -p -S -200
 ```
+
+---
+
+### Step 8: Routing validation battery — does `activity_queues` actually isolate workers?
+
+This step validates the v1 per-activity, per-handle routing (PR #879) end-to-end
+against a real Temporal server. It is **opt-in** — Tiers 1–11 above all run with
+the default empty `activity_queues`, where every activity lands on
+`worker_config.task_queue` and either of the split workers picks it up. Step 8
+proves the routing feature works as advertised when operators actually configure
+it: each activity (and, in Tier 10b, each model handle) lands on its dedicated
+worker pool, never on the fallback runner.
+
+Step 8 is **live-only**. The routing decision happens in the workflow regardless
+of dry/live, but the only way to prove a routed activity wasn't picked up by the
+wrong worker is to actually dispatch it and watch where it executes. Dry-run
+short-circuits LLM calls inside the workflow process (`ContentGeneratorDry`),
+so no `act_*` ever gets scheduled and the routing assertion is meaningless.
+
+**Step 8.0 — Preflight + setup**
+
+Verify base split workers from Step 2 are still alive (router + runner). If not,
+go back and start them.
+
+Write the routing override:
+
+```bash
+cat > .pipelex/pipelex_temporary_override.toml << 'EOF'
+[temporal.worker_config.activity_queues.act_llm_gen_text]
+default = "q_inference"
+by_handle = { "claude-4.6-sonnet" = "q_handle_a", "gemini-flash-latest" = "q_handle_b" }
+
+[temporal.worker_config.activity_queues.act_img_gen_images]
+default = "q_image_gen"
+
+[temporal.worker_config.activity_queues.act_extract_gen_extract_pages]
+default = "q_extract"
+
+[temporal.worker_config.activity_queues.act_render_page_views]
+default = "q_extract"
+EOF
+```
+
+The override needs to be visible to the **router** process (where `resolve_queue`
+runs inside the workflow). The dedicated activity workers don't read this config
+— they just listen on the queue named in their `--task-queue` flag. Restart the
+router so it reloads config:
+
+```bash
+tmux kill-session -t temporal-worker-router
+tmux new-session -d -c "$PWD" -s temporal-worker-router \
+  '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope router'
+sleep 4
+tmux capture-pane -t temporal-worker-router -p -S -30 | grep "Temporal Worker started"
+```
+
+Spawn the five dedicated activity workers, one per named queue:
+
+```bash
+for q in q_inference q_handle_a q_handle_b q_image_gen q_extract; do
+  session="temporal-worker-${q//_/-}"
+  tmux has-session -t "$session" 2>/dev/null && tmux kill-session -t "$session"
+  tmux new-session -d -c "$PWD" -s "$session" \
+    ".venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope runner --task-queue $q"
+done
+sleep 5
+for q in q_inference q_handle_a q_handle_b q_image_gen q_extract; do
+  session="temporal-worker-${q//_/-}"
+  echo "=== $session ==="
+  tmux capture-pane -t "$session" -p -S -20 | grep -B 1 -A 1 "started for"
+done
+```
+
+Each session should report `Temporal Worker started for '<queue>'`. If any
+worker failed to start, stop and diagnose before running the sub-tiers.
+
+**Tier 10a — Multi-activity isolation (live)**
+
+Runs an image-generation pipeline that dispatches `act_llm_gen_text` (handle
+resolves to `gpt-4o-mini` via `@default-small` — not in `by_handle`, falls through
+to activity default `q_inference`) AND `act_img_gen_images` (default → `q_image_gen`).
+Both activities must land on their dedicated workers; the inference runner from
+Step 2 must see 0 hits for either.
+
+```bash
+.venv/bin/pipelex run bundle \
+  tests/integration/pipelex/pipes/pipelines/crazy_image_generation.mthds \
+  --pipe generate_crazy_image \
+  --temporal --no-logo --graph
+```
+
+After completion:
+
+```bash
+INF=$(tmux capture-pane -t temporal-worker-q-inference -p -S -500 | grep -c "act_llm_gen_text")
+IMG=$(tmux capture-pane -t temporal-worker-q-image-gen -p -S -500 | grep -c "act_img_gen_images")
+INF_IMG=$(tmux capture-pane -t temporal-worker-q-inference -p -S -500 | grep -c "act_img_gen_images")
+IMG_LLM=$(tmux capture-pane -t temporal-worker-q-image-gen -p -S -500 | grep -c "act_llm_gen_text")
+RUN_LLM=$(tmux capture-pane -t temporal-worker-runner -p -S -500 | grep -c "act_llm_gen_text")
+RUN_IMG=$(tmux capture-pane -t temporal-worker-runner -p -S -500 | grep -c "act_img_gen_images")
+echo "q_inference   llm=$INF        img=$INF_IMG (want llm≥1, img=0)"
+echo "q_image_gen   llm=$IMG_LLM    img=$IMG     (want llm=0,  img≥1)"
+echo "runner        llm=$RUN_LLM    img=$RUN_IMG (want llm=0,  img=0)"
+if [ "$INF" -ge 1 ] && [ "$IMG" -ge 1 ] && [ "$INF_IMG" -eq 0 ] && [ "$IMG_LLM" -eq 0 ] && [ "$RUN_LLM" -eq 0 ] && [ "$RUN_IMG" -eq 0 ]; then
+  echo "Tier 10a PASS: multi-activity isolation verified"
+else
+  echo "Tier 10a FAIL — see hit table above"
+fi
+```
+
+**Tier 10b — Per-handle routing (live)**
+
+Runs `per_handle_routing.mthds`, a 2-step PipeSequence that dispatches `act_llm_gen_text`
+twice — step 1 with `model = "claude-4.6-sonnet"`, step 2 with `model = "gemini-flash-latest"`.
+The override maps each handle to its own queue via `by_handle`. After execution,
+each per-handle worker should show exactly 1 hit for `act_llm_gen_text`, and
+`q_inference` (the activity default) should see 0 — proving the per-handle layer
+wins over the activity default.
+
+```bash
+.venv/bin/pipelex run bundle \
+  tests/integration/pipelex/temporal/library_crate/per_handle_routing.mthds \
+  --pipe per_handle_routing_sequence \
+  --temporal --no-logo --graph
+```
+
+After completion:
+
+```bash
+HA=$(tmux capture-pane -t temporal-worker-q-handle-a -p -S -500 | grep -c "act_llm_gen_text")
+HB=$(tmux capture-pane -t temporal-worker-q-handle-b -p -S -500 | grep -c "act_llm_gen_text")
+INF=$(tmux capture-pane -t temporal-worker-q-inference -p -S -500 | grep -c "act_llm_gen_text")
+RUN=$(tmux capture-pane -t temporal-worker-runner -p -S -500 | grep -c "act_llm_gen_text")
+echo "q_handle_a (claude)  hits=$HA  (want ≥1)"
+echo "q_handle_b (gemini)  hits=$HB  (want ≥1)"
+echo "q_inference          hits=$INF (want delta=0 from Tier 10a baseline — by_handle wins)"
+echo "runner               hits=$RUN (want delta=0 from Tier 10a baseline)"
+if [ "$HA" -ge 1 ] && [ "$HB" -ge 1 ]; then
+  echo "Tier 10b PASS: per-handle routing verified (both handles landed on their dedicated workers)"
+else
+  echo "Tier 10b FAIL — see hit table above"
+fi
+```
+
+Note: `q_inference` and `runner` hit counts include Tier 10a's `act_llm_gen_text`
+dispatch (1 from Tier 10a's `@default-small` → `gpt-4o-mini` call landing on
+`q_inference`). The Tier 10b assertion is that neither counter incremented after
+this run — i.e. both Tier 10b dispatches landed on their per-handle workers.
+If you ran Step 8 from a fresh session restart, `q_inference` should be exactly
+1 (from Tier 10a) and `runner` should be 0.
+
+**Tier 10c — Two activities, one route (live, conditional)**
+
+This sub-tier requires Azure Document Intelligence credentials (the extract
+backend) and a PDF input. If those aren't available, **SKIP this tier** and
+record SKIPPED in the summary table — the design is validated by the unit
+tests already.
+
+When available, run an extract pipeline (e.g. a `.mthds` bundle that calls
+PipeExtract on a PDF with `should_include_page_views = true`), then:
+
+```bash
+EXTR=$(tmux capture-pane -t temporal-worker-q-extract -p -S -500 | grep -c "act_extract_gen_extract_pages")
+RNDR=$(tmux capture-pane -t temporal-worker-q-extract -p -S -500 | grep -c "act_render_page_views")
+RUN_EXTR=$(tmux capture-pane -t temporal-worker-runner -p -S -500 | grep -c "act_extract_gen_extract_pages")
+RUN_RNDR=$(tmux capture-pane -t temporal-worker-runner -p -S -500 | grep -c "act_render_page_views")
+echo "q_extract: extract=$EXTR (want ≥1)  render=$RNDR (want ≥1)"
+echo "runner:    extract=$RUN_EXTR        render=$RUN_RNDR (want both 0)"
+if [ "$EXTR" -ge 1 ] && [ "$RNDR" -ge 1 ] && [ "$RUN_EXTR" -eq 0 ] && [ "$RUN_RNDR" -eq 0 ]; then
+  echo "Tier 10c PASS: both extract activities routed to q_extract (activity-default fallback for routing_key=None works)"
+else
+  echo "Tier 10c FAIL — see hit table above"
+fi
+```
+
+**Step 8.d — Teardown**
+
+Restore the default empty `activity_queues` and kill the dedicated workers:
+
+```bash
+rm -f .pipelex/pipelex_temporary_override.toml
+for q in q_inference q_handle_a q_handle_b q_image_gen q_extract; do
+  tmux kill-session -t "temporal-worker-${q//_/-}" 2>/dev/null
+done
+# Restart the router so it reverts to empty activity_queues
+tmux kill-session -t temporal-worker-router
+tmux new-session -d -c "$PWD" -s temporal-worker-router \
+  '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope router'
+sleep 4
+tmux capture-pane -t temporal-worker-router -p -S -10 | grep "Temporal Worker started"
+```
+
+Optionally re-run Tier 1 (default routing) to confirm the baseline is restored.
 
 ---
 

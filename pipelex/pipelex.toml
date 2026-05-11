@@ -464,6 +464,31 @@ task_timeout = "0:00:10"
 start_delay = "0:00:00"
 rpc_timeout = "1:00:00"
 
+# Per-activity, per-handle routing. Each entry declares:
+#   default   = the queue used when no per-handle override matches
+#   by_handle = optional { handle_name -> queue }
+# Activities not listed here resolve to `task_queue` above. Empty by default
+# means every activity lands on `temporal_task_queue` — same as legacy behavior.
+#
+# Example: route OpenAI vs Anthropic to separate worker pools, send image
+# generation to a dedicated heavy-payload pool, and isolate Mistral OCR:
+#
+# [temporal.worker_config.activity_queues.act_llm_gen_text]
+# default = "inference_q"
+# by_handle = { "claude-opus-4-7" = "anthropic_q", "gpt-5" = "openai_q" }
+#
+# [temporal.worker_config.activity_queues.act_llm_gen_object]
+# default = "inference_q"
+# by_handle = { "claude-opus-4-7" = "anthropic_q", "gpt-5" = "openai_q" }
+#
+# [temporal.worker_config.activity_queues.act_img_gen_images]
+# default = "image_gen_q"
+# by_handle = { "flux-1.1-pro" = "fal_q", "dall-e-3" = "openai_image_q" }
+#
+# [temporal.worker_config.activity_queues.act_extract_gen_extract_pages]
+# default = "extract_q"
+# by_handle = { "mistral-ocr" = "mistral_extract_q" }
+
 [temporal.worker_config.retry_policy_config]
 initial_interval = "0:00:03"
 backoff_coefficient = 2.0
