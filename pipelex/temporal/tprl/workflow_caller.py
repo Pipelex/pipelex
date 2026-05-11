@@ -4,10 +4,11 @@ from typing import Any, Callable, Coroutine, Generic, Protocol, TypeVar, Union, 
 
 from pydantic import BaseModel
 from temporalio import workflow
-from temporalio.client import Callback, WorkflowHandle
+from temporalio.client import Callback, WorkflowFailureError, WorkflowHandle
 from temporalio.client import Client as TemporalClient
 from temporalio.common import RetryPolicy, TypedSearchAttributes
-from temporalio.exceptions import ApplicationError, ChildWorkflowError
+from temporalio.exceptions import ApplicationError, ChildWorkflowError, WorkflowAlreadyStartedError
+from temporalio.service import RPCError
 from temporalio.workflow import ChildWorkflowHandle
 
 from pipelex import log
@@ -118,8 +119,7 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
                 static_details=static_details,
                 memo=memo,
             )
-        except Exception as exc:
-            # TODO: wip - do not catch all exceptions
+        except (WorkflowAlreadyStartedError, RPCError, WorkflowFailureError) as exc:
             log.error(f"Failed to execute workflow {workflow_class.__name__}: {exc}")
             msg = f"Failed to execute workflow {workflow_class.__name__}"
             raise WorkflowExecutionError(msg) from exc
@@ -158,7 +158,7 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
                 static_details=static_details,
                 memo=memo,
             )
-        except Exception as exc:
+        except (WorkflowAlreadyStartedError, RPCError) as exc:
             log.error(f"Failed to start workflow {workflow_class.__name__}: {exc}")
             msg = f"Failed to start workflow {workflow_class.__name__}"
             raise WorkflowExecutionError(msg) from exc
@@ -200,10 +200,6 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
                 raise WorkflowExecutionError(msg) from exc.cause
             msg = f"Failed to execute child workflow {workflow_class.__name__}"
             raise WorkflowExecutionError(msg) from exc
-        except Exception as exc:
-            log.error(f"Failed to execute child workflow {workflow_class.__name__}: {exc}")
-            msg = f"Failed to execute child workflow {workflow_class.__name__}"
-            raise WorkflowExecutionError(msg) from exc
 
     async def start_child_workflow(
         self,
@@ -240,10 +236,6 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
             if isinstance(exc.cause, ApplicationError):
                 msg = f"Application error in child workflow {workflow_class.__name__}"
                 raise WorkflowExecutionError(msg) from exc.cause
-            msg = f"Failed to start child workflow {workflow_class.__name__}"
-            raise WorkflowExecutionError(msg) from exc
-        except Exception as exc:
-            log.error(f"Failed to start child workflow {workflow_class.__name__}: {exc}")
             msg = f"Failed to start child workflow {workflow_class.__name__}"
             raise WorkflowExecutionError(msg) from exc
 

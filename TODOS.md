@@ -268,7 +268,7 @@ Each phase section answers the same four questions: **What lands**, **Files touc
     - **Required attributes present:** no warning. Continue boot silently.
     - **Required attributes missing:** log a warning naming exactly which attributes are missing, including the exact `temporal operator search-attribute create` command to register them. Continue boot.
     - Runs **once per worker process** (at boot, not per workflow). The result is not cached across processes — every worker boot does its own check.
-- `docs/temporal-deployment.md` (new) — section on required custom search attributes and how to register them. Cross-link from any existing Temporal-related docs.
+- `docs/under-the-hood/temporal-deployment.md` (new) — section on required custom search attributes and how to register them. Cross-link from any existing Temporal-related docs.
 - `CHANGELOG.md` — `[Unreleased]` entry covering:
     - Workflow ID shape change (`{env}{session5}-{rand5}-{ClassName}` → `{env_prefix}{pipeline_run_id}`).
     - **Pipeline run chain semantics.** Because the Workflow ID is now derived from `pipeline_run_id`, callers that pass a stable `pipeline_run_id` to `PipelineFactory.make_pipeline(pipeline_run_id=...)` and re-execute will land on the same Temporal Workflow Execution Chain (with a fresh `run_id` per execution and `WorkflowIDReusePolicy` at SDK default `ALLOW_DUPLICATE`). Old behavior produced a fresh workflow_id per execution by accident, via the session-id and random-id components. This is documented behavior now — not a bug, but a real semantic shift for any caller that supplied stable IDs.
@@ -349,6 +349,15 @@ Each phase section answers the same four questions: **What lands**, **Files touc
 - **Exception-type shift.** The catch site changes from `except ChildWorkflowError` to `except WorkflowExecutionError`. The wrapper re-raises with `from exc`, so the original `ChildWorkflowError` is preserved on `__cause__` and failure attribution still works at the `raise execution_error` site below.
 - **Imports removed.** `ChildWorkflowError` from `temporalio.exceptions` (no longer caught at this site).
 - **Quality gates.** `make agent-check` clean. Targeted run (`tests/unit/pipelex/temporal/ tests/integration/pipelex/temporal/`): 318 passed, 2 xpassed.
+
+### Phase 5 follow-up — Pre-Phase-6 cleanup
+
+- **What landed.**
+    - **Tightened exception handling in `pipelex/temporal/tprl/workflow_caller.py`.** Replaced catch-all `except Exception` on all four entry points with named SDK exceptions: `(WorkflowAlreadyStartedError, RPCError, WorkflowFailureError)` for `execute_workflow`; `(WorkflowAlreadyStartedError, RPCError)` for `start_workflow`; trailing `except Exception` blocks dropped from `execute_child_workflow` and `start_child_workflow` (the existing `except ChildWorkflowError` is the only thing those paths can raise). Resolves the `# TODO: wip - do not catch all exceptions` self-comment. Per CLAUDE.md, anything outside these named exceptions is a real bug and must propagate.
+    - **Failure-path test for `WfPipeRun`.** Added `tests/integration/pipelex/temporal/test_wf_pipe_run_failure_path.py`. Pins the invariant: when the child `WfPipeRouter` raises `ApplicationError`, the wrapper converts it to `WorkflowExecutionError`, `WfPipeRun` catches it, `act_deliver` fires exactly once with `status=DeliveryStatus.FAILED` and `pipe_output=None`, and the workflow re-raises the original execution error. Stubs the failing router via a `WfPipeRouterFailingStub` workflow registered with `@workflow.defn(name="wf_pipe_router")` (replaces the real router by name on the test worker). Stubs `act_deliver` via a closure-capturing activity.
+    - **Latent production bug fix: `workflow_failure_exception_types` registration.** While writing the failure-path test, discovered that `WfPipeRun` re-raising `WorkflowExecutionError` triggers indefinite workflow-task retry instead of a terminal workflow failure — because `WorkflowExecutionError` is a `PipelexError(Exception)`, not a `temporalio.exceptions.FailureError` subclass. Temporal SDK only treats `FailureError` subclasses as workflow failures by default; everything else is treated as a programmer bug and the activation is retried forever. Pre-Phase-5 code raised `ChildWorkflowError` directly (a `FailureError`), so this was masked. Fixed by adding `workflow_failure_exception_types=[WorkflowExecutionError]` to `pipelex/temporal/temporal_task_manager.py:make_worker` (production) and the equivalent option on the test Worker. With this registered, any workflow that propagates `WorkflowExecutionError` now ends terminally and the failure surfaces to the client as `WorkflowFailureError`.
+    - **TODOS.md doc-path fix.** Phase 4 "Files touched" section now points at `docs/under-the-hood/temporal-deployment.md` (Phase 6's "Code anchors" already had the correct path).
+- **Quality gates.** `make agent-check` clean. `make agent-test` green (full suite).
 
 ---
 

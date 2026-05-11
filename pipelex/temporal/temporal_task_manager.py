@@ -14,7 +14,7 @@ from pipelex.config import get_config
 from pipelex.hub import get_class_registry
 from pipelex.system.runtime import WorkerMode, runtime_manager
 from pipelex.temporal.config_temporal import WorkerRuntimeProfile, WorkerScope
-from pipelex.temporal.exceptions import WorkerProfileConfigError, WorkerScopeConfigError
+from pipelex.temporal.exceptions import WorkerProfileConfigError, WorkerScopeConfigError, WorkflowExecutionError
 from pipelex.temporal.log_temporal import configure_temporal_logs
 from pipelex.temporal.sandbox_manager import sandbox_manager
 from pipelex.temporal.task_manager import TaskManager
@@ -135,6 +135,14 @@ class TemporalTaskManager(TaskManager):
             workflows=workflows,
             activities=activities,
             workflow_runner=workflow_runner,
+            # Register the Pipelex wrapper exception so a workflow re-raising it
+            # (e.g. WfPipeRun re-raising the execution_error from a failed child)
+            # surfaces as a terminal workflow failure instead of being treated
+            # as an unhandled-exception workflow task failure (which retries
+            # indefinitely). The WorkflowExecutor wrapper raises this from
+            # ChildWorkflowError; without registration Temporal cannot tell it
+            # apart from a programmer bug.
+            workflow_failure_exception_types=[WorkflowExecutionError],
             max_cached_workflows=profile.max_cached_workflows,
             max_concurrent_workflow_tasks=profile.max_concurrent_workflow_tasks,
             max_concurrent_activities=profile.max_concurrent_activities,
