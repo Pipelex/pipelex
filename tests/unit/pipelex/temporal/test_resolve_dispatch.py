@@ -242,6 +242,17 @@ class TestResolveDispatch:
         assert dispatch.start_to_close_timeout == timedelta(minutes=5)
         assert dispatch.heartbeat_timeout == timedelta(minutes=1)
 
+    def test_split_classes_lock_in_extra_forbid(self) -> None:
+        """The split-class invariant is load-bearing on ``ConfigModel``'s
+        ``extra="forbid"`` setting: if ``extra="allow"`` were ever set on
+        either subclass, the layer asymmetry would silently lift and the
+        original silent-drop bug for baseline ``_extra`` would come back.
+        Assert the setting directly so a future contributor flipping it gets
+        a unit-test failure rather than a runtime regression.
+        """
+        assert RetryPolicyConfig.model_config.get("extra") == "forbid"
+        assert RetryPolicyConfigOverlay.model_config.get("extra") == "forbid"
+
     def test_baseline_class_rejects_extra_field(self) -> None:
         """Issue #880 #5 regression: ``RetryPolicyConfig`` (baseline) has no
         ``non_retryable_error_types_extra`` field. ``ConfigModel``'s
