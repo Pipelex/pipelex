@@ -253,15 +253,15 @@ rpc_timeout = "1:00:00"
 #
 # [temporal.worker_config.activity_queues.act_llm_gen_text]
 # default = "inference_q"
-# by_handle = { "claude-opus-4-7" = "anthropic_q", "gpt-5" = "openai_q" }
+# by_handle = { "claude-4.7-opus" = "anthropic_q", "gpt-5.5" = "openai_q" }
 #
 # [temporal.worker_config.activity_queues.act_llm_gen_object]
 # default = "inference_q"
-# by_handle = { "claude-opus-4-7" = "anthropic_q", "gpt-5" = "openai_q" }
+# by_handle = { "claude-4.7-opus" = "anthropic_q", "gpt-5.5" = "openai_q" }
 #
 # [temporal.worker_config.activity_queues.act_img_gen_images]
 # default = "image_gen_q"
-# by_handle = { "flux-1.1-pro" = "fal_q", "dall-e-3" = "openai_image_q" }
+# by_handle = { "flux-1.1-pro" = "fal_q", "gpt-image-2" = "openai_image_q" }
 #
 # [temporal.worker_config.activity_queues.act_extract_gen_extract_pages]
 # default = "extract_q"
