@@ -34,6 +34,8 @@ allowed-tools:
   - Bash(grep *)
   - Bash(sort *)
   - Bash(head *)
+  - Bash(temporal *)
+  - Bash(jq *)
 ---
 
 # Temporal E2E Validation Suite
@@ -868,7 +870,7 @@ tmux capture-pane -t temporal-worker-runner -p -S -200
 This step validates the v1 per-activity, per-handle routing (PR #879) end-to-end
 against a real Temporal server. It is **opt-in** — Tiers 1–11 above all run with
 the default empty `activity_queues`, where every activity lands on
-`worker_config.task_queue` and either of the split workers picks it up. Step 8
+`worker_config.default_task_queue` and either of the split workers picks it up. Step 8
 proves the routing feature works as advertised when operators actually configure
 it: each activity (and, in Tier 10b, each model handle) lands on its dedicated
 worker pool, never on the fallback runner.
