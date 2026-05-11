@@ -825,7 +825,7 @@ ls results/*/reactflow.html
 | Tier 9: Object gen cross-process | `act_llm_gen_object` / `act_llm_gen_object_list` survive the JSON round-trip with nested fields intact | PASS/FAIL | path | — |
 | Tier 10a: Multi-activity routing | `activity_queues.default` routes both `act_llm_gen_text` and `act_img_gen_images` to their dedicated worker pools; default runner sees 0 hits for either | PASS/FAIL/SKIPPED | — | — |
 | Tier 10b: Per-handle routing | `activity_queues.by_handle` overrides the activity default per model handle — two distinct handles in one workflow land on two distinct workers | PASS/FAIL/SKIPPED | path | — |
-| Tier 10c: Two activities, one route | `act_extract_gen_extract_pages` + `act_render_page_views` (no routing key) both land on a shared dedicated queue, exercising activity-default fallback for non-handle activities | PASS/FAIL/SKIPPED | — | — |
+| Tier 10c: Two activities, one route | `act_extract_gen_extract_pages` + `act_render_page_views` (no routing key) both land on a shared dedicated queue via Azure Doc Intel through Pipelex Gateway | PASS/FAIL | — | — |
 | Tier 11: Extract two-activity | `act_extract_gen_extract_pages` + `act_render_page_views` dispatched cross-process with distinct activity_ids | PASS/FAIL | — | — |
 | Concept isolation (alpha) | Conflicting `Result` concepts don't cross-contaminate | PASS/FAIL | path | — |
 | Concept isolation (beta) | (same test, other side) | PASS/FAIL | path | — |
@@ -999,15 +999,47 @@ this run — i.e. both Tier 10b dispatches landed on their per-handle workers.
 If you ran Step 8 from a fresh session restart, `q_inference` should be exactly
 1 (from Tier 10a) and `runner` should be 0.
 
-**Tier 10c — Two activities, one route (live, conditional)**
+**Tier 10c — Two activities, one route (live)**
 
-This sub-tier requires Azure Document Intelligence credentials (the extract
-backend) and a PDF input. If those aren't available, **SKIP this tier** and
-record SKIPPED in the summary table — the design is validated by the unit
-tests already.
+**Credentials note.** This repo's `.env` provides `PIPELEX_GATEWAY_API_KEY`
+and `PIPELEX_INFERENCE_API_KEY` — the Pipelex Gateway proxies extract
+backends (including Azure Document Intelligence) without needing direct
+`AZURE_DOCUMENT_INTELLIGENCE_*` env vars. Use the
+`azure-document-intelligence` handle directly; do **NOT** substitute
+`mistral-ocr` or `deepseek-ocr` even when those handles seem available.
+User preference: extract = Azure Doc Intel via the gateway, period. (The
+`mistral-ocr` handle defined in `mistral.toml` is not auto-registered in
+the deck on this setup — `is_model_handle_defined` returns False — so
+trying it produces `Extract choice '...mistral-ocr...' was not found in the
+model deck`. Skip that path.)
 
-When available, run an extract pipeline (e.g. a `.mthds` bundle that calls
-PipeExtract on a PDF with `should_include_page_views = true`), then:
+The existing bundle at
+`tests/integration/pipelex/temporal/library_crate/pdf_extract_page_views.mthds`
+already references `@default-extract-document` (→ `azure-document-intelligence`)
+and sets `page_views = true`, exercising both activities. There is no
+matching inputs JSON for the CLI run — write one at `/tmp/pdf_extract_inputs.json`
+pointing at any `tests/data/documents/*.pdf` (e.g. `Job-Offer.pdf`):
+
+```bash
+cat > /tmp/pdf_extract_inputs.json << EOF
+{
+  "source_pdf": {
+    "concept": "native.Document",
+    "content": {
+      "url": "$PWD/tests/data/documents/Job-Offer.pdf"
+    }
+  }
+}
+EOF
+
+.venv/bin/pipelex run bundle \
+  tests/integration/pipelex/temporal/library_crate/pdf_extract_page_views.mthds \
+  --pipe pdf_extract_with_page_views \
+  --inputs /tmp/pdf_extract_inputs.json \
+  --temporal --no-logo --graph
+```
+
+After completion:
 
 ```bash
 EXTR=$(tmux capture-pane -t temporal-worker-q-extract -p -S -500 | grep -c "act_extract_gen_extract_pages")
@@ -1022,6 +1054,10 @@ else
   echo "Tier 10c FAIL — see hit table above"
 fi
 ```
+
+If the pipeline ever errors with `Extract choice '...' was not found in the
+model deck`, the deck is not loading Azure Doc Intel — fix the deck before
+falling back to a different handle; do not substitute another OCR backend.
 
 **Step 8.d — Teardown**
 
