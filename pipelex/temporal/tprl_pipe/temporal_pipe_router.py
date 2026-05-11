@@ -69,7 +69,7 @@ class TemporalPipeRouter(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtoc
                 workflow_class=WfPipeRouter,
                 workflow_id=child_workflow_id,
                 workflow_arg=pipe_job,
-                search_attributes=dict(build_search_attributes(pipe_job)),
+                search_attributes=build_search_attributes(pipe_job),
                 static_summary=build_static_summary(pipe_job.pipe),
             )
         else:
@@ -90,7 +90,7 @@ class TemporalPipeRouter(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtoc
                 workflow_class=WfPipeRouter,
                 workflow_id=self.make_workflow_id(pipeline_run_id=pipe_job.job_metadata.pipeline_run_id),
                 workflow_arg=pipe_job,
-                search_attributes=dict(build_search_attributes(pipe_job)),
+                search_attributes=build_search_attributes(pipe_job),
                 static_summary=build_static_summary(pipe_job.pipe),
                 static_details=build_static_details(pipe_job),
             )

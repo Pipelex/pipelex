@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 from pytest_mock import MockerFixture
+from temporalio.common import SearchAttributeKey, SearchAttributePair, TypedSearchAttributes
 from typing_extensions import override
 
 from pipelex.temporal.tprl.workflow_caller import WorkflowClass, WorkflowExecutor
@@ -23,7 +24,12 @@ class _StubWorkflow(WorkflowClass[Any, Any]):
         return workflow_arg
 
 
-_SEARCH_ATTRS = {"PipeCode": ["translate_doc"], "DomainCode": ["documents"]}
+_SEARCH_ATTRS = TypedSearchAttributes(
+    [
+        SearchAttributePair(SearchAttributeKey.for_keyword("PipeCode"), "translate_doc"),
+        SearchAttributePair(SearchAttributeKey.for_keyword("DomainCode"), "documents"),
+    ],
+)
 _SUMMARY = "translate_doc — Translate EN→FR"
 _DETAILS = "| Field | Value |\n|---|---|\n| Pipe | `translate_doc` |"
 _MEMO = {"pipelex": {"library_crate": "documents@2.1.4"}}

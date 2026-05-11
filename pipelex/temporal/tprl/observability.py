@@ -12,6 +12,8 @@ unit-testable. Length caps follow Temporal's documented limits
 from collections.abc import Mapping
 from typing import Final
 
+from temporalio.common import SearchAttributeKey, SearchAttributePair, TypedSearchAttributes
+
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -19,6 +21,16 @@ from pipelex.temporal.temporal_manager import get_temporal_manager
 
 _MAX_SUMMARY_BYTES: Final[int] = 200
 _ELLIPSIS: Final[str] = "…"
+
+# Typed search-attribute keys. Defined once at module level so call sites and
+# tests can share the exact ``SearchAttributeKey`` instances (key equality is
+# by name + type, so identity is not required, but keeping a single instance
+# avoids accidental drift between the builder and any future readers).
+PIPE_CODE_KEY: Final[SearchAttributeKey[str]] = SearchAttributeKey.for_keyword("PipeCode")
+PIPELINE_RUN_ID_KEY: Final[SearchAttributeKey[str]] = SearchAttributeKey.for_keyword("PipelineRunId")
+SESSION_ID_KEY: Final[SearchAttributeKey[str]] = SearchAttributeKey.for_keyword("SessionId")
+USER_ID_KEY: Final[SearchAttributeKey[str]] = SearchAttributeKey.for_keyword("UserId")
+DOMAIN_CODE_KEY: Final[SearchAttributeKey[str]] = SearchAttributeKey.for_keyword("DomainCode")
 
 
 def _truncate_utf8(text: str, max_bytes: int) -> str:
@@ -38,21 +50,23 @@ def _truncate_utf8(text: str, max_bytes: int) -> str:
 _LIBRARY_CRATE_ID_LEN: Final[int] = 12
 
 
-def build_search_attributes(pipe_job: PipeJob) -> Mapping[str, list[str]]:
-    """Build the five-keyed search-attribute dict for a workflow start.
+def build_search_attributes(pipe_job: PipeJob) -> TypedSearchAttributes:
+    """Build the five-keyed typed search attributes for a workflow start.
 
     Used identically at top-level dispatch (submitter side) and at child dispatch
     (inside a workflow): the child's ``pipe_job`` already carries the inherited
     ``PipelineRunId`` / ``UserId`` from its parent, and ``PipeCode`` /
     ``DomainCode`` correctly reflect the child's own pipe.
     """
-    return {
-        "PipeCode": [pipe_job.pipe.code],
-        "PipelineRunId": [pipe_job.job_metadata.pipeline_run_id],
-        "SessionId": [get_temporal_manager().session_id],
-        "UserId": [pipe_job.job_metadata.user_id],
-        "DomainCode": [pipe_job.pipe.domain_code],
-    }
+    return TypedSearchAttributes(
+        [
+            SearchAttributePair(PIPE_CODE_KEY, pipe_job.pipe.code),
+            SearchAttributePair(PIPELINE_RUN_ID_KEY, pipe_job.job_metadata.pipeline_run_id),
+            SearchAttributePair(SESSION_ID_KEY, get_temporal_manager().session_id),
+            SearchAttributePair(USER_ID_KEY, pipe_job.job_metadata.user_id),
+            SearchAttributePair(DOMAIN_CODE_KEY, pipe_job.pipe.domain_code),
+        ],
+    )
 
 
 def build_static_summary(pipe: PipeAbstract) -> str:

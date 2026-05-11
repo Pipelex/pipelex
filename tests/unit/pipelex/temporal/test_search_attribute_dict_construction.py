@@ -1,4 +1,4 @@
-"""Unit tests for the five-keyed search-attribute dict.
+"""Unit tests for the five-keyed typed search attributes.
 
 Pins the schema documented in
 ``wip/temporal-primitives/id-and-naming-design.md`` §"Layer 4 — Search & Filter":
@@ -22,7 +22,14 @@ from typing import Any
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.temporal.tprl.observability import build_search_attributes
+from pipelex.temporal.tprl.observability import (
+    DOMAIN_CODE_KEY,
+    PIPE_CODE_KEY,
+    PIPELINE_RUN_ID_KEY,
+    SESSION_ID_KEY,
+    USER_ID_KEY,
+    build_search_attributes,
+)
 
 
 def _make_pipe_job_stub(
@@ -53,7 +60,7 @@ def patch_temporal_manager(mocker: MockerFixture) -> None:
 
 @pytest.mark.usefixtures("patch_temporal_manager")
 class TestSearchAttributeDictConstruction:
-    def test_top_level_dict_has_five_keys_with_correct_value_sources(self, mocker: MockerFixture) -> None:
+    def test_top_level_attrs_have_five_keys_with_correct_value_sources(self, mocker: MockerFixture) -> None:
         pipe_job = _make_pipe_job_stub(
             mocker,
             pipe_code="translate_doc",
@@ -64,12 +71,12 @@ class TestSearchAttributeDictConstruction:
 
         attrs = build_search_attributes(pipe_job)
 
-        assert sorted(attrs.keys()) == sorted(["PipeCode", "PipelineRunId", "SessionId", "UserId", "DomainCode"])
-        assert attrs["PipeCode"] == ["translate_doc"]
-        assert attrs["PipelineRunId"] == ["3f9c8b2a-1e4d-4f5b-9c7a-2d8e1f0a6b3c"]
-        assert attrs["SessionId"] == ["EdgdJ7Yk4Q3HF2pXyZv9w8"]
-        assert attrs["UserId"] == ["acme-corp"]
-        assert attrs["DomainCode"] == ["documents"]
+        assert len(attrs) == 5
+        assert attrs[PIPE_CODE_KEY] == "translate_doc"
+        assert attrs[PIPELINE_RUN_ID_KEY] == "3f9c8b2a-1e4d-4f5b-9c7a-2d8e1f0a6b3c"
+        assert attrs[SESSION_ID_KEY] == "EdgdJ7Yk4Q3HF2pXyZv9w8"
+        assert attrs[USER_ID_KEY] == "acme-corp"
+        assert attrs[DOMAIN_CODE_KEY] == "documents"
 
     def test_child_pipe_job_carries_inherited_identity_and_own_pipe_code(self, mocker: MockerFixture) -> None:
         """Child workflows reuse ``build_search_attributes`` on the child's own
@@ -90,10 +97,10 @@ class TestSearchAttributeDictConstruction:
         child_attrs = build_search_attributes(child_pipe_job)
 
         # Child's own:
-        assert child_attrs["PipeCode"] == ["extract_text"]
-        assert child_attrs["DomainCode"] == ["extraction"]
+        assert child_attrs[PIPE_CODE_KEY] == "extract_text"
+        assert child_attrs[DOMAIN_CODE_KEY] == "extraction"
         # Inherited via propagated job_metadata:
-        assert child_attrs["PipelineRunId"] == ["parent-run-id"]
-        assert child_attrs["UserId"] == ["parent-user"]
+        assert child_attrs[PIPELINE_RUN_ID_KEY] == "parent-run-id"
+        assert child_attrs[USER_ID_KEY] == "parent-user"
         # From TemporalManager:
-        assert child_attrs["SessionId"] == ["EdgdJ7Yk4Q3HF2pXyZv9w8"]
+        assert child_attrs[SESSION_ID_KEY] == "EdgdJ7Yk4Q3HF2pXyZv9w8"

@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from temporalio import workflow
 from temporalio.client import Callback, WorkflowHandle
 from temporalio.client import Client as TemporalClient
-from temporalio.common import RetryPolicy
+from temporalio.common import RetryPolicy, TypedSearchAttributes
 from temporalio.exceptions import ApplicationError, ChildWorkflowError
 from temporalio.workflow import ChildWorkflowHandle
 
@@ -91,7 +91,7 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
         workflow_class: type[WorkflowClass[WorkflowInput, WorkflowOutput]],
         workflow_arg: WorkflowInput,
         workflow_id: str,
-        search_attributes: Mapping[str, list[str]] | None = None,
+        search_attributes: TypedSearchAttributes | None = None,
         static_summary: str | None = None,
         static_details: str | None = None,
         memo: Mapping[str, Any] | None = None,
@@ -130,7 +130,7 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
         workflow_arg: WorkflowInput,
         workflow_id: str,
         callbacks: Sequence[Callback] | None = None,
-        search_attributes: Mapping[str, list[str]] | None = None,
+        search_attributes: TypedSearchAttributes | None = None,
         static_summary: str | None = None,
         static_details: str | None = None,
         memo: Mapping[str, Any] | None = None,
@@ -169,7 +169,7 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
         workflow_arg: WorkflowInput,
         workflow_id: str,
         child_task_queue: str | None = None,
-        search_attributes: Mapping[str, list[str]] | None = None,
+        search_attributes: TypedSearchAttributes | None = None,
         static_summary: str | None = None,
         static_details: str | None = None,
         memo: Mapping[str, Any] | None = None,
@@ -211,7 +211,7 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
         workflow_arg: WorkflowInput,
         workflow_id: str,
         child_task_queue: str | None = None,
-        search_attributes: Mapping[str, list[str]] | None = None,
+        search_attributes: TypedSearchAttributes | None = None,
         static_summary: str | None = None,
         static_details: str | None = None,
         memo: Mapping[str, Any] | None = None,

@@ -253,7 +253,7 @@ Each phase section answers the same four questions: **What lands**, **Files touc
     - Search-attribute keys to register: `PipeCode`, `PipelineRunId`, `SessionId`, `UserId`, `DomainCode` (all `Keyword`).
     - Bootstrap check belongs in `pipelex/temporal/temporal_task_manager.py` near `TemporalManager.setup(...)` (line ~59). Soft-fail catch is `temporalio.service.RPCError` only; everything else propagates.
     - CHANGELOG should call out the pipeline_run_id → Workflow ID chain semantics shift: callers that pass a stable `pipeline_run_id` to `PipelineFactory.make_pipeline(...)` and re-run now land on the same Temporal Workflow Execution Chain (with `ALLOW_DUPLICATE` reuse policy), where previously the random/session id suffix made every run unique.
-    - `wf_pipe_run.py` still uses raw `workflow.execute_child_workflow(...)`, not the wrapper. Unifying the two child-spawn paths is captured in the design's **Out of scope** list — not a Phase 4 deliverable.
+    - `wf_pipe_run.py` still uses raw `workflow.execute_child_workflow(...)`, not the wrapper. Unifying the two child-spawn paths is captured in the design's **Out of scope** list — not a Phase 4 deliverable. *(Update: unified in Phase 5 follow-up; both child-spawn paths now route through `WorkflowExecutor.execute_child_workflow`.)*
 
 ---
 
@@ -326,11 +326,29 @@ Each phase section answers the same four questions: **What lands**, **Files touc
 
 ### Checkpoint — end of Phase 5
 
-To be filled in by the implementer at the phase boundary.
+- **Status.** Implemented on branch `feature/Temporal-ids` (uncommitted).
+- **Code state.**
+    - `pipelex/temporal/tprl/observability.py` now defines five module-level `SearchAttributeKey[str]` constants (`PIPE_CODE_KEY`, `PIPELINE_RUN_ID_KEY`, `SESSION_ID_KEY`, `USER_ID_KEY`, `DOMAIN_CODE_KEY`) and `build_search_attributes` returns `TypedSearchAttributes` instead of `Mapping[str, list[str]]`. The five `SearchAttributePair` instances replace the old dict literal one-for-one. No `build_search_attributes_for_child` exists today — earlier phases collapsed child-attribute construction to just calling `build_search_attributes(child_pipe_job)`, since the child's `pipe_job` already carries inherited identity. Phase 5 did not need to touch that simplification.
+    - `pipelex/temporal/tprl/workflow_caller.py` — all four executor entry points (`execute_workflow`, `start_workflow`, `execute_child_workflow`, `start_child_workflow`) now declare `search_attributes: TypedSearchAttributes | None`. The SDK pass-through is unchanged; only the type annotation flipped.
+    - `pipelex/temporal/tprl_pipe/temporal_pipe_run.py`, `temporal_pipe_router.py`, `wf_pipe_run.py` — the four `search_attributes=dict(build_search_attributes(pipe_job))` call sites are now `search_attributes=build_search_attributes(pipe_job)` (dict wrap dropped). No other changes at these call sites.
+- **Tests.**
+    - `tests/unit/pipelex/temporal/test_observability_helpers.py` — imports the five `*_KEY` constants and rewrote `test_build_search_attributes_returns_five_keyed_dict` → `test_build_search_attributes_returns_five_typed_keys`, asserting against the typed form (`attrs[KEY] == "..."` plus `len(attrs) == 5`) instead of dict equality.
+    - `tests/unit/pipelex/temporal/test_search_attribute_dict_construction.py` — same conversion: imports the five `*_KEY` constants; asserts via `attrs[KEY]` instead of dict access by string. Renamed the top-level test to `test_top_level_attrs_have_five_keys_with_correct_value_sources`.
+    - `tests/unit/pipelex/temporal/test_workflow_caller_passthrough.py` — `_SEARCH_ATTRS` constant changed from a `dict` to a `TypedSearchAttributes([SearchAttributePair(SearchAttributeKey.for_keyword("PipeCode"), "translate_doc"), ...])`. The four pass-through assertions (`kwargs.get("search_attributes") == _SEARCH_ATTRS`) still work — `TypedSearchAttributes` supports value equality.
+- **Quality gates.** `make agent-check` clean (pyright 0/0/0, mypy success). Targeted unit run (`tests/unit/pipelex/temporal/`): 201 passed. Integration run (`tests/integration/pipelex/temporal/` with default `--temporal-server none`): 117 passed, 2 xpassed. `grep -rn "Mapping\[str, list\[str\]\]" pipelex/temporal/` returns empty. Running the integration suite with `-W "always::DeprecationWarning"` produces zero "Dictionary-based search attributes are deprecated" lines.
+- **API note.** Each typed key holds a single `str` value, not a list. The old dict form used `list[str]` because Temporal's dashboard filtering API on Keyword attributes is multi-valued; with `SearchAttributeKey.for_keyword(...)` the value type is `str` (single-valued). The SDK serializes both forms to the same wire shape, so the cluster-side behavior is identical.
+- **Handoff notes for Phase 6.**
+    - No unrelated dict-based search-attribute call sites surfaced. The only remaining places that touch search attributes are `namespace_check.py` (`AddSearchAttributesRequest` and `ListSearchAttributesRequest` — bridge-level, not SDK workflow API) and the conftest auto-registration. Both are untouched and correct.
+    - Phase 6 is the soft-fail → hard-fail flip in `namespace_check.py:check_required_search_attributes`. The five attribute keys are already centralized as the module-level `REQUIRED_SEARCH_ATTRIBUTES` tuple there; no further refactor needed before flipping the failure mode.
+    - Tests that mock `build_search_attributes` no longer need to manufacture dicts; they can use `TypedSearchAttributes([])` or call the helper directly with a stubbed `pipe_job`.
 
-- **Status.** _(planned / in progress / merged)_
-- **Code state.** _(any deviations from the migration, edge cases discovered in TypedSearchAttributes API)_
-- **Handoff notes for Phase 6.** _(state of `search_attributes` API; whether any unrelated dict-based call sites surfaced that also need the migration)_
+### Phase 5 follow-up — Child-spawn path unification
+
+- **What landed.** `wf_pipe_run.py` was the last call site using raw `workflow.execute_child_workflow(...)`. It now routes through `WorkflowExecutor.execute_child_workflow(...)` via `WorkflowExecutorFactory[PipeJob, PipeOutput]().create_executor(task_queue=None)` — the same pattern `TemporalPipeRouter._run_pipe_job` already uses on its child branch. Both child-spawn paths are now consistent.
+- **Imports added inside the `workflow.unsafe.imports_passed_through()` block.** `PipeJob` (for the generic parameter), `WorkflowExecutionError` (the wrapper's exception contract), `build_static_summary` (now passed too — same pipe, same summary), `WorkflowExecutorFactory`.
+- **Exception-type shift.** The catch site changes from `except ChildWorkflowError` to `except WorkflowExecutionError`. The wrapper re-raises with `from exc`, so the original `ChildWorkflowError` is preserved on `__cause__` and failure attribution still works at the `raise execution_error` site below.
+- **Imports removed.** `ChildWorkflowError` from `temporalio.exceptions` (no longer caught at this site).
+- **Quality gates.** `make agent-check` clean. Targeted run (`tests/unit/pipelex/temporal/ tests/integration/pipelex/temporal/`): 318 passed, 2 xpassed.
 
 ---
 
@@ -422,5 +440,5 @@ These do **not** ship in this plan. They are listed here so they don't accidenta
 - Per-pipe Workflow Type registration.
 - Search attribute schema versioning / migration tooling.
 - An optional `display_label` parameter at the `PipeRun` entry point.
-- **Unifying the two child-spawn paths.** `wf_pipe_run.py` uses raw `workflow.execute_child_workflow(...)`; `temporal_pipe_router.py` uses the `WorkflowExecutor.execute_child_workflow(...)` wrapper. Phase 3 adds search-attribute kwargs to both call sites without consolidating the paths. Worth a follow-up TODO; not in this scope because the centralization touches more code than the bug fix justifies.
+- ~~**Unifying the two child-spawn paths.**~~ **RESOLVED in Phase 5 follow-up.** `wf_pipe_run.py` previously used raw `workflow.execute_child_workflow(...)` while `temporal_pipe_router.py` used the `WorkflowExecutor.execute_child_workflow(...)` wrapper. Both now go through the wrapper. Exception model shifts from `ChildWorkflowError` to `WorkflowExecutionError` at the catch site in `wf_pipe_run.py` to match the wrapper's contract (the original `ChildWorkflowError` is preserved on `__cause__`).
 - **`WorkflowIDReusePolicy` choice.** Stays at SDK default `ALLOW_DUPLICATE`. A separate decision (later) is whether `REJECT_DUPLICATE` would catch double-execution bugs at the Temporal layer once workflow IDs are deterministic from `pipeline_run_id`.

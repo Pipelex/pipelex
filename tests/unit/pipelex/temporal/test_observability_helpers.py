@@ -13,6 +13,11 @@ from pytest_mock import MockerFixture
 
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.temporal.tprl.observability import (
+    DOMAIN_CODE_KEY,
+    PIPE_CODE_KEY,
+    PIPELINE_RUN_ID_KEY,
+    SESSION_ID_KEY,
+    USER_ID_KEY,
     build_activity_summary,
     build_search_attributes,
     build_static_details,
@@ -58,18 +63,17 @@ def patch_temporal_manager(mocker: MockerFixture) -> None:
 
 @pytest.mark.usefixtures("patch_temporal_manager")
 class TestObservabilityHelpers:
-    def test_build_search_attributes_returns_five_keyed_dict(self, mocker: MockerFixture) -> None:
+    def test_build_search_attributes_returns_five_typed_keys(self, mocker: MockerFixture) -> None:
         pipe_job = _make_pipe_job_stub(mocker)
 
         attrs = build_search_attributes(pipe_job)
 
-        assert dict(attrs) == {
-            "PipeCode": ["translate_doc"],
-            "PipelineRunId": ["3f9c8b2a-1e4d-4f5b-9c7a-2d8e1f0a6b3c"],
-            "SessionId": ["EdgdJ7Yk4Q3HF2pXyZv9w8"],
-            "UserId": ["acme-corp"],
-            "DomainCode": ["documents"],
-        }
+        assert attrs[PIPE_CODE_KEY] == "translate_doc"
+        assert attrs[PIPELINE_RUN_ID_KEY] == "3f9c8b2a-1e4d-4f5b-9c7a-2d8e1f0a6b3c"
+        assert attrs[SESSION_ID_KEY] == "EdgdJ7Yk4Q3HF2pXyZv9w8"
+        assert attrs[USER_ID_KEY] == "acme-corp"
+        assert attrs[DOMAIN_CODE_KEY] == "documents"
+        assert len(attrs) == 5
 
     def test_build_static_summary_with_description(self, mocker: MockerFixture) -> None:
         pipe_job = _make_pipe_job_stub(mocker)

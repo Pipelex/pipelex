@@ -66,7 +66,7 @@ class TemporalPipeRun(WorkflowExecutor[PipeRunArg, PipeOutput], PipeRunProtocol)
             workflow_class=WfPipeRun,
             workflow_id=self.make_workflow_id(pipeline_run_id=pipe_job.job_metadata.pipeline_run_id),
             workflow_arg=pipe_run_arg,
-            search_attributes=dict(build_search_attributes(pipe_job)),
+            search_attributes=build_search_attributes(pipe_job),
             static_summary=build_static_summary(pipe_job.pipe),
             static_details=build_static_details(pipe_job),
         )
@@ -103,7 +103,7 @@ class TemporalPipeRun(WorkflowExecutor[PipeRunArg, PipeOutput], PipeRunProtocol)
             workflow_class=WfPipeRun,
             workflow_id=workflow_id,
             workflow_arg=pipe_run_arg,
-            search_attributes=dict(build_search_attributes(pipe_job)),
+            search_attributes=build_search_attributes(pipe_job),
             static_summary=build_static_summary(pipe_job.pipe),
             static_details=build_static_details(pipe_job),
         )
