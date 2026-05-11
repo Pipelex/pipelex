@@ -17,7 +17,11 @@ class TemporalError(ApplicationError):
     def from_app_error(cls, exc: ApplicationError) -> Self:
         message = exc.message
         error_type = exc.type
-        if error_type in get_config().temporal.worker_config.retry_policy_config.non_retryable_error_types:
+        temporal_config = get_config().temporal
+        all_non_retryable = temporal_config.worker_config.all_non_retryable_error_types(
+            queue_options_by_queue=temporal_config.queue_options,
+        )
+        if error_type in all_non_retryable:
             workflow_log.critical(f"Non retryable error from ApplicationError[{error_type}]: {message}")
         else:
             workflow_log.error(f"Error from ApplicationError[{error_type}]: {message}")
@@ -30,7 +34,11 @@ class TemporalError(ApplicationError):
     def from_message_exception(cls, exc: PipelexError) -> Self:
         message = exc.message
         error_type = exc.__class__.__name__
-        if error_type in get_config().temporal.worker_config.retry_policy_config.non_retryable_error_types:
+        temporal_config = get_config().temporal
+        all_non_retryable = temporal_config.worker_config.all_non_retryable_error_types(
+            queue_options_by_queue=temporal_config.queue_options,
+        )
+        if error_type in all_non_retryable:
             workflow_log.critical(f"Non retryable error from PipelexError[{error_type}]: {message}")
         else:
             workflow_log.error(f"Retryable error from PipelexError[{error_type}]: {message}")

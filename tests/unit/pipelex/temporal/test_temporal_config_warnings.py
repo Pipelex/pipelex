@@ -175,3 +175,37 @@ class TestTemporalConfigWarnings:
             )
         relevant_warnings = [record for record in caplog.records if "default_q" in record.message and record.levelno == logging.WARNING]
         assert not relevant_warnings, f"unexpected warning for default_task_queue: {[r.message for r in relevant_warnings]!r}"
+
+    def test_unreachable_queue_options_entry_warns(self, caplog: pytest.LogCaptureFixture) -> None:
+        """``queue_options`` entry naming a queue that no ``activity_queues``
+        route references AND that isn't ``default_task_queue`` triggers a WARN —
+        the overlay will never apply and is almost always a typo or stale entry.
+        """
+        with caplog.at_level(logging.WARNING):
+            _make_temporal_config(
+                activity_queues={},
+                queue_options={"orphan_q": QueueOptions(start_to_close_timeout=timedelta(minutes=5))},
+            )
+        warnings = [record for record in caplog.records if record.levelno == logging.WARNING]
+        assert any("orphan_q" in record.message and "overlay will never apply" in record.message for record in warnings), (
+            f"expected warning about 'orphan_q' overlay never applying, got: {[r.message for r in warnings]!r}"
+        )
+
+    def test_default_task_queue_in_queue_options_does_not_warn(self, caplog: pytest.LogCaptureFixture) -> None:
+        """``queue_options[default_task_queue]`` is the supported single-queue
+        tuning path — it must not trigger the unreachable-overlay warning even
+        with empty ``activity_queues``.
+        """
+        with caplog.at_level(logging.WARNING):
+            _make_temporal_config(
+                activity_queues={},
+                queue_options={"default_q": QueueOptions(start_to_close_timeout=timedelta(minutes=5))},
+            )
+        unreachable_warnings = [
+            record
+            for record in caplog.records
+            if record.levelno == logging.WARNING and "default_q" in record.message and "overlay will never apply" in record.message
+        ]
+        assert not unreachable_warnings, (
+            f"unexpected unreachable-overlay warning for default_task_queue: {[r.message for r in unreachable_warnings]!r}"
+        )

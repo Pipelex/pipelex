@@ -150,7 +150,7 @@ If any of these fails, the phase is not done. No skipping.
 
 ### Notes
 
-- Migration map placed under `[migration.migration_maps.temporal]` per design doc (advisory only — validation.py still uses `category="config"`; wiring is left for a follow-up).
+- Migration map entry placed under `[migration.migration_maps.config]` (line 414 of `pipelex/pipelex.toml`) rather than `[migration.migration_maps.temporal]` as the original task wording suggested — `report_validation_error` only looks up `category="config"`, so the entry has to live there to actually fire. The temporal-category section is unused for now; wiring it through validation is a follow-up.
 - Internal callers updated beyond what TODOS.md enumerated: `pipelex/temporal/tprl/workflow_caller.py:238` also referenced `worker_config.task_queue`. Tracing helper docstring also touched.
 - Empty `[temporal.queue_options]` placeholder kept in pipelex.toml so the parser produces an empty dict; per-queue tuning is opt-in via project overrides.
 

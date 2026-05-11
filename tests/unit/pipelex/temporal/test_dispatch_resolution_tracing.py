@@ -89,6 +89,40 @@ class TestDispatchResolutionTracing:
         assert "queue=anthropic_q" in line
         assert "timeout=300.0s (from=queue_options)" in line
 
+    def test_heartbeat_omitted_from_trace_when_unset(self, caplog: pytest.LogCaptureFixture) -> None:
+        """When no heartbeat is configured anywhere (baseline None, no overlay),
+        the trace line must not include a ``heartbeat=...`` segment.
+        """
+        worker_config = _make_worker_config()
+        with caplog.at_level(logging.INFO):
+            worker_config.resolve_dispatch(
+                activity_name="act_llm_gen_text",
+                routing_key="claude-opus-4-7",
+                is_traced=True,
+            )
+        trace_records = [record for record in caplog.records if "temporal.dispatch" in record.message]
+        assert len(trace_records) == 1
+        assert "heartbeat" not in trace_records[0].message
+
+    def test_heartbeat_source_in_trace_from_queue_options(self, caplog: pytest.LogCaptureFixture) -> None:
+        """When ``queue_options[X].heartbeat_timeout`` is set, the trace reports
+        ``heartbeat=<s>s (from=queue_options)``.
+        """
+        worker_config = _make_worker_config(
+            activity_queues={"act_llm_gen_text": ActivityRouteConfig(default="anthropic_q", by_handle={})},
+        )
+        queue_options = {"anthropic_q": QueueOptions(heartbeat_timeout=timedelta(seconds=30))}
+        with caplog.at_level(logging.INFO):
+            worker_config.resolve_dispatch(
+                activity_name="act_llm_gen_text",
+                routing_key="some-handle",
+                queue_options_by_queue=queue_options,
+                is_traced=True,
+            )
+        trace_records = [record for record in caplog.records if "temporal.dispatch" in record.message]
+        assert len(trace_records) == 1
+        assert "heartbeat=30.0s (from=queue_options)" in trace_records[0].message
+
     def test_handle_options_source_wins(self, caplog: pytest.LogCaptureFixture) -> None:
         """When ``handle_options.start_to_close_timeout`` is set, the trace
         reports ``from=handle_options`` even if ``queue_options`` also had one.

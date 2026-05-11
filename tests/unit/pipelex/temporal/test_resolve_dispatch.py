@@ -292,6 +292,28 @@ class TestResolveDispatch:
             )
         assert "non_retryable_error_types" in str(exc_info.value)
 
+    def test_queue_options_applies_via_default_task_queue_when_routing_empty(self) -> None:
+        """Empty-routing hybrid fallback asymmetry: dispatch still emits
+        ``task_queue=None`` (activities ride the workflow's own queue) but
+        ``queue_options[default_task_queue]`` still applies so single-queue
+        deployments can tune timeouts/retry/rate without opting into the
+        ``activity_queues`` routing topology.
+        """
+        worker_config = _make_worker_config()  # empty activity_queues, default_task_queue="default_q"
+        queue_options = {"default_q": QueueOptions(start_to_close_timeout=timedelta(minutes=5))}
+
+        dispatch = worker_config.resolve_dispatch(
+            activity_name="act_llm_gen_text",
+            routing_key="claude-opus-4-7",
+            queue_options_by_queue=queue_options,
+        )
+
+        # Dispatch still omits task_queue (workflow-local).
+        assert dispatch.task_queue is None
+        assert "task_queue" not in dispatch.to_execute_kwargs()
+        # But the queue_options[default_task_queue] timeout overlay applies.
+        assert dispatch.start_to_close_timeout == timedelta(minutes=5)
+
     def test_resolve_queue_still_works(self) -> None:
         """``resolve_queue`` must remain a thin delegate consistent with
         ``resolve_dispatch``'s queue resolution. Regression guard for callers

@@ -176,6 +176,10 @@ class TemporalTaskManager(TaskManager):
             temporal_client = await connect_to_temporal()
             worker_config = get_config().temporal.worker_config
             task_queue = task_queue or worker_config.default_task_queue
+            # Strict check also runs at the worker CLI startup; repeated here
+            # so programmatic callers of ``run_worker`` (tests, library code)
+            # also fast-fail on typos rather than polling an idle queue.
+            get_config().temporal.validate_task_queue_known(task_queue)
             scope = self._resolve_scope_by_name(scope_name=scope_name)
             runtime_profile = self._resolve_runtime_profile_by_name(profile_name=profile_name)
             effective_scope_name = scope_name or get_config().temporal.worker_scopes.default_scope

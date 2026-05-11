@@ -1,12 +1,13 @@
+import difflib
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Literal, Union
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Union
 
 from pydantic import Field, model_validator
 
 from pipelex import log
 from pipelex.system.configuration.config_model import ConfigModel
-from pipelex.temporal.exceptions import TemporalConfigError
+from pipelex.temporal.exceptions import TemporalConfigError, WorkerTaskQueueUnknownError
 from pipelex.tools.storage.storage_config import StorageProviderConfig
 from pipelex.types import Self, StrEnum
 
@@ -126,10 +127,10 @@ class RetryPolicyConfigBase(ConfigModel):
     needed.
     """
 
-    initial_interval: timedelta = Field(strict=False)
-    backoff_coefficient: float
-    maximum_interval: Union[timedelta, Literal["unlimited"]]
-    maximum_attempts: Union[int, Literal["unlimited"]]
+    initial_interval: timedelta = Field(strict=False, gt=timedelta(0))
+    backoff_coefficient: float = Field(ge=1.0)
+    maximum_interval: Union[Annotated[timedelta, Field(gt=timedelta(0))], Literal["unlimited"]]
+    maximum_attempts: Union[Annotated[int, Field(gt=0)], Literal["unlimited"]]
 
     def make_retry_policy(self, merged_non_retryable_types: list[str]) -> "RetryPolicy":
         """Create a RetryPolicy instance from these scalars + the merged
@@ -195,14 +196,14 @@ class QueueOptions(ConfigModel):
     cadence, add the field to ``HandleOptions`` then — schema change is one line.
     """
 
-    start_to_close_timeout: timedelta | None = Field(default=None, strict=False)
-    schedule_to_close_timeout: timedelta | None = Field(default=None, strict=False)
-    schedule_to_start_timeout: timedelta | None = Field(default=None, strict=False)
-    heartbeat_timeout: timedelta | None = Field(default=None, strict=False)
+    start_to_close_timeout: timedelta | None = Field(default=None, strict=False, gt=timedelta(0))
+    schedule_to_close_timeout: timedelta | None = Field(default=None, strict=False, gt=timedelta(0))
+    schedule_to_start_timeout: timedelta | None = Field(default=None, strict=False, gt=timedelta(0))
+    heartbeat_timeout: timedelta | None = Field(default=None, strict=False, gt=timedelta(0))
     retry_policy_config: RetryPolicyConfigOverlay | None = None
     # Cluster-wide queue rate limit, conveyed to the Temporal server by every
     # worker on this queue. The latest value to be sent by a worker wins.
-    max_task_queue_activities_per_second: float | None = None
+    max_task_queue_activities_per_second: float | None = Field(default=None, gt=0)
 
 
 class HandleOptions(ConfigModel):
@@ -212,25 +213,8 @@ class HandleOptions(ConfigModel):
     Other fields will be added on demand when a real case surfaces.
     """
 
-    start_to_close_timeout: timedelta | None = Field(default=None, strict=False)
+    start_to_close_timeout: timedelta | None = Field(default=None, strict=False, gt=timedelta(0))
     retry_policy_config: RetryPolicyConfigOverlay | None = None
-
-
-# class PipelexWorkflowsConfig(ConfigModel):
-#     """Configuration model for workflow settings."""
-
-#     jinja2_activity_timeout: timedelta = Field(strict=False)
-#     jinja2_retry_policy_config: RetryPolicyConfig
-
-#     @property
-#     def jinja2_retry_policy(self) -> RetryPolicy:
-#         """
-#         Create a RetryPolicy for LLM generation based on the configuration.
-
-#         Returns:
-#             RetryPolicy: A configured RetryPolicy object for LLM generation.
-#         """
-#         return self.jinja2_retry_policy_config.make_retry_policy()
 
 
 class ActivityRouteConfig(ConfigModel):
@@ -272,17 +256,21 @@ class WorkerRuntimeProfile(ConfigModel):
     """
 
     tuning_mode: WorkerTuningMode = Field(strict=False)
-    max_cached_workflows: int
-    max_concurrent_workflow_tasks: int
-    max_concurrent_activities: int
-    max_concurrent_local_activities: int
-    max_concurrent_workflow_task_polls: int
-    max_concurrent_activity_task_polls: int
-    max_activities_per_second: float
-    sticky_queue_schedule_to_start_timeout: timedelta = Field(strict=False)
-    max_heartbeat_throttle_interval: timedelta = Field(strict=False)
-    default_heartbeat_throttle_interval: timedelta = Field(strict=False)
-    graceful_shutdown_timeout: timedelta = Field(strict=False)
+    # ge=0 on the workflow-cache-and-activity-slot knobs lets operators stand
+    # up workflow-only workers (max_concurrent_activities=0) for the router
+    # profile pattern. The poll/workflow knobs need gt=0 — a worker with zero
+    # workflow-task polls can't make progress.
+    max_cached_workflows: int = Field(ge=0)
+    max_concurrent_workflow_tasks: int = Field(gt=0)
+    max_concurrent_activities: int = Field(ge=0)
+    max_concurrent_local_activities: int = Field(ge=0)
+    max_concurrent_workflow_task_polls: int = Field(gt=0)
+    max_concurrent_activity_task_polls: int = Field(ge=0)
+    max_activities_per_second: float = Field(gt=0)
+    sticky_queue_schedule_to_start_timeout: timedelta = Field(strict=False, gt=timedelta(0))
+    max_heartbeat_throttle_interval: timedelta = Field(strict=False, gt=timedelta(0))
+    default_heartbeat_throttle_interval: timedelta = Field(strict=False, gt=timedelta(0))
+    graceful_shutdown_timeout: timedelta = Field(strict=False, gt=timedelta(0))
 
     @model_validator(mode="after")
     def reject_unimplemented_tuning_mode(self) -> Self:
@@ -377,6 +365,30 @@ class WorkerConfig(ConfigModel):
         """
         return self.retry_policy_config.make_retry_policy(merged_non_retryable_types=list(self.retry_policy_config.non_retryable_error_types))
 
+    def all_non_retryable_error_types(
+        self,
+        queue_options_by_queue: dict[str, "QueueOptions"],
+    ) -> set[str]:
+        """Union of every ``non_retryable_error_types`` declared anywhere in the
+        temporal config: baseline main list + every queue overlay's ``_extra``
+        + every handle overlay's ``_extra``.
+
+        Used by ``TemporalError.from_app_error`` for log-severity classification
+        — that error-handling site sees only the error type string, not the
+        dispatch that produced it, so it can't know which overlay contributed
+        the entry. Retry behavior itself is correct via the dispatch-time
+        ``retry_policy``; this helper only powers the log-severity decision.
+        """
+        result: set[str] = set(self.retry_policy_config.non_retryable_error_types)
+        for queue_opts in queue_options_by_queue.values():
+            if queue_opts.retry_policy_config is not None:
+                result.update(queue_opts.retry_policy_config.non_retryable_error_types_extra)
+        for route in self.activity_queues.values():
+            for handle_opts in route.handle_options.values():
+                if handle_opts.retry_policy_config is not None:
+                    result.update(handle_opts.retry_policy_config.non_retryable_error_types_extra)
+        return result
+
     def resolve_queue(self, activity_name: str, routing_key: str | None = None) -> str | None:
         """Resolve which task queue an activity should dispatch to.
 
@@ -431,6 +443,13 @@ class WorkerConfig(ConfigModel):
           2. ``queue_options[resolved_queue]`` if present.
           3. ``activity_queues[activity_name].handle_options[routing_key]`` if present.
 
+        Dispatch / queue_options asymmetry: when ``activity_queues`` is empty
+        the hybrid fallback returns ``resolved_queue=None`` so dispatch omits
+        the ``task_queue`` kwarg (activities ride the workflow's own queue).
+        But ``queue_options[default_task_queue]`` STILL applies in that case —
+        single-queue deployments can tune timeouts/retry/rate without opting
+        into the ``activity_queues`` routing topology.
+
         ``non_retryable_error_types`` composes **additively** across all three
         layers (baseline list + queue ``_extra`` + handle ``_extra``) — never
         substituted. This is a safety lean: per-queue layers can add to the
@@ -443,10 +462,10 @@ class WorkerConfig(ConfigModel):
                 ``Temporal.queue_options``). Explicit dependency rather than a
                 ``get_config()`` reach so this method stays unit-testable.
             is_traced: When true, emit one INFO log line per call with the
-                resolved queue + timeout + retry attempts and the layer each
-                scalar came from (baseline / queue_options / handle_options).
-                Off by default — verbose; turn on when debugging mis-tuned
-                timeouts.
+                resolved queue + timeout + retry attempts + heartbeat and the
+                layer each scalar came from (baseline / queue_options /
+                handle_options). Off by default — verbose; turn on when
+                debugging mis-tuned timeouts.
 
         Returns:
             A ``DispatchOptions`` ready to be splatted into
@@ -455,8 +474,17 @@ class WorkerConfig(ConfigModel):
         resolved_queue = self.resolve_queue(activity_name=activity_name, routing_key=routing_key)
 
         queue_opts: QueueOptions | None = None
-        if queue_options_by_queue is not None and resolved_queue is not None:
-            queue_opts = queue_options_by_queue.get(resolved_queue)
+        if queue_options_by_queue is not None:
+            if resolved_queue is not None:
+                queue_opts = queue_options_by_queue.get(resolved_queue)
+            else:
+                # Empty-routing hybrid fallback: dispatch still emits
+                # ``task_queue=None`` so the activity rides the workflow's own
+                # queue, but apply ``queue_options[default_task_queue]``
+                # overlays when configured so single-queue deployments can
+                # tune timeouts/retry/rate without opting into the
+                # ``activity_queues`` routing topology.
+                queue_opts = queue_options_by_queue.get(self.default_task_queue)
 
         handle_opts: HandleOptions | None = None
         activity_route = self.activity_queues.get(activity_name)
@@ -468,6 +496,7 @@ class WorkerConfig(ConfigModel):
         schedule_to_close: timedelta | None = None
         schedule_to_start: timedelta | None = None
         heartbeat: timedelta | None = self.default_activity_heartbeat_timeout
+        heartbeat_source = "baseline"
 
         if queue_opts is not None:
             if queue_opts.start_to_close_timeout is not None:
@@ -479,6 +508,7 @@ class WorkerConfig(ConfigModel):
                 schedule_to_start = queue_opts.schedule_to_start_timeout
             if queue_opts.heartbeat_timeout is not None:
                 heartbeat = queue_opts.heartbeat_timeout
+                heartbeat_source = "queue_options"
 
         if handle_opts is not None and handle_opts.start_to_close_timeout is not None:
             start_to_close = handle_opts.start_to_close_timeout
@@ -515,12 +545,15 @@ class WorkerConfig(ConfigModel):
         retry_policy = retry_base.make_retry_policy(merged_non_retryable_types=deduped_non_retryable)
 
         if is_traced:
-            log.info(
-                f"temporal.dispatch act={activity_name} handle={routing_key} "
-                f"-> queue={resolved_queue} "
-                f"timeout={start_to_close.total_seconds()}s (from={start_to_close_source}) "
-                f"retry_attempts={retry_base.maximum_attempts} (from={retry_source})"
-            )
+            parts = [
+                f"temporal.dispatch act={activity_name} handle={routing_key}",
+                f"-> queue={resolved_queue}",
+                f"timeout={start_to_close.total_seconds()}s (from={start_to_close_source})",
+                f"retry_attempts={retry_base.maximum_attempts} (from={retry_source})",
+            ]
+            if heartbeat is not None:
+                parts.append(f"heartbeat={heartbeat.total_seconds()}s (from={heartbeat_source})")
+            log.info(" ".join(parts))
 
         return DispatchOptions(
             task_queue=resolved_queue,
@@ -553,9 +586,15 @@ class Temporal(ConfigModel):
     payload_codec_config: PayloadCodecConfig
 
     @model_validator(mode="after")
-    def warn_on_unknown_routing_queues(self) -> Self:
-        """Warn when ``activity_queues`` names a queue that has no matching
-        ``queue_options`` entry and isn't the worker's ``default_task_queue``.
+    def warn_on_orphan_queue_references(self) -> Self:
+        """Warn (lenient) on two orphan patterns:
+
+        1. ``activity_queues`` references a queue with no ``queue_options``
+           entry and not equal to ``default_task_queue`` — likely typo or
+           missing tuning.
+        2. ``queue_options`` declares a queue that nothing routes to and isn't
+           ``default_task_queue`` — overlay will never apply, likely typo or
+           stale entry.
 
         Lenient on purpose: a queue riding the worker_config baselines is a
         legitimate state (small deployments don't need per-queue tuning).
@@ -578,4 +617,50 @@ class Temporal(ConfigModel):
                         f'activity_queues.{activity_name}.by_handle["{handle}"] has no '
                         f"queue_options entry — it will use worker_config defaults. Typo?"
                     )
+
+        # Symmetric check: queue_options entries that nothing routes to are
+        # silently no-op overlays. ``default_task_queue`` is considered
+        # "routed" because the hybrid fallback applies its queue_options when
+        # ``activity_queues`` is empty.
+        routed_queues: set[str] = {self.worker_config.default_task_queue}
+        for route in self.worker_config.activity_queues.values():
+            routed_queues.add(route.default)
+            routed_queues.update(route.by_handle.values())
+        for queue_name in self.queue_options:
+            if queue_name not in routed_queues:
+                log.warning(
+                    f"temporal: queue_options has entry {queue_name!r} but no "
+                    f"activity_queues route references it and it is not default_task_queue — "
+                    f"overlay will never apply. Typo or stale entry?"
+                )
         return self
+
+    def validate_task_queue_known(self, task_queue: str) -> None:
+        """Raise ``WorkerTaskQueueUnknownError`` when ``task_queue`` is not
+        declared anywhere in the temporal config — neither as
+        ``default_task_queue``, nor in any ``activity_queues`` entry, nor in
+        ``queue_options``.
+
+        Strict counterpart to the lenient warn that fires at config load time:
+        a worker polling a queue that nothing routes to is almost always a typo,
+        and the runtime can't detect it later — the worker would sit idle
+        forever. Fast-fail at startup with a "did you mean?" suggestion when a
+        close match exists.
+
+        Called from both ``worker_cli.configure`` (CLI fast-fail before library
+        load) and ``TemporalTaskManager.run_worker`` (so programmatic callers
+        get the check too).
+        """
+        known_queues: set[str] = {self.worker_config.default_task_queue}
+        for route in self.worker_config.activity_queues.values():
+            known_queues.add(route.default)
+            known_queues.update(route.by_handle.values())
+        known_queues.update(self.queue_options.keys())
+        if task_queue in known_queues:
+            return
+        sorted_known = sorted(known_queues)
+        suggestions = difflib.get_close_matches(task_queue, sorted_known, n=1, cutoff=0.7)
+        msg = f"--task-queue '{task_queue}' is not referenced by any routing or options entry. Known queues: {sorted_known}."
+        if suggestions:
+            msg += f" Did you mean '{suggestions[0]}'?"
+        raise WorkerTaskQueueUnknownError(msg)

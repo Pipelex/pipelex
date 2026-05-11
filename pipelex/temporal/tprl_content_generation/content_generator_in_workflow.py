@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from typing import Any
 
 from pydantic import BaseModel  # noqa: TC002
@@ -52,23 +53,29 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
     workflow's ``run()``. Calling these methods outside of a workflow context will fail.
     """
 
+    # Upper bound on tracked workflow runs. Each entry is one
+    # ``(workflow_id, run_id) -> set[str]`` mapping holding activity_ids
+    # observed during one workflow execution. The LRU eviction kicks in only
+    # on long-running worker processes — a worker handling fewer than this
+    # many workflow runs over its lifetime never evicts.
+    _MAX_SEEN_RUNS = 4096
+
     def __init__(self, generated_content_factory: GeneratedContentFactory) -> None:
         self._generated_content_factory = generated_content_factory
-        # Per-run uniqueness invariant for activity_ids. Today no operator call site
-        # invokes the same protocol method twice within one ``WfPipeRouter`` execution
-        # (audit recorded in TODOS.md / collapse-content-generation-workflow-layer-v2.md
-        # §0). This dict is a runtime guard so a future regression surfaces as a clear
-        # ``ContentGenerationError`` instead of an opaque Temporal duplicate-activity-id
-        # failure. Keyed by ``(workflow_id, run_id)`` so retries, ``continue_as_new``,
-        # and id-reuse policies (which keep ``workflow_id`` but produce a new ``run_id``)
-        # do not inherit the prior run's seen ids — that would raise spurious duplicates
-        # on the new run's first default activity_id. The generator instance is set once
-        # on the hub and reused across many workflow runs.
-        # Replay-safety: ``_record_activity_id`` short-circuits during replay so a
-        # cached set on this same worker process does not produce false-positive
-        # duplicates after cache eviction. The dict otherwise grows unboundedly across
-        # workflow runs — accepted for now; cleanup is a follow-up tracked in TODOS.md.
-        self._seen_activity_ids: dict[tuple[str, str], set[str]] = {}
+        # Per-run uniqueness guard for activity_ids: surfaces accidental
+        # duplicate-id regressions as a clear ``ContentGenerationError`` rather
+        # than an opaque Temporal duplicate-activity-id failure. Keyed by
+        # ``(workflow_id, run_id)`` so retries, ``continue_as_new``, and
+        # id-reuse policies (which keep ``workflow_id`` but produce a new
+        # ``run_id``) do not inherit the prior run's seen ids — that would
+        # raise spurious duplicates on the new run's first default activity_id.
+        # The generator instance is set once on the hub and reused across many
+        # workflow runs, so the mapping is LRU-bounded at ``_MAX_SEEN_RUNS`` to
+        # keep long-lived workers from growing it unboundedly.
+        # Replay-safety: ``_record_activity_id`` short-circuits during replay,
+        # so the cache only mutates on first execution; the bounded LRU never
+        # affects replay determinism.
+        self._seen_activity_ids: OrderedDict[tuple[str, str], set[str]] = OrderedDict()
 
     def _record_activity_id(self, activity_id: str, method_name: str) -> None:
         # Skip the check on replay. After cache eviction, Temporal replays the
@@ -80,7 +87,18 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
             return
         info = workflow.info()
         run_key = (info.workflow_id, info.run_id)
-        seen = self._seen_activity_ids.setdefault(run_key, set())
+        seen = self._seen_activity_ids.get(run_key)
+        if seen is None:
+            seen = set[str]()
+            self._seen_activity_ids[run_key] = seen
+            # Evict the oldest run (by insertion order) once we exceed the
+            # cap. ``popitem(last=False)`` is FIFO eviction; combined with
+            # the ``move_to_end`` in the touch branch below, this gives true
+            # LRU behavior keyed by most-recent activity observation.
+            while len(self._seen_activity_ids) > self._MAX_SEEN_RUNS:
+                self._seen_activity_ids.popitem(last=False)
+        else:
+            self._seen_activity_ids.move_to_end(run_key)
         if activity_id in seen:
             msg = (
                 f"Duplicate activity_id '{activity_id}' for method '{method_name}'. "
