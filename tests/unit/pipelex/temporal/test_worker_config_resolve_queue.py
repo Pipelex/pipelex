@@ -21,9 +21,10 @@ def _make_worker_config(activity_queues: dict[str, ActivityRouteConfig] | None =
     with placeholder values that satisfy the schema.
     """
     return WorkerConfig(
-        task_queue="default_q",
+        default_task_queue="default_q",
         activity_queues=activity_queues or {},
         workflow_execution_timeout=timedelta(hours=1),
+        default_activity_start_to_close_timeout=timedelta(minutes=10),
         retry_policy_config=RetryPolicyConfig(
             initial_interval=timedelta(seconds=3),
             backoff_coefficient=2.0,

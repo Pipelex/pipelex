@@ -3,9 +3,11 @@ python -m pipelex.temporal.worker_cli --is-unit-testing
 python -m pipelex.temporal.worker_cli --is-not-sandboxed
 python -m pipelex.temporal.worker_cli --task-queue my_task_queue
 python -m pipelex.temporal.worker_cli --scope router
+python -m pipelex.temporal.worker_cli --profile anthropic-tier4 --scope runner-llm --task-queue anthropic_q
 """
 
 import asyncio
+import difflib
 import os
 from typing import Annotated
 
@@ -15,8 +17,40 @@ from pipelex import log
 from pipelex.config import get_config
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import RunMode, runtime_manager
+from pipelex.temporal.exceptions import WorkerTaskQueueUnknownError
 from pipelex.temporal.temporal_hub import get_task_manager
 from pipelex.tools.misc.toml_utils import load_toml_from_path
+
+
+def _validate_task_queue_known(task_queue: str) -> None:
+    """Raise ``WorkerTaskQueueUnknownError`` when ``task_queue`` is not declared
+    anywhere in the temporal config — neither as ``default_task_queue``, nor in
+    any ``activity_queues`` entry, nor in ``queue_options``.
+
+    The strict counterpart to the lenient warn that fires at config load time:
+    a worker polling a queue that nothing routes to is almost always a typo,
+    and the runtime can't detect it later — the worker would sit idle forever.
+    Fast-fail at boot with a "did you mean?" suggestion when a close match
+    exists.
+    """
+    temporal_config = get_config().temporal
+    worker_config = temporal_config.worker_config
+    known_queues: set[str] = {worker_config.default_task_queue}
+    for route in worker_config.activity_queues.values():
+        known_queues.add(route.default)
+        known_queues.update(route.by_handle.values())
+    known_queues.update(temporal_config.queue_options.keys())
+
+    if task_queue in known_queues:
+        return
+
+    sorted_known = sorted(known_queues)
+    suggestions = difflib.get_close_matches(task_queue, sorted_known, n=1, cutoff=0.7)
+    msg = f"--task-queue '{task_queue}' is not referenced by any routing or options entry. Known queues: {sorted_known}."
+    if suggestions:
+        msg += f" Did you mean '{suggestions[0]}'?"
+    raise WorkerTaskQueueUnknownError(msg)
+
 
 app = typer.Typer()
 
@@ -27,6 +61,7 @@ async def run_worker(
     is_unit_testing: bool = False,
     task_queue: str | None = None,
     scope_name: str | None = None,
+    profile_name: str | None = None,
 ):
     if project is None:
         log.info(f"Starting worker for current project '{project}', from {os.path.relpath(__file__)}")
@@ -37,6 +72,7 @@ async def run_worker(
         is_unit_testing=is_unit_testing,
         task_queue=task_queue,
         scope_name=scope_name,
+        profile_name=profile_name,
     )
 
 
@@ -47,6 +83,10 @@ def configure(
     is_unit_testing: Annotated[bool, typer.Option(help="Flag to indicate if running unit tests")] = False,
     task_queue: Annotated[str | None, typer.Option(help="The task queue to use")] = None,
     scope: Annotated[str | None, typer.Option(help="Worker scope name from [temporal.worker_scopes.scopes] (defaults to default_scope)")] = None,
+    profile: Annotated[
+        str | None,
+        typer.Option(help="Worker runtime profile name from [temporal.worker_runtime_profiles.profiles] (defaults to default_profile)"),
+    ] = None,
 ):
     if is_unit_testing:
         runtime_manager.set_run_mode(RunMode.UNIT_TEST)
@@ -79,7 +119,10 @@ def configure(
         updated_temporal = get_config().temporal.model_copy(update={"is_enabled": True})
         get_config().temporal = updated_temporal
 
-    asyncio.run(run_worker(project, is_not_sandboxed, is_unit_testing, task_queue, scope))
+    effective_task_queue = task_queue or get_config().temporal.worker_config.default_task_queue
+    _validate_task_queue_known(effective_task_queue)
+
+    asyncio.run(run_worker(project, is_not_sandboxed, is_unit_testing, task_queue, scope, profile))
 
 
 if __name__ == "__main__":

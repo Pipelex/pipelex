@@ -26,15 +26,18 @@ follow-up — this file is the primary caller of that upgrade.
 """
 
 import uuid
+from datetime import timedelta
 
 import pytest
 from temporalio import activity
 from temporalio.client import Client as TemporalClient
 
 from pipelex.cogt.content_generation.assignment_models import ExtractAssignment, RenderPageViewsAssignment
+from pipelex.config import get_config
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
+from pipelex.temporal.config_temporal import QueueOptions
 from pipelex.temporal.temporal_hub import get_task_manager
 from pipelex.temporal.test_extras.temporal_test_tasks import TEMPORAL_TEST_WORKFLOWS
 from pipelex.temporal.test_extras.wf_test_content_generator_pdf_page_views import WfTestContentGeneratorPdfPageViews
@@ -133,3 +136,60 @@ class TestSplitWorkerExtractPages:
         assert extract_ids == ["extract-pages", "extract-render-page-views"], (
             f"Unexpected extract activity_ids in history: {extract_ids!r} (full scheduled (type, id) pairs: {all_scheduled!r})"
         )
+
+    @pytest.mark.timeout(60)
+    async def test_queue_options_start_to_close_timeout_flows_to_dispatch(
+        self,
+        temporal_client: TemporalClient,
+    ) -> None:
+        """Setting ``queue_options[X].start_to_close_timeout`` must make every
+        ``workflow.execute_activity`` call on queue ``X`` use that timeout
+        instead of the worker_config baseline.
+
+        Submits the same two-activity workflow, but registers a per-queue
+        timeout (``0:07:00``) for the test's UUID queue and verifies the
+        scheduled-event ``start_to_close_timeout`` in workflow history matches
+        — proving the submitter-side resolver overlays correctly end-to-end.
+        """
+        task_queue = f"q_extract_{uuid.uuid4().hex[:8]}"
+        workflow_id = f"wf_extract_{uuid.uuid4().hex[:8]}"
+        expected_timeout = timedelta(minutes=7)
+
+        queue_options = get_config().temporal.queue_options
+        assert task_queue not in queue_options, "Test task_queue collision — UUID should be unique."
+        queue_options[task_queue] = QueueOptions(start_to_close_timeout=expected_timeout)
+        try:
+            with route_activities_to(task_queue, [act_extract_gen_extract_pages.__name__, act_render_page_views.__name__]):
+                async with get_task_manager().make_worker(
+                    temporal_client,
+                    task_queue=task_queue,
+                    is_not_sandboxed=True,
+                    test_workflows=TEMPORAL_TEST_WORKFLOWS,
+                    substitute_activities={
+                        act_extract_gen_extract_pages: _stub_act_extract_gen_extract_pages,
+                        act_render_page_views: _stub_act_render_page_views,
+                    },
+                ):
+                    handle = await temporal_client.start_workflow(  # pyright: ignore[reportUnknownMemberType]
+                        workflow=WfTestContentGeneratorPdfPageViews.run,
+                        arg=False,
+                        id=workflow_id,
+                        task_queue=task_queue,
+                    )
+                    await handle.result()
+                    history = await handle.fetch_history()
+        finally:
+            queue_options.pop(task_queue, None)
+
+        extract_activity_names = {"act_extract_gen_extract_pages", "act_render_page_views"}
+        scheduled_timeouts = [
+            event.activity_task_scheduled_event_attributes.start_to_close_timeout.ToTimedelta()
+            for event in history.events
+            if event.activity_task_scheduled_event_attributes.activity_type.name in extract_activity_names
+        ]
+        assert scheduled_timeouts, "No extract activity scheduled events found in history."
+        for observed_timeout in scheduled_timeouts:
+            assert observed_timeout == expected_timeout, (
+                f"start_to_close_timeout from queue_options[{task_queue}] not observed in dispatch: "
+                f"expected {expected_timeout!r}, got {observed_timeout!r}"
+            )

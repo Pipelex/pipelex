@@ -1,5 +1,4 @@
 import asyncio
-from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.client import Client as TemporalClient
@@ -14,8 +13,8 @@ from pipelex import log
 from pipelex.config import get_config
 from pipelex.hub import get_class_registry
 from pipelex.system.runtime import WorkerMode, runtime_manager
-from pipelex.temporal.config_temporal import WorkerScope
-from pipelex.temporal.exceptions import WorkerScopeConfigError
+from pipelex.temporal.config_temporal import WorkerRuntimeProfile, WorkerScope
+from pipelex.temporal.exceptions import WorkerProfileConfigError, WorkerScopeConfigError
 from pipelex.temporal.log_temporal import configure_temporal_logs
 from pipelex.temporal.sandbox_manager import sandbox_manager
 from pipelex.temporal.task_manager import TaskManager
@@ -84,6 +83,7 @@ class TemporalTaskManager(TaskManager):
         task_queue: str,
         is_not_sandboxed: bool = False,
         scope: WorkerScope | None = None,
+        runtime_profile: WorkerRuntimeProfile | None = None,
         substitute_activities: dict[ActivityType, ActivityType] | None = None,
         test_workflows: WorkflowList | None = None,
         test_activities: ActivityList | None = None,
@@ -117,24 +117,35 @@ class TemporalTaskManager(TaskManager):
                     "citadel.gcp.gsecret_helpers",
                 )
             )
+
+        # Resolve to the default profile when the caller does not specify one.
+        # Most internal/test call sites don't care about profile tuning and want
+        # the default knobs; the worker CLI path always passes an explicit profile.
+        profile = runtime_profile or self._resolve_runtime_profile_by_name(profile_name=None)
+
+        # Queue-level cluster-wide rate cap is attached to the queue, not the
+        # profile. Every worker on this queue sends it; the server enforces it.
+        queue_options = get_config().temporal.queue_options.get(task_queue)
+        max_task_queue_activities_per_second = queue_options.max_task_queue_activities_per_second if queue_options is not None else None
+
         return Worker(
             temporal_client,
             task_queue=task_queue,
             workflows=workflows,
             activities=activities,
             workflow_runner=workflow_runner,
-            max_cached_workflows=10000,
-            max_concurrent_workflow_tasks=1000,
-            max_concurrent_activities=1000,
-            max_concurrent_local_activities=1000,
-            max_concurrent_workflow_task_polls=100,
-            max_concurrent_activity_task_polls=100,
-            sticky_queue_schedule_to_start_timeout=timedelta(minutes=30),
-            max_heartbeat_throttle_interval=timedelta(minutes=60),
-            default_heartbeat_throttle_interval=timedelta(minutes=60),
-            graceful_shutdown_timeout=timedelta(minutes=30),
-            max_activities_per_second=1000,
-            max_task_queue_activities_per_second=1000,
+            max_cached_workflows=profile.max_cached_workflows,
+            max_concurrent_workflow_tasks=profile.max_concurrent_workflow_tasks,
+            max_concurrent_activities=profile.max_concurrent_activities,
+            max_concurrent_local_activities=profile.max_concurrent_local_activities,
+            max_concurrent_workflow_task_polls=profile.max_concurrent_workflow_task_polls,
+            max_concurrent_activity_task_polls=profile.max_concurrent_activity_task_polls,
+            sticky_queue_schedule_to_start_timeout=profile.sticky_queue_schedule_to_start_timeout,
+            max_heartbeat_throttle_interval=profile.max_heartbeat_throttle_interval,
+            default_heartbeat_throttle_interval=profile.default_heartbeat_throttle_interval,
+            graceful_shutdown_timeout=profile.graceful_shutdown_timeout,
+            max_activities_per_second=profile.max_activities_per_second,
+            max_task_queue_activities_per_second=max_task_queue_activities_per_second,
         )
 
     @override
@@ -144,6 +155,7 @@ class TemporalTaskManager(TaskManager):
         is_unit_testing: bool,
         task_queue: str | None = None,
         scope_name: str | None = None,
+        profile_name: str | None = None,
     ):
         try:
             test_workflows: WorkflowList | None = None
@@ -163,14 +175,18 @@ class TemporalTaskManager(TaskManager):
                 runtime_manager.set_worker_mode(worker_mode=WorkerMode.NORMAL)
             temporal_client = await connect_to_temporal()
             worker_config = get_config().temporal.worker_config
-            task_queue = task_queue or worker_config.task_queue
+            task_queue = task_queue or worker_config.default_task_queue
             scope = self._resolve_scope_by_name(scope_name=scope_name)
-            log.info(f"Temporal Worker scope: '{scope_name or get_config().temporal.worker_scopes.default_scope}'")
+            runtime_profile = self._resolve_runtime_profile_by_name(profile_name=profile_name)
+            effective_scope_name = scope_name or get_config().temporal.worker_scopes.default_scope
+            effective_profile_name = profile_name or get_config().temporal.worker_runtime_profiles.default_profile
+            log.info(f"Temporal Worker starting: profile='{effective_profile_name}' scope='{effective_scope_name}' task_queue='{task_queue}'")
             async with self.make_worker(
                 temporal_client=temporal_client,
                 task_queue=task_queue,
                 is_not_sandboxed=is_not_sandboxed,
                 scope=scope,
+                runtime_profile=runtime_profile,
                 test_workflows=test_workflows,
                 test_activities=test_activities,
             ):
@@ -191,6 +207,15 @@ class TemporalTaskManager(TaskManager):
             msg = f"Unknown worker scope '{effective_name}' (known: {sorted(worker_scopes.scopes.keys())})"
             raise WorkerScopeConfigError(msg)
         return worker_scopes.scopes[effective_name]
+
+    @staticmethod
+    def _resolve_runtime_profile_by_name(profile_name: str | None) -> WorkerRuntimeProfile:
+        profiles_config = get_config().temporal.worker_runtime_profiles
+        effective_name = profile_name or profiles_config.default_profile
+        if effective_name not in profiles_config.profiles:
+            msg = f"Unknown worker runtime profile '{effective_name}' (known: {sorted(profiles_config.profiles.keys())})"
+            raise WorkerProfileConfigError(msg)
+        return profiles_config.profiles[effective_name]
 
     @override
     def task_packs(self) -> list[str]:

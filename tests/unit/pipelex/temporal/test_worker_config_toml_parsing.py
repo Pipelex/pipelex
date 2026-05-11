@@ -17,20 +17,25 @@ in their projects, this test fails before the broken config reaches them.
 """
 
 import tomllib
+from datetime import timedelta
 
-from pipelex.temporal.config_temporal import ActivityRouteConfig, WorkerConfig
+from pipelex.temporal.config_temporal import ActivityRouteConfig, HandleOptions, WorkerConfig
 
 _TOML_FRAGMENT = """
-task_queue = "temporal_task_queue"
+default_task_queue = "temporal_task_queue"
 workflow_execution_timeout = "1:00:00"
 run_timeout = "1:00:00"
 task_timeout = "0:00:10"
 start_delay = "0:00:00"
 rpc_timeout = "1:00:00"
+default_activity_start_to_close_timeout = "0:10:00"
 
 [activity_queues.act_llm_gen_text]
 default = "inference_q"
 by_handle = { "claude-opus-4-7" = "anthropic_q", "gpt-5" = "openai_q" }
+
+[activity_queues.act_llm_gen_text.handle_options."claude-opus-4-7-1m"]
+start_to_close_timeout = "0:25:00"
 
 [activity_queues.act_img_gen_images]
 default = "image_gen_q"
@@ -46,18 +51,19 @@ backoff_coefficient = 2.0
 maximum_interval = "unlimited"
 maximum_attempts = 3
 non_retryable_error_types = []
+non_retryable_error_types_extra = []
 """
 
 
 class TestWorkerConfigTomlParsing:
     """Parse a TOML fragment shaped like the project override and validate
-    that the new per-activity routing keys round-trip into ``WorkerConfig``.
+    that the new per-activity routing keys (including ``handle_options``) round-trip into ``WorkerConfig``.
     """
 
     def test_activity_queues_parse_into_typed_models(self) -> None:
         worker_config = WorkerConfig.model_validate(tomllib.loads(_TOML_FRAGMENT))
 
-        assert worker_config.task_queue == "temporal_task_queue"
+        assert worker_config.default_task_queue == "temporal_task_queue"
         assert set(worker_config.activity_queues.keys()) == {
             "act_llm_gen_text",
             "act_img_gen_images",
@@ -69,10 +75,17 @@ class TestWorkerConfigTomlParsing:
         llm_route = worker_config.activity_queues["act_llm_gen_text"]
         assert llm_route.default == "inference_q"
         assert llm_route.by_handle == {"claude-opus-4-7": "anthropic_q", "gpt-5": "openai_q"}
+        # handle_options round-trip into HandleOptions models.
+        assert set(llm_route.handle_options.keys()) == {"claude-opus-4-7-1m"}
+        opus_1m = llm_route.handle_options["claude-opus-4-7-1m"]
+        assert isinstance(opus_1m, HandleOptions)
+        assert opus_1m.start_to_close_timeout == timedelta(minutes=25)
 
         img_route = worker_config.activity_queues["act_img_gen_images"]
         assert img_route.default == "image_gen_q"
         assert img_route.by_handle == {"flux-1.1-pro": "fal_q"}
+        # handle_options defaults to an empty dict when omitted from TOML.
+        assert img_route.handle_options == {}
 
         extract_route = worker_config.activity_queues["act_extract_gen_extract_pages"]
         assert extract_route.default == "extract_q"

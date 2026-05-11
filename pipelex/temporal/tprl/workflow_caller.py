@@ -235,7 +235,7 @@ class WorkflowExecutorFactory(Generic[WorkflowInput, WorkflowOutput]):
         config = get_config().temporal.worker_config
 
         return WorkflowExecutor[WorkflowInput, WorkflowOutput](
-            task_queue=task_queue or config.task_queue,
+            task_queue=task_queue or config.default_task_queue,
             workflow_execution_timeout=workflow_execution_timeout or config.workflow_execution_timeout,
             retry_policy=retry_policy or config.retry_policy,
             run_timeout=run_timeout or config.run_timeout,

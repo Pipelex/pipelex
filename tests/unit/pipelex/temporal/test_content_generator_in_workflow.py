@@ -115,7 +115,7 @@ class TestContentGeneratorInWorkflow:
         )
 
         worker_config = get_config().temporal.worker_config
-        expected_queue = worker_config.task_queue
+        expected_queue = worker_config.default_task_queue
         kwargs = mock_execute.call_args.kwargs
         assert kwargs.get("task_queue") == expected_queue
         assert kwargs.get("activity_id") == "craft-text"
@@ -154,7 +154,7 @@ class TestContentGeneratorInWorkflow:
         """Every non-llm-text method must also pass ``task_queue=<resolved>``.
 
         With default config (empty ``activity_queues``), the resolved queue
-        equals ``worker_config.task_queue`` — the workflow's own queue. The
+        equals ``worker_config.default_task_queue`` — the workflow's own queue. The
         asymmetric "no ``task_queue`` kwarg" contract that existed pre-v1 is
         gone: dispatch is uniform across all activities.
         """
@@ -166,7 +166,7 @@ class TestContentGeneratorInWorkflow:
 
         kwargs = mock_execute.call_args.kwargs
         worker_config = get_config().temporal.worker_config
-        assert kwargs.get("task_queue") == worker_config.task_queue, (
+        assert kwargs.get("task_queue") == worker_config.default_task_queue, (
             f"{caller} did not pass the resolved default task_queue (got {kwargs.get('task_queue')!r})"
         )
         assert kwargs.get("activity_id") == method_default_id
@@ -188,7 +188,7 @@ class TestContentGeneratorInWorkflow:
         assert mock_execute.call_count == 1
         kwargs = mock_execute.call_args.kwargs
         worker_config = get_config().temporal.worker_config
-        assert kwargs.get("task_queue") == worker_config.task_queue
+        assert kwargs.get("task_queue") == worker_config.default_task_queue
         assert kwargs.get("activity_id") == "extract-pages"
 
     async def test_make_extract_pages_image_uri_with_page_views_skips_render_activity(self, mocker: MockerFixture) -> None:
@@ -249,7 +249,7 @@ class TestContentGeneratorInWorkflow:
         assert observed_activity_ids == ["extract-pages", "extract-render-page-views"]
         worker_config = get_config().temporal.worker_config
         for call in mock_execute.call_args_list:
-            assert call.kwargs.get("task_queue") == worker_config.task_queue
+            assert call.kwargs.get("task_queue") == worker_config.default_task_queue
         assert result[0].page_view is page_view
 
     async def test_duplicate_wfid_raises_content_generation_error(self, mocker: MockerFixture) -> None:

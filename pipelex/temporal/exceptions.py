@@ -27,3 +27,11 @@ class TemporalServerError(TemporalFlowError):
 
 class WorkerScopeConfigError(TemporalConfigError):
     pass
+
+
+class WorkerProfileConfigError(TemporalConfigError):
+    pass
+
+
+class WorkerTaskQueueUnknownError(TemporalConfigError):
+    pass

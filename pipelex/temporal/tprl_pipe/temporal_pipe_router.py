@@ -101,7 +101,7 @@ def make_temporal_pipe_router(
     """Factory: creates a TemporalPipeRouter from config defaults."""
     worker_config = get_config().temporal.worker_config
     return TemporalPipeRouter(
-        task_queue=task_queue or worker_config.task_queue,
+        task_queue=task_queue or worker_config.default_task_queue,
         workflow_execution_timeout=workflow_execution_timeout or worker_config.workflow_execution_timeout,
         retry_policy=retry_policy or worker_config.retry_policy,
         should_auto_connect_temporal=should_auto_connect_temporal,

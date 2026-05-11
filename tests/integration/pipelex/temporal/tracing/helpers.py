@@ -40,9 +40,9 @@ def route_activities_to(queue: str, activity_names: Iterable[str]) -> Iterator[N
 
     Tests that run an in-process worker on a UUID-based task queue and
     substitute activities on that worker need this override: without it the
-    in-workflow dispatcher resolves to ``worker_config.task_queue`` (the
-    production default) where no worker is listening, and the activity hangs
-    until pytest-timeout fires.
+    in-workflow dispatcher resolves to ``worker_config.default_task_queue``
+    (the production default) where no worker is listening, and the activity
+    hangs until pytest-timeout fires.
     """
     worker_config = get_config().temporal.worker_config
     originals: dict[str, ActivityRouteConfig | None] = {}

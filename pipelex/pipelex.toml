@@ -411,6 +411,7 @@ img_gen = "model"
 llm_handle = "model"
 llm = "model"
 llm_to_structure = "model_to_structure"
+task_queue = "default_task_queue"
 
 [migration.migration_maps.mthds]
 img_gen = "model"
@@ -457,12 +458,14 @@ uri_format = "{hash}"
 local_storage_path = ".pipelex/temporal-payload-store"
 
 [temporal.worker_config]
-task_queue = "temporal_task_queue"
-workflow_execution_timeout = "1:00:00"
+default_task_queue = "temporal_task_queue"
+workflow_execution_timeout = "1:00:00"     # for the workflow itself (NOT used as activity timeout)
 run_timeout = "1:00:00"
 task_timeout = "0:00:10"
 start_delay = "0:00:00"
 rpc_timeout = "1:00:00"
+# Baseline activity timeout used when no per-queue or per-handle overlay applies.
+default_activity_start_to_close_timeout = "0:10:00"
 activity_queues = {}
 
 [temporal.worker_config.retry_policy_config]
@@ -478,6 +481,34 @@ non_retryable_error_types = [
   "ModelNotFoundError",
   "ValidationError",
 ]
+# Per-queue and per-handle overlays contribute `non_retryable_error_types_extra`
+# lists; the dispatch resolver unions them on top of the baseline above.
+non_retryable_error_types_extra = []
+
+# Per-queue submitter options. Empty by default — every activity uses the
+# worker_config baselines. Operators populate this when a backend pool needs
+# its own timeout or retry tuning. See .pipelex/pipelex.toml for examples.
+[temporal.queue_options]
+
+# Named worker-runtime profiles. A worker process selects one via --profile.
+# Defaults are lifted verbatim from the pre-v2 hardcoded Worker(...) construction
+# so out-of-the-box behavior is unchanged.
+[temporal.worker_runtime_profiles]
+default_profile = "default"
+
+[temporal.worker_runtime_profiles.profiles.default]
+tuning_mode = "explicit"
+max_cached_workflows = 10000
+max_concurrent_workflow_tasks = 1000
+max_concurrent_activities = 1000
+max_concurrent_local_activities = 1000
+max_concurrent_workflow_task_polls = 100
+max_concurrent_activity_task_polls = 100
+max_activities_per_second = 1000
+sticky_queue_schedule_to_start_timeout = "0:30:00"
+max_heartbeat_throttle_interval = "1:00:00"
+default_heartbeat_throttle_interval = "1:00:00"
+graceful_shutdown_timeout = "0:30:00"
 
 [temporal.temporal_config]
 selected_server = "local"
@@ -510,6 +541,11 @@ managed_loggers = [
   "temporalio.workflow",
   "temporalio.worker._activity",
 ]
+# When true, every workflow.execute_activity dispatch logs the resolved queue +
+# timeout + retry along with the layer each value came from (baseline /
+# queue_options / handle_options). Verbose — enable when debugging mis-tuned
+# timeouts.
+is_dispatch_resolution_traced = false
 
 [temporal.worker_scopes]
 default_scope = "full"
@@ -540,6 +576,56 @@ disable_all_activities = true
 required_tasks_packs = ["crafting", "pipe"]
 required_workflows = []
 required_activities = []
+excluded_workflows = []
+excluded_activities = []
+disable_all_workflows = true
+disable_all_activities = false
+
+# Specialized activity-only scopes for deployment manifests with one worker pool
+# per backend class. Each registers only the activities its name implies — paired
+# with `--task-queue <q>` so the worker pulls only its class of work.
+#
+# Note: `act_render_page_views` is intentionally listed under BOTH `runner-img-gen`
+# (used by single-image / image-list generation paths that may render a layout view)
+# AND `runner-extract` (used by the `make_extract_pages` two-activity branch that
+# pairs OCR with page-view rendering). Belt-and-suspenders: both scopes can render
+# pages, so neither breaks if routing sends the activity to either.
+
+[temporal.worker_scopes.scopes.runner-llm]
+required_tasks_packs = []
+required_workflows = []
+required_activities = [
+  "act_llm_gen_text",
+  "act_llm_gen_object",
+  "act_llm_gen_object_list",
+]
+excluded_workflows = []
+excluded_activities = []
+disable_all_workflows = true
+disable_all_activities = false
+
+[temporal.worker_scopes.scopes.runner-img-gen]
+required_tasks_packs = []
+required_workflows = []
+required_activities = ["act_img_gen_images", "act_render_page_views"]
+excluded_workflows = []
+excluded_activities = []
+disable_all_workflows = true
+disable_all_activities = false
+
+[temporal.worker_scopes.scopes.runner-extract]
+required_tasks_packs = []
+required_workflows = []
+required_activities = ["act_extract_gen_extract_pages", "act_render_page_views"]
+excluded_workflows = []
+excluded_activities = []
+disable_all_workflows = true
+disable_all_activities = false
+
+[temporal.worker_scopes.scopes.runner-jinja2]
+required_tasks_packs = []
+required_workflows = []
+required_activities = ["act_jinja2_gen_text"]
 excluded_workflows = []
 excluded_activities = []
 disable_all_workflows = true
