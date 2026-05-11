@@ -181,14 +181,14 @@ class ActivityRouteConfig(ConfigModel):
     """
 
     default: str
-    by_handle: dict[str, str] = Field(default_factory=dict)
+    by_handle: dict[str, str]
 
 
 class WorkerConfig(ConfigModel):
     """Configuration model for workflow execution settings."""
 
     task_queue: str
-    activity_queues: dict[str, ActivityRouteConfig] = Field(default_factory=dict)
+    activity_queues: dict[str, ActivityRouteConfig]
     workflow_execution_timeout: timedelta = Field(strict=False)
     run_timeout: timedelta | None = Field(default=None, strict=False)
     task_timeout: timedelta | None = Field(default=None, strict=False)

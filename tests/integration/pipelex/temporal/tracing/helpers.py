@@ -48,7 +48,7 @@ def route_activities_to(queue: str, activity_names: Iterable[str]) -> Iterator[N
     originals: dict[str, ActivityRouteConfig | None] = {}
     for activity_name in activity_names:
         originals[activity_name] = worker_config.activity_queues.get(activity_name)
-        worker_config.activity_queues[activity_name] = ActivityRouteConfig(default=queue)
+        worker_config.activity_queues[activity_name] = ActivityRouteConfig(default=queue, by_handle={})
     try:
         yield
     finally:
@@ -254,8 +254,8 @@ async def make_split_workers(
       accidentally use the router's registered context.
 
     Pair this with `worker_config.activity_queues[act_llm_gen_text.__name__] =
-    ActivityRouteConfig(default=q_runner)` so the workflow on `q_router`
-    actually dispatches `act_llm_gen_text` to `q_runner`.
+    ActivityRouteConfig(default=q_runner, by_handle={})` so the workflow on
+    `q_router` actually dispatches `act_llm_gen_text` to `q_runner`.
     """
     worker_scopes = get_config().temporal.worker_scopes
     base_router = worker_scopes.scopes["router"]

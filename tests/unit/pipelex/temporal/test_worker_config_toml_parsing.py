@@ -38,6 +38,7 @@ by_handle = { "flux-1.1-pro" = "fal_q" }
 
 [activity_queues.act_extract_gen_extract_pages]
 default = "extract_q"
+by_handle = {}
 
 [retry_policy_config]
 initial_interval = "0:00:03"
@@ -75,7 +76,6 @@ class TestWorkerConfigTomlParsing:
 
         extract_route = worker_config.activity_queues["act_extract_gen_extract_pages"]
         assert extract_route.default == "extract_q"
-        # by_handle omitted in TOML → defaults to empty dict (not None, not missing)
         assert extract_route.by_handle == {}
 
     def test_resolve_queue_works_on_parsed_config(self) -> None:
