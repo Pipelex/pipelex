@@ -418,7 +418,7 @@ cleanderived:
 cleanenv:
 	$(call PRINT_TITLE,"Erasing virtual environment")
 	rm -rf "$(VIRTUAL_ENV)" && \
-	echo "Cleaned up virtual env and dependency lock files";
+	echo "Cleaned up virtual env";
 
 cleanconfig:
 	$(call PRINT_TITLE,"Erasing config files and directories")
