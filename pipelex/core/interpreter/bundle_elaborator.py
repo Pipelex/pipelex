@@ -88,8 +88,12 @@ class BundleElaborator:
         )
 
         # Re-run bundle-level validators against the synthetic pipes so any reference rot
-        # surfaces with bundle context, not deep inside library_manager. The validated
-        # instance is intentionally discarded — callers receive `elaborated`.
+        # surfaces with bundle context, not deep inside library_manager. Because
+        # `elaboration_metadata` is declared `Field(exclude=True)` on PipelexBundleBlueprint,
+        # `model_dump` strips it before the round-trip — that's intentional: this is a pure
+        # pipe/concept-reference check, not a metadata round-trip. The validated instance
+        # is therefore discarded; callers receive `elaborated` (which still carries the
+        # side-table from the `model_copy` above).
         try:
             _ = PipelexBundleBlueprint.model_validate(elaborated.model_dump(by_alias=True))
         except ValidationError as exc:

@@ -67,6 +67,11 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
             # to do this wrap before; the integration test
             # ``test_wf_pipe_run_failure_path`` pins the workflow_failure_exception_types
             # contract on ``WorkflowExecutionError``.
+            #
+            # Manual ``__cause__`` wire (not ``raise X from exc``): we hold the
+            # wrapped error for a deferred re-raise in the post-delivery block
+            # below so ``act_deliver`` still fires on the failure path. Raising
+            # here would short-circuit delivery.
             execution_error = WorkflowExecutionError("WfPipeRouter failed")
             execution_error.__cause__ = exc
             workflow_log.error(f"WfPipeRouter failed: {exc}")

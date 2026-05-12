@@ -72,6 +72,22 @@ These are explicitly out of scope for the shipped temporal-primitives work but s
 
 ---
 
+## Config-driven infrastructure activity tuning
+
+**Source:** PR #891 `/review` (informational finding #8).
+**Owner doc:** this file.
+
+`pipelex/temporal/tprl_pipe/wf_pipe_run.py` dispatches two infrastructure activities — `act_assemble_graph` and `act_deliver` — with hardcoded options: `start_to_close_timeout=timedelta(seconds=30)` / `RetryPolicy(maximum_attempts=3)` for graph assembly, `start_to_close_timeout=timedelta(seconds=60)` / `RetryPolicy(maximum_attempts=3)` for delivery. Content-generation activities were threaded through `worker_config.resolve_dispatch(...)` in the v2 routing work, but these two infra paths were deliberately left hardcoded: they're not part of the content-generation surface, and forwarding the dispatch resolver here re-introduces the same config-read-on-workflow-runtime concern that motivated bypassing `WorkflowExecutor.execute_child_workflow` from inside workflows.
+
+Want: a config-driven path that lets operators tune these two activities without code changes. Open design questions:
+
+- Where the config lives — a dedicated `[temporal.infrastructure_activity_options]` block, or extend `[temporal.queue_options]` with per-activity baseline overrides for infra activities specifically?
+- How to keep it replay-deterministic — same constraint as `resolve_dispatch`: any `get_config()` read at workflow runtime drifts on replay after a config edit. Probably depends on the search-attribute / Worker Versioning answer in the "Replay-determinism" section above landing first.
+
+Out of scope until: an operator hits an actual timeout/retry mismatch on graph assembly or delivery. Today's hardcoded values are conservative.
+
+---
+
 ## Real-cluster validation gaps
 
 **Source:** [`../temporal-primitives/02-id-and-naming-plan.md`](../temporal-primitives/02-id-and-naming-plan.md) §"Known follow-ups (deferred)" under Phase 6.

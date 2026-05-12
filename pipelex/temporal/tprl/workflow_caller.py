@@ -176,7 +176,11 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
     ) -> WorkflowOutput:
         """Execute a child workflow and wait for its completion.
 
-        Note: Pipelex's own in-workflow child-spawn sites
+        NOT used by Pipelex's in-workflow child-spawn sites — call
+        ``workflow.execute_child_workflow(...)`` directly from inside a
+        workflow. See the replay-determinism note below.
+
+        Pipelex's own in-workflow child-spawn sites
         (``pipelex.temporal.tprl_pipe.wf_pipe_run`` and
         ``pipelex.temporal.tprl_pipe.temporal_pipe_router``) deliberately do
         NOT use this wrapper. ``WorkflowExecutorFactory.create_executor``
