@@ -179,6 +179,32 @@ class TestInitCommandIntegration:
         # Verify telemetry was created with default mode (off)
         env.verify_telemetry("off")
 
+    def test_init_telemetry_project_uses_commented_template(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Project-targeted telemetry init must drop the commented-out template so it
+        doesn't shadow the user's global telemetry settings.
+        """
+        env = MockedInitEnvironment(tmp_path, mocker)
+        env.setup_with_configs(include_backends=True, include_routing=True, include_telemetry=False)
+
+        env.add_confirm_input(True)  # Confirm initialization
+        env.setup_mocks()
+
+        init_cmd(focus=InitFocus.TELEMETRY, local=True)
+
+        telemetry_path = env.pipelex_dir / "telemetry.toml"
+        assert telemetry_path.exists()
+        content = telemetry_path.read_text(encoding="utf-8")
+        # Every non-blank line in the project template must be a comment — no active
+        # assignments are allowed, otherwise the file would shadow global telemetry settings.
+        for raw_line in content.splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            assert line.startswith("#"), f"Project template should be fully commented; found active line: {raw_line!r}"
+        # Still documents available knobs as "invitation to override" markers.
+        assert "# [custom_posthog]" in content
+        assert "# [langfuse]" in content
+
     def test_init_with_reset_flag(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test initialization with reset flag overwrites existing config."""
         # Setup environment with existing config

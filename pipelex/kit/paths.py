@@ -7,12 +7,15 @@ from pipelex.types import Traversable
 # - pipelex_service.toml: Contains terms_accepted (False for new users, True for devs)
 # - pipelex_override.toml: Personal config overrides
 # - telemetry_override.toml: Personal telemetry settings
+# - telemetry.project.toml: Kit-internal commented-out template used by project init
+#   only; must never be propagated into ~/.pipelex/ or a project's .pipelex/ as-is
 GIT_IGNORED_CONFIG_FILES: frozenset[str] = frozenset(
     {
         ".DS_Store",
         "pipelex_service.toml",
         "pipelex_override.toml",
         "telemetry_override.toml",
+        "telemetry.project.toml",
         "pipelex_gateway_models.md",  # Auto-generated from remote config
         "pipelex_gateway_models_plain.md",  # Auto-generated from remote config
         # Custom deck files differ intentionally: kit templates have waterfalls
@@ -23,9 +26,10 @@ GIT_IGNORED_CONFIG_FILES: frozenset[str] = frozenset(
 )
 
 # Files excluded from config sync checks but still copied during `pipelex init config`.
-# Currently equals GIT_IGNORED_CONFIG_FILES; kept as a separate variable so that
-# additional auto-generated or environment-specific files can be excluded independently.
-CONFIG_SYNC_EXCLUDED_FILES: frozenset[str] = GIT_IGNORED_CONFIG_FILES
+# Extends GIT_IGNORED_CONFIG_FILES with `telemetry.toml`: the kit's `telemetry.toml`
+# holds the active global template, while the pipelex repo's `.pipelex/telemetry.toml`
+# dogfoods the commented-out project template. The two files intentionally differ.
+CONFIG_SYNC_EXCLUDED_FILES: frozenset[str] = GIT_IGNORED_CONFIG_FILES | {"telemetry.toml"}
 
 # Directories that should not be synced between .pipelex and kit/configs.
 # These are runtime directories created locally:

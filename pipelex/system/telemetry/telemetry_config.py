@@ -17,6 +17,12 @@ from pipelex.types import Self, StrEnum
 
 TELEMETRY_CONFIG_FILE_NAME = "telemetry.toml"
 TELEMETRY_CONFIG_OVERRIDE_FILE_NAME = "telemetry_override.toml"
+# Kit template used when populating a project's `.pipelex/`. Every setting is commented
+# out so the project file does not shadow `~/.pipelex/telemetry.toml` or
+# `~/.pipelex/telemetry_override.toml` during layered config loading. Kit-internal:
+# this filename never appears in `~/.pipelex/` or in a project's `.pipelex/` — it is
+# always renamed to `telemetry.toml` on copy.
+TELEMETRY_PROJECT_TEMPLATE_FILE_NAME = "telemetry.project.toml"
 
 
 class PostHogMode(StrEnum):
@@ -159,8 +165,19 @@ class TelemetryConfig(ConfigModel):
     langfuse: LangfuseConfig = Field(default_factory=LangfuseConfig, description="Langfuse configuration")
     otlp: list[OtlpExporterConfig] = Field(default_factory=empty_list_factory_of(OtlpExporterConfig), description="Additional OTLP exporters")
     telemetry_allowed_modes: dict[str, bool] = Field(
-        default_factory=dict,
-        description="Which integration modes allow custom telemetry (e.g. cli=true, pytest=false)",
+        default_factory=lambda: {
+            "ci": False,
+            "cli": True,
+            "docker": True,
+            "fastapi": True,
+            "mcp": True,
+            "n8n": True,
+            "pytest": False,
+            "python": False,
+        },
+        description="Which integration modes allow custom telemetry (e.g. cli=true, pytest=false). "
+        "Defaults live here so a project-level telemetry.toml that omits the section "
+        "doesn't silently disable custom telemetry for everyone.",
     )
     pipelex_gateway: PipelexGatewayTelemetryConfig | None = Field(default=None, description="Pipelex Gateway telemetry configuration")
 

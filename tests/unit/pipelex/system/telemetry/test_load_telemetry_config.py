@@ -6,11 +6,13 @@ are layered under the project's equivalents instead of being silently shadowed.
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 
+from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.telemetry.telemetry_config import load_telemetry_config
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
@@ -127,3 +129,47 @@ class TestLoadTelemetryConfigLayering:
         config = load_telemetry_config(secrets_provider=secrets_provider)
 
         assert config.langfuse.public_key == "pk_global"
+
+    def test_commented_project_template_does_not_shadow_global_override(
+        self, fake_dirs: tuple[Path, Path], secrets_provider: EnvSecretsProvider
+    ) -> None:
+        """The kit's project template is fully commented out, so dropping it into a
+        project's .pipelex/ must not override globally-enabled telemetry.
+
+        This is the regression guard for the bug Codex flagged: prior to splitting the
+        kit template, the project copy carried explicit `enabled = false` defaults that
+        silently disabled Langfuse in every initialized project even when the user had
+        enabled it globally.
+        """
+        global_dir, project_dir = fake_dirs
+        (global_dir / "telemetry_override.toml").write_text(
+            '[langfuse]\nenabled = true\npublic_key = "pk_global"\nsecret_key = "sk_global"\n',
+        )
+        # Copy the actual kit project template (the one shipped to users via init).
+        kit_project_template = Path(str(get_kit_configs_dir())) / "telemetry.project.toml"
+        shutil.copy2(kit_project_template, project_dir / "telemetry.toml")
+
+        config = load_telemetry_config(secrets_provider=secrets_provider)
+
+        assert config.langfuse.enabled is True
+        assert config.langfuse.public_key == "pk_global"
+        assert config.langfuse.secret_key == "sk_global"
+
+    @pytest.mark.usefixtures("fake_dirs")
+    def test_telemetry_allowed_modes_defaults_from_pydantic(self, secrets_provider: EnvSecretsProvider) -> None:
+        """`telemetry_allowed_modes` defaults must live in the Pydantic model so a project
+        telemetry.toml that omits the section doesn't silently disable custom telemetry
+        for cli/docker/fastapi/etc.
+        """
+        config = load_telemetry_config(secrets_provider=secrets_provider)
+
+        assert config.is_custom_telemetry_allowed_for_mode("cli") is True
+        assert config.is_custom_telemetry_allowed_for_mode("docker") is True
+        assert config.is_custom_telemetry_allowed_for_mode("fastapi") is True
+        assert config.is_custom_telemetry_allowed_for_mode("mcp") is True
+        assert config.is_custom_telemetry_allowed_for_mode("n8n") is True
+        assert config.is_custom_telemetry_allowed_for_mode("ci") is False
+        assert config.is_custom_telemetry_allowed_for_mode("pytest") is False
+        assert config.is_custom_telemetry_allowed_for_mode("python") is False
+        # Unknown modes still fall back to False.
+        assert config.is_custom_telemetry_allowed_for_mode("does_not_exist") is False
