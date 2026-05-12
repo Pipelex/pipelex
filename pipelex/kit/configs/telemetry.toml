@@ -79,14 +79,18 @@ enabled = false
 # ──────────────────────────────────────────────────────────────────────────────
 # Custom Telemetry Allowed Modes
 # Controls which integration modes can use custom telemetry settings above.
+# Defaults live in the Pydantic model (TelemetryConfig.telemetry_allowed_modes):
+#   ci=false, cli=true, docker=true, fastapi=true, mcp=true, n8n=true,
+#   pytest=false, python=false
+# Uncomment below to override.
 # ──────────────────────────────────────────────────────────────────────────────
 
-[telemetry_allowed_modes]
-ci = false     # CI environments don't use custom telemetry
-cli = true     # CLI usage allows custom telemetry
-docker = true  # Docker deployments allow custom telemetry
-fastapi = true # FastAPI integrations allow custom telemetry
-mcp = true     # MCP integrations allow custom telemetry
-n8n = true     # n8n integrations allow custom telemetry
-pytest = false # Tests don't use custom telemetry
-python = false # Direct Python SDK usage doesn't use custom telemetry by default
+# [telemetry_allowed_modes]
+# ci = false     # CI environments don't use custom telemetry
+# cli = true     # CLI usage allows custom telemetry
+# docker = true  # Docker deployments allow custom telemetry
+# fastapi = true # FastAPI integrations allow custom telemetry
+# mcp = true     # MCP integrations allow custom telemetry
+# n8n = true     # n8n integrations allow custom telemetry
+# pytest = false # Tests don't use custom telemetry
+# python = false # Direct Python SDK usage doesn't use custom telemetry by default

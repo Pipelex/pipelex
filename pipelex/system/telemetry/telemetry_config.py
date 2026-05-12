@@ -17,6 +17,12 @@ from pipelex.types import Self, StrEnum
 
 TELEMETRY_CONFIG_FILE_NAME = "telemetry.toml"
 TELEMETRY_CONFIG_OVERRIDE_FILE_NAME = "telemetry_override.toml"
+# Kit template used when populating a project's `.pipelex/`. Every setting is commented
+# out so the project file does not shadow `~/.pipelex/telemetry.toml` or
+# `~/.pipelex/telemetry_override.toml` during layered config loading. Kit-internal:
+# this filename never appears in `~/.pipelex/` or in a project's `.pipelex/` — it is
+# always renamed to `telemetry.toml` on copy.
+TELEMETRY_PROJECT_TEMPLATE_FILE_NAME = "telemetry.project.toml"
 
 
 class PostHogMode(StrEnum):
@@ -159,8 +165,19 @@ class TelemetryConfig(ConfigModel):
     langfuse: LangfuseConfig = Field(default_factory=LangfuseConfig, description="Langfuse configuration")
     otlp: list[OtlpExporterConfig] = Field(default_factory=empty_list_factory_of(OtlpExporterConfig), description="Additional OTLP exporters")
     telemetry_allowed_modes: dict[str, bool] = Field(
-        default_factory=dict,
-        description="Which integration modes allow custom telemetry (e.g. cli=true, pytest=false)",
+        default_factory=lambda: {
+            "ci": False,
+            "cli": True,
+            "docker": True,
+            "fastapi": True,
+            "mcp": True,
+            "n8n": True,
+            "pytest": False,
+            "python": False,
+        },
+        description="Which integration modes allow custom telemetry (e.g. cli=true, pytest=false). "
+        "Defaults live here so a project-level telemetry.toml that omits the section "
+        "doesn't silently disable custom telemetry for everyone.",
     )
     pipelex_gateway: PipelexGatewayTelemetryConfig | None = Field(default=None, description="Pipelex Gateway telemetry configuration")
 
@@ -224,6 +241,18 @@ class TelemetryRedactionConfig(BaseModel):
 def load_telemetry_config(secrets_provider: SecretsProviderAbstract) -> TelemetryConfig:
     """Load telemetry configuration from a TOML file with variable substitution.
 
+    Files are deep-merged in this order (later wins per leaf key):
+
+    1. ~/.pipelex/telemetry.toml (global base)
+    2. ~/.pipelex/telemetry_override.toml
+    3. {project_root}/.pipelex/telemetry.toml (if project dir exists and is
+       distinct from the global dir)
+    4. {project_root}/.pipelex/telemetry_override.toml (same condition)
+
+    This means a project telemetry config layers *on top of* the user's global
+    one rather than replacing it — secrets and personal observability settings
+    declared once in ~/.pipelex/ stay in effect across all projects.
+
     Supports variable placeholders in string values:
     - ${VAR_NAME} -> use secrets provider by default
     - ${env:ENV_VAR_NAME} -> force use environment variable
@@ -239,10 +268,15 @@ def load_telemetry_config(secrets_provider: SecretsProviderAbstract) -> Telemetr
     Raises:
         TelemetryConfigValidationError: If configuration is invalid or variable substitution fails.
     """
+    global_config_dir = config_manager.global_config_dir
     telemetry_config_paths = [
-        config_manager.pipelex_config_dir / TELEMETRY_CONFIG_FILE_NAME,
-        config_manager.pipelex_config_dir / TELEMETRY_CONFIG_OVERRIDE_FILE_NAME,
+        global_config_dir / TELEMETRY_CONFIG_FILE_NAME,
+        global_config_dir / TELEMETRY_CONFIG_OVERRIDE_FILE_NAME,
     ]
+    project_config_dir = config_manager.project_config_dir
+    if project_config_dir is not None and project_config_dir != global_config_dir:
+        telemetry_config_paths.append(project_config_dir / TELEMETRY_CONFIG_FILE_NAME)
+        telemetry_config_paths.append(project_config_dir / TELEMETRY_CONFIG_OVERRIDE_FILE_NAME)
     telemetry_config_toml_raw = load_toml_from_path_and_merge_with_overrides(paths=telemetry_config_paths)
 
     # Apply variable substitution to all string values (keep placeholders for missing vars)
