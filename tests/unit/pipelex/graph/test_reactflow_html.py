@@ -98,3 +98,15 @@ class TestReactFlowHtml:
         html = generate_reactflow_html(self._empty_graphspec(), self._rf_config())
 
         assert html.count("</script>") == 4
+
+    def test_no_legacy_toolbar(self) -> None:
+        """Verify the old hand-rendered toolbar is gone; mthds-ui v0.6+ owns chrome."""
+        html = generate_reactflow_html(self._empty_graphspec(), self._rf_config())
+
+        assert '<div class="toolbar">' not in html
+        assert 'id="direction-toggle"' not in html
+        assert 'id="controllers-toggle"' not in html
+        assert 'id="zoom-in"' not in html
+        assert 'id="zoom-out"' not in html
+        assert 'id="zoom-fit"' not in html
+        assert 'id="theme-toggle"' not in html

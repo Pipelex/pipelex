@@ -13,7 +13,6 @@ from pipelex.graph.reactflow.reactflow_config import ReactFlowRenderingConfig
 from pipelex.graph.reactflow.standalone_assets import get_standalone_css, get_standalone_js
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async, render_jinja2_sync
 from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
-from pipelex.urls import URLs
 
 _REACTFLOW_TEMPLATE_KEY = "reactflow/main.html.jinja2"
 
@@ -58,8 +57,6 @@ def generate_reactflow_html(
         template_category=TemplateCategory.HTML,
         templating_context={
             "title": title or config.default_title,
-            "logo_dark": URLs.logo_white_on_transparent,
-            "logo_light": URLs.logo_black_on_transparent,
             "graphspec_json": graphspec_json,
             "config_json": config_json,
             "theme": config.style.theme,
@@ -95,8 +92,6 @@ async def generate_reactflow_html_async(
         template_category=TemplateCategory.HTML,
         templating_context={
             "title": title or config.default_title,
-            "logo_dark": URLs.logo_white_on_transparent,
-            "logo_light": URLs.logo_black_on_transparent,
             "graphspec_json": graphspec_json,
             "config_json": config_json,
             "theme": config.style.theme,

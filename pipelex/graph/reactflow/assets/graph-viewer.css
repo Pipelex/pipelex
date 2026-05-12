@@ -757,6 +757,31 @@ svg.react-flow__connectionline {
   border-color: rgba(255, 255, 255, 0.35);
   background: rgba(255, 255, 255, 0.05);
 }
+.controller-group-collapse:focus-visible {
+  outline: 2px solid var(--controller-header-color, #94a3b8);
+  outline-offset: 2px;
+}
+
+/* Fold-into-card toggle — sits on the right of the header bar. */
+.controller-group-fold {
+  all: unset;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--controller-header-color, #94a3b8);
+  padding: 4px 10px;
+  border-radius: 6px;
+  pointer-events: auto;
+  margin-left: auto;
+}
+.controller-group-fold:hover {
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.06);
+}
+.controller-group-fold:focus-visible {
+  outline: 2px solid var(--controller-header-color, #94a3b8);
+  outline-offset: 2px;
+}
 
 /* Sequence — solid thin border, calm flow */
 .controller-group--sequence {
@@ -874,6 +899,37 @@ svg.react-flow__connectionline {
 .pipe-card-status-dot--pulse {
   animation: pipe-card-pulse 1.5s ease-in-out infinite;
 }
+
+/* Expand button — appears on folded controller cards. */
+.pipe-card-expand {
+  all: unset;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--pipe-card-text-muted);
+  padding: 4px 8px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.pipe-card-expand:hover {
+  color: var(--pipe-card-text-bright);
+  background: rgba(255, 255, 255, 0.08);
+}
+.pipe-card-expand:focus-visible {
+  outline: 2px solid var(--pipe-card-text-bright);
+  outline-offset: 2px;
+}
+
+/* Folded-controller card variant — slightly tinted badge to differentiate
+   from operator cards. */
+.pipe-card-badge--controller {
+  background: rgba(148, 163, 184, 0.25);
+  color: var(--pipe-card-text-bright);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+}
+.pipe-card--controller {
+  --pipe-card-accent: #94a3b8;
+}
 @keyframes pipe-card-pulse {
   0%,
   100% {
@@ -960,6 +1016,10 @@ svg.react-flow__connectionline {
 .pipe-card-io-more:hover {
   color: var(--pipe-card-text);
   border-color: rgba(255, 255, 255, 0.25);
+}
+.pipe-card-io-more:focus-visible {
+  outline: 2px solid var(--pipe-card-text);
+  outline-offset: 2px;
 }
 
 /* ─── LR: label on top, pills stacked vertically, hard-truncated ─────── */
@@ -1259,6 +1319,29 @@ svg.react-flow__connectionline {
   border-radius: 6px;
   background: var(--sv-surface);
   border: 1px solid var(--sv-border);
+}
+
+/* Clickable variant — used when an open-externally action is bound (e.g. PDF
+   fallback in hosts that can't render <embed type="application/pdf">). */
+button.stuff-viewer-local-file--button {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+button.stuff-viewer-local-file--button:hover {
+  background: var(--sv-surface-hover, var(--sv-surface));
+  border-color: var(--sv-accent, var(--sv-border));
+}
+
+button.stuff-viewer-local-file--button:focus-visible {
+  outline: 2px solid var(--sv-accent, var(--sv-border));
+  outline-offset: 2px;
 }
 
 .stuff-viewer-local-file-icon {
@@ -1825,6 +1908,82 @@ svg.react-flow__connectionline {
   color: #64748b;
   font-style: italic;
   padding: 8px 0;
+}
+
+/* ─── Graph Toolbar — floating controls over the graph background ─────── */
+
+.graph-toolbar {
+  position: absolute;
+  top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 11;
+  pointer-events: auto;
+}
+
+.graph-toolbar-btn {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: rgba(17, 17, 24, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+  backdrop-filter: blur(6px);
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.graph-toolbar-btn:hover {
+  background: rgba(30, 30, 40, 0.9);
+  color: #f1f5f9;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.graph-toolbar-btn:focus-visible {
+  outline: 2px solid rgba(59, 130, 246, 0.6);
+  outline-offset: 1px;
+}
+
+.graph-toolbar-btn--active {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: #ffffff;
+}
+
+.graph-toolbar-btn--active:hover {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+.graph-toolbar-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: rgba(17, 17, 24, 0.6);
+  color: #64748b;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.graph-toolbar-btn:disabled:hover {
+  background: rgba(17, 17, 24, 0.6);
+  color: #64748b;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.graph-toolbar-separator {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 2px;
 }
 
 /* ─── Standalone GraphViewer chrome (toolbar, theme, layout) ─────────── */

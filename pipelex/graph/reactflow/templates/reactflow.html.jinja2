@@ -14,32 +14,6 @@
 </head>
 <body data-theme="{{ theme }}">
 <div id="app-container">
-  <div class="toolbar">
-    <div class="header-brand">
-      <img src="{{ logo_dark }}" alt="Pipelex" class="header-logo dark-logo">
-      <img src="{{ logo_light }}" alt="Pipelex" class="header-logo light-logo">
-      <span class="header-title">{{ title }}</span>
-    </div>
-    <button id="direction-toggle" class="toolbar-btn" title="Toggle layout direction">
-      <span class="direction-icon lr-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
-      <span class="direction-icon tb-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg></span>
-    </button>
-    <label class="toggle-switch" title="Show/hide controller containers">
-      <input type="checkbox" id="controllers-toggle">
-      <span class="toggle-track"><span class="toggle-knob"></span></span>
-      <span class="toggle-label">Controllers</span>
-    </label>
-    <div class="toolbar-spacer"></div>
-    <div class="toolbar-zoom">
-      <button id="zoom-out" class="toolbar-btn" title="Zoom out"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
-      <button id="zoom-in" class="toolbar-btn" title="Zoom in"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
-      <button id="zoom-fit" class="toolbar-btn" title="Fit to view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button>
-    </div>
-    <button id="theme-toggle" class="theme-btn" title="Toggle theme">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-      <span class="theme-label">{{ theme }}</span>
-    </button>
-  </div>
   <div id="root"></div>
 </div>
 
