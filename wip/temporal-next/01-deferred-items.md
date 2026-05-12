@@ -8,7 +8,7 @@ For non-temporal deferrals, see [`../deferred-items.md`](../deferred-items.md).
 
 ## Replay-determinism: remaining `get_config()` reads inside workflow code
 
-**Source:** PR #891 review (chatgpt-codex-connector, 2026-05).
+**Source:** PR #891 review (chatgpt-codex-connector, 2026-05; cubic-dev-ai independently flagged the same root cause at `wf_pipe_run.py:57`, 2026-05).
 **Owner doc:** Phase 0 of [`00-enterprise-readiness-analysis.md`](00-enterprise-readiness-analysis.md) — bullet "Eliminate remaining config reads inside workflow code".
 **Precedent:** the same class of issue was already solved at the submitter boundary for `WorkflowExecutorFactory` (bypassed inside workflows — see `tprl/workflow_caller.py:179+`) and for `TemporalManager.session_id` (`stamp_submitter_session_id` in `tprl/observability.py`).
 

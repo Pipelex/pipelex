@@ -34,8 +34,14 @@ allowed-tools:
   - Bash(grep *)
   - Bash(sort *)
   - Bash(head *)
+  - Bash(tail *)
   - Bash(temporal *)
   - Bash(jq *)
+  - Bash(timeout *)
+  - Bash(pkill *)
+  - Bash(sleep *)
+  - Bash(echo *)
+  - Bash(seq *)
 ---
 
 # Temporal E2E Validation Suite
@@ -316,8 +322,20 @@ tmux new-session -d -c "$PWD" -s temporal-worker-router \
   '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope router'
 tmux new-session -d -c "$PWD" -s temporal-worker-runner \
   '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope runner'
-until tmux capture-pane -t temporal-worker-router -p 2>/dev/null | grep -q "Temporal Worker started"; do sleep 1; done
-until tmux capture-pane -t temporal-worker-runner -p 2>/dev/null | grep -q "Temporal Worker started"; do sleep 1; done
+# Bounded wait: fail fast with captured logs if a worker can't start within 30s
+# (boot is normally <5s — anything past that means a stuck config validator,
+# missing search attributes, or the worker crashed early).
+for session in temporal-worker-router temporal-worker-runner; do
+  for attempt in $(seq 1 30); do
+    if tmux capture-pane -t "$session" -p 2>/dev/null | grep -q "Temporal Worker started"; then break; fi
+    if [ "$attempt" -eq 30 ]; then
+      echo "TIMEOUT: $session did not report 'Temporal Worker started' within 30s — last 50 lines:"
+      tmux capture-pane -t "$session" -p -S -50
+      exit 1
+    fi
+    sleep 1
+  done
+done
 tmux capture-pane -t temporal-worker-router -p -S -30 | grep -E "scope|started for|search-attribute" | head -5
 tmux capture-pane -t temporal-worker-runner -p -S -30 | grep -E "scope|started for|search-attribute" | head -5
 ```
@@ -334,7 +352,16 @@ use only when you don't need the regression coverage):
 tmux has-session -t temporal-worker 2>/dev/null && tmux kill-session -t temporal-worker
 tmux new-session -d -c "$PWD" -s temporal-worker \
   '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed'
-until tmux capture-pane -t temporal-worker -p 2>/dev/null | grep -q "Temporal Worker started"; do sleep 1; done
+# Bounded wait: fail fast with captured logs if the worker can't start within 30s
+for attempt in $(seq 1 30); do
+  if tmux capture-pane -t temporal-worker -p 2>/dev/null | grep -q "Temporal Worker started"; then break; fi
+  if [ "$attempt" -eq 30 ]; then
+    echo "TIMEOUT: temporal-worker did not report 'Temporal Worker started' within 30s — last 50 lines:"
+    tmux capture-pane -t temporal-worker -p -S -50
+    exit 1
+  fi
+  sleep 1
+done
 tmux capture-pane -t temporal-worker -p -S -30
 ```
 

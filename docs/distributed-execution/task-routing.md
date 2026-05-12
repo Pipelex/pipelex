@@ -23,22 +23,22 @@ Three motivations cover almost every real-world case:
 
 ## Per-activity, per-handle routing
 
-Routing lives under `[temporal.activity_queues.<activity_name>]`. Each entry declares a `default` queue and an optional `by_handle` map keyed by the activity's routing key:
+Routing lives under `[temporal.worker_config.activity_queues.<activity_name>]`. Each entry declares a `default` queue and an optional `by_handle` map keyed by the activity's routing key:
 
 ```toml
-[temporal.activity_queues.act_llm_gen_text]
+[temporal.worker_config.activity_queues.act_llm_gen_text]
 default = "openai_q"
 by_handle.anthropic-default = "anthropic_q"
 by_handle.gemini-pro = "gemini_q"
 
-[temporal.activity_queues.act_llm_gen_object]
+[temporal.worker_config.activity_queues.act_llm_gen_object]
 default = "openai_q"
 by_handle.anthropic-default = "anthropic_q"
 
-[temporal.activity_queues.act_img_gen_images]
+[temporal.worker_config.activity_queues.act_img_gen_images]
 default = "imggen_q"
 
-[temporal.activity_queues.act_extract_gen_extract_pages]
+[temporal.worker_config.activity_queues.act_extract_gen_extract_pages]
 default = "extract_q"
 ```
 
@@ -56,15 +56,15 @@ The **routing key** is the runtime handle the activity is about to call:
 
 `WorkerConfig.resolve_queue(activity_name, routing_key)` walks three layers, returning the first match:
 
-1. `activity_queues[activity_name].by_handle[routing_key]`
-2. `activity_queues[activity_name].default`
+1. `worker_config.activity_queues[activity_name].by_handle[routing_key]`
+2. `worker_config.activity_queues[activity_name].default`
 3. `default_task_queue` (worker-wide fallback)
 
 When `activity_queues` is completely empty (the shipping default), `resolve_queue` returns `None` and dispatch omits the `task_queue` kwarg — every activity rides the workflow's own queue, preserving single-queue behavior for installs that haven't opted into routing.
 
 !!! note "Every routed queue needs a `queue_options` entry"
 
-    Any queue named under `[temporal.activity_queues.*]` must have a matching `[temporal.queue_options.<q>]` entry (an empty stanza is fine and means "use worker-config baselines for this queue"). Routing to an undeclared queue is treated as a typo and fails at config-load with `TemporalConfigError`. `default_task_queue` is the one implicit exception — it never needs its own `queue_options` entry.
+    Any queue named under `[temporal.worker_config.activity_queues.*]` must have a matching `[temporal.queue_options.<q>]` entry (an empty stanza is fine and means "use worker-config baselines for this queue"). Routing to an undeclared queue is treated as a typo and fails at config-load with `TemporalConfigError`. `default_task_queue` is the one implicit exception — it never needs its own `queue_options` entry.
 
 ---
 
@@ -124,15 +124,15 @@ Deployments using non-default queue names should add their own `[temporal.queue_
 For the rare case where one model variant needs different timeouts or retry from its queue baseline, declare a `handle_options.<handle>` entry on the activity route:
 
 ```toml
-[temporal.activity_queues.act_llm_gen_text]
+[temporal.worker_config.activity_queues.act_llm_gen_text]
 default = "openai_q"
 by_handle.anthropic-default = "anthropic_q"
 by_handle.anthropic-claude-3-5-sonnet-long-context = "anthropic_q"
 
-[temporal.activity_queues.act_llm_gen_text.handle_options.anthropic-claude-3-5-sonnet-long-context]
+[temporal.worker_config.activity_queues.act_llm_gen_text.handle_options.anthropic-claude-3-5-sonnet-long-context]
 start_to_close_timeout = "0:30:00"
 
-[temporal.activity_queues.act_llm_gen_text.handle_options.anthropic-claude-3-5-sonnet-long-context.retry_policy_config]
+[temporal.worker_config.activity_queues.act_llm_gen_text.handle_options.anthropic-claude-3-5-sonnet-long-context.retry_policy_config]
 maximum_attempts = 2
 non_retryable_error_types_extra = ["AnthropicLongContextOverflow"]
 ```
@@ -145,7 +145,7 @@ At dispatch time, `WorkerConfig.resolve_dispatch(activity_name, routing_key)` co
 
 1. **Baseline** — worker-config defaults (`default_activity_start_to_close_timeout`, `default_activity_heartbeat_timeout`, `retry_policy_config`).
 2. **Queue overlay** — `queue_options[resolved_queue]` if it exists.
-3. **Handle overlay** — `activity_queues[activity_name].handle_options[routing_key]` if it exists.
+3. **Handle overlay** — `worker_config.activity_queues[activity_name].handle_options[routing_key]` if it exists.
 
 Each layer can replace a scalar (timeout, retry interval, max attempts) or leave it untouched. The result is splatted directly into `workflow.execute_activity(...)`.
 

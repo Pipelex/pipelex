@@ -236,7 +236,7 @@ Concrete pipe operators (PipeLLM, PipeCompose, PipeExtract, PipeImgGen) dispatch
 | `act_render_page_views` | PDF page rendering (page-views) |
 | `act_img_gen_images` | Image generation |
 
-`act_llm_gen_text` is the one activity that supports task-queue routing today: `ContentGeneratorInWorkflow.make_llm_text` passes `task_queue=worker_config.inference_task_queue` so inference can be deployed on a separate worker pool from the router. All other activities run on the workflow's own task queue. General per-activity routing is on the roadmap.
+All content-generation activities resolve dispatch via `worker_config.resolve_dispatch(...)`, so task-queue routing can be configured per activity (and, where applicable, per handle) through `[temporal.worker_config.activity_queues]`. If no routing is configured, activities fall back to the workflow's own task queue.
 
 ### Worker Environment
 
