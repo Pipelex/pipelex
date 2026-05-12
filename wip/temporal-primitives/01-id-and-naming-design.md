@@ -227,7 +227,7 @@ This is an extension point. Anything that should round-trip with the execution b
 | Static summary / details | Set at submit time, outside workflow code |
 | Per-activity summary | Derived from `job_metadata` + activity input — no I/O, no time, no randomness |
 
-The LRU + `(workflow_id, run_id)` keying + `is_replaying()` short-circuit in `content_generator_in_workflow.py` existed solely to defend against worker-singleton state issues with the activity-id disambiguator. Once the disambiguator stops existing on the worker singleton (because the SDK assigns it), all of that complexity is unnecessary — and stops being a trap for future contributors.
+The invariant to defend in review: nothing on the activity-dispatch path may read worker-singleton state. Activity-id determinism comes entirely from the Temporal SDK assigning IDs by history position — that is the load-bearing fact for the whole design.
 
 ## Side-by-side: before / after
 
