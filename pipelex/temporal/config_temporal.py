@@ -636,37 +636,47 @@ class Temporal(ConfigModel):
     search_attributes: SearchAttributesConfig
 
     @model_validator(mode="after")
-    def warn_on_orphan_queue_references(self) -> Self:
-        """Warn (lenient) on two orphan patterns:
+    def validate_no_orphan_queue_references(self) -> Self:
+        """Fail config-load on two orphan patterns:
 
         1. ``activity_queues`` references a queue with no ``queue_options``
-           entry and not equal to ``default_task_queue`` — likely typo or
-           missing tuning.
+           entry and not equal to ``default_task_queue`` — almost always a typo.
         2. ``queue_options`` declares a queue that nothing routes to and isn't
-           ``default_task_queue`` — overlay will never apply, likely typo or
-           stale entry.
+           ``default_task_queue`` — overlay will never apply.
 
-        Lenient on purpose: a queue riding the worker_config baselines is a
-        legitimate state (small deployments don't need per-queue tuning).
-        But the message is loud enough that typos surface in CI / on first
-        boot. Strict failure happens at worker CLI startup (separate path).
+        Every queue named under ``activity_queues`` must have a matching
+        ``[temporal.queue_options.<q>]`` entry. An empty stanza is fine and
+        explicitly means "use worker_config defaults for this queue" — it is
+        the one-line declaration of intent that closes the typo loop.
+        ``default_task_queue`` is implicitly known and never needs a
+        ``queue_options`` entry.
         """
         known_queues = set(self.queue_options.keys())
         known_queues.add(self.worker_config.default_task_queue)
         for activity_name, route in self.worker_config.activity_queues.items():
             if route.default not in known_queues:
-                log.warning(
-                    f"temporal: queue {route.default!r} referenced by "
-                    f"activity_queues.{activity_name}.default has no queue_options entry — "
-                    f"it will use worker_config defaults. Typo?"
+                msg = (
+                    f"temporal: queue {route.default!r} is referenced by "
+                    f"activity_queues.{activity_name}.default but has no "
+                    f"[temporal.queue_options.{route.default}] entry and is not default_task_queue. "
+                    f"Fix: either (a) add an entry '[temporal.queue_options.{route.default}]' "
+                    f"to your config (an empty stanza is fine — it means 'use worker_config "
+                    f"defaults for this queue'), or (b) fix the typo in "
+                    f"activity_queues.{activity_name}.default."
                 )
+                raise TemporalConfigError(msg)
             for handle, handle_queue in route.by_handle.items():
                 if handle_queue not in known_queues:
-                    log.warning(
-                        f"temporal: queue {handle_queue!r} referenced by "
-                        f'activity_queues.{activity_name}.by_handle["{handle}"] has no '
-                        f"queue_options entry — it will use worker_config defaults. Typo?"
+                    msg = (
+                        f"temporal: queue {handle_queue!r} is referenced by "
+                        f'activity_queues.{activity_name}.by_handle["{handle}"] but has no '
+                        f"[temporal.queue_options.{handle_queue}] entry and is not default_task_queue. "
+                        f"Fix: either (a) add an entry '[temporal.queue_options.{handle_queue}]' "
+                        f"to your config (an empty stanza is fine — it means 'use worker_config "
+                        f"defaults for this queue'), or (b) fix the typo in "
+                        f'activity_queues.{activity_name}.by_handle["{handle}"].'
                     )
+                    raise TemporalConfigError(msg)
 
         # Symmetric check: queue_options entries that nothing routes to are
         # silently no-op overlays. ``default_task_queue`` is considered
@@ -678,11 +688,15 @@ class Temporal(ConfigModel):
             routed_queues.update(route.by_handle.values())
         for queue_name in self.queue_options:
             if queue_name not in routed_queues:
-                log.warning(
-                    f"temporal: queue_options has entry {queue_name!r} but no "
-                    f"activity_queues route references it and it is not default_task_queue — "
-                    f"overlay will never apply. Typo or stale entry?"
+                msg = (
+                    f"temporal: [temporal.queue_options.{queue_name}] declares queue "
+                    f"{queue_name!r} but no activity_queues route references it and "
+                    f"{queue_name!r} is not default_task_queue. The overlay will never apply. "
+                    f"Fix: either (a) add a route under [temporal.worker_config.activity_queues.*] "
+                    f"that points at {queue_name!r}, or (b) remove the "
+                    f"[temporal.queue_options.{queue_name}] entry."
                 )
+                raise TemporalConfigError(msg)
         return self
 
     def validate_task_queue_known(self, task_queue: str) -> None:

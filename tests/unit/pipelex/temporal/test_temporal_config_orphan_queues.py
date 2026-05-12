@@ -1,15 +1,20 @@
-"""Unit tests for ``Temporal.warn_on_unknown_routing_queues``.
+"""Unit tests for ``Temporal.validate_no_orphan_queue_references``.
 
 When ``activity_queues.*.default`` or ``activity_queues.*.by_handle.*`` names
 a queue with no ``queue_options`` entry (and which isn't the worker's
-``default_task_queue``), the config-load validator must emit a WARN — typos
-in routing tables should surface in CI rather than at runtime as silent misroutes.
+``default_task_queue``), the config-load validator must raise
+``TemporalConfigError`` so typos surface at boot rather than at runtime as
+silent misroutes.
+
+Pydantic wraps ``TemporalConfigError`` (a ``ValueError`` subclass) in
+``pydantic.ValidationError`` when raised from a ``model_validator``, so tests
+match on ``ValidationError`` and inspect the message for the offending queue.
 """
 
-import logging
 from datetime import timedelta
 
 import pytest
+from pydantic import ValidationError
 
 from pipelex.temporal.config_temporal import (
     BUILTIN_SEARCH_ATTRIBUTES,
@@ -38,11 +43,11 @@ def _make_storage_provider_config() -> StorageProviderConfig:
 
 
 def _make_temporal_config(activity_queues: dict[str, ActivityRouteConfig], queue_options: dict[str, QueueOptions]) -> Temporal:
-    """Build a minimal valid Temporal config for warn-validation tests.
+    """Build a minimal valid Temporal config for orphan-queue validation tests.
 
     All non-test fields are filled with sensible defaults; only
-    ``activity_queues`` and ``queue_options`` matter for the warn-validation
-    logic under test.
+    ``activity_queues`` and ``queue_options`` matter for the validation logic
+    under test.
     """
     return Temporal(
         is_enabled=True,
@@ -130,15 +135,15 @@ def _make_temporal_config(activity_queues: dict[str, ActivityRouteConfig], queue
     )
 
 
-class TestTemporalConfigWarnings:
-    """Lenient warn fires on routing entries that reference unknown queues."""
+class TestTemporalConfigOrphanQueues:
+    """Config-load fails on routing entries that reference unknown queues."""
 
-    def test_unknown_queue_in_activity_default_warns(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_unknown_queue_in_activity_by_handle_raises(self) -> None:
         """A ``by_handle`` entry naming a queue with no ``queue_options`` and
-        not equal to ``default_task_queue`` triggers a WARN with the activity
-        + handle path so the user can locate the typo.
+        not equal to ``default_task_queue`` raises with the activity + handle
+        path and a fix suggestion.
         """
-        with caplog.at_level(logging.WARNING):
+        with pytest.raises(ValidationError, match="anthrpic_q") as exc_info:
             _make_temporal_config(
                 activity_queues={
                     "act_llm_gen_text": ActivityRouteConfig(
@@ -148,70 +153,84 @@ class TestTemporalConfigWarnings:
                 },
                 queue_options={},
             )
-        warnings = [record for record in caplog.records if record.levelno == logging.WARNING]
-        assert any("anthrpic_q" in record.message for record in warnings), (
-            f"expected warning about 'anthrpic_q', got: {[r.message for r in warnings]!r}"
-        )
+        message = str(exc_info.value)
+        assert "act_llm_gen_text" in message
+        assert "claude-opus-4-7" in message
+        assert "[temporal.queue_options.anthrpic_q]" in message
 
-    def test_no_warning_when_queue_in_queue_options(self, caplog: pytest.LogCaptureFixture) -> None:
-        """A queue present in ``queue_options`` is known — no warning fires."""
-        with caplog.at_level(logging.WARNING):
+    def test_unknown_queue_in_activity_default_raises(self) -> None:
+        """An ``activity_queues.*.default`` entry naming a queue with no
+        ``queue_options`` and not equal to ``default_task_queue`` raises with
+        a fix suggestion that names the orphan queue.
+        """
+        with pytest.raises(ValidationError, match="missing_q") as exc_info:
             _make_temporal_config(
                 activity_queues={
                     "act_llm_gen_text": ActivityRouteConfig(
-                        default="anthropic_q",
+                        default="missing_q",
                         by_handle={},
                     ),
                 },
-                queue_options={"anthropic_q": QueueOptions(start_to_close_timeout=timedelta(minutes=5))},
-            )
-        relevant_warnings = [record for record in caplog.records if "anthropic_q" in record.message and record.levelno == logging.WARNING]
-        assert not relevant_warnings, f"expected no warning for known queue, got: {[r.message for r in relevant_warnings]!r}"
-
-    def test_default_task_queue_is_known_without_queue_options(self, caplog: pytest.LogCaptureFixture) -> None:
-        """``default_task_queue`` is implicitly known — no warning even when no
-        ``queue_options`` entry exists for it.
-        """
-        with caplog.at_level(logging.WARNING):
-            _make_temporal_config(
-                activity_queues={
-                    "act_llm_gen_text": ActivityRouteConfig(default="default_q", by_handle={}),
-                },
                 queue_options={},
             )
-        relevant_warnings = [record for record in caplog.records if "default_q" in record.message and record.levelno == logging.WARNING]
-        assert not relevant_warnings, f"unexpected warning for default_task_queue: {[r.message for r in relevant_warnings]!r}"
+        message = str(exc_info.value)
+        assert "[temporal.queue_options.missing_q]" in message
+        assert "activity_queues.act_llm_gen_text.default" in message
 
-    def test_unreachable_queue_options_entry_warns(self, caplog: pytest.LogCaptureFixture) -> None:
-        """``queue_options`` entry naming a queue that no ``activity_queues``
-        route references AND that isn't ``default_task_queue`` triggers a WARN —
-        the overlay will never apply and is almost always a typo or stale entry.
+    def test_no_error_when_queue_in_queue_options(self) -> None:
+        """A queue present in ``queue_options`` is known — config loads."""
+        _make_temporal_config(
+            activity_queues={
+                "act_llm_gen_text": ActivityRouteConfig(
+                    default="anthropic_q",
+                    by_handle={},
+                ),
+            },
+            queue_options={"anthropic_q": QueueOptions(start_to_close_timeout=timedelta(minutes=5))},
+        )
+
+    def test_empty_queue_options_stanza_is_sufficient(self) -> None:
+        """An empty ``[temporal.queue_options.<q>]`` stanza is the explicit
+        "use worker_config defaults" declaration and satisfies the validator.
         """
-        with caplog.at_level(logging.WARNING):
+        _make_temporal_config(
+            activity_queues={
+                "act_llm_gen_text": ActivityRouteConfig(default="my_q", by_handle={}),
+            },
+            queue_options={"my_q": QueueOptions()},
+        )
+
+    def test_default_task_queue_is_known_without_queue_options(self) -> None:
+        """``default_task_queue`` is implicitly known — config loads even
+        when no ``queue_options`` entry exists for it.
+        """
+        _make_temporal_config(
+            activity_queues={
+                "act_llm_gen_text": ActivityRouteConfig(default="default_q", by_handle={}),
+            },
+            queue_options={},
+        )
+
+    def test_unreachable_queue_options_entry_raises(self) -> None:
+        """A ``queue_options`` entry naming a queue that no ``activity_queues``
+        route references AND that isn't ``default_task_queue`` raises — the
+        overlay would never apply.
+        """
+        with pytest.raises(ValidationError, match="orphan_q") as exc_info:
             _make_temporal_config(
                 activity_queues={},
                 queue_options={"orphan_q": QueueOptions(start_to_close_timeout=timedelta(minutes=5))},
             )
-        warnings = [record for record in caplog.records if record.levelno == logging.WARNING]
-        assert any("orphan_q" in record.message and "overlay will never apply" in record.message for record in warnings), (
-            f"expected warning about 'orphan_q' overlay never applying, got: {[r.message for r in warnings]!r}"
-        )
+        message = str(exc_info.value)
+        assert "overlay will never apply" in message
+        assert "[temporal.queue_options.orphan_q]" in message
 
-    def test_default_task_queue_in_queue_options_does_not_warn(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_default_task_queue_in_queue_options_does_not_raise(self) -> None:
         """``queue_options[default_task_queue]`` is the supported single-queue
-        tuning path — it must not trigger the unreachable-overlay warning even
+        tuning path — it must not trigger the unreachable-overlay error even
         with empty ``activity_queues``.
         """
-        with caplog.at_level(logging.WARNING):
-            _make_temporal_config(
-                activity_queues={},
-                queue_options={"default_q": QueueOptions(start_to_close_timeout=timedelta(minutes=5))},
-            )
-        unreachable_warnings = [
-            record
-            for record in caplog.records
-            if record.levelno == logging.WARNING and "default_q" in record.message and "overlay will never apply" in record.message
-        ]
-        assert not unreachable_warnings, (
-            f"unexpected unreachable-overlay warning for default_task_queue: {[r.message for r in unreachable_warnings]!r}"
+        _make_temporal_config(
+            activity_queues={},
+            queue_options={"default_q": QueueOptions(start_to_close_timeout=timedelta(minutes=5))},
         )

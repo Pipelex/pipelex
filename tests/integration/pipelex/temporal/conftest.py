@@ -6,6 +6,7 @@ from pytest import FixtureRequest, Parser
 from temporalio.client import Client as TemporalClient
 from temporalio.testing import WorkflowEnvironment
 
+from pipelex import log
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.temporal.config_temporal import BUILTIN_SEARCH_ATTRIBUTES
@@ -14,7 +15,7 @@ from pipelex.temporal.temporal_connect import connect_to_temporal_selected_serve
 from pipelex.temporal.temporal_data_converter import data_converter
 from pipelex.temporal.temporal_hub import temporal_hub
 from pipelex.temporal.temporal_task_manager import TemporalTaskManager
-from pipelex.temporal.tprl.namespace_check import ensure_required_search_attributes_registered
+from pipelex.temporal.tprl.namespace_check import RegistrationFailure, ensure_required_search_attributes_registered
 from pipelex.test_extras.shared_pytest_plugins import ClassRegistryMode
 
 TEMPORAL_SERVER_NONE = "none"
@@ -114,22 +115,8 @@ async def env(request: FixtureRequest) -> AsyncGenerator[WorkflowEnvironment, No
     workflow_env: WorkflowEnvironment
     if server_option == TEMPORAL_SERVER_NONE:
         workflow_env = await WorkflowEnvironment.start_local(data_converter=data_converter)  # pyright: ignore[reportUnknownMemberType]
-        # The in-process server starts with no custom search attributes registered;
-        # the cluster's StartWorkflowExecution RPC rejects every workflow that sets
-        # one until they exist. Register the five Pipelex attributes here so all
-        # temporal tests can start workflows without per-test bootstrap.
-        await ensure_required_search_attributes_registered(
-            temporal_client=workflow_env.client,
-            namespace=workflow_env.client.namespace,
-            configured_attributes=BUILTIN_SEARCH_ATTRIBUTES,
-        )
     elif server_option == TEMPORAL_SERVER_TIME_SKIPPING:
         workflow_env = await WorkflowEnvironment.start_time_skipping(data_converter=data_converter)
-        await ensure_required_search_attributes_registered(
-            temporal_client=workflow_env.client,
-            namespace=workflow_env.client.namespace,
-            configured_attributes=BUILTIN_SEARCH_ATTRIBUTES,
-        )
     else:
         # Bootstrap Pipelex temporarily to read server connection config.
         # If a module-scoped fixture already initialized Pipelex (happens when
@@ -149,6 +136,32 @@ async def env(request: FixtureRequest) -> AsyncGenerator[WorkflowEnvironment, No
         if needs_teardown:
             Pipelex.teardown_if_needed()
         workflow_env = WorkflowEnvironment.from_client(temporal_client)
+    # Every Temporal namespace — in-process, time-skipping, or real-server profile —
+    # starts with no custom search attributes registered, so the cluster's
+    # StartWorkflowExecution RPC rejects every workflow that sets one. Register
+    # them here so all temporal tests can start workflows without per-test
+    # bootstrap. Idempotent: only adds attributes that are missing.
+    # ``RegistrationFailure`` is returned (not raised) when the API key lacks
+    # ``AddSearchAttributes`` permission (Temporal Cloud read-only key); surface
+    # it as a warning so the operator runs ``pipelex setup-temporal-namespace``
+    # with an admin key before rerunning the tests. For in-process and
+    # time-skipping servers the caller is always admin, so this branch is
+    # unreachable there — but handling it uniformly keeps the call site honest
+    # against the function's full return type.
+    registration_result = await ensure_required_search_attributes_registered(
+        temporal_client=workflow_env.client,
+        namespace=workflow_env.client.namespace,
+        configured_attributes=BUILTIN_SEARCH_ATTRIBUTES,
+    )
+    if isinstance(registration_result, RegistrationFailure):
+        msg = (
+            f"Could not auto-register Temporal search attributes on namespace "
+            f"'{registration_result.namespace}' (missing: {list(registration_result.missing)}). "
+            f"Workflow starts will fail at dispatch. Run `pipelex setup-temporal-namespace` "
+            f"with an admin API key, then rerun the tests. RPC error: "
+            f"{registration_result.rpc_error_message}"
+        )
+        log.warning(msg)
     yield workflow_env
     await workflow_env.shutdown()
 

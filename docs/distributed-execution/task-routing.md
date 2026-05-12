@@ -62,6 +62,10 @@ The **routing key** is the runtime handle the activity is about to call:
 
 When `activity_queues` is completely empty (the shipping default), `resolve_queue` returns `None` and dispatch omits the `task_queue` kwarg — every activity rides the workflow's own queue, preserving single-queue behavior for installs that haven't opted into routing.
 
+!!! note "Every routed queue needs a `queue_options` entry"
+
+    Any queue named under `[temporal.activity_queues.*]` must have a matching `[temporal.queue_options.<q>]` entry (an empty stanza is fine and means "use worker-config baselines for this queue"). Routing to an undeclared queue is treated as a typo and fails at config-load with `TemporalConfigError`. `default_task_queue` is the one implicit exception — it never needs its own `queue_options` entry.
+
 ---
 
 ## Per-queue option overlays
@@ -86,6 +90,11 @@ max_task_queue_activities_per_second = 50
 [temporal.queue_options.extract_q]
 start_to_close_timeout = "0:30:00"
 heartbeat_timeout = "0:05:00"
+
+# Empty stanzas for queues routed in activity_queues that don't need any
+# tuning — required by the orphan-queue validator at config-load.
+[temporal.queue_options.gemini_q]
+[temporal.queue_options.imggen_q]
 ```
 
 All fields are optional — anything you leave out falls through to the worker-config baseline:
