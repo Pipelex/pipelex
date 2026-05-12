@@ -784,6 +784,53 @@ For manual Temporal Web UI inspection, point `temporal-worker-router` /
 event timeline — the two scheduled activities should be visible with their
 distinct activity_ids.
 
+### Step 5e: Tier 12 — Deeply-nested controller stack (CV batch screening)
+
+Validates the full pipelex-demos example 21 pipeline through Temporal: a
+nested PipeSequence -> PipeSequence (job-offer prep) + PipeBatch (per-CV
+fan-out) -> PipeSequence (extract + analyze + match) over PipeExtract +
+PipeLLM operators. This is the canonical "real-world" e2e bundle for the
+skill — controller composition that the other tiers only exercise piecewise.
+
+The pytest counterpart lives at
+`tests/integration/pipelex/temporal/library_crate/test_wf_cv_batch_screening.py`
+(in-process server, dry mode). The direct-mode (no Temporal) e2e counterpart
+lives at `tests/e2e/pipelex/cv_batch_screening/test_cv_batch_screening.py`.
+
+Dry-run (CLI mocks inputs — no PDFs needed):
+
+```bash
+timeout 180 .venv/bin/pipelex run bundle \
+  tests/integration/pipelex/temporal/library_crate/cv_batch_screening.mthds \
+  --pipe batch_analyze_cvs_for_job_offer \
+  --temporal --dry-run --mock-inputs --no-logo --graph
+```
+
+Live (real Azure Doc Intel extract + LLM analysis — uses `John-Doe-CV.pdf`
+and `Job-Offer.pdf` from `tests/data/documents/`):
+
+```bash
+timeout 900 .venv/bin/pipelex run bundle \
+  tests/integration/pipelex/temporal/library_crate/cv_batch_screening.mthds \
+  --pipe batch_analyze_cvs_for_job_offer \
+  --inputs tests/integration/pipelex/temporal/library_crate/cv_batch_screening_inputs.json \
+  --temporal --no-logo --graph
+```
+
+After completion, tell the user: PASS/FAIL, output dir, graph file path. The
+generated ReactFlow graph is unusually rich for this pipeline (nested
+PipeSequence containers + PipeBatch fan-out edges + per-step extract/LLM
+nodes) and is the recommended one to open at the end of the run:
+
+```bash
+open results/batch_analyze_cvs_for_job_offer_output_01/reactflow.html
+```
+
+If the live run errors with `Extract choice '...' was not found in the model
+deck`, the deck is not loading Azure Doc Intel — fix the deck before falling
+back to a different handle; user preference is Azure Doc Intel via the
+Pipelex Gateway, period (do not substitute `mistral-ocr` / `deepseek-ocr`).
+
 ---
 
 ### Step 6: StoragePayloadCodec tests — does the codec work end-to-end?
@@ -918,6 +965,7 @@ ls results/*/reactflow.html
 | Tier 10b: Per-handle routing | `activity_queues.by_handle` overrides the activity default per model handle — two distinct handles in one workflow land on two distinct workers | PASS/FAIL/SKIPPED | path | — |
 | Tier 10c: Two activities, one route | `act_extract_gen_extract_pages` + `act_render_page_views` (no routing key) both land on a shared dedicated queue via Azure Doc Intel through Pipelex Gateway | PASS/FAIL | — | — |
 | Tier 11: Extract two-activity | `act_extract_gen_extract_pages` + `act_render_page_views` dispatched cross-process with distinct activity_ids | PASS/FAIL | — | — |
+| Tier 12: CV batch screening | Deeply-nested controller stack (PipeSequence → PipeSequence + PipeBatch → PipeSequence) over PipeExtract + PipeLLM (pipelex-demos example 21) | PASS/FAIL | path | — |
 | Scenario A: v2 multi-class routing | Specialized scopes + per-class runners cover LLM/img-gen/extract without cross-class leakage | PASS/FAIL/SKIPPED | — | — |
 | Scenario B: per-queue timeout | `queue_options[X].start_to_close_timeout` overrides the worker_config baseline and flows into `ActivityTaskScheduled.start_to_close_timeout` | PASS/FAIL/SKIPPED | — | — |
 | Scenario C: per-handle override | `handle_options[<handle>].start_to_close_timeout` wins over per-queue value for that one handle | PASS/FAIL/SKIPPED | — | — |
@@ -1521,6 +1569,7 @@ Leave the server running if the user plans to iterate.
 | `temporal_compose.mthds` | PipeCompose — operator composition + deferred hydration | `temporal_compose_sequence` |
 | `temporal_combined.mthds` | Nested PipeParallel + PipeCondition | `temporal_combined_pipeline` |
 | `large_payload_sequence.mthds` | Codec stress test — 3-step verbose sequence accumulating large WorkingMemory | `large_payload_sequence` |
+| `cv_batch_screening.mthds` | Deeply-nested controller stack (PipeSequence -> PipeSequence + PipeBatch -> PipeSequence) over PipeExtract + PipeLLM. Inputs JSON: `cv_batch_screening_inputs.json` | `batch_analyze_cvs_for_job_offer` |
 
 **Image payload bundles** — in `tests/integration/pipelex/pipes/pipelines/`:
 

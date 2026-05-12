@@ -1,18 +1,21 @@
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from pathlib import Path
 
 import pytest
 
-from pipelex.hub import get_library_manager
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.hub import get_library_manager, get_required_pipe
+from pipelex.pipe_run.dry_run import convert_to_working_memory_format
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.fixtures.pipe_job_helpers import pipe_job_from_bundle, pipe_job_from_library
+from tests.integration.pipelex.fixtures.pipe_job_helpers import build_pipe_job, pipe_job_from_bundle, pipe_job_from_library
 from tests.integration.pipelex.temporal.test_data import (
     CombinedPipelineTemporalTestData,
     ConflictConceptAlphaTestData,
     ConflictConceptBetaTestData,
     ConflictPipeAlphaTestData,
     ConflictPipeBetaTestData,
+    CvBatchScreeningTemporalTestData,
     LibraryCrateTestData,
     MultiConceptAlphaTestData,
     MultiConceptBetaTestData,
@@ -183,3 +186,63 @@ def combined_job(pipe_run_mode: PipeRunMode, is_class_registry_isolated: bool) -
         pipe_run_mode=pipe_run_mode,
         isolated_registry=is_class_registry_isolated,
     )
+
+
+# --- CV batch screening fixture (deeply-nested controller + PipeExtract + PipeLLM) ---
+
+
+@pytest.fixture(scope="class")
+def cv_batch_screening_job(pipe_run_mode: PipeRunMode, is_class_registry_isolated: bool) -> Generator[PipeJob, None, None]:
+    """PipeJob for the CV batch screening pipeline, pre-populated with mock cvs + job_offer_pdf.
+
+    Mirrors the demos example 21 pipeline (PipeSequence -> PipeSequence -> PipeBatch).
+    The top-level pipe requires ``cvs: Document[]`` and ``job_offer_pdf: Document``
+    inputs; we synthesize them via ``make_mock_inputs`` so the fixture works in dry
+    mode (the default for the temporal in-process test).
+    """
+
+    def _load(library_id: str) -> None:
+        mthds_content = Path(CvBatchScreeningTemporalTestData.BUNDLE_FILE).read_text(encoding="utf-8")
+        from pipelex.core.interpreter.interpreter import PipelexInterpreter  # noqa: PLC0415
+
+        blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
+        get_library_manager().load_from_blueprints(library_id=library_id, blueprints=[blueprint])
+
+    yield from _cv_job_iter(_load, pipe_run_mode=pipe_run_mode, isolated_registry=is_class_registry_isolated)
+
+
+def _cv_job_iter(
+    load_fn: Callable[[str], None],
+    pipe_run_mode: PipeRunMode,
+    isolated_registry: bool,
+) -> Generator[PipeJob, None, None]:
+    """Shared library-open/build/teardown sequence for the CV batch screening fixture.
+
+    Captures ``library_id`` as a local so we can fetch the crate without depending on
+    a ``get_current_library_id`` accessor on the manager protocol.
+    """
+    from pipelex.hub import set_current_library, teardown_current_library  # noqa: PLC0415
+
+    library_manager = get_library_manager()
+    library_id, library = library_manager.open_library()
+    if isolated_registry:
+        from kajson.class_registry import ClassRegistry  # noqa: PLC0415
+        from kajson.kajson_manager import KajsonManager  # noqa: PLC0415
+
+        global_registry = KajsonManager.get_class_registry()
+        scoped_registry = ClassRegistry()
+        scoped_registry.register_classes_dict(global_registry.get_classes_dict())
+        library.set_class_registry(scoped_registry)
+    set_current_library(library_id=library_id)
+
+    try:
+        load_fn(library_id)
+        pipe = get_required_pipe(pipe_code=CvBatchScreeningTemporalTestData.PIPE_CODE)
+        needed_inputs = convert_to_working_memory_format(needed_inputs_spec=pipe.needed_inputs())
+        working_memory = WorkingMemoryFactory.make_mock_inputs(needed_inputs=needed_inputs)
+        library_crate = library_manager.get_crate(library_id=library_id)
+        job = build_pipe_job(pipe=pipe, library_crate=library_crate, pipe_run_mode=pipe_run_mode)
+        yield job.model_copy(update={"working_memory": working_memory})
+    finally:
+        library_manager.teardown(library_id=library_id)
+        teardown_current_library()
