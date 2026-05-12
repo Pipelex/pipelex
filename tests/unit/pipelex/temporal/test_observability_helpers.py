@@ -61,7 +61,18 @@ def patch_temporal_manager(mocker: MockerFixture) -> None:
     mocker.patch("pipelex.temporal.tprl.observability.get_temporal_manager", return_value=manager)
 
 
-@pytest.mark.usefixtures("patch_temporal_manager")
+@pytest.fixture
+def patch_search_attributes_config_all_enabled(mocker: MockerFixture) -> None:
+    """Patch ``get_config`` so ``build_search_attributes`` sees the default
+    "all five enabled" surface without booting Pipelex.
+    """
+    config_root = mocker.MagicMock()
+    config_root.temporal.search_attributes.enabled = True
+    config_root.temporal.search_attributes.attributes = ["PipeCode", "PipelineRunId", "SessionId", "UserId", "DomainCode"]
+    mocker.patch("pipelex.temporal.tprl.observability.get_config", return_value=config_root)
+
+
+@pytest.mark.usefixtures("patch_temporal_manager", "patch_search_attributes_config_all_enabled")
 class TestObservabilityHelpers:
     def test_build_search_attributes_returns_five_typed_keys(self, mocker: MockerFixture) -> None:
         pipe_job = _make_pipe_job_stub(mocker)
@@ -74,6 +85,37 @@ class TestObservabilityHelpers:
         assert attrs[USER_ID_KEY] == "acme-corp"
         assert attrs[DOMAIN_CODE_KEY] == "documents"
         assert len(attrs) == 5
+
+    def test_build_search_attributes_returns_empty_when_disabled(self, mocker: MockerFixture) -> None:
+        """``enabled = false`` short-circuits to an empty ``TypedSearchAttributes``
+        so the dashboard view degrades cleanly to WorkflowType / WorkflowId /
+        StartTime without rejecting workflow starts.
+        """
+        config_root = mocker.MagicMock()
+        config_root.temporal.search_attributes.enabled = False
+        config_root.temporal.search_attributes.attributes = []
+        mocker.patch("pipelex.temporal.tprl.observability.get_config", return_value=config_root)
+        pipe_job = _make_pipe_job_stub(mocker)
+
+        attrs = build_search_attributes(pipe_job)
+
+        assert len(attrs) == 0
+
+    def test_build_search_attributes_filters_to_configured_subset(self, mocker: MockerFixture) -> None:
+        """When ``attributes`` lists only a subset of the five built-ins, only
+        those pairs end up on the workflow start.
+        """
+        config_root = mocker.MagicMock()
+        config_root.temporal.search_attributes.enabled = True
+        config_root.temporal.search_attributes.attributes = ["PipeCode", "DomainCode"]
+        mocker.patch("pipelex.temporal.tprl.observability.get_config", return_value=config_root)
+        pipe_job = _make_pipe_job_stub(mocker)
+
+        attrs = build_search_attributes(pipe_job)
+
+        assert len(attrs) == 2
+        assert attrs[PIPE_CODE_KEY] == "translate_doc"
+        assert attrs[DOMAIN_CODE_KEY] == "documents"
 
     def test_build_static_summary_with_description(self, mocker: MockerFixture) -> None:
         pipe_job = _make_pipe_job_stub(mocker)

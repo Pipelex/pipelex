@@ -12,10 +12,12 @@ from datetime import timedelta
 import pytest
 
 from pipelex.temporal.config_temporal import (
+    BUILTIN_SEARCH_ATTRIBUTES,
     ActivityRouteConfig,
     PayloadCodecConfig,
     QueueOptions,
     RetryPolicyConfig,
+    SearchAttributesConfig,
     SecretMethod,
     Temporal,
     TemporalConfig,
@@ -120,6 +122,10 @@ def _make_temporal_config(activity_queues: dict[str, ActivityRouteConfig], queue
             size_threshold=1_048_576,
             storage_prefix="prefix/",
             storage_provider_config=_make_storage_provider_config(),
+        ),
+        search_attributes=SearchAttributesConfig(
+            enabled=True,
+            attributes=list(BUILTIN_SEARCH_ATTRIBUTES),
         ),
     )
 

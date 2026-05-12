@@ -8,6 +8,7 @@ from temporalio.testing import WorkflowEnvironment
 
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode, runtime_manager
+from pipelex.temporal.config_temporal import BUILTIN_SEARCH_ATTRIBUTES
 from pipelex.temporal.tasks import Tasks
 from pipelex.temporal.temporal_connect import connect_to_temporal_selected_server
 from pipelex.temporal.temporal_data_converter import data_converter
@@ -120,12 +121,14 @@ async def env(request: FixtureRequest) -> AsyncGenerator[WorkflowEnvironment, No
         await ensure_required_search_attributes_registered(
             temporal_client=workflow_env.client,
             namespace=workflow_env.client.namespace,
+            configured_attributes=BUILTIN_SEARCH_ATTRIBUTES,
         )
     elif server_option == TEMPORAL_SERVER_TIME_SKIPPING:
         workflow_env = await WorkflowEnvironment.start_time_skipping(data_converter=data_converter)
         await ensure_required_search_attributes_registered(
             temporal_client=workflow_env.client,
             namespace=workflow_env.client.namespace,
+            configured_attributes=BUILTIN_SEARCH_ATTRIBUTES,
         )
     else:
         # Bootstrap Pipelex temporarily to read server connection config.

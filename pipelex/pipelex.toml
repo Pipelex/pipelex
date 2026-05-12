@@ -445,6 +445,17 @@ preferred_agent_targets = ["claude", "agents"]
 [temporal]
 is_enabled = false
 
+[temporal.search_attributes]
+# Master toggle. When false, workflow starts don't attach any custom search
+# attributes, the worker-boot check is skipped, and the dashboard view falls
+# back to WorkflowType / WorkflowId / StartTime only.
+enabled = true
+# Subset of the five built-in attributes to populate. Names not in this list
+# are skipped at workflow-start time AND not required at worker boot. Pipelex
+# only knows how to populate these five; arbitrary custom names are out of
+# scope (they would require code that knows the value source).
+attributes = ["PipeCode", "PipelineRunId", "SessionId", "UserId", "DomainCode"]
+
 [temporal.payload_codec_config]
 is_enabled = false
 size_threshold = 1_048_576

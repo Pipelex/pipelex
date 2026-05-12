@@ -58,7 +58,18 @@ def patch_temporal_manager(mocker: MockerFixture) -> None:
     mocker.patch("pipelex.temporal.tprl.observability.get_temporal_manager", return_value=manager)
 
 
-@pytest.mark.usefixtures("patch_temporal_manager")
+@pytest.fixture
+def patch_search_attributes_config_all_enabled(mocker: MockerFixture) -> None:
+    """Patch ``get_config`` so ``build_search_attributes`` sees the default
+    "all five enabled" surface without booting Pipelex.
+    """
+    config_root = mocker.MagicMock()
+    config_root.temporal.search_attributes.enabled = True
+    config_root.temporal.search_attributes.attributes = ["PipeCode", "PipelineRunId", "SessionId", "UserId", "DomainCode"]
+    mocker.patch("pipelex.temporal.tprl.observability.get_config", return_value=config_root)
+
+
+@pytest.mark.usefixtures("patch_temporal_manager", "patch_search_attributes_config_all_enabled")
 class TestSearchAttributeDictConstruction:
     def test_top_level_attrs_have_five_keys_with_correct_value_sources(self, mocker: MockerFixture) -> None:
         pipe_job = _make_pipe_job_stub(

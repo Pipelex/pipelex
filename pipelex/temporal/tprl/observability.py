@@ -14,6 +14,7 @@ from typing import Final
 
 from temporalio.common import SearchAttributeKey, SearchAttributePair, TypedSearchAttributes
 
+from pipelex.config import get_config
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -50,23 +51,43 @@ def _truncate_utf8(text: str, max_bytes: int) -> str:
 _LIBRARY_CRATE_ID_LEN: Final[int] = 12
 
 
-def build_search_attributes(pipe_job: PipeJob) -> TypedSearchAttributes:
-    """Build the five-keyed typed search attributes for a workflow start.
+_KEY_BY_NAME: Final[dict[str, SearchAttributeKey[str]]] = {
+    "PipeCode": PIPE_CODE_KEY,
+    "PipelineRunId": PIPELINE_RUN_ID_KEY,
+    "SessionId": SESSION_ID_KEY,
+    "UserId": USER_ID_KEY,
+    "DomainCode": DOMAIN_CODE_KEY,
+}
 
-    Used identically at top-level dispatch (submitter side) and at child dispatch
-    (inside a workflow): the child's ``pipe_job`` already carries the inherited
-    ``PipelineRunId`` / ``UserId`` from its parent, and ``PipeCode`` /
-    ``DomainCode`` correctly reflect the child's own pipe.
+
+def build_search_attributes(pipe_job: PipeJob) -> TypedSearchAttributes:
+    """Build the typed search attributes for a workflow start, filtered by the
+    configured subset.
+
+    Returns an empty ``TypedSearchAttributes`` when
+    ``[temporal.search_attributes].enabled = false`` so workflow starts attach
+    no custom attributes (the dashboard view degrades to
+    WorkflowType / WorkflowId / StartTime). Otherwise emits the subset of pairs
+    declared in ``[temporal.search_attributes].attributes``.
+
+    Used identically at top-level dispatch (submitter side) and at child
+    dispatch (inside a workflow): the child's ``pipe_job`` already carries the
+    inherited ``PipelineRunId`` / ``UserId`` from its parent, and ``PipeCode``
+    / ``DomainCode`` correctly reflect the child's own pipe.
     """
-    return TypedSearchAttributes(
-        [
-            SearchAttributePair(PIPE_CODE_KEY, pipe_job.pipe.code),
-            SearchAttributePair(PIPELINE_RUN_ID_KEY, pipe_job.job_metadata.pipeline_run_id),
-            SearchAttributePair(SESSION_ID_KEY, get_temporal_manager().session_id),
-            SearchAttributePair(USER_ID_KEY, pipe_job.job_metadata.user_id),
-            SearchAttributePair(DOMAIN_CODE_KEY, pipe_job.pipe.domain_code),
-        ],
-    )
+    config = get_config().temporal.search_attributes
+    if not config.enabled:
+        return TypedSearchAttributes([])
+    enabled_names = set(config.attributes)
+    value_by_name: dict[str, str] = {
+        "PipeCode": pipe_job.pipe.code,
+        "PipelineRunId": pipe_job.job_metadata.pipeline_run_id,
+        "SessionId": get_temporal_manager().session_id,
+        "UserId": pipe_job.job_metadata.user_id,
+        "DomainCode": pipe_job.pipe.domain_code,
+    }
+    pairs = [SearchAttributePair(_KEY_BY_NAME[name], value_by_name[name]) for name in _KEY_BY_NAME if name in enabled_names]
+    return TypedSearchAttributes(pairs)
 
 
 def build_static_summary(pipe: PipeAbstract) -> str:

@@ -18,6 +18,7 @@ from temporalio.testing import WorkflowEnvironment
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.temporal.codec.storage_payload_codec import StoragePayloadCodec
+from pipelex.temporal.config_temporal import BUILTIN_SEARCH_ATTRIBUTES
 from pipelex.temporal.tasks import Tasks
 from pipelex.temporal.temporal_data_converter import make_data_converter
 from pipelex.temporal.temporal_hub import get_task_manager, temporal_hub
@@ -120,7 +121,11 @@ async def codec_env(tmp_path_factory: pytest.TempPathFactory) -> AsyncGenerator[
         # The in-process server rejects workflows that set custom search attributes
         # until they are registered. Pipelex sets five on every workflow start; register
         # them here so this module's class-scoped server accepts dispatches.
-        await ensure_required_search_attributes_registered(temporal_client=env.client, namespace=env.client.namespace)
+        await ensure_required_search_attributes_registered(
+            temporal_client=env.client,
+            namespace=env.client.namespace,
+            configured_attributes=BUILTIN_SEARCH_ATTRIBUTES,
+        )
         yield env, storage_root
 
 

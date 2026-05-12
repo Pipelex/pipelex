@@ -15,6 +15,55 @@ if TYPE_CHECKING:
     from temporalio.common import RetryPolicy
 
 
+# Names of the five custom search attributes Pipelex knows how to populate.
+# Listed here (rather than in ``pipelex.temporal.tprl.namespace_check``) so the
+# ``SearchAttributesConfig`` validator can reference them without pulling
+# ``temporalio`` into the config-load path. Pipelex only knows how to populate
+# these five; arbitrary custom names are out of scope (they would require code
+# that knows the value source).
+BUILTIN_SEARCH_ATTRIBUTES: tuple[str, ...] = (
+    "PipeCode",
+    "PipelineRunId",
+    "SessionId",
+    "UserId",
+    "DomainCode",
+)
+
+
+class SearchAttributesConfig(ConfigModel):
+    """Configuration for the five custom Temporal search attributes Pipelex populates.
+
+    ``enabled`` is a master toggle:
+
+    - ``true`` → workflow starts attach the subset listed in ``attributes`` and
+      the worker-boot check requires those same attributes to be registered on
+      the namespace.
+    - ``false`` → no custom search attributes are attached, the worker-boot
+      check is skipped, and the dashboard view degrades to
+      WorkflowType / WorkflowId / StartTime only.
+
+    ``attributes`` is the opt-in/opt-out subset of the five built-ins. Names not
+    in this list are neither attached at workflow start nor required at worker
+    boot. Custom attribute names that are not built-ins are rejected by the
+    validator — Pipelex only knows how to populate the five built-ins.
+    """
+
+    enabled: bool
+    attributes: list[str]
+
+    @model_validator(mode="after")
+    def validate_attribute_names(self) -> Self:
+        unknown = [name for name in self.attributes if name not in BUILTIN_SEARCH_ATTRIBUTES]
+        if unknown:
+            msg = (
+                f"[temporal.search_attributes] attributes contains unknown name(s) {unknown}. "
+                f"Pipelex only knows how to populate the five built-in attributes: "
+                f"{list(BUILTIN_SEARCH_ATTRIBUTES)}."
+            )
+            raise TemporalConfigError(msg)
+        return self
+
+
 class SecretMethod(StrEnum):
     NONE = "none"
     ENV_VAR = "env_var"
@@ -584,6 +633,7 @@ class Temporal(ConfigModel):
     worker_runtime_profiles: WorkerRuntimeProfilesConfig
     worker_scopes: WorkerScopesConfig
     payload_codec_config: PayloadCodecConfig
+    search_attributes: SearchAttributesConfig
 
     @model_validator(mode="after")
     def warn_on_orphan_queue_references(self) -> Self:

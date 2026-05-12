@@ -189,13 +189,21 @@ class TemporalTaskManager(TaskManager):
             # so programmatic callers of ``run_worker`` (tests, library code)
             # also fast-fail on typos rather than polling an idle queue.
             get_config().temporal.validate_task_queue_known(task_queue)
-            # One-shot soft-fail check that the namespace has the required
-            # custom search attributes registered. Warns only — dev environments
-            # without registration still run; only the dashboard is degraded.
-            await check_required_search_attributes(
-                temporal_client=temporal_client,
-                namespace=temporal_client.namespace,
-            )
+            # Hard-fail check: when the workflow-start side is configured to
+            # populate custom search attributes, abort worker boot loudly if
+            # any are missing on a reachable namespace. The cluster would
+            # otherwise reject every workflow start that references an
+            # unregistered attribute with a much less actionable error.
+            # ``[temporal.search_attributes].enabled = false`` skips both this
+            # check and the attribute attachment in
+            # ``build_search_attributes``.
+            search_attributes_config = get_config().temporal.search_attributes
+            if search_attributes_config.enabled:
+                await check_required_search_attributes(
+                    temporal_client=temporal_client,
+                    namespace=temporal_client.namespace,
+                    configured_attributes=search_attributes_config.attributes,
+                )
             scope = self._resolve_scope_by_name(scope_name=scope_name)
             runtime_profile = self._resolve_runtime_profile_by_name(profile_name=profile_name)
             effective_scope_name = scope_name or get_config().temporal.worker_scopes.default_scope

@@ -220,6 +220,16 @@ is_dump_error_enabled = false
 [temporal]
 is_enabled = false
 
+# Custom Temporal search attributes Pipelex populates on every workflow start
+# so the dashboard can group/filter by PipeCode, PipelineRunId, SessionId,
+# UserId, and DomainCode. Uncomment to override the default (all five enabled).
+# Setting `enabled = false` skips both the worker-boot registration check and
+# the per-workflow attribute attachment — useful when the operator owns the
+# namespace policy and can't grant search-attribute admin to the worker.
+# [temporal.search_attributes]
+# enabled = true
+# attributes = ["PipeCode", "PipelineRunId", "SessionId", "UserId", "DomainCode"]
+
 [temporal.payload_codec_config]
 is_enabled = false
 size_threshold = 1_048_576            # in bytes (~1 MB, well under Temporal's 2 MB hard limit)

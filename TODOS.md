@@ -361,51 +361,239 @@ Each phase section answers the same four questions: **What lands**, **Files touc
 
 ---
 
-## Phase 6 — Hard-fail worker boot when required search attributes are missing on a real server
+## Phase 6 — Hard-fail worker boot + configurable attributes + CLI registration
 
-**What lands.** Flip the current soft-fail framing (warn-and-continue) into a hard fail on real Temporal namespaces. The current behavior is dishonest: workers boot fine when the five custom attributes are missing, but every workflow dispatch then fails with `RPCError: Namespace ... has no mapping defined for search attribute PipeCode`. Better to fast-fail at worker boot with the exact registration command than to keep failing on every dispatch with a less actionable error. The in-process / test path keeps auto-registering via `ensure_required_search_attributes_registered` (already in place).
+### Cold-start orientation for Phase 6
 
-**Why this isn't a no-op.** The Phase 4 design doc framed the missing-attributes case as "degraded dashboard, workflows still run". That premise is false against a real Temporal server — the cluster rejects every workflow start that references an unregistered attribute. The CHANGELOG and `docs/under-the-hood/temporal-deployment.md` need to be updated to match the new strict behavior.
+A fresh session picking this up should read in this order:
+
+1. The top of this file (`## Status`, `## Cold-start orientation`, `## How to use this plan`) — gives global framing and confirms Phases 1–5 are merged on `feature/Temporal-ids`.
+2. `wip/temporal-primitives/id-and-naming-design.md` — authoritative spec for the five search attributes (`PipeCode`, `PipelineRunId`, `SessionId`, `UserId`, `DomainCode`) and what they're for. The design doc framed missing attributes as a degraded-dashboard concern; **this phase overrides that framing** for reachable real namespaces, because real clusters reject every workflow start that references an unregistered attribute (not just degrade filtering).
+3. This Phase 6 section in full.
+4. The Phase 5 checkpoint just above — confirms the typed-attribute surface (`TypedSearchAttributes`, `SearchAttributeKey.for_keyword`) that Phase 6 builds on.
+
+**Verification before touching anything:**
+
+```bash
+# Targeted unit suite must be green on entry — that's the Phase 5 final state.
+.venv/bin/pytest tests/unit/pipelex/temporal/ -q
+
+# The existing unit test for the bootstrap check exercises today's soft-fail
+# behavior. Read it before rewriting — the rewrite changes the contract.
+.venv/bin/pytest tests/unit/pipelex/temporal/test_search_attribute_bootstrap_check.py -v
+```
+
+**Key code anchors (line numbers verified at plan time; re-check if drift suspected):**
+
+- `pipelex/temporal/tprl/namespace_check.py:32` — `REQUIRED_SEARCH_ATTRIBUTES` tuple (rename + relocate target). The full module is ~120 lines and covers both the soft-fail check and the auto-register helper used by tests.
+- `pipelex/temporal/tprl/namespace_check.py:54` — `check_required_search_attributes` (the soft-fail audit; today logs `log.warning(...)` and returns — must hard-fail for the configured subset on reachable namespaces).
+- `pipelex/temporal/tprl/namespace_check.py:93` — `ensure_required_search_attributes_registered` (auto-register helper; gains `configured_attributes` parameter + permission-denied fallback).
+- `pipelex/temporal/temporal_task_manager.py:32` — top-level import of `check_required_search_attributes`.
+- `pipelex/temporal/temporal_task_manager.py:195` — call site inside `run_worker`. Gate on `enabled` flag from new config.
+- `pipelex/temporal/config_temporal.py:577-586` — `class Temporal(ConfigModel)`. Add `search_attributes: SearchAttributesConfig` field here. New `SearchAttributesConfig` model goes earlier in the module (alongside `WorkerScopesConfig` at line 84). New `BUILTIN_SEARCH_ATTRIBUTES` tuple also lives here (the `TYPE_CHECKING`-only `temporalio` import guarantees the module is safe to load without the temporal extra).
+- `pipelex/temporal/exceptions.py:20` — `TemporalConfigError`. New `SearchAttributeRegistrationError` subclasses this.
+- `pipelex/temporal/tprl/observability.py:53-69` — `build_search_attributes`. Add the early-return-when-disabled branch + filter-by-configured-subset logic before the five `SearchAttributePair` constructors.
+- `pipelex/temporal/tprl/observability.py:29-33` — the five `*_KEY` module constants. Filter logic walks these by name.
+- `pipelex/pipelex.toml:445-449` — `[temporal]` block (currently just `is_enabled` + `payload_codec_config`). New `[temporal.search_attributes]` block inserts after line 449 (before `[temporal.worker_config]`).
+- `pipelex/cli/_cli.py:20` — `from pipelex.cli.commands.worker_cmd import worker_cmd` — the precedent for module-level CLI command import; the new `setup_temporal_namespace_cmd` slots in next to it on line 21.
+- `pipelex/cli/_cli.py:33` — `list_commands` order (`["login", "init", "doctor", ..., "worker"]`). Append `"setup-temporal-namespace"` (or chosen name) at the end.
+- `pipelex/cli/_cli.py:209` — `app.command(name="worker", ...)` registration; new command registers next to it.
+- `pipelex/cli/commands/worker_cmd.py:45` — example of deferred `pipelex.temporal.*` import with `# noqa: PLC0415`. **Copy this pattern verbatim** in the new command so the temporal extra stays optional.
+- `pipelex/cli/cli_factory.py` — `make_pipelex_for_cli(...)` accepts `temporal_enabled=True`. The new command calls this the same way `worker_cmd` does at line 43.
+- `pipelex/temporal/temporal_connect.py` — `connect_to_temporal_selected_server(selected_server_config=...)` is the entry the new CLI command uses to honor `--server <profile>`. Already used by the integration conftest at line 145.
+- `tests/integration/pipelex/temporal/conftest.py:16,120,126` — three existing call sites of `ensure_required_search_attributes_registered`. After the helper grows a `configured_attributes` parameter, these must pass `BUILTIN_SEARCH_ATTRIBUTES` explicitly. **Don't forget the third call site** at line 126 (time-skipping server branch).
+- `tests/integration/pipelex/temporal/test_payload_codec_pipeline.py:25,123` — second test file calling the helper; same signature update.
+- `tests/unit/pipelex/temporal/test_search_attribute_bootstrap_check.py:20,42,46,58,80,90` — the existing four tests against the soft-fail contract. Phase 6 rewrites them per the Tests section below; the `REQUIRED_SEARCH_ATTRIBUTES` import becomes `BUILTIN_SEARCH_ATTRIBUTES`.
+
+**Three call sites of `build_search_attributes(pipe_job)` that will inherit the filter automatically** (no Phase 6 work here, but flag them if a test surfaces the wrong behavior):
+
+- `pipelex/temporal/tprl_pipe/temporal_pipe_run.py:69, 106`
+- `pipelex/temporal/tprl_pipe/temporal_pipe_router.py:72, 93`
+- `pipelex/temporal/tprl_pipe/wf_pipe_run.py:55`
+
+Since they all delegate to `build_search_attributes`, the `enabled = false` early-return propagates through five workflow-start paths with one change.
+
+**External tooling worth knowing about:**
+
+- `/temporal-e2e-validate` skill (Claude Code) — validates Temporal distributed execution against a real server end-to-end. Use after Phase 6 lands with `[temporal.search_attributes] enabled = true` AND `enabled = false` to confirm both paths.
+- Integration tests support `--temporal-server local|testing|<profile>` for running against a real cluster. See CLAUDE.md "Temporal Integration Test Options."
+- For Temporal Cloud verification: cluster admin registers via `tcld namespace search-attributes add` or the Cloud UI's "Namespace → Custom Search Attributes" page. Worker API keys typically lack `OperatorService` permissions — the `pipelex setup-temporal-namespace --dry-run` path is the operator-facing fallback for that case.
+
+**What lands.** Three intertwined deliverables:
+
+1. **Configurable search-attribute surface.** A new `[temporal.search_attributes]` config block with a master `enabled` toggle and an `attributes` subset selector (opt-in/opt-out of the fixed five — names and value sources stay built-in; custom attributes are out of scope).
+2. **Hard-fail worker boot when attributes are missing on a reachable namespace.** Flip the current soft-fail framing (warn-and-continue) into a hard fail. The current behavior is dishonest: workers boot fine when the configured custom attributes are missing, but every workflow dispatch then fails with `RPCError: Namespace ... has no mapping defined for search attribute PipeCode`. Better to fast-fail at worker boot with the exact registration command than to keep failing on every dispatch with a less actionable error.
+3. **`pipelex setup-temporal-namespace` CLI command.** Wraps the existing `ensure_required_search_attributes_registered` helper so operators don't need a separate `temporal` / `tcld` install for the common case. Reads the same `[temporal.temporal_config]` block the worker uses, so the namespace/host can never drift between "what got registered" and "what the worker will dispatch to". `--dry-run` prints the equivalent `temporal operator search-attribute create` command instead of executing.
+
+**Why this isn't a no-op.** The Phase 4 design doc framed the missing-attributes case as "degraded dashboard, workflows still run". That premise is false against a real Temporal server — the cluster rejects every workflow start that references an unregistered attribute. The CHANGELOG and `docs/under-the-hood/temporal-deployment.md` need to be updated to match the new strict behavior. The in-process / test path keeps auto-registering via `ensure_required_search_attributes_registered` (already in place in `tests/integration/pipelex/temporal/conftest.py`).
+
+### Deliverable 1 — Configurable `[temporal.search_attributes]`
+
+**Config schema.** Add a `SearchAttributesConfig` model to `pipelex/temporal/config_temporal.py`, wired onto `TemporalConfig`:
+
+```toml
+[temporal.search_attributes]
+# Master toggle. When false: workflow starts don't attach any custom search
+# attributes, the worker-boot check is skipped, and the dashboard view falls
+# back to WorkflowType / WorkflowId / StartTime only.
+enabled = true
+
+# Subset of the five built-in attributes to populate. Names not in this list
+# are skipped at workflow-start time AND not required at worker boot.
+# Pipelex only knows how to populate these five; arbitrary custom names are
+# out of scope (they would require code to know the value source).
+attributes = ["PipeCode", "PipelineRunId", "SessionId", "UserId", "DomainCode"]
+```
+
+**Pydantic model.**
+
+```python
+class SearchAttributesConfig(ConfigModel):
+    enabled: bool
+    attributes: list[str]
+
+    @model_validator(mode="after")
+    def validate_attribute_names(self) -> Self:
+        # The five built-ins live in namespace_check.BUILTIN_SEARCH_ATTRIBUTES.
+        # Reject any unknown name with a helpful message — protects against
+        # typos like "PipelineRunID" silently producing no attribute.
+        ...
+```
+
+**Behavior changes in three call sites.**
+
+- `pipelex/temporal/tprl/observability.py:build_search_attributes` — early-return `TypedSearchAttributes([])` when `enabled = false`. Otherwise, filter the five `SearchAttributePair`s by membership in `config.attributes`. Pull config via `get_config().temporal.search_attributes` (the helper is already called from sandbox-safe code paths; `get_temporal_manager()` is the existing precedent for sandbox imports in this module).
+- `pipelex/temporal/tprl/namespace_check.py:check_required_search_attributes` — accept the configured subset (`list[str]`) as a parameter instead of reading `REQUIRED_SEARCH_ATTRIBUTES`. The hard-coded tuple stays in the module as `BUILTIN_SEARCH_ATTRIBUTES` (the union of all five Pipelex can populate) for validator + CLI use; the *runtime check* uses only the configured subset.
+- `pipelex/temporal/temporal_task_manager.py:run_worker` — read `enabled` and `attributes` from config; skip the boot check entirely when `enabled = false`.
+
+**Renaming.** `REQUIRED_SEARCH_ATTRIBUTES` → `BUILTIN_SEARCH_ATTRIBUTES` to reflect that "required" is now a function of config, not a constant.
+
+### Deliverable 2 — Hard-fail worker boot on missing attributes
 
 **Code anchors.**
 
-- `pipelex/temporal/tprl/namespace_check.py:check_required_search_attributes` — today logs `log.warning(...)` and returns. Switch to raising a new exception (`SearchAttributeRegistrationError`?) when any attribute is missing AND the `ListSearchAttributes` call succeeds (i.e. it's a real namespace, not an unreachable one). The exact registration command should be in the exception message.
-- `RPCError` on the call itself stays a soft fail — the namespace was unreachable, not misconfigured. Keep the warning, don't raise.
-- `pipelex/temporal/temporal_task_manager.py:run_worker` — the call site is already in place; only the failure mode changes. The exception propagates and crashes worker boot, which is the desired behavior.
-- `docs/under-the-hood/temporal-deployment.md` — replace the "soft fail" framing with "strict prerequisite". Document Temporal Cloud specifics: the `temporal` CLI authenticated with a Cloud API key, or the Cloud UI's "Namespace → Custom Search Attributes" page. Note that on Cloud, app workers typically do **not** have `OperatorService` permission, so auto-registration is not possible — the namespace admin must register once.
-- `CHANGELOG.md` — replace the "soft-fail check" line with the strict-prerequisite framing.
+- `pipelex/temporal/tprl/namespace_check.py:check_required_search_attributes` — today logs `log.warning(...)` and returns. Switch to raising a new exception (`SearchAttributeRegistrationError`, subclass of `TemporalConfigError`) when any *configured* attribute is missing AND the `ListSearchAttributes` call succeeds (i.e. it's a real namespace, not an unreachable one). The exact registration command — both the `pipelex setup-temporal-namespace` invocation **and** the equivalent `temporal operator search-attribute create` fallback — goes in the exception message.
+- `RPCError` on the call itself stays a soft fail — the namespace was unreachable, not misconfigured. Keep the warning, don't raise. (In-process / time-skipping test servers don't trigger this path because the conftest pre-registers.)
+- `pipelex/temporal/temporal_task_manager.py:run_worker` — the call site is already in place; only the failure mode changes. The exception propagates and crashes worker boot, which is the desired behavior. When `enabled = false`, the call is skipped entirely.
+- The error message format must be copy-paste-ready: both the Pipelex CLI invocation and the raw `temporal` CLI command, on separate lines, so operators on either side of the fence can fix the gap.
 
-**Tests.**
+### Deliverable 3 — `pipelex setup-temporal-namespace` CLI command
+
+**Why a flat command, not a `pipelex temporal` group.** There is no `pipelex temporal` Typer sub-app today (just the single `pipelex worker` command). Adding a sub-app is a separate refactor; flat command keeps the diff focused on the search-attribute problem.
+
+**Optional-dependency handling.** The `temporal` extra (`temporalio==1.23.0`, `aiohttp`) is optional — `pipelex` works without it for non-Temporal users. The new command follows the existing `worker_cmd` pattern:
+
+- Module file `pipelex/cli/commands/setup_temporal_namespace_cmd.py` has **no** `pipelex.temporal.*` imports at module level — only `typer` and standard pipelex. This way `pipelex/cli/_cli.py` can import it unconditionally and `pipelex --help` works without the extra installed (verified by the same flow today for `pipelex worker`).
+- All `pipelex.temporal.*` imports go inside the function body with `# noqa: PLC0415` — `temporal_connect`, `namespace_check`, anything else.
+- Wrap the deferred import in `try/except ImportError` with a friendly `Install with: pip install pipelex[temporal]` message. (Strictly nicer than `worker_cmd` today, which lets the raw Python `ImportError` bubble. Optionally retrofit `worker_cmd` with the same handler — small bonus.)
+
+**`BUILTIN_SEARCH_ATTRIBUTES` location.** The tuple of attribute names is referenced by the config validator in `SearchAttributesConfig`. If it lives in `pipelex/temporal/tprl/namespace_check.py` (current `REQUIRED_SEARCH_ATTRIBUTES`), the validator can't reference it without importing temporal at config-load time — defeating the optional-dep contract. **Move the tuple to `pipelex/temporal/config_temporal.py`** (which already only imports `temporalio` under `if TYPE_CHECKING:`, so it's safe to load without the extra). `namespace_check.py` imports it from there. The validator reads it locally.
+
+**Command surface.**
+
+```bash
+# Default: read [temporal.temporal_config] from pipelex.toml, connect, register
+# any missing configured attributes. Idempotent.
+pipelex setup-temporal-namespace
+
+# Print the equivalent `temporal operator search-attribute create` invocation
+# without executing — useful for ops folks who need the namespace admin to
+# register on their behalf.
+pipelex setup-temporal-namespace --dry-run
+
+# Target a non-default server profile.
+pipelex setup-temporal-namespace --server testing
+```
+
+**Files touched.**
+
+- `pipelex/cli/commands/setup_temporal_namespace_cmd.py` (new) — Typer command. Calls `make_pipelex_for_cli(temporal_enabled=True)`, connects via `connect_to_temporal_selected_server`, calls `ensure_required_search_attributes_registered`. On `RPCError(PermissionDenied)`, prints the fallback runbook (raw `temporal` CLI command, `tcld` for Cloud, Cloud UI link).
+- `pipelex/cli/_cli.py` — register the new command alongside `worker_cmd`.
+- `pipelex/temporal/tprl/namespace_check.py:ensure_required_search_attributes_registered` — accept a `configured_attributes: list[str]` parameter so the CLI registers only what config says is enabled. Test conftest call site keeps default = all five (passes `BUILTIN_SEARCH_ATTRIBUTES`).
+
+**Permission-denied fallback.** Helper catches `RPCError` where `status == PERMISSION_DENIED` and returns a structured `RegistrationFailure` instead of raising — the CLI command formats it into the fallback runbook. Other RPC errors (`UNAVAILABLE`, `NOT_FOUND`) re-raise.
+
+### Files touched (consolidated)
+
+- `pipelex/temporal/config_temporal.py` — new `SearchAttributesConfig`, wired to `TemporalConfig`.
+- `pipelex/pipelex.toml` — new `[temporal.search_attributes]` block with documented defaults.
+- `.pipelex/pipelex.toml` (project template) — same block commented out as an override invitation, per project convention.
+- `pipelex/temporal/tprl/observability.py:build_search_attributes` — filter by configured subset; early-return when disabled.
+- `pipelex/temporal/tprl/namespace_check.py` — rename `REQUIRED_SEARCH_ATTRIBUTES` → `BUILTIN_SEARCH_ATTRIBUTES`; accept `configured_attributes` parameter; hard-fail instead of warning; permission-denied fallback in `ensure_required_search_attributes_registered`; new `SearchAttributeRegistrationError` exception.
+- `pipelex/temporal/temporal_task_manager.py:run_worker` — gate the check on `enabled`; pass configured subset.
+- `pipelex/cli/commands/setup_temporal_namespace_cmd.py` (new) — CLI command.
+- `pipelex/cli/_cli.py` — wire the new command.
+- `tests/integration/pipelex/temporal/conftest.py` — pass `BUILTIN_SEARCH_ATTRIBUTES` to the helper (no behavior change for tests, just makes the signature change explicit).
+- `docs/under-the-hood/temporal-deployment.md` — full rewrite of the "soft fail" framing → "strict prerequisite + configurable + here's the easy registration command".
+- `CHANGELOG.md` — replace the soft-fail line with the strict-prerequisite framing; add config block; add CLI command.
+
+### Tests
 
 - `tests/unit/pipelex/temporal/test_search_attribute_bootstrap_check.py` — rewrite:
     - "all present" → still no exception, no warning.
-    - "some missing" → now `pytest.raises(SearchAttributeRegistrationError)` with the exact registration command in the message.
-    - "`RPCError`" → still soft-fails (warns, returns).
+    - "some missing" → now `pytest.raises(SearchAttributeRegistrationError)` with both the `pipelex setup-temporal-namespace` invocation AND the raw `temporal operator search-attribute create` command in the message.
+    - "`RPCError(UNAVAILABLE)`" → still soft-fails (warns, returns).
     - "non-`RPCError`" → propagates unchanged.
+    - **New:** "configured subset" — only the subset is checked; missing built-ins outside the subset don't trigger the error.
+    - **New:** "disabled" — `enabled = false` skips the check entirely (verify the operator service is never called).
+- `tests/unit/pipelex/temporal/test_observability_helpers.py` — extend:
+    - **New:** `enabled = false` → `build_search_attributes` returns empty `TypedSearchAttributes`.
+    - **New:** `attributes = ["PipeCode", "DomainCode"]` → only those two pairs in the returned set.
+- `tests/unit/pipelex/temporal/test_setup_temporal_namespace_cmd.py` (new) — exercise the CLI command with a mocked temporal client: happy path registers missing, dry-run prints without registering, permission-denied path prints the fallback runbook.
+- `tests/unit/pipelex/temporal/test_search_attributes_config.py` (new) — config validator rejects unknown attribute names with a helpful error; default config matches the historic five.
 - No integration test changes; the test path auto-registers before any workflow runs (Phase 4 fix).
 
-**Done when.**
+### Done when
 
 - `make agent-check` clean.
 - `make agent-test` green.
 - The full integration suite (`tests/integration/pipelex/temporal/`) still passes — the auto-registration in the test conftest keeps everything green there.
-- A manual run against a real Temporal server with **no** attributes registered fails clean at worker boot with the registration command in the error message. Re-registering, the worker boots and dispatches succeed.
-- `docs/under-the-hood/temporal-deployment.md` and `CHANGELOG.md` updated.
+- A manual run against a real Temporal server with **no** attributes registered fails clean at worker boot with both registration commands in the error message. Running `pipelex setup-temporal-namespace` once, the worker then boots and dispatches succeed.
+- Setting `[temporal.search_attributes] enabled = false` lets a worker boot against a namespace with zero custom attributes registered; workflows dispatch successfully (verified by the same `temporal-e2e-validate` flow with the toggle flipped).
+- `pipelex setup-temporal-namespace --dry-run` prints the exact `temporal operator search-attribute create` command, including the configured subset.
+- `docs/under-the-hood/temporal-deployment.md` documents: the configurable surface, the two registration paths (Pipelex CLI vs Temporal CLI), and the Cloud-specific runbook (`tcld` + UI), plus the permission model for self-managed workers on Temporal Cloud.
+- `CHANGELOG.md` updated.
 
-**Open questions (cold-start may need to decide).**
+### Open questions (cold-start may need to decide)
 
-- What's the cleanest place to inject the registration step on **Pipelex Cloud** deployments — a one-shot job that runs `ensure_required_search_attributes_registered` against the target namespace before workers come up, or a manual operator runbook step? Probably a job; reuse the existing helper.
-- For Temporal Cloud customers running self-managed Pipelex workers, what permission level does the customer's API key need to call `OperatorService.AddSearchAttributes`? (Probably "Namespace Admin" — confirm against Cloud docs at implementation time.)
-- Is there a sane fallback for `--temporal-server <profile>` integration test runs that point at a real cluster the developer doesn't have admin on? Likely: call `ensure_required_search_attributes_registered` in the conftest's real-server branch too, and tolerate the `RPCError` from a permission-denied response (warn and skip the test session, or fail fast — judgment call when this comes up).
+- For Temporal Cloud customers running self-managed Pipelex workers, what permission level does the customer's API key need to call `OperatorService.AddSearchAttributes`? (Probably "Namespace Admin" — confirm against Cloud docs at implementation time and document in `temporal-deployment.md`.)
+- Is there a sane fallback for `--temporal-server <profile>` integration test runs that point at a real cluster the developer doesn't have admin on? Likely: call `ensure_required_search_attributes_registered` in the conftest's real-server branch too, and tolerate `RPCError(PermissionDenied)` (warn and continue — the cluster admin will have done it). Decide when this case actually surfaces.
+- Should the `enabled = false` mode also short-circuit the static summary / static details (which are independent of search attributes today)? Probably no — those are orthogonal observability features and may be useful even when filtering is disabled. Leave them on; only search attributes are gated by this toggle.
 
 ### Checkpoint — end of Phase 6
 
-To be filled in by the implementer at the phase boundary.
+- **Status.** Implementation complete on `feature/Temporal-ids`. `make agent-check` clean, `make agent-test` green, 561 targeted unit tests pass in `tests/unit/pipelex/temporal/` + `tests/unit/pipelex/cli/` + `tests/unit/pipelex/system/`.
 
-- **Status.** _(planned / in progress / merged)_
-- **Behavior change confirmed.** _(real-server boot fails loudly with missing attributes; in-process tests still auto-register and pass)_
-- **Docs + CHANGELOG synced.** _(yes/no; references)_
-- **Open questions resolved during implementation.** _(Temporal Cloud permission model, etc.)_
+- **Behavior change confirmed.** Worker boot now hard-fails on a reachable namespace when a configured custom search attribute is missing (raises `SearchAttributeRegistrationError` with both the `pipelex setup-temporal-namespace` invocation and the equivalent raw `temporal operator search-attribute create` command in the message). `RPCError` from the operator service stays a soft fail. `[temporal.search_attributes].enabled = false` skips both the check and the per-workflow attachment. In-process / time-skipping test servers continue to auto-register via the conftest, now passing `BUILTIN_SEARCH_ATTRIBUTES` through the helper's new `configured_attributes` parameter. The new `pipelex setup-temporal-namespace` CLI command was smoke-tested with `--dry-run` and prints the exact `temporal operator search-attribute create` invocation for the resolved namespace + the Cloud `tcld` fallback.
+
+- **What landed.**
+    - `pipelex/temporal/config_temporal.py` — new `SearchAttributesConfig` model + `BUILTIN_SEARCH_ATTRIBUTES` tuple. The constant lives here (not in `namespace_check.py`) so the validator can reference it without pulling `temporalio` into the config-load path. `Temporal` gains a `search_attributes: SearchAttributesConfig` field.
+    - `pipelex/pipelex.toml` — new `[temporal.search_attributes]` block (enabled = true, all five attributes). `.pipelex/pipelex.toml` template ships the same block commented out as an override invitation.
+    - `pipelex/temporal/tprl/namespace_check.py` — `REQUIRED_SEARCH_ATTRIBUTES` removed; helpers now take `configured_attributes: Sequence[str]`. `check_required_search_attributes` raises `SearchAttributeRegistrationError` instead of warning when configured attributes are missing on a reachable namespace. `ensure_required_search_attributes_registered` returns a structured `RegistrationFailure` dataclass on `RPCError(PERMISSION_DENIED)` instead of raising, so the CLI command can format the fallback runbook. Other `RPCError` codes propagate. Empty `configured_attributes` short-circuits both helpers.
+    - `pipelex/temporal/exceptions.py` — new `SearchAttributeRegistrationError(TemporalConfigError)`.
+    - `pipelex/temporal/tprl/observability.py` — `build_search_attributes` early-returns `TypedSearchAttributes([])` when `enabled = false`, otherwise filters the five `SearchAttributePair`s by `config.attributes`. The five workflow-start call sites in `tprl_pipe/` inherit the filter automatically.
+    - `pipelex/temporal/temporal_task_manager.py` — `run_worker` gates the bootstrap check on `enabled` and passes the configured subset.
+    - `pipelex/cli/commands/setup_temporal_namespace_cmd.py` (new) — Typer command. `--dry-run` prints the equivalent raw `temporal` CLI command + the Cloud `tcld` runbook. `--server <profile>` targets a non-default profile. Permission-denied path prints the actionable fallback and exits with code 1. Module-level imports stay pure-pipelex; all `pipelex.temporal.*` imports are deferred inside the function body (carrying `# noqa: PLC0415`) and wrapped in a `try/except ImportError` so `pipelex --help` works without the `temporal` extra.
+    - `pipelex/cli/_cli.py` — registers the new command next to `pipelex worker`, appended to `list_commands` order.
+    - `tests/integration/pipelex/temporal/conftest.py` + `test_payload_codec_pipeline.py` — three integration call sites of the helper now pass `BUILTIN_SEARCH_ATTRIBUTES` explicitly.
+    - `tests/unit/pipelex/temporal/test_search_attribute_bootstrap_check.py` — rewritten for the hard-fail contract (six cases: all-present silent, some-missing raises with both commands, RPC soft-fail, non-RPC propagation, configured-subset, disabled).
+    - `tests/unit/pipelex/temporal/test_observability_helpers.py` + `test_search_attribute_dict_construction.py` — extended with `enabled = false` and partial-subset cases; existing tests patch `get_config` via a new module-local fixture.
+    - `tests/unit/pipelex/temporal/test_search_attributes_config.py` (new) — config validator rejects unknown attribute names; default config matches the historic five.
+    - `tests/unit/pipelex/cli/test_setup_temporal_namespace_cmd.py` (new) — CLI command unit tests: dry-run, happy-path, permission-denied fallback, disabled short-circuit, unknown-server-profile.
+    - `tests/unit/pipelex/temporal/test_temporal_config_warnings.py` — `_make_temporal_config` helper passes the new `search_attributes=SearchAttributesConfig(...)` arg.
+
+- **Docs + CHANGELOG synced.** `docs/under-the-hood/temporal-deployment.md` was fully rewritten away from the "soft fail" framing into "strict prerequisite + configurable surface + two registration paths + permission model for Temporal Cloud self-managed workers". `CHANGELOG.md` replaces the soft-fail line under [Unreleased] with the strict-prerequisite framing and adds two new entries for the config block and the CLI command.
+
+- **Promotion.** `namespace_check._format_registration_command` → `format_temporal_cli_command` (public) because the CLI command now also calls it. Implementation unchanged.
+
+- **Open questions resolved during implementation.**
+    - **Temporal Cloud permission model.** Documented in `temporal-deployment.md` as "the customer's namespace admin owns `OperatorService.AddSearchAttributes`; the worker API key typically doesn't have it." `pipelex setup-temporal-namespace` handles `RPCError(PERMISSION_DENIED)` by printing the exact `temporal` / `tcld` / Cloud UI commands the admin needs to run.
+    - **Static summary / static details independence.** Confirmed orthogonal to the search-attribute toggle. `build_static_summary` / `build_static_details` are not gated by `[temporal.search_attributes].enabled`.
+    - **Custom attribute names beyond the five built-ins.** Out of scope (per the design). The config validator rejects them with a helpful message listing the five known names.
+
+- **Known follow-ups (deferred).**
+    - Verifying the hard-fail path against a real Temporal cluster with `--temporal-server <profile>` (using `/temporal-e2e-validate`) was not run as part of this checkpoint — the unit suite covers the hard-fail contract via mocked clients, and the integration test path keeps the in-process server registered by the conftest. Run the e2e slash command once a real-cluster credential is available.
+    - The `enabled = false` end-to-end path was not run on a real cluster either. The unit tests verify the bootstrap check is skipped and `build_search_attributes` returns empty; the workflow-start call sites all delegate to `build_search_attributes`, so the propagation is by construction.
 
 ---
 
