@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipelex.kit.paths import get_kit_configs_dir
+from pipelex.system.telemetry import telemetry_config as telemetry_config_module
 from pipelex.system.telemetry.telemetry_config import load_telemetry_config
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
@@ -109,10 +110,12 @@ class TestLoadTelemetryConfigLayering:
         assert config.langfuse.public_key == "pk_global_override"  # global override beats global base
         assert config.langfuse.secret_key == "sk_project_override"  # project override beats project base
 
-    def test_project_layer_skipped_when_global_equals_project(
+    def test_project_layer_skipped_when_no_project_pipelex_dir(
         self, tmp_path: Path, mocker: MockerFixture, secrets_provider: EnvSecretsProvider
     ) -> None:
-        """When cwd has no .pipelex/, only global layers load (no double-merge of same dir)."""
+        """When cwd has no `.pipelex/`, `project_config_dir` resolves to None and only the
+        global layers are loaded — the project-layer branch is never entered.
+        """
         fake_home = tmp_path / "home"
         fake_home.mkdir()
         global_dir = fake_home / ".pipelex"
@@ -129,6 +132,42 @@ class TestLoadTelemetryConfigLayering:
         config = load_telemetry_config(secrets_provider=secrets_provider)
 
         assert config.langfuse.public_key == "pk_global"
+
+    def test_project_layer_skipped_when_project_dir_equals_global_dir(
+        self, tmp_path: Path, mocker: MockerFixture, secrets_provider: EnvSecretsProvider
+    ) -> None:
+        """When the user runs from their home directory itself, project-root detection lands
+        on `~`, so `project_config_dir` resolves to `~/.pipelex/` — the same path as
+        `global_config_dir`. The project-layer branch must be skipped to avoid double-loading
+        the same files. This test spies on the toml loader to assert the paths list is the
+        global-only sequence, not the global-then-project doubled sequence.
+        """
+        fake_home = tmp_path / "home"
+        fake_home.mkdir()
+        # Make the home directory itself a project root so project_root detection picks it.
+        (fake_home / ".git").mkdir()
+        global_dir = fake_home / ".pipelex"
+        global_dir.mkdir()
+        (global_dir / "telemetry.toml").write_text('[langfuse]\npublic_key = "pk_global"\n')
+        (global_dir / "telemetry_override.toml").write_text('[langfuse]\nsecret_key = "sk_global"\n')
+
+        mocker.patch.object(Path, "home", return_value=fake_home)
+        mocker.patch.object(Path, "cwd", return_value=fake_home)
+
+        spy = mocker.spy(telemetry_config_module, "load_toml_from_path_and_merge_with_overrides")
+
+        config = load_telemetry_config(secrets_provider=secrets_provider)
+
+        # Skip guard fired: paths list contains only the two global-layer entries, not four.
+        spy.assert_called_once()
+        paths_passed = spy.call_args.kwargs["paths"]
+        assert paths_passed == [
+            global_dir / "telemetry.toml",
+            global_dir / "telemetry_override.toml",
+        ]
+        # Sanity: merged config still reflects the global values.
+        assert config.langfuse.public_key == "pk_global"
+        assert config.langfuse.secret_key == "sk_global"
 
     def test_commented_project_template_does_not_shadow_global_override(
         self, fake_dirs: tuple[Path, Path], secrets_provider: EnvSecretsProvider
