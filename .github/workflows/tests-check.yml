@@ -25,7 +25,7 @@ jobs:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
       ENV: dev
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install dependencies
         run: PYTHON_VERSION=${{ matrix.python-version }} make install

@@ -11,7 +11,7 @@ jobs:
     name: Graph UI sync
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Check graph UI assets are in sync
         run: |

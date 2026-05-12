@@ -18,7 +18,7 @@ jobs:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install dependencies
         run: PYTHON_VERSION=3.11 TEST_PROFILE=ci make install
@@ -49,7 +49,7 @@ jobs:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install dependencies
         run: PYTHON_VERSION=3.11 TEST_PROFILE=ci make install
@@ -70,7 +70,7 @@ jobs:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install dependencies
         run: PYTHON_VERSION=3.11 TEST_PROFILE=ci make install
