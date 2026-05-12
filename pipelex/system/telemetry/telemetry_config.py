@@ -224,6 +224,18 @@ class TelemetryRedactionConfig(BaseModel):
 def load_telemetry_config(secrets_provider: SecretsProviderAbstract) -> TelemetryConfig:
     """Load telemetry configuration from a TOML file with variable substitution.
 
+    Files are deep-merged in this order (later wins per leaf key):
+
+    1. ~/.pipelex/telemetry.toml (global base)
+    2. ~/.pipelex/telemetry_override.toml
+    3. {project_root}/.pipelex/telemetry.toml (if project dir exists and is
+       distinct from the global dir)
+    4. {project_root}/.pipelex/telemetry_override.toml (same condition)
+
+    This means a project telemetry config layers *on top of* the user's global
+    one rather than replacing it — secrets and personal observability settings
+    declared once in ~/.pipelex/ stay in effect across all projects.
+
     Supports variable placeholders in string values:
     - ${VAR_NAME} -> use secrets provider by default
     - ${env:ENV_VAR_NAME} -> force use environment variable
@@ -239,10 +251,15 @@ def load_telemetry_config(secrets_provider: SecretsProviderAbstract) -> Telemetr
     Raises:
         TelemetryConfigValidationError: If configuration is invalid or variable substitution fails.
     """
+    global_config_dir = config_manager.global_config_dir
     telemetry_config_paths = [
-        config_manager.pipelex_config_dir / TELEMETRY_CONFIG_FILE_NAME,
-        config_manager.pipelex_config_dir / TELEMETRY_CONFIG_OVERRIDE_FILE_NAME,
+        global_config_dir / TELEMETRY_CONFIG_FILE_NAME,
+        global_config_dir / TELEMETRY_CONFIG_OVERRIDE_FILE_NAME,
     ]
+    project_config_dir = config_manager.project_config_dir
+    if project_config_dir is not None and project_config_dir != global_config_dir:
+        telemetry_config_paths.append(project_config_dir / TELEMETRY_CONFIG_FILE_NAME)
+        telemetry_config_paths.append(project_config_dir / TELEMETRY_CONFIG_OVERRIDE_FILE_NAME)
     telemetry_config_toml_raw = load_toml_from_path_and_merge_with_overrides(paths=telemetry_config_paths)
 
     # Apply variable substitution to all string values (keep placeholders for missing vars)

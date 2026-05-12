@@ -24,6 +24,20 @@ Telemetry configuration is stored in `.pipelex/telemetry.toml`. This file contro
 
 This file is created when you run `pipelex init telemetry` or `pipelex init`.
 
+### Global vs project config
+
+Telemetry config is layered: a project `.pipelex/telemetry.toml` is merged **on top of** the user's global `~/.pipelex/telemetry.toml`, not as a replacement. The load order is:
+
+1. `~/.pipelex/telemetry.toml`
+2. `~/.pipelex/telemetry_override.toml`
+3. `{project_root}/.pipelex/telemetry.toml` *(if it exists and the project dir is distinct from the global dir)*
+4. `{project_root}/.pipelex/telemetry_override.toml` *(same condition)*
+
+Files are deep-merged, with later layers winning per leaf key. This means Langfuse keys or OTLP endpoints declared once in `~/.pipelex/telemetry.toml` keep applying across every project — a project file can override specific keys without redeclaring the rest.
+
+!!! note "List merge behavior"
+    The `[[otlp]]` array and the `redact_properties` list do not concatenate across layers — the later layer replaces the whole list. If you want to add an OTLP exporter on top of the global set, redeclare all exporters in the layer that wins.
+
 ## Full Example Configuration
 
 ```toml

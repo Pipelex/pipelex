@@ -55,6 +55,9 @@ pipelex init telemetry
 
 This creates `.pipelex/telemetry.toml` with all options disabled by default. Edit this file to enable your preferred telemetry destinations.
 
+!!! note "Global vs project config"
+    Pipelex looks for telemetry config in **both** `~/.pipelex/` (machine-wide) and `{project_root}/.pipelex/` (per-project). Both are deep-merged, with the project file winning on key collisions — your global Langfuse keys keep applying across every project unless a project explicitly overrides them. See [Telemetry Configuration → Global vs project config](../configuration/config-practical/telemetry-config.md#global-vs-project-config) for the full load order.
+
 ### Example: Enable PostHog Tracing
 
 ```toml
