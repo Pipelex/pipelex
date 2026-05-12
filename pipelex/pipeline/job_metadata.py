@@ -43,6 +43,13 @@ class JobMetadata(BaseModel):
     pipeline_run_id: str
     pipe_code: str | None = None
 
+    # Per-process Pipelex session id (``Config.session_id``) captured at the
+    # submitter dispatch boundary. Inheriting it through ``JobMetadata`` lets
+    # the Temporal observability helpers stay pure functions of the workflow
+    # input — replay on a different worker no longer changes the value and
+    # so cannot cause a non-determinism mismatch on child-workflow starts.
+    session_id: str | None = None
+
     # Business ID for the current pipe execution (16-char hex string).
     # Always set during pipe runs for tracking purposes.
     pipe_run_id: str | None = None

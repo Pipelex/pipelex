@@ -21,6 +21,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.temporal.temporal_manager import get_temporal_manager
 
 _MAX_SUMMARY_BYTES: Final[int] = 200
+_MAX_DETAILS_BYTES: Final[int] = 20 * 1024
 _ELLIPSIS: Final[str] = "…"
 
 # Typed search-attribute keys. Defined once at module level so call sites and
@@ -60,6 +61,27 @@ _KEY_BY_NAME: Final[dict[str, SearchAttributeKey[str]]] = {
 }
 
 
+def stamp_submitter_session_id(pipe_job: PipeJob) -> PipeJob:
+    """Stamp the current ``TemporalManager.session_id`` onto ``pipe_job.job_metadata``
+    when it is not already set. Called at every top-level Temporal dispatch
+    boundary (``TemporalPipeRun.run``, ``TemporalPipeRun.start``,
+    ``TemporalPipeRouter._run_pipe_job`` top-level branch) so the value flows
+    into child workflows through the workflow input.
+
+    Why this matters: ``build_search_attributes`` reads ``session_id`` off
+    ``pipe_job.job_metadata``. Inside workflow code (child-workflow starts in
+    ``WfPipeRun`` and ``TemporalPipeRouter``) that read must be deterministic
+    — Temporal verifies replayed ``StartChildWorkflowExecution`` commands
+    against the recorded ones, and ``TemporalManager.session_id`` differs
+    across worker processes. Reading it once at the submitter boundary and
+    threading it through the workflow input is the deterministic path.
+    """
+    if pipe_job.job_metadata.session_id is not None:
+        return pipe_job
+    stamped_metadata = pipe_job.job_metadata.model_copy(update={"session_id": get_temporal_manager().session_id})
+    return pipe_job.model_copy(update={"job_metadata": stamped_metadata})
+
+
 def build_search_attributes(pipe_job: PipeJob) -> TypedSearchAttributes:
     """Build the typed search attributes for a workflow start, filtered by the
     configured subset.
@@ -72,17 +94,26 @@ def build_search_attributes(pipe_job: PipeJob) -> TypedSearchAttributes:
 
     Used identically at top-level dispatch (submitter side) and at child
     dispatch (inside a workflow): the child's ``pipe_job`` already carries the
-    inherited ``PipelineRunId`` / ``UserId`` from its parent, and ``PipeCode``
-    / ``DomainCode`` correctly reflect the child's own pipe.
+    inherited ``PipelineRunId`` / ``UserId`` / ``SessionId`` from its parent,
+    and ``PipeCode`` / ``DomainCode`` correctly reflect the child's own pipe.
+    Reading every field off ``pipe_job`` (the workflow input) keeps the helper
+    a pure function — child workflow start commands stay byte-equal across
+    replays even when the worker process restarts with a fresh
+    ``TemporalManager.session_id``.
     """
     config = get_config().temporal.search_attributes
     if not config.enabled:
         return TypedSearchAttributes([])
     enabled_names = set(config.attributes)
+    # ``session_id`` is stamped at the submitter dispatch boundary; if a caller
+    # somehow forgot to stamp it, fall back to the empty string so we emit a
+    # well-formed (if uninformative) attribute rather than ``None`` — Keyword
+    # search attributes don't accept ``None``.
+    session_id = pipe_job.job_metadata.session_id or ""
     value_by_name: dict[str, str] = {
         "PipeCode": pipe_job.pipe.code,
         "PipelineRunId": pipe_job.job_metadata.pipeline_run_id,
-        "SessionId": get_temporal_manager().session_id,
+        "SessionId": session_id,
         "UserId": pipe_job.job_metadata.user_id,
         "DomainCode": pipe_job.pipe.domain_code,
     }
@@ -116,7 +147,7 @@ def build_static_details(pipe_job: PipeJob) -> str:
         ("Domain", f"`{pipe.domain_code}`"),
         ("Pipeline run", f"`{metadata.pipeline_run_id}`"),
         ("User", f"`{metadata.user_id}`"),
-        ("Session", f"`{get_temporal_manager().session_id}`"),
+        ("Session", f"`{metadata.session_id or ''}`"),
     ]
     if pipe_job.library_crate is not None and pipe_job.library_crate.fingerprint:
         rows.append(("Library crate", f"`{pipe_job.library_crate.fingerprint[:_LIBRARY_CRATE_ID_LEN]}`"))
@@ -126,7 +157,7 @@ def build_static_details(pipe_job: PipeJob) -> str:
     lines: list[str] = ["| Field | Value |", "|---|---|"]
     for field, value in rows:
         lines.append(f"| {field} | {value} |")
-    return "\n".join(lines)
+    return _truncate_utf8("\n".join(lines), _MAX_DETAILS_BYTES)
 
 
 def build_activity_summary(

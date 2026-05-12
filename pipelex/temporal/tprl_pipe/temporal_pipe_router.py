@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
+from temporalio.exceptions import ChildWorkflowError
 from typing_extensions import override
 
 from pipelex import log
@@ -10,6 +11,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.observer.observer_protocol import ObserverNoOp
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
+from pipelex.temporal.exceptions import WorkflowExecutionError
 from pipelex.temporal.temporal_manager import TemporalWorkerEnvironment
 from pipelex.temporal.temporal_workflow_utils import is_in_temporal_workflow
 from pipelex.temporal.tprl.conditional_worker import with_conditional_worker
@@ -17,6 +19,7 @@ from pipelex.temporal.tprl.observability import (
     build_search_attributes,
     build_static_details,
     build_static_summary,
+    stamp_submitter_session_id,
 )
 from pipelex.temporal.tprl.workflow_caller import WorkflowExecutor, WorkflowExecutorFactory
 from pipelex.temporal.tprl_pipe.submitter_hydration import rehydrate_pipe_output_with_crate
@@ -64,16 +67,32 @@ class TemporalPipeRouter(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtoc
             log.debug("TemporalPipeRouter: child workflow dispatch")
             parent_workflow_id = workflow.info().workflow_id
             child_workflow_id = f"{parent_workflow_id}/{pipe_job.pipe.code}-{str(workflow.uuid4())[:8]}"
-            executor = WorkflowExecutorFactory[PipeJob, PipeOutput]().create_executor(task_queue=None)
-            pipe_output = await executor.execute_child_workflow(
-                workflow_class=WfPipeRouter,
-                workflow_id=child_workflow_id,
-                workflow_arg=pipe_job,
-                search_attributes=build_search_attributes(pipe_job),
-                static_summary=build_static_summary(pipe_job.pipe),
-            )
+            # Dispatch via ``workflow.execute_child_workflow`` directly. The
+            # ``WorkflowExecutorFactory`` is only safe at the submitter boundary
+            # because it reads ``get_config().temporal.worker_config`` to seed
+            # execution_timeout / retry_policy / run_timeout / etc., which would
+            # bake config-dependent options into the recorded
+            # ``StartChildWorkflowExecution`` command and break determinism on
+            # replay after any config change. Wrap raw ``ChildWorkflowError``
+            # as ``WorkflowExecutionError`` so the worker's
+            # ``workflow_failure_exception_types`` contract still ends the
+            # workflow terminally instead of triggering task-failure retry.
+            try:
+                pipe_output = await workflow.execute_child_workflow(
+                    WfPipeRouter.run,
+                    arg=pipe_job,
+                    id=child_workflow_id,
+                    search_attributes=build_search_attributes(pipe_job),
+                    static_summary=build_static_summary(pipe_job.pipe),
+                )
+            except ChildWorkflowError as exc:
+                msg = f"Failed to execute child workflow WfPipeRouter for pipe '{pipe_job.pipe.code}'"
+                raise WorkflowExecutionError(msg) from exc
         else:
-            # Top-level dispatch (outside a Temporal workflow)
+            # Top-level dispatch (outside a Temporal workflow). Stamp the submitter's
+            # session_id onto the pipe_job's metadata so child workflows started later
+            # from inside Temporal code can read it without touching worker-local state.
+            pipe_job = stamp_submitter_session_id(pipe_job)
             log.debug(f"TemporalPipeRouter: top-level dispatch, task_queue={self.task_queue}")
             executor = WorkflowExecutorFactory[PipeJob, PipeOutput]().create_executor(
                 task_queue=self.task_queue,

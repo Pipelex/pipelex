@@ -22,7 +22,10 @@ from pipelex.temporal.tprl.observability import (
     build_search_attributes,
     build_static_details,
     build_static_summary,
+    stamp_submitter_session_id,
 )
+
+_STUB_SESSION_ID = "EdgdJ7Yk4Q3HF2pXyZv9w8"
 
 
 def _make_pipe_job_stub(
@@ -34,9 +37,16 @@ def _make_pipe_job_stub(
     input_keys: list[str] | None = None,
     user_id: str = "acme-corp",
     pipeline_run_id: str = "3f9c8b2a-1e4d-4f5b-9c7a-2d8e1f0a6b3c",
+    session_id: str | None = _STUB_SESSION_ID,
     library_crate_fingerprint: str | None = None,
 ) -> Any:
-    """Build a stub PipeJob with only the attributes the helpers read."""
+    """Build a stub PipeJob with only the attributes the helpers read.
+
+    ``session_id`` defaults to the canonical stub value because the helpers
+    now read it directly off ``pipe_job.job_metadata`` instead of touching
+    the worker-local ``TemporalManager``. Pass ``None`` to exercise the
+    "session_id not stamped" fallback path.
+    """
     pipe_job = mocker.MagicMock()
     pipe_job.pipe.code = pipe_code
     pipe_job.pipe.domain_code = domain_code
@@ -44,6 +54,7 @@ def _make_pipe_job_stub(
     pipe_job.pipe.inputs.root = {key: object() for key in (input_keys or [])}
     pipe_job.job_metadata.user_id = user_id
     pipe_job.job_metadata.pipeline_run_id = pipeline_run_id
+    pipe_job.job_metadata.session_id = session_id
     if library_crate_fingerprint is None:
         pipe_job.library_crate = None
     else:
@@ -53,11 +64,12 @@ def _make_pipe_job_stub(
 
 @pytest.fixture
 def patch_temporal_manager(mocker: MockerFixture) -> None:
-    """Patch ``get_temporal_manager`` so the helpers can read ``session_id``
-    without needing a real ``TemporalManager`` singleton.
+    """Patch ``get_temporal_manager`` so the ``stamp_submitter_session_id``
+    helper can capture a value without needing a real ``TemporalManager``
+    singleton. The observability helpers themselves no longer read it.
     """
     manager = mocker.MagicMock()
-    manager.session_id = "EdgdJ7Yk4Q3HF2pXyZv9w8"
+    manager.session_id = _STUB_SESSION_ID
     mocker.patch("pipelex.temporal.tprl.observability.get_temporal_manager", return_value=manager)
 
 
@@ -100,6 +112,30 @@ class TestObservabilityHelpers:
         attrs = build_search_attributes(pipe_job)
 
         assert len(attrs) == 0
+
+    def test_build_search_attributes_reads_session_id_from_pipe_job_not_manager(self, mocker: MockerFixture) -> None:
+        """Determinism regression: ``build_search_attributes`` must be a pure
+        function of ``pipe_job``. Reading ``TemporalManager.session_id`` from
+        inside workflow code produced non-deterministic ``StartChildWorkflowExecution``
+        commands on replay across worker restarts. Two ``pipe_job`` stubs with
+        the same stamped ``job_metadata.session_id`` but different fake
+        managers must yield byte-equal ``SessionId`` pairs.
+        """
+        manager_alpha = mocker.MagicMock()
+        manager_alpha.session_id = "this-must-not-leak-into-attrs-A"
+        mocker.patch("pipelex.temporal.tprl.observability.get_temporal_manager", return_value=manager_alpha)
+        pipe_job = _make_pipe_job_stub(mocker, session_id="stamped-at-submitter")
+
+        attrs_first = build_search_attributes(pipe_job)
+
+        manager_beta = mocker.MagicMock()
+        manager_beta.session_id = "this-must-not-leak-into-attrs-B"
+        mocker.patch("pipelex.temporal.tprl.observability.get_temporal_manager", return_value=manager_beta)
+
+        attrs_second = build_search_attributes(pipe_job)
+
+        assert attrs_first[SESSION_ID_KEY] == "stamped-at-submitter"
+        assert attrs_second[SESSION_ID_KEY] == "stamped-at-submitter"
 
     def test_build_search_attributes_filters_to_configured_subset(self, mocker: MockerFixture) -> None:
         """When ``attributes`` lists only a subset of the five built-ins, only
@@ -189,6 +225,73 @@ class TestObservabilityHelpers:
         details = build_static_details(pipe_job)
 
         assert "Library crate" not in details
+
+    def test_stamp_submitter_session_id_sets_when_missing(self, mocker: MockerFixture) -> None:
+        """At top-level dispatch, the helper must read ``TemporalManager.session_id``
+        once and write it onto ``pipe_job.job_metadata`` so the value flows into
+        child workflows via the workflow input.
+        """
+        manager = mocker.MagicMock()
+        manager.session_id = "submitter-session-xyz"
+        mocker.patch("pipelex.temporal.tprl.observability.get_temporal_manager", return_value=manager)
+
+        pipe_job = _make_pipe_job_stub(mocker, session_id=None)
+        # Configure the model_copy chain so the assertion sees the stamped value.
+        updated_metadata = mocker.MagicMock()
+        updated_metadata.session_id = "submitter-session-xyz"
+        pipe_job.job_metadata.model_copy.return_value = updated_metadata
+        stamped_pipe_job = mocker.MagicMock()
+        stamped_pipe_job.job_metadata = updated_metadata
+        pipe_job.model_copy.return_value = stamped_pipe_job
+
+        stamped = stamp_submitter_session_id(pipe_job)
+
+        assert stamped.job_metadata.session_id == "submitter-session-xyz"
+        # The helper must call model_copy with the right update payload.
+        pipe_job.job_metadata.model_copy.assert_called_once_with(update={"session_id": "submitter-session-xyz"})
+        pipe_job.model_copy.assert_called_once_with(update={"job_metadata": updated_metadata})
+
+    def test_stamp_submitter_session_id_is_idempotent(self, mocker: MockerFixture) -> None:
+        """When ``session_id`` is already set on the incoming ``pipe_job``,
+        the helper must return the same object untouched — child workflows
+        inherit the parent's session_id and must not have it overwritten by
+        a worker-local fallback.
+        """
+        manager = mocker.MagicMock()
+        manager.session_id = "worker-local-value-should-be-ignored"
+        mocker.patch("pipelex.temporal.tprl.observability.get_temporal_manager", return_value=manager)
+        pipe_job = _make_pipe_job_stub(mocker, session_id="parent-session-preserved")
+
+        stamped = stamp_submitter_session_id(pipe_job)
+
+        assert stamped is pipe_job
+        assert stamped.job_metadata.session_id == "parent-session-preserved"
+        pipe_job.job_metadata.model_copy.assert_not_called()
+        pipe_job.model_copy.assert_not_called()
+
+    def test_build_search_attributes_falls_back_to_empty_string_when_session_unset(self, mocker: MockerFixture) -> None:
+        """Defensive fallback: if a caller bypasses ``stamp_submitter_session_id``
+        somehow, ``build_search_attributes`` must emit an empty string for
+        ``SessionId`` rather than ``None`` (Keyword attributes reject ``None``).
+        """
+        pipe_job = _make_pipe_job_stub(mocker, session_id=None)
+
+        attrs = build_search_attributes(pipe_job)
+
+        assert attrs[SESSION_ID_KEY] == ""
+
+    def test_build_static_details_truncates_at_20kb(self, mocker: MockerFixture) -> None:
+        """Module docstring claims ``static_details`` are capped at 20 KB.
+        Push the input list past the cap and assert the renderer truncates
+        with an ellipsis instead of returning an oversize payload.
+        """
+        long_input_names = [f"input_field_name_{index:04d}" for index in range(2000)]
+        pipe_job = _make_pipe_job_stub(mocker, input_keys=long_input_names)
+
+        details = build_static_details(pipe_job)
+
+        assert len(details.encode("utf-8")) <= 20 * 1024
+        assert details.endswith("…")
 
     def test_build_activity_summary_includes_method_pipe_and_extras(self) -> None:
         job_metadata = JobMetadata(user_id="u", pipeline_run_id="r", pipe_code="translate_doc")

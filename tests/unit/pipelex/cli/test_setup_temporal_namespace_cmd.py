@@ -82,9 +82,11 @@ class TestSetupTemporalNamespaceCmd:
             "pipelex.temporal.temporal_connect.connect_to_temporal_selected_server",
             new=mocker.AsyncMock(return_value=fake_client),
         )
+        # Helper now returns the tuple of newly-registered names; two of the five
+        # attributes were missing and have just been added.
         register_mock = mocker.patch(
             "pipelex.temporal.tprl.namespace_check.ensure_required_search_attributes_registered",
-            new=mocker.AsyncMock(return_value=None),
+            new=mocker.AsyncMock(return_value=("SessionId", "DomainCode")),
         )
 
         setup_temporal_namespace_cmd(dry_run=False, server=None)
@@ -95,8 +97,34 @@ class TestSetupTemporalNamespaceCmd:
         assert kwargs["temporal_client"] is fake_client
         assert kwargs["namespace"] == "default"
         assert kwargs["configured_attributes"] == ["PipeCode", "PipelineRunId", "SessionId", "UserId", "DomainCode"]
-        # Success message lands on stdout.
-        assert "Registered" in capsys.readouterr().out
+        # Success message names the actual delta, not the configured set size.
+        captured_out = capsys.readouterr().out
+        assert "Registered 2 new" in captured_out
+        assert "SessionId" in captured_out
+        assert "DomainCode" in captured_out
+
+    @pytest.mark.usefixtures("patch_pipelex_lifecycle")
+    def test_idempotent_no_op_reports_already_registered(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+        """When every configured attribute is already registered, the helper
+        returns an empty tuple. The CLI must report the idempotent outcome
+        clearly instead of falsely claiming it just registered the full set
+        (the misleading "Registered N" that operators saw before).
+        """
+        self._patch_config(mocker)
+        mocker.patch(
+            "pipelex.temporal.temporal_connect.connect_to_temporal_selected_server",
+            new=mocker.AsyncMock(return_value=mocker.MagicMock()),
+        )
+        mocker.patch(
+            "pipelex.temporal.tprl.namespace_check.ensure_required_search_attributes_registered",
+            new=mocker.AsyncMock(return_value=()),
+        )
+
+        setup_temporal_namespace_cmd(dry_run=False, server=None)
+
+        out = capsys.readouterr().out
+        assert "already registered" in out
+        assert "All 5" in out
 
     @pytest.mark.usefixtures("patch_pipelex_lifecycle")
     def test_permission_denied_prints_fallback_runbook_and_exits(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:

@@ -16,6 +16,7 @@ from pipelex.temporal.tprl.observability import (
     build_search_attributes,
     build_static_details,
     build_static_summary,
+    stamp_submitter_session_id,
 )
 from pipelex.temporal.tprl.workflow_caller import WorkflowClass, WorkflowExecutor, WorkflowExecutorFactory
 from pipelex.temporal.tprl_pipe.pipe_run_arg import PipeRunArg
@@ -51,6 +52,9 @@ class TemporalPipeRun(WorkflowExecutor[PipeRunArg, PipeOutput], PipeRunProtocol)
         delivery_assignment: DeliveryAssignment | None = None,
     ) -> PipeOutput:
         """Execute a pipe run via Temporal (blocking — waits for completion)."""
+        # Stamp submitter session_id before the workflow input is built so the
+        # value flows through to every child workflow via the workflow arg.
+        pipe_job = stamp_submitter_session_id(pipe_job)
         pipe_run_arg = PipeRunArg(
             pipe_job=pipe_job,
             delivery_assignment=delivery_assignment,
@@ -87,6 +91,9 @@ class TemporalPipeRun(WorkflowExecutor[PipeRunArg, PipeOutput], PipeRunProtocol)
         Returns the workflow_id and a WorkflowHandle that can be awaited later.
         """
         log.debug(f"TemporalPipeRun start using task_queue: {self.task_queue}")
+        # Stamp submitter session_id before building the workflow input so it
+        # flows through every child workflow via the workflow arg.
+        pipe_job = stamp_submitter_session_id(pipe_job)
         pipe_run_arg = PipeRunArg(
             pipe_job=pipe_job,
             delivery_assignment=delivery_assignment,

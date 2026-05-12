@@ -57,7 +57,15 @@ def setup_temporal_namespace_cmd(
         pipelex setup-temporal-namespace --dry-run
         pipelex setup-temporal-namespace --server testing
     """
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN, temporal_enabled=True)
+    # ``needs_inference=False``: namespace registration only needs the Temporal
+    # config; forcing inference setup (gateway/telemetry/credentials) would make
+    # the command fail on unrelated prerequisites that aren't required to talk
+    # to the Operator service.
+    make_pipelex_for_cli(
+        context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN,
+        temporal_enabled=True,
+        needs_inference=False,
+    )
 
     try:
         from temporalio.service import RPCError  # noqa: PLC0415
@@ -111,7 +119,7 @@ def setup_temporal_namespace_cmd(
             )
             return
 
-        async def _connect_and_register() -> RegistrationFailure | None:
+        async def _connect_and_register() -> RegistrationFailure | tuple[str, ...]:
             # Single event loop for both awaits: the Temporal SDK binds the
             # Client to the loop it was created on, so the registration call
             # must run on the same loop as the connect.
@@ -139,9 +147,10 @@ def setup_temporal_namespace_cmd(
 
         if isinstance(outcome, RegistrationFailure):
             typer.secho(
-                "Permission denied: this Temporal API key cannot call "
-                "OperatorService.AddSearchAttributes. Ask a namespace admin to register "
-                "the missing attributes manually:\n",
+                "Permission denied: this Temporal API key cannot register search "
+                "attributes on the namespace (OperatorService.ListSearchAttributes "
+                "or OperatorService.AddSearchAttributes). Ask a namespace admin to "
+                "register the missing attributes manually:\n",
                 fg=typer.colors.RED,
                 err=True,
             )
@@ -155,9 +164,19 @@ def setup_temporal_namespace_cmd(
             )
             raise typer.Exit(1)
 
-        typer.secho(
-            f"Registered {len(configured)} custom search attribute(s) on namespace '{namespace}'.",
-            fg=typer.colors.GREEN,
-        )
+        # outcome is the tuple of newly-registered attribute names. Empty means
+        # the namespace already had everything — report that distinctly so the
+        # operator knows the command was idempotent rather than misreading the
+        # success count.
+        if len(outcome) == 0:
+            typer.secho(
+                f"All {len(configured)} configured custom search attribute(s) were already registered on namespace '{namespace}'.",
+                fg=typer.colors.GREEN,
+            )
+        else:
+            typer.secho(
+                f"Registered {len(outcome)} new custom search attribute(s) on namespace '{namespace}': {list(outcome)}.",
+                fg=typer.colors.GREEN,
+            )
     finally:
         Pipelex.teardown_if_needed()

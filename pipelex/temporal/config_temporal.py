@@ -178,7 +178,7 @@ class RetryPolicyConfigBase(ConfigModel):
 
     initial_interval: timedelta = Field(strict=False, gt=timedelta(0))
     backoff_coefficient: float = Field(ge=1.0)
-    maximum_interval: Union[Annotated[timedelta, Field(gt=timedelta(0))], Literal["unlimited"]]
+    maximum_interval: Union[Annotated[timedelta, Field(strict=False, gt=timedelta(0))], Literal["unlimited"]]
     maximum_attempts: Union[Annotated[int, Field(gt=0)], Literal["unlimited"]]
 
     def make_retry_policy(self, merged_non_retryable_types: list[str]) -> "RetryPolicy":

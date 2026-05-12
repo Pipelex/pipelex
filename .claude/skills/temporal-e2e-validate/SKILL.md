@@ -1078,7 +1078,7 @@ falling back to a different handle; do not substitute another OCR backend.
 Restore the default empty `activity_queues` and kill the dedicated workers:
 
 ```bash
-rm -f .pipelex/pipelex_temporary_override.toml
+.venv/bin/python -c "from pathlib import Path; Path('.pipelex/pipelex_temporary_override.toml').unlink(missing_ok=True)"
 for q in q_inference q_handle_a q_handle_b q_image_gen q_extract; do
   tmux kill-session -t "temporal-worker-${q//_/-}" 2>/dev/null
 done
@@ -1351,7 +1351,7 @@ Should start up (proceed past the validator without raising).
 **Step 9.t — Teardown**
 
 ```bash
-rm -f .pipelex/pipelex_temporary_override.toml
+.venv/bin/python -c "from pathlib import Path; Path('.pipelex/pipelex_temporary_override.toml').unlink(missing_ok=True)"
 for q in q-llm q-llm-anthropic q-imggen q-extract; do
   tmux kill-session -t "temporal-worker-$q" 2>/dev/null
 done

@@ -20,7 +20,7 @@ from datetime import timedelta
 
 import tomli
 
-from pipelex.temporal.config_temporal import ActivityRouteConfig, HandleOptions, WorkerConfig
+from pipelex.temporal.config_temporal import ActivityRouteConfig, HandleOptions, RetryPolicyConfig, RetryPolicyConfigOverlay, WorkerConfig
 
 _TOML_FRAGMENT = """
 default_task_queue = "temporal_task_queue"
@@ -105,3 +105,31 @@ class TestWorkerConfigTomlParsing:
         assert worker_config.resolve_queue("act_extract_gen_extract_pages", routing_key=None) == "extract_q"
         # Layer 1: completely unmapped activity falls back to the worker default.
         assert worker_config.resolve_queue("act_jinja2_gen_text") == "temporal_task_queue"
+
+    def test_retry_policy_finite_maximum_interval_from_toml(self) -> None:
+        """Finite TOML duration on ``maximum_interval`` must round-trip under
+        ``ConfigModel``'s ``strict=True``. Regression for the missing ``strict=False``
+        on the Annotated arm of the Union — without it, operator overlays like
+        ``maximum_interval = "0:02:00"`` blocked config load.
+        """
+        toml_fragment = """
+initial_interval = "0:00:03"
+backoff_coefficient = 2.0
+maximum_interval = "0:02:00"
+maximum_attempts = 3
+non_retryable_error_types = []
+"""
+        baseline = RetryPolicyConfig.model_validate(tomli.loads(toml_fragment))
+        assert baseline.maximum_interval == timedelta(minutes=2)
+
+        # Same on the overlay class — both inherit RetryPolicyConfigBase, so the
+        # fix at the base must cover both layers.
+        overlay_fragment = """
+initial_interval = "0:00:03"
+backoff_coefficient = 2.0
+maximum_interval = "0:02:00"
+maximum_attempts = 3
+non_retryable_error_types_extra = []
+"""
+        overlay = RetryPolicyConfigOverlay.model_validate(tomli.loads(overlay_fragment))
+        assert overlay.maximum_interval == timedelta(minutes=2)

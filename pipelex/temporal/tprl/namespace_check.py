@@ -17,9 +17,13 @@ Two entry points:
 - ``ensure_required_search_attributes_registered`` — auto-register the missing
   attributes. Used by test infrastructure to set up the in-process Temporal
   server before any tests run, and by the ``pipelex setup-temporal-namespace``
-  CLI command. Catches ``RPCError(PERMISSION_DENIED)`` and returns a structured
-  ``RegistrationFailure`` instead of raising so the CLI can format a fallback
-  runbook for operators whose API key lacks namespace-admin permissions.
+  CLI command. Catches ``RPCError(PERMISSION_DENIED)`` on either RPC
+  (``ListSearchAttributes`` or ``AddSearchAttributes``) and returns a
+  structured ``RegistrationFailure`` instead of raising so the CLI can format
+  a fallback runbook for operators whose API key lacks namespace-admin
+  permissions. Returns the tuple of newly-registered names (possibly empty,
+  for the idempotent "everything already present" no-op) on success so callers
+  can report the actual delta instead of the configured-set size.
 """
 
 from collections.abc import Sequence
@@ -144,7 +148,7 @@ async def ensure_required_search_attributes_registered(
     temporal_client: TemporalClient,
     namespace: str,
     configured_attributes: Sequence[str],
-) -> RegistrationFailure | None:
+) -> RegistrationFailure | tuple[str, ...]:
     """Register any missing configured search attributes as Keyword.
 
     Idempotent: calls ``ListSearchAttributes`` first and only adds the ones
@@ -152,12 +156,13 @@ async def ensure_required_search_attributes_registered(
     Temporal server and by the ``pipelex setup-temporal-namespace`` CLI
     command.
 
-    Returns ``None`` on success (including the no-op "everything already
-    registered" case). Returns a ``RegistrationFailure`` when the namespace
-    is reachable but the client's API key lacks
-    ``OperatorService.AddSearchAttributes`` permission — the CLI command
-    formats it into the fallback runbook. Other ``RPCError`` codes
-    (``UNAVAILABLE``, ``NOT_FOUND``) propagate.
+    Returns the tuple of newly-registered attribute names on success — an
+    empty tuple in the idempotent "everything already registered" no-op case,
+    otherwise the names that were just added. Returns a ``RegistrationFailure``
+    when the namespace is reachable but the client's API key lacks read
+    (``ListSearchAttributes``) or write (``AddSearchAttributes``) permission;
+    the CLI command formats it into the fallback runbook. Other ``RPCError``
+    codes (``UNAVAILABLE``, ``NOT_FOUND``) propagate.
 
     Args:
         temporal_client: The client used to talk to the operator service.
@@ -166,14 +171,25 @@ async def ensure_required_search_attributes_registered(
             registered. Pass ``BUILTIN_SEARCH_ATTRIBUTES`` for the full set.
     """
     if not configured_attributes:
-        return None
-    response = await temporal_client.operator_service.list_search_attributes(
-        ListSearchAttributesRequest(namespace=namespace),
-    )
+        return ()
+    try:
+        response = await temporal_client.operator_service.list_search_attributes(
+            ListSearchAttributesRequest(namespace=namespace),
+        )
+    except RPCError as list_exc:
+        if list_exc.status == RPCStatusCode.PERMISSION_DENIED:
+            # Without read access we cannot compute the actual missing set, so
+            # surface the full configured set as the operator's work item.
+            return RegistrationFailure(
+                namespace=namespace,
+                missing=tuple(configured_attributes),
+                rpc_error_message=str(list_exc),
+            )
+        raise
     present = set(response.custom_attributes.keys())
     missing = tuple(name for name in configured_attributes if name not in present)
     if not missing:
-        return None
+        return ()
 
     try:
         await temporal_client.operator_service.add_search_attributes(
@@ -182,12 +198,12 @@ async def ensure_required_search_attributes_registered(
                 search_attributes=dict.fromkeys(missing, IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD),
             ),
         )
-    except RPCError as exc:
-        if exc.status == RPCStatusCode.PERMISSION_DENIED:
+    except RPCError as add_exc:
+        if add_exc.status == RPCStatusCode.PERMISSION_DENIED:
             return RegistrationFailure(
                 namespace=namespace,
                 missing=missing,
-                rpc_error_message=str(exc),
+                rpc_error_message=str(add_exc),
             )
         raise
-    return None
+    return missing

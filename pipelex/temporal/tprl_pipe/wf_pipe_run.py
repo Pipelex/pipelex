@@ -2,17 +2,16 @@ from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
-from temporalio.exceptions import ActivityError
+from temporalio.exceptions import ActivityError, ChildWorkflowError
 from typing_extensions import override
 
 with workflow.unsafe.imports_passed_through():
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryStatus
-    from pipelex.pipe_run.pipe_job import PipeJob
     from pipelex.temporal.exceptions import WorkflowExecutionError
     from pipelex.temporal.log_temporal import workflow_log
     from pipelex.temporal.tprl.observability import build_search_attributes, build_static_summary
-    from pipelex.temporal.tprl.workflow_caller import WorkflowClass, WorkflowExecutorFactory
+    from pipelex.temporal.tprl.workflow_caller import WorkflowClass
     from pipelex.temporal.tprl_pipe.act_assemble_graph import AssembleGraphArg, act_assemble_graph
     from pipelex.temporal.tprl_pipe.act_deliver import DeliveryActivityArg, act_deliver
     from pipelex.temporal.tprl_pipe.pipe_run_arg import PipeRunArg
@@ -44,21 +43,32 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
 
         # The wf_pipe_router child runs the same pipe as wf_pipe_run, so its
         # search attributes and static summary are identical — re-derive them
-        # from the same pipe_job. Routes through the WorkflowExecutor wrapper
-        # so this stays consistent with TemporalPipeRouter's child branch.
-        executor = WorkflowExecutorFactory[PipeJob, PipeOutput]().create_executor(task_queue=None)
+        # from the same pipe_job. Dispatched via ``workflow.execute_child_workflow``
+        # directly so the recorded ``StartChildWorkflowExecution`` command is a
+        # pure function of the workflow input: no config-derived
+        # execution_timeout / retry_policy / task_queue smuggled in via the
+        # ``WorkflowExecutorFactory``, which would change across deploys and
+        # break determinism on replay after a config edit.
         try:
-            pipe_output = await executor.execute_child_workflow(
-                workflow_class=WfPipeRouter,
-                workflow_arg=pipe_job,
-                workflow_id=f"{workflow.info().workflow_id}/pipe-router",
+            pipe_output = await workflow.execute_child_workflow(
+                WfPipeRouter.run,
+                arg=pipe_job,
+                id=f"{workflow.info().workflow_id}/pipe-router",
                 search_attributes=build_search_attributes(pipe_job),
                 static_summary=build_static_summary(pipe_job.pipe),
             )
             workflow_log.debug("WfPipeRouter completed successfully")
-        except WorkflowExecutionError as exc:
+        except ChildWorkflowError as exc:
             status = DeliveryStatus.FAILED
-            execution_error = exc
+            # Wrap the raw ``ChildWorkflowError`` as ``WorkflowExecutionError`` so
+            # the rest of this function and the outer ``execute_workflow`` caller
+            # continue to see the same Pipelex error type as before — the
+            # in-workflow ``WorkflowExecutor.execute_child_workflow`` wrapper used
+            # to do this wrap before; the integration test
+            # ``test_wf_pipe_run_failure_path`` pins the workflow_failure_exception_types
+            # contract on ``WorkflowExecutionError``.
+            execution_error = WorkflowExecutionError("WfPipeRouter failed")
+            execution_error.__cause__ = exc
             workflow_log.error(f"WfPipeRouter failed: {exc}")
 
         # Step 2: Assemble full graph from trace events (cross-worker)
