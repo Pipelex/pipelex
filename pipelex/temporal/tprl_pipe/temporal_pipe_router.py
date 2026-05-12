@@ -84,6 +84,7 @@ class TemporalPipeRouter(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtoc
                     id=child_workflow_id,
                     search_attributes=build_search_attributes(pipe_job),
                     static_summary=build_static_summary(pipe_job.pipe),
+                    static_details=build_static_details(pipe_job),
                 )
             except ChildWorkflowError as exc:
                 msg = f"Failed to execute child workflow WfPipeRouter for pipe '{pipe_job.pipe.code}'"

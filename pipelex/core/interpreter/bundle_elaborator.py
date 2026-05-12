@@ -88,9 +88,10 @@ class BundleElaborator:
         )
 
         # Re-run bundle-level validators against the synthetic pipes so any reference rot
-        # surfaces with bundle context, not deep inside library_manager.
+        # surfaces with bundle context, not deep inside library_manager. The validated
+        # instance is intentionally discarded — callers receive `elaborated`.
         try:
-            PipelexBundleBlueprint.model_validate(elaborated.model_dump(by_alias=True))
+            _ = PipelexBundleBlueprint.model_validate(elaborated.model_dump(by_alias=True))
         except ValidationError as exc:
             msg = (
                 f"Bundle elaboration produced an invalid bundle (domain '{bundle.domain}'). "
