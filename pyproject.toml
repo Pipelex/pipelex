@@ -102,7 +102,7 @@ dev = [
   "boto3-stubs>=1.35.24",
   "cryptography>=46.0.7",
   "moto[dynamodb,s3]>=5.0.0",
-  "mypy==1.19.1",
+  "mypy==2.1.0",
   "pipelex-tools>=0.3.2",
   "pyright==1.1.408",
   "pylint==4.0.4",
