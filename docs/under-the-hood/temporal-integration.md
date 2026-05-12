@@ -5,6 +5,8 @@ description: "How Pipelex distributes pipe execution across Temporal workers —
 
 # Temporal Integration
 
+This page is for contributors working on Pipelex internals. If you're deploying or operating Pipelex on Temporal, see the user-facing [Distributed Execution with Temporal](../distributed-execution/index.md) guide instead.
+
 This page covers the Temporal-specific mechanisms that enable distributed pipe execution. For the general pipe routing architecture (shared between direct and distributed modes), see [Pipe Routing & Execution](./pipe-routing-and-execution.md).
 
 ---

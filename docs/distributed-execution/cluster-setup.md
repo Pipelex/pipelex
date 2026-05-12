@@ -1,11 +1,11 @@
 ---
-title: "Temporal Deployment"
-description: "What a Temporal cluster operator needs to register before running Pipelex workers — the strict-prerequisite custom search attributes, the configurable surface, and the registration runbook."
+title: "Cluster Setup"
+description: "One-time Temporal namespace prerequisites for Pipelex: custom search attributes, the strict worker-boot check, and the `pipelex setup-temporal-namespace` registration command."
 ---
 
-# Temporal Deployment
+# Cluster Setup
 
-This page covers the one-time cluster-side configuration Pipelex requires before workers can dispatch workflows on a real Temporal cluster. For the runtime mechanism (LibraryCrate propagation, deferred hydration, per-workflow isolation), see [Temporal Integration](./temporal-integration.md).
+This page covers the one-time cluster-side configuration Pipelex requires before workers can dispatch workflows on a real Temporal cluster. If you're new to distributed execution with Pipelex, start with the [Overview](index.md).
 
 ---
 
@@ -62,7 +62,7 @@ Every Pipelex worker process performs a one-shot `ListSearchAttributes` call on 
 - **`enabled = false`** → the check is skipped entirely. No `ListSearchAttributes` call is made.
 - **Any other exception** → propagates and crashes the worker (real bug).
 
-Failing fast at worker boot — rather than at every workflow dispatch — is the design point of this phase. The previous warn-and-continue behavior produced thousands of unactionable `RPCError`s in the activity logs, one per dispatch, instead of one loud, copy-paste-fixable error at boot.
+Failing fast at worker boot — rather than at every workflow dispatch — is the design point of this phase. The previous warn-and-continue behavior produced unactionable `RPCError`s in the activity logs, one per dispatch, instead of one loud, copy-paste-fixable error at boot.
 
 The check runs **once per worker process at boot**. There is no caching across processes — every worker performs its own check.
 
@@ -148,3 +148,9 @@ For production environments — Pipelex Cloud, Temporal Cloud, self-hosted Tempo
 ## In-process test server
 
 The Temporal in-process test server (`WorkflowEnvironment.start_local()`, used by CI and unit tests) starts with no custom attributes registered. The integration test conftest registers them up front via `ensure_required_search_attributes_registered(..., configured_attributes=BUILTIN_SEARCH_ATTRIBUTES)` so all temporal tests can start workflows without per-test bootstrap. There is no need to set `enabled = false` for tests — the conftest covers it.
+
+---
+
+## What's next
+
+Once the namespace is set up, head to **[Worker Deployment](workers.md)** to run the worker process that will execute your workflows.

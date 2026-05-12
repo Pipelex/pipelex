@@ -58,6 +58,7 @@ plugins:
       separator: '[\s\-\.]+'
   - redirects:
       redirect_maps:
+        'under-the-hood/temporal-deployment.md': 'distributed-execution/cluster-setup.md'
         'home/1-features/advanced-customizations.md': 'features/advanced-customizations.md'
         'home/1-features/claude-code-skills-plugin.md': 'features/claude-code-skills-plugin.md'
         'home/1-features/cli.md': 'features/cli.md'
@@ -376,6 +377,12 @@ nav:
     - Viewpoint:
       - The Know-How Graph: viewpoint/viewpoint.md
   - Guide:
+    - Distributed Execution with Temporal:
+      - Overview: distributed-execution/index.md
+      - Cluster Setup: distributed-execution/cluster-setup.md
+      - Worker Deployment: distributed-execution/workers.md
+      - Task-Queue Routing: distributed-execution/task-routing.md
+      - Workflow Observability: distributed-execution/observability.md
     - Features:
       - Overview: features/index.md
       - Declarative AI Methods:
@@ -396,6 +403,7 @@ nav:
         - Execution Graph Visualization: features/execution-graph.md
       - Production & Operations:
         - Validation & Dry Run: features/validation-dry-run.md
+        - Distributed Execution with Temporal: features/distributed-execution.md
         - Telemetry & Observability: features/telemetry.md
         - Cloud Storage: features/cloud-storage.md
         - Cost Tracking & Reporting: features/cost-tracking.md
@@ -498,7 +506,6 @@ nav:
       - Init CLI Flows: under-the-hood/init-cli-flows.md
       - Pipe Routing & Execution: under-the-hood/pipe-routing-and-execution.md
       - Temporal Integration: under-the-hood/temporal-integration.md
-      - Temporal Deployment: under-the-hood/temporal-deployment.md
       - Distributed Content Generation: under-the-hood/distributed-content-generation.md
   - Project:
     - Contributing: contributing.md
