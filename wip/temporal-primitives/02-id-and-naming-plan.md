@@ -2,17 +2,19 @@
 
 ## Status
 
-**All four phases implemented on `feature/Temporal-config` (uncommitted).** TDD gate green, `make agent-check` clean across the lot, unit suite passes (4501 tests). Phase-by-phase checkpoints below capture handoff state for review and follow-on work.
+**Phases 1–6 shipped on `feature/Temporal-ids`.** Latest: commit `c89674f5` (Phase 6 hard-fail worker boot + configurable search attributes + setup CLI), with follow-up cleanup in `ac8e2335` and doc sync in `5afe850d`. `make agent-check` clean, `make agent-test` green. Phase-by-phase checkpoints below capture handoff state and decisions.
 
-Original plan: implements `id-and-naming-design.md` against the failing TDD gate in `tests/unit/pipelex/temporal/test_default_activity_id_collision_bug.py`. Aligned with the problem statement in `workflow-and-activity-ids.md` and the primitives reference in `temporal-id-primitives.md`.
+The only remaining temporal-primitives work captured in this directory is `03-temporal-error-handling-revamp.md` — a deferred proposal to make `WorkflowExecutionError` inherit from `temporalio.exceptions.ApplicationError`, dropping the Worker-side `workflow_failure_exception_types` registration.
+
+Original frame: implements `01-id-and-naming-design.md` against the failing TDD gate in `tests/unit/pipelex/temporal/test_default_activity_id_collision_bug.py`. The problem statement (`workflow-and-activity-ids.md`) and pre-checkpoint plan (`id-and-naming-plan.md`) are archived under `wip/archive/`.
 
 ## Cold-start orientation
 
 A fresh session picking this up should read in this order:
 
-1. `wip/temporal-primitives/workflow-and-activity-ids.md` — the problem statement and the failing TDD gate that frames this work.
-2. `wip/temporal-primitives/temporal-id-primitives.md` — what Temporal's identifier and observability surface actually offers.
-3. `wip/temporal-primitives/id-and-naming-design.md` — the authoritative spec. If anything in this plan conflicts with the design doc, the design doc wins.
+1. `wip/archive/workflow-and-activity-ids.md` — the problem statement and the (now-green) TDD gate that framed this work.
+2. `wip/temporal-primitives/00-temporal-id-primitives.md` — what Temporal's identifier and observability surface actually offers.
+3. `wip/temporal-primitives/01-id-and-naming-design.md` — the authoritative spec. If anything in this plan conflicts with the design doc, the design doc wins.
 4. This file — the sequencing of work and the per-phase done-when criteria.
 
 ### Key code anchors

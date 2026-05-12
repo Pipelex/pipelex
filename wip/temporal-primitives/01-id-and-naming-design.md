@@ -2,7 +2,9 @@
 
 ## Status
 
-Design locked. Reads cleanly with the problem statement in `workflow-and-activity-ids.md` and the primitives catalogued in `temporal-id-primitives.md`. This doc captures every decision needed to drive an implementation plan in a follow-up session — it does not itself sequence the work.
+**Implemented.** Phases 1–6 shipped on `feature/Temporal-ids` (latest: commit `c89674f5`, Phase 6 hard-fail worker boot + configurable search attributes + setup CLI). See `02-id-and-naming-plan.md` for the per-phase execution log and checkpoint notes. This doc remains the authoritative reference for the architectural decisions.
+
+Reads cleanly with the primitives catalogued in `00-temporal-id-primitives.md`. The original problem statement (`workflow-and-activity-ids.md`) and the pre-checkpoint plan (`id-and-naming-plan.md`) are archived under `wip/archive/`.
 
 Decisions taken in this session, recorded so the next session does not reopen them:
 
