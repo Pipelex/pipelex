@@ -174,7 +174,28 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
         static_details: str | None = None,
         memo: Mapping[str, Any] | None = None,
     ) -> WorkflowOutput:
-        """Execute a child workflow and wait for its completion."""
+        """Execute a child workflow and wait for its completion.
+
+        Note: Pipelex's own in-workflow child-spawn sites
+        (``pipelex.temporal.tprl_pipe.wf_pipe_run`` and
+        ``pipelex.temporal.tprl_pipe.temporal_pipe_router``) deliberately do
+        NOT use this wrapper. ``WorkflowExecutorFactory.create_executor``
+        reads ``get_config().temporal.worker_config`` to seed
+        ``execution_timeout`` / ``retry_policy`` / ``run_timeout`` /
+        ``task_timeout`` / ``start_delay`` / ``rpc_timeout`` for the
+        executor instance, and forwarding those into a
+        ``StartChildWorkflowExecution`` command from inside a workflow would
+        bake config-derived values into the recorded history — replay after a
+        config edit would then re-derive different values and Temporal would
+        reject the replay with a non-determinism mismatch. The submitter-side
+        entry points (``execute_workflow`` / ``start_workflow``) do not have
+        this problem because they run outside the workflow sandbox. If you
+        need to start a child workflow from inside a workflow, call
+        ``workflow.execute_child_workflow(...)`` directly and pass only
+        replay-deterministic options (workflow input, ids derived from the
+        input, ``search_attributes`` / ``static_summary`` built by the pure
+        helpers in ``pipelex.temporal.tprl.observability``).
+        """
         try:
             return await cast(
                 "Callable[..., Coroutine[Any, Any, WorkflowOutput]]",
@@ -212,7 +233,15 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
         static_details: str | None = None,
         memo: Mapping[str, Any] | None = None,
     ) -> ChildWorkflowHandle[WorkflowClass[WorkflowInput, WorkflowOutput], WorkflowOutput]:
-        """Start a child workflow without waiting for its completion."""
+        """Start a child workflow without waiting for its completion.
+
+        Same replay-determinism caveat as ``execute_child_workflow``: Pipelex's
+        in-workflow child-spawn sites bypass this wrapper because the
+        config-derived options it carries would be baked into the
+        ``StartChildWorkflowExecution`` command and break replay after any
+        config change. Call ``workflow.start_child_workflow(...)`` directly
+        from inside a workflow.
+        """
         try:
             return await cast(
                 "Callable[..., Coroutine[Any, Any, ChildWorkflowHandle[WorkflowClass[WorkflowInput, WorkflowOutput], WorkflowOutput]]]",

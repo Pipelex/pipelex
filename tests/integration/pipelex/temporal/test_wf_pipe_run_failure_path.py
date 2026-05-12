@@ -1,13 +1,16 @@
 """Failure-path integration test for ``WfPipeRun``.
 
-Pins the invariant that the Phase 5 child-spawn-path unification did not
-break failure handling: when the child ``WfPipeRouter`` raises, ``WfPipeRun``
-must still fire ``act_deliver`` with ``status=DeliveryStatus.FAILED`` and an
-empty ``pipe_output``, then re-raise the original execution error.
+Pins the failure-path invariant: when the child ``WfPipeRouter`` raises,
+``WfPipeRun`` must still fire ``act_deliver`` with
+``status=DeliveryStatus.FAILED`` and an empty ``pipe_output``, then re-raise
+the original execution error.
 
-After the unification, ``WfPipeRun`` catches ``WorkflowExecutionError`` (the
-``WorkflowExecutor.execute_child_workflow`` wrapper's contract) instead of
-the raw ``ChildWorkflowError``. This test exercises that path end-to-end
+``WfPipeRun`` catches ``ChildWorkflowError`` from
+``workflow.execute_child_workflow(...)`` and wraps it as
+``WorkflowExecutionError`` in-place; the Worker's
+``workflow_failure_exception_types=[WorkflowExecutionError]`` registration is
+what makes the re-raise end the workflow terminally instead of triggering
+indefinite task-failure retry. This test exercises that path end-to-end
 through a real Temporal worker.
 """
 

@@ -135,13 +135,16 @@ class TemporalTaskManager(TaskManager):
             workflows=workflows,
             activities=activities,
             workflow_runner=workflow_runner,
-            # Register the Pipelex wrapper exception so a workflow re-raising it
-            # (e.g. WfPipeRun re-raising the execution_error from a failed child)
-            # surfaces as a terminal workflow failure instead of being treated
-            # as an unhandled-exception workflow task failure (which retries
-            # indefinitely). The WorkflowExecutor wrapper raises this from
-            # ChildWorkflowError; without registration Temporal cannot tell it
-            # apart from a programmer bug.
+            # Register WorkflowExecutionError as a workflow-failure type so a
+            # workflow re-raising it (e.g. WfPipeRun re-raising the
+            # execution_error from a failed child) surfaces as a terminal
+            # workflow failure instead of being treated as an
+            # unhandled-exception workflow task failure (which retries
+            # indefinitely). WfPipeRun and TemporalPipeRouter both catch
+            # ChildWorkflowError from their workflow.execute_child_workflow
+            # calls and wrap it in-place as WorkflowExecutionError; without
+            # this registration Temporal cannot tell that re-raise apart from
+            # a programmer bug.
             workflow_failure_exception_types=[WorkflowExecutionError],
             max_cached_workflows=profile.max_cached_workflows,
             max_concurrent_workflow_tasks=profile.max_concurrent_workflow_tasks,
