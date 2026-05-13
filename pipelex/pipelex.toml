@@ -348,9 +348,10 @@ edge_type = "bezier"
 initial_zoom = 1.0
 pan_to_top = true
 default_title = "Pipelex Graph"
-# When true, PipeBatch controller nodes appear in the graph as pipe nodes for batch edges
-# When false, batch edges connect stuff nodes directly (list -> items, items -> list)
-show_batch_controller = false
+# Forwarded to mthds-ui as `showControllers`: when true, controller pipes (PipeSequence,
+# PipeParallel, PipeCondition, PipeBatch) render as grouping containers around their children;
+# when false, they collapse out of the graph and edges connect stuff nodes directly.
+show_batch_controller = true
 
 [pipelex.pipeline_execution_config.graph_config.reactflow_config.style]
 theme = "dark"

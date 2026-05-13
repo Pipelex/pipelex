@@ -60,6 +60,8 @@ class GraphTracerProtocol(Protocol):
         input_specs: list[IOSpec] | None = None,
         pipe_data: dict[str, Any] | None = None,
         concept_data: list[dict[str, Any]] | None = None,
+        description: str | None = None,
+        domain_code: str | None = None,
     ) -> tuple[str, GraphContext]:
         """Record the start of a pipe execution.
 
@@ -72,6 +74,8 @@ class GraphTracerProtocol(Protocol):
             input_specs: Optional list of IOSpec describing the inputs consumed.
             pipe_data: Optional serialized pipe instance for the pipe registry.
             concept_data: Optional list of serialized concept dicts for the concept registry.
+            description: Optional human-readable pipe description (mirrored onto NodeSpec).
+            domain_code: Optional domain code of the pipe (mirrored onto NodeSpec).
 
         Returns:
             Tuple of (node_id for this pipe, updated GraphContext for children).
@@ -261,6 +265,8 @@ class GraphTracerNoOp(GraphTracerProtocol):
         input_specs: list[IOSpec] | None = None,
         pipe_data: dict[str, Any] | None = None,
         concept_data: list[dict[str, Any]] | None = None,
+        description: str | None = None,
+        domain_code: str | None = None,
     ) -> tuple[str, GraphContext]:
         node_id = graph_context.make_node_id()
         child_context = graph_context.copy_for_child(node_id, graph_context.node_sequence + 1)

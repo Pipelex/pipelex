@@ -642,3 +642,53 @@ class TestGraphSpecAssembler:
         # Verify passthrough node has no output_specs (pass-through was skipped)
         passthrough_node = next(node for node in result.nodes if node.node_id == passthrough)
         assert len(passthrough_node.node_io.outputs) == 0
+
+    def test_pipe_start_description_and_domain_code_propagate_to_node_spec(self) -> None:
+        node = _node_id(_WF_A, 0)
+        events = [
+            PipeStartEvent(
+                **_base(_WF_A, 0),
+                node_id=node,
+                pipe_code="summarize",
+                pipe_type="PipeLLM",
+                node_kind=NodeKind.OPERATOR,
+                description="Summarize the input document.",
+                domain_code="summarization",
+            ),
+            PipeEndSuccessEvent(
+                **_base(_WF_A, 1),
+                node_id=node,
+                ended_at=_time_at(1),
+            ),
+        ]
+
+        result = GraphSpecAssembler.assemble(events=events, graph_id=_GRAPH_ID)
+
+        assert len(result.nodes) == 1
+        assembled_node = result.nodes[0]
+        assert assembled_node.description == "Summarize the input document."
+        assert assembled_node.domain_code == "summarization"
+
+    def test_pipe_start_without_metadata_yields_none_on_node_spec(self) -> None:
+        node = _node_id(_WF_A, 0)
+        events = [
+            PipeStartEvent(
+                **_base(_WF_A, 0),
+                node_id=node,
+                pipe_code="noop",
+                pipe_type="PipeLLM",
+                node_kind=NodeKind.OPERATOR,
+            ),
+            PipeEndSuccessEvent(
+                **_base(_WF_A, 1),
+                node_id=node,
+                ended_at=_time_at(1),
+            ),
+        ]
+
+        result = GraphSpecAssembler.assemble(events=events, graph_id=_GRAPH_ID)
+
+        assert len(result.nodes) == 1
+        assembled_node = result.nodes[0]
+        assert assembled_node.description is None
+        assert assembled_node.domain_code is None
