@@ -347,6 +347,23 @@ Line after"""
         expected = '{{ trailing_|tag("trailing_") }}'
         assert result == expected
 
+    @pytest.mark.parametrize(
+        ("template", "expected"),
+        [
+            ("value is $_ here", "value is {{ _|format() }} here"),
+            ("@_", '{{ _|tag("_") }}'),
+            ("@?_", '{% if _ %}{{ _|tag("_") }}{% endif %}'),
+        ],
+        ids=["inline_dollar_bare_underscore", "alone_at_bare_underscore", "alone_optional_at_bare_underscore"],
+    )
+    def test_bare_underscore_is_a_valid_identifier(self, template: str, expected: str):
+        """The identifier shape `[a-zA-Z_][a-zA-Z0-9_]*` allows a single `_`, so `$_`, `@_`,
+        and `@?_` are valid sigils and rewrite. The `*` quantifier on the trailing chars
+        makes this a real code path — lock it in so a future tightening of the identifier
+        regex catches it.
+        """
+        assert preprocess_template(template) == expected
+
     # =========================================================================
     # Mixed scenarios
     # =========================================================================
@@ -570,6 +587,72 @@ Line after"""
         assert result == template
 
     # =========================================================================
+    # Code-shape lookahead must not leak across newlines.
+    # The trailing `(?![ \t]*[({\"'])` guard is same-line only: it blocks inline
+    # constructs like `$foo(...)` but must NOT suppress `$var` when the *next*
+    # line happens to start with `{`, `(`, `"`, or `'`.
+    # =========================================================================
+
+    @pytest.mark.parametrize(
+        ("template", "expected"),
+        [
+            (
+                "Value: $price\n{{ extra }}",
+                "Value: {{ price|format() }}\n{{ extra }}",
+            ),
+            (
+                "foo: $name\n'hello'",
+                "foo: {{ name|format() }}\n'hello'",
+            ),
+            (
+                "Hello $user\n  (parens)",
+                "Hello {{ user|format() }}\n  (parens)",
+            ),
+            (
+                'Hello $user\n  "quoted"',
+                'Hello {{ user|format() }}\n  "quoted"',
+            ),
+            (
+                "first $a\nsecond $b\n{ braces }",
+                "first {{ a|format() }}\nsecond {{ b|format() }}\n{ braces }",
+            ),
+        ],
+        ids=[
+            "next_line_jinja_brace",
+            "next_line_single_quote",
+            "next_line_paren",
+            "next_line_double_quote",
+            "two_dollars_then_brace_line",
+        ],
+    )
+    def test_dollar_at_eol_before_code_shape_opener_on_next_line(self, template: str, expected: str):
+        """`$var` ending a line must still be rewritten when the following line
+        starts with a code-shape opener. The same-line code-shape guard must not
+        leak across the newline.
+        """
+        assert preprocess_template(template) == expected
+
+    @pytest.mark.parametrize(
+        ("template", "expected"),
+        [
+            ("result is $value)", "result is {{ value|format() }})"),
+            ("items: $list]", "items: {{ list|format() }}]"),
+            ("end of $section}", "end of {{ section|format() }}}"),
+        ],
+        ids=[
+            "closing_paren",
+            "closing_bracket",
+            "closing_brace",
+        ],
+    )
+    def test_dollar_followed_by_closing_delimiter_rewrites(self, template: str, expected: str):
+        """Closing delimiters (`)`, `]`, `}`) are not code-shape openers. `$var`
+        immediately before them must rewrite — they are natural punctuation
+        closing a parenthetical phrase, not a function call or string.
+        """
+        assert preprocess_template(template) == expected
+
+    # =========================================================================
     # Escape sequences: @@ → literal @, $$ → literal $
     # =========================================================================
 
@@ -627,6 +710,25 @@ Line after"""
         template = "@@@@var"
         result = preprocess_template(template)
         expected = "@@var"
+        assert result == expected
+
+    def test_triple_dollar_is_literal_dollar_plus_interpolated_var(self):
+        """`$$$var` is left-to-right `$$` (escape → literal `$`) + `$var` (interpolated).
+        Parallels the `@@@var` semantics — `str.replace` finds non-overlapping `$$` first,
+        leaving a single `$` next to the identifier which the `$` rewriter then picks up.
+        """
+        template = "Line $$$var here"
+        result = preprocess_template(template)
+        expected = "Line ${{ var|format() }} here"
+        assert result == expected
+
+    def test_double_dollar_alone_on_line_is_literal_dollar(self):
+        """`$$` on its own line collapses to a literal `$` — the sentinel-then-restore
+        pipeline does not produce a stray sigil or a spurious rewrite.
+        """
+        template = "Line 1\n$$\nLine 2"
+        result = preprocess_template(template)
+        expected = "Line 1\n$\nLine 2"
         assert result == expected
 
     def test_escape_inside_style_block(self):
@@ -1035,3 +1137,33 @@ Line after"""
         is gated.
         """
         assert preprocess_template(template, declared_inputs=declared_inputs) == expected
+
+    def test_validator_skips_non_declared_candidates_then_raises_on_declared_one(self):
+        """When a line contains multiple inline `@` candidates, the validator must
+        iterate past non-declared ones (e.g. CSS at-rules) and raise only when it
+        reaches a candidate whose root identifier is a declared input.
+        """
+        template = "@media (max-width: 820px) { color: red; } @invoice_text inline here"
+        with pytest.raises(TemplateSigilSyntaxError) as exc_info:
+            preprocess_template(template, declared_inputs={"invoice_text"})
+        error_message = str(exc_info.value)
+        assert "@invoice_text" in error_message
+        assert "@media" not in error_message
+        assert "line 1" in error_message
+
+    def test_at_var_with_trailing_dot_falls_through_to_inline_validator(self):
+        r"""`@var.` on its own line is NOT matched by the line-bounded `@` pattern (the
+        trailing dot breaks `^([ \t]*)(@\??)<ident>([ \t]*)$`), so it falls through to
+        the inline-candidate validator. When `var` is in `declared_inputs`, the validator
+        raises — locking in the "pattern misses → validator catches" fall-through. Without
+        `declared_inputs`, the same input passes through unchanged.
+        """
+        template = "@var."
+        # Without declared_inputs: validator skipped, line-bounded pattern misses, pass-through.
+        assert preprocess_template(template) == template
+        # With declared_inputs={"var"}: inline validator raises.
+        with pytest.raises(TemplateSigilSyntaxError) as exc_info:
+            preprocess_template(template, declared_inputs={"var"})
+        error_message = str(exc_info.value)
+        assert "@var" in error_message
+        assert "line 1" in error_message

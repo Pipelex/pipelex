@@ -39,9 +39,11 @@ _AT_SIGIL_PATTERN = re.compile(
 # leading digit (so `$10` is unaffected without a separate `(?![0-9])` arm) and consecutive dots
 # (so `$name..` matches just `name`, leaving both trailing dots as literal punctuation outside
 # the match — no invalid Jinja). The trailing lookaheads block word-character continuation and
-# code-shape constructs (`$foo(`, `$foo "..."`, `${...}`).
+# code-shape constructs on the same line (`$foo(`, `$foo "..."`, `${...}`). The horizontal-only
+# whitespace class `[ \t]*` (not `\s*`) keeps the code-shape guard within the current line, so
+# a `$var` ending a line is still rewritten when the next line starts with `{`, `(`, `"`, or `'`.
 _DOLLAR_SIGIL_PATTERN = re.compile(
-    r"(?<!\w)(\$)([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)(?![a-zA-Z0-9_])(?!\s*[({\"'])",
+    r"(?<!\w)(\$)([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)(?![a-zA-Z0-9_])(?![ \t]*[({\"'])",
 )
 
 # Candidate-sigil detector for the validator: any unescaped `@`/`@?` at a non-word boundary
