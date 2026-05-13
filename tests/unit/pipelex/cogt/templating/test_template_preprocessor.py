@@ -975,6 +975,42 @@ Line after"""
         assert preprocess_template(template, declared_inputs={"profile"}) == template
 
     @pytest.mark.parametrize(
+        ("template", "declared_inputs", "expected_match"),
+        [
+            (
+                "<style>@media (max-width: 768px) { color: @user.color; }</style>",
+                {"user"},
+                "@user.color",
+            ),
+            (
+                "@font-face { src: @logo.url; }",
+                {"logo"},
+                "@logo.url",
+            ),
+            (
+                "@deprecated and also @invoice_text inline",
+                {"invoice_text"},
+                "@invoice_text",
+            ),
+        ],
+        ids=["media_then_user", "fontface_then_logo", "decorator_then_input"],
+    )
+    def test_inline_at_raises_on_later_candidate_when_earlier_candidate_is_not_input(
+        self,
+        template: str,
+        declared_inputs: set[str],
+        expected_match: str,
+    ):
+        """A non-input `@xxx` (CSS at-rule or decorator) earlier on the line must not
+        mask a later declared-input `@<ident>` collision. The validator must inspect
+        every candidate on the line, not just the first one.
+        """
+        with pytest.raises(TemplateSigilSyntaxError) as exc_info:
+            preprocess_template(template, declared_inputs=declared_inputs)
+        error_message = str(exc_info.value)
+        assert expected_match in error_message
+
+    @pytest.mark.parametrize(
         ("template", "expected", "declared_inputs"),
         [
             ("@invoice_text", '{{ invoice_text|tag("invoice_text") }}', set[str]()),

@@ -90,23 +90,21 @@ def _validate_at_sigil_alone_on_line(template: str, declared_inputs: set[str]) -
             continue
         if _AT_SIGIL_PATTERN.fullmatch(line):
             continue
-        candidate = _AT_CANDIDATE_PATTERN.search(line)
-        if candidate is None:
-            continue
-        sigil = candidate.group(1)
-        identifier = candidate.group(2)
-        root_identifier = get_root_from_dotted_path(identifier)
-        if root_identifier not in declared_inputs:
-            continue
-        msg = (
-            f"Inline `{sigil}{identifier}` is not allowed on line {line_index}: "
-            f"the `{sigil}` sigil produces tag-wrapped block content and must appear alone on "
-            f"its own line. "
-            f"Did you mean `${identifier}` (inline value), or move `{sigil}{identifier}` onto "
-            f"its own line? "
-            f"Escape with `@@` if you intend a literal `@`."
-        )
-        raise TemplateSigilSyntaxError(msg)
+        for candidate in _AT_CANDIDATE_PATTERN.finditer(line):
+            sigil = candidate.group(1)
+            identifier = candidate.group(2)
+            root_identifier = get_root_from_dotted_path(identifier)
+            if root_identifier not in declared_inputs:
+                continue
+            msg = (
+                f"Inline `{sigil}{identifier}` is not allowed on line {line_index}: "
+                f"the `{sigil}` sigil produces tag-wrapped block content and must appear alone on "
+                f"its own line. "
+                f"Did you mean `${identifier}` (inline value), or move `{sigil}{identifier}` onto "
+                f"its own line? "
+                f"Escape with `@@` if you intend a literal `@`."
+            )
+            raise TemplateSigilSyntaxError(msg)
 
 
 def _normalize_and_escape(template: str) -> str:
