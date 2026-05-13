@@ -409,18 +409,11 @@ Line after"""
     # Edge cases with @ symbol in non-variable contexts
     # =========================================================================
 
-    def test_email_address_partially_processed(self):
-        """Test that email-like patterns are partially processed (after @).
-
-        The regex pattern [a-zA-Z0-9_.] matches 'example.com' as a single variable
-        name since dots are allowed in variable names.
-        """
-        # Note: user@domain.ext will match 'domain.ext' as variable after @
+    def test_email_address_pass_through(self):
+        """Email addresses must not be rewritten — the lookbehind on @ prevents it."""
         template = "Contact: someone@example.com"
         result = preprocess_template(template)
-        # After @ we have example.com which matches entirely as variable name
-        expected = 'Contact: someone{{ example.com|tag("example.com") }}'
-        assert result == expected
+        assert result == template
 
     def test_at_sign_alone(self):
         """Test @ sign alone (not followed by valid variable name char)."""
@@ -434,4 +427,209 @@ Line after"""
         template = "Cost is $ for @item"
         result = preprocess_template(template)
         expected = 'Cost is $ for {{ item|tag("item") }}'
+        assert result == expected
+
+    # =========================================================================
+    # CSS at-rule pass-through (heuristic lookahead: identifier followed by `\s*[({"']`)
+    # =========================================================================
+
+    def test_css_media_query_pass_through(self):
+        """@media at-rule must not be rewritten as a variable."""
+        template = "@media (max-width: 820px) { color: red; }"
+        result = preprocess_template(template)
+        assert result == template
+
+    def test_css_supports_pass_through(self):
+        """@supports at-rule must not be rewritten as a variable."""
+        template = "@supports (display: grid) { color: red; }"
+        result = preprocess_template(template)
+        assert result == template
+
+    def test_css_import_string_pass_through(self):
+        """@import with a string argument must not be rewritten."""
+        template = '@import "reset.css";'
+        result = preprocess_template(template)
+        assert result == template
+
+    def test_css_import_url_pass_through(self):
+        """@import url(...) must not be rewritten."""
+        template = '@import url("reset.css");'
+        result = preprocess_template(template)
+        assert result == template
+
+    def test_css_charset_pass_through(self):
+        """@charset at-rule must not be rewritten."""
+        template = '@charset "UTF-8";'
+        result = preprocess_template(template)
+        assert result == template
+
+    def test_css_namespace_pass_through(self):
+        """@namespace with inner word and quoted URL is a residual: prose like `@name said "X"`
+        is too easy to confuse with `@kw word "X"`, so the heuristic only blocks the inner-word
+        shape when followed by `(` or `{`. Authors escape this one with `@@namespace`.
+        """
+        template = '@namespace svg "http://www.w3.org/2000/svg";'
+        result = preprocess_template(template)
+        expected = '{{ namespace|tag("namespace") }} svg "http://www.w3.org/2000/svg";'
+        assert result == expected
+
+    def test_css_namespace_escaped_pass_through(self):
+        """Author workaround for @namespace: escape with @@namespace."""
+        template = '@@namespace svg "http://www.w3.org/2000/svg";'
+        result = preprocess_template(template)
+        expected = '@namespace svg "http://www.w3.org/2000/svg";'
+        assert result == expected
+
+    def test_css_keyframes_pass_through(self):
+        """@keyframes at-rule must not be rewritten."""
+        template = "@keyframes spin { from { opacity: 0; } to { opacity: 1; } }"
+        result = preprocess_template(template)
+        assert result == template
+
+    def test_css_page_pass_through(self):
+        """@page at-rule must not be rewritten."""
+        template = "@page { margin: 1in; }"
+        result = preprocess_template(template)
+        assert result == template
+
+    def test_css_layer_named_pass_through(self):
+        """@layer at-rule with a name must not be rewritten."""
+        template = "@layer reset { color: red; }"
+        result = preprocess_template(template)
+        assert result == template
+
+    def test_css_container_pass_through(self):
+        """@container at-rule must not be rewritten."""
+        template = "@container (width > 400px) { color: red; }"
+        result = preprocess_template(template)
+        assert result == template
+
+    def test_css_font_face_pass_through(self):
+        r"""@font-face: heuristic can only protect `@font` (hyphen is outside the identifier class).
+
+        The lookahead `(?!\s*[({"'])` does NOT fire because the next char after `font` is `-`,
+        not whitespace+brace. Documented residual case — author must escape with `@@font-face`.
+        """
+        template = '@font-face { font-family: "X"; }'
+        result = preprocess_template(template)
+        expected = '{{ font|tag("font") }}-face { font-family: "X"; }'
+        assert result == expected
+
+    def test_css_font_face_escaped_pass_through(self):
+        """Author workaround for @font-face: escape with @@font-face."""
+        template = '@@font-face { font-family: "X"; }'
+        result = preprocess_template(template)
+        expected = '@font-face { font-family: "X"; }'
+        assert result == expected
+
+    def test_full_style_block_pass_through(self):
+        """A realistic multi-rule <style> block must pass through byte-for-byte."""
+        template = """<style>
+  .page { padding: 32px; }
+  @media (max-width: 820px) {
+    .page { padding: 24px; }
+  }
+  @supports (display: grid) {
+    .grid { display: grid; }
+  }
+</style>"""
+        result = preprocess_template(template)
+        assert result == template
+
+    # =========================================================================
+    # Email / word-adjacent @ pass-through (heuristic lookbehind)
+    # =========================================================================
+
+    def test_email_in_sentence_pass_through(self):
+        """Email address embedded in a sentence must not be rewritten."""
+        template = "Contact us at hello@pipelex.com for help."
+        result = preprocess_template(template)
+        assert result == template
+
+    def test_word_adjacent_at_pass_through(self):
+        """@ preceded by a word character (email-like) must not be rewritten."""
+        template = "Send to noreply@anthropic.com immediately."
+        result = preprocess_template(template)
+        assert result == template
+
+    # =========================================================================
+    # Code-like punctuation regression guards (already pass today, locked in by lookahead)
+    # =========================================================================
+
+    def test_jquery_call_pass_through(self):
+        """jQuery-style $("...") call must not be rewritten."""
+        template = '$("body").addClass("x")'
+        result = preprocess_template(template)
+        assert result == template
+
+    def test_bash_subshell_pass_through(self):
+        """Bash subshell $(...) must not be rewritten."""
+        template = "result=$(date +%s)"
+        result = preprocess_template(template)
+        assert result == template
+
+    def test_dollar_brace_pass_through(self):
+        """Shell ${VAR} must not be rewritten."""
+        template = "Use ${PATH} for the path."
+        result = preprocess_template(template)
+        assert result == template
+
+    # =========================================================================
+    # Escape sequences: @@ → literal @, $$ → literal $
+    # =========================================================================
+
+    def test_double_at_escapes_to_literal_at(self):
+        """@@media must collapse to literal @media with no interpolation."""
+        template = "@@media (max-width: 820px) { color: red; }"
+        result = preprocess_template(template)
+        expected = "@media (max-width: 820px) { color: red; }"
+        assert result == expected
+
+    def test_double_at_makes_at_var_literal(self):
+        """@@var must collapse to literal @var (no {{ ... }} interpolation)."""
+        template = "Use @@var here."
+        result = preprocess_template(template)
+        expected = "Use @var here."
+        assert result == expected
+
+    def test_double_dollar_escapes_to_literal_dollar(self):
+        """$$10 must collapse to literal $10."""
+        template = "Cost is $$10."
+        result = preprocess_template(template)
+        expected = "Cost is $10."
+        assert result == expected
+
+    def test_double_dollar_makes_dollar_var_literal(self):
+        """$$var must collapse to literal $var (no interpolation)."""
+        template = "Use $$var here."
+        result = preprocess_template(template)
+        expected = "Use $var here."
+        assert result == expected
+
+    def test_escape_does_not_consume_legit_variable(self):
+        """Escape on one token must not affect a legitimate variable later in the string."""
+        template = "@@media is literal, but @width is a variable."
+        result = preprocess_template(template)
+        expected = '@media is literal, but {{ width|tag("width") }} is a variable.'
+        assert result == expected
+
+    def test_triple_at_is_escape_plus_variable(self):
+        """@@@var → @{{ var|tag("var") }} — one escape followed by an interpolated var."""
+        template = "@@@var"
+        result = preprocess_template(template)
+        expected = '@{{ var|tag("var") }}'
+        assert result == expected
+
+    def test_quadruple_at_is_two_escapes(self):
+        """@@@@var → @@var — two non-overlapping escapes, no interpolation."""
+        template = "@@@@var"
+        result = preprocess_template(template)
+        expected = "@@var"
+        assert result == expected
+
+    def test_escape_inside_style_block(self):
+        """@@font-face inside a <style> block restores to literal @font-face."""
+        template = '<style>@@font-face { font-family: "X"; }</style>'
+        result = preprocess_template(template)
+        expected = '<style>@font-face { font-family: "X"; }</style>'
         assert result == expected

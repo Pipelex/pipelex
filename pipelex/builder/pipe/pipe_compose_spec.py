@@ -82,6 +82,9 @@ class PipeComposeSpec(PipeSpec):
       - `@variable` renders an entire object with all attributes auto-formatted
       - `$variable.field` for inline field access (e.g., "Order #$order.id")
       - Only use `{{ variable.field }}` for isolated single-field access
+      - Escape with `@@` or `$$` to emit a literal `@` or `$` without interpolation
+        (e.g., `@@font-face` or `@@media` inside an HTML `<style>` block; `$$10` for
+        a literal dollar amount before a word)
     - NEVER manually list all attributes - use `@variable` instead
 
     **Construct mode** (for StructuredContent output):
