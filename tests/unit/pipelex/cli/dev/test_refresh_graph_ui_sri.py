@@ -8,7 +8,10 @@ from pathlib import Path
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.cli.dev_cli.commands.refresh_graph_ui_sri_cmd import refresh_graph_ui_sri_cmd
+from pipelex.cli.dev_cli.commands.refresh_graph_ui_sri_cmd import (
+    _validate_sri,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+    refresh_graph_ui_sri_cmd,
+)
 from pipelex.cli.exceptions import PipelexCLIError
 
 
@@ -113,3 +116,24 @@ class TestRefreshGraphUiSri:
             )
 
         assert not target.exists(), "Output file must not be touched when validation fails"
+
+    def test_validate_sri_accepts_canonical_sha384(self) -> None:
+        """Real sha384 base64 output (48 bytes → 64 chars, no padding) must pass."""
+        canonical = "sha384-" + base64.b64encode(hashlib.sha384(b"anything").digest()).decode("ascii")
+        assert _validate_sri(canonical) == canonical
+
+    @pytest.mark.parametrize(
+        "bad_sri",
+        [
+            "sha384-" + "A" * 63,  # one short
+            "sha384-" + "A" * 65,  # one long
+            "sha384-" + "A" * 62 + "==",  # padded — never produced by sha384(48 bytes)
+            "sha384-" + "A" * 64 + "=",  # trailing pad
+            "sha256-" + "A" * 64,  # wrong algo
+            "sha384-" + "A" * 63 + "$",  # bad alphabet
+            "",
+        ],
+    )
+    def test_validate_sri_rejects_non_canonical(self, bad_sri: str) -> None:
+        with pytest.raises(PipelexCLIError):
+            _validate_sri(bad_sri)

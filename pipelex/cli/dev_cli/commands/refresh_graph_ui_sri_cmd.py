@@ -91,8 +91,13 @@ def _validate_version(name: str, value: str) -> str:
 
 
 def _validate_sri(value: str) -> str:
-    """Re-validate the computed SRI string before it goes into the regenerated module."""
-    if not re.fullmatch(r"sha384-[A-Za-z0-9+/=]+", value):
+    """Re-validate the computed SRI string before it goes into the regenerated module.
+
+    sha384 always produces a 48-byte digest, which base64-encodes to exactly 64 chars
+    with no `=` padding — so the literal must match that exact shape, not a looser
+    alphabet+padding pattern.
+    """
+    if not re.fullmatch(r"sha384-[A-Za-z0-9+/]{64}", value):
         msg = f"Refusing to write malformed SRI literal {value!r}"
         raise PipelexCLIError(msg)
     return value

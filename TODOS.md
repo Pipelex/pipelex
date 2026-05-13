@@ -190,7 +190,7 @@ At this point the generated HTML is small, externally linked, integrity-protecte
 
 - [x] `make agent-check` — clean.
 - [x] `make agent-test` — green.
-- [x] Added `tests/unit/pipelex/graph/test_smoke_html_render.py` as a permanent bounded-size smoke (`len(html) < 50_000`); the rendered output is now **~2.2 kB** vs. the prior ~530 kB+ (drop of ~99.6%). The full live-browser checklist below stays as a manual gate the operator should run once before merging:
+- [x] Added `tests/unit/pipelex/graph/test_smoke_html_render.py` as a permanent bounded-size smoke (`len(html) < 10_000`); the rendered output is now **~2.2 kB** vs. the prior ~530 kB+ (drop of ~99.6%). The full live-browser checklist below stays as a manual gate the operator should run once before merging:
     - [ ] Open the generated HTML in a real browser; confirm the graph renders correctly.
     - [ ] DevTools → Network shows three external requests to `cdn.jsdelivr.net` (or cache hits).
     - [ ] DevTools → Console is free of SRI mismatch errors (`Failed to find a valid digest in the 'integrity' attribute for resource …`).
