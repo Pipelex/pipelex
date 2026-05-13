@@ -826,3 +826,38 @@ Line after"""
         sigil and passes through silently — never raises, never rewrites.
         """
         assert preprocess_template(template) == template
+
+    # =========================================================================
+    # Word-adjacent `$` is not a candidate sigil — silent pass-through
+    # =========================================================================
+
+    @pytest.mark.parametrize(
+        "template",
+        [
+            "micro$oft is a company",
+            "user$host.com",
+            "P@ssw$rd123",
+            "a$b$c",
+        ],
+        ids=[
+            "mid_word_letters",
+            "mid_word_with_dot",
+            "mid_word_after_at",
+            "back_to_back_mid_word",
+        ],
+    )
+    def test_word_adjacent_dollar_pass_through(self, template: str):
+        """`$` preceded by a word character must not be rewritten — the word-boundary
+        lookbehind on the `$` arm prevents mid-word substitution.
+        """
+        assert preprocess_template(template) == template
+
+    def test_dollar_consecutive_dots_pass_through(self):
+        """`$name..` must render `{{ name|format() }}..` — the strict segmented
+        identifier stops at `name`; both trailing dots stay outside the match as
+        literal punctuation (no invalid Jinja produced).
+        """
+        template = "$name.."
+        result = preprocess_template(template)
+        expected = "{{ name|format() }}.."
+        assert result == expected

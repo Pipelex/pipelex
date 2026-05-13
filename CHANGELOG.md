@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Template preprocessor: `$<var>` no longer substitutes when `$` is adjacent to a word character on the left** (e.g. `micro$oft`, `user$host.com`, `P@ssw$rd123`, `a$b$c` now pass through unchanged instead of producing mid-word `{{ ... }}` substitutions), and no longer emits invalid Jinja for shapes like `$name..` (now renders `{{ name|format() }}..` with both trailing dots preserved as literal punctuation). The `$` arm now mirrors the `@` candidate pattern's word-boundary lookbehind (`(?<!\w)`) and uses a strict segmented identifier `[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*` that rules out a leading digit and consecutive dots structurally. The trailing-dot kludge in the `$` replacement function is gone (unreachable under the strict identifier shape). `$var` keeps its silent pass-through posture for non-candidate shapes — it does not raise like the `@` arm does.
+
 ### Changed
 
 - **Breaking: `@var` / `@?var` sigils must be alone on their own line.** The `@`/`@?` rewriters wrap the value in a tag-shaped block envelope (`<var>...</var>` via the `tag()` filter), so the inline shapes never produced sensible output. The preprocessor now requires `@var` and `@?var` to sit alone on their line (leading and trailing whitespace allowed; whitespace is preserved). Any inline candidate — `Hello @name`, `Extract from @doc.`, `@media (...)`, `@font-face {...}`, `@property --my-color {...}`, etc. — raises a new `TemplateSigilSyntaxError` at load time, surfaced through pydantic validation with the line number, the offending span, and a migration hint. The strict rule replaces the heuristic regex tightening from the prior CSS-collision fix: CSS at-rules now uniformly raise (no residual rewrites for `@font-face` / `@counter-style` / `@view-transition` / `@property --x`, no special-case lookbehind/lookahead arms). The `$var` inline sigil is unchanged. **Migration:** for inline values, switch from `@var` to `$var`; for block-shaped content, move the sigil onto its own line; for literal `@` or `$` characters, use the `@@` / `$$` escapes documented below.

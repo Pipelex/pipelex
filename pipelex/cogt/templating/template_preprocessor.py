@@ -31,11 +31,16 @@ _AT_SIGIL_PATTERN = re.compile(
     re.MULTILINE,
 )
 
-# Inline `$` sigil — keeps its inline contract. The lookaheads block dollar amounts (`$10`),
-# code-shape constructs (`$(`, `${`), and word-character continuation (so `$foo` followed by
-# more identifier chars doesn't half-match).
+# Inline `$` sigil — keeps its inline contract. The word-boundary lookbehind `(?<!\w)` mirrors
+# the `@` candidate pattern's left guard: `$` adjacent to a word character on the left passes
+# through silently (so prose like `micro$oft` or `user$host.com` does not produce mid-word
+# substitution). The strict segmented identifier `[a-zA-Z_]...(?:\.[a-zA-Z_]...)*` rules out a
+# leading digit (so `$10` is unaffected without a separate `(?![0-9])` arm) and consecutive dots
+# (so `$name..` matches just `name`, leaving both trailing dots as literal punctuation outside
+# the match — no invalid Jinja). The trailing lookaheads block word-character continuation and
+# code-shape constructs (`$foo(`, `$foo "..."`, `${...}`).
 _DOLLAR_SIGIL_PATTERN = re.compile(
-    r"(\$)(?![0-9])([a-zA-Z0-9_.]+)(?![a-zA-Z0-9_.])(?!\s*[({\"'])",
+    r"(?<!\w)(\$)([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)(?![a-zA-Z0-9_])(?!\s*[({\"'])",
 )
 
 # Candidate-sigil detector for the validator: any unescaped `@`/`@?` at a non-word boundary
@@ -66,11 +71,7 @@ def _replace_at_sigil(match: Match[str]) -> str:
 
 def _replace_dollar_sigil(match: Match[str]) -> str:
     variable: str = match.group(2)
-    trailing_dot = variable.endswith(".")
-    if trailing_dot:
-        variable = variable[:-1]
-    rendered = f"{{{{ {variable}|format() }}}}"
-    return f"{rendered}." if trailing_dot else rendered
+    return f"{{{{ {variable}|format() }}}}"
 
 
 def _validate_at_sigil_alone_on_line(template: str) -> None:

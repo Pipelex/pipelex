@@ -1,10 +1,17 @@
 # Template preprocessor — sigil collision fix (TDD plan)
 
-## Status: `$` sigil footgun fixes planned (Phase 7 — open, 2026-05-13) — HIGH PRIORITY
+## Status: `$` sigil footgun fixes landed (Phase 7 — 2026-05-13)
 
-A live audit of the inline `$` sigil surfaced four word-adjacent substitution bugs (`micro$oft`, `user$host.com`, `P@ssw$rd123`, `a$b$c`) and a consecutive-dots edge case (`$name..` → invalid Jinja). Root cause: the `$` regex is missing the `(?<!\w)` lookbehind that the `@` candidate pattern carries, and its identifier class is too permissive. Phase 7 lands the regex tightening, the matching tests, and a small simplification of `_replace_dollar_sigil` (the trailing-dot kludge becomes unreachable). **Coding must stop after Phase 7 is delivered so the work can be checkpointed before Phase 8.** See "Phase 7 — `$` sigil footgun fixes" below for the TDD plan.
+The inline `$` sigil now mirrors the `@` candidate pattern's word-boundary lookbehind and uses a strict segmented identifier shape. Word-adjacent `$` (`micro$oft`, `user$host.com`, `P@ssw$rd123`, `a$b$c`) is now silent pass-through; `$name..` renders cleanly as `{{ name|format() }}..` (consecutive dots stay outside the match as literal punctuation). The trailing-dot kludge in `_replace_dollar_sigil` is gone — unreachable under the new identifier shape. `make agent-check` clean, `make agent-test` green.
+
+### Deviations from Phase 7 plan
+
+1. **One existing test updated to match the new contract.** `tests/unit/pipelex/pipe_operators/pipe_compose/test_structured_content_composer.py::TestStructuredContentComposerRuntimeParams::test_template_field_accesses_extra_context` used the template `"Summary for $fiscal_year Q$quarter"`, which relied on the pre-Phase-7 deviation that allowed word-adjacent `$` to interpolate (so `Q$quarter` → `Q1`). Under Phase 7's word-boundary lookbehind that shape is intentional silent pass-through. The template was changed to `"Summary for $fiscal_year, quarter $quarter"` (separator added so the second `$` is not word-adjacent) and the assertion updated to `"quarter 1" in result.generated_summary`. Test intent (verifying `extra_context` is merged into template rendering) is preserved.
+2. **No `.mthds` workspace migration needed.** The Phase 7.3 grep flagged two lines in `mthds-ui/data/pipelines/pipeline_25/bundle.mthds` (`"# Text Report\n\n$classified.content"` and `"# Data Report\n\n$classified.content"`), but these are grep false positives — the `n` matched by `[[:alnum:]_]` is the `n` of the TOML `\n` escape; after TOML decoding the `$` is preceded by a real newline (whitespace), so the new regex still rewrites correctly.
 
 ## Status: declared-inputs gating planned (Phase 8 — open, 2026-05-13)
+
+**Coding must stop here for checkpoint before Phase 8.** Phase 7 is delivered (regex tightening, tests, CHANGELOG entry). Phase 8 opens a new area of concern — function split, signature change, and call-site threading across 9 files — and should be picked up in a fresh session with this `TODOS.md` as the entry point.
 
 The strict line-bounded `@` rule (landed earlier today) catches inline `@var` typos but is hostile to CSS in HTML templates — coding agents writing `<style>@media (...) { ... }</style>` get a `TemplateSigilSyntaxError` and have to learn the `@@` escape. Phase 8 relaxes the validator so that inline `@<ident>` only raises when `<ident>` is a declared input of the surrounding pipe; otherwise the candidate passes through silently. The rewriter (line-bounded substitution) is unchanged — alone-on-line `@var` still rewrites to `{{ var|tag("var") }}`. See "Phase 8 — Declared-inputs gating for the `@`-sigil validator" below for the TDD plan.
 
@@ -400,57 +407,31 @@ Notes:
 
 All new tests go inside the existing `TestTemplatePreprocessor` class in `tests/unit/pipelex/cogt/templating/test_template_preprocessor.py`.
 
-- [ ] `test_word_adjacent_dollar_pass_through` — parametrize over the four mid-word bug shapes:
-  - `micro$oft is a company`
-  - `user$host.com`
-  - `P@ssw$rd123`
-  - `a$b$c`
+- [x] `test_word_adjacent_dollar_pass_through` — parametrized over the four mid-word bug shapes (`micro$oft is a company`, `user$host.com`, `P@ssw$rd123`, `a$b$c`); each passes through unchanged.
 
-  Each must pass through unchanged.
+- [x] `test_dollar_consecutive_dots_pass_through` — `$name..` renders as `{{ name|format() }}..`. Both dots stay outside the match as literal punctuation.
 
-- [ ] `test_dollar_consecutive_dots_pass_through` — `$name..` must render as `{{ name|format() }}..`. The strict identifier stops at `name`; both dots stay outside the match as literal punctuation.
-
-- [ ] Re-run the targeted module:
-
-  ```bash
-  .venv/bin/pytest -q tests/unit/pipelex/cogt/templating/test_template_preprocessor.py
-  ```
-
-  Expected: new tests fail (red); all existing `$`-related tests still pass.
+- [x] Re-ran the targeted module — new tests went red first (content mismatches), all existing `$`-related tests still passed.
 
 ### Phase 7.2 — Implementation (green)
 
-- [ ] In `pipelex/cogt/templating/template_preprocessor.py`:
-  - [ ] Replace `_DOLLAR_SIGIL_PATTERN` with the strict shape from §Target code.
-  - [ ] Drop the `(?![0-9])` lookahead arm (redundant under the new identifier shape).
-  - [ ] Simplify `_replace_dollar_sigil` to the one-liner version. The `trailing_dot` branch is unreachable under the new regex and is removed.
-  - [ ] Update the `# Inline \`$\` sigil` comment to describe the new contract (word-boundary lookbehind, strict segmented identifier, trailing `.` stays outside the match).
-- [ ] Re-run the targeted module. Expected: all Phase 7.1 tests green; all legacy `$`-related tests still green (`test_dollar_variable_pattern`, `test_dollar_variable_with_trailing_dot`, `test_dollar_amounts_not_processed`, `test_jquery_call_pass_through`, `test_bash_subshell_pass_through`, `test_dollar_brace_pass_through`, `test_double_dollar_*`, and the punctuation-following tests).
+- [x] In `pipelex/cogt/templating/template_preprocessor.py`:
+  - [x] Replaced `_DOLLAR_SIGIL_PATTERN` with the strict segmented shape and added the `(?<!\w)` lookbehind.
+  - [x] Dropped the `(?![0-9])` lookahead arm (redundant under the new identifier shape).
+  - [x] Simplified `_replace_dollar_sigil` to the one-liner version. The `trailing_dot` branch is gone (unreachable under the new regex).
+  - [x] Updated the `# Inline \`$\` sigil` comment to describe the new contract.
+- [x] Targeted module green: 121 passed.
 
 ### Phase 7.3 — Workspace sanity check
 
-- [ ] From `/Users/lchoquel/repos/Pipelex/`, grep `.mthds` files for word-adjacent `$` (the shape whose behavior changes under the new regex):
-
-  ```bash
-  grep -rEn '[[:alnum:]_]\$[a-zA-Z_][a-zA-Z0-9_.]*' --include="*.mthds" . | head -50
-  ```
-
-- [ ] For each hit, decide: (a) it was relying on the buggy mid-word substitution and is now intentionally broken — flag back to the human, or (b) it's an unrelated literal `$` that the new regex correctly leaves alone — no action.
+- [x] Ran the grep against `/Users/lchoquel/repos/Pipelex/`. Two hits in `mthds-ui/data/pipelines/pipeline_25/bundle.mthds` (lines 100 and 107), both of the shape `"...\n\n$classified.content"`. These are grep false positives — the `n` matched by `[[:alnum:]_]` belongs to the TOML `\n` escape; after TOML decoding the `$` is preceded by a real newline, so the new regex still rewrites correctly. No action.
 
 ### Phase 7.4 — Lint, tests, docs
 
-- [ ] `make agent-check` clean (Pyright, Ruff, Mypy, plxt).
-- [ ] Targeted test run:
-
-  ```bash
-  .venv/bin/pytest -n auto \
-    -m "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api" \
-    -o log_level=WARNING --tb=short -q \
-    tests/unit/pipelex/cogt/
-  ```
-
-- [ ] `make agent-test` — full suite green.
-- [ ] `CHANGELOG.md` under `[Unreleased]` `### Fixed`: "Template preprocessor: `$<var>` no longer substitutes when `$` is adjacent to a word character on the left (e.g. `micro$oft`, `user$host.com`, `P@ssw$rd123`, `a$b$c`), and no longer emits invalid Jinja for shapes like `$name..`. The `$` arm now mirrors the `@` candidate pattern's word-boundary lookbehind and uses a strict segmented identifier shape."
+- [x] `make agent-check` clean (Pyright, Ruff, Mypy, plxt).
+- [x] Targeted cogt test run: 584 passed in 9.06s.
+- [x] `make agent-test` — full suite green (5148 passed, 2 skipped, 3 xfailed). One pre-existing test (`test_template_field_accesses_extra_context`) had its template changed from `Q$quarter` to `, quarter $quarter` to match the new contract — see the "Deviations from Phase 7 plan" section near the top.
+- [x] `CHANGELOG.md` updated under `[Unreleased]` `### Fixed`.
 
 **Checkpoint C**: Phase 7 complete when the four word-adjacent-`$` tests and the consecutive-dots test are green, all legacy tests are green, `make agent-check` is clean, and `make agent-test` is green.
 
