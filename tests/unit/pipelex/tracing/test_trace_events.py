@@ -337,6 +337,49 @@ class TestTraceEvents:
         assert restored.tokens_usage.nb_tokens_by_category[TokenCategory.INPUT] == 100
         assert restored.tokens_usage.nb_tokens_by_category[TokenCategory.OUTPUT] == 50
 
+    def test_pipe_start_carries_description_and_domain_code(self) -> None:
+        event = PipeStartEvent(
+            **_Shared.make_base_fields(),
+            node_id=_Shared.NODE_ID,
+            pipe_code="gen_summary",
+            pipe_type="PipeLLM",
+            node_kind=NodeKind.OPERATOR,
+            description="Summarize the input document.",
+            domain_code="summarization",
+        )
+
+        assert event.description == "Summarize the input document."
+        assert event.domain_code == "summarization"
+
+    def test_pipe_start_description_and_domain_code_default_to_none(self) -> None:
+        event = PipeStartEvent(
+            **_Shared.make_base_fields(),
+            node_id=_Shared.NODE_ID,
+            pipe_code="noop_pipe",
+            pipe_type="PipeNoop",
+            node_kind=NodeKind.OPERATOR,
+        )
+
+        assert event.description is None
+        assert event.domain_code is None
+
+    def test_pipe_start_description_and_domain_code_round_trip(self) -> None:
+        event = PipeStartEvent(
+            **_Shared.make_base_fields(),
+            node_id=_Shared.NODE_ID,
+            pipe_code="gen_summary",
+            pipe_type="PipeLLM",
+            node_kind=NodeKind.OPERATOR,
+            description="Summarize the input document.",
+            domain_code="summarization",
+        )
+
+        json_str = event.model_dump_json()
+        restored = PipeStartEvent.model_validate_json(json_str)
+
+        assert restored.description == "Summarize the input document."
+        assert restored.domain_code == "summarization"
+
     def test_all_event_kinds_covered(self) -> None:
         """Every TraceEventKind has a corresponding test case and event class."""
         tested_kinds = {entry[1] for entry in self.EVENTS_AND_KINDS}
