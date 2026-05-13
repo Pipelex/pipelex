@@ -1,3 +1,5 @@
+import pytest
+
 from pipelex import pretty_print
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 
@@ -463,7 +465,7 @@ Line after"""
         result = preprocess_template(template)
         assert result == template
 
-    def test_css_namespace_pass_through(self):
+    def test_css_namespace_residual_rewritten(self):
         """@namespace with inner word and quoted URL is a residual: prose like `@name said "X"`
         is too easy to confuse with `@kw word "X"`, so the heuristic only blocks the inner-word
         shape when followed by `(` or `{`. Authors escape this one with `@@namespace`.
@@ -504,7 +506,7 @@ Line after"""
         result = preprocess_template(template)
         assert result == template
 
-    def test_css_font_face_pass_through(self):
+    def test_css_font_face_residual_rewritten(self):
         r"""@font-face: heuristic can only protect `@font` (hyphen is outside the identifier class).
 
         The lookahead `(?!\s*[({"'])` does NOT fire because the next char after `font` is `-`,
@@ -632,4 +634,49 @@ Line after"""
         template = '<style>@@font-face { font-family: "X"; }</style>'
         result = preprocess_template(template)
         expected = '<style>@font-face { font-family: "X"; }</style>'
+        assert result == expected
+
+    # =========================================================================
+    # Broader residual class: at-rules with hyphens in the name (`@font-face`,
+    # `@counter-style`, `@view-transition`) or with arguments starting with `-`/`--`
+    # (`@property --x`, `@color-profile --x`). The heuristic can't reach past `-`,
+    # so these are silently rewritten — the `@@` escape is the documented workaround.
+    # =========================================================================
+
+    @pytest.mark.parametrize(
+        ("template", "expected"),
+        [
+            (
+                "@property --my-color { syntax: '<color>'; inherits: false; }",
+                "{{ property|tag(\"property\") }} --my-color { syntax: '<color>'; inherits: false; }",
+            ),
+            (
+                "@counter-style thumbs { system: cyclic; }",
+                '{{ counter|tag("counter") }}-style thumbs { system: cyclic; }',
+            ),
+            (
+                "@color-profile --swop5c { src: url('x.icc'); }",
+                "{{ color|tag(\"color\") }}-profile --swop5c { src: url('x.icc'); }",
+            ),
+            (
+                "@view-transition { navigation: auto; }",
+                '{{ view|tag("view") }}-transition { navigation: auto; }',
+            ),
+        ],
+        ids=["property", "counter-style", "color-profile", "view-transition"],
+    )
+    def test_css_dash_residual_rewritten(self, template: str, expected: str):
+        """At-rules whose name has `-` or whose argument starts with `-`/`--` aren't
+        protected by the heuristic — they get rewritten. Authors escape with `@@`.
+        """
+        result = preprocess_template(template)
+        assert result == expected
+
+    def test_css_dash_residual_escape_workaround(self):
+        """`@@property --my-color { ... }` proves the documented workaround for the
+        broader dash-residual class.
+        """
+        template = "@@property --my-color { syntax: '<color>'; inherits: false; }"
+        result = preprocess_template(template)
+        expected = "@property --my-color { syntax: '<color>'; inherits: false; }"
         assert result == expected

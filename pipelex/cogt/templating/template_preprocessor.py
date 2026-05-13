@@ -20,7 +20,17 @@ from re import Match
 #   - one-word-then-opener: `\s*[a-zA-Z][\w-]*\s*(?:[(]|\{(?!\{))` covers `@keyframes spin {...}`,
 #     `@layer reset {...}`, `@import url(...)`. The inner-word arm requires `(` or a *single* `{`
 #     (NOT `{{`) — `@var with {{ ... }}` is a legit template with Jinja, and `@name said "..."`
-#     is prose. `@namespace svg "..."` is the remaining residual case; escape with `@@`.
+#     is prose.
+#
+# Residual cases the heuristic cannot disambiguate — author must escape with `@@`:
+#   - At-rule name contains `-`: the greedy identifier `[a-zA-Z0-9_.]+` excludes `-`, so it
+#     truncates at the hyphen. Examples: `@font-face`, `@counter-style`, `@color-profile`,
+#     `@view-transition`, `@font-feature-values`.
+#   - Argument starts with `-`/`--`: the inner-word arm `[a-zA-Z][\w-]*` can't reach past the
+#     dash. Examples: `@property --my-color { ... }`, `@color-profile --my-profile { ... }`.
+#   - Multi-word prelude before the brace: the inner-word arm matches only one word. Examples:
+#     `@counter-style my-counter { ... }`, `@namespace svg "..."`, `@font-feature-values Font
+#     Name { ... }`.
 #
 # A single pass is required so this last lookahead only sees characters from the original
 # template — running sequential passes would let `{` braces introduced by an earlier substitution
