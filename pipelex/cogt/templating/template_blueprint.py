@@ -3,7 +3,6 @@ from typing import Any
 from pydantic import BaseModel, Field, model_validator
 
 from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.cogt.templating.template_errors import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
@@ -21,11 +20,7 @@ class TemplateBlueprint(BaseModel):
 
     @model_validator(mode="after")
     def validate_template(self) -> "TemplateBlueprint":
-        try:
-            preprocessed = preprocess_template(self.template)
-        except TemplateSigilSyntaxError as exc:
-            msg = f"Template sigil error in TemplateBlueprint: {exc}"
-            raise ValueError(msg) from exc
+        preprocessed = preprocess_template(self.template)
         try:
             check_jinja2_parsing(template_source=preprocessed, template_category=self.category)
         except Jinja2TemplateSyntaxError as exc:
