@@ -71,6 +71,6 @@ output = "QualityReport"
 model = "$testing-text"
 prompt = """
 Create a quality report from:
-Part A: @part_a
-Part B: @part_b
+Part A: $part_a
+Part B: $part_b
 """

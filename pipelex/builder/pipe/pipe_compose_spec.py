@@ -79,13 +79,15 @@ class PipeComposeSpec(PipeSpec):
     **Template mode** (for Text/Html output):
     - Renders a template to produce formatted text
     - Use Pipelex pre-processor syntax:
-      - `@variable` renders an entire object with all attributes auto-formatted
+      - `@variable` renders an entire object with all attributes auto-formatted —
+        **must be alone on its own line** (leading/trailing whitespace is allowed
+        and preserved). Inline `@variable` raises a load-time `TemplateSigilSyntaxError`.
       - `$variable.field` for inline field access (e.g., "Order #$order.id")
       - Only use `{{ variable.field }}` for isolated single-field access
       - Escape with `@@` or `$$` to emit a literal `@` or `$` without interpolation
         (e.g., `@@font-face` or `@@media` inside an HTML `<style>` block; `$$10` for
         a literal dollar amount before a word)
-    - NEVER manually list all attributes - use `@variable` instead
+    - NEVER manually list all attributes - use `@variable` (on its own line) instead
 
     **Construct mode** (for StructuredContent output):
     - Assembles a structured object from working memory variables
@@ -104,7 +106,7 @@ class PipeComposeSpec(PipeSpec):
         default=None,
         description=(
             "Template string using Pipelex pre-processor syntax: "
-            "use @variable to render entire objects with auto-formatting, "
+            "use @variable (alone on its own line) to render entire objects with auto-formatting, "
             "$variable.field for inline access. "
             "NEVER manually list all attributes of an object - use @variable instead."
         ),

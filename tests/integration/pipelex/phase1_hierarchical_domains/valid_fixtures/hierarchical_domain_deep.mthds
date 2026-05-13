@@ -11,4 +11,4 @@ description = "Analyze a shareholder agreement"
 inputs      = { agreement = "ShareholderAgreement" }
 output      = "Text"
 model       = "$quick-reasoning"
-prompt      = "Analyze @agreement"
+prompt      = "Analyze $agreement"

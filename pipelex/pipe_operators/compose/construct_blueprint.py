@@ -13,6 +13,7 @@ from typing import Any, cast
 from pydantic import BaseModel, ConfigDict, SerializationInfo, SerializerFunctionWrapHandler, field_validator, model_serializer, model_validator
 
 from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.template_errors import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.pipe_operators.compose.exceptions import ConstructFieldBlueprintTypeError, ConstructFieldBlueprintValueError
 from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
@@ -244,7 +245,11 @@ class ConstructBlueprint(BaseModel):
                 case ConstructFieldMethod.TEMPLATE:
                     if field_blueprint.template:
                         # Use the same approach as template mode: preprocess then detect variables
-                        preprocessed = preprocess_template(field_blueprint.template)
+                        try:
+                            preprocessed = preprocess_template(field_blueprint.template)
+                        except TemplateSigilSyntaxError as exc:
+                            msg = f"Template sigil error in construct template: {exc}"
+                            raise ValueError(msg) from exc
                         try:
                             template_vars = detect_jinja2_required_variables(
                                 template_category=TemplateCategory.BASIC,

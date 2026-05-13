@@ -47,6 +47,6 @@ output = "Text"
 model = "$testing-text"
 prompt = """
 Combine these results:
-Tone: @tone_result
-Length: @length_result
+Tone: $tone_result
+Length: $length_result
 """

@@ -5,6 +5,7 @@ from typing_extensions import override
 
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.template_errors import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
@@ -101,7 +102,11 @@ class PipeComposeBlueprint(PipeBlueprint):
         if self.template_source is None:
             return
 
-        preprocessed_template = preprocess_template(self.template_source)
+        try:
+            preprocessed_template = preprocess_template(self.template_source)
+        except TemplateSigilSyntaxError as exc:
+            msg = f"Template sigil error in PipeCompose template: {exc}"
+            raise ValueError(msg) from exc
         try:
             check_jinja2_parsing(
                 template_source=preprocessed_template,

@@ -56,7 +56,7 @@ description = "Generate multiple items"
 inputs = { topic = "Text" }
 output = "Item[]"
 model = "$testing-text"
-prompt = "Generate 3 items about: @topic"
+prompt = "Generate 3 items about: $topic"
 
 # PipeLLM that processes a single item
 [pipe.process_item]
@@ -65,7 +65,7 @@ description = "Process a single item"
 inputs = { item = "Item" }
 output = "ProcessedItem"
 model = "$testing-text"
-prompt = "Process this item: @item"
+prompt = "Process this item: $item"
 """
 
 
@@ -192,7 +192,7 @@ description = "Generates employee profiles"
 inputs = { nb_employees = "Number" }
 output = "Employee[]"
 model = "$testing-text"
-prompt = "Generate @nb_employees employees"
+prompt = "Generate $nb_employees employees"
 
 # Inner sequence - THIS IS WHERE THE BUG OCCURS
 [pipe.generate_employee_report]
@@ -213,7 +213,7 @@ description = "Generates multiple expenses for an employee"
 inputs = { employee = "Employee" }
 output = "Expense[]"
 model = "$testing-text"
-prompt = "Generate expenses for: @employee"
+prompt = "Generate expenses for: $employee"
 
 # Process single expense
 [pipe.process_expense]
@@ -222,7 +222,7 @@ description = "Process a single expense"
 inputs = { expense = "Expense" }
 output = "ProcessedExpense"
 model = "$testing-text"
-prompt = "Process expense: @expense"
+prompt = "Process expense: $expense"
 
 # Compose final report
 [pipe.compose_report]
@@ -231,7 +231,7 @@ description = "Compose the final report"
 inputs = { employee = "Employee", processed_expenses = "ProcessedExpense[]" }
 output = "EmployeeReport"
 model = "$testing-text"
-prompt = "Create report for @employee with @processed_expenses"
+prompt = "Create report for $employee with $processed_expenses"
 """
 
 

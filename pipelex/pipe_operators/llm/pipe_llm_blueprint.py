@@ -4,6 +4,7 @@ from typing_extensions import override
 
 from pipelex.cogt.llm.llm_setting import LLMModelChoice
 from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.template_errors import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.validation import is_input_used_by_variables, is_variable_satisfied_by_inputs
@@ -36,7 +37,11 @@ class PipeLLMBlueprint(PipeBlueprint):
         required_variable_paths: set[str] = set()
 
         if self.prompt:
-            preprocessed_template = preprocess_template(self.prompt)
+            try:
+                preprocessed_template = preprocess_template(self.prompt)
+            except TemplateSigilSyntaxError as exc:
+                msg = f"Template sigil error in PipeLLM prompt: {exc}"
+                raise ValueError(msg) from exc
             try:
                 required_variable_paths.update(
                     detect_jinja2_required_variables(
@@ -49,7 +54,11 @@ class PipeLLMBlueprint(PipeBlueprint):
                 raise ValueError(msg) from exc
 
         if self.system_prompt:
-            preprocessed_system_template = preprocess_template(self.system_prompt)
+            try:
+                preprocessed_system_template = preprocess_template(self.system_prompt)
+            except TemplateSigilSyntaxError as exc:
+                msg = f"Template sigil error in PipeLLM system_prompt: {exc}"
+                raise ValueError(msg) from exc
             try:
                 required_variable_paths.update(
                     detect_jinja2_required_variables(

@@ -1,102 +1,135 @@
 import re
 from re import Match
 
+from pipelex.cogt.templating.template_errors import TemplateSigilSyntaxError
 from pipelex.types import StrEnum
 
 
 class _Sigil(StrEnum):
-    """Recognized sigil prefixes. The regex captures one of these and the dispatcher routes to
-    the matching rendering. Defined as a `StrEnum` so the `match`/`case` over sigils is
+    """Recognized sigil prefixes. Defined as a `StrEnum` so the `match`/`case` over sigils is
     exhaustiveness-checked by the linter — adding a new sigil to the regex without updating the
     dispatcher (or vice versa) fails CI rather than silently misrouting.
     """
 
     AT = "@"
     AT_OPTIONAL = "@?"
-    DOLLAR = "$"
 
 
-# Single-pass pattern covering all three sigils:
-#   - `@?` optional insertion
-#   - `@` tagged insertion
-#   - `$` formatted insertion
+# Line-bounded `@` / `@?` sigil.
 #
-# Sigil prefix: `@`/`@?` need the `(?<!\w)` lookbehind so emails (`user@example.com`) and other
-# word-adjacent `@` don't get rewritten. `$` does NOT use the lookbehind — prose like `Q$quarter`
-# should interpolate, and dollar amounts (`$10`) are already blocked downstream by `(?![0-9])`.
+# The line-bounded form is the only valid shape for `@`/`@?` — the `tag()` rewriter wraps the
+# value in a block-shaped envelope, so an inline shape would produce nonsensical output. Leading
+# and trailing whitespace on the line is captured and preserved so templates embedded in indented
+# YAML/TOML blocks render in the same column as the surrounding text. Input is normalized to
+# `\n` line endings up-front (see `preprocess_template`), so this pattern only needs to handle
+# `\n`-separated lines.
 #
-# Identifier: `(?![a-zA-Z0-9_.])` immediately after the greedy `[a-zA-Z0-9_.]+` prevents the regex
-# engine from backtracking inside the identifier when the CSS/code-shape lookahead fails — it
-# forces the match to span the whole identifier so the final lookahead either passes or the whole
-# match is rejected (no half-identifier matches).
-#
-# Trailing CSS/code-shape lookahead blocks two shapes:
-#   - direct: `\s*[({"']` covers `@media (...)`, `@import "..."`, `$(...)`, `${...}`, etc.
-#   - one-word-then-opener: `\s*[a-zA-Z][\w-]*\s*(?:[(]|\{(?!\{))` covers `@keyframes spin {...}`,
-#     `@layer reset {...}`, `@import url(...)`. The inner-word arm requires `(` or a *single* `{`
-#     (NOT `{{`) — `@var with {{ ... }}` is a legit template with Jinja, and `@name said "..."`
-#     is prose.
-#
-# Residual cases the heuristic cannot disambiguate — author must escape with `@@`:
-#   - At-rule name contains `-`: the greedy identifier `[a-zA-Z0-9_.]+` excludes `-`, so it
-#     truncates at the hyphen. Examples: `@font-face`, `@counter-style`, `@color-profile`,
-#     `@view-transition`, `@font-feature-values`.
-#   - Argument starts with `-`/`--`: the inner-word arm `[a-zA-Z][\w-]*` can't reach past the
-#     dash. Examples: `@property --my-color { ... }`, `@color-profile --my-profile { ... }`.
-#   - Multi-word prelude before the brace: the inner-word arm matches only one word. Examples:
-#     `@counter-style my-counter { ... }`, `@namespace svg "..."`, `@font-feature-values Font
-#     Name { ... }`.
-#
-# A single pass is required so this last lookahead only sees characters from the original
-# template — running sequential passes would let `{` braces introduced by an earlier substitution
-# trigger the lookahead and truncate later matches.
-_SIGIL_PATTERN = re.compile(
-    r"(?:(?<!\w)(@\??)|(\$))(?![0-9])([a-zA-Z0-9_.]+)(?![a-zA-Z0-9_.])"
-    r"(?!\s*(?:[({\"']|[a-zA-Z][\w-]*\s*(?:[(]|\{(?!\{))))"
+# Identifier shape: first char must be a letter or underscore (not a digit); dotted access
+# supported; segments are non-empty and start with letter or underscore.
+_AT_SIGIL_PATTERN = re.compile(
+    r"^([ \t]*)(@\??)([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)([ \t]*)$",
+    re.MULTILINE,
 )
 
-# Sentinels for `@@` / `$$` escapes. Replaced before the regex pass and restored after, so the
-# escaped characters can't be confused with sigils. The NUL bytes make collision with realistic
-# template content extremely unlikely — NUL is not a printable character and doesn't appear in
-# plain-text Pipelex sources.
+# Inline `$` sigil — keeps its inline contract. The lookaheads block dollar amounts (`$10`),
+# code-shape constructs (`$(`, `${`), and word-character continuation (so `$foo` followed by
+# more identifier chars doesn't half-match).
+_DOLLAR_SIGIL_PATTERN = re.compile(
+    r"(\$)(?![0-9])([a-zA-Z0-9_.]+)(?![a-zA-Z0-9_.])(?!\s*[({\"'])",
+)
+
+# Candidate-sigil detector for the validator: any unescaped `@`/`@?` at a non-word boundary
+# followed immediately by an identifier shape. Used only to surface errors; never substitutes.
+_AT_CANDIDATE_PATTERN = re.compile(
+    r"(?<!\w)(@\??)([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)",
+)
+
+# Sentinels for `@@` / `$$` escapes. Replaced before the validator and regex pass, and restored
+# after, so escaped characters never reach the validator and never trip the strict rule. The NUL
+# bytes make collision with realistic template content extremely unlikely.
 _AT_ESCAPE_SENTINEL = "\x00PIPELEX_AT_ESCAPE\x00"
 _DOLLAR_ESCAPE_SENTINEL = "\x00PIPELEX_DOLLAR_ESCAPE\x00"
 
 
-def _replace_sigil(match: Match[str]) -> str:
-    # Exactly one of group(1) (the `@`/`@?` arm) or group(2) (the `$` arm) is populated; the
-    # `_Sigil` constructor raises `ValueError` if the regex is ever widened to a fourth sigil
-    # without updating the enum.
-    sigil = _Sigil(match.group(1) or match.group(2))
+def _replace_at_sigil(match: Match[str]) -> str:
+    leading: str = match.group(1)
+    sigil = _Sigil(match.group(2))
     variable: str = match.group(3)
-    trailing_dot = variable.endswith(".")
-    if trailing_dot:
-        # Trailing dot can't be in a variable name so it must be punctuation in the surrounding
-        # sentence — strip it from the variable and re-emit it after the rendered Jinja.
-        variable = variable[:-1]
+    trailing: str = match.group(4)
     match sigil:
         case _Sigil.AT_OPTIONAL:
             rendered = f'{{% if {variable} %}}{{{{ {variable}|tag("{variable}") }}}}{{% endif %}}'
         case _Sigil.AT:
             rendered = f'{{{{ {variable}|tag("{variable}") }}}}'
-        case _Sigil.DOLLAR:
-            rendered = f"{{{{ {variable}|format() }}}}"
+    return f"{leading}{rendered}{trailing}"
+
+
+def _replace_dollar_sigil(match: Match[str]) -> str:
+    variable: str = match.group(2)
+    trailing_dot = variable.endswith(".")
+    if trailing_dot:
+        variable = variable[:-1]
+    rendered = f"{{{{ {variable}|format() }}}}"
     return f"{rendered}." if trailing_dot else rendered
 
 
+def _validate_at_sigil_alone_on_line(template: str) -> None:
+    r"""Scan for `@`/`@?` sigil candidates that are not alone on their own line and raise.
+
+    Inputs are post-`@@`-escape (so `@@` cases are already sentinel-replaced and don't trip the
+    check). Word-adjacent `@` (emails, prose hashtags) is excluded by the `(?<!\w)` lookbehind
+    on the candidate pattern.
+    """
+    for line_index, line in enumerate(template.split("\n"), start=1):
+        if "@" not in line:
+            continue
+        if _AT_SIGIL_PATTERN.fullmatch(line):
+            continue
+        candidate = _AT_CANDIDATE_PATTERN.search(line)
+        if candidate is None:
+            continue
+        sigil = candidate.group(1)
+        identifier = candidate.group(2)
+        msg = (
+            f"Inline `{sigil}{identifier}` is not allowed on line {line_index}: "
+            f"the `{sigil}` sigil produces tag-wrapped block content and must appear alone on "
+            f"its own line. "
+            f"Did you mean `${identifier}` (inline value), or move `{sigil}{identifier}` onto "
+            f"its own line? "
+            f"Escape with `@@` if you intend a literal `@`."
+        )
+        raise TemplateSigilSyntaxError(msg)
+
+
 def preprocess_template(template: str) -> str:
-    """Preprocess a template string to convert our sigil syntax patterns into Jinja2 syntax.
+    r"""Preprocess a template string to convert our sigil syntax patterns into Jinja2 syntax.
 
-    Recognized sigils (each must be preceded by a non-word boundary and not be followed by a
-    code/CSS-like opener):
+    Recognized sigils:
 
-    - ``@var`` → ``{{ var|tag("var") }}``
-    - ``@?var`` → ``{% if var %}{{ var|tag("var") }}{% endif %}``
-    - ``$var`` → ``{{ var|format() }}``
+    - ``@var`` (alone on its own line) → ``{{ var|tag("var") }}``
+    - ``@?var`` (alone on its own line) → ``{% if var %}{{ var|tag("var") }}{% endif %}``
+    - ``$var`` (inline) → ``{{ var|format() }}``
+
+    Inline ``@var`` / ``@?var`` shapes are rejected at load time with `TemplateSigilSyntaxError`.
 
     Authors can opt out per occurrence with the explicit escapes ``@@`` (→ literal ``@``) and
     ``$$`` (→ literal ``$``).
+
+    Line endings (``\r\n``, ``\r``) are normalized to ``\n`` up-front so the line-bounded ``@``
+    rule works the same for Windows / classic-Mac authored templates as for Unix ones. The
+    rendered output uses ``\n``-only line endings; downstream Jinja rendering is
+    line-ending-insensitive.
     """
-    processed_template = template.replace("@@", _AT_ESCAPE_SENTINEL).replace("$$", _DOLLAR_ESCAPE_SENTINEL)
-    processed_template = _SIGIL_PATTERN.sub(_replace_sigil, processed_template)
+    # 1. Normalize line endings so the line-bounded rule is consistent across platforms.
+    processed_template = template.replace("\r\n", "\n").replace("\r", "\n")
+    # 2. Escape sentinels — @@ and $$ disappear before validation and substitution.
+    processed_template = processed_template.replace("@@", _AT_ESCAPE_SENTINEL).replace("$$", _DOLLAR_ESCAPE_SENTINEL)
+    # 3. Validate: any candidate @-sigil that is not alone on its line is an error.
+    _validate_at_sigil_alone_on_line(processed_template)
+    # 4. Substitute: $ inline first, then @ line-bounded. Running $ first keeps the $ pattern's
+    #    code-shape lookahead from misfiring on `{{` braces introduced by the @ pass. The @
+    #    pattern is line-bounded and indifferent to $-introduced braces.
+    processed_template = _DOLLAR_SIGIL_PATTERN.sub(_replace_dollar_sigil, processed_template)
+    processed_template = _AT_SIGIL_PATTERN.sub(_replace_at_sigil, processed_template)
+    # 5. Restore sentinels.
     return processed_template.replace(_AT_ESCAPE_SENTINEL, "@").replace(_DOLLAR_ESCAPE_SENTINEL, "$")

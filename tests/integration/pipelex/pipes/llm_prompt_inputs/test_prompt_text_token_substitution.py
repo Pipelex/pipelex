@@ -29,7 +29,7 @@ class TestPromptTextTokenSubstitution:
             description="Test token substitution",
             inputs={"image": "Image"},
             output="Text",
-            prompt="Describe this image: @image",
+            prompt="Describe this image: $image",
         )
 
         pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(

@@ -11,7 +11,7 @@ class TestPipeLLMBlueprint:
             description="lorem ipsum",
             inputs={"input_one": "native.Text", "input_two": "native.Text"},
             output="native.Text",
-            prompt="Process @input_one and @input_two",
+            prompt="Process $input_one and $input_two",
         )
         assert blueprint.nb_inputs == 2
         assert set(blueprint.input_names) == {"input_one", "input_two"}
@@ -22,7 +22,7 @@ class TestPipeLLMBlueprint:
             description="lorem ipsum",
             inputs={"context": "native.Text"},
             output="native.Text",
-            system_prompt="Use this context: @context",
+            system_prompt="Use this context: $context",
             prompt="Generate a response",
         )
         assert blueprint.nb_inputs == 1
@@ -34,8 +34,8 @@ class TestPipeLLMBlueprint:
             description="lorem ipsum",
             inputs={"context": "native.Text", "query": "native.Text"},
             output="native.Text",
-            system_prompt="Context: @context",
-            prompt="Answer this query: @query",
+            system_prompt="Context: $context",
+            prompt="Answer this query: $query",
         )
         assert blueprint.nb_inputs == 2
         assert set(blueprint.input_names) == {"context", "query"}
@@ -68,7 +68,7 @@ class TestPipeLLMBlueprint:
                 description="lorem ipsum",
                 inputs={"input_one": "native.Text", "input_two": "native.Text"},
                 output="native.Text",
-                prompt="Process @input_one, @input_two, and @input_three",
+                prompt="Process $input_one, $input_two, and $input_three",
             )
         error_msg = str(exc_info.value)
         assert "Missing input variable(s):" in error_msg
@@ -82,7 +82,7 @@ class TestPipeLLMBlueprint:
                 description="lorem ipsum",
                 inputs={"input_one": "native.Text"},
                 output="native.Text",
-                prompt="Process @input_one, @input_two, and @input_three",
+                prompt="Process $input_one, $input_two, and $input_three",
             )
         error_msg = str(exc_info.value)
         assert "Missing input variable(s):" in error_msg
@@ -96,8 +96,8 @@ class TestPipeLLMBlueprint:
                 description="lorem ipsum",
                 inputs={"query": "native.Text"},
                 output="native.Text",
-                system_prompt="Use context: @context",
-                prompt="Answer: @query",
+                system_prompt="Use context: $context",
+                prompt="Answer: $query",
             )
         error_msg = str(exc_info.value)
         assert "Missing input variable(s):" in error_msg
@@ -110,7 +110,7 @@ class TestPipeLLMBlueprint:
                 description="lorem ipsum",
                 inputs={},
                 output="native.Text",
-                prompt="Process @data",
+                prompt="Process $data",
             )
         error_msg = str(exc_info.value)
         assert "Missing input variable(s):" in error_msg or "data" in error_msg
@@ -121,7 +121,7 @@ class TestPipeLLMBlueprint:
             description="lorem ipsum",
             inputs=None,
             output="native.Text",
-            prompt="Use internal variable @_internal_var",
+            prompt="Use internal variable $_internal_var",
         )
         # Should not raise error even though _internal_var is not in inputs
         assert blueprint.inputs is None
@@ -132,7 +132,7 @@ class TestPipeLLMBlueprint:
             description="lorem ipsum",
             inputs=None,
             output="native.Text",
-            prompt="Use @preliminary_text and @place_holder",
+            prompt="Use $preliminary_text and $place_holder",
         )
         # Should not raise error even though these special variables are not in inputs
         assert blueprint.inputs is None
@@ -146,7 +146,7 @@ class TestPipeLLMBlueprint:
         whose message names the offending span, the line number, and both migration
         hints (`$var` for inline, `@@` for literal).
         """
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="@invoice_text") as exc_info:
             PipeLLMBlueprint(
                 description="lorem ipsum",
                 inputs={"invoice_text": "native.Text"},
@@ -163,7 +163,7 @@ class TestPipeLLMBlueprint:
         """Inline `@var` in the system_prompt also surfaces with the strict-rule
         diagnostic — both prompt fields are validated.
         """
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="@context") as exc_info:
             PipeLLMBlueprint(
                 description="lorem ipsum",
                 inputs={"context": "native.Text"},
@@ -179,7 +179,7 @@ class TestPipeLLMBlueprint:
 
     def test_validate_inputs_raises_with_correct_line_for_multiline_prompt(self):
         """Line number in the diagnostic is 1-based and accurate for multi-line prompts."""
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="line 2") as exc_info:
             PipeLLMBlueprint(
                 description="lorem ipsum",
                 inputs={"data": "native.Text"},

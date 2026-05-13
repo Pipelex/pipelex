@@ -1,12 +1,19 @@
 # Template preprocessor — sigil collision fix (TDD plan)
 
-## Next phase
+## Status: strict line-bounded `@` rule landed (2026-05-13)
 
-The CSS-collision fix shipped on this branch (heuristic regex + `@@` / `$$` escapes). A redesign now supersedes the heuristic approach for the `@` sigil: **`@var` must be alone on its own line**, with a load-time validator raising on inline candidates. See `wip/template-preprocessor-line-bounded-at.md` for the active plan.
+The redesign described in `wip/template-preprocessor-line-bounded-at.md` shipped:
 
-The history below documents the heuristic work that landed on the branch — kept for context, but the regex it produced is about to be replaced.
+- `@var` / `@?var` must be alone on their own line. Inline candidates raise `TemplateSigilSyntaxError`
+  at load time, surfaced through pydantic validation with line number + migration hint.
+- `$var` keeps its inline contract (unchanged).
+- `@@` and `$$` escapes preserved.
+- Workspace `.mthds` files migrated; all tests green; `make agent-check` clean; `make agent-test` clean.
 
-## Status: Complete (2026-05-13)
+The history below documents the original heuristic CSS-collision fix, kept for context — the
+heuristic regex it produced was replaced by the strict rule above.
+
+## Status: heuristic CSS-collision fix complete (earlier)
 
 All phases (1–6) landed. Full `make agent-test` is green and `make agent-check` is clean. The
 work is ready to ship via `/release`.

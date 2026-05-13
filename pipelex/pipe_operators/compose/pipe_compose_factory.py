@@ -2,6 +2,7 @@ from typing import Any
 
 from typing_extensions import override
 
+from pipelex.cogt.templating.template_errors import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
@@ -62,7 +63,11 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
             msg = "Template source is required for template mode"
             raise PipeComposeFactoryError(msg)
 
-        preprocessed_template = preprocess_template(template_source)
+        try:
+            preprocessed_template = preprocess_template(template_source)
+        except TemplateSigilSyntaxError as exc:
+            msg = f"Template sigil error in PipeCompose template: {exc}"
+            raise PipeComposeFactoryError(msg) from exc
         try:
             check_jinja2_parsing(
                 template_source=preprocessed_template,

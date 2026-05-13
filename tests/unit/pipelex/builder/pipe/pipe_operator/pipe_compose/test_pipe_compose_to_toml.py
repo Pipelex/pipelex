@@ -48,7 +48,7 @@ class _TomlTestCases:
             "inputs": {"name": "native.Text"},
             "output": "native.Text",
             "target_format": "markdown",
-            "template": "Hello @name!",
+            "template": "Hello $name!",
         },
     )
 
@@ -106,6 +106,6 @@ class TestPipeComposeToToml:
         result = pipe_spec_to_toml(pipe_spec)
 
         assert 'target_format = "markdown"' in result
-        assert 'template = "Hello @name!"' in result
+        assert 'template = "Hello $name!"' in result
         # Construct section should NOT appear
         assert "construct" not in result.split("template")[0]  # no construct key before template

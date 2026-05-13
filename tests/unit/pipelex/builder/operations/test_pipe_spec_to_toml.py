@@ -47,7 +47,7 @@ class TestPipeSpecToToml:
         spec = parse_pipe_spec("PipeLLM", {**_BASE_LLM})
         toml = pipe_spec_to_toml(spec)
         assert "prompt" in toml
-        assert "Write about @text" in toml
+        assert "Write about $text" in toml
 
     def test_llm_no_inputs_omits_inputs(self) -> None:
         empty_inputs: dict[str, str] = {}
@@ -171,7 +171,7 @@ class TestPipeSpecToToml:
                 "inputs": {"query_text": "Text"},
                 "output": "Text",
                 "model": "$search-model",
-                "prompt": "Search for @query_text",
+                "prompt": "Search for $query_text",
                 "from_date": "2024-01-01",
                 "to_date": "2024-12-31",
                 "include_domains": ["example.com", "docs.example.com"],
@@ -181,7 +181,7 @@ class TestPipeSpecToToml:
         )
         toml = pipe_spec_to_toml(spec)
         assert 'model = "$search-model"' in toml
-        assert "Search for @query_text" in toml
+        assert "Search for $query_text" in toml
         assert 'from_date = "2024-01-01"' in toml
         assert 'to_date = "2024-12-31"' in toml
         assert "example.com" in toml
@@ -191,10 +191,10 @@ class TestPipeSpecToToml:
     def test_search_minimal(self) -> None:
         spec = parse_pipe_spec(
             "PipeSearch",
-            {"pipe_code": "web_search", "description": "Search", "inputs": {"query_text": "Text"}, "output": "Text", "prompt": "Find @query_text"},
+            {"pipe_code": "web_search", "description": "Search", "inputs": {"query_text": "Text"}, "output": "Text", "prompt": "Find $query_text"},
         )
         toml = pipe_spec_to_toml(spec)
-        assert "Find @query_text" in toml
+        assert "Find $query_text" in toml
         assert "from_date" not in toml
         assert "to_date" not in toml
         assert "include_domains" not in toml
@@ -338,13 +338,13 @@ class TestPipeSpecToToml:
                 "inputs": {"name": "native.Text"},
                 "output": "native.Text",
                 "target_format": "markdown",
-                "template": "Hello @name!",
+                "template": "Hello $name!",
             },
         )
         toml = pipe_spec_to_toml(spec)
         assert 'type = "PipeCompose"' in toml
         assert 'target_format = "markdown"' in toml
-        assert 'template = "Hello @name!"' in toml
+        assert 'template = "Hello $name!"' in toml
 
     def test_compose_no_construct_in_template_mode(self) -> None:
         spec = parse_pipe_spec(
@@ -355,7 +355,7 @@ class TestPipeSpecToToml:
                 "inputs": {"name": "native.Text"},
                 "output": "native.Text",
                 "target_format": "markdown",
-                "template": "Hello @name!",
+                "template": "Hello $name!",
             },
         )
         toml = pipe_spec_to_toml(spec)

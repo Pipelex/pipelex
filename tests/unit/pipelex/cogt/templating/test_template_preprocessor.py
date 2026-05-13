@@ -78,9 +78,9 @@ Optional notes:
     def test_optional_pattern_priority(self):
         """Test that @? pattern is processed before @ pattern."""
         # This ensures @? doesn't get matched as @ followed by ?
-        template = "@?optional @required"
+        template = "@?optional\n@required"
         result = preprocess_template(template)
-        expected = '{% if optional %}{{ optional|tag("optional") }}{% endif %} {{ required|tag("required") }}'
+        expected = '{% if optional %}{{ optional|tag("optional") }}{% endif %}\n{{ required|tag("required") }}'
         assert result == expected
 
     def test_dollar_amounts_not_processed(self):
@@ -115,35 +115,30 @@ Optional notes:
         assert result == template
 
     def test_mixed_at_patterns_with_numbers(self):
-        """Test mixing @ patterns with numbers and valid variables."""
-        template = "Version @1.0, build @?2.3.4, and @valid_var with @?optional_var"
+        """Test mixing @ patterns with numbers and valid variables.
+
+        `@1.0` / `@?2.3.4` aren't candidate sigils (digit after `@`), so they pass through.
+        The legitimate variables go on their own lines per the strict rule.
+        """
+        template = "Version @1.0, build @?2.3.4\n@valid_var\n@?optional_var"
         result = preprocess_template(template)
         expected = (
-            "Version @1.0, build @?2.3.4, and "
-            '{{ valid_var|tag("valid_var") }} with '
-            '{% if optional_var %}{{ optional_var|tag("optional_var") }}{% endif %}'
+            'Version @1.0, build @?2.3.4\n{{ valid_var|tag("valid_var") }}\n{% if optional_var %}{{ optional_var|tag("optional_var") }}{% endif %}'
         )
         assert result == expected
 
-    def test_at_variable_with_trailing_dot(self):
-        """Test @variable pattern with trailing dot (punctuation)."""
-        template = "Extract employee information from this invoice text: @invoice_text."
+    def test_dollar_variable_with_trailing_dot_in_sentence(self):
+        """Inline $variable with trailing dot — $ keeps its inline contract."""
+        template = "Extract employee information from this invoice text: $invoice_text."
         result = preprocess_template(template)
-        expected = 'Extract employee information from this invoice text: {{ invoice_text|tag("invoice_text") }}.'
+        expected = "Extract employee information from this invoice text: {{ invoice_text|format() }}."
         assert result == expected
 
-    def test_optional_at_variable_with_trailing_dot(self):
-        """Test @?variable pattern with trailing dot (punctuation)."""
-        template = "Optional information: @?optional_data."
+    def test_multiple_dollar_variables_with_trailing_dots(self):
+        """Inline $variable patterns with trailing dots — $ keeps its inline contract."""
+        template = "Extract all articles from this invoice text: $invoice_text. Process the items: $item_list."
         result = preprocess_template(template)
-        expected = 'Optional information: {% if optional_data %}{{ optional_data|tag("optional_data") }}{% endif %}.'
-        assert result == expected
-
-    def test_multiple_at_variables_with_trailing_dots(self):
-        """Test multiple @variable patterns with trailing dots."""
-        template = "Extract all articles from this invoice text: @invoice_text. Process the items: @item_list."
-        result = preprocess_template(template)
-        expected = """Extract all articles from this invoice text: {{ invoice_text|tag("invoice_text") }}. Process the items: {{ item_list|tag("item_list") }}."""  # noqa: E501
+        expected = "Extract all articles from this invoice text: {{ invoice_text|format() }}. Process the items: {{ item_list|format() }}."
 
         pretty_print(result, title="result")
         pretty_print(expected, title="expected")
@@ -181,8 +176,13 @@ Here is the name of the task you have to extract the dates for:
         assert result == expected
 
     def test_invoice_extraction_template(self):
-        """Test real-world invoice extraction template."""
-        template = """Extract employee information from this invoice text: @invoice_text.
+        """Test real-world invoice extraction template.
+
+        The block-shaped invoice body goes on its own line (`@invoice_text`); the inline
+        company name uses `$company_name`.
+        """
+        template = """Extract employee information from this invoice text:
+@invoice_text
 
 The company name is: $company_name
 
@@ -194,7 +194,8 @@ Please extract the following fields:
 @?additional_instructions"""
 
         result = preprocess_template(template)
-        expected = """Extract employee information from this invoice text: {{ invoice_text|tag("invoice_text") }}.
+        expected = """Extract employee information from this invoice text:
+{{ invoice_text|tag("invoice_text") }}
 
 The company name is: {{ company_name|format() }}
 
@@ -211,71 +212,64 @@ Please extract the following fields:
     # Edge cases with punctuation and special characters
     # =========================================================================
 
-    def test_variable_followed_by_comma(self):
-        """Test variable followed by comma."""
-        template = "Values: @first, @second, and @third"
+    def test_dollar_variable_followed_by_comma(self):
+        """Inline $variable followed by comma — $ keeps its inline contract."""
+        template = "Values: $first, $second, and $third"
         result = preprocess_template(template)
-        expected = 'Values: {{ first|tag("first") }}, {{ second|tag("second") }}, and {{ third|tag("third") }}'
+        expected = "Values: {{ first|format() }}, {{ second|format() }}, and {{ third|format() }}"
         assert result == expected
 
-    def test_variable_followed_by_colon(self):
-        """Test variable followed by colon."""
-        template = "@label: the value is @value"
+    def test_dollar_variable_followed_by_colon(self):
+        """Inline $variable followed by colon."""
+        template = "$label: the value is $value"
         result = preprocess_template(template)
-        expected = '{{ label|tag("label") }}: the value is {{ value|tag("value") }}'
+        expected = "{{ label|format() }}: the value is {{ value|format() }}"
         assert result == expected
 
-    def test_variable_followed_by_semicolon(self):
-        """Test variable followed by semicolon."""
-        template = "First: @first; Second: @second"
+    def test_dollar_variable_followed_by_semicolon(self):
+        """Inline $variable followed by semicolon."""
+        template = "First: $first; Second: $second"
         result = preprocess_template(template)
-        expected = 'First: {{ first|tag("first") }}; Second: {{ second|tag("second") }}'
+        expected = "First: {{ first|format() }}; Second: {{ second|format() }}"
         assert result == expected
 
-    def test_variable_in_parentheses(self):
-        """Test variable inside parentheses."""
-        template = "The value (@value) is important"
+    def test_dollar_variable_in_brackets(self):
+        """Inline $variable inside square brackets and surrounding context."""
+        template = "Array element [$index] = $element"
         result = preprocess_template(template)
-        expected = 'The value ({{ value|tag("value") }}) is important'
+        expected = "Array element [{{ index|format() }}] = {{ element|format() }}"
         assert result == expected
 
-    def test_variable_in_brackets(self):
-        """Test variable inside square brackets."""
-        template = "Array element [$index] = @element"
+    def test_dollar_variable_followed_by_question_mark(self):
+        """Inline $variable followed by question mark."""
+        template = "Is $value correct?"
         result = preprocess_template(template)
-        expected = 'Array element [{{ index|format() }}] = {{ element|tag("element") }}'
+        expected = "Is {{ value|format() }} correct?"
         assert result == expected
 
-    def test_variable_followed_by_question_mark(self):
-        """Test variable followed by question mark (but not @? pattern)."""
-        template = "Is @value correct?"
+    def test_dollar_variable_followed_by_exclamation(self):
+        """Inline $variable followed by exclamation mark."""
+        template = "Hello $name!"
         result = preprocess_template(template)
-        expected = 'Is {{ value|tag("value") }} correct?'
-        assert result == expected
-
-    def test_variable_followed_by_exclamation(self):
-        """Test variable followed by exclamation mark."""
-        template = "Hello @name!"
-        result = preprocess_template(template)
-        expected = 'Hello {{ name|tag("name") }}!'
+        expected = "Hello {{ name|format() }}!"
         assert result == expected
 
     # =========================================================================
     # Variables at different positions
     # =========================================================================
 
-    def test_variable_at_start_of_line(self):
-        """Test variable at the start of a line."""
-        template = "@start_var is at the beginning"
+    def test_dollar_variable_at_start_of_line(self):
+        """Inline $variable at the start of a line."""
+        template = "$start_var is at the beginning"
         result = preprocess_template(template)
-        expected = '{{ start_var|tag("start_var") }} is at the beginning'
+        expected = "{{ start_var|format() }} is at the beginning"
         assert result == expected
 
-    def test_variable_at_end_of_line(self):
-        """Test variable at the end of a line (no trailing punctuation)."""
-        template = "The value is @end_var"
+    def test_dollar_variable_at_end_of_line(self):
+        """Inline $variable at the end of a line (no trailing punctuation)."""
+        template = "The value is $end_var"
         result = preprocess_template(template)
-        expected = 'The value is {{ end_var|tag("end_var") }}'
+        expected = "The value is {{ end_var|format() }}"
         assert result == expected
 
     def test_variable_alone_on_line(self):
@@ -289,11 +283,11 @@ Line after"""
 Line after"""
         assert result == expected
 
-    def test_back_to_back_at_variables(self):
-        """Test multiple @ variables back to back with space."""
-        template = "@first @second @third"
+    def test_back_to_back_at_variables_alone_on_lines(self):
+        """Multiple @ variables back to back on consecutive lines (each alone on line)."""
+        template = "@first\n@second\n@third"
         result = preprocess_template(template)
-        expected = '{{ first|tag("first") }} {{ second|tag("second") }} {{ third|tag("third") }}'
+        expected = '{{ first|tag("first") }}\n{{ second|tag("second") }}\n{{ third|tag("third") }}'
         assert result == expected
 
     def test_back_to_back_dollar_variables(self):
@@ -332,11 +326,11 @@ Line after"""
     # Variable names with underscores
     # =========================================================================
 
-    def test_variable_with_leading_underscore(self):
-        """Test variable name starting with underscore."""
-        template = "@_private_var and $_another_private"
+    def test_dollar_variable_with_leading_underscore(self):
+        """Inline $variable names starting with underscore."""
+        template = "$_private_var and $_another_private"
         result = preprocess_template(template)
-        expected = '{{ _private_var|tag("_private_var") }} and {{ _another_private|format() }}'
+        expected = "{{ _private_var|format() }} and {{ _another_private|format() }}"
         assert result == expected
 
     def test_variable_with_multiple_underscores(self):
@@ -357,25 +351,25 @@ Line after"""
     # Mixed scenarios
     # =========================================================================
 
-    def test_all_pattern_types_in_one_line(self):
-        """Test all three pattern types in a single line."""
-        template = "$dollar_var @at_var @?optional_var"
+    def test_all_pattern_types_across_lines(self):
+        """Inline $ + line-bounded @ + line-bounded @? all in one template."""
+        template = "$dollar_var\n@at_var\n@?optional_var"
         result = preprocess_template(template)
-        expected = '{{ dollar_var|format() }} {{ at_var|tag("at_var") }} {% if optional_var %}{{ optional_var|tag("optional_var") }}{% endif %}'
+        expected = '{{ dollar_var|format() }}\n{{ at_var|tag("at_var") }}\n{% if optional_var %}{{ optional_var|tag("optional_var") }}{% endif %}'
         assert result == expected
 
-    def test_nested_with_trailing_dot_in_complex_sentence(self):
-        """Test nested variable with trailing dot in complex context."""
-        template = "The user's preference is @user.settings.theme. Please apply it."
+    def test_nested_dollar_with_trailing_dot_in_complex_sentence(self):
+        """Nested $variable with trailing dot in complex context."""
+        template = "The user's preference is $user.settings.theme. Please apply it."
         result = preprocess_template(template)
-        expected = 'The user\'s preference is {{ user.settings.theme|tag("user.settings.theme") }}. Please apply it.'
+        expected = "The user's preference is {{ user.settings.theme|format() }}. Please apply it."
         assert result == expected
 
-    def test_variable_adjacent_to_newline(self):
-        """Test variable immediately before newline."""
-        template = "First: @first\nSecond: @second"
+    def test_dollar_variable_adjacent_to_newline(self):
+        """Inline $variable immediately before newline."""
+        template = "First: $first\nSecond: $second"
         result = preprocess_template(template)
-        expected = 'First: {{ first|tag("first") }}\nSecond: {{ second|tag("second") }}'
+        expected = "First: {{ first|format() }}\nSecond: {{ second|format() }}"
         assert result == expected
 
     def test_empty_template(self):
@@ -398,12 +392,12 @@ Line after"""
         assert result == expected
 
     def test_multiple_optional_variables_in_sequence(self):
-        """Test multiple optional variables in sequence."""
-        template = "@?first @?second @?third"
+        """Multiple @? optional variables on consecutive lines (each alone on line)."""
+        template = "@?first\n@?second\n@?third"
         result = preprocess_template(template)
         expected = (
-            '{% if first %}{{ first|tag("first") }}{% endif %} '
-            '{% if second %}{{ second|tag("second") }}{% endif %} '
+            '{% if first %}{{ first|tag("first") }}{% endif %}\n'
+            '{% if second %}{{ second|tag("second") }}{% endif %}\n'
             '{% if third %}{{ third|tag("third") }}{% endif %}'
         )
         assert result == expected
@@ -426,96 +420,61 @@ Line after"""
         assert result == expected
 
     def test_dollar_sign_alone(self):
-        """Test $ sign alone (not followed by valid variable name char)."""
-        template = "Cost is $ for @item"
+        """Test $ sign alone (not followed by valid variable name char) with inline $variable."""
+        template = "Cost is $ for $item"
         result = preprocess_template(template)
-        expected = 'Cost is $ for {{ item|tag("item") }}'
+        expected = "Cost is $ for {{ item|format() }}"
         assert result == expected
 
     # =========================================================================
-    # CSS at-rule pass-through (heuristic lookahead: identifier followed by `\s*[({"']`)
+    # CSS at-rule strict-rule violations — each raises (escape with `@@` to opt out).
     # =========================================================================
 
-    def test_css_media_query_pass_through(self):
-        """@media at-rule must not be rewritten as a variable."""
-        template = "@media (max-width: 820px) { color: red; }"
-        result = preprocess_template(template)
-        assert result == template
-
-    def test_css_supports_pass_through(self):
-        """@supports at-rule must not be rewritten as a variable."""
-        template = "@supports (display: grid) { color: red; }"
-        result = preprocess_template(template)
-        assert result == template
-
-    def test_css_import_string_pass_through(self):
-        """@import with a string argument must not be rewritten."""
-        template = '@import "reset.css";'
-        result = preprocess_template(template)
-        assert result == template
-
-    def test_css_import_url_pass_through(self):
-        """@import url(...) must not be rewritten."""
-        template = '@import url("reset.css");'
-        result = preprocess_template(template)
-        assert result == template
-
-    def test_css_charset_pass_through(self):
-        """@charset at-rule must not be rewritten."""
-        template = '@charset "UTF-8";'
-        result = preprocess_template(template)
-        assert result == template
-
-    def test_css_namespace_residual_rewritten(self):
-        """@namespace with inner word and quoted URL is a residual: prose like `@name said "X"`
-        is too easy to confuse with `@kw word "X"`, so the heuristic only blocks the inner-word
-        shape when followed by `(` or `{`. Authors escape this one with `@@namespace`.
+    @pytest.mark.parametrize(
+        ("template", "expected_sigil_and_identifier"),
+        [
+            ("@media (max-width: 820px) { color: red; }", "@media"),
+            ("@supports (display: grid) { color: red; }", "@supports"),
+            ('@import "reset.css";', "@import"),
+            ('@import url("reset.css");', "@import"),
+            ('@charset "UTF-8";', "@charset"),
+            ('@namespace svg "http://www.w3.org/2000/svg";', "@namespace"),
+            ("@keyframes spin { from { opacity: 0; } to { opacity: 1; } }", "@keyframes"),
+            ("@page { margin: 1in; }", "@page"),
+            ("@layer reset { color: red; }", "@layer"),
+            ("@container (width > 400px) { color: red; }", "@container"),
+            ('@font-face { font-family: "X"; }', "@font"),
+        ],
+        ids=[
+            "media",
+            "supports",
+            "import_string",
+            "import_url",
+            "charset",
+            "namespace",
+            "keyframes",
+            "page",
+            "layer_named",
+            "container",
+            "font_face",
+        ],
+    )
+    def test_css_at_rule_raises_under_strict_rule(self, template: str, expected_sigil_and_identifier: str):
+        """CSS at-rules are inline `@` candidates — they violate the strict line-bounded rule
+        and raise. Authors escape with `@@` to opt out (see companion `*_escaped_pass_through`
+        tests).
         """
-        template = '@namespace svg "http://www.w3.org/2000/svg";'
-        result = preprocess_template(template)
-        expected = '{{ namespace|tag("namespace") }} svg "http://www.w3.org/2000/svg";'
-        assert result == expected
+        with pytest.raises(TemplateSigilSyntaxError) as exc_info:
+            preprocess_template(template)
+        error_message = str(exc_info.value)
+        assert "line 1" in error_message
+        assert expected_sigil_and_identifier in error_message
 
     def test_css_namespace_escaped_pass_through(self):
         """Author workaround for @namespace: escape with @@namespace."""
         template = '@@namespace svg "http://www.w3.org/2000/svg";'
         result = preprocess_template(template)
         expected = '@namespace svg "http://www.w3.org/2000/svg";'
-        assert result == expected
-
-    def test_css_keyframes_pass_through(self):
-        """@keyframes at-rule must not be rewritten."""
-        template = "@keyframes spin { from { opacity: 0; } to { opacity: 1; } }"
-        result = preprocess_template(template)
-        assert result == template
-
-    def test_css_page_pass_through(self):
-        """@page at-rule must not be rewritten."""
-        template = "@page { margin: 1in; }"
-        result = preprocess_template(template)
-        assert result == template
-
-    def test_css_layer_named_pass_through(self):
-        """@layer at-rule with a name must not be rewritten."""
-        template = "@layer reset { color: red; }"
-        result = preprocess_template(template)
-        assert result == template
-
-    def test_css_container_pass_through(self):
-        """@container at-rule must not be rewritten."""
-        template = "@container (width > 400px) { color: red; }"
-        result = preprocess_template(template)
-        assert result == template
-
-    def test_css_font_face_residual_rewritten(self):
-        r"""@font-face: heuristic can only protect `@font` (hyphen is outside the identifier class).
-
-        The lookahead `(?!\s*[({"'])` does NOT fire because the next char after `font` is `-`,
-        not whitespace+brace. Documented residual case — author must escape with `@@font-face`.
-        """
-        template = '@font-face { font-family: "X"; }'
-        result = preprocess_template(template)
-        expected = '{{ font|tag("font") }}-face { font-family: "X"; }'
         assert result == expected
 
     def test_css_font_face_escaped_pass_through(self):
@@ -642,17 +601,23 @@ Line after"""
 
     def test_escape_does_not_consume_legit_variable(self):
         """Escape on one token must not affect a legitimate variable later in the string."""
-        template = "@@media is literal, but @width is a variable."
+        template = "@@media is literal, but $width is a variable."
         result = preprocess_template(template)
-        expected = '@media is literal, but {{ width|tag("width") }} is a variable.'
+        expected = "@media is literal, but {{ width|format() }} is a variable."
         assert result == expected
 
-    def test_triple_at_is_escape_plus_variable(self):
-        """@@@var → @{{ var|tag("var") }} — one escape followed by an interpolated var."""
+    def test_triple_at_raises_under_strict_rule(self):
+        """`@@@var` post-sentinel becomes literal `@` + `@var`; the `@var` is no longer alone
+        on its line (the sentinel-substituted `@` sits in front of it), so the strict rule
+        raises. Authors who want literal `@` followed by an interpolated `@var` must move the
+        variable onto its own line.
+        """
         template = "@@@var"
-        result = preprocess_template(template)
-        expected = '@{{ var|tag("var") }}'
-        assert result == expected
+        with pytest.raises(TemplateSigilSyntaxError) as exc_info:
+            preprocess_template(template)
+        error_message = str(exc_info.value)
+        assert "@var" in error_message
+        assert "line 1" in error_message
 
     def test_quadruple_at_is_two_escapes(self):
         """@@@@var → @@var — two non-overlapping escapes, no interpolation."""
@@ -669,44 +634,35 @@ Line after"""
         assert result == expected
 
     # =========================================================================
-    # Broader residual class: at-rules with hyphens in the name (`@font-face`,
-    # `@counter-style`, `@view-transition`) or with arguments starting with `-`/`--`
-    # (`@property --x`, `@color-profile --x`). The heuristic can't reach past `-`,
-    # so these are silently rewritten — the `@@` escape is the documented workaround.
+    # Broader CSS class (hyphenated names / dash arguments): each raises under the
+    # strict line-bounded `@` rule; authors escape with `@@`.
     # =========================================================================
 
     @pytest.mark.parametrize(
-        ("template", "expected"),
+        ("template", "expected_sigil_and_identifier"),
         [
-            (
-                "@property --my-color { syntax: '<color>'; inherits: false; }",
-                "{{ property|tag(\"property\") }} --my-color { syntax: '<color>'; inherits: false; }",
-            ),
-            (
-                "@counter-style thumbs { system: cyclic; }",
-                '{{ counter|tag("counter") }}-style thumbs { system: cyclic; }',
-            ),
-            (
-                "@color-profile --swop5c { src: url('x.icc'); }",
-                "{{ color|tag(\"color\") }}-profile --swop5c { src: url('x.icc'); }",
-            ),
-            (
-                "@view-transition { navigation: auto; }",
-                '{{ view|tag("view") }}-transition { navigation: auto; }',
-            ),
+            ("@property --my-color { syntax: '<color>'; inherits: false; }", "@property"),
+            ("@counter-style thumbs { system: cyclic; }", "@counter"),
+            ("@color-profile --swop5c { src: url('x.icc'); }", "@color"),
+            ("@view-transition { navigation: auto; }", "@view"),
         ],
         ids=["property", "counter-style", "color-profile", "view-transition"],
     )
-    def test_css_dash_residual_rewritten(self, template: str, expected: str):
-        """At-rules whose name has `-` or whose argument starts with `-`/`--` aren't
-        protected by the heuristic — they get rewritten. Authors escape with `@@`.
+    def test_css_dash_at_rule_raises_under_strict_rule(self, template: str, expected_sigil_and_identifier: str):
+        """At-rules with hyphenated names or dash arguments now raise under the strict rule.
+        The validator captures only the leading `@` + identifier (it stops at the hyphen
+        boundary, just like the rewriter did before), but the diagnostic still names the
+        right line and migration hint.
         """
-        result = preprocess_template(template)
-        assert result == expected
+        with pytest.raises(TemplateSigilSyntaxError) as exc_info:
+            preprocess_template(template)
+        error_message = str(exc_info.value)
+        assert "line 1" in error_message
+        assert expected_sigil_and_identifier in error_message
 
-    def test_css_dash_residual_escape_workaround(self):
+    def test_css_dash_at_rule_escape_workaround(self):
         """`@@property --my-color { ... }` proves the documented workaround for the
-        broader dash-residual class.
+        hyphenated/dash-arg CSS class.
         """
         template = "@@property --my-color { syntax: '<color>'; inherits: false; }"
         result = preprocess_template(template)
@@ -755,6 +711,32 @@ Line after"""
         """
         assert preprocess_template(template) == expected
 
+    @pytest.mark.parametrize(
+        ("template", "expected"),
+        [
+            (
+                "Header\r\n@payload\r\nFooter",
+                'Header\n{{ payload|tag("payload") }}\nFooter',
+            ),
+            (
+                "@only_var\r\n",
+                '{{ only_var|tag("only_var") }}\n',
+            ),
+            (
+                "Old Mac\r@payload\rEnd",
+                'Old Mac\n{{ payload|tag("payload") }}\nEnd',
+            ),
+        ],
+        ids=["crlf_surrounded", "crlf_terminated", "cr_only_old_mac"],
+    )
+    def test_strict_line_at_sigil_handles_crlf_and_cr_line_endings(self, template: str, expected: str):
+        r"""Lines terminated with `\r\n` (Windows) or `\r` (classic Mac) must not be misread as
+        inline candidates. Line endings are normalized to `\n` at the top of the preprocessor,
+        so the alone-on-line sigil rewrites correctly and the validator does not raise. The
+        normalized `\n`-only output is what downstream Jinja rendering sees.
+        """
+        assert preprocess_template(template) == expected
+
     # =========================================================================
     # Strict line-bounded `@` sigil contract — error cases (raises)
     # =========================================================================
@@ -788,8 +770,9 @@ Line after"""
             ('@font-face { font-family: "X"; }', 1, "@", "font"),
             ('@import url("reset.css");', 1, "@", "import"),
             ("@keyframes spin { from { opacity: 0; } }", 1, "@", "keyframes"),
-            # Code constructs
-            ("@Override", 1, "@", "Override"),
+            # Code constructs (`@Override` alone on its line IS a valid sigil — authors who want
+            # a literal Java/Python decorator must escape with `@@Override`. Only the inline
+            # shape `@deprecated def foo():` raises.)
             ("@deprecated def foo():", 1, "@", "deprecated"),
             # Multi-line: first error reported, with correct 1-based line number
             ("OK line\nbroken @var line\nanother line", 2, "@", "var"),

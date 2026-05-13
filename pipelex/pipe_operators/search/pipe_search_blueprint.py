@@ -6,6 +6,7 @@ from typing_extensions import override
 
 from pipelex.cogt.search.search_setting import SearchModelChoice
 from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.template_errors import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
@@ -39,7 +40,11 @@ class PipeSearchBlueprint(PipeBlueprint):
     @override
     def validate_inputs(self):
         template_category = TemplateCategory.BASIC
-        preprocessed_template = preprocess_template(self.prompt)
+        try:
+            preprocessed_template = preprocess_template(self.prompt)
+        except TemplateSigilSyntaxError as exc:
+            msg = f"Template sigil error in PipeSearch prompt: {exc}"
+            raise ValueError(msg) from exc
         try:
             check_jinja2_parsing(
                 template_source=preprocessed_template,
