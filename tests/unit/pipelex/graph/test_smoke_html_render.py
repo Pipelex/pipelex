@@ -24,6 +24,8 @@ class TestSmokeHtmlRender:
         assert "cdn.jsdelivr.net/npm/@pipelex/mthds-ui" in html
         assert "cdn.jsdelivr.net/npm/elkjs" in html
         assert "sha384-" in html
-        # The full IIFE bundle is ~466 kB; if a future change accidentally inlines it,
-        # this generous ceiling will catch the regression.
-        assert len(html) < 50_000, f"HTML unexpectedly large ({len(html)} bytes) — assets may have been re-inlined"
+        # A real render with externalized assets is ~2 kB. The bundle this used to
+        # inline is ~466 kB JS + ~55 kB CSS. A 10 kB ceiling catches any meaningful
+        # re-inlining (CSS chunk, base64 image, vendored elkjs) while leaving headroom
+        # for legitimate template growth.
+        assert len(html) < 10_000, f"HTML unexpectedly large ({len(html)} bytes) — assets may have been re-inlined"

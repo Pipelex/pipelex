@@ -5,9 +5,11 @@ import hashlib
 import io
 from pathlib import Path
 
+import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.cli.dev_cli.commands.refresh_graph_ui_sri_cmd import refresh_graph_ui_sri_cmd
+from pipelex.cli.exceptions import PipelexCLIError
 
 
 class TestRefreshGraphUiSri:
@@ -83,3 +85,31 @@ class TestRefreshGraphUiSri:
 
         assert "1.2.3" in mthds_ui_js.url  # type: ignore[attr-defined]
         assert "9.9.9" in elkjs.url  # type: ignore[attr-defined]
+
+    @pytest.mark.parametrize(
+        "bad_version",
+        [
+            '1.0.0"; import os; os.system("rm -rf ~")  #',
+            "1.0.0/../../../etc/passwd",
+            "1.0.0\nimport os",
+            "latest",
+            "v1.0.0",
+            "1.0",
+            "1.0.0 ",
+            "",
+        ],
+    )
+    def test_rejects_malformed_versions(self, tmp_path: Path, mocker: MockerFixture, bad_version: str) -> None:
+        """Strings that aren't strict SemVer must be rejected — guards against code injection into the regenerated module."""
+        self._install_fake_urlopen(mocker)
+        target = tmp_path / "standalone_assets.py"
+
+        with pytest.raises(PipelexCLIError):
+            refresh_graph_ui_sri_cmd(
+                mthds_ui_version=bad_version,
+                elkjs_version="9.9.9",
+                output_path=target,
+                quiet=True,
+            )
+
+        assert not target.exists(), "Output file must not be touched when validation fails"

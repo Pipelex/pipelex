@@ -5,9 +5,11 @@ CSS) and `elkjs` from `cdn.jsdelivr.net` with Subresource Integrity (SRI)
 hashes. Versions and `sha384` integrities are pinned here so the template
 can read them through a single source of truth.
 
-To bump a version, run `pipelex-dev refresh-graph-ui-sri` (Phase 5) which
-re-fetches the URLs, recomputes the hashes, and updates the constants below.
+To bump a version, run `pipelex-dev refresh-graph-ui-sri`, which re-fetches
+the URLs, recomputes the hashes, and rewrites this file.
 """
+
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -19,7 +21,7 @@ class CDNAsset(BaseModel):
 
     url: str
     integrity: str
-    crossorigin: str = "anonymous"
+    crossorigin: Literal["anonymous", "use-credentials"] = "anonymous"
 
 
 MTHDS_UI_VERSION = "0.6.3"

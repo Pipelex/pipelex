@@ -1,7 +1,6 @@
 """Unit tests for the CDN asset constants module."""
 
 import base64
-import re
 
 from pipelex.graph.reactflow.standalone_assets import (
     ELKJS,
@@ -14,8 +13,6 @@ from pipelex.graph.reactflow.standalone_assets import (
 
 
 class TestCdnAssets:
-    _SRI_PATTERN = re.compile(r"^sha384-[A-Za-z0-9+/]+=*$")
-
     def test_assets_are_cdnasset_instances(self) -> None:
         assert isinstance(MTHDS_UI_JS, CDNAsset)
         assert isinstance(MTHDS_UI_CSS, CDNAsset)
@@ -32,8 +29,9 @@ class TestCdnAssets:
 
     def test_integrity_is_sha384_and_decodes_to_48_bytes(self) -> None:
         for asset in (MTHDS_UI_JS, MTHDS_UI_CSS, ELKJS):
-            assert self._SRI_PATTERN.match(asset.integrity), asset.integrity
-            digest_b64 = asset.integrity.split("-", 1)[1]
+            assert asset.integrity.startswith("sha384-"), asset.integrity
+            digest_b64 = asset.integrity.removeprefix("sha384-")
+            # validate=True rejects bad alphabet and bad padding both
             digest_bytes = base64.b64decode(digest_b64, validate=True)
             assert len(digest_bytes) == 48, f"{asset.integrity} decoded to {len(digest_bytes)} bytes (expected 48)"
 

@@ -10,17 +10,31 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
+import re
 from pathlib import Path
 from urllib.request import urlopen
 
+from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.graph.reactflow import standalone_assets as current_pins
 from pipelex.hub import get_console
 
 _DEFAULT_OUTPUT_PATH = Path(current_pins.__file__)
 
+# Accepts SemVer-ish version strings: 1.2.3, 1.2.3-rc.1, 1.2.3+build.5, 1.2.3-beta+exp.sha.5114f85.
+# Anchored, no slashes, no whitespace — eliminates URL traversal and Python-literal-injection vectors.
+_VERSION_PATTERN = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$")
+
 _MTHDS_UI_JS_URL_TEMPLATE = "https://cdn.jsdelivr.net/npm/@pipelex/mthds-ui@{version}/dist/standalone/graph-viewer.js"
 _MTHDS_UI_CSS_URL_TEMPLATE = "https://cdn.jsdelivr.net/npm/@pipelex/mthds-ui@{version}/dist/standalone/graph-viewer.css"
 _ELKJS_URL_TEMPLATE = "https://cdn.jsdelivr.net/npm/elkjs@{version}/lib/elk.bundled.js"
+
+# URL templates we are willing to fetch from. Split into (prefix, suffix) around the `{version}`
+# placeholder so the runtime check can match a candidate URL against the same shape we built it from.
+_ALLOWED_URL_SHAPES: tuple[tuple[str, str], ...] = tuple(
+    tuple(template.split("{version}", maxsplit=1))  # type: ignore[misc]
+    for template in (_MTHDS_UI_JS_URL_TEMPLATE, _MTHDS_UI_CSS_URL_TEMPLATE, _ELKJS_URL_TEMPLATE)
+)
 
 _MODULE_TEMPLATE = '''\
 """CDN-pinned GraphViewer asset references.
@@ -30,9 +44,11 @@ CSS) and `elkjs` from `cdn.jsdelivr.net` with Subresource Integrity (SRI)
 hashes. Versions and `sha384` integrities are pinned here so the template
 can read them through a single source of truth.
 
-To bump a version, run `pipelex-dev refresh-graph-ui-sri` (Phase 5) which
-re-fetches the URLs, recomputes the hashes, and updates the constants below.
+To bump a version, run `pipelex-dev refresh-graph-ui-sri`, which re-fetches
+the URLs, recomputes the hashes, and rewrites this file.
 """
+
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -44,37 +60,49 @@ class CDNAsset(BaseModel):
 
     url: str
     integrity: str
-    crossorigin: str = "anonymous"
+    crossorigin: Literal["anonymous", "use-credentials"] = "anonymous"
 
 
-MTHDS_UI_VERSION = "{mthds_ui_version}"
-ELKJS_VERSION = "{elkjs_version}"
+MTHDS_UI_VERSION = {mthds_ui_version_literal}
+ELKJS_VERSION = {elkjs_version_literal}
 
 MTHDS_UI_JS = CDNAsset(
     url=f"https://cdn.jsdelivr.net/npm/@pipelex/mthds-ui@{{MTHDS_UI_VERSION}}/dist/standalone/graph-viewer.js",
-    integrity="{mthds_ui_js_integrity}",
+    integrity={mthds_ui_js_integrity_literal},
 )
 
 MTHDS_UI_CSS = CDNAsset(
     url=f"https://cdn.jsdelivr.net/npm/@pipelex/mthds-ui@{{MTHDS_UI_VERSION}}/dist/standalone/graph-viewer.css",
-    integrity="{mthds_ui_css_integrity}",
+    integrity={mthds_ui_css_integrity_literal},
 )
 
 ELKJS = CDNAsset(
     url=f"https://cdn.jsdelivr.net/npm/elkjs@{{ELKJS_VERSION}}/lib/elk.bundled.js",
-    integrity="{elkjs_integrity}",
+    integrity={elkjs_integrity_literal},
 )
 '''
 
 
-_ALLOWED_URL_PREFIX = "https://cdn.jsdelivr.net/npm/"
+def _validate_version(name: str, value: str) -> str:
+    if not _VERSION_PATTERN.fullmatch(value):
+        msg = f"Invalid {name} version {value!r}: expected a SemVer string like 1.2.3 or 1.2.3-rc.1"
+        raise PipelexCLIError(msg)
+    return value
+
+
+def _validate_sri(value: str) -> str:
+    """Re-validate the computed SRI string before it goes into the regenerated module."""
+    if not re.fullmatch(r"sha384-[A-Za-z0-9+/=]+", value):
+        msg = f"Refusing to write malformed SRI literal {value!r}"
+        raise PipelexCLIError(msg)
+    return value
 
 
 def _fetch(url: str, timeout: float = 30.0) -> bytes:
-    """Fetch the full body at `url`. Raises if the request fails."""
-    if not url.startswith(_ALLOWED_URL_PREFIX):
-        msg = f"Refusing to fetch {url}: only {_ALLOWED_URL_PREFIX}... is allowed"
-        raise ValueError(msg)
+    """Fetch the full body at `url`. Raises if the URL is not on the allowlist or the request fails."""
+    if not any(url.startswith(prefix) and url.endswith(suffix) for prefix, suffix in _ALLOWED_URL_SHAPES):
+        msg = f"Refusing to fetch {url}: only the jsDelivr graph viewer URLs are allowed"
+        raise PipelexCLIError(msg)
     with urlopen(url, timeout=timeout) as response:  # noqa: S310  # URL is a known-good https jsDelivr origin (checked above)
         body: bytes = response.read()
     return body
@@ -86,6 +114,15 @@ def _sha384_sri(payload: bytes) -> str:
     return "sha384-" + base64.b64encode(digest).decode("ascii")
 
 
+def _python_string_literal(value: str) -> str:
+    """Encode `value` as a double-quoted Python string literal (matches the codebase's ruff format).
+
+    `json.dumps` is suitable because every value we encode (SemVer versions, sha384 base64) only
+    contains ASCII characters that have identical Python and JSON string-literal forms.
+    """
+    return json.dumps(value, ensure_ascii=True)
+
+
 def _render_module_source(
     *,
     mthds_ui_version: str,
@@ -95,11 +132,11 @@ def _render_module_source(
     elkjs_integrity: str,
 ) -> str:
     return _MODULE_TEMPLATE.format(
-        mthds_ui_version=mthds_ui_version,
-        elkjs_version=elkjs_version,
-        mthds_ui_js_integrity=mthds_ui_js_integrity,
-        mthds_ui_css_integrity=mthds_ui_css_integrity,
-        elkjs_integrity=elkjs_integrity,
+        mthds_ui_version_literal=_python_string_literal(mthds_ui_version),
+        elkjs_version_literal=_python_string_literal(elkjs_version),
+        mthds_ui_js_integrity_literal=_python_string_literal(mthds_ui_js_integrity),
+        mthds_ui_css_integrity_literal=_python_string_literal(mthds_ui_css_integrity),
+        elkjs_integrity_literal=_python_string_literal(elkjs_integrity),
     )
 
 
@@ -117,8 +154,15 @@ def refresh_graph_ui_sri_cmd(
         output_path: Override the module path to rewrite (used by tests).
         quiet: Suppress all output except a single status line.
     """
-    target_mthds_ui_version = mthds_ui_version or current_pins.MTHDS_UI_VERSION
-    target_elkjs_version = elkjs_version or current_pins.ELKJS_VERSION
+    # `is None` (not falsy) so an explicit empty-string argument fails validation rather than silently falling back to the default.
+    target_mthds_ui_version = _validate_version(
+        "mthds-ui",
+        current_pins.MTHDS_UI_VERSION if mthds_ui_version is None else mthds_ui_version,
+    )
+    target_elkjs_version = _validate_version(
+        "elkjs",
+        current_pins.ELKJS_VERSION if elkjs_version is None else elkjs_version,
+    )
     target_path = output_path or _DEFAULT_OUTPUT_PATH
 
     console = get_console()
@@ -143,9 +187,9 @@ def refresh_graph_ui_sri_cmd(
     source = _render_module_source(
         mthds_ui_version=target_mthds_ui_version,
         elkjs_version=target_elkjs_version,
-        mthds_ui_js_integrity=_sha384_sri(js_bytes),
-        mthds_ui_css_integrity=_sha384_sri(css_bytes),
-        elkjs_integrity=_sha384_sri(elk_bytes),
+        mthds_ui_js_integrity=_validate_sri(_sha384_sri(js_bytes)),
+        mthds_ui_css_integrity=_validate_sri(_sha384_sri(css_bytes)),
+        elkjs_integrity=_validate_sri(_sha384_sri(elk_bytes)),
     )
 
     target_path.parent.mkdir(parents=True, exist_ok=True)
