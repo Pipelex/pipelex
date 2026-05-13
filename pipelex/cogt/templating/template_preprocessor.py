@@ -27,6 +27,11 @@ class _Sigil(StrEnum):
 #
 # Identifier shape: first char must be a letter or underscore (not a digit); dotted access
 # supported; segments are non-empty and start with letter or underscore.
+#
+# The `[ \t]` whitespace class is intentionally ASCII-only. Non-ASCII whitespace (NBSP,
+# EM SPACE, etc. — usually from rich-text copy-paste) is not recognized as indentation;
+# the validator (`_validate_at_sigil_alone_on_line`) surfaces a targeted error when this
+# trips up a declared input rather than the generic "must appear alone on its own line".
 _AT_SIGIL_PATTERN = re.compile(
     r"^([ \t]*)(@\??)([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)([ \t]*)$",
     re.MULTILINE,
@@ -39,11 +44,17 @@ _AT_SIGIL_PATTERN = re.compile(
 # leading digit (so `$10` is unaffected without a separate `(?![0-9])` arm) and consecutive dots
 # (so `$name..` matches just `name`, leaving both trailing dots as literal punctuation outside
 # the match — no invalid Jinja). The trailing lookaheads block word-character continuation and
-# code-shape constructs on the same line (`$foo(`, `$foo "..."`, `${...}`). The horizontal-only
-# whitespace class `[ \t]*` (not `\s*`) keeps the code-shape guard within the current line, so
-# a `$var` ending a line is still rewritten when the next line starts with `{`, `(`, `"`, or `'`.
+# shell-style code constructs on the same line (`$foo "..."`, `$foo 'bar'`, `$foo {y}`,
+# `$foo (parens)`). The horizontal-whitespace class `[ \t]+` (one-or-more, not zero-or-more)
+# keeps the guard same-line *and* requires a space before the opener: zero-space adjacency
+# to `'` / `"` / `{` / `(` reads as natural prose (possessives like `$user's data`, parenthetical
+# `$user(note)`, adjacent quoting `$user"x"`) and interpolates. Zero-space `$` + opener with no
+# identifier in between (`$(...)`, `${...}`, `$"..."`) is still blocked because the identifier
+# capture in this same pattern fails — the lookahead only matters when an identifier did match.
+# The `[ \t]+` class is also intentionally ASCII-only — non-ASCII whitespace (NBSP / EM SPACE)
+# adjacent to an opener reads as opaque text, so `$foo<NBSP>"bar"` interpolates `$foo`.
 _DOLLAR_SIGIL_PATTERN = re.compile(
-    r"(?<!\w)(\$)([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)(?![a-zA-Z0-9_])(?![ \t]*[({\"'])",
+    r"(?<!\w)(\$)([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)(?![a-zA-Z0-9_])(?![ \t]+[({\"'])",
 )
 
 # Candidate-sigil detector for the validator: any unescaped `@`/`@?` at a non-word boundary
@@ -92,6 +103,21 @@ def _validate_at_sigil_alone_on_line(template: str, declared_inputs: set[str]) -
             continue
         if _AT_SIGIL_PATTERN.fullmatch(line):
             continue
+        stripped = line.strip()
+        if _AT_SIGIL_PATTERN.fullmatch(stripped):
+            padding_candidate = _AT_CANDIDATE_PATTERN.search(stripped)
+            if padding_candidate is not None:
+                padding_identifier = padding_candidate.group(2)
+                if get_root_from_dotted_path(padding_identifier) in declared_inputs:
+                    padding_sigil = padding_candidate.group(1)
+                    msg = (
+                        f"`{padding_sigil}{padding_identifier}` on line {line_index} is padded with "
+                        f"non-ASCII whitespace (e.g. NBSP, EM SPACE — often from rich-text "
+                        f"copy-paste). Only ASCII space/tab is recognized as line indentation. "
+                        f"Replace non-ASCII whitespace with regular spaces, or escape with `@@` if "
+                        f"you intend a literal `@`."
+                    )
+                    raise TemplateSigilSyntaxError(msg)
         for candidate in _AT_CANDIDATE_PATTERN.finditer(line):
             sigil = candidate.group(1)
             identifier = candidate.group(2)

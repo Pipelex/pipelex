@@ -382,6 +382,31 @@ Line after"""
         expected = "The user's preference is {{ user.settings.theme|format() }}. Please apply it."
         assert result == expected
 
+    @pytest.mark.parametrize(
+        ("template", "expected"),
+        [
+            (
+                "Summarize $user's data",
+                "Summarize {{ user|format() }}'s data",
+            ),
+            (
+                "It's $user's preference, not $admin's.",
+                "It's {{ user|format() }}'s preference, not {{ admin|format() }}'s.",
+            ),
+            (
+                "Apply $user.profile.theme's variant to the page.",
+                "Apply {{ user.profile.theme|format() }}'s variant to the page.",
+            ),
+        ],
+        ids=["single_possessive", "two_possessives", "dotted_path_possessive"],
+    )
+    def test_dollar_sigil_interpolates_through_possessive_apostrophe(self, template: str, expected: str):
+        """`$var's` (possessive) must interpolate `$var` — the zero-space adjacency to `'`
+        is natural prose, not a shell-style `$foo 'arg'` construct (which requires a space
+        before the quote and stays blocked).
+        """
+        assert preprocess_template(template) == expected
+
     def test_dollar_variable_adjacent_to_newline(self):
         """Inline $variable immediately before newline."""
         template = "First: $first\nSecond: $second"
@@ -651,6 +676,60 @@ Line after"""
         closing a parenthetical phrase, not a function call or string.
         """
         assert preprocess_template(template) == expected
+
+    # =========================================================================
+    # Unicode whitespace contract — both sigil patterns recognize ASCII space/tab
+    # only. NBSP (U+00A0), EM SPACE (U+2003) and friends are treated as opaque
+    # text, not whitespace. These tests lock in that intentional contract.
+    # =========================================================================
+
+    @pytest.mark.parametrize(
+        ("template", "expected"),
+        [
+            ('$foo\xa0"bar"', '{{ foo|format() }}\xa0"bar"'),
+            ('$foo "bar"', '{{ foo|format() }} "bar"'),
+            ("$foo\xa0'bar'", "{{ foo|format() }}\xa0'bar'"),
+        ],
+        ids=["nbsp_before_dquote", "em_space_before_dquote", "nbsp_before_squote"],
+    )
+    def test_dollar_code_shape_guard_is_ascii_whitespace_only(self, template: str, expected: str):
+        r"""The `$` trailing code-shape guard `(?![ \t]+[({\"'])` matches ASCII space/tab only.
+        Non-ASCII whitespace (NBSP, EM SPACE) is not treated as a separator, so
+        `$foo<NBSP>"bar"` interpolates `$foo` — consistent with natural-prose interpretation
+        of non-ASCII whitespace as opaque text.
+        """
+        assert preprocess_template(template) == expected
+
+    @pytest.mark.parametrize(
+        "template",
+        [
+            "\xa0@var\n",
+            "@var\xa0\n",
+            " @var\n",
+        ],
+        ids=["nbsp_leading", "nbsp_trailing", "em_space_leading"],
+    )
+    def test_at_sigil_line_bounded_pattern_is_ascii_whitespace_only(self, template: str):
+        """`_AT_SIGIL_PATTERN` accepts ASCII space/tab only for leading/trailing whitespace.
+        Lines padded with non-ASCII whitespace are NOT recognized as line-bounded `@var`
+        and pass through unchanged (no rewrite, no error when `declared_inputs is None`).
+        """
+        assert preprocess_template(template) == template
+
+    def test_at_validator_flags_non_ascii_whitespace_indentation(self):
+        """When `@var` is alone on a line but padded with non-ASCII whitespace (e.g. NBSP
+        from rich-text copy-paste) and `var` is a declared input, the validator must emit
+        a clear error pointing at the whitespace problem — not the misleading "must appear
+        alone on its own line" message (the line IS alone, just padded with non-ASCII
+        whitespace).
+        """
+        template = "\xa0@var\xa0"
+        with pytest.raises(TemplateSigilSyntaxError) as exc_info:
+            preprocess_template(template, declared_inputs={"var"})
+        error_message = str(exc_info.value)
+        assert "non-ASCII whitespace" in error_message
+        assert "@var" in error_message
+        assert "line 1" in error_message
 
     # =========================================================================
     # Escape sequences: @@ → literal @, $$ → literal $
