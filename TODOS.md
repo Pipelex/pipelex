@@ -1,5 +1,13 @@
 # Template preprocessor — sigil collision fix (TDD plan)
 
+## Status: `$` sigil footgun fixes planned (Phase 7 — open, 2026-05-13) — HIGH PRIORITY
+
+A live audit of the inline `$` sigil surfaced four word-adjacent substitution bugs (`micro$oft`, `user$host.com`, `P@ssw$rd123`, `a$b$c`) and a consecutive-dots edge case (`$name..` → invalid Jinja). Root cause: the `$` regex is missing the `(?<!\w)` lookbehind that the `@` candidate pattern carries, and its identifier class is too permissive. Phase 7 lands the regex tightening, the matching tests, and a small simplification of `_replace_dollar_sigil` (the trailing-dot kludge becomes unreachable). **Coding must stop after Phase 7 is delivered so the work can be checkpointed before Phase 8.** See "Phase 7 — `$` sigil footgun fixes" below for the TDD plan.
+
+## Status: declared-inputs gating planned (Phase 8 — open, 2026-05-13)
+
+The strict line-bounded `@` rule (landed earlier today) catches inline `@var` typos but is hostile to CSS in HTML templates — coding agents writing `<style>@media (...) { ... }</style>` get a `TemplateSigilSyntaxError` and have to learn the `@@` escape. Phase 8 relaxes the validator so that inline `@<ident>` only raises when `<ident>` is a declared input of the surrounding pipe; otherwise the candidate passes through silently. The rewriter (line-bounded substitution) is unchanged — alone-on-line `@var` still rewrites to `{{ var|tag("var") }}`. See "Phase 8 — Declared-inputs gating for the `@`-sigil validator" below for the TDD plan.
+
 ## Status: strict line-bounded `@` rule landed (2026-05-13)
 
 The redesign described in `wip/template-preprocessor-line-bounded-at.md` shipped:
@@ -338,3 +346,296 @@ Look for any existing `.mthds` file in the workspace that would behave different
 - No syntax migration (`@{var}` etc.) — purely additive change.
 - No changes to the `replace_*` helper functions or to the surrounding `tag(...)` / `format()` filters.
 - No changes to the call sites of `preprocess_template` listed in the design doc — they all benefit transparently.
+
+---
+
+## Phase 7 — `$` sigil footgun fixes (open, HIGH PRIORITY)
+
+### Why this phase
+
+A live audit of the inline `$` sigil surfaced four word-adjacent substitution bugs plus a consecutive-dots edge case. Root causes: the `$` regex is missing the `(?<!\w)` lookbehind that the `@` candidate pattern carries, and its identifier class (`[a-zA-Z0-9_.]+`) is too permissive (allows leading digit, consecutive dots, trailing dot inside the captured identifier).
+
+Concrete bugs (verified live against the current `preprocess_template`):
+
+| Input | Current output | Verdict |
+|---|---|---|
+| `micro$oft is a company` | `micro{{ oft\|format() }} is a company` | bug — mid-word substitution |
+| `user$host.com` | `user{{ host.com\|format() }}` | bug — mid-word substitution |
+| `P@ssw$rd123` | `P@ssw{{ rd123\|format() }}` | bug — mid-word substitution |
+| `a$b$c` | `a{{ b\|format() }}{{ c\|format() }}` | bug — back-to-back mid-word |
+| `$name..` | `{{ name.\|format() }}.` | bug — emits invalid Jinja |
+
+Regression guards (already correct under the current regex — must stay correct under the new one):
+
+- `see $name.` → `see {{ name|format() }}.` (sentence terminator)
+- `$user.name.first.` → `{{ user.name.first|format() }}.` (dotted access + terminator)
+- `run $(whatever) please` → unchanged (code-shape opener)
+- `price $10 today` → unchanged (dollar amount)
+- `$foo(bar)` / `$foo "bar"` → unchanged (code-shape lookahead)
+- `$$literal` → `$literal` (escape)
+
+Posture: **silent pass-through** for word-adjacent `$` (do not raise like `@` does). The `$` arm is best-effort inline by design — it already silently passes `$10`, `$(`, `${`, `$foo "..."`. Raising on `micro$oft` would be a noisier contract than warranted, and inconsistent with the existing `$` posture.
+
+### Target code
+
+In `pipelex/cogt/templating/template_preprocessor.py`:
+
+```python
+_DOLLAR_SIGIL_PATTERN = re.compile(
+    r"(?<!\w)(\$)([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)(?![a-zA-Z0-9_])(?!\s*[({\"'])",
+)
+
+def _replace_dollar_sigil(match: Match[str]) -> str:
+    variable: str = match.group(2)
+    return f"{{{{ {variable}|format() }}}}"
+```
+
+Notes:
+
+- `(?<!\w)` mirrors the `@` candidate pattern's left guard. Fixes all four word-adjacent bugs.
+- The strict segmented identifier `[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*` rules out consecutive dots automatically and makes the prior `(?![0-9])` arm redundant — drop it.
+- The trailing-dot kludge in `_replace_dollar_sigil` (`if variable.endswith("."): variable = variable[:-1]; ...`) goes away. Under the strict shape a trailing `.` cannot end the captured identifier, so it naturally sits outside the match as literal punctuation. `$name.` still renders as `{{ name|format() }}.` because the `.` is simply not part of the match.
+
+### Phase 7.1 — TDD red
+
+All new tests go inside the existing `TestTemplatePreprocessor` class in `tests/unit/pipelex/cogt/templating/test_template_preprocessor.py`.
+
+- [ ] `test_word_adjacent_dollar_pass_through` — parametrize over the four mid-word bug shapes:
+  - `micro$oft is a company`
+  - `user$host.com`
+  - `P@ssw$rd123`
+  - `a$b$c`
+
+  Each must pass through unchanged.
+
+- [ ] `test_dollar_consecutive_dots_pass_through` — `$name..` must render as `{{ name|format() }}..`. The strict identifier stops at `name`; both dots stay outside the match as literal punctuation.
+
+- [ ] Re-run the targeted module:
+
+  ```bash
+  .venv/bin/pytest -q tests/unit/pipelex/cogt/templating/test_template_preprocessor.py
+  ```
+
+  Expected: new tests fail (red); all existing `$`-related tests still pass.
+
+### Phase 7.2 — Implementation (green)
+
+- [ ] In `pipelex/cogt/templating/template_preprocessor.py`:
+  - [ ] Replace `_DOLLAR_SIGIL_PATTERN` with the strict shape from §Target code.
+  - [ ] Drop the `(?![0-9])` lookahead arm (redundant under the new identifier shape).
+  - [ ] Simplify `_replace_dollar_sigil` to the one-liner version. The `trailing_dot` branch is unreachable under the new regex and is removed.
+  - [ ] Update the `# Inline \`$\` sigil` comment to describe the new contract (word-boundary lookbehind, strict segmented identifier, trailing `.` stays outside the match).
+- [ ] Re-run the targeted module. Expected: all Phase 7.1 tests green; all legacy `$`-related tests still green (`test_dollar_variable_pattern`, `test_dollar_variable_with_trailing_dot`, `test_dollar_amounts_not_processed`, `test_jquery_call_pass_through`, `test_bash_subshell_pass_through`, `test_dollar_brace_pass_through`, `test_double_dollar_*`, and the punctuation-following tests).
+
+### Phase 7.3 — Workspace sanity check
+
+- [ ] From `/Users/lchoquel/repos/Pipelex/`, grep `.mthds` files for word-adjacent `$` (the shape whose behavior changes under the new regex):
+
+  ```bash
+  grep -rEn '[[:alnum:]_]\$[a-zA-Z_][a-zA-Z0-9_.]*' --include="*.mthds" . | head -50
+  ```
+
+- [ ] For each hit, decide: (a) it was relying on the buggy mid-word substitution and is now intentionally broken — flag back to the human, or (b) it's an unrelated literal `$` that the new regex correctly leaves alone — no action.
+
+### Phase 7.4 — Lint, tests, docs
+
+- [ ] `make agent-check` clean (Pyright, Ruff, Mypy, plxt).
+- [ ] Targeted test run:
+
+  ```bash
+  .venv/bin/pytest -n auto \
+    -m "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api" \
+    -o log_level=WARNING --tb=short -q \
+    tests/unit/pipelex/cogt/
+  ```
+
+- [ ] `make agent-test` — full suite green.
+- [ ] `CHANGELOG.md` under `[Unreleased]` `### Fixed`: "Template preprocessor: `$<var>` no longer substitutes when `$` is adjacent to a word character on the left (e.g. `micro$oft`, `user$host.com`, `P@ssw$rd123`, `a$b$c`), and no longer emits invalid Jinja for shapes like `$name..`. The `$` arm now mirrors the `@` candidate pattern's word-boundary lookbehind and uses a strict segmented identifier shape."
+
+**Checkpoint C**: Phase 7 complete when the four word-adjacent-`$` tests and the consecutive-dots test are green, all legacy tests are green, `make agent-check` is clean, and `make agent-test` is green.
+
+### STOP HERE — checkpoint before Phase 8
+
+**Coding must stop after Phase 7 is delivered.** Do **not** start Phase 8 in the same session. After Checkpoint C is reached:
+
+1. Update the top "Status" block to record Phase 7 as landed (with the date), mirroring the style of the existing "strict line-bounded `@` rule landed" block.
+2. Note any open questions, deviations from this plan, or follow-up items in a brief retrospective near the top of this file (same style as the existing "Deviations from the original plan" section).
+3. Hand back to the human for review.
+
+Phase 8 (declared-inputs gating, formerly Phase 7) opens a new area of concern — function split, signature change, and call-site threading across 9 files — and should be picked up in a fresh session with this `TODOS.md` as the entry point.
+
+---
+
+## Phase 8 — Declared-inputs gating for the `@`-sigil validator (open)
+
+### Why this phase
+
+The strict line-bounded `@` rule (Phases 1–6) turned every inline `@<ident>` into a load-time error to catch typos like `Extract from @invoice_text.` The same rule, however, makes inline `@media`, `@import`, `@keyframes`, `@font-face`, `@deprecated`, `@Override` — the CSS at-rules and code decorators that coding agents emit by default when writing HTML/CSS in PipeCompose templates — fail at load time too. Authors must escape every occurrence with `@@`, which is unfamiliar and surprising for both humans and agents. Phase 8 narrows the validator's "is this a real typo?" question by gating on the pipe's declared `inputs:`: an inline `@<ident>` raises only when `<ident>` (root segment for dotted paths) is one of the pipe's declared inputs. Everything else passes through silently, restoring CSS-friendliness without resurrecting the prior heuristic regex residuals (the rewriter stays strict line-bounded — alone-on-line `@var` still rewrites; nothing inline ever rewrites). LSP / `plxt check` still surface real typos at edit time because the inputs list is known at load time; no runtime threading required.
+
+### Target behavior
+
+```text
+pipe with inputs: { invoice_text: Text }:
+✗ Extract from @invoice_text. Done.            → RAISES (invoice_text is declared → real typo)
+✓ Extract from $invoice_text. Done.            → rewrites $invoice_text inline
+✓ @invoice_text                                 → rewrites alone-on-line (unchanged)
+
+pipe with inputs: { invoice_text: Text } (no `media` input):
+✓ <style>@media (max-width: 820px) { ... }</style>   → pass-through (media is NOT declared)
+✓ @media (max-width: 820px) { ... }                  → pass-through
+✓ @deprecated def foo():                             → pass-through
+✓ @Override                                          → pass-through (alone-on-line, but no Override input)
+
+pipe with inputs: { Override: Text } (unusual but possible):
+✗ @Override                                          → RAISES at the alone-on-line shape too? NO —
+   alone-on-line still rewrites, because that's the rewriter's strict success case.
+   The gate only applies to the INLINE-candidate validator path.
+```
+
+### Target code
+
+**Signature change (`pipelex/cogt/templating/template_preprocessor.py`):**
+
+```python
+def preprocess_template(template: str, *, declared_inputs: set[str] | None = None) -> str: ...
+```
+
+When `declared_inputs is None`, the validator skips the inline-candidate check entirely (lenient pass-through). When a set is provided, the validator raises only when the candidate identifier's root segment is in the set.
+
+**Function split (for clean runtime path):**
+
+```python
+def validate_template_sigils(template: str, declared_inputs: set[str]) -> None:
+    """Raise TemplateSigilSyntaxError when an inline @-candidate matches a declared input."""
+
+def rewrite_template_sigils(template: str) -> str:
+    """Pure rewrite — applies @-line-bounded and $-inline substitutions. Does not validate."""
+
+def preprocess_template(template: str, *, declared_inputs: set[str] | None = None) -> str:
+    """Convenience entry: normalize, escape sentinels, optionally validate, rewrite, restore."""
+```
+
+`render_template` (runtime, in `template_rendering.py:17`) calls `rewrite_template_sigils` directly — by the time we reach render, the template has already been validated at load time, so the runtime call only needs the rewrite step. This avoids threading `declared_inputs` through the rendering path.
+
+**Validator gating logic (`_validate_at_sigil_alone_on_line`):**
+
+```python
+def _validate_at_sigil_alone_on_line(template: str, declared_inputs: set[str] | None) -> None:
+    if declared_inputs is None:
+        return  # lenient: no inputs context, nothing to gate against
+    for line_index, line in enumerate(template.split("\n"), start=1):
+        if "@" not in line:
+            continue
+        if _AT_SIGIL_PATTERN.fullmatch(line):
+            continue
+        candidate = _AT_CANDIDATE_PATTERN.search(line)
+        if candidate is None:
+            continue
+        identifier = candidate.group(2)
+        root = get_root_from_dotted_path(identifier)
+        if root not in declared_inputs:
+            continue  # not a declared input → not a typo candidate → pass through
+        # ... build current error message and raise ...
+```
+
+### Call sites to update
+
+| File | Line(s) | Inputs source | Pass |
+|---|---|---|---|
+| `pipe_llm_blueprint.py` | 41, 58 | `self.inputs: dict[str, str] \| None` | `set(self.inputs or {})` |
+| `pipe_compose_blueprint.py` | 106 | same | same |
+| `pipe_search_blueprint.py` | 44 | same | same |
+| `pipe_img_gen_blueprint.py` | 39 | same | same |
+| `pipe_compose_factory.py` | 67 | `inputs: InputStuffSpecs` | `set(inputs.variables)` |
+| `template_document_analyzer.py` | 48 | `input_specs: dict[str, str]` | `set(input_specs.keys())` |
+| `template_image_analyzer.py` | 64, 163 | same | same |
+| `construct_blueprint.py` | 249 | none (discovery function, not primary validation) | `None` |
+| `template_blueprint.py` | 25, 37 | none (base blueprint, no inputs context) | `None` |
+| `template_rendering.py` | 17 | runtime (already validated at load) | switch to `rewrite_template_sigils` |
+
+### Phase 8.1 — TDD red: tests for the new behavior
+
+All new tests go inside the existing `TestTemplatePreprocessor` class in `tests/unit/pipelex/cogt/templating/test_template_preprocessor.py`.
+
+- [ ] **Parametrized success (lenient when no matching input):** inline `@media (...)`, `@import "..."`, `@keyframes`, `@font-face`, `@deprecated def foo():`, `@Override` — each with `declared_inputs=set()` or `declared_inputs={"other_var"}` — pass through unchanged, no raise.
+- [ ] **Parametrized success (lenient when `declared_inputs=None`):** same set of inputs as above, called with no kwarg — pass through unchanged.
+- [ ] **Parametrized error (strict when match):** inline `@invoice_text.` with `declared_inputs={"invoice_text"}` raises with the existing migration hint shape (line N, sigil+identifier, `$var` hint, `@@` escape hint).
+- [ ] **Dotted-access gating:** inline `@user.profile.bio` with `declared_inputs={"user"}` raises; same template with `declared_inputs={"profile"}` passes through (gate is on root segment).
+- [ ] **Alone-on-line rewrites regardless of inputs:** `@invoice_text` alone on its line still rewrites whether or not `invoice_text` is in `declared_inputs` — the rewriter is strict and inputs-agnostic.
+- [ ] **Update CSS at-rule tests:** the existing `test_css_at_rule_raises_under_strict_rule` (parametrized) splits into two cases: `declared_inputs=set()` → pass-through, `declared_inputs={<at-rule keyword>}` → still raises. Keep the `@@`-escape companion tests as documented opt-outs (escape still works under any gating regime).
+
+Blueprint integration tests (`tests/unit/pipelex/pipe_operators/pipe_llm/test_pipe_llm_blueprint.py`):
+
+- [ ] PipeLLM with `inputs: {"invoice_text": "Text"}` and `prompt = "Extract from @invoice_text."` — pydantic raises `ValidationError` wrapping `TemplateSigilSyntaxError`.
+- [ ] Same prompt with no `inputs` declared — loads cleanly (pass-through).
+- [ ] PipeLLM with `inputs: {"page": "Page"}` and `prompt = "<style>@media (max-width: 820px) { ... }</style>\n@page"` — loads cleanly (no `media` input → CSS passes through; `@page` alone on line → rewrites).
+- [ ] Same prompt with `inputs: {"page": "Page", "media": "Text"}` — raises on `@media` (declared input now matches).
+
+Run target:
+
+```bash
+.venv/bin/pytest -q tests/unit/pipelex/cogt/templating/test_template_preprocessor.py
+.venv/bin/pytest -q tests/unit/pipelex/pipe_operators/pipe_llm/test_pipe_llm_blueprint.py
+```
+
+Expected state after Phase 8.1: new tests fail (red), all existing tests still pass (the lenient-when-`None` default keeps current call sites' behavior intact for legacy tests that don't pass inputs).
+
+### Phase 8.2 — Implementation (green)
+
+- [ ] In `pipelex/cogt/templating/template_preprocessor.py`:
+  - [ ] Add `get_root_from_dotted_path` import (or inline equivalent).
+  - [ ] Change `_validate_at_sigil_alone_on_line` signature to accept `declared_inputs: set[str] | None`; gate per the logic in §Target code.
+  - [ ] Split `preprocess_template` into `validate_template_sigils` (just the validator wrapper) and `rewrite_template_sigils` (escape → normalize → substitute → restore, no validation). Keep `preprocess_template` as the convenience entry that runs both.
+  - [ ] Update the module docstring to describe the gating behavior.
+- [ ] Thread `declared_inputs` through the 7 call sites that have inputs context (see table). Pass `None` from the 2 call sites that don't.
+- [ ] In `pipelex/cogt/templating/template_rendering.py:17`: switch from `preprocess_template(template)` to `rewrite_template_sigils(template)` — no need to re-validate at render time.
+
+Run target same as Phase 8.1. Expected: all Phase 8.1 tests green, all legacy tests still green.
+
+### Phase 8.3 — Workspace sanity check
+
+- [ ] Re-run the workspace `.mthds` grep from Phase 4 of the line-bounded plan (`wip/template-preprocessor-line-bounded-at.md`):
+
+  ```bash
+  # Inline @-sigil candidates — anything @var that's not on its own line:
+  grep -rEn '(^|[^[:alnum:]_])@\??[a-zA-Z_][a-zA-Z0-9_.]*' --include="*.mthds" . | \
+    grep -vE '^[^:]+:[0-9]+:[[:space:]]*@\??[a-zA-Z_][a-zA-Z0-9_.]*[[:space:]]*$' | \
+    head -50
+  ```
+
+- [ ] For each hit: confirm it now loads cleanly under the new gating (the identifier should NOT be a declared input — that's the whole point). If any hit IS a declared input, it's a genuine typo that should keep raising — verify the error fires.
+- [ ] Confirm any `@@`-escape workarounds added in Phase 4 are still functionally correct (they should be; `@@` still works) but are no longer strictly necessary for the CSS cases. Note them in a "follow-up cleanup" list — don't strip them in this PR.
+
+### Phase 8.4 — Lint, tests, docs
+
+- [ ] `make agent-check` clean (Pyright, Ruff, Mypy, plxt).
+- [ ] Targeted test run (per `tests/CLAUDE.md` mapping for `pipelex/cogt/` + `pipelex/pipe_operators/`):
+
+  ```bash
+  .venv/bin/pytest -n auto \
+    -m "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api" \
+    -o log_level=WARNING --tb=short -q \
+    tests/unit/pipelex/cogt/ tests/unit/pipelex/pipe_operators/ tests/integration/pipelex/pipes/
+  ```
+
+- [ ] `make agent-test` — full suite green.
+- [ ] `CHANGELOG.md` under `[Unreleased]` `### Changed`: "Template preprocessor: relaxed the strict `@`-line rule. Inline `@<ident>` now raises only when `<ident>` is a declared input of the surrounding pipe; other inline `@` candidates (CSS at-rules, code decorators) pass through silently. The line-bounded rewriter is unchanged."
+- [ ] MTHDS authoring guidance (`pipelex/builder/` prompts and any in-repo docs that currently steer authors toward `@@`-escapes for CSS): drop the CSS-escape advice, keep the `@@`/`$$` mention as the literal-character opt-out.
+
+**Checkpoint D**: Phase 8 complete when CSS at-rules in PipeCompose HTML templates load without `@@` escapes (where they don't collide with declared inputs), AND typo-shape inline `@<declared>` still raises with the migration hint at load time.
+
+### Open decisions for Phase 8
+
+These are small enough to default and proceed; flag objections before locking in.
+
+1. **`declared_inputs=None` default = lenient (no raise).** Reasoning: callers without inputs context (the base `TemplateBlueprint`, the `ConstructBlueprint` discovery function) can't make the gate decision; the strict behavior is hostile in those contexts. Alternative: default-strict — every call site that doesn't pass inputs gets the current Phase 1–6 behavior. Less friendly to the discovery / runtime paths.
+2. **Gate on root segment of dotted identifier.** `@user.profile.bio` is gated on `user`. Matches how Pipelex's input resolution and `detect_jinja2_required_variables` treat dotted paths.
+3. **Validator does NOT consult Jinja2-detected variables.** It only consults `declared_inputs`. Reasoning: by the time we validate, we haven't rewritten yet, so Jinja2 can't see `@var` as a variable; conversely, if the author wrote `{{ media }}` directly in Jinja, that's a separate concern. Keep the gate narrow and explicit.
+4. **Reserved-name handling unchanged.** Internal vars (`preliminary_text`, `place_holder`, `_-prefixed`) are still filtered downstream in `pipe_llm_blueprint.py:78`. The validator doesn't need to know about them — they're not realistic typo candidates inline.
+
+### Out of scope for Phase 8
+
+- **Auto-cleanup of existing `@@`-escapes in workspace `.mthds` files.** Phase 4 of the line-bounded plan added some; they keep working under the new gating. A follow-up PR can strip the ones that are no longer needed.
+- **Runtime gating on actual working-memory contents.** The proposal we considered first (check the candidate against the runtime context) would catch typos that aren't declared as inputs. Rejected because it moves validation from load time to render time and breaks LSP / `plxt check` integration. The declared-inputs gate is the load-time approximation.
+- **Heuristic shape detection inside the validator.** No `(?!\s*[({"'])` lookahead — the declared-inputs gate fully replaces shape-based heuristics for the `@` arm.
+- **Changes to the `$` sigil contract.** `$` is unchanged.
