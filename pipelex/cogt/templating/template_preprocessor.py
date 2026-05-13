@@ -1,6 +1,21 @@
 import re
 from re import Match
 
+from pipelex.types import StrEnum
+
+
+class _Sigil(StrEnum):
+    """Recognized sigil prefixes. The regex captures one of these and the dispatcher routes to
+    the matching rendering. Defined as a `StrEnum` so the `match`/`case` over sigils is
+    exhaustiveness-checked by the linter — adding a new sigil to the regex without updating the
+    dispatcher (or vice versa) fails CI rather than silently misrouting.
+    """
+
+    AT = "@"
+    AT_OPTIONAL = "@?"
+    DOLLAR = "$"
+
+
 # Single-pass pattern covering all three sigils:
 #   - `@?` optional insertion
 #   - `@` tagged insertion
@@ -41,27 +56,31 @@ _SIGIL_PATTERN = re.compile(
 )
 
 # Sentinels for `@@` / `$$` escapes. Replaced before the regex pass and restored after, so the
-# escaped characters can't be confused with sigils. The NUL bytes make the sentinel impossible to
-# collide with user template content.
+# escaped characters can't be confused with sigils. The NUL bytes make collision with realistic
+# template content extremely unlikely — NUL is not a printable character and doesn't appear in
+# plain-text Pipelex sources.
 _AT_ESCAPE_SENTINEL = "\x00PIPELEX_AT_ESCAPE\x00"
 _DOLLAR_ESCAPE_SENTINEL = "\x00PIPELEX_DOLLAR_ESCAPE\x00"
 
 
 def _replace_sigil(match: Match[str]) -> str:
-    # Exactly one of group(1) (the `@`/`@?` arm) or group(2) (the `$` arm) is populated.
-    sigil: str = match.group(1) or match.group(2)
+    # Exactly one of group(1) (the `@`/`@?` arm) or group(2) (the `$` arm) is populated; the
+    # `_Sigil` constructor raises `ValueError` if the regex is ever widened to a fourth sigil
+    # without updating the enum.
+    sigil = _Sigil(match.group(1) or match.group(2))
     variable: str = match.group(3)
     trailing_dot = variable.endswith(".")
     if trailing_dot:
         # Trailing dot can't be in a variable name so it must be punctuation in the surrounding
         # sentence — strip it from the variable and re-emit it after the rendered Jinja.
         variable = variable[:-1]
-    if sigil == "@?":
-        rendered = f'{{% if {variable} %}}{{{{ {variable}|tag("{variable}") }}}}{{% endif %}}'
-    elif sigil == "@":
-        rendered = f'{{{{ {variable}|tag("{variable}") }}}}'
-    else:
-        rendered = f"{{{{ {variable}|format() }}}}"
+    match sigil:
+        case _Sigil.AT_OPTIONAL:
+            rendered = f'{{% if {variable} %}}{{{{ {variable}|tag("{variable}") }}}}{{% endif %}}'
+        case _Sigil.AT:
+            rendered = f'{{{{ {variable}|tag("{variable}") }}}}'
+        case _Sigil.DOLLAR:
+            rendered = f"{{{{ {variable}|format() }}}}"
     return f"{rendered}." if trailing_dot else rendered
 
 

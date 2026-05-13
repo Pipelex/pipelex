@@ -1,6 +1,7 @@
 import pytest
 
 from pipelex import pretty_print
+from pipelex.cogt.templating.template_errors import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 
 
@@ -524,8 +525,10 @@ Line after"""
         expected = '@font-face { font-family: "X"; }'
         assert result == expected
 
-    def test_full_style_block_pass_through(self):
-        """A realistic multi-rule <style> block must pass through byte-for-byte."""
+    def test_full_style_block_raises_under_strict_rule(self):
+        """Under the strict line-bounded `@` rule, a realistic <style> block raises
+        TemplateSigilSyntaxError on the first inline at-rule (no longer pass-through).
+        """
         template = """<style>
   .page { padding: 32px; }
   @media (max-width: 820px) {
@@ -535,8 +538,37 @@ Line after"""
     .grid { display: grid; }
   }
 </style>"""
-        result = preprocess_template(template)
-        assert result == template
+        with pytest.raises(TemplateSigilSyntaxError) as exc_info:
+            preprocess_template(template)
+        error_message = str(exc_info.value)
+        assert "line 3" in error_message
+        assert "@media" in error_message
+        assert "@@" in error_message  # escape hint must be present
+
+    def test_full_style_block_escaped_pass_through(self):
+        """Authors escape every CSS at-rule in a <style> block with `@@` to opt out of
+        strict-rule enforcement; the doubled sigils restore to literal `@` and nothing
+        is rewritten as a Pipelex sigil.
+        """
+        template = """<style>
+  .page { padding: 32px; }
+  @@media (max-width: 820px) {
+    .page { padding: 24px; }
+  }
+  @@supports (display: grid) {
+    .grid { display: grid; }
+  }
+</style>"""
+        expected = """<style>
+  .page { padding: 32px; }
+  @media (max-width: 820px) {
+    .page { padding: 24px; }
+  }
+  @supports (display: grid) {
+    .grid { display: grid; }
+  }
+</style>"""
+        assert preprocess_template(template) == expected
 
     # =========================================================================
     # Email / word-adjacent @ pass-through (heuristic lookbehind)
@@ -680,3 +712,134 @@ Line after"""
         result = preprocess_template(template)
         expected = "@property --my-color { syntax: '<color>'; inherits: false; }"
         assert result == expected
+
+    # =========================================================================
+    # Strict line-bounded `@` sigil contract — alone-on-line success cases
+    # (Phase 2 contract: `@var` and `@?var` are valid only when alone on their line.
+    # Leading and trailing whitespace is preserved through the rewrite so templates
+    # embedded in indented YAML/TOML blocks survive a round-trip.)
+    # =========================================================================
+
+    @pytest.mark.parametrize(
+        ("template", "expected"),
+        [
+            ("@var", '{{ var|tag("var") }}'),
+            ("@?var", '{% if var %}{{ var|tag("var") }}{% endif %}'),
+            ("@user.profile.bio", '{{ user.profile.bio|tag("user.profile.bio") }}'),
+            ("@_private_var", '{{ _private_var|tag("_private_var") }}'),
+            ("    @indented_var", '    {{ indented_var|tag("indented_var") }}'),
+            ("@var\t", '{{ var|tag("var") }}\t'),
+            (
+                "\t@?indented_optional",
+                '\t{% if indented_optional %}{{ indented_optional|tag("indented_optional") }}{% endif %}',
+            ),
+            (
+                "Line before\n    @middle\nLine after",
+                'Line before\n    {{ middle|tag("middle") }}\nLine after',
+            ),
+        ],
+        ids=[
+            "bare_at_var",
+            "bare_optional_at_var",
+            "dotted_at_var",
+            "underscore_prefixed_at_var",
+            "indented_at_var",
+            "trailing_tab_at_var",
+            "tab_indented_optional_at_var",
+            "indented_at_var_in_block",
+        ],
+    )
+    def test_strict_line_at_sigil_success(self, template: str, expected: str):
+        """Alone-on-line @ / @? sigils (with optional leading/trailing whitespace)
+        rewrite correctly; whitespace is preserved.
+        """
+        assert preprocess_template(template) == expected
+
+    # =========================================================================
+    # Strict line-bounded `@` sigil contract — error cases (raises)
+    # =========================================================================
+
+    @pytest.mark.parametrize(
+        ("template", "expected_line", "expected_sigil", "expected_identifier"),
+        [
+            # Inline mid-sentence
+            ("Extract from @invoice_text. Done.", 1, "@", "invoice_text"),
+            # Inline trailing punctuation
+            ("@var.", 1, "@", "var"),
+            ("@var,", 1, "@", "var"),
+            ("@var!", 1, "@", "var"),
+            ("@var?", 1, "@", "var"),
+            ("@var;", 1, "@", "var"),
+            ("@var:", 1, "@", "var"),
+            # Inline parenthetical / bracketed
+            ("(@var)", 1, "@", "var"),
+            ("[@var]", 1, "@", "var"),
+            # Multiple sigils per line
+            ("@a @b", 1, "@", "a"),
+            ("@a $b", 1, "@", "a"),
+            ("$b @a", 1, "@", "a"),
+            # Word-adjacent (space before — not email)
+            ("Word @var", 1, "@", "var"),
+            ("@var Word", 1, "@", "var"),
+            # Optional sigil inline
+            ("Hello @?notes", 1, "@?", "notes"),
+            # CSS at-rules — no longer pass-through
+            ("@media (max-width: 820px) {", 1, "@", "media"),
+            ('@font-face { font-family: "X"; }', 1, "@", "font"),
+            ('@import url("reset.css");', 1, "@", "import"),
+            ("@keyframes spin { from { opacity: 0; } }", 1, "@", "keyframes"),
+            # Code constructs
+            ("@Override", 1, "@", "Override"),
+            ("@deprecated def foo():", 1, "@", "deprecated"),
+            # Multi-line: first error reported, with correct 1-based line number
+            ("OK line\nbroken @var line\nanother line", 2, "@", "var"),
+        ],
+    )
+    def test_strict_line_at_sigil_raises(
+        self,
+        template: str,
+        expected_line: int,
+        expected_sigil: str,
+        expected_identifier: str,
+    ):
+        """Inline / non-alone @ or @? sigils raise TemplateSigilSyntaxError with a
+        message that names the line, the offending span, and a migration hint.
+        """
+        with pytest.raises(TemplateSigilSyntaxError) as exc_info:
+            preprocess_template(template)
+        error_message = str(exc_info.value)
+        offending_span = f"{expected_sigil}{expected_identifier}"
+        # Line number must be present and correctly 1-based
+        assert f"line {expected_line}" in error_message
+        # Offending span (sigil + identifier) must be quoted somewhere in the message
+        assert offending_span in error_message
+        # Migration hints — both alternatives must be visible to the author
+        assert f"${expected_identifier}" in error_message  # inline-value migration
+        assert "@@" in error_message  # literal-escape hint
+
+    # =========================================================================
+    # Word-adjacent `@` is not a candidate sigil — silent pass-through
+    # =========================================================================
+
+    @pytest.mark.parametrize(
+        "template",
+        [
+            "someone@example.com",
+            "hello@pipelex.com",
+            "Send to noreply@anthropic.com immediately.",
+            "prefix@suffix",
+            "Contact us at hello@pipelex.com for help.",
+        ],
+        ids=[
+            "bare_email",
+            "domain_email",
+            "email_in_sentence",
+            "letters_around_at",
+            "email_in_help_sentence",
+        ],
+    )
+    def test_word_adjacent_at_silent_pass_through(self, template: str):
+        """`@` preceded by a word character (emails, prose hashtags) is not a candidate
+        sigil and passes through silently — never raises, never rewrites.
+        """
+        assert preprocess_template(template) == template

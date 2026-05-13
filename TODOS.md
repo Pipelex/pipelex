@@ -1,5 +1,11 @@
 # Template preprocessor — sigil collision fix (TDD plan)
 
+## Next phase
+
+The CSS-collision fix shipped on this branch (heuristic regex + `@@` / `$$` escapes). A redesign now supersedes the heuristic approach for the `@` sigil: **`@var` must be alone on its own line**, with a load-time validator raising on inline candidates. See `wip/template-preprocessor-line-bounded-at.md` for the active plan.
+
+The history below documents the heuristic work that landed on the branch — kept for context, but the regex it produced is about to be replaced.
+
 ## Status: Complete (2026-05-13)
 
 All phases (1–6) landed. Full `make agent-test` is green and `make agent-check` is clean. The

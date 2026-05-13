@@ -136,3 +136,56 @@ class TestPipeLLMBlueprint:
         )
         # Should not raise error even though these special variables are not in inputs
         assert blueprint.inputs is None
+
+    # =========================================================================
+    # Strict line-bounded `@` sigil contract — surfaces through pydantic validation
+    # =========================================================================
+
+    def test_validate_inputs_raises_for_inline_at_sigil_in_prompt(self):
+        """Inline `@var` in the prompt surfaces as a pydantic validation failure
+        whose message names the offending span, the line number, and both migration
+        hints (`$var` for inline, `@@` for literal).
+        """
+        with pytest.raises(ValueError) as exc_info:
+            PipeLLMBlueprint(
+                description="lorem ipsum",
+                inputs={"invoice_text": "native.Text"},
+                output="native.Text",
+                prompt="Extract from @invoice_text. Done.",
+            )
+        error_msg = str(exc_info.value)
+        assert "@invoice_text" in error_msg
+        assert "$invoice_text" in error_msg
+        assert "@@" in error_msg
+        assert "line 1" in error_msg
+
+    def test_validate_inputs_raises_for_inline_at_sigil_in_system_prompt(self):
+        """Inline `@var` in the system_prompt also surfaces with the strict-rule
+        diagnostic — both prompt fields are validated.
+        """
+        with pytest.raises(ValueError) as exc_info:
+            PipeLLMBlueprint(
+                description="lorem ipsum",
+                inputs={"context": "native.Text"},
+                output="native.Text",
+                system_prompt="Hello @context!",
+                prompt="Generate a response",
+            )
+        error_msg = str(exc_info.value)
+        assert "@context" in error_msg
+        assert "$context" in error_msg
+        assert "@@" in error_msg
+        assert "line 1" in error_msg
+
+    def test_validate_inputs_raises_with_correct_line_for_multiline_prompt(self):
+        """Line number in the diagnostic is 1-based and accurate for multi-line prompts."""
+        with pytest.raises(ValueError) as exc_info:
+            PipeLLMBlueprint(
+                description="lorem ipsum",
+                inputs={"data": "native.Text"},
+                output="native.Text",
+                prompt="Header line\nBody with inline @data\nFooter line",
+            )
+        error_msg = str(exc_info.value)
+        assert "line 2" in error_msg
+        assert "@data" in error_msg
