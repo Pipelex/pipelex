@@ -37,93 +37,112 @@ Net: `str` on the pipe (required by the language), `str | None = None` on the no
 
 ## Phase 1 — `NodeSpec` schema (red → green)
 
-- [ ] Add a failing unit test in `tests/unit/pipelex/graph/test_graphspec_validation.py` (new `TestNodeSpecPipeMetadata` class in a new module if a second class is needed — recall: 1 class per module) asserting:
-    - [ ] `NodeSpec(... description="d", domain_code="dc", ...)` instantiates.
-    - [ ] `description` and `domain_code` default to `None` when omitted (back-compat).
-    - [ ] `NodeSpec(**node.model_dump(by_alias=True))` round-trips.
-- [ ] Run the test, confirm it fails on unknown keyword (`extra="forbid"`).
-- [ ] Add `description: str | None = None` and `domain_code: str | None = None` to `NodeSpec` in `pipelex/graph/graphspec.py`.
-- [ ] Run `make agent-check` and the new test alone; both green.
+- [x] Add a failing unit test in `tests/unit/pipelex/graph/test_graphspec_validation.py` (new `TestNodeSpecPipeMetadata` class in a new module if a second class is needed — recall: 1 class per module) asserting:
+    - [x] `NodeSpec(... description="d", domain_code="dc", ...)` instantiates.
+    - [x] `description` and `domain_code` default to `None` when omitted (back-compat).
+    - [x] `NodeSpec(**node.model_dump(by_alias=True))` round-trips.
+- [x] Run the test, confirm it fails on unknown keyword (`extra="forbid"`).
+- [x] Add `description: str | None = None` and `domain_code: str | None = None` to `NodeSpec` in `pipelex/graph/graphspec.py`.
+- [x] Run `make agent-check` and the new test alone; both green.
 
 ## Phase 2 — `PipeStartEvent` payload (red → green)
 
-- [ ] Add a failing test in `tests/unit/pipelex/tracing/test_trace_events.py` asserting:
-    - [ ] `PipeStartEvent(..., description="d", domain_code="dc")` instantiates.
-    - [ ] Fields default to `None` when omitted.
-    - [ ] JSON round-trip preserves both fields.
-- [ ] Run, confirm failure.
-- [ ] Add `description: str | None = None` and `domain_code: str | None = None` to `PipeStartEvent` in `pipelex/tracing/trace_events.py`.
-- [ ] Re-run; green.
+- [x] Add a failing test in `tests/unit/pipelex/tracing/test_trace_events.py` asserting:
+    - [x] `PipeStartEvent(..., description="d", domain_code="dc")` instantiates.
+    - [x] Fields default to `None` when omitted.
+    - [x] JSON round-trip preserves both fields.
+- [x] Run, confirm failure.
+- [x] Add `description: str | None = None` and `domain_code: str | None = None` to `PipeStartEvent` in `pipelex/tracing/trace_events.py`.
+- [x] Re-run; green.
 
-### Checkpoint A — schema layer complete
+### Checkpoint A — schema layer complete ✅
 
 At this point the data model can carry the new fields end-to-end but nothing populates them. Good handoff point: next phase opens up the wiring layer across tracer / assembler / call site.
 
-Status snapshot to record here when reached:
+Status snapshot:
 
-- [ ] Phase 1 + 2 done.
-- [ ] No existing tests broken (run `make agent-test`).
+- [x] Phase 1 + 2 done.
+- [x] No existing tests broken (run `make agent-test`).
+- New test modules: `tests/unit/pipelex/graph/test_node_spec_pipe_metadata.py`; expanded methods in `tests/unit/pipelex/tracing/test_trace_events.py`.
 
 ---
 
 ## Phase 3 — Live tracer wiring (red → green)
 
-- [ ] Add a failing test in `tests/unit/pipelex/graph/` (new module e.g. `test_graph_tracer_node_metadata.py`, one class) that:
-    - [ ] Builds a `GraphTracer` directly, calls `on_pipe_start(..., description="d", domain_code="dc", ...)`, then `on_pipe_end_success(...)` and `teardown()`.
-    - [ ] Asserts the resulting `GraphSpec.nodes[0].description == "d"` and `.domain_code == "dc"`.
-- [ ] Run, confirm failure (kwarg unknown).
-- [ ] Add `description` and `domain_code` parameters (both `str | None = None`) to:
-    - [ ] `GraphTracerProtocol.on_pipe_start` in `pipelex/graph/graph_tracer_protocol.py`.
-    - [ ] `GraphTracerManager.on_pipe_start` in `pipelex/graph/graph_tracer_manager.py` (forward through).
-    - [ ] `GraphTracer.on_pipe_start` in `pipelex/graph/graph_tracer.py`.
-    - [ ] No-op / null tracer implementations (whatever else implements the protocol).
-- [ ] Extend `_MutableNodeData` in `pipelex/graph/graph_tracer.py` with the two fields and pass them when constructing.
-- [ ] Update the conversion that builds the final `NodeSpec` (look for the `to_node_spec` / `NodeSpec(...)` site inside `graph_tracer.py`) to forward both fields.
-- [ ] Also include `description`/`domain_code` when emitting `PipeStartEvent` (lines ~611–627 in `graph_tracer.py`).
-- [ ] Re-run the new test; green. Run `make agent-check`.
+- [x] Add a failing test in `tests/unit/pipelex/graph/` (new module e.g. `test_graph_tracer_node_metadata.py`, one class) that:
+    - [x] Builds a `GraphTracer` directly, calls `on_pipe_start(..., description="d", domain_code="dc", ...)`, then `on_pipe_end_success(...)` and `teardown()`.
+    - [x] Asserts the resulting `GraphSpec.nodes[0].description == "d"` and `.domain_code == "dc"`.
+- [x] Run, confirm failure (kwarg unknown).
+- [x] Add `description` and `domain_code` parameters (both `str | None = None`) to:
+    - [x] `GraphTracerProtocol.on_pipe_start` in `pipelex/graph/graph_tracer_protocol.py`.
+    - [x] `GraphTracerManager.on_pipe_start` in `pipelex/graph/graph_tracer_manager.py` (forward through).
+    - [x] `GraphTracer.on_pipe_start` in `pipelex/graph/graph_tracer.py`.
+    - [x] No-op / null tracer implementations (whatever else implements the protocol).
+- [x] Extend `_MutableNodeData` in `pipelex/graph/graph_tracer.py` with the two fields and pass them when constructing.
+- [x] Update the conversion that builds the final `NodeSpec` (look for the `to_node_spec` / `NodeSpec(...)` site inside `graph_tracer.py`) to forward both fields.
+- [x] Also include `description`/`domain_code` when emitting `PipeStartEvent` (lines ~611–627 in `graph_tracer.py`).
+- [x] Re-run the new test; green. Run `make agent-check`.
 
 ## Phase 4 — Replay assembler wiring (red → green)
 
-- [ ] Add a failing test in `tests/unit/pipelex/tracing/test_graphspec_assembler.py` (new test method inside the existing class — keep 1 class per module rule) that:
-    - [ ] Feeds a `PipeStartEvent` with `description="d"`, `domain_code="dc"` plus matching `PipeEndSuccessEvent` to `GraphSpecAssembler.assemble(...)`.
-    - [ ] Asserts the produced `GraphSpec.nodes[0].description == "d"` and `.domain_code == "dc"`.
-- [ ] Run, confirm failure.
-- [ ] Extend `_AssemblerNodeData` in `pipelex/tracing/graphspec_assembler.py` with the two fields.
-- [ ] In `_handle_pipe_start`, read `event.description` / `event.domain_code` and store on the node.
-- [ ] In the assembler's NodeSpec construction site, forward both fields.
-- [ ] Re-run; green.
+- [x] Add a failing test in `tests/unit/pipelex/tracing/test_graphspec_assembler.py` (new test method inside the existing class — keep 1 class per module rule) that:
+    - [x] Feeds a `PipeStartEvent` with `description="d"`, `domain_code="dc"` plus matching `PipeEndSuccessEvent` to `GraphSpecAssembler.assemble(...)`.
+    - [x] Asserts the produced `GraphSpec.nodes[0].description == "d"` and `.domain_code == "dc"`.
+- [x] Run, confirm failure.
+- [x] Extend `_AssemblerNodeData` in `pipelex/tracing/graphspec_assembler.py` with the two fields.
+- [x] In `_handle_pipe_start`, read `event.description` / `event.domain_code` and store on the node.
+- [x] In the assembler's NodeSpec construction site, forward both fields.
+- [x] Re-run; green.
 
 ---
 
 ## Phase 5 — Call-site wiring in `PipeAbstract.run_pipe` (red → green)
 
-- [ ] Add a failing **integration** test (or expand an existing one under `tests/integration/pipelex/temporal/tracing/` or `tests/e2e/pipelex/graph/`) that:
-    - [ ] Runs (dry-run is fine) a small pipeline with a known pipe `code`, `domain_code`, and `description`.
-    - [ ] Asserts the resulting `GraphSpec` has a node whose `description` and `domain_code` match the source pipe.
-- [ ] Run, confirm failure (still `None`).
-- [ ] In `pipelex/core/pipes/pipe_abstract.py` around line 454 (`tracer_manager.on_pipe_start(...)`), pass `description=self.description, domain_code=self.domain_code`.
-- [ ] Re-run; green.
+- [x] Add a failing **integration** test (or expand an existing one under `tests/integration/pipelex/temporal/tracing/` or `tests/e2e/pipelex/graph/`) that:
+    - [x] Runs (dry-run is fine) a small pipeline with a known pipe `code`, `domain_code`, and `description`.
+    - [x] Asserts the resulting `GraphSpec` has a node whose `description` and `domain_code` match the source pipe.
+- [x] Run, confirm failure (still `None`).
+- [x] In `pipelex/core/pipes/pipe_abstract.py` around line 454 (`tracer_manager.on_pipe_start(...)`), pass `description=self.description, domain_code=self.domain_code`.
+- [x] Re-run; green.
 
 ## Phase 6 — Sweep for incidental breakage
 
-- [ ] `grep -rn "on_pipe_start(" tests/ pipelex/` and update any in-test callers if they assert exact kwargs.
-- [ ] `grep -rn "PipeStartEvent(" tests/ pipelex/` — confirm new optional fields don't break existing constructions (they shouldn't, since defaults are `None`).
-- [ ] `grep -rn "NodeSpec(" tests/ pipelex/` — confirm no test re-asserts field-set exhaustiveness in a way that the new fields would break.
-- [ ] Re-run `make agent-test`. Fix any fallout.
+- [x] `grep -rn "on_pipe_start(" tests/ pipelex/` and update any in-test callers if they assert exact kwargs.
+- [x] `grep -rn "PipeStartEvent(" tests/ pipelex/` — confirm new optional fields don't break existing constructions (they shouldn't, since defaults are `None`).
+- [x] `grep -rn "NodeSpec(" tests/ pipelex/` — confirm no test re-asserts field-set exhaustiveness in a way that the new fields would break.
+- [x] Re-run `make agent-test`. Fix any fallout.
 
 ## Phase 7 — Quality gates
 
-- [ ] `make agent-check` (pyright, ruff, mypy, plxt) — clean.
-- [ ] `make agent-test` — green.
-- [ ] Eyeball one generated `GraphSpec` JSON (e.g. via a small dry-run script or an existing e2e graph fixture regenerated) and confirm the new fields appear on nodes.
+- [x] `make agent-check` (pyright, ruff, mypy, plxt) — clean.
+- [x] `make agent-test` — green.
+- [x] Eyeball one generated `GraphSpec` JSON (e.g. via a small dry-run script or an existing e2e graph fixture regenerated) and confirm the new fields appear on nodes.
 
-### Checkpoint B — feature complete
+### Checkpoint B — feature complete ✅
 
-Status snapshot to record here when reached:
+Status snapshot:
 
-- [ ] Phases 3–7 done.
-- [ ] `NodeSpec.description` + `NodeSpec.domain_code` populated on every pipe-call node in both live and replay paths.
+- [x] Phases 3–7 done.
+- [x] `NodeSpec.description` + `NodeSpec.domain_code` populated on every pipe-call node in both live and replay paths.
+- [x] `make agent-check` and `make agent-test` green; new-field JSON output verified.
 - [ ] Optional next step (NOT part of this plan; track separately if pursued): wire the reactflow viewer (`pipelex/graph/reactflow/assets/`) to consume the new per-node fields instead of joining with `pipe_registry`.
+
+Touched code:
+
+- `pipelex/graph/graphspec.py` — `NodeSpec.description`, `NodeSpec.domain_code`
+- `pipelex/tracing/trace_events.py` — `PipeStartEvent.description`, `PipeStartEvent.domain_code`
+- `pipelex/graph/graph_tracer_protocol.py` — protocol + NoOp signature
+- `pipelex/graph/graph_tracer_manager.py` — forwarder signature
+- `pipelex/graph/graph_tracer.py` — `_MutableNodeData`, `to_node_spec`, `on_pipe_start`, `PipeStartEvent` emit
+- `pipelex/tracing/graphspec_assembler.py` — `_AssemblerNodeData`, `to_node_spec`, `_handle_pipe_start`
+- `pipelex/core/pipes/pipe_abstract.py` — `run_pipe` call site forwards `self.description` / `self.domain_code`
+
+New tests:
+
+- `tests/unit/pipelex/graph/test_node_spec_pipe_metadata.py`
+- `tests/unit/pipelex/graph/test_graph_tracer_node_metadata.py`
+- `tests/unit/pipelex/core/pipes/test_run_pipe_tracer_metadata.py`
+- New methods on `tests/unit/pipelex/tracing/test_trace_events.py::TestTraceEvents` and `tests/unit/pipelex/tracing/test_graphspec_assembler.py::TestGraphSpecAssembler`.
 
 ---
 

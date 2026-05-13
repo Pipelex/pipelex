@@ -69,6 +69,8 @@ class PipeStartEvent(TraceEvent):
     pipe_code: str
     pipe_type: str
     node_kind: NodeKind
+    description: str | None = None
+    domain_code: str | None = None
     input_specs: list[IOSpec] = Field(default_factory=empty_list_factory_of(IOSpec))
     pipe_data: dict[str, Any] = Field(default_factory=dict)
     concept_data: list[dict[str, Any]] = Field(default_factory=empty_list_factory_of(dict))
