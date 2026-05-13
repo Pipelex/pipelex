@@ -18,6 +18,7 @@ from pipelex.cli.dev_cli.commands.check_urls_cmd import DEFAULT_TIMEOUT, check_u
 from pipelex.cli.dev_cli.commands.generate_mthds_schema_cmd import generate_mthds_schema_cmd
 from pipelex.cli.dev_cli.commands.kit_cmd import kit_app
 from pipelex.cli.dev_cli.commands.preprocess_test_models_cmd import preprocess_test_models_cmd
+from pipelex.cli.dev_cli.commands.refresh_graph_ui_sri_cmd import refresh_graph_ui_sri_cmd
 from pipelex.cli.dev_cli.commands.sync_main_config_cmd import SyncTarget, sync_main_config_cmd
 from pipelex.cli.dev_cli.commands.update_gateway_models_cmd import update_gateway_models_cmd
 from pipelex.hub import get_console
@@ -39,6 +40,7 @@ class PipelexDevCLI(TyperGroup):
             "generate-mthds-schema",
             "kit",
             "preprocess-test-models",
+            "refresh-graph-ui-sri",
             "sync-main-config",
             "update-gateway-models",
         ]
@@ -226,6 +228,37 @@ def preprocess_test_models_command(
     """Preprocess test models and generate fixture files for parametrized tests."""
     try:
         preprocess_test_models_cmd(profile=profile, generate_fixtures=generate_fixtures, output_json=output_json, quiet=quiet)
+    except Exception:
+        console = get_console()
+        console.print()
+        console.print("[bold red]Unexpected error occurred[/bold red]")
+        console.print()
+        console.print(Traceback())
+        sys.exit(1)
+
+
+@app.command(
+    name="refresh-graph-ui-sri",
+    help="Refetch the pinned graph viewer assets from jsDelivr and rewrite SRI hashes in standalone_assets.py",
+)
+def refresh_graph_ui_sri_command(
+    mthds_ui_version: Annotated[
+        str | None,
+        typer.Option("--mthds-ui-version", help="Target @pipelex/mthds-ui version (default: currently pinned)"),
+    ] = None,
+    elkjs_version: Annotated[
+        str | None,
+        typer.Option("--elkjs-version", help="Target elkjs version (default: currently pinned)"),
+    ] = None,
+    quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only a single status line")] = False,
+) -> None:
+    """Refetch the pinned graph viewer assets and rewrite `standalone_assets.py`."""
+    try:
+        refresh_graph_ui_sri_cmd(
+            mthds_ui_version=mthds_ui_version,
+            elkjs_version=elkjs_version,
+            quiet=quiet,
+        )
     except Exception:
         console = get_console()
         console.print()

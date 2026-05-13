@@ -6,6 +6,7 @@ from pipelex.config import get_config
 from pipelex.graph.graphspec import GraphSpec, NodeKind, NodeSpec, NodeStatus, PipelineRef
 from pipelex.graph.reactflow.reactflow_config import ReactFlowRenderingConfig
 from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html
+from pipelex.graph.reactflow.standalone_assets import ELKJS, MTHDS_UI_CSS, MTHDS_UI_JS
 
 
 class TestReactFlowHtml:
@@ -74,11 +75,36 @@ class TestReactFlowHtml:
         assert "</html>" in html
         assert '<div id="root">' in html
 
-    def test_html_contains_bundled_js(self) -> None:
-        """Test that HTML includes the mthds-ui GraphViewer bundle."""
+    def test_html_loads_mthds_ui_js_from_cdn_with_sri(self) -> None:
+        """The HTML must reference the pinned mthds-ui JS bundle on jsDelivr with SRI."""
         html = generate_reactflow_html(self._empty_graphspec(), self._rf_config())
 
-        assert '"use strict"' in html
+        expected = f'<script src="{MTHDS_UI_JS.url}" integrity="{MTHDS_UI_JS.integrity}" crossorigin="{MTHDS_UI_JS.crossorigin}"></script>'
+        assert expected in html
+
+    def test_html_loads_mthds_ui_css_from_cdn_with_sri(self) -> None:
+        """The HTML must reference the pinned mthds-ui CSS on jsDelivr with SRI."""
+        html = generate_reactflow_html(self._empty_graphspec(), self._rf_config())
+
+        expected = f'<link rel="stylesheet" href="{MTHDS_UI_CSS.url}" integrity="{MTHDS_UI_CSS.integrity}" crossorigin="{MTHDS_UI_CSS.crossorigin}">'
+        assert expected in html
+
+    def test_html_loads_elkjs_from_jsdelivr_with_sri(self) -> None:
+        """Elkjs must come from jsDelivr (not unpkg) and carry an SRI hash."""
+        html = generate_reactflow_html(self._empty_graphspec(), self._rf_config())
+
+        expected = f'<script src="{ELKJS.url}" integrity="{ELKJS.integrity}" crossorigin="{ELKJS.crossorigin}"></script>'
+        assert expected in html
+        assert "unpkg.com/elkjs" not in html
+
+    def test_html_does_not_inline_bundle_contents(self) -> None:
+        """Bundle bytes must not be inlined — externalized via <link>/<script src>."""
+        html = generate_reactflow_html(self._empty_graphspec(), self._rf_config())
+
+        # Tokens that only exist inside the IIFE bundle / CSS bundle.
+        assert '"use strict"' not in html
+        assert ".react-flow" not in html
+        assert "<style>" not in html
 
     def test_json_data_scripts_have_no_nonce(self) -> None:
         """Verify application/json script tags do NOT have a nonce attribute."""

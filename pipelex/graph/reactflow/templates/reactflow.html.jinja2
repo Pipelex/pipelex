@@ -1,16 +1,17 @@
 <!DOCTYPE html>
 <!--
-  Bundled: React (MIT), @xyflow/react (MIT), DOMPurify (MPL-2.0/Apache-2.0), @pipelex/mthds-ui (MIT)
-  External: elkjs (EPL-2.0) loaded from CDN
+  External (loaded from jsDelivr with Subresource Integrity):
+    React (MIT), @xyflow/react (MIT), DOMPurify (MPL-2.0/Apache-2.0),
+    @pipelex/mthds-ui (MIT), elkjs (EPL-2.0).
+  Nothing is bundled into this file — all viewer code is fetched at view time
+  from cdn.jsdelivr.net with sha384 hashes that pin tamper-evident content.
 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ title }}</title>
-<style>
-{{ viewer_css | safe }}
-</style>
+<link rel="stylesheet" href="{{ mthds_ui_css.url }}" integrity="{{ mthds_ui_css.integrity }}" crossorigin="{{ mthds_ui_css.crossorigin }}">
 </head>
 <body data-theme="{{ theme }}">
 <div id="app-container">
@@ -20,11 +21,7 @@
 <script type="application/json" id="pipelex-graphspec">{{ graphspec_json | escape_script_tag | safe }}</script>
 <script type="application/json" id="pipelex-config">{{ config_json | escape_script_tag | safe }}</script>
 
-<!-- elkjs: EPL-2.0 licensed, loaded from CDN (not bundled) -->
-<script src="https://unpkg.com/elkjs@0.11.1/lib/elk.bundled.js"></script>
-
-<script>
-{{ viewer_js | escape_script_tag | safe }}
-</script>
+<script src="{{ elkjs.url }}" integrity="{{ elkjs.integrity }}" crossorigin="{{ elkjs.crossorigin }}"></script>
+<script src="{{ mthds_ui_js.url }}" integrity="{{ mthds_ui_js.integrity }}" crossorigin="{{ mthds_ui_js.crossorigin }}"></script>
 </body>
 </html>

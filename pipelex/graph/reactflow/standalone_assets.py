@@ -1,33 +1,41 @@
-"""Standalone GraphViewer asset loader.
+"""CDN-pinned GraphViewer asset references.
 
-Loads the pre-built JS and CSS bundles from mthds-ui for embedding
-in Jinja2 templates via the standard template rendering pipeline.
+Generated HTML loads `@pipelex/mthds-ui` (the GraphViewer IIFE bundle + its
+CSS) and `elkjs` from `cdn.jsdelivr.net` with Subresource Integrity (SRI)
+hashes. Versions and `sha384` integrities are pinned here so the template
+can read them through a single source of truth.
+
+To bump a version, run `pipelex-dev refresh-graph-ui-sri` (Phase 5) which
+re-fetches the URLs, recomputes the hashes, and updates the constants below.
 """
 
-import importlib.resources
-from functools import lru_cache
-
-_ASSET_PACKAGE = "pipelex.graph.reactflow.assets"
+from pydantic import BaseModel, ConfigDict
 
 
-# @lru_cache(maxsize=1) memoizes the no-arg call: file is read once, then served from cache.
-@lru_cache(maxsize=1)
-def get_standalone_js() -> str:
-    """Load the pre-built GraphViewer JS bundle (IIFE).
+class CDNAsset(BaseModel):
+    """A pinned CDN asset with its Subresource Integrity hash."""
 
-    Returns:
-        The JS bundle as a string, cached after first load.
-    """
-    package_files = importlib.resources.files(_ASSET_PACKAGE)
-    return (package_files / "graph-viewer.js").read_text(encoding="utf-8")
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    url: str
+    integrity: str
+    crossorigin: str = "anonymous"
 
 
-@lru_cache(maxsize=1)
-def get_standalone_css() -> str:
-    """Load the pre-built GraphViewer CSS bundle.
+MTHDS_UI_VERSION = "0.6.3"
+ELKJS_VERSION = "0.11.1"
 
-    Returns:
-        The CSS bundle as a string, cached after first load.
-    """
-    package_files = importlib.resources.files(_ASSET_PACKAGE)
-    return (package_files / "graph-viewer.css").read_text(encoding="utf-8")
+MTHDS_UI_JS = CDNAsset(
+    url=f"https://cdn.jsdelivr.net/npm/@pipelex/mthds-ui@{MTHDS_UI_VERSION}/dist/standalone/graph-viewer.js",
+    integrity="sha384-BS9SD/K440VwYZxJCMuOi3g0FVlFz9ugiivYvkVpRDPFRo9FMc6IXQl9EM22VCSP",
+)
+
+MTHDS_UI_CSS = CDNAsset(
+    url=f"https://cdn.jsdelivr.net/npm/@pipelex/mthds-ui@{MTHDS_UI_VERSION}/dist/standalone/graph-viewer.css",
+    integrity="sha384-Ue1fm1guW8EQGdaqrsi+8Zm5Iq5AGkxa5+UeWw+sy8vVCSYkGez6+80+p9/oxqOn",
+)
+
+ELKJS = CDNAsset(
+    url=f"https://cdn.jsdelivr.net/npm/elkjs@{ELKJS_VERSION}/lib/elk.bundled.js",
+    integrity="sha384-k7OFwtsMfFyYU75zZhPkC8VRASnGrW1pxavUnozOiO2B5M5gv6PYGOkEYZTrVtvo",
+)
