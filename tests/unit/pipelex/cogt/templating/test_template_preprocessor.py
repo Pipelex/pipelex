@@ -1167,3 +1167,131 @@ Line after"""
         error_message = str(exc_info.value)
         assert "@var" in error_message
         assert "line 1" in error_message
+
+    # =========================================================================
+    # Adjacent `@` and `$` sigils on the same line
+    # =========================================================================
+
+    @pytest.mark.parametrize(
+        ("template", "expected"),
+        [
+            ("@$foo", "@{{ foo|format() }}"),
+            ("@?$foo", "@?{{ foo|format() }}"),
+            ("hello@$world", "hello@{{ world|format() }}"),
+            ("prefix @$bar suffix", "prefix @{{ bar|format() }} suffix"),
+        ],
+        ids=[
+            "at_then_dollar_bare",
+            "optional_at_then_dollar_bare",
+            "word_at_then_dollar",
+            "at_then_dollar_in_sentence",
+        ],
+    )
+    def test_at_then_dollar_adjacency_rewrites_inline_dollar(self, template: str, expected: str):
+        """`@` (or `@?`) followed immediately by `$<ident>` is not a candidate (the next
+        char isn't an identifier start), but the `$<ident>` rewrites because the preceding
+        `@` / `?` is not a word character — the `$` lookbehind passes.
+        """
+        assert preprocess_template(template) == expected
+
+    @pytest.mark.parametrize(
+        ("template", "expected_sigil", "expected_identifier"),
+        [
+            ("$@foo", "@", "foo"),
+            ("$@?foo", "@?", "foo"),
+            ("$@invoice_text.", "@", "invoice_text"),
+        ],
+        ids=[
+            "dollar_then_at_bare",
+            "dollar_then_optional_at_bare",
+            "dollar_then_at_with_trailing_dot",
+        ],
+    )
+    def test_dollar_then_at_adjacency_raises_when_at_ident_is_declared(
+        self,
+        template: str,
+        expected_sigil: str,
+        expected_identifier: str,
+    ):
+        """`$@<ident>` / `$@?<ident>`: the leading `$` has no identifier so it doesn't
+        substitute, but the `@`/`@?` candidate fires because `$` is non-word. The line
+        isn't alone-on-line, so the validator raises when the identifier is declared.
+        """
+        with pytest.raises(TemplateSigilSyntaxError) as exc_info:
+            preprocess_template(template, declared_inputs={expected_identifier})
+        error_message = str(exc_info.value)
+        assert f"{expected_sigil}{expected_identifier}" in error_message
+        assert f"${expected_identifier}" in error_message
+        assert "@@" in error_message
+        assert "line 1" in error_message
+
+    @pytest.mark.parametrize(
+        "template",
+        ["$@foo", "$@?foo", "$@invoice_text."],
+        ids=[
+            "dollar_then_at_bare",
+            "dollar_then_optional_at_bare",
+            "dollar_then_at_with_trailing_dot",
+        ],
+    )
+    def test_dollar_then_at_adjacency_passes_through_when_not_declared(self, template: str):
+        """Same `$@<ident>` shape with no `declared_inputs` → silent pass-through. The
+        validator is skipped and the rewriter finds no match for either sigil.
+        """
+        assert preprocess_template(template) == template
+
+    @pytest.mark.parametrize(
+        ("template", "expected_identifier"),
+        [
+            ("@world$", "world"),
+            ("@invoice_text$", "invoice_text"),
+        ],
+        ids=["at_ident_trailing_dollar", "at_long_ident_trailing_dollar"],
+    )
+    def test_at_ident_with_trailing_dollar_raises_when_declared(
+        self,
+        template: str,
+        expected_identifier: str,
+    ):
+        """`@<ident>$` — `@<ident>` is an inline candidate; the trailing `$` keeps the
+        line from matching the alone-on-line pattern. Raises when the identifier is a
+        declared input.
+        """
+        with pytest.raises(TemplateSigilSyntaxError) as exc_info:
+            preprocess_template(template, declared_inputs={expected_identifier})
+        error_message = str(exc_info.value)
+        assert f"@{expected_identifier}" in error_message
+        assert f"${expected_identifier}" in error_message
+        assert "@@" in error_message
+        assert "line 1" in error_message
+
+    @pytest.mark.parametrize(
+        "template",
+        ["@world$", "@invoice_text$"],
+        ids=["at_ident_trailing_dollar", "at_long_ident_trailing_dollar"],
+    )
+    def test_at_ident_with_trailing_dollar_passes_through_when_not_declared(self, template: str):
+        """Same `@<ident>$` shape with no `declared_inputs` → silent pass-through."""
+        assert preprocess_template(template) == template
+
+    def test_escaped_at_then_dollar_rewrites_inline_dollar(self):
+        """`@@$foo` — `@@` becomes literal `@` (via sentinel), and `$foo` still rewrites
+        because the sentinel boundary is non-word so the `$` lookbehind passes.
+        """
+        assert preprocess_template("@@$foo") == "@{{ foo|format() }}"
+
+    def test_escaped_dollar_then_at_still_raises_when_declared(self):
+        """`$$@foo` — `$$` becomes a sentinel, but `@foo` is still an inline candidate
+        after the sentinel boundary, so the validator raises when `foo` is declared.
+        """
+        with pytest.raises(TemplateSigilSyntaxError) as exc_info:
+            preprocess_template("$$@foo", declared_inputs={"foo"})
+        error_message = str(exc_info.value)
+        assert "@foo" in error_message
+        assert "$foo" in error_message
+        assert "@@" in error_message
+        assert "line 1" in error_message
+
+    def test_escaped_dollar_then_at_passes_through_when_not_declared(self):
+        """`$$@foo` without `declared_inputs` → `$@foo` (sentinel restored, no validation)."""
+        assert preprocess_template("$$@foo") == "$@foo"
