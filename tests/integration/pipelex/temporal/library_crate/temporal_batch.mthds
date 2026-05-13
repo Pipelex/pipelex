@@ -37,4 +37,4 @@ description = "Write a short note about a topic"
 inputs      = { topic = "Topic" }
 output      = "TopicNote"
 model       = "$testing-text"
-prompt      = "Write one sentence about: @topic"
+prompt      = "Write one sentence about: $topic"

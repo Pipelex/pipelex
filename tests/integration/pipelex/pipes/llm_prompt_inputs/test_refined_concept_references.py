@@ -33,7 +33,7 @@ class TestRefinedConceptReferences:
             description="Test refined Image concept",
             inputs={"photo": "refined_concepts_test.Photo"},
             output="Text",
-            prompt="Describe this photo: @photo",
+            prompt="Describe this photo: $photo",
         )
 
         pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
@@ -56,7 +56,7 @@ class TestRefinedConceptReferences:
             description="Test refined Document concept",
             inputs={"report": "refined_concepts_test.Report"},
             output="Text",
-            prompt="Summarize this report: @report",
+            prompt="Summarize this report: $report",
         )
 
         pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
@@ -80,7 +80,7 @@ class TestRefinedConceptReferences:
             description="Test refined Image extraction",
             inputs={"photo": "refined_concepts_test.Photo"},
             output="Text",
-            prompt="Describe: @photo",
+            prompt="Describe: $photo",
         )
 
         pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
@@ -117,7 +117,7 @@ class TestRefinedConceptReferences:
             description="Test refined Document extraction",
             inputs={"report": "refined_concepts_test.Report"},
             output="Text",
-            prompt="Summarize: @report",
+            prompt="Summarize: $report",
         )
 
         pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(

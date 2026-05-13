@@ -23,7 +23,7 @@ class TestPipeImgGenFactoryImageReferences:
             description="Test image in positive prompt",
             inputs={"source_image": "Image"},
             output="Image",
-            prompt="Edit this image: @source_image",
+            prompt="Edit this image:\n@source_image",
             negative_prompt=None,
         )
 
@@ -55,7 +55,7 @@ class TestPipeImgGenFactoryImageReferences:
             inputs={"avoid_image": "Image"},
             output="Image",
             prompt="Generate a beautiful landscape",
-            negative_prompt="Avoid features from: @avoid_image",
+            negative_prompt="Avoid features from:\n@avoid_image",
         )
 
         pipe = PipeFactory[PipeImgGen].make_from_blueprint(
@@ -82,8 +82,8 @@ class TestPipeImgGenFactoryImageReferences:
             description="Test images in both prompts",
             inputs={"style_ref": "Image", "avoid_ref": "Image"},
             output="Image",
-            prompt="Apply style from: @style_ref",
-            negative_prompt="Avoid style from: @avoid_ref",
+            prompt="Apply style from:\n@style_ref",
+            negative_prompt="Avoid style from:\n@avoid_ref",
         )
 
         pipe = PipeFactory[PipeImgGen].make_from_blueprint(
@@ -110,8 +110,8 @@ class TestPipeImgGenFactoryImageReferences:
             description="Test same image in both prompts",
             inputs={"shared_image": "Image"},
             output="Image",
-            prompt="Apply style from: @shared_image",
-            negative_prompt="But avoid these aspects: @shared_image",
+            prompt="Apply style from:\n@shared_image",
+            negative_prompt="But avoid these aspects:\n@shared_image",
         )
 
         pipe = PipeFactory[PipeImgGen].make_from_blueprint(
@@ -138,7 +138,7 @@ class TestPipeImgGenFactoryImageReferences:
             inputs={"avoid_images": "Image[]"},
             output="Image",
             prompt="Generate a beautiful landscape",
-            negative_prompt="Avoid features from: @avoid_images",
+            negative_prompt="Avoid features from:\n@avoid_images",
         )
 
         pipe = PipeFactory[PipeImgGen].make_from_blueprint(

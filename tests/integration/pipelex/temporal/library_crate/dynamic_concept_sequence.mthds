@@ -33,6 +33,6 @@ output = "Text"
 model = "$testing-text"
 prompt = """
 Summarize this greeting:
-Message: @greeting_result.message
-Language: @greeting_result.language
+Message: $greeting_result.message
+Language: $greeting_result.language
 """

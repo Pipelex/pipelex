@@ -20,7 +20,7 @@ class TestDocumentReferencesFactoryLevel:
             description="Test DIRECT document reference",
             inputs={"document": "Document"},
             output="Text",
-            prompt="Analyze: @document",
+            prompt="Analyze: $document",
         )
 
         pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
@@ -66,7 +66,7 @@ class TestDocumentReferencesFactoryLevel:
             description="Test mixed references",
             inputs={"doc": "Document", "image": "Image"},
             output="Text",
-            prompt="Document: @doc\nImage: @image",
+            prompt="Document:\n@doc\nImage:\n@image",
         )
 
         pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
@@ -93,7 +93,7 @@ class TestDocumentReferencesFactoryLevel:
             description="Test no document reference for text",
             inputs={"text": "Text"},
             output="Text",
-            prompt="Process: @text",
+            prompt="Process: $text",
         )
 
         pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(

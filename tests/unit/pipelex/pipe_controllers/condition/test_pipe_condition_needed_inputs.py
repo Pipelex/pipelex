@@ -87,7 +87,7 @@ class TestPipeConditionNeededInputs:
             description="Pipe A",
             inputs={"doc_input": document_concept.concept_ref},
             output=analysis_concept.concept_ref,
-            prompt="Analyze: @doc_input",
+            prompt="Analyze: $doc_input",
         )
         pipe_a = PipeFactory[PipeLLM].make_from_blueprint(
             domain_code=domain_code,
@@ -101,7 +101,7 @@ class TestPipeConditionNeededInputs:
             description="Pipe B",
             inputs={"other_doc": document_concept.concept_ref},
             output=analysis_concept.concept_ref,
-            prompt="Summarize: @other_doc",
+            prompt="Summarize: $other_doc",
         )
         pipe_b = PipeFactory[PipeLLM].make_from_blueprint(
             domain_code=domain_code,
@@ -168,7 +168,7 @@ class TestPipeConditionNeededInputs:
             description="Pipe with list input",
             inputs={"items": f"{item_concept.concept_ref}[]"},  # List multiplicity
             output=result_concept.concept_ref,
-            prompt="Process items: @items",
+            prompt="Process items: $items",
         )
         pipe_with_list = PipeFactory[PipeLLM].make_from_blueprint(
             domain_code=domain_code,
@@ -243,7 +243,7 @@ class TestPipeConditionOutputValidation:
                 description="Pipe A",
                 inputs={"input_a": input_concept.concept_ref},
                 output=output_concept.concept_ref,
-                prompt="Process A: @input_a",
+                prompt="Process A: $input_a",
             ),
             concept_codes_from_the_same_domain=[input_concept.code, output_concept.code],
         )
@@ -256,7 +256,7 @@ class TestPipeConditionOutputValidation:
                 description="Pipe B",
                 inputs={"input_b": input_concept.concept_ref},
                 output=output_concept.concept_ref,
-                prompt="Process B: @input_b",
+                prompt="Process B: $input_b",
             ),
             concept_codes_from_the_same_domain=[input_concept.code, output_concept.code],
         )
@@ -312,7 +312,7 @@ class TestPipeConditionOutputValidation:
                 description="Pipe A",
                 inputs={"input_a": input_concept.concept_ref},
                 output=output_concept.concept_ref,
-                prompt="Process A: @input_a",
+                prompt="Process A: $input_a",
             ),
             concept_codes_from_the_same_domain=[input_concept.code, output_concept.code],
         )
@@ -325,7 +325,7 @@ class TestPipeConditionOutputValidation:
                 description="Pipe B",
                 inputs={"input_b": input_concept.concept_ref},
                 output=output_concept.concept_ref,
-                prompt="Process B: @input_b",
+                prompt="Process B: $input_b",
             ),
             concept_codes_from_the_same_domain=[input_concept.code, output_concept.code],
         )
@@ -384,7 +384,7 @@ class TestPipeConditionOutputValidation:
                 description="Pipe A",
                 inputs={"input_a": input_concept.concept_ref},
                 output=output_concept.concept_ref,
-                prompt="Process A: @input_a",
+                prompt="Process A: $input_a",
             ),
             concept_codes_from_the_same_domain=[input_concept.code, output_concept.code],
         )
@@ -447,7 +447,7 @@ class TestPipeConditionOutputValidation:
                 description="Pipe A",
                 inputs={"input_a": input_concept.concept_ref},
                 output=output_a.concept_ref,
-                prompt="Process A: @input_a",
+                prompt="Process A: $input_a",
             ),
             concept_codes_from_the_same_domain=[input_concept.code, output_a.code, output_b.code],
         )
@@ -460,7 +460,7 @@ class TestPipeConditionOutputValidation:
                 description="Pipe B",
                 inputs={"input_b": input_concept.concept_ref},
                 output=output_b.concept_ref,
-                prompt="Process B: @input_b",
+                prompt="Process B: $input_b",
             ),
             concept_codes_from_the_same_domain=[input_concept.code, output_a.code, output_b.code],
         )
@@ -520,7 +520,7 @@ class TestPipeConditionOutputValidation:
                 description="Pipe A",
                 inputs={"input_a": input_concept.concept_ref},
                 output=output_a.concept_ref,
-                prompt="Process A: @input_a",
+                prompt="Process A: $input_a",
             ),
             concept_codes_from_the_same_domain=[input_concept.code, output_a.code, output_b.code],
         )
@@ -533,7 +533,7 @@ class TestPipeConditionOutputValidation:
                 description="Pipe B",
                 inputs={"input_b": input_concept.concept_ref},
                 output=output_b.concept_ref,
-                prompt="Process B: @input_b",
+                prompt="Process B: $input_b",
             ),
             concept_codes_from_the_same_domain=[input_concept.code, output_a.code, output_b.code],
         )
@@ -597,7 +597,7 @@ class TestPipeConditionOutputValidation:
                 description="Pipe A",
                 inputs={"input_a": input_concept.concept_ref},
                 output=output_a.concept_ref,
-                prompt="Process A: @input_a",
+                prompt="Process A: $input_a",
             ),
             concept_codes_from_the_same_domain=[input_concept.code, output_a.code, output_b.code],
         )
@@ -610,7 +610,7 @@ class TestPipeConditionOutputValidation:
                 description="Pipe B",
                 inputs={"input_b": input_concept.concept_ref},
                 output=output_b.concept_ref,
-                prompt="Process B: @input_b",
+                prompt="Process B: $input_b",
             ),
             concept_codes_from_the_same_domain=[input_concept.code, output_a.code, output_b.code],
         )
@@ -732,7 +732,7 @@ class TestPipeConditionSpecialOutcomes:
                 description="Process pipe",
                 inputs={"doc": input_concept.concept_ref},
                 output=output_concept.concept_ref,
-                prompt="Process: @doc",
+                prompt="Process: $doc",
             ),
             concept_codes_from_the_same_domain=[input_concept.code, output_concept.code],
         )
@@ -795,7 +795,7 @@ class TestPipeConditionSpecialOutcomes:
                 description="Success pipe",
                 inputs={"data": input_concept.concept_ref},
                 output=output_concept.concept_ref,
-                prompt="Process: @data",
+                prompt="Process: $data",
             ),
             concept_codes_from_the_same_domain=[input_concept.code, output_concept.code],
         )

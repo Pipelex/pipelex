@@ -13,7 +13,7 @@ class PipeLLMInputTestCases:
             description="Test case: valid_text_input",
             inputs={"user_text": "native.Text"},
             output="native.Text",
-            prompt="Process this text: @user_text",
+            prompt="Process this text: $user_text",
         ),
     )
 
@@ -23,7 +23,7 @@ class PipeLLMInputTestCases:
             description="Test case: valid_image_input",
             inputs={"user_image": "native.Image"},
             output="native.Text",
-            prompt="Describe this image: @user_image",
+            prompt="Describe this image: $user_image",
         ),
     )
 
@@ -33,7 +33,7 @@ class PipeLLMInputTestCases:
             description="Test case: valid_two_inputs",
             inputs={"text_input": "native.Text", "another_text": "native.Text"},
             output="native.Text",
-            prompt="Compare @text_input with @another_text",
+            prompt="Compare $text_input with $another_text",
         ),
     )
 
@@ -43,7 +43,7 @@ class PipeLLMInputTestCases:
             description="Test case: valid_text_and_image",
             inputs={"user_text": "native.Text", "user_image": "native.Image"},
             output="native.Text",
-            prompt="Analyze this text: @user_text with the image: @user_image",
+            prompt="Analyze this text: $user_text with the image: $user_image",
         ),
     )
 
@@ -53,7 +53,7 @@ class PipeLLMInputTestCases:
             description="Test case: image_mentioned_in_prompt",
             inputs={"user_image": "native.Image"},
             output="native.Text",
-            prompt="Describe @user_image",
+            prompt="Describe $user_image",
         ),
     )
 
@@ -63,7 +63,7 @@ class PipeLLMInputTestCases:
             description="Test case: text_and_image_both_in_prompt",
             inputs={"user_text": "native.Text", "user_image": "native.Image"},
             output="native.Text",
-            prompt="Analyze @user_text and describe @user_image",
+            prompt="Analyze $user_text and describe $user_image",
         ),
     )
 

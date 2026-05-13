@@ -32,7 +32,7 @@ def _make_pipe(domain_code: str, pipe_code: str, output: str) -> PipeLLM:
         description="dynamic-output test pipe",
         inputs={"user_text": "native.Text"},
         output=output,
-        prompt="Process @user_text",
+        prompt="Process $user_text",
     )
     return PipeFactory[PipeLLM].make_from_blueprint(
         domain_code=domain_code,

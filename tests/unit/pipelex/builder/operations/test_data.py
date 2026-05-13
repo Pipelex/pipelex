@@ -10,5 +10,5 @@ class PipeOpsTestData:
         "model": "$writing-creative",
         "inputs": {"text": "Text"},
         "output": "Text",
-        "prompt": "Write about @text",
+        "prompt": "Write about $text",
     }

@@ -802,7 +802,7 @@ class TestStructuredContentComposerRuntimeParams:
         blueprint = ConstructBlueprint.make_from_raw(
             {
                 "title": "Financial Report",
-                "generated_summary": {"template": "Summary for $fiscal_year Q$quarter"},
+                "generated_summary": {"template": "Summary for $fiscal_year, quarter $quarter"},
             }
         )
 
@@ -817,7 +817,7 @@ class TestStructuredContentComposerRuntimeParams:
         assert isinstance(result, ReportWithRuntimeParams)
         assert result.title == "Financial Report"
         assert "2025" in result.generated_summary
-        assert "Q1" in result.generated_summary
+        assert "quarter 1" in result.generated_summary
 
     async def test_template_field_combines_all_context_sources(self, working_memory_with_deal: WorkingMemory):
         """Test that template fields can access all context sources together.

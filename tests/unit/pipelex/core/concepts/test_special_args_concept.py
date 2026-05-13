@@ -64,7 +64,7 @@ class TestSpecialArgsConcept:
             description="A pipe that reads the content",
             inputs={"my_input": "ContentConcept"},
             output="native.Text",
-            prompt="read the content, @my_input.content",
+            prompt="read the content, $my_input.content",
         )
 
         # Make a PipeLLM using PipeFactory

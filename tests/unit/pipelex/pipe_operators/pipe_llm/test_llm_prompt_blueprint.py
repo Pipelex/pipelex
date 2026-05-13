@@ -33,7 +33,7 @@ Output: "MARKETING_BUSINESS_PROCESSED"
     def test_required_variables_returns_root_names_for_dotted_paths_in_system_prompt(self):
         """Test that dotted paths in system_prompt are converted to root names."""
         system_prompt_template = """
-You are processing documents for @organization.name in @organization.region.
+You are processing documents for $organization.name in $organization.region.
 """
         blueprint = LLMPromptBlueprint(
             system_prompt_blueprint=TemplateBlueprint(
@@ -52,7 +52,7 @@ You are processing documents for @organization.name in @organization.region.
     def test_required_variables_returns_root_names_for_both_prompts(self):
         """Test that both prompt and system_prompt dotted paths are converted to root names."""
         prompt_template = "@request.content"
-        system_prompt_template = "Context: @context.metadata.source"
+        system_prompt_template = "Context: $context.metadata.source"
 
         blueprint = LLMPromptBlueprint(
             prompt_blueprint=TemplateBlueprint(
@@ -77,8 +77,8 @@ You are processing documents for @organization.name in @organization.region.
     def test_required_variables_handles_mix_of_root_and_dotted_paths(self):
         """Test that both root variables and dotted paths are handled correctly."""
         prompt_template = """
-Process @simple_var and @complex_object.nested.value
-Also use @another_object.field
+Process $simple_var and $complex_object.nested.value
+Also use $another_object.field
 """
         blueprint = LLMPromptBlueprint(
             prompt_blueprint=TemplateBlueprint(
@@ -102,7 +102,7 @@ Also use @another_object.field
     def test_required_variables_deduplicates_same_root(self):
         """Test that multiple dotted paths with same root are deduplicated."""
         prompt_template = """
-Use @user.name and @user.email and @user.address.city
+Use $user.name and $user.email and $user.address.city
 """
         blueprint = LLMPromptBlueprint(
             prompt_blueprint=TemplateBlueprint(
@@ -118,7 +118,7 @@ Use @user.name and @user.email and @user.address.city
 
     def test_required_variables_excludes_internal_variables(self):
         """Test that internal variables starting with _ are excluded."""
-        prompt_template = "@public_var and @_internal_var.field"
+        prompt_template = "$public_var and $_internal_var.field"
 
         blueprint = LLMPromptBlueprint(
             prompt_blueprint=TemplateBlueprint(
@@ -134,7 +134,7 @@ Use @user.name and @user.email and @user.address.city
 
     def test_required_variables_excludes_special_variables(self):
         """Test that special variables preliminary_text and place_holder are excluded."""
-        prompt_template = "@data and @preliminary_text and @place_holder"
+        prompt_template = "$data and $preliminary_text and $place_holder"
 
         blueprint = LLMPromptBlueprint(
             prompt_blueprint=TemplateBlueprint(

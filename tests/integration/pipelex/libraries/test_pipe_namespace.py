@@ -23,7 +23,7 @@ description = "Process scoring data"
 inputs = { data = "Text" }
 output = "ScoreResult"
 model = "$quick-reasoning"
-prompt = "Process scoring from @data"
+prompt = "Process scoring from $data"
 """
 
 ANALYTICS_MTHDS = """\
@@ -39,7 +39,7 @@ description = "Process analytics data"
 inputs = { data = "Text" }
 output = "AnalyticsResult"
 model = "$quick-reasoning"
-prompt = "Process analytics from @data"
+prompt = "Process analytics from $data"
 """
 
 SCORING_CORE_MTHDS = """\
@@ -52,7 +52,7 @@ description = "Compute a score"
 inputs = { data = "Text" }
 output = "Text"
 model = "$quick-reasoning"
-prompt = "Compute score from @data"
+prompt = "Compute score from $data"
 """
 
 SCORING_ADVANCED_MTHDS = """\
@@ -65,7 +65,7 @@ description = "Compute a weighted score"
 inputs = { data = "Text" }
 output = "Text"
 model = "$quick-reasoning"
-prompt = "Compute weighted score from @data"
+prompt = "Compute weighted score from $data"
 """
 
 SCORING_DUPLICATE_MTHDS = """\
@@ -78,7 +78,7 @@ description = "Duplicate compute score"
 inputs = { data = "Text" }
 output = "Text"
 model = "$quick-reasoning"
-prompt = "Duplicate compute score from @data"
+prompt = "Duplicate compute score from $data"
 """
 
 SCORING_CONCEPT_A_MTHDS = """\
@@ -94,7 +94,7 @@ description = "Compute a score"
 inputs = { data = "Text" }
 output = "ScoreResult"
 model = "$quick-reasoning"
-prompt = "Compute score from @data"
+prompt = "Compute score from $data"
 """
 
 SCORING_CONCEPT_B_MTHDS = """\
@@ -110,7 +110,7 @@ description = "Compute a weighted score"
 inputs = { data = "Text" }
 output = "ScoreResult"
 model = "$quick-reasoning"
-prompt = "Compute weighted score from @data"
+prompt = "Compute weighted score from $data"
 """
 
 SINGLE_DOMAIN_MTHDS = """\
@@ -126,7 +126,7 @@ description = "Compute a score"
 inputs = { data = "Text" }
 output = "ScoreResult"
 model = "$quick-reasoning"
-prompt = "Compute score from @data"
+prompt = "Compute score from $data"
 """
 
 

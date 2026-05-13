@@ -31,7 +31,7 @@ class TestSystemPromptReferences:
             description="Test system prompt image reference",
             inputs={"image": "Image"},
             output="Text",
-            system_prompt="Context image: @image",
+            system_prompt="Context image: $image",
             prompt="Describe what you see",
         )
 
@@ -81,7 +81,7 @@ class TestSystemPromptReferences:
             description="Test system prompt document reference",
             inputs={"document": "Document"},
             output="Text",
-            system_prompt="Reference document: @document",
+            system_prompt="Reference document: $document",
             prompt="Summarize the document",
         )
 
@@ -132,7 +132,7 @@ class TestSystemPromptReferences:
             description="Test system prompt image extraction",
             inputs={"image": "Image"},
             output="Text",
-            system_prompt="Context: @image",
+            system_prompt="Context: $image",
             prompt="Describe what you see",
         )
 
@@ -171,7 +171,7 @@ class TestSystemPromptReferences:
             description="Test system prompt document extraction",
             inputs={"document": "Document"},
             output="Text",
-            system_prompt="Context: @document",
+            system_prompt="Context: $document",
             prompt="Summarize",
         )
 
@@ -213,8 +213,8 @@ class TestSystemPromptReferences:
             description="Test global image numbering",
             inputs={"system_image": "Image", "user_image": "Image"},
             output="Text",
-            system_prompt="System context: @system_image",
-            prompt="User query with: @user_image",
+            system_prompt="System context: $system_image",
+            prompt="User query with: $user_image",
         )
 
         pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
@@ -264,8 +264,8 @@ class TestSystemPromptReferences:
             description="Test global document numbering",
             inputs={"system_doc": "Document", "user_doc": "Document"},
             output="Text",
-            system_prompt="System context: @system_doc",
-            prompt="User query with: @user_doc",
+            system_prompt="System context: $system_doc",
+            prompt="User query with: $user_doc",
         )
 
         pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
