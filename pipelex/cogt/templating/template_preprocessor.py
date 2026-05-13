@@ -131,9 +131,11 @@ def validate_template_sigils(template: str, declared_inputs: set[str]) -> None:
 def rewrite_template_sigils(template: str) -> str:
     r"""Apply the sigil rewrites without validation.
 
-    Substitutes `$` inline first, then `@`/`@?` line-bounded. Running `$` first keeps its
-    code-shape lookahead from misfiring on `{{` braces introduced by the `@` pass. The `@`
-    pattern is line-bounded and indifferent to `$`-introduced braces.
+    Substitutes `$` inline first, then `@`/`@?` line-bounded. Order is structurally safe
+    in either direction: the `$` code-shape lookahead `(?![ \t]*[({"'])` is horizontal-only,
+    so it cannot cross a `\n` to reach the `{` introduced by the `@` pass (which only
+    substitutes alone-on-line, always preceded by a newline). `$`-first is chosen defensively
+    — it remains correct if the `$` lookahead is ever loosened to `\s*`.
 
     Use this at render time, when the template has already been validated at load time —
     there's no point re-running the validator.
