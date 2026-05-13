@@ -47,12 +47,13 @@ class TestData:
         ),
     ]
 
-    # Inline @-sigils that violate the strict rule. (topic, raw_template)
-    AT_VARIABLE_PIPELINE_ERRORS: ClassVar[list[tuple[str, str]]] = [
-        ("single_at_variable_inline", "Hello @name"),
-        ("multiple_at_variables_inline", "@first and @second"),
-        ("at_variable_with_trailing_dot_inline", "The value is @amount."),
-        ("nested_at_variable_inline", "User: @user.profile.name"),
+    # Inline @-sigils that violate the strict rule when the root identifier is a declared
+    # input of the surrounding pipe. (topic, raw_template, root_identifier)
+    AT_VARIABLE_PIPELINE_ERRORS: ClassVar[list[tuple[str, str, str]]] = [
+        ("single_at_variable_inline", "Hello @name", "name"),
+        ("multiple_at_variables_inline", "@first and @second", "first"),
+        ("at_variable_with_trailing_dot_inline", "The value is @amount.", "amount"),
+        ("nested_at_variable_inline", "User: @user.profile.name", "user"),
     ]
 
     DOLLAR_VARIABLE_PIPELINE: ClassVar[list[tuple[str, str, str, set[str]]]] = [
@@ -325,13 +326,16 @@ class TestTemplatePipelineIntegration:
         assert variables == expected_variables, f"Variable detection failed for topic: {topic}"
 
     @pytest.mark.parametrize(
-        ("topic", "raw_template"),
+        ("topic", "raw_template", "root_identifier"),
         TestData.AT_VARIABLE_PIPELINE_ERRORS,
     )
-    def test_at_variable_pipeline_raises_when_inline(self, topic: str, raw_template: str):
-        """Inline @-sigils violate the strict line-bounded rule and raise."""
+    def test_at_variable_pipeline_raises_when_inline(self, topic: str, raw_template: str, root_identifier: str):
+        """Inline @-sigils whose root identifier is a declared input violate the strict
+        line-bounded rule and raise. The `root_identifier` from the parametrized case is
+        passed as `declared_inputs` to activate the gate.
+        """
         with pytest.raises(TemplateSigilSyntaxError) as exc_info:
-            preprocess_template(raw_template)
+            preprocess_template(raw_template, declared_inputs={root_identifier})
         assert "line " in str(exc_info.value), f"Missing line number in error for topic: {topic}"
 
     @pytest.mark.parametrize(

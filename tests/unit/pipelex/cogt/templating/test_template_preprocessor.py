@@ -459,13 +459,15 @@ Line after"""
             "font_face",
         ],
     )
-    def test_css_at_rule_raises_under_strict_rule(self, template: str, expected_sigil_and_identifier: str):
-        """CSS at-rules are inline `@` candidates — they violate the strict line-bounded rule
-        and raise. Authors escape with `@@` to opt out (see companion `*_escaped_pass_through`
-        tests).
+    def test_css_at_rule_raises_when_keyword_is_declared_input(self, template: str, expected_sigil_and_identifier: str):
+        """CSS at-rules are inline `@` candidates — when the at-rule keyword (`media`,
+        `keyframes`, ...) is a declared input of the surrounding pipe, the validator treats
+        it as a real typo and raises. Authors escape with `@@` to opt out (see companion
+        `*_escaped_pass_through` tests).
         """
+        identifier = expected_sigil_and_identifier.lstrip("@")
         with pytest.raises(TemplateSigilSyntaxError) as exc_info:
-            preprocess_template(template)
+            preprocess_template(template, declared_inputs={identifier})
         error_message = str(exc_info.value)
         assert "line 1" in error_message
         assert expected_sigil_and_identifier in error_message
@@ -484,9 +486,9 @@ Line after"""
         expected = '@font-face { font-family: "X"; }'
         assert result == expected
 
-    def test_full_style_block_raises_under_strict_rule(self):
-        """Under the strict line-bounded `@` rule, a realistic <style> block raises
-        TemplateSigilSyntaxError on the first inline at-rule (no longer pass-through).
+    def test_full_style_block_raises_when_keyword_is_declared_input(self):
+        """When `media` is a declared input of the pipe, an inline `@media` at-rule in a
+        <style> block is treated as a real typo and raises.
         """
         template = """<style>
   .page { padding: 32px; }
@@ -498,7 +500,7 @@ Line after"""
   }
 </style>"""
         with pytest.raises(TemplateSigilSyntaxError) as exc_info:
-            preprocess_template(template)
+            preprocess_template(template, declared_inputs={"media"})
         error_message = str(exc_info.value)
         assert "line 3" in error_message
         assert "@media" in error_message
@@ -606,15 +608,16 @@ Line after"""
         expected = "@media is literal, but {{ width|format() }} is a variable."
         assert result == expected
 
-    def test_triple_at_raises_under_strict_rule(self):
+    def test_triple_at_raises_when_var_is_declared_input(self):
         """`@@@var` post-sentinel becomes literal `@` + `@var`; the `@var` is no longer alone
-        on its line (the sentinel-substituted `@` sits in front of it), so the strict rule
-        raises. Authors who want literal `@` followed by an interpolated `@var` must move the
-        variable onto its own line.
+        on its line (the sentinel-substituted `@` sits in front of it). When `var` is a
+        declared input, the validator treats this as a real typo and raises. Authors who
+        want literal `@` followed by an interpolated `@var` must move the variable onto its
+        own line.
         """
         template = "@@@var"
         with pytest.raises(TemplateSigilSyntaxError) as exc_info:
-            preprocess_template(template)
+            preprocess_template(template, declared_inputs={"var"})
         error_message = str(exc_info.value)
         assert "@var" in error_message
         assert "line 1" in error_message
@@ -648,14 +651,15 @@ Line after"""
         ],
         ids=["property", "counter-style", "color-profile", "view-transition"],
     )
-    def test_css_dash_at_rule_raises_under_strict_rule(self, template: str, expected_sigil_and_identifier: str):
-        """At-rules with hyphenated names or dash arguments now raise under the strict rule.
-        The validator captures only the leading `@` + identifier (it stops at the hyphen
-        boundary, just like the rewriter did before), but the diagnostic still names the
-        right line and migration hint.
+    def test_css_dash_at_rule_raises_when_keyword_is_declared_input(self, template: str, expected_sigil_and_identifier: str):
+        """At-rules with hyphenated names or dash arguments raise when the at-rule's leading
+        identifier (the part before the hyphen) is a declared input of the pipe. The validator
+        captures only the leading `@` + identifier (it stops at the hyphen boundary, just like
+        the rewriter), and the diagnostic still names the right line and migration hint.
         """
+        identifier = expected_sigil_and_identifier.lstrip("@")
         with pytest.raises(TemplateSigilSyntaxError) as exc_info:
-            preprocess_template(template)
+            preprocess_template(template, declared_inputs={identifier})
         error_message = str(exc_info.value)
         assert "line 1" in error_message
         assert expected_sigil_and_identifier in error_message
@@ -786,10 +790,13 @@ Line after"""
         expected_identifier: str,
     ):
         """Inline / non-alone @ or @? sigils raise TemplateSigilSyntaxError with a
-        message that names the line, the offending span, and a migration hint.
+        message that names the line, the offending span, and a migration hint —
+        but only when the candidate's root identifier is a declared input of the pipe.
+        Each parametrized case passes the identifier as `declared_inputs` to lock in
+        the strict-rule behavior.
         """
         with pytest.raises(TemplateSigilSyntaxError) as exc_info:
-            preprocess_template(template)
+            preprocess_template(template, declared_inputs={expected_identifier})
         error_message = str(exc_info.value)
         offending_span = f"{expected_sigil}{expected_identifier}"
         # Line number must be present and correctly 1-based
@@ -861,3 +868,134 @@ Line after"""
         result = preprocess_template(template)
         expected = "{{ name|format() }}.."
         assert result == expected
+
+    # =========================================================================
+    # Declared-inputs gating — inline `@<ident>` only raises when `<ident>` is a
+    # declared input of the pipe; CSS at-rules and code decorators pass through
+    # silently when they don't collide with a declared input.
+    # =========================================================================
+
+    @pytest.mark.parametrize(
+        "template",
+        [
+            "@media (max-width: 820px) { color: red; }",
+            '@import "reset.css";',
+            "@keyframes spin { from { opacity: 0; } }",
+            '@font-face { font-family: "X"; }',
+            "@deprecated def foo():",
+            "Use @Override in Java decorators.",
+            "<style>@media (max-width: 820px) { color: red; }</style>",
+        ],
+        ids=[
+            "css_media",
+            "css_import",
+            "css_keyframes",
+            "css_font_face",
+            "python_decorator",
+            "java_decorator_inline",
+            "css_inside_html",
+        ],
+    )
+    def test_inline_at_passes_through_when_declared_inputs_omitted(self, template: str):
+        """Without a `declared_inputs` kwarg, the validator is skipped — inline `@<ident>`
+        candidates pass through silently. This is the default for callers that don't have
+        an inputs context (base TemplateBlueprint, ConstructBlueprint discovery).
+        """
+        assert preprocess_template(template) == template
+
+    @pytest.mark.parametrize(
+        "template",
+        [
+            "@media (max-width: 820px) { color: red; }",
+            '@import "reset.css";',
+            "@keyframes spin { from { opacity: 0; } }",
+            '@font-face { font-family: "X"; }',
+            "@deprecated def foo():",
+            "Use @Override in Java decorators.",
+        ],
+        ids=[
+            "css_media",
+            "css_import",
+            "css_keyframes",
+            "css_font_face",
+            "python_decorator",
+            "java_decorator_inline",
+        ],
+    )
+    def test_inline_at_passes_through_when_declared_inputs_empty(self, template: str):
+        """With `declared_inputs=set()`, no candidate can match — inline `@<ident>` passes
+        through silently. Mirrors a pipe that declares no inputs at all.
+        """
+        assert preprocess_template(template, declared_inputs=set()) == template
+
+    @pytest.mark.parametrize(
+        "template",
+        [
+            "@media (max-width: 820px) { color: red; }",
+            '@import "reset.css";',
+            "@deprecated def foo():",
+            "Use @Override in Java decorators.",
+        ],
+        ids=["css_media", "css_import", "python_decorator", "java_decorator_inline"],
+    )
+    def test_inline_at_passes_through_when_no_input_matches(self, template: str):
+        """With `declared_inputs={"other_var"}`, no candidate's root matches — inline
+        `@<ident>` passes through silently.
+        """
+        assert preprocess_template(template, declared_inputs={"other_var"}) == template
+
+    def test_inline_at_raises_when_root_is_declared_input(self):
+        """When the inline candidate's root identifier matches a declared input, the
+        validator raises with the migration hint (the existing typo-catching behavior).
+        """
+        template = "Extract from @invoice_text. Done."
+        with pytest.raises(TemplateSigilSyntaxError) as exc_info:
+            preprocess_template(template, declared_inputs={"invoice_text"})
+        error_message = str(exc_info.value)
+        assert "line 1" in error_message
+        assert "@invoice_text" in error_message
+        assert "$invoice_text" in error_message  # inline migration hint
+        assert "@@" in error_message  # literal-escape hint
+
+    def test_inline_at_with_dotted_path_raises_when_root_is_declared_input(self):
+        """The gate matches on the root segment of a dotted identifier — `@user.profile.bio`
+        with `declared_inputs={"user"}` raises (root `user` matches).
+        """
+        template = "Inline @user.profile.bio reference"
+        with pytest.raises(TemplateSigilSyntaxError) as exc_info:
+            preprocess_template(template, declared_inputs={"user"})
+        error_message = str(exc_info.value)
+        assert "@user.profile.bio" in error_message
+
+    def test_inline_at_with_dotted_path_passes_when_only_inner_segment_declared(self):
+        """The gate is on the root segment only — `@user.profile.bio` with
+        `declared_inputs={"profile"}` passes through (root `user` is not declared).
+        """
+        template = "Inline @user.profile.bio reference"
+        assert preprocess_template(template, declared_inputs={"profile"}) == template
+
+    @pytest.mark.parametrize(
+        ("template", "expected", "declared_inputs"),
+        [
+            ("@invoice_text", '{{ invoice_text|tag("invoice_text") }}', set[str]()),
+            ("@invoice_text", '{{ invoice_text|tag("invoice_text") }}', {"invoice_text"}),
+            ("@invoice_text", '{{ invoice_text|tag("invoice_text") }}', {"other_var"}),
+            (
+                "@?optional_field",
+                '{% if optional_field %}{{ optional_field|tag("optional_field") }}{% endif %}',
+                {"optional_field"},
+            ),
+        ],
+        ids=[
+            "empty_inputs",
+            "input_matches",
+            "input_does_not_match",
+            "optional_with_match",
+        ],
+    )
+    def test_alone_on_line_rewrites_regardless_of_declared_inputs(self, template: str, expected: str, declared_inputs: set[str]):
+        """The line-bounded rewriter is inputs-agnostic: `@var` alone on its own line
+        rewrites under any `declared_inputs` value. Only the inline-candidate validator
+        is gated.
+        """
+        assert preprocess_template(template, declared_inputs=declared_inputs) == expected

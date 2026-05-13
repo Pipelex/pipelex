@@ -64,7 +64,7 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
             raise PipeComposeFactoryError(msg)
 
         try:
-            preprocessed_template = preprocess_template(template_source)
+            preprocessed_template = preprocess_template(template_source, declared_inputs=set(inputs.variables))
         except TemplateSigilSyntaxError as exc:
             msg = f"Template sigil error in PipeCompose template: {exc}"
             raise PipeComposeFactoryError(msg) from exc

@@ -102,8 +102,9 @@ class PipeComposeBlueprint(PipeBlueprint):
         if self.template_source is None:
             return
 
+        declared_inputs: set[str] = set(self.inputs.keys()) if self.inputs else set()
         try:
-            preprocessed_template = preprocess_template(self.template_source)
+            preprocessed_template = preprocess_template(self.template_source, declared_inputs=declared_inputs)
         except TemplateSigilSyntaxError as exc:
             msg = f"Template sigil error in PipeCompose template: {exc}"
             raise ValueError(msg) from exc

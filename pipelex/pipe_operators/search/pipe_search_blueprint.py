@@ -40,8 +40,9 @@ class PipeSearchBlueprint(PipeBlueprint):
     @override
     def validate_inputs(self):
         template_category = TemplateCategory.BASIC
+        declared_inputs: set[str] = set(self.inputs.keys()) if self.inputs else set()
         try:
-            preprocessed_template = preprocess_template(self.prompt)
+            preprocessed_template = preprocess_template(self.prompt, declared_inputs=declared_inputs)
         except TemplateSigilSyntaxError as exc:
             msg = f"Template sigil error in PipeSearch prompt: {exc}"
             raise ValueError(msg) from exc
@@ -64,8 +65,7 @@ class PipeSearchBlueprint(PipeBlueprint):
             if not root.startswith("_"):
                 required_variables.add(root)
 
-        input_names: set[str] = set(self.inputs.keys()) if self.inputs else set()
-        missing_variables: set[str] = required_variables - input_names
+        missing_variables: set[str] = required_variables - declared_inputs
 
         if missing_variables:
             missing_vars_str = ", ".join(sorted(missing_variables))

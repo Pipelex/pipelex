@@ -2,6 +2,7 @@ import re
 from re import Match
 
 from pipelex.cogt.templating.template_errors import TemplateSigilSyntaxError
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.types import StrEnum
 
 
@@ -74,12 +75,15 @@ def _replace_dollar_sigil(match: Match[str]) -> str:
     return f"{{{{ {variable}|format() }}}}"
 
 
-def _validate_at_sigil_alone_on_line(template: str) -> None:
-    r"""Scan for `@`/`@?` sigil candidates that are not alone on their own line and raise.
+def _validate_at_sigil_alone_on_line(template: str, declared_inputs: set[str]) -> None:
+    r"""Scan for `@`/`@?` sigil candidates that are not alone on their own line and raise
+    when the candidate's root identifier is one of the surrounding pipe's declared inputs.
 
     Inputs are post-`@@`-escape (so `@@` cases are already sentinel-replaced and don't trip the
     check). Word-adjacent `@` (emails, prose hashtags) is excluded by the `(?<!\w)` lookbehind
-    on the candidate pattern.
+    on the candidate pattern. Inline candidates whose root identifier is not in `declared_inputs`
+    pass through silently — they're CSS at-rules, code decorators, or other false positives the
+    validator can't distinguish from typos without the inputs context.
     """
     for line_index, line in enumerate(template.split("\n"), start=1):
         if "@" not in line:
@@ -91,6 +95,9 @@ def _validate_at_sigil_alone_on_line(template: str) -> None:
             continue
         sigil = candidate.group(1)
         identifier = candidate.group(2)
+        root_identifier = get_root_from_dotted_path(identifier)
+        if root_identifier not in declared_inputs:
+            continue
         msg = (
             f"Inline `{sigil}{identifier}` is not allowed on line {line_index}: "
             f"the `{sigil}` sigil produces tag-wrapped block content and must appear alone on "
@@ -102,7 +109,42 @@ def _validate_at_sigil_alone_on_line(template: str) -> None:
         raise TemplateSigilSyntaxError(msg)
 
 
-def preprocess_template(template: str) -> str:
+def _normalize_and_escape(template: str) -> str:
+    """Normalize line endings and replace `@@`/`$$` escapes with sentinels."""
+    normalized = template.replace("\r\n", "\n").replace("\r", "\n")
+    return normalized.replace("@@", _AT_ESCAPE_SENTINEL).replace("$$", _DOLLAR_ESCAPE_SENTINEL)
+
+
+def validate_template_sigils(template: str, declared_inputs: set[str]) -> None:
+    r"""Raise `TemplateSigilSyntaxError` when an inline `@`/`@?` candidate's root identifier
+    matches one of the pipe's declared inputs.
+
+    The check is narrow on purpose: shapes like inline `@media` (CSS at-rules) or `@deprecated`
+    (Python/Java decorators) are common in HTML/CSS templates, so raising on every inline `@`
+    would be hostile. By gating on `declared_inputs`, the validator only fires on identifiers
+    the author actually plans to use — i.e. the "real typo" cases.
+    """
+    prepared = _normalize_and_escape(template)
+    _validate_at_sigil_alone_on_line(prepared, declared_inputs)
+
+
+def rewrite_template_sigils(template: str) -> str:
+    r"""Apply the sigil rewrites without validation.
+
+    Substitutes `$` inline first, then `@`/`@?` line-bounded. Running `$` first keeps its
+    code-shape lookahead from misfiring on `{{` braces introduced by the `@` pass. The `@`
+    pattern is line-bounded and indifferent to `$`-introduced braces.
+
+    Use this at render time, when the template has already been validated at load time —
+    there's no point re-running the validator.
+    """
+    prepared = _normalize_and_escape(template)
+    prepared = _DOLLAR_SIGIL_PATTERN.sub(_replace_dollar_sigil, prepared)
+    prepared = _AT_SIGIL_PATTERN.sub(_replace_at_sigil, prepared)
+    return prepared.replace(_AT_ESCAPE_SENTINEL, "@").replace(_DOLLAR_ESCAPE_SENTINEL, "$")
+
+
+def preprocess_template(template: str, *, declared_inputs: set[str] | None = None) -> str:
     r"""Preprocess a template string to convert our sigil syntax patterns into Jinja2 syntax.
 
     Recognized sigils:
@@ -111,7 +153,11 @@ def preprocess_template(template: str) -> str:
     - ``@?var`` (alone on its own line) → ``{% if var %}{{ var|tag("var") }}{% endif %}``
     - ``$var`` (inline) → ``{{ var|format() }}``
 
-    Inline ``@var`` / ``@?var`` shapes are rejected at load time with `TemplateSigilSyntaxError`.
+    Inline ``@var`` / ``@?var`` shapes are rejected at load time with `TemplateSigilSyntaxError`
+    **only when** the candidate identifier's root segment is in ``declared_inputs`` — that's the
+    "real typo" gate. When ``declared_inputs`` is ``None`` (the default), the validator is
+    skipped entirely, so callers without inputs context (the base ``TemplateBlueprint`` model
+    validator, discovery passes in ``ConstructBlueprint``) don't raise on inline shapes.
 
     Authors can opt out per occurrence with the explicit escapes ``@@`` (→ literal ``@``) and
     ``$$`` (→ literal ``$``).
@@ -121,16 +167,6 @@ def preprocess_template(template: str) -> str:
     rendered output uses ``\n``-only line endings; downstream Jinja rendering is
     line-ending-insensitive.
     """
-    # 1. Normalize line endings so the line-bounded rule is consistent across platforms.
-    processed_template = template.replace("\r\n", "\n").replace("\r", "\n")
-    # 2. Escape sentinels — @@ and $$ disappear before validation and substitution.
-    processed_template = processed_template.replace("@@", _AT_ESCAPE_SENTINEL).replace("$$", _DOLLAR_ESCAPE_SENTINEL)
-    # 3. Validate: any candidate @-sigil that is not alone on its line is an error.
-    _validate_at_sigil_alone_on_line(processed_template)
-    # 4. Substitute: $ inline first, then @ line-bounded. Running $ first keeps the $ pattern's
-    #    code-shape lookahead from misfiring on `{{` braces introduced by the @ pass. The @
-    #    pattern is line-bounded and indifferent to $-introduced braces.
-    processed_template = _DOLLAR_SIGIL_PATTERN.sub(_replace_dollar_sigil, processed_template)
-    processed_template = _AT_SIGIL_PATTERN.sub(_replace_at_sigil, processed_template)
-    # 5. Restore sentinels.
-    return processed_template.replace(_AT_ESCAPE_SENTINEL, "@").replace(_DOLLAR_ESCAPE_SENTINEL, "$")
+    if declared_inputs is not None:
+        validate_template_sigils(template, declared_inputs)
+    return rewrite_template_sigils(template)

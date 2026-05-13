@@ -36,9 +36,11 @@ class PipeLLMBlueprint(PipeBlueprint):
         # Get all required variable paths from prompt and system_prompt (full dotted paths)
         required_variable_paths: set[str] = set()
 
+        declared_inputs: set[str] = set(self.inputs.keys()) if self.inputs else set()
+
         if self.prompt:
             try:
-                preprocessed_template = preprocess_template(self.prompt)
+                preprocessed_template = preprocess_template(self.prompt, declared_inputs=declared_inputs)
             except TemplateSigilSyntaxError as exc:
                 msg = f"Template sigil error in PipeLLM prompt: {exc}"
                 raise ValueError(msg) from exc
@@ -55,7 +57,7 @@ class PipeLLMBlueprint(PipeBlueprint):
 
         if self.system_prompt:
             try:
-                preprocessed_system_template = preprocess_template(self.system_prompt)
+                preprocessed_system_template = preprocess_template(self.system_prompt, declared_inputs=declared_inputs)
             except TemplateSigilSyntaxError as exc:
                 msg = f"Template sigil error in PipeLLM system_prompt: {exc}"
                 raise ValueError(msg) from exc
@@ -78,13 +80,11 @@ class PipeLLMBlueprint(PipeBlueprint):
             if not var.startswith("_") and get_root_from_dotted_path(var) not in {"preliminary_text", "place_holder"}
         }
 
-        input_names: set[str] = set(self.inputs.keys()) if self.inputs else set()
-
         # Find variables used in prompts but not satisfied by any input
-        missing_inputs = {var_path for var_path in filtered_variable_paths if not is_variable_satisfied_by_inputs(var_path, input_names)}
+        missing_inputs = {var_path for var_path in filtered_variable_paths if not is_variable_satisfied_by_inputs(var_path, declared_inputs)}
 
         # Find inputs declared but not used by any variable path
-        unused_inputs = {input_name for input_name in input_names if not is_input_used_by_variables(input_name, filtered_variable_paths)}
+        unused_inputs = {input_name for input_name in declared_inputs if not is_input_used_by_variables(input_name, filtered_variable_paths)}
 
         if missing_inputs:
             missing_vars_str = ", ".join(sorted(missing_inputs))
