@@ -23,8 +23,8 @@ matching `sha384` SRI hashes in
 
 ## Prerequisites
 
-- `curl` and `openssl` on PATH (used by the refresh command and the sanity
-  check below).
+- `curl`, `openssl`, and `npm` on PATH (used by the refresh command, npm
+  version lookup, and the sanity checks below).
 - The target `@pipelex/mthds-ui` version must already be published on npm
   **with `dist/standalone/graph-viewer.{js,css}` in the tarball**. If it
   isn't, jsDelivr will 404 — fix the publish in the `mthds-ui` repo first.
