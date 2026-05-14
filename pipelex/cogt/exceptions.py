@@ -6,14 +6,17 @@ from pydantic.dataclasses import rebuild_dataclass
 from typing_extensions import override
 
 from pipelex.base_exceptions import ErrorReport, PipelexError
-from pipelex.cogt.inference.error_classification import ProviderErrorMetadata
+from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     from pipelex.cogt.model_backends.model_type import ModelType
     from pipelex.cogt.models.model_reference import ModelReferenceKind
 
-rebuild_dataclass(cast("Any", ErrorReport), _types_namespace={"ProviderErrorMetadata": ProviderErrorMetadata})
+rebuild_dataclass(
+    cast("Any", ErrorReport),
+    _types_namespace={"ProviderErrorMetadata": ProviderErrorMetadata, "UserAction": UserAction},
+)
 
 
 class InferenceErrorCategory(StrEnum):
@@ -41,14 +44,14 @@ class InferenceErrorCategory(StrEnum):
 
 class CogtError(PipelexError):
     error_category: InferenceErrorCategory | None = None
-    user_action: str | None = None
+    user_action: UserAction | None = None
     provider_metadata: ProviderErrorMetadata | None = None
 
     def __init__(
         self,
         message: str,
         error_category: InferenceErrorCategory | None = None,
-        user_action: str | None = None,
+        user_action: UserAction | None = None,
         provider_metadata: ProviderErrorMetadata | None = None,
     ):
         super().__init__(message)
@@ -330,7 +333,10 @@ class InferenceBackendCredentialsErrorType(StrEnum):
 
 class InferenceBackendCredentialsError(CogtError):
     error_category = InferenceErrorCategory.CONFIGURATION
-    user_action = "Check that the required API key environment variable is set"
+    user_action = UserAction(
+        kind=UserActionKind.CHECK_CREDENTIALS,
+        detail="Check that the required API key environment variable is set",
+    )
 
     def __init__(
         self,

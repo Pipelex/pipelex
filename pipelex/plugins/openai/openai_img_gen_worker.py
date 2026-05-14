@@ -13,6 +13,8 @@ from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.error_classification import (
+    UserAction,
+    UserActionKind,
     is_content_policy_violation,
     is_quota_exhaustion_openai,
 )
@@ -88,13 +90,19 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
                 raise ImgGenGenerationError(
                     msg,
                     error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=f"Your OpenAI account has exceeded its quota — check billing at {URLs.openai_billing}",
+                    user_action=UserAction(
+                        kind=UserActionKind.UNKNOWN,
+                        detail=f"Your OpenAI account has exceeded its quota — check billing at {URLs.openai_billing}",
+                    ),
                 ) from rate_limit_error
             msg = f"OpenAI rate limit exceeded for model '{self.inference_model.desc}': {rate_limit_error}"
             raise ImgGenGenerationError(
                 msg,
                 error_category=InferenceErrorCategory.TRANSIENT,
-                user_action="Rate limited by OpenAI — the system will retry automatically",
+                user_action=UserAction(
+                    kind=UserActionKind.UNKNOWN,
+                    detail="Rate limited by OpenAI — the system will retry automatically",
+                ),
             ) from rate_limit_error
         except APITimeoutError as timeout_error:
             msg = f"OpenAI API request timed out for model '{self.inference_model.desc}': {timeout_error}"
@@ -109,7 +117,10 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
                 raise ImgGenGenerationError(
                     msg,
                     error_category=InferenceErrorCategory.CONTENT,
-                    user_action="Content was rejected by safety filters — revise the prompt",
+                    user_action=UserAction(
+                        kind=UserActionKind.UNKNOWN,
+                        detail="Content was rejected by safety filters — revise the prompt",
+                    ),
                 ) from bad_request_error
             msg = f"ImgGen bad request error with model: {self.inference_model.desc}:\n{bad_request_error}"
             raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONTENT) from bad_request_error

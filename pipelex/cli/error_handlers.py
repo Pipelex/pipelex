@@ -56,7 +56,9 @@ def handle_model_choice_error(exc: PipeOperatorModelChoiceError, context: ErrorC
     console.print(f"[bold cyan]Model Type:[/bold cyan]   [yellow]'{escape(exc.model_type)}'[/yellow]")
     console.print(f"[bold cyan]Model Choice:[/bold cyan] [yellow]'{escape(str(exc.model_choice))}'[/yellow]")
     console.print(f"\n[bold red]Error:[/bold red]        {escape(exc.message)}\n")
-    tip = report.user_action or (f"Check your model configuration in .pipelex/inference/ or specify a different model in the '{exc.pipe_code}' pipe.")
+    tip = report.user_action_detail() or (
+        f"Check your model configuration in .pipelex/inference/ or specify a different model in the '{exc.pipe_code}' pipe."
+    )
     console.print(f"\n[bold green]💡 Tip:[/bold green] {escape(tip)}")
     console.print(f"[dim]Learn more about the inference backend system: {URLs.backend_provider_docs}[/dim]")
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
@@ -82,7 +84,9 @@ def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, con
         stack_str = " [dim]→[/dim] ".join([f"[yellow]{escape(p)}[/yellow]" for p in exc.pipe_stack])
         console.print(f"[bold cyan]Pipe Stack:[/bold cyan]   {stack_str}")
     console.print(f"\n[bold red]Error:[/bold red]        {escape(str(exc))}\n")
-    tip = report.user_action or (f"Check your model configuration in .pipelex/inference/ or specify a different model in the '{exc.pipe_code}' pipe.")
+    tip = report.user_action_detail() or (
+        f"Check your model configuration in .pipelex/inference/ or specify a different model in the '{exc.pipe_code}' pipe."
+    )
     console.print(f"[bold green]💡 Tip:[/bold green] {escape(tip)}")
     console.print(f"[dim]Learn more about the inference backend system: {URLs.backend_provider_docs}[/dim]")
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
@@ -106,8 +110,8 @@ def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, context: 
         backends_str = ", ".join([f"[yellow]{escape(b)}[/yellow]" for b in sorted(exc.enabled_backends)])
         console.print(f"[bold cyan]Enabled Backends:[/bold cyan] {backends_str}")
     console.print(f"\n[bold red]Error:[/bold red]        {escape(exc.message)}\n")
-    if report.user_action:
-        console.print(f"[bold green]💡 Tip:[/bold green] {escape(report.user_action)}")
+    if (tip := report.user_action_detail()) is not None:
+        console.print(f"[bold green]💡 Tip:[/bold green] {escape(tip)}")
     else:
         console.print(
             f"[bold green]💡 Tip:[/bold green] The preset [yellow]'{escape(exc.preset_id)}'[/yellow] references model handle "
@@ -216,7 +220,7 @@ def handle_validate_bundle_error(exc: ValidateBundleError, bundle_path: Path | N
     _display_validation_error_details(console=console, exc=exc)
 
     # Display helpful tips
-    tip = report.user_action or (
+    tip = report.user_action_detail() or (
         "Review the error messages above and check your pipeline configuration. Make sure all required fields are present and correctly formatted."
     )
     console.print(f"[bold green]💡 Tip:[/bold green] {escape(tip)}")

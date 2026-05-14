@@ -119,7 +119,7 @@ class TestMistralWorkerErrorHandling:
         assert exc_info.value.__cause__ is sdk_exc
         if expected_action_substring:
             assert exc_info.value.user_action is not None
-            assert expected_action_substring in exc_info.value.user_action.lower()
+            assert expected_action_substring in exc_info.value.user_action.detail.lower()
 
     # ---- MistralExtractWorker error handling ----
 
@@ -154,7 +154,7 @@ class TestMistralWorkerErrorHandling:
         assert exc_info.value.__cause__ is sdk_exc
         if expected_action_substring:
             assert exc_info.value.user_action is not None
-            assert expected_action_substring in exc_info.value.user_action.lower()
+            assert expected_action_substring in exc_info.value.user_action.detail.lower()
 
     # ---- to_error_report() integration ----
 

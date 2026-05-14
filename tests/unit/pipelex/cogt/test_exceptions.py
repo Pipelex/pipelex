@@ -13,6 +13,7 @@ from pipelex.cogt.exceptions import (
     LLMCompletionError,
     LLMModelNotFoundError,
 )
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from tests.unit.pipelex.cogt.test_data import ExceptionTestData
 
 
@@ -71,8 +72,13 @@ class TestErrorCategoryInfrastructure:
 
     def test_user_action_instance_set(self) -> None:
         """user_action can be set at construction."""
-        err = CogtError("bad config", user_action="Check your API key")
-        assert err.user_action == "Check your API key"
+        err = CogtError(
+            "bad config",
+            user_action=UserAction(kind=UserActionKind.CHECK_CREDENTIALS, detail="Check your API key"),
+        )
+        assert err.user_action is not None
+        assert err.user_action.kind is UserActionKind.CHECK_CREDENTIALS
+        assert err.user_action.detail == "Check your API key"
 
     def test_user_action_class_level(self) -> None:
         """Subclass with class-level user_action inherits it."""
@@ -82,7 +88,9 @@ class TestErrorCategoryInfrastructure:
             message="key missing",
             key_name="OPENAI_API_KEY",
         )
-        assert err.user_action == "Check that the required API key environment variable is set"
+        assert err.user_action is not None
+        assert err.user_action.kind is UserActionKind.CHECK_CREDENTIALS
+        assert err.user_action.detail == "Check that the required API key environment variable is set"
 
     # --- to_error_report() ---
 
@@ -119,12 +127,14 @@ class TestErrorCategoryInfrastructure:
         err = CogtError(
             "oops",
             error_category=InferenceErrorCategory.TRANSIENT,
-            user_action="Retry in a moment",
+            user_action=UserAction(kind=UserActionKind.WAIT_AND_RETRY, detail="Retry in a moment"),
         )
         report = err.to_error_report()
         assert report.error_category == "transient"
         assert report.retryable is True
-        assert report.user_action == "Retry in a moment"
+        assert report.user_action is not None
+        assert report.user_action.kind is UserActionKind.WAIT_AND_RETRY
+        assert report.user_action.detail == "Retry in a moment"
 
     def test_to_error_report_with_model_handle(self) -> None:
         """Report includes model field for errors with model_handle."""

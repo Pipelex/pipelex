@@ -131,27 +131,18 @@ Every raised inference error should carry structured SDK metadata so downstream 
 
 Replace the free-form `user_action: str` with `user_action: UserAction(kind: UserActionKind, detail: str)`. This phase has two parts: define the new types and migrate every existing call site mechanically. Per-worker phases later refine the `kind` from the placeholder `UNKNOWN` to semantic values.
 
-- [ ] **RED** — write `tests/unit/pipelex/cogt/inference/test_user_action.py`:
-  - `UserActionKind` is a `StrEnum` (imported from `pipelex.types`) with values: `WAIT_AND_RETRY`, `CHECK_BILLING`, `CHECK_CREDENTIALS`, `CHANGE_INPUT`, `CHANGE_MODEL`, `CONTACT_SUPPORT`, `UNKNOWN`
+- [x] **RED** — wrote `tests/unit/pipelex/cogt/inference/test_user_action.py`:
+  - `UserActionKind` is a `StrEnum` with values `WAIT_AND_RETRY`, `CHECK_BILLING`, `CHECK_CREDENTIALS`, `CHANGE_INPUT`, `CHANGE_MODEL`, `CONTACT_SUPPORT`, `UNKNOWN`
   - `UserAction` is a Pydantic `BaseModel` with `kind: UserActionKind` and `detail: str`
-  - Round-trips correctly through `model_dump`/`model_validate`
-- [ ] **RED** — update Anthropic worker test cases to assert `user_action.kind` AND `user_action.detail` (preserving the existing string contents in `detail`):
-  - rate-limit → `kind=WAIT_AND_RETRY`
-  - quota → `kind=CHECK_BILLING`
-  - auth → `kind=CHECK_CREDENTIALS`
-  - content-policy → `kind=CHANGE_INPUT`
-  - model-not-found → `kind=CHANGE_MODEL`
-  - unrecognized underlying → `kind=UNKNOWN`
-- [ ] **GREEN** — define `UserActionKind` (StrEnum) and `UserAction` (BaseModel) in `pipelex/cogt/inference/error_classification.py`
-- [ ] **GREEN** — change the `user_action` field type on `CogtError` (or its subclass that defines the field — check `pipelex/cogt/exceptions.py`) from `str | None` to `UserAction | None`
-- [ ] **GREEN — mechanical migration of every existing call site:**
-  - `rg "user_action=" pipelex/` to find every caller
-  - For each: wrap the existing string as `user_action=UserAction(kind=UserActionKind.UNKNOWN, detail=<the_string>)`. This preserves the existing advice text in `detail`.
-  - Note: this touches every worker that already raises with a `user_action` (Anthropic, OpenAI Completions/Responses, Mistral, Google, Bedrock, plus all the non-LLM workers per [track-worker-classification.md](wip/error-handling/track-worker-classification.md)). The `kind` will be refined to semantically appropriate values in each worker's dedicated phase. Migrating with placeholder `UNKNOWN` first keeps the codebase compiling end-to-end.
-- [ ] **GREEN** — refine the Anthropic worker (reference) to use semantic `UserActionKind` values per the mapping in the RED step above. This is the only worker that gets fully semantic `kind` values in this phase.
-- [ ] **GREEN** — update `PipelexError.to_error_report()` to serialize `user_action.kind` and `user_action.detail` as a nested object (changes the JSON shape — see Risk note below)
-- [ ] **VERIFY** — full test suite passes: `make agent-test`
-- [ ] Run `make agent-check`
+  - Round-trips through `model_dump`/`model_validate`
+- [x] **RED** — updated Anthropic worker test cases to assert `user_action.kind` AND `user_action.detail` per the semantic mapping
+- [x] **GREEN** — defined `UserActionKind` (StrEnum) and `UserAction` (BaseModel) in `pipelex/cogt/inference/error_classification.py`
+- [x] **GREEN** — changed the `user_action` field type on `CogtError` from `str | None` to `UserAction | None`; updated `ErrorReport` accordingly with a TYPE_CHECKING forward ref; extended the `rebuild_dataclass` namespace in `cogt/exceptions.py` to include `UserAction`
+- [x] **GREEN — mechanical migration of every existing call site:** every `user_action=...` site in `pipelex/plugins/**` now wraps the existing advice string as `UserAction(kind=UserActionKind.UNKNOWN, detail=<the_string>)`. Also migrated the two class-level defaults: `InferenceBackendCredentialsError` (cogt/exceptions.py) and `AnthropicCredentialsError` (plugins/anthropic/anthropic_exceptions.py)
+- [x] **GREEN** — refined the Anthropic worker (reference) to use semantic `UserActionKind` values: rate-limit → `WAIT_AND_RETRY`, quota → `CHECK_BILLING`, timeout/connection → `WAIT_AND_RETRY`, content-policy → `CHANGE_INPUT`, bad-request fallback → `CHANGE_INPUT`, permission-denied → `CHECK_CREDENTIALS`
+- [x] **GREEN** — `to_error_report()` serialization unchanged structurally; nested `UserAction` is now serialized by `TypeAdapter.dump_python()` as a `{"kind": "...", "detail": "..."}` dict (Pydantic v2 handles the nested model). CLI consumers (`pipelex/cli/error_handlers.py` and `pipelex/cli/agent_cli/commands/agent_output.py`) now read `report.user_action.detail` instead of treating it as a string.
+- [x] **VERIFY** — targeted tests pass: `tests/unit/pipelex/cogt/`, `tests/unit/pipelex/plugins/`, `tests/unit/pipelex/cli/` all green.
+- [x] Ran `make agent-check` — clean (0 errors, 0 warnings).
 
 > ⚠️ **Risk note:** `to_error_report()` JSON shape changes from `"user_action": "<string>"` to `"user_action": {"kind": "...", "detail": "..."}`. Consumers downstream (CLI rendering, agent JSON, Temporal `ApplicationError.details`) read fields not specific shapes, but verify with a grep across `pipelex/` and the CLI for any code that does `error_report["user_action"]` as a string. Bring it up to the new shape in the same phase.
 
@@ -400,6 +391,11 @@ Use this section to capture decisions, surprises, and cold-start handoff context
 - **2026-05-14 — Bedrock decision.** `pipelex/plugins/bedrock/bedrock_llm_worker.py::_gen_object` raises `LLMCapabilityError` and does not use instructor (the file's only `instructor` mention is a `# TODO` comment). No `Phase 8.5` will be created. Bedrock still gets upgrades A–C in Phase 11.
 - **2026-05-14 — Phase 1 landed.** `extract_underlying_sdk_exception` lives in `pipelex/cogt/inference/error_classification.py`. Anthropic worker imports from the shared module. The defensive try/except around `failed_attempts[-1]` swallows `TypeError`/`KeyError`/`IndexError` to keep the helper safe against malformed input (the tests cover a string-as-failed_attempts case). Defending only against typing/lookup exceptions (not generic Exception) keeps real bugs visible.
 - **2026-05-14 — Phase 2 landed.** `InferenceErrorCategory.UNKNOWN` lives in `pipelex/cogt/exceptions.py` (NOT `error_classification.py` — TODOS.md text was off). Value is lowercase `"unknown"` to match other members. `is_retryable=False`. Anthropic worker's `InstructorRetryException` fallback uses UNKNOWN. Other workers still use whatever they had — they get migrated in their own phases.
+- **2026-05-14 — Phase 4 landed.** `UserActionKind` (StrEnum) and `UserAction` (BaseModel) live in `pipelex/cogt/inference/error_classification.py`. Decisions:
+  - **Field type changed on the base `CogtError`** (not per-leaf), keeping subclasses uniform — same approach as `provider_metadata` in Phase 3.
+  - **JSON shape change.** `report_dict["user_action"]` is now a nested `{"kind": "...", "detail": "..."}` object instead of a free string. `Pydantic v2` `TypeAdapter.dump_python(... mode="python")` recursively serializes nested `BaseModel` fields inside the `ErrorReport` Pydantic dataclass, so no extra plumbing was needed in `to_error_report()`.
+  - **CLI consumers updated.** `pipelex/cli/error_handlers.py` and `pipelex/cli/agent_cli/commands/agent_output.py` read `report.user_action.detail` (with `None`-guard) instead of treating the field as a string. Tests in `tests/unit/pipelex/cogt/test_exceptions.py` and `tests/unit/pipelex/cli/test_agent_output.py` were migrated to construct `UserAction(...)` explicitly. Worker tests that previously did `exc_info.value.user_action.lower()` now do `exc_info.value.user_action.detail.lower()`.
+  - **Anthropic worker semantic kinds.** The Anthropic reference worker (and `AnthropicCredentialsError`'s class-level default, plus `InferenceBackendCredentialsError`'s class-level default) use semantic `UserActionKind` values. Every other worker (OpenAI Completions/Responses, OpenAI img-gen, OpenAI completions img-gen, Google LLM/img-gen, Mistral LLM/extract, Bedrock LLM, Linkup extract/search, Azure img-gen, FAL img-gen, HuggingFace img-gen) carries `kind=UNKNOWN` as a placeholder for now. Per-worker phases will refine those.
 - **2026-05-14 — Phase 3 landed.** `ProviderErrorMetadata` + `extract_anthropic_metadata` live in `pipelex/cogt/inference/error_classification.py`. Decisions:
   - **Field placement.** `provider_metadata` was added to `CogtError` (not the four leaf classes the plan named). The uniform base-class field keeps every subclass's `__init__` consistent and lets `to_error_report()` serialize it generically. Non-SDK CogtError subclasses just leave it `None` — same cost as Optional fields on the four leaves, simpler code.
   - **`AnthropicCredentialsError` carries metadata too** because we now have the metadata at the raise site and dropping it would lose auth-error telemetry (status_code 401, request_id).

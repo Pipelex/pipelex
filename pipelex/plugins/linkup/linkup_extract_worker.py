@@ -20,6 +20,7 @@ from pipelex.cogt.exceptions import ExtractJobFailureError, InferenceErrorCatego
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.hub import get_secrets_provider
@@ -68,21 +69,30 @@ class LinkupExtractWorker(ExtractWorkerAbstract):
             raise ExtractJobFailureError(
                 msg,
                 error_category=InferenceErrorCategory.CONFIGURATION,
-                user_action="Check that the LINKUP_API_KEY environment variable is set",
+                user_action=UserAction(
+                    kind=UserActionKind.UNKNOWN,
+                    detail="Check that the LINKUP_API_KEY environment variable is set",
+                ),
             ) from exc
         except LinkupInsufficientCreditError as exc:
             msg = f"Linkup credits exhausted: {exc}"
             raise ExtractJobFailureError(
                 msg,
                 error_category=InferenceErrorCategory.CAPACITY,
-                user_action=f"Your Linkup account has insufficient credits — check billing at {URLs.linkup_billing}",
+                user_action=UserAction(
+                    kind=UserActionKind.UNKNOWN,
+                    detail=f"Your Linkup account has insufficient credits — check billing at {URLs.linkup_billing}",
+                ),
             ) from exc
         except LinkupTooManyRequestsError as exc:
             msg = f"Linkup rate limit exceeded: {exc}"
             raise ExtractJobFailureError(
                 msg,
                 error_category=InferenceErrorCategory.TRANSIENT,
-                user_action="Rate limited by Linkup — the system will retry automatically",
+                user_action=UserAction(
+                    kind=UserActionKind.UNKNOWN,
+                    detail="Rate limited by Linkup — the system will retry automatically",
+                ),
             ) from exc
         except LinkupTimeoutError as exc:
             msg = f"Linkup request timed out: {exc}"

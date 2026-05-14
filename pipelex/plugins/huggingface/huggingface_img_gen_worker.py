@@ -11,6 +11,7 @@ from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.image_utils import ImageFormat
@@ -68,7 +69,10 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
                 raise ImgGenGenerationError(
                     msg,
                     error_category=InferenceErrorCategory.TRANSIENT,
-                    user_action="Rate limited by HuggingFace — the system will retry automatically",
+                    user_action=UserAction(
+                        kind=UserActionKind.UNKNOWN,
+                        detail="Rate limited by HuggingFace — the system will retry automatically",
+                    ),
                 ) from exc
             if status_code == 402:
                 msg = f"HuggingFace quota exhausted for model '{self.inference_model.desc}': {exc}"

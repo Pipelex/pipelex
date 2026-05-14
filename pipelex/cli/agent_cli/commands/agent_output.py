@@ -167,7 +167,7 @@ def agent_error(message: str, error_type: str, cause: BaseException | None = Non
 
     if isinstance(cause, PipelexError):
         report = cause.to_error_report()
-        report_hint = report.user_action
+        report_hint = report.user_action_detail()
         report_retryable = report.retryable
         report_category = report.error_category
         if report.model:

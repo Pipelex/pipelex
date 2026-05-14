@@ -10,6 +10,8 @@ from pipelex.cogt.extract.extract_job_components import ExtractJobParams
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.inference.error_classification import (
+    UserAction,
+    UserActionKind,
     is_content_policy_violation,
     is_quota_exhaustion_mistral,
 )
@@ -70,7 +72,10 @@ class MistralExtractWorker(ExtractWorkerAbstract):
             return ExtractJobFailureError(
                 msg,
                 error_category=InferenceErrorCategory.CAPACITY,
-                user_action=f"Your Mistral account has exceeded its quota — check billing at {URLs.mistral_billing}",
+                user_action=UserAction(
+                    kind=UserActionKind.UNKNOWN,
+                    detail=f"Your Mistral account has exceeded its quota — check billing at {URLs.mistral_billing}",
+                ),
             )
 
         if status_code in {401, 403}:
@@ -86,7 +91,10 @@ class MistralExtractWorker(ExtractWorkerAbstract):
             return ExtractJobFailureError(
                 msg,
                 error_category=InferenceErrorCategory.TRANSIENT,
-                user_action="Rate limited by Mistral — the system will retry automatically",
+                user_action=UserAction(
+                    kind=UserActionKind.UNKNOWN,
+                    detail="Rate limited by Mistral — the system will retry automatically",
+                ),
             )
 
         if status_code == 400:
@@ -95,7 +103,10 @@ class MistralExtractWorker(ExtractWorkerAbstract):
                 return ExtractJobFailureError(
                     msg,
                     error_category=InferenceErrorCategory.CONTENT,
-                    user_action="Content was rejected by safety filters — revise the input",
+                    user_action=UserAction(
+                        kind=UserActionKind.UNKNOWN,
+                        detail="Content was rejected by safety filters — revise the input",
+                    ),
                 )
             msg = f"Mistral bad request error for model '{self.inference_model.desc}': {exc}"
             return ExtractJobFailureError(msg, error_category=InferenceErrorCategory.CONTENT)

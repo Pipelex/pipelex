@@ -10,6 +10,8 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, LLMModelNotFoundError, SdkTypeError
 from pipelex.cogt.inference.error_classification import (
+    UserAction,
+    UserActionKind,
     is_content_policy_violation,
     is_quota_exhaustion_openai,
 )
@@ -154,13 +156,19 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
                 raise LLMCompletionError(
                     msg,
                     error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=f"Your OpenAI account has exceeded its quota — check billing at {URLs.openai_billing}",
+                    user_action=UserAction(
+                        kind=UserActionKind.UNKNOWN,
+                        detail=f"Your OpenAI account has exceeded its quota — check billing at {URLs.openai_billing}",
+                    ),
                 ) from rate_limit_error
             msg = f"OpenAI rate limit exceeded for model '{self.inference_model.desc}': {rate_limit_error}"
             raise LLMCompletionError(
                 msg,
                 error_category=InferenceErrorCategory.TRANSIENT,
-                user_action="Rate limited by OpenAI — the system will retry automatically",
+                user_action=UserAction(
+                    kind=UserActionKind.UNKNOWN,
+                    detail="Rate limited by OpenAI — the system will retry automatically",
+                ),
             ) from rate_limit_error
         except APITimeoutError as timeout_error:
             msg = f"OpenAI API request timed out for model '{self.inference_model.desc}': {timeout_error}"
@@ -175,7 +183,10 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
                 raise LLMCompletionError(
                     msg,
                     error_category=InferenceErrorCategory.CONTENT,
-                    user_action="Content was rejected by safety filters — revise the prompt",
+                    user_action=UserAction(
+                        kind=UserActionKind.UNKNOWN,
+                        detail="Content was rejected by safety filters — revise the prompt",
+                    ),
                 ) from bad_request_error
             msg = f"OpenAI bad request error with model: {self.inference_model.desc}:\n{bad_request_error}"
             raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT) from bad_request_error
@@ -233,13 +244,19 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
                 raise LLMCompletionError(
                     msg,
                     error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=f"Your OpenAI account has exceeded its quota — check billing at {URLs.openai_billing}",
+                    user_action=UserAction(
+                        kind=UserActionKind.UNKNOWN,
+                        detail=f"Your OpenAI account has exceeded its quota — check billing at {URLs.openai_billing}",
+                    ),
                 ) from rate_limit_error
             msg = f"OpenAI rate limit exceeded for model '{self.inference_model.desc}': {rate_limit_error}"
             raise LLMCompletionError(
                 msg,
                 error_category=InferenceErrorCategory.TRANSIENT,
-                user_action="Rate limited by OpenAI — the system will retry automatically",
+                user_action=UserAction(
+                    kind=UserActionKind.UNKNOWN,
+                    detail="Rate limited by OpenAI — the system will retry automatically",
+                ),
             ) from rate_limit_error
         except APITimeoutError as timeout_error:
             msg = f"OpenAI API request timed out for model '{self.inference_model.desc}': {timeout_error}"
@@ -254,7 +271,10 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
                 raise LLMCompletionError(
                     msg,
                     error_category=InferenceErrorCategory.CONTENT,
-                    user_action="Content was rejected by safety filters — revise the prompt",
+                    user_action=UserAction(
+                        kind=UserActionKind.UNKNOWN,
+                        detail="Content was rejected by safety filters — revise the prompt",
+                    ),
                 ) from bad_request_error
             msg = f"OpenAI bad request error with model: {self.inference_model.desc}:\n{bad_request_error}"
             raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT) from bad_request_error

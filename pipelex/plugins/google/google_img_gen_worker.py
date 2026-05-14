@@ -14,6 +14,8 @@ from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.error_classification import (
+    UserAction,
+    UserActionKind,
     is_content_policy_violation,
     is_quota_exhaustion_google,
 )
@@ -106,13 +108,19 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                 return ImgGenGenerationError(
                     msg,
                     error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=f"Your Google Cloud account has exceeded its quota — check billing at {URLs.google_billing}",
+                    user_action=UserAction(
+                        kind=UserActionKind.UNKNOWN,
+                        detail=f"Your Google Cloud account has exceeded its quota — check billing at {URLs.google_billing}",
+                    ),
                 )
             msg = f"Google rate limit exceeded for model '{self.inference_model.desc}': {exc}"
             return ImgGenGenerationError(
                 msg,
                 error_category=InferenceErrorCategory.TRANSIENT,
-                user_action="Rate limited by Google — the system will retry automatically",
+                user_action=UserAction(
+                    kind=UserActionKind.UNKNOWN,
+                    detail="Rate limited by Google — the system will retry automatically",
+                ),
             )
 
         if status_code == 400:
@@ -121,7 +129,10 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                 return ImgGenGenerationError(
                     msg,
                     error_category=InferenceErrorCategory.CONTENT,
-                    user_action="Content was rejected by safety filters — revise the prompt",
+                    user_action=UserAction(
+                        kind=UserActionKind.UNKNOWN,
+                        detail="Content was rejected by safety filters — revise the prompt",
+                    ),
                 )
             msg = f"Google bad request error for model '{self.inference_model.desc}': {exc}"
             return ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONTENT)

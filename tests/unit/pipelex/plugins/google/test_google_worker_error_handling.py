@@ -140,7 +140,7 @@ class TestGoogleWorkerErrorHandling:
         assert exc_info.value.__cause__ is sdk_exc
         if expected_action_substring:
             assert exc_info.value.user_action is not None
-            assert expected_action_substring in exc_info.value.user_action.lower()
+            assert expected_action_substring in exc_info.value.user_action.detail.lower()
 
     # ---- LLM worker ServerError test ----
 
@@ -183,7 +183,7 @@ class TestGoogleWorkerErrorHandling:
         assert exc_info.value.__cause__ is sdk_exc
         if expected_action_substring:
             assert exc_info.value.user_action is not None
-            assert expected_action_substring in exc_info.value.user_action.lower()
+            assert expected_action_substring in exc_info.value.user_action.detail.lower()
 
     # ---- ImgGen worker ServerError test ----
 

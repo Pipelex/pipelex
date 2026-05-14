@@ -10,6 +10,8 @@ from typing import Any, cast
 
 from pydantic import BaseModel
 
+from pipelex.types import StrEnum
+
 
 class ProviderErrorMetadata(BaseModel):
     """Structured SDK metadata attached to inference errors.
@@ -25,6 +27,33 @@ class ProviderErrorMetadata(BaseModel):
     retry_after_seconds: float | None = None
     provider_error_code: str | None = None
     body: Any | None = None
+
+
+class UserActionKind(StrEnum):
+    """Discrete categories of advice we surface to the user/agent.
+
+    Lets the CLI render consistent guidance and agent JSON stay typed across
+    providers. The free-form ``detail`` string carries provider-specific text.
+    """
+
+    WAIT_AND_RETRY = "wait_and_retry"
+    CHECK_BILLING = "check_billing"
+    CHECK_CREDENTIALS = "check_credentials"
+    CHANGE_INPUT = "change_input"
+    CHANGE_MODEL = "change_model"
+    CONTACT_SUPPORT = "contact_support"
+    UNKNOWN = "unknown"
+
+
+class UserAction(BaseModel):
+    """Structured user-facing advice attached to an inference error.
+
+    ``kind`` discriminates the type of action, ``detail`` is the free-form
+    provider-specific advice (e.g. a billing URL, a retry hint).
+    """
+
+    kind: UserActionKind
+    detail: str
 
 
 _OPENAI_QUOTA_PATTERNS: tuple[str, ...] = (

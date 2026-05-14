@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
+from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicCredentialsError
 from pipelex.plugins.anthropic.anthropic_llm_worker import AnthropicLLMWorker
 from tests.helpers.instructor_test_utils import DummySchema, make_llm_job, wrap_in_instructor_retry
@@ -105,7 +106,8 @@ class TestAnthropicWorkerObjectErrorHandling:
 
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
         assert exc_info.value.user_action is not None
-        assert "retry" in exc_info.value.user_action.lower()
+        assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
+        assert "retry" in exc_info.value.user_action.detail.lower()
         assert exc_info.value.__cause__ is wrapped
         metadata = exc_info.value.provider_metadata
         assert metadata is not None
@@ -125,7 +127,8 @@ class TestAnthropicWorkerObjectErrorHandling:
 
         assert exc_info.value.error_category is InferenceErrorCategory.CAPACITY
         assert exc_info.value.user_action is not None
-        assert "billing" in exc_info.value.user_action.lower()
+        assert exc_info.value.user_action.kind is UserActionKind.CHECK_BILLING
+        assert "billing" in exc_info.value.user_action.detail.lower()
         metadata = exc_info.value.provider_metadata
         assert metadata is not None
         assert metadata.status_code == 429
@@ -154,7 +157,8 @@ class TestAnthropicWorkerObjectErrorHandling:
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONTENT
         assert exc_info.value.user_action is not None
-        assert "safety filters" in exc_info.value.user_action.lower()
+        assert exc_info.value.user_action.kind is UserActionKind.CHANGE_INPUT
+        assert "safety filters" in exc_info.value.user_action.detail.lower()
         metadata = exc_info.value.provider_metadata
         assert metadata is not None
         assert metadata.status_code == 400
@@ -181,6 +185,8 @@ class TestAnthropicWorkerObjectErrorHandling:
             await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.CHECK_CREDENTIALS
 
     async def test_wrapped_permission_quota_is_capacity(self, mocker: MockerFixture) -> None:
         _patch_gen_object_dependencies(mocker)
@@ -192,6 +198,8 @@ class TestAnthropicWorkerObjectErrorHandling:
             await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CAPACITY
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.CHECK_BILLING
 
     async def test_unrecognized_underlying_falls_back_to_unknown(self, mocker: MockerFixture) -> None:
         """A wrapped non-SDK exception (e.g. validation failure) routes to UNKNOWN, not CONTENT."""
@@ -225,6 +233,11 @@ class TestAnthropicWorkerObjectErrorHandling:
         assert metadata_dict["provider"] == "anthropic"
         assert metadata_dict["sdk_exception_type"] == "RateLimitError"
         assert metadata_dict["status_code"] == 429
+        assert "user_action" in report_dict
+        user_action_dict = report_dict["user_action"]
+        assert isinstance(user_action_dict, dict)
+        assert user_action_dict["kind"] == UserActionKind.CHECK_BILLING
+        assert isinstance(user_action_dict["detail"], str)
 
     async def test_real_instructor_wraps_rate_limit_and_fix_unwraps_correctly(self, mocker: MockerFixture) -> None:
         """End-to-end: drive the real instructor library with an SDK exception and

@@ -18,6 +18,8 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
 from pipelex.cogt.inference.error_classification import (
+    UserAction,
+    UserActionKind,
     extract_anthropic_metadata,
     extract_underlying_sdk_exception,
     is_content_policy_violation,
@@ -252,14 +254,20 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                 raise LLMCompletionError(
                     msg,
                     error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=f"Your Anthropic account has exceeded its quota — check billing at {URLs.anthropic_billing}",
+                    user_action=UserAction(
+                        kind=UserActionKind.CHECK_BILLING,
+                        detail=f"Your Anthropic account has exceeded its quota — check billing at {URLs.anthropic_billing}",
+                    ),
                     provider_metadata=metadata,
                 ) from cause
             msg = f"Anthropic rate limit exceeded for model '{self.inference_model.desc}': {sdk_exc}"
             raise LLMCompletionError(
                 msg,
                 error_category=InferenceErrorCategory.TRANSIENT,
-                user_action="Rate limited by Anthropic — the system will retry automatically",
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Rate limited by Anthropic — the system will retry automatically",
+                ),
                 provider_metadata=metadata,
             ) from cause
 
@@ -268,6 +276,10 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
             raise LLMCompletionError(
                 msg,
                 error_category=InferenceErrorCategory.TRANSIENT,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Anthropic API request timed out — the system will retry automatically",
+                ),
                 provider_metadata=metadata,
             ) from cause
 
@@ -278,13 +290,20 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                 raise LLMCompletionError(
                     msg,
                     error_category=InferenceErrorCategory.CONTENT,
-                    user_action="Content was rejected by safety filters — revise the prompt",
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_INPUT,
+                        detail="Content was rejected by safety filters — revise the prompt",
+                    ),
                     provider_metadata=metadata,
                 ) from cause
             msg = f"Anthropic bad request error: {sdk_exc}"
             raise LLMCompletionError(
                 msg,
                 error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Anthropic rejected the request — review the prompt and parameters",
+                ),
                 provider_metadata=metadata,
             ) from cause
 
@@ -293,6 +312,10 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
             raise LLMCompletionError(
                 msg,
                 error_category=InferenceErrorCategory.TRANSIENT,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Could not reach Anthropic — the system will retry automatically",
+                ),
                 provider_metadata=metadata,
             ) from cause
 
@@ -303,13 +326,20 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                 raise LLMCompletionError(
                     msg,
                     error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=f"Your Anthropic account has exceeded its quota — check billing at {URLs.anthropic_billing}",
+                    user_action=UserAction(
+                        kind=UserActionKind.CHECK_BILLING,
+                        detail=f"Your Anthropic account has exceeded its quota — check billing at {URLs.anthropic_billing}",
+                    ),
                     provider_metadata=metadata,
                 ) from cause
             msg = f"Anthropic permission denied: {sdk_exc}"
             raise LLMCompletionError(
                 msg,
                 error_category=InferenceErrorCategory.CONFIGURATION,
+                user_action=UserAction(
+                    kind=UserActionKind.CHECK_CREDENTIALS,
+                    detail="Anthropic denied permission — check your API key permissions",
+                ),
                 provider_metadata=metadata,
             ) from cause
 

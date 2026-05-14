@@ -7,7 +7,7 @@ from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
-from pipelex.cogt.inference.error_classification import is_content_policy_violation
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, is_content_policy_violation
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.hub import get_models_manager
@@ -112,7 +112,10 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                 raise ImgGenGenerationError(
                     msg,
                     error_category=InferenceErrorCategory.TRANSIENT,
-                    user_action="Rate limited by Azure — the system will retry automatically",
+                    user_action=UserAction(
+                        kind=UserActionKind.UNKNOWN,
+                        detail="Rate limited by Azure — the system will retry automatically",
+                    ),
                 ) from exc
             if status_code == 402:
                 msg = f"Azure quota exhausted for model '{self.inference_model.desc}': {error_body}"
@@ -126,7 +129,10 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                     raise ImgGenGenerationError(
                         msg,
                         error_category=InferenceErrorCategory.CONTENT,
-                        user_action="Content was rejected by safety filters — revise the prompt",
+                        user_action=UserAction(
+                            kind=UserActionKind.UNKNOWN,
+                            detail="Content was rejected by safety filters — revise the prompt",
+                        ),
                     ) from exc
                 msg = f"Azure bad request for model '{self.inference_model.desc}': {error_body}"
                 raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONTENT) from exc

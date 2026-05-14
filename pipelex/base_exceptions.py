@@ -4,7 +4,7 @@ from pydantic import TypeAdapter
 from pydantic.dataclasses import dataclass
 
 if TYPE_CHECKING:
-    from pipelex.cogt.inference.error_classification import ProviderErrorMetadata
+    from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction
 
 
 @dataclass(frozen=True, config={"extra": "forbid", "arbitrary_types_allowed": True})
@@ -18,7 +18,7 @@ class ErrorReport:
     message: str
     error_category: str | None = None
     retryable: bool | None = None
-    user_action: str | None = None
+    user_action: "UserAction | None" = None
     model: str | None = None
     provider: str | None = None
     provider_metadata: "ProviderErrorMetadata | None" = None
@@ -29,6 +29,10 @@ class ErrorReport:
             "dict[str, Any]",
             TypeAdapter(type(self)).dump_python(self, mode="python", exclude_none=True),
         )
+
+    def user_action_detail(self) -> str | None:
+        """Return the free-form advice text on ``user_action``, or ``None`` when absent."""
+        return self.user_action.detail if self.user_action is not None else None
 
 
 class PipelexError(Exception):

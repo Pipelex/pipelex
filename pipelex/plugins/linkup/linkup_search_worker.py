@@ -15,6 +15,7 @@ from linkup import (
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import InferenceErrorCategory, SearchJobFailureError
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_job import SearchJob
@@ -45,21 +46,30 @@ class LinkupSearchWorker(SearchWorkerAbstract):
             return SearchJobFailureError(
                 msg,
                 error_category=InferenceErrorCategory.CONFIGURATION,
-                user_action="Check that the LINKUP_API_KEY environment variable is set",
+                user_action=UserAction(
+                    kind=UserActionKind.UNKNOWN,
+                    detail="Check that the LINKUP_API_KEY environment variable is set",
+                ),
             )
         if isinstance(exc, LinkupInsufficientCreditError):
             msg = f"Linkup credits exhausted: {exc}"
             return SearchJobFailureError(
                 msg,
                 error_category=InferenceErrorCategory.CAPACITY,
-                user_action=f"Your Linkup account has insufficient credits — check billing at {URLs.linkup_billing}",
+                user_action=UserAction(
+                    kind=UserActionKind.UNKNOWN,
+                    detail=f"Your Linkup account has insufficient credits — check billing at {URLs.linkup_billing}",
+                ),
             )
         if isinstance(exc, LinkupTooManyRequestsError):
             msg = f"Linkup rate limit exceeded: {exc}"
             return SearchJobFailureError(
                 msg,
                 error_category=InferenceErrorCategory.TRANSIENT,
-                user_action="Rate limited by Linkup — the system will retry automatically",
+                user_action=UserAction(
+                    kind=UserActionKind.UNKNOWN,
+                    detail="Rate limited by Linkup — the system will retry automatically",
+                ),
             )
         if isinstance(exc, LinkupTimeoutError):
             msg = f"Linkup request timed out: {exc}"
