@@ -141,7 +141,6 @@ def _normalize_and_escape(template: str) -> str:
     return normalized.replace("@@", _AT_ESCAPE_SENTINEL).replace("$$", _DOLLAR_ESCAPE_SENTINEL)
 
 
-
 def validate_template_sigils(template: str, declared_inputs: set[str]) -> None:
     r"""Raise `TemplateSigilSyntaxError` when an inline `@`/`@?` candidate's root identifier
     matches one of the pipe's declared inputs.

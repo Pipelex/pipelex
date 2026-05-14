@@ -1,6 +1,7 @@
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic.json_schema import SkipJsonSchema
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
@@ -73,11 +74,14 @@ class PipelexBundleBlueprint(BaseModel):
 
     pipe: dict[str, PipeBlueprintUnion] | None = Field(default_factory=dict)
 
-    # Process-local side-table populated by `BundleElaborator`. Survives `model_copy` but is
-    # dropped by any `model_dump` / `model_validate` round-trip (exclude=True keeps MTHDS /
-    # TOML / JSON exports clean). Persisting it for downstream consumers — graph viewer,
-    # Temporal payload, library cache — is captured as a follow-up in TODOS.md.
-    elaboration_metadata: dict[str, ElaborationMetadata] | None = Field(default=None, exclude=True)
+    # Process-local side-table populated by `BundleElaborator`. `exclude=True` drops it from
+    # `model_dump()` / `model_validate()` round-trips so MTHDS / TOML / JSON exports stay
+    # clean. `SkipJsonSchema[...]` ALSO hides the field (and its `ElaborationMetadata` /
+    # `StepRole` definitions) from the generated JSON schema — Pydantic v2's `exclude=True`
+    # by itself does not affect `model_json_schema()`. Persisting it for downstream
+    # consumers — graph viewer, Temporal payload, library cache — is captured as a
+    # follow-up in TODOS.md.
+    elaboration_metadata: SkipJsonSchema[dict[str, ElaborationMetadata] | None] = Field(default=None, exclude=True)
 
     @field_validator("domain", mode="before")
     @classmethod
