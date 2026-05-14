@@ -63,7 +63,7 @@ async def dry_run_pipe(pipe: PipeAbstract, *, allow_signatures: bool = False, ra
         signature_refs = pipe.collect_signature_refs(pipe_lookup=get_optional_pipe)
         if signature_refs:
             raise SignaturesNotAllowedError(
-                pipe_ref=pipe.pipe_ref,
+                offending_pipe_refs={pipe.pipe_ref},
                 signature_refs=signature_refs,
                 dep_paths=pipe.collect_signature_paths(pipe_lookup=get_optional_pipe),
             )
@@ -131,10 +131,12 @@ async def dry_run_pipes(
     if not allow_signatures:
         all_signature_refs: set[str] = set()
         all_dep_paths: dict[str, list[str]] = {}
+        offending_pipe_refs: set[str] = set()
         for pipe in pipes:
             sig_refs = pipe.collect_signature_refs(pipe_lookup=get_optional_pipe)
             if not sig_refs:
                 continue
+            offending_pipe_refs.add(pipe.pipe_ref)
             all_signature_refs.update(sig_refs)
             for sig_ref, path in pipe.collect_signature_paths(pipe_lookup=get_optional_pipe).items():
                 # Prefer the longest known dep chain so the error message shows the most informative
@@ -145,7 +147,7 @@ async def dry_run_pipes(
                     all_dep_paths[sig_ref] = path
         if all_signature_refs:
             raise SignaturesNotAllowedError(
-                pipe_ref=pipes[0].pipe_ref if pipes else "",
+                offending_pipe_refs=offending_pipe_refs,
                 signature_refs=all_signature_refs,
                 dep_paths=all_dep_paths,
             )

@@ -28,20 +28,37 @@ class SignaturesNotAllowedError(PipelexError):
 
     def __init__(
         self,
-        pipe_ref: str,
+        offending_pipe_refs: set[str],
         signature_refs: set[str],
         dep_paths: dict[str, list[str]],
     ) -> None:
-        self.pipe_ref = pipe_ref
+        self.offending_pipe_refs = offending_pipe_refs
         self.signature_refs = signature_refs
         self.dep_paths = dep_paths
         message = self._format_message()
         super().__init__(message)
 
+    @property
+    def pipe_ref(self) -> str:
+        """Primary offending pipe_ref (lowest sort order), or empty string when none.
+
+        Kept as a convenience for callers wanting a single representative; the source of
+        truth is `offending_pipe_refs`.
+        """
+        if not self.offending_pipe_refs:
+            return ""
+        return min(self.offending_pipe_refs)
+
     def _format_message(self) -> str:
-        lines: list[str] = [
-            f"Pipe '{self.pipe_ref}' depends on PipeSignature placeholders that have no implementation:",
-        ]
+        sorted_offenders = sorted(self.offending_pipe_refs)
+        if len(sorted_offenders) == 1:
+            header = f"Pipe '{sorted_offenders[0]}' depends on PipeSignature placeholders that have no implementation:"
+        elif len(sorted_offenders) > 1:
+            offender_list = ", ".join(f"'{ref}'" for ref in sorted_offenders)
+            header = f"The following pipes depend on PipeSignature placeholders that have no implementation: {offender_list}"
+        else:
+            header = "Pipes depend on PipeSignature placeholders that have no implementation:"
+        lines: list[str] = [header]
         for sig_ref in sorted(self.signature_refs):
             dep_chain = self.dep_paths.get(sig_ref, [])
             if dep_chain:

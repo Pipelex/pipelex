@@ -9,6 +9,7 @@ from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.hub import get_console
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
+from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 from pipelex.pipeline.validate_bundle import ValidateBundleError
 from pipelex.system.pipelex_service.exceptions import (
     GatewayApiKeyMissingError,
@@ -202,6 +203,23 @@ def _display_validation_error_details(console: Console, exc: ValidateBundleError
     if exc.signature_check_error is not None:
         console.print("[bold cyan]Unimplemented Signatures:[/bold cyan]\n")
         console.print(f"[yellow]{escape(str(exc.signature_check_error))}[/yellow]\n")
+
+
+def handle_signatures_not_allowed_error(exc: SignaturesNotAllowedError, *, context: ErrorContext) -> NoReturn:
+    """Render `SignaturesNotAllowedError` as a Rich CLI error and exit.
+
+    Mirrors the bundle-path treatment so the single-pipe validation path also produces a
+    friendly error message instead of an unhandled traceback (issue #6 / greptile).
+    """
+    console = get_console()
+    console.print(f"\n[bold red]❌ {context} failed because of unimplemented PipeSignature placeholders[/bold red]\n")
+    console.print(f"[yellow]{escape(str(exc))}[/yellow]\n")
+    console.print(
+        "[bold green]💡 Tip:[/bold green] Replace each placeholder with a real implementation, or re-run with [cyan]--allow-signatures[/cyan]."
+    )
+    console.print(f"[dim]Learn more: {URLs.documentation}[/dim]")
+    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
+    raise typer.Exit(1) from exc
 
 
 def handle_validate_bundle_error(exc: ValidateBundleError, bundle_path: Path | None = None) -> NoReturn:

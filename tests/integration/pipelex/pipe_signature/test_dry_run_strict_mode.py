@@ -293,3 +293,108 @@ class TestDryRunStrictMode:
         assert "bundle_strict_domain.bundle_seq" in result.dry_run_result
         for entry in result.dry_run_result.values():
             assert entry.status is DryRunStatus.SUCCESS
+
+    async def test_aggregated_error_names_actual_offender_not_first_pipe(
+        self,
+        setup_signature_library: Callable[[], None],
+        make_signature_blueprint: Callable[..., PipeSignatureBlueprint],
+    ) -> None:
+        # Regression: when pipes[0] is clean and a later pipe reaches a signature, the aggregated
+        # error must name the offender — not pipes[0]. The previous code used pipes[0].pipe_ref
+        # unconditionally for the message header.
+        setup_signature_library()
+        innocent_op = PipeFactory[PipeLLM].make_from_blueprint(
+            domain_code=SIGNATURES_DOMAIN_CODE,
+            pipe_code="innocent_first_op",
+            blueprint=PipeLLMBlueprint(
+                description="Real LLM step with no signature deps.",
+                inputs={"doc": "SigTestDoc"},
+                output="SigTestSummary",
+                prompt="Summarize $doc.",
+            ),
+            concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
+        )
+        get_pipe_library().add_new_pipe(pipe=innocent_op)
+
+        hidden_sig = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+            domain_code=SIGNATURES_DOMAIN_CODE,
+            pipe_code="hidden_sig",
+            blueprint=make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary"),
+            concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
+        )
+        get_pipe_library().add_new_pipe(pipe=hidden_sig)
+        offender_seq = PipeFactory[PipeSequence].make_from_blueprint(
+            domain_code=SIGNATURES_DOMAIN_CODE,
+            pipe_code="offender_seq",
+            blueprint=PipeSequenceBlueprint(
+                description="Sequence reaching a signature.",
+                inputs={"doc": "SigTestDoc"},
+                output="SigTestSummary",
+                steps=[SubPipeBlueprint(pipe="hidden_sig", result="summary")],
+            ),
+            concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
+        )
+        get_pipe_library().add_new_pipe(pipe=offender_seq)
+
+        # Iterate innocent FIRST, offender SECOND — exposes the pipes[0] bug.
+        with pytest.raises(SignaturesNotAllowedError) as exc_info:
+            await dry_run_pipes(pipes=[innocent_op, offender_seq])
+        error = exc_info.value
+        assert offender_seq.pipe_ref in error.offending_pipe_refs
+        assert innocent_op.pipe_ref not in error.offending_pipe_refs
+        assert offender_seq.pipe_ref in str(error)
+        assert f"'{innocent_op.pipe_ref}' depends on" not in str(error)
+
+    async def test_aggregated_error_lists_all_offenders_when_multiple(
+        self,
+        setup_signature_library: Callable[[], None],
+        make_signature_blueprint: Callable[..., PipeSignatureBlueprint],
+    ) -> None:
+        # Regression: when multiple pipes each reach distinct signatures, all offenders must be
+        # reported — not just one. Multi-offender message uses a plural header.
+        setup_signature_library()
+        sig_a = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+            domain_code=SIGNATURES_DOMAIN_CODE,
+            pipe_code="multi_off_sig_a",
+            blueprint=make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary"),
+            concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
+        )
+        sig_b = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+            domain_code=SIGNATURES_DOMAIN_CODE,
+            pipe_code="multi_off_sig_b",
+            blueprint=make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary"),
+            concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
+        )
+        get_pipe_library().add_pipes(pipes=[sig_a, sig_b])
+        seq_a = PipeFactory[PipeSequence].make_from_blueprint(
+            domain_code=SIGNATURES_DOMAIN_CODE,
+            pipe_code="multi_off_seq_a",
+            blueprint=PipeSequenceBlueprint(
+                description="Sequence reaching sig_a.",
+                inputs={"doc": "SigTestDoc"},
+                output="SigTestSummary",
+                steps=[SubPipeBlueprint(pipe="multi_off_sig_a", result="summary")],
+            ),
+            concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
+        )
+        seq_b = PipeFactory[PipeSequence].make_from_blueprint(
+            domain_code=SIGNATURES_DOMAIN_CODE,
+            pipe_code="multi_off_seq_b",
+            blueprint=PipeSequenceBlueprint(
+                description="Sequence reaching sig_b.",
+                inputs={"doc": "SigTestDoc"},
+                output="SigTestSummary",
+                steps=[SubPipeBlueprint(pipe="multi_off_sig_b", result="summary")],
+            ),
+            concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
+        )
+        get_pipe_library().add_pipes(pipes=[seq_a, seq_b])
+
+        with pytest.raises(SignaturesNotAllowedError) as exc_info:
+            await dry_run_pipes(pipes=[seq_a, seq_b])
+        error = exc_info.value
+        assert error.offending_pipe_refs == {seq_a.pipe_ref, seq_b.pipe_ref}
+        message = str(error)
+        assert "The following pipes depend on" in message
+        assert seq_a.pipe_ref in message
+        assert seq_b.pipe_ref in message

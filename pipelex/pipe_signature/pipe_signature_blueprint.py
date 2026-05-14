@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from typing_extensions import override
 
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint, PipeType
@@ -24,6 +24,14 @@ class PipeSignatureBlueprint(PipeBlueprint):
         default_factory=list,
         description="Pipes this signature claims to depend on (metadata for tooling).",
     )
+
+    @field_validator("signature_for", mode="after")
+    @classmethod
+    def reject_signature_for_pipe_signature(cls, value: PipeType | None) -> PipeType | None:
+        if value is PipeType.PIPE_SIGNATURE:
+            msg = "A PipeSignature blueprint cannot have signature_for=PipeSignature."
+            raise ValueError(msg)
+        return value
 
     @override
     def validate_inputs(self) -> None:

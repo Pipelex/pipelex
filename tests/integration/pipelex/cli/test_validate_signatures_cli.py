@@ -106,3 +106,31 @@ class TestValidateSignaturesCli:
     def test_validate_all_allow_signatures_passes(self, signature_caller_dir: Path) -> None:
         # Lenient mode: --all succeeds even when a non-signature pipe reaches a signature.
         do_validate_all_libraries_and_dry_run(library_dirs=[signature_caller_dir], allow_signatures=True)
+
+    def test_validate_pipe_strict_default_fails_with_friendly_exit(
+        self,
+        signature_caller_dir: Path,
+    ) -> None:
+        # Regression (issue 6 / greptile): single-pipe validation must wrap SignaturesNotAllowedError
+        # as typer.Exit(1) with a Rich error message, not bubble a raw traceback to the user.
+        with pytest.raises(typer.Exit) as exc_info:
+            asyncio.run(
+                _validate_pipe_or_bundle(
+                    pipe_code="sigcli_caller.caller_seq",
+                    library_dirs=[signature_caller_dir],
+                )
+            )
+        assert exc_info.value.exit_code == 1
+
+    def test_validate_pipe_allow_signatures_passes(
+        self,
+        signature_caller_dir: Path,
+    ) -> None:
+        # Sanity-check: lenient mode still completes without raising for the single-pipe path.
+        asyncio.run(
+            _validate_pipe_or_bundle(
+                pipe_code="sigcli_caller.caller_seq",
+                library_dirs=[signature_caller_dir],
+                allow_signatures=True,
+            )
+        )

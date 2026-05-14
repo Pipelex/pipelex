@@ -60,7 +60,7 @@ class TestSignaturesNotAllowedErrorMessage:
         sig_pipe, outer_seq = self._build_sequence_with_signature(make_signature_blueprint)
 
         error = SignaturesNotAllowedError(
-            pipe_ref=outer_seq.pipe_ref,
+            offending_pipe_refs={outer_seq.pipe_ref},
             signature_refs=outer_seq.collect_signature_refs(pipe_lookup=get_optional_pipe),
             dep_paths=outer_seq.collect_signature_paths(pipe_lookup=get_optional_pipe),
         )
@@ -81,7 +81,7 @@ class TestSignaturesNotAllowedErrorMessage:
         sig_pipe, outer_seq = self._build_sequence_with_signature(make_signature_blueprint)
 
         error = SignaturesNotAllowedError(
-            pipe_ref=outer_seq.pipe_ref,
+            offending_pipe_refs={outer_seq.pipe_ref},
             signature_refs=outer_seq.collect_signature_refs(pipe_lookup=get_optional_pipe),
             dep_paths=outer_seq.collect_signature_paths(pipe_lookup=get_optional_pipe),
         )
@@ -98,7 +98,7 @@ class TestSignaturesNotAllowedErrorMessage:
         sig_pipe, outer_seq = self._build_sequence_with_signature(make_signature_blueprint)
 
         error = SignaturesNotAllowedError(
-            pipe_ref=outer_seq.pipe_ref,
+            offending_pipe_refs={outer_seq.pipe_ref},
             signature_refs=outer_seq.collect_signature_refs(pipe_lookup=get_optional_pipe),
             dep_paths=outer_seq.collect_signature_paths(pipe_lookup=get_optional_pipe),
         )

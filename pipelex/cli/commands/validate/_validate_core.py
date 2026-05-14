@@ -13,6 +13,7 @@ from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_availability_error,
     handle_model_choice_error,
+    handle_signatures_not_allowed_error,
     handle_validate_bundle_error,
 )
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
@@ -28,6 +29,7 @@ from pipelex.hub import (
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
+from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 from pipelex.system.runtime import IntegrationMode
@@ -139,11 +141,14 @@ async def _validate_pipe_or_bundle(
         pipe = get_required_pipe(pipe_code=pipe_code)
         typer.echo(f"Validating pipe '{pipe_code}'...")
         get_telemetry_manager().track_event(EventName.PIPE_DRY_RUN, properties={EventProperty.PIPE_TYPE: pipe.type})
-        await dry_run_pipe(
-            pipe,
-            allow_signatures=allow_signatures,
-            raise_on_failure=True,
-        )
+        try:
+            await dry_run_pipe(
+                pipe,
+                allow_signatures=allow_signatures,
+                raise_on_failure=True,
+            )
+        except SignaturesNotAllowedError as sig_error:
+            handle_signatures_not_allowed_error(sig_error, context=ErrorContext.VALIDATION)
         signature_count = len(pipe.collect_signature_refs(pipe_lookup=get_optional_pipe))
         typer.secho(
             f"Successfully validated pipe '{pipe_code}'{_format_signatures_summary_suffix(signature_count)}",
