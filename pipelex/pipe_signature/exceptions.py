@@ -38,17 +38,6 @@ class SignaturesNotAllowedError(PipelexError):
         message = self._format_message()
         super().__init__(message)
 
-    @property
-    def pipe_ref(self) -> str:
-        """Primary offending pipe_ref (lowest sort order), or empty string when none.
-
-        Kept as a convenience for callers wanting a single representative; the source of
-        truth is `offending_pipe_refs`.
-        """
-        if not self.offending_pipe_refs:
-            return ""
-        return min(self.offending_pipe_refs)
-
     def _format_message(self) -> str:
         sorted_offenders = sorted(self.offending_pipe_refs)
         if len(sorted_offenders) == 1:
