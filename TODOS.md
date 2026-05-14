@@ -109,9 +109,9 @@ After every `🛑 CHECKPOINT` line:
 
 ## Phase 0 — Lock down current behaviour (no production code changes)
 
-- [ ] **0.1** Add `tests/integration/pipelex/system/pipelex_service/test_offline_baseline.py` with `TestOfflineBaseline` covering the baseline that must NOT regress: BYOK-offline succeeds, gateway-offline-without-cache raises today. Write these as **passing tests against current behaviour** (do not write "expected-to-fail" tests). In Phases 2/3 they will be updated as semantics legitimately change, not "flipped." Use `mocker.patch("httpx.get", side_effect=httpx.ConnectError(...))`.
-- [ ] **0.2** Confirm by running the new tests that `Pipelex.make(needs_inference=False, needs_model_specs=True)` with gateway disabled (BYOK backend only) succeeds offline. If it does not, file a sub-task here before continuing — a phantom network call somewhere has to be tracked down. **Note**: 3.2 will add an explicit regression guard for this; 0.2 is the one-time confirmation.
-- [ ] **0.3** Run `make agent-check && make agent-test`. Record output in the checkpoint status.
+- [x] **0.1** Add `tests/integration/pipelex/system/pipelex_service/test_offline_baseline.py` with `TestOfflineBaseline` covering the baseline that must NOT regress: BYOK-offline succeeds, gateway-offline-without-cache raises today. Write these as **passing tests against current behaviour** (do not write "expected-to-fail" tests). In Phases 2/3 they will be updated as semantics legitimately change, not "flipped." Use `mocker.patch("httpx.get", side_effect=httpx.ConnectError(...))`.
+- [x] **0.2** Confirm by running the new tests that `Pipelex.make(needs_inference=False, needs_model_specs=True)` with gateway disabled (BYOK backend only) succeeds offline. If it does not, file a sub-task here before continuing — a phantom network call somewhere has to be tracked down. **Note**: 3.2 will add an explicit regression guard for this; 0.2 is the one-time confirmation.
+- [x] **0.3** Run `make agent-check && make agent-test`. Record output in the checkpoint status.
 
 🛑 **CHECKPOINT 0** — Baseline pinned. Cold-start safe: new session can pick up from Phase 1 with confidence about what already works.
 
@@ -121,7 +121,7 @@ After every `🛑 CHECKPOINT` line:
 
 **Goal:** stand up `RemoteConfigCache` with no other code calling it yet. Pure read/write/version logic.
 
-- [ ] **1.1** Write failing tests first: `tests/unit/system/pipelex_service/test_remote_config_cache.py` with `TestRemoteConfigCache`:
+- [x] **1.1** Write failing tests first: `tests/unit/system/pipelex_service/test_remote_config_cache.py` with `TestRemoteConfigCache`:
   - `test_write_then_read_roundtrip` — writes a config, reads it back, asserts equality + non-stale timestamp.
   - `test_read_missing_returns_none` — no cache file → `None` (no exception).
   - `test_read_corrupted_json_returns_none_and_logs` — file exists but isn't JSON → returns `None`, logs a warning. (Use `caplog`.)
@@ -130,14 +130,14 @@ After every `🛑 CHECKPOINT` line:
   - `test_cache_path_uses_global_config_dir` — path lives under `config_manager.global_config_dir / "cache" / "remote_config.json"`.
   - `test_write_is_atomic` — simulate failure between write-to-tmp and `os.replace` (e.g. via `mocker.patch("os.replace", side_effect=OSError)`); assert no partial file at the destination path.
   - `test_raw_payload_extras_preserved` — store a payload with an unknown top-level key, load it back, pass through `RemoteConfig.model_validate(...)`, and assert the unknown key is still on the resulting model (Pydantic `extra="allow"` semantics). Guards the cache-integrity invariant.
-- [ ] **1.2** Implement `pipelex/system/pipelex_service/remote_config_cache.py`:
+- [x] **1.2** Implement `pipelex/system/pipelex_service/remote_config_cache.py`:
   - `class RemoteConfigCache` with `@classmethod load() -> CachedRemoteConfig | None` and `@classmethod store(remote_config_payload: dict[str, Any]) -> None`. **The `store` argument is the raw JSON dict from `response.json()`, not a `RemoteConfig` instance.**
   - JSON file format on disk: `{"schema_version": 1, "cached_at": "<iso>", "raw_config": { ... raw remote payload ... }}`.
   - Atomic write via `tempfile.NamedTemporaryFile(dir=cache_dir, delete=False)` + `os.replace`.
   - Catch only `OSError`, `JSONDecodeError`, `ValidationError` — never bare `Exception`.
-- [ ] **1.3** Add `CachedRemoteConfig` Pydantic model alongside `RemoteConfigCache`. Fields: `schema_version: int`, `cached_at: datetime`, `raw_config: dict[str, Any]`. Use `datetime.timezone.utc` (Python 3.10 compatibility). Provide a `to_remote_config()` helper that returns `RemoteConfig.model_validate(self.raw_config)`.
-- [ ] **1.4** `make agent-check` clean.
-- [ ] **1.5** Tests green.
+- [x] **1.3** Add `CachedRemoteConfig` Pydantic model alongside `RemoteConfigCache`. Fields: `schema_version: int`, `cached_at: datetime`, `raw_config: dict[str, Any]`. Use `datetime.timezone.utc` (Python 3.10 compatibility). Provide a `to_remote_config()` helper that returns `RemoteConfig.model_validate(self.raw_config)`.
+- [x] **1.4** `make agent-check` clean.
+- [x] **1.5** Tests green.
 
 🛑 **CHECKPOINT 1** — Cache module shippable on its own. Cold-start safe.
 
@@ -312,3 +312,36 @@ Capture as separate work after this lands:
 ## Checkpoint status log
 
 <!-- Append a "### Checkpoint N status" block here after each 🛑 CHECKPOINT, capturing what landed, open decisions, and the next checkbox to start with. Keep blocks short; the codebase is authoritative. -->
+
+### Checkpoint 0 status
+
+**Landed:**
+- `tests/integration/pipelex/system/pipelex_service/test_offline_baseline.py` — `TestOfflineBaseline` with two passing tests:
+  - `test_byok_offline_setup_succeeds_without_fetching_remote_config` — gateway disabled, no network, `fetch_remote_config` and `httpx.get` are asserted to be uncalled.
+  - `test_gateway_offline_without_cache_raises_remote_config_fetch_error` — gateway enabled + terms accepted + `httpx.get` raising `ConnectError` raises `RemoteConfigFetchError`. Bypasses the session-scoped cache patch via a module-level capture of the original classmethod.
+
+**Workaround:** The test module overrides the autouse `reset_pipelex_config_fixture` (no eager `Pipelex.make`) and the gateway-offline test explicitly calls `log.reset()` after the expected failure, because `Pipelex.make` does not reset log state when setup raises. This is pre-existing behaviour — flagged for future fix, not in scope here.
+
+**Verification:**
+- `make agent-check` → clean.
+- `make agent-test` → all green (5253 passed, 2 skipped, 3 xfailed; matches main).
+
+**Next:** Phase 1 — start at **1.1** (failing tests for `RemoteConfigCache` in `tests/unit/system/pipelex_service/test_remote_config_cache.py`).
+
+### Checkpoint 1 status
+
+**Landed:**
+- `pipelex/system/pipelex_service/remote_config_cache.py` — `CachedRemoteConfig` (Pydantic) + `RemoteConfigCache` (class with `cache_path()`, `load()`, `store()`). On-disk layout `{schema_version, cached_at, raw_config}`. Atomic writes via `tempfile.NamedTemporaryFile` + `os.replace` (kept explicit `os.replace` with a per-line `# noqa: PTH202`, with cleanup of the tmp file on failure via a `replaced` flag in `finally`). Module constant `CACHE_SCHEMA_VERSION = 1`.
+- `tests/unit/pipelex/system/pipelex_service/test_remote_config_cache.py` — 8 tests covering roundtrip, missing-file, corrupted-JSON, wrong-schema-version, parent-dir creation, cache-path location, atomic-write-on-rename-failure, and raw-payload extras preservation.
+- `tests/unit/pipelex/system/pipelex_service/conftest.py` — extended the existing `mock_log` autouse fixture to also patch `remote_config_cache.log`, so unit tests don't need a configured Pipelex log stack.
+
+**Decisions:**
+- `CachedRemoteConfig.model_config` is `ConfigDict(extra="forbid")` — *not* strict, because we deserialize datetimes from ISO strings.
+- The cache module uses `pipelex.log` rather than stdlib `logging` to stay consistent with the rest of the package; tests rely on the module-scoped `mock_log` fixture to assert warnings instead of `caplog`.
+- For `test_write_is_atomic`, the test patches `pathlib.Path.replace` (which is what Python uses under the hood after ruff PTH-fixed the call) rather than `os.replace` at module scope.
+
+**Verification:**
+- `.venv/bin/pytest tests/unit/pipelex/system/pipelex_service/test_remote_config_cache.py` — 8 passed.
+- `make agent-check` — clean.
+
+**Next:** Phase 2 — start at **2.1** (failing tests for `RemoteConfigFetcher.fetch_remote_config` with fallback semantics in `tests/integration/pipelex/system/pipelex_service/test_remote_config_fetcher.py`).
