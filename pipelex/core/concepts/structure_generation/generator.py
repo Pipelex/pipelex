@@ -51,6 +51,7 @@ class StructureGenerator:
     def __init__(
         self,
         concept_ref_to_class_info: dict[str, ConceptClassInfo] | None = None,
+        local_domain: str | None = None,
     ):
         """Initialize the StructureGenerator.
 
@@ -58,6 +59,9 @@ class StructureGenerator:
             concept_ref_to_class_info: Optional mapping from concept refs to ConceptClassInfo.
                 When module_path is provided, proper import statements will be generated.
                 When module_path is None, forward references (strings) will be used.
+            local_domain: Optional domain to use when resolving bare concept refs
+                (refs without a domain prefix, e.g. "ColorPalette") to their
+                domain-qualified structure class name.
         """
         self.imports = {
             "from typing import Optional, List, Dict, Any, Literal",
@@ -67,6 +71,7 @@ class StructureGenerator:
         }
         self.enum_definitions: dict[str, dict[str, Any]] = {}  # Store enum definitions
         self.concept_ref_to_class_info = concept_ref_to_class_info or {}
+        self.local_domain = local_domain
         # Track concept classes that need to be mocked during validation (for file generation)
         self._concept_classes_to_mock: set[str] = set()
 
@@ -268,10 +273,18 @@ class StructureGenerator:
             self.imports.add(f"from {cls.__module__} import {cls.__name__}")
         elif base_class != "StructuredContent":
             # Check if we have module info for this custom base class in concept_ref_to_class_info
+            base_module_path: str | None = None
             for class_info in self.concept_ref_to_class_info.values():
                 if class_info.class_name == base_class and class_info.module_path:
-                    self.imports.add(f"from {class_info.module_path} import {class_info.class_name}")
+                    base_module_path = class_info.module_path
                     break
+            if base_module_path is None:
+                # Cross-package refines: base class lives in another already-installed package — recover its module via the class registry.
+                registered_cls = _get_class_registry().get_class(name=base_class)
+                if registered_cls is not None and registered_cls.__name__ == base_class and registered_cls.__module__ not in {"__main__", "builtins"}:
+                    base_module_path = registered_cls.__module__
+            if base_module_path:
+                self.imports.add(f"from {base_module_path} import {base_class}")
 
         # Generate class header with docstring (use class name if no description provided)
         docstring = description or f"Generated {class_name} class"
@@ -432,6 +445,14 @@ class StructureGenerator:
             except ValueError:
                 pass
 
+        # Bare concept_refs (e.g. "ColorPalette") in field defs are local to the
+        # current bundle's domain. Promote them to a qualified ref so the lookup
+        # below — and the qualified-name fallback after it — find the right class.
+        parsed_ref = QualifiedRef.parse_stripping_cross_package(concept_ref)
+        if not parsed_ref.domain_path and self.local_domain:
+            concept_ref = f"{self.local_domain}.{concept_ref}"
+            parsed_ref = QualifiedRef.parse_stripping_cross_package(concept_ref)
+
         # Check concept_ref_to_class_info for the concept reference
         if concept_ref in self.concept_ref_to_class_info:
             class_info = self.concept_ref_to_class_info[concept_ref]
@@ -446,7 +467,6 @@ class StructureGenerator:
         # Default: use domain-qualified forward reference when domain is available
         # e.g., "myapp.Customer" -> '"myapp__Customer"'
         concept_code = extract_concept_code_from_concept_ref_or_code(concept_ref)
-        parsed_ref = QualifiedRef.parse_stripping_cross_package(concept_ref)
         if parsed_ref.domain_path and not NativeConceptCode.is_native_concept_ref_or_code(concept_ref):
             qualified_name = make_qualified_structure_class_name(parsed_ref.domain_path, concept_code)
             return f'"{qualified_name}"'
@@ -585,9 +605,6 @@ class StructureGenerator:
                     except ValueError:
                         pass
                 return f"Dict[{key_type}, {value_type}]"
-
-        # Fallback for unknown types
-        return str(field_type)
 
     def _validate_execution(
         self,

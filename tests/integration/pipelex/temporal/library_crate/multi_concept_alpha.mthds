@@ -41,8 +41,8 @@ output = "Summary"
 model = "$testing-text"
 prompt = """
 Create a summary for this person:
-Name: @profile_result.name
-Age: @profile_result.age
+Name: $profile_result.name
+Age: $profile_result.age
 
 Respond with a headline and body.
 """
@@ -55,6 +55,6 @@ output = "Text"
 model = "$testing-text"
 prompt = """
 Format this summary as plain text:
-Headline: @summary_result.headline
-Body: @summary_result.body
+Headline: $summary_result.headline
+Body: $summary_result.body
 """

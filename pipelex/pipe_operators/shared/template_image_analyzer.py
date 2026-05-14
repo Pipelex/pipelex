@@ -61,7 +61,7 @@ class TemplateImageAnalyzer:
             WithImagesFilterError: If | with_images is used on a type without nested images
         """
         # Preprocess template (convert @variable, $variable syntax)
-        preprocessed = preprocess_template(template_source)
+        preprocessed = preprocess_template(template_source, declared_inputs=set(input_specs.keys()))
 
         # Parse template to get variable references with filters
         variable_refs = detect_jinja2_variable_references(
@@ -158,9 +158,10 @@ class TemplateImageAnalyzer:
             UnusedInputError: If any declared input is never referenced
         """
         referenced_roots: set[str] = set()
+        declared_inputs = set(input_specs.keys())
 
         for template_source in template_sources:
-            preprocessed = preprocess_template(template_source)
+            preprocessed = preprocess_template(template_source, declared_inputs=declared_inputs)
             variable_refs = detect_jinja2_variable_references(
                 template_category=template_category,
                 template_source=preprocessed,
@@ -169,7 +170,6 @@ class TemplateImageAnalyzer:
                 root_var = get_root_from_dotted_path(var_ref.path)
                 referenced_roots.add(root_var)
 
-        declared_inputs = set(input_specs.keys())
         unused_inputs = declared_inputs - referenced_roots
 
         if unused_inputs:

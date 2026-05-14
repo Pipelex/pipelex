@@ -460,6 +460,8 @@ class PipeAbstract(ABC, BaseModel):
                     input_specs=input_specs or None,
                     pipe_data=pipe_data,
                     concept_data=concept_data,
+                    description=self.description,
+                    domain_code=self.domain_code,
                 )
                 # Update job metadata with child graph context for nested pipes
                 if child_graph_context is not None:

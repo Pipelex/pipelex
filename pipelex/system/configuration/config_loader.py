@@ -166,58 +166,81 @@ class ConfigLoader:
 
         write_manifest(global_dir / "inference" / "deck", compute_kit_manifest())
 
+    @classmethod
+    def _override_files_for_dir(cls, config_dir: Path, include_run_mode: bool) -> list[Path]:
+        """Build the override file sequence for a single config dir.
+
+        Order matters: later files win on key collisions during deep-merge.
+
+        Args:
+            config_dir: The .pipelex directory to look in.
+            include_run_mode: When False, omit the `pipelex_{run_mode}.toml` entry.
+                Used under unit testing so the run_mode file is sourced only from
+                `./tests/` and not from per-dir overrides.
+
+        Returns:
+            Ordered list of candidate file paths (missing files are ignored at load time).
+        """
+        files = [
+            config_dir / "pipelex_local.toml",
+            config_dir / f"pipelex_{runtime_manager.environment}.toml",
+        ]
+        if include_run_mode:
+            files.append(config_dir / f"pipelex_{runtime_manager.run_mode}.toml")
+        files.append(config_dir / "pipelex_override.toml")
+        files.append(config_dir / "pipelex_temporary_override.toml")
+        return files
+
     def load_config(self, extra_overrides: dict[str, Any] | None = None) -> dict[str, Any]:
         """Load and merge configurations from pipelex and local config files.
 
-        The configuration is loaded and merged in the following order:
-        1. Base pipelex config (pipelex/pipelex.toml — package defaults)
-        2. Global config (~/.pipelex/pipelex.toml)
-        3. Project config ({project_root}/.pipelex/pipelex.toml, if found)
-        4. Override configs from effective config dir in sequence:
-           - pipelex_local.toml (local execution)
+        The configuration is loaded and deep-merged in the following order
+        (later wins per leaf key):
+
+        1. Package defaults (pipelex/pipelex.toml)
+        2. Global base (~/.pipelex/pipelex.toml)
+        3. Global override sequence (from ~/.pipelex/):
+           - pipelex_local.toml
            - pipelex_{environment}.toml
-           - pipelex_{run_mode}.toml
-           - pipelex_override.toml (user's final override)
-           - pipelex_temporary_override.toml (ephemeral, safe for tools to create/delete)
+           - pipelex_{run_mode}.toml (omitted under unit testing — see below)
+           - pipelex_override.toml
+           - pipelex_temporary_override.toml
+        4. Project base ({project_root}/.pipelex/pipelex.toml, if found and
+           distinct from the global dir)
+        5. Project override sequence (same five files as step 3, from the
+           project's .pipelex/), if the project dir is distinct from global
+        6. Programmatic `extra_overrides`, if any
+
+        Unit-testing special case: when `runtime_manager.is_unit_testing` is
+        true, the `pipelex_{run_mode}.toml` entry is sourced exclusively from
+        `./tests/pipelex_{run_mode}.toml` and is layered at the highest run_mode
+        precedence. Global and project run_mode files are not loaded, to keep
+        test runs hermetic.
 
         Returns:
             dict[str, Any]: The merged configuration dictionary
         """
         self.ensure_global_config_exists()
 
-        list_of_configs: list[Path] = []
-
-        # 1. Pipelex package defaults
-        list_of_configs.append(self.pipelex_root_dir / CONFIG_NAME)
-
-        # 2. Global config
-        list_of_configs.append(self.global_config_dir / CONFIG_NAME)
-
-        # 3. Project config (if different from global)
+        is_unit_testing = runtime_manager.is_unit_testing
         project_dir = self.project_config_dir
+
+        list_of_configs: list[Path] = [
+            self.pipelex_root_dir / CONFIG_NAME,
+            self.global_config_dir / CONFIG_NAME,
+        ]
+        list_of_configs.extend(
+            self._override_files_for_dir(self.global_config_dir, include_run_mode=not is_unit_testing),
+        )
+
         if project_dir is not None and project_dir != self.global_config_dir:
             list_of_configs.append(project_dir / CONFIG_NAME)
+            list_of_configs.extend(
+                self._override_files_for_dir(project_dir, include_run_mode=not is_unit_testing),
+            )
 
-        # Effective config dir for overrides
-        effective_config_dir = self.pipelex_config_dir
-
-        # 4. Override for local execution
-        list_of_configs.append(effective_config_dir / "pipelex_local.toml")
-
-        # Override for environment
-        list_of_configs.append(effective_config_dir / f"pipelex_{runtime_manager.environment}.toml")
-
-        # Override for run mode
-        if runtime_manager.is_unit_testing:
+        if is_unit_testing:
             list_of_configs.append(Path.cwd() / "tests" / f"pipelex_{runtime_manager.run_mode}.toml")
-        else:
-            list_of_configs.append(effective_config_dir / f"pipelex_{runtime_manager.run_mode}.toml")
-
-        # Final override
-        list_of_configs.append(effective_config_dir / "pipelex_override.toml")
-
-        # Temporary override (e.g. for testing tools — safe to create/delete)
-        list_of_configs.append(effective_config_dir / "pipelex_temporary_override.toml")
 
         merged = load_toml_from_path_and_merge_with_overrides(paths=list_of_configs)
         if extra_overrides:

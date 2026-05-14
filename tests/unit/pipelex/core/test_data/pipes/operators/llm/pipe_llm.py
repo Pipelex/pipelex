@@ -243,7 +243,7 @@ description = "Analysis with dynamic system prompt"
 inputs = { expertise_level = "Text", content = "Text" }
 output = "Text"
 system_prompt = "You are an expert with $expertise_level level knowledge"
-prompt = "Analyze this content: @content"
+prompt = "Analyze this content: $content"
 """,
     PipelexBundleBlueprint(
         domain="test_pipes",
@@ -255,7 +255,7 @@ prompt = "Analyze this content: @content"
                 inputs={"expertise_level": "Text", "content": "Text"},
                 output=NativeConceptCode.TEXT,
                 system_prompt="You are an expert with $expertise_level level knowledge",
-                prompt="Analyze this content: @content",
+                prompt="Analyze this content: $content",
             ),
         },
     ),
@@ -275,7 +275,7 @@ type = "PipeLLM"
 description = "Extract structured person information"
 inputs = { text = "Text[1]" }
 output = "PersonInfo"
-prompt = "Extract person information from this text: @text"
+prompt = "Extract person information from this text: $text"
 """,
     PipelexBundleBlueprint(
         domain="test_pipes",
@@ -287,7 +287,7 @@ prompt = "Extract person information from this text: @text"
                 description="Extract structured person information",
                 inputs={"text": "Text[1]"},
                 output="PersonInfo",
-                prompt="Extract person information from this text: @text",
+                prompt="Extract person information from this text: $text",
             ),
         },
     ),
@@ -310,7 +310,8 @@ output = "DocumentSummary"
 prompt = """
 Analyze these documents based on the query: $query
 
-Documents: @documents
+Documents:
+@documents
 """
 ''',
     PipelexBundleBlueprint(
@@ -328,7 +329,8 @@ Documents: @documents
                 output="DocumentSummary",
                 prompt="""Analyze these documents based on the query: $query
 
-Documents: @documents
+Documents:
+@documents
 """,
             ),
         },

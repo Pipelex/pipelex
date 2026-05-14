@@ -22,7 +22,7 @@ from pipelex.system.pipelex_service.pipelex_service_agreement import (
     update_inference_setup_completed,
     update_service_terms_acceptance,
 )
-from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
+from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TELEMETRY_PROJECT_TEMPLATE_FILE_NAME
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 
@@ -125,13 +125,21 @@ def _copy_inference_templates(target_dir: Path) -> None:
         shutil.copy2(template_routing_path, target_inference_dir / "routing_profiles.toml")
 
 
-def _copy_telemetry_template(target_dir: Path) -> None:
-    """Copy the telemetry template (defaults to off) to the target directory.
+def _copy_telemetry_template(target_dir: Path, for_project: bool) -> None:
+    """Copy the appropriate telemetry template to the target directory.
+
+    The global template (`telemetry.toml`) carries active defaults. The project
+    template (`telemetry.project.toml`) is fully commented out so a project's
+    `.pipelex/telemetry.toml` doesn't shadow the user's global telemetry
+    settings during layered loading.
 
     Args:
         target_dir: Target config directory (e.g. .pipelex/).
+        for_project: True when targeting a project's `.pipelex/`; False when
+            targeting the global `~/.pipelex/`.
     """
-    template_path = Path(str(get_kit_configs_dir())) / TELEMETRY_CONFIG_FILE_NAME
+    template_name = TELEMETRY_PROJECT_TEMPLATE_FILE_NAME if for_project else TELEMETRY_CONFIG_FILE_NAME
+    template_path = Path(str(get_kit_configs_dir())) / template_name
     target_path = target_dir / TELEMETRY_CONFIG_FILE_NAME
     target_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(template_path, target_path)
@@ -327,7 +335,9 @@ def agent_init_cmd(
     - primary_backend: required when 2+ backends are selected and pipelex_gateway
       is not among them. Auto-derived when only 1 backend or pipelex_gateway is present.
 
-    Telemetry is always initialized to "off" (can be changed manually in telemetry.toml).
+    Telemetry: global init seeds an active `telemetry.toml` template with all destinations
+    off; project init drops in a commented-out template that inherits the user's global
+    telemetry settings via layered loading. Edit `telemetry.toml` to enable destinations.
     """
     try:
         # Parse config
@@ -342,8 +352,10 @@ def agent_init_cmd(
         # Step 1.5: Copy inference templates (init_config skips inference/)
         _copy_inference_templates(target_dir)
 
-        # Step 1.6: Copy telemetry template (defaults to off)
-        _copy_telemetry_template(target_dir)
+        # Step 1.6: Copy telemetry template. Global init seeds active defaults;
+        # project init drops in a commented-out template so it doesn't shadow
+        # the user's global telemetry settings during layered loading.
+        _copy_telemetry_template(target_dir, for_project=not global_)
 
         # Step 2: Configure backends
         template_backends_path = str(get_kit_configs_dir() / "inference" / "backends.toml")

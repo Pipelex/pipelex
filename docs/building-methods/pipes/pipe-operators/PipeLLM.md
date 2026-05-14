@@ -222,7 +222,7 @@ Analyze the document and explain how it relates to the context: $reference_doc
 | `model`                       | string or table     | Specifies the LLM choice by name, setting, or preset to use.              | No       |
 | `model_to_structure`                       | string or table     | Specifies the LLM choice by name, setting, or preset to use for structuring after preliminary text generation.              | No       |
 | `system_prompt`             | string              | A system-level prompt to guide the LLM's behavior (e.g., "You are a helpful assistant"). Supports the same variable syntax as `prompt`, including image and document references.  | No       |
-| `prompt`           | string              | A template for the user prompt. Use `$` for inline variables (e.g., `$topic`) and `@` to insert the content of an entire input (e.g., `@text_to_summarize`). Image and document variables should also be tagged with `$` or `@`.                 | No       |
+| `prompt`           | string              | A template for the user prompt. Use `$` for inline variables (e.g., `$topic`). Use `@input_name` as a block sigil on its own line to insert the content of an entire input — inline `@var` raises `TemplateSigilSyntaxError` when `var` collides with a declared input. Image and document variables follow the same rules. Escape with `@@` or `$$` to emit a literal `@` or `$` (e.g., `@@font-face` inside a `<style>` block). | No       |
 | `structuring_method`        | string              | The method for generating structured output. Can be `direct` or `preliminary_text`. Defaults to the global configuration.                                                      | No       |
 
 ### LLM Setting Fields

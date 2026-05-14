@@ -164,6 +164,7 @@ Key concepts:
 
 - **`inputs = { topic = "Text" }`** — declares what the pipe expects as input
 - **`$topic`** — references an input variable in the prompt (as opposed to `@variable` which references data from working memory)
+- **`@@` and `$$`** — write a literal `@` or `$` without triggering interpolation. Use `@@font-face` or `@@media` inside `<style>` blocks, `$$10` for a literal dollar amount before a word, and so on. The escape is per-occurrence.
 - **`-i inputs.json`** — provides input data at runtime
 
 ## Step 4: Structured Outputs

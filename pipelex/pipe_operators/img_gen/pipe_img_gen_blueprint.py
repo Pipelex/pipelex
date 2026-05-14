@@ -6,6 +6,7 @@ from typing_extensions import override
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
 from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.template_errors import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
@@ -34,7 +35,12 @@ class PipeImgGenBlueprint(PipeBlueprint):
     def validate_inputs(self):
         # Get all required variables from prompt
         template_category = TemplateCategory.IMG_GEN_PROMPT
-        preprocessed_template = preprocess_template(self.prompt)
+        declared_inputs: set[str] = set(self.inputs.keys()) if self.inputs else set()
+        try:
+            preprocessed_template = preprocess_template(self.prompt, declared_inputs=declared_inputs)
+        except TemplateSigilSyntaxError as exc:
+            msg = f"Template sigil error in PipeImgGen prompt: {exc}"
+            raise ValueError(msg) from exc
         try:
             check_jinja2_parsing(
                 template_source=preprocessed_template,
@@ -55,8 +61,7 @@ class PipeImgGenBlueprint(PipeBlueprint):
                 required_variables.add(root)
 
         # Check that all required variables are in inputs
-        input_names: set[str] = set(self.inputs.keys()) if self.inputs else set()
-        missing_variables: set[str] = required_variables - input_names
+        missing_variables: set[str] = required_variables - declared_inputs
 
         if missing_variables:
             missing_vars_str = ", ".join(sorted(missing_variables))

@@ -319,7 +319,7 @@ class ConceptFactory:
 
         qualified_class_name = make_qualified_structure_class_name(domain_code, concept_code)
         try:
-            _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
+            _, the_generated_class = StructureGenerator(local_domain=domain_code).generate_from_structure_blueprint(
                 class_name=qualified_class_name,
                 structure_blueprint=normalized_structure,
                 description=blueprint.description,

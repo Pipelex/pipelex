@@ -238,6 +238,8 @@ class NodeSpec(BaseModel):
     kind: NodeKind = Field(strict=False)
     pipe_code: str | None = None
     pipe_type: str | None = None
+    description: str | None = None
+    domain_code: str | None = None
     status: NodeStatus = Field(strict=False)
     timing: TimingSpec | None = None
     node_io: NodeIOSpec = Field(

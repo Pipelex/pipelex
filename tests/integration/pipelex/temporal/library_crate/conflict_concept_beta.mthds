@@ -34,7 +34,7 @@ output = "Text"
 model = "$testing-text"
 prompt = """
 Summarize this result:
-Value: @beta_result.value
-Confidence: @beta_result.confidence
-Valid: @beta_result.is_valid
+Value: $beta_result.value
+Confidence: $beta_result.confidence
+Valid: $beta_result.is_valid
 """
