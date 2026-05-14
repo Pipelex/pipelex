@@ -118,6 +118,7 @@ def _validate_at_sigil_alone_on_line(template: str, declared_inputs: set[str]) -
                         f"you intend a literal `@`."
                     )
                     raise TemplateSigilSyntaxError(msg)
+            continue
         for candidate in _AT_CANDIDATE_PATTERN.finditer(line):
             sigil = candidate.group(1)
             identifier = candidate.group(2)
