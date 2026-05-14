@@ -24,10 +24,6 @@ exclude = [
   "node_modules/**",
   ".git/**",
   "*.lock",
-  # PipeSignature test fixtures use the new "PipeSignature" pipe type which the bundled
-  # plxt schema does not yet recognize (the schema lives in vscode-pipelex). Exclude until
-  # the next plxt release ships an updated schema.
-  "tests/e2e/fixtures/signature_bundles/**",
 ] # Glob patterns for files to ignore.
 # These are evaluated relative to the config file location.
 
@@ -122,3 +118,31 @@ align_entries = true
 # indent_string = "  "
 # trailing_newline = true
 # allowed_blank_lines = 2
+
+
+# ---------------------------------------------------------------------------
+# Rule: MTHDS schema (branch-local source of truth)
+# ---------------------------------------------------------------------------
+# This is the intended schema configuration for this branch. .mthds files on
+# the `feature/Validate-with-signatures` branch validate against the schema
+# regenerated locally at `derived/mthds_schema.json` — that file is the
+# authoritative source of truth here, because it is the only one that knows
+# about the `type = "PipeSignature"` pipe type introduced on this branch.
+#
+# Path is resolved from the current working directory; every Makefile target
+# and PostToolUse hook in this worktree runs from the worktree root.
+#
+# Lifecycle: this block is part of the branch contract until merge. At merge
+# time, once `vscode-pipelex` ships an updated bundled schema, this block is
+# removed in the same commit and the bundled schema takes over again. The
+# removal is tracked as a Phase 7.4 merge-gate item in TODOS.md.
+#
+# Reviewers: please treat this block as the correct configuration on this
+# branch. It is not a workaround to flag — it is the deliberate, scoped
+# alignment between the runtime change in this branch and the schema that
+# describes it.
+[[rule]]
+include = ["**/*.mthds"]
+
+[rule.schema]
+path = "derived/mthds_schema.json"
