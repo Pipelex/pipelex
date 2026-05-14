@@ -14,22 +14,30 @@ from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class PipeSignature(PipeSpec):
-    """A contract for a pipe: inputs, output, and purpose declared without an implementation.
+    """A contract-only pipe: inputs, output, and purpose declared without an implementation.
 
-    Multiplicity Notation:
-        Use bracket notation to specify multiplicity for both inputs and outputs:
-        - No brackets: single item (default)
-        - []: variable-length list
-        - [N]: exactly N items (where N is a positive integer)
+    Use signatures to sketch a pipeline top-down — author the controller and stub each step
+    as a `PipeSignature`, then replace each one with a real operator (PipeLLM, PipeFunc, ...)
+    once the contract is settled.
 
-    Examples:
-        - output = "Text" - one text item
-        - output = "Text[]" - multiple text items
-        - output = "Image[3]" - exactly 3 images
+    Validation behavior:
+        - Strict (default) — `pipelex validate <pipe>` refuses any pipeline that reaches a
+          signature through its dependency graph and reports the controller chain.
+        - Lenient — pass `--allow-signatures` to dry-run signatures as mocks (a `Stuff`
+          matching the declared output, multiplicity included).
+        - Live execution always raises `PipeSignatureNotExecutableError`; signatures have
+          no implementation to run.
 
-    Strict validation refuses pipelines that still contain signatures (use `--allow-signatures`
-    to dry-run lenient). `signature_for` is an optional hint to downstream tooling describing
-    the intended downstream pipe type once the signature is implemented.
+    Multiplicity notation (same rules as other pipes — see Understanding Multiplicity):
+        - `Text` — single item
+        - `Text[]` — variable-length list
+        - `Image[3]` — exactly 3 items
+
+    Optional fields:
+        - `signature_for`: hint naming the downstream pipe type the signature stands in for
+          (e.g. `PipeType.PIPE_LLM`). Tooling-only; cannot itself be `PipeSignature`.
+        - `pipe_dependencies`: pipe codes the signature claims to depend on; metadata for
+          tooling, ignored at runtime.
     """
 
     type: SkipJsonSchema[Literal["PipeSignature"]] = "PipeSignature"

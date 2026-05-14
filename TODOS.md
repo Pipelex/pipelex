@@ -1,6 +1,6 @@
 # Signature-Based Validation — TDD implementation plan
 
-Status: Phases 1–6 landed (2026-05-14). End-to-end signature validation works from `.mthds`. Docs and CHANGELOG are open.
+Status: Phases 1–7.3 landed (2026-05-14); Phase 7.4 still open. **Branch is NOT ready to ship — blocked on `vscode-pipelex` schema update (see Phase 7.4 below).** Docs (new `signature-pipes.md` page + nav + cross-links + CLI reference + tightened spec docstring) and CHANGELOG (`[Unreleased]` Added/Changed) are in. `make agent-check` and `make agent-test` are green on this branch.
 
 Current state: A `PipeSignature` can be authored as a spec (`pipelex/builder/pipe/pipe_signature.py`), compiled to a blueprint (`pipelex/pipe_signature/pipe_signature_blueprint.py`), instantiated as a runtime (`pipelex/pipe_signature/pipe_signature_runtime.py`) via the registered `PipeSignatureFactory`, dry-run (yields a mock `Stuff` from the declared output `StuffSpec`), and rejected on live-run (`PipeSignatureNotExecutableError`). Signatures slot into `PipeBlueprintUnion` and `PipeSpecUnion`. Strict-mode gating is live: `PipeAbstract.collect_signature_refs(pipe_lookup=...)` walks the dependency graph; `dry_run_pipe(..., allow_signatures=False)` (the default) raises `SignaturesNotAllowedError` carrying both `signature_refs` and the qualified `dep_paths` chain. `dry_run_pipes` does a pre-pass that aggregates signature refs across all pipes in the batch so the user sees every offender in one error (post-review fix). `validate_bundle` and `validate_bundles_from_directory` catch the error and surface it via `ValidateBundleError.signature_check_error`. CLI surface: `pipelex validate pipe`/`bundle` now take `--allow-signatures` (default off); `pipelex validate --all` filters signature pipes out of the strict iteration; the agent CLI's `validate_*_core` functions default to lenient. Signatures still raise `PipeSignatureNotExecutableError` on live run. End-to-end `.mthds` parsing works: the interpreter happily round-trips `type = "PipeSignature"` through `PipelexBundleBlueprint` → library → runtime → dry-run, in both strict and lenient mode. The schema generator was updated to strip `pipe_category` from `PipeSignatureBlueprint`, but the JSON Schema file lives in `vscode-pipelex/` (not this repo) so no schema artifact needed regeneration here. Surprise: `pipe_abstract.py` could not import from `pipelex.hub` (even via a function-local import) because pyright's `reportImportCycles` is on and the cycle pipe_abstract → hub → libraries.library → libraries.pipe.pipe_library → pipe_abstract is real. The walker therefore takes a `pipe_lookup` callable parameter (typically `pipelex.hub.get_optional_pipe`) — slightly more explicit than the plan's pseudocode, but cycle-free. Walker iterates `sorted(pipe_dependencies())` so the dep chain rendered in `SignaturesNotAllowedError` is deterministic (post-review fix). Phase 6 surfaced one design gap: `dry_run_pipes` aggregated dep paths with a "first wins" rule, which lost the informative controller chain when the signature pipe was iterated first; the aggregator now prefers the longest known dep chain so the error message always shows the most useful path.
 
@@ -513,21 +513,25 @@ Phase 7 picks up by reading the updated "Status" plus the Phase 7 section below.
 
 ### Phase 7.1 — Docs
 
-- [ ] `docs/` MTHDS authoring guide: add a section "Signature pipes" describing the `type = "PipeSignature"` shape, listing all valid fields, with the three example fixtures from Phase 6 inlined as illustrations.
-- [ ] CLI help text — confirm `pipelex validate --help` mentions `--allow-signatures` with a one-line description ("Accept PipeSignature placeholders in the dependency graph (lenient mode).").
-- [ ] `pipelex/builder/pipe/pipe_signature.py`: tighten the class docstring with the new contract (drop the `result` line, mention `signature_for`, mention strict-vs-lenient).
+- [x] `docs/` MTHDS authoring guide: add a section "Signature pipes" describing the `type = "PipeSignature"` shape, listing all valid fields, with the three example fixtures from Phase 6 inlined as illustrations.
+  > Landed as a new top-level page under `building-methods/pipes/`: `docs/building-methods/pipes/signature-pipes.md`. Wired into `mkdocs.yml` in both nav placements (after the controllers list, before `Optimize Cost & Quality`). Cross-linked from `docs/building-methods/pipes/index.md` and `docs/tools/cli/validate.md`. The three Phase 6 fixtures are inlined verbatim.
+- [x] CLI help text — confirm `pipelex validate --help` mentions `--allow-signatures` with a one-line description ("Accept PipeSignature placeholders in the dependency graph (lenient mode).").
+  > Already wired by Phase 5 on both `validate_pipe_cmd` and `validate_bundle_cmd` with that exact help string. Also added the flag to `docs/tools/cli/validate.md` under both subcommands' Options blocks with example invocations.
+- [x] `pipelex/builder/pipe/pipe_signature.py`: tighten the class docstring with the new contract (drop the `result` line, mention `signature_for`, mention strict-vs-lenient).
+  > Rewrote the docstring to lead with the design intent (top-down sketching, replace each signature with a real operator), then call out validation behavior (strict / lenient / live), multiplicity, and the optional `signature_for` / `pipe_dependencies` fields. The pre-existing docstring already had no `result` reference, so nothing to drop.
 
 ### Phase 7.2 — CHANGELOG
 
-- [ ] `CHANGELOG.md` under `## [Unreleased]`:
+- [x] `CHANGELOG.md` under `## [Unreleased]`:
   - `### Added` — `PipeSignature` pipe type, `--allow-signatures` flag, agent CLI lenient default, `collect_signature_refs` graph walk.
   - `### Changed` — `dry_run_pipe`/`dry_run_pipes`/`validate_bundle` now accept `allow_signatures: bool = False`.
   - Cross-link `wip/signature-based-validation.md`.
+  > New `## [Unreleased]` section inserted above `[v0.28.0]`, with `### Added` (signature pipe type + factory + runtime, `--allow-signatures` flag with lenient agent-CLI default, `collect_signature_refs`/`collect_signature_paths` graph walk) and `### Changed` (the `allow_signatures` parameter threaded through `dry_run_pipe`/`dry_run_pipes`/`validate_bundle`/`validate_bundles_from_directory`, plus the new `signature_check_error` field on `ValidateBundleError`). Cross-link to `wip/signature-based-validation.md` included in the Added bullet.
 
 ### Phase 7.3 — Final lint and tests
 
-- [ ] `make agent-check` clean.
-- [ ] `make agent-test` — full suite green.
+- [x] `make agent-check` clean.
+- [x] `make agent-test` — full suite green.
 
 ### Phase 7.4 — Cross-repo pre-ship blockers (do NOT skip)
 

@@ -253,6 +253,7 @@ plugins:
         - building-methods/pipes/pipe-controllers/PipeParallel.md: "PipeParallel"
         - building-methods/pipes/pipe-controllers/PipeBatch.md: "PipeBatch"
         - building-methods/pipes/pipe-controllers/PipeCondition.md: "PipeCondition"
+        - building-methods/pipes/signature-pipes.md: "Signature Pipes"
         - building-methods/configure-ai-llm-to-optimize-methods.md: "Optimize Cost & Quality"
         - building-methods/llm-structured-generation-config.md: "LLM Structured Generation"
         - building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md: "LLM Prompting Style"
@@ -432,6 +433,7 @@ nav:
           - PipeParallel: building-methods/pipes/pipe-controllers/PipeParallel.md
           - PipeBatch: building-methods/pipes/pipe-controllers/PipeBatch.md
           - PipeCondition: building-methods/pipes/pipe-controllers/PipeCondition.md
+        - Signature Pipes: building-methods/pipes/signature-pipes.md
       - Optimize Cost & Quality: building-methods/configure-ai-llm-to-optimize-methods.md
       - LLM Structured Generation: building-methods/llm-structured-generation-config.md
       - LLM Prompting Style: building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
