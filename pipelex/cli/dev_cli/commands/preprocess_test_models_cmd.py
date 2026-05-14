@@ -16,7 +16,7 @@ from rich.table import Table
 from pipelex.hub import get_console
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.configs import ConfigPaths
-from pipelex.system.pipelex_service.exceptions import RemoteConfigFetchError, RemoteConfigValidationError
+from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableError, RemoteConfigValidationError
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_path
@@ -95,9 +95,9 @@ def _fetch_gateway_models() -> dict[str, list[str]]:
         Dictionary mapping model_type to list of model handles.
     """
     try:
-        remote_config = RemoteConfigFetcher.fetch_remote_config()
-        model_specs = dict(remote_config.backend_model_specs)
-    except (RemoteConfigFetchError, RemoteConfigValidationError):
+        result = RemoteConfigFetcher.fetch_remote_config(require_fresh=True)
+        model_specs = dict(result.config.backend_model_specs)
+    except (RemoteConfigUnavailableError, RemoteConfigValidationError):
         return {"llm": [], "img_gen": [], "text_extractor": [], "search": []}
 
     # Get defaults

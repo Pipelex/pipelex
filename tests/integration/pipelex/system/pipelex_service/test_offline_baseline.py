@@ -1,16 +1,15 @@
-"""Pins the offline-mode baseline before Phase 1+ refactors.
+"""Pins the offline-mode baseline.
 
-These tests describe the behaviour that must NOT regress as the cache + fallback layer
-lands in later phases:
+These tests describe the behaviour that must NOT regress:
 
 - BYOK setups (gateway disabled) must complete offline without any remote-config fetch.
-- Gateway-enabled setups with no network and no cache currently raise ``RemoteConfigFetchError``;
-  Phase 2 will replace that error with ``RemoteConfigUnavailableError`` and this test will be
-  updated then to track the new semantics.
+- Gateway-enabled setups with no network AND no cache must raise
+  ``RemoteConfigUnavailableError`` (the user-facing offline-mode error introduced in Phase 2).
 """
 
 from __future__ import annotations
 
+from pathlib import Path  # noqa: TC003 — referenced by pytest fixture type hints at runtime
 from typing import TYPE_CHECKING
 
 import httpx
@@ -18,7 +17,8 @@ import pytest
 
 from pipelex import log
 from pipelex.pipelex import Pipelex
-from pipelex.system.pipelex_service.exceptions import RemoteConfigFetchError
+from pipelex.system.configuration.config_loader import ConfigLoader
+from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableError
 from pipelex.system.pipelex_service.pipelex_service_agreement import (
     PipelexServiceAgreement,
     PipelexServiceOnboarding,
@@ -82,17 +82,27 @@ class TestOfflineBaseline:
         assert fetch_spy.call_count == 0, "fetch_remote_config must not be invoked when gateway is disabled"
         assert httpx_get_mock.call_count == 0, "httpx.get must not be invoked when gateway is disabled"
 
-    def test_gateway_offline_without_cache_raises_remote_config_fetch_error(
+    def test_gateway_offline_without_cache_raises_remote_config_unavailable_error(
         self,
         mocker: MockerFixture,
+        tmp_path: Path,
     ) -> None:
-        """Current (pre-Phase-2) behaviour: gateway enabled + offline → ``RemoteConfigFetchError``.
+        """Gateway enabled + offline + no primed cache → ``RemoteConfigUnavailableError``.
 
-        Phase 2 introduces a cache fallback that returns the cached config instead of raising
-        when offline. When that lands, this test will be rewritten to assert the new semantics
-        (cache miss → ``RemoteConfigUnavailableError``).
+        Phase 2 introduced a cache fallback so the fetcher only raises when both the network
+        and the local cache are unusable. We redirect ``~/.pipelex`` to a tmp path so any
+        cache the developer has from prior online work doesn't satisfy the fallback.
         """
         Pipelex.teardown_if_needed()
+
+        # Isolate the cache so a real ``~/.pipelex/cache/`` from prior online runs can't
+        # accidentally make this test "succeed via cache" and miss the regression.
+        mocker.patch.object(
+            ConfigLoader,
+            "global_config_dir",
+            new_callable=mocker.PropertyMock,
+            return_value=tmp_path / ".pipelex",
+        )
 
         service_config = PipelexServiceConfig(
             agreement=PipelexServiceAgreement(terms_accepted=True),
@@ -112,10 +122,11 @@ class TestOfflineBaseline:
         # Bypass the session-level cache patch from tests/conftest.py so we exercise the real
         # fetch path against a controlled httpx mock.
         mocker.patch.object(RemoteConfigFetcher, "fetch_remote_config", _ORIGINAL_FETCH_REMOTE_CONFIG)
+        mocker.patch.object(RemoteConfigFetcher, "FETCH_MAX_RETRIES", 1)
         mocker.patch("httpx.get", side_effect=httpx.ConnectError("no network"))
 
         try:
-            with pytest.raises(RemoteConfigFetchError):
+            with pytest.raises(RemoteConfigUnavailableError):
                 Pipelex.make(
                     integration_mode=IntegrationMode.PYTEST,
                     needs_inference=False,

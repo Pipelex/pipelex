@@ -82,7 +82,11 @@ class TestGatewayTermsCheck:
         # Mock the remote config fetch so we don't hit the network
         mock_remote_config = mocker.MagicMock()
         mock_remote_config.backend_model_specs = {}
-        mocker.patch(f"{PIPELEX_MODULE}.RemoteConfigFetcher.fetch_remote_config", return_value=mock_remote_config)
+        mock_remote_config.aws_region = "us-east-1"
+        mock_result = mocker.MagicMock()
+        mock_result.config = mock_remote_config
+        mock_result.source = "fresh"
+        mocker.patch(f"{PIPELEX_MODULE}.RemoteConfigFetcher.fetch_remote_config", return_value=mock_result)
 
         pipelex_instance = Pipelex.__new__(Pipelex)
 

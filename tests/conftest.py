@@ -17,7 +17,7 @@ from pipelex.system.pipelex_service.pipelex_service_config import (
     load_pipelex_service_config_if_exists as _original_load_pipelex_service_config,
 )
 from pipelex.system.pipelex_service.remote_config import RemoteConfig
-from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
+from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher, RemoteConfigResult, RemoteConfigSource
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 
@@ -35,11 +35,16 @@ _remote_config_cache: dict[str, RemoteConfig] = {}
 _original_fetch_remote_config = RemoteConfigFetcher.fetch_remote_config
 
 
-def _cached_fetch_remote_config() -> RemoteConfig:
-    """Wrapper that caches the remote config for the entire test session."""
+def _cached_fetch_remote_config(require_fresh: bool = False) -> "RemoteConfigResult":  # noqa: ARG001
+    """Wrapper that caches the remote config for the entire test session.
+
+    The ``require_fresh`` arg matches the new fetcher signature; ignored here because the
+    test-session cache exists precisely so we don't re-hit the network mid-suite.
+    """
     if "config" not in _remote_config_cache:
-        _remote_config_cache["config"] = _original_fetch_remote_config()
-    return _remote_config_cache["config"]
+        result = _original_fetch_remote_config()
+        _remote_config_cache["config"] = result.config
+    return RemoteConfigResult(config=_remote_config_cache["config"], source=RemoteConfigSource.FRESH, cached_at=None)
 
 
 # Session-level cache for pipelex service config to avoid flaky tests from concurrent file reads

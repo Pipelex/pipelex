@@ -147,7 +147,7 @@ After every `🛑 CHECKPOINT` line:
 
 **Goal:** `RemoteConfigFetcher.fetch_remote_config()` returns a `RemoteConfigResult` carrying source provenance, writes cache on success, reads cache on failure, raises `RemoteConfigUnavailableError` only when both fail. Keep `RemoteConfigFetchError` as the internal exception raised by the retry layer.
 
-- [ ] **2.1** Failing tests in `tests/integration/pipelex/system/pipelex_service/test_remote_config_fetcher.py` with `TestRemoteConfigFetcher`:
+- [x] **2.1** Failing tests in `tests/integration/pipelex/system/pipelex_service/test_remote_config_fetcher.py` with `TestRemoteConfigFetcher`:
   - `test_success_returns_fresh_and_writes_cache` — `mocker.patch("httpx.get")` returns a valid payload → result has `source=FRESH`, cache file written.
   - `test_network_failure_with_cache_returns_cached` — `httpx.get` raises `httpx.ConnectError`, cache is pre-populated via `RemoteConfigCache.store(...)` → result has `source=CACHED`, `RemoteConfigStaleWarning` emitted.
   - `test_network_failure_without_cache_raises_unavailable` — `httpx.get` raises, no cache → `RemoteConfigUnavailableError` with cache path in message.
@@ -158,14 +158,14 @@ After every `🛑 CHECKPOINT` line:
   - `test_succeeds_after_4_transient_failures_no_cache_fallback` — `httpx.get` raises `ConnectError` 4 times then returns valid payload; tenacity (`stop_after_attempt(5)`) rescues; result has `source=FRESH`, no cache fallback was triggered.
   - `test_falls_back_to_cache_after_5_transient_failures` — all 5 attempts raise; cache is pre-populated; result has `source=CACHED`.
   - `test_require_fresh_refuses_cache` — `httpx.get` raises, cache populated, but caller passed `require_fresh=True` → raises `RemoteConfigUnavailableError` (doc generators must not silently use cache).
-- [ ] **2.2** Implement the new control flow in `remote_config_fetcher.py`:
+- [x] **2.2** Implement the new control flow in `remote_config_fetcher.py`:
   - Change `fetch_remote_config` to return `RemoteConfigResult(config, source, cached_at)` and accept `require_fresh: bool = False`.
   - Keep raising the existing `RemoteConfigFetchError` from the inner `_fetch_remote_config_with_retry` path (don't churn that).
   - In the outer flow: catch `RemoteConfigFetchError`. If `require_fresh`: re-raise as `RemoteConfigUnavailableError`. Else: try cache; if hit, emit `RemoteConfigStaleWarning` + return `source=CACHED`; if miss, raise `RemoteConfigUnavailableError` (message includes cache path).
   - Persist to cache on success.
   - Leave `RemoteConfigValidationError` path untouched (no cache fallback).
-- [ ] **2.3** Add `RemoteConfigUnavailableError` and `RemoteConfigStaleWarning` to `exceptions.py`. `RemoteConfigUnavailableError` message: include cache path and remediation (`pipelex init` while online to prime cache; disable gateway in `backends.toml` as the offline-permanent alternative). Do NOT remove `RemoteConfigFetchError`.
-- [ ] **2.4** Update every existing caller of `fetch_remote_config()`. Pre-checked call sites (run `grep -rn "fetch_remote_config" --include="*.py"` to verify nothing else has appeared):
+- [x] **2.3** Add `RemoteConfigUnavailableError` and `RemoteConfigStaleWarning` to `exceptions.py`. `RemoteConfigUnavailableError` message: include cache path and remediation (`pipelex init` while online to prime cache; disable gateway in `backends.toml` as the offline-permanent alternative). Do NOT remove `RemoteConfigFetchError`.
+- [x] **2.4** Update every existing caller of `fetch_remote_config()`. Pre-checked call sites (run `grep -rn "fetch_remote_config" --include="*.py"` to verify nothing else has appeared):
   - `pipelex/pipelex.py:235` — main setup; needs `source` for downstream wiring.
   - `pipelex/cli/commands/doctor_cmd.py:740` — doctor; surface cache age in output.
   - `pipelex/cli/dev_cli/commands/gateway_models_generator.py:46` — **must pass `require_fresh=True`** (regenerates committed docs).
@@ -173,8 +173,8 @@ After every `🛑 CHECKPOINT` line:
   - `tests/conftest.py:35` — session cache shim; just unwrap `.config`.
   - `tests/unit/pipelex/cogt/models/test_model_deck_references.py:59` — just unwrap `.config`.
   Most callers do `result = ...; remote_config = result.config`.
-- [ ] **2.4b** While editing `doctor_cmd.py` for 2.4, replace the **pre-existing** `except Exception as exc:` at `doctor_cmd.py:767` with the specific exception classes that `models_manager.setup()` and `validate_model_deck()` can raise (the lineage is already enumerated in `pipelex.py:307-336`). This is an existing CLAUDE.md violation; fix it while we're here.
-- [ ] **2.5** `make agent-check` clean. Tests green.
+- [x] **2.4b** While editing `doctor_cmd.py` for 2.4, replace the **pre-existing** `except Exception as exc:` at `doctor_cmd.py:767` with the specific exception classes that `models_manager.setup()` and `validate_model_deck()` can raise (the lineage is already enumerated in `pipelex.py:307-336`). This is an existing CLAUDE.md violation; fix it while we're here.
+- [x] **2.5** `make agent-check` clean. Tests green.
 
 🛑 **CHECKPOINT 2** — Fetcher is now resilient and provenance-aware. Cold-start safe.
 
@@ -345,3 +345,32 @@ Capture as separate work after this lands:
 - `make agent-check` — clean.
 
 **Next:** Phase 2 — start at **2.1** (failing tests for `RemoteConfigFetcher.fetch_remote_config` with fallback semantics in `tests/integration/pipelex/system/pipelex_service/test_remote_config_fetcher.py`).
+
+### Checkpoint 2 status
+
+**Landed:**
+- `pipelex/system/pipelex_service/exceptions.py` — added `RemoteConfigUnavailableError(PipelexServiceError)` (user-facing offline-mode error: cache path + `pipelex init`/disable-gateway remediation hints) and `RemoteConfigStaleWarning(UserWarning)`. `RemoteConfigFetchError` kept intact as the internal retry-layer exception.
+- `pipelex/system/pipelex_service/remote_config_fetcher.py` — full rewrite of the public API. `fetch_remote_config(require_fresh: bool = False) -> RemoteConfigResult` now carries provenance (`source: RemoteConfigSource` = `FRESH` | `CACHED`, plus `cached_at`). On success: validates payload then writes the **raw JSON dict** via `RemoteConfigCache.store(...)`. On `RemoteConfigFetchError`: tries cache (unless `require_fresh=True`), emits `RemoteConfigStaleWarning` on hit, raises `RemoteConfigUnavailableError` chained from the original `RemoteConfigFetchError` on miss. `RemoteConfigValidationError` path untouched — no cache fallback for schema breaks. Codex Cloud short-circuit still returns a dummy result without writing the cache.
+- `tests/integration/pipelex/system/pipelex_service/test_remote_config_fetcher.py` — new `TestRemoteConfigFetcher` with 11 tests covering all the matrix entries from the plan: fresh success + cache write, connect-error fallback, HTTP-5xx fallback, both no-cache variants raising `RemoteConfigUnavailableError`, schema-break never falling back, Codex Cloud short-circuit untouched, tenacity recovering after 4 transient failures (no cache fallback triggered), tenacity exhausting all 5 attempts (cache fallback), `require_fresh=True` refusing cache, and a guard that the inner `RemoteConfigFetchError` is chained as `__cause__`.
+- Caller migration:
+  - `pipelex/pipelex.py:235` — unwraps `result.config`, logs the source.
+  - `pipelex/cli/commands/doctor_cmd.py` — unwraps `result.config`; the `except (RemoteConfigFetchError, RemoteConfigValidationError)` became `except (RemoteConfigUnavailableError, RemoteConfigValidationError)`.
+  - `pipelex/cli/dev_cli/commands/gateway_models_generator.py` and `preprocess_test_models_cmd.py` — pass `require_fresh=True` (these regenerate committed reference docs and test fixtures; stale cache must never bake in).
+  - `tests/conftest.py` — session-level cache shim now returns a `RemoteConfigResult`; signature accepts `require_fresh` and ignores it (intentional — the test session cache exists to avoid network).
+  - `tests/unit/pipelex/cogt/models/test_model_deck_references.py` — unwraps `.config`.
+  - `tests/unit/pipelex/system/pipelex_service/test_gateway_terms_check.py` — mock now returns a result-shaped object whose `.config` exposes `backend_model_specs` + `aws_region`.
+- `tests/integration/pipelex/system/pipelex_service/test_offline_baseline.py` — renamed the gateway-offline test to `test_gateway_offline_without_cache_raises_remote_config_unavailable_error` and isolated `~/.pipelex` per test via the `ConfigLoader.global_config_dir` `PropertyMock` so a developer's real cache can't accidentally satisfy the fallback. The BYOK-offline test is unchanged.
+- `pipelex/cli/commands/doctor_cmd.py` — replaced the pre-existing `except Exception as exc:` at the model-check block with the specific exception lineage (`RoutingProfileLibraryNotFoundError`, `InferenceBackendLibraryNotFoundError`, `ModelDeckNotFoundError`, `RoutingProfileDisabledBackendError`, `InferenceBackendLibraryValidationError`, `ModelDeckValidationError`, `InferenceBackendCredentialsError`).
+
+**Decisions:**
+- `RemoteConfigResult` is a Pydantic `BaseModel` with `ConfigDict(extra="forbid", strict=True, arbitrary_types_allowed=True)` (matches project convention; the `arbitrary_types_allowed` is needed because `RemoteConfig` is also a `BaseModel`). Carries `config`, `source`, `cached_at` (UTC).
+- `RemoteConfigSource` is a `StrEnum` from `pipelex.types` with lowercase values `fresh` / `cached`.
+- `RemoteConfigUnavailableError` is built by a helper (`_build_unavailable_error`) and the caller does the `raise ... from fetch_error`. Initial draft had a helper that raised directly; refactored to return-and-raise so pyright doesn't see "unreachable code" at the call site and ruff doesn't complain about `raise AssertionError("unreachable")`.
+- `datetime` import in the fetcher is annotated `# noqa: TC003` — Pydantic v2 resolves annotations at runtime even with `from __future__ import annotations`, so it cannot be moved into the `TYPE_CHECKING` block.
+
+**Verification:**
+- `make agent-check` — clean (ruff fix-imports, ruff format, plxt fmt, ruff lint, plxt lint, pyright, mypy all green).
+- Targeted: `.venv/bin/pytest -n auto -m "..." tests/unit/pipelex/system/ tests/integration/pipelex/system/` → 110 passed; same flags on `tests/unit/pipelex/cli/ tests/integration/pipelex/cli/ tests/unit/pipelex/cogt/ tests/integration/pipelex/cogt/` → 1006 passed.
+- `make agent-test` — full suite green.
+
+**Next:** Phase 3 — start at **3.1** (failing tests for `GatewayUnknownModelError` in `tests/integration/pipelex/cogt/model_backends/test_gateway_unknown_model.py`).

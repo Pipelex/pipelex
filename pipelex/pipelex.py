@@ -231,9 +231,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                     # who disabled gateway via init skip this entire block.
                     if not pipelex_service_config.agreement.terms_accepted:
                         raise GatewayTermsNotAcceptedError
-                # Fetch remote configuration
-                remote_config = RemoteConfigFetcher.fetch_remote_config()
-                log.verbose("Successfully fetched Pipelex Gateway remote configuration")
+                # Fetch remote configuration (may fall back to on-disk cache when offline).
+                remote_config_result = RemoteConfigFetcher.fetch_remote_config()
+                remote_config = remote_config_result.config
+                log.verbose(f"Successfully fetched Pipelex Gateway remote configuration (source={remote_config_result.source})")
                 gateway_model_specs = remote_config.backend_model_specs
                 gateway_config = GatewayConfig(
                     model_specs=gateway_model_specs,
