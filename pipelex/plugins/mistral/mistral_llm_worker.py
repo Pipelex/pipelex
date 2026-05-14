@@ -233,10 +233,26 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
 
         if not response:
             msg = "Mistral response is None"
-            raise LLMCompletionError(msg)
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                provider_metadata=None,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Mistral returned an empty response — the system will retry automatically",
+                ),
+            )
         if not response.choices:
             msg = "Mistral response.choices is None"
-            raise LLMCompletionError(msg)
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                provider_metadata=None,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Mistral returned a response with no choices — the system will retry automatically",
+                ),
+            )
         mistral_response_content = response.choices[0].message.content
         result_text: str
         if isinstance(mistral_response_content, str):
@@ -255,11 +271,27 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
             result_text = "".join(text_parts)
         else:
             msg = f"Unexpected Mistral response content type: {type(mistral_response_content)}"
-            raise LLMCompletionError(msg)
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                provider_metadata=None,
+                user_action=UserAction(
+                    kind=UserActionKind.CONTACT_SUPPORT,
+                    detail="Mistral returned an unrecognized content type — report this to Pipelex support",
+                ),
+            )
 
         if not result_text:
             msg = "Mistral response text is empty"
-            raise LLMCompletionError(msg)
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                provider_metadata=None,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Mistral returned an empty text response — try rephrasing the prompt or using a different model",
+                ),
+            )
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := response.usage):
             llm_tokens_usage.nb_tokens_by_category = self.mistral_factory.make_nb_tokens_by_category(usage=usage)

@@ -314,7 +314,15 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
 
         if not response.choices:
             msg = f"OpenAI chat completion response choices are empty with model: {self.inference_model.desc}"
-            raise LLMCompletionError(msg)
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                provider_metadata=None,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="OpenAI returned no completion choices — try rephrasing the prompt or using a different model",
+                ),
+            )
 
         finish_reason = response.choices[0].finish_reason
         if finish_reason == "content_filter":
@@ -332,7 +340,15 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
         response_text = openai_message.content
         if response_text is None:
             msg = f"OpenAI response message content is None: {response}\nmodel: {self.inference_model.desc}"
-            raise LLMCompletionError(msg)
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                provider_metadata=None,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="OpenAI returned a response with no content — try rephrasing the prompt or using a different model",
+                ),
+            )
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := response.usage):
             llm_tokens_usage.nb_tokens_by_category = self.openai_completions_factory.make_nb_tokens_by_category(usage=usage)

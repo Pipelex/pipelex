@@ -407,7 +407,18 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                 f"model: {self.inference_model.desc}\nstop_reason: {final_message.stop_reason}\n"
                 f"content_block_types: {block_types}"
             )
-            raise LLMCompletionError(msg)
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                provider_metadata=None,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail=(
+                        "Model produced no answer (likely exhausted token budget on reasoning)"
+                        " — shorten the prompt, raise max_tokens, or disable thinking"
+                    ),
+                ),
+            )
 
         full_reply_content = "\n\n".join(text_parts)
 

@@ -4,7 +4,7 @@
 
 Every inference worker that calls a third-party SDK must catch the SDK's typed exceptions and re-raise a `CogtError` subclass with an `InferenceErrorCategory`, a `user_action` hint, the model descriptor in the message, and `from exc` to preserve the cause chain. This is the foundation that everything downstream depends on — retry policy, agent hints, Temporal `non_retryable` decisions, human Rich panels.
 
-The work to lift every worker to this standard **has landed**. One residual defect remains: structured generation through `instructor` wraps the SDK exception in `InstructorRetryException`, and only the Anthropic worker currently unwraps it. OpenAI Completions, OpenAI Responses, Mistral, and Google still mis-categorize wrapped errors as `CONTENT`.
+The work to lift every worker to this standard **has landed**, including the four LLM workers that previously mis-categorized `instructor`-wrapped errors. OpenAI Completions, OpenAI Responses, Mistral, and Google all now unwrap `InstructorRetryException` and dispatch through the same categorization helper their `_gen_text` paths use. The five LLM workers in scope (Anthropic + four) additionally carry beyond-reference upgrades: `InferenceErrorCategory.UNKNOWN` for unrecognized-underlying fallbacks (instead of mis-categorizing as `CONTENT`), structured `ProviderErrorMetadata` (status_code, request_id, retry_after_seconds, provider_error_code, body) on every raised inference error, and structured `UserAction(kind, detail)` with semantic `UserActionKind` values.
 
 ## Current state
 
@@ -91,102 +91,20 @@ The end-to-end test `tests/unit/pipelex/plugins/anthropic/test_anthropic_worker_
 
 ## Open gaps
 
-### Instructor unwrap missing on four other workers
+The LLM-side gaps have been closed across Anthropic, OpenAI Completions, OpenAI Responses, Mistral, and Google. Open gaps that remain are scoped to non-LLM workers:
 
-Every LLM worker that uses `instructor.from_*` and a separate top-level catch for SDK exceptions has the same defect: structured-gen failures (rate limit, timeout, auth, quota) wrap as `InstructorRetryException` and get mis-categorized as `CONTENT`.
-
-| Worker | File | Current SDK types caught directly | Behavior on wrapped error |
-|---|---|---|---|
-| OpenAI Completions | `pipelex/plugins/openai/openai_completions_llm_worker.py` | `NotFoundError`, `RateLimitError`, `APITimeoutError`, `APIConnectionError`, `BadRequestError`, `AuthenticationError` | All flatten to `CONTENT`; the quota / content-policy discriminators never run on the wrapped path. |
-| OpenAI Responses | `pipelex/plugins/openai/openai_responses_llm_worker.py` | Same six, plus `LLMModelNotFoundError` from `NotFoundError` | Same flattening; `LLMModelNotFoundError`/`model_handle` plumbing only fires on the unwrapped path. |
-| Mistral | `pipelex/plugins/mistral/mistral_llm_worker.py` | `MistralError` routed through `_classify_mistral_error` | Wrapped `MistralError` → `CONTENT`; `_classify_mistral_error` (which already discriminates by status code / message) never runs on the wrapped path. |
-| Google Gemini | `pipelex/plugins/google/google_llm_worker.py` | `genai_errors.ServerError` → `TRANSIENT`, `genai_errors.ClientError` → `_classify_google_client_error` | Wrapped `ServerError` (should be `TRANSIENT`) → `CONTENT`. Wrapped `ClientError` → `CONTENT`. |
-
-### Other small gaps
-
-- **`pydantic.ValidationError` as a legitimate `CONTENT`.** When the LLM returns JSON that doesn't match the schema, `instructor` raises `InstructorRetryException` with a `ValidationError` (or `JSONDecodeError`) at `failed_attempts[-1].exception`. The unwrap branch must preserve this categorization — `_extract_underlying_sdk_exception` returns the `ValidationError`, the SDK helper doesn't recognize it, and the existing `CONTENT` fallback kicks in. The Anthropic test `test_unrecognized_underlying_falls_back_to_content` covers this and must be replicated.
-- **Silent gaps if a provider adds a new SDK exception type.** If, say, OpenAI introduces an `InternalServerError`, the categorization helper returns without raising and falls through to `CONTENT`. Worth a short audit of each provider's SDK exception hierarchy while doing the unwrap work.
-- **`instructor` import path.** The Anthropic worker moved from `instructor.exceptions` to `instructor.core` (the former is deprecated). The four pending workers should do the same one-line change.
+- **Beyond-reference upgrades on remaining workers.** Img-gen, extract, and search workers (and AWS Bedrock LLM, which does not use `instructor` and so was never affected by the unwrap defect) still need migration to the three beyond-reference upgrades — `UNKNOWN` category for unrecognized fallback paths, `ProviderErrorMetadata` on every raise, and semantic `UserActionKind` values on `UserAction`. Tracked in Phases 10–11 of `_tprl/TODOS.md`.
+- **`pydantic.ValidationError` now routes to `UNKNOWN`.** When the LLM returns JSON that doesn't match the schema, `instructor` raises `InstructorRetryException` with a `ValidationError` (or `JSONDecodeError`) at `failed_attempts[-1].exception`. The unwrap branch returns it, the per-provider SDK categorization helpers don't recognize it, and the `UNKNOWN` fallback (introduced by Phase 2's upgrade A) catches it — distinguishing schema-mismatch from genuine `CONTENT`-policy violations. If we ever want a dedicated SCHEMA_MISMATCH category, the categorization helpers can be extended to recognize `pydantic.ValidationError` explicitly. Not a regression.
 
 ## Followups
 
-### 1. Lift `_extract_underlying_sdk_exception` to a shared module
+The major followups from this track have landed (`extract_underlying_sdk_exception` is shared in `pipelex/cogt/inference/error_classification.py`; OpenAI Completions, OpenAI Responses, Mistral, and Google now unwrap-and-dispatch; per-provider test parity with the Anthropic suite is in place; the `instructor.exceptions` → `instructor.core` import migration is complete). Remaining followups are about extending the same standard to non-LLM workers (tracked in `_tprl/TODOS.md` Phases 10–12) and the deeper Extract/Classify/Render refactor that consolidates the per-worker pipeline ([track-extract-classify-render.md](track-extract-classify-render.md)).
 
-The function is small and provider-agnostic — it only reads attributes that `InstructorRetryException` and tenacity always populate. Move it to `pipelex/cogt/inference/error_classification.py` (next to the discriminators) and have every worker import from there. Anthropic switches to the shared import. Pure refactor, zero behavior change.
+### Risks and gotchas (for future similar work)
 
-Tests for the shared helper cover both the `failed_attempts` path and the `__cause__.last_attempt._exception` fallback.
-
-### 2. Apply unwrap-and-dispatch to OpenAI Completions
-
-Mirror the Anthropic shape. The OpenAI exception classes have identical constructor shapes to Anthropic's (httpx-based), so the test fixtures port over directly. The current `_gen_object` body has a nested `try { try { ... } except InstructorRetryException }` — collapse to a single try; replace the inner with the unwrap-and-dispatch branch; replace the six SDK clauses with a single tuple-catch that delegates to the helper. Keep `NotFoundError → LLMCompletionError(error_category=CONFIGURATION)` to match `_gen_text`.
-
-### 3. Apply unwrap-and-dispatch to OpenAI Responses
-
-Same pattern as Completions, but the `NotFoundError` branch raises a more specialized `LLMModelNotFoundError(message=msg, model_handle=...)`. Keep that specialization inside the categorization helper — it's a real signal worth preserving for callers that want to swap models.
-
-### 4. Apply unwrap-and-dispatch to Mistral
-
-Smallest change of the four — `_classify_mistral_error` is doing the right work, it just never gets called on the wrapped path:
-
-```python
-except InstructorRetryException as instructor_exc:
-    underlying = _extract_underlying_sdk_exception(instructor_exc)
-    if isinstance(underlying, MistralError):
-        raise self._classify_mistral_error(underlying) from instructor_exc
-    msg = f"Mistral structured generation failed after retries for model '{self.inference_model.desc}': {instructor_exc}"
-    raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT) from instructor_exc
-```
-
-### 5. Apply unwrap-and-dispatch to Google Gemini
-
-Symmetric to Mistral:
-
-```python
-except InstructorRetryException as instructor_exc:
-    underlying = _extract_underlying_sdk_exception(instructor_exc)
-    if isinstance(underlying, genai_errors.ServerError):
-        msg = f"Google API server error for model '{self.inference_model.desc}': {underlying}"
-        raise LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT) from instructor_exc
-    if isinstance(underlying, genai_errors.ClientError):
-        raise self._classify_google_client_error(underlying) from instructor_exc
-    msg = f"Google structured generation failed after retries for model '{self.inference_model.desc}': {instructor_exc}"
-    raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT) from instructor_exc
-```
-
-### 6. Per-provider test plan
-
-Mirror `tests/unit/pipelex/plugins/anthropic/test_anthropic_worker_object_error_handling.py`. The structure is reusable; only the SDK-exception factories and the patched helper paths change.
-
-**Shared test pieces worth lifting:**
-
-- `_wrap_in_instructor_retry(sdk_exc, *, include_failed_attempts=True)` — builds an `InstructorRetryException` matching what real `instructor` produces. Could move to `tests/helpers/instructor_test_utils.py` for reuse.
-- `_DummySchema(BaseModel)` — minimal pydantic model passed as `response_model`.
-- A `_make_llm_job(mocker)` skeleton — already provider-agnostic.
-
-**Per-worker cases:**
-
-| Case | What it proves |
-|---|---|
-| Wrapped rate-limit → `TRANSIENT` | The unwrap branch routes to the rate-limit handler. |
-| Wrapped quota-exhaustion message → `CAPACITY` + billing `user_action` | `is_quota_exhaustion_*` runs after unwrap. |
-| Wrapped timeout → `TRANSIENT` | Timeout types unwrap. |
-| Wrapped connection error → `TRANSIENT` | Network errors unwrap. |
-| Wrapped content-policy bad-request → `CONTENT` + safety `user_action` | `is_content_policy_violation` runs after unwrap. |
-| Wrapped auth error → `CONFIGURATION` (or provider-specific credentials exception) | Auth still routes correctly. |
-| Wrapped `ValueError` (non-SDK) → `CONTENT` fallback | Genuine schema/validation failures stay as `CONTENT`. |
-| Real-instructor end-to-end (one per provider) | Locks in `instructor`'s actual wrapping shape so a future upgrade fails loudly here, not in production. |
-
-**Provider-specific notes:**
-
-- **OpenAI Completions / Responses** — construct SDK exceptions identically to Anthropic via `httpx.Response(status_code=..., request=...)`. The end-to-end test uses `instructor.from_openai(openai.AsyncOpenAI(api_key="fake"))` and patches `client.chat.completions.create` (Completions) or `client.responses.create` (Responses) with `mocker.AsyncMock(side_effect=sdk_exc)`.
-- **Mistral** — `MistralError` constructor differs across SDK versions; confirm kwargs against the installed `mistralai` before writing factories. The end-to-end test patches `mistralai.Mistral.chat.complete_async` (or the current `from_mistral` adapter call).
-- **Google** — `genai_errors.ServerError` / `ClientError` wrap an HTTP response object. Look at how `_classify_google_client_error` constructs them in tests (if any) before writing factories. The end-to-end test patches the `genai.Client.aio.models.generate_content`-equivalent that `instructor.from_genai` calls. If constructor shapes are awkward, prefer `_wrap_in_instructor_retry(real_sdk_exc)` for the seven categorization cases and keep only the real-instructor end-to-end test provider-specific.
-
-### Risks and gotchas
-
-- `_classify_mistral_error` and `_classify_google_client_error` expect a raw SDK exception, not the wrapped one. Confirm the helpers don't introspect attributes the wrapped exception lacks.
+- The categorization helpers expect a raw SDK exception, not the wrapped one. The unwrap step in each worker preserves this contract.
 - Chain via `from instructor_exc` so the traceback shows `instructor → tenacity → SDK`. Don't chain from the bare SDK exc — it loses retry context useful for debugging.
-- Real-instructor + AsyncMock'd SDK tests are slightly slow (~0.5s each) because `instructor` still does its full attempt loop. Keep one such test per provider, not one per case.
+- Real-instructor + AsyncMock'd SDK tests are slightly slow (~0.5s each) because `instructor` still does its full attempt loop. Each provider has one such test (kept as an end-to-end lock-in); the remaining categorization cases use the synthetic `wrap_in_instructor_retry` helper in `tests/helpers/instructor_test_utils.py`.
 
 ## Related tracks
 

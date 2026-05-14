@@ -288,16 +288,13 @@ Symmetric to Mistral, plus `ServerError → TRANSIENT` direct mapping that doesn
 
 ## Phase 9 — LLM cross-cutting cleanup
 
-- [ ] Full LLM test sweep: `.venv/bin/pytest tests/unit/pipelex/plugins/{anthropic,openai,mistral,google}/` — confirm zero failures
-- [ ] `rg "from instructor.exceptions" pipelex/` — must return zero results
-- [ ] **Uniformity check** — `rg "raise LLMCompletionError" pipelex/plugins/{anthropic,openai,mistral,google}/` — every match should include `provider_metadata=` AND `user_action=UserAction(...)` (with a semantic `kind`, not `UNKNOWN`, except for the unrecognized-underlying fallback paths)
-- [ ] **AWS Bedrock decision check** — if Phase 0 found Bedrock uses `instructor`, confirm Phase 8.5 landed (or schedule it now). If not, confirm the Bedrock worker still benefits from upgrades A–C in Phase 11 below.
-- [ ] Update [wip/error-handling/track-worker-classification.md](wip/error-handling/track-worker-classification.md):
-  - Move "Instructor unwrap missing on four other workers" out of "Open gaps"
-  - Strike followups 1 (Phase 1), 2–5 (Phases 5–8), and 6 (Phases 5–8) from the followup list
-  - Add a note that beyond-reference upgrades A (UNKNOWN), B (ProviderErrorMetadata), C (UserAction) have landed across these workers
-- [ ] Update [wip/error-handling/README.md](wip/error-handling/README.md) status table row "Worker classification" → drop the gap clause; mark Landed. Update "Error metadata model" row to reflect that structured metadata is now uniform across LLM workers.
-- [ ] `make agent-check && make agent-test`
+- [x] Full LLM test sweep: `.venv/bin/pytest tests/unit/pipelex/plugins/{anthropic,openai,mistral,google}/` — 217 passed.
+- [x] `rg "from instructor.exceptions" pipelex/` — zero results (`instructor.core` migration complete on all five LLM workers).
+- [x] **Uniformity check** — `rg "raise LLMCompletionError" pipelex/plugins/{anthropic,openai,mistral,google}/` — every match now carries `provider_metadata=` and `user_action=UserAction(...)`. The orphan response-shape validation paths (empty choices, no candidates, None content, exhausted-thinking-tokens, instructor-misconfigured-for-Responses) that previously raised bare `LLMCompletionError(msg)` were migrated to explicit `error_category` + `provider_metadata=None` (non-SDK paths) + semantic `UserAction`. Audit one-liner `rg "raise LLMCompletionError" pipelex/plugins/{anthropic,openai,mistral,google}/ -A 6 | rg -v "provider_metadata" | rg "raise (LLM|Img|Extract|Search)"` returns empty.
+- [x] **AWS Bedrock decision check** — Phase 0 confirmed Bedrock LLM worker does not use `instructor` (the `_gen_object` path raises `LLMCapabilityError`). No Phase 8.5 was created. Bedrock still benefits from upgrades A–C in Phase 11.
+- [x] Updated [wip/error-handling/track-worker-classification.md](wip/error-handling/track-worker-classification.md): the "Instructor unwrap missing on four other workers" gap is gone, the per-provider unwrap-and-dispatch followups are collapsed into a "landed" note, and a sentence about beyond-reference upgrades A/B/C now sits in the opening paragraph.
+- [x] Updated [wip/error-handling/README.md](wip/error-handling/README.md): "Worker classification" row marks the LLM-side track as landed and points the remaining non-LLM-worker migration at `_tprl/TODOS.md` Phases 10–12. "Error metadata model" row reflects that `ProviderErrorMetadata` + `UserAction` are now uniform across LLM workers.
+- [x] `make agent-check && make agent-test` — clean.
 
 > ### **STOP — CHECKPOINT J: LLM-side track closed**
 >

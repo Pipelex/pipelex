@@ -322,7 +322,15 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
 
         if not response.output_text:
             msg = f"OpenAI Responses message content is empty: {response}\nmodel: {self.inference_model.desc}"
-            raise LLMCompletionError(msg)
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                provider_metadata=None,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="OpenAI Responses API returned no text — try rephrasing the prompt or using a different model",
+                ),
+            )
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and response.usage:
             llm_tokens_usage.nb_tokens_by_category = self.openai_responses_factory.make_nb_tokens_by_category(usage=response.usage)
@@ -340,7 +348,18 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
 
         if not hasattr(self.instructor_for_objects, "responses"):
             msg = "Instructor client is not configured for the Responses API. Set a responses-capable structure_method for this model."
-            raise LLMCompletionError(msg)
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.CONFIGURATION,
+                provider_metadata=None,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_MODEL,
+                    detail=(
+                        "The model's structure_method is not configured for the Responses API"
+                        " — set a responses-capable structure_method or switch to a model that supports it"
+                    ),
+                ),
+            )
         extra_headers, extra_body = self.openai_responses_factory.make_extras(
             inference_model=self.inference_model, inference_job=llm_job, output_desc=schema.__name__
         )
