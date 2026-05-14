@@ -1,620 +1,526 @@
-# Template preprocessor — sigil collision fix (TDD plan)
+# Signature-Based Validation — TDD implementation plan
 
-## Status: `$` sigil footgun fixes landed (Phase 7 — 2026-05-13)
+Status: not started. Design locked in `wip/signature-based-validation.md` (v2, Option A).
 
-The inline `$` sigil now mirrors the `@` candidate pattern's word-boundary lookbehind and uses a strict segmented identifier shape. Word-adjacent `$` (`micro$oft`, `user$host.com`, `P@ssw$rd123`, `a$b$c`) is now silent pass-through; `$name..` renders cleanly as `{{ name|format() }}..` (consecutive dots stay outside the match as literal punctuation). The trailing-dot kludge in `_replace_dollar_sigil` is gone — unreachable under the new identifier shape. `make agent-check` clean, `make agent-test` green.
+This plan is **strict TDD**: in every phase, failing tests are written first (red), then implementation makes them green. Integration tests construct blueprints directly in Python; end-to-end tests load real `.mthds` files. Each phase ends with `make agent-check` and a targeted test run; the final phase ends with `make agent-test`.
 
-### Deviations from Phase 7 plan
+**Tick boxes as you go.** Mark each checkbox the moment its item lands — don't wait for the next checkpoint. The boxes are the working log: if a session is interrupted mid-phase, the next session resumes from the first unticked box. Checkpoints are for halting, not for batch-ticking.
 
-1. **One existing test updated to match the new contract.** `tests/unit/pipelex/pipe_operators/pipe_compose/test_structured_content_composer.py::TestStructuredContentComposerRuntimeParams::test_template_field_accesses_extra_context` used the template `"Summary for $fiscal_year Q$quarter"`, which relied on the pre-Phase-7 deviation that allowed word-adjacent `$` to interpolate (so `Q$quarter` → `Q1`). Under Phase 7's word-boundary lookbehind that shape is intentional silent pass-through. The template was changed to `"Summary for $fiscal_year, quarter $quarter"` (separator added so the second `$` is not word-adjacent) and the assertion updated to `"quarter 1" in result.generated_summary`. Test intent (verifying `extra_context` is merged into template rendering) is preserved.
-2. **No `.mthds` workspace migration needed.** The Phase 7.3 grep flagged two lines in `mthds-ui/data/pipelines/pipeline_25/bundle.mthds` (`"# Text Report\n\n$classified.content"` and `"# Data Report\n\n$classified.content"`), but these are grep false positives — the `n` matched by `[[:alnum:]_]` is the `n` of the TOML `\n` escape; after TOML decoding the `$` is preceded by a real newline (whitespace), so the new regex still rewrites correctly.
+**Stop checkpoints** are marked ⛔. At each one, coding must halt, the status block at the top of this file must be updated (and any deviations recorded), and a fresh session picks up at the next phase.
 
-## Status: declared-inputs gating landed (Phase 8 — 2026-05-13)
-
-Phase 8 shipped. Inline `@<ident>` now raises only when `<ident>` (root segment for dotted paths) is a declared input of the surrounding pipe; CSS at-rules (`@media`, `@font-face`, `@import`, `@keyframes`, `@property`, …) and code decorators (`@deprecated`, `@Override`) pass through silently when they don't collide with an input. The line-bounded rewriter is unchanged. `preprocess_template` gained a keyword-only `declared_inputs: set[str] | None = None` parameter (default lenient); new helpers `validate_template_sigils(template, declared_inputs)` and `rewrite_template_sigils(template)` split the validate and rewrite steps so `render_template` skips re-validation at runtime. All pipe blueprints (`PipeLLM`, `PipeCompose`, `PipeSearch`, `PipeImgGen`, `PipeComposeFactory`) and template analyzers (`TemplateDocumentAnalyzer`, `TemplateImageAnalyzer`) thread their declared inputs into the validator. `make agent-check` clean, `make agent-test` green.
-
-### Deviations from Phase 8 plan
-
-1. **`preprocess_template` keeps its zero-arg form for legacy callers.** The plan implied every caller of `preprocess_template` would either pass `declared_inputs={...}` or explicit `None`. In practice the keyword-only signature with `declared_inputs=None` as default means the two call sites without inputs context (`TemplateBlueprint.validate_template`, `TemplateBlueprint.required_variables`, `ConstructBlueprint.get_required_variables`) keep their existing zero-arg call and benefit from the lenient default — no explicit `None` pass-through was needed.
-
-2. **Dedup'd `input_names` in three blueprints.** In `pipe_llm_blueprint.py`, `pipe_search_blueprint.py`, and `pipe_img_gen_blueprint.py`, the previous code computed `input_names: set[str] = set(self.inputs.keys()) if self.inputs else set()` separately from the new `declared_inputs` variable. Folded the two into a single `declared_inputs` reference threaded through both the preprocess call and the downstream missing/unused-inputs checks. Pure code clarity — no behavior change.
-
-3. **Existing strict-rule tests updated rather than removed.** The plan's "all existing tests still pass under the lenient-`None` default" claim was inconsistent with reality: parametrized tests like `test_strict_line_at_sigil_raises` and `test_css_at_rule_raises_under_strict_rule` called `preprocess_template(template)` with no kwarg and expected a raise. Under the new lenient default they would stop raising. Resolution: those parametrized tests now pass `declared_inputs={expected_identifier}` per case so they preserve the strict-rule assertion under the new gate, and were renamed accordingly (`*_raises_under_strict_rule` → `*_raises_when_keyword_is_declared_input`). The lenient pass-through case is covered by new parametrized tests (`test_inline_at_passes_through_when_declared_inputs_omitted/empty/no_input_matches`).
-
-4. **Workspace `.mthds` sanity check: pre-existing typos in sibling repos remain pre-existing typos.** Surfaced inline `@question` in `pipelex-cookbook` (two files) and `Idea: @idea` in `internal-tools/wip/`, all of which have the at-identifier declared as an input — these already raised under Phases 1–6's strict rule and continue to raise under Phase 8 (correct behavior). Flagged as follow-up cleanup for those sibling repos rather than fixed in this PR.
-
-## Status: strict line-bounded `@` rule landed (2026-05-13)
-
-The redesign described in `wip/template-preprocessor-line-bounded-at.md` shipped:
-
-- `@var` / `@?var` must be alone on their own line. Inline candidates raise `TemplateSigilSyntaxError`
-  at load time, surfaced through pydantic validation with line number + migration hint.
-- `$var` keeps its inline contract (unchanged).
-- `@@` and `$$` escapes preserved.
-- Workspace `.mthds` files migrated; all tests green; `make agent-check` clean; `make agent-test` clean.
-
-The history below documents the original heuristic CSS-collision fix, kept for context — the
-heuristic regex it produced was replaced by the strict rule above.
-
-## Status: heuristic CSS-collision fix complete (earlier)
-
-All phases (1–6) landed. Full `make agent-test` is green and `make agent-check` is clean. The
-work is ready to ship via `/release`.
-
-### Deviations from the original plan
-
-Two design points evolved during implementation. They are reflected in the code, the new tests,
-and the CHANGELOG, but the prose below is the historical plan and was not rewritten to match —
-read this block first, then the rest as TDD history.
-
-1. **Single-pass regex instead of three sequential `re.sub` calls.** The plan's three
-   `re.sub(...)` calls (one per sigil) cannot share the lookahead reliably: after the first pass
-   rewrites `@var` to `{{ var|tag("var") }}`, the second pass's `(?!\s*[({"'])` lookahead sees
-   the inserted `{` and aborts the next `$var` match. Combined into a single
-   `_SIGIL_PATTERN` with an alternation `(?:(?<!\w)(@\??)|(\$))...` and a dispatch callback
-   (`_replace_sigil`) so the lookahead only sees original-template characters. The original
-   `replace_at_variable` / `replace_optional_at_variable` / `replace_dollar_variable` helpers
-   were folded into the single callback.
-2. **`$` arm omits the `(?<!\w)` lookbehind.** The plan applied the lookbehind uniformly to
-   all three sigils, but it broke prose like `Summary for $fiscal_year Q$quarter` — `Q`
-   precedes the `$`, blocking the match. Splitting the alternation so only the `@`/`@?` arm
-   carries the lookbehind keeps emails (`user@example.com`) protected while letting
-   word-adjacent `$var` interpolate. Dollar amounts (`$10`) remain protected by the
-   `(?![0-9])` lookahead.
-3. **Inner-word lookahead added for `@keyframes spin {`, `@layer reset {`, `@import url(...)`.**
-   The plan's `(?!\s*[({"'])` only catches *direct* openers, but several CSS at-rules sit a
-   word between the keyword and the brace. Added a second lookahead arm
-   `\s*[a-zA-Z][\w-]*\s*(?:[(]|\{(?!\{))` to cover them. The arm requires `(` or a *single* `{`
-   (NOT `{{`) so legitimate Jinja constructs in the same template (e.g.
-   `@var with {{ page | with_images }}`) aren't misclassified. `@namespace svg "..."` remains a
-   residual (too easily confused with prose like `@name said "..."`); authors escape with
-   `@@namespace`.
+---
 
 ## Quick start (cold session)
 
-Working directory: `/Users/lchoquel/repos/Pipelex/pipelex` (the `pipelex/` runtime repo inside the multi-repo workspace at `/Users/lchoquel/repos/Pipelex/`).
+Working directory: `/Users/lchoquel/repos/Pipelex/_sig` (a worktree of the `pipelex/` runtime repo).
 
 Read in this order:
 
-1. This file (`TODOS.md`).
-2. `wip/template-preprocessor-css-collision.md` — full design rationale and alternatives considered.
-3. `pipelex/cogt/templating/template_preprocessor.py` — the file being changed (~100 lines).
-4. `tests/unit/pipelex/cogt/templating/test_template_preprocessor.py` — the test file being extended.
+1. This file (`TODOS.md`) — phase by phase.
+2. `wip/signature-based-validation.md` — full design, rejected alternatives, edge cases. The authoritative source for "why" decisions.
+3. `pipelex/builder/pipe/pipe_signature.py` — the existing spec class that needs corrections.
+4. `pipelex/core/pipes/pipe_blueprint.py` — `PipeType` / `PipeCategory` enums and `PipeBlueprint` base.
+5. `pipelex/core/pipes/pipe_abstract.py` — `PipeAbstract` (gains `is_signature`, promoted `pipe_dependencies`, new `collect_signature_refs`).
+6. `pipelex/pipe_run/dry_run.py` — `dry_run_pipe` / `dry_run_pipes` (gains `allow_signatures` parameter).
+7. `pipelex/pipeline/validate_bundle.py` — entry point that threads `allow_signatures` down.
 
-Project conventions that apply (see `pipelex/CLAUDE.md` for the full list):
+Project conventions that apply (see `CLAUDE.md` for the full list):
 
-- One `TestClass` per test module. The existing class is `TestTemplatePreprocessor`. Add new test methods inside that same class — do **not** create a second class.
-- Use pytest-mock, never `unittest.mock`. None of the new tests need mocking.
-- Run `make agent-check` after code changes (lint + type check).
-- Use `make agent-test` to validate, or for the targeted module: `.venv/bin/pytest -q tests/unit/pipelex/cogt/templating/test_template_preprocessor.py`.
+- One `TestClass` per test module.
+- Use pytest-mock; never `unittest.mock`.
+- Tests live under `tests/unit/`, `tests/integration/`, `tests/e2e/` per the test type.
+- After every code change: `make agent-check` (lint + type) before moving on.
+- After every phase: targeted `pytest` run for the affected area. After the last phase: `make agent-test` (full).
+- Never hardcode counts in comments or docstrings.
+- Don't hard-wrap markdown.
 
-## Background (minimal)
+If `make` isn't available, run the agent-check steps manually (see Makefile's `agent-check` target).
 
-The template preprocessor at `pipelex/cogt/templating/template_preprocessor.py` rewrites three sigils into Jinja2 before rendering: `@var` → `{{ var|tag("var") }}`, `@?var` → optional insertion, `$var` → `{{ var|format() }}`.
+---
 
-The current regexes are too permissive. CSS at-rules (`@media`, `@import`, `@keyframes`, …) inside `<style>` blocks of PipeCompose HTML templates get rewritten as variables and break rendering. Email addresses (`user@example.com`) and code constructs (Python decorators, bash subshells) have the same problem.
+## Architecture at a glance (for the impatient)
 
-Fix has two parts:
+```
+PipeType.PIPE_SIGNATURE   ←  new enum value, category PipeCategory.PIPE_SIGNATURE
 
-1. **Heuristic regex tightening** — add a `(?<!\w)` lookbehind before each sigil (kills emails / word-adjacent `@`) and a `(?!\s*[({"'])` lookahead after the captured identifier (kills CSS at-rules and code constructs).
-2. **Explicit escapes** — `@@` → literal `@`, `$$` → literal `$`. This is the documented opt-out for any residual case the heuristic can't predict.
+spec     PipeSignature             — corrected (literal type, multiplicity inputs, no `result`)
+blueprint PipeSignatureBlueprint   — new
+runtime  PipeSignatureRuntime      — new; _dry_run mocks, _live_run raises
 
-## Current code (reference)
+PipeAbstract gains:  is_signature (property), pipe_dependencies() (default empty),
+                     collect_signature_refs() (graph walk)
 
-`pipelex/cogt/templating/template_preprocessor.py`, the three regex calls inside `preprocess_template`:
+Validation:
+  strict (default):   dry_run_pipe(... allow_signatures=False) → SignaturesNotAllowedError
+                      if pipe.collect_signature_refs() is non-empty
+  lenient:            dry_run_pipe(... allow_signatures=True)  → signatures mock outputs
 
-```python
-# Replace @?variable patterns (optional insertion) - must come before @variable
-new_template = re.sub(r"@\?(?![0-9])([a-zA-Z0-9_.]+)", replace_optional_at_variable, processed_template)
-# ...
-# Replace @variable patterns
-new_template = re.sub(r"@(?![0-9])([a-zA-Z0-9_.]+)", replace_at_variable, processed_template)
-# ...
-# Replace $variable patterns
-new_template = re.sub(r"\$(?![0-9])([a-zA-Z0-9_.]+)", replace_dollar_variable, processed_template)
+CLI:
+  pipelex validate <pipe> [--allow-signatures]
+  pipelex validate --all  [--allow-signatures]
+  pipelex-agent validate  → defaults allow_signatures=True
 ```
 
-The three `replace_*` helpers above them are unchanged by this work.
+---
 
-## Target code
+## Phase 1 — Type system foundations
 
-New regex strings (Phase 2):
+Lay down the enum values, the `is_signature` property, and the promoted `pipe_dependencies` method. Small, foundational, no behavior change for existing pipes.
 
-```python
-r"(?<!\w)@\?(?![0-9])([a-zA-Z0-9_.]+)(?!\s*[({\"'])"
-r"(?<!\w)@(?![0-9])([a-zA-Z0-9_.]+)(?!\s*[({\"'])"
-r"(?<!\w)\$(?![0-9])([a-zA-Z0-9_.]+)(?!\s*[({\"'])"
-```
+### Phase 1.1 — Tests first (red)
 
-Note: `(?<!\w)` is a fixed-width negative lookbehind (one char) — supported by `re`. The lookahead set `[({\"']` covers the four shapes CSS at-rules and code constructs take after the identifier; whitespace before them is allowed (`\s*`).
+All tests use direct construction; no fixtures needed beyond pytest-mock when applicable.
 
-Escape implementation (Phase 3): use null-byte sentinels that templates cannot contain. Recommended scheme:
+- [ ] `tests/unit/pipelex/core/pipes/test_pipe_blueprint_signature_enums.py` — `class TestPipeSignatureEnums`
+  - `test_pipe_type_pipe_signature_value` — `PipeType.PIPE_SIGNATURE` equals `"PipeSignature"`.
+  - `test_pipe_type_pipe_signature_in_value_list` — `"PipeSignature" in PipeType.value_list()`.
+  - `test_pipe_type_pipe_signature_category` — `PipeType("PipeSignature").category is PipeCategory.PIPE_SIGNATURE`.
+  - `test_pipe_category_pipe_signature_value` — `PipeCategory.PIPE_SIGNATURE` equals `"PipeSignature"`.
+  - `test_pipe_category_signature_is_not_controller` — `PipeCategory.is_controller_by_str("PipeSignature") is False`.
+- [ ] `tests/unit/pipelex/core/pipes/test_pipe_abstract_signature_surface.py` — `class TestPipeAbstractSignatureSurface`
+  - Build a minimal in-memory `PipeAbstract` subclass (or use an existing PipeLLM with stubbed validators) to assert:
+    - `is_signature` returns `False` for any operator/controller.
+    - `pipe_dependencies()` default returns `set()` on `PipeAbstract` (i.e. operators inherit the empty default).
+  - `is_signature` returns `True` for a category-`PIPE_SIGNATURE` instance (deferred — full assertion happens in Phase 2 once the runtime class exists; here, just assert the property reads from `self.pipe_category` correctly).
+- [ ] Run: `.venv/bin/pytest -q tests/unit/pipelex/core/pipes/test_pipe_blueprint_signature_enums.py tests/unit/pipelex/core/pipes/test_pipe_abstract_signature_surface.py`. Confirm: red for the new value-existence assertions; legacy tests unaffected.
 
-```python
-_AT_ESCAPE_SENTINEL = "\x00PIPELEX_AT_ESCAPE\x00"
-_DOLLAR_ESCAPE_SENTINEL = "\x00PIPELEX_DOLLAR_ESCAPE\x00"
+### Phase 1.2 — Implementation (green)
 
-def preprocess_template(template: str) -> str:
-    processed_template = template.replace("@@", _AT_ESCAPE_SENTINEL).replace("$$", _DOLLAR_ESCAPE_SENTINEL)
-    # ... existing three re.sub calls run on processed_template ...
-    processed_template = processed_template.replace(_AT_ESCAPE_SENTINEL, "@").replace(_DOLLAR_ESCAPE_SENTINEL, "$")
-    return processed_template
-```
+- [ ] `pipelex/core/pipes/pipe_blueprint.py`:
+  - Add `PipeType.PIPE_SIGNATURE = "PipeSignature"`.
+  - Add `PipeCategory.PIPE_SIGNATURE = "PipeSignature"`.
+  - Update `PipeType.category` match to map `PIPE_SIGNATURE → PipeCategory.PIPE_SIGNATURE`. (Linter will catch missing cases.)
+  - Update `PipeCategory.is_controller` match to return `False` for `PIPE_SIGNATURE`.
+  - Add `is_signature` property to `PipeBlueprint` returning `PipeCategory(self.pipe_category) is PipeCategory.PIPE_SIGNATURE`.
+- [ ] `pipelex/core/pipes/pipe_abstract.py`:
+  - Add `is_signature` property mirroring the blueprint's.
+  - Add a default `pipe_dependencies(self) -> set[str]: return set()` method (matches the blueprint-side default).
+- [ ] `pipelex/pipe_controllers/pipe_controller.py`:
+  - Confirm the abstract `pipe_dependencies` override remains in place (no behavior change for controllers).
 
-`str.replace("@@", …)` is non-overlapping left-to-right greedy, which gives the correct semantics:
+### Phase 1.3 — Lint and targeted tests
 
-- `@@var` → `<SENTINEL>var` → (no `@` left for the regex) → restored: `@var` (literal, no interpolation).
-- `@@@var` → `<SENTINEL>@var` → regex matches `@var` → `<SENTINEL>{{ var|tag("var") }}` → restored: `@{{ var|tag("var") }}` (literal `@` + interpolated `var`).
-- `@@@@var` → `<SENTINEL><SENTINEL>var` → no match → restored: `@@var` (two literal `@`s).
+- [ ] `make agent-check` clean.
+- [ ] `.venv/bin/pytest -q tests/unit/pipelex/core/pipes/` — all green (new + legacy).
 
 ---
 
-## Phase 1 — Extend tests with new expected behaviors (red)
+## Phase 2 — Blueprint, runtime, factory
 
-All tests go inside the existing `TestTemplatePreprocessor` class in `tests/unit/pipelex/cogt/templating/test_template_preprocessor.py`.
+The runtime class is where the dry-run mock generation lives. Tests construct `PipeSignatureBlueprint` directly in Python and verify end-to-end runtime behavior via `PipeFactory.make_from_blueprint` and `dry_run_pipe`.
 
-### 1.1 — CSS at-rule pass-through (heuristic lookahead)
+### Phase 2.1 — Tests first (red)
 
-Identifier followed by `\s*[({"']` must not be rewritten. Expected output equals the input (unchanged) for each:
+Use blueprints constructed in Python — no `.mthds` parsing in this phase.
 
-- [x] `test_css_media_query_pass_through` — input `@media (max-width: 820px) { color: red; }`, output identical.
-- [x] `test_css_supports_pass_through` — input `@supports (display: grid) { color: red; }`, output identical.
-- [x] `test_css_import_string_pass_through` — input `@import "reset.css";`, output identical.
-- [x] `test_css_import_url_pass_through` — input `@import url("reset.css");`, output identical.
-- [x] `test_css_charset_pass_through` — input `@charset "UTF-8";`, output identical.
-- [x] `test_css_namespace_pass_through` — input `@namespace svg "http://www.w3.org/2000/svg";`, output identical.
-- [x] `test_css_keyframes_pass_through` — input `@keyframes spin { from { opacity: 0; } to { opacity: 1; } }`, output identical. (Both `@keyframes` and the `from`/`to` selectors are unaffected since they aren't preceded by a sigil.)
-- [x] `test_css_page_pass_through` — input `@page { margin: 1in; }`, output identical.
-- [x] `test_css_layer_named_pass_through` — input `@layer reset { color: red; }`, output identical.
-- [x] `test_css_container_pass_through` — input `@container (width > 400px) { color: red; }`, output identical.
-- [x] `test_css_font_face_pass_through` — input `@font-face { font-family: "X"; }`, output identical. Note: the identifier class today is `[a-zA-Z0-9_.]+`, which does not include `-`. So today `@font-face` already captures only `@font` and then encounters `-face` as literal — the lookahead `(?!\s*[({"'])` fires on `@font` because the next non-identifier character is `-`, not whitespace+brace. **Outcome under new regex**: `@font` captures, lookahead sees `-`, not whitespace+brace, so the lookahead does **not** fire — and `@font` would still be rewritten to `{{ font|tag("font") }}`. This is a residual case. **Decision for this test**: assert the heuristic does **not** save `@font-face` (input contains literal hyphen) and document `@@font-face` as the required author workaround. The test should assert the rewritten form so the limitation is visible:
+- [ ] `tests/integration/pipelex/pipe_signature/conftest.py` — shared fixtures:
+  - `pipelex_for_signatures` — Pipelex setup with a tiny library containing a `Text` concept and one PipeSignature pipe (used by multiple tests).
+  - `make_signature_blueprint(...)` factory helper.
+- [ ] `tests/integration/pipelex/pipe_signature/test_pipe_signature_runtime.py` — `class TestPipeSignatureRuntime` (one class only — split into multiple test methods, parametrized where useful):
+  - `test_factory_produces_runtime_from_blueprint` — `PipeFactory.make_from_blueprint` on a `PipeSignatureBlueprint` returns a `PipeSignatureRuntime`.
+  - `test_is_signature_true` — `runtime.is_signature is True`; `is_controller is False`.
+  - `test_needed_inputs_returns_declared` — runtime with declared inputs `{"doc": "Text"}` returns that set from `needed_inputs()`.
+  - `test_required_variables_returns_input_names` — same, `required_variables()` returns `{"doc"}` (no dotted paths).
+  - `test_dry_run_produces_mock_text` — runtime with `output = "Text"`, `dry_run_pipe` writes a `TextContent` stuff to working memory.
+  - `test_dry_run_produces_mock_variable_list` — runtime with `output = "Text[]"`, dry-run produces a `ListContent[TextContent]`.
+  - `test_dry_run_produces_mock_fixed_list` — runtime with `output = "Text[3]"`, dry-run produces a `ListContent` of length 3.
+  - `test_live_run_raises_signature_error` — `await pipe.run_pipe(..., run_mode=LIVE)` raises `PipeSignatureNotExecutableError` whose message contains the pipe's `pipe_ref`.
+  - `test_input_multiplicity_in_blueprint` — blueprint accepts `inputs = {"docs": "Document[]"}` without validation error.
+  - `test_validators_are_noops` — `validate_inputs_static`, `validate_inputs_with_library`, `validate_output_static`, `validate_output_with_library` all return without raising on a well-formed signature.
+- [ ] `tests/integration/pipelex/pipe_signature/test_pipe_signature_in_blueprint_union.py` — `class TestPipeSignatureBlueprintUnion`:
+  - `test_bundle_blueprint_accepts_signature_pipe` — a `PipelexBundleBlueprint` built with a `pipe = {"foo": PipeSignatureBlueprint(...)}` validates cleanly.
+  - `test_bundle_blueprint_rejects_unknown_pipe_type` — sanity guard, asserts the discriminator union still rejects garbage.
+- [ ] Run: `.venv/bin/pytest -q tests/integration/pipelex/pipe_signature/`. Confirm: all red with `ImportError` or `AttributeError` (the runtime class doesn't exist yet).
 
-  ```text
-  input:    @font-face { font-family: "X"; }
-  expected: {{ font|tag("font") }}-face { font-family: "X"; }
-  ```
+### Phase 2.2 — Implementation (green)
 
-  Then add a companion `test_css_font_face_escaped_pass_through` that asserts `@@font-face { font-family: "X"; }` → `@font-face { font-family: "X"; }`.
+- [ ] `pipelex/pipe_signature/` — new package directory.
+  - `pipelex/pipe_signature/__init__.py` — empty.
+  - `pipelex/pipe_signature/pipe_signature_blueprint.py`:
+    - `PipeSignatureBlueprint(PipeBlueprint)` with `type: Literal["PipeSignature"]`, `pipe_category: Literal["PipeSignature"]`, `signature_for: PipeType | None = None`, `pipe_dependencies: list[str] = Field(default_factory=list)` (metadata).
+  - `pipelex/pipe_signature/pipe_signature_runtime.py`:
+    - `PipeSignatureRuntime(PipeAbstract)` with `type: Literal["PipeSignature"]`, `pipe_category: Literal["PipeSignature"]`, `signature_for: PipeType | None = None`, `_signature_pipe_dependencies: list[str] = Field(default_factory=list, alias="pipe_dependencies")`.
+    - `validate_inputs_static`, `validate_inputs_with_library`, `validate_output_static`, `validate_output_with_library` → no-ops.
+    - `needed_inputs(visited_pipes=None)` → returns `self.inputs` (mirrors operator pattern).
+    - `required_variables()` → `set(self.inputs.variables)`.
+    - `pipe_dependencies()` → `set(self._signature_pipe_dependencies)`.
+    - `_live_run_pipe(...)` → `raise PipeSignatureNotExecutableError(pipe_ref=self.pipe_ref)`.
+    - `_dry_run_pipe(...)` → builds mock content for `self.output` via a new helper `WorkingMemoryFactory.make_mock_stuff_for_stuff_spec(stuff_spec=self.output, name=output_name or self.code)` (refactor `make_mock_content` to accept a `StuffSpec` directly), writes to `working_memory.set_new_main_stuff(...)`, returns `PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.pipeline_run_id)`.
+    - `_validate_before_run`, `_validate_after_run` → no-ops.
+  - `pipelex/pipe_signature/pipe_signature_factory.py`:
+    - `PipeSignatureFactory(PipeFactoryProtocol[PipeSignatureBlueprint, PipeSignatureRuntime])` with a `make(...)` classmethod that builds the runtime from the blueprint + parsed inputs/output.
+  - `pipelex/pipe_signature/exceptions.py`:
+    - `PipeSignatureNotExecutableError(PipelexError)` with a `pipe_ref` field and a clear message.
+- [ ] Register `PipeSignatureFactory` in the class registry so `PipeFactory.make_from_blueprint` dispatches via the existing `f"{pipe_type.value}Factory"` convention. (Look at how other factories are registered — probably in `pipelex/__init__.py` or via auto-import; mirror.)
+- [ ] `pipelex/core/bundles/pipelex_bundle_blueprint.py`:
+  - Add `PipeSignatureBlueprint` to `PipeBlueprintUnion`.
+- [ ] `pipelex/core/memory/working_memory_factory.py`:
+  - Add `make_mock_stuff_for_stuff_spec(stuff_spec, name)` helper that wraps the existing `make_mock_content` + `make_mock_inputs` logic so the signature runtime can call a clean entry point. (Or refactor `make_mock_inputs` to accept a single `TypedNamedStuffSpec` — whichever is cleaner. Document the choice in the test class docstring.)
 
-- [x] `test_full_style_block_pass_through` — a realistic multi-rule `<style>` block (combining `@media`, normal selectors, and at least one nested ruleset) must pass through byte-for-byte. Use this fixture:
+### Phase 2.3 — Lint and targeted tests
 
-  ```html
-  <style>
-    .page { padding: 32px; }
-    @media (max-width: 820px) {
-      .page { padding: 24px; }
-    }
-    @supports (display: grid) {
-      .grid { display: grid; }
-    }
-  </style>
-  ```
-
-### 1.2 — Email and word-adjacent `@` (heuristic lookbehind)
-
-`@` preceded by a word character must not be treated as a sigil.
-
-- [x] **Update** the existing `test_email_address_partially_processed` (lines 412–423 of the current test file): rename it to `test_email_address_pass_through` and replace its body to assert pass-through:
-
-  ```text
-  input:    Contact: someone@example.com
-  expected: Contact: someone@example.com
-  ```
-
-- [x] `test_email_in_sentence_pass_through` — input `Contact us at hello@pipelex.com for help.`, output identical.
-- [x] `test_word_adjacent_at_pass_through` — input `Send to noreply@anthropic.com immediately.`, output identical.
-
-### 1.3 — `$` and `@` followed by code-like punctuation (regression guards)
-
-These shapes already pass through today because the identifier class `[a-zA-Z0-9_.]+` does not match `(` or `{`. They're included as regression guards so the new lookahead doesn't accidentally regress them, and to lock in the documented behavior.
-
-- [x] `test_jquery_call_pass_through` — input `$("body").addClass("x")`, output identical.
-- [x] `test_bash_subshell_pass_through` — input `result=$(date +%s)`, output identical.
-- [x] `test_dollar_brace_pass_through` — input `Use ${PATH} for the path.`, output identical.
-
-### 1.4 — Escape sequences `@@` and `$$`
-
-- [x] `test_double_at_escapes_to_literal_at`:
-  ```text
-  input:    @@media (max-width: 820px) { color: red; }
-  expected: @media (max-width: 820px) { color: red; }
-  ```
-
-- [x] `test_double_at_makes_at_var_literal`:
-  ```text
-  input:    Use @@var here.
-  expected: Use @var here.
-  ```
-  No `{{ … }}` in the output — the escape suppresses interpolation for that occurrence.
-
-- [x] `test_double_dollar_escapes_to_literal_dollar`:
-  ```text
-  input:    Cost is $$10.
-  expected: Cost is $10.
-  ```
-
-- [x] `test_double_dollar_makes_dollar_var_literal`:
-  ```text
-  input:    Use $$var here.
-  expected: Use $var here.
-  ```
-
-- [x] `test_escape_does_not_consume_legit_variable`:
-  ```text
-  input:    @@media is literal, but @width is a variable.
-  expected: @media is literal, but {{ width|tag("width") }} is a variable.
-  ```
-
-- [x] `test_triple_at_is_escape_plus_variable`:
-  ```text
-  input:    @@@var
-  expected: @{{ var|tag("var") }}
-  ```
-
-- [x] `test_quadruple_at_is_two_escapes`:
-  ```text
-  input:    @@@@var
-  expected: @@var
-  ```
-
-- [x] `test_escape_inside_style_block` — `<style>` block containing `@@font-face` (the residual heuristic case from §1.1) — verifies the recommended manual override:
-  ```text
-  input:    <style>@@font-face { font-family: "X"; }</style>
-  expected: <style>@font-face { font-family: "X"; }</style>
-  ```
-
-### 1.5 — Confirm all legacy tests still apply
-
-No test currently passing should regress. Skim each and confirm the new regexes don't break them. Quick reasoning for the non-obvious ones:
-
-- `test_variable_in_parentheses` — `The value (@value) is important`: the `@` is preceded by `(` (non-word), lookbehind passes; the captured `value` is followed by `)` (not in lookahead set), so lookahead passes. ✓ Still rewrites.
-- `test_email_address_partially_processed` — being replaced by `test_email_address_pass_through` (§1.2). Drop the old assertion.
-
-All other legacy tests are unaffected by the lookbehind (sigil is preceded by space/newline/start-of-string) and unaffected by the lookahead (variables are followed by space/dot/punctuation, not `(` / `{` / `"` / `'`).
-
-- [x] Re-run the full test module locally; legacy tests pass, new tests fail (red).
-
-### 1.6 — Run the suite to confirm reds
-
-- [x] `.venv/bin/pytest -q tests/unit/pipelex/cogt/templating/test_template_preprocessor.py`
-- [x] Confirm: all Phase 1 new tests fail with content mismatches (not import errors or syntax errors).
-
-**Checkpoint A**: Phase 1 complete when all new tests are written, all legacy tests still pass, and the new tests fail for the documented reasons.
+- [ ] `make agent-check` clean.
+- [ ] `.venv/bin/pytest -q tests/integration/pipelex/pipe_signature/` — all green.
 
 ---
 
-## Phase 2 — Implement the heuristic regex tightening (green for §1.1–§1.3)
+## Phase 3 — Spec layer
 
-Edit `pipelex/cogt/templating/template_preprocessor.py`.
+Wire the existing `PipeSignature` spec into the `PipeSpecUnion`, fix the three corrections (literal `type`, multiplicity inputs, drop `result`), and implement `to_blueprint()`.
 
-- [x] Replace the three regex strings in `preprocess_template` with the new ones from the "Target code" section above. The replacement-function calls (`replace_optional_at_variable`, `replace_at_variable`, `replace_dollar_variable`) and their bodies stay unchanged.
-- [x] Re-run the test module. Expected state:
-  - §1.1 CSS tests pass (except `test_css_font_face_pass_through`, which asserts the documented residual hyphen limitation, also passes — see its expected output above).
-  - §1.2 email tests pass.
-  - §1.3 regression guards pass.
-  - §1.4 escape tests still fail (escapes not implemented yet).
-  - §1.5 legacy tests still pass.
+### Phase 3.1 — Tests first (red)
 
----
+- [ ] `tests/unit/pipelex/builder/pipe/test_pipe_signature_spec.py` — `class TestPipeSignatureSpec`:
+  - `test_type_literal_is_pipe_signature` — `PipeSignature(...).type == "PipeSignature"`.
+  - `test_signature_for_optional` — `PipeSignature(...)` with no `signature_for` field validates; setting `signature_for = PipeType.PIPE_LLM` validates.
+  - `test_inputs_accept_multiplicity` — `inputs = {"docs": "Document[]"}` validates; `inputs = {"images": "Image[3]"}` validates.
+  - `test_inputs_reject_invalid_concept_syntax` — `inputs = {"bad": "lowercase"}` raises.
+  - `test_no_result_field` — `assert "result" not in PipeSignature.model_fields`.
+  - `test_to_blueprint_returns_signature_blueprint` — `PipeSignature(...).to_blueprint()` returns a `PipeSignatureBlueprint` with matching `code`/`description`/`inputs`/`output`/`signature_for`/`pipe_dependencies`.
+  - `test_to_blueprint_preserves_input_multiplicity` — `inputs = {"docs": "Document[]"}` round-trips through `to_blueprint()` unchanged.
+- [ ] `tests/unit/pipelex/builder/pipe/test_pipe_spec_union_signature.py` — `class TestPipeSpecUnionDispatch`:
+  - `test_union_dispatches_pipe_signature` — `pydantic.TypeAdapter(PipeSpecUnion).validate_python({"type": "PipeSignature", ...})` returns a `PipeSignature` instance, not another spec type.
+  - `test_union_dispatches_pipe_llm_unchanged` — regression guard: existing `{"type": "PipeLLM", ...}` still dispatches to `PipeLLMSpec`.
+- [ ] Run: `.venv/bin/pytest -q tests/unit/pipelex/builder/pipe/test_pipe_signature_spec.py tests/unit/pipelex/builder/pipe/test_pipe_spec_union_signature.py`. Confirm red.
 
-## Phase 3 — Implement the `@@` / `$$` escapes (green for §1.4)
+### Phase 3.2 — Implementation (green)
 
-Still in `pipelex/cogt/templating/template_preprocessor.py`.
+- [ ] `pipelex/builder/pipe/pipe_signature.py`:
+  - Change `type: PipeType | str = Field(...)` to `type: Literal["PipeSignature"] = "PipeSignature"` (use `SkipJsonSchema` if needed to match sibling pattern).
+  - Change `pipe_category` to `SkipJsonSchema[Literal["PipeSignature"]] = "PipeSignature"`.
+  - Add `signature_for: PipeType | None = None` with description "Intended downstream pipe type when this signature is implemented (optional hint for agents)."
+  - Remove the `set_pipe_category` and `validate_type` validators (the literal handles both).
+  - **Remove `result` field entirely.**
+  - Allow multiplicity in inputs: replace the inputs description and add a `validate_inputs` validator that mirrors `PipeSpec.validate_inputs` (reuse via shared helper or copy).
+  - Add `pipe_dependencies: list[str] = Field(default_factory=list, description="Pipes this signature claims to depend on (metadata for tooling).")`.
+  - Add `to_blueprint(self) -> PipeSignatureBlueprint` building the blueprint from the spec fields.
+  - Update `rendered_pretty` for the new field surface (drop `result`).
+- [ ] `pipelex/builder/pipe/pipe_spec_union.py`:
+  - Add `PipeSignature` to the union.
+- [ ] `pipelex/builder/pipe/pipe_spec_map.py`:
+  - Add `"PipeSignature": PipeSignature`.
 
-- [x] Add the two sentinel module-level constants from the "Target code" section (`_AT_ESCAPE_SENTINEL`, `_DOLLAR_ESCAPE_SENTINEL`).
-- [x] In `preprocess_template`, before the existing regex substitutions, prepend:
-  ```python
-  processed_template = template.replace("@@", _AT_ESCAPE_SENTINEL).replace("$$", _DOLLAR_ESCAPE_SENTINEL)
-  ```
-  (Replaces the current `processed_template = template` line.)
-- [x] After the three regex substitutions, before the `return`, append:
-  ```python
-  processed_template = processed_template.replace(_AT_ESCAPE_SENTINEL, "@").replace(_DOLLAR_ESCAPE_SENTINEL, "$")
-  ```
-- [x] Remove the `# TODO: allow escape patterns` comment (line 73 in the current file).
-- [x] Re-run the test module. Expected: all Phase 1 tests now pass; legacy tests still pass.
+### Phase 3.3 — Lint and targeted tests
 
----
-
-## Phase 4 — Workspace sanity check
-
-Look for any existing `.mthds` file in the workspace that would behave differently under the new rules.
-
-- [x] From the workspace root (`/Users/lchoquel/repos/Pipelex/`), run:
-  ```bash
-  grep -rn '@[a-zA-Z_][a-zA-Z_0-9.]*[[:space:]]*[({"'\'']' --include="*.mthds" . | head -50
-  grep -rn '@@\|\$\$' --include="*.mthds" . | head -50
-  ```
-- [x] For any hit, decide: accept (intended behavior change, the new heuristic does what the user wants), document, or flag back to the human.
+- [ ] `make agent-check` clean.
+- [ ] `.venv/bin/pytest -q tests/unit/pipelex/builder/pipe/ tests/integration/pipelex/pipe_signature/` — all green.
 
 ---
 
-## Phase 5 — Lint and full tests
+⛔ **CHECKPOINT A — STOP HERE**
 
-- [x] `make agent-check` — Pyright, Ruff, Mypy, plxt all clean.
-- [x] Targeted test run for impacted areas:
-  ```bash
-  .venv/bin/pytest -n auto \
-    -m "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api" \
-    -o log_level=WARNING --tb=short -q \
-    tests/unit/pipelex/cogt/ tests/unit/pipelex/pipe_operators/
-  ```
-- [x] `make agent-test` — full suite green.
+**Coding must stop after Phase 3.** Do **not** start Phase 4 in the same session.
+
+Before handing back:
+
+1. Confirm every box above is ticked (boxes should have been ticked as each item landed, not now). For any item that diverged from the plan, add a `> Deviation:` blockquote inline next to the box.
+2. Update the top "Status" line of this file to read: `Status: Phases 1–3 landed (YYYY-MM-DD). Signatures construct end-to-end in Python (spec → blueprint → runtime → dry-run mock). Strict-mode gating, CLI wiring, e2e, and docs are open.`
+3. Add a "Current state" paragraph near the top summarizing: signatures are mockable but not strict-checked; live execution raises but is unreachable through validate (validate doesn't yet know to refuse them); .mthds files cannot yet declare a `PipeSignature` end-to-end because the interpreter path hasn't been exercised. Note any unexpected surprises (e.g. if a refactor of `make_mock_content` was larger than planned).
+4. Run `make agent-test` (full suite) to confirm no regressions. Note the result.
+5. Hand back to the human.
+
+Phase 4 picks up by reading this updated "Current state" plus the Phase 4 section below.
 
 ---
 
-## Phase 6 — Docs & changelog
+## Phase 4 — Strict pre-check
 
-- [x] `CHANGELOG.md`: add an entry under `## [Unreleased]` — `### Fixed` for the CSS collision, `### Added` for the `@@` / `$$` escapes. Cross-link `wip/template-preprocessor-css-collision.md`.
-- [x] Update MTHDS authoring guidance / agent prompts to mention `@@` and `$$`. Likely targets:
-  - `pipelex/builder/` (in-repo authoring docs and any prompts that describe template syntax).
-  - `mthds-plugins/` build/edit skill prompts (workspace neighbor — only update if the user explicitly asks to touch it; per `CLAUDE.md` plugin files belong to the published marketplace plugin).
+Add `collect_signature_refs`, `SignaturesNotAllowedError`, and thread `allow_signatures` through the dry-run + bundle-validation surface.
 
-**Checkpoint B**: Phase 6 complete = ready to ship via `/release`.
+### Phase 4.1 — Tests first (red)
+
+- [ ] `tests/integration/pipelex/pipe_signature/test_collect_signature_refs.py` — `class TestCollectSignatureRefs`:
+  - Fixtures construct mini libraries in Python with mixed pipe types.
+  - `test_operator_returns_empty` — a real `PipeLLM`'s `collect_signature_refs()` returns `set()`.
+  - `test_signature_returns_self` — a `PipeSignatureRuntime`'s `collect_signature_refs()` returns `{self.pipe_ref}`.
+  - `test_controller_walks_dependencies` — a `PipeSequence` whose step references a signature returns `{sig.pipe_ref}`.
+  - `test_nested_controller_walks_deeply` — `PipeSequence(steps=[PipeSequence(steps=[signature])])` — outer returns the leaf signature.
+  - `test_cycle_protection` — two pipes whose `pipe_dependencies()` mutually reference each other; walk terminates and returns the signatures found (if any).
+  - `test_unresolved_cross_package_dep_skipped` — controller references a cross-package pipe not in the library; walk does not raise and returns the signatures found in the resolvable subgraph.
+- [ ] `tests/integration/pipelex/pipe_signature/test_dry_run_strict_mode.py` — `class TestDryRunStrictMode`:
+  - `test_strict_default_passes_when_no_signatures` — dry-run of a real `PipeSequence` of real pipes with `allow_signatures=False` (the default) succeeds.
+  - `test_strict_fails_on_signature_in_sequence` — dry-run with a signature step + `allow_signatures=False` raises `SignaturesNotAllowedError`; the error's `signature_refs` includes the leaf signature's `pipe_ref`.
+  - `test_lenient_succeeds_on_signature_in_sequence` — same setup with `allow_signatures=True` succeeds; the working memory after dry-run contains a mock stuff for the signature's output.
+  - `test_strict_error_lists_all_signatures` — a controller depending on two signatures; the error lists both `pipe_ref`s.
+  - `test_strict_error_includes_dep_paths` — the error's payload includes the dep-chain that reached each signature (e.g. `{"sig_ref": ["outer_seq", "inner_seq"]}`).
+  - `test_validate_bundle_strict_fails_on_signature` — `validate_bundle(blueprints=[...], allow_signatures=False)` raises with a wrapped `SignaturesNotAllowedError`.
+  - `test_validate_bundle_lenient_passes_on_signature` — same `allow_signatures=True` passes.
+- [ ] Run: `.venv/bin/pytest -q tests/integration/pipelex/pipe_signature/`. Confirm red on the new tests; previously-green tests stay green.
+
+### Phase 4.2 — Implementation (green)
+
+- [ ] `pipelex/core/pipes/pipe_abstract.py`:
+  - Add `collect_signature_refs(self, visited: set[str] | None = None) -> set[str]` — walks `self.pipe_dependencies()` via `get_optional_pipe`, accumulates signatures, short-circuits on `visited`. (Pseudocode in `wip/signature-based-validation.md`.)
+- [ ] `pipelex/pipe_signature/exceptions.py`:
+  - Add `SignaturesNotAllowedError(PipelexError)` with fields `pipe_ref: str`, `signature_refs: set[str]`, `dep_paths: dict[str, list[str]]` (signature pipe_ref → ordered path of controller refs that reached it).
+  - Helpful `__str__` listing each signature on its own line with its dep path and the suggested fix.
+- [ ] `pipelex/core/pipes/pipe_abstract.py`:
+  - Optionally add a `collect_signature_paths(self)` helper that returns the `dep_paths` map (instead of just the set), used by the error construction.
+- [ ] `pipelex/pipe_run/dry_run.py`:
+  - Update `dry_run_pipe` signature to `async def dry_run_pipe(pipe: PipeAbstract, *, allow_signatures: bool = False, raise_on_failure: bool = False) -> DryRunOutput`.
+  - At the top of the body, if `not allow_signatures`: call `sig_refs = pipe.collect_signature_refs()`; if non-empty, raise `SignaturesNotAllowedError(...)`.
+  - Update `dry_run_pipes` similarly.
+- [ ] `pipelex/pipeline/validate_bundle.py`:
+  - Add `allow_signatures: bool = False` to `validate_bundle` and `validate_bundles_from_directory`. Thread to `dry_run_pipes`.
+- [ ] `pipelex/cli/commands/validate/_validate_core.py`:
+  - Thread `allow_signatures` from the CLI into `dry_run_pipe`/`dry_run_pipes`/`validate_bundle`. (CLI flag wiring is Phase 5; here just thread the parameter so the function plumbing is in place.)
+
+### Phase 4.3 — Lint and targeted tests
+
+- [ ] `make agent-check` clean.
+- [ ] `.venv/bin/pytest -q tests/integration/pipelex/pipe_signature/ tests/unit/pipelex/pipe_run/` — all green.
+
+---
+
+## Phase 5 — CLI surface
+
+Surface the strict/lenient choice at the CLI. The agent CLI defaults to lenient because that's its primary use case.
+
+### Phase 5.1 — Tests first (red)
+
+CLI tests should drive the typer command directly via `CliRunner` rather than spawning subprocesses (matches existing CLI test patterns in this repo).
+
+- [ ] `tests/integration/pipelex/cli/test_validate_signatures_cli.py` — `class TestValidateSignaturesCli`:
+  - Fixtures load a tiny in-memory library directory with a signature-containing bundle.
+  - `test_validate_pipe_strict_default_fails` — `pipelex validate <pipe>` (no flag) on a pipe that reaches a signature exits non-zero with the signature listed in stderr.
+  - `test_validate_pipe_allow_signatures_passes` — `pipelex validate <pipe> --allow-signatures` exits zero on the same bundle.
+  - `test_validate_all_strict_default_passes_with_orphan_signature` — `pipelex validate --all` succeeds even when the library contains an orphan signature (no caller); confirms "iterate non-signature pipes only" semantics.
+  - `test_validate_all_strict_fails_with_caller_of_signature` — `pipelex validate --all` fails when a non-signature pipe reaches a signature.
+  - `test_validate_all_allow_signatures_passes` — same setup, lenient flag, passes.
+- [ ] `tests/integration/pipelex/cli/test_agent_validate_defaults_lenient.py` — `class TestAgentValidateDefaultsLenient`:
+  - `test_agent_validate_defaults_to_lenient` — calling the agent CLI's validate against a signature-bundle exits zero without an explicit flag.
+- [ ] Run: `.venv/bin/pytest -q tests/integration/pipelex/cli/`. Confirm red.
+
+### Phase 5.2 — Implementation (green)
+
+- [ ] `pipelex/cli/commands/validate/app.py` (and any sibling typer command modules):
+  - Add `--allow-signatures` boolean option, default `False`. Thread to `execute_validate`.
+- [ ] `pipelex/cli/commands/validate/_validate_core.py`:
+  - Already threads `allow_signatures` from Phase 4. Surface it to typer.
+  - `do_validate_all_libraries_and_dry_run` — iterate non-signature pipes only when `allow_signatures=False` (use `pipe.is_signature`); when `allow_signatures=True`, iterate everything (signatures dry-run trivially).
+- [ ] `pipelex/cli/agent_cli/commands/validate/_validate_core.py`:
+  - Default `allow_signatures=True` for the agent CLI. Add an `--strict` flag if needed (defer if not required by current tests).
+- [ ] Validation summary: when lenient and signatures were involved, print a final line like `"Validated N pipes (M signatures)."`. Add to whatever summary line currently exists.
+
+### Phase 5.3 — Lint and targeted tests
+
+- [ ] `make agent-check` clean.
+- [ ] `.venv/bin/pytest -q tests/integration/pipelex/cli/ tests/integration/pipelex/pipe_signature/` — all green.
+
+---
+
+⛔ **CHECKPOINT B — STOP HERE**
+
+**Coding must stop after Phase 5.** Do **not** start Phase 6 in the same session.
+
+Before handing back:
+
+1. Confirm every box above is ticked. Add `> Deviation:` notes inline for anything that differed from the plan.
+2. Update the top "Status" line: `Status: Phases 1–5 landed (YYYY-MM-DD). Strict / lenient validation works end-to-end through Python and CLI. E2E .mthds tests and docs are open.`
+3. Add to the "Current state" paragraph: e2e .mthds parsing not yet exercised; some surprise may surface there (interpreter or schema generator might need touching).
+4. Run `make agent-test` — full suite green.
+5. Hand back to the human.
+
+Phase 6 picks up by reading the updated "Current state" plus the Phase 6 section below.
+
+---
+
+## Phase 6 — End-to-end tests with real `.mthds`
+
+This phase exercises the full path: `.mthds` file → `PipelexInterpreter` → `PipelexBundleBlueprint` → library load → factory → runtime → dry-run. No new production code is expected; if something breaks, the design surfaces a real bug rather than a test issue.
+
+### Phase 6.1 — Tests first (red)
+
+Build `.mthds` fixtures under `tests/e2e/fixtures/signature_bundles/` and reference them from the tests.
+
+- [ ] `tests/e2e/fixtures/signature_bundles/signature_only.mthds` — a bundle whose `main_pipe` is a `PipeSignature`. Single domain, single concept, single pipe.
+
+  ```toml
+  domain = "signature_demo"
+  main_pipe = "summarize_doc"
+
+  [concept]
+  Document = "A document concept used for testing signatures."
+
+  [pipe.summarize_doc]
+  type = "PipeSignature"
+  description = "Produces a summary of a document (contract only)."
+  inputs = { doc = "Document" }
+  output = "Text"
+  ```
+
+- [ ] `tests/e2e/fixtures/signature_bundles/mixed_with_signature_step.mthds` — a `PipeSequence` whose second step is a signature.
+
+  ```toml
+  domain = "signature_mixed"
+  main_pipe = "process_doc"
+
+  [concept]
+  Document = "A document concept."
+  Summary = "A summary concept."
+
+  [pipe.extract_doc]
+  type = "PipeLLM"
+  description = "Extract text from a document."
+  inputs = { doc = "Document" }
+  output = "Text"
+  prompt = "Extract text from $doc."
+
+  [pipe.summarize_extracted]
+  type = "PipeSignature"
+  description = "Summarize extracted text (contract only)."
+  inputs = { extracted = "Text" }
+  output = "Summary"
+
+  [pipe.process_doc]
+  type = "PipeSequence"
+  description = "Extract then summarize."
+  inputs = { doc = "Document" }
+  output = "Summary"
+  steps = [
+    { pipe = "extract_doc", result = "extracted" },
+    { pipe = "summarize_extracted", result = "summary" },
+  ]
+  ```
+
+- [ ] `tests/e2e/fixtures/signature_bundles/multi_input_multiplicity.mthds` — signature with `Document[]` and `Image[3]` inputs.
+
+  ```toml
+  domain = "signature_multiplicity"
+  main_pipe = "fuse_docs_and_images"
+
+  [concept]
+  Document = "A document."
+  Image = "An image."
+  Report = "A report."
+
+  [pipe.fuse_docs_and_images]
+  type = "PipeSignature"
+  description = "Combine docs and exactly 3 images (contract only)."
+  inputs = { docs = "Document[]", images = "Image[3]" }
+  output = "Report"
+  ```
+
+- [ ] `tests/e2e/test_signature_validation_mthds.py` — `class TestSignatureValidationE2E`:
+  - `test_signature_only_bundle_strict_fails` — `validate_bundle(mthds_file_path=signature_only_path)` with default strict raises `ValidateBundleError` wrapping `SignaturesNotAllowedError`.
+  - `test_signature_only_bundle_lenient_passes` — same call with `allow_signatures=True` returns a `ValidateBundleResult` with a populated `dry_run_result`.
+  - `test_mixed_bundle_strict_fails_with_dep_path` — strict mode on `mixed_with_signature_step.mthds` fails; the error message includes both the leaf signature's `pipe_ref` and the controller's `pipe_ref` in the dep path.
+  - `test_mixed_bundle_lenient_passes_and_produces_mock` — lenient mode succeeds; dry-run output for `process_doc` contains a `Summary` mock stuff.
+  - `test_multiplicity_inputs_lenient_passes` — lenient mode on `multi_input_multiplicity.mthds` succeeds.
+  - `test_live_run_signature_pipeline_fails` — running the bundle live (via `PipelexRunner.execute_pipeline` with `pipe_run_mode=LIVE`) raises `PipelineExecutionError` whose underlying cause is `PipeSignatureNotExecutableError`.
+- [ ] `tests/e2e/test_signature_validation_cli.py` — `class TestSignatureValidationCli`:
+  - `test_cli_validate_signature_bundle_strict_fails` — `pipelex validate signature_only.mthds` exits non-zero with the signature listed in stderr.
+  - `test_cli_validate_signature_bundle_lenient_passes` — same with `--allow-signatures` exits zero.
+- [ ] Run: `.venv/bin/pytest -q tests/e2e/`. Confirm: most red because interpreter / schema generator hasn't been exercised on the new `type = "PipeSignature"` shape yet.
+
+### Phase 6.2 — Make e2e tests green
+
+Whatever this phase surfaces is a real bug in the previous phases. Expected categories:
+
+- `PipelexInterpreter` round-trip: confirm TOML parsing of `type = "PipeSignature"` produces a `PipeSignatureBlueprint`. If the discriminator dispatch fails in `PipelexBundleBlueprint.pipe`, fix it.
+- Library load: confirm `LibraryCrateFactory.make_from_blueprints` + `library_manager.load_from_blueprints` accept the new blueprint shape. If `concept_codes_from_the_same_domain` filtering doesn't accommodate signature concepts, fix.
+- Bundle-level validation: `validate_local_pipe_references` already key-based, should pass. Confirm.
+- Schema generator: `pipelex-dev generate-mthds-schema` should include `PipeSignature` in the union. Verify and regenerate the schema file (`derived/mthds_schema.json`) if it exists in the repo.
+
+- [ ] Make every Phase 6.1 test green.
+- [ ] If the JSON schema is checked in: run `.venv/bin/pipelex-dev generate-mthds-schema` and commit the diff.
+
+### Phase 6.3 — Lint and full tests
+
+- [ ] `make agent-check` clean.
+- [ ] `make agent-test` — full suite green.
+
+---
+
+⛔ **CHECKPOINT C — STOP HERE**
+
+**Coding must stop after Phase 6.** Do **not** start Phase 7 in the same session.
+
+Before handing back:
+
+1. Confirm every box above is ticked. Add `> Deviation:` notes for anything that surprised you (especially in Phase 6.2 — the e2e phase is the most likely to surface design gaps).
+2. Update the top "Status" line: `Status: Phases 1–6 landed (YYYY-MM-DD). End-to-end signature validation works from .mthds. Docs and CHANGELOG are open.`
+3. Append a "Known gaps after Phase 6" subsection listing anything noticed but deferred (e.g. "schema generator output diff visible; not committed").
+4. Hand back to the human.
+
+Phase 7 picks up by reading the updated "Status" plus the Phase 7 section below.
+
+---
+
+## Phase 7 — Docs, CHANGELOG, polish
+
+### Phase 7.1 — Docs
+
+- [ ] `docs/` MTHDS authoring guide: add a section "Signature pipes" describing the `type = "PipeSignature"` shape, listing all valid fields, with the three example fixtures from Phase 6 inlined as illustrations.
+- [ ] CLI help text — confirm `pipelex validate --help` mentions `--allow-signatures` with a one-line description ("Accept PipeSignature placeholders in the dependency graph (lenient mode).").
+- [ ] `pipelex/builder/pipe/pipe_signature.py`: tighten the class docstring with the new contract (drop the `result` line, mention `signature_for`, mention strict-vs-lenient).
+
+### Phase 7.2 — CHANGELOG
+
+- [ ] `CHANGELOG.md` under `## [Unreleased]`:
+  - `### Added` — `PipeSignature` pipe type, `--allow-signatures` flag, agent CLI lenient default, `collect_signature_refs` graph walk.
+  - `### Changed` — `dry_run_pipe`/`dry_run_pipes`/`validate_bundle` now accept `allow_signatures: bool = False`.
+  - Cross-link `wip/signature-based-validation.md`.
+
+### Phase 7.3 — Final lint and tests
+
+- [ ] `make agent-check` clean.
+- [ ] `make agent-test` — full suite green.
+
+---
+
+⛔ **CHECKPOINT D — FINAL**
+
+**Coding stops here.** Before handing back:
+
+1. Confirm every box is ticked; add deviation notes for anything that didn't match the plan.
+2. Update the top "Status" line: `Status: All phases landed (YYYY-MM-DD). Ready to ship via /release.`
+3. Hand back to the human.
 
 ---
 
 ## Out of scope / explicit non-goals
 
-- No reserved CSS keyword list. The heuristic covers the realistic surface; the escape covers the rest.
-- No HTML/`<style>`-aware parsing of templates.
-- No syntax migration (`@{var}` etc.) — purely additive change.
-- No changes to the `replace_*` helper functions or to the surrounding `tag(...)` / `format()` filters.
-- No changes to the call sites of `preprocess_template` listed in the design doc — they all benefit transparently.
+- Signature concepts (concept stubs analogous to pipe signatures). Bigger design, separate plan.
+- `signature_for`-driven mock specialization (e.g. `signature_for = "PipeImgGen"` mints an actual ImageContent URL). Deferred — flagged in the design doc as a phase-2 enhancement.
+- Migrating existing bundles to use signatures. Authors opt in.
+- Parallel `[signature.foo]` TOML table as syntactic sugar. Possible later, not a structural alternative.
+- Runtime-time validation of signatures during live execution. Live-run on a signature must raise; that's the only enforcement.
 
 ---
 
-## Phase 7 — `$` sigil footgun fixes (open, HIGH PRIORITY)
-
-### Why this phase
-
-A live audit of the inline `$` sigil surfaced four word-adjacent substitution bugs plus a consecutive-dots edge case. Root causes: the `$` regex is missing the `(?<!\w)` lookbehind that the `@` candidate pattern carries, and its identifier class (`[a-zA-Z0-9_.]+`) is too permissive (allows leading digit, consecutive dots, trailing dot inside the captured identifier).
-
-Concrete bugs (verified live against the current `preprocess_template`):
-
-| Input | Current output | Verdict |
-|---|---|---|
-| `micro$oft is a company` | `micro{{ oft\|format() }} is a company` | bug — mid-word substitution |
-| `user$host.com` | `user{{ host.com\|format() }}` | bug — mid-word substitution |
-| `P@ssw$rd123` | `P@ssw{{ rd123\|format() }}` | bug — mid-word substitution |
-| `a$b$c` | `a{{ b\|format() }}{{ c\|format() }}` | bug — back-to-back mid-word |
-| `$name..` | `{{ name.\|format() }}.` | bug — emits invalid Jinja |
-
-Regression guards (already correct under the current regex — must stay correct under the new one):
-
-- `see $name.` → `see {{ name|format() }}.` (sentence terminator)
-- `$user.name.first.` → `{{ user.name.first|format() }}.` (dotted access + terminator)
-- `run $(whatever) please` → unchanged (code-shape opener)
-- `price $10 today` → unchanged (dollar amount)
-- `$foo(bar)` / `$foo "bar"` → unchanged (code-shape lookahead)
-- `$$literal` → `$literal` (escape)
-
-Posture: **silent pass-through** for word-adjacent `$` (do not raise like `@` does). The `$` arm is best-effort inline by design — it already silently passes `$10`, `$(`, `${`, `$foo "..."`. Raising on `micro$oft` would be a noisier contract than warranted, and inconsistent with the existing `$` posture.
-
-### Target code
-
-In `pipelex/cogt/templating/template_preprocessor.py`:
-
-```python
-_DOLLAR_SIGIL_PATTERN = re.compile(
-    r"(?<!\w)(\$)([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)(?![a-zA-Z0-9_])(?!\s*[({\"'])",
-)
-
-def _replace_dollar_sigil(match: Match[str]) -> str:
-    variable: str = match.group(2)
-    return f"{{{{ {variable}|format() }}}}"
-```
-
-Notes:
-
-- `(?<!\w)` mirrors the `@` candidate pattern's left guard. Fixes all four word-adjacent bugs.
-- The strict segmented identifier `[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*` rules out consecutive dots automatically and makes the prior `(?![0-9])` arm redundant — drop it.
-- The trailing-dot kludge in `_replace_dollar_sigil` (`if variable.endswith("."): variable = variable[:-1]; ...`) goes away. Under the strict shape a trailing `.` cannot end the captured identifier, so it naturally sits outside the match as literal punctuation. `$name.` still renders as `{{ name|format() }}.` because the `.` is simply not part of the match.
-
-### Phase 7.1 — TDD red
-
-All new tests go inside the existing `TestTemplatePreprocessor` class in `tests/unit/pipelex/cogt/templating/test_template_preprocessor.py`.
-
-- [x] `test_word_adjacent_dollar_pass_through` — parametrized over the four mid-word bug shapes (`micro$oft is a company`, `user$host.com`, `P@ssw$rd123`, `a$b$c`); each passes through unchanged.
-
-- [x] `test_dollar_consecutive_dots_pass_through` — `$name..` renders as `{{ name|format() }}..`. Both dots stay outside the match as literal punctuation.
-
-- [x] Re-ran the targeted module — new tests went red first (content mismatches), all existing `$`-related tests still passed.
-
-### Phase 7.2 — Implementation (green)
-
-- [x] In `pipelex/cogt/templating/template_preprocessor.py`:
-  - [x] Replaced `_DOLLAR_SIGIL_PATTERN` with the strict segmented shape and added the `(?<!\w)` lookbehind.
-  - [x] Dropped the `(?![0-9])` lookahead arm (redundant under the new identifier shape).
-  - [x] Simplified `_replace_dollar_sigil` to the one-liner version. The `trailing_dot` branch is gone (unreachable under the new regex).
-  - [x] Updated the `# Inline \`$\` sigil` comment to describe the new contract.
-- [x] Targeted module green: 121 passed.
-
-### Phase 7.3 — Workspace sanity check
-
-- [x] Ran the grep against `/Users/lchoquel/repos/Pipelex/`. Two hits in `mthds-ui/data/pipelines/pipeline_25/bundle.mthds` (lines 100 and 107), both of the shape `"...\n\n$classified.content"`. These are grep false positives — the `n` matched by `[[:alnum:]_]` belongs to the TOML `\n` escape; after TOML decoding the `$` is preceded by a real newline, so the new regex still rewrites correctly. No action.
-
-### Phase 7.4 — Lint, tests, docs
-
-- [x] `make agent-check` clean (Pyright, Ruff, Mypy, plxt).
-- [x] Targeted cogt test run: 584 passed in 9.06s.
-- [x] `make agent-test` — full suite green (5148 passed, 2 skipped, 3 xfailed). One pre-existing test (`test_template_field_accesses_extra_context`) had its template changed from `Q$quarter` to `, quarter $quarter` to match the new contract — see the "Deviations from Phase 7 plan" section near the top.
-- [x] `CHANGELOG.md` updated under `[Unreleased]` `### Fixed`.
-
-**Checkpoint C**: Phase 7 complete when the four word-adjacent-`$` tests and the consecutive-dots test are green, all legacy tests are green, `make agent-check` is clean, and `make agent-test` is green.
-
-### STOP HERE — checkpoint before Phase 8
-
-**Coding must stop after Phase 7 is delivered.** Do **not** start Phase 8 in the same session. After Checkpoint C is reached:
-
-1. Update the top "Status" block to record Phase 7 as landed (with the date), mirroring the style of the existing "strict line-bounded `@` rule landed" block.
-2. Note any open questions, deviations from this plan, or follow-up items in a brief retrospective near the top of this file (same style as the existing "Deviations from the original plan" section).
-3. Hand back to the human for review.
-
-Phase 8 (declared-inputs gating, formerly Phase 7) opens a new area of concern — function split, signature change, and call-site threading across 9 files — and should be picked up in a fresh session with this `TODOS.md` as the entry point.
-
----
-
-## Phase 8 — Declared-inputs gating for the `@`-sigil validator (landed 2026-05-13)
-
-### Why this phase
-
-The strict line-bounded `@` rule (Phases 1–6) turned every inline `@<ident>` into a load-time error to catch typos like `Extract from @invoice_text.` The same rule, however, makes inline `@media`, `@import`, `@keyframes`, `@font-face`, `@deprecated`, `@Override` — the CSS at-rules and code decorators that coding agents emit by default when writing HTML/CSS in PipeCompose templates — fail at load time too. Authors must escape every occurrence with `@@`, which is unfamiliar and surprising for both humans and agents. Phase 8 narrows the validator's "is this a real typo?" question by gating on the pipe's declared `inputs:`: an inline `@<ident>` raises only when `<ident>` (root segment for dotted paths) is one of the pipe's declared inputs. Everything else passes through silently, restoring CSS-friendliness without resurrecting the prior heuristic regex residuals (the rewriter stays strict line-bounded — alone-on-line `@var` still rewrites; nothing inline ever rewrites). LSP / `plxt check` still surface real typos at edit time because the inputs list is known at load time; no runtime threading required.
-
-### Target behavior
-
-```text
-pipe with inputs: { invoice_text: Text }:
-✗ Extract from @invoice_text. Done.            → RAISES (invoice_text is declared → real typo)
-✓ Extract from $invoice_text. Done.            → rewrites $invoice_text inline
-✓ @invoice_text                                 → rewrites alone-on-line (unchanged)
-
-pipe with inputs: { invoice_text: Text } (no `media` input):
-✓ <style>@media (max-width: 820px) { ... }</style>   → pass-through (media is NOT declared)
-✓ @media (max-width: 820px) { ... }                  → pass-through
-✓ @deprecated def foo():                             → pass-through
-✓ @Override                                          → pass-through (alone-on-line, but no Override input)
-
-pipe with inputs: { Override: Text } (unusual but possible):
-✗ @Override                                          → RAISES at the alone-on-line shape too? NO —
-   alone-on-line still rewrites, because that's the rewriter's strict success case.
-   The gate only applies to the INLINE-candidate validator path.
-```
-
-### Target code
-
-**Signature change (`pipelex/cogt/templating/template_preprocessor.py`):**
-
-```python
-def preprocess_template(template: str, *, declared_inputs: set[str] | None = None) -> str: ...
-```
-
-When `declared_inputs is None`, the validator skips the inline-candidate check entirely (lenient pass-through). When a set is provided, the validator raises only when the candidate identifier's root segment is in the set.
-
-**Function split (for clean runtime path):**
-
-```python
-def validate_template_sigils(template: str, declared_inputs: set[str]) -> None:
-    """Raise TemplateSigilSyntaxError when an inline @-candidate matches a declared input."""
-
-def rewrite_template_sigils(template: str) -> str:
-    """Pure rewrite — applies @-line-bounded and $-inline substitutions. Does not validate."""
-
-def preprocess_template(template: str, *, declared_inputs: set[str] | None = None) -> str:
-    """Convenience entry: normalize, escape sentinels, optionally validate, rewrite, restore."""
-```
-
-`render_template` (runtime, in `template_rendering.py:17`) calls `rewrite_template_sigils` directly — by the time we reach render, the template has already been validated at load time, so the runtime call only needs the rewrite step. This avoids threading `declared_inputs` through the rendering path.
-
-**Validator gating logic (`_validate_at_sigil_alone_on_line`):**
-
-```python
-def _validate_at_sigil_alone_on_line(template: str, declared_inputs: set[str] | None) -> None:
-    if declared_inputs is None:
-        return  # lenient: no inputs context, nothing to gate against
-    for line_index, line in enumerate(template.split("\n"), start=1):
-        if "@" not in line:
-            continue
-        if _AT_SIGIL_PATTERN.fullmatch(line):
-            continue
-        candidate = _AT_CANDIDATE_PATTERN.search(line)
-        if candidate is None:
-            continue
-        identifier = candidate.group(2)
-        root = get_root_from_dotted_path(identifier)
-        if root not in declared_inputs:
-            continue  # not a declared input → not a typo candidate → pass through
-        # ... build current error message and raise ...
-```
-
-### Call sites to update
-
-| File | Line(s) | Inputs source | Pass |
-|---|---|---|---|
-| `pipe_llm_blueprint.py` | 41, 58 | `self.inputs: dict[str, str] \| None` | `set(self.inputs or {})` |
-| `pipe_compose_blueprint.py` | 106 | same | same |
-| `pipe_search_blueprint.py` | 44 | same | same |
-| `pipe_img_gen_blueprint.py` | 39 | same | same |
-| `pipe_compose_factory.py` | 67 | `inputs: InputStuffSpecs` | `set(inputs.variables)` |
-| `template_document_analyzer.py` | 48 | `input_specs: dict[str, str]` | `set(input_specs.keys())` |
-| `template_image_analyzer.py` | 64, 163 | same | same |
-| `construct_blueprint.py` | 249 | none (discovery function, not primary validation) | `None` |
-| `template_blueprint.py` | 25, 37 | none (base blueprint, no inputs context) | `None` |
-| `template_rendering.py` | 17 | runtime (already validated at load) | switch to `rewrite_template_sigils` |
-
-### Phase 8.1 — TDD red: tests for the new behavior
-
-All new tests go inside the existing `TestTemplatePreprocessor` class in `tests/unit/pipelex/cogt/templating/test_template_preprocessor.py`.
-
-- [x] **Parametrized success (lenient when no matching input):** inline `@media (...)`, `@import "..."`, `@keyframes`, `@font-face`, `@deprecated def foo():`, `@Override` — each with `declared_inputs=set()` or `declared_inputs={"other_var"}` — pass through unchanged, no raise. Implemented as `test_inline_at_passes_through_when_declared_inputs_empty` and `test_inline_at_passes_through_when_no_input_matches`.
-- [x] **Parametrized success (lenient when `declared_inputs=None`):** same set of inputs as above, called with no kwarg — pass through unchanged. Implemented as `test_inline_at_passes_through_when_declared_inputs_omitted`.
-- [x] **Parametrized error (strict when match):** inline `@invoice_text.` with `declared_inputs={"invoice_text"}` raises with the existing migration hint shape (line N, sigil+identifier, `$var` hint, `@@` escape hint). Implemented as `test_inline_at_raises_when_root_is_declared_input` plus the existing `test_strict_line_at_sigil_raises` parametrized suite (updated to pass `declared_inputs={expected_identifier}` per case).
-- [x] **Dotted-access gating:** inline `@user.profile.bio` with `declared_inputs={"user"}` raises; same template with `declared_inputs={"profile"}` passes through (gate is on root segment). Implemented as `test_inline_at_with_dotted_path_raises_when_root_is_declared_input` and `test_inline_at_with_dotted_path_passes_when_only_inner_segment_declared`.
-- [x] **Alone-on-line rewrites regardless of inputs:** `@invoice_text` alone on its line still rewrites whether or not `invoice_text` is in `declared_inputs` — the rewriter is strict and inputs-agnostic. Implemented as `test_alone_on_line_rewrites_regardless_of_declared_inputs` (parametrized across empty / matching / non-matching / optional shapes).
-- [x] **Update CSS at-rule tests:** renamed `test_css_at_rule_raises_under_strict_rule` → `test_css_at_rule_raises_when_keyword_is_declared_input` (parametrized; derives the identifier from the keyword and passes `declared_inputs={identifier}`). Same renaming pattern applied to `test_full_style_block_raises_*`, `test_triple_at_raises_*`, `test_css_dash_at_rule_raises_*`. The lenient-pass-through case is covered by the new parametrized tests above. `@@`-escape companion tests are unchanged.
-
-Blueprint integration tests (`tests/unit/pipelex/pipe_operators/pipe_llm/test_pipe_llm_blueprint.py`):
-
-- [x] PipeLLM with `inputs: {"invoice_text": "Text"}` and `prompt = "Extract from @invoice_text."` — pydantic raises `ValueError` wrapping `TemplateSigilSyntaxError`. Already covered by the existing `test_validate_inputs_raises_for_inline_at_sigil_in_prompt`.
-- [x] PipeLLM with `inputs: {"page": "Page"}` and `prompt = "<style>@media (max-width: 820px) { ... }</style>\n...$page"` — loads cleanly (no `media` input → CSS passes through). Implemented as `test_inline_css_at_rule_passes_when_keyword_not_declared`.
-- [x] Same prompt with `inputs: {"media": "Text"}` — raises on `@media` (declared input now matches). Implemented as `test_inline_at_raises_when_input_collides_with_at_rule_keyword`.
-- [x] Inline Python decorator (`@deprecated def foo():`) loads cleanly when `deprecated` is not a declared input. Implemented as `test_inline_python_decorator_passes_through`.
-
-Run target:
-
-```bash
-.venv/bin/pytest -q tests/unit/pipelex/cogt/templating/test_template_preprocessor.py
-.venv/bin/pytest -q tests/unit/pipelex/pipe_operators/pipe_llm/test_pipe_llm_blueprint.py
-```
-
-Expected state after Phase 8.1: new tests fail (red), all existing tests still pass (the lenient-when-`None` default keeps current call sites' behavior intact for legacy tests that don't pass inputs).
-
-> **Deviation:** TDD was followed in spirit but not literally — under the new lenient-when-`None` default, the existing strict-rule tests that called `preprocess_template(template)` (no kwarg) would *stop raising*, breaking the "all existing tests still pass" claim. The fix was to update those parametrized tests to pass `declared_inputs={expected_identifier}` so they preserve their raise expectation under the new gate. New tests for the lenient cases were added alongside.
-
-### Phase 8.2 — Implementation (green)
-
-- [x] In `pipelex/cogt/templating/template_preprocessor.py`:
-  - [x] Added `get_root_from_dotted_path` import (from `pipelex.tools.misc.string_utils`).
-  - [x] Changed `_validate_at_sigil_alone_on_line` to accept `declared_inputs: set[str]` (not `Optional`) — the `None`-gate is now handled at the `preprocess_template` boundary so internal helpers don't need to re-check.
-  - [x] Split `preprocess_template` into `validate_template_sigils` (validator wrapper) and `rewrite_template_sigils` (escape → normalize → substitute → restore, no validation). Kept `preprocess_template` as a thin convenience entry that skips validation when `declared_inputs is None`. Extracted `_normalize_and_escape` to dedupe the line-ending + sentinel prelude across the two halves.
-  - [x] Updated the module docstring + function docstrings to describe the gating behavior.
-- [x] Threaded `declared_inputs` through the 7 call sites that have inputs context (`pipe_llm_blueprint`, `pipe_compose_blueprint`, `pipe_search_blueprint`, `pipe_img_gen_blueprint`, `pipe_compose_factory`, `template_document_analyzer`, `template_image_analyzer`). The 2 call sites without inputs context (`construct_blueprint`, `template_blueprint`) keep the zero-arg form and benefit from the lenient default — no explicit `None` pass-through needed.
-- [x] In `pipelex/cogt/templating/template_rendering.py`: switched from `preprocess_template(template)` to `rewrite_template_sigils(template)` — render path no longer re-validates.
-- [x] Dedup'd `input_names` / `declared_inputs` in `pipe_llm_blueprint`, `pipe_search_blueprint`, `pipe_img_gen_blueprint` — single `declared_inputs` variable threads through both the preprocess call and the downstream missing/unused-inputs checks. Pure code clarity, no behavior change.
-
-Run target same as Phase 8.1. Expected: all Phase 8.1 tests green, all legacy tests still green.
-
-### Phase 8.3 — Workspace sanity check
-
-- [x] Ran the workspace `.mthds` grep from `/Users/lchoquel/repos/Pipelex/`. After excluding TOML model references (`model = "@default-..."` — these never go through `preprocess_template`) and false positives from string-literal contexts, the surviving hits are:
-  - `pipelex-cookbook/examples/c_advanced/crewai_with_pipelex_tools/research_report.mthds:46` — inline `Question: @question` where `question` IS a declared input (line 40).
-  - `pipelex-cookbook/examples/b_basics/document_extract/answer_from_documents/bundle.mthds:150,261` — same shape (`Question: @question` with `question` declared on the surrounding pipe).
-  - `internal-tools/wip/carol-sessions/2026-04-07T06-11-46_dev_old-plugin/mthds-wip/haiku_writer/bundle.mthds:13` — `Idea: @idea` with `idea` declared.
-- [x] Verified: each hit is a genuine pre-existing typo that already raised under Phases 1–6 and continues to raise under Phase 8 (the declared-inputs gate intentionally fires here). They live in sibling repos (`pipelex-cookbook`, `internal-tools/wip/`), out of this PR's scope — flagged as follow-up cleanup in those repos rather than fixed here.
-- [x] Confirmed `@@`-escape workarounds still work under the new gating. None of the CSS-case workarounds needed to be added in `pipelex/` itself (the Phase 1–6 fix only touched code/tests, not `.mthds` files in this repo). No follow-up cleanup list required.
-
-### Phase 8.4 — Lint, tests, docs
-
-- [x] `make agent-check` clean (Pyright, Ruff, Mypy, plxt).
-- [x] Targeted test run for `tests/unit/pipelex/cogt/ tests/unit/pipelex/pipe_operators/ tests/integration/pipelex/pipes/`: 994 passed, 1 xfailed (pre-existing unrelated).
-- [x] `make agent-test` — full suite green.
-- [x] `CHANGELOG.md` updated under `[Unreleased]` `### Changed`. The entry describes the gating contract, the new `validate_template_sigils` / `rewrite_template_sigils` split, the call-site threading, and the `render_template` switch to `rewrite_template_sigils` at runtime.
-- [x] MTHDS authoring guidance updated in `pipelex/builder/pipe/pipe_compose_spec.py` (the only file in `pipelex/builder/` mentioning `@@`-escapes): dropped the `@@font-face` / `@@media` CSS example, kept the `@@`/`$$` mention as the literal-character opt-out, and added a note that inline CSS at-rules now pass through silently unless their keyword collides with a declared input.
-
-**Checkpoint D**: Phase 8 complete when CSS at-rules in PipeCompose HTML templates load without `@@` escapes (where they don't collide with declared inputs), AND typo-shape inline `@<declared>` still raises with the migration hint at load time.
-
-### Open decisions for Phase 8
-
-These are small enough to default and proceed; flag objections before locking in.
-
-1. **`declared_inputs=None` default = lenient (no raise).** Reasoning: callers without inputs context (the base `TemplateBlueprint`, the `ConstructBlueprint` discovery function) can't make the gate decision; the strict behavior is hostile in those contexts. Alternative: default-strict — every call site that doesn't pass inputs gets the current Phase 1–6 behavior. Less friendly to the discovery / runtime paths.
-2. **Gate on root segment of dotted identifier.** `@user.profile.bio` is gated on `user`. Matches how Pipelex's input resolution and `detect_jinja2_required_variables` treat dotted paths.
-3. **Validator does NOT consult Jinja2-detected variables.** It only consults `declared_inputs`. Reasoning: by the time we validate, we haven't rewritten yet, so Jinja2 can't see `@var` as a variable; conversely, if the author wrote `{{ media }}` directly in Jinja, that's a separate concern. Keep the gate narrow and explicit.
-4. **Reserved-name handling unchanged.** Internal vars (`preliminary_text`, `place_holder`, `_-prefixed`) are still filtered downstream in `pipe_llm_blueprint.py:78`. The validator doesn't need to know about them — they're not realistic typo candidates inline.
-
-### Out of scope for Phase 8
-
-- **Auto-cleanup of existing `@@`-escapes in workspace `.mthds` files.** Phase 4 of the line-bounded plan added some; they keep working under the new gating. A follow-up PR can strip the ones that are no longer needed.
-- **Runtime gating on actual working-memory contents.** The proposal we considered first (check the candidate against the runtime context) would catch typos that aren't declared as inputs. Rejected because it moves validation from load time to render time and breaks LSP / `plxt check` integration. The declared-inputs gate is the load-time approximation.
-- **Heuristic shape detection inside the validator.** No `(?!\s*[({"'])` lookahead — the declared-inputs gate fully replaces shape-based heuristics for the `@` arm.
-- **Changes to the `$` sigil contract.** `$` is unchanged.
+## Reference: file targets at a glance
+
+Production code:
+
+- `pipelex/core/pipes/pipe_blueprint.py` — enum additions, `is_signature` on `PipeBlueprint`.
+- `pipelex/core/pipes/pipe_abstract.py` — `is_signature`, promoted `pipe_dependencies`, new `collect_signature_refs`.
+- `pipelex/core/bundles/pipelex_bundle_blueprint.py` — `PipeBlueprintUnion` gains `PipeSignatureBlueprint`.
+- `pipelex/pipe_signature/` — new package: blueprint, runtime, factory, exceptions.
+- `pipelex/builder/pipe/pipe_signature.py` — three corrections, `to_blueprint()`.
+- `pipelex/builder/pipe/pipe_spec_union.py` — `PipeSignature` added to union.
+- `pipelex/builder/pipe/pipe_spec_map.py` — `PipeSignature` added to map.
+- `pipelex/pipe_run/dry_run.py` — `allow_signatures` parameter, strict pre-check.
+- `pipelex/pipeline/validate_bundle.py` — `allow_signatures` threaded.
+- `pipelex/core/memory/working_memory_factory.py` — `make_mock_stuff_for_stuff_spec` helper.
+- `pipelex/cli/commands/validate/app.py` + `_validate_core.py` — `--allow-signatures` flag.
+- `pipelex/cli/agent_cli/commands/validate/_validate_core.py` — lenient default.
+
+Tests:
+
+- `tests/unit/pipelex/core/pipes/test_pipe_blueprint_signature_enums.py`
+- `tests/unit/pipelex/core/pipes/test_pipe_abstract_signature_surface.py`
+- `tests/unit/pipelex/builder/pipe/test_pipe_signature_spec.py`
+- `tests/unit/pipelex/builder/pipe/test_pipe_spec_union_signature.py`
+- `tests/integration/pipelex/pipe_signature/conftest.py`
+- `tests/integration/pipelex/pipe_signature/test_pipe_signature_runtime.py`
+- `tests/integration/pipelex/pipe_signature/test_pipe_signature_in_blueprint_union.py`
+- `tests/integration/pipelex/pipe_signature/test_collect_signature_refs.py`
+- `tests/integration/pipelex/pipe_signature/test_dry_run_strict_mode.py`
+- `tests/integration/pipelex/cli/test_validate_signatures_cli.py`
+- `tests/integration/pipelex/cli/test_agent_validate_defaults_lenient.py`
+- `tests/e2e/fixtures/signature_bundles/signature_only.mthds`
+- `tests/e2e/fixtures/signature_bundles/mixed_with_signature_step.mthds`
+- `tests/e2e/fixtures/signature_bundles/multi_input_multiplicity.mthds`
+- `tests/e2e/test_signature_validation_mthds.py`
+- `tests/e2e/test_signature_validation_cli.py`
