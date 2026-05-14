@@ -1,0 +1,12 @@
+domain      = "offline_byok_simple"
+description = "Minimal BYOK pipeline used by offline-mode E2E tests"
+main_pipe   = "byok_simple_pipe"
+
+[pipe]
+[pipe.byok_simple_pipe]
+type        = "PipeLLM"
+description = "Single LLM step using a non-gateway backend model handle"
+inputs      = { topic = "Text" }
+output      = "Text"
+model       = "claude-4.5-haiku"
+prompt      = "Write a single sentence about $topic.text."

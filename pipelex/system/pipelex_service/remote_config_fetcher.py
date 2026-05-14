@@ -203,7 +203,7 @@ class RemoteConfigFetcher:
             print_to_stderr("Skipping remote config fetch in Codex Cloud, using dummy config instead")
             return RemoteConfigResult(config=cls.make_dummy_remote_config(), source=RemoteConfigSource.FRESH, cached_at=None)
 
-        url = PipelexDetails.REMOTE_CONFIG_URL
+        url = PipelexDetails.remote_config_url()
 
         try:
             payload = cls._fetch_fresh(url)
