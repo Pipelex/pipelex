@@ -25,14 +25,11 @@ _FAKE_BASE_MODULE_PATH = "tests_pr898_other_pkg_stub.structures.other_domain__ot
 
 
 class TestStructuresCmdCrossPackageRefines:
-    def _register_cross_package_stub(self) -> type:
-        """Register a stub that mimics what another package's `pipelex build structures`
-        would have produced for `other_domain.OtherConcept`:
-
-        - The class name equals the registry key (`other_domain__OtherConcept`),
-          matching what `ConceptFactory` registers.
-        - The class lives at a stable, importable-looking module path on `sys.modules`
-          so the generator can recover an import statement from `__module__`.
+    @classmethod
+    def _register_cross_package_stub(cls) -> type:
+        """Register a stub mimicking what another package's `pipelex build structures` would have
+        produced: a class whose `__name__` equals the registry key and that lives at a stable
+        importable module path, so the generator can recover the import path via `__module__`.
         """
         stub_module = ModuleType(_FAKE_BASE_MODULE_PATH)
         stub_class: type = type("other_domain__OtherConcept", (StructuredContent,), {"__module__": _FAKE_BASE_MODULE_PATH})

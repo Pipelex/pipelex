@@ -279,11 +279,7 @@ class StructureGenerator:
                     base_module_path = class_info.module_path
                     break
             if base_module_path is None:
-                # Cross-package refines: the base class lives in another package's
-                # already-generated structures module and is not in concept_ref_to_class_info
-                # (which only covers the bundles passed to `pipelex build structures`).
-                # Recover the import path from the class registry. Guard on
-                # __name__ == base_class so we only emit a valid `from X import <base_class>`.
+                # Cross-package refines: base class lives in another already-installed package — recover its module via the class registry.
                 registered_cls = _get_class_registry().get_class(name=base_class)
                 if registered_cls is not None and registered_cls.__name__ == base_class and registered_cls.__module__ not in {"__main__", "builtins"}:
                     base_module_path = registered_cls.__module__
