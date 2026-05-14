@@ -137,7 +137,11 @@ async def dry_run_pipes(
                 continue
             all_signature_refs.update(sig_refs)
             for sig_ref, path in pipe.collect_signature_paths(pipe_lookup=get_optional_pipe).items():
-                if sig_ref not in all_dep_paths:
+                # Prefer the longest known dep chain so the error message shows the most informative
+                # path (a chain rooted at a controller is more useful than an empty chain rooted at
+                # the signature itself, which can happen when the signature pipe is iterated first).
+                existing = all_dep_paths.get(sig_ref)
+                if existing is None or len(path) > len(existing):
                     all_dep_paths[sig_ref] = path
         if all_signature_refs:
             raise SignaturesNotAllowedError(

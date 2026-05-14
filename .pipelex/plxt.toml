@@ -24,6 +24,10 @@ exclude = [
   "node_modules/**",
   ".git/**",
   "*.lock",
+  # PipeSignature test fixtures use the new "PipeSignature" pipe type which the bundled
+  # plxt schema does not yet recognize (the schema lives in vscode-pipelex). Exclude until
+  # the next plxt release ships an updated schema.
+  "tests/e2e/fixtures/signature_bundles/**",
 ] # Glob patterns for files to ignore.
 # These are evaluated relative to the config file location.
 
