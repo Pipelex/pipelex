@@ -13,7 +13,11 @@ from pipelex import log
 from pipelex.cogt.exceptions import InferenceErrorCategory
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
-from pipelex.cogt.inference.error_classification import is_quota_exhaustion_gateway
+from pipelex.cogt.inference.error_classification import (
+    UserAction,
+    UserActionKind,
+    is_quota_exhaustion_gateway,
+)
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.hub import get_telemetry_manager
@@ -142,6 +146,46 @@ class GatewayFactory:
         if isinstance(exc, (portkey_exc.APITimeoutError, portkey_exc.APIConnectionError)):
             return InferenceErrorCategory.TRANSIENT
         return InferenceErrorCategory.TRANSIENT
+
+    @classmethod
+    def make_user_action_from_portkey_error(cls, exc: portkey_exceptions.APIError) -> UserAction:
+        """Map a Portkey API error to a semantic ``UserAction`` for downstream consumers."""
+        if isinstance(exc, portkey_exc.APIStatusError):
+            status_code = exc.status_code
+            if is_quota_exhaustion_gateway(str(exc), status_code):
+                return UserAction(
+                    kind=UserActionKind.CHECK_BILLING,
+                    detail="Your Pipelex Gateway account has exceeded its quota — check billing",
+                )
+            if isinstance(exc, portkey_exc.RateLimitError):
+                return UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Rate limited by the Pipelex Gateway — the system will retry automatically",
+                )
+            if isinstance(exc, (portkey_exc.AuthenticationError, portkey_exc.PermissionDeniedError)):
+                return UserAction(
+                    kind=UserActionKind.CHECK_CREDENTIALS,
+                    detail="Pipelex Gateway rejected the API key — check your credentials",
+                )
+            if isinstance(exc, portkey_exc.NotFoundError):
+                return UserAction(
+                    kind=UserActionKind.CHANGE_MODEL,
+                    detail="The requested model or endpoint was not found — pick an available model",
+                )
+            if isinstance(exc, portkey_exc.BadRequestError):
+                return UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Pipelex Gateway rejected the request — review the prompt and parameters",
+                )
+        if isinstance(exc, (portkey_exc.APITimeoutError, portkey_exc.APIConnectionError)):
+            return UserAction(
+                kind=UserActionKind.WAIT_AND_RETRY,
+                detail="Could not reach Pipelex Gateway — the system will retry automatically",
+            )
+        return UserAction(
+            kind=UserActionKind.WAIT_AND_RETRY,
+            detail="Pipelex Gateway returned an error — the system will retry automatically",
+        )
 
     @classmethod
     def make_error_summary_from_portkey_error(cls, exc: portkey_exceptions.APIError) -> str:

@@ -324,6 +324,35 @@ def _provider_error_code_from_flat_body(body: Any) -> str | None:
     return None
 
 
+def _parse_response_text_body(response: Any) -> tuple[Any | None, str | None]:
+    """Read ``response.text`` and recover ``(body, provider_error_code)`` on a best-effort basis.
+
+    Used by providers that deliver the response body as a *raw string* (Azure REST,
+    FAL, HuggingFace, Mistral) — JSON-parse it when possible, fall back to the raw
+    string for HTML / non-JSON bodies. The provider-error-code probe tries both the
+    nested ``{"error": {...}}`` shape and the flat ``{"type": ..., "code": ...}``
+    shape so the same helper works across providers.
+
+    Returns ``(None, None)`` when the response has no text. Returns
+    ``(raw_string, None)`` for non-JSON bodies. Returns ``(parsed_dict, code)``
+    when the body parses as a JSON dict.
+    """
+    if response is None:
+        return None, None
+    raw_text = getattr(response, "text", None)
+    if not isinstance(raw_text, str) or not raw_text:
+        return None, None
+    try:
+        parsed: Any = json.loads(raw_text)
+    except (json.JSONDecodeError, ValueError):
+        return raw_text, None
+    if not isinstance(parsed, dict):
+        return raw_text, None
+    parsed_dict = cast("dict[str, Any]", parsed)
+    code = _provider_error_code_from_body(parsed_dict) or _provider_error_code_from_flat_body(parsed_dict)
+    return parsed_dict, code
+
+
 def _google_provider_error_code_from_details(details: Any) -> str | None:
     """Read the symbolic ``status`` (e.g. ``RESOURCE_EXHAUSTED``) from a Google error payload.
 
@@ -380,6 +409,142 @@ def extract_google_metadata(exc: BaseException) -> ProviderErrorMetadata:
         retry_after_seconds=retry_after_seconds,
         provider_error_code=_google_provider_error_code_from_details(details),
         body=details,
+    )
+
+
+def extract_azure_metadata(exc: BaseException) -> ProviderErrorMetadata:
+    """Distill an Azure REST API error (``httpx`` exception) into a ``ProviderErrorMetadata``.
+
+    Azure REST returns errors as plain ``httpx`` exceptions — there is no SDK
+    exception layer like Anthropic/OpenAI. We read fields off ``exc.response``
+    when available (status code, headers, body) and JSON-parse the body on a
+    best-effort basis. ``httpx.ConnectError`` / ``httpx.TimeoutException`` carry
+    only a request; every status-related field comes back as ``None``.
+    """
+    response = getattr(exc, "response", None)
+    status_code = getattr(response, "status_code", None)
+    if not isinstance(status_code, int):
+        status_code = None
+    headers = getattr(response, "headers", None)
+    request_id: str | None = None
+    retry_after_seconds: float | None = None
+    if headers is not None:
+        request_id_value = headers.get("x-ms-request-id") or headers.get("apim-request-id") or headers.get("x-request-id")
+        if isinstance(request_id_value, str):
+            request_id = request_id_value
+        retry_after_seconds = _parse_retry_after_seconds(headers.get("retry-after"))
+    body, provider_error_code = _parse_response_text_body(response)
+    return ProviderErrorMetadata(
+        provider="azure",
+        sdk_exception_type=type(exc).__name__,
+        status_code=status_code,
+        request_id=request_id,
+        retry_after_seconds=retry_after_seconds,
+        provider_error_code=provider_error_code,
+        body=body,
+    )
+
+
+def extract_fal_metadata(exc: BaseException) -> ProviderErrorMetadata:
+    """Distill a FAL SDK exception into a ``ProviderErrorMetadata``.
+
+    FAL's ``FalClientHTTPError`` carries ``status_code``, ``response_headers``
+    (a plain dict), ``response`` (an httpx.Response), and ``error_type``
+    (a SDK-level discriminator like ``ContentPolicyViolation``).
+    ``FalClientTimeoutError`` / ``FalClientError`` / ``MissingCredentialsError``
+    have no response metadata; every status field comes back as ``None``.
+    """
+    status_code = getattr(exc, "status_code", None)
+    if not isinstance(status_code, int):
+        status_code = None
+    response_headers = getattr(exc, "response_headers", None)
+    request_id: str | None = None
+    retry_after_seconds: float | None = None
+    if response_headers is not None:
+        request_id_value = response_headers.get("x-request-id") or response_headers.get("x-fal-request-id")
+        if isinstance(request_id_value, str):
+            request_id = request_id_value
+        retry_after_seconds = _parse_retry_after_seconds(response_headers.get("retry-after"))
+    error_type = getattr(exc, "error_type", None)
+    base_provider_error_code: str | None = error_type if isinstance(error_type, str) else None
+    response = getattr(exc, "response", None)
+    body, parsed_provider_error_code = _parse_response_text_body(response)
+    # Prefer the SDK's ``error_type`` attribute (FAL's canonical signal) over a
+    # code recovered from the body.
+    provider_error_code = base_provider_error_code or parsed_provider_error_code
+    return ProviderErrorMetadata(
+        provider="fal",
+        sdk_exception_type=type(exc).__name__,
+        status_code=status_code,
+        request_id=request_id,
+        retry_after_seconds=retry_after_seconds,
+        provider_error_code=provider_error_code,
+        body=body,
+    )
+
+
+def extract_huggingface_metadata(exc: BaseException) -> ProviderErrorMetadata:
+    """Distill a HuggingFace ``HfHubHTTPError`` / ``InferenceTimeoutError`` into a ``ProviderErrorMetadata``.
+
+    HuggingFace wraps a ``requests.Response`` (not ``httpx.Response``); the
+    ``request_id`` is mirrored onto ``exc.request_id`` by ``HfHubHTTPError.__init__``
+    (sourced from headers like ``X-Request-Id`` / ``X-Amzn-Trace-Id`` / ``X-Amz-Cf-Id``).
+    Network-level failures (``InferenceTimeoutError``, raw ``requests`` exceptions)
+    carry no response metadata; every status field comes back as ``None``.
+    """
+    response = getattr(exc, "response", None)
+    status_code = getattr(response, "status_code", None)
+    if not isinstance(status_code, int):
+        status_code = None
+    request_id = getattr(exc, "request_id", None)
+    if not isinstance(request_id, str):
+        request_id = None
+    headers = getattr(response, "headers", None)
+    retry_after_seconds: float | None = None
+    if headers is not None:
+        retry_after_seconds = _parse_retry_after_seconds(headers.get("retry-after"))
+    body, provider_error_code = _parse_response_text_body(response)
+    return ProviderErrorMetadata(
+        provider="huggingface",
+        sdk_exception_type=type(exc).__name__,
+        status_code=status_code,
+        request_id=request_id,
+        retry_after_seconds=retry_after_seconds,
+        provider_error_code=provider_error_code,
+        body=body,
+    )
+
+
+def extract_gateway_metadata(exc: BaseException) -> ProviderErrorMetadata:
+    """Distill a Portkey/Gateway SDK exception into a ``ProviderErrorMetadata``.
+
+    ``APIStatusError`` subclasses expose ``status_code``, ``response`` (httpx),
+    and ``body`` (already a pre-parsed dict — Portkey mirrors the OpenAI SDK
+    style here). ``APIConnectionError`` / ``APITimeoutError`` carry only a
+    request; every status field comes back as ``None``.
+    """
+    status_code = getattr(exc, "status_code", None)
+    if not isinstance(status_code, int):
+        status_code = None
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", None)
+    request_id: str | None = None
+    retry_after_seconds: float | None = None
+    if headers is not None:
+        request_id_value = headers.get("x-request-id") or headers.get("x-portkey-trace-id")
+        if isinstance(request_id_value, str):
+            request_id = request_id_value
+        retry_after_seconds = _parse_retry_after_seconds(headers.get("retry-after"))
+    body: Any = getattr(exc, "body", None)
+    provider_error_code = _provider_error_code_from_body(body) or _provider_error_code_from_flat_body(body)
+    return ProviderErrorMetadata(
+        provider="gateway",
+        sdk_exception_type=type(exc).__name__,
+        status_code=status_code,
+        request_id=request_id,
+        retry_after_seconds=retry_after_seconds,
+        provider_error_code=provider_error_code,
+        body=body,
     )
 
 

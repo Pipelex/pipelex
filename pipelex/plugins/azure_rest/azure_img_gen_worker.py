@@ -7,7 +7,7 @@ from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
-from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, is_content_policy_violation
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_azure_metadata, is_content_policy_violation
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.hub import get_models_manager
@@ -54,6 +54,100 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
     def _check_can_perform_job(self, img_gen_job: ImgGenJob):
         # This can be overridden by subclasses for specific checks
         pass
+
+    def _raise_categorized_azure_status_error(self, exc: httpx.HTTPStatusError) -> None:
+        """Categorize an ``httpx.HTTPStatusError`` and raise the matching ``ImgGenGenerationError``."""
+        status_code = exc.response.status_code
+        error_body = exc.response.text
+        metadata = extract_azure_metadata(exc)
+
+        if status_code == 429:
+            msg = f"Azure rate limit exceeded for model '{self.inference_model.desc}': {error_body}"
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Rate limited by Azure — the system will retry automatically",
+                ),
+                provider_metadata=metadata,
+            ) from exc
+        if status_code == 402:
+            msg = f"Azure quota exhausted for model '{self.inference_model.desc}': {error_body}"
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.CAPACITY,
+                user_action=UserAction(
+                    kind=UserActionKind.CHECK_BILLING,
+                    detail="Your Azure account has exceeded its quota — check billing in the Azure portal",
+                ),
+                provider_metadata=metadata,
+            ) from exc
+        if status_code in {401, 403}:
+            msg = f"Azure authentication error for model '{self.inference_model.desc}': {error_body}"
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.CONFIGURATION,
+                user_action=UserAction(
+                    kind=UserActionKind.CHECK_CREDENTIALS,
+                    detail="Azure rejected the API key — check your subscription key and permissions",
+                ),
+                provider_metadata=metadata,
+            ) from exc
+        if status_code == 404:
+            msg = f"Azure deployment not found for model '{self.inference_model.desc}': {error_body}"
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.CONFIGURATION,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_MODEL,
+                    detail=f"Deployment '{self.inference_model.model_id}' was not found — pick an available deployment",
+                ),
+                provider_metadata=metadata,
+            ) from exc
+        if status_code == 400:
+            if is_content_policy_violation(error_body):
+                msg = f"Content rejected by safety filters for model '{self.inference_model.desc}': {error_body}"
+                raise ImgGenGenerationError(
+                    msg,
+                    error_category=InferenceErrorCategory.CONTENT,
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_INPUT,
+                        detail="Content was rejected by safety filters — revise the prompt",
+                    ),
+                    provider_metadata=metadata,
+                ) from exc
+            msg = f"Azure bad request for model '{self.inference_model.desc}': {error_body}"
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Azure rejected the request — review the prompt and parameters",
+                ),
+                provider_metadata=metadata,
+            ) from exc
+        if status_code >= 500:
+            msg = f"Azure server error ({status_code}) for model '{self.inference_model.desc}': {error_body}"
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Azure server error — the system will retry automatically",
+                ),
+                provider_metadata=metadata,
+            ) from exc
+        msg = f"Azure API error ({status_code}) for model '{self.inference_model.desc}': {error_body}"
+        raise ImgGenGenerationError(
+            msg,
+            error_category=InferenceErrorCategory.CONFIGURATION,
+            user_action=UserAction(
+                kind=UserActionKind.CONTACT_SUPPORT,
+                detail=f"Azure returned an unexpected status code {status_code} — contact support if this persists",
+            ),
+            provider_metadata=metadata,
+        ) from exc
 
     @override
     async def _gen_image(
@@ -105,48 +199,32 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                 response.raise_for_status()
                 response_dict = response.json()
         except httpx.HTTPStatusError as exc:
-            status_code = exc.response.status_code
-            error_body = exc.response.text
-            if status_code == 429:
-                msg = f"Azure rate limit exceeded for model '{self.inference_model.desc}': {error_body}"
-                raise ImgGenGenerationError(
-                    msg,
-                    error_category=InferenceErrorCategory.TRANSIENT,
-                    user_action=UserAction(
-                        kind=UserActionKind.UNKNOWN,
-                        detail="Rate limited by Azure — the system will retry automatically",
-                    ),
-                ) from exc
-            if status_code == 402:
-                msg = f"Azure quota exhausted for model '{self.inference_model.desc}': {error_body}"
-                raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CAPACITY) from exc
-            if status_code in {401, 403}:
-                msg = f"Azure authentication error for model '{self.inference_model.desc}': {error_body}"
-                raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from exc
-            if status_code == 400:
-                if is_content_policy_violation(error_body):
-                    msg = f"Content rejected by safety filters for model '{self.inference_model.desc}': {error_body}"
-                    raise ImgGenGenerationError(
-                        msg,
-                        error_category=InferenceErrorCategory.CONTENT,
-                        user_action=UserAction(
-                            kind=UserActionKind.UNKNOWN,
-                            detail="Content was rejected by safety filters — revise the prompt",
-                        ),
-                    ) from exc
-                msg = f"Azure bad request for model '{self.inference_model.desc}': {error_body}"
-                raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
-            if status_code >= 500:
-                msg = f"Azure server error ({status_code}) for model '{self.inference_model.desc}': {error_body}"
-                raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
-            msg = f"Azure API error ({status_code}) for model '{self.inference_model.desc}': {error_body}"
-            raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from exc
+            self._raise_categorized_azure_status_error(exc)
+            raise  # unreachable: helper always raises
         except httpx.ConnectError as exc:
+            metadata = extract_azure_metadata(exc)
             msg = f"Azure connection error for model '{self.inference_model.desc}': {exc}"
-            raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Could not reach Azure — the system will retry automatically",
+                ),
+                provider_metadata=metadata,
+            ) from exc
         except httpx.TimeoutException as exc:
+            metadata = extract_azure_metadata(exc)
             msg = f"Azure request timed out for model '{self.inference_model.desc}': {exc}"
-            raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Azure request timed out — the system will retry automatically",
+                ),
+                provider_metadata=metadata,
+            ) from exc
 
         # Extract usage tokens if available
         if (usage_dict := response_dict.get("usage")) and (img_gen_tokens_usage := img_gen_job.job_report.img_gen_tokens_usage):
