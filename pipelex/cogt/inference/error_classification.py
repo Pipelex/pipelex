@@ -324,6 +324,65 @@ def _provider_error_code_from_flat_body(body: Any) -> str | None:
     return None
 
 
+def _google_provider_error_code_from_details(details: Any) -> str | None:
+    """Read the symbolic ``status`` (e.g. ``RESOURCE_EXHAUSTED``) from a Google error payload.
+
+    Google API error responses typically look like
+    ``{"error": {"code": 429, "message": "...", "status": "RESOURCE_EXHAUSTED"}}``,
+    but some endpoints flatten the same field to the top level. Try the nested
+    shape first, then the top-level fallback.
+    """
+    if not isinstance(details, dict):
+        return None
+    details_dict = cast("dict[str, Any]", details)
+    error_section = details_dict.get("error")
+    if isinstance(error_section, dict):
+        error_dict = cast("dict[str, Any]", error_section)
+        nested_status = error_dict.get("status")
+        if isinstance(nested_status, str):
+            return nested_status
+    top_status = details_dict.get("status")
+    if isinstance(top_status, str):
+        return top_status
+    return None
+
+
+def extract_google_metadata(exc: BaseException) -> ProviderErrorMetadata:
+    """Distill a Google GenAI SDK exception into a ``ProviderErrorMetadata``.
+
+    Google's exception shape differs from OpenAI/Anthropic:
+
+    - ``APIError`` (and subclasses ``ClientError`` / ``ServerError``) expose
+      ``code: int`` (the HTTP status code — *not* ``status_code``), ``message``,
+      ``status`` (the symbolic name like ``RESOURCE_EXHAUSTED``), and
+      ``details`` (the raw response JSON dict).
+    - ``response`` may be ``None`` or any of ``httpx.Response`` /
+      ``requests.Response`` / ``ReplayResponse``. We read ``x-goog-request-id``
+      and ``retry-after`` from ``response.headers`` when present.
+    """
+    code = getattr(exc, "code", None)
+    status_code = code if isinstance(code, int) else None
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", None)
+    request_id: str | None = None
+    retry_after_seconds: float | None = None
+    if headers is not None:
+        request_id_value = headers.get("x-goog-request-id") or headers.get("x-request-id")
+        if isinstance(request_id_value, str):
+            request_id = request_id_value
+        retry_after_seconds = _parse_retry_after_seconds(headers.get("retry-after"))
+    details = getattr(exc, "details", None)
+    return ProviderErrorMetadata(
+        provider="google",
+        sdk_exception_type=type(exc).__name__,
+        status_code=status_code,
+        request_id=request_id,
+        retry_after_seconds=retry_after_seconds,
+        provider_error_code=_google_provider_error_code_from_details(details),
+        body=details,
+    )
+
+
 def extract_mistral_metadata(exc: BaseException) -> ProviderErrorMetadata:
     """Distill a Mistral SDK exception into a ``ProviderErrorMetadata``.
 

@@ -256,43 +256,29 @@ Smallest of the four — `_classify_mistral_error` already does the work; the wr
 
 Symmetric to Mistral, plus `ServerError → TRANSIENT` direct mapping that doesn't need `_classify_google_client_error`. Add `extract_google_metadata`.
 
-- [ ] **RED** — write `tests/unit/pipelex/plugins/google/test_extract_google_metadata.py`. **First** check `genai_errors.ServerError` / `ClientError` constructor shape (they wrap an HTTP response object); reuse the construction pattern from existing `_classify_google_client_error` tests if any exist.
-- [ ] **RED** — write `tests/unit/pipelex/plugins/google/test_google_llm_worker_object_error_handling.py`. If construction is awkward, prefer wrapping a real SDK exception via `_wrap_in_instructor_retry(real_sdk_exc)` and keep only the real-instructor end-to-end test provider-specific. Cases (each asserts category + `user_action.kind` + `provider_metadata`):
-  - Wrapped `genai_errors.ServerError` → `TRANSIENT` + `WAIT_AND_RETRY`
-  - Wrapped `genai_errors.ClientError` (rate-limit) → `TRANSIENT` + `WAIT_AND_RETRY`
-  - Wrapped `genai_errors.ClientError` (quota) → `CAPACITY` + `CHECK_BILLING`
-  - Wrapped `genai_errors.ClientError` (content-policy) → `CONTENT` + `CHANGE_INPUT`
-  - Wrapped `genai_errors.ClientError` (auth) → `CONFIGURATION` + `CHECK_CREDENTIALS`
-  - Wrapped `genai_errors.ClientError` (bad request) → `CONTENT` + `UNKNOWN`
-  - Wrapped non-SDK exception → `UNKNOWN` + `UNKNOWN`
-  - Real-instructor end-to-end: patch the `genai.Client.aio.models.generate_content`-equivalent that `instructor.from_genai` calls
-- [ ] **GREEN** — write `extract_google_metadata(exc: genai_errors.APIError) -> ProviderErrorMetadata` (or whatever the Google base class is)
-- [ ] **GREEN** — add to `pipelex/plugins/google/google_llm_worker.py`:
-  ```python
-  except InstructorRetryException as instructor_exc:
-      underlying = extract_underlying_sdk_exception(instructor_exc)
-      if isinstance(underlying, genai_errors.ServerError):
-          msg = f"Google API server error for model '{self.inference_model.desc}': {underlying}"
-          raise LLMCompletionError(
-              msg,
-              error_category=InferenceErrorCategory.TRANSIENT,
-              user_action=UserAction(kind=UserActionKind.WAIT_AND_RETRY, detail="Google API server error — will retry"),
-              provider_metadata=extract_google_metadata(underlying),
-          ) from instructor_exc
-      if isinstance(underlying, genai_errors.ClientError):
-          raise self._classify_google_client_error(underlying) from instructor_exc
-      msg = f"Google structured generation failed after retries for model '{self.inference_model.desc}': {instructor_exc}"
-      raise LLMCompletionError(
-          msg,
-          error_category=InferenceErrorCategory.UNKNOWN,
-          user_action=UserAction(kind=UserActionKind.UNKNOWN, detail="Unexpected error from Google structured generation"),
-          provider_metadata=None,
-      ) from instructor_exc
-  ```
-- [ ] **GREEN** — refine `_classify_google_client_error` to attach `provider_metadata=extract_google_metadata(exc)` and use semantic `user_action.kind` on every raise
-- [ ] Migrate `instructor.exceptions` → `instructor.core`
-- [ ] **AUDIT** — `google-genai` SDK exception hierarchy
-- [ ] Run tests + `make agent-check`
+- [x] **RED** — wrote `tests/unit/pipelex/plugins/google/test_extract_google_metadata.py` (10 tests). Google's `APIError`/`ClientError`/`ServerError` carry `code: int` (HTTP status — *not* `status_code`), `message`, `status` (symbolic name like `RESOURCE_EXHAUSTED`), and `details` (the raw JSON response dict). Constructed via `genai_errors.ClientError(code, response_json, response)` with an `httpx.Response` for header-bearing cases.
+- [x] **RED** — wrote `tests/unit/pipelex/plugins/google/test_google_llm_worker_object_error_handling.py` (10 tests). Cases (each asserts category + `user_action.kind` + `provider_metadata`):
+  - Wrapped `genai_errors.ServerError` (500) → `TRANSIENT` + `WAIT_AND_RETRY`
+  - Wrapped `genai_errors.ClientError` (429 generic) → `TRANSIENT` + `WAIT_AND_RETRY`
+  - Wrapped `genai_errors.ClientError` (429 quota / `RESOURCE_EXHAUSTED`) → `CAPACITY` + `CHECK_BILLING`
+  - Wrapped `genai_errors.ClientError` (400 content-policy) → `CONTENT` + `CHANGE_INPUT`
+  - Wrapped `genai_errors.ClientError` (400 generic) → `CONTENT` + `CHANGE_INPUT`
+  - Wrapped `genai_errors.ClientError` (401 auth) → `CONFIGURATION` + `CHECK_CREDENTIALS`
+  - Wrapped `genai_errors.ClientError` (403 forbidden) → `CONFIGURATION` + `CHECK_CREDENTIALS`
+  - Wrapped `genai_errors.ClientError` (404 not-found) → `CONFIGURATION` + `CHANGE_MODEL`
+  - Wrapped non-SDK exception (`ValueError`) → `UNKNOWN` + `provider_metadata=None`
+  - Real-instructor end-to-end: patches `client.aio.models.generate_content` (what `instructor.from_genai` ultimately calls in `use_async=True` mode); requires injecting a real `genai_types.Content` from `prepare_user_contents` because instructor's gemini message converter rejects a bare empty list as a message.
+- [x] **GREEN** — added `extract_google_metadata(exc: BaseException) -> ProviderErrorMetadata` in `pipelex/cogt/inference/error_classification.py` alongside a small `_google_provider_error_code_from_details` helper (reads `error.status` then top-level `status` to recover symbolic names like `RESOURCE_EXHAUSTED`, `UNAUTHENTICATED`, `PERMISSION_DENIED`). `request_id` comes from `response.headers["x-goog-request-id"]` (falling back to `x-request-id`); status code from `exc.code` (Google does not use `exc.status_code`); body is `exc.details`.
+- [x] **GREEN** — refactored `pipelex/plugins/google/google_llm_worker.py`. Added `_raise_categorized_google_sdk_error(sdk_exc, chain_from)` helper that dispatches `ServerError` directly to TRANSIENT (no need for the 4xx discriminator) and routes `ClientError` through `_classify_google_client_error`. Both `_gen_text` and `_gen_object` now go through the helper. `_gen_object` unwraps `InstructorRetryException` first; unrecognized underlying routes to `UNKNOWN` per Phase 2 convention (previously fell back to `CONTENT`).
+- [x] **GREEN** — refined `_classify_google_client_error` to attach `provider_metadata=extract_google_metadata(exc)` on every raise and use semantic `UserActionKind` values: 404→CHANGE_MODEL, 401/403→CHECK_CREDENTIALS, 429+quota→CHECK_BILLING, 429+generic→WAIT_AND_RETRY, 400+content-policy→CHANGE_INPUT, 400+generic→CHANGE_INPUT, 4xx fallback→WAIT_AND_RETRY. Previously the 404, 401/403, generic-400, and 4xx-fallback paths lacked a `user_action` entirely; they now carry one so downstream consumers see a uniform shape. Existing `test_google_worker_error_handling.py` (the direct `_gen_text` path) keeps passing — the `expected_action_substring` check is `None` for the cases we newly populated, so adding a `user_action.detail` is a no-op for the assertion.
+- [x] Migrated `from instructor.exceptions import InstructorRetryException` → `from instructor.core import InstructorRetryException` in `google_llm_worker.py`.
+- [x] **AUDIT** — `google-genai` SDK exception hierarchy (`google/genai/errors.py`):
+  - `APIError(Exception)` — base for all HTTP errors. Carries `code: int` (HTTP status), `response` (httpx/requests/replay response, may be `None`), `message`, `status` (symbolic), `details` (raw JSON dict).
+  - `ClientError(APIError)` — 4xx errors.
+  - `ServerError(APIError)` — 5xx errors.
+  - `UnknownFunctionCallArgumentError(ValueError)`, `UnsupportedFunctionError(ValueError)`, `FunctionInvocationError(ValueError)`, `UnknownApiResponseError(ValueError)` — these are tool-calling / response-parsing failures, not HTTP errors. They subclass `ValueError`, not `APIError`, so they fall through to the wrapped-path `UNKNOWN` branch. Acceptable today; if telemetry shows them appearing in inference flows, add a dedicated branch.
+  - Note: Google's SDK does *not* have separate timeout/connection classes the way OpenAI/Anthropic do. Network-level failures propagate as the underlying `httpx`/`requests` exceptions and would fall through tuple-catch, hitting the wrapped-path `UNKNOWN` branch or being absorbed by tenacity retry above.
+- [x] Ran `.venv/bin/pytest tests/unit/pipelex/plugins/google/` (68 passed) and full plugins+cogt sweep (889 passed); `make agent-check` clean (0 errors, 0 warnings).
 
 > ### **STOP — CHECKPOINT I: Google Gemini LLM done**
 >
@@ -416,6 +402,15 @@ Use this section to capture decisions, surprises, and cold-start handoff context
   - **Fallback path now routes to UNKNOWN.** Previously the unwrapped-instructor fallback used `error_category=CONTENT`, which silently mis-categorized non-Mistral underlying exceptions. Per Phase 2 convention, it now routes to `UNKNOWN` with `provider_metadata=None`.
   - **Semantic UserActionKind values:** rate-limit→WAIT_AND_RETRY, quota (402 or 429+keywords)→CHECK_BILLING, 401/403→CHECK_CREDENTIALS, 404→CHANGE_MODEL, content-policy→CHANGE_INPUT, generic bad-request→CHANGE_INPUT, 5xx→WAIT_AND_RETRY, fallback→WAIT_AND_RETRY. Previously the 401/403/404 paths and the fallback path lacked a `user_action` entirely; they now carry one so downstream consumers see a uniform shape.
   - **Tests.** New: `test_extract_mistral_metadata.py` (10 tests) and `test_mistral_llm_worker_object_error_handling.py` (10 tests including a real-instructor end-to-end). Existing `test_mistral_worker_error_handling.py` (the direct `_gen_text` path) still passes — the `_classify_mistral_error` refactor preserved the categorization output for every case it covered.
+- **2026-05-14 — Phase 8 landed.** Google Gemini LLM brought up to the beyond-reference standard.
+  - **`extract_google_metadata` field shape.** Google's SDK differs from OpenAI/Anthropic on three points: (1) HTTP status lives on `exc.code` (not `exc.status_code`); (2) the response body lives on `exc.details` (the raw JSON dict the API returned, *not* `exc.body`); (3) the symbolic error code is a textual `status` field like `RESOURCE_EXHAUSTED`, `UNAUTHENTICATED`, `PERMISSION_DENIED` — read from `details["error"]["status"]` with a top-level `details["status"]` fallback for endpoints that flatten the payload. Added `_google_provider_error_code_from_details` helper to handle both shapes. `request_id` reads `x-goog-request-id` first (Google-specific) and falls back to `x-request-id` for older endpoints. `response` may be `None` (the SDK constructor accepts it), so the helper degrades gracefully — every header-derived field becomes `None`.
+  - **Helper method + ServerError specialization.** Introduced `_raise_categorized_google_sdk_error(sdk_exc, chain_from)` so both `_gen_text` and `_gen_object` dispatch through one place. `ServerError` is handled directly in the helper (TRANSIENT + WAIT_AND_RETRY) without going through the 4xx-discriminator in `_classify_google_client_error` — same shape as Phase 8's plan called for.
+  - **Fallback path now routes to UNKNOWN.** Previously `_gen_object`'s `InstructorRetryException` clause raised `LLMCompletionError` with `error_category=CONTENT`, which silently mis-categorized any non-Google underlying exception. Per Phase 2 convention, it now routes to `UNKNOWN` with `provider_metadata=None`.
+  - **Real-instructor test required a real `Content` object.** instructor's gemini message converter (`instructor/providers/gemini/utils.py:565`) rejects a bare `list` as a message: it expects each message to be a dict or a `genai_types.Content`. The Google worker wraps `prepare_user_contents`'s return value as `messages=[contents]`, so when the mock returned `[]` we ended up with `messages=[[]]` which crashes the converter. The real-instructor test now injects a `genai_types.Content(role="user", parts=[Part.from_text(text="hi")])` so instructor reaches the SDK call (which we patched to raise `ClientError`). The other 9 tests in the suite use a synthetic `wrap_in_instructor_retry(sdk_exc)` that side-effects the instructor client mock directly, so they never go through the converter.
+  - **Semantic UserActionKind values:** 404→CHANGE_MODEL, 401/403→CHECK_CREDENTIALS, 429+quota→CHECK_BILLING, 429+generic→WAIT_AND_RETRY, 400+content-policy→CHANGE_INPUT, 400+generic→CHANGE_INPUT, 4xx fallback→WAIT_AND_RETRY, 5xx (ServerError)→WAIT_AND_RETRY. Previously the 404/401/403/generic-400/fallback paths lacked a `user_action`; they now carry one so downstream consumers see a uniform shape.
+  - **Img-gen worker untouched.** `pipelex/plugins/google/google_img_gen_worker.py` has its own `_classify_google_client_error` copy with the same shape. It is in scope for Phase 10 (img-gen audits), not Phase 8 — left as-is for now.
+  - **SDK hierarchy audited.** `genai_errors.{APIError, ClientError, ServerError}` are the HTTP error classes; `UnknownFunctionCallArgumentError`, `UnsupportedFunctionError`, `FunctionInvocationError`, `UnknownApiResponseError` are tool-calling / parsing failures that subclass `ValueError`, *not* `APIError`. They fall through tuple-catch and route to wrapped-path `UNKNOWN`. Google's SDK doesn't have separate timeout/connection classes the way OpenAI/Anthropic do — network failures propagate as the underlying `httpx`/`requests` exceptions.
+  - **Tests.** New: `test_extract_google_metadata.py` (10 tests) and `test_google_llm_worker_object_error_handling.py` (10 tests, including a real-instructor end-to-end). Existing `test_google_worker_error_handling.py` (direct `_gen_text` path through `ClientError`/`ServerError`) still passes — the `_classify_google_client_error` refactor preserved every case it covered, and the newly-populated `user_action.detail` fields are no-ops where the test asserted `expected_action_substring is None`.
 - **2026-05-14 — Phase 3 landed.** `ProviderErrorMetadata` + `extract_anthropic_metadata` live in `pipelex/cogt/inference/error_classification.py`. Decisions:
   - **Field placement.** `provider_metadata` was added to `CogtError` (not the four leaf classes the plan named). The uniform base-class field keeps every subclass's `__init__` consistent and lets `to_error_report()` serialize it generically. Non-SDK CogtError subclasses just leave it `None` — same cost as Optional fields on the four leaves, simpler code.
   - **`AnthropicCredentialsError` carries metadata too** because we now have the metadata at the raise site and dropping it would lose auth-error telemetry (status_code 401, request_id).
