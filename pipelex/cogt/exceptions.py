@@ -1,15 +1,19 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
+from pydantic.dataclasses import rebuild_dataclass
 from typing_extensions import override
 
 from pipelex.base_exceptions import ErrorReport, PipelexError
+from pipelex.cogt.inference.error_classification import ProviderErrorMetadata
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     from pipelex.cogt.model_backends.model_type import ModelType
     from pipelex.cogt.models.model_reference import ModelReferenceKind
+
+rebuild_dataclass(cast("Any", ErrorReport), _types_namespace={"ProviderErrorMetadata": ProviderErrorMetadata})
 
 
 class InferenceErrorCategory(StrEnum):
@@ -38,18 +42,22 @@ class InferenceErrorCategory(StrEnum):
 class CogtError(PipelexError):
     error_category: InferenceErrorCategory | None = None
     user_action: str | None = None
+    provider_metadata: ProviderErrorMetadata | None = None
 
     def __init__(
         self,
         message: str,
         error_category: InferenceErrorCategory | None = None,
         user_action: str | None = None,
+        provider_metadata: ProviderErrorMetadata | None = None,
     ):
         super().__init__(message)
         if error_category is not None:
             self.error_category = error_category
         if user_action is not None:
             self.user_action = user_action
+        if provider_metadata is not None:
+            self.provider_metadata = provider_metadata
 
     @override
     def to_error_report(self) -> ErrorReport:
@@ -61,6 +69,7 @@ class CogtError(PipelexError):
             user_action=self.user_action,
             model=getattr(self, "model_handle", None),
             provider=getattr(self, "backend_name", None),
+            provider_metadata=self.provider_metadata,
         )
 
 

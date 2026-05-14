@@ -6,7 +6,26 @@ recover the underlying SDK exception that ``InstructorRetryException``
 wraps when ``instructor`` exhausts its retry loop.
 """
 
-from typing import Any
+from typing import Any, cast
+
+from pydantic import BaseModel
+
+
+class ProviderErrorMetadata(BaseModel):
+    """Structured SDK metadata attached to inference errors.
+
+    Carries information downstream consumers (retry, temporal, CLI) need
+    without having to scrape it back from the exception chain.
+    """
+
+    provider: str
+    sdk_exception_type: str
+    status_code: int | None = None
+    request_id: str | None = None
+    retry_after_seconds: float | None = None
+    provider_error_code: str | None = None
+    body: Any | None = None
+
 
 _OPENAI_QUOTA_PATTERNS: tuple[str, ...] = (
     "insufficient_quota",
@@ -155,3 +174,59 @@ def extract_underlying_sdk_exception(instructor_exc: Any) -> BaseException | Non
         if isinstance(underlying, BaseException):
             return underlying
     return None
+
+
+def _parse_retry_after_seconds(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _provider_error_code_from_body(body: Any) -> str | None:
+    if not isinstance(body, dict):
+        return None
+    error_section = cast("dict[str, Any]", body).get("error")
+    if not isinstance(error_section, dict):
+        return None
+    error_dict = cast("dict[str, Any]", error_section)
+    code = error_dict.get("type") or error_dict.get("code")
+    if isinstance(code, str):
+        return code
+    return None
+
+
+def extract_anthropic_metadata(exc: BaseException) -> ProviderErrorMetadata:
+    """Distill an Anthropic SDK exception into a ``ProviderErrorMetadata``.
+
+    Tolerates the two exception shapes in the Anthropic SDK:
+
+    - ``APIStatusError`` subclasses expose ``status_code``, ``request_id``,
+      ``response.headers`` (for ``Retry-After``) and ``body``.
+    - ``APIConnectionError`` / ``APITimeoutError`` expose neither
+      ``status_code`` nor ``response``; every status-related field comes back
+      as ``None``.
+    """
+    status_code = getattr(exc, "status_code", None)
+    if not isinstance(status_code, int):
+        status_code = None
+    request_id = getattr(exc, "request_id", None)
+    if not isinstance(request_id, str):
+        request_id = None
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", None)
+    retry_after_seconds: float | None = None
+    if headers is not None:
+        retry_after_seconds = _parse_retry_after_seconds(headers.get("retry-after"))
+    body = getattr(exc, "body", None)
+    return ProviderErrorMetadata(
+        provider="anthropic",
+        sdk_exception_type=type(exc).__name__,
+        status_code=status_code,
+        request_id=request_id,
+        retry_after_seconds=retry_after_seconds,
+        provider_error_code=_provider_error_code_from_body(body),
+        body=body,
+    )

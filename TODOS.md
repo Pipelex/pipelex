@@ -107,23 +107,15 @@ The current "fall back to `CONTENT`" path when `extract_underlying_sdk_exception
 
 Every raised inference error should carry structured SDK metadata so downstream consumers (retry/temporal/CLI) don't have to scrape it back from the exception chain.
 
-- [ ] **RED** — write `tests/unit/pipelex/cogt/inference/test_provider_error_metadata.py`:
-  - `ProviderErrorMetadata` accepts `provider: str`, `sdk_exception_type: str`, `status_code: int | None`, `request_id: str | None`, `retry_after_seconds: float | None`, `provider_error_code: str | None`, `body: Any | None`
-  - All fields except `provider` and `sdk_exception_type` are Optional
-  - Pydantic v2 round-trips correctly
-- [ ] **RED** — write `tests/unit/pipelex/plugins/anthropic/test_extract_anthropic_metadata.py`:
-  - extracts `status_code` from `anthropic.RateLimitError(..., response=httpx.Response(status_code=429, ...))`
-  - extracts `request_id` from `anthropic.APIError.request_id` (confirm attribute name against installed SDK)
-  - extracts `retry_after_seconds` from the `Retry-After` response header when present; returns `None` when absent
-  - extracts `provider_error_code` from wherever Anthropic exposes it on the exception body (confirm against SDK; often `exc.body["error"]["type"]`)
-  - returns metadata with `None` for every missing field, without raising
-- [ ] **RED** — in `test_anthropic_worker_object_error_handling.py`, add assertions to a representative subset of existing cases (rate-limit, quota, bad-request) that the raised `LLMCompletionError.provider_metadata` is populated with the expected `status_code`, `request_id`, `retry_after_seconds`, `provider_error_code`. Add a snapshot/structure assertion that `to_error_report()` includes the metadata under a stable key.
-- [ ] **GREEN** — define `ProviderErrorMetadata` (Pydantic `BaseModel`) in `pipelex/cogt/inference/error_classification.py`
-- [ ] **GREEN** — add `provider_metadata: ProviderErrorMetadata | None = None` field to the four dynamic-category exception types: `LLMCompletionError`, `ImgGenGenerationError`, `ExtractJobFailureError`, `SearchJobFailureError`
-- [ ] **GREEN** — write `extract_anthropic_metadata(exc: anthropic.APIError) -> ProviderErrorMetadata` in `pipelex/cogt/inference/error_classification.py`
-- [ ] **GREEN** — update the Anthropic worker's catch blocks (and `_raise_categorized_anthropic_sdk_error`) to call `extract_anthropic_metadata(exc)` and pass `provider_metadata=...` to each `LLMCompletionError(...)` call
-- [ ] **GREEN** — update `PipelexError.to_error_report()` (in `pipelex/base_exceptions.py`) to include `provider_metadata` via `.model_dump()` when present
-- [ ] Run `make agent-check`
+- [x] **RED** — wrote `tests/unit/pipelex/cogt/inference/test_provider_error_metadata.py` (required/optional fields, round-trip)
+- [x] **RED** — wrote `tests/unit/pipelex/plugins/anthropic/test_extract_anthropic_metadata.py` (status_code, request_id, retry-after, provider_error_code from body, graceful handling of APIConnectionError/APITimeoutError shapes)
+- [x] **RED** — in `test_anthropic_worker_object_error_handling.py`, added `provider_metadata` assertions to rate-limit/quota/bad-request cases plus a `to_error_report()` serialization test.
+- [x] **GREEN** — defined `ProviderErrorMetadata` (Pydantic `BaseModel`) in `pipelex/cogt/inference/error_classification.py`.
+- [x] **GREEN** — added `provider_metadata: ProviderErrorMetadata | None = None` on `CogtError` (rather than scattering on each of the four leaf classes). Rationale in running notes — every CogtError subclass now carries the field uniformly with no per-class `__init__` plumbing.
+- [x] **GREEN** — wrote `extract_anthropic_metadata(exc: BaseException) -> ProviderErrorMetadata` in `pipelex/cogt/inference/error_classification.py`. Tolerates the two SDK shapes (APIStatusError vs APIConnectionError/APITimeoutError).
+- [x] **GREEN** — updated `_raise_categorized_anthropic_sdk_error` to call `extract_anthropic_metadata(sdk_exc)` once and pass `provider_metadata=metadata` to every `LLMCompletionError` and `AnthropicCredentialsError` raise.
+- [x] **GREEN** — added `provider_metadata` to `ErrorReport` (with `arbitrary_types_allowed=True` for the Pydantic dataclass), and wired the field into `CogtError.to_error_report()`. Used `rebuild_dataclass(ErrorReport, ...)` in `cogt/exceptions.py` to resolve the forward reference at import time (keeps `base_exceptions.py` free of cogt deps).
+- [x] Ran `make agent-check` — clean.
 
 > ### **STOP — CHECKPOINT D: `ProviderErrorMetadata` field landed**
 >
@@ -408,3 +400,8 @@ Use this section to capture decisions, surprises, and cold-start handoff context
 - **2026-05-14 — Bedrock decision.** `pipelex/plugins/bedrock/bedrock_llm_worker.py::_gen_object` raises `LLMCapabilityError` and does not use instructor (the file's only `instructor` mention is a `# TODO` comment). No `Phase 8.5` will be created. Bedrock still gets upgrades A–C in Phase 11.
 - **2026-05-14 — Phase 1 landed.** `extract_underlying_sdk_exception` lives in `pipelex/cogt/inference/error_classification.py`. Anthropic worker imports from the shared module. The defensive try/except around `failed_attempts[-1]` swallows `TypeError`/`KeyError`/`IndexError` to keep the helper safe against malformed input (the tests cover a string-as-failed_attempts case). Defending only against typing/lookup exceptions (not generic Exception) keeps real bugs visible.
 - **2026-05-14 — Phase 2 landed.** `InferenceErrorCategory.UNKNOWN` lives in `pipelex/cogt/exceptions.py` (NOT `error_classification.py` — TODOS.md text was off). Value is lowercase `"unknown"` to match other members. `is_retryable=False`. Anthropic worker's `InstructorRetryException` fallback uses UNKNOWN. Other workers still use whatever they had — they get migrated in their own phases.
+- **2026-05-14 — Phase 3 landed.** `ProviderErrorMetadata` + `extract_anthropic_metadata` live in `pipelex/cogt/inference/error_classification.py`. Decisions:
+  - **Field placement.** `provider_metadata` was added to `CogtError` (not the four leaf classes the plan named). The uniform base-class field keeps every subclass's `__init__` consistent and lets `to_error_report()` serialize it generically. Non-SDK CogtError subclasses just leave it `None` — same cost as Optional fields on the four leaves, simpler code.
+  - **`AnthropicCredentialsError` carries metadata too** because we now have the metadata at the raise site and dropping it would lose auth-error telemetry (status_code 401, request_id).
+  - **Forward reference resolution.** `ErrorReport` (Pydantic dataclass in `base_exceptions.py`) takes `ProviderErrorMetadata` as a string-forward-ref. To avoid making `base_exceptions` depend on `cogt/`, `cogt/exceptions.py` does the import and calls `rebuild_dataclass(cast("Any", ErrorReport), _types_namespace=...)`. The cast is needed because pyright doesn't recognize Pydantic dataclasses through its `PydanticDataclass` protocol. `arbitrary_types_allowed=True` is set on the dataclass config because `ProviderErrorMetadata` is a `BaseModel` (not a dataclass), which Pydantic v2 dataclasses don't accept by default.
+  - **Body type handling.** `extract_anthropic_metadata` reads `exc.body` (Any) and `exc.response.headers["retry-after"]`. `_provider_error_code_from_body` casts the body to `dict[str, Any]` to silence `reportUnknownMemberType` on `.get()`. The fallback chain is `error.type` then `error.code` — Anthropic uses `type`, but other providers (when this helper pattern is replicated) commonly use `code`, so we accept both for future reuse.

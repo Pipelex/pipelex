@@ -1,10 +1,13 @@
-from typing import cast
+from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import TypeAdapter
 from pydantic.dataclasses import dataclass
 
+if TYPE_CHECKING:
+    from pipelex.cogt.inference.error_classification import ProviderErrorMetadata
 
-@dataclass(frozen=True, config={"extra": "forbid"})
+
+@dataclass(frozen=True, config={"extra": "forbid", "arbitrary_types_allowed": True})
 class ErrorReport:
     """Structured error report — single source of truth for all error serialization.
 
@@ -18,11 +21,12 @@ class ErrorReport:
     user_action: str | None = None
     model: str | None = None
     provider: str | None = None
+    provider_metadata: "ProviderErrorMetadata | None" = None
 
-    def to_dict(self) -> dict[str, str | bool]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a dict with only non-None fields."""
         return cast(
-            "dict[str, str | bool]",
+            "dict[str, Any]",
             TypeAdapter(type(self)).dump_python(self, mode="python", exclude_none=True),
         )
 

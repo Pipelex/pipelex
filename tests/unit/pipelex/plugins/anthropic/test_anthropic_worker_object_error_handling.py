@@ -107,6 +107,11 @@ class TestAnthropicWorkerObjectErrorHandling:
         assert exc_info.value.user_action is not None
         assert "retry" in exc_info.value.user_action.lower()
         assert exc_info.value.__cause__ is wrapped
+        metadata = exc_info.value.provider_metadata
+        assert metadata is not None
+        assert metadata.provider == "anthropic"
+        assert metadata.sdk_exception_type == "RateLimitError"
+        assert metadata.status_code == 429
 
     async def test_wrapped_rate_limit_quota_is_capacity(self, mocker: MockerFixture) -> None:
         _patch_gen_object_dependencies(mocker)
@@ -121,6 +126,10 @@ class TestAnthropicWorkerObjectErrorHandling:
         assert exc_info.value.error_category is InferenceErrorCategory.CAPACITY
         assert exc_info.value.user_action is not None
         assert "billing" in exc_info.value.user_action.lower()
+        metadata = exc_info.value.provider_metadata
+        assert metadata is not None
+        assert metadata.status_code == 429
+        assert metadata.sdk_exception_type == "RateLimitError"
 
     async def test_wrapped_timeout_is_transient(self, mocker: MockerFixture) -> None:
         _patch_gen_object_dependencies(mocker)
@@ -146,6 +155,10 @@ class TestAnthropicWorkerObjectErrorHandling:
         assert exc_info.value.error_category is InferenceErrorCategory.CONTENT
         assert exc_info.value.user_action is not None
         assert "safety filters" in exc_info.value.user_action.lower()
+        metadata = exc_info.value.provider_metadata
+        assert metadata is not None
+        assert metadata.status_code == 400
+        assert metadata.sdk_exception_type == "BadRequestError"
 
     async def test_wrapped_connection_error_is_transient(self, mocker: MockerFixture) -> None:
         _patch_gen_object_dependencies(mocker)
@@ -192,6 +205,26 @@ class TestAnthropicWorkerObjectErrorHandling:
 
         assert exc_info.value.error_category is InferenceErrorCategory.UNKNOWN
         assert exc_info.value.__cause__ is wrapped
+
+    async def test_provider_metadata_is_serialized_in_error_report(self, mocker: MockerFixture) -> None:
+        """``to_error_report()`` must surface ``provider_metadata`` so downstream consumers see it."""
+        _patch_gen_object_dependencies(mocker)
+        worker = _make_worker(mocker)
+        sdk_exc = _make_anthropic_rate_limit_error("Your account quota has been exceeded")
+        wrapped = wrap_in_instructor_retry(sdk_exc)
+        worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        with pytest.raises(LLMCompletionError) as exc_info:
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        report = exc_info.value.to_error_report()
+        report_dict = report.to_dict()
+        assert "provider_metadata" in report_dict
+        metadata_dict = report_dict["provider_metadata"]
+        assert isinstance(metadata_dict, dict)
+        assert metadata_dict["provider"] == "anthropic"
+        assert metadata_dict["sdk_exception_type"] == "RateLimitError"
+        assert metadata_dict["status_code"] == 429
 
     async def test_real_instructor_wraps_rate_limit_and_fix_unwraps_correctly(self, mocker: MockerFixture) -> None:
         """End-to-end: drive the real instructor library with an SDK exception and

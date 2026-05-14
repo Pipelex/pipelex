@@ -18,6 +18,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
 from pipelex.cogt.inference.error_classification import (
+    extract_anthropic_metadata,
     extract_underlying_sdk_exception,
     is_content_policy_violation,
     is_quota_exhaustion_anthropic,
@@ -242,6 +243,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
 
         """
         cause = chain_from if chain_from is not None else sdk_exc
+        metadata = extract_anthropic_metadata(sdk_exc)
 
         if isinstance(sdk_exc, RateLimitError):
             error_message = str(sdk_exc)
@@ -251,17 +253,23 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                     msg,
                     error_category=InferenceErrorCategory.CAPACITY,
                     user_action=f"Your Anthropic account has exceeded its quota — check billing at {URLs.anthropic_billing}",
+                    provider_metadata=metadata,
                 ) from cause
             msg = f"Anthropic rate limit exceeded for model '{self.inference_model.desc}': {sdk_exc}"
             raise LLMCompletionError(
                 msg,
                 error_category=InferenceErrorCategory.TRANSIENT,
                 user_action="Rate limited by Anthropic — the system will retry automatically",
+                provider_metadata=metadata,
             ) from cause
 
         if isinstance(sdk_exc, APITimeoutError):
             msg = f"Anthropic API request timed out for model '{self.inference_model.desc}': {sdk_exc}"
-            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT) from cause
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                provider_metadata=metadata,
+            ) from cause
 
         if isinstance(sdk_exc, BadRequestError):
             error_message = str(sdk_exc)
@@ -271,13 +279,22 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                     msg,
                     error_category=InferenceErrorCategory.CONTENT,
                     user_action="Content was rejected by safety filters — revise the prompt",
+                    provider_metadata=metadata,
                 ) from cause
             msg = f"Anthropic bad request error: {sdk_exc}"
-            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT) from cause
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                provider_metadata=metadata,
+            ) from cause
 
         if isinstance(sdk_exc, APIConnectionError):
             msg = f"Anthropic API connection error: {sdk_exc}"
-            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT) from cause
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                provider_metadata=metadata,
+            ) from cause
 
         if isinstance(sdk_exc, PermissionDeniedError):
             error_message = str(sdk_exc)
@@ -287,13 +304,18 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                     msg,
                     error_category=InferenceErrorCategory.CAPACITY,
                     user_action=f"Your Anthropic account has exceeded its quota — check billing at {URLs.anthropic_billing}",
+                    provider_metadata=metadata,
                 ) from cause
             msg = f"Anthropic permission denied: {sdk_exc}"
-            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from cause
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.CONFIGURATION,
+                provider_metadata=metadata,
+            ) from cause
 
         if isinstance(sdk_exc, AuthenticationError):
             msg = f"Anthropic credentials error: {sdk_exc}"
-            raise AnthropicCredentialsError(msg) from cause
+            raise AnthropicCredentialsError(msg, provider_metadata=metadata) from cause
 
     @override
     async def _gen_text(
