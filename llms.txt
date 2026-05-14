@@ -4,150 +4,150 @@
 
 ## Get Started
 
-- [Build & Run AI Methods](https://docs.pipelex.com/0.27.0/index.md): Build & Run AI Methods (landing page)
-- [Build with Claude Code](https://docs.pipelex.com/0.27.0/get-started/build-with-claude-code/index.md): Build with Claude Code
-- [The MTHDS Language Tutorial](https://docs.pipelex.com/0.27.0/get-started/mthds-language-tutorial/index.md): The MTHDS Language Tutorial
-- [Configure AI Providers](https://docs.pipelex.com/0.27.0/get-started/configure-ai-providers/index.md): Configure AI Providers
+- [Build & Run AI Methods](https://docs.pipelex.com/0.28.0/index.md): Build & Run AI Methods (landing page)
+- [Build with Claude Code](https://docs.pipelex.com/0.28.0/get-started/build-with-claude-code/index.md): Build with Claude Code
+- [The MTHDS Language Tutorial](https://docs.pipelex.com/0.28.0/get-started/mthds-language-tutorial/index.md): The MTHDS Language Tutorial
+- [Configure AI Providers](https://docs.pipelex.com/0.28.0/get-started/configure-ai-providers/index.md): Configure AI Providers
 
 ## Cookbook Examples
 
-- [Overview](https://docs.pipelex.com/0.27.0/cookbook/index.md): Cookbook Overview
-- [Hello World](https://docs.pipelex.com/0.27.0/cookbook/hello-world/index.md): Hello World
-- [Summarize](https://docs.pipelex.com/0.27.0/cookbook/summarize/index.md): Summarize
-- [Generic Document](https://docs.pipelex.com/0.27.0/cookbook/extract-generic/index.md): Extract Generic Document
-- [Invoice](https://docs.pipelex.com/0.27.0/cookbook/extract-invoice/index.md): Extract Invoice
-- [Proof of Purchase](https://docs.pipelex.com/0.27.0/cookbook/extract-proof-of-purchase/index.md): Extract Proof of Purchase
-- [DPE (Energy Diagnostic)](https://docs.pipelex.com/0.27.0/cookbook/extract-dpe/index.md): Extract DPE (Energy Diagnostic)
-- [Table from Image](https://docs.pipelex.com/0.27.0/cookbook/extract-table/index.md): Extract Table from Image
-- [Gantt Chart](https://docs.pipelex.com/0.27.0/cookbook/extract-gantt/index.md): Extract Gantt Chart
-- [Markdown from Document](https://docs.pipelex.com/0.27.0/cookbook/extract-markdown/index.md): Extract Markdown from Document
-- [Slides from Presentation](https://docs.pipelex.com/0.27.0/cookbook/extract-slides/index.md): Extract Slides from Presentation
-- [Design Slides](https://docs.pipelex.com/0.27.0/cookbook/design-slides/index.md): Design Slides
-- [Generate Image](https://docs.pipelex.com/0.27.0/cookbook/generate-image/index.md): Generate Image
-- [Synthetic Data](https://docs.pipelex.com/0.27.0/cookbook/gen-synthetic-data/index.md): Generate Synthetic Data
-- [Expense Data with Receipts](https://docs.pipelex.com/0.27.0/cookbook/gen-expense-data/index.md): Generate Expense Data with Receipts
-- [Using Inference Plugins](https://docs.pipelex.com/0.27.0/cookbook/using-inference-plugins/index.md): Using Inference Plugins
+- [Overview](https://docs.pipelex.com/0.28.0/cookbook/index.md): Cookbook Overview
+- [Hello World](https://docs.pipelex.com/0.28.0/cookbook/hello-world/index.md): Hello World
+- [Summarize](https://docs.pipelex.com/0.28.0/cookbook/summarize/index.md): Summarize
+- [Generic Document](https://docs.pipelex.com/0.28.0/cookbook/extract-generic/index.md): Extract Generic Document
+- [Invoice](https://docs.pipelex.com/0.28.0/cookbook/extract-invoice/index.md): Extract Invoice
+- [Proof of Purchase](https://docs.pipelex.com/0.28.0/cookbook/extract-proof-of-purchase/index.md): Extract Proof of Purchase
+- [DPE (Energy Diagnostic)](https://docs.pipelex.com/0.28.0/cookbook/extract-dpe/index.md): Extract DPE (Energy Diagnostic)
+- [Table from Image](https://docs.pipelex.com/0.28.0/cookbook/extract-table/index.md): Extract Table from Image
+- [Gantt Chart](https://docs.pipelex.com/0.28.0/cookbook/extract-gantt/index.md): Extract Gantt Chart
+- [Markdown from Document](https://docs.pipelex.com/0.28.0/cookbook/extract-markdown/index.md): Extract Markdown from Document
+- [Slides from Presentation](https://docs.pipelex.com/0.28.0/cookbook/extract-slides/index.md): Extract Slides from Presentation
+- [Design Slides](https://docs.pipelex.com/0.28.0/cookbook/design-slides/index.md): Design Slides
+- [Generate Image](https://docs.pipelex.com/0.28.0/cookbook/generate-image/index.md): Generate Image
+- [Synthetic Data](https://docs.pipelex.com/0.28.0/cookbook/gen-synthetic-data/index.md): Generate Synthetic Data
+- [Expense Data with Receipts](https://docs.pipelex.com/0.28.0/cookbook/gen-expense-data/index.md): Generate Expense Data with Receipts
+- [Using Inference Plugins](https://docs.pipelex.com/0.28.0/cookbook/using-inference-plugins/index.md): Using Inference Plugins
 
 ## Viewpoint
 
-- [The Know-How Graph](https://docs.pipelex.com/0.27.0/viewpoint/viewpoint/index.md): The Know-How Graph
+- [The Know-How Graph](https://docs.pipelex.com/0.28.0/viewpoint/viewpoint/index.md): The Know-How Graph
 
 ## Features
 
-- [Overview](https://docs.pipelex.com/0.27.0/features/index.md): Features Overview
-- [MTHDS Language](https://docs.pipelex.com/0.27.0/features/mthds-language/index.md): MTHDS Language
-- [Concepts & Structured Types](https://docs.pipelex.com/0.27.0/features/concepts/index.md): Concepts & Structured Types
-- [Pipe Operators](https://docs.pipelex.com/0.27.0/features/pipe-operators/index.md): Pipe Operators
-- [Pipeline Orchestration](https://docs.pipelex.com/0.27.0/features/pipeline-orchestration/index.md): Pipeline Orchestration
-- [Pipelex Gateway & Model Access](https://docs.pipelex.com/0.27.0/features/gateway/index.md): Pipelex Gateway & Model Access
-- [LLM Integration](https://docs.pipelex.com/0.27.0/features/llm-integration/index.md): LLM Integration
-- [Document Extraction](https://docs.pipelex.com/0.27.0/features/document-extraction/index.md): Document Extraction
-- [Image Generation](https://docs.pipelex.com/0.27.0/features/image-generation/index.md): Image Generation
-- [Web Search](https://docs.pipelex.com/0.27.0/features/web-search/index.md): Web Search
-- [Claude Code Skills Plugin](https://docs.pipelex.com/0.27.0/features/claude-code-skills-plugin/index.md): Claude Code Skills Plugin
-- [CLI](https://docs.pipelex.com/0.27.0/features/cli/index.md): CLI
-- [plxt Formatter & Linter](https://docs.pipelex.com/0.27.0/features/plxt/index.md): plxt Formatter & Linter
-- [Execution Graph Visualization](https://docs.pipelex.com/0.27.0/features/execution-graph/index.md): Execution Graph Visualization
-- [Validation & Dry Run](https://docs.pipelex.com/0.27.0/features/validation-dry-run/index.md): Validation & Dry Run
-- [Telemetry & Observability](https://docs.pipelex.com/0.27.0/features/telemetry/index.md): Telemetry & Observability
-- [Cloud Storage](https://docs.pipelex.com/0.27.0/features/cloud-storage/index.md): Cloud Storage
-- [Cost Tracking & Reporting](https://docs.pipelex.com/0.27.0/features/cost-tracking/index.md): Cost Tracking & Reporting
-- [Configuration System](https://docs.pipelex.com/0.27.0/features/configuration/index.md): Configuration System
-- [Advanced Customizations](https://docs.pipelex.com/0.27.0/features/advanced-customizations/index.md): Advanced Customizations
+- [Overview](https://docs.pipelex.com/0.28.0/features/index.md): Features Overview
+- [MTHDS Language](https://docs.pipelex.com/0.28.0/features/mthds-language/index.md): MTHDS Language
+- [Concepts & Structured Types](https://docs.pipelex.com/0.28.0/features/concepts/index.md): Concepts & Structured Types
+- [Pipe Operators](https://docs.pipelex.com/0.28.0/features/pipe-operators/index.md): Pipe Operators
+- [Pipeline Orchestration](https://docs.pipelex.com/0.28.0/features/pipeline-orchestration/index.md): Pipeline Orchestration
+- [Pipelex Gateway & Model Access](https://docs.pipelex.com/0.28.0/features/gateway/index.md): Pipelex Gateway & Model Access
+- [LLM Integration](https://docs.pipelex.com/0.28.0/features/llm-integration/index.md): LLM Integration
+- [Document Extraction](https://docs.pipelex.com/0.28.0/features/document-extraction/index.md): Document Extraction
+- [Image Generation](https://docs.pipelex.com/0.28.0/features/image-generation/index.md): Image Generation
+- [Web Search](https://docs.pipelex.com/0.28.0/features/web-search/index.md): Web Search
+- [Claude Code Skills Plugin](https://docs.pipelex.com/0.28.0/features/claude-code-skills-plugin/index.md): Claude Code Skills Plugin
+- [CLI](https://docs.pipelex.com/0.28.0/features/cli/index.md): CLI
+- [plxt Formatter & Linter](https://docs.pipelex.com/0.28.0/features/plxt/index.md): plxt Formatter & Linter
+- [Execution Graph Visualization](https://docs.pipelex.com/0.28.0/features/execution-graph/index.md): Execution Graph Visualization
+- [Validation & Dry Run](https://docs.pipelex.com/0.28.0/features/validation-dry-run/index.md): Validation & Dry Run
+- [Telemetry & Observability](https://docs.pipelex.com/0.28.0/features/telemetry/index.md): Telemetry & Observability
+- [Cloud Storage](https://docs.pipelex.com/0.28.0/features/cloud-storage/index.md): Cloud Storage
+- [Cost Tracking & Reporting](https://docs.pipelex.com/0.28.0/features/cost-tracking/index.md): Cost Tracking & Reporting
+- [Configuration System](https://docs.pipelex.com/0.28.0/features/configuration/index.md): Configuration System
+- [Advanced Customizations](https://docs.pipelex.com/0.28.0/features/advanced-customizations/index.md): Advanced Customizations
 
 ## Building Methods
 
-- [Kick off a Method Project](https://docs.pipelex.com/0.27.0/building-methods/kick-off-a-methods-project/index.md): Kick off a Method Project
-- [Pipelex Bundle Specification](https://docs.pipelex.com/0.27.0/building-methods/pipelex-bundle-specification/index.md): Pipelex Bundle Specification
-- [Domain](https://docs.pipelex.com/0.27.0/building-methods/domain/index.md): Domain
-- [Define Your Concepts](https://docs.pipelex.com/0.27.0/building-methods/concepts/define_your_concepts/index.md): Define Your Concepts
-- [Inline structures](https://docs.pipelex.com/0.27.0/building-methods/concepts/inline-structures/index.md): Inline Structures
-- [Python classes](https://docs.pipelex.com/0.27.0/building-methods/concepts/python-classes/index.md): Python Classes
-- [Native Concepts](https://docs.pipelex.com/0.27.0/building-methods/concepts/native-concepts/index.md): Native Concepts
-- [Refining Concepts](https://docs.pipelex.com/0.27.0/building-methods/concepts/refining-concepts/index.md): Refining Concepts
-- [Overview](https://docs.pipelex.com/0.27.0/building-methods/pipes/index.md): Design and Run Methods Overview
-- [Libraries](https://docs.pipelex.com/0.27.0/building-methods/libraries/index.md): Libraries
-- [Packages](https://docs.pipelex.com/0.27.0/building-methods/packages/index.md): Packages
-- [Executing Pipelines](https://docs.pipelex.com/0.27.0/building-methods/pipes/executing-pipelines/index.md): Executing Pipelines
-- [Providing Inputs to Pipelines](https://docs.pipelex.com/0.27.0/building-methods/pipes/provide-inputs/index.md): Providing Inputs to Pipelines
-- [Working Memory](https://docs.pipelex.com/0.27.0/building-methods/pipes/working-memory/index.md): Working Memory
-- [Pipe Output](https://docs.pipelex.com/0.27.0/building-methods/pipes/pipe-output/index.md): Pipe Output
-- [Understanding Multiplicity](https://docs.pipelex.com/0.27.0/building-methods/pipes/understanding-multiplicity/index.md): Understanding Multiplicity
-- [Overview](https://docs.pipelex.com/0.27.0/building-methods/pipes/pipe-operators/index.md): Pipe Operators Overview
-- [PipeLLM](https://docs.pipelex.com/0.27.0/building-methods/pipes/pipe-operators/PipeLLM/index.md): PipeLLM
-- [PipeExtract](https://docs.pipelex.com/0.27.0/building-methods/pipes/pipe-operators/PipeExtract/index.md): PipeExtract
-- [PipeImgGen](https://docs.pipelex.com/0.27.0/building-methods/pipes/pipe-operators/PipeImgGen/index.md): PipeImgGen
-- [PipeSearch](https://docs.pipelex.com/0.27.0/building-methods/pipes/pipe-operators/PipeSearch/index.md): PipeSearch
-- [PipeCompose](https://docs.pipelex.com/0.27.0/building-methods/pipes/pipe-operators/PipeCompose/index.md): PipeCompose
-- [PipeFunc](https://docs.pipelex.com/0.27.0/building-methods/pipes/pipe-operators/PipeFunc/index.md): PipeFunc
-- [Overview](https://docs.pipelex.com/0.27.0/building-methods/pipes/pipe-controllers/index.md): Pipe Controllers Overview
-- [PipeSequence](https://docs.pipelex.com/0.27.0/building-methods/pipes/pipe-controllers/PipeSequence/index.md): PipeSequence
-- [PipeParallel](https://docs.pipelex.com/0.27.0/building-methods/pipes/pipe-controllers/PipeParallel/index.md): PipeParallel
-- [PipeBatch](https://docs.pipelex.com/0.27.0/building-methods/pipes/pipe-controllers/PipeBatch/index.md): PipeBatch
-- [PipeCondition](https://docs.pipelex.com/0.27.0/building-methods/pipes/pipe-controllers/PipeCondition/index.md): PipeCondition
-- [Optimize Cost & Quality](https://docs.pipelex.com/0.27.0/building-methods/configure-ai-llm-to-optimize-methods/index.md): Optimize Cost & Quality
-- [LLM Structured Generation](https://docs.pipelex.com/0.27.0/building-methods/llm-structured-generation-config/index.md): LLM Structured Generation
-- [LLM Prompting Style](https://docs.pipelex.com/0.27.0/building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral/index.md): LLM Prompting Style
+- [Kick off a Method Project](https://docs.pipelex.com/0.28.0/building-methods/kick-off-a-methods-project/index.md): Kick off a Method Project
+- [Pipelex Bundle Specification](https://docs.pipelex.com/0.28.0/building-methods/pipelex-bundle-specification/index.md): Pipelex Bundle Specification
+- [Domain](https://docs.pipelex.com/0.28.0/building-methods/domain/index.md): Domain
+- [Define Your Concepts](https://docs.pipelex.com/0.28.0/building-methods/concepts/define_your_concepts/index.md): Define Your Concepts
+- [Inline structures](https://docs.pipelex.com/0.28.0/building-methods/concepts/inline-structures/index.md): Inline Structures
+- [Python classes](https://docs.pipelex.com/0.28.0/building-methods/concepts/python-classes/index.md): Python Classes
+- [Native Concepts](https://docs.pipelex.com/0.28.0/building-methods/concepts/native-concepts/index.md): Native Concepts
+- [Refining Concepts](https://docs.pipelex.com/0.28.0/building-methods/concepts/refining-concepts/index.md): Refining Concepts
+- [Overview](https://docs.pipelex.com/0.28.0/building-methods/pipes/index.md): Design and Run Methods Overview
+- [Libraries](https://docs.pipelex.com/0.28.0/building-methods/libraries/index.md): Libraries
+- [Packages](https://docs.pipelex.com/0.28.0/building-methods/packages/index.md): Packages
+- [Executing Pipelines](https://docs.pipelex.com/0.28.0/building-methods/pipes/executing-pipelines/index.md): Executing Pipelines
+- [Providing Inputs to Pipelines](https://docs.pipelex.com/0.28.0/building-methods/pipes/provide-inputs/index.md): Providing Inputs to Pipelines
+- [Working Memory](https://docs.pipelex.com/0.28.0/building-methods/pipes/working-memory/index.md): Working Memory
+- [Pipe Output](https://docs.pipelex.com/0.28.0/building-methods/pipes/pipe-output/index.md): Pipe Output
+- [Understanding Multiplicity](https://docs.pipelex.com/0.28.0/building-methods/pipes/understanding-multiplicity/index.md): Understanding Multiplicity
+- [Overview](https://docs.pipelex.com/0.28.0/building-methods/pipes/pipe-operators/index.md): Pipe Operators Overview
+- [PipeLLM](https://docs.pipelex.com/0.28.0/building-methods/pipes/pipe-operators/PipeLLM/index.md): PipeLLM
+- [PipeExtract](https://docs.pipelex.com/0.28.0/building-methods/pipes/pipe-operators/PipeExtract/index.md): PipeExtract
+- [PipeImgGen](https://docs.pipelex.com/0.28.0/building-methods/pipes/pipe-operators/PipeImgGen/index.md): PipeImgGen
+- [PipeSearch](https://docs.pipelex.com/0.28.0/building-methods/pipes/pipe-operators/PipeSearch/index.md): PipeSearch
+- [PipeCompose](https://docs.pipelex.com/0.28.0/building-methods/pipes/pipe-operators/PipeCompose/index.md): PipeCompose
+- [PipeFunc](https://docs.pipelex.com/0.28.0/building-methods/pipes/pipe-operators/PipeFunc/index.md): PipeFunc
+- [Overview](https://docs.pipelex.com/0.28.0/building-methods/pipes/pipe-controllers/index.md): Pipe Controllers Overview
+- [PipeSequence](https://docs.pipelex.com/0.28.0/building-methods/pipes/pipe-controllers/PipeSequence/index.md): PipeSequence
+- [PipeParallel](https://docs.pipelex.com/0.28.0/building-methods/pipes/pipe-controllers/PipeParallel/index.md): PipeParallel
+- [PipeBatch](https://docs.pipelex.com/0.28.0/building-methods/pipes/pipe-controllers/PipeBatch/index.md): PipeBatch
+- [PipeCondition](https://docs.pipelex.com/0.28.0/building-methods/pipes/pipe-controllers/PipeCondition/index.md): PipeCondition
+- [Optimize Cost & Quality](https://docs.pipelex.com/0.28.0/building-methods/configure-ai-llm-to-optimize-methods/index.md): Optimize Cost & Quality
+- [LLM Structured Generation](https://docs.pipelex.com/0.28.0/building-methods/llm-structured-generation-config/index.md): LLM Structured Generation
+- [LLM Prompting Style](https://docs.pipelex.com/0.28.0/building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral/index.md): LLM Prompting Style
 
 ## Reference
 
-- [Overview](https://docs.pipelex.com/0.27.0/tools/cli/index.md): CLI Reference Overview
-- [Init](https://docs.pipelex.com/0.27.0/tools/cli/init/index.md): CLI Init
-- [Update](https://docs.pipelex.com/0.27.0/tools/cli/update/index.md): CLI Update
-- [Validate](https://docs.pipelex.com/0.27.0/tools/cli/validate/index.md): CLI Validate
-- [Run](https://docs.pipelex.com/0.27.0/tools/cli/run/index.md): CLI Run
-- [Show](https://docs.pipelex.com/0.27.0/tools/cli/show/index.md): CLI Show
-- [Pkg](https://docs.pipelex.com/0.27.0/tools/cli/pkg/index.md): CLI Pkg
-- [Overview](https://docs.pipelex.com/0.27.0/tools/cli/build/index.md): CLI Build Overview
-- [Runner](https://docs.pipelex.com/0.27.0/tools/cli/build/runner/index.md): CLI Build Runner
-- [Structures](https://docs.pipelex.com/0.27.0/tools/cli/build/structures/index.md): CLI Build Structures
-- [Inputs](https://docs.pipelex.com/0.27.0/tools/cli/build/inputs/index.md): CLI Build Inputs
-- [Output](https://docs.pipelex.com/0.27.0/tools/cli/build/output/index.md): CLI Build Output
-- [Agent CLI](https://docs.pipelex.com/0.27.0/tools/cli/agent-cli/index.md): Agent CLI
-- [Overview](https://docs.pipelex.com/0.27.0/configuration/index.md): Configuration Overview
-- [Dry Run](https://docs.pipelex.com/0.27.0/configuration/config-pipeline-validation/dry-run-config/index.md): Dry Run Configuration
-- [Logging](https://docs.pipelex.com/0.27.0/configuration/config-practical/logging-config/index.md): Logging Configuration
-- [Pipe Run](https://docs.pipelex.com/0.27.0/configuration/config-practical/pipe-run-config/index.md): Pipe Run Configuration
-- [Reporting](https://docs.pipelex.com/0.27.0/configuration/config-practical/reporting-config/index.md): Reporting Configuration
-- [Telemetry](https://docs.pipelex.com/0.27.0/configuration/config-practical/telemetry-config/index.md): Telemetry Configuration
-- [AWS](https://docs.pipelex.com/0.27.0/configuration/config-technical/aws-config/index.md): AWS Configuration
-- [Cogt](https://docs.pipelex.com/0.27.0/configuration/config-technical/cogt-config/index.md): Cogt Configuration
-- [LLM Providers & Models](https://docs.pipelex.com/0.27.0/configuration/config-technical/inference-backend-config/index.md): LLM Providers & Models Configuration
-- [Library](https://docs.pipelex.com/0.27.0/configuration/config-technical/library-config/index.md): Library Configuration
-- [Feature](https://docs.pipelex.com/0.27.0/configuration/config-advanced/feature-config/index.md): Feature Configuration
-- [plxt (Formatter & Linter)](https://docs.pipelex.com/0.27.0/tools/plxt/index.md): plxt (Formatter & Linter)
-- [Logging](https://docs.pipelex.com/0.27.0/tools/logging/index.md): Logging
-- [Observer Data Extraction](https://docs.pipelex.com/0.27.0/analytics/data-extraction/index.md): Observer Data Extraction
-- [Telemetry](https://docs.pipelex.com/0.27.0/setup/telemetry/index.md): Telemetry
-- [Gateway Available Models](https://docs.pipelex.com/0.27.0/setup/gateway-models/index.md): Gateway Available Models
+- [Overview](https://docs.pipelex.com/0.28.0/tools/cli/index.md): CLI Reference Overview
+- [Init](https://docs.pipelex.com/0.28.0/tools/cli/init/index.md): CLI Init
+- [Update](https://docs.pipelex.com/0.28.0/tools/cli/update/index.md): CLI Update
+- [Validate](https://docs.pipelex.com/0.28.0/tools/cli/validate/index.md): CLI Validate
+- [Run](https://docs.pipelex.com/0.28.0/tools/cli/run/index.md): CLI Run
+- [Show](https://docs.pipelex.com/0.28.0/tools/cli/show/index.md): CLI Show
+- [Pkg](https://docs.pipelex.com/0.28.0/tools/cli/pkg/index.md): CLI Pkg
+- [Overview](https://docs.pipelex.com/0.28.0/tools/cli/build/index.md): CLI Build Overview
+- [Runner](https://docs.pipelex.com/0.28.0/tools/cli/build/runner/index.md): CLI Build Runner
+- [Structures](https://docs.pipelex.com/0.28.0/tools/cli/build/structures/index.md): CLI Build Structures
+- [Inputs](https://docs.pipelex.com/0.28.0/tools/cli/build/inputs/index.md): CLI Build Inputs
+- [Output](https://docs.pipelex.com/0.28.0/tools/cli/build/output/index.md): CLI Build Output
+- [Agent CLI](https://docs.pipelex.com/0.28.0/tools/cli/agent-cli/index.md): Agent CLI
+- [Overview](https://docs.pipelex.com/0.28.0/configuration/index.md): Configuration Overview
+- [Dry Run](https://docs.pipelex.com/0.28.0/configuration/config-pipeline-validation/dry-run-config/index.md): Dry Run Configuration
+- [Logging](https://docs.pipelex.com/0.28.0/configuration/config-practical/logging-config/index.md): Logging Configuration
+- [Pipe Run](https://docs.pipelex.com/0.28.0/configuration/config-practical/pipe-run-config/index.md): Pipe Run Configuration
+- [Reporting](https://docs.pipelex.com/0.28.0/configuration/config-practical/reporting-config/index.md): Reporting Configuration
+- [Telemetry](https://docs.pipelex.com/0.28.0/configuration/config-practical/telemetry-config/index.md): Telemetry Configuration
+- [AWS](https://docs.pipelex.com/0.28.0/configuration/config-technical/aws-config/index.md): AWS Configuration
+- [Cogt](https://docs.pipelex.com/0.28.0/configuration/config-technical/cogt-config/index.md): Cogt Configuration
+- [LLM Providers & Models](https://docs.pipelex.com/0.28.0/configuration/config-technical/inference-backend-config/index.md): LLM Providers & Models Configuration
+- [Library](https://docs.pipelex.com/0.28.0/configuration/config-technical/library-config/index.md): Library Configuration
+- [Feature](https://docs.pipelex.com/0.28.0/configuration/config-advanced/feature-config/index.md): Feature Configuration
+- [plxt (Formatter & Linter)](https://docs.pipelex.com/0.28.0/tools/plxt/index.md): plxt (Formatter & Linter)
+- [Logging](https://docs.pipelex.com/0.28.0/tools/logging/index.md): Logging
+- [Observer Data Extraction](https://docs.pipelex.com/0.28.0/analytics/data-extraction/index.md): Observer Data Extraction
+- [Telemetry](https://docs.pipelex.com/0.28.0/setup/telemetry/index.md): Telemetry
+- [Gateway Available Models](https://docs.pipelex.com/0.28.0/setup/gateway-models/index.md): Gateway Available Models
 
 ## Advanced
 
-- [Overview](https://docs.pipelex.com/0.27.0/advanced/index.md): Advanced Customizations Overview
-- [Secrets Provider](https://docs.pipelex.com/0.27.0/advanced/secrets-provider-injection/index.md): Secrets Provider
-- [Reporting Delegate](https://docs.pipelex.com/0.27.0/advanced/reporting-delegate-injection/index.md): Reporting Delegate
-- [Storage Provider](https://docs.pipelex.com/0.27.0/advanced/storage-provider-injection/index.md): Storage Provider
-- [Observer](https://docs.pipelex.com/0.27.0/advanced/observer-provider-injection/index.md): Observer
-- [Content Generator](https://docs.pipelex.com/0.27.0/advanced/content-generator-injection/index.md): Content Generator
-- [Pipe Router](https://docs.pipelex.com/0.27.0/advanced/pipe-router-injection/index.md): Pipe Router
+- [Overview](https://docs.pipelex.com/0.28.0/advanced/index.md): Advanced Customizations Overview
+- [Secrets Provider](https://docs.pipelex.com/0.28.0/advanced/secrets-provider-injection/index.md): Secrets Provider
+- [Reporting Delegate](https://docs.pipelex.com/0.28.0/advanced/reporting-delegate-injection/index.md): Reporting Delegate
+- [Storage Provider](https://docs.pipelex.com/0.28.0/advanced/storage-provider-injection/index.md): Storage Provider
+- [Observer](https://docs.pipelex.com/0.28.0/advanced/observer-provider-injection/index.md): Observer
+- [Content Generator](https://docs.pipelex.com/0.28.0/advanced/content-generator-injection/index.md): Content Generator
+- [Pipe Router](https://docs.pipelex.com/0.28.0/advanced/pipe-router-injection/index.md): Pipe Router
 
 ## Under the Hood
 
-- [Overview](https://docs.pipelex.com/0.27.0/under-the-hood/index.md): Under the Hood Overview
-- [Architecture Overview](https://docs.pipelex.com/0.27.0/under-the-hood/architecture-overview/index.md): Architecture Overview
-- [Dry Run Mock Generation](https://docs.pipelex.com/0.27.0/under-the-hood/dry-run-mock-generation/index.md): Dry Run Mock Generation
-- [Execution Graph Tracing](https://docs.pipelex.com/0.27.0/under-the-hood/execution-graph-tracing/index.md): Execution Graph Tracing
-- [Image Handling in LLM Prompts](https://docs.pipelex.com/0.27.0/under-the-hood/image-handling-in-llm-prompts/index.md): Image Handling in LLM Prompts
-- [Reasoning Controls](https://docs.pipelex.com/0.27.0/under-the-hood/reasoning-controls/index.md): Reasoning Controls
-- [StuffArtefact & Image Rendering](https://docs.pipelex.com/0.27.0/under-the-hood/stuffartefact-and-image-rendering/index.md): StuffArtefact & Image Rendering
-- [Test Profile Configuration](https://docs.pipelex.com/0.27.0/under-the-hood/test-profile-configuration/index.md): Test Profile Configuration
-- [Init CLI Flows](https://docs.pipelex.com/0.27.0/under-the-hood/init-cli-flows/index.md): Init CLI Flows
-- [Pipe Routing & Execution](https://docs.pipelex.com/0.27.0/under-the-hood/pipe-routing-and-execution/index.md): Pipe Routing & Execution
-- [Temporal Integration](https://docs.pipelex.com/0.27.0/under-the-hood/temporal-integration/index.md): Temporal Integration
-- [Distributed Content Generation](https://docs.pipelex.com/0.27.0/under-the-hood/distributed-content-generation/index.md): Distributed Content Generation
+- [Overview](https://docs.pipelex.com/0.28.0/under-the-hood/index.md): Under the Hood Overview
+- [Architecture Overview](https://docs.pipelex.com/0.28.0/under-the-hood/architecture-overview/index.md): Architecture Overview
+- [Dry Run Mock Generation](https://docs.pipelex.com/0.28.0/under-the-hood/dry-run-mock-generation/index.md): Dry Run Mock Generation
+- [Execution Graph Tracing](https://docs.pipelex.com/0.28.0/under-the-hood/execution-graph-tracing/index.md): Execution Graph Tracing
+- [Image Handling in LLM Prompts](https://docs.pipelex.com/0.28.0/under-the-hood/image-handling-in-llm-prompts/index.md): Image Handling in LLM Prompts
+- [Reasoning Controls](https://docs.pipelex.com/0.28.0/under-the-hood/reasoning-controls/index.md): Reasoning Controls
+- [StuffArtefact & Image Rendering](https://docs.pipelex.com/0.28.0/under-the-hood/stuffartefact-and-image-rendering/index.md): StuffArtefact & Image Rendering
+- [Test Profile Configuration](https://docs.pipelex.com/0.28.0/under-the-hood/test-profile-configuration/index.md): Test Profile Configuration
+- [Init CLI Flows](https://docs.pipelex.com/0.28.0/under-the-hood/init-cli-flows/index.md): Init CLI Flows
+- [Pipe Routing & Execution](https://docs.pipelex.com/0.28.0/under-the-hood/pipe-routing-and-execution/index.md): Pipe Routing & Execution
+- [Temporal Integration](https://docs.pipelex.com/0.28.0/under-the-hood/temporal-integration/index.md): Temporal Integration
+- [Distributed Content Generation](https://docs.pipelex.com/0.28.0/under-the-hood/distributed-content-generation/index.md): Distributed Content Generation
 
 ## Project
 
-- [Contributing](https://docs.pipelex.com/0.27.0/contributing/index.md): Contributing
-- [Configuration Internals](https://docs.pipelex.com/0.27.0/contribute/configuration-defaults-and-overrides/index.md): Configuration Internals
-- [Changelog](https://docs.pipelex.com/0.27.0/changelog/index.md): Changelog
+- [Contributing](https://docs.pipelex.com/0.28.0/contributing/index.md): Contributing
+- [Configuration Internals](https://docs.pipelex.com/0.28.0/contribute/configuration-defaults-and-overrides/index.md): Configuration Internals
+- [Changelog](https://docs.pipelex.com/0.28.0/changelog/index.md): Changelog
