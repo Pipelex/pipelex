@@ -12,8 +12,9 @@ from pipelex.cogt.exceptions import (
     LLMCapabilityError,
     LLMCompletionError,
     LLMModelNotFoundError,
+    ModelWaterfallError,
 )
-from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
+from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from tests.unit.pipelex.cogt.test_data import ExceptionTestData
 
 
@@ -57,6 +58,35 @@ class TestErrorCategoryInfrastructure:
         err = LLMModelNotFoundError(message="not found", model_handle="gpt-4")
         assert err.error_category is InferenceErrorCategory.CONFIGURATION
         assert err.model_handle == "gpt-4"
+
+    def test_model_waterfall_error_preserves_class_level_category(self) -> None:
+        """ModelWaterfallError forwards only message + model_handle to ModelNotFoundError.__init__;
+        the new optional kwargs default to None and must not clobber the class-level
+        error_category = CONFIGURATION.
+        """
+        err = ModelWaterfallError(message="waterfall exhausted", model_handle="gpt-4", fallback_list=["gpt-3.5"])
+        assert err.error_category is InferenceErrorCategory.CONFIGURATION
+        assert err.model_handle == "gpt-4"
+        assert err.fallback_list == ["gpt-3.5"]
+        assert err.user_action is None
+        assert err.provider_metadata is None
+
+    def test_llm_model_not_found_error_carries_new_kwargs(self) -> None:
+        """LLMModelNotFoundError accepts user_action and provider_metadata via the widened
+        ModelNotFoundError.__init__, so worker-side categorization can attach SDK metadata.
+        """
+        metadata = ProviderErrorMetadata(provider="openai", sdk_exception_type="NotFoundError", status_code=404)
+        user_action = UserAction(kind=UserActionKind.CHANGE_MODEL, detail="pick another model")
+        err = LLMModelNotFoundError(
+            message="model gpt-99 not found",
+            model_handle="gpt-99",
+            user_action=user_action,
+            provider_metadata=metadata,
+        )
+        assert err.error_category is InferenceErrorCategory.CONFIGURATION
+        assert err.model_handle == "gpt-99"
+        assert err.user_action is user_action
+        assert err.provider_metadata is metadata
 
     def test_instance_override_beats_class_default(self) -> None:
         """Per-instance category overrides the class-level default."""
