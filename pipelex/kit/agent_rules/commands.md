@@ -126,3 +126,11 @@
      ```bash
      .venv/bin/pipelex-dev generate-mthds-schema
      ```
+
+   - **`refresh-graph-ui-sri`**: Refetch the pinned graph viewer assets from jsDelivr (`@pipelex/mthds-ui` standalone JS+CSS, `elkjs`) and rewrite `pipelex/graph/reactflow/standalone_assets.py` with new `sha384` Subresource Integrity hashes. Use when bumping the pinned mthds-ui or elkjs version.
+
+     ```bash
+     .venv/bin/pipelex-dev refresh-graph-ui-sri --mthds-ui-version 0.6.3
+     # or rotate elkjs alongside:
+     .venv/bin/pipelex-dev refresh-graph-ui-sri --mthds-ui-version 0.6.3 --elkjs-version 0.11.1
+     ```

@@ -273,10 +273,18 @@ class StructureGenerator:
             self.imports.add(f"from {cls.__module__} import {cls.__name__}")
         elif base_class != "StructuredContent":
             # Check if we have module info for this custom base class in concept_ref_to_class_info
+            base_module_path: str | None = None
             for class_info in self.concept_ref_to_class_info.values():
                 if class_info.class_name == base_class and class_info.module_path:
-                    self.imports.add(f"from {class_info.module_path} import {class_info.class_name}")
+                    base_module_path = class_info.module_path
                     break
+            if base_module_path is None:
+                # Cross-package refines: base class lives in another already-installed package — recover its module via the class registry.
+                registered_cls = _get_class_registry().get_class(name=base_class)
+                if registered_cls is not None and registered_cls.__name__ == base_class and registered_cls.__module__ not in {"__main__", "builtins"}:
+                    base_module_path = registered_cls.__module__
+            if base_module_path:
+                self.imports.add(f"from {base_module_path} import {base_class}")
 
         # Generate class header with docstring (use class name if no description provided)
         docstring = description or f"Generated {class_name} class"
@@ -597,9 +605,6 @@ class StructureGenerator:
                     except ValueError:
                         pass
                 return f"Dict[{key_type}, {value_type}]"
-
-        # Fallback for unknown types
-        return str(field_type)
 
     def _validate_execution(
         self,
