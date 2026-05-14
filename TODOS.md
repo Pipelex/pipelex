@@ -249,15 +249,15 @@ After every `🛑 CHECKPOINT` line:
 
 ## Phase 6 — User-facing polish
 
-- [ ] **6.1** Update `pipelex/cli/agent_cli/commands/agent_output.py`:
+- [x] **6.1** Update `pipelex/cli/agent_cli/commands/agent_output.py`:
   - Add `AGENT_ERROR_HINTS` entries for `RemoteConfigUnavailableError` and `GatewayUnknownModelError`.
   - Add `AGENT_ERROR_DOMAINS` entries for both.
   - Keep the existing `RemoteConfigFetchError` and `RemoteConfigValidationError` hints intact.
-- [ ] **6.2** Update `pipelex/cli/error_handlers.py` for the Rich CLI surface: add handlers for `RemoteConfigUnavailableError` and `GatewayUnknownModelError` mirroring the agent-cli hints. Keep existing `RemoteConfigFetchError`/`RemoteConfigValidationError` handlers.
-- [ ] **6.3** Update relevant CLAUDE.md sections:
+- [x] **6.2** Update `pipelex/cli/error_handlers.py` for the Rich CLI surface: add handlers for `RemoteConfigUnavailableError` and `GatewayUnknownModelError` mirroring the agent-cli hints. Keep existing `RemoteConfigFetchError`/`RemoteConfigValidationError` handlers.
+- [x] **6.3** Update relevant CLAUDE.md sections:
   - `pipelex/cli/agent_cli/CLAUDE.md` if error classes are mentioned.
   - `pipelex/system/pipelex_service/CLAUDE.md` if it exists; create a short note if not (only if there's already a convention for service-level docs).
-- [ ] **6.4** Add a `## [Unreleased]` entry to `CHANGELOG.md` summarising the user-visible behaviour change (offline support + new error types + new warning).
+- [x] **6.4** Add a `## [Unreleased]` entry to `CHANGELOG.md` summarising the user-visible behaviour change (offline support + new error types + new warning).
 
 > **Deferred from this PR:** Phase 6.3-old (`pipelex doctor` cache-age reporting) and Phase 6.6-old (cross-repo `mthds-plugins/wip/codex-sandbox-escalation.md` update). See "Deferred follow-ups" at the bottom of this file.
 
@@ -479,3 +479,28 @@ Capture as separate work after this lands:
 - `make agent-check` — clean (ruff + plxt + pyright + mypy all green).
 
 **Next:** Phase 6 — start at **6.1** (update `agent_output.py` `AGENT_ERROR_HINTS`/`AGENT_ERROR_DOMAINS` for new error types).
+
+### Checkpoint 6 status
+
+**Landed:**
+- `pipelex/cli/agent_cli/commands/agent_output.py` — already carried `AGENT_ERROR_HINTS` and `AGENT_ERROR_DOMAINS` entries for `RemoteConfigUnavailableError` and `GatewayUnknownModelError` from Phase 3. No further changes needed. Existing `RemoteConfigFetchError` and `RemoteConfigValidationError` hints intact.
+- `pipelex/cli/error_handlers.py` — added two Rich-CLI handlers mirroring the agent-cli hints:
+  - `handle_remote_config_unavailable_error(exc)` — frames the failure as "offline + cold cache", names both remediation paths (prime the cache via `pipelex init` while online, or disable the gateway for permanent BYOK operation). Echoes the underlying error message which already contains the cache file path.
+  - `handle_gateway_unknown_model_error(exc)` — shows the unknown model handle and the config source provenance, and branches the remediation via `match exc.source` on `RemoteConfigSource.{FRESH,CACHED}`. Fresh-source: typo/deck-update guidance; cached-source: `pipelex init` while online to refresh the cache. Imported the `RemoteConfigSource` enum from `pipelex.system.pipelex_service.types` (the leaf-level enum module, not `pipelex_service.types` reachable through `remote_config_fetcher`).
+  - Existing `handle_remote_config_fetch_error` and `handle_remote_config_validation_error` handlers untouched.
+- `pipelex/cli/cli_factory.py` — wired both new handlers into `make_pipelex_for_cli`'s except chain: `RemoteConfigUnavailableError` → `handle_remote_config_unavailable_error`; `GatewayUnknownModelError` → `handle_gateway_unknown_model_error`. Order matters: `RemoteConfigFetchError` is the parent-level retry-layer exception (caught first); `RemoteConfigUnavailableError` is its user-facing sibling raised when the cache fallback fails too (caught next); `GatewayUnknownModelError` is unrelated and lives further down the chain.
+- `CHANGELOG.md` — added a fresh `## [Unreleased]` section above v0.28.0 with three buckets:
+  - **Added**: offline-mode setup/dry-run support (cache lifecycle, stale warning, telemetry suppression, doc-generator refusal), `GatewayUnknownModelError` (source-aware messaging), `RemoteConfigUnavailableError` (cache-cold failure), `PIPELEX_REMOTE_CONFIG_URL` env var.
+  - **Changed**: `RemoteConfigFetcher.fetch_remote_config()` now returns a `RemoteConfigResult` with provenance and accepts `require_fresh: bool = False`; `ModelManager.setup()` / `BackendLibrary._load_gateway_model_specs()` accept `gateway_config_source: RemoteConfigSource | None`.
+
+**Decisions:**
+- **6.3 CLAUDE.md updates: no-op.** `pipelex/cli/agent_cli/CLAUDE.md` only points at `AGENT_ERROR_HINTS` as the registry — it doesn't enumerate specific error classes, so the new entries don't need to be mentioned. `pipelex/system/pipelex_service/CLAUDE.md` does not exist, and there's no convention for service-level CLAUDE.md docs (only `pipelex/builder/CLAUDE.md` and `pipelex/cli/agent_cli/CLAUDE.md` exist across the whole `pipelex/` tree). The plan's "only if there's already a convention" gate is not satisfied, so no new file was created.
+- The Rich CLI handlers deliberately mirror the agent-CLI hints but in Rich's "❌ / ⚠ / 💡" style rather than as one-liner JSON `hint` strings. Both surfaces remain consistent in *content* (same remediation paths, same provenance branching) but differ in *form* (Rich-formatted multi-line vs JSON envelope field).
+- The `RemoteConfigUnavailableError` handler does NOT re-print the cache file path because the underlying error message already contains it (see `RemoteConfigUnavailableError._build_unavailable_error` in `remote_config_fetcher.py`). Echoing `str(exc)` is sufficient.
+
+**Verification:**
+- `make agent-check` — clean (ruff fix-imports, ruff format, plxt fmt, ruff lint, plxt lint, pyright, mypy all green).
+- Targeted: `.venv/bin/pytest -n auto -m "not pipelex_api and not llm and not img_gen and not extract and not inference" tests/unit/pipelex/cli/ tests/integration/pipelex/cli/ tests/unit/pipelex/system/ tests/integration/pipelex/system/` — 429 passed (1 expected `RemoteConfigStaleWarning` from `test_telemetry_disabled_when_source_cached`).
+- `make agent-test` — full suite green.
+
+**Next:** Phase 7 — start at **7.1** (`make agent-check` clean) → **7.2** (`make agent-test` clean) → **7.3** (manual reproduction of every behaviour-matrix scenario through the real CLI surface) → **7.4** (squash-friendly commit history + PR description that references the codex-sandbox-escalation handoff and the deferred follow-ups).

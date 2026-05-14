@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Offline mode for Pipelex Gateway setup and dry-run.** When the gateway is enabled but the remote config service is temporarily unreachable, Pipelex now falls back to a previously primed on-disk cache (`~/.pipelex/cache/remote_config.json`, schema-versioned) instead of failing setup outright. Dry-run, validation, and `pipelex-agent run bundle --dry-run` complete normally; only the actual inference call still needs the network at runtime. The cache is primed on every successful fetch and on `pipelex init` while online. When the gateway is disabled (BYOK), no remote fetch is attempted at all — setup is fully offline. A new `RemoteConfigStaleWarning` (`UserWarning`) is emitted whenever stale cache is in use; the agent CLI surfaces it on the JSON envelope as `warnings: [{"type": "RemoteConfigStale", ...}]`. Telemetry is suppressed (no-op) when running on a cached config so stale model identities don't pollute metrics. The doc/fixture generators (`pipelex-dev update-gateway-models`, `preprocess_test_models_cmd`) refuse the cache fallback via a new `require_fresh=True` flag, so committed reference docs and test fixtures never bake in stale data.
+- **`GatewayUnknownModelError` (`pipelex.cogt.exceptions`).** Raised at setup time when the active model deck references a gateway model handle that isn't present in the (fresh or cached) gateway specs. Carries the model name and the config source (`RemoteConfigSource.FRESH` | `CACHED`); the message branches on source so a cached-source failure suggests `pipelex init` while online and a fresh-source failure points at deck/typo fixes. Wired through both the Rich CLI (`handle_gateway_unknown_model_error` in `error_handlers.py`) and the agent CLI (`AGENT_ERROR_HINTS` / `AGENT_ERROR_DOMAINS`).
+- **`RemoteConfigUnavailableError` (`pipelex.system.pipelex_service.exceptions`).** User-facing offline-mode error: raised only when the network fetch fails AND no usable cached fallback exists. The message names the cache file path and the two remediation paths (run `pipelex init` while online to prime the cache; or disable `pipelex_gateway` in `backends.toml` for permanent BYOK operation). Distinct from the internal `RemoteConfigFetchError`, which is kept as the retry-layer exception.
+- **`PIPELEX_REMOTE_CONFIG_URL` environment variable.** Overrides the default remote-config URL. Useful for staging/testing environments; defaults to the production URL when unset.
+
+### Changed
+
+- **`RemoteConfigFetcher.fetch_remote_config()` now returns a `RemoteConfigResult`** carrying `config`, `source` (`fresh` | `cached`), and `cached_at`, instead of a bare `RemoteConfig`. Callers unwrap `.config` for the payload and may branch on `.source` to know whether the config is fresh or restored from cache. The fetcher accepts a new keyword-only `require_fresh: bool = False` — when `True`, a cached fallback raises `RemoteConfigUnavailableError` instead. `RemoteConfigValidationError` is never satisfied by the cache (server-side schema breaks must surface loudly).
+- **`ModelManager.setup()` and `BackendLibrary._load_gateway_model_specs()` accept a new `gateway_config_source: RemoteConfigSource | None` parameter.** Passed through from `Pipelex.setup()` so the deck-level gateway membership check can branch its error message on `FRESH` vs `CACHED`. `GatewayConfig` itself stays `extra="forbid"` and source-free — provenance is plumbed alongside, not baked in.
+
 ## [v0.28.0] - 2026-05-13
 
 ### Changed
