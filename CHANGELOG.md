@@ -13,6 +13,7 @@
 
 - **`RemoteConfigFetcher.fetch_remote_config()` now returns a `RemoteConfigResult`** carrying `config`, `source` (`fresh` | `cached`), and `cached_at`, instead of a bare `RemoteConfig`. Callers unwrap `.config` for the payload and may branch on `.source` to know whether the config is fresh or restored from cache. The fetcher accepts a new keyword-only `require_fresh: bool = False` — when `True`, a cached fallback raises `RemoteConfigUnavailableError` instead. `RemoteConfigValidationError` is never satisfied by the cache (server-side schema breaks must surface loudly).
 - **`ModelManager.setup()` and `BackendLibrary._load_gateway_model_specs()` accept a new `gateway_config_source: RemoteConfigSource | None` parameter.** Passed through from `Pipelex.setup()` so the deck-level gateway membership check can branch its error message on `FRESH` vs `CACHED`. `GatewayConfig` itself stays `extra="forbid"` and source-free — provenance is plumbed alongside, not baked in.
+- **`RemoteConfigUnavailableError` message branches on whether the cache was refused vs absent.** When `require_fresh=True` (dev-CLI generators) refuses to fall back to an existing cache, the message now reads "the local cache at `<path>` was refused because a fresh fetch is required" instead of the previously misleading "no local cache is available at `<path>`". The cache-truly-missing path keeps its original wording.
 
 ## [v0.28.0] - 2026-05-13
 

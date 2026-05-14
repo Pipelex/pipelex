@@ -257,13 +257,19 @@ class TestRemoteConfigFetcher:
 
     @pytest.mark.usefixtures("isolated_cache_dir")
     def test_require_fresh_refuses_cache(self, mocker: MockerFixture) -> None:
-        """Doc generators set ``require_fresh=True`` so they never bake stale data into committed files."""
+        """Doc generators set ``require_fresh=True`` so they never bake stale data into committed files.
+
+        When cache is present, the error message must call out that the cache was refused
+        (not that it is missing) so the user gets accurate diagnostics.
+        """
         RemoteConfigCache.store(_valid_remote_config_payload())
         mocker.patch("httpx.get", side_effect=httpx.ConnectError("no network"))
         mocker.patch.object(RemoteConfigFetcher, "FETCH_MAX_RETRIES", 1)
 
-        with pytest.raises(RemoteConfigUnavailableError):
+        with pytest.raises(RemoteConfigUnavailableError) as exc_info:
             RemoteConfigFetcher.fetch_remote_config(require_fresh=True)
+
+        assert "was refused because a fresh fetch is required" in str(exc_info.value)
 
     @pytest.mark.usefixtures("isolated_cache_dir")
     def test_inner_retry_layer_still_raises_remote_config_fetch_error(self, mocker: MockerFixture) -> None:

@@ -162,16 +162,30 @@ class RemoteConfigFetcher:
         return payload
 
     @classmethod
-    def _build_unavailable_error(cls, fetch_error: RemoteConfigFetchError) -> RemoteConfigUnavailableError:
+    def _build_unavailable_error(
+        cls,
+        fetch_error: RemoteConfigFetchError,
+        cache_refused: bool = False,
+    ) -> RemoteConfigUnavailableError:
         """Build the user-facing offline-mode error with a clear remediation hint.
+
+        Args:
+            fetch_error: The underlying network/HTTP failure that triggered the unavailable state.
+            cache_refused: When ``True``, the caller passed ``require_fresh=True`` and refused
+                to fall back to any cached payload (dev-CLI generators do this). The message
+                branches to call out that the cache was refused rather than missing.
 
         Returns the exception so the caller can ``raise ... from fetch_error`` itself; this
         avoids "unreachable code" gymnastics at the call site.
         """
         cache_path = RemoteConfigCache.cache_path()
+        if cache_refused:
+            location = f"and the local cache at {cache_path} was refused because a fresh fetch is required"
+        else:
+            location = f"and no local cache is available at {cache_path}"
         msg = (
             f"Pipelex Gateway is enabled but the remote configuration is unreachable "
-            f"and no local cache is available at {cache_path}.\n"
+            f"{location}.\n"
             f"Underlying error: {fetch_error}\n"
             "Remediation:\n"
             "  - Run `pipelex init` while online to prime the cache.\n"
@@ -209,7 +223,7 @@ class RemoteConfigFetcher:
             payload = cls._fetch_fresh(url)
         except RemoteConfigFetchError as fetch_error:
             if require_fresh:
-                raise cls._build_unavailable_error(fetch_error) from fetch_error
+                raise cls._build_unavailable_error(fetch_error, cache_refused=True) from fetch_error
             cached = RemoteConfigCache.load()
             if cached is None:
                 raise cls._build_unavailable_error(fetch_error) from fetch_error

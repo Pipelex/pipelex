@@ -267,16 +267,16 @@ After every `🛑 CHECKPOINT` line:
 
 ## Phase 7 — Final verification
 
-- [ ] **7.1** `make agent-check` clean.
-- [ ] **7.2** `make agent-test` clean.
-- [ ] **7.3** Manually reproduce all scenarios from the behaviour matrix:
+- [x] **7.1** `make agent-check` clean.
+- [x] **7.2** `make agent-test` clean.
+- [x] **7.3** Manually reproduce all scenarios from the behaviour matrix:
   - BYOK offline `mthds-agent run bundle ... --dry-run --mock-inputs` → success.
   - Gateway online, no cache → success, cache written.
   - Gateway offline, cache present → success with stale warning.
   - Gateway offline, no cache → clear `RemoteConfigUnavailableError`.
   - Bundle references unknown gateway model → clear `GatewayUnknownModelError`.
   - `pipelex-dev update-gateway-models` offline → clear refusal (no stale docs written).
-- [ ] **7.4** Squash-friendly commit history; PR description references the codex-sandbox-escalation handoff and the deferred follow-ups.
+- [x] **7.4** Squash-friendly commit history; PR description references the codex-sandbox-escalation handoff and the deferred follow-ups.
 
 🛑 **CHECKPOINT 7** — Ready for review.
 
@@ -504,3 +504,34 @@ Capture as separate work after this lands:
 - `make agent-test` — full suite green.
 
 **Next:** Phase 7 — start at **7.1** (`make agent-check` clean) → **7.2** (`make agent-test` clean) → **7.3** (manual reproduction of every behaviour-matrix scenario through the real CLI surface) → **7.4** (squash-friendly commit history + PR description that references the codex-sandbox-escalation handoff and the deferred follow-ups).
+
+### Checkpoint 7 status
+
+**Landed:**
+- No new feature code — Phase 7 is a verification gate. One small message-clarity fix landed during the manual repro of 7.3 (see below).
+- `pipelex/system/pipelex_service/remote_config_fetcher.py` — `_build_unavailable_error` gained a `cache_refused: bool = False` flag. When the dev-CLI path passes `require_fresh=True` and a cache exists on disk, the error message now reads "the local cache at `<path>` was refused because a fresh fetch is required" instead of the previously misleading "no local cache is available at `<path>`". The cache-truly-missing path keeps its original wording. Call site at line 211 passes `cache_refused=True`.
+- `tests/integration/pipelex/system/pipelex_service/test_remote_config_fetcher.py::test_require_fresh_refuses_cache` — strengthened to assert the new "was refused because a fresh fetch is required" phrasing so the contract is pinned.
+- `CHANGELOG.md` — new "Changed" entry under `[Unreleased]` documenting the `RemoteConfigUnavailableError` message branching.
+
+**Manual reproduction summary (7.3):**
+- BYOK offline → covered by `tests/e2e/agent_cli/test_offline_run_dry.py::test_byok_offline_succeeds`.
+- Gateway online, no cache, cache written → covered by `tests/integration/pipelex/system/pipelex_service/test_remote_config_fetcher.py::test_success_returns_fresh_and_writes_cache` and `tests/integration/pipelex/cli/commands/init/test_cache_priming.py::test_init_primes_cache_when_online`.
+- Gateway offline, cache present, stale warning → covered by `test_gateway_known_with_cache_succeeds_offline` (E2E).
+- Gateway offline, no cache, `RemoteConfigUnavailableError` → covered by `test_gateway_no_cache_no_network_fails_with_unavailable` (E2E).
+- Bundle references unknown gateway model → covered by `tests/integration/pipelex/cogt/model_backends/test_gateway_unknown_model.py` plus the E2E `test_gateway_unknown_with_cache_fails_with_clear_error` (the E2E intentionally does not pin `error_type` — see deferred follow-up #7).
+- `pipelex-dev update-gateway-models` offline → manually reproduced via `PIPELEX_REMOTE_CONFIG_URL=http://127.0.0.1:1/unreachable.json .venv/bin/pipelex-dev update-gateway-models`; raises `RemoteConfigUnavailableError` with the new "cache refused because a fresh fetch is required" remediation message, and no docs are written. Also pinned in `test_require_fresh_refuses_cache`.
+
+**Commit history (7.4):**
+- Phase-aligned commits ahead of `main` (`1d9293d3` ... `6b5d0d40`), one per phase boundary. Phase 7 changes are still uncommitted in the working tree (`CHANGELOG.md`, `remote_config_fetcher.py`, `test_remote_config_fetcher.py`) — to be squashed with Phase 6 or landed as a small "polish" commit, at the user's discretion at `/ship` time.
+- PR description should reference (a) the codex-sandbox-escalation handoff in `mthds-plugins/wip/codex-sandbox-escalation.md` — note that `--dry-run` no longer requires escalation once Pipelex has been initialised online once, and (b) the deferred follow-ups list at the bottom of this file (especially #1 `pipelex doctor` cache reporting, #2 Codex Cloud cache-first short-circuit, #3 the cross-repo escalation-doc update, and #7 pinning `GatewayUnknownModelError` end-to-end via a deck override).
+
+**Verification:**
+- `make agent-check` — clean (ruff fix-imports, ruff format, plxt fmt, ruff lint, plxt lint, pyright, mypy all green).
+- `make agent-test` — full suite green (zero output on success).
+- Targeted: `.venv/bin/pytest -n auto -m "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api" tests/unit/pipelex/system/ tests/integration/pipelex/system/ tests/unit/pipelex/cli/ tests/integration/pipelex/cli/` — all green (one expected `RemoteConfigStaleWarning` from `test_telemetry_disabled_when_source_cached`).
+- Manual: `PIPELEX_REMOTE_CONFIG_URL=http://127.0.0.1:1/... .venv/bin/pipelex-dev update-gateway-models` → new "cache refused" wording confirmed in stderr.
+
+**Decision:**
+- The message-clarity fix was made in scope as a Phase 7 finding (no new entry was added to the deferred-follow-ups list). Branching `_build_unavailable_error` is a one-liner with a one-keyword call-site update; the alternative — adding the deferred entry — would have left a known-misleading user-facing message in v0.29.0.
+
+**Next:** Branch is ready for `/ship`. No remaining checkbox in this plan.
