@@ -36,6 +36,8 @@ from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from pipelex.pipe_operators.search.pipe_search import PipeSearch
 from pipelex.pipe_operators.search.pipe_search_factory import PipeSearchFactory
+from pipelex.pipe_signature.pipe_signature_factory import PipeSignatureFactory
+from pipelex.pipe_signature.pipe_signature_runtime import PipeSignatureRuntime
 from pipelex.system.registries.registry_base import ModelType, RegistryModels
 
 
@@ -72,6 +74,14 @@ class CoreRegistryModels(RegistryModels):
         PipeConditionFactory,
         PipeParallelFactory,
         PipeSequenceFactory,
+    ]
+
+    PIPE_SIGNATURES: ClassVar[list[PipeAbstractType]] = [
+        PipeSignatureRuntime,
+    ]
+
+    PIPE_SIGNATURES_FACTORY: ClassVar[list[PipeFactoryProtocol[Any, Any]]] = [
+        PipeSignatureFactory,
     ]
 
     STUFF: ClassVar[list[ModelType]] = [

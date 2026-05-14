@@ -27,7 +27,12 @@ DRY_RUN_METHOD_NAMES = ("_dry_run_operator_pipe", "_dry_run_controller_pipe")
 
 
 def _discover_pipe_classes() -> list[type[PipeAbstract]]:
-    """Import every pipe module and return concrete leaf PipeAbstract subclasses."""
+    """Import every pipe module and return concrete leaf PipeAbstract subclasses.
+
+    Excludes signature pipes: a `PipeSignature` is a contract-only placeholder. Its live-run
+    raises before any runtime data exists, and its dry-run only mints a mock output — neither
+    is a place to register execution data for the graph tracer.
+    """
     for package in (pipe_operators, pipe_controllers):
         for module_info in pkgutil.walk_packages(package.__path__, prefix=f"{package.__name__}."):
             importlib.import_module(module_info.name)
@@ -42,7 +47,12 @@ def _discover_pipe_classes() -> list[type[PipeAbstract]]:
 
     walk(PipeAbstract)  # type: ignore[type-abstract]
 
-    leaves = [cls for cls in seen if not cls.__module__.endswith((".pipe_operator", ".pipe_controller", ".pipe_abstract"))]
+    leaves = [
+        cls
+        for cls in seen
+        if not cls.__module__.endswith((".pipe_operator", ".pipe_controller", ".pipe_abstract"))
+        and not cls.__module__.startswith("pipelex.pipe_signature.")
+    ]
     return sorted(leaves, key=lambda c: c.__name__)
 
 

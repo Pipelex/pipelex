@@ -1,22 +1,20 @@
-from typing import Any
+from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, field_validator
 from pydantic.json_schema import SkipJsonSchema
 from rich.console import Group
 from rich.table import Table
 from rich.text import Text
 from typing_extensions import override
 
-from pipelex.cogt.content_generation.dry_run_factory import MockFormat
-from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
-from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.builder.pipe.pipe_spec import PipeSpec
+from pipelex.core.pipes.pipe_blueprint import PipeType
+from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
 from pipelex.tools.misc.pretty import PrettyPrintable
 
 
-class PipeSignature(StructuredContent):
-    """PipeSignature is a contract for a pipe.
-
-    It defines the inputs, outputs, and the purpose of the pipe without implementation details.
+class PipeSignature(PipeSpec):
+    """A contract for a pipe: inputs, output, and purpose declared without an implementation.
 
     Multiplicity Notation:
         Use bracket notation to specify multiplicity for both inputs and outputs:
@@ -25,73 +23,63 @@ class PipeSignature(StructuredContent):
         - [N]: exactly N items (where N is a positive integer)
 
     Examples:
-        - output = "Text" - one text items
+        - output = "Text" - one text item
         - output = "Text[]" - multiple text items
         - output = "Image[3]" - exactly 3 images
+
+    Strict validation refuses pipelines that still contain signatures (use `--allow-signatures`
+    to dry-run lenient). `signature_for` is an optional hint to downstream tooling describing
+    the intended downstream pipe type once the signature is implemented.
     """
 
-    code: str = Field(description="Pipe code identifying the pipe. Must be snake_case.", json_schema_extra={"mock_format": MockFormat.SNAKE_CASE})
-    # TODO: Change examples to list(PipeType) for randomness in mocks
-    type: PipeType | str = Field(description="Pipe type.", examples=["PipeLLM"])
-    pipe_category: SkipJsonSchema[PipeCategory] = Field(description="Pipe category set according to its type.")
-    description: str = Field(description="What the pipe does")
-    inputs: dict[str, str] = Field(
-        description=(
-            "Input specifications mapping variable names to concept codes. "
-            "Keys: input variable names in snake_case. "
-            "Values: ConceptCodes in PascalCase. Don't use multiplicity brackets. "
+    type: SkipJsonSchema[Literal["PipeSignature"]] = "PipeSignature"
+    pipe_category: SkipJsonSchema[Literal["PipeSignature"]] = "PipeSignature"
+    signature_for: PipeType | None = Field(
+        default=None,
+        description="Intended downstream pipe type when this signature is implemented (optional hint for agents).",
+    )
+    # Stored as `pipe_dependencies` on the spec (user-authoring surface), mapped to
+    # `signature_pipe_dependencies` on the blueprint and `declared_dependencies` on the runtime —
+    # both layers carry `pipe_dependencies` already as a property/method returning `set[str]`,
+    # which a list-typed field would silently shadow.
+    pipe_dependencies: list[str] = Field(
+        default_factory=list,
+        description="Pipes this signature claims to depend on (metadata for tooling).",
+    )
+
+    @field_validator("signature_for", mode="after")
+    @classmethod
+    def reject_signature_for_pipe_signature(cls, value: PipeType | None) -> PipeType | None:
+        if value is PipeType.PIPE_SIGNATURE:
+            msg = "A PipeSignature cannot have signature_for=PipeSignature."
+            raise ValueError(msg)
+        return value
+
+    @override
+    def to_blueprint(self) -> PipeSignatureBlueprint:
+        return PipeSignatureBlueprint(
+            description=self.description,
+            inputs=self.inputs,
+            output=self.output,
+            signature_for=self.signature_for,
+            signature_pipe_dependencies=list(self.pipe_dependencies),
         )
-    )
-    result: str = Field(
-        description="Variable name for the pipe's result in snake_case. This name can be referenced as input in subsequent pipes.",
-        json_schema_extra={"mock_format": MockFormat.SNAKE_CASE},
-    )
-    output: str = Field(
-        description=(
-            "Output concept code in PascalCase with optional multiplicity brackets. "
-            "Examples: 'Text' (single text), 'Article[]' (list of articles), 'Image[5]' (exactly 5 images)."
-        ),
-        json_schema_extra={"mock_format": MockFormat.PASCAL_CASE},
-    )
-    pipe_dependencies: list[str] = Field(description="List of pipe codes that this pipe depends on. This is for the PipeControllers")
-
-    @model_validator(mode="before")
-    @classmethod
-    def set_pipe_category(cls, values: dict[str, Any]) -> dict[str, Any]:
-        try:
-            type_str = values["type"]
-        except TypeError as exc:
-            msg = f"Invalid type for '{values}': could not get subscript, required for 'type'"
-            raise ValueError(msg) from exc
-        # we need to convert the type string to the PipeType enum because it arrives as a str implictly converted to enum but not yet
-        the_type = PipeType(type_str)
-        values["pipe_category"] = the_type.category
-        return values
-
-    @field_validator("type", mode="before")
-    @classmethod
-    def validate_type(cls, type_value: str) -> PipeType:
-        return PipeType(type_value)
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         pipe_group = Group()
         if title:
             pipe_group.renderables.append(Text(title, style="bold"))
-        pipe_group.renderables.append(Text.from_markup(f"Pipe Signature: [red]{self.code}[/red]\n", style="bold"))
-        pipe_type = self.type.value if isinstance(self.type, PipeType) else str(self.type)
-        pipe_group.renderables.append(Text.from_markup(f"Type: [bold magenta]{pipe_type}[/bold magenta] ({self.pipe_category.value})\n"))
+        pipe_group.renderables.append(Text.from_markup(f"Pipe Signature: [red]{self.pipe_code}[/red]\n", style="bold"))
+        pipe_group.renderables.append(Text.from_markup(f"Type: [bold magenta]{self.type}[/bold magenta] ({self.pipe_category})\n"))
         pipe_group.renderables.append(Text.from_markup(f"Description: [yellow italic]{self.description}[/yellow italic]\n"))
 
-        # Create inputs section
         if not self.inputs:
             pipe_group.renderables.append(Text.from_markup("\nNo inputs"))
         elif len(self.inputs) == 1:
-            # Single input: display as a simple line of text
             input_name, concept_spec = next(iter(self.inputs.items()))
             pipe_group.renderables.append(Text.from_markup(f"\nInput: [cyan]{input_name}[/cyan] ([bold green]{concept_spec}[/bold green])"))
         else:
-            # Multiple inputs: display as a table
             inputs_table = Table(
                 title="Inputs:",
                 title_justify="left",
@@ -107,11 +95,9 @@ class PipeSignature(StructuredContent):
                 inputs_table.add_row(input_name, concept_spec)
             pipe_group.renderables.append(inputs_table)
 
-        # Show output and result
         pipe_group.renderables.append(Text.from_markup(f"\nOutput concept: [bold green]{self.output}[/bold green]"))
-        pipe_group.renderables.append(Text.from_markup(f"\nOutput name: [cyan]{self.result}[/cyan]"))
-
-        # Show dependencies if any
+        if self.signature_for is not None:
+            pipe_group.renderables.append(Text.from_markup(f"\nSignature for: [bold yellow]{self.signature_for}[/bold yellow]"))
         if self.pipe_dependencies:
             pipe_group.renderables.append(Text.from_markup(f"\nDependencies: [red]{', '.join(self.pipe_dependencies)}[/red]"))
 

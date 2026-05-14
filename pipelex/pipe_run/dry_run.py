@@ -6,8 +6,9 @@ from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, TypedNamedStuffSpec
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, NamedStuffSpec, TypedNamedStuffSpec
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_class_registry
@@ -194,3 +195,27 @@ def convert_to_working_memory_format(needed_inputs_spec: InputStuffSpecs) -> lis
             needed_inputs_for_factory.append(text_typed_named_stuff_spec)
 
     return needed_inputs_for_factory
+
+
+def convert_stuff_spec_to_typed_named(stuff_spec: StuffSpec, name: str) -> TypedNamedStuffSpec:
+    """Resolve a single output `StuffSpec` to a `TypedNamedStuffSpec`.
+
+    Mirrors the class-registry lookup behavior used inside `convert_to_working_memory_format`:
+    looks up the concept's `structure_class_name`, and falls back to `TextContent` when the
+    class is missing from the registry (matching the existing fallback for inputs).
+    """
+    class_registry = get_class_registry()
+    concept = stuff_spec.concept
+    structure_class_name = concept.structure_class_name
+    named = NamedStuffSpec(
+        variable_name=name,
+        concept=concept,
+        multiplicity=stuff_spec.multiplicity,
+    )
+    structure_class = class_registry.get_class(name=structure_class_name)
+    if structure_class and issubclass(structure_class, StuffContent):
+        return TypedNamedStuffSpec.make_from_named(named=named, structure_class=structure_class)
+    log.verbose(
+        f"Could not get structure class '{structure_class_name}' for concept '{concept.code}', falling back to TextContent",
+    )
+    return TypedNamedStuffSpec.make_from_named(named=named, structure_class=TextContent)

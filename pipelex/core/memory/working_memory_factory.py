@@ -129,6 +129,47 @@ class WorkingMemoryFactory(BaseModel):
         return structure_class
 
     @classmethod
+    def make_mock_stuff(cls, typed_named_stuff_spec: TypedNamedStuffSpec) -> Stuff:
+        """Create a single mock `Stuff` from a `TypedNamedStuffSpec`.
+
+        Honors multiplicity: a non-multiple spec yields a `Stuff` of mock content;
+        a multiple spec yields a `Stuff` whose content is a `ListContent` of mock items.
+        Errors from `make_mock_content` are allowed to propagate — the legacy
+        `make_mock_inputs` loop is the one place that swallows them with a fallback.
+        """
+        if not typed_named_stuff_spec.multiplicity:
+            mock_content = cls.make_mock_content(typed_named_stuff_spec)
+            return StuffFactory.make_stuff(
+                concept=typed_named_stuff_spec.concept,
+                content=mock_content,
+                name=typed_named_stuff_spec.variable_name,
+                code=shortuuid.uuid()[:5],
+            )
+
+        if isinstance(typed_named_stuff_spec.multiplicity, bool):
+            # TODO: make this configurable or use existing config variable
+            nb_stuffs = 3
+        else:
+            nb_stuffs = typed_named_stuff_spec.multiplicity
+
+        items: list[StuffContent] = []
+        for idx in range(nb_stuffs):
+            item_mock_content = cls.make_mock_content(typed_named_stuff_spec)
+            # For the first item in pipe specs, set pipe_code to "mock_main"
+            # to match the mock main_pipe in BundleHeaderSpec
+            if idx == 0 and hasattr(item_mock_content, "pipe_code"):
+                item_mock_content.pipe_code = "mock_main"  # pyright: ignore[reportAttributeAccessIssue]
+            items.append(item_mock_content)
+
+        mock_list_content = ListContent[StuffContent](items=items)
+        return StuffFactory.make_stuff(
+            concept=typed_named_stuff_spec.concept,
+            content=mock_list_content,
+            name=typed_named_stuff_spec.variable_name,
+            code=shortuuid.uuid()[:5],
+        )
+
+    @classmethod
     def make_mock_inputs(cls, needed_inputs: list[TypedNamedStuffSpec]) -> "WorkingMemory":
         """Create a WorkingMemory with mock objects for the needed inputs.
 
@@ -143,50 +184,8 @@ class WorkingMemoryFactory(BaseModel):
 
         for typed_named_stuff_spec in needed_inputs:
             try:
-                if not typed_named_stuff_spec.multiplicity:
-                    mock_content = cls.make_mock_content(typed_named_stuff_spec)
-
-                    # Create stuff with mock content
-                    mock_stuff = StuffFactory.make_stuff(
-                        concept=typed_named_stuff_spec.concept,
-                        content=mock_content,
-                        name=typed_named_stuff_spec.variable_name,
-                        code=shortuuid.uuid()[:5],
-                    )
-
-                    working_memory.add_new_stuff(name=typed_named_stuff_spec.variable_name, stuff=mock_stuff)
-                else:
-                    # Let's create a ListContent of multiple stuffs
-                    # For pipe_specs lists, ensure the first item uses "mock_main" as pipe_code
-                    # to match the mock main_pipe in BundleHeaderSpec
-                    nb_stuffs: int
-                    if isinstance(typed_named_stuff_spec.multiplicity, bool):
-                        # TODO: make this configurable or use existing config variable
-                        nb_stuffs = 3
-                    else:
-                        nb_stuffs = typed_named_stuff_spec.multiplicity
-
-                    items: list[StuffContent] = []
-                    for idx in range(nb_stuffs):
-                        item_mock_content = cls.make_mock_content(typed_named_stuff_spec)
-                        # For the first item in pipe specs, set pipe_code to "mock_main"
-                        # to match the mock main_pipe in BundleHeaderSpec
-                        if idx == 0 and hasattr(item_mock_content, "pipe_code"):
-                            item_mock_content.pipe_code = "mock_main"  # pyright: ignore[reportAttributeAccessIssue]
-                        items.append(item_mock_content)
-
-                    mock_list_content = ListContent[StuffContent](items=items)
-
-                    # Create stuff with mock content
-                    mock_stuff = StuffFactory.make_stuff(
-                        concept=typed_named_stuff_spec.concept,
-                        content=mock_list_content,
-                        name=typed_named_stuff_spec.variable_name,
-                        code=shortuuid.uuid()[:5],
-                    )
-
-                    working_memory.add_new_stuff(name=typed_named_stuff_spec.variable_name, stuff=mock_stuff)
-
+                mock_stuff = cls.make_mock_stuff(typed_named_stuff_spec)
+                working_memory.add_new_stuff(name=typed_named_stuff_spec.variable_name, stuff=mock_stuff)
             except Exception as exc:
                 log.warning(
                     f"Failed to create mock for '{typed_named_stuff_spec.variable_name}' ({typed_named_stuff_spec.concept.code}): "

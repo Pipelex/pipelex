@@ -101,6 +101,7 @@ def _collect_possible_outputs(
             | PipeType.PIPE_SEARCH
             | PipeType.PIPE_BATCH
             | PipeType.PIPE_PARALLEL
+            | PipeType.PIPE_SIGNATURE
         ):
             return []
 

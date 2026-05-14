@@ -34,6 +34,7 @@ _PIPE_DEFINITION_NAMES = {
     "PipeConditionBlueprint",
     "PipeParallelBlueprint",
     "PipeSequenceBlueprint",
+    "PipeSignatureBlueprint",
 }
 
 

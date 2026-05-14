@@ -22,6 +22,7 @@ from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.search.pipe_search_blueprint import PipeSearchBlueprint
+from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
 from pipelex.types import Self
 from pipelex.urls import URLs
 
@@ -35,7 +36,8 @@ PipeBlueprintUnion = Annotated[
     | PipeBatchBlueprint
     | PipeConditionBlueprint
     | PipeParallelBlueprint
-    | PipeSequenceBlueprint,
+    | PipeSequenceBlueprint
+    | PipeSignatureBlueprint,
     Field(discriminator="type"),
 ]
 

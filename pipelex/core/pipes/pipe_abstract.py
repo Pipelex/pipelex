@@ -68,6 +68,18 @@ class PipeAbstract(ABC, BaseModel):
         return PipeCategory.is_controller_by_str(self.pipe_category)
 
     @property
+    def is_signature(self) -> bool:
+        return PipeCategory(self.pipe_category) is PipeCategory.PIPE_SIGNATURE
+
+    def pipe_dependencies(self) -> set[str]:
+        """Return the set of pipe codes that this pipe depends on.
+
+        Operators and signatures have no sub-pipe dependencies by default. Controllers
+        override this to return the codes of pipes they orchestrate.
+        """
+        return set()
+
+    @property
     def concept_dependencies(self) -> list[Concept]:
         """Return all unique concept dependencies (output + inputs) without duplicates."""
         seen_concept_refs: set[str] = set()

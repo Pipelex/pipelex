@@ -1,6 +1,8 @@
 # Signature-Based Validation — TDD implementation plan
 
-Status: not started. Design v3, ready to start. Locked in `wip/signature-based-validation.md` (v2, Option A) with corrections from the engineering review applied below.
+Status: Phases 1–3 landed (2026-05-14). Signatures construct end-to-end in Python (spec → blueprint → runtime → dry-run mock). Strict-mode gating, CLI wiring, e2e, and docs are open.
+
+Current state: A `PipeSignature` can be authored as a spec (`pipelex/builder/pipe/pipe_signature.py`), compiled to a blueprint (`pipelex/pipe_signature/pipe_signature_blueprint.py`), instantiated as a runtime (`pipelex/pipe_signature/pipe_signature_runtime.py`) via the registered `PipeSignatureFactory`, dry-run (yields a mock `Stuff` from the declared output `StuffSpec`), and rejected on live-run (`PipeSignatureNotExecutableError`). Signatures slot into `PipeBlueprintUnion` and `PipeSpecUnion`. **Not yet wired:** `dry_run_pipe` / `validate_bundle` still have no `allow_signatures` flag, no `collect_signature_refs` graph walk, no `SignaturesNotAllowedError`, no CLI options. End-to-end `.mthds` parsing of `type = "PipeSignature"` has not been exercised — interpreter / schema generator may still need touches in Phase 6. The schema generator was updated to strip `pipe_category` from `PipeSignatureBlueprint`, but the JSON Schema file lives in `vscode-pipelex/` (not this repo) so no schema artifact needed regeneration here. Surprise: the spec-layer file `pipelex/builder/pipe/pipe_signature.py` was easiest to refactor by making it inherit from `PipeSpec` rather than `StructuredContent` (gets `pipe_code` and shared input/output validators for free), which is a small but deliberate departure from the plan's "copy validators" suggestion.
 
 **Pre-flight note:** `validate_bundle` was updated on this branch to actually call `dry_run_pipes` (the previously-commented-out calls in all three branches of `validate_bundle.py` were uncommented). This means the strict signature check sitting inside `dry_run_pipe` fires for **every** `validate_bundle` caller, not just direct CLI usage — no separate pre-flight helper is needed.
 
@@ -73,37 +75,41 @@ Lay down the enum values, the `is_signature` property, and the promoted `pipe_de
 
 All tests use direct construction; no fixtures needed beyond pytest-mock when applicable.
 
-- [ ] `tests/unit/pipelex/core/pipes/test_pipe_blueprint_signature_enums.py` — `class TestPipeSignatureEnums`
+- [x] `tests/unit/pipelex/core/pipes/test_pipe_blueprint_signature_enums.py` — `class TestPipeSignatureEnums`
   - `test_pipe_type_pipe_signature_value` — `PipeType.PIPE_SIGNATURE` equals `"PipeSignature"`.
   - `test_pipe_type_pipe_signature_in_value_list` — `"PipeSignature" in PipeType.value_list()`.
   - `test_pipe_type_pipe_signature_category` — `PipeType("PipeSignature").category is PipeCategory.PIPE_SIGNATURE`.
   - `test_pipe_category_pipe_signature_value` — `PipeCategory.PIPE_SIGNATURE` equals `"PipeSignature"`.
   - `test_pipe_category_signature_is_not_controller` — `PipeCategory.is_controller_by_str("PipeSignature") is False`.
-- [ ] `tests/unit/pipelex/core/pipes/test_pipe_abstract_signature_surface.py` — `class TestPipeAbstractSignatureSurface`
+- [x] `tests/unit/pipelex/core/pipes/test_pipe_abstract_signature_surface.py` — `class TestPipeAbstractSignatureSurface`
   - Build a minimal in-memory `PipeAbstract` subclass (or use an existing PipeLLM with stubbed validators) to assert:
     - `is_signature` returns `False` for any operator/controller.
     - `pipe_dependencies()` default returns `set()` on `PipeAbstract` (i.e. operators inherit the empty default).
   - `is_signature` returns `True` for a category-`PIPE_SIGNATURE` instance (deferred — full assertion happens in Phase 2 once the runtime class exists; here, just assert the property reads from `self.pipe_category` correctly).
-- [ ] Run: `.venv/bin/pytest -q tests/unit/pipelex/core/pipes/test_pipe_blueprint_signature_enums.py tests/unit/pipelex/core/pipes/test_pipe_abstract_signature_surface.py`. Confirm: red for the new value-existence assertions; legacy tests unaffected.
+  > Deviation: used a descriptor-on-stub pattern (resolving `__dict__["is_signature"]` / `__dict__["pipe_dependencies"]`) rather than constructing a full `PipeAbstract` subclass — building one would require a fully-formed `StuffSpec` + `Concept` and pull unrelated machinery into a unit test. Plan explicitly allowed the alternative.
+- [x] Run: `.venv/bin/pytest -q tests/unit/pipelex/core/pipes/test_pipe_blueprint_signature_enums.py tests/unit/pipelex/core/pipes/test_pipe_abstract_signature_surface.py`. Confirm: red for the new value-existence assertions; legacy tests unaffected.
 
 ### Phase 1.2 — Implementation (green)
 
-- [ ] `pipelex/core/pipes/pipe_blueprint.py`:
+- [x] `pipelex/core/pipes/pipe_blueprint.py`:
   - Add `PipeType.PIPE_SIGNATURE = "PipeSignature"`.
   - Add `PipeCategory.PIPE_SIGNATURE = "PipeSignature"`.
   - Update `PipeType.category` match to map `PIPE_SIGNATURE → PipeCategory.PIPE_SIGNATURE`. (Linter will catch missing cases.)
   - Update `PipeCategory.is_controller` match to return `False` for `PIPE_SIGNATURE`.
   - Add `is_signature` property to `PipeBlueprint` returning `PipeCategory(self.pipe_category) is PipeCategory.PIPE_SIGNATURE`.
-- [ ] `pipelex/core/pipes/pipe_abstract.py`:
+- [x] `pipelex/core/pipes/pipe_abstract.py`:
   - Add `is_signature` property mirroring the blueprint's.
   - Add a default `pipe_dependencies(self) -> set[str]: return set()` method (matches the blueprint-side default).
-- [ ] `pipelex/pipe_controllers/pipe_controller.py`:
+- [x] `pipelex/pipe_controllers/pipe_controller.py`:
   - `PipeController.pipe_dependencies` stays `@abstractmethod` — every controller must implement it; the linter enforces. Do not turn it concrete just because `PipeAbstract` now has a default. The default exists for operators and signatures, not for controllers.
+  > Deviation: also decorated `PipeController.pipe_dependencies` with `@override` so pyright's `reportImplicitOverride` accepts that it overrides the new `PipeAbstract` default. Linter forced this once the parent method became concrete.
 
 ### Phase 1.3 — Lint and targeted tests
 
-- [ ] `make agent-check` clean.
-- [ ] `.venv/bin/pytest -q tests/unit/pipelex/core/pipes/` — all green (new + legacy).
+- [x] `make agent-check` clean.
+- [x] `.venv/bin/pytest -q tests/unit/pipelex/core/pipes/` — all green (new + legacy).
+
+> Phase 1 deviation summary: `pipelex/core/pipes/output/output_renderer.py` and `tests/unit/pipelex/core/pipes/test_pipe_blueprint.py` both contained non-exhaustive `match` statements that needed a new `PIPE_SIGNATURE` arm to satisfy pyright. Added them.
 
 ---
 
@@ -115,10 +121,11 @@ The runtime class is where the dry-run mock generation lives. Tests construct `P
 
 Use blueprints constructed in Python — no `.mthds` parsing in this phase.
 
-- [ ] `tests/integration/pipelex/pipe_signature/conftest.py` — shared fixtures:
+- [x] `tests/integration/pipelex/pipe_signature/conftest.py` — shared fixtures:
   - `pipelex_for_signatures` — Pipelex setup with a tiny library containing a `Text` concept and one PipeSignature pipe (used by multiple tests).
   - `make_signature_blueprint(...)` factory helper.
-- [ ] `tests/integration/pipelex/pipe_signature/test_pipe_signature_runtime.py` — `class TestPipeSignatureRuntime` (one class only — split into multiple test methods, parametrized where useful):
+  > Deviation: the per-test setup fixture was named `setup_signature_library` (rather than `pipelex_for_signatures`) and shaped as a callable, mirroring the existing `load_empty_library` pattern. The concepts registered are `SigTestDoc` / `SigTestSummary` rather than `Document` / `Summary` because both `Document` and `Summary` collide with native concept names.
+- [x] `tests/integration/pipelex/pipe_signature/test_pipe_signature_runtime.py` — `class TestPipeSignatureRuntime` (one class only — split into multiple test methods, parametrized where useful):
   - `test_factory_produces_runtime_from_blueprint` — `PipeFactory.make_from_blueprint` on a `PipeSignatureBlueprint` returns a `PipeSignatureRuntime`.
   - `test_is_signature_true` — `runtime.is_signature is True`; `is_controller is False`.
   - `test_needed_inputs_returns_declared` — runtime with declared inputs `{"doc": "Text"}` returns that set from `needed_inputs()`.
@@ -129,18 +136,19 @@ Use blueprints constructed in Python — no `.mthds` parsing in this phase.
   - `test_live_run_raises_signature_error` — `await pipe.run_pipe(..., run_mode=LIVE)` raises `PipeSignatureNotExecutableError` whose message contains the pipe's `pipe_ref`.
   - `test_input_multiplicity_in_blueprint` — blueprint accepts `inputs = {"docs": "Document[]"}` without validation error.
   - `test_validators_are_noops` — `validate_inputs_static`, `validate_inputs_with_library`, `validate_output_static`, `validate_output_with_library` all return without raising on a well-formed signature.
-- [ ] `tests/integration/pipelex/pipe_signature/test_pipe_signature_in_blueprint_union.py` — `class TestPipeSignatureBlueprintUnion`:
+- [x] `tests/integration/pipelex/pipe_signature/test_pipe_signature_in_blueprint_union.py` — `class TestPipeSignatureBlueprintUnion`:
   - `test_bundle_blueprint_accepts_signature_pipe` — a `PipelexBundleBlueprint` built with a `pipe = {"foo": PipeSignatureBlueprint(...)}` validates cleanly.
   - `test_bundle_blueprint_rejects_unknown_pipe_type` — sanity guard, asserts the discriminator union still rejects garbage.
-- [ ] Run: `.venv/bin/pytest -q tests/integration/pipelex/pipe_signature/`. Confirm: all red with `ImportError` or `AttributeError` (the runtime class doesn't exist yet).
+- [x] Run: `.venv/bin/pytest -q tests/integration/pipelex/pipe_signature/`. Confirm: all red with `ImportError` or `AttributeError` (the runtime class doesn't exist yet).
 
 ### Phase 2.2 — Implementation (green)
 
-- [ ] `pipelex/pipe_signature/` — new package directory.
+- [x] `pipelex/pipe_signature/` — new package directory.
   - `pipelex/pipe_signature/__init__.py` — empty.
   - `pipelex/pipe_signature/pipe_signature_blueprint.py`:
     - `PipeSignatureBlueprint(PipeBlueprint)` with `type: Literal["PipeSignature"]`, `pipe_category: Literal["PipeSignature"]`, `signature_for: PipeType | None = None`, `pipe_dependencies: list[str] = Field(default_factory=list)` (metadata).
-  - `pipelex/pipe_signature/pipe_signature_runtime.py`:
+    > Deviation: the storage field is named `signature_pipe_dependencies`, not `pipe_dependencies`, because `PipeBlueprint` declares `pipe_dependencies` as a `@property` returning `set[str]`. Shadowing the property with a Pydantic field of incompatible type would silently break call sites like `pipe_sorter.py` that iterate it expecting a set/iterable. The spec layer keeps the user-facing name `pipe_dependencies` and `to_blueprint()` maps to `signature_pipe_dependencies`. Apply the same reasoning to the runtime storage field (`declared_dependencies`) noted further below.
+  - [x] `pipelex/pipe_signature/pipe_signature_runtime.py`:
     - `PipeSignatureRuntime(PipeAbstract)` with `type: Literal["PipeSignature"]`, `pipe_category: Literal["PipeSignature"]`, `signature_for: PipeType | None = None`, `declared_dependencies: list[str] = Field(default_factory=list, description="Pipes this signature claims to depend on (metadata for tooling).")`.
     - **No pydantic alias on `declared_dependencies`.** The earlier draft proposed aliasing a `_signature_pipe_dependencies` field to `pipe_dependencies`; that collides with the method name and is fragile under `extra="forbid"` + `strict=True`. Storage field and method name are kept distinct.
     - `validate_inputs_static`, `validate_inputs_with_library`, `validate_output_static`, `validate_output_with_library` → no-ops.
@@ -154,23 +162,24 @@ Use blueprints constructed in Python — no `.mthds` parsing in this phase.
       3. Write to `working_memory.set_new_main_stuff(...)` and return `PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.pipeline_run_id)`.
     - `_validate_before_run`, `_validate_after_run` → no-ops.
     - **Error-handling rule for new code:** do NOT introduce new `except Exception` catches in `PipeSignatureRuntime`, the new helpers in `WorkingMemoryFactory`, or `convert_stuff_spec_to_typed_named`. Let mock-construction errors propagate (e.g. `DryRunFactory` failures, `ClassRegistryNotFoundError`). A separate worktree owns the error-handling refactor of the pre-existing `except Exception` in `WorkingMemoryFactory.make_mock_inputs:190` — do not replicate that pattern.
-  - `pipelex/pipe_signature/pipe_signature_factory.py`:
+  - [x] `pipelex/pipe_signature/pipe_signature_factory.py`:
     - `PipeSignatureFactory(PipeFactoryProtocol[PipeSignatureBlueprint, PipeSignatureRuntime])` with a `make(...)` classmethod that builds the runtime from the blueprint + parsed inputs/output.
-  - `pipelex/pipe_signature/exceptions.py`:
+  - [x] `pipelex/pipe_signature/exceptions.py`:
     - `PipeSignatureNotExecutableError(PipelexError)` with a `pipe_ref` field and a clear message.
-- [ ] Register `PipeSignatureFactory` in the class registry so `PipeFactory.make_from_blueprint` dispatches via the existing `f"{pipe_type.value}Factory"` convention. (Look at how other factories are registered — probably in `pipelex/__init__.py` or via auto-import; mirror.)
-- [ ] `pipelex/core/bundles/pipelex_bundle_blueprint.py`:
+- [x] Register `PipeSignatureFactory` in the class registry so `PipeFactory.make_from_blueprint` dispatches via the existing `f"{pipe_type.value}Factory"` convention. (Look at how other factories are registered — probably in `pipelex/__init__.py` or via auto-import; mirror.)
+  > Registered alongside `PipeSignatureRuntime` in `CoreRegistryModels.PIPE_SIGNATURES` / `PIPE_SIGNATURES_FACTORY`. `RegistryModels.get_all_models()` walks every list-valued class attribute, so the new lists are auto-discovered.
+- [x] `pipelex/core/bundles/pipelex_bundle_blueprint.py`:
   - Add `PipeSignatureBlueprint` to `PipeBlueprintUnion`.
-- [ ] `pipelex/core/memory/working_memory_factory.py`:
+- [x] `pipelex/core/memory/working_memory_factory.py`:
   - Add `make_mock_stuff(typed_named_stuff_spec: TypedNamedStuffSpec) -> Stuff` — extracts the per-iteration body of `make_mock_inputs` (both the no-multiplicity branch and the multiplicity branch combined into one helper returning a single `Stuff`). `make_mock_inputs` then becomes a thin loop over `make_mock_stuff`.
   - Preserve the existing `except Exception` fallback inside `make_mock_inputs` (separate worktree owns that refactor). Do NOT add a new `except Exception` catch inside `make_mock_stuff` — let `make_mock_content` errors propagate. The existing fallback continues to wrap only the multi-stuff loop.
-- [ ] `pipelex/pipe_run/dry_run.py`:
+- [x] `pipelex/pipe_run/dry_run.py`:
   - Add `convert_stuff_spec_to_typed_named(stuff_spec: StuffSpec, name: str) -> TypedNamedStuffSpec` — sibling of `convert_to_working_memory_format` that operates on a single output `StuffSpec` instead of `InputStuffSpecs`. Same class-registry lookup, same fallback-to-`TextContent` behavior on missing structure class (matches the existing behavior inside `convert_to_working_memory_format`). Do NOT add a new `except Exception`; mirror the specific exception types the existing function catches.
 
 ### Phase 2.3 — Lint and targeted tests
 
-- [ ] `make agent-check` clean.
-- [ ] `.venv/bin/pytest -q tests/integration/pipelex/pipe_signature/` — all green.
+- [x] `make agent-check` clean.
+- [x] `.venv/bin/pytest -q tests/integration/pipelex/pipe_signature/` — all green.
 
 ---
 
@@ -180,7 +189,7 @@ Wire the existing `PipeSignature` spec into the `PipeSpecUnion`, fix the three c
 
 ### Phase 3.1 — Tests first (red)
 
-- [ ] `tests/unit/pipelex/builder/pipe/test_pipe_signature_spec.py` — `class TestPipeSignatureSpec`:
+- [x] `tests/unit/pipelex/builder/pipe/test_pipe_signature_spec.py` — `class TestPipeSignatureSpec`:
   - `test_type_literal_is_pipe_signature` — `PipeSignature(...).type == "PipeSignature"`.
   - `test_signature_for_optional` — `PipeSignature(...)` with no `signature_for` field validates; setting `signature_for = PipeType.PIPE_LLM` validates.
   - `test_signature_for_rejects_pipe_signature` — `PipeSignature(..., signature_for=PipeType.PIPE_SIGNATURE)` raises. A signature standing in for a signature is nonsensical; the validator rejects it.
@@ -189,14 +198,15 @@ Wire the existing `PipeSignature` spec into the `PipeSpecUnion`, fix the three c
   - `test_no_result_field` — `assert "result" not in PipeSignature.model_fields`.
   - `test_to_blueprint_returns_signature_blueprint` — `PipeSignature(...).to_blueprint()` returns a `PipeSignatureBlueprint` with matching `code`/`description`/`inputs`/`output`/`signature_for`/`pipe_dependencies`.
   - `test_to_blueprint_preserves_input_multiplicity` — `inputs = {"docs": "Document[]"}` round-trips through `to_blueprint()` unchanged.
-- [ ] `tests/unit/pipelex/builder/pipe/test_pipe_spec_union_signature.py` — `class TestPipeSpecUnionDispatch`:
+- [x] `tests/unit/pipelex/builder/pipe/test_pipe_spec_union_signature.py` — `class TestPipeSpecUnionDispatch`:
   - `test_union_dispatches_pipe_signature` — `pydantic.TypeAdapter(PipeSpecUnion).validate_python({"type": "PipeSignature", ...})` returns a `PipeSignature` instance, not another spec type.
   - `test_union_dispatches_pipe_llm_unchanged` — regression guard: existing `{"type": "PipeLLM", ...}` still dispatches to `PipeLLMSpec`.
-- [ ] Run: `.venv/bin/pytest -q tests/unit/pipelex/builder/pipe/test_pipe_signature_spec.py tests/unit/pipelex/builder/pipe/test_pipe_spec_union_signature.py`. Confirm red.
+  > Deviation: the test on bad concept syntax accepts both `ValidationError` and the underlying `ConceptStringError`. PipeSpec's inherited `validate_inputs` re-raises `ConceptStringError` without wrapping it in `ValueError`, so pydantic does not convert it to `ValidationError`. That looks like a pre-existing rough edge in PipeSpec; I did not widen its scope to address it.
+- [x] Run: `.venv/bin/pytest -q tests/unit/pipelex/builder/pipe/test_pipe_signature_spec.py tests/unit/pipelex/builder/pipe/test_pipe_spec_union_signature.py`. Confirm red.
 
 ### Phase 3.2 — Implementation (green)
 
-- [ ] `pipelex/builder/pipe/pipe_signature.py`:
+- [x] `pipelex/builder/pipe/pipe_signature.py`:
   - Change `type: PipeType | str = Field(...)` to `type: Literal["PipeSignature"] = "PipeSignature"` (use `SkipJsonSchema` if needed to match sibling pattern).
   - Change `pipe_category` to `SkipJsonSchema[Literal["PipeSignature"]] = "PipeSignature"`.
   - Add `signature_for: PipeType | None = None` with description "Intended downstream pipe type when this signature is implemented (optional hint for agents)."
@@ -207,15 +217,18 @@ Wire the existing `PipeSignature` spec into the `PipeSpecUnion`, fix the three c
   - Add `pipe_dependencies: list[str] = Field(default_factory=list, description="Pipes this signature claims to depend on (metadata for tooling).")`.
   - Add `to_blueprint(self) -> PipeSignatureBlueprint` building the blueprint from the spec fields.
   - Update `rendered_pretty` for the new field surface (drop `result`).
-- [ ] `pipelex/builder/pipe/pipe_spec_union.py`:
+  > Deviation: `PipeSignature` now inherits from `PipeSpec` (was `StructuredContent`), so it gets `pipe_code`/`description`/`inputs`/`output`/`validate_inputs`/`validate_output` for free and slots naturally into `pipe_type_to_spec_class: dict[str, type[PipeSpec]]`. As a consequence the spec uses `pipe_code` rather than the old `code` field name (matching sibling specs).
+- [x] `pipelex/builder/pipe/pipe_spec_union.py`:
   - Add `PipeSignature` to the union.
-- [ ] `pipelex/builder/pipe/pipe_spec_map.py`:
+- [x] `pipelex/builder/pipe/pipe_spec_map.py`:
   - Add `"PipeSignature": PipeSignature`.
 
 ### Phase 3.3 — Lint and targeted tests
 
-- [ ] `make agent-check` clean.
-- [ ] `.venv/bin/pytest -q tests/unit/pipelex/builder/pipe/ tests/integration/pipelex/pipe_signature/` — all green.
+- [x] `make agent-check` clean.
+- [x] `.venv/bin/pytest -q tests/unit/pipelex/builder/pipe/ tests/integration/pipelex/pipe_signature/` — all green.
+
+> Phase 3 deviation summary: `pipe_signature.py` now extends `PipeSpec` (not `StructuredContent`) so it inherits `pipe_code` and the shared inputs/output validators. The hardcoded `len(PipeType.value_list()) == 10` assertion in `tests/unit/pipelex/language/test_mthds_schema.py` was changed to compare against the expected-blueprint set size; this also caught two other places that needed updates after the new `PipeType.PIPE_SIGNATURE` value: `tests/unit/pipelex/core/pipes/test_execution_data_coverage.py` (filters signature pipes out of the execution-data coverage walk) and `pipelex/language/mthds_schema_generator.py` (adds `PipeSignatureBlueprint` to `_PIPE_DEFINITION_NAMES` so `pipe_category` is stripped from its schema).
 
 ---
 
