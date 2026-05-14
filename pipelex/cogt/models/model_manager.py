@@ -1,6 +1,9 @@
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import ModelManagerError
+from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelManagerError
+from pipelex.cogt.extract.extract_setting import ExtractSetting
+from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
+from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.model_backends.backend import InferenceBackend, PipelexBackend
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.gateway_config import GatewayConfig
@@ -12,8 +15,11 @@ from pipelex.cogt.model_routing.routing_profile_loader import load_active_routin
 from pipelex.cogt.models.model_deck import ModelDeck, ModelDeckBlueprint
 from pipelex.cogt.models.model_deck_loader import load_model_deck_blueprint
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
+from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind, ModelReferenceParseError
+from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.config import get_config
 from pipelex.system.configuration.config_loader import config_manager
+from pipelex.system.pipelex_service.types import RemoteConfigSource
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
@@ -56,6 +62,7 @@ class ModelManager(ModelManagerAbstract):
         self,
         secrets_provider: SecretsProviderAbstract,
         gateway_config: GatewayConfig | None,
+        gateway_config_source: RemoteConfigSource | None,
         needs_inference: bool = True,
     ) -> None:
         self.inference_backend_library.load(
@@ -74,6 +81,127 @@ class ModelManager(ModelManagerAbstract):
         model_deck_paths = ModelManager.get_model_deck_paths(deck_dir_path=str(config_manager.model_decks_dir_path))
         deck_blueprint = load_model_deck_blueprint(model_deck_paths=model_deck_paths)
         self.model_deck = self.build_deck(enabled_backends=enabled_backends, model_deck_blueprint=deck_blueprint)
+
+        self._enforce_gateway_model_membership(
+            gateway_config=gateway_config,
+            gateway_config_source=gateway_config_source,
+        )
+
+    def _enforce_gateway_model_membership(
+        self,
+        gateway_config: GatewayConfig | None,
+        gateway_config_source: RemoteConfigSource | None,
+    ) -> None:
+        """Fail loudly when the deck references a handle the gateway should provide but cannot.
+
+        Runs even when ``missing_presets_reaction = "log"`` (the default), because a missing
+        gateway model is a distinct failure mode from a generic preset mismatch: it means the
+        active gateway specs (fresh or cached) are out of sync with what the deck author
+        declared. Surfacing this as ``GatewayUnknownModelError`` lets the agent CLI hint at
+        cache-refresh remediation when the config was sourced from the on-disk fallback.
+
+        We only fire the check when both ``gateway_config`` and ``gateway_config_source`` are
+        set — that is, when the gateway is actually live in this setup pass.
+        """
+        if gateway_config is None or gateway_config_source is None:
+            return
+        deck = self.get_model_deck()
+        gateway_spec_names = {name for name in gateway_config.model_specs if name != "defaults"}
+
+        for handle, model_type in self._collect_deck_referenced_handles(deck):
+            try:
+                ref = ModelReference.parse(handle)
+            except ModelReferenceParseError:
+                continue
+            terminal_name = self._resolve_terminal_handle(deck=deck, ref=ref, model_type=model_type)
+            if terminal_name is None:
+                continue
+            if terminal_name in deck.inference_models:
+                continue
+            if terminal_name in gateway_spec_names:
+                continue
+            raise GatewayUnknownModelError(model_name=terminal_name, source=gateway_config_source)
+
+    @classmethod
+    def _collect_deck_referenced_handles(cls, deck: ModelDeck) -> list[tuple[str, ModelType]]:
+        """Gather the (handle, model_type) pairs that the deck advertises as usable.
+
+        Covers presets and choice defaults across every model type. Aliases and waterfalls
+        are intentionally NOT enumerated directly — they are reachable via preset/choice
+        references, and the resolver walks through them. Including them here would force the
+        check on dangling helpers the user has not actively wired into a preset.
+        """
+        references: list[tuple[str, ModelType]] = []
+        for llm_setting in deck.llm_presets.values():
+            references.append((llm_setting.model, ModelType.LLM))
+        llm_text_handle = cls._extract_choice_handle(deck.llm_choice_defaults.for_text)
+        if llm_text_handle is not None:
+            references.append((llm_text_handle, ModelType.LLM))
+        llm_object_handle = cls._extract_choice_handle(deck.llm_choice_defaults.for_object)
+        if llm_object_handle is not None:
+            references.append((llm_object_handle, ModelType.LLM))
+        for extract_setting in deck.extract_presets.values():
+            references.append((extract_setting.model, ModelType.TEXT_EXTRACTOR))
+        for img_gen_setting in deck.img_gen_presets.values():
+            references.append((img_gen_setting.model, ModelType.IMG_GEN))
+        for search_setting in deck.search_presets.values():
+            references.append((search_setting.model, ModelType.SEARCH))
+        return references
+
+    @classmethod
+    def _extract_choice_handle(cls, choice: LLMSetting | ExtractSetting | ImgGenSetting | SearchSetting | ModelReference | str | None) -> str | None:
+        """Normalise a ``*ModelChoice`` union (LLMModelChoice etc.) to a raw handle string.
+
+        Choice defaults can be a typed setting object, a parsed ``ModelReference``, or a raw
+        string — all three paths point at a handle we need to validate.
+        """
+        if choice is None:
+            return None
+        if isinstance(choice, str):
+            return choice
+        if isinstance(choice, ModelReference):
+            return choice.raw
+        return choice.model
+
+    @classmethod
+    def _resolve_terminal_handle(
+        cls,
+        deck: ModelDeck,
+        ref: ModelReference,
+        model_type: ModelType,
+    ) -> str | None:
+        """Follow aliases/waterfalls down to a concrete handle name, or ``None`` when the
+        reference is a preset (presets cannot themselves be handles) or the chain dead-ends
+        without a resolvable target.
+        """
+        aliases, waterfalls = deck.get_aliases_and_waterfalls_for_type(model_type)
+        visited: set[str] = set()
+        current = ref
+        while True:
+            match current.kind:
+                case ModelReferenceKind.HANDLE:
+                    return current.name
+                case ModelReferenceKind.ALIAS:
+                    if current.name in visited:
+                        return None
+                    visited.add(current.name)
+                    target = aliases.get(current.name)
+                    if target is None:
+                        return current.name
+                    try:
+                        current = ModelReference.parse(target)
+                    except ModelReferenceParseError:
+                        return None
+                case ModelReferenceKind.WATERFALL:
+                    fallback_list = waterfalls.get(current.name)
+                    if not fallback_list:
+                        return current.name
+                    try:
+                        current = ModelReference.parse(fallback_list[0])
+                    except ModelReferenceParseError:
+                        return None
+                case ModelReferenceKind.PRESET:
+                    return None
 
     @override
     def validate_model_deck(self):

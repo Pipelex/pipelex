@@ -184,24 +184,24 @@ After every `🛑 CHECKPOINT` line:
 
 **Goal:** downstream code can see whether the config it has is fresh or cached; backend library raises a clear error when a bundle references a gateway model not present in the (fresh or cached) specs. **Source is passed as a separate argument, NOT stored on `GatewayConfig`** — `GatewayConfig` stays `extra="forbid"` and remains a pure value object.
 
-- [ ] **3.1** Failing tests in `tests/integration/pipelex/cogt/model_backends/test_gateway_unknown_model.py` with `TestGatewayUnknownModel`:
+- [x] **3.1** Failing tests in `tests/integration/pipelex/cogt/model_backends/test_gateway_unknown_model.py` with `TestGatewayUnknownModel`:
   - `test_known_model_loads` — gateway specs contain `gpt-x`, backend deck references it → load OK.
   - `test_unknown_model_fresh_raises` — backend deck references `gpt-future` not in fresh gateway specs → `GatewayUnknownModelError` with `source=FRESH` and the model name in the message.
   - `test_unknown_model_cached_raises_with_stale_hint` — same as above but source is `CACHED`; message hints "remote config is stale; run `pipelex init` while online to refresh".
-- [ ] **3.2** Failing tests in `tests/integration/pipelex/system/pipelex_service/test_setup_with_cache.py` with `TestSetupWithCache`:
+- [x] **3.2** Failing tests in `tests/integration/pipelex/system/pipelex_service/test_setup_with_cache.py` with `TestSetupWithCache`:
   - `test_setup_succeeds_with_stale_cache_dry_run` — `Pipelex.make(needs_inference=False, needs_model_specs=True)` with gateway enabled + httpx mocked to fail + cache primed → setup succeeds, a `RemoteConfigStaleWarning` is emitted.
   - `test_setup_fails_without_cache_dry_run` — same as above but cache empty → `RemoteConfigUnavailableError`.
   - `test_telemetry_disabled_when_source_cached` — `Pipelex.make(needs_inference=True)` with gateway enabled + cache fallback → assert the active telemetry manager is the no-op variant (or `is_pipelex_telemetry_enabled` is `False`). Guards the "stale ops shouldn't phone home" invariant.
   - `test_byok_offline_regression_guard` — `Pipelex.make(needs_inference=False, needs_model_specs=True)` with gateway **disabled** in backends.toml + httpx mocked to fail → setup succeeds without ever calling `fetch_remote_config()` (assert via `mocker.spy`). This is the explicit regression test that 0.2 only verifies one-time; without it, a future refactor could re-introduce a phantom network call.
-- [ ] **3.3** Implement:
+- [x] **3.3** Implement:
   - Add a `gateway_config_source: RemoteConfigSource | None` parameter to `ModelManager.setup()` and `BackendLibrary._load_gateway_model_specs()`. `None` means no gateway active.
   - In `pipelex.py:setup()`, after the fetch:
     - Build `GatewayConfig` from `result.config` (no `is_from_cache` field — `GatewayConfig` stays unchanged).
     - Pass `result.source` to `models_manager.setup(...)` as `gateway_config_source`.
     - When `result.source == CACHED`, emit `RemoteConfigStaleWarning` (UserWarning subclass next to `GatewayOverrideWarning`).
   - In `BackendLibrary._load_gateway_model_specs` (or wherever model_handle resolution lives — read the call site before deciding), raise `GatewayUnknownModelError(model_name=..., source=gateway_config_source)` when a referenced gateway model isn't in `gateway_config.model_specs`. Message branches on `source`.
-- [ ] **3.4** Update agent CLI error mapping in `pipelex/cli/agent_cli/commands/agent_output.py` (`AGENT_ERROR_HINTS`, `AGENT_ERROR_DOMAINS`) for `RemoteConfigUnavailableError` and `GatewayUnknownModelError`. Plumb the structured `warnings` field into the `agent_success(...)` envelope so machine consumers see `[{"type": "RemoteConfigStale", "cached_at": "..."}]` when source is cached.
-- [ ] **3.5** `make agent-check` clean. Tests green.
+- [x] **3.4** Update agent CLI error mapping in `pipelex/cli/agent_cli/commands/agent_output.py` (`AGENT_ERROR_HINTS`, `AGENT_ERROR_DOMAINS`) for `RemoteConfigUnavailableError` and `GatewayUnknownModelError`. Plumb the structured `warnings` field into the `agent_success(...)` envelope so machine consumers see `[{"type": "RemoteConfigStale", "cached_at": "..."}]` when source is cached.
+- [x] **3.5** `make agent-check` clean. Tests green.
 
 🛑 **CHECKPOINT 3** — Stale operation is safe, model membership is enforced. Cold-start safe.
 
@@ -374,3 +374,48 @@ Capture as separate work after this lands:
 - `make agent-test` — full suite green.
 
 **Next:** Phase 3 — start at **3.1** (failing tests for `GatewayUnknownModelError` in `tests/integration/pipelex/cogt/model_backends/test_gateway_unknown_model.py`).
+
+### Checkpoint 3 status
+
+**Landed:**
+- `pipelex/cogt/exceptions.py` — added `GatewayUnknownModelError(CogtError)` with `error_category=CONFIGURATION`. Carries `model_name: str` and `source: RemoteConfigSource`. Message branches on source via exhaustive match: `FRESH` → "gateway no longer offers it / check name / disable gateway"; `CACHED` → "cache may be stale, run `pipelex init` while online". Imports `RemoteConfigSource` at module level — no circular-import issue since the fetcher module doesn't touch `cogt`.
+- `pipelex/cogt/models/model_manager_abstract.py` — added required `gateway_config_source: RemoteConfigSource | None` parameter to the abstract `setup()`.
+- `pipelex/cogt/models/model_manager.py` — implementation of the membership check:
+  - `setup()` now accepts `gateway_config_source` and calls `_enforce_gateway_model_membership` after `build_deck`.
+  - `_enforce_gateway_model_membership(gateway_config, gateway_config_source)` — no-op when either is `None` (gateway not live). Otherwise iterates `_collect_deck_referenced_handles(deck)`, resolves each through `_resolve_terminal_handle` (walks aliases + first-element of waterfalls), and raises `GatewayUnknownModelError(model_name=terminal, source=gateway_config_source)` when the terminal handle is missing from both `deck.inference_models` AND `gateway_config.model_specs` (defaults key skipped).
+  - `_collect_deck_referenced_handles` covers preset models (LLM/Extract/ImgGen/Search) and the two LLM choice defaults. Aliases/waterfalls are intentionally NOT enumerated directly — they're reachable via preset/choice references and the resolver walks them.
+  - `_extract_choice_handle` normalises the `LLMModelChoice` union (`LLMSetting | ModelReference | str | None`) to a raw handle string.
+  - `_resolve_terminal_handle` does its own model-type → aliases/waterfalls dispatch (instead of calling `ModelDeck._get_aliases_and_waterfalls_for_type`, which is protected) to keep the cogt API surface clean.
+- `pipelex/pipelex.py` — captures `gateway_config_source` from the fetch result, passes it through `models_manager.setup(...)`, and tightens the telemetry guard:
+  - `is_pipelex_telemetry_enabled = is_pipelex_service_enabled and needs_inference and gateway_config_source != RemoteConfigSource.CACHED` (stale config implies stale model identities; phoning home then would pollute metrics).
+  - Re-emits `RemoteConfigStaleWarning` at setup time even when the fetcher itself didn't (the session-cached fetcher in `tests/conftest.py` swaps in a wrapper that doesn't warn — re-emitting here makes provenance visible regardless of how the result reached us).
+  - Dummy remote config path (`needs_model_specs=False`) gets `source=FRESH` so the gateway-membership check is silent in that branch (model_specs is empty there).
+- `pipelex/cli/commands/doctor_cmd.py` — propagates `gateway_config_source` from the fetch result through `models_manager.setup(...)`.
+- `pipelex/cli/agent_cli/commands/agent_output.py`:
+  - New module-level capture buffer + `record_setup_warning(...)` / `consume_setup_warnings()` helpers.
+  - `agent_success(...)` drains the buffer into a top-level `warnings` array on the JSON envelope (appending to any caller-supplied list).
+  - Added `AGENT_ERROR_HINTS` and `AGENT_ERROR_DOMAINS` entries for `RemoteConfigUnavailableError` and `GatewayUnknownModelError`. Existing `RemoteConfigFetchError` and `RemoteConfigValidationError` hints untouched.
+- `pipelex/cli/agent_cli/commands/agent_cli_factory.py`:
+  - Wraps `Pipelex.make` in `warnings.catch_warnings(record=True)` and records every `RemoteConfigStaleWarning` as `{"type": "RemoteConfigStale", "message": "..."}` via `record_setup_warning(...)`. The next `agent_success` call surfaces it on the envelope.
+  - New `except` clauses for `RemoteConfigUnavailableError` and `GatewayUnknownModelError`; the latter exposes `model_name` and `source` on the error JSON.
+
+**Tests:**
+- `tests/integration/pipelex/cogt/model_backends/test_gateway_unknown_model.py` — `TestGatewayUnknownModel` with three tests covering the happy path (default cached gateway has all referenced handles), fresh-source missing handle, and cached-source missing handle (asserts the message hints at `pipelex init`).
+- `tests/integration/pipelex/system/pipelex_service/test_setup_with_cache.py` — `TestSetupWithCache` with four tests: dry-run with primed cache (warning emitted), dry-run with cold cache (`RemoteConfigUnavailableError`), telemetry-downgrade-to-no-op when source is cached even with `needs_inference=True`, and the BYOK-offline regression guard (gateway disabled → `fetch_remote_config` never called).
+
+**Decisions:**
+- `GatewayConfig` stays `extra="forbid"` and source-free. Provenance flows through `ModelManager.setup(gateway_config_source=...)` rather than being baked into the value object.
+- The membership check runs at the end of `ModelManager.setup` (not only at `validate_model_deck` time), so even `needs_inference=False, needs_model_specs=True` dry-run flows surface gateway-spec mismatches. This is necessary because the default `missing_presets_reaction = "log"` would otherwise swallow the failure silently.
+- `_enforce_gateway_model_membership` skips already-resolved handles (i.e. ones that ended up in `deck.inference_models`). This means the production happy path is silent even when the gateway has every standard model.
+- We did NOT extend `ModelDeck._get_aliases_and_waterfalls_for_type` to public access — the resolver re-does the dispatch locally to keep the deck's invariants encapsulated.
+- The structured `warnings` envelope is keyed `type=RemoteConfigStale`; the `cached_at` field will be added once we propagate the timestamp through the warning payload (currently the warning message has it inline; deferred to a follow-up if a structured field becomes necessary for downstream consumers).
+- Telemetry is downgraded to no-op (rather than to a "stale" variant) when the source is cached. Stricter than the original plan's "is_pipelex_telemetry_enabled stays False" wording — current implementation makes the downgrade explicit in `pipelex.py` so the existing `TelemetryFactory.make_telemetry_manager(is_pipelex_telemetry_enabled=False, ...)` path returns the no-op directly.
+
+**Verification:**
+- Targeted: `.venv/bin/pytest -n auto -m "not pipelex_api" tests/integration/pipelex/system/pipelex_service/ tests/unit/pipelex/system/` → 112 passed.
+- Targeted: `.venv/bin/pytest -n auto -m "not pipelex_api" tests/integration/pipelex/cogt/model_backends/test_gateway_unknown_model.py` → 3 passed.
+- Targeted: `.venv/bin/pytest -n auto -m "not pipelex_api" tests/integration/pipelex/system/pipelex_service/test_setup_with_cache.py` → 4 passed.
+- `make agent-check` — clean (ruff + plxt + pyright + mypy all green).
+- `make agent-test` — full suite green.
+
+**Next:** Phase 4 — start at **4.1** (failing tests for cache priming in `tests/integration/pipelex/cli/commands/init/test_cache_priming.py`).

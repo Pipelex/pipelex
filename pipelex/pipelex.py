@@ -1,4 +1,5 @@
 import types
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -57,12 +58,14 @@ from pipelex.system.environment import get_pipelexpath_dirs
 from pipelex.system.pipelex_service.exceptions import (
     GatewayTermsNotAcceptedError,
     InferenceSetupRequiredError,
+    RemoteConfigStaleWarning,
 )
 from pipelex.system.pipelex_service.pipelex_service_config import (
     is_pipelex_gateway_enabled,
     load_pipelex_service_config_if_exists,
 )
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
+from pipelex.system.pipelex_service.types import RemoteConfigSource
 from pipelex.system.registries.func_registry import FuncRegistry, func_registry
 from pipelex.system.registries.singleton import MetaSingleton
 from pipelex.system.runtime import IntegrationMode, runtime_manager
@@ -203,6 +206,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         remote_config: RemoteConfig | None = None
         gateway_config: GatewayConfig | None = None
+        gateway_config_source: RemoteConfigSource | None = None
         if is_pipelex_service_enabled:
             if not effective_needs_model_specs:
                 # Use dummy config when inference is not needed (for testing without network access)
@@ -212,6 +216,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                     model_specs=gateway_model_specs,
                     aws_region=remote_config.aws_region,
                 )
+                gateway_config_source = RemoteConfigSource.FRESH
                 log.verbose("Using dummy remote config (inference not needed)")
             else:
                 # Terms acceptance is only required for actual inference usage, not for
@@ -234,15 +239,32 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 # Fetch remote configuration (may fall back to on-disk cache when offline).
                 remote_config_result = RemoteConfigFetcher.fetch_remote_config()
                 remote_config = remote_config_result.config
-                log.verbose(f"Successfully fetched Pipelex Gateway remote configuration (source={remote_config_result.source})")
+                gateway_config_source = remote_config_result.source
+                log.verbose(f"Successfully fetched Pipelex Gateway remote configuration (source={gateway_config_source})")
                 gateway_model_specs = remote_config.backend_model_specs
                 gateway_config = GatewayConfig(
                     model_specs=gateway_model_specs,
                     aws_region=remote_config.aws_region,
                 )
+                # Stale operation: warn loudly so machine consumers can re-surface the provenance.
+                # Emission lives at this orchestration layer (not in the fetcher) so the fetcher
+                # stays a pure data-returning function — and so test fixtures that swap in a
+                # cached fetcher (tests/conftest.py) don't need to special-case warning replay.
+                if gateway_config_source.is_cached:
+                    cached_at_iso = remote_config_result.cached_at.isoformat() if remote_config_result.cached_at else "unknown"
+                    warnings.warn(
+                        f"Pipelex Gateway is running off a cached remote config (snapshot: {cached_at_iso}). "
+                        "Run `pipelex init` while online to refresh.",
+                        RemoteConfigStaleWarning,
+                        stacklevel=2,
+                    )
 
-        # Disable Pipelex telemetry when inference is not needed (no remote config available)
-        is_pipelex_telemetry_enabled = is_pipelex_service_enabled and needs_inference
+        # Disable Pipelex telemetry when:
+        # - inference is not needed (no live runs to track), OR
+        # - the gateway config came from the cache (stale specs imply potentially stale model
+        #   identities; phoning home about pipe runs in that state would pollute metrics).
+        gateway_source_is_cached = gateway_config_source is not None and gateway_config_source.is_cached
+        is_pipelex_telemetry_enabled = is_pipelex_service_enabled and needs_inference and not gateway_source_is_cached
         self.telemetry_manager = TelemetryFactory.make_telemetry_manager(
             secrets_provider=secrets_provider,
             integration_mode=integration_mode,
@@ -303,6 +325,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             self.models_manager.setup(
                 secrets_provider=secrets_provider,
                 gateway_config=gateway_config,
+                gateway_config_source=gateway_config_source,
                 needs_inference=needs_inference,
             )
         except RoutingProfileLibraryNotFoundError as routing_not_found_exc:

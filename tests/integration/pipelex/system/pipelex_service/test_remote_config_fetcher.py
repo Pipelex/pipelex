@@ -3,8 +3,9 @@
 These tests pin the post-refactor semantics:
 
 - success → ``RemoteConfigResult(source=FRESH)`` AND the cache is written
-- network/HTTP failure with a usable cache → ``RemoteConfigResult(source=CACHED)`` AND a
-  ``RemoteConfigStaleWarning`` is emitted
+- network/HTTP failure with a usable cache → ``RemoteConfigResult(source=CACHED)`` with a
+  ``cached_at`` timestamp. Warning emission lives at the orchestration layer
+  (``Pipelex.setup``), not here — the fetcher is a pure data-returning function.
 - failure with no cache → ``RemoteConfigUnavailableError`` (cache path in the message)
 - malformed JSON → ``RemoteConfigValidationError`` (no silent cache fallback — server-side bug)
 - ``require_fresh=True`` (used by the doc generators) refuses cached fallback
@@ -13,7 +14,6 @@ These tests pin the post-refactor semantics:
 from __future__ import annotations
 
 import json
-import warnings
 from pathlib import Path  # noqa: TC003 — referenced by pytest fixture type hints at runtime
 from typing import TYPE_CHECKING, Any
 
@@ -23,7 +23,6 @@ import pytest
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.system.pipelex_service.exceptions import (
     RemoteConfigFetchError,
-    RemoteConfigStaleWarning,
     RemoteConfigUnavailableError,
     RemoteConfigValidationError,
 )
@@ -31,8 +30,8 @@ from pipelex.system.pipelex_service.remote_config_cache import RemoteConfigCache
 from pipelex.system.pipelex_service.remote_config_fetcher import (
     RemoteConfigFetcher,
     RemoteConfigResult,
-    RemoteConfigSource,
 )
+from pipelex.system.pipelex_service.types import RemoteConfigSource
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -118,20 +117,25 @@ class TestRemoteConfigFetcher:
 
     @pytest.mark.usefixtures("isolated_cache_dir")
     def test_network_failure_with_cache_returns_cached(self, mocker: MockerFixture) -> None:
+        """Cache fallback returns the cached payload tagged ``source=CACHED`` with a
+        ``cached_at`` timestamp forwarded verbatim from the on-disk snapshot — not a
+        fabricated "now" — so callers can reason about staleness accurately. Warning
+        emission lives at the orchestration layer (``Pipelex.setup``); the fetcher itself
+        stays a pure data-returning function.
+        """
         payload = _valid_remote_config_payload()
         RemoteConfigCache.store(payload)
+        stored_snapshot = RemoteConfigCache.load()
+        assert stored_snapshot is not None
 
         mocker.patch("httpx.get", side_effect=httpx.ConnectError("no network"))
         mocker.patch.object(RemoteConfigFetcher, "FETCH_MAX_RETRIES", 1)
 
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            result = RemoteConfigFetcher.fetch_remote_config()
+        result = RemoteConfigFetcher.fetch_remote_config()
 
         assert result.source == RemoteConfigSource.CACHED
-        assert result.cached_at is not None
+        assert result.cached_at == stored_snapshot.cached_at, "result must forward the cache's snapshot timestamp, not a freshly-computed one"
         assert result.config.aws_region == "eu-west-3"
-        assert any(issubclass(item.category, RemoteConfigStaleWarning) for item in caught), "cache fallback must emit a RemoteConfigStaleWarning"
 
     @pytest.mark.usefixtures("isolated_cache_dir")
     def test_network_failure_without_cache_raises_unavailable(self, mocker: MockerFixture) -> None:
@@ -148,8 +152,14 @@ class TestRemoteConfigFetcher:
 
     @pytest.mark.usefixtures("isolated_cache_dir")
     def test_http_error_with_cache_returns_cached(self, mocker: MockerFixture) -> None:
+        """5xx response with a primed cache falls back to cache, same as a connect error.
+        Asserts the cached payload (not a fabricated empty one) flows back, with its
+        snapshot timestamp preserved.
+        """
         payload = _valid_remote_config_payload()
         RemoteConfigCache.store(payload)
+        stored_snapshot = RemoteConfigCache.load()
+        assert stored_snapshot is not None
 
         failing_response = httpx.Response(
             status_code=503,
@@ -159,12 +169,11 @@ class TestRemoteConfigFetcher:
         mocker.patch("httpx.get", return_value=failing_response)
         mocker.patch.object(RemoteConfigFetcher, "FETCH_MAX_RETRIES", 1)
 
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            result = RemoteConfigFetcher.fetch_remote_config()
+        result = RemoteConfigFetcher.fetch_remote_config()
 
         assert result.source == RemoteConfigSource.CACHED
-        assert any(issubclass(item.category, RemoteConfigStaleWarning) for item in caught)
+        assert result.cached_at == stored_snapshot.cached_at
+        assert result.config.aws_region == "eu-west-3"
 
     @pytest.mark.usefixtures("isolated_cache_dir")
     def test_http_error_without_cache_raises_unavailable(self, mocker: MockerFixture) -> None:
@@ -234,17 +243,17 @@ class TestRemoteConfigFetcher:
 
     @pytest.mark.usefixtures("isolated_cache_dir", "fast_retry")
     def test_falls_back_to_cache_after_5_transient_failures(self, mocker: MockerFixture) -> None:
+        """All retry attempts exhausted, cache primed → cache fallback. Stale-cache warning
+        emission is the orchestration layer's concern, so it's not asserted here.
+        """
         payload = _valid_remote_config_payload()
         RemoteConfigCache.store(payload)
 
         mocker.patch("httpx.get", side_effect=httpx.ConnectError("always down"))
 
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            result = RemoteConfigFetcher.fetch_remote_config()
+        result = RemoteConfigFetcher.fetch_remote_config()
 
         assert result.source == RemoteConfigSource.CACHED
-        assert any(issubclass(item.category, RemoteConfigStaleWarning) for item in caught)
 
     @pytest.mark.usefixtures("isolated_cache_dir")
     def test_require_fresh_refuses_cache(self, mocker: MockerFixture) -> None:

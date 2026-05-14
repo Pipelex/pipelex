@@ -1,11 +1,12 @@
 """Factory function for agent CLI commands -- JSON-only error output."""
 
+import warnings
 from pathlib import Path
 
 import typer
 
-from pipelex.cli.agent_cli.commands.agent_output import agent_error
-from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
+from pipelex.cli.agent_cli.commands.agent_output import agent_error, record_setup_warning
+from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelDeckPresetValidatonError
 from pipelex.pipelex import Pipelex
 from pipelex.system.pipelex_service.exceptions import (
     GatewayApiKeyMissingError,
@@ -13,6 +14,8 @@ from pipelex.system.pipelex_service.exceptions import (
     GatewayTermsNotAcceptedError,
     InferenceSetupRequiredError,
     RemoteConfigFetchError,
+    RemoteConfigStaleWarning,
+    RemoteConfigUnavailableError,
     RemoteConfigValidationError,
 )
 from pipelex.system.runtime import IntegrationMode
@@ -53,9 +56,16 @@ def make_pipelex_for_agent_cli(
             or if inference setup is required (after printing markdown to stdout).
     """
     try:
-        pipelex_instance = Pipelex.make(
-            integration_mode=IntegrationMode.CLI, library_dirs=library_dirs, needs_inference=needs_inference, needs_model_specs=needs_model_specs
-        )
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always", RemoteConfigStaleWarning)
+            pipelex_instance = Pipelex.make(
+                integration_mode=IntegrationMode.CLI, library_dirs=library_dirs, needs_inference=needs_inference, needs_model_specs=needs_model_specs
+            )
+        # Surface a structured ``RemoteConfigStale`` entry so JSON consumers can react to
+        # stale-cache operation without parsing stderr.
+        for item in caught:
+            if issubclass(item.category, RemoteConfigStaleWarning):
+                record_setup_warning({"type": "RemoteConfigStale", "message": str(item.message)})
     except InferenceSetupRequiredError:
         print(
             "# First-time inference setup required\n"
@@ -77,8 +87,18 @@ def make_pipelex_for_agent_cli(
         agent_error(exc.message, "GatewayDoNotTrackConflictError", cause=exc)
     except RemoteConfigFetchError as exc:
         agent_error(exc.message, "RemoteConfigFetchError", cause=exc)
+    except RemoteConfigUnavailableError as exc:
+        agent_error(exc.message, "RemoteConfigUnavailableError", cause=exc)
     except RemoteConfigValidationError as exc:
         agent_error(exc.message, "RemoteConfigValidationError", cause=exc)
+    except GatewayUnknownModelError as exc:
+        agent_error(
+            exc.message,
+            "GatewayUnknownModelError",
+            cause=exc,
+            model_name=exc.model_name,
+            source=exc.source,
+        )
     except ModelDeckPresetValidatonError as exc:
         agent_error(
             exc.message,

@@ -17,7 +17,8 @@ from pipelex.system.pipelex_service.pipelex_service_config import (
     load_pipelex_service_config_if_exists as _original_load_pipelex_service_config,
 )
 from pipelex.system.pipelex_service.remote_config import RemoteConfig
-from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher, RemoteConfigResult, RemoteConfigSource
+from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher, RemoteConfigResult
+from pipelex.system.pipelex_service.types import RemoteConfigSource
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 

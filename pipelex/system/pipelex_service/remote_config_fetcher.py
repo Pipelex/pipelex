@@ -5,14 +5,20 @@ Its public method returns a :class:`RemoteConfigResult` carrying the parsed conf
 source it came from (``FRESH`` vs ``CACHED``), so downstream code can branch its error
 messaging and disable telemetry when running off stale data.
 
+This module emits no warnings — stale-cache surfacing is the orchestration layer's job
+(see ``Pipelex.setup``). Keeping the fetcher pure means test fixtures that swap in a cached
+fetcher don't need to special-case warning replay.
+
 Behaviour:
 
 - Every successful fetch persists the raw JSON to :class:`RemoteConfigCache` (opportunistic
   refresh).
-- On network or HTTP failure, the fetcher falls back to the cache if one exists and emits a
-  :class:`RemoteConfigStaleWarning`. If no usable cache exists, it raises
-  :class:`RemoteConfigUnavailableError`. The inner :class:`RemoteConfigFetchError` is chained
-  as ``__cause__`` so existing surfaces (doctor, agent hints) keep working.
+- On network or HTTP failure, the fetcher falls back to the cache if one exists and returns
+  it tagged ``source=CACHED`` with a ``cached_at`` timestamp. If no usable cache exists, it
+  raises :class:`RemoteConfigUnavailableError`. The inner :class:`RemoteConfigFetchError` is
+  chained as ``__cause__`` so existing surfaces (doctor, agent hints) keep working. Warning
+  emission is the orchestration layer's responsibility — see ``Pipelex.setup`` — so the
+  fetcher itself remains a pure data-returning function.
 - On JSON-validation failure (a server-side schema break — we control the server) the
   fetcher raises :class:`RemoteConfigValidationError` and does NOT silently fall back to
   cache.
@@ -23,7 +29,6 @@ Behaviour:
 
 from __future__ import annotations
 
-import warnings
 from datetime import datetime  # noqa: TC003 — Pydantic v2 resolves this annotation at runtime
 from typing import Any
 
@@ -33,24 +38,16 @@ from tenacity import RetryCallState, retry, retry_if_exception_type, stop_after_
 
 from pipelex.system.pipelex_service.exceptions import (
     RemoteConfigFetchError,
-    RemoteConfigStaleWarning,
     RemoteConfigUnavailableError,
     RemoteConfigValidationError,
 )
 from pipelex.system.pipelex_service.pipelex_details import PipelexDetails
 from pipelex.system.pipelex_service.remote_config import PipelexPosthogConfig, RemoteConfig
 from pipelex.system.pipelex_service.remote_config_cache import RemoteConfigCache
+from pipelex.system.pipelex_service.types import RemoteConfigSource
 from pipelex.system.runtime import runtime_manager
 from pipelex.tools.misc.terminal_utils import print_to_stderr
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
-from pipelex.types import StrEnum
-
-
-class RemoteConfigSource(StrEnum):
-    """Where a ``RemoteConfigResult`` was sourced from."""
-
-    FRESH = "fresh"
-    CACHED = "cached"
 
 
 class RemoteConfigResult(BaseModel):
@@ -216,11 +213,6 @@ class RemoteConfigFetcher:
             cached = RemoteConfigCache.load()
             if cached is None:
                 raise cls._build_unavailable_error(fetch_error) from fetch_error
-            warning_msg = (
-                f"Falling back to cached Pipelex Gateway remote config from {cached.cached_at.isoformat()}; "
-                "the remote endpoint was unreachable. Run `pipelex init` while online to refresh."
-            )
-            warnings.warn(warning_msg, RemoteConfigStaleWarning, stacklevel=2)
             return RemoteConfigResult(
                 config=cached.to_remote_config(),
                 source=RemoteConfigSource.CACHED,

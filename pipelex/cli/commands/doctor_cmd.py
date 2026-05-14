@@ -7,7 +7,7 @@ import io
 import os
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ValidationError
 from rich.panel import Panel
@@ -57,6 +57,9 @@ from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.placeholder import value_is_placeholder
 from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_path
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
+
+if TYPE_CHECKING:
+    from pipelex.system.pipelex_service.types import RemoteConfigSource
 
 
 class ConfigLocationInfo(BaseModel):
@@ -742,6 +745,7 @@ def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, B
 
     # Fetch gateway model specs if Gateway is enabled
     gateway_config: GatewayConfig | None = None
+    gateway_config_source: RemoteConfigSource | None = None
     if is_pipelex_gateway_enabled():
         pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
         if pipelex_service_config is None:
@@ -751,6 +755,7 @@ def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, B
         try:
             result = RemoteConfigFetcher.fetch_remote_config()
             remote_config = result.config
+            gateway_config_source = result.source
             gateway_config = GatewayConfig(
                 model_specs=remote_config.backend_model_specs,
                 aws_region=remote_config.aws_region,
@@ -764,6 +769,7 @@ def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, B
         models_manager.setup(
             secrets_provider=secrets_provider,
             gateway_config=gateway_config,
+            gateway_config_source=gateway_config_source,
         )
         models_manager.validate_model_deck()
     except InferenceBackendLibraryError as exc:
