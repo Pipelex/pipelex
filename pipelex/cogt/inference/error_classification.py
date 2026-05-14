@@ -6,6 +6,7 @@ recover the underlying SDK exception that ``InstructorRetryException``
 wraps when ``instructor`` exhausts its retry loop.
 """
 
+import json
 from typing import Any, cast
 
 from pydantic import BaseModel
@@ -303,5 +304,68 @@ def extract_anthropic_metadata(exc: BaseException) -> ProviderErrorMetadata:
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
         provider_error_code=_provider_error_code_from_body(body),
+        body=body,
+    )
+
+
+def _provider_error_code_from_flat_body(body: Any) -> str | None:
+    """Read ``type``/``code`` directly off the top-level body dict.
+
+    Mistral returns flat error payloads (``{"message": ..., "type": ..., "code": ...}``)
+    on most endpoints, in addition to the nested ``{"error": {...}}`` shape covered
+    by ``_provider_error_code_from_body``.
+    """
+    if not isinstance(body, dict):
+        return None
+    flat = cast("dict[str, Any]", body)
+    code = flat.get("type") or flat.get("code")
+    if isinstance(code, str):
+        return code
+    return None
+
+
+def extract_mistral_metadata(exc: BaseException) -> ProviderErrorMetadata:
+    """Distill a Mistral SDK exception into a ``ProviderErrorMetadata``.
+
+    Tolerates the two shapes the Mistral SDK raises:
+
+    - ``MistralError`` (and subclasses like ``SDKError``) carry ``status_code``,
+      ``headers`` (httpx.Headers), and ``body`` as a *raw response text string*
+      — not a pre-parsed dict like OpenAI/Anthropic. We JSON-parse it on a
+      best-effort basis to recover ``provider_error_code`` from either the
+      top-level ``type``/``code`` or the nested ``error.type``/``error.code``.
+    - ``NoResponseError`` is a separate ``Exception`` subclass with no response
+      metadata; every status-related field comes back as ``None``.
+    """
+    status_code = getattr(exc, "status_code", None)
+    if not isinstance(status_code, int):
+        status_code = None
+    headers = getattr(exc, "headers", None)
+    request_id: str | None = None
+    retry_after_seconds: float | None = None
+    if headers is not None:
+        request_id_value = headers.get("x-request-id")
+        if isinstance(request_id_value, str):
+            request_id = request_id_value
+        retry_after_seconds = _parse_retry_after_seconds(headers.get("retry-after"))
+    raw_body = getattr(exc, "body", None)
+    body: Any = raw_body
+    provider_error_code: str | None = None
+    if isinstance(raw_body, str) and raw_body:
+        try:
+            parsed: Any = json.loads(raw_body)
+        except (json.JSONDecodeError, ValueError):
+            parsed = None
+        if isinstance(parsed, dict):
+            parsed_dict = cast("dict[str, Any]", parsed)
+            body = parsed_dict
+            provider_error_code = _provider_error_code_from_flat_body(parsed_dict) or _provider_error_code_from_body(parsed_dict)
+    return ProviderErrorMetadata(
+        provider="mistral",
+        sdk_exception_type=type(exc).__name__,
+        status_code=status_code,
+        request_id=request_id,
+        retry_after_seconds=retry_after_seconds,
+        provider_error_code=provider_error_code,
         body=body,
     )

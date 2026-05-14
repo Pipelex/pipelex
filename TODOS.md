@@ -205,37 +205,50 @@ Same shape as Phase 5 with one specialization: `NotFoundError` raises `LLMModelN
 
 Smallest of the four — `_classify_mistral_error` already does the work; the wrapped path just never reaches it. Add `extract_mistral_metadata`.
 
-- [ ] **RED** — write `tests/unit/pipelex/plugins/mistral/test_extract_mistral_metadata.py`. **First** confirm `MistralError` and its subclasses' attribute shapes against the installed `mistralai` (varies across versions).
-- [ ] **RED** — write `tests/unit/pipelex/plugins/mistral/test_mistral_llm_worker_object_error_handling.py`. Cases (each asserts category + `user_action.kind` + `provider_metadata`):
-  - Wrapped `MistralError` (rate-limit) → `TRANSIENT` + `WAIT_AND_RETRY`
-  - Wrapped `MistralError` (HTTP 402 / quota match) → `CAPACITY` + `CHECK_BILLING`
-  - Wrapped `MistralError` (timeout) → `TRANSIENT` + `WAIT_AND_RETRY`
-  - Wrapped `MistralError` (connection) → `TRANSIENT` + `WAIT_AND_RETRY`
-  - Wrapped `MistralError` (content-policy) → `CONTENT` + `CHANGE_INPUT`
-  - Wrapped `MistralError` (auth) → `CONFIGURATION` + `CHECK_CREDENTIALS`
-  - Wrapped non-`MistralError` (e.g. `pydantic.ValidationError`) → `UNKNOWN` + `UNKNOWN`
-  - Real-instructor end-to-end: patch `mistralai.Mistral.chat.complete_async` (or current `from_mistral` adapter target) with `AsyncMock(side_effect=MistralError(...))`
-- [ ] **GREEN** — write `extract_mistral_metadata(exc: MistralError) -> ProviderErrorMetadata`
-- [ ] **GREEN** — add to `pipelex/plugins/mistral/mistral_llm_worker.py`:
+- [x] **RED** — wrote `tests/unit/pipelex/plugins/mistral/test_extract_mistral_metadata.py` (10 tests). Mistral's body is a raw JSON string (not a pre-parsed dict like OpenAI/Anthropic), so the helper JSON-parses it on a best-effort basis. `NoResponseError` is a separate `Exception` subclass with no response metadata — every status-related field comes back as `None`.
+- [x] **RED** — wrote `tests/unit/pipelex/plugins/mistral/test_mistral_llm_worker_object_error_handling.py` (10 tests). Cases (each asserts category + `user_action.kind` + `provider_metadata`):
+  - Wrapped `MistralError` (rate-limit generic 429) → `TRANSIENT` + `WAIT_AND_RETRY`
+  - Wrapped `MistralError` (429 with quota keywords) → `CAPACITY` + `CHECK_BILLING`
+  - Wrapped `MistralError` (HTTP 402) → `CAPACITY` + `CHECK_BILLING`
+  - Wrapped `MistralError` (content-policy 400) → `CONTENT` + `CHANGE_INPUT`
+  - Wrapped `MistralError` (generic 400) → `CONTENT` + `CHANGE_INPUT`
+  - Wrapped `MistralError` (auth 401) → `CONFIGURATION` + `CHECK_CREDENTIALS`
+  - Wrapped `MistralError` (not-found 404) → `CONFIGURATION` + `CHANGE_MODEL`
+  - Wrapped `MistralError` (server error 500) → `TRANSIENT` + `WAIT_AND_RETRY`
+  - Wrapped non-`MistralError` (e.g. `ValueError`) → `UNKNOWN` + `provider_metadata=None`
+  - Real-instructor end-to-end: patches `Mistral.chat.complete_async` (which is what `instructor.from_mistral` ultimately calls)
+  - **Note: skipped timeout/connection cases.** Mistral does not have separate `APITimeoutError`/`APIConnectionError` classes the way OpenAI/Anthropic do — its only network-layer exception is `NoResponseError` (a separate `Exception` subclass, not a `MistralError`). HTTP-level errors all surface as `MistralError` with `status_code` set.
+- [x] **GREEN** — added `extract_mistral_metadata(exc: BaseException) -> ProviderErrorMetadata` in `pipelex/cogt/inference/error_classification.py`. Reads `status_code`, `headers` (httpx.Headers — for `x-request-id` and `retry-after`), and `body` (raw JSON string). JSON-parses the body on a best-effort basis; tolerates non-JSON bodies (e.g. HTML error pages from upstream) by leaving `provider_error_code=None` and storing the raw string. Added a small `_provider_error_code_from_flat_body` helper because Mistral's body is flat (`{"message": ..., "type": ..., "code": ...}`) while OpenAI/Anthropic wrap it as `{"error": {...}}` — falls back to the nested helper for endpoints that use that shape.
+- [x] **GREEN** — refactored `_gen_object` in `pipelex/plugins/mistral/mistral_llm_worker.py`:
   ```python
   except InstructorRetryException as instructor_exc:
-      underlying = extract_underlying_sdk_exception(instructor_exc)
-      if isinstance(underlying, MistralError):
-          raise self._classify_mistral_error(underlying) from instructor_exc
+      underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
+      if isinstance(underlying_exc, MistralError):
+          raise self._classify_mistral_error(underlying_exc) from instructor_exc
       msg = f"Mistral structured generation failed after retries for model '{self.inference_model.desc}': {instructor_exc}"
-      raise LLMCompletionError(
-          msg,
-          error_category=InferenceErrorCategory.UNKNOWN,
-          user_action=UserAction(kind=UserActionKind.UNKNOWN, detail="Unexpected error from Mistral structured generation"),
-          provider_metadata=None,
-      ) from instructor_exc
+      raise LLMCompletionError(msg, error_category=InferenceErrorCategory.UNKNOWN) from instructor_exc
+  except MistralError as exc:
+      raise self._classify_mistral_error(exc) from exc
   ```
-- [ ] **GREEN** — refine `_classify_mistral_error` to attach `provider_metadata=extract_mistral_metadata(exc)` and use semantic `user_action.kind` on every raise inside it
-- [ ] Migrate `instructor.exceptions` → `instructor.core`
-- [ ] **AUDIT** — `mistralai` SDK exception hierarchy
-- [ ] Run tests + `make agent-check`
+  Dropped the dead `except LLMCompletionError: raise` clause (no callee was raising a pre-categorized `LLMCompletionError` from inside the try). Dropped the misleading `error_category=CONTENT` fallback that previously fired for any unwrappable `InstructorRetryException` — it now routes to `UNKNOWN` per the Phase 2 convention.
+- [x] **GREEN** — refined `_classify_mistral_error` to attach `provider_metadata=extract_mistral_metadata(exc)` on every raise and use semantic `UserActionKind` values: rate-limit→WAIT_AND_RETRY, quota (402 or 429+keywords)→CHECK_BILLING, 401/403→CHECK_CREDENTIALS, 404→CHANGE_MODEL, content-policy→CHANGE_INPUT, generic bad-request→CHANGE_INPUT, 5xx→WAIT_AND_RETRY, fallback→WAIT_AND_RETRY. Note: previously the fallback path lacked a `user_action` entirely; it now carries one too so downstream consumers see a uniform shape.
+- [x] Migrated `from instructor.exceptions import InstructorRetryException` → `from instructor.core import InstructorRetryException` in `mistral_llm_worker.py`.
+- [x] **AUDIT** — `mistralai` SDK exception hierarchy (rooted at `mistralai/models/`):
+  - `MistralError(Exception)` — base for all HTTP errors. Carries `message`, `status_code` (int), `body` (str — raw response text), `headers` (httpx.Headers), `raw_response` (httpx.Response).
+  - `SDKError(MistralError)` — fallback when no more specific error class matches.
+  - `ResponseValidationError(MistralError)` — pydantic validation failure on response shape.
+  - `HTTPValidationError(MistralError)` — server-side validation error (typically 422).
+  - `NoResponseError(Exception)` — separate (not a MistralError); raised when no HTTP response is received at all (network/timeout). The current worker tuple-catch only catches `MistralError`, so `NoResponseError` would propagate as-is — acceptable today because the tenacity retry layer above absorbs it. If telemetry surfaces it later, add a dedicated branch.
+- [x] Ran `.venv/bin/pytest tests/unit/pipelex/plugins/mistral/` (51 passed) and full plugins+cogt sweep (962 passed); `make agent-check` clean (0 errors, 0 warnings).
 
 > ### **STOP — CHECKPOINT H: Mistral LLM done**
+>
+> **Hand-off context:**
+> - `extract_mistral_metadata` lives in `pipelex/cogt/inference/error_classification.py` alongside the OpenAI/Anthropic helpers ✅
+> - `_classify_mistral_error` now attaches `provider_metadata` + semantic `user_action.kind` on every branch ✅
+> - `_gen_object` unwraps `InstructorRetryException` and dispatches through `_classify_mistral_error`; unrecognized underlying routes to `UNKNOWN` ✅
+> - `instructor.core` import migrated ✅
+> - `MistralError` body is a raw JSON string (unlike OpenAI/Anthropic which deliver a dict); the helper parses it on a best-effort basis. The flat top-level shape (`{"type": ..., "code": ...}`) is handled in addition to the nested `{"error": {...}}` shape via the new `_provider_error_code_from_flat_body` helper.
 
 ---
 
@@ -395,6 +408,14 @@ Use this section to capture decisions, surprises, and cold-start handoff context
   - **SDK exception coverage now uniform with Phase 5.** Added `InternalServerError` (5xx → TRANSIENT + WAIT_AND_RETRY) and `PermissionDeniedError` (403 → CONFIGURATION + CHECK_CREDENTIALS) to the tuple-catch — both were previously missing. `ConflictError` / `UnprocessableEntityError` are not raised on the responses path in practice and fall through to the wrapped-path `UNKNOWN` branch.
   - **Semantic UserActionKind values:** rate-limit→WAIT_AND_RETRY, quota→CHECK_BILLING, timeout/connection/server→WAIT_AND_RETRY, not-found→CHANGE_MODEL (on `LLMModelNotFoundError`), bad-request (content-policy or generic)→CHANGE_INPUT, auth/permission-denied→CHECK_CREDENTIALS.
   - **Tests.** New: `test_openai_responses_worker_object_error_handling.py` (10 tests including a real-instructor end-to-end). Existing `test_openai_worker_error_handling.py` (which tests the `_gen_text` Responses path through `responses.create`) still passes — the `_gen_text` refactor preserved the user-visible behavior for the categories it covered.
+- **2026-05-14 — Phase 7 landed.** Mistral LLM brought up to the beyond-reference standard.
+  - **`extract_mistral_metadata` body parsing.** Unlike OpenAI/Anthropic — whose SDKs deliver `body` as a pre-parsed dict — Mistral's SDK sets `MistralError.body` to the raw response *text string* (from `httpx.Response.text`). The helper JSON-parses it on a best-effort basis and stores the parsed dict back on `ProviderErrorMetadata.body` so downstream consumers see a uniform shape. Non-JSON bodies (HTML error pages from upstream gateways during 502/504s) are tolerated: `provider_error_code` stays `None` and `body` keeps the raw string.
+  - **Two body shapes.** Mistral returns the flat shape `{"message": ..., "type": ..., "code": ...}` on most endpoints, but some endpoints wrap it as `{"error": {...}}`. Added a small `_provider_error_code_from_flat_body` helper and fall back to the existing nested-shape helper to cover both. The OR-chain (`flat or nested`) means whichever shape Mistral uses, we extract the code.
+  - **No separate timeout/connection classes.** Mistral has only `MistralError` (HTTP errors with a `status_code`) and `NoResponseError` (a sibling `Exception` for true no-response failures — network-level). The current worker tuple-catch on `MistralError` does not catch `NoResponseError`, so it propagates up to the tenacity retry layer. Acceptable today; documented in the audit notes inside Phase 7. If telemetry surfaces it later, add a dedicated branch in `_gen_text`/`_gen_object` similar to OpenAI's `APIConnectionError`/`APITimeoutError`.
+  - **Dead `except LLMCompletionError` clause removed.** The prior `_gen_object` had an `except LLMCompletionError: raise` clause between the SDK catch and the `InstructorRetryException` catch. Nothing on the call path raised `LLMCompletionError` from inside the try, so the clause was dead. Removing it lets pyright/mypy see the unwrap path more cleanly.
+  - **Fallback path now routes to UNKNOWN.** Previously the unwrapped-instructor fallback used `error_category=CONTENT`, which silently mis-categorized non-Mistral underlying exceptions. Per Phase 2 convention, it now routes to `UNKNOWN` with `provider_metadata=None`.
+  - **Semantic UserActionKind values:** rate-limit→WAIT_AND_RETRY, quota (402 or 429+keywords)→CHECK_BILLING, 401/403→CHECK_CREDENTIALS, 404→CHANGE_MODEL, content-policy→CHANGE_INPUT, generic bad-request→CHANGE_INPUT, 5xx→WAIT_AND_RETRY, fallback→WAIT_AND_RETRY. Previously the 401/403/404 paths and the fallback path lacked a `user_action` entirely; they now carry one so downstream consumers see a uniform shape.
+  - **Tests.** New: `test_extract_mistral_metadata.py` (10 tests) and `test_mistral_llm_worker_object_error_handling.py` (10 tests including a real-instructor end-to-end). Existing `test_mistral_worker_error_handling.py` (the direct `_gen_text` path) still passes — the `_classify_mistral_error` refactor preserved the categorization output for every case it covered.
 - **2026-05-14 — Phase 3 landed.** `ProviderErrorMetadata` + `extract_anthropic_metadata` live in `pipelex/cogt/inference/error_classification.py`. Decisions:
   - **Field placement.** `provider_metadata` was added to `CogtError` (not the four leaf classes the plan named). The uniform base-class field keeps every subclass's `__init__` consistent and lets `to_error_report()` serialize it generically. Non-SDK CogtError subclasses just leave it `None` — same cost as Optional fields on the four leaves, simpler code.
   - **`AnthropicCredentialsError` carries metadata too** because we now have the metadata at the raise site and dropping it would lose auth-error telemetry (status_code 401, request_id).
