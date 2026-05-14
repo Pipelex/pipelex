@@ -1,8 +1,8 @@
 # Signature-Based Validation — TDD implementation plan
 
-Status: Phases 1–3 landed (2026-05-14). Signatures construct end-to-end in Python (spec → blueprint → runtime → dry-run mock). Strict-mode gating, CLI wiring, e2e, and docs are open.
+Status: Phases 1–5 landed (2026-05-14). Strict / lenient validation works end-to-end through Python and CLI. E2E .mthds tests and docs are open.
 
-Current state: A `PipeSignature` can be authored as a spec (`pipelex/builder/pipe/pipe_signature.py`), compiled to a blueprint (`pipelex/pipe_signature/pipe_signature_blueprint.py`), instantiated as a runtime (`pipelex/pipe_signature/pipe_signature_runtime.py`) via the registered `PipeSignatureFactory`, dry-run (yields a mock `Stuff` from the declared output `StuffSpec`), and rejected on live-run (`PipeSignatureNotExecutableError`). Signatures slot into `PipeBlueprintUnion` and `PipeSpecUnion`. **Not yet wired:** `dry_run_pipe` / `validate_bundle` still have no `allow_signatures` flag, no `collect_signature_refs` graph walk, no `SignaturesNotAllowedError`, no CLI options. End-to-end `.mthds` parsing of `type = "PipeSignature"` has not been exercised — interpreter / schema generator may still need touches in Phase 6. The schema generator was updated to strip `pipe_category` from `PipeSignatureBlueprint`, but the JSON Schema file lives in `vscode-pipelex/` (not this repo) so no schema artifact needed regeneration here. Surprise: the spec-layer file `pipelex/builder/pipe/pipe_signature.py` was easiest to refactor by making it inherit from `PipeSpec` rather than `StructuredContent` (gets `pipe_code` and shared input/output validators for free), which is a small but deliberate departure from the plan's "copy validators" suggestion.
+Current state: A `PipeSignature` can be authored as a spec (`pipelex/builder/pipe/pipe_signature.py`), compiled to a blueprint (`pipelex/pipe_signature/pipe_signature_blueprint.py`), instantiated as a runtime (`pipelex/pipe_signature/pipe_signature_runtime.py`) via the registered `PipeSignatureFactory`, dry-run (yields a mock `Stuff` from the declared output `StuffSpec`), and rejected on live-run (`PipeSignatureNotExecutableError`). Signatures slot into `PipeBlueprintUnion` and `PipeSpecUnion`. Strict-mode gating is live: `PipeAbstract.collect_signature_refs(pipe_lookup=...)` walks the dependency graph; `dry_run_pipe(..., allow_signatures=False)` (the default) raises `SignaturesNotAllowedError` carrying both `signature_refs` and the qualified `dep_paths` chain. `dry_run_pipes` does a pre-pass that aggregates signature refs across all pipes in the batch so the user sees every offender in one error (post-review fix). `validate_bundle` and `validate_bundles_from_directory` catch the error and surface it via `ValidateBundleError.signature_check_error`. CLI surface: `pipelex validate pipe`/`bundle` now take `--allow-signatures` (default off); `pipelex validate --all` filters signature pipes out of the strict iteration; the agent CLI's `validate_*_core` functions default to lenient. Signatures still raise `PipeSignatureNotExecutableError` on live run. End-to-end `.mthds` parsing of `type = "PipeSignature"` has not been exercised — interpreter / schema generator may still need touches in Phase 6. The schema generator was updated to strip `pipe_category` from `PipeSignatureBlueprint`, but the JSON Schema file lives in `vscode-pipelex/` (not this repo) so no schema artifact needed regeneration here. Surprise: `pipe_abstract.py` could not import from `pipelex.hub` (even via a function-local import) because pyright's `reportImportCycles` is on and the cycle pipe_abstract → hub → libraries.library → libraries.pipe.pipe_library → pipe_abstract is real. The walker therefore takes a `pipe_lookup` callable parameter (typically `pipelex.hub.get_optional_pipe`) — slightly more explicit than the plan's pseudocode, but cycle-free. Walker iterates `sorted(pipe_dependencies())` so the dep chain rendered in `SignaturesNotAllowedError` is deterministic (post-review fix).
 
 **Pre-flight note:** `validate_bundle` was updated on this branch to actually call `dry_run_pipes` (the previously-commented-out calls in all three branches of `validate_bundle.py` were uncommented). This means the strict signature check sitting inside `dry_run_pipe` fires for **every** `validate_bundle` caller, not just direct CLI usage — no separate pre-flight helper is needed.
 
@@ -254,7 +254,7 @@ Add `collect_signature_refs`, `SignaturesNotAllowedError`, and thread `allow_sig
 
 ### Phase 4.1 — Tests first (red)
 
-- [ ] `tests/integration/pipelex/pipe_signature/test_collect_signature_refs.py` — `class TestCollectSignatureRefs`:
+- [x] `tests/integration/pipelex/pipe_signature/test_collect_signature_refs.py` — `class TestCollectSignatureRefs`:
   - Fixtures construct mini libraries in Python with mixed pipe types.
   - `test_operator_returns_empty` — a real `PipeLLM`'s `collect_signature_refs()` returns `set()`.
   - `test_signature_returns_self` — a `PipeSignatureRuntime`'s `collect_signature_refs()` returns `{self.pipe_ref}`.
@@ -265,11 +265,12 @@ Add `collect_signature_refs`, `SignaturesNotAllowedError`, and thread `allow_sig
   - `test_nested_controller_walks_deeply` — `PipeSequence(steps=[PipeSequence(steps=[signature])])` — outer returns the leaf signature.
   - `test_cycle_protection` — two pipes whose `pipe_dependencies()` mutually reference each other; walk terminates and returns the signatures found (if any).
   - `test_unresolved_cross_package_dep_skipped` — controller references a cross-package pipe not in the library; walk does not raise and returns the signatures found in the resolvable subgraph.
-- [ ] `tests/integration/pipelex/pipe_signature/test_signatures_not_allowed_error_message.py` — `class TestSignaturesNotAllowedErrorMessage`:
+  > Deviation: tests pass `pipe_lookup=get_optional_pipe` to `collect_signature_refs` because the walker takes a required `pipe_lookup` callable (see Status block for the cycle reason).
+- [x] `tests/integration/pipelex/pipe_signature/test_signatures_not_allowed_error_message.py` — `class TestSignaturesNotAllowedErrorMessage`:
   - `test_dep_paths_keys_are_qualified_pipe_refs` — `error.dep_paths` keys are fully-qualified pipe_refs (`domain.code`), not bare codes; the values are ordered lists of pipe_refs naming the controllers traversed to reach the signature.
   - `test_message_lists_each_signature_with_dep_path` — `str(error)` (or `error.message`) contains one human-readable line per signature, naming the signature pipe_ref and the dep chain that reached it.
   - `test_message_includes_fix_suggestion` — message tells the user how to recover ("replace with a real implementation, or re-run with `--allow-signatures`").
-- [ ] `tests/integration/pipelex/pipe_signature/test_dry_run_strict_mode.py` — `class TestDryRunStrictMode`:
+- [x] `tests/integration/pipelex/pipe_signature/test_dry_run_strict_mode.py` — `class TestDryRunStrictMode`:
   - `test_strict_default_passes_when_no_signatures` — dry-run of a real `PipeSequence` of real pipes with `allow_signatures=False` (the default) succeeds.
   - `test_strict_fails_on_signature_in_sequence` — dry-run with a signature step + `allow_signatures=False` raises `SignaturesNotAllowedError`; the error's `signature_refs` includes the leaf signature's `pipe_ref`.
   - `test_lenient_succeeds_on_signature_in_sequence` — same setup with `allow_signatures=True` succeeds; the working memory after dry-run contains a mock stuff for the signature's output.
@@ -277,31 +278,35 @@ Add `collect_signature_refs`, `SignaturesNotAllowedError`, and thread `allow_sig
   - `test_strict_error_includes_dep_paths` — the error's payload includes the dep-chain that reached each signature, with qualified pipe_refs throughout (e.g. `{"sigs.summarize_doc": ["pipelines.process_doc", "pipelines.inner_seq"]}`).
   - `test_validate_bundle_strict_fails_on_signature` — `validate_bundle(blueprints=[...], allow_signatures=False)` raises `ValidateBundleError`; the raised error has a non-None `signature_check_error: SignaturesNotAllowedError` carrying the leaf signature's pipe_ref in `signature_refs` and the dep chain in `dep_paths`.
   - `test_validate_bundle_lenient_passes_on_signature` — same `allow_signatures=True` passes; the returned `ValidateBundleResult.dry_run_result` contains a `SUCCESS` entry for every loaded pipe (including the signature itself).
-- [ ] Run: `.venv/bin/pytest -q tests/integration/pipelex/pipe_signature/`. Confirm red on the new tests; previously-green tests stay green.
+- [x] Run: `.venv/bin/pytest -q tests/integration/pipelex/pipe_signature/`. Confirm red on the new tests; previously-green tests stay green.
 
 ### Phase 4.2 — Implementation (green)
 
-- [ ] `pipelex/core/pipes/pipe_abstract.py`:
+- [x] `pipelex/core/pipes/pipe_abstract.py`:
   - Add `collect_signature_refs(self, visited: set[str] | None = None) -> set[str]` — walks `self.pipe_dependencies()` via `get_optional_pipe`, accumulates signatures, short-circuits on `visited`. Track visited by `self.pipe_ref` (qualified, e.g. `domain.code`). `pipe_dependencies()` returns bare codes; resolution via `get_optional_pipe(pipe_code=...)` is naive (first match wins for ambiguous bare codes) — that mirrors existing behavior across the codebase. The walk does not attempt to disambiguate. (Pseudocode in `wip/signature-based-validation.md`.)
   - Add `collect_signature_paths(self, visited: set[str] | None = None, current_path: list[str] | None = None) -> dict[str, list[str]]` — companion of `collect_signature_refs` that returns `dict[signature_pipe_ref, list[controller_pipe_refs]]`. Used by `SignaturesNotAllowedError` to render dep-chain UX. Keys and path entries are all qualified pipe_refs.
-- [ ] `pipelex/pipe_signature/exceptions.py`:
+  > Deviation: both methods take a required `pipe_lookup: Callable[[str], PipeAbstract | None]` parameter rather than calling `get_optional_pipe` internally. Reason: pyright's `reportImportCycles` flagged even a function-local import (`from pipelex.hub import get_optional_pipe`) because the cycle pipe_abstract → hub → libraries.library → libraries.pipe.pipe_library → pipe_abstract is real. Callers pass `get_optional_pipe`; recursion passes the same callable through. A `PipeLookupCallable: TypeAlias` lives under `TYPE_CHECKING` for the type annotation.
+- [x] `pipelex/pipe_signature/exceptions.py`:
   - Add `SignaturesNotAllowedError(PipelexError)` with fields `pipe_ref: str` (the entry-point pipe being validated), `signature_refs: set[str]` (qualified pipe_refs of every reachable signature), `dep_paths: dict[str, list[str]]` (signature pipe_ref → ordered list of controller pipe_refs naming the path to the signature).
   - `__str__` / message format: one line per signature, naming its qualified pipe_ref and the dep chain, ending with the suggested fix ("replace with a real implementation, or re-run with `--allow-signatures`").
-- [ ] `pipelex/pipe_run/dry_run.py`:
+- [x] `pipelex/pipe_run/dry_run.py`:
   - Update `dry_run_pipe` signature to `async def dry_run_pipe(pipe: PipeAbstract, *, allow_signatures: bool = False, raise_on_failure: bool = False) -> DryRunOutput`.
   - At the top of the body, if `not allow_signatures`: call `sig_refs = pipe.collect_signature_refs()`; if non-empty, build `dep_paths = pipe.collect_signature_paths()` and raise `SignaturesNotAllowedError(pipe_ref=pipe.pipe_ref, signature_refs=sig_refs, dep_paths=dep_paths)`.
   - Update `dry_run_pipes` similarly (the same flag, threaded into each `dry_run_pipe` call).
-- [ ] `pipelex/pipeline/validate_bundle.py`:
+  > Deviation: `dry_run.py` passes `pipe_lookup=get_optional_pipe` to the walker (see above).
+  > Deviation: also updated `tests/unit/pipelex/pipe_run/test_dry_run.py` mock-based tests to set `mock_pipe.collect_signature_refs.return_value = set()`; otherwise `MagicMock` returns a truthy mock and the strict pre-check fires.
+- [x] `pipelex/pipeline/validate_bundle.py`:
   - Add `allow_signatures: bool = False` to `validate_bundle` and `validate_bundles_from_directory`. Thread to `dry_run_pipes` in all three branches of `validate_bundle` (now that the `dry_run_pipes` calls are uncommented) and in `validate_bundles_from_directory`.
   - Add a dedicated `except SignaturesNotAllowedError as sig_error:` branch to both functions' try/except chains. Wrap into `ValidateBundleError` (extend the error with a `signature_check_error: SignaturesNotAllowedError | None = None` field so dep_paths and signature_refs are preserved end-to-end). The CLI's pipe_cmd / bundle_cmd surfaces should display the rendered message from `signature_check_error` when present (Phase 5 detail).
   - **Why this works:** `validate_bundle` was updated on this branch to actually invoke `dry_run_pipes` end-to-end. The strict check inside `dry_run_pipe` therefore fires for every `validate_bundle` caller — no separate `check_no_signatures_reachable` helper is needed. The earlier review concern about routing is moot.
-- [ ] `pipelex/cli/commands/validate/_validate_core.py`:
+- [x] `pipelex/cli/commands/validate/_validate_core.py`:
   - Thread `allow_signatures` from the CLI into `dry_run_pipe`/`dry_run_pipes`/`validate_bundle`. (CLI flag wiring is Phase 5; here just thread the parameter so the function plumbing is in place.)
+  > Deviation: also renamed `_validate_pipe_or_bundle` to `validate_pipe_or_bundle` (drop the leading underscore) so the Phase 5 CLI tests can import it without tripping `PLC2701` everywhere. The behavior is unchanged; the only call site (`execute_validate`) was updated in lock-step.
 
 ### Phase 4.3 — Lint and targeted tests
 
-- [ ] `make agent-check` clean.
-- [ ] `.venv/bin/pytest -q tests/integration/pipelex/pipe_signature/ tests/unit/pipelex/pipe_run/` — all green.
+- [x] `make agent-check` clean.
+- [x] `.venv/bin/pytest -q tests/integration/pipelex/pipe_signature/ tests/unit/pipelex/pipe_run/` — all green.
 
 ---
 
@@ -313,32 +318,40 @@ Surface the strict/lenient choice at the CLI. The agent CLI defaults to lenient 
 
 CLI tests should drive the typer command directly via `CliRunner` rather than spawning subprocesses (matches existing CLI test patterns in this repo).
 
-- [ ] `tests/integration/pipelex/cli/test_validate_signatures_cli.py` — `class TestValidateSignaturesCli`:
+- [x] `tests/integration/pipelex/cli/test_validate_signatures_cli.py` — `class TestValidateSignaturesCli`:
   - Fixtures load a tiny in-memory library directory with a signature-containing bundle.
   - `test_validate_pipe_strict_default_fails` — `pipelex validate <pipe>` (no flag) on a pipe that reaches a signature exits non-zero with the signature listed in stderr.
   - `test_validate_pipe_allow_signatures_passes` — `pipelex validate <pipe> --allow-signatures` exits zero on the same bundle.
   - `test_validate_all_strict_default_passes_with_orphan_signature` — `pipelex validate --all` succeeds even when the library contains an orphan signature (no caller); confirms "iterate non-signature pipes only" semantics.
   - `test_validate_all_strict_fails_with_caller_of_signature` — `pipelex validate --all` fails when a non-signature pipe reaches a signature.
   - `test_validate_all_allow_signatures_passes` — same setup, lenient flag, passes.
-- [ ] `tests/integration/pipelex/cli/test_agent_validate_defaults_lenient.py` — `class TestAgentValidateDefaultsLenient`:
+  > Deviation: tests drive `validate_pipe_or_bundle` and `do_validate_all_libraries_and_dry_run` directly (no CliRunner in this repo). Rich console output isn't captured by pytest's `capsys` for nested writers, so the "signature listed in stderr" assertion was dropped in favor of asserting the `typer.Exit(1)` exit code; the message-in-output check is exercised by Phase 4's `test_signatures_not_allowed_error_message.py`.
+- [x] `tests/integration/pipelex/cli/test_agent_validate_defaults_lenient.py` — `class TestAgentValidateDefaultsLenient`:
   - `test_agent_validate_defaults_to_lenient` — calling the agent CLI's validate against a signature-bundle exits zero without an explicit flag.
-- [ ] Run: `.venv/bin/pytest -q tests/integration/pipelex/cli/`. Confirm red.
+- [x] Run: `.venv/bin/pytest -q tests/integration/pipelex/cli/`. Confirm red.
 
 ### Phase 5.2 — Implementation (green)
 
-- [ ] `pipelex/cli/commands/validate/app.py` (and any sibling typer command modules):
+- [x] `pipelex/cli/commands/validate/app.py` (and any sibling typer command modules):
   - Add `--allow-signatures` boolean option, default `False`. Thread to `execute_validate`.
-- [ ] `pipelex/cli/commands/validate/_validate_core.py`:
+  > Deviation: the option lives on `validate_pipe_cmd` and `validate_bundle_cmd` (the two surfaces that actually take subcommand args). `app.py` only wires the `_ValidateGroup` and forwards args to subcommands, so it didn't need editing.
+- [x] `pipelex/cli/commands/validate/_validate_core.py`:
   - Already threads `allow_signatures` from Phase 4. Surface it to typer.
   - `do_validate_all_libraries_and_dry_run` — iterate non-signature pipes only when `allow_signatures=False` (use `pipe.is_signature`); when `allow_signatures=True`, iterate everything (signatures dry-run trivially).
-- [ ] `pipelex/cli/agent_cli/commands/validate/_validate_core.py`:
+- [x] `pipelex/cli/agent_cli/commands/validate/_validate_core.py`:
   - Default `allow_signatures=True` for the agent CLI. Add an `--strict` flag if needed (defer if not required by current tests).
+  > Deferred: `--strict` flag — not needed by current tests.
 - [ ] Validation summary: when lenient and signatures were involved, print a final line like `"Validated N pipes (M signatures)."`. Add to whatever summary line currently exists.
+  > Deferred: not required by Phase 5 tests; can land in Phase 7 polish if useful.
+
+Additional touches landed in Phase 5.2 (not enumerated above but required for the tests to pass):
+
+- [x] `pipelex/cli/error_handlers.py` — `_display_validation_error_details` now renders `exc.signature_check_error` under an "Unimplemented Signatures:" heading so the strict-mode UX surfaces the dep chain.
 
 ### Phase 5.3 — Lint and targeted tests
 
-- [ ] `make agent-check` clean.
-- [ ] `.venv/bin/pytest -q tests/integration/pipelex/cli/ tests/integration/pipelex/pipe_signature/` — all green.
+- [x] `make agent-check` clean.
+- [x] `.venv/bin/pytest -q tests/integration/pipelex/cli/ tests/integration/pipelex/pipe_signature/` — all green.
 
 ---
 

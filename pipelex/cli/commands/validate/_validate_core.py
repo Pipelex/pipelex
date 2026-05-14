@@ -41,6 +41,7 @@ COMMAND = "validate"
 
 def do_validate_all_libraries_and_dry_run(
     library_dirs: list[Path] | None = None,
+    allow_signatures: bool = False,
 ) -> None:
     try:
         with get_telemetry_manager().telemetry_context():
@@ -57,7 +58,10 @@ def do_validate_all_libraries_and_dry_run(
             else:
                 log.info(f"No library directories to load ({source_label})")
 
-            pipes = library.pipe_library.get_pipes()
+            all_pipes = library.pipe_library.get_pipes()
+            # In strict mode, signatures themselves are skipped (validating them would always fail
+            # the signature pre-check). In lenient mode, iterate all pipes — signatures dry-run trivially.
+            pipes = all_pipes if allow_signatures else [pipe for pipe in all_pipes if not pipe.is_signature]
             if library_dirs:
                 dirs_str = ", ".join(f'"{lib_dir}"' for lib_dir in library_dirs)
                 typer.echo(f"Validating {len(pipes)} pipe(s) from: {dirs_str}")
@@ -66,7 +70,13 @@ def do_validate_all_libraries_and_dry_run(
 
             get_telemetry_manager().track_event(EventName.PIPE_DRY_RUN, properties={EventProperty.NB_PIPES: len(pipes)})
 
-            asyncio.run(dry_run_pipes(pipes=pipes, raise_on_failure=True))
+            asyncio.run(
+                dry_run_pipes(
+                    pipes=pipes,
+                    allow_signatures=allow_signatures,
+                    raise_on_failure=True,
+                )
+            )
             typer.echo("Setup sequence passed OK, config and pipelines are validated.")
     except PipeOperatorModelAvailabilityError as exc:
         handle_model_availability_error(exc, context=ErrorContext.VALIDATION)
@@ -78,11 +88,16 @@ async def _validate_pipe_or_bundle(
     pipe_code: str | None = None,
     bundle_path: Path | None = None,
     library_dirs: list[Path] | None = None,
+    allow_signatures: bool = False,
 ) -> None:
     """Core async validation logic shared between method and pipe subcommands."""
     if bundle_path:
         try:
-            await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs)
+            await validate_bundle(
+                mthds_file_path=bundle_path,
+                library_dirs=library_dirs,
+                allow_signatures=allow_signatures,
+            )
             typer.secho(
                 f"Successfully validated bundle '{bundle_path}'",
                 fg=typer.colors.GREEN,
@@ -111,6 +126,7 @@ async def _validate_pipe_or_bundle(
         get_telemetry_manager().track_event(EventName.PIPE_DRY_RUN, properties={EventProperty.PIPE_TYPE: pipe.type})
         await dry_run_pipe(
             pipe,
+            allow_signatures=allow_signatures,
             raise_on_failure=True,
         )
         typer.secho(f"Successfully validated pipe '{pipe_code}'", fg=typer.colors.GREEN)
@@ -128,6 +144,7 @@ def execute_validate(
     bundle_path: Path | None,
     library_dirs: list[Path] | None,
     telemetry_command_label: str = COMMAND,
+    allow_signatures: bool = False,
 ) -> None:
     """Synchronous entry point wrapping the async validation with Pipelex setup/teardown."""
     make_pipelex_for_cli(context=ErrorContext.VALIDATION, needs_inference=False, needs_model_specs=True)
@@ -146,6 +163,7 @@ def execute_validate(
                     pipe_code=pipe_code,
                     bundle_path=bundle_path,
                     library_dirs=library_dirs,
+                    allow_signatures=allow_signatures,
                 )
             )
     except PipeNotFoundError as exc:

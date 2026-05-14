@@ -34,6 +34,13 @@ def validate_pipe_cmd(
             help="Directory to search for pipe definitions (.mthds files). Can be specified multiple times.",
         ),
     ] = None,
+    allow_signatures: Annotated[
+        bool,
+        typer.Option(
+            "--allow-signatures",
+            help="Accept PipeSignature placeholders in the dependency graph (lenient mode).",
+        ),
+    ] = False,
 ) -> None:
     """Validate and dry run a pipe by code, or all pipes.
 
@@ -41,6 +48,7 @@ def validate_pipe_cmd(
         pipelex validate pipe my_pipe
         pipelex validate pipe --all
         pipelex validate pipe my_pipe -L ./my_pipes
+        pipelex validate pipe --all --allow-signatures
     """
     if validate_all:
         if pipe_code:
@@ -58,7 +66,10 @@ def validate_pipe_cmd(
                 needs_inference=False,
                 needs_model_specs=True,
             )
-            do_validate_all_libraries_and_dry_run(library_dirs=library_dirs_paths)
+            do_validate_all_libraries_and_dry_run(
+                library_dirs=library_dirs_paths,
+                allow_signatures=allow_signatures,
+            )
         finally:
             Pipelex.teardown_if_needed()
         return
@@ -106,4 +117,5 @@ def validate_pipe_cmd(
         bundle_path=None,
         library_dirs=library_dirs_paths,
         telemetry_command_label=f"{COMMAND} pipe",
+        allow_signatures=allow_signatures,
     )

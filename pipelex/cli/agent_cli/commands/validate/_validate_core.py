@@ -19,11 +19,14 @@ if TYPE_CHECKING:
 
 async def validate_all_core(
     library_dirs: list[Path] | None = None,
+    allow_signatures: bool = True,
 ) -> dict[str, Any]:
     """Validate all pipes in all libraries.
 
     Args:
         library_dirs: List of library directories to search for pipe definitions.
+        allow_signatures: Whether to accept PipeSignature placeholders. The agent CLI defaults
+            to True because authoring workflows routinely contain unresolved signatures.
 
     Returns:
         Dictionary with validation results suitable for JSON serialization.
@@ -39,11 +42,13 @@ async def validate_all_core(
     if effective_dirs:
         library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
 
-    pipes = library.pipe_library.get_pipes()
+    all_pipes = library.pipe_library.get_pipes()
+    # In strict mode, signatures themselves would always fail the pre-check; filter them out.
+    pipes = all_pipes if allow_signatures else [pipe for pipe in all_pipes if not pipe.is_signature]
     for the_pipe in pipes:
         the_pipe.validate_with_libraries()
 
-    dry_run_results = await dry_run_pipes(pipes=pipes, raise_on_failure=True)
+    dry_run_results = await dry_run_pipes(pipes=pipes, allow_signatures=allow_signatures, raise_on_failure=True)
 
     validated_pipes: list[dict[str, str]] = []
     for the_pipe in pipes:
@@ -61,12 +66,15 @@ async def validate_all_core(
 async def validate_bundle_core(
     bundle_path: Path,
     library_dirs: list[Path] | None = None,
+    allow_signatures: bool = True,
 ) -> dict[str, Any]:
     """Validate a bundle file.
 
     Args:
         bundle_path: Path to the bundle file.
         library_dirs: List of library directories to search for pipe definitions.
+        allow_signatures: Whether to accept PipeSignature placeholders. Defaults to True for
+            the agent CLI since signatures are the authoring sweet-spot.
 
     Returns:
         Dictionary with validation results suitable for JSON serialization.
@@ -74,7 +82,11 @@ async def validate_bundle_core(
     Raises:
         ValidateBundleError: If validation fails.
     """
-    result = await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs)
+    result = await validate_bundle(
+        mthds_file_path=bundle_path,
+        library_dirs=library_dirs,
+        allow_signatures=allow_signatures,
+    )
 
     validated_pipes = [{"pipe_code": the_pipe.pipe_ref, "status": "SUCCESS"} for the_pipe in result.pipes]
 
@@ -89,12 +101,15 @@ async def validate_bundle_core(
 async def validate_pipe_core(
     pipe_code: str,
     library_dirs: list[Path] | None = None,
+    allow_signatures: bool = True,
 ) -> dict[str, Any]:
     """Validate a single pipe.
 
     Args:
         pipe_code: The pipe code to validate.
         library_dirs: List of library directories to search for pipe definitions.
+        allow_signatures: Whether to accept PipeSignature placeholders. Defaults to True for
+            the agent CLI since signatures are the authoring sweet-spot.
 
     Returns:
         Dictionary with validation results suitable for JSON serialization.
@@ -111,7 +126,7 @@ async def validate_pipe_core(
         library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
 
     the_pipe = get_required_pipe(pipe_code=pipe_code)
-    await dry_run_pipe(the_pipe, raise_on_failure=True)
+    await dry_run_pipe(the_pipe, allow_signatures=allow_signatures, raise_on_failure=True)
 
     return {
         "success": True,
@@ -124,6 +139,7 @@ async def validate_pipe_in_bundle_core(
     bundle_path: Path,
     pipe_code: str,
     library_dirs: list[Path] | None = None,
+    allow_signatures: bool = True,
 ) -> dict[str, Any]:
     """Validate a single pipe within a bundle.
 
@@ -134,6 +150,8 @@ async def validate_pipe_in_bundle_core(
         bundle_path: Path to the bundle file.
         pipe_code: The pipe code to validate within the bundle.
         library_dirs: List of library directories to search for pipe definitions.
+        allow_signatures: Whether to accept PipeSignature placeholders. Defaults to True for
+            the agent CLI since signatures are the authoring sweet-spot.
 
     Returns:
         Dictionary with validation results suitable for JSON serialization.
@@ -143,11 +161,15 @@ async def validate_pipe_in_bundle_core(
     """
     # Validate the bundle to load all its pipes into the library
     # This ensures all dependencies are available
-    await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs)
+    await validate_bundle(
+        mthds_file_path=bundle_path,
+        library_dirs=library_dirs,
+        allow_signatures=allow_signatures,
+    )
 
     # Now get the specific pipe and dry-run only that one
     the_pipe = get_required_pipe(pipe_code=pipe_code)
-    await dry_run_pipe(the_pipe, raise_on_failure=True)
+    await dry_run_pipe(the_pipe, allow_signatures=allow_signatures, raise_on_failure=True)
 
     return {
         "success": True,

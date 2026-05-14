@@ -11,12 +11,13 @@ from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_class_registry
+from pipelex.hub import get_class_registry, get_optional_pipe
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_operators.compose.exceptions import PipeComposeError
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
@@ -57,7 +58,15 @@ class DryRunOutput(BaseModel):
     error_message: str | None = None
 
 
-async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> DryRunOutput:
+async def dry_run_pipe(pipe: PipeAbstract, *, allow_signatures: bool = False, raise_on_failure: bool = False) -> DryRunOutput:
+    if not allow_signatures:
+        signature_refs = pipe.collect_signature_refs(pipe_lookup=get_optional_pipe)
+        if signature_refs:
+            raise SignaturesNotAllowedError(
+                pipe_ref=pipe.pipe_ref,
+                signature_refs=signature_refs,
+                dep_paths=pipe.collect_signature_paths(pipe_lookup=get_optional_pipe),
+            )
     try:
         needed_inputs_for_factory = convert_to_working_memory_format(needed_inputs_spec=pipe.needed_inputs())
         working_memory = WorkingMemoryFactory.make_mock_inputs(needed_inputs=needed_inputs_for_factory)
@@ -87,11 +96,18 @@ async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> Dr
     return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.SUCCESS)
 
 
-async def dry_run_pipes(pipes: list[PipeAbstract], raise_on_failure: bool = True) -> dict[str, DryRunOutput]:
+async def dry_run_pipes(
+    pipes: list[PipeAbstract],
+    *,
+    allow_signatures: bool = False,
+    raise_on_failure: bool = True,
+) -> dict[str, DryRunOutput]:
     """Dry run pipes with optional parallelization.
 
     Args:
         pipes: List of pipes to dry run
+        allow_signatures: If False (default), reject any pipe whose dependency graph reaches a
+            `PipeSignature`. If True, signatures dry-run trivially by minting a mock output.
         raise_on_failure: If True, raise an exception if any pipe fails.
 
     For each pipe, this method:
@@ -110,8 +126,32 @@ async def dry_run_pipes(pipes: list[PipeAbstract], raise_on_failure: bool = True
     results: dict[str, DryRunOutput] = {}
     allowed_to_fail_pipes = get_config().pipelex.dry_run_config.allowed_to_fail_pipes
 
+    # Strict-mode signature pre-check: aggregate across all pipes so the user sees every offender
+    # in a single error, rather than only the first one to fail (`dry_run_pipe` would otherwise raise).
+    if not allow_signatures:
+        all_signature_refs: set[str] = set()
+        all_dep_paths: dict[str, list[str]] = {}
+        for pipe in pipes:
+            sig_refs = pipe.collect_signature_refs(pipe_lookup=get_optional_pipe)
+            if not sig_refs:
+                continue
+            all_signature_refs.update(sig_refs)
+            for sig_ref, path in pipe.collect_signature_paths(pipe_lookup=get_optional_pipe).items():
+                if sig_ref not in all_dep_paths:
+                    all_dep_paths[sig_ref] = path
+        if all_signature_refs:
+            raise SignaturesNotAllowedError(
+                pipe_ref=pipes[0].pipe_ref if pipes else "",
+                signature_refs=all_signature_refs,
+                dep_paths=all_dep_paths,
+            )
+
     for pipe in pipes:
-        results[pipe.pipe_ref] = await dry_run_pipe(pipe, raise_on_failure=raise_on_failure)
+        results[pipe.pipe_ref] = await dry_run_pipe(
+            pipe,
+            allow_signatures=allow_signatures,
+            raise_on_failure=raise_on_failure,
+        )
 
     successful_pipes: list[str] = []
     failed_pipes: list[str] = []

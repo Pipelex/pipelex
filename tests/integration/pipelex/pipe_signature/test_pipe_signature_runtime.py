@@ -85,7 +85,7 @@ class TestPipeSignatureRuntime:
         setup_signature_library()
         blueprint = make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="Text")
         runtime = _make_runtime(blueprint, pipe_code="sig_for_text")
-        dry_run_output = await dry_run_pipe(runtime)
+        dry_run_output = await dry_run_pipe(runtime, allow_signatures=True)
         assert dry_run_output.status is DryRunStatus.SUCCESS
 
     @pytest.mark.asyncio

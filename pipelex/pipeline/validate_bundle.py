@@ -24,6 +24,7 @@ from pipelex.hub import get_library_manager, resolve_library_dirs, set_current_l
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.pipe_run.dry_run import DryRunError, DryRunOutput, dry_run_pipes
 from pipelex.pipe_run.exceptions import PipeRunError
+from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 
 
 class ValidateBundleError(PipelexError):
@@ -47,6 +48,7 @@ class ValidateBundleError(PipelexError):
         pipe_validation_errors: list[PipesAndConceptValidationErrorData] | None = None,
         pipe_concept_instantiation_errors: list[PipesAndConceptValidationErrorData] | None = None,
         dry_run_error_message: str | None = None,
+        signature_check_error: SignaturesNotAllowedError | None = None,
     ):
         # Blueprint validation errors (e.g., PIPE_SEQUENCE_OUTPUT_MISMATCH)
         self.pipelex_bundle_blueprint_validation_errors = pipelex_bundle_blueprint_validation_errors or []
@@ -65,6 +67,9 @@ class ValidateBundleError(PipelexError):
 
         # Dry run errors
         self.dry_run_error_message = dry_run_error_message
+
+        # Signature pre-check error (strict-mode validation refused due to PipeSignature placeholders)
+        self.signature_check_error = signature_check_error
 
         super().__init__(message)
 
@@ -89,6 +94,7 @@ async def validate_bundle(
     mthds_contents: list[str] | None = None,
     blueprints: list[PipelexBundleBlueprint] | None = None,
     library_dirs: Sequence[Path] | None = None,
+    allow_signatures: bool = False,
 ) -> ValidateBundleResult:
     provided_params = sum(
         [
@@ -126,13 +132,21 @@ async def validate_bundle(
         if blueprints is not None:
             loaded_blueprints = blueprints
             loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints)
-            dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
+            dry_run_results = await dry_run_pipes(
+                pipes=loaded_pipes,
+                allow_signatures=allow_signatures,
+                raise_on_failure=True,
+            )
             return ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
 
         elif mthds_contents is not None:
             loaded_blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
             loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
-            dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
+            dry_run_results = await dry_run_pipes(
+                pipes=loaded_pipes,
+                allow_signatures=allow_signatures,
+                raise_on_failure=True,
+            )
             return ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
 
         else:
@@ -148,7 +162,11 @@ async def validate_bundle(
                 pipe_codes = list(blueprint.pipe.keys()) if blueprint.pipe else []
                 loaded_pipes = [library.pipe_library.get_required_pipe(pipe_code=code) for code in pipe_codes]
 
-            dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
+            dry_run_results = await dry_run_pipes(
+                pipes=loaded_pipes,
+                allow_signatures=allow_signatures,
+                raise_on_failure=True,
+            )
             return ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
 
     except PipelexInterpreterError as interpreter_error:
@@ -189,9 +207,14 @@ async def validate_bundle(
             message=dry_run_error.message,
             dry_run_error_message=dry_run_error.message,
         ) from dry_run_error
+    except SignaturesNotAllowedError as sig_error:
+        raise ValidateBundleError(
+            message=str(sig_error),
+            signature_check_error=sig_error,
+        ) from sig_error
 
 
-async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResult:
+async def validate_bundles_from_directory(directory: Path, allow_signatures: bool = False) -> ValidateBundleResult:
     mthds_files = get_pipelex_mthds_files_from_dirs(dirs={directory})
     all_blueprints: list[PipelexBundleBlueprint] = []
 
@@ -204,7 +227,11 @@ async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResu
             all_blueprints.append(blueprint)
 
         loaded_pipes = library_manager.load_libraries(library_id=library_id, library_dirs=[Path(directory)])
-        dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
+        dry_run_results = await dry_run_pipes(
+            pipes=loaded_pipes,
+            allow_signatures=allow_signatures,
+            raise_on_failure=True,
+        )
     except MthdsDecodeError as decode_error:
         msg = f"TOML syntax error at line {decode_error.lineno}, column {decode_error.colno}: {decode_error.message}"
         raise ValidateBundleError(message=msg) from decode_error
@@ -243,6 +270,11 @@ async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResu
             message=dry_run_error.message,
             dry_run_error_message=dry_run_error.message,
         ) from dry_run_error
+    except SignaturesNotAllowedError as sig_error:
+        raise ValidateBundleError(
+            message=str(sig_error),
+            signature_check_error=sig_error,
+        ) from sig_error
     return ValidateBundleResult(blueprints=all_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
 
 

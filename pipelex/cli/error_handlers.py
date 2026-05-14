@@ -198,6 +198,11 @@ def _display_validation_error_details(console: Console, exc: ValidateBundleError
         console.print("[bold cyan]Dry Run Error:[/bold cyan]\n")
         console.print(f"[yellow]{escape(exc.dry_run_error_message)}[/yellow]\n")
 
+    # Display signature pre-check error (strict mode refused due to PipeSignature placeholders)
+    if exc.signature_check_error is not None:
+        console.print("[bold cyan]Unimplemented Signatures:[/bold cyan]\n")
+        console.print(f"[yellow]{escape(str(exc.signature_check_error))}[/yellow]\n")
+
 
 def handle_validate_bundle_error(exc: ValidateBundleError, bundle_path: Path | None = None) -> NoReturn:
     """Handle and display ValidateBundleError with formatted output.
