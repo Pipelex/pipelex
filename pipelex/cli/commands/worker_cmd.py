@@ -28,6 +28,13 @@ def worker_cmd(
         str | None,
         typer.Option("--scope", help="Worker scope name from [temporal.worker_scopes.scopes] (defaults to default_scope)"),
     ] = None,
+    profile: Annotated[
+        str | None,
+        typer.Option(
+            "--profile",
+            help="Worker runtime profile name from [temporal.worker_runtime_profiles.profiles] (defaults to default_profile)",
+        ),
+    ] = None,
 ) -> None:
     """Start a Temporal worker.
 
@@ -39,6 +46,7 @@ def worker_cmd(
         pipelex worker --no-sandbox
         pipelex worker --task-queue my_queue
         pipelex worker --scope router
+        pipelex worker --profile anthropic-tier4 --scope runner-llm --task-queue anthropic_q
     """
     make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN, temporal_enabled=True)
 
@@ -52,6 +60,7 @@ def worker_cmd(
                 is_unit_testing=is_unit_testing,
                 task_queue=task_queue,
                 scope_name=scope,
+                profile_name=profile,
             )
         )
     except KeyboardInterrupt:

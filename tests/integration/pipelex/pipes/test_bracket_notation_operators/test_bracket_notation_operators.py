@@ -78,7 +78,7 @@ class TestBracketNotationInOperators:
             description="Process multiple documents",
             inputs={"documents": f"{NativeConceptCode.TEXT}[]", "query": NativeConceptCode.TEXT},
             output=NativeConceptCode.TEXT,
-            prompt="Summarize @documents based on $query",
+            prompt="Summarize $documents based on $query",
         )
 
         pipe = PipeFactory[PipeLLM].make_from_blueprint(

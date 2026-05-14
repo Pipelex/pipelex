@@ -1,13 +1,14 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import timedelta
 from typing import Any, Callable, Coroutine, Generic, Protocol, TypeVar, Union, cast
 
 from pydantic import BaseModel
 from temporalio import workflow
-from temporalio.client import Callback, WorkflowHandle
+from temporalio.client import Callback, WorkflowFailureError, WorkflowHandle
 from temporalio.client import Client as TemporalClient
-from temporalio.common import RetryPolicy
-from temporalio.exceptions import ApplicationError, ChildWorkflowError
+from temporalio.common import RetryPolicy, TypedSearchAttributes
+from temporalio.exceptions import ApplicationError, ChildWorkflowError, WorkflowAlreadyStartedError
+from temporalio.service import RPCError
 from temporalio.workflow import ChildWorkflowHandle
 
 from pipelex import log
@@ -81,8 +82,8 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
                 raise WorkflowExecutionError(msg)
         return self._temporal_client
 
-    def make_workflow_id(self, base_id: str) -> str:
-        workflow_id = get_temporal_manager().make_top_workflow_id(base_id=base_id)
+    def make_workflow_id(self, pipeline_run_id: str) -> str:
+        workflow_id = get_temporal_manager().make_top_workflow_id(pipeline_run_id=pipeline_run_id)
         log.debug(f"Top workflow_id: {workflow_id}")
         return workflow_id
 
@@ -91,6 +92,10 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
         workflow_class: type[WorkflowClass[WorkflowInput, WorkflowOutput]],
         workflow_arg: WorkflowInput,
         workflow_id: str,
+        search_attributes: TypedSearchAttributes | None = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        memo: Mapping[str, Any] | None = None,
     ) -> WorkflowOutput:
         """Execute a workflow and wait for its completion."""
         try:
@@ -109,9 +114,12 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
                 task_timeout=self.task_timeout,
                 start_delay=self.start_delay,
                 rpc_timeout=self.rpc_timeout,
+                search_attributes=search_attributes,
+                static_summary=static_summary,
+                static_details=static_details,
+                memo=memo,
             )
-        except Exception as exc:
-            # TODO: wip - do not catch all exceptions
+        except (WorkflowAlreadyStartedError, RPCError, WorkflowFailureError) as exc:
             log.error(f"Failed to execute workflow {workflow_class.__name__}: {exc}")
             msg = f"Failed to execute workflow {workflow_class.__name__}"
             raise WorkflowExecutionError(msg) from exc
@@ -122,6 +130,10 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
         workflow_arg: WorkflowInput,
         workflow_id: str,
         callbacks: Sequence[Callback] | None = None,
+        search_attributes: TypedSearchAttributes | None = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        memo: Mapping[str, Any] | None = None,
     ) -> WorkflowHandle[WorkflowClass[WorkflowInput, WorkflowOutput], WorkflowOutput]:
         """Start a workflow without waiting for its completion."""
         try:
@@ -141,8 +153,12 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
                 start_delay=self.start_delay,
                 rpc_timeout=self.rpc_timeout,
                 callbacks=callbacks or [],
+                search_attributes=search_attributes,
+                static_summary=static_summary,
+                static_details=static_details,
+                memo=memo,
             )
-        except Exception as exc:
+        except (WorkflowAlreadyStartedError, RPCError) as exc:
             log.error(f"Failed to start workflow {workflow_class.__name__}: {exc}")
             msg = f"Failed to start workflow {workflow_class.__name__}"
             raise WorkflowExecutionError(msg) from exc
@@ -153,8 +169,37 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
         workflow_arg: WorkflowInput,
         workflow_id: str,
         child_task_queue: str | None = None,
+        search_attributes: TypedSearchAttributes | None = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        memo: Mapping[str, Any] | None = None,
     ) -> WorkflowOutput:
-        """Execute a child workflow and wait for its completion."""
+        """Execute a child workflow and wait for its completion.
+
+        NOT used by Pipelex's in-workflow child-spawn sites — call
+        ``workflow.execute_child_workflow(...)`` directly from inside a
+        workflow. See the replay-determinism note below.
+
+        Pipelex's own in-workflow child-spawn sites
+        (``pipelex.temporal.tprl_pipe.wf_pipe_run`` and
+        ``pipelex.temporal.tprl_pipe.temporal_pipe_router``) deliberately do
+        NOT use this wrapper. ``WorkflowExecutorFactory.create_executor``
+        reads ``get_config().temporal.worker_config`` to seed
+        ``execution_timeout`` / ``retry_policy`` / ``run_timeout`` /
+        ``task_timeout`` / ``start_delay`` / ``rpc_timeout`` for the
+        executor instance, and forwarding those into a
+        ``StartChildWorkflowExecution`` command from inside a workflow would
+        bake config-derived values into the recorded history — replay after a
+        config edit would then re-derive different values and Temporal would
+        reject the replay with a non-determinism mismatch. The submitter-side
+        entry points (``execute_workflow`` / ``start_workflow``) do not have
+        this problem because they run outside the workflow sandbox. If you
+        need to start a child workflow from inside a workflow, call
+        ``workflow.execute_child_workflow(...)`` directly and pass only
+        replay-deterministic options (workflow input, ids derived from the
+        input, ``search_attributes`` / ``static_summary`` built by the pure
+        helpers in ``pipelex.temporal.tprl.observability``).
+        """
         try:
             return await cast(
                 "Callable[..., Coroutine[Any, Any, WorkflowOutput]]",
@@ -168,16 +213,16 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
                 retry_policy=self.retry_policy,
                 run_timeout=self.run_timeout,
                 task_timeout=self.task_timeout,
+                search_attributes=search_attributes,
+                static_summary=static_summary,
+                static_details=static_details,
+                memo=memo,
             )
         except ChildWorkflowError as exc:
             log.error(f"ChildWorkflowError in {workflow_class.__name__} caused by: {exc.cause}")
             if isinstance(exc.cause, ApplicationError):
                 msg = f"Application error in child workflow {workflow_class.__name__}"
                 raise WorkflowExecutionError(msg) from exc.cause
-            msg = f"Failed to execute child workflow {workflow_class.__name__}"
-            raise WorkflowExecutionError(msg) from exc
-        except Exception as exc:
-            log.error(f"Failed to execute child workflow {workflow_class.__name__}: {exc}")
             msg = f"Failed to execute child workflow {workflow_class.__name__}"
             raise WorkflowExecutionError(msg) from exc
 
@@ -187,8 +232,20 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
         workflow_arg: WorkflowInput,
         workflow_id: str,
         child_task_queue: str | None = None,
+        search_attributes: TypedSearchAttributes | None = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        memo: Mapping[str, Any] | None = None,
     ) -> ChildWorkflowHandle[WorkflowClass[WorkflowInput, WorkflowOutput], WorkflowOutput]:
-        """Start a child workflow without waiting for its completion."""
+        """Start a child workflow without waiting for its completion.
+
+        Same replay-determinism caveat as ``execute_child_workflow``: Pipelex's
+        in-workflow child-spawn sites bypass this wrapper because the
+        config-derived options it carries would be baked into the
+        ``StartChildWorkflowExecution`` command and break replay after any
+        config change. Call ``workflow.start_child_workflow(...)`` directly
+        from inside a workflow.
+        """
         try:
             return await cast(
                 "Callable[..., Coroutine[Any, Any, ChildWorkflowHandle[WorkflowClass[WorkflowInput, WorkflowOutput], WorkflowOutput]]]",
@@ -202,16 +259,16 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
                 retry_policy=self.retry_policy,
                 run_timeout=self.run_timeout,
                 task_timeout=self.task_timeout,
+                search_attributes=search_attributes,
+                static_summary=static_summary,
+                static_details=static_details,
+                memo=memo,
             )
         except ChildWorkflowError as exc:
             log.error(f"ChildWorkflowError in {workflow_class.__name__} caused by: {exc.cause}")
             if isinstance(exc.cause, ApplicationError):
                 msg = f"Application error in child workflow {workflow_class.__name__}"
                 raise WorkflowExecutionError(msg) from exc.cause
-            msg = f"Failed to start child workflow {workflow_class.__name__}"
-            raise WorkflowExecutionError(msg) from exc
-        except Exception as exc:
-            log.error(f"Failed to start child workflow {workflow_class.__name__}: {exc}")
             msg = f"Failed to start child workflow {workflow_class.__name__}"
             raise WorkflowExecutionError(msg) from exc
 
@@ -235,7 +292,7 @@ class WorkflowExecutorFactory(Generic[WorkflowInput, WorkflowOutput]):
         config = get_config().temporal.worker_config
 
         return WorkflowExecutor[WorkflowInput, WorkflowOutput](
-            task_queue=task_queue or config.task_queue,
+            task_queue=task_queue or config.default_task_queue,
             workflow_execution_timeout=workflow_execution_timeout or config.workflow_execution_timeout,
             retry_policy=retry_policy or config.retry_policy,
             run_timeout=run_timeout or config.run_timeout,

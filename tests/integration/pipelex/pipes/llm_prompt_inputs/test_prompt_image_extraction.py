@@ -328,7 +328,7 @@ class TestPromptImageExtraction:
             description="Test direct nested image reference",
             inputs={"page.page_view": "Image", "page": "Page"},
             output="Text",
-            prompt="Describe this image: @page.page_view",
+            prompt="Describe this image: $page.page_view",
         )
 
         pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
@@ -481,7 +481,7 @@ class TestPromptImageExtraction:
                 description="Test @image",
                 inputs={"image": "Image"},
                 output="Text",
-                prompt="Content: @image",
+                prompt="Content:\n@image",
             ),
         )
 
@@ -546,7 +546,7 @@ class TestPromptImageExtraction:
                 description="Test @images list",
                 inputs={"images": "Image[]"},
                 output="Text",
-                prompt="Here are the images: @images",
+                prompt="Here are the images:\n@images",
             ),
         )
 

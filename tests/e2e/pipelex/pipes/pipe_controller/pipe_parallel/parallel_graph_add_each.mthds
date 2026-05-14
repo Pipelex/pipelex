@@ -37,7 +37,7 @@ description = "Generate a short one-sentence summary"
 inputs      = { input_text = "Text" }
 output      = "ShortSummary"
 model       = "$testing-text"
-prompt      = "Summarize in one sentence: @input_text.text"
+prompt      = "Summarize in one sentence: $input_text.text"
 
 [pipe.summarize_detailed]
 type        = "PipeLLM"
@@ -45,7 +45,7 @@ description = "Generate a detailed summary"
 inputs      = { input_text = "Text" }
 output      = "DetailedSummary"
 model       = "$testing-text"
-prompt      = "Write a detailed summary of: @input_text.text"
+prompt      = "Write a detailed summary of: $input_text.text"
 
 [pipe.combine_summaries]
 type = "PipeLLM"
@@ -55,5 +55,5 @@ output = "Text"
 model = "$testing-text"
 prompt = """Combine these two summaries into a final result:
 
-Short: @short_summary.text
-Detailed: @detailed_summary.text"""
+Short: $short_summary.text
+Detailed: $detailed_summary.text"""

@@ -118,10 +118,10 @@ class TestParsePipeSpec:
     def test_prompt_template_alias_for_llm(self) -> None:
         """`prompt_template` alone is promoted to `prompt` for PipeLLM."""
         spec = {key: val for key, val in _BASE_LLM.items() if key != "prompt"}
-        spec["prompt_template"] = "Write about @text"
+        spec["prompt_template"] = "Write about $text"
         result = parse_pipe_spec("PipeLLM", spec)
         assert isinstance(result, PipeLLMSpec)
-        assert result.prompt == "Write about @text"
+        assert result.prompt == "Write about $text"
 
     def test_canonical_prompt_takes_precedence_over_alias(self) -> None:
         """When both `prompt` and `prompt_template` are present, canonical wins and alias is dropped."""
@@ -267,7 +267,7 @@ class TestParsePipeSpec:
             "model": "$writing-creative",
             "inputs": {"text": "Text"},
             "output": "Text",
-            "prompt": "Write about @text",
+            "prompt": "Write about $text",
         }
         snapshot = dict(original)
         parse_pipe_spec("PipeLLM", original)
@@ -324,7 +324,7 @@ class TestParsePipeSpec:
                     "description": "Search the web",
                     "inputs": {"query_text": "Text"},
                     "output": "Text",
-                    "prompt": "Search for @query_text",
+                    "prompt": "Search for $query_text",
                 },
                 PipeSearchSpec,
             ),

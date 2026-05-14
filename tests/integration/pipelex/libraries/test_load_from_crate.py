@@ -21,7 +21,7 @@ description = "Compute a score"
 inputs = { data = "Text" }
 output = "ScoreResult"
 model = "$quick-reasoning"
-prompt = "Compute score from @data"
+prompt = "Compute score from $data"
 """
 
 ANALYTICS_MTHDS = """\
@@ -37,7 +37,7 @@ description = "Analyze data"
 inputs = { data = "Text" }
 output = "AnalyticsResult"
 model = "$quick-reasoning"
-prompt = "Analyze @data"
+prompt = "Analyze $data"
 """
 
 

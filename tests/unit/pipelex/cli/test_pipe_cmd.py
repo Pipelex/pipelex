@@ -26,7 +26,7 @@ class TestCliPipeCmd:
         "model": "$writing-creative",
         "inputs": {"text": "Text"},
         "output": "Text",
-        "prompt": "Write about @text",
+        "prompt": "Write about $text",
     }
 
     # -- pipe_type alias in JSON (handled by pipe_cmd, not parse_pipe_spec) --
@@ -40,7 +40,7 @@ class TestCliPipeCmd:
             "model": "$writing-creative",
             "inputs": {"text": "Text"},
             "output": "Text",
-            "prompt": "Write about @text",
+            "prompt": "Write about $text",
         }
         pipe_type = spec.pop("type")
         result = parse_pipe_spec(pipe_type, spec)
@@ -96,7 +96,7 @@ class TestCliPipeCmd:
     def test_toml_contains_prompt(self) -> None:
         spec = parse_pipe_spec("PipeLLM", {**self._BASE_LLM})
         toml = _pipe_spec_to_toml(spec)
-        assert 'prompt = "Write about @text"' in toml
+        assert 'prompt = "Write about $text"' in toml
 
     def test_sequence_toml_has_steps(self) -> None:
         spec = parse_pipe_spec(
@@ -125,7 +125,7 @@ class TestCliPipeCmd:
                 "description": "No model specified",
                 "inputs": {"text": "Text"},
                 "output": "Text",
-                "prompt": "Write about @text",
+                "prompt": "Write about $text",
             },
         )
         toml = _pipe_spec_to_toml(spec)
@@ -141,7 +141,7 @@ class TestCliPipeCmd:
             "model": "$writing-creative",
             "inputs": {"idea": "Text"},
             "output": {"type": "ImgGenPrompt"},
-            "prompt": "Generate a creative image prompt based on @idea",
+            "prompt": "Generate a creative image prompt based on $idea",
         }
         result = parse_pipe_spec("PipeLLM", spec)
         assert result.model == "$writing-creative"  # type: ignore[attr-defined]
@@ -155,7 +155,7 @@ class TestCliPipeCmd:
             "model": "$writing-creative",
             "inputs": {"idea": "Text"},
             "output": {"type": "ImgGenPrompt"},
-            "prompt": "Generate a creative image prompt based on @idea",
+            "prompt": "Generate a creative image prompt based on $idea",
         }
         result = parse_pipe_spec("PipeLLM", spec)
         toml = _pipe_spec_to_toml(result)

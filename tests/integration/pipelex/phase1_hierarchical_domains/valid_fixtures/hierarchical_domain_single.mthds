@@ -11,4 +11,4 @@ description = "Extract a clause from a contract"
 inputs      = { contract = "Text" }
 output      = "ContractClause"
 model       = "$quick-reasoning"
-prompt      = "Extract the clause from @contract"
+prompt      = "Extract the clause from $contract"

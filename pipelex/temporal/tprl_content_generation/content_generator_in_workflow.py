@@ -31,6 +31,7 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.temporal.exceptions import ContentGenerationError
+from pipelex.temporal.tprl.observability import build_activity_summary
 from pipelex.temporal.tprl.temporal_error import TemporalError
 from pipelex.temporal.tprl_content_generation.act_extract_generate import act_extract_gen_extract_pages
 from pipelex.temporal.tprl_content_generation.act_img_gen_generate import act_img_gen_images
@@ -50,45 +51,14 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
     The ``InWorkflow`` suffix signals the load-bearing constraint: every method calls
     ``workflow.execute_activity(...)``, which only works when invoked from inside a
     workflow's ``run()``. Calling these methods outside of a workflow context will fail.
+
+    Activity IDs are never customized — the Temporal SDK assigns deterministic
+    sequential integers per workflow run, which both guarantees uniqueness and
+    is replay-safe by construction. Per-call meaning is carried in ``summary=``.
     """
 
     def __init__(self, generated_content_factory: GeneratedContentFactory) -> None:
         self._generated_content_factory = generated_content_factory
-        # Per-run uniqueness invariant for activity_ids. Today no operator call site
-        # invokes the same protocol method twice within one ``WfPipeRouter`` execution
-        # (audit recorded in TODOS.md / collapse-content-generation-workflow-layer-v2.md
-        # §0). This dict is a runtime guard so a future regression surfaces as a clear
-        # ``ContentGenerationError`` instead of an opaque Temporal duplicate-activity-id
-        # failure. Keyed by ``(workflow_id, run_id)`` so retries, ``continue_as_new``,
-        # and id-reuse policies (which keep ``workflow_id`` but produce a new ``run_id``)
-        # do not inherit the prior run's seen ids — that would raise spurious duplicates
-        # on the new run's first default activity_id. The generator instance is set once
-        # on the hub and reused across many workflow runs.
-        # Replay-safety: ``_record_activity_id`` short-circuits during replay so a
-        # cached set on this same worker process does not produce false-positive
-        # duplicates after cache eviction. The dict otherwise grows unboundedly across
-        # workflow runs — accepted for now; cleanup is a follow-up tracked in TODOS.md.
-        self._seen_activity_ids: dict[tuple[str, str], set[str]] = {}
-
-    def _record_activity_id(self, activity_id: str, method_name: str) -> None:
-        # Skip the check on replay. After cache eviction, Temporal replays the
-        # workflow code from history on the same worker process; the singleton
-        # generator's set still holds entries from the original execution, so
-        # checking would raise spurious "duplicate" errors. Trust history during
-        # replay — duplicates can only be introduced on a fresh execution.
-        if workflow.unsafe.is_replaying():
-            return
-        info = workflow.info()
-        run_key = (info.workflow_id, info.run_id)
-        seen = self._seen_activity_ids.setdefault(run_key, set())
-        if activity_id in seen:
-            msg = (
-                f"Duplicate activity_id '{activity_id}' for method '{method_name}'. "
-                "Activity ids must be unique within a single workflow execution; "
-                "pass a distinct ``wfid`` at the call site to disambiguate repeated calls."
-            )
-            raise ContentGenerationError(msg)
-        seen.add(activity_id)
 
     @override
     @update_job_metadata
@@ -97,27 +67,28 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
         job_metadata: JobMetadata,
         llm_setting_main: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
-        wfid: str | None = None,
     ) -> str:
         log.debug(f"ContentGeneratorInWorkflow make_llm_text: {llm_prompt_for_text}")
         log.verbose(f"llm_setting_main: {llm_setting_main}")
         worker_config = get_config().temporal.worker_config
-        activity_id = wfid or "craft-text"
-        self._record_activity_id(activity_id, "make_llm_text")
         llm_assignment = LLMAssignment(
             job_metadata=job_metadata,
             llm_setting=llm_setting_main,
             llm_prompt=llm_prompt_for_text,
         )
         log.verbose(llm_assignment.desc, title="llm_assignment")
+        dispatch_kwargs = worker_config.resolve_dispatch(
+            activity_name=act_llm_gen_text.__name__,
+            routing_key=llm_assignment.llm_handle,
+            queue_options_by_queue=get_config().temporal.queue_options,
+            is_traced=get_config().temporal.temporal_config.temporal_log_config.is_dispatch_resolution_traced,
+        ).to_execute_kwargs()
         try:
             generated_text: str = await workflow.execute_activity(
                 act_llm_gen_text,
                 arg=llm_assignment,
-                task_queue=worker_config.resolve_queue(act_llm_gen_text.__name__, llm_assignment.llm_handle),
-                start_to_close_timeout=worker_config.workflow_execution_timeout,
-                retry_policy=worker_config.retry_policy,
-                activity_id=activity_id,
+                summary=build_activity_summary("LLM text", job_metadata, extras={"model": llm_assignment.llm_handle}),
+                **dispatch_kwargs,
             )
         except ActivityError as exc:
             log.error(f"ActivityError caused by: {exc.cause}")
@@ -135,12 +106,9 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
         object_class: type[BaseModelTypeVar],
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_object: LLMPrompt,
-        wfid: str | None = None,
     ) -> BaseModelTypeVar:
         log.verbose(f"ContentGeneratorInWorkflow make_object: {llm_prompt_for_object}")
         worker_config = get_config().temporal.worker_config
-        activity_id = wfid or "craft-object-direct"
-        self._record_activity_id(activity_id, "make_object")
         llm_assignment_for_object = LLMAssignment(
             job_metadata=job_metadata,
             llm_setting=llm_setting_for_object,
@@ -150,14 +118,18 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
             object_class=object_class,
             llm_assignment=llm_assignment_for_object,
         )
+        dispatch_kwargs = worker_config.resolve_dispatch(
+            activity_name=act_llm_gen_object.__name__,
+            routing_key=llm_assignment_for_object.llm_handle,
+            queue_options_by_queue=get_config().temporal.queue_options,
+            is_traced=get_config().temporal.temporal_config.temporal_log_config.is_dispatch_resolution_traced,
+        ).to_execute_kwargs()
         try:
             obj: BaseModel = await workflow.execute_activity(
                 act_llm_gen_object,
                 arg=object_assignment,
-                task_queue=worker_config.resolve_queue(act_llm_gen_object.__name__, llm_assignment_for_object.llm_handle),
-                start_to_close_timeout=worker_config.workflow_execution_timeout,
-                retry_policy=worker_config.retry_policy,
-                activity_id=activity_id,
+                summary=build_activity_summary("LLM object", job_metadata, extras={"class": object_class.__name__}),
+                **dispatch_kwargs,
             )
         except ActivityError as exc:
             log.error(f"ActivityError caused by: {exc.cause}")
@@ -179,11 +151,8 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
         llm_setting_for_object_list: LLMSetting,
         llm_prompt_for_object_list: LLMPrompt,
         nb_items: int | None = None,
-        wfid: str | None = None,
     ) -> list[BaseModelTypeVar]:
         worker_config = get_config().temporal.worker_config
-        activity_id = wfid or "craft-object-list-direct"
-        self._record_activity_id(activity_id, "make_object_list")
         llm_assignment_for_object = LLMAssignment(
             job_metadata=job_metadata,
             llm_setting=llm_setting_for_object_list,
@@ -193,14 +162,18 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
             object_class=object_class,
             llm_assignment=llm_assignment_for_object,
         )
+        dispatch_kwargs = worker_config.resolve_dispatch(
+            activity_name=act_llm_gen_object_list.__name__,
+            routing_key=llm_assignment_for_object.llm_handle,
+            queue_options_by_queue=get_config().temporal.queue_options,
+            is_traced=get_config().temporal.temporal_config.temporal_log_config.is_dispatch_resolution_traced,
+        ).to_execute_kwargs()
         try:
             obj_list: list[BaseModel] = await workflow.execute_activity(
                 act_llm_gen_object_list,
                 arg=object_assignment,
-                task_queue=worker_config.resolve_queue(act_llm_gen_object_list.__name__, llm_assignment_for_object.llm_handle),
-                start_to_close_timeout=worker_config.workflow_execution_timeout,
-                retry_policy=worker_config.retry_policy,
-                activity_id=activity_id,
+                summary=build_activity_summary("LLM object list", job_metadata, extras={"class": object_class.__name__}),
+                **dispatch_kwargs,
             )
         except ActivityError as exc:
             log.error(f"ActivityError caused by: {exc.cause}")
@@ -248,12 +221,9 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
         img_gen_prompt: ImgGenPrompt,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
-        wfid: str | None = None,
     ) -> ImageContent:
         worker_config = get_config().temporal.worker_config
         img_gen_config = get_config().cogt.img_gen_config
-        activity_id = wfid or "craft-image-single"
-        self._record_activity_id(activity_id, "make_single_image")
         img_gen_assignment = ImgGenAssignment(
             job_metadata=job_metadata,
             img_gen_handle=img_gen_handle,
@@ -262,14 +232,18 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
             img_gen_job_config=img_gen_job_config or img_gen_config.img_gen_job_config,
             nb_images=1,
         )
+        dispatch_kwargs = worker_config.resolve_dispatch(
+            activity_name=act_img_gen_images.__name__,
+            routing_key=img_gen_assignment.img_gen_handle,
+            queue_options_by_queue=get_config().temporal.queue_options,
+            is_traced=get_config().temporal.temporal_config.temporal_log_config.is_dispatch_resolution_traced,
+        ).to_execute_kwargs()
         try:
             image_content_list: list[ImageContent] = await workflow.execute_activity(
                 act_img_gen_images,
                 arg=img_gen_assignment,
-                task_queue=worker_config.resolve_queue(act_img_gen_images.__name__, img_gen_assignment.img_gen_handle),
-                start_to_close_timeout=worker_config.workflow_execution_timeout,
-                retry_policy=worker_config.retry_policy,
-                activity_id=activity_id,
+                summary=build_activity_summary("Img gen 1×", job_metadata, extras={"model": img_gen_handle}),
+                **dispatch_kwargs,
             )
         except ActivityError as exc:
             log.error(f"ActivityError caused by: {exc.cause}")
@@ -293,12 +267,9 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
         nb_images: int,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
-        wfid: str | None = None,
     ) -> list[ImageContent]:
         worker_config = get_config().temporal.worker_config
         img_gen_config = get_config().cogt.img_gen_config
-        activity_id = wfid or "craft-image-list"
-        self._record_activity_id(activity_id, "make_image_list")
         img_gen_assignment = ImgGenAssignment(
             job_metadata=job_metadata,
             img_gen_handle=img_gen_handle,
@@ -307,14 +278,18 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
             img_gen_job_config=img_gen_job_config or img_gen_config.img_gen_job_config,
             nb_images=nb_images,
         )
+        dispatch_kwargs = worker_config.resolve_dispatch(
+            activity_name=act_img_gen_images.__name__,
+            routing_key=img_gen_assignment.img_gen_handle,
+            queue_options_by_queue=get_config().temporal.queue_options,
+            is_traced=get_config().temporal.temporal_config.temporal_log_config.is_dispatch_resolution_traced,
+        ).to_execute_kwargs()
         try:
             image_content_list: list[ImageContent] = await workflow.execute_activity(
                 act_img_gen_images,
                 arg=img_gen_assignment,
-                task_queue=worker_config.resolve_queue(act_img_gen_images.__name__, img_gen_assignment.img_gen_handle),
-                start_to_close_timeout=worker_config.workflow_execution_timeout,
-                retry_policy=worker_config.retry_policy,
-                activity_id=activity_id,
+                summary=build_activity_summary("Img gen N×", job_metadata, extras={"model": img_gen_handle, "n": str(nb_images)}),
+                **dispatch_kwargs,
             )
         except ActivityError as exc:
             log.error(f"ActivityError caused by: {exc.cause}")
@@ -333,11 +308,8 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
         template: str,
         templating_style: TemplatingStyle | None = None,
         template_category: TemplateCategory | None = None,
-        wfid: str | None = None,
     ) -> str:
         worker_config = get_config().temporal.worker_config
-        activity_id = wfid or "jinja2-text"
-        self._record_activity_id(activity_id, "make_templated_text")
         templating_assignment = TemplatingAssignment(
             job_metadata=job_metadata,
             context=context,
@@ -345,14 +317,17 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
             templating_style=templating_style,
             category=template_category or TemplateCategory.BASIC,
         )
+        dispatch_kwargs = worker_config.resolve_dispatch(
+            activity_name=act_jinja2_gen_text.__name__,
+            queue_options_by_queue=get_config().temporal.queue_options,
+            is_traced=get_config().temporal.temporal_config.temporal_log_config.is_dispatch_resolution_traced,
+        ).to_execute_kwargs()
         try:
             jinja2_text: str = await workflow.execute_activity(
                 act_jinja2_gen_text,
                 arg=templating_assignment,
-                task_queue=worker_config.resolve_queue(act_jinja2_gen_text.__name__),
-                start_to_close_timeout=worker_config.workflow_execution_timeout,
-                retry_policy=worker_config.retry_policy,
-                activity_id=activity_id,
+                summary=build_activity_summary("Templated text", job_metadata),
+                **dispatch_kwargs,
             )
         except ActivityError as exc:
             log.error(f"ActivityError caused by: {exc.cause}")
@@ -371,7 +346,6 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
         extract_handle: str,
         extract_job_params: ExtractJobParams | None = None,
         extract_job_config: ExtractJobConfig | None = None,
-        wfid: str | None = None,
     ) -> list[ImageContent]:
         if not extract_input.document_uri:
             msg = "PDF URI is required to render page views"
@@ -379,21 +353,22 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
         worker_config = get_config().temporal.worker_config
         job_params = extract_job_params or ExtractJobParams.make_default_extract_job_params()
         page_views_dpi = job_params.page_views_dpi or get_config().cogt.extract_config.default_page_views_dpi
-        activity_id = wfid or "render-page-views"
-        self._record_activity_id(activity_id, "make_render_page_views")
         render_assignment = RenderPageViewsAssignment(
             job_metadata=job_metadata,
             document_uri=extract_input.document_uri,
             page_views_dpi=page_views_dpi,
         )
+        dispatch_kwargs = worker_config.resolve_dispatch(
+            activity_name=act_render_page_views.__name__,
+            queue_options_by_queue=get_config().temporal.queue_options,
+            is_traced=get_config().temporal.temporal_config.temporal_log_config.is_dispatch_resolution_traced,
+        ).to_execute_kwargs()
         try:
             image_content_list: list[ImageContent] = await workflow.execute_activity(
                 act_render_page_views,
                 arg=render_assignment,
-                task_queue=worker_config.resolve_queue(act_render_page_views.__name__),
-                start_to_close_timeout=worker_config.workflow_execution_timeout,
-                retry_policy=worker_config.retry_policy,
-                activity_id=activity_id,
+                summary=build_activity_summary("Render page views", job_metadata),
+                **dispatch_kwargs,
             )
         except ActivityError as exc:
             log.error(f"ActivityError caused by: {exc.cause}")
@@ -412,12 +387,8 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
         extract_handle: str,
         extract_job_params: ExtractJobParams,
         extract_job_config: ExtractJobConfig,
-        wfid: str | None = None,
     ) -> list[PageContent]:
         worker_config = get_config().temporal.worker_config
-        base_id = wfid or "extract"
-        extract_activity_id = f"{base_id}-pages"
-        self._record_activity_id(extract_activity_id, "make_extract_pages")
         extract_assignment = ExtractAssignment(
             job_metadata=job_metadata,
             extract_handle=extract_handle,
@@ -425,14 +396,18 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
             extract_job_params=extract_job_params,
             extract_job_config=extract_job_config,
         )
+        dispatch_kwargs = worker_config.resolve_dispatch(
+            activity_name=act_extract_gen_extract_pages.__name__,
+            routing_key=extract_assignment.extract_handle,
+            queue_options_by_queue=get_config().temporal.queue_options,
+            is_traced=get_config().temporal.temporal_config.temporal_log_config.is_dispatch_resolution_traced,
+        ).to_execute_kwargs()
         try:
             page_contents: list[PageContent] = await workflow.execute_activity(
                 act_extract_gen_extract_pages,
                 arg=extract_assignment,
-                task_queue=worker_config.resolve_queue(act_extract_gen_extract_pages.__name__, extract_assignment.extract_handle),
-                start_to_close_timeout=worker_config.workflow_execution_timeout,
-                retry_policy=worker_config.retry_policy,
-                activity_id=extract_activity_id,
+                summary=build_activity_summary("Extract pages", job_metadata, extras={"handle": extract_handle}),
+                **dispatch_kwargs,
             )
         except ActivityError as exc:
             log.error(f"ActivityError caused by: {exc.cause}")
@@ -444,22 +419,23 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
         if extract_job_params.should_include_page_views:
             page_view_contents: list[ImageContent] = []
             if extract_input.document_uri:
-                render_activity_id = f"{base_id}-render-page-views"
-                self._record_activity_id(render_activity_id, "make_extract_pages")
                 page_views_dpi = extract_job_params.page_views_dpi or get_config().cogt.extract_config.default_page_views_dpi
                 render_assignment = RenderPageViewsAssignment(
                     job_metadata=job_metadata,
                     document_uri=extract_input.document_uri,
                     page_views_dpi=page_views_dpi,
                 )
+                render_dispatch_kwargs = worker_config.resolve_dispatch(
+                    activity_name=act_render_page_views.__name__,
+                    queue_options_by_queue=get_config().temporal.queue_options,
+                    is_traced=get_config().temporal.temporal_config.temporal_log_config.is_dispatch_resolution_traced,
+                ).to_execute_kwargs()
                 try:
                     page_view_contents = await workflow.execute_activity(
                         act_render_page_views,
                         arg=render_assignment,
-                        task_queue=worker_config.resolve_queue(act_render_page_views.__name__),
-                        start_to_close_timeout=worker_config.workflow_execution_timeout,
-                        retry_policy=worker_config.retry_policy,
-                        activity_id=render_activity_id,
+                        summary=build_activity_summary("Render page views (extract)", job_metadata),
+                        **render_dispatch_kwargs,
                     )
                 except ActivityError as exc:
                     log.error(f"ActivityError caused by: {exc.cause}")

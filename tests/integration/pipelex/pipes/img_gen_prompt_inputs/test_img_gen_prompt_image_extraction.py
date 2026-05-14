@@ -149,7 +149,7 @@ class TestImgGenPromptImageExtraction:
             description="Test at dotted path image in img_gen prompt",
             inputs={"page.page_view": "Image", "page": "Page"},
             output="Image",
-            prompt="Edit this image: @page.page_view",
+            prompt="Edit this image:\n@page.page_view",
         )
 
         pipe = PipeFactory[PipeImgGen].make_from_blueprint(

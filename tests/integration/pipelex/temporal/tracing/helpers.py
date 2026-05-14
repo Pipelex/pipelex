@@ -40,15 +40,15 @@ def route_activities_to(queue: str, activity_names: Iterable[str]) -> Iterator[N
 
     Tests that run an in-process worker on a UUID-based task queue and
     substitute activities on that worker need this override: without it the
-    in-workflow dispatcher resolves to ``worker_config.task_queue`` (the
-    production default) where no worker is listening, and the activity hangs
-    until pytest-timeout fires.
+    in-workflow dispatcher resolves to ``worker_config.default_task_queue``
+    (the production default) where no worker is listening, and the activity
+    hangs until pytest-timeout fires.
     """
     worker_config = get_config().temporal.worker_config
     originals: dict[str, ActivityRouteConfig | None] = {}
     for activity_name in activity_names:
         originals[activity_name] = worker_config.activity_queues.get(activity_name)
-        worker_config.activity_queues[activity_name] = ActivityRouteConfig(default=queue)
+        worker_config.activity_queues[activity_name] = ActivityRouteConfig(default=queue, by_handle={})
     try:
         yield
     finally:
@@ -254,8 +254,8 @@ async def make_split_workers(
       accidentally use the router's registered context.
 
     Pair this with `worker_config.activity_queues[act_llm_gen_text.__name__] =
-    ActivityRouteConfig(default=q_runner)` so the workflow on `q_router`
-    actually dispatches `act_llm_gen_text` to `q_runner`.
+    ActivityRouteConfig(default=q_runner, by_handle={})` so the workflow on
+    `q_router` actually dispatches `act_llm_gen_text` to `q_runner`.
     """
     worker_scopes = get_config().temporal.worker_scopes
     base_router = worker_scopes.scopes["router"]

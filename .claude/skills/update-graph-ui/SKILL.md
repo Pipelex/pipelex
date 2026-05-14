@@ -1,112 +1,112 @@
 ---
 name: update-graph-ui
 description: >
-  Update the mthds-ui graph viewer assets in pipelex to a new version.
-  Bumps the version tag in package.json, runs make sync-graph-ui to rebuild
-  and copy the standalone JS/CSS assets, verifies the sync and runs tests.
-  Use when user says "update graph ui", "bump mthds-ui", "sync graph viewer",
-  "update graph viewer", "new version of mthds-ui", or any variation of
-  updating the vendored graph viewer assets.
+  Bump the pinned `@pipelex/mthds-ui` (and `elkjs`) version that the generated
+  ReactFlow HTML loads from jsDelivr. Re-fetches the bundle, recomputes SRI
+  hashes, and updates the Python constants in `standalone_assets.py`.
+  Use when user says "update graph ui", "bump mthds-ui", "update graph viewer",
+  "new version of mthds-ui", or any variation of updating the CDN-pinned graph
+  viewer assets.
 user_invocable: true
 ---
 
-# Update Graph UI Assets
+# Update Graph UI Assets (CDN + SRI)
 
-Update the vendored mthds-ui graph viewer assets in pipelex to a new version.
+Bump the pinned `@pipelex/mthds-ui` version that the generated ReactFlow HTML
+loads from `cdn.jsdelivr.net`, refresh the Subresource Integrity hashes, and
+verify everything still renders.
+
+There is no vendored bundle anymore. Assets are loaded from jsDelivr at view
+time; the only things stored in this repo are the version strings and the
+matching `sha384` SRI hashes in
+`pipelex/graph/reactflow/standalone_assets.py`.
 
 ## Prerequisites
 
-- `node` and `npm` must be on PATH
-- Git access to `github.com/Pipelex/mthds-ui`
+- `curl`, `openssl`, and `npm` on PATH (used by the refresh command, npm
+  version lookup, and the sanity checks below).
+- The target `@pipelex/mthds-ui` version must already be published on npm
+  **with `dist/standalone/graph-viewer.{js,css}` in the tarball**. If it
+  isn't, jsDelivr will 404 — fix the publish in the `mthds-ui` repo first.
 
 ## Workflow
 
-### 1. Check current state
+### 1. Check current pin
 
 ```bash
-grep '@pipelex/mthds-ui' package.json
-cat pipelex/graph/reactflow/assets/.graph-ui-version
+grep -E 'MTHDS_UI_VERSION|ELKJS_VERSION' pipelex/graph/reactflow/standalone_assets.py
 ```
 
-Report the currently pinned version and the currently synced version.
+Report the currently pinned versions.
 
-### 2. Determine target version
+### 2. Pick the target version
 
-Ask the user which version to update to, or check the latest tag:
+Latest published version on npm:
 
 ```bash
-git ls-remote --tags https://github.com/Pipelex/mthds-ui.git | grep -o 'refs/tags/v[0-9.]*' | sed 's|refs/tags/v||' | sort -V | tail -1
+npm view @pipelex/mthds-ui version
 ```
 
-Show the user the latest available version and ask for confirmation.
+Confirm with the user.
 
-### 3. Update package.json
-
-Edit `package.json` to change the version tag and update the pinned SHA:
+### 3. Verify the target is reachable on jsDelivr
 
 ```bash
-git ls-remote https://github.com/Pipelex/mthds-ui.git refs/tags/v<NEW_VERSION> refs/tags/v<NEW_VERSION>^{}
+curl -fsI https://cdn.jsdelivr.net/npm/@pipelex/mthds-ui@<NEW_VERSION>/dist/standalone/graph-viewer.js
+curl -fsI https://cdn.jsdelivr.net/npm/@pipelex/mthds-ui@<NEW_VERSION>/dist/standalone/graph-viewer.css
 ```
 
-If two lines appear (annotated tag), use the `^{}` dereferenced SHA (the commit).
-If one line appears (lightweight tag), use that SHA directly.
-Update both fields:
+Both must return `HTTP/2 200`. If either 404s, the npm publish for that
+version did not include the standalone bundle — stop and ask the maintainer
+to re-publish properly before proceeding.
 
-```json
-"dependencies": {
-  "@pipelex/mthds-ui": "github:Pipelex/mthds-ui#v<NEW_VERSION>"
-},
-"//dependencies": {
-  "@pipelex/mthds-ui": "v<NEW_VERSION> = <COMMIT_SHA>"
-}
-```
-
-### 4. Sync assets
+### 4. Refresh the SRI hashes
 
 ```bash
-make sync-graph-ui
+.venv/bin/pipelex-dev refresh-graph-ui-sri --mthds-ui-version <NEW_VERSION>
 ```
 
-This clones mthds-ui at the pinned tag, builds the standalone JS/CSS bundles,
-and copies them to `pipelex/graph/reactflow/assets/`.
+This re-fetches each URL, computes `sha384`, and rewrites the constants in
+`pipelex/graph/reactflow/standalone_assets.py`.
 
-If this fails, stop and report the error. Common issues:
-- Tag doesn't exist on the remote (check available tags)
-- npm install failure (network issue)
-- Build failure (mthds-ui build broken at that tag)
+To rotate `elkjs` at the same time, pass `--elkjs-version <NEW_ELKJS_VERSION>`.
 
-### 5. Verify sync
+### 5. Run graph tests
 
 ```bash
-make check-graph-ui-sync
-```
-
-Must print "up-to-date". If not, something went wrong in step 4.
-
-### 6. Run graph tests
-
-```bash
-.venv/bin/pytest tests/unit/pipelex/graph/test_reactflow_html.py -v --no-header
+.venv/bin/pytest tests/unit/pipelex/graph/reactflow tests/unit/pipelex/graph/test_reactflow_html.py -q
 ```
 
 All tests must pass. These verify:
-- HTML generation with embedded GraphSpec
-- Bundled JS/CSS is present
-- Config JSON embedding
-- HTML structure validity
 
-### 7. Run full quality checks
+- CDN constants are well-formed (`sha384-…` decoding to 48 bytes, URLs pinned to declared versions).
+- Generated HTML references `cdn.jsdelivr.net` with the new integrity hashes.
+- HTML structure (DOCTYPE, root div, embedded JSON data scripts) is intact.
+
+### 6. Run full quality checks
 
 ```bash
 make agent-check
 ```
 
-Ensures the new assets don't break lint, type checking, or any other checks.
+### 7. Smoke test the rendered HTML (recommended)
+
+Generate one graph and open it in a browser:
+
+```bash
+make serve-graph
+```
+
+In DevTools → Network, confirm three external requests to `cdn.jsdelivr.net`
+succeed with no `Failed to find a valid digest in the 'integrity' attribute`
+errors in the console.
 
 ### 8. Report
 
 Tell the user:
-- Previous version and new version
-- Asset sizes (JS + CSS)
-- Test results
-- Remind to commit: `package.json`, `graph-viewer.js`, `graph-viewer.css`, `.graph-ui-version`
+
+- Previous and new versions for `mthds-ui` (and `elkjs` if bumped).
+- New SRI hashes.
+- Test results.
+- Remind to commit `pipelex/graph/reactflow/standalone_assets.py` and any
+  CHANGELOG entry.

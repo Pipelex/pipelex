@@ -41,7 +41,7 @@ description = "Analyze the tone of the text"
 inputs      = { input_text = "Text" }
 output      = "PgcToneResult"
 model       = "$testing-text"
-prompt      = "Describe the tone of: @input_text.text"
+prompt      = "Describe the tone of: $input_text.text"
 
 [pipe.pgc_analyze_length]
 type        = "PipeLLM"
@@ -49,7 +49,7 @@ description = "Analyze the length of the text"
 inputs      = { input_text = "Text" }
 output      = "PgcLengthResult"
 model       = "$testing-text"
-prompt      = "Describe the length characteristics of: @input_text.text"
+prompt      = "Describe the length characteristics of: $input_text.text"
 
 [pipe.pgc_summarize_combined]
 type        = "PipeLLM"
@@ -57,4 +57,4 @@ description = "Summarize the combined parallel analysis result"
 inputs      = { pgc_combined_result = "PgcCombinedResult" }
 output      = "Text"
 model       = "$testing-text"
-prompt      = "Summarize the following analysis: @pgc_combined_result"
+prompt      = "Summarize the following analysis: $pgc_combined_result"

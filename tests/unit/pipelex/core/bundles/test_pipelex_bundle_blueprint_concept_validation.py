@@ -40,7 +40,7 @@ class TestPipelexBundleBlueprintConceptValidation:
                     description="Test pipe",
                     inputs={"data": "Text", "image": "Image"},
                     output="Text",
-                    prompt="Process @data and @image",
+                    prompt="Process $data and $image",
                 ),
             },
         )
@@ -76,7 +76,7 @@ class TestPipelexBundleBlueprintConceptValidation:
                     description="Test pipe",
                     inputs={"data": "InputData"},
                     output="Text",
-                    prompt="Process @data",
+                    prompt="Process $data",
                 ),
             },
         )
@@ -110,7 +110,7 @@ class TestPipelexBundleBlueprintConceptValidation:
                     description="Test pipe",
                     inputs={"external_data": "other_domain.ExternalConcept"},
                     output="Text",
-                    prompt="Process @external_data",
+                    prompt="Process $external_data",
                 ),
             },
         )
@@ -144,7 +144,7 @@ class TestPipelexBundleBlueprintConceptValidation:
                     description="Test pipe",
                     inputs={"items": "Item[]"},
                     output="Text[3]",
-                    prompt="Process @items",
+                    prompt="Process $items",
                 ),
             },
         )
@@ -255,7 +255,7 @@ class TestPipelexBundleBlueprintConceptValidation:
                     description="Test pipe",
                     inputs={"score": "scoring.WeightedScore"},
                     output="Text",
-                    prompt="Process @score",
+                    prompt="Process $score",
                 ),
             },
         )
@@ -316,7 +316,7 @@ class TestPipelexBundleBlueprintConceptValidation:
                         description="Test pipe",
                         inputs={"data": "UndeclaredInput"},
                         output="Text",
-                        prompt="Process @data",
+                        prompt="Process $data",
                     ),
                 },
             )
@@ -426,7 +426,7 @@ class TestPipelexBundleBlueprintConceptValidation:
                         description="Test pipe",
                         inputs={"items": "UndeclaredItem[]"},
                         output="Text",
-                        prompt="Process @items",
+                        prompt="Process $items",
                     ),
                 },
             )
@@ -447,7 +447,7 @@ class TestPipelexBundleBlueprintConceptValidation:
                         description="Test pipe",
                         inputs={"input1": "Undeclared1", "input2": "Undeclared2"},
                         output="Undeclared3",
-                        prompt="Process @input1 and @input2",
+                        prompt="Process $input1 and $input2",
                     ),
                 },
             )

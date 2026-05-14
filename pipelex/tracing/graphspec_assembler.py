@@ -54,6 +54,8 @@ class _AssemblerNodeData:
         started_at: datetime,
         parent_node_id: str | None,
         input_specs: list[IOSpec] | None = None,
+        description: str | None = None,
+        domain_code: str | None = None,
     ) -> None:
         self.node_id = node_id
         self.pipe_code = pipe_code
@@ -61,6 +63,8 @@ class _AssemblerNodeData:
         self.node_kind = node_kind
         self.started_at = started_at
         self.parent_node_id = parent_node_id
+        self.description = description
+        self.domain_code = domain_code
         self.ended_at: datetime | None = None
         self.status: NodeStatus = NodeStatus.RUNNING
         self.metrics: dict[str, float] = {}
@@ -88,6 +92,8 @@ class _AssemblerNodeData:
             kind=self.node_kind,
             pipe_code=self.pipe_code,
             pipe_type=self.pipe_type,
+            description=self.description,
+            domain_code=self.domain_code,
             status=self.status,
             timing=timing,
             node_io=node_io,
@@ -223,6 +229,8 @@ class _AssemblerState:
             started_at=event.timestamp,
             parent_node_id=event.parent_node_id,
             input_specs=list(event.input_specs),
+            description=event.description,
+            domain_code=event.domain_code,
         )
         self._nodes[event.node_id] = node_data
 

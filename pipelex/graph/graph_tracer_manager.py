@@ -198,6 +198,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         input_specs: list[IOSpec] | None = None,
         pipe_data: dict[str, Any] | None = None,
         concept_data: list[dict[str, Any]] | None = None,
+        description: str | None = None,
+        domain_code: str | None = None,
     ) -> tuple[str | None, GraphContext | None]:
         """Record the start of a pipe execution.
 
@@ -210,6 +212,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             input_specs: Optional list of IOSpec describing the inputs consumed.
             pipe_data: Optional serialized pipe instance for the pipe registry.
             concept_data: Optional list of serialized concept dicts for the concept registry.
+            description: Optional human-readable pipe description (mirrored onto NodeSpec).
+            domain_code: Optional domain code of the pipe (mirrored onto NodeSpec).
 
         Returns:
             Tuple of (node_id, child_graph_context) if tracing is active, (None, None) otherwise.
@@ -227,6 +231,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             input_specs=input_specs,
             pipe_data=pipe_data,
             concept_data=concept_data,
+            description=description,
+            domain_code=domain_code,
         )
 
     def on_pipe_end_success(

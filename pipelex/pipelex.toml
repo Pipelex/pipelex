@@ -326,9 +326,10 @@ edge_type = "bezier"
 initial_zoom = 1.0
 pan_to_top = true
 default_title = "Pipelex Graph"
-# When true, PipeBatch controller nodes appear in the graph as pipe nodes for batch edges
-# When false, batch edges connect stuff nodes directly (list -> items, items -> list)
-show_batch_controller = false
+# Forwarded to mthds-ui as `showControllers`: when true, controller pipes (PipeSequence,
+# PipeParallel, PipeCondition, PipeBatch) render as grouping containers around their children;
+# when false, they collapse out of the graph and edges connect stuff nodes directly.
+show_batch_controller = true
 
 [pipelex.pipeline_execution_config.graph_config.reactflow_config.style]
 theme = "dark"
@@ -411,6 +412,7 @@ img_gen = "model"
 llm_handle = "model"
 llm = "model"
 llm_to_structure = "model_to_structure"
+task_queue = "default_task_queue"
 
 [migration.migration_maps.mthds]
 img_gen = "model"
@@ -444,6 +446,17 @@ preferred_agent_targets = ["claude", "agents"]
 [temporal]
 is_enabled = false
 
+[temporal.search_attributes]
+# Master toggle. When false, workflow starts don't attach any custom search
+# attributes, the worker-boot check is skipped, and the dashboard view falls
+# back to WorkflowType / WorkflowId / StartTime only.
+enabled = true
+# Subset of the five built-in attributes to populate. Names not in this list
+# are skipped at workflow-start time AND not required at worker boot. Pipelex
+# only knows how to populate these five; arbitrary custom names are out of
+# scope (they would require code that knows the value source).
+attributes = ["PipeCode", "PipelineRunId", "SessionId", "UserId", "DomainCode"]
+
 [temporal.payload_codec_config]
 is_enabled = false
 size_threshold = 1_048_576
@@ -457,37 +470,15 @@ uri_format = "{hash}"
 local_storage_path = ".pipelex/temporal-payload-store"
 
 [temporal.worker_config]
-task_queue = "temporal_task_queue"
-workflow_execution_timeout = "1:00:00"
+default_task_queue = "temporal_task_queue"
+workflow_execution_timeout = "1:00:00"     # for the workflow itself (NOT used as activity timeout)
 run_timeout = "1:00:00"
 task_timeout = "0:00:10"
 start_delay = "0:00:00"
 rpc_timeout = "1:00:00"
-
-# Per-activity, per-handle routing. Each entry declares:
-#   default   = the queue used when no per-handle override matches
-#   by_handle = optional { handle_name -> queue }
-# Activities not listed here resolve to `task_queue` above. Empty by default
-# means every activity lands on `temporal_task_queue` — same as legacy behavior.
-#
-# Example: route OpenAI vs Anthropic to separate worker pools, send image
-# generation to a dedicated heavy-payload pool, and isolate Mistral OCR:
-#
-# [temporal.worker_config.activity_queues.act_llm_gen_text]
-# default = "inference_q"
-# by_handle = { "claude-opus-4-7" = "anthropic_q", "gpt-5" = "openai_q" }
-#
-# [temporal.worker_config.activity_queues.act_llm_gen_object]
-# default = "inference_q"
-# by_handle = { "claude-opus-4-7" = "anthropic_q", "gpt-5" = "openai_q" }
-#
-# [temporal.worker_config.activity_queues.act_img_gen_images]
-# default = "image_gen_q"
-# by_handle = { "flux-1.1-pro" = "fal_q", "dall-e-3" = "openai_image_q" }
-#
-# [temporal.worker_config.activity_queues.act_extract_gen_extract_pages]
-# default = "extract_q"
-# by_handle = { "mistral-ocr" = "mistral_extract_q" }
+# Baseline activity timeout used when no per-queue or per-handle overlay applies.
+default_activity_start_to_close_timeout = "0:10:00"
+activity_queues = {}
 
 [temporal.worker_config.retry_policy_config]
 initial_interval = "0:00:03"
@@ -502,6 +493,46 @@ non_retryable_error_types = [
   "ModelNotFoundError",
   "ValidationError",
 ]
+# Per-queue and per-handle overlays contribute `non_retryable_error_types_extra`
+# lists; the dispatch resolver unions them on top of the baseline above. That
+# field belongs only on overlays — adding it here would be silently dropped by
+# the resolver, so the baseline schema (RetryPolicyConfig) deliberately does
+# not accept it.
+
+# Per-queue submitter options. Operators populate this when a backend pool
+# needs its own timeout or retry tuning. See pipelex/kit/configs/pipelex.toml
+# for examples.
+[temporal.queue_options]
+
+# Default cluster-wide rate cap on the worker's home queue. Mirrors the pre-v2
+# hardcoded ``max_task_queue_activities_per_second=1000`` on ``Worker(...)`` so
+# existing deployments on ``temporal_task_queue`` keep the same Temporal-server-
+# enforced cap. Deployments using non-default queue names should add their own
+# ``[temporal.queue_options.<queue>]`` entries. The empty-routing hybrid
+# fallback applies these overlays to activities dispatched without an explicit
+# task_queue too.
+[temporal.queue_options.temporal_task_queue]
+max_task_queue_activities_per_second = 1000
+
+# Named worker-runtime profiles. A worker process selects one via --profile.
+# Defaults are lifted verbatim from the pre-v2 hardcoded Worker(...) construction
+# so out-of-the-box behavior is unchanged.
+[temporal.worker_runtime_profiles]
+default_profile = "default"
+
+[temporal.worker_runtime_profiles.profiles.default]
+tuning_mode = "explicit"
+max_cached_workflows = 10000
+max_concurrent_workflow_tasks = 1000
+max_concurrent_activities = 1000
+max_concurrent_local_activities = 1000
+max_concurrent_workflow_task_polls = 100
+max_concurrent_activity_task_polls = 100
+max_activities_per_second = 1000
+sticky_queue_schedule_to_start_timeout = "0:30:00"
+max_heartbeat_throttle_interval = "1:00:00"
+default_heartbeat_throttle_interval = "1:00:00"
+graceful_shutdown_timeout = "0:30:00"
 
 [temporal.temporal_config]
 selected_server = "local"
@@ -534,6 +565,11 @@ managed_loggers = [
   "temporalio.workflow",
   "temporalio.worker._activity",
 ]
+# When true, every workflow.execute_activity dispatch logs the resolved queue +
+# timeout + retry along with the layer each value came from (baseline /
+# queue_options / handle_options). Verbose — enable when debugging mis-tuned
+# timeouts.
+is_dispatch_resolution_traced = false
 
 [temporal.worker_scopes]
 default_scope = "full"
@@ -564,6 +600,56 @@ disable_all_activities = true
 required_tasks_packs = ["crafting", "pipe"]
 required_workflows = []
 required_activities = []
+excluded_workflows = []
+excluded_activities = []
+disable_all_workflows = true
+disable_all_activities = false
+
+# Specialized activity-only scopes for deployment manifests with one worker pool
+# per backend class. Each registers only the activities its name implies — paired
+# with `--task-queue <q>` so the worker pulls only its class of work.
+#
+# Note: `act_render_page_views` is intentionally listed under BOTH `runner-img-gen`
+# (used by single-image / image-list generation paths that may render a layout view)
+# AND `runner-extract` (used by the `make_extract_pages` two-activity branch that
+# pairs OCR with page-view rendering). Belt-and-suspenders: both scopes can render
+# pages, so neither breaks if routing sends the activity to either.
+
+[temporal.worker_scopes.scopes.runner-llm]
+required_tasks_packs = []
+required_workflows = []
+required_activities = [
+  "act_llm_gen_text",
+  "act_llm_gen_object",
+  "act_llm_gen_object_list",
+]
+excluded_workflows = []
+excluded_activities = []
+disable_all_workflows = true
+disable_all_activities = false
+
+[temporal.worker_scopes.scopes.runner-img-gen]
+required_tasks_packs = []
+required_workflows = []
+required_activities = ["act_img_gen_images", "act_render_page_views"]
+excluded_workflows = []
+excluded_activities = []
+disable_all_workflows = true
+disable_all_activities = false
+
+[temporal.worker_scopes.scopes.runner-extract]
+required_tasks_packs = []
+required_workflows = []
+required_activities = ["act_extract_gen_extract_pages", "act_render_page_views"]
+excluded_workflows = []
+excluded_activities = []
+disable_all_workflows = true
+disable_all_activities = false
+
+[temporal.worker_scopes.scopes.runner-jinja2]
+required_tasks_packs = []
+required_workflows = []
+required_activities = ["act_jinja2_gen_text"]
 excluded_workflows = []
 excluded_activities = []
 disable_all_workflows = true

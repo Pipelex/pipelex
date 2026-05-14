@@ -14,7 +14,6 @@ class PipeRouter(PipeRouterProtocol):
     async def _run_pipe_job(
         self,
         pipe_job: PipeJob,
-        wfid: str | None = None,
     ) -> PipeOutput:
         return await pipe_job.pipe.run_pipe(
             job_metadata=pipe_job.job_metadata,

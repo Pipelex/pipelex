@@ -96,7 +96,7 @@ class TestSplitWorkerUsageEmission:
         worker_config = get_config().temporal.worker_config
         activity_name = act_llm_gen_text.__name__
         original_entry = worker_config.activity_queues.get(activity_name)
-        worker_config.activity_queues[activity_name] = ActivityRouteConfig(default=q_runner)
+        worker_config.activity_queues[activity_name] = ActivityRouteConfig(default=q_runner, by_handle={})
         yield
         if original_entry is None:
             worker_config.activity_queues.pop(activity_name, None)

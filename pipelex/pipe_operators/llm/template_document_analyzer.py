@@ -45,7 +45,7 @@ class TemplateDocumentAnalyzer:
             List of DocumentReference objects describing how to extract documents
         """
         # Preprocess template (convert @variable, $variable syntax)
-        preprocessed = preprocess_template(template_source)
+        preprocessed = preprocess_template(template_source, declared_inputs=set(input_specs.keys()))
 
         # Parse template to get variable references with filters
         variable_refs = detect_jinja2_variable_references(

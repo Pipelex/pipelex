@@ -13,10 +13,11 @@ For the user-facing configuration guide, see [Configuration Overview](../configu
 Pipelex configuration is merged in layers:
 
 - **Shipped defaults**: maintained by the Pipelex project and used as the baseline by the installed package.
-- **Project overrides**: created in `.pipelex/` by `pipelex init …` and edited by projects that use Pipelex.
-- **Root override files** (advanced): optional files for machine/env/run-mode/super overrides.
+- **Global config** (`~/.pipelex/`): machine-wide settings for a developer, applied to every project on the machine.
+- **Project config** (`{project_root}/.pipelex/`): per-project settings, edited by teams using Pipelex.
+- **Override files** at each level (`pipelex_local.toml`, `pipelex_{environment}.toml`, `pipelex_{run_mode}.toml`, `pipelex_override.toml`, `pipelex_temporary_override.toml`): optional, typically gitignored, used for personal or ephemeral tweaks.
 
-The key idea: client projects typically edit **`.pipelex/`**, while the Pipelex repository holds the **default values** used as a starting point.
+The key idea: global personal preferences layer **under** project-specific settings — both are loaded, and project values win on collisions. Nothing in `~/.pipelex/` is shadowed by the mere existence of a project `.pipelex/`.
 
 ## Where defaults live (Pipelex repository)
 
@@ -25,20 +26,24 @@ The key idea: client projects typically edit **`.pipelex/`**, while the Pipelex 
 
 ## Merge order (runtime)
 
-The configuration loading/merging behavior is implemented in `pipelex/system/configuration/config_loader.py`.
+The configuration loading/merging behavior is implemented in `pipelex/system/configuration/config_loader.py`. Files are deep-merged via `load_toml_from_path_and_merge_with_overrides`; the later a file appears in the load list, the higher its precedence per leaf key.
 
-At a high level, the load order is:
+Load order:
 
-1. **Pipelex base defaults** (from the installed package)
-2. **Project config** from `.pipelex/pipelex.toml` (when running in a client project)
-3. **Root overrides** (optional), in this order:
-   1. `pipelex_local.toml`
-   2. `pipelex_{environment}.toml`
-   3. `pipelex_{run_mode}.toml`
-   4. `pipelex_override.toml`
+1. **Package defaults** — `pipelex/pipelex.toml` shipped with the installed package.
+2. **Global base** — `~/.pipelex/pipelex.toml`.
+3. **Global override sequence** — from `~/.pipelex/`, in this order:
+    1. `pipelex_local.toml`
+    2. `pipelex_{environment}.toml`
+    3. `pipelex_{run_mode}.toml` *(see unit-test special case below)*
+    4. `pipelex_override.toml`
+    5. `pipelex_temporary_override.toml`
+4. **Project base** — `{project_root}/.pipelex/pipelex.toml`, if a project `.pipelex/` exists and is distinct from `~/.pipelex/`.
+5. **Project override sequence** — same five files as step 3, read from `{project_root}/.pipelex/`, if the project dir is distinct from the global dir.
+6. **Programmatic `extra_overrides`** passed into `ConfigLoader.load_config()` (if any).
 
-!!! note "Unit test special case"
-    When unit testing, run-mode overrides may be loaded from `tests/pipelex_{run_mode}.toml` (example: `tests/pipelex_unit_test.toml`).
+!!! note "Unit-test special case"
+    When `runtime_manager.is_unit_testing` is true, the `pipelex_{run_mode}.toml` entry is sourced exclusively from `./tests/pipelex_{run_mode}.toml` (e.g. `tests/pipelex_unit_test.toml`). Global and project run_mode files are not loaded, keeping test runs hermetic from machine-wide overrides.
 
 ## Where to change things in code
 

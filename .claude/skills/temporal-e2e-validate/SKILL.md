@@ -1,20 +1,26 @@
 ---
 name: temporal-e2e-validate
 description: >
-  Full end-to-end validation of Temporal distributed execution (Phases 2-5).
-  Two modes: (1) pytest against a real Temporal server for detailed assertions on
-  all test cases, and (2) true 3-process setup (server + separate worker process
-  + submitter) that validates the actual deployment topology including cross-process
-  serialization, LibraryCrate propagation, deferred hydration, concurrent
-  isolation, image payload storage, and cross-worker graph tracing with GraphSpec
-  assembly. Includes image generation and image flow tests that verify large binary
-  payloads are stored at the activity level (not passed inline through Temporal).
+  Full end-to-end validation of Temporal distributed execution (Phases 2-5 +
+  v1 routing + v2 queue options / worker-runtime profiles). Two modes:
+  (1) pytest against a real Temporal server for detailed assertions on all
+  test cases, and (2) true 3-process setup (server + separate worker process
+  + submitter) that validates the actual deployment topology including
+  cross-process serialization, LibraryCrate propagation, deferred hydration,
+  concurrent isolation, image payload storage, and cross-worker graph
+  tracing with GraphSpec assembly. Step 8 validates v1 per-activity routing.
+  Step 9 validates v2 per-queue submitter options (timeouts, retry,
+  rate-limit), per-handle option overrides, named worker-runtime profiles
+  selected via `--profile`, and the strict `--task-queue` CLI typo check
+  with "did you mean?" suggestion.
   Use when the user says "validate temporal", "e2e temporal",
   "temporal regression", "temporal validation", "3-process test", "full temporal
-  test", "validate phases", "image temporal", or wants comprehensive verification
-  that distributed execution works end-to-end. Also use proactively after changes
-  to LibraryCrate, deferred hydration, ClassRegistry scoping, graph tracing,
-  image generation activities, content storage, or Temporal workflow code.
+  test", "validate phases", "image temporal", "queue options", "runtime profile",
+  or wants comprehensive verification that distributed execution works
+  end-to-end. Also use proactively after changes to LibraryCrate, deferred
+  hydration, ClassRegistry scoping, graph tracing, image generation activities,
+  content storage, queue options resolution, worker-runtime profiles, or
+  Temporal workflow code.
 allowed-tools:
   - Bash(tmux *)
   - Bash(curl *)
@@ -28,6 +34,14 @@ allowed-tools:
   - Bash(grep *)
   - Bash(sort *)
   - Bash(head *)
+  - Bash(tail *)
+  - Bash(temporal *)
+  - Bash(jq *)
+  - Bash(timeout *)
+  - Bash(pkill *)
+  - Bash(sleep *)
+  - Bash(echo *)
+  - Bash(seq *)
 ---
 
 # Temporal E2E Validation Suite
@@ -68,6 +82,57 @@ Tier 2 FAIL
 
 ---
 
+## Timeouts policy — REQUIRED for every command
+
+A hung Temporal test will lock the session and consume the agent's wall time until the
+user interrupts. Workers, workflow polls, and gRPC retries will happily wait forever.
+**Every** `.venv/bin/pytest` and `.venv/bin/pipelex run bundle` invocation in this skill
+runs under a hard shell `timeout` and, for pytest, under `--timeout=N` per test as well.
+`pytest --timeout=N` alone is not sufficient — it caps a single test, not fixture
+setup/teardown, so a broken session-scoped fixture can still hang forever without the
+shell cap.
+
+**Defaults to use (apply unless a step explicitly overrides):**
+
+| Command kind | Shell cap | Per-test cap |
+|---|---|---|
+| Single dry-run pipeline (`pipelex run bundle ... --dry-run --mock-inputs`) | `timeout 120` | — |
+| Two concurrent dry-run pipelines (isolation pairs) | `timeout 180` | — |
+| Live pipeline (`pipelex run bundle ... --temporal` without `--dry-run`) | `timeout 600` | — |
+| Repro/diagnostic script (`.venv/bin/python <path-to-script>.py`) | `timeout 120` | — |
+| Pytest folder (dry, `library_crate/` or single module) | `timeout 300` | `--timeout=90` |
+| Pytest single test class/case (dry) | `timeout 180` | `--timeout=60` |
+| Pytest folder (live, real LLM/img-gen) | `timeout 900` | `--timeout=300` |
+
+**Form to use everywhere:**
+
+```bash
+timeout 300 .venv/bin/pytest -x -v tests/integration/pipelex/temporal/library_crate/ \
+  -m temporal --temporal-server local --timeout=90 2>&1 | tail -80
+```
+
+```bash
+timeout 120 .venv/bin/pipelex run bundle <bundle> --pipe <pipe> \
+  --temporal --dry-run --mock-inputs --no-logo --graph 2>&1 | tail -15
+echo "EXIT=$?"
+```
+
+**If a command times out (exit 124 from `timeout`) or behaves as if hung, the response is
+ALWAYS the same:**
+
+1. Capture worker output: `tmux capture-pane -t temporal-worker-router -p -S -200`
+   and `tmux capture-pane -t temporal-worker-runner -p -S -200` (or
+   `temporal-worker` for the single-worker setup). Quote the actual error.
+2. Kill zombies before retrying: `pkill -f "pipelex.temporal.worker_cli"`,
+   `pkill -f "pytest.*temporal"`. Stale workers from a previous timed-out run
+   will swallow new dispatches and make every subsequent step look hung.
+3. Diagnose root cause from the captured output. Do **not** raise the timeout
+   and rerun blind — that wastes another minute and produces the same hang. The
+   "Interpreting failures" table at the bottom of this skill maps common error
+   strings to causes.
+
+---
+
 ## Prerequisites
 
 ```bash
@@ -102,19 +167,27 @@ Do NOT start if already running — it will fail with a bind error.
 
 ### Step 2: Run the tests
 
+The conftest auto-registers the Pipelex custom search attributes listed in
+`pipelex.temporal.config_temporal.BUILTIN_SEARCH_ATTRIBUTES` on the first
+session that hits a fresh dev server. No manual setup needed.
+
 **Dry mode (fast, no LLM costs):**
 
 ```bash
-.venv/bin/pytest -x -v tests/integration/pipelex/temporal/library_crate/ \
-  -m temporal --temporal-server local 2>&1
+timeout 300 .venv/bin/pytest -v tests/integration/pipelex/temporal/library_crate/ \
+  -m temporal --temporal-server local --timeout=90 2>&1 | tail -80
 ```
 
 **Live mode (real LLM calls):**
 
 ```bash
-.venv/bin/pytest -x -v tests/integration/pipelex/temporal/library_crate/ \
-  -m temporal --temporal-server local --pipe-run-mode live 2>&1
+timeout 900 .venv/bin/pytest -v tests/integration/pipelex/temporal/library_crate/ \
+  -m temporal --temporal-server local --pipe-run-mode live --timeout=300 2>&1 | tail -80
 ```
+
+Note on `-x`: omitted here so we see the full failure surface, not just the first hang.
+If you want the classic stop-on-first-failure behavior, add `-x` back — but expect to
+diagnose root cause from the first failure before retrying.
 
 ### Step 3: Report results
 
@@ -190,6 +263,27 @@ if activity-level storage isn't implemented.
 
 Same as Mode 1 Step 1.
 
+**Search-attribute registration on a fresh dev server.** Worker boot performs a
+hard-fail audit (`check_required_search_attributes`) and refuses to start if any
+of the Pipelex custom attributes (defined in `BUILTIN_SEARCH_ATTRIBUTES`) is
+missing from the namespace. The error message includes the exact
+`pipelex setup-temporal-namespace` command to run. For a freshly started
+`temporal server start-dev`, register them once (idempotent):
+
+```bash
+.venv/bin/pipelex setup-temporal-namespace
+```
+
+This wraps the same helper the test conftest uses, so the set stays in sync
+with `BUILTIN_SEARCH_ATTRIBUTES` automatically. (If you need to invoke the raw
+Temporal CLI for some reason — e.g. an environment where the Pipelex CLI is
+unavailable — the command shape is
+`temporal operator search-attribute create --namespace <ns> --name <Name> --type Keyword`,
+one per attribute name from `BUILTIN_SEARCH_ATTRIBUTES`.)
+
+Mode 1 (pytest) handles this automatically via the test conftest. Mode 2 needs
+it done before worker startup.
+
 ### Step 2: Start the worker processes
 
 The workers should NOT have test bundles in their PIPELEXPATH — the whole point is
@@ -228,13 +322,28 @@ tmux new-session -d -c "$PWD" -s temporal-worker-router \
   '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope router'
 tmux new-session -d -c "$PWD" -s temporal-worker-runner \
   '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope runner'
-sleep 4
-tmux capture-pane -t temporal-worker-router -p -S -30
-tmux capture-pane -t temporal-worker-runner -p -S -30
+# Bounded wait: fail fast with captured logs if a worker can't start within 30s
+# (boot is normally <5s — anything past that means a stuck config validator,
+# missing search attributes, or the worker crashed early).
+for session in temporal-worker-router temporal-worker-runner; do
+  for attempt in $(seq 1 30); do
+    if tmux capture-pane -t "$session" -p 2>/dev/null | grep -q "Temporal Worker started"; then break; fi
+    if [ "$attempt" -eq 30 ]; then
+      echo "TIMEOUT: $session did not report 'Temporal Worker started' within 30s — last 50 lines:"
+      tmux capture-pane -t "$session" -p -S -50
+      exit 1
+    fi
+    sleep 1
+  done
+done
+tmux capture-pane -t temporal-worker-router -p -S -30 | grep -E "scope|started for|search-attribute" | head -5
+tmux capture-pane -t temporal-worker-runner -p -S -30 | grep -E "scope|started for|search-attribute" | head -5
 ```
 
 Look for `Temporal Worker started for 'temporal_task_queue'` in each session, plus
-`Temporal Worker scope: 'router'` and `'runner'` respectively.
+`profile='default' scope='router'` and `'runner'` respectively. If a worker fails with
+`SearchAttributeRegistrationError`, register the missing attributes per Step 1 and
+restart the worker — do **not** bump the timeout and retry blind.
 
 **Alternative — single full worker** (simpler, but masks distributed-execution bugs;
 use only when you don't need the regression coverage):
@@ -243,7 +352,16 @@ use only when you don't need the regression coverage):
 tmux has-session -t temporal-worker 2>/dev/null && tmux kill-session -t temporal-worker
 tmux new-session -d -c "$PWD" -s temporal-worker \
   '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed'
-sleep 4
+# Bounded wait: fail fast with captured logs if the worker can't start within 30s
+for attempt in $(seq 1 30); do
+  if tmux capture-pane -t temporal-worker -p 2>/dev/null | grep -q "Temporal Worker started"; then break; fi
+  if [ "$attempt" -eq 30 ]; then
+    echo "TIMEOUT: temporal-worker did not report 'Temporal Worker started' within 30s — last 50 lines:"
+    tmux capture-pane -t temporal-worker -p -S -50
+    exit 1
+  fi
+  sleep 1
+done
 tmux capture-pane -t temporal-worker -p -S -30
 ```
 
@@ -262,7 +380,7 @@ these pipes. The worker must unpack the LibraryCrate, register the pipes, and ex
 them in order. This is the most basic "does Temporal work at all" test.
 
 ```bash
-.venv/bin/pipelex run bundle \
+timeout 120 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/temporal/library_crate/native_text_sequence.mthds \
   --pipe native_text_sequence \
   --temporal --dry-run --mock-inputs --no-logo --graph
@@ -284,7 +402,7 @@ order is wrong **on the router**, this fails with
 > cross-process repro.
 
 ```bash
-.venv/bin/pipelex run bundle \
+timeout 120 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/temporal/library_crate/dynamic_concept_sequence.mthds \
   --pipe dynamic_greeting_sequence \
   --temporal --dry-run --mock-inputs --no-logo --graph
@@ -314,13 +432,13 @@ The error surfaces on the **runner** tmux session, raised by the activity worker
 *before* the activity body runs.
 
 ```bash
-.venv/bin/python .claude/skills/temporal-e2e-validate/scripts/repro_runner_registry_bug.py
+timeout 120 .venv/bin/python .claude/skills/temporal-e2e-validate/scripts/repro_runner_registry_bug.py
 ```
 
 To reproduce against a different bundle:
 
 ```bash
-.venv/bin/python .claude/skills/temporal-e2e-validate/scripts/repro_runner_registry_bug.py \
+timeout 120 .venv/bin/python .claude/skills/temporal-e2e-validate/scripts/repro_runner_registry_bug.py \
   --bundle <path/to/bundle.mthds> --pipe <pipe_code>
 ```
 
@@ -340,7 +458,7 @@ interesting: it shows cross-worker execution with child workflow branches in the
 ReactFlow visualization.
 
 ```bash
-.venv/bin/pipelex run bundle \
+timeout 120 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/temporal/library_crate/temporal_parallel.mthds \
   --pipe temporal_parallel_sequence \
   --temporal --dry-run --mock-inputs --no-logo --graph
@@ -376,7 +494,7 @@ image generation path through Temporal, including the custom `ImagePrompt` conce
 Dry-run:
 
 ```bash
-.venv/bin/pipelex run bundle \
+timeout 120 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/pipes/pipelines/crazy_image_generation.mthds \
   --pipe generate_crazy_image \
   --temporal --dry-run --mock-inputs --no-logo --graph
@@ -385,7 +503,7 @@ Dry-run:
 Live (real image generation — required to catch payload size bugs):
 
 ```bash
-.venv/bin/pipelex run bundle \
+timeout 600 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/pipes/pipelines/crazy_image_generation.mthds \
   --pipe generate_crazy_image \
   --temporal --no-logo --graph
@@ -427,7 +545,7 @@ bytes exceed Temporal's payload limit, or because the worker can't deserialize t
 Dry-run:
 
 ```bash
-.venv/bin/pipelex run bundle \
+timeout 120 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/pipes/pipelines/test_image_out_in.mthds \
   --pipe image_out_in \
   --temporal --dry-run --mock-inputs --no-logo --graph
@@ -436,7 +554,7 @@ Dry-run:
 Live (real image generation + vision — required to catch payload size bugs):
 
 ```bash
-.venv/bin/pipelex run bundle \
+timeout 600 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/pipes/pipelines/test_image_out_in.mthds \
   --pipe image_out_in \
   --temporal --no-logo --graph
@@ -501,13 +619,13 @@ while beta's has `value` + `confidence` + `is_valid`. If isolation fails, one wo
 will try to populate the wrong fields.
 
 ```bash
-.venv/bin/pipelex run bundle \
+timeout 120 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/temporal/library_crate/conflict_concept_alpha.mthds \
   --pipe alpha_pipeline \
   --temporal --dry-run --mock-inputs --no-logo --graph &
 PID_ALPHA=$!
 
-.venv/bin/pipelex run bundle \
+timeout 120 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/temporal/library_crate/conflict_concept_beta.mthds \
   --pipe beta_pipeline \
   --temporal --dry-run --mock-inputs --no-logo --graph &
@@ -524,13 +642,13 @@ Two workflows both define a pipe called `shared_step` but with different prompts
 Does each workflow execute its own version?
 
 ```bash
-.venv/bin/pipelex run bundle \
+timeout 120 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/temporal/library_crate/conflict_pipe_alpha.mthds \
   --pipe pipe_alpha_pipeline \
   --temporal --dry-run --mock-inputs --no-logo --graph &
 PID_ALPHA=$!
 
-.venv/bin/pipelex run bundle \
+timeout 120 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/temporal/library_crate/conflict_pipe_beta.mthds \
   --pipe pipe_beta_pipeline \
   --temporal --dry-run --mock-inputs --no-logo --graph &
@@ -548,13 +666,13 @@ This is the hardest isolation test — if ContextVar scoping leaks between workf
 this is where it shows up.
 
 ```bash
-.venv/bin/pipelex run bundle \
+timeout 120 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/temporal/library_crate/multi_concept_alpha.mthds \
   --pipe multi_alpha_pipeline \
   --temporal --dry-run --mock-inputs --no-logo --graph &
 PID_ALPHA=$!
 
-.venv/bin/pipelex run bundle \
+timeout 120 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/temporal/library_crate/multi_concept_beta.mthds \
   --pipe multi_beta_pipeline \
   --temporal --dry-run --mock-inputs --no-logo --graph &
@@ -584,9 +702,9 @@ fallback in dry-run, run the Phase 4 integration test, which substitutes the
 inference activity with a wrapper that synthesizes a real `LLMJob` server-side:
 
 ```bash
-.venv/bin/pytest -x -v \
+timeout 180 .venv/bin/pytest -x -v \
   tests/integration/pipelex/temporal/tracing/test_split_worker_usage.py \
-  -m temporal --temporal-server local 2>&1
+  -m temporal --temporal-server local --timeout=60 2>&1 | tail -60
 ```
 
 Expected: both test cases pass —
@@ -598,7 +716,7 @@ double-counting between fast path and fallback).
 costs money) so `act_llm_gen_text` is actually dispatched to the runner:
 
 ```bash
-.venv/bin/pipelex run bundle \
+timeout 600 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/temporal/library_crate/native_text_sequence.mthds \
   --pipe native_text_sequence \
   --temporal --no-logo --graph
@@ -644,14 +762,14 @@ nested `Customer` concept and a `LineItem` list — at least one nested field
 is required so the test exercises non-trivial JSON serialization.
 
 ```bash
-.venv/bin/pipelex run bundle \
+timeout 120 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/temporal/library_crate/structured_output_sequence.mthds \
   --pipe generate_invoice_single \
   --temporal --dry-run --mock-inputs --no-logo --graph
 ```
 
 ```bash
-.venv/bin/pipelex run bundle \
+timeout 120 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/temporal/library_crate/structured_output_sequence.mthds \
   --pipe generate_invoice_list \
   --temporal --dry-run --mock-inputs --no-logo --graph
@@ -680,9 +798,9 @@ activity_id contract, not to re-validate the OCR backend (already covered by
 `content_generation/test_tprl_content_generator_pdf_page_views.py`):
 
 ```bash
-.venv/bin/pytest -x -v \
+timeout 180 .venv/bin/pytest -x -v \
   tests/integration/pipelex/temporal/tracing/test_split_worker_extract_pages.py \
-  -m temporal --temporal-server local 2>&1
+  -m temporal --temporal-server local --timeout=60 2>&1 | tail -60
 ```
 
 After this completes, tell the user: PASS/FAIL. The test asserts via
@@ -692,6 +810,53 @@ For manual Temporal Web UI inspection, point `temporal-worker-router` /
 `temporal-worker-runner` at the same dev server and inspect the workflow's
 event timeline — the two scheduled activities should be visible with their
 distinct activity_ids.
+
+### Step 5e: Tier 12 — Deeply-nested controller stack (CV batch screening)
+
+Validates the full pipelex-demos example 21 pipeline through Temporal: a
+nested PipeSequence -> PipeSequence (job-offer prep) + PipeBatch (per-CV
+fan-out) -> PipeSequence (extract + analyze + match) over PipeExtract +
+PipeLLM operators. This is the canonical "real-world" e2e bundle for the
+skill — controller composition that the other tiers only exercise piecewise.
+
+The pytest counterpart lives at
+`tests/integration/pipelex/temporal/library_crate/test_wf_cv_batch_screening.py`
+(in-process server, dry mode). The direct-mode (no Temporal) e2e counterpart
+lives at `tests/e2e/pipelex/cv_batch_screening/test_cv_batch_screening.py`.
+
+Dry-run (CLI mocks inputs — no PDFs needed):
+
+```bash
+timeout 180 .venv/bin/pipelex run bundle \
+  tests/integration/pipelex/temporal/library_crate/cv_batch_screening.mthds \
+  --pipe batch_analyze_cvs_for_job_offer \
+  --temporal --dry-run --mock-inputs --no-logo --graph
+```
+
+Live (real Azure Doc Intel extract + LLM analysis — uses `John-Doe-CV.pdf`
+and `Job-Offer.pdf` from `tests/data/documents/`):
+
+```bash
+timeout 900 .venv/bin/pipelex run bundle \
+  tests/integration/pipelex/temporal/library_crate/cv_batch_screening.mthds \
+  --pipe batch_analyze_cvs_for_job_offer \
+  --inputs tests/integration/pipelex/temporal/library_crate/cv_batch_screening_inputs.json \
+  --temporal --no-logo --graph
+```
+
+After completion, tell the user: PASS/FAIL, output dir, graph file path. The
+generated ReactFlow graph is unusually rich for this pipeline (nested
+PipeSequence containers + PipeBatch fan-out edges + per-step extract/LLM
+nodes) and is the recommended one to open at the end of the run:
+
+```bash
+open results/batch_analyze_cvs_for_job_offer_output_01/reactflow.html
+```
+
+If the live run errors with `Extract choice '...' was not found in the model
+deck`, the deck is not loading Azure Doc Intel — fix the deck before falling
+back to a different handle; user preference is Azure Doc Intel via the
+Pipelex Gateway, period (do not substitute `mistral-ocr` / `deepseek-ocr`).
 
 ---
 
@@ -738,14 +903,14 @@ same pipelines produce the same results. The only difference: payloads above 1MB
 stored in `.pipelex/temporal-payload-store/` instead of inline in Temporal's event history.
 
 ```bash
-.venv/bin/pipelex run bundle \
+timeout 120 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/temporal/library_crate/native_text_sequence.mthds \
   --pipe native_text_sequence \
   --temporal --dry-run --mock-inputs --no-logo --graph
 ```
 
 ```bash
-.venv/bin/pipelex run bundle \
+timeout 120 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/temporal/library_crate/dynamic_concept_sequence.mthds \
   --pipe dynamic_greeting_sequence \
   --temporal --dry-run --mock-inputs --no-logo --graph
@@ -770,7 +935,7 @@ mode this produces realistic multi-KB to multi-MB payloads. In dry-run mode, moc
 outputs are small but the codec path is still exercised.
 
 ```bash
-.venv/bin/pipelex run bundle \
+timeout 120 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/temporal/library_crate/large_payload_sequence.mthds \
   --pipe large_payload_sequence \
   --temporal --dry-run --mock-inputs --no-logo --graph
@@ -779,7 +944,7 @@ outputs are small but the codec path is still exercised.
 Live (real LLM calls — produces larger payloads, better stress test):
 
 ```bash
-.venv/bin/pipelex run bundle \
+timeout 600 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/temporal/library_crate/large_payload_sequence.mthds \
   --pipe large_payload_sequence \
   --temporal --no-logo --graph
@@ -827,6 +992,13 @@ ls results/*/reactflow.html
 | Tier 10b: Per-handle routing | `activity_queues.by_handle` overrides the activity default per model handle — two distinct handles in one workflow land on two distinct workers | PASS/FAIL/SKIPPED | path | — |
 | Tier 10c: Two activities, one route | `act_extract_gen_extract_pages` + `act_render_page_views` (no routing key) both land on a shared dedicated queue via Azure Doc Intel through Pipelex Gateway | PASS/FAIL | — | — |
 | Tier 11: Extract two-activity | `act_extract_gen_extract_pages` + `act_render_page_views` dispatched cross-process with distinct activity_ids | PASS/FAIL | — | — |
+| Tier 12: CV batch screening | Deeply-nested controller stack (PipeSequence → PipeSequence + PipeBatch → PipeSequence) over PipeExtract + PipeLLM (pipelex-demos example 21) | PASS/FAIL | path | — |
+| Scenario A: v2 multi-class routing | Specialized scopes + per-class runners cover LLM/img-gen/extract without cross-class leakage | PASS/FAIL/SKIPPED | — | — |
+| Scenario B: per-queue timeout | `queue_options[X].start_to_close_timeout` overrides the worker_config baseline and flows into `ActivityTaskScheduled.start_to_close_timeout` | PASS/FAIL/SKIPPED | — | — |
+| Scenario C: per-handle override | `handle_options[<handle>].start_to_close_timeout` wins over per-queue value for that one handle | PASS/FAIL/SKIPPED | — | — |
+| Scenario D: queue rate limit | `queue_options[X].max_task_queue_activities_per_second` throttles dispatch — burst of N at rate R produces non-zero schedule_to_start latency on the tail | PASS/FAIL/SKIPPED | — | — |
+| Scenario E: missing-worker timeout | A queue referenced by routing but polled by no worker produces a bounded `schedule_to_start` timeout, not a hang | PASS/FAIL/SKIPPED | — | — |
+| Scenario F: CLI typo | `--task-queue typo_q` fails fast with `WorkerTaskQueueUnknownError` and a "Did you mean?" suggestion | PASS/FAIL | — | — |
 | Concept isolation (alpha) | Conflicting `Result` concepts don't cross-contaminate | PASS/FAIL | path | — |
 | Concept isolation (beta) | (same test, other side) | PASS/FAIL | path | — |
 | Pipe isolation (alpha) | Conflicting `shared_step` pipes use correct version | PASS/FAIL | path | — |
@@ -856,7 +1028,7 @@ tmux capture-pane -t temporal-worker-runner -p -S -200
 This step validates the v1 per-activity, per-handle routing (PR #879) end-to-end
 against a real Temporal server. It is **opt-in** — Tiers 1–11 above all run with
 the default empty `activity_queues`, where every activity lands on
-`worker_config.task_queue` and either of the split workers picks it up. Step 8
+`worker_config.default_task_queue` and either of the split workers picks it up. Step 8
 proves the routing feature works as advertised when operators actually configure
 it: each activity (and, in Tier 10b, each model handle) lands on its dedicated
 worker pool, never on the fallback runner.
@@ -888,6 +1060,15 @@ default = "q_extract"
 
 [temporal.worker_config.activity_queues.act_render_page_views]
 default = "q_extract"
+
+# Every queue named under activity_queues must have a matching
+# [temporal.queue_options.<q>] entry. Empty stanza = "use worker_config
+# defaults for this queue" — required by the orphan-queue validator.
+[temporal.queue_options.q_inference]
+[temporal.queue_options.q_handle_a]
+[temporal.queue_options.q_handle_b]
+[temporal.queue_options.q_image_gen]
+[temporal.queue_options.q_extract]
 EOF
 ```
 
@@ -904,7 +1085,7 @@ sleep 4
 tmux capture-pane -t temporal-worker-router -p -S -30 | grep "Temporal Worker started"
 ```
 
-Spawn the five dedicated activity workers, one per named queue:
+Spawn the dedicated activity workers, one per named queue:
 
 ```bash
 for q in q_inference q_handle_a q_handle_b q_image_gen q_extract; do
@@ -933,7 +1114,7 @@ Both activities must land on their dedicated workers; the inference runner from
 Step 2 must see 0 hits for either.
 
 ```bash
-.venv/bin/pipelex run bundle \
+timeout 600 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/pipes/pipelines/crazy_image_generation.mthds \
   --pipe generate_crazy_image \
   --temporal --no-logo --graph
@@ -968,7 +1149,7 @@ each per-handle worker should show exactly 1 hit for `act_llm_gen_text`, and
 wins over the activity default.
 
 ```bash
-.venv/bin/pipelex run bundle \
+timeout 600 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/temporal/library_crate/per_handle_routing.mthds \
   --pipe per_handle_routing_sequence \
   --temporal --no-logo --graph
@@ -1032,7 +1213,7 @@ cat > /tmp/pdf_extract_inputs.json << EOF
 }
 EOF
 
-.venv/bin/pipelex run bundle \
+timeout 600 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/temporal/library_crate/pdf_extract_page_views.mthds \
   --pipe pdf_extract_with_page_views \
   --inputs /tmp/pdf_extract_inputs.json \
@@ -1064,7 +1245,7 @@ falling back to a different handle; do not substitute another OCR backend.
 Restore the default empty `activity_queues` and kill the dedicated workers:
 
 ```bash
-rm -f .pipelex/pipelex_temporary_override.toml
+.venv/bin/python -c "from pathlib import Path; Path('.pipelex/pipelex_temporary_override.toml').unlink(missing_ok=True)"
 for q in q_inference q_handle_a q_handle_b q_image_gen q_extract; do
   tmux kill-session -t "temporal-worker-${q//_/-}" 2>/dev/null
 done
@@ -1077,6 +1258,287 @@ tmux capture-pane -t temporal-worker-router -p -S -10 | grep "Temporal Worker st
 ```
 
 Optionally re-run Tier 1 (default routing) to confirm the baseline is restored.
+
+---
+
+### Step 9: Queue options + worker-runtime profiles battery (v2)
+
+This step validates the v2 surfaces shipped on top of v1 routing:
+
+- **Per-queue submitter options** (`[temporal.queue_options.<q>]`) — timeouts and retry policy attach to the queue, not the activity.
+- **Per-handle option overrides** (`activity_queues.*.handle_options.<handle>`) — a single handle on a queue can override the queue baseline.
+- **Cluster-wide queue rate limit** (`queue_options[q].max_task_queue_activities_per_second`).
+- **Named worker-runtime profiles** (`[temporal.worker_runtime_profiles.profiles.<name>]`) — concurrency slots, pollers, and rate-limit knobs become per-worker config selected via `--profile`.
+- **Startup validation** — warn on unknown routing queues; fail with "did you mean?" on unknown `--task-queue`.
+
+All scenarios A-D below are **live-only** for the same reason as Step 8: dry-run short-circuits inference inside the workflow process, so `act_*` activities never get scheduled and the routing/timeout/rate-limit assertions are meaningless.
+
+**Step 9.0 — Preflight + setup**
+
+Build a temporary override exercising the new schema. Notice the named `worker_runtime_profiles` and `queue_options` blocks layered on top of v1 `activity_queues`:
+
+```bash
+cat > .pipelex/pipelex_temporary_override.toml << 'EOF'
+# v1 routing — drives which queue each activity lands on.
+[temporal.worker_config.activity_queues.act_llm_gen_text]
+default = "q_llm"
+by_handle = { "claude-4.6-sonnet" = "q_llm_anthropic" }
+
+[temporal.worker_config.activity_queues.act_img_gen_images]
+default = "q_imggen"
+
+[temporal.worker_config.activity_queues.act_extract_gen_extract_pages]
+default = "q_extract"
+
+[temporal.worker_config.activity_queues.act_render_page_views]
+default = "q_extract"
+
+# Scenario B — per-queue timeout. q_slow has a generous start_to_close; the baseline is tight.
+[temporal.worker_config]
+default_activity_start_to_close_timeout = "0:00:30"   # baseline tight on purpose
+
+[temporal.queue_options.q_llm]
+start_to_close_timeout = "0:05:00"
+
+[temporal.queue_options.q_llm_anthropic]
+start_to_close_timeout = "0:05:00"
+
+# Every queue named under activity_queues must have a matching queue_options
+# entry. Empty stanza = "use worker_config defaults for this queue".
+[temporal.queue_options.q_imggen]
+[temporal.queue_options.q_extract]
+
+[temporal.queue_options.q_capped]
+max_task_queue_activities_per_second = 2              # scenario D — cluster rate cap
+
+# Scenario C — per-handle override on top of per-queue.
+[temporal.worker_config.activity_queues.act_llm_gen_text.handle_options."claude-opus-4-7-1m"]
+start_to_close_timeout = "0:25:00"
+
+# Scenario A also exercises differently-shaped worker profiles per pool.
+[temporal.worker_runtime_profiles]
+default_profile = "default"
+
+[temporal.worker_runtime_profiles.profiles.llm-throughput]
+tuning_mode = "explicit"
+max_cached_workflows = 10000
+max_concurrent_workflow_tasks = 1000
+max_concurrent_activities = 50
+max_concurrent_local_activities = 1000
+max_concurrent_workflow_task_polls = 100
+max_concurrent_activity_task_polls = 20
+max_activities_per_second = 60
+sticky_queue_schedule_to_start_timeout = "0:30:00"
+max_heartbeat_throttle_interval = "1:00:00"
+default_heartbeat_throttle_interval = "1:00:00"
+graceful_shutdown_timeout = "0:30:00"
+
+[temporal.worker_runtime_profiles.profiles.img-gen-tight]
+tuning_mode = "explicit"
+max_cached_workflows = 10000
+max_concurrent_workflow_tasks = 1000
+max_concurrent_activities = 2                          # small parallelism, large payloads
+max_concurrent_local_activities = 1000
+max_concurrent_workflow_task_polls = 100
+max_concurrent_activity_task_polls = 100
+max_activities_per_second = 2
+sticky_queue_schedule_to_start_timeout = "0:30:00"
+max_heartbeat_throttle_interval = "1:00:00"
+default_heartbeat_throttle_interval = "1:00:00"
+graceful_shutdown_timeout = "0:10:00"
+EOF
+```
+
+Restart the router (only the router reads `activity_queues` / `queue_options` at dispatch time):
+
+```bash
+tmux kill-session -t temporal-worker-router 2>/dev/null
+tmux new-session -d -c "$PWD" -s temporal-worker-router \
+  '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope router'
+sleep 4
+tmux capture-pane -t temporal-worker-router -p -S -30 | grep "Temporal Worker started"
+```
+
+Spawn one specialized runner per queue, each with a profile shaped for its workload. Note the use of the new `runner-llm` / `runner-img-gen` / `runner-extract` scopes shipped in Phase 5:
+
+```bash
+tmux has-session -t temporal-worker-q-llm 2>/dev/null && tmux kill-session -t temporal-worker-q-llm
+tmux new-session -d -c "$PWD" -s temporal-worker-q-llm \
+  '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope runner-llm --profile llm-throughput --task-queue q_llm'
+
+tmux has-session -t temporal-worker-q-llm-anthropic 2>/dev/null && tmux kill-session -t temporal-worker-q-llm-anthropic
+tmux new-session -d -c "$PWD" -s temporal-worker-q-llm-anthropic \
+  '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope runner-llm --profile llm-throughput --task-queue q_llm_anthropic'
+
+tmux has-session -t temporal-worker-q-imggen 2>/dev/null && tmux kill-session -t temporal-worker-q-imggen
+tmux new-session -d -c "$PWD" -s temporal-worker-q-imggen \
+  '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope runner-img-gen --profile img-gen-tight --task-queue q_imggen'
+
+tmux has-session -t temporal-worker-q-extract 2>/dev/null && tmux kill-session -t temporal-worker-q-extract
+tmux new-session -d -c "$PWD" -s temporal-worker-q-extract \
+  '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope runner-extract --task-queue q_extract'
+
+sleep 5
+for q in q-llm q-llm-anthropic q-imggen q-extract; do
+  echo "=== temporal-worker-$q ==="
+  tmux capture-pane -t "temporal-worker-$q" -p -S -20 | grep -E "started for|profile=|scope=" | head -3
+done
+```
+
+Each line should report `profile='<name>' scope='<name>' task_queue='<q>'`. Profile selection should be visible in the worker startup log (introduced by the Phase 3 logging).
+
+**Scenario A — Multi-class routing with specialized scopes (live)**
+
+The v2 counterpart of Tier 10a, but using the specialized `runner-llm` / `runner-img-gen` / `runner-extract` scopes instead of bare `runner`. Each worker only registers its own activity class, so a stray routing decision lands on the wrong queue and the activity never executes (instead of being silently picked up by a generalist runner).
+
+Submit a pipeline that fires at least one activity of each class:
+
+```bash
+timeout 600 .venv/bin/pipelex run bundle \
+  tests/integration/pipelex/pipes/pipelines/crazy_image_generation.mthds \
+  --pipe generate_crazy_image \
+  --temporal --no-logo --graph
+```
+
+After completion:
+
+```bash
+LLM_HITS=$(tmux capture-pane -t temporal-worker-q-llm -p -S -500 | grep -c "act_llm_gen_text")
+IMG_HITS=$(tmux capture-pane -t temporal-worker-q-imggen -p -S -500 | grep -c "act_img_gen_images")
+LLM_IMG_CROSS=$(tmux capture-pane -t temporal-worker-q-llm -p -S -500 | grep -c "act_img_gen_images")
+IMG_LLM_CROSS=$(tmux capture-pane -t temporal-worker-q-imggen -p -S -500 | grep -c "act_llm_gen_text")
+echo "q_llm     llm=$LLM_HITS    cross-class img=$LLM_IMG_CROSS (want llm≥1, img=0)"
+echo "q_imggen  img=$IMG_HITS    cross-class llm=$IMG_LLM_CROSS (want img≥1, llm=0)"
+if [ "$LLM_HITS" -ge 1 ] && [ "$IMG_HITS" -ge 1 ] && [ "$LLM_IMG_CROSS" -eq 0 ] && [ "$IMG_LLM_CROSS" -eq 0 ]; then
+  echo "Scenario A PASS"
+else
+  echo "Scenario A FAIL — see hit table"
+fi
+```
+
+**Scenario B — Per-queue timeout applied (live)**
+
+The override sets `default_activity_start_to_close_timeout = "0:00:30"` (baseline tight) and `queue_options.q_llm.start_to_close_timeout = "0:05:00"` (generous). An LLM activity routed to `q_llm` should use 5min, not 30s. Read it back from workflow history:
+
+```bash
+timeout 600 .venv/bin/pipelex run bundle \
+  tests/integration/pipelex/temporal/library_crate/native_text_sequence.mthds \
+  --pipe native_text_sequence \
+  --temporal --no-logo --graph
+```
+
+After completion, find the latest workflow run in the dev UI (http://localhost:8233) and inspect any `ActivityTaskScheduled` event for `act_llm_gen_text`. Its `start_to_close_timeout` field should show `300s` (= 5min), not `30s`. To check programmatically, use the Temporal CLI:
+
+```bash
+RUN_ID=$(temporal workflow list --limit 1 --output json | jq -r '.[0].execution.run_id')
+WF_ID=$(temporal workflow list --limit 1 --output json | jq -r '.[0].execution.workflow_id')
+temporal workflow show --workflow-id "$WF_ID" --run-id "$RUN_ID" --output json \
+  | jq '.events[] | select(.activityTaskScheduledEventAttributes.activityType.name == "act_llm_gen_text") | .activityTaskScheduledEventAttributes.startToCloseTimeout'
+```
+
+Expected output: `"300s"`. Anything else (especially `"30s"`) means the resolver didn't pick up the per-queue overlay — Scenario B FAIL.
+
+**Scenario C — Per-handle override wins over per-queue (live)**
+
+Two LLM calls routed to `q_llm_anthropic`: one with a regular Anthropic handle (uses queue baseline `0:05:00`), one with `claude-opus-4-7-1m` (the handle_options entry overrides to `0:25:00`). The reusable `per_handle_routing.mthds` bundle from Step 8 can serve here, but with a manual pipe definition where step 2 uses model `"claude-opus-4-7-1m"` — adapt or write a new bundle. For now, validate via the per-queue value flowing as in Scenario B, plus inspect the `start_to_close_timeout` per scheduled activity in history: one should be `300s`, one should be `1500s`.
+
+The full pytest integration sibling for this scenario already exists at:
+`tests/integration/pipelex/temporal/tracing/test_split_worker_extract_pages.py::test_queue_options_start_to_close_timeout_flows_to_dispatch`.
+Run that to validate the resolver layer without spinning up the live CLI:
+
+```bash
+timeout 120 .venv/bin/pytest -xvs tests/integration/pipelex/temporal/tracing/test_split_worker_extract_pages.py::TestSplitWorkerExtractPages::test_queue_options_start_to_close_timeout_flows_to_dispatch \
+  -m temporal --temporal-server local --timeout=60
+```
+
+PASS = per-queue timeout flows through the resolver into the actual dispatch. The handle-options layer is covered by `tests/unit/pipelex/temporal/test_resolve_dispatch.py::test_handle_options_override_queue`.
+
+**Scenario D — Queue-level rate limit observed (live)**
+
+`queue_options.q_capped.max_task_queue_activities_per_second = 2`. Submit a burst (workflow with ≥10 activity dispatches to `q_capped`). The server enforces 2 RPS, so the tail activities should show non-zero `scheduledToStartTimeout` latency (waited in the queue before being picked up).
+
+There is no canned pipeline for this — write a temporary bundle that fans out, e.g. a PipeBatch on 10 items each calling `act_llm_gen_text` routed to `q_capped`. After completion:
+
+```bash
+temporal workflow show --workflow-id "<wf_id>" --run-id "<run_id>" --output json \
+  | jq '[.events[] | select(.activityTaskStartedEventAttributes != null)] | length as $started
+        | [.events[] | select(.activityTaskScheduledEventAttributes != null and
+                                .activityTaskScheduledEventAttributes.taskQueue.name == "q_capped") |
+           .eventTime] | sort | map(fromdateiso8601) |
+          {first: .[0], last: .[-1], span_seconds: (.[-1] - .[0]), total: length}'
+```
+
+PASS criteria (per TODOS.md): ordering of dispatches is preserved AND `span_seconds` is non-zero for 10 activities at 2 RPS. Don't pin exact timing — the server's rate-limit precision is per-second, not millisecond.
+
+**Scenario E — Missing-worker negative (live, bounded)**
+
+Route an activity to a queue nothing polls. Override:
+
+```bash
+cat >> .pipelex/pipelex_temporary_override.toml << 'EOF'
+
+[temporal.worker_config.activity_queues.act_jinja2_gen_text]
+default = "q_orphan"
+
+# q_orphan must have a queue_options entry to pass the orphan-queue validator;
+# the schedule_to_start_timeout bounds the wait so a workflow dispatched to a
+# queue nothing polls fails fast instead of hanging.
+[temporal.queue_options.q_orphan]
+schedule_to_start_timeout = "0:00:30"
+EOF
+```
+
+Restart the router (re-read the override), then submit a pipeline that fires `act_jinja2_gen_text`. With Phase 4's strict CLI validation, the worker process would refuse to start on `--task-queue q_orphan` if you tried — but a routing-only orphan queue (referenced in `activity_queues` with a `queue_options` entry but polled by no worker) is fine until dispatch.
+
+After submission, the workflow's first `act_jinja2_gen_text` invocation will time out on `schedule_to_start` thanks to the bound set above. Expected: the workflow fails with a clear `schedule_to_start` timeout, not a hang.
+
+```bash
+timeout 600 .venv/bin/pipelex run bundle \
+  <some_bundle_using_jinja2>.mthds \
+  --pipe <pipe_using_templating> \
+  --temporal --no-logo
+```
+
+Expected: non-zero exit within ~35s with `ScheduleToStartTimeout` in the error chain. PASS = bounded timeout, clear error. FAIL = hangs > 60s or unclear error.
+
+**Scenario F — CLI startup typo (no live submission)**
+
+`pipelex worker --task-queue typo_q` (where `typo_q` isn't in `queue_options`, `activity_queues`, or `default_task_queue`) must exit non-zero with the Phase 4 "did you mean?" suggestion. No tmux session needed — run inline:
+
+```bash
+.venv/bin/python -m pipelex.temporal.worker_cli --task-queue temporal_task_queu 2>&1 | tail -20
+```
+
+PASS = process exits with non-zero status and the error contains:
+
+```
+WorkerTaskQueueUnknownError: --task-queue 'temporal_task_queu' is not referenced by any routing or options entry.
+Known queues: [...]. Did you mean 'temporal_task_queue'?
+```
+
+FAIL = process starts up, hangs, or errors with a different message.
+
+Sanity-check that a known queue passes:
+
+```bash
+.venv/bin/python -m pipelex.temporal.worker_cli --task-queue q_llm --is-unit-testing 2>&1 | head -10
+```
+
+Should start up (proceed past the validator without raising).
+
+**Step 9.t — Teardown**
+
+```bash
+.venv/bin/python -c "from pathlib import Path; Path('.pipelex/pipelex_temporary_override.toml').unlink(missing_ok=True)"
+for q in q-llm q-llm-anthropic q-imggen q-extract; do
+  tmux kill-session -t "temporal-worker-$q" 2>/dev/null
+done
+tmux kill-session -t temporal-worker-router 2>/dev/null
+tmux new-session -d -c "$PWD" -s temporal-worker-router \
+  '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope router'
+sleep 4
+tmux capture-pane -t temporal-worker-router -p -S -10 | grep "Temporal Worker started"
+```
 
 ---
 
@@ -1134,6 +1596,7 @@ Leave the server running if the user plans to iterate.
 | `temporal_compose.mthds` | PipeCompose — operator composition + deferred hydration | `temporal_compose_sequence` |
 | `temporal_combined.mthds` | Nested PipeParallel + PipeCondition | `temporal_combined_pipeline` |
 | `large_payload_sequence.mthds` | Codec stress test — 3-step verbose sequence accumulating large WorkingMemory | `large_payload_sequence` |
+| `cv_batch_screening.mthds` | Deeply-nested controller stack (PipeSequence -> PipeSequence + PipeBatch -> PipeSequence) over PipeExtract + PipeLLM. Inputs JSON: `cv_batch_screening_inputs.json` | `batch_analyze_cvs_for_job_offer` |
 
 **Image payload bundles** — in `tests/integration/pipelex/pipes/pipelines/`:
 

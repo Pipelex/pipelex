@@ -30,7 +30,6 @@ class PipeRun(PipeRunProtocol):
         self,
         pipe_job: PipeJob,
         delivery_assignment: DeliveryAssignment | None = None,
-        wfid: str | None = None,
     ) -> PipeOutput:
         pipeline_run_id: str = pipe_job.job_metadata.pipeline_run_id
         status: DeliveryStatus = DeliveryStatus.COMPLETED
@@ -38,7 +37,7 @@ class PipeRun(PipeRunProtocol):
         execution_error: Exception | None = None
 
         try:
-            pipe_output = await self._pipe_router.run(pipe_job, wfid=wfid)
+            pipe_output = await self._pipe_router.run(pipe_job)
         except Exception as exc:
             status = DeliveryStatus.FAILED
             execution_error = exc

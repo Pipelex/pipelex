@@ -95,6 +95,10 @@ This section covers all Pipelex capabilities, organized by area.
 
     Pipeline validation without execution, dry run with mocked LLM responses, input validation, and allowed-to-fail pipes.
 
+-   **[Distributed Execution with Temporal](distributed-execution.md)**
+
+    Run pipelines as durable Temporal workflows across worker pools. Per-activity routing, named runtime profiles, dashboard observability with custom search attributes.
+
 -   **[Telemetry & Observability](telemetry.md)**
 
     Production monitoring with Langfuse, OpenTelemetry, and PostHog integration. Gateway telemetry, span tracing, and custom destinations.

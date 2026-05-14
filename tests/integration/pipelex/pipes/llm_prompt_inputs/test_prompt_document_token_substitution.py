@@ -29,7 +29,7 @@ class TestPromptDocumentTokenSubstitution:
             description="Test document token substitution",
             inputs={"document": "Document"},
             output="Text",
-            prompt="Analyze this document: @document",
+            prompt="Analyze this document: $document",
         )
 
         pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(

@@ -108,7 +108,7 @@ model = { model = "gpt-5.2", temperature = 0.1, reasoning_effort = "max" }
 
 ### ReasoningEffort
 
-The `ReasoningEffort` enum (`pipelex/cogt/llm/llm_job_components.py`) defines six levels:
+The `ReasoningEffort` enum (`pipelex/cogt/llm/llm_job_components.py`) defines the following levels:
 
 | Level | Value | Description |
 |-------|-------|-------------|
@@ -117,6 +117,7 @@ The `ReasoningEffort` enum (`pipelex/cogt/llm/llm_job_components.py`) defines si
 | `LOW` | `"low"` | Light reasoning |
 | `MEDIUM` | `"medium"` | Moderate reasoning |
 | `HIGH` | `"high"` | Heavy reasoning |
+| `XHIGH` | `"xhigh"` | Above `HIGH`, below `MAX`; maps to provider-specific xhigh value where supported (e.g. OpenAI) |
 | `MAX` | `"max"` | Maximum reasoning budget |
 
 ### ThinkingMode

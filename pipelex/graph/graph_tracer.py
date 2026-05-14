@@ -48,6 +48,8 @@ class _MutableNodeData:
         started_at: datetime,
         parent_node_id: str | None,
         input_specs: list[IOSpec] | None = None,
+        description: str | None = None,
+        domain_code: str | None = None,
     ) -> None:
         self.node_id = node_id
         self.pipe_code = pipe_code
@@ -55,6 +57,8 @@ class _MutableNodeData:
         self.node_kind = node_kind
         self.started_at = started_at
         self.parent_node_id = parent_node_id
+        self.description = description
+        self.domain_code = domain_code
         self.ended_at: datetime | None = None
         self.status: NodeStatus = NodeStatus.RUNNING
         self.output_preview: str | None = None
@@ -86,6 +90,8 @@ class _MutableNodeData:
             kind=self.node_kind,
             pipe_code=self.pipe_code,
             pipe_type=self.pipe_type,
+            description=self.description,
+            domain_code=self.domain_code,
             status=self.status,
             timing=timing,
             node_io=node_io,
@@ -571,6 +577,8 @@ class GraphTracer(GraphTracerProtocol):
         input_specs: list[IOSpec] | None = None,
         pipe_data: dict[str, Any] | None = None,
         concept_data: list[dict[str, Any]] | None = None,
+        description: str | None = None,
+        domain_code: str | None = None,
     ) -> tuple[str, GraphContext]:
         """Record the start of a pipe execution."""
         if not self._is_active:
@@ -591,6 +599,8 @@ class GraphTracer(GraphTracerProtocol):
             started_at=started_at,
             parent_node_id=graph_context.parent_node_id,
             input_specs=input_specs,
+            description=description,
+            domain_code=domain_code,
         )
         self._nodes[node_id] = node_data
 
@@ -620,6 +630,8 @@ class GraphTracer(GraphTracerProtocol):
                     pipe_code=pipe_code,
                     pipe_type=pipe_type,
                     node_kind=node_kind,
+                    description=description,
+                    domain_code=domain_code,
                     input_specs=input_specs or [],
                     pipe_data=pipe_data or {},
                     concept_data=concept_data or [],

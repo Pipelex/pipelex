@@ -20,8 +20,9 @@ class TemplateBlueprint(BaseModel):
 
     @model_validator(mode="after")
     def validate_template(self) -> "TemplateBlueprint":
+        preprocessed = preprocess_template(self.template)
         try:
-            check_jinja2_parsing(template_source=self.template, template_category=self.category)
+            check_jinja2_parsing(template_source=preprocessed, template_category=self.category)
         except Jinja2TemplateSyntaxError as exc:
             msg = f"Could not parse template for TemplateBlueprint: {exc}"
             raise ValueError(msg) from exc
