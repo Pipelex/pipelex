@@ -1,75 +1,410 @@
-# TODOS — Recap
+# TODOS — Inference Workers: Excellent Error Handling
 
-## Summary
-
-Two adjacent refactors landed on feature branches:
-
-- **`temporal-primitives`** — overhauled how Pipelex maps its identity model onto Temporal's identifier and observability primitives. Fixed the activity-id collision bug, deleted the worker-singleton LRU, dropped the `wfid` parameter across protocols, switched to typed search attributes, and made the namespace bootstrap hard-fail with a `pipelex setup-temporal-namespace` CLI. Phases 1–6 shipped; only the `WorkflowExecutionError → ApplicationError` revamp remains deferred.
-- **`text-then-object`** — reintroduced the removed `structuring_method = preliminary_text` capability as a build-time elaboration. Added a first-class `PipeStructure` operator, a bundle-level elaboration pass that rewrites `preliminary_text` PipeLLMs into `PipeSequence(PipeLLM(text), PipeStructure)`, and removed `structuring_method` from the runtime `PipeLLM`. All ten phases complete.
+> **Source of truth:** [wip/error-handling/track-worker-classification.md](wip/error-handling/track-worker-classification.md).
+> **Implementation reference:** `pipelex/plugins/anthropic/anthropic_llm_worker.py`.
+> **Test reference:** `tests/unit/pipelex/plugins/anthropic/test_anthropic_worker_object_error_handling.py`.
+> **Out-of-scope follow-up:** [wip/error-handling/track-extract-classify-render.md](wip/error-handling/track-extract-classify-render.md) — the natural next step once this sweep lands. Do **not** pull forward.
 
 ---
 
-## `wip/temporal-primitives/`
+## Strategy — how we test SDK boundaries
 
-See `00-temporal-id-primitives.md`, `01-id-and-naming-design.md`, `02-id-and-naming-plan.md`, `03-temporal-error-handling-revamp.md`.
+We do **not** mock SDK modules wholesale. We:
 
-### What landed (Phases 1–6 on `feature/Temporal-ids`)
+1. **Construct real SDK exception types** with minimal fake response objects (e.g. `anthropic.RateLimitError(..., response=httpx.Response(status_code=429, request=...))`). The worker's `isinstance(...)` checks fire against the real classes, so the test survives SDK renames.
+2. **Patch only the SDK's outbound I/O method** with `mocker.AsyncMock(side_effect=sdk_exc)` — never replace exception classes or SDK modules.
+3. **For instructor-using LLM workers, use real `instructor.from_*()`** against a patched underlying client. The whole point of this work is to handle `InstructorRetryException`'s real wrapping shape; a faked instructor would defeat it.
 
-- **Phase 1 — Foundations.** New `pipelex/temporal/tprl/observability.py` with five helpers (`build_search_attributes`, `build_search_attributes_for_child`, `build_static_summary`, `build_static_details`, `build_activity_summary`). `TemporalManager.make_top_workflow_id` simplified to `{env_prefix}{pipeline_run_id}`. `WorkflowExecutor` entry points (top-level + child variants) gained additive `search_attributes`, `static_summary`, `static_details`, `memo` kwargs.
-- **Phase 2 — Activity-layer rewrite.** Deleted `_seen_activity_ids` LRU, `_MAX_SEEN_RUNS`, `_record_activity_id`, and the `is_replaying()` short-circuit from `ContentGeneratorInWorkflow`. Stopped passing `activity_id=` on every `workflow.execute_activity(...)` call (SDK now assigns deterministic integers). Dropped `wfid` from `ContentGeneratorProtocol` and both other implementations. Every dispatch now carries a `summary=build_activity_summary(...)`. The TDD gate in `test_default_activity_id_collision_bug.py` flipped green.
-- **Phase 3 — Workflow-layer rewrite + protocol cleanup.** Top-level Workflow ID is now `{env_prefix}{pipeline_run_id}`. Child Workflow IDs use slash-separated paths (`{parent}/pipe-router` for the fixed-role child, `{parent}/{pipe_code}-{workflow.uuid4()[:8]}` for dynamic children). `wfid` removed from `PipeRunProtocol`, `PipeRouterProtocol`, `PipeRun`, `PipeRouter`, `DryPipeRouter`, `TemporalPipeRun`, `TemporalPipeRouter`. Search attributes and static summary/details now populate on every workflow start.
-- **Phase 4 — Deployment hooks, docs, CHANGELOG.** Namespace bootstrap soft-fail check added (catches `RPCError`, warns with the registration command). New `docs/under-the-hood/temporal-deployment.md`. `[Unreleased]` CHANGELOG entry covers all breaking changes including the new pipeline-run-chain semantics.
-- **Phase 5 — TypedSearchAttributes migration.** Switched from `Mapping[str, list[str]]` to `TypedSearchAttributes` everywhere. Five `SearchAttributeKey` module constants in `observability.py`. Zero `DeprecationWarning: Dictionary-based search attributes are deprecated` lines remain. Two follow-ups landed in the same window:
-    - **Child-spawn unification reverted** (commit `ac8e2335`): briefly routed `wf_pipe_run.py` through `WorkflowExecutor.execute_child_workflow`, then reverted because the factory bakes config values into the recorded `StartChildWorkflowExecution` command and breaks replay determinism. Both child paths now call `workflow.execute_child_workflow(...)` directly.
-    - **Session-id determinism fix** (same commit): `build_search_attributes` and `build_static_details` no longer read `get_temporal_manager().session_id` at workflow runtime. New `stamp_submitter_session_id(pipe_job)` helper stamps it onto `JobMetadata.session_id` at the submitter boundary; helpers stay pure functions of workflow input.
-    - **Pre-Phase-6 cleanup**: tightened exception handling in `workflow_caller.py` (replaced `except Exception` with named SDK exceptions on all four entry points). Added `tests/integration/pipelex/temporal/test_wf_pipe_run_failure_path.py`. Discovered + fixed a latent prod bug — `WorkflowExecutionError` re-raised inside a workflow caused infinite task retry; fixed by registering it in `workflow_failure_exception_types=[WorkflowExecutionError]` on `make_worker`.
-- **Phase 6 — Hard-fail worker boot + configurable attributes + CLI.** Three intertwined deliverables (latest commit `c89674f5`):
-    - New `[temporal.search_attributes]` config block with master `enabled` toggle and `attributes` subset selector.
-    - Worker boot now **hard-fails** on a reachable namespace when configured attributes are missing (raises `SearchAttributeRegistrationError`). Soft-fail kept only for unreachable namespaces (`RPCError`).
-    - New `pipelex setup-temporal-namespace` CLI command that wraps `ensure_required_search_attributes_registered`, honors `--server <profile>`, supports `--dry-run`. Follows the `worker_cmd` deferred-import pattern so the `temporal` extra stays optional.
-    - `REQUIRED_SEARCH_ATTRIBUTES` renamed to `BUILTIN_SEARCH_ATTRIBUTES` and moved to `pipelex/temporal/config_temporal.py` (under `TYPE_CHECKING`-guarded temporalio import) so the config validator can reference it without the temporal extra.
-
-### What remains deferred
-
-- **`03-temporal-error-handling-revamp.md` — `WorkflowExecutionError → ApplicationError`.** Currently `WorkflowExecutionError(PipelexError)` is registered in `workflow_failure_exception_types` to make Temporal treat it as a terminal failure. The cleaner final form is to make it subclass `temporalio.exceptions.ApplicationError` so the worker-side registration becomes redundant. Not done because: scope creep beyond Phase 5 cleanup, `ApplicationError.__init__` signature is incompatible with `PipelexError`, and the line between "raised inside a workflow" exceptions and the rest of the `TemporalFlowError` hierarchy needs design work. Estimated 1–2 hours. Triggers to revisit: a second-time encounter of the "I forgot to register my new exception" footgun, or a Phase 7+ holistic error-model cleanup.
+**Tradeoff:** real-instructor tests are ~0.5s each because instructor runs its full retry loop. We keep **one** real-instructor end-to-end test per provider; the other categorization cases use a synthetic `_wrap_in_instructor_retry(sdk_exc)` helper to build an `InstructorRetryException` directly. Constructing some SDK exceptions requires reading the SDK source for required kwargs (httpx shapes for OpenAI/Anthropic; Google's response wrapper). Acceptable cost; the alternative (mock modules) is brittle and fights the type checker.
 
 ---
 
-## `wip/text-then-object/`
+## Scope
 
-See `text-then-object-plan.md` and `PR-text-then-object.html`.
+Lift every inference worker **beyond** the current Anthropic-as-reference standard. "Beyond" means:
 
-### What landed (all ten phases on `feature/Text-then-object`)
+1. **Primary fix:** close the `InstructorRetryException` unwrap defect on OpenAI Completions, OpenAI Responses, Mistral LLM, Google Gemini LLM (the four workers flagged in [track-worker-classification.md](wip/error-handling/track-worker-classification.md#instructor-unwrap-missing-on-four-other-workers)).
+2. **Beyond-reference upgrade A — `UNKNOWN` category.** The current "fall back to `CONTENT`" for an unrecognized underlying exception is wrong. Add `InferenceErrorCategory.UNKNOWN` (with `is_retryable=False`) and route the fallback there. Surfaces real unknowns in telemetry instead of silently mis-categorizing them.
+3. **Beyond-reference upgrade B — structured SDK metadata.** Every raised `CogtError` carries a `provider_metadata: ProviderErrorMetadata` with `status_code`, `request_id`, `retry_after_seconds`, `provider_error_code`, `body`. Unlocks the retry / temporal / CLI tracks already listed as open in the README.
+4. **Beyond-reference upgrade C — structured `UserAction`.** Replace the free-form `user_action: str` with `user_action: UserAction(kind: UserActionKind, detail: str)`. Lets the CLI render consistent advice and lets agent JSON be typed.
+5. **Hygiene:** migrate every worker's `instructor.exceptions` → `instructor.core` import.
+6. **Coverage:** test parity with the Anthropic suite per provider — ~7 categorization cases via synthetic wrap + 1 real-instructor end-to-end. Each case now asserts `provider_metadata` and `user_action.kind` alongside `error_category`.
+7. **Other worker kinds:** audit and lift img-gen, extract, and search workers to the same standard (including upgrades A–C).
 
-- **Phase 1 — Bundle-level elaboration metadata.** Added `StepRole`, `ElaborationMetadata`, and `elaboration_metadata: dict[str, ElaborationMetadata] | None = Field(default=None, exclude=True)` side-table to `PipelexBundleBlueprint`. The side-table is internal — does not leak onto the per-pipe surface or runtime `PipeAbstract`. Accessor `get_elaboration_for(pipe_code)` added.
-- **Phase 2 — `PipeStructure` operator.** New `pipelex/pipe_operators/structure/` package with blueprint, factory, runtime operator. Registered in `PipeBlueprintUnion`, `PipeType.PIPE_STRUCTURE`, `CoreRegistryModels.PIPE_OPERATORS{,_FACTORY}`, `output_renderer._collect_possible_outputs`, and `mthds_schema_generator._PIPE_DEFINITION_NAMES`. New `structuring_prompt` template under `[cogt.llm_config.generic_templates]`. Validates Text-compatible input + structured output. Regenerated `derived/mthds_schema.json`.
-- **Phase 3 — `PipeStructureSpec`.** Authoring-layer counterpart at `pipelex/builder/pipe/pipe_structure_spec.py`, registered in `pipe_spec_union.py` and `pipe_spec_map.py`.
-- **Phase 4 — Bundle elaboration framework.** New `pipelex/core/interpreter/bundle_elaborator.py` with `BundleElaborator.elaborate()`. Fast-path short-circuit when no `preliminary_text` directive present. Recursive-elaboration guard. Post-elaboration `model_validate` re-run. `BundleElaboratorError(PipelexInterpreterError)`. Wired into `PipelexInterpreter.make_pipelex_bundle_blueprint`. Uses `TypeGuard[PipeLLMBlueprint]` so callers narrow without casts.
-- **Phase 5 — `preliminary_text` elaboration.** Synthesizes step-1 (`<code>__draft_text` PipeLLM, output always literal `Text`), step-2 (`<code>__structure` PipeStructure, original output preserved with multiplicity), and replaces the original `<code>` with a `PipeSequence` wrapping both. `elaboration_metadata` populated. Image inputs naturally flow only to step-1.
-- **Phase 6 — Removed `structuring_method` from runtime PipeLLM.** Field, validator, `NotImplementedError` block, and `execution_data_dict` line all gone from `PipeLLM`. Factory no longer forwards it. Authoring-time `model_validator(mode="after")` on `PipeLLMBlueprint` rejects `preliminary_text + Text output` before the elaborator runs. Added `StructuringMethod.is_preliminary_text` `@property`. `PipeLLMSpec.structuring_method` exposed as plain `Field` (not `SkipJsonSchema`) so AI builders see it in the JSON schema.
-- **Phase 7 — Skipped per plan.** All trace/log/CLI/graph-viewer integration deferred to follow-up TODOs.
-- **Phase 8 — Round-out tests.** Kajson round-trip for `PipeStructureBlueprint` + elaborated bundles. End-to-end interpreter test from `.mthds` source. Hand-authored `PipeSequence` wrapping `PipeStructure`. `PipeBatch` iterating `PipeStructure` over three texts. Full e2e (`preliminary_text_e2e.mthds`) parametrized over all three multiplicity forms (`RestaurantReview`, `RestaurantReview[]`, `RestaurantReview[2]`), with assertion that **exactly two LLM calls** are issued in live mode. Inline-structure variant (`HikingTripReport`, 12 fields, no Python class) covers the inline-concept path.
-- **Phase 9 — Documentation & changelog.** New `docs/building-methods/pipes/pipe-operators/PipeStructure.md` and `docs/under-the-hood/build-time-elaboration.md`. Updated `PipeLLM.md` (`structuring_method` section, parameters table). Relinked dangling references to the deleted `llm-structured-generation-config.md`. `mkdocs.yml` + nav + redirects updated. `[Unreleased]` CHANGELOG entry.
-- **Phase 10 — Final validation.** `make agent-check`, `make agent-test`, `make docs-check` all clean.
+The Extract/Classify/Render decomposition that would eliminate duplication across all 18+ workers is **deferred** to [track-extract-classify-render.md](wip/error-handling/track-extract-classify-render.md). It is the natural next step once this sweep lands.
 
-### Code-quality decisions worth noting
+TDD discipline applies to every phase: **RED** (test that fails) → **GREEN** (minimal code to pass) → **REFACTOR** (clean up).
 
-- No premature error types: `pipe_operators/structure/exceptions.py` deleted — no call site distinguished from generic `PipeRunError`/`ValidationError`.
-- No speculative `try/except`: `pipe_structure.py` does not wrap `make_object` — the cogt layer wraps any underlying `ValidationError` in `LLMCompletionError`.
-- `QualifiedRef.parse(...).local_code` consolidated across three call sites instead of inline `split(".")`.
-- `StructuringMethod.is_preliminary_text` property added so call sites read as `method.is_preliminary_text` (project rule: never `==` against an enum value).
-- `TypeGuard[PipeLLMBlueprint]` on `_is_preliminary_text_pipe` eliminates a `# type: ignore[arg-type]`.
+---
 
-### What remains as follow-up TODOs (out of scope for this PR)
+## Phase 0 — Test helper foundation
 
-1. **plxt schema sync.** `vscode-pipelex/crates/taplo-common/schemas/mthds_schema.json` is from before this PR — authoring `type = "PipeStructure"` directly in a `.mthds` file fails plxt validation. Regenerate via `pipelex-dev generate-mthds-schema` and ship a `pipelex-tools` release. The `preliminary_text` path is unaffected because the synthesized `PipeStructure` lives in-memory only.
-2. **Synthetic-pipe marker on graph nodes + CLI listing exclusion.** When emitting `NodeSpec`, look up `bundle.elaboration_metadata` and set `tags["synthetic"] = "true"` + `tags["parent_pipe_code"] = parent`. Requires either a runtime-only field on `PipeAbstract` or a side-registry keyed by pipe code. Also hide synthetic pipes from `pipelex list`. ~2–3 file edits.
-3. **Friendly synthetic-pipe rendering across logs/traces/run-reporting.** After (2), render `<parent_pipe_code> [<step_role_label>]` everywhere `self.code` appears. Touches graph_tracer, run_reporting, journal, distributed-tracing. ~5–8 file edits.
-4. **`mthds-ui` graph viewer integration.** After (2), decide in the UI repo whether to nest synthetic pipes under their parent or hide them.
-5. **Bundle-load benchmark in CI.** Microbenchmark library load time; alert on >5% regression. Protects future elaboration-pass additions.
-6. **PipeStructure image input support.** v1 takes Text only; extend when a concrete need arises.
-7. **Per-step prompt customization for `preliminary_text`.** Don't build until requested.
-8. **Generic meta-pipe / build-time elaboration framework.** Promote `BundleElaborator._elaborate_preliminary_text` into a plugin registry when a SECOND elaboration directive appears.
-9. **`pipelex-dev elaborate-bundle <path>`** debugging CLI to print the elaborated form without running.
-10. **Revisit `StructuringMethod.DIRECT`.** Functionally identical to `None`. Delete if no second method materializes.
-11. **Persist `elaboration_metadata` into MTHDS/JSON exports.** Today `Field(exclude=True)` drops it on every `model_dump`. When a cross-boundary consumer materializes (graph viewer over a serialized bundle, Temporal payload, persistent cache), flip `exclude=False`, regenerate the schema, ship a plxt bump. The regression test at `test_elaboration_metadata.py::test_bundle_round_trip_drops_elaboration_metadata` flips first.
+Lift reusable test pieces from `tests/unit/pipelex/plugins/anthropic/test_anthropic_worker_object_error_handling.py` to a shared module so every provider test can import them.
+
+- [ ] **RED** — write `tests/helpers/test_instructor_test_utils.py` asserting:
+  - `_wrap_in_instructor_retry(sdk_exc)` returns an `InstructorRetryException` whose `failed_attempts[-1].exception is sdk_exc`
+  - `_wrap_in_instructor_retry(sdk_exc, include_failed_attempts=False)` produces a wrap where `__cause__.last_attempt._exception is sdk_exc` and `failed_attempts == []` (tenacity-fallback path)
+  - `_DummySchema` is a minimal `BaseModel` subclass with a single `text: str` field
+- [ ] **GREEN** — create `tests/helpers/instructor_test_utils.py` exposing `_wrap_in_instructor_retry`, `_DummySchema`, and a `_make_llm_job(mocker)` skeleton lifted verbatim from the Anthropic test
+- [ ] Update `test_anthropic_worker_object_error_handling.py` to import from the shared helper; confirm `.venv/bin/pytest tests/unit/pipelex/plugins/anthropic/` stays green
+- [ ] Investigate whether **AWS Bedrock LLM worker** (`pipelex/plugins/bedrock/bedrock_llm_worker.py`) uses `instructor` for structured generation. Record the finding in the Running Notes section. If yes, add a parallel `Phase 8.5 — AWS Bedrock` between 8 and 9. If no (e.g. native Bedrock tool-use), document why.
+- [ ] Run `make agent-check`
+
+> ### **STOP — CHECKPOINT A: Test helper foundation landed**
+>
+> Update this file's checkboxes, commit, and prepare cold-start handoff. Next session resumes at Phase 1.
+>
+> **Hand-off context:**
+> - Shared helpers at `tests/helpers/instructor_test_utils.py` ✅
+> - Anthropic tests still green ✅
+> - AWS Bedrock instructor-usage decision: _record in Running Notes_
+
+---
+
+## Phase 1 — Shared unwrap helper
+
+Move `_extract_underlying_sdk_exception` from the Anthropic worker to `pipelex/cogt/inference/error_classification.py` so the four pending workers can share one implementation. Promote it to a public name (drop the leading underscore).
+
+- [ ] **RED** — write `tests/unit/pipelex/cogt/inference/test_error_classification_unwrap.py`:
+  - returns the SDK exception when `instructor_exc.failed_attempts[-1].exception` is set
+  - falls back to `__cause__.last_attempt._exception` when `failed_attempts` is empty (tenacity path)
+  - returns `None` when both paths are empty
+  - never raises on malformed input (defensive)
+- [ ] **GREEN** — move the function from `pipelex/plugins/anthropic/anthropic_llm_worker.py` to `pipelex/cogt/inference/error_classification.py`. Rename to `extract_underlying_sdk_exception` (public).
+- [ ] Update `anthropic_llm_worker.py` to import from the shared module; confirm Anthropic worker tests still pass
+- [ ] Run `make agent-check`
+
+> ### **STOP — CHECKPOINT B: Shared unwrap helper landed**
+>
+> **Hand-off context:**
+> - `extract_underlying_sdk_exception` lives in `pipelex/cogt/inference/error_classification.py` ✅
+> - Anthropic worker imports from the shared module ✅
+> - Next phases land the three data-contract upgrades before touching the four pending workers
+
+---
+
+## Phase 2 — `InferenceErrorCategory.UNKNOWN` (upgrade A)
+
+The current "fall back to `CONTENT`" path when `extract_underlying_sdk_exception` returns something we don't recognize is technically wrong — `CONTENT` means "the LLM returned bad content," but the truth is "we don't know what happened." `UNKNOWN` with `is_retryable=False` makes downstream retry decisions accurate and surfaces "we should add this case" in telemetry.
+
+- [ ] **RED** — write `tests/unit/pipelex/cogt/inference/test_error_classification_unknown.py`:
+  - `InferenceErrorCategory.UNKNOWN` exists; `str(InferenceErrorCategory.UNKNOWN) == "UNKNOWN"`
+  - `InferenceErrorCategory.UNKNOWN.is_retryable` is `False`
+  - `to_error_report()` round-trips `UNKNOWN` correctly (i.e. an error raised with category `UNKNOWN` serializes and deserializes with the value preserved)
+- [ ] **RED** — in `test_anthropic_worker_object_error_handling.py`, update (or add) a case asserting that when the underlying exception is unrecognized (synthetic `RuntimeError`), the raised `LLMCompletionError.error_category == UNKNOWN`. Rename the existing `test_unrecognized_underlying_falls_back_to_content` to `test_unrecognized_underlying_falls_back_to_unknown`.
+- [ ] **GREEN** — add `UNKNOWN = "UNKNOWN"` to `InferenceErrorCategory` (find current definition in `pipelex/cogt/inference/error_classification.py`)
+- [ ] **GREEN** — extend `InferenceErrorCategory.is_retryable` to return `False` for `UNKNOWN`
+- [ ] **GREEN** — update the Anthropic worker's fallback (in `_raise_categorized_anthropic_sdk_error` or equivalent) so an unrecognized underlying raises with `error_category=UNKNOWN` rather than `CONTENT`
+- [ ] Run `make agent-check`
+
+> ### **STOP — CHECKPOINT C: `UNKNOWN` category landed**
+>
+> **Hand-off context:**
+> - `UNKNOWN` category present with `is_retryable=False` ✅
+> - Anthropic reference worker uses `UNKNOWN` for the unrecognized-underlying fallback ✅
+> - Other workers still use `CONTENT` fallback; migrated in their respective phases
+
+---
+
+## Phase 3 — `ProviderErrorMetadata` field (upgrade B)
+
+Every raised inference error should carry structured SDK metadata so downstream consumers (retry/temporal/CLI) don't have to scrape it back from the exception chain.
+
+- [ ] **RED** — write `tests/unit/pipelex/cogt/inference/test_provider_error_metadata.py`:
+  - `ProviderErrorMetadata` accepts `provider: str`, `sdk_exception_type: str`, `status_code: int | None`, `request_id: str | None`, `retry_after_seconds: float | None`, `provider_error_code: str | None`, `body: Any | None`
+  - All fields except `provider` and `sdk_exception_type` are Optional
+  - Pydantic v2 round-trips correctly
+- [ ] **RED** — write `tests/unit/pipelex/plugins/anthropic/test_extract_anthropic_metadata.py`:
+  - extracts `status_code` from `anthropic.RateLimitError(..., response=httpx.Response(status_code=429, ...))`
+  - extracts `request_id` from `anthropic.APIError.request_id` (confirm attribute name against installed SDK)
+  - extracts `retry_after_seconds` from the `Retry-After` response header when present; returns `None` when absent
+  - extracts `provider_error_code` from wherever Anthropic exposes it on the exception body (confirm against SDK; often `exc.body["error"]["type"]`)
+  - returns metadata with `None` for every missing field, without raising
+- [ ] **RED** — in `test_anthropic_worker_object_error_handling.py`, add assertions to a representative subset of existing cases (rate-limit, quota, bad-request) that the raised `LLMCompletionError.provider_metadata` is populated with the expected `status_code`, `request_id`, `retry_after_seconds`, `provider_error_code`. Add a snapshot/structure assertion that `to_error_report()` includes the metadata under a stable key.
+- [ ] **GREEN** — define `ProviderErrorMetadata` (Pydantic `BaseModel`) in `pipelex/cogt/inference/error_classification.py`
+- [ ] **GREEN** — add `provider_metadata: ProviderErrorMetadata | None = None` field to the four dynamic-category exception types: `LLMCompletionError`, `ImgGenGenerationError`, `ExtractJobFailureError`, `SearchJobFailureError`
+- [ ] **GREEN** — write `extract_anthropic_metadata(exc: anthropic.APIError) -> ProviderErrorMetadata` in `pipelex/cogt/inference/error_classification.py`
+- [ ] **GREEN** — update the Anthropic worker's catch blocks (and `_raise_categorized_anthropic_sdk_error`) to call `extract_anthropic_metadata(exc)` and pass `provider_metadata=...` to each `LLMCompletionError(...)` call
+- [ ] **GREEN** — update `PipelexError.to_error_report()` (in `pipelex/base_exceptions.py`) to include `provider_metadata` via `.model_dump()` when present
+- [ ] Run `make agent-check`
+
+> ### **STOP — CHECKPOINT D: `ProviderErrorMetadata` field landed**
+>
+> **Hand-off context:**
+> - Four dynamic-category exception types carry `provider_metadata` ✅
+> - Anthropic worker (reference) populates it via `extract_anthropic_metadata` ✅
+> - `to_error_report()` serializes it ✅
+> - Other workers leave `provider_metadata=None` for now; migrated in their respective phases
+
+---
+
+## Phase 4 — Structured `UserAction` (upgrade C)
+
+Replace the free-form `user_action: str` with `user_action: UserAction(kind: UserActionKind, detail: str)`. This phase has two parts: define the new types and migrate every existing call site mechanically. Per-worker phases later refine the `kind` from the placeholder `UNKNOWN` to semantic values.
+
+- [ ] **RED** — write `tests/unit/pipelex/cogt/inference/test_user_action.py`:
+  - `UserActionKind` is a `StrEnum` (imported from `pipelex.types`) with values: `WAIT_AND_RETRY`, `CHECK_BILLING`, `CHECK_CREDENTIALS`, `CHANGE_INPUT`, `CHANGE_MODEL`, `CONTACT_SUPPORT`, `UNKNOWN`
+  - `UserAction` is a Pydantic `BaseModel` with `kind: UserActionKind` and `detail: str`
+  - Round-trips correctly through `model_dump`/`model_validate`
+- [ ] **RED** — update Anthropic worker test cases to assert `user_action.kind` AND `user_action.detail` (preserving the existing string contents in `detail`):
+  - rate-limit → `kind=WAIT_AND_RETRY`
+  - quota → `kind=CHECK_BILLING`
+  - auth → `kind=CHECK_CREDENTIALS`
+  - content-policy → `kind=CHANGE_INPUT`
+  - model-not-found → `kind=CHANGE_MODEL`
+  - unrecognized underlying → `kind=UNKNOWN`
+- [ ] **GREEN** — define `UserActionKind` (StrEnum) and `UserAction` (BaseModel) in `pipelex/cogt/inference/error_classification.py`
+- [ ] **GREEN** — change the `user_action` field type on `CogtError` (or its subclass that defines the field — check `pipelex/cogt/exceptions.py`) from `str | None` to `UserAction | None`
+- [ ] **GREEN — mechanical migration of every existing call site:**
+  - `rg "user_action=" pipelex/` to find every caller
+  - For each: wrap the existing string as `user_action=UserAction(kind=UserActionKind.UNKNOWN, detail=<the_string>)`. This preserves the existing advice text in `detail`.
+  - Note: this touches every worker that already raises with a `user_action` (Anthropic, OpenAI Completions/Responses, Mistral, Google, Bedrock, plus all the non-LLM workers per [track-worker-classification.md](wip/error-handling/track-worker-classification.md)). The `kind` will be refined to semantically appropriate values in each worker's dedicated phase. Migrating with placeholder `UNKNOWN` first keeps the codebase compiling end-to-end.
+- [ ] **GREEN** — refine the Anthropic worker (reference) to use semantic `UserActionKind` values per the mapping in the RED step above. This is the only worker that gets fully semantic `kind` values in this phase.
+- [ ] **GREEN** — update `PipelexError.to_error_report()` to serialize `user_action.kind` and `user_action.detail` as a nested object (changes the JSON shape — see Risk note below)
+- [ ] **VERIFY** — full test suite passes: `make agent-test`
+- [ ] Run `make agent-check`
+
+> ⚠️ **Risk note:** `to_error_report()` JSON shape changes from `"user_action": "<string>"` to `"user_action": {"kind": "...", "detail": "..."}`. Consumers downstream (CLI rendering, agent JSON, Temporal `ApplicationError.details`) read fields not specific shapes, but verify with a grep across `pipelex/` and the CLI for any code that does `error_report["user_action"]` as a string. Bring it up to the new shape in the same phase.
+
+> ### **STOP — CHECKPOINT E: Structured `UserAction` landed**
+>
+> **Hand-off context:**
+> - `UserAction` model + `UserActionKind` enum defined ✅
+> - Field type changed on every `CogtError` subclass that owns `user_action` ✅
+> - Every existing call site mechanically migrated to wrap with `UserAction(kind=UNKNOWN, detail=<existing string>)` ✅
+> - Anthropic worker fully refined with semantic `UserActionKind` values ✅
+> - `to_error_report()` JSON shape updated ✅
+> - Other workers still carry `kind=UNKNOWN` placeholder; refined in their respective phases
+
+---
+
+## Phase 5 — OpenAI Completions LLM
+
+Apply unwrap-and-dispatch to `pipelex/plugins/openai/openai_completions_llm_worker.py`. The current `_gen_object` body has a nested `try { try { ... } except InstructorRetryException }`. Collapse to a single `try`; replace the inner with the unwrap-and-dispatch branch; replace the six SDK clauses with a single tuple-catch that delegates to the same categorization helper `_gen_text` uses. Simultaneously: write `extract_openai_metadata`, populate `provider_metadata`, refine `user_action.kind` to semantic values.
+
+- [ ] **RED** — write `tests/unit/pipelex/plugins/openai/test_extract_openai_metadata.py`:
+  - extracts `status_code` from `openai.RateLimitError(..., response=httpx.Response(status_code=429, ...))`
+  - extracts `request_id` (OpenAI uses `exc.response.headers["x-request-id"]` or `exc.request_id`; confirm against installed SDK)
+  - extracts `retry_after_seconds` from `Retry-After` header
+  - extracts `provider_error_code` from `exc.body["error"]["code"]` (or whatever OpenAI exposes; confirm)
+  - returns `None` for missing fields
+- [ ] **RED** — write `tests/unit/pipelex/plugins/openai/test_openai_completions_worker_object_error_handling.py` mirroring the Anthropic layout. Each case currently classifies as `CONTENT` (or `UNKNOWN`) and asserts the **full beyond-reference shape**: category + `user_action.kind` + `provider_metadata.{status_code,request_id,retry_after_seconds,provider_error_code}`. Cases:
+  - Wrapped `RateLimitError` → `TRANSIENT` + `kind=WAIT_AND_RETRY` + status_code=429
+  - Wrapped `RateLimitError` w/ OpenAI quota message → `CAPACITY` + `kind=CHECK_BILLING` + status_code=429
+  - Wrapped `APITimeoutError` → `TRANSIENT` + `kind=WAIT_AND_RETRY`
+  - Wrapped `APIConnectionError` → `TRANSIENT` + `kind=WAIT_AND_RETRY`
+  - Wrapped `BadRequestError` w/ content-policy → `CONTENT` + `kind=CHANGE_INPUT` + status_code=400
+  - Wrapped `BadRequestError` w/o content-policy → `CONTENT` + `kind=UNKNOWN` (default detail-only advice)
+  - Wrapped `AuthenticationError` → `CONFIGURATION` + `kind=CHECK_CREDENTIALS` + status_code=401
+  - Wrapped `NotFoundError` → `CONFIGURATION` + `kind=CHANGE_MODEL` + status_code=404
+  - Wrapped `pydantic.ValidationError` (genuine schema mismatch) → `UNKNOWN` + `kind=UNKNOWN` + `provider_metadata=None` (no SDK metadata to extract from a non-SDK exception)
+  - Real-instructor end-to-end: `instructor.from_openai(openai.AsyncOpenAI(api_key="fake"))`; patch `client.chat.completions.create` with `AsyncMock(side_effect=RateLimitError(...))`; confirm category + metadata + kind survive instructor's real wrapping
+- [ ] **GREEN** — write `extract_openai_metadata(exc: openai.APIError) -> ProviderErrorMetadata` in `pipelex/cogt/inference/error_classification.py`
+- [ ] **GREEN** — refactor `_gen_object`. Add `except InstructorRetryException as instructor_exc:` that calls `extract_underlying_sdk_exception(instructor_exc)` and dispatches through the same per-SDK categorization helper as `_gen_text`. Each `raise LLMCompletionError(...)` now passes `provider_metadata=extract_openai_metadata(exc)` and `user_action=UserAction(kind=<semantic>, detail=<existing string>)`.
+- [ ] **GREEN** — refine `user_action.kind` in `_gen_text`'s catch blocks (was migrated to `UNKNOWN` in Phase 4) to semantic values matching the test cases above
+- [ ] Migrate `from instructor.exceptions import InstructorRetryException` → `from instructor.core import InstructorRetryException`
+- [ ] **AUDIT** — read `openai/_exceptions.py` in the installed version; list every concrete exception class; confirm each is caught (or document the reason for `UNKNOWN` fallback). Add `InternalServerError` to the tuple-catch if missing.
+- [ ] Run `.venv/bin/pytest tests/unit/pipelex/plugins/openai/` and `make agent-check`
+
+> ### **STOP — CHECKPOINT F: OpenAI Completions done**
+>
+> **Hand-off context:**
+> - Wrapped-path categorization parity with `_gen_text` ✅
+> - `extract_openai_metadata` helper landed ✅
+> - All raised errors carry `provider_metadata` + semantic `user_action.kind` ✅
+> - `instructor.core` import migrated ✅
+> - SDK exception hierarchy audited (notes in test docstring / Running Notes)
+
+---
+
+## Phase 6 — OpenAI Responses LLM
+
+Same shape as Phase 5 with one specialization: `NotFoundError` raises `LLMModelNotFoundError(message=msg, model_handle=...)` (not just `LLMCompletionError`) so callers can swap models. Keep that specialization inside the categorization helper so it fires on both wrapped and unwrapped paths. `extract_openai_metadata` from Phase 5 is reused (same SDK).
+
+- [ ] **RED** — write `tests/unit/pipelex/plugins/openai/test_openai_responses_worker_object_error_handling.py` (same case list and assertion shape as Phase 5), plus one extra case: wrapped `NotFoundError` raises `LLMModelNotFoundError` (not `LLMCompletionError`), `model_handle` is populated, and `provider_metadata.status_code == 404`
+- [ ] **GREEN** — refactor `_gen_object` in `pipelex/plugins/openai/openai_responses_llm_worker.py`. Mirror Anthropic shape. Each raise carries `provider_metadata=extract_openai_metadata(exc)` and semantic `user_action.kind`.
+- [ ] **GREEN** — ensure `LLMModelNotFoundError` also carries `provider_metadata` (it's a subclass of `CogtError` — confirm field is inherited or add explicitly)
+- [ ] Migrate `instructor.exceptions` → `instructor.core`
+- [ ] **AUDIT** — confirm no Responses-only SDK exception types are missed
+- [ ] Run tests + `make agent-check`
+
+> ### **STOP — CHECKPOINT G: OpenAI Responses done**
+>
+> **Hand-off context:**
+> - `LLMModelNotFoundError(model_handle=...)` plumbing fires on the wrapped path AND carries provider_metadata ✅
+> - Both OpenAI workers at full parity ✅
+
+---
+
+## Phase 7 — Mistral LLM
+
+Smallest of the four — `_classify_mistral_error` already does the work; the wrapped path just never reaches it. Add `extract_mistral_metadata`.
+
+- [ ] **RED** — write `tests/unit/pipelex/plugins/mistral/test_extract_mistral_metadata.py`. **First** confirm `MistralError` and its subclasses' attribute shapes against the installed `mistralai` (varies across versions).
+- [ ] **RED** — write `tests/unit/pipelex/plugins/mistral/test_mistral_llm_worker_object_error_handling.py`. Cases (each asserts category + `user_action.kind` + `provider_metadata`):
+  - Wrapped `MistralError` (rate-limit) → `TRANSIENT` + `WAIT_AND_RETRY`
+  - Wrapped `MistralError` (HTTP 402 / quota match) → `CAPACITY` + `CHECK_BILLING`
+  - Wrapped `MistralError` (timeout) → `TRANSIENT` + `WAIT_AND_RETRY`
+  - Wrapped `MistralError` (connection) → `TRANSIENT` + `WAIT_AND_RETRY`
+  - Wrapped `MistralError` (content-policy) → `CONTENT` + `CHANGE_INPUT`
+  - Wrapped `MistralError` (auth) → `CONFIGURATION` + `CHECK_CREDENTIALS`
+  - Wrapped non-`MistralError` (e.g. `pydantic.ValidationError`) → `UNKNOWN` + `UNKNOWN`
+  - Real-instructor end-to-end: patch `mistralai.Mistral.chat.complete_async` (or current `from_mistral` adapter target) with `AsyncMock(side_effect=MistralError(...))`
+- [ ] **GREEN** — write `extract_mistral_metadata(exc: MistralError) -> ProviderErrorMetadata`
+- [ ] **GREEN** — add to `pipelex/plugins/mistral/mistral_llm_worker.py`:
+  ```python
+  except InstructorRetryException as instructor_exc:
+      underlying = extract_underlying_sdk_exception(instructor_exc)
+      if isinstance(underlying, MistralError):
+          raise self._classify_mistral_error(underlying) from instructor_exc
+      msg = f"Mistral structured generation failed after retries for model '{self.inference_model.desc}': {instructor_exc}"
+      raise LLMCompletionError(
+          msg,
+          error_category=InferenceErrorCategory.UNKNOWN,
+          user_action=UserAction(kind=UserActionKind.UNKNOWN, detail="Unexpected error from Mistral structured generation"),
+          provider_metadata=None,
+      ) from instructor_exc
+  ```
+- [ ] **GREEN** — refine `_classify_mistral_error` to attach `provider_metadata=extract_mistral_metadata(exc)` and use semantic `user_action.kind` on every raise inside it
+- [ ] Migrate `instructor.exceptions` → `instructor.core`
+- [ ] **AUDIT** — `mistralai` SDK exception hierarchy
+- [ ] Run tests + `make agent-check`
+
+> ### **STOP — CHECKPOINT H: Mistral LLM done**
+
+---
+
+## Phase 8 — Google Gemini LLM
+
+Symmetric to Mistral, plus `ServerError → TRANSIENT` direct mapping that doesn't need `_classify_google_client_error`. Add `extract_google_metadata`.
+
+- [ ] **RED** — write `tests/unit/pipelex/plugins/google/test_extract_google_metadata.py`. **First** check `genai_errors.ServerError` / `ClientError` constructor shape (they wrap an HTTP response object); reuse the construction pattern from existing `_classify_google_client_error` tests if any exist.
+- [ ] **RED** — write `tests/unit/pipelex/plugins/google/test_google_llm_worker_object_error_handling.py`. If construction is awkward, prefer wrapping a real SDK exception via `_wrap_in_instructor_retry(real_sdk_exc)` and keep only the real-instructor end-to-end test provider-specific. Cases (each asserts category + `user_action.kind` + `provider_metadata`):
+  - Wrapped `genai_errors.ServerError` → `TRANSIENT` + `WAIT_AND_RETRY`
+  - Wrapped `genai_errors.ClientError` (rate-limit) → `TRANSIENT` + `WAIT_AND_RETRY`
+  - Wrapped `genai_errors.ClientError` (quota) → `CAPACITY` + `CHECK_BILLING`
+  - Wrapped `genai_errors.ClientError` (content-policy) → `CONTENT` + `CHANGE_INPUT`
+  - Wrapped `genai_errors.ClientError` (auth) → `CONFIGURATION` + `CHECK_CREDENTIALS`
+  - Wrapped `genai_errors.ClientError` (bad request) → `CONTENT` + `UNKNOWN`
+  - Wrapped non-SDK exception → `UNKNOWN` + `UNKNOWN`
+  - Real-instructor end-to-end: patch the `genai.Client.aio.models.generate_content`-equivalent that `instructor.from_genai` calls
+- [ ] **GREEN** — write `extract_google_metadata(exc: genai_errors.APIError) -> ProviderErrorMetadata` (or whatever the Google base class is)
+- [ ] **GREEN** — add to `pipelex/plugins/google/google_llm_worker.py`:
+  ```python
+  except InstructorRetryException as instructor_exc:
+      underlying = extract_underlying_sdk_exception(instructor_exc)
+      if isinstance(underlying, genai_errors.ServerError):
+          msg = f"Google API server error for model '{self.inference_model.desc}': {underlying}"
+          raise LLMCompletionError(
+              msg,
+              error_category=InferenceErrorCategory.TRANSIENT,
+              user_action=UserAction(kind=UserActionKind.WAIT_AND_RETRY, detail="Google API server error — will retry"),
+              provider_metadata=extract_google_metadata(underlying),
+          ) from instructor_exc
+      if isinstance(underlying, genai_errors.ClientError):
+          raise self._classify_google_client_error(underlying) from instructor_exc
+      msg = f"Google structured generation failed after retries for model '{self.inference_model.desc}': {instructor_exc}"
+      raise LLMCompletionError(
+          msg,
+          error_category=InferenceErrorCategory.UNKNOWN,
+          user_action=UserAction(kind=UserActionKind.UNKNOWN, detail="Unexpected error from Google structured generation"),
+          provider_metadata=None,
+      ) from instructor_exc
+  ```
+- [ ] **GREEN** — refine `_classify_google_client_error` to attach `provider_metadata=extract_google_metadata(exc)` and use semantic `user_action.kind` on every raise
+- [ ] Migrate `instructor.exceptions` → `instructor.core`
+- [ ] **AUDIT** — `google-genai` SDK exception hierarchy
+- [ ] Run tests + `make agent-check`
+
+> ### **STOP — CHECKPOINT I: Google Gemini LLM done**
+>
+> **Hand-off context:** all four instructor-unwrap workers now classify wrapped errors correctly AND carry full structured metadata + semantic user_action. LLM-side defect closed; beyond-reference upgrades A–C delivered for the four targeted workers plus Anthropic.
+
+---
+
+## Phase 9 — LLM cross-cutting cleanup
+
+- [ ] Full LLM test sweep: `.venv/bin/pytest tests/unit/pipelex/plugins/{anthropic,openai,mistral,google}/` — confirm zero failures
+- [ ] `rg "from instructor.exceptions" pipelex/` — must return zero results
+- [ ] **Uniformity check** — `rg "raise LLMCompletionError" pipelex/plugins/{anthropic,openai,mistral,google}/` — every match should include `provider_metadata=` AND `user_action=UserAction(...)` (with a semantic `kind`, not `UNKNOWN`, except for the unrecognized-underlying fallback paths)
+- [ ] **AWS Bedrock decision check** — if Phase 0 found Bedrock uses `instructor`, confirm Phase 8.5 landed (or schedule it now). If not, confirm the Bedrock worker still benefits from upgrades A–C in Phase 11 below.
+- [ ] Update [wip/error-handling/track-worker-classification.md](wip/error-handling/track-worker-classification.md):
+  - Move "Instructor unwrap missing on four other workers" out of "Open gaps"
+  - Strike followups 1 (Phase 1), 2–5 (Phases 5–8), and 6 (Phases 5–8) from the followup list
+  - Add a note that beyond-reference upgrades A (UNKNOWN), B (ProviderErrorMetadata), C (UserAction) have landed across these workers
+- [ ] Update [wip/error-handling/README.md](wip/error-handling/README.md) status table row "Worker classification" → drop the gap clause; mark Landed. Update "Error metadata model" row to reflect that structured metadata is now uniform across LLM workers.
+- [ ] `make agent-check && make agent-test`
+
+> ### **STOP — CHECKPOINT J: LLM-side track closed**
+>
+> **Hand-off context:** worker-classification track has no remaining LLM-side gaps. Track docs reflect reality. Beyond-reference upgrades A–C live across all LLM workers that this sweep touched (Anthropic + 4). Other LLM workers still need upgrade migration via Phase 11. Ready to audit non-LLM worker kinds.
+
+---
+
+## Phase 10 — Img-gen worker audits
+
+> Note: each worker within this phase is an independent unit of work. The agent may save/checkpoint between workers if context grows — record per-worker hand-off in the Running Notes section.
+
+The img-gen workers already have basic classification landed. This phase brings each up to the beyond-reference standard: extract metadata, structured user_action, UNKNOWN fallback where applicable, and confirms SDK exception coverage.
+
+For each worker: (a) read source — confirm every documented SDK exception type is caught and routed through the right discriminator; (b) write `extract_<provider>_metadata` helper if not already done (some providers may already have it from LLM workers — e.g. OpenAI img-gen reuses `extract_openai_metadata`); (c) update each raise to pass `provider_metadata=...` and semantic `user_action=UserAction(...)`; (d) replace `CONTENT` fallback with `UNKNOWN` where the underlying is genuinely unknown; (e) update tests to assert metadata + user_action.kind.
+
+- [ ] **OpenAI img-gen** — `pipelex/plugins/openai/openai_img_gen_worker.py` (reuse `extract_openai_metadata`)
+- [ ] **OpenAI Completions img-gen** — `pipelex/plugins/openai/openai_completions_img_gen_worker.py` (reuse `extract_openai_metadata`)
+- [ ] **Google img-gen** — `pipelex/plugins/google/google_img_gen_worker.py` (reuse `extract_google_metadata`)
+- [ ] **Azure img-gen** — `pipelex/plugins/azure/azure_img_gen_worker.py` (new `extract_azure_metadata`)
+- [ ] **FAL img-gen** — `pipelex/plugins/fal/fal_img_gen_worker.py` (new `extract_fal_metadata`)
+- [ ] **HuggingFace img-gen** — `pipelex/plugins/huggingface/huggingface_img_gen_worker.py` (new `extract_huggingface_metadata`)
+- [ ] **Gateway img-gen** — `pipelex/plugins/gateway/gateway_img_gen_worker.py` (new or shared `extract_gateway_metadata`)
+- [ ] `make agent-check && make agent-test`
+
+> ### **STOP — CHECKPOINT K: Img-gen audit complete**
+
+---
+
+## Phase 11 — Extract worker audits + AWS Bedrock LLM (if not handled in 8.5)
+
+Same approach as Phase 10. Bedrock LLM lands here too if Phase 0 found it doesn't use instructor (no unwrap defect, but it still benefits from upgrades A–C).
+
+- [ ] **AWS Bedrock LLM** — `pipelex/plugins/bedrock/bedrock_llm_worker.py` (skip if Phase 8.5 already shipped — confirm in Running Notes)
+- [ ] **Mistral extract** — `pipelex/plugins/mistral/mistral_extract_worker.py` (reuse `extract_mistral_metadata`)
+- [ ] **Docling extract** — `pipelex/plugins/docling/docling_extract_worker.py` (new `extract_docling_metadata` — Docling is not an HTTP SDK; metadata fields like `status_code`/`request_id` will be `None` for most cases, but `sdk_exception_type` and `provider_error_code` still useful)
+- [ ] **Linkup extract** — `pipelex/plugins/linkup/linkup_extract_worker.py` (new `extract_linkup_metadata`)
+- [ ] **Gateway extract** — `pipelex/plugins/gateway/gateway_extract_worker.py` (reuse `extract_gateway_metadata`; has its own tenacity retry — confirm it doesn't swallow categorization signal or strip metadata)
+- [ ] **pypdfium2** — `pipelex/plugins/pypdfium2/pypdfium2_worker.py` (pypdfium2 is purely local; minimal metadata, no network — adapt fields accordingly)
+- [ ] `make agent-check && make agent-test`
+
+> ### **STOP — CHECKPOINT L: Extract audit complete**
+
+---
+
+## Phase 12 — Search worker audits
+
+- [ ] **Linkup search** — `pipelex/plugins/linkup/linkup_search_worker.py` (reuse `extract_linkup_metadata`)
+- [ ] **Gateway search** — `pipelex/plugins/gateway/gateway_search_worker.py` (reuse `extract_gateway_metadata`; has its own tenacity retry — confirm categorization survives the retry boundary)
+- [ ] `make agent-check && make agent-test`
+
+> ### **STOP — CHECKPOINT M: Search audit complete**
+
+---
+
+## Phase 13 — Final integration check
+
+- [ ] Full suite: `make agent-test`
+- [ ] Confirm no `except Exception:` regressions: `rg "except Exception" pipelex/plugins/` — must be empty (or each match has a documented reason in source)
+- [ ] Confirm every worker chains via `from exc` and uses `msg = ...; raise XError(msg) from exc` (per `_tprl/CLAUDE.md` rules)
+- [ ] **Uniformity check** — every raised `LLMCompletionError` / `ImgGenGenerationError` / `ExtractJobFailureError` / `SearchJobFailureError` in `pipelex/plugins/` includes `provider_metadata=` (`None` allowed only for non-SDK fallback paths) AND `user_action=UserAction(...)` (with `kind != UNKNOWN`, except for fallback paths). One-liner audit: `rg "raise (LLMCompletionError|ImgGenGenerationError|ExtractJobFailureError|SearchJobFailureError)" pipelex/plugins/ -A 6 | rg -v "provider_metadata" | rg "raise (LLM|Img|Extract|Search)"` — should return zero "orphan" raises
+- [ ] Confirm `rg "kind=UserActionKind.UNKNOWN" pipelex/plugins/` only matches inside fallback / unrecognized-underlying paths (not in any semantically-typed catch)
+- [ ] Update [wip/error-handling/README.md](wip/error-handling/README.md) status table — drop any residual-gap clauses introduced during audits; update "Error metadata model" → fully landed if metadata is now uniform
+- [ ] Confirm [wip/error-handling/track-testing.md](wip/error-handling/track-testing.md) "worker-level classification tests are comprehensive" claim still matches reality (or update it)
+- [ ] **Verify the Extract/Classify/Render track is ready to start:** [track-extract-classify-render.md](wip/error-handling/track-extract-classify-render.md) prerequisites should all be satisfied. Confirm the doc still accurately describes the current state.
+
+> ### **DONE**
+
+---
+
+## Running notes
+
+Use this section to capture decisions, surprises, and cold-start handoff context as phases land. Add timestamped entries; never delete.
+
+- _<empty>_
