@@ -606,9 +606,6 @@ class StructureGenerator:
                         pass
                 return f"Dict[{key_type}, {value_type}]"
 
-        # Fallback for unknown types
-        return str(field_type)
-
     def _validate_execution(
         self,
         python_code: str,
