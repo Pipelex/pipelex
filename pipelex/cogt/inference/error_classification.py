@@ -624,6 +624,7 @@ def extract_bedrock_metadata(exc: BaseException) -> ProviderErrorMetadata:
     headers = response_metadata.get("HTTPHeaders")
     retry_after_seconds: float | None = None
     if isinstance(headers, dict):
+        # botocore lowercases all HTTPHeaders keys, so ``retry-after`` is the canonical lookup.
         retry_after_seconds = _parse_retry_after_seconds(cast("dict[str, Any]", headers).get("retry-after"))
     error_code = error_section.get("Code")
     provider_error_code = error_code if isinstance(error_code, str) else None
