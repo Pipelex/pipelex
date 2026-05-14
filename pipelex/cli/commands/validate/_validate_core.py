@@ -19,6 +19,7 @@ from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.hub import (
     get_console,
     get_library_manager,
+    get_optional_pipe,
     get_required_pipe,
     get_telemetry_manager,
     resolve_library_dirs,
@@ -37,6 +38,18 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 COMMAND = "validate"
+
+
+def _format_signatures_summary_suffix(signature_count: int) -> str:
+    """Return the suffix appended to lenient-mode validation summaries.
+
+    Empty when no signatures were involved so fully-implemented bundles read naturally.
+    """
+    if signature_count == 0:
+        return ""
+    if signature_count == 1:
+        return " (1 signature)"
+    return f" ({signature_count} signatures)"
 
 
 def do_validate_all_libraries_and_dry_run(
@@ -77,7 +90,8 @@ def do_validate_all_libraries_and_dry_run(
                     raise_on_failure=True,
                 )
             )
-            typer.echo("Setup sequence passed OK, config and pipelines are validated.")
+            signature_count = sum(1 for pipe in pipes if pipe.is_signature)
+            typer.echo(f"Setup sequence passed OK, config and pipelines are validated.{_format_signatures_summary_suffix(signature_count)}")
     except PipeOperatorModelAvailabilityError as exc:
         handle_model_availability_error(exc, context=ErrorContext.VALIDATION)
     except PipeOperatorModelChoiceError as exc:
@@ -93,13 +107,14 @@ async def _validate_pipe_or_bundle(
     """Core async validation logic shared between method and pipe subcommands."""
     if bundle_path:
         try:
-            await validate_bundle(
+            bundle_result = await validate_bundle(
                 mthds_file_path=bundle_path,
                 library_dirs=library_dirs,
                 allow_signatures=allow_signatures,
             )
+            signature_count = sum(1 for pipe in bundle_result.pipes if pipe.is_signature)
             typer.secho(
-                f"Successfully validated bundle '{bundle_path}'",
+                f"Successfully validated bundle '{bundle_path}'{_format_signatures_summary_suffix(signature_count)}",
                 fg=typer.colors.GREEN,
             )
         except FileNotFoundError as exc:
@@ -129,7 +144,11 @@ async def _validate_pipe_or_bundle(
             allow_signatures=allow_signatures,
             raise_on_failure=True,
         )
-        typer.secho(f"Successfully validated pipe '{pipe_code}'", fg=typer.colors.GREEN)
+        signature_count = len(pipe.collect_signature_refs(pipe_lookup=get_optional_pipe))
+        typer.secho(
+            f"Successfully validated pipe '{pipe_code}'{_format_signatures_summary_suffix(signature_count)}",
+            fg=typer.colors.GREEN,
+        )
     else:
         typer.secho(
             "Failed to validate: no pipe code or bundle specified",
