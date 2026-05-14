@@ -172,9 +172,21 @@ class ModelDeckPresetValidatonError(ModelDeckValidatonError):
 class ModelNotFoundError(CogtError):
     error_category = InferenceErrorCategory.CONFIGURATION
 
-    def __init__(self, message: str, model_handle: str):
+    def __init__(
+        self,
+        message: str,
+        model_handle: str,
+        error_category: InferenceErrorCategory | None = None,
+        user_action: UserAction | None = None,
+        provider_metadata: ProviderErrorMetadata | None = None,
+    ):
         self.model_handle = model_handle
-        super().__init__(message)
+        super().__init__(
+            message=message,
+            error_category=error_category,
+            user_action=user_action,
+            provider_metadata=provider_metadata,
+        )
 
 
 class ModelWaterfallError(ModelNotFoundError):
