@@ -593,3 +593,91 @@ def extract_mistral_metadata(exc: BaseException) -> ProviderErrorMetadata:
         provider_error_code=provider_error_code,
         body=body,
     )
+
+
+def extract_bedrock_metadata(exc: BaseException) -> ProviderErrorMetadata:
+    """Distill an AWS Bedrock ``botocore.exceptions.ClientError`` into a ``ProviderErrorMetadata``.
+
+    botocore exposes a single ``response`` dict shaped like
+    ``{"Error": {"Code": ..., "Message": ...}, "ResponseMetadata":
+    {"RequestId": ..., "HTTPStatusCode": ..., "HTTPHeaders": {...}}}``.
+    The ``provider_error_code`` we surface is the AWS error code (e.g.
+    ``ThrottlingException``); the JSON ``body`` we keep is the full
+    ``response`` dict so downstream consumers can recover the original
+    error message and any extra fields without scraping ``str(exc)``.
+    """
+    response = getattr(exc, "response", None)
+    response_dict = cast("dict[str, Any]", response) if isinstance(response, dict) else None
+    error_section: dict[str, Any] = {}
+    response_metadata: dict[str, Any] = {}
+    if response_dict is not None:
+        raw_error = response_dict.get("Error")
+        if isinstance(raw_error, dict):
+            error_section = cast("dict[str, Any]", raw_error)
+        raw_meta = response_dict.get("ResponseMetadata")
+        if isinstance(raw_meta, dict):
+            response_metadata = cast("dict[str, Any]", raw_meta)
+    status_code_value = response_metadata.get("HTTPStatusCode")
+    status_code = status_code_value if isinstance(status_code_value, int) else None
+    request_id_value = response_metadata.get("RequestId")
+    request_id = request_id_value if isinstance(request_id_value, str) else None
+    headers = response_metadata.get("HTTPHeaders")
+    retry_after_seconds: float | None = None
+    if isinstance(headers, dict):
+        retry_after_seconds = _parse_retry_after_seconds(cast("dict[str, Any]", headers).get("retry-after"))
+    error_code = error_section.get("Code")
+    provider_error_code = error_code if isinstance(error_code, str) else None
+    return ProviderErrorMetadata(
+        provider="bedrock",
+        sdk_exception_type=type(exc).__name__,
+        status_code=status_code,
+        request_id=request_id,
+        retry_after_seconds=retry_after_seconds,
+        provider_error_code=provider_error_code,
+        body=response_dict,
+    )
+
+
+def extract_linkup_metadata(exc: BaseException) -> ProviderErrorMetadata:
+    """Distill a Linkup SDK exception into a ``ProviderErrorMetadata``.
+
+    The Linkup Python SDK raises typed exceptions (``LinkupAuthenticationError``,
+    ``LinkupTooManyRequestsError``, ``LinkupInvalidRequestError`` …) that wrap
+    a plain message string but do not carry the underlying HTTP ``response``,
+    ``status_code``, ``request_id``, or ``retry-after`` header. Every
+    status-related field comes back as ``None``; the SDK class name is the
+    main discriminator. We expose the exception class name as
+    ``provider_error_code`` so downstream consumers can branch on it without
+    importing the Linkup SDK at the call site.
+    """
+    return ProviderErrorMetadata(
+        provider="linkup",
+        sdk_exception_type=type(exc).__name__,
+        status_code=None,
+        request_id=None,
+        retry_after_seconds=None,
+        provider_error_code=type(exc).__name__,
+        body=None,
+    )
+
+
+def extract_local_extract_metadata(exc: BaseException, provider: str) -> ProviderErrorMetadata:
+    """Distill a local (non-HTTP) extraction exception into a ``ProviderErrorMetadata``.
+
+    Local extractors (``docling``, ``pypdfium2`` …) run in-process against the
+    file system; there is no HTTP response, no request id, no retry-after.
+    The only meaningful signal is the underlying exception class
+    (``FileNotFoundError``, ``ValueError``, ``RuntimeError``, ``OSError``),
+    which we expose as ``sdk_exception_type`` and ``provider_error_code`` so
+    downstream consumers can branch without importing the underlying library
+    at the call site.
+    """
+    return ProviderErrorMetadata(
+        provider=provider,
+        sdk_exception_type=type(exc).__name__,
+        status_code=None,
+        request_id=None,
+        retry_after_seconds=None,
+        provider_error_code=type(exc).__name__,
+        body=None,
+    )

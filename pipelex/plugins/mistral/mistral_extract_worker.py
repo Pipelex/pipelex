@@ -12,6 +12,7 @@ from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.inference.error_classification import (
     UserAction,
     UserActionKind,
+    extract_mistral_metadata,
     is_content_policy_violation,
     is_quota_exhaustion_mistral,
 )
@@ -63,9 +64,15 @@ class MistralExtractWorker(ExtractWorkerAbstract):
         return extract_output
 
     def _classify_mistral_error(self, exc: MistralError) -> ExtractJobFailureError:
-        """Classify a Mistral SDK error into a categorized ExtractJobFailureError."""
+        """Classify a Mistral SDK error into a categorized ExtractJobFailureError.
+
+        The returned error carries a structured ``provider_metadata`` and a
+        semantic ``UserActionKind`` so downstream consumers (retry, CLI,
+        telemetry) get uniform shape across providers.
+        """
         error_message = str(exc)
         status_code = exc.status_code
+        metadata = extract_mistral_metadata(exc)
 
         if is_quota_exhaustion_mistral(error_message, status_code):
             msg = f"Mistral quota exhausted for model '{self.inference_model.desc}': {exc}"
@@ -73,18 +80,35 @@ class MistralExtractWorker(ExtractWorkerAbstract):
                 msg,
                 error_category=InferenceErrorCategory.CAPACITY,
                 user_action=UserAction(
-                    kind=UserActionKind.UNKNOWN,
+                    kind=UserActionKind.CHECK_BILLING,
                     detail=f"Your Mistral account has exceeded its quota — check billing at {URLs.mistral_billing}",
                 ),
+                provider_metadata=metadata,
             )
 
         if status_code in {401, 403}:
             msg = f"Mistral authentication error for model '{self.inference_model.desc}': {exc}"
-            return ExtractJobFailureError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
+            return ExtractJobFailureError(
+                msg,
+                error_category=InferenceErrorCategory.CONFIGURATION,
+                user_action=UserAction(
+                    kind=UserActionKind.CHECK_CREDENTIALS,
+                    detail="Mistral rejected the API key — check your credentials",
+                ),
+                provider_metadata=metadata,
+            )
 
         if status_code == 404:
             msg = f"Mistral model '{self.inference_model.desc}' not found: {exc}"
-            return ExtractJobFailureError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
+            return ExtractJobFailureError(
+                msg,
+                error_category=InferenceErrorCategory.CONFIGURATION,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_MODEL,
+                    detail=f"Model '{self.inference_model.model_id}' was not found — pick an available model",
+                ),
+                provider_metadata=metadata,
+            )
 
         if status_code == 429:
             msg = f"Mistral rate limit exceeded for model '{self.inference_model.desc}': {exc}"
@@ -92,9 +116,10 @@ class MistralExtractWorker(ExtractWorkerAbstract):
                 msg,
                 error_category=InferenceErrorCategory.TRANSIENT,
                 user_action=UserAction(
-                    kind=UserActionKind.UNKNOWN,
+                    kind=UserActionKind.WAIT_AND_RETRY,
                     detail="Rate limited by Mistral — the system will retry automatically",
                 ),
+                provider_metadata=metadata,
             )
 
         if status_code == 400:
@@ -104,19 +129,44 @@ class MistralExtractWorker(ExtractWorkerAbstract):
                     msg,
                     error_category=InferenceErrorCategory.CONTENT,
                     user_action=UserAction(
-                        kind=UserActionKind.UNKNOWN,
+                        kind=UserActionKind.CHANGE_INPUT,
                         detail="Content was rejected by safety filters — revise the input",
                     ),
+                    provider_metadata=metadata,
                 )
             msg = f"Mistral bad request error for model '{self.inference_model.desc}': {exc}"
-            return ExtractJobFailureError(msg, error_category=InferenceErrorCategory.CONTENT)
+            return ExtractJobFailureError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Mistral rejected the request — review the inputs and parameters",
+                ),
+                provider_metadata=metadata,
+            )
 
         if status_code >= 500:
             msg = f"Mistral server error for model '{self.inference_model.desc}': {exc}"
-            return ExtractJobFailureError(msg, error_category=InferenceErrorCategory.TRANSIENT)
+            return ExtractJobFailureError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Mistral server error — the system will retry automatically",
+                ),
+                provider_metadata=metadata,
+            )
 
         msg = f"Mistral API error for model '{self.inference_model.desc}': {exc}"
-        return ExtractJobFailureError(msg, error_category=InferenceErrorCategory.TRANSIENT)
+        return ExtractJobFailureError(
+            msg,
+            error_category=InferenceErrorCategory.TRANSIENT,
+            user_action=UserAction(
+                kind=UserActionKind.WAIT_AND_RETRY,
+                detail="Mistral API returned an unexpected error — the system will retry automatically",
+            ),
+            provider_metadata=metadata,
+        )
 
     async def _extract_page_from_image(
         self,

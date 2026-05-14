@@ -9,6 +9,7 @@ from pipelex.cogt.extract.extract_input import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput, Page
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_local_extract_metadata
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.hub import get_storage_provider
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -89,16 +90,48 @@ class Pypdfium2Worker(ExtractWorkerAbstract):
         # The exceptions below are raised by pypdfium2_renderer for corrupt/invalid PDFs or file system issues.
         except FileNotFoundError as exc:
             msg = f"PDF file not found: {exc}"
-            raise ExtractJobFailureError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from exc
+            raise ExtractJobFailureError(
+                msg,
+                error_category=InferenceErrorCategory.CONFIGURATION,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="The PDF path could not be found — check the URI or file path",
+                ),
+                provider_metadata=extract_local_extract_metadata(exc, provider="pypdfium2"),
+            ) from exc
         except ValueError as exc:
             msg = f"Invalid PDF format: {exc}"
-            raise ExtractJobFailureError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
+            raise ExtractJobFailureError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="pypdfium2 could not parse the PDF — the file may be corrupt or password-protected",
+                ),
+                provider_metadata=extract_local_extract_metadata(exc, provider="pypdfium2"),
+            ) from exc
         except RuntimeError as exc:
             msg = f"PDF extraction failed: {exc}"
-            raise ExtractJobFailureError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
+            raise ExtractJobFailureError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="pypdfium2 failed during PDF extraction — the file may be corrupt or unsupported",
+                ),
+                provider_metadata=extract_local_extract_metadata(exc, provider="pypdfium2"),
+            ) from exc
         except OSError as exc:
             msg = f"I/O error during PDF extraction: {exc}"
-            raise ExtractJobFailureError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
+            raise ExtractJobFailureError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="I/O error during PDF extraction — the system will retry automatically",
+                ),
+                provider_metadata=extract_local_extract_metadata(exc, provider="pypdfium2"),
+            ) from exc
         pages: dict[int, Page] = {}
         total_images_count = 0
 

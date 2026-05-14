@@ -13,6 +13,7 @@ from pipelex.cogt.extract.extract_input import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
+from pipelex.cogt.inference.error_classification import extract_gateway_metadata
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import TokenCategory
@@ -182,11 +183,18 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
         except portkey_exceptions.APIError as exc:
             error_summary = GatewayFactory.make_error_summary_from_portkey_error(exc)
             error_category = GatewayFactory.classify_error_category(exc)
+            user_action = GatewayFactory.make_user_action_from_portkey_error(exc)
+            metadata = extract_gateway_metadata(exc)
             msg = (
                 f"Web fetch service error for URL '{document_uri}' via model '{self.inference_model.tag}' "
                 f"after {attempt_number} attempt(s): {error_summary}"
             )
-            raise ExtractJobFailureError(msg, error_category=error_category) from exc
+            raise ExtractJobFailureError(
+                msg,
+                error_category=error_category,
+                user_action=user_action,
+                provider_metadata=metadata,
+            ) from exc
 
         if response is None:
             msg = f"Could not get a response for model '{self.inference_model.tag}' via Portkey after {attempt_number} attempts"
@@ -249,8 +257,15 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
         except portkey_exceptions.APIError as exc:
             error_summary = GatewayFactory.make_error_summary_from_portkey_error(exc)
             error_category = GatewayFactory.classify_error_category(exc)
+            user_action = GatewayFactory.make_user_action_from_portkey_error(exc)
+            metadata = extract_gateway_metadata(exc)
             msg = f"Extract service error for model '{self.inference_model.tag}' after {attempt_number} attempt(s): {error_summary}"
-            raise ExtractJobFailureError(msg, error_category=error_category) from exc
+            raise ExtractJobFailureError(
+                msg,
+                error_category=error_category,
+                user_action=user_action,
+                provider_metadata=metadata,
+            ) from exc
 
         if response is None:
             msg = f"Could not get a response for model '{self.inference_model.tag}' via Portkey after {attempt_number} attempts"
