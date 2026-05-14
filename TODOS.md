@@ -211,14 +211,14 @@ After every `🛑 CHECKPOINT` line:
 
 **Goal:** when `pipelex init` (or the agent-cli equivalent) completes the gateway terms acceptance flow, attempt one fetch and persist the cache. If offline at init time, log a warning and continue — cache stays empty, user has been told.
 
-- [ ] **4.1** Failing tests in `tests/integration/pipelex/cli/commands/init/test_cache_priming.py` with `TestCachePriming`:
+- [x] **4.1** Failing tests in `tests/integration/pipelex/cli/commands/init/test_cache_priming.py` with `TestCachePriming`:
   - `test_init_primes_cache_when_online` — run init flow with gateway enabled + httpx mocked to succeed → cache file present and readable afterwards.
   - `test_init_warns_when_offline` — same flow but httpx mocked to fail → init completes (no crash), cache file not present, warning printed to console.
   - `test_init_skips_priming_when_gateway_disabled` — gateway disabled in backends → no fetch attempted, no cache written.
   - `test_init_does_not_double_prime` — if cache already exists and is fresh, init can still refresh it (this is fine; assert the file was rewritten).
-- [ ] **4.2** Implement priming hook: in `pipelex/cli/commands/init/command.py`, after `_check_gateway_terms_if_needed` has accepted terms and gateway remains enabled, call a new helper `prime_remote_config_cache(console)` that calls `RemoteConfigFetcher.fetch_remote_config()` inside a try/except limited to `RemoteConfigUnavailableError`, `RemoteConfigFetchError`, and `RemoteConfigValidationError`. On unavailable/fetch-error: log a clear yellow warning; on validation error: re-raise (server schema break is fatal, and we control the server). **Never `except Exception`.**
-- [ ] **4.3** Mirror the same hook into the agent CLI init path (`pipelex/cli/agent_cli/commands/init_cmd.py`) so machine clients also prime.
-- [ ] **4.4** `make agent-check` clean. Tests green.
+- [x] **4.2** Implement priming hook: in `pipelex/cli/commands/init/command.py`, after `_check_gateway_terms_if_needed` has accepted terms and gateway remains enabled, call a new helper `prime_remote_config_cache(console)` that calls `RemoteConfigFetcher.fetch_remote_config()` inside a try/except limited to `RemoteConfigUnavailableError`, `RemoteConfigFetchError`, and `RemoteConfigValidationError`. On unavailable/fetch-error: log a clear yellow warning; on validation error: re-raise (server schema break is fatal, and we control the server). **Never `except Exception`.**
+- [x] **4.3** Mirror the same hook into the agent CLI init path (`pipelex/cli/agent_cli/commands/init_cmd.py`) so machine clients also prime.
+- [x] **4.4** `make agent-check` clean. Tests green.
 
 🛑 **CHECKPOINT 4** — Cache lifecycle complete. Cold-start safe.
 
@@ -419,3 +419,31 @@ Capture as separate work after this lands:
 - `make agent-test` — full suite green.
 
 **Next:** Phase 4 — start at **4.1** (failing tests for cache priming in `tests/integration/pipelex/cli/commands/init/test_cache_priming.py`).
+
+### Checkpoint 4 status
+
+**Landed:**
+- `pipelex/cli/commands/init/command.py`:
+  - New `CachePrimingResult` Pydantic model (`extra="forbid", strict=True`) with `primed: bool` and `error_message: str | None`.
+  - New pure-logic helper `attempt_prime_remote_config_cache()` — checks gateway enabled + terms accepted, calls `RemoteConfigFetcher.fetch_remote_config()`, returns a `CachePrimingResult`. Catches only `RemoteConfigUnavailableError` and `RemoteConfigFetchError`; `RemoteConfigValidationError` propagates (server-side schema breaks must surface — we control the back-office).
+  - Interactive wrapper `prime_remote_config_cache(console)` — calls the pure helper and emits a yellow Rich warning when a fetch was attempted and failed; otherwise silent.
+  - `execute_initialization(...)` now calls `prime_remote_config_cache(console)` as Step 5, after telemetry setup. No-op for BYOK/declined-terms paths, so unconditional call is safe.
+- `pipelex/cli/agent_cli/commands/init_cmd.py`:
+  - Calls `attempt_prime_remote_config_cache()` after `update_inference_setup_completed(...)`.
+  - The `agent_success(...)` envelope now includes `cache_primed: bool` and (when applicable) `cache_priming_error: str`. Machine consumers can branch on these without parsing log output.
+- `tests/integration/pipelex/cli/commands/init/test_cache_priming.py` — `TestCachePriming` with 4 tests covering the matrix: primes when online, warns when offline (no crash, no cache written, yellow warning emitted), skips when gateway disabled (no fetch + no cache), and overwrites an existing cache when refreshing online.
+
+**Decisions:**
+- Split the helper into a pure-logic `attempt_prime_remote_config_cache()` + an interactive `prime_remote_config_cache(console)` wrapper. The split lets the agent CLI surface structured fields (`cache_primed`, `cache_priming_error`) on its JSON envelope while the Rich CLI gets a yellow warning. The plan's original sketch only described the interactive wrapper; the agent CLI mirror needed the pure variant.
+- Priming runs unconditionally at the end of `execute_initialization`. The helper itself short-circuits when gateway is disabled or terms not accepted, so wrapping the call in `if PipelexBackend.GATEWAY in selected_backend_keys:` at the call site would be redundant double-checking. The internal short-circuit also covers the agent CLI mirror cleanly.
+- The skipped state (`primed=False, error_message=None`) is intentionally indistinguishable from "no gateway/no terms" — both surface the same `cache_primed: false` on the agent envelope. Consumers that care can check `backends_enabled` or read `pipelex_service.toml` directly.
+- No `--no-prime` opt-out flag for now. If priming ever becomes a real problem at init time (slow network, captive portals), revisit; today the helper warns and continues so it can't block init.
+- `attempt_prime_remote_config_cache` passes ``require_fresh=True`` to the fetcher. Without it, an offline fetch with a stale cache on disk would silently return ``source=CACHED`` and the helper would falsely report ``primed=True`` (no new write happened). With ``require_fresh=True``, the offline-with-stale-cache path raises ``RemoteConfigUnavailableError`` → we surface it as ``error_message`` and the existing cache file is left intact. Caught in code review post-Phase 4; `test_init_warns_when_offline_with_stale_cache_present` pins the regression.
+
+**Verification:**
+- `.venv/bin/pytest tests/integration/pipelex/cli/commands/init/test_cache_priming.py` — 5 passed.
+- Targeted: `.venv/bin/pytest -n auto -m "..." tests/unit/pipelex/cli/ tests/integration/pipelex/cli/ tests/unit/pipelex/system/ tests/integration/pipelex/system/` → 429 passed.
+- `make agent-check` — clean (ruff + plxt + pyright + mypy all green).
+- `make agent-test` — full suite green.
+
+**Next:** Phase 5 — start at **5.1** (create `tests/e2e/data/offline_mode/` bundles for `byok_simple`, `gateway_known_model`, `gateway_unknown_model`).

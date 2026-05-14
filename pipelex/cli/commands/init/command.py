@@ -5,6 +5,7 @@ import shutil
 from pathlib import Path
 
 import typer
+from pydantic import BaseModel, ConfigDict
 from rich.console import Console
 from rich.markup import escape
 from rich.prompt import Confirm
@@ -31,13 +32,77 @@ from pipelex.cogt.models.deck_manifest import compute_kit_manifest, write_manife
 from pipelex.hub import get_console
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
+from pipelex.system.pipelex_service.exceptions import RemoteConfigFetchError, RemoteConfigUnavailableError
 from pipelex.system.pipelex_service.pipelex_service_agreement import update_service_terms_acceptance
 from pipelex.system.pipelex_service.pipelex_service_config import (
     is_pipelex_gateway_enabled,
     load_pipelex_service_config_if_exists,
 )
+from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
 from pipelex.tools.misc.file_utils import path_exists
+
+
+class CachePrimingResult(BaseModel):
+    """Outcome of an attempt to prime the on-disk remote-config cache.
+
+    ``primed`` is ``True`` only when a fresh fetch succeeded and the cache was written.
+    ``error_message`` is populated only when the fetch was attempted but failed (offline at init
+    time); ``None`` means priming was skipped (gateway disabled or terms not accepted) or that
+    it succeeded.
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    primed: bool
+    error_message: str | None = None
+
+
+def attempt_prime_remote_config_cache() -> CachePrimingResult:
+    """Prime the on-disk remote-config cache so later offline runs can fall back to it.
+
+    Pure-logic variant: no I/O on the way out, so both the interactive (`pipelex init`) and
+    machine (`pipelex-agent init`) surfaces can decide how to surface failure (Rich warning vs
+    structured JSON field).
+
+    Skipped (``primed=False, error_message=None``) when:
+    - the gateway is disabled in ``backends.toml`` (BYOK has nothing to cache), or
+    - gateway terms have not been accepted (we cannot fetch without consent).
+
+    Always passes ``require_fresh=True`` to the fetcher: priming's only job is to write a fresh
+    cache, so silently accepting an existing cached fallback would be a misleading success. When
+    the network is unreachable and only a stale cache exists, the fetcher raises
+    ``RemoteConfigUnavailableError`` and we surface that as ``error_message`` — the stale cache
+    on disk is left intact so subsequent offline dry-runs can still fall back to it.
+
+    ``RemoteConfigValidationError`` is intentionally NOT caught: a server-side schema break is a
+    real bug (we control the back-office) and should surface loudly rather than be hidden by the
+    priming step.
+    """
+    if not is_pipelex_gateway_enabled():
+        return CachePrimingResult(primed=False)
+
+    service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
+    if service_config is None or not service_config.agreement.terms_accepted:
+        return CachePrimingResult(primed=False)
+
+    try:
+        RemoteConfigFetcher.fetch_remote_config(require_fresh=True)
+    except (RemoteConfigUnavailableError, RemoteConfigFetchError) as exc:
+        return CachePrimingResult(primed=False, error_message=str(exc))
+    return CachePrimingResult(primed=True)
+
+
+def prime_remote_config_cache(console: Console) -> None:
+    """Interactive-surface wrapper around :func:`attempt_prime_remote_config_cache`.
+
+    Prints a yellow warning to the console when a fetch was attempted and failed; otherwise
+    silent. Used by ``pipelex init`` so the user knows priming didn't happen and how to retry.
+    """
+    result = attempt_prime_remote_config_cache()
+    if result.error_message is not None:
+        console.print(f"[yellow]⚠ Could not prime remote config cache: {escape(result.error_message)}[/yellow]")
+        console.print("[dim]Re-run 'pipelex init' while online to prime the cache for offline dry-runs.[/dim]")
 
 
 def _check_gateway_terms_if_needed(console: Console, backends_toml_path: str) -> None:
@@ -305,6 +370,10 @@ def execute_initialization(
     # Step 4: Set up telemetry if needed
     if needs_telemetry:
         setup_telemetry(console, telemetry_config_path, for_project=for_project)
+
+    # Step 5: Prime the remote-config cache so dry-runs and validate can fall back offline.
+    # No-op when gateway is disabled or terms have not been accepted.
+    prime_remote_config_cache(console)
 
     console.print()
 

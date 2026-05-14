@@ -11,6 +11,7 @@ from tomlkit import table
 
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
 from pipelex.cli.commands.init.backends import get_selected_backend_keys, update_backends_in_toml
+from pipelex.cli.commands.init.command import attempt_prime_remote_config_cache
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.ui.backends_ui import get_backend_options_from_toml
 from pipelex.cogt.model_backends.backend import PipelexBackend
@@ -368,17 +369,24 @@ def agent_init_cmd(
         # Step 4: Mark inference setup as completed
         update_inference_setup_completed(completed=True, config_dir=config_manager.global_config_dir)
 
+        # Step 5: Prime the remote-config cache so subsequent offline dry-runs can fall back.
+        # No-op when gateway is disabled or terms have not been accepted; surfaces failure as
+        # structured fields on the success envelope rather than crashing init.
+        priming_result = attempt_prime_remote_config_cache()
+        result_payload: dict[str, Any] = {
+            "success": True,
+            "target_dir": str(target_dir),
+            "config_files_copied": config_files_copied,
+            "backends_enabled": backends_enabled,
+            "routing_profile": routing_profile,
+            "inference_setup_completed": True,
+            "cache_primed": priming_result.primed,
+        }
+        if priming_result.error_message is not None:
+            result_payload["cache_priming_error"] = priming_result.error_message
+
         # Output result
-        agent_success(
-            {
-                "success": True,
-                "target_dir": str(target_dir),
-                "config_files_copied": config_files_copied,
-                "backends_enabled": backends_enabled,
-                "routing_profile": routing_profile,
-                "inference_setup_completed": True,
-            }
-        )
+        agent_success(result_payload)
 
     except typer.Exit:
         raise
