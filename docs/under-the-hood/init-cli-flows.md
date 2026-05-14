@@ -224,7 +224,12 @@ If `needs_routing` is `True` (only for `focus=routing`), runs `customize_routing
 
 ### Step 4: Telemetry Step
 
-Copies the `telemetry.toml` template and prints instructions. No interactive prompts.
+Copies a telemetry template and prints instructions. No interactive prompts. Which template is copied depends on the target:
+
+- **Global init** (target is `~/.pipelex/`): copies `pipelex/kit/configs/telemetry.toml` — the active template with disabled-by-default settings.
+- **Project init** (target is `{project_root}/.pipelex/`): copies `pipelex/kit/configs/telemetry.project.toml` — every setting commented out so the project file does not shadow `~/.pipelex/telemetry.toml` or `~/.pipelex/telemetry_override.toml` during layered loading.
+
+`setup_telemetry()` selects the template via a `for_project: bool` arg passed down from the `--local` flag on `pipelex init`.
 
 ---
 
@@ -267,7 +272,7 @@ Copies the `telemetry.toml` template and prints instructions. No interactive pro
 
 | Constant | Contents | Reason |
 |----------|----------|--------|
-| `INIT_SKIP_FILES` | All `GIT_IGNORED_CONFIG_FILES` (`pipelex_service.toml`, `pipelex_override.toml`, `telemetry_override.toml`, `pipelex_gateway_models.md`, `pipelex_gateway_models_plain.md`, `x_custom_llm_deck.toml`, `x_custom_extract_deck.toml`) plus `telemetry.toml` and `.DS_Store` | Git-ignored, auto-generated, or managed by other steps |
+| `INIT_SKIP_FILES` | All `GIT_IGNORED_CONFIG_FILES` (`pipelex_service.toml`, `pipelex_override.toml`, `telemetry_override.toml`, `telemetry.project.toml`, `pipelex_gateway_models.md`, `pipelex_gateway_models_plain.md`, `x_custom_llm_deck.toml`, `x_custom_extract_deck.toml`) plus `telemetry.toml` and `.DS_Store` | Git-ignored, auto-generated, or managed by other steps |
 | `INIT_SKIP_DIRS` | `inference` | Managed independently by inference step |
 
 ### Source Modules

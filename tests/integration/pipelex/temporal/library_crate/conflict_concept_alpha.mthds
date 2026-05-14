@@ -33,6 +33,6 @@ output = "Text"
 model = "$testing-text"
 prompt = """
 Summarize this result:
-Score: @alpha_result.score
-Label: @alpha_result.label
+Score: $alpha_result.score
+Label: $alpha_result.label
 """

@@ -24,6 +24,23 @@ Telemetry configuration is stored in `.pipelex/telemetry.toml`. This file contro
 
 This file is created when you run `pipelex init telemetry` or `pipelex init`.
 
+### Global vs project config
+
+Telemetry config is layered: a project `.pipelex/telemetry.toml` is merged **on top of** the user's global `~/.pipelex/telemetry.toml`, not as a replacement. The load order is:
+
+1. `~/.pipelex/telemetry.toml`
+2. `~/.pipelex/telemetry_override.toml`
+3. `{project_root}/.pipelex/telemetry.toml` *(if it exists and the project dir is distinct from the global dir)*
+4. `{project_root}/.pipelex/telemetry_override.toml` *(same condition)*
+
+Files are deep-merged, with later layers winning per leaf key. This means Langfuse keys or OTLP endpoints declared once in `~/.pipelex/telemetry.toml` keep applying across every project — a project file can override specific keys without redeclaring the rest.
+
+!!! info "Project telemetry.toml is empty by default"
+    To make the layering above actually work, `pipelex init` (when targeting a project's `.pipelex/`) drops in a **fully commented-out template**. Every section is present as documentation, but no key is set. This is deliberate: a value defined in the project file would otherwise override your global setting. Uncomment a key in the project template only when you want this project to diverge from your global telemetry config. Global init (`~/.pipelex/`) gets the active template with real defaults.
+
+!!! note "List merge behavior"
+    The `[[otlp]]` array and the `redact_properties` list do not concatenate across layers — the later layer replaces the whole list. If you want to add an OTLP exporter on top of the global set, redeclare all exporters in the layer that wins.
+
 ## Full Example Configuration
 
 ```toml

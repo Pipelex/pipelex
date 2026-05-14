@@ -1,8 +1,8 @@
 """ReactFlow HTML generator for GraphSpec rendering.
 
-Generates standalone HTML files using the mthds-ui GraphViewer component.
-The HTML template uses Jinja2 for data injection, consistent with mermaid rendering.
-JS and CSS bundles are loaded from vendored assets.
+Generates HTML files using the mthds-ui GraphViewer component, loaded from
+jsDelivr with Subresource Integrity. The template uses Jinja2 for data
+injection, consistent with mermaid rendering.
 """
 
 import json
@@ -10,10 +10,9 @@ import json
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.graph.reactflow.reactflow_config import ReactFlowRenderingConfig
-from pipelex.graph.reactflow.standalone_assets import get_standalone_css, get_standalone_js
+from pipelex.graph.reactflow.standalone_assets import ELKJS, MTHDS_UI_CSS, MTHDS_UI_JS
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async, render_jinja2_sync
 from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
-from pipelex.urls import URLs
 
 _REACTFLOW_TEMPLATE_KEY = "reactflow/main.html.jinja2"
 
@@ -32,13 +31,29 @@ def _build_viewer_config(config: ReactFlowRenderingConfig) -> dict[str, object]:
     }
 
 
+def _build_templating_context(
+    graphspec: GraphSpec,
+    config: ReactFlowRenderingConfig,
+    title: str | None,
+) -> dict[str, object]:
+    return {
+        "title": title or config.default_title,
+        "graphspec_json": json.dumps(graphspec.model_dump(mode="json", by_alias=True), indent=2),
+        "config_json": json.dumps(_build_viewer_config(config)),
+        "theme": config.style.theme,
+        "mthds_ui_js": MTHDS_UI_JS,
+        "mthds_ui_css": MTHDS_UI_CSS,
+        "elkjs": ELKJS,
+    }
+
+
 def generate_reactflow_html(
     graphspec: GraphSpec,
     config: ReactFlowRenderingConfig,
     *,
     title: str | None = None,
 ) -> str:
-    """Generate single-file HTML with embedded GraphSpec and mthds-ui GraphViewer.
+    """Generate HTML with embedded GraphSpec; viewer assets load from jsDelivr (SRI-pinned).
 
     Args:
         graphspec: The GraphSpec to embed and render.
@@ -46,26 +61,13 @@ def generate_reactflow_html(
         title: Optional page title, overrides config.default_title.
 
     Returns:
-        Complete HTML page as a string with embedded GraphViewer.
+        Complete HTML page as a string.
     """
     template_source = TemplateRegistry.get(_REACTFLOW_TEMPLATE_KEY)
-
-    graphspec_json = json.dumps(graphspec.model_dump(mode="json", by_alias=True), indent=2)
-    config_json = json.dumps(_build_viewer_config(config))
-
     return render_jinja2_sync(
         template_source=template_source,
         template_category=TemplateCategory.HTML,
-        templating_context={
-            "title": title or config.default_title,
-            "logo_dark": URLs.logo_white_on_transparent,
-            "logo_light": URLs.logo_black_on_transparent,
-            "graphspec_json": graphspec_json,
-            "config_json": config_json,
-            "theme": config.style.theme,
-            "viewer_js": get_standalone_js(),
-            "viewer_css": get_standalone_css(),
-        },
+        templating_context=_build_templating_context(graphspec, config, title),
     )
 
 
@@ -75,32 +77,10 @@ async def generate_reactflow_html_async(
     *,
     title: str | None = None,
 ) -> str:
-    """Generate single-file HTML with embedded GraphSpec and mthds-ui GraphViewer (async version).
-
-    Args:
-        graphspec: The GraphSpec to embed and render.
-        config: ReactFlow rendering configuration.
-        title: Optional page title, overrides config.default_title.
-
-    Returns:
-        Complete HTML page as a string with embedded GraphViewer.
-    """
+    """Async variant of `generate_reactflow_html`."""
     template_source = TemplateRegistry.get(_REACTFLOW_TEMPLATE_KEY)
-
-    graphspec_json = json.dumps(graphspec.model_dump(mode="json", by_alias=True), indent=2)
-    config_json = json.dumps(_build_viewer_config(config))
-
     return await render_jinja2_async(
         template_source=template_source,
         template_category=TemplateCategory.HTML,
-        templating_context={
-            "title": title or config.default_title,
-            "logo_dark": URLs.logo_white_on_transparent,
-            "logo_light": URLs.logo_black_on_transparent,
-            "graphspec_json": graphspec_json,
-            "config_json": config_json,
-            "theme": config.style.theme,
-            "viewer_js": get_standalone_js(),
-            "viewer_css": get_standalone_css(),
-        },
+        templating_context=_build_templating_context(graphspec, config, title),
     )

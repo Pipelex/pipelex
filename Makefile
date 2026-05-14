@@ -137,11 +137,6 @@ make docs-deploy-specific-version         - Deploy docs for the current version 
 make docs-deploy-root          - Deploy root assets (404.html, robots.txt, index.html) to gh-pages
 make docs-delete VERSION=x.y.z - Delete a deployed documentation version
 
-make sync-graph-ui            - Sync graph viewer assets from mthds-ui (requires node/npm)
-make sgui                     - Shorthand -> sync-graph-ui
-make check-graph-ui-sync      - Check graph viewer assets match pinned version
-make cguis                    - Shorthand -> check-graph-ui-sync
-
 make serve-graph              - Start HTTP server to view ReactFlow graphs (PORT=8765, DIR=temp/test_outputs)
 make stop-graph-server        - Stop the graph viewer HTTP server
 make view-graph               - Start server and open ReactFlow graph in browser
@@ -194,7 +189,6 @@ export HELP
 	update-gateway-models update-gateway-models-quiet ugm check-gateway-models cgm up \
 	test-count check-test-badge \
 	serve-graph serve-graph-bg stop-graph-server view-graph sg vg \
-	sync-graph-ui sgui check-graph-ui-sync cguis \
 	temporal-server ts temporal-stop tstop temporal-worker tw temporal-worker-router twr temporal-worker-runner twn \
 	temporal-run trun temporal-run-dry trund \
 	docs-deploy-root
@@ -1066,51 +1060,6 @@ trund: temporal-run-dry
 ##########################################################################################
 ### GRAPH UI ASSET SYNC (from mthds-ui)
 ##########################################################################################
-
-GRAPH_UI_ASSETS_DIR := pipelex/graph/reactflow/assets
-GRAPH_UI_VERSION_FILE := $(GRAPH_UI_ASSETS_DIR)/.graph-ui-version
-
-sync-graph-ui:
-	$(call PRINT_TITLE,"Syncing graph UI assets from mthds-ui")
-	@PINNED_VERSION=$$(grep -o '"github:Pipelex/mthds-ui#[^"]*"' package.json | sed 's/.*#//;s/"//') && \
-	if [ -z "$$PINNED_VERSION" ]; then \
-		echo "ERROR: Could not find @pipelex/mthds-ui version in package.json"; \
-		exit 1; \
-	fi && \
-	echo "Pinned version: $$PINNED_VERSION" && \
-	TMPDIR=$$(mktemp -d) && \
-	trap "rm -rf $$TMPDIR" EXIT && \
-	echo "Cloning mthds-ui@$$PINNED_VERSION..." && \
-	git clone --depth 1 --branch "$$PINNED_VERSION" https://github.com/Pipelex/mthds-ui.git "$$TMPDIR/mthds-ui" && \
-	echo "Installing dependencies..." && \
-	cd "$$TMPDIR/mthds-ui" && npm install --ignore-scripts && \
-	echo "Building standalone assets..." && \
-	npm run build:standalone && \
-	echo "Copying assets..." && \
-	cp dist/standalone/graph-viewer.js "$(CURDIR)/$(GRAPH_UI_ASSETS_DIR)/graph-viewer.js" && \
-	cp dist/standalone/graph-viewer.css "$(CURDIR)/$(GRAPH_UI_ASSETS_DIR)/graph-viewer.css" && \
-	echo "$$PINNED_VERSION" > "$(CURDIR)/$(GRAPH_UI_VERSION_FILE)" && \
-	echo "Synced graph-viewer assets from mthds-ui@$$PINNED_VERSION"
-
-sgui: sync-graph-ui
-	@echo "> done: sgui = sync-graph-ui"
-
-check-graph-ui-sync:
-	$(call PRINT_TITLE,"Checking graph UI assets are up-to-date")
-	@PINNED_VERSION=$$(grep -o '"github:Pipelex/mthds-ui#[^"]*"' package.json | sed 's/.*#//;s/"//') && \
-	SYNCED_VERSION=$$(cat $(GRAPH_UI_VERSION_FILE) 2>/dev/null | tr -d '[:space:]' || echo "NONE") && \
-	if [ "$$PINNED_VERSION" != "$$SYNCED_VERSION" ]; then \
-		echo "Graph UI assets are out of date!"; \
-		echo "  Pinned version: $$PINNED_VERSION"; \
-		echo "  Synced version: $$SYNCED_VERSION"; \
-		echo "  Run 'make sync-graph-ui' to update."; \
-		exit 1; \
-	else \
-		echo "Graph UI assets are up-to-date ($$SYNCED_VERSION)"; \
-	fi
-
-cguis: check-graph-ui-sync
-	@echo "> done: cguis = check-graph-ui-sync"
 
 ##########################################################################################
 ### SHORTHANDS

@@ -178,6 +178,7 @@ def execute_initialization(
     telemetry_config_path: str,
     is_first_time_backends_setup: bool,
     target_config_dir: Path | None = None,
+    for_project: bool = False,
 ):
     """Execute the initialization steps.
 
@@ -195,6 +196,8 @@ def execute_initialization(
         telemetry_config_path: Path to telemetry config file.
         is_first_time_backends_setup: Whether backends.toml didn't exist before this run.
         target_config_dir: Explicit target .pipelex directory. If None, uses config_manager.pipelex_config_dir.
+        for_project: True when initializing a project's .pipelex/; False when initializing
+            the global ~/.pipelex/. Selects which telemetry template gets copied.
 
     """
     # Step 1: Initialize config if needed
@@ -301,7 +304,7 @@ def execute_initialization(
 
     # Step 4: Set up telemetry if needed
     if needs_telemetry:
-        setup_telemetry(console, telemetry_config_path)
+        setup_telemetry(console, telemetry_config_path, for_project=for_project)
 
     console.print()
 
@@ -472,6 +475,7 @@ def init_cmd(
             telemetry_config_path=telemetry_config_path,
             is_first_time_backends_setup=is_first_time_backends_setup,
             target_config_dir=pipelex_config_dir,
+            for_project=local,
         )
 
     except typer.Exit:

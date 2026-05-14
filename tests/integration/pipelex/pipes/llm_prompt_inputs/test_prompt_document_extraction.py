@@ -103,7 +103,7 @@ class TestPromptDocumentExtraction:
             description="Test images and documents",
             inputs={"doc": "Document", "image": "Image"},
             output="Text",
-            prompt="Document: @doc\nImage: @image",
+            prompt="Document:\n@doc\nImage:\n@image",
         )
 
         pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(

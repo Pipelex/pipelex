@@ -25,7 +25,7 @@ class TestTemplateImageAnalyzer:
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
 
         result = TemplateImageAnalyzer.analyze_template_for_images(
-            template_source="Describe this image: @image",
+            template_source="Describe this image:\n@image",
             input_specs={"image": "Image"},
             domain_code="test_pipes",
         )
@@ -40,7 +40,7 @@ class TestTemplateImageAnalyzer:
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
 
         result = TemplateImageAnalyzer.analyze_template_for_images(
-            template_source="Look at this: @page.page_view",
+            template_source="Look at this:\n@page.page_view",
             input_specs={"page": "Page"},
             domain_code="test_pipes",
         )
@@ -68,7 +68,7 @@ class TestTemplateImageAnalyzer:
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
 
         result = TemplateImageAnalyzer.analyze_template_for_images(
-            template_source="Compare @image_a with @image_b",
+            template_source="Compare:\n@image_a\nwith:\n@image_b",
             input_specs={"image_a": "Image", "image_b": "Image"},
             domain_code="test_pipes",
         )
@@ -124,7 +124,7 @@ class TestTemplateImageAnalyzer:
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
 
         result = TemplateImageAnalyzer.analyze_template_for_images(
-            template_source="Describe the page: @page",
+            template_source="Describe the page:\n@page",
             input_specs={"page": "Page"},
             domain_code="test_pipes",
         )
@@ -137,7 +137,7 @@ class TestTemplateImageAnalyzer:
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
 
         result = TemplateImageAnalyzer.analyze_template_for_images(
-            template_source="Process this: @text",
+            template_source="Process this:\n@text",
             input_specs={"text": "Text"},
             domain_code="test_pipes",
         )
@@ -149,7 +149,7 @@ class TestTemplateImageAnalyzer:
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
 
         result = TemplateImageAnalyzer.analyze_template_for_images(
-            template_source="Hello @name, your age is @age",
+            template_source="Hello $name, your age is $age",
             input_specs={"name": "Text", "age": "Text"},
             domain_code="test_pipes",
         )
@@ -178,7 +178,7 @@ class TestTemplateImageAnalyzer:
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
 
         result = TemplateImageAnalyzer.analyze_template_for_images(
-            template_source="Look at: @portrait",
+            template_source="Look at:\n@portrait",
             input_specs={"portrait": "Image"},
             domain_code="test_pipes",
         )
@@ -234,7 +234,7 @@ class TestTemplateImageAnalyzer:
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
 
         result = TemplateImageAnalyzer.analyze_template_for_images(
-            template_source="Compare @extra_photo with {{ page | with_images }}",
+            template_source="Compare:\n@extra_photo\nwith {{ page | with_images }}",
             input_specs={"extra_photo": "Image", "page": "Page"},
             domain_code="test_pipes",
         )
@@ -253,7 +253,7 @@ class TestValidateUnusedInputs:
 
         # Should not raise
         TemplateImageAnalyzer.validate_unused_inputs(
-            template_sources=["Process @name and @age"],
+            template_sources=["Process $name and $age"],
             input_specs={"name": "Text", "age": "Text"},
         )
 
@@ -263,7 +263,7 @@ class TestValidateUnusedInputs:
 
         with pytest.raises(UnusedInputError, match="unused_var"):
             TemplateImageAnalyzer.validate_unused_inputs(
-                template_sources=["Process @name"],
+                template_sources=["Process $name"],
                 input_specs={"name": "Text", "unused_var": "Text"},
             )
 
@@ -273,7 +273,7 @@ class TestValidateUnusedInputs:
 
         # name in first, age in second - both should pass
         TemplateImageAnalyzer.validate_unused_inputs(
-            template_sources=["Hello @name", "You are @age years old"],
+            template_sources=["Hello $name", "You are $age years old"],
             input_specs={"name": "Text", "age": "Text"},
         )
 
@@ -283,6 +283,6 @@ class TestValidateUnusedInputs:
 
         # page.page_view should count page as used
         TemplateImageAnalyzer.validate_unused_inputs(
-            template_sources=["Look at @page.page_view"],
+            template_sources=["Look at $page.page_view"],
             input_specs={"page": "Page"},
         )

@@ -41,9 +41,9 @@ output = "Summary"
 model = "$testing-text"
 prompt = """
 Create a one-line summary for this employee:
-Title: @profile_result.title
-Department: @profile_result.department
-Level: @profile_result.level
+Title: $profile_result.title
+Department: $profile_result.department
+Level: $profile_result.level
 """
 
 [pipe.multi_beta_finalize]

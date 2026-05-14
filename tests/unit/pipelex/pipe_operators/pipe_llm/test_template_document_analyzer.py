@@ -19,7 +19,7 @@ class TestTemplateDocumentAnalyzer:
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
 
         result = TemplateDocumentAnalyzer.analyze_template_for_documents(
-            template_source="Analyze this document: @document",
+            template_source="Analyze this document:\n@document",
             input_specs={"document": "Document"},
             domain_code="test_pipes",
         )
@@ -47,7 +47,7 @@ class TestTemplateDocumentAnalyzer:
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
 
         result = TemplateDocumentAnalyzer.analyze_template_for_documents(
-            template_source="Compare @doc_a with @doc_b",
+            template_source="Compare:\n@doc_a\nwith:\n@doc_b",
             input_specs={"doc_a": "Document", "doc_b": "Document"},
             domain_code="test_pipes",
         )
@@ -67,7 +67,7 @@ class TestTemplateDocumentAnalyzer:
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
 
         result = TemplateDocumentAnalyzer.analyze_template_for_documents(
-            template_source="Process this: @text",
+            template_source="Process this:\n@text",
             input_specs={"text": "Text"},
             domain_code="test_pipes",
         )
@@ -79,7 +79,7 @@ class TestTemplateDocumentAnalyzer:
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
 
         result = TemplateDocumentAnalyzer.analyze_template_for_documents(
-            template_source="Look at: @image",
+            template_source="Look at:\n@image",
             input_specs={"image": "Image"},
             domain_code="test_pipes",
         )
@@ -91,7 +91,7 @@ class TestTemplateDocumentAnalyzer:
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
 
         result = TemplateDocumentAnalyzer.analyze_template_for_documents(
-            template_source="Hello @name, your age is @age",
+            template_source="Hello $name, your age is $age",
             input_specs={"name": "Text", "age": "Text"},
             domain_code="test_pipes",
         )
@@ -120,7 +120,7 @@ class TestTemplateDocumentAnalyzer:
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
 
         result = TemplateDocumentAnalyzer.analyze_template_for_documents(
-            template_source="Analyze: @report",
+            template_source="Analyze:\n@report",
             input_specs={"report": "Document"},
             domain_code="test_pipes",
         )
@@ -151,7 +151,7 @@ class TestTemplateDocumentAnalyzer:
 
         # This analyzer should only return document references
         result = TemplateDocumentAnalyzer.analyze_template_for_documents(
-            template_source="Document: @doc, Image: @image",
+            template_source="Document:\n@doc\nImage:\n@image",
             input_specs={"doc": "Document", "image": "Image"},
             domain_code="test_pipes",
         )
@@ -166,7 +166,7 @@ class TestTemplateDocumentAnalyzer:
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
 
         result = TemplateDocumentAnalyzer.analyze_template_for_documents(
-            template_source="Document: @doc, Other: @other",
+            template_source="Document:\n@doc\nOther:\n@other",
             input_specs={"doc": "Document", "other": "Text"},
             domain_code="test_pipes",
         )

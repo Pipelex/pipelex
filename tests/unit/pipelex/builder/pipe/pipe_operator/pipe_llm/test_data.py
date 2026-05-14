@@ -115,7 +115,7 @@ class PipeLLMTestCases:
             inputs={"data": "Data"},
             output="Analysis",
             system_prompt="You are a data analyst",
-            prompt="Analyze: @data",
+            prompt="Analyze: $data",
             model="$retrieval",
         ),
         PipeLLMBlueprint(
@@ -124,7 +124,7 @@ class PipeLLMTestCases:
             description="Generate with system prompt",
             inputs={"data": "Data"},
             system_prompt="You are a data analyst",
-            prompt="Analyze: @data",
+            prompt="Analyze: $data",
             output="Analysis",
             model="$retrieval",
         ),

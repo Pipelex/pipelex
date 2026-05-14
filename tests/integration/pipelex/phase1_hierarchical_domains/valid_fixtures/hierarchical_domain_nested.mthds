@@ -12,4 +12,4 @@ description = "Summarize a contract"
 inputs      = { clause = "NonCompeteClause" }
 output      = "ContractSummary"
 model       = "$quick-reasoning"
-prompt      = "Summarize @clause"
+prompt      = "Summarize $clause"

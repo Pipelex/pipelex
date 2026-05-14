@@ -20,7 +20,7 @@ class TestImageReferencesFactoryLevel:
             description="Test DIRECT reference",
             inputs={"image": "Image"},
             output="Text",
-            prompt="Describe: @image",
+            prompt="Describe: $image",
         )
 
         pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
@@ -66,7 +66,7 @@ class TestImageReferencesFactoryLevel:
             description="Test no reference without filter",
             inputs={"page": "Page"},
             output="Text",
-            prompt="Describe the page: @page",
+            prompt="Describe the page: $page",
         )
 
         pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(

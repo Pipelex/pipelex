@@ -47,7 +47,7 @@ description = "Analyze the tone of the text"
 inputs      = { input_text = "Text" }
 output      = "Pg3ToneResult"
 model       = "$testing-text"
-prompt      = "Describe the tone of: @input_text.text"
+prompt      = "Describe the tone of: $input_text.text"
 
 [pipe.pg3_analyze_length]
 type        = "PipeLLM"
@@ -55,7 +55,7 @@ description = "Analyze the length of the text"
 inputs      = { input_text = "Text" }
 output      = "Pg3LengthResult"
 model       = "$testing-text"
-prompt      = "Describe the length characteristics of: @input_text.text"
+prompt      = "Describe the length characteristics of: $input_text.text"
 
 [pipe.pg3_analyze_style]
 type        = "PipeLLM"
@@ -63,7 +63,7 @@ description = "Analyze the writing style of the text"
 inputs      = { input_text = "Text" }
 output      = "Pg3StyleResult"
 model       = "$testing-text"
-prompt      = "Describe the writing style of: @input_text.text"
+prompt      = "Describe the writing style of: $input_text.text"
 
 [pipe.pg3_refine_tone]
 type        = "PipeLLM"
@@ -71,7 +71,7 @@ description = "Refine the tone analysis"
 inputs      = { tone_result = "Pg3ToneResult" }
 output      = "Text"
 model       = "$testing-text"
-prompt      = "Refine and elaborate on this tone analysis: @tone_result.text"
+prompt      = "Refine and elaborate on this tone analysis: $tone_result.text"
 
 [pipe.pg3_refine_length]
 type        = "PipeLLM"
@@ -79,4 +79,4 @@ description = "Refine the length analysis"
 inputs      = { length_result = "Pg3LengthResult" }
 output      = "Text"
 model       = "$testing-text"
-prompt      = "Refine and elaborate on this length analysis: @length_result.text"
+prompt      = "Refine and elaborate on this length analysis: $length_result.text"

@@ -61,7 +61,7 @@ type = "PipeLLM"
 description = "Generate a topic"
 inputs = { subject = "Text" }
 output = "Topic"
-prompt = "Generate a topic about @subject"
+prompt = "Generate a topic about $subject"
 """
 
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -306,7 +306,7 @@ type = "PipeLLM"
 description = "A pipe that should be skipped"
 inputs = { subject = "Text" }
 output = "Result"
-prompt = "Generate a result about @subject"
+prompt = "Generate a result about $subject"
 """
 
         with tempfile.TemporaryDirectory() as tmp_dir:

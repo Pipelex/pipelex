@@ -11,4 +11,4 @@ description = "Compute a weighted score"
 inputs      = { data = "Text" }
 output      = "WeightedScore"
 model       = "$quick-reasoning"
-prompt      = "Compute score from @data"
+prompt      = "Compute score from $data"

@@ -8,4 +8,4 @@ description = "Analyze a non-compete clause from the legal.contracts domain"
 inputs      = { clause = "legal.contracts.NonCompeteClause" }
 output      = "Text"
 model       = "$quick-reasoning"
-prompt      = "Analyze @clause"
+prompt      = "Analyze $clause"
