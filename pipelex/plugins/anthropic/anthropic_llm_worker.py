@@ -18,6 +18,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
 from pipelex.cogt.inference.error_classification import (
+    extract_underlying_sdk_exception,
     is_content_policy_violation,
     is_quota_exhaustion_anthropic,
 )
@@ -224,29 +225,6 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                 msg = f"Model '{self.inference_model.desc}' does not support reasoning (thinking_mode=none)"
                 raise LLMCapabilityError(msg)
 
-    @staticmethod
-    def _extract_underlying_sdk_exception(instructor_exc: Any) -> BaseException | None:
-        """Recover the SDK exception that caused an ``InstructorRetryException``.
-
-        instructor's retry loop wraps the last failed attempt's exception inside
-        ``InstructorRetryException``. We prefer ``failed_attempts[-1].exception``
-        (the documented public attribute) and fall back to walking ``__cause__``
-        (a tenacity ``RetryError`` whose ``last_attempt._exception`` holds the
-        original exception) when ``failed_attempts`` is unset.
-        """
-        failed_attempts = getattr(instructor_exc, "failed_attempts", None)
-        if failed_attempts:
-            last_exc = getattr(failed_attempts[-1], "exception", None)
-            if isinstance(last_exc, BaseException):
-                return last_exc
-        cause = instructor_exc.__cause__
-        last_attempt = getattr(cause, "last_attempt", None)
-        if last_attempt is not None:
-            underlying = getattr(last_attempt, "_exception", None)
-            if isinstance(underlying, BaseException):
-                return underlying
-        return None
-
     def _raise_categorized_anthropic_sdk_error(
         self,
         sdk_exc: BaseException,
@@ -423,15 +401,15 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
             )
         except InstructorRetryException as instructor_exc:
             # instructor wraps SDK exceptions during retries; recover the underlying
-            # one so transient/capacity/auth errors aren't all flattened to CONTENT.
-            underlying_exc = self._extract_underlying_sdk_exception(instructor_exc=instructor_exc)
+            # one so transient/capacity/auth errors aren't all flattened to UNKNOWN.
+            underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
             if underlying_exc is not None:
                 self._raise_categorized_anthropic_sdk_error(sdk_exc=underlying_exc, chain_from=instructor_exc)
             msg = (
                 f"Anthropic structured generation via 'instructor' failed with model: {self.inference_model.desc} "
                 f"trying to generate schema: {schema} with error: {instructor_exc}"
             )
-            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT) from instructor_exc
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.UNKNOWN) from instructor_exc
         except (
             RateLimitError,
             APITimeoutError,

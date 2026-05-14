@@ -19,13 +19,19 @@ class InferenceErrorCategory(StrEnum):
     CONFIGURATION = "configuration"
     CONTENT = "content"
     CAPACITY = "capacity"
+    UNKNOWN = "unknown"
 
     @property
     def is_retryable(self) -> bool:
         match self:
             case InferenceErrorCategory.TRANSIENT:
                 return True
-            case InferenceErrorCategory.CONFIGURATION | InferenceErrorCategory.CONTENT | InferenceErrorCategory.CAPACITY:
+            case (
+                InferenceErrorCategory.CONFIGURATION
+                | InferenceErrorCategory.CONTENT
+                | InferenceErrorCategory.CAPACITY
+                | InferenceErrorCategory.UNKNOWN
+            ):
                 return False
 
 

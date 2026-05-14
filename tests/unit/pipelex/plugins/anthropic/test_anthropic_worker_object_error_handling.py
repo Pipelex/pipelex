@@ -7,14 +7,12 @@ are categorized correctly instead of being flattened to ``CONTENT``.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import anthropic
 import httpx
 import pytest
-from instructor.core import FailedAttempt, InstructorRetryException
-from pydantic import BaseModel
-from tenacity import RetryError
+from instructor.core import InstructorRetryException
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -22,6 +20,7 @@ if TYPE_CHECKING:
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
 from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicCredentialsError
 from pipelex.plugins.anthropic.anthropic_llm_worker import AnthropicLLMWorker
+from tests.helpers.instructor_test_utils import DummySchema, make_llm_job, wrap_in_instructor_retry
 
 
 def _mock_httpx_response(status_code: int) -> httpx.Response:
@@ -55,23 +54,6 @@ def _make_anthropic_permission_denied_error(message: str) -> anthropic.Permissio
     return anthropic.PermissionDeniedError(message, response=_mock_httpx_response(403), body=None)
 
 
-def _wrap_in_instructor_retry(sdk_exc: Exception, *, include_failed_attempts: bool = True) -> InstructorRetryException:
-    """Build an ``InstructorRetryException`` as instructor's retry loop would."""
-    failed_attempts: list[FailedAttempt] | None = [FailedAttempt(attempt_number=1, exception=sdk_exc)] if include_failed_attempts else None
-    return InstructorRetryException(
-        str(sdk_exc),
-        last_completion=None,
-        n_attempts=1,
-        total_usage=0,
-        create_kwargs={},
-        failed_attempts=failed_attempts,
-    )
-
-
-class _DummySchema(BaseModel):
-    value: str
-
-
 def _make_worker(mocker: MockerFixture) -> AnthropicLLMWorker:
     worker = object.__new__(AnthropicLLMWorker)
     mock_model = mocker.MagicMock()
@@ -90,18 +72,6 @@ def _make_worker(mocker: MockerFixture) -> AnthropicLLMWorker:
     worker.instructor_for_objects = instructor_client
 
     return worker
-
-
-def _make_llm_job(mocker: MockerFixture) -> Any:
-    job = mocker.MagicMock()
-    job.applied_job_params = None
-    job.job_params.temperature = 0.5
-    job.job_params.max_tokens = None
-    job.job_params.reasoning_effort = None
-    job.job_params.reasoning_budget = None
-    job.job_config.max_retries = 1
-    job.job_report.llm_tokens_usage = None
-    return job
 
 
 def _patch_gen_object_dependencies(mocker: MockerFixture) -> None:
@@ -127,11 +97,11 @@ class TestAnthropicWorkerObjectErrorHandling:
         _patch_gen_object_dependencies(mocker)
         worker = _make_worker(mocker)
         sdk_exc = _make_anthropic_rate_limit_error("Number of request tokens has exceeded your per-minute limit")
-        wrapped = _wrap_in_instructor_retry(sdk_exc)
+        wrapped = wrap_in_instructor_retry(sdk_exc)
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_object(llm_job=_make_llm_job(mocker), schema=_DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
         assert exc_info.value.user_action is not None
@@ -142,11 +112,11 @@ class TestAnthropicWorkerObjectErrorHandling:
         _patch_gen_object_dependencies(mocker)
         worker = _make_worker(mocker)
         sdk_exc = _make_anthropic_rate_limit_error("Your account quota has been exceeded")
-        wrapped = _wrap_in_instructor_retry(sdk_exc)
+        wrapped = wrap_in_instructor_retry(sdk_exc)
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_object(llm_job=_make_llm_job(mocker), schema=_DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CAPACITY
         assert exc_info.value.user_action is not None
@@ -155,11 +125,11 @@ class TestAnthropicWorkerObjectErrorHandling:
     async def test_wrapped_timeout_is_transient(self, mocker: MockerFixture) -> None:
         _patch_gen_object_dependencies(mocker)
         worker = _make_worker(mocker)
-        wrapped = _wrap_in_instructor_retry(_make_anthropic_timeout_error())
+        wrapped = wrap_in_instructor_retry(_make_anthropic_timeout_error())
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_object(llm_job=_make_llm_job(mocker), schema=_DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
 
@@ -167,11 +137,11 @@ class TestAnthropicWorkerObjectErrorHandling:
         _patch_gen_object_dependencies(mocker)
         worker = _make_worker(mocker)
         sdk_exc = _make_anthropic_bad_request_error("Your request was rejected due to content_policy_violation")
-        wrapped = _wrap_in_instructor_retry(sdk_exc)
+        wrapped = wrap_in_instructor_retry(sdk_exc)
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_object(llm_job=_make_llm_job(mocker), schema=_DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONTENT
         assert exc_info.value.user_action is not None
@@ -180,59 +150,48 @@ class TestAnthropicWorkerObjectErrorHandling:
     async def test_wrapped_connection_error_is_transient(self, mocker: MockerFixture) -> None:
         _patch_gen_object_dependencies(mocker)
         worker = _make_worker(mocker)
-        wrapped = _wrap_in_instructor_retry(_make_anthropic_connection_error())
+        wrapped = wrap_in_instructor_retry(_make_anthropic_connection_error())
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_object(llm_job=_make_llm_job(mocker), schema=_DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
 
     async def test_wrapped_auth_error_raises_credentials_error(self, mocker: MockerFixture) -> None:
         _patch_gen_object_dependencies(mocker)
         worker = _make_worker(mocker)
-        wrapped = _wrap_in_instructor_retry(_make_anthropic_auth_error("Invalid API key"))
+        wrapped = wrap_in_instructor_retry(_make_anthropic_auth_error("Invalid API key"))
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(AnthropicCredentialsError) as exc_info:
-            await worker._gen_object(llm_job=_make_llm_job(mocker), schema=_DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
 
     async def test_wrapped_permission_quota_is_capacity(self, mocker: MockerFixture) -> None:
         _patch_gen_object_dependencies(mocker)
         worker = _make_worker(mocker)
-        wrapped = _wrap_in_instructor_retry(_make_anthropic_permission_denied_error("Your account quota has been exceeded"))
+        wrapped = wrap_in_instructor_retry(_make_anthropic_permission_denied_error("Your account quota has been exceeded"))
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_object(llm_job=_make_llm_job(mocker), schema=_DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CAPACITY
 
-    async def test_unrecognized_underlying_falls_back_to_content(self, mocker: MockerFixture) -> None:
-        """A wrapped non-SDK exception (e.g. validation failure) keeps the CONTENT fallback."""
+    async def test_unrecognized_underlying_falls_back_to_unknown(self, mocker: MockerFixture) -> None:
+        """A wrapped non-SDK exception (e.g. validation failure) routes to UNKNOWN, not CONTENT."""
         _patch_gen_object_dependencies(mocker)
         worker = _make_worker(mocker)
-        wrapped = _wrap_in_instructor_retry(ValueError("Schema validation failed"))
+        wrapped = wrap_in_instructor_retry(ValueError("Schema validation failed"))
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_object(llm_job=_make_llm_job(mocker), schema=_DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
-        assert exc_info.value.error_category is InferenceErrorCategory.CONTENT
+        assert exc_info.value.error_category is InferenceErrorCategory.UNKNOWN
         assert exc_info.value.__cause__ is wrapped
-
-    async def test_extract_underlying_uses_cause_when_failed_attempts_missing(self, mocker: MockerFixture) -> None:
-        """When ``failed_attempts`` is None, the helper must fall back to walking ``__cause__``."""
-        sdk_exc = _make_anthropic_rate_limit_error("Rate limited")
-        retry_error = RetryError(last_attempt=mocker.MagicMock(_exception=sdk_exc))
-        wrapped = _wrap_in_instructor_retry(sdk_exc, include_failed_attempts=False)
-        wrapped.__cause__ = retry_error
-
-        recovered = AnthropicLLMWorker._extract_underlying_sdk_exception(instructor_exc=wrapped)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
-
-        assert recovered is sdk_exc
 
     async def test_real_instructor_wraps_rate_limit_and_fix_unwraps_correctly(self, mocker: MockerFixture) -> None:
         """End-to-end: drive the real instructor library with an SDK exception and
@@ -256,7 +215,7 @@ class TestAnthropicWorkerObjectErrorHandling:
         worker.instructor_for_objects = instructor.from_anthropic(anthropic_client)
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_object(llm_job=_make_llm_job(mocker), schema=_DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
         # The ``from`` chain should preserve the wrapper (not the raw SDK exc),

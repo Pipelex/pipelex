@@ -41,14 +41,14 @@ TDD discipline applies to every phase: **RED** (test that fails) → **GREEN** (
 
 Lift reusable test pieces from `tests/unit/pipelex/plugins/anthropic/test_anthropic_worker_object_error_handling.py` to a shared module so every provider test can import them.
 
-- [ ] **RED** — write `tests/helpers/test_instructor_test_utils.py` asserting:
-  - `_wrap_in_instructor_retry(sdk_exc)` returns an `InstructorRetryException` whose `failed_attempts[-1].exception is sdk_exc`
-  - `_wrap_in_instructor_retry(sdk_exc, include_failed_attempts=False)` produces a wrap where `__cause__.last_attempt._exception is sdk_exc` and `failed_attempts == []` (tenacity-fallback path)
-  - `_DummySchema` is a minimal `BaseModel` subclass with a single `text: str` field
-- [ ] **GREEN** — create `tests/helpers/instructor_test_utils.py` exposing `_wrap_in_instructor_retry`, `_DummySchema`, and a `_make_llm_job(mocker)` skeleton lifted verbatim from the Anthropic test
-- [ ] Update `test_anthropic_worker_object_error_handling.py` to import from the shared helper; confirm `.venv/bin/pytest tests/unit/pipelex/plugins/anthropic/` stays green
-- [ ] Investigate whether **AWS Bedrock LLM worker** (`pipelex/plugins/bedrock/bedrock_llm_worker.py`) uses `instructor` for structured generation. Record the finding in the Running Notes section. If yes, add a parallel `Phase 8.5 — AWS Bedrock` between 8 and 9. If no (e.g. native Bedrock tool-use), document why.
-- [ ] Run `make agent-check`
+- [x] **RED** — write `tests/helpers/test_instructor_test_utils.py` asserting:
+  - `wrap_in_instructor_retry(sdk_exc)` returns an `InstructorRetryException` whose `failed_attempts[-1].exception is sdk_exc`
+  - `wrap_in_instructor_retry(sdk_exc, include_failed_attempts=False)` produces a wrap where `failed_attempts is None or []` (tenacity-fallback path; `__cause__` is set by callers)
+  - `DummySchema` is a minimal `BaseModel` subclass with a single `text: str` field
+- [x] **GREEN** — create `tests/helpers/instructor_test_utils.py` exposing `wrap_in_instructor_retry`, `DummySchema`, and a `make_llm_job(mocker)` skeleton lifted from the Anthropic test (names made public so pyright doesn't flag cross-module private-use)
+- [x] Update `test_anthropic_worker_object_error_handling.py` to import from the shared helper; confirm `.venv/bin/pytest tests/unit/pipelex/plugins/anthropic/` stays green
+- [x] Investigate whether **AWS Bedrock LLM worker** (`pipelex/plugins/bedrock/bedrock_llm_worker.py`) uses `instructor` for structured generation. **Finding:** No — `_gen_object` raises `LLMCapabilityError` ("It is not possible to generate objects with a BedrockLLMWorker") with a `# TODO: try with the newest instructor release` comment. **No Phase 8.5 needed.** Bedrock LLM still benefits from upgrades A–C in Phase 11.
+- [x] Run `make agent-check`
 
 > ### **STOP — CHECKPOINT A: Test helper foundation landed**
 >
@@ -65,14 +65,14 @@ Lift reusable test pieces from `tests/unit/pipelex/plugins/anthropic/test_anthro
 
 Move `_extract_underlying_sdk_exception` from the Anthropic worker to `pipelex/cogt/inference/error_classification.py` so the four pending workers can share one implementation. Promote it to a public name (drop the leading underscore).
 
-- [ ] **RED** — write `tests/unit/pipelex/cogt/inference/test_error_classification_unwrap.py`:
+- [x] **RED** — write `tests/unit/pipelex/cogt/inference/test_error_classification_unwrap.py`:
   - returns the SDK exception when `instructor_exc.failed_attempts[-1].exception` is set
   - falls back to `__cause__.last_attempt._exception` when `failed_attempts` is empty (tenacity path)
   - returns `None` when both paths are empty
   - never raises on malformed input (defensive)
-- [ ] **GREEN** — move the function from `pipelex/plugins/anthropic/anthropic_llm_worker.py` to `pipelex/cogt/inference/error_classification.py`. Rename to `extract_underlying_sdk_exception` (public).
-- [ ] Update `anthropic_llm_worker.py` to import from the shared module; confirm Anthropic worker tests still pass
-- [ ] Run `make agent-check`
+- [x] **GREEN** — move the function from `pipelex/plugins/anthropic/anthropic_llm_worker.py` to `pipelex/cogt/inference/error_classification.py`. Renamed to `extract_underlying_sdk_exception` (public).
+- [x] Update `anthropic_llm_worker.py` to import from the shared module; Anthropic worker tests still pass. Removed the now-redundant `test_extract_underlying_uses_cause_when_failed_attempts_missing` test from the Anthropic suite (covered by the new shared test module).
+- [x] Run `make agent-check`
 
 > ### **STOP — CHECKPOINT B: Shared unwrap helper landed**
 >
@@ -87,15 +87,12 @@ Move `_extract_underlying_sdk_exception` from the Anthropic worker to `pipelex/c
 
 The current "fall back to `CONTENT`" path when `extract_underlying_sdk_exception` returns something we don't recognize is technically wrong — `CONTENT` means "the LLM returned bad content," but the truth is "we don't know what happened." `UNKNOWN` with `is_retryable=False` makes downstream retry decisions accurate and surfaces "we should add this case" in telemetry.
 
-- [ ] **RED** — write `tests/unit/pipelex/cogt/inference/test_error_classification_unknown.py`:
-  - `InferenceErrorCategory.UNKNOWN` exists; `str(InferenceErrorCategory.UNKNOWN) == "UNKNOWN"`
-  - `InferenceErrorCategory.UNKNOWN.is_retryable` is `False`
-  - `to_error_report()` round-trips `UNKNOWN` correctly (i.e. an error raised with category `UNKNOWN` serializes and deserializes with the value preserved)
-- [ ] **RED** — in `test_anthropic_worker_object_error_handling.py`, update (or add) a case asserting that when the underlying exception is unrecognized (synthetic `RuntimeError`), the raised `LLMCompletionError.error_category == UNKNOWN`. Rename the existing `test_unrecognized_underlying_falls_back_to_content` to `test_unrecognized_underlying_falls_back_to_unknown`.
-- [ ] **GREEN** — add `UNKNOWN = "UNKNOWN"` to `InferenceErrorCategory` (find current definition in `pipelex/cogt/inference/error_classification.py`)
-- [ ] **GREEN** — extend `InferenceErrorCategory.is_retryable` to return `False` for `UNKNOWN`
-- [ ] **GREEN** — update the Anthropic worker's fallback (in `_raise_categorized_anthropic_sdk_error` or equivalent) so an unrecognized underlying raises with `error_category=UNKNOWN` rather than `CONTENT`
-- [ ] Run `make agent-check`
+- [x] **RED** — write `tests/unit/pipelex/cogt/inference/test_error_classification_unknown.py`. (Note: the enum is defined in `pipelex/cogt/exceptions.py`, not `error_classification.py`. The plan-doc reference was off; tests still import from the correct path.)
+- [x] **RED** — in `test_anthropic_worker_object_error_handling.py`, renamed `test_unrecognized_underlying_falls_back_to_content` → `test_unrecognized_underlying_falls_back_to_unknown`; assertion now expects `InferenceErrorCategory.UNKNOWN`.
+- [x] **GREEN** — added `UNKNOWN = "unknown"` to `InferenceErrorCategory` in `pipelex/cogt/exceptions.py` (lowercase value to match the existing convention; the test asserts `str(...) == "unknown"`).
+- [x] **GREEN** — extended `InferenceErrorCategory.is_retryable` to return `False` for `UNKNOWN` (added to the existing `CONFIGURATION | CONTENT | CAPACITY` group).
+- [x] **GREEN** — Anthropic worker's `InstructorRetryException` fallback now raises `error_category=UNKNOWN` (was `CONTENT`).
+- [x] Run `make agent-check`
 
 > ### **STOP — CHECKPOINT C: `UNKNOWN` category landed**
 >
@@ -407,4 +404,7 @@ Same approach as Phase 10. Bedrock LLM lands here too if Phase 0 found it doesn'
 
 Use this section to capture decisions, surprises, and cold-start handoff context as phases land. Add timestamped entries; never delete.
 
-- _<empty>_
+- **2026-05-14 — Phase 0 landed.** Shared helpers at `tests/helpers/instructor_test_utils.py` expose `wrap_in_instructor_retry`, `DummySchema`, and `make_llm_job`. Names are public (no underscore) because pyright flags cross-module use of underscore-prefixed identifiers with `reportPrivateUsage`. Anthropic worker tests refactored to import the shared helpers; all 24 tests pass.
+- **2026-05-14 — Bedrock decision.** `pipelex/plugins/bedrock/bedrock_llm_worker.py::_gen_object` raises `LLMCapabilityError` and does not use instructor (the file's only `instructor` mention is a `# TODO` comment). No `Phase 8.5` will be created. Bedrock still gets upgrades A–C in Phase 11.
+- **2026-05-14 — Phase 1 landed.** `extract_underlying_sdk_exception` lives in `pipelex/cogt/inference/error_classification.py`. Anthropic worker imports from the shared module. The defensive try/except around `failed_attempts[-1]` swallows `TypeError`/`KeyError`/`IndexError` to keep the helper safe against malformed input (the tests cover a string-as-failed_attempts case). Defending only against typing/lookup exceptions (not generic Exception) keeps real bugs visible.
+- **2026-05-14 — Phase 2 landed.** `InferenceErrorCategory.UNKNOWN` lives in `pipelex/cogt/exceptions.py` (NOT `error_classification.py` — TODOS.md text was off). Value is lowercase `"unknown"` to match other members. `is_retryable=False`. Anthropic worker's `InstructorRetryException` fallback uses UNKNOWN. Other workers still use whatever they had — they get migrated in their own phases.

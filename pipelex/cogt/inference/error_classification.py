@@ -1,8 +1,12 @@
 """Helpers for classifying SDK errors into InferenceErrorCategory values.
 
 Pure functions that inspect error messages to discriminate between
-quota exhaustion vs rate limiting, and detect content policy violations.
+quota exhaustion vs rate limiting, detect content policy violations, and
+recover the underlying SDK exception that ``InstructorRetryException``
+wraps when ``instructor`` exhausts its retry loop.
 """
+
+from typing import Any
 
 _OPENAI_QUOTA_PATTERNS: tuple[str, ...] = (
     "insufficient_quota",
@@ -114,3 +118,40 @@ def is_content_policy_violation(error_message: str) -> bool:
     """Check if an error message indicates a content policy or safety filter violation."""
     lower_message = error_message.lower()
     return any(pattern in lower_message for pattern in _CONTENT_POLICY_PATTERNS)
+
+
+def extract_underlying_sdk_exception(instructor_exc: Any) -> BaseException | None:
+    """Recover the SDK exception that caused an ``InstructorRetryException``.
+
+    instructor's retry loop wraps the last failed attempt's exception inside
+    ``InstructorRetryException``. We prefer ``failed_attempts[-1].exception``
+    (the documented public attribute) and fall back to walking ``__cause__``
+    (a tenacity ``RetryError`` whose ``last_attempt._exception`` holds the
+    original exception) when ``failed_attempts`` is unset.
+
+    Args:
+        instructor_exc: The ``InstructorRetryException`` to unwrap. Typed as
+            ``Any`` so callers don't need to import ``InstructorRetryException``
+            just for the call site, and so malformed inputs are tolerated.
+
+    Returns:
+        The underlying SDK exception when one can be recovered, ``None`` when
+        neither path yields a ``BaseException``.
+    """
+    failed_attempts: Any = getattr(instructor_exc, "failed_attempts", None)
+    if failed_attempts:
+        try:
+            last_attempt = failed_attempts[-1]
+        except (TypeError, KeyError, IndexError):
+            last_attempt = None
+        if last_attempt is not None:
+            last_exc = getattr(last_attempt, "exception", None)
+            if isinstance(last_exc, BaseException):
+                return last_exc
+    cause: Any = getattr(instructor_exc, "__cause__", None)
+    last_attempt = getattr(cause, "last_attempt", None)
+    if last_attempt is not None:
+        underlying = getattr(last_attempt, "_exception", None)
+        if isinstance(underlying, BaseException):
+            return underlying
+    return None
