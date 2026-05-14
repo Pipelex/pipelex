@@ -56,7 +56,7 @@ pipelex init telemetry
 The behavior depends on the target:
 
 - **Global init** (default — writes to `~/.pipelex/telemetry.toml`): an active template is created with all options disabled. Edit it to enable your preferred telemetry destinations machine-wide.
-- **Project init** (`pipelex init --local` — writes to `{project_root}/.pipelex/telemetry.toml`): a fully **commented-out** template is created. The project file is layered on top of your global config, so leaving it commented means the project inherits your global telemetry settings as-is. Uncomment a key only when this project should diverge.
+- **Project init** (`pipelex init telemetry --local` — writes to `{project_root}/.pipelex/telemetry.toml`): a fully **commented-out** template is created. The project file is layered on top of your global config, so leaving it commented means the project inherits your global telemetry settings as-is. Uncomment a key only when this project should diverge.
 
 !!! note "Global vs project config"
     Pipelex looks for telemetry config in **both** `~/.pipelex/` (machine-wide) and `{project_root}/.pipelex/` (per-project). Both are deep-merged, with the project file winning on key collisions — your global Langfuse keys keep applying across every project unless a project explicitly overrides them. See [Telemetry Configuration → Global vs project config](../configuration/config-practical/telemetry-config.md#global-vs-project-config) for the full load order.
