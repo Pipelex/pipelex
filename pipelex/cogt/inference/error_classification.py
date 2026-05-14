@@ -227,6 +227,52 @@ def _provider_error_code_from_body(body: Any) -> str | None:
     return None
 
 
+def extract_openai_metadata(exc: BaseException) -> ProviderErrorMetadata:
+    """Distill an OpenAI SDK exception into a ``ProviderErrorMetadata``.
+
+    Tolerates the SDK's two exception shapes:
+
+    - ``APIStatusError`` subclasses (``BadRequestError``, ``RateLimitError``,
+      ``AuthenticationError`` …) expose ``status_code``, ``request_id``,
+      ``response.headers`` (for ``Retry-After``), and ``body``. The SDK
+      pre-unwraps ``body["error"]`` so ``body["type"]`` / ``body["code"]``
+      sit at the top level — and are also mirrored to ``exc.type`` /
+      ``exc.code`` as instance attributes.
+    - ``APIConnectionError`` / ``APITimeoutError`` carry only a ``request``;
+      every status-related field comes back as ``None``.
+    """
+    status_code = getattr(exc, "status_code", None)
+    if not isinstance(status_code, int):
+        status_code = None
+    request_id = getattr(exc, "request_id", None)
+    if not isinstance(request_id, str):
+        request_id = None
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", None)
+    retry_after_seconds: float | None = None
+    if headers is not None:
+        retry_after_seconds = _parse_retry_after_seconds(headers.get("retry-after"))
+    body = getattr(exc, "body", None)
+    # OpenAI's _make_status_error pre-unwraps body["error"] onto exc.type / exc.code,
+    # so we read those attributes directly rather than re-parsing the body.
+    error_type = getattr(exc, "type", None)
+    error_code = getattr(exc, "code", None)
+    provider_error_code: str | None = None
+    if isinstance(error_type, str):
+        provider_error_code = error_type
+    elif isinstance(error_code, str):
+        provider_error_code = error_code
+    return ProviderErrorMetadata(
+        provider="openai",
+        sdk_exception_type=type(exc).__name__,
+        status_code=status_code,
+        request_id=request_id,
+        retry_after_seconds=retry_after_seconds,
+        provider_error_code=provider_error_code,
+        body=body,
+    )
+
+
 def extract_anthropic_metadata(exc: BaseException) -> ProviderErrorMetadata:
     """Distill an Anthropic SDK exception into a ``ProviderErrorMetadata``.
 
