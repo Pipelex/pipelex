@@ -60,7 +60,7 @@ These were verified directly — not taken on faith from prior notes.
 
 ```
 Phase 1   Broad-except hygiene sweep       (priority 3 — independent, de-risks classification)
-   └─ CHECKPOINT A
+   └─    A
 Phase 1.5 Second-pass narrowing of catches (priority 3 — narrows what Phase 1 noqa'd, finishes the sweep)
    └─ CHECKPOINT A.5
 Phase 2   error_domain on the error model  (metadata foundation, part 1)
@@ -376,7 +376,7 @@ Reference: [track-temporal-integration.md](wip/error-handling/track-temporal-int
 
 ### RED
 
-- [ ] Write `tests/unit/pipelex/temporal/test_temporal_error_bridge.py` asserting:
+- [x] Write `tests/unit/pipelex/temporal/test_temporal_error_bridge.py` asserting:
   - `from_message_exception()` on a `CogtError` with `TRANSIENT` produces `non_retryable=False`.
   - …with `CONFIGURATION` / `CONTENT` / `CAPACITY` / `UNKNOWN` produces `non_retryable=True`.
   - …on a non-`CogtError` `PipelexError` falls back to the `non_retryable_error_types` name list.
@@ -386,24 +386,24 @@ Reference: [track-temporal-integration.md](wip/error-handling/track-temporal-int
 
 ### GREEN
 
-- [ ] In `pipelex/temporal/tprl/temporal_error.py`, `from_message_exception()`: when `exc` is a `CogtError` with a non-`None` `error_category`, derive retryability from `error_category.is_retryable` and set `non_retryable = not is_retryable` on the `ApplicationError`. When the category is `None`, keep the existing `non_retryable_error_types` lookup.
-- [ ] Pack `exc.to_error_report().to_dict()` into `ApplicationError.details`. `from_app_error()` extracts the details payload and surfaces it back as fields on the resulting `TemporalError` so the structured data survives the round-trip.
-- [ ] Update the docstrings of `RetryPolicyConfig.non_retryable_error_types` and `non_retryable_error_types_extra` (`pipelex/temporal/config_temporal.py`) to state that the name list is a *fallback* for category-less exceptions and an override mechanism — category decides retryability for `CogtError`.
-- [ ] Run `make agent-check`.
+- [x] In `pipelex/temporal/tprl/temporal_error.py`, `from_message_exception()`: when `exc` is a `CogtError` with a non-`None` `error_category`, derive retryability from `error_category.is_retryable` and set `non_retryable = not is_retryable` on the `ApplicationError`. When the category is `None`, keep the existing `non_retryable_error_types` lookup.
+- [x] Pack `exc.to_error_report().to_dict()` into `ApplicationError.details`. `from_app_error()` extracts the details payload and surfaces it back as fields on the resulting `TemporalError` so the structured data survives the round-trip.
+- [x] Update the docstrings of `RetryPolicyConfig.non_retryable_error_types` and `non_retryable_error_types_extra` (`pipelex/temporal/config_temporal.py`) to state that the name list is a *fallback* for category-less exceptions and an override mechanism — category decides retryability for `CogtError`.
+- [x] Run `make agent-check`.
 
 ### REFACTOR
 
-- [ ] Check the in-process PipeRouter retry (Phase 5) and the Temporal retry agree on what "transient" means — both consult `is_retryable`. Note in Running Notes how the two layers compose (Temporal sees a non-retryable error only after the router exhausted its retries, or for non-`TRANSIENT` categories).
+- [x] Check the in-process PipeRouter retry (Phase 5) and the Temporal retry agree on what "transient" means — both consult `is_retryable`. Note in Running Notes how the two layers compose (Temporal sees a non-retryable error only after the router exhausted its retries, or for non-`TRANSIENT` categories).
 
 > ### STOP — CHECKPOINT D: Resilience landed (Temporal half)
 >
 > Update checkboxes, run `make agent-check` and `make agent-test`, commit. Run the Temporal integration tests per `_tprl/CLAUDE.md` (`--temporal-server` options). Then **stop — Phase 7 is a fresh session.**
 >
-> **Status:** _(fill in when landed)_
+> **Status (landed 2026-05-16):** COMPLETE — RED, GREEN, REFACTOR all landed. `make agent-check` clean (ruff + plxt + pyright 0 errors + mypy 0 issues); `make agent-test` passed (full suite). Temporal integration suite (`tests/integration/pipelex/temporal/`, in-process server) passed — 94 passed, 4 xpassed (pre-existing xdist-flaky tests that happened to pass; not a regression), 0 failures, no timing-sensitive regression. Per-decision detail in the "Phase 6" section of Running Notes below.
 >
 > Priority 1 is complete: standalone, Pipelex retries transients and bounds fan-out concurrency; across the Temporal boundary, retry flows from the same `is_retryable` signal and `ErrorReport` round-trips in `ApplicationError.details`.
 >
-> **Hand-off context to record in Running Notes:** how the in-process retry (Phase 5) and Temporal retry compose; whether the Temporal integration suite surfaced any timing-sensitive regression.
+> **Hand-off context:** the in-process retry (Phase 5) and Temporal retry compose as nested layers agreeing on `is_retryable` — see "How Phases 5 and 6 compose" in Running Notes. The Temporal integration suite surfaced no timing-sensitive regression.
 >
 > **Next session resumes at Phase 7** — re-read the "Start here" section, the Phase 7 section, and [track-cli-delivery.md](wip/error-handling/track-cli-delivery.md).
 
@@ -705,3 +705,19 @@ Net: config is read at router **construction** time, not per-`run()`. Acceptable
 **Intentional behavior change.** With the default `max_concurrency = 8`, a `PipeBatch` over more than 8 items no longer runs every branch at once — it runs in chunks of 8. On the *success* path, batches of ≤ 8 items (or `max_concurrency = "unbounded"`) behave exactly as before. On the *failure* path, behavior changes uniformly for all batch sizes: a failing branch now drains its chunk (siblings are awaited, not left as orphaned background tasks) and the lowest-input-index error wins, instead of the prior plain-`asyncio.gather` first-by-completion-order selection. This is a deliberate improvement, not a regression. No test regressed: `make agent-check`, `make tb`, the targeted `pipe_controllers` / `tools` / `pipes` suites, and `make agent-test` all pass.
 
 **Track doc.** `wip/error-handling/track-retry-and-resilience.md` gained a "Pillar B — Bounded fan-out concurrency" section capturing this design, as the plan directed (it was net-new ground).
+
+### Phase 6 — Temporal bridge: category-aware retry + details payload (landed 2026-05-16)
+
+**`TemporalError` extension.** `__init__` gained two passthrough params — `non_retryable: bool` and `error_report: dict[str, Any] | None`. `error_report`, when present, is splatted as the single `ApplicationError.details` entry (`super().__init__(message, *details, type=..., non_retryable=...)`) and also kept as an instance attribute for in-process readers. `non_retryable` is the Temporal-native retry flag — the inverse of `is_retryable`.
+
+**Category-aware retry decision.** `from_message_exception()` delegates to a new `_is_non_retryable(exc, error_type)` classmethod: when `exc` is a `CogtError` with a non-`None` `error_category`, it returns `not error_category.is_retryable` — the same `is_retryable` signal the Phase 5 PipeRouter loop consults. Otherwise (non-`CogtError` `PipelexError`, or a `CogtError` raised without a category) it falls back to the configured `all_non_retryable_error_types` class-name lookup. Only `InferenceErrorCategory.TRANSIENT` is retryable, so a `TRANSIENT` `CogtError` → `non_retryable=False`; `CONFIGURATION` / `CONTENT` / `CAPACITY` / `UNKNOWN` → `non_retryable=True`.
+
+**Details payload + round-trip.** `from_message_exception()` packs `exc.to_error_report().to_dict()` into details. `from_app_error()` recovers it via the module-level `_error_report_from_details()` helper, which scans `ApplicationError.details` for the first dict carrying the report's `error_type` + `message` shape (so an unrelated details payload is not mistaken for a report). `from_app_error()` preserves the round-tripped `non_retryable` flag and re-packs the report — the structured data (`error_category`, `user_action`, `model`, `provider`) survives the activity → workflow boundary. A legacy fallback remains: when an `ApplicationError` arrives with neither a details report nor `non_retryable` set (a plain error that never went through this bridge), `from_app_error()` still consults the class-name list for the severity decision.
+
+**Log helpers for testability.** Logging was extracted into `_log_critical` / `_log_error` classmethods. `workflow_log` routes through `workflow.logger`, which raises `_NotInWorkflowEventLoopError` outside a live workflow event loop — so unit tests `mocker.patch.object` these two helpers (via an autouse fixture) and assert which severity the retry decision routed to. This is a pure refactor of the existing `workflow_log.critical` / `.error` calls; production behavior is unchanged.
+
+**Config docs.** `RetryPolicyConfig.non_retryable_error_types` and `RetryPolicyConfigOverlay.non_retryable_error_types_extra` gained field-level docstrings stating the name list is a *fallback* for category-less exceptions and an *override* mechanism — category decides retryability for a category-carrying `CogtError`.
+
+**How Phases 5 and 6 compose.** The two retry layers are nested and agree on "transient" — both read `InferenceErrorCategory.is_retryable`. The Phase 5 PipeRouter loop runs *inside* the activity: it retries a `TRANSIENT` `CogtError` up to `max_transient_retries`, sleeping between attempts. Only after that budget is exhausted (or immediately, for a non-`TRANSIENT` category) does the exception leave the activity and hit the Temporal bridge. So Temporal sees a `non_retryable=False` error only after the in-process loop already gave up on it — Temporal's own retry policy (durable, cross-worker) then gets another crack; a non-`TRANSIENT` category arrives as `non_retryable=True` and Temporal does not retry. Fast in-process retry first, durable Temporal retry on the residual.
+
+**Known follow-up — `from_message_exception` is not yet wired (deferred, by decision).** A post-landing code review surfaced that `from_message_exception` — the activity-side half of the bridge, where the category-aware decision and `ErrorReport` details-packing live — has no production caller. Activities raise raw `CogtError` / `PipelexError`; Temporal's default failure converter auto-wraps them without packing our `ErrorReport`, so `from_app_error` currently always takes its `error_report is None` fallback branch and the category-aware path is inert in production. The Phase 6 unit test proves a self-consistent bridge round-trip but does not cross a real activity → workflow boundary. This was deliberately scoped out of Phase 6 (whose plan named only the bridge methods, not the activity wiring); it is recorded as **Followup 5** in [track-temporal-integration.md](wip/error-handling/track-temporal-integration.md) — wiring the ~8 `act_*` functions plus a real-boundary integration test is the next coherent unit of work.

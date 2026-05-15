@@ -217,6 +217,17 @@ class RetryPolicyConfig(RetryPolicyConfigBase):
     """
 
     non_retryable_error_types: list[str] = Field(default_factory=list)
+    """Class-name fallback list for the retry decision.
+
+    Retryability for a ``CogtError`` carrying an ``InferenceErrorCategory`` is
+    decided by ``category.is_retryable`` (see ``TemporalError.from_message_exception``)
+    — *not* by this list. The class-name list applies to:
+
+    - Non-``CogtError`` ``PipelexError`` subclasses, which carry no category.
+    - Any ``CogtError`` raised without a category set.
+    - Special cases that must override the category default (e.g. forcing a
+      type non-retryable on a specific queue via ``non_retryable_error_types_extra``).
+    """
 
 
 class RetryPolicyConfigOverlay(RetryPolicyConfigBase):
@@ -229,6 +240,13 @@ class RetryPolicyConfigOverlay(RetryPolicyConfigBase):
     """
 
     non_retryable_error_types_extra: list[str] = Field(default_factory=list)
+    """Additive class-name overrides layered onto the baseline non-retryable list.
+
+    Same fallback-and-override semantics as ``RetryPolicyConfig.non_retryable_error_types``:
+    category-carrying ``CogtError`` retryability is decided by category, not by
+    name. Use this list to force a type non-retryable for a specific queue or
+    handle, or to cover category-less exceptions on that route.
+    """
 
 
 class QueueOptions(ConfigModel):

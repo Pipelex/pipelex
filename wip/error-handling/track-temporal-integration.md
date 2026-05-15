@@ -52,6 +52,8 @@ The composition is **additive** across worker → queue → handle layers (see c
 
 ## Followups
 
+> **Status:** Followups 1–4 landed in Phase 6 (commit `f5176d39`). Followup 5 is open — see below. It is the wiring step that makes 1–4 actually run in production.
+
 ### 1. Use `is_retryable` in `from_message_exception`
 
 In `pipelex/temporal/tprl/temporal_error.py`, when `exc` is a `CogtError` and `exc.error_category is not None`, derive retryability from `exc.error_category.is_retryable`. When category is `None`, fall back to the existing `non_retryable_error_types` lookup.
@@ -82,6 +84,25 @@ Update the docstring of `RetryPolicyConfig.non_retryable_error_types` and `non_r
 - `from_message_exception` on a `CogtError` with `error_category=None` falls back to the name list (no NPE).
 - `ApplicationError.details` round-trips through Temporal's serialization with all `ErrorReport` fields intact.
 - Log severity (critical / error) matches the retry decision in both paths.
+
+### 5. Wire `from_message_exception` into the activity boundary (OPEN)
+
+Phase 6 implemented `from_message_exception` (category-aware retry decision + `ErrorReport` details packing) but **no activity calls it**. The activity functions in `pipelex/temporal/tprl_content_generation/act_*.py` and `pipelex/temporal/tprl_pipe/act_*.py` raise raw `CogtError` / `PipelexError`, and Temporal's default failure converter auto-wraps them — that converter does not pack our `ErrorReport` into `details` and leaves `non_retryable=False`.
+
+Consequence: in production today, `from_app_error` always lands in its `error_report is None` fallback branch, and the category-aware retry decision never runs. The Phase 6 unit test (`test_temporal_error_bridge.py`) exercises the bridge methods directly and proves a self-consistent round-trip, but no integration test crosses a real activity → workflow boundary through this bridge.
+
+To close the gap, each activity entry point should convert at its boundary, e.g.:
+
+```python
+@activity.defn
+async def act_llm_gen_text(llm_assignment: LLMAssignment) -> str:
+    try:
+        return await llm_gen_text(llm_assignment=llm_assignment)
+    except PipelexError as exc:
+        raise TemporalError.from_message_exception(exc=exc) from exc
+```
+
+This is ~8 activity functions plus an integration test that raises a real `CogtError` from an activity and asserts what `from_app_error` receives on the workflow side. It was deliberately scoped out of Phase 6 (whose plan named only the bridge methods) and recorded here as the next coherent unit of work.
 
 ## Prerequisites
 

@@ -1,0 +1,158 @@
+"""Unit tests for the Temporal error bridge (``TemporalError``).
+
+Covers the category-aware retry decision and the ``ErrorReport`` details
+payload that survives the activity → workflow boundary:
+
+- ``from_message_exception`` derives ``non_retryable`` from
+  ``InferenceErrorCategory.is_retryable`` for ``CogtError`` carrying a category,
+  and falls back to the class-name list otherwise.
+- ``to_error_report().to_dict()`` is packed into ``ApplicationError.details``
+  and round-trips through Temporal's failure serialization intact.
+- Log severity (critical / error) matches the retry decision on both the
+  ``from_message_exception`` and ``from_app_error`` paths.
+"""
+
+from typing import Any
+
+import pytest
+from pytest_mock import MockerFixture
+from temporalio.api.failure.v1 import Failure
+from temporalio.converter import default as default_converter
+from temporalio.exceptions import ApplicationError
+
+from pipelex.base_exceptions import PipelexError
+from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
+from pipelex.temporal.tprl.temporal_error import TemporalError
+
+
+class ModelNotFoundError(PipelexError):
+    """Non-``CogtError`` ``PipelexError`` whose name is in the default non-retryable list."""
+
+
+class UnlistedRuntimeError(PipelexError):
+    """Non-``CogtError`` ``PipelexError`` whose name is absent from the non-retryable list."""
+
+
+def _round_trip_application_error(exc: ApplicationError) -> ApplicationError:
+    """Serialize an ``ApplicationError`` to a Temporal ``Failure`` and back.
+
+    Mirrors what Temporal does when an activity raises across the
+    activity → workflow boundary, so the test exercises real payload conversion
+    rather than an in-process shortcut.
+    """
+    converter = default_converter()
+    failure = Failure()
+    converter.failure_converter.to_failure(exc, converter.payload_converter, failure)
+    recovered = converter.failure_converter.from_failure(failure, converter.payload_converter)
+    assert isinstance(recovered, ApplicationError)
+    return recovered
+
+
+class TestTemporalErrorBridge:
+    @pytest.fixture(autouse=True)
+    def log_mocks(self, mocker: MockerFixture) -> tuple[Any, Any]:
+        """Replace the workflow-log helpers — they require a live workflow event loop.
+
+        Returns the ``(critical, error)`` mocks so a test can assert which
+        severity the retry decision routed the log line to.
+        """
+        critical_mock = mocker.patch.object(TemporalError, "_log_critical")
+        error_mock = mocker.patch.object(TemporalError, "_log_error")
+        return critical_mock, error_mock
+
+    @pytest.mark.parametrize(
+        ("error_category", "expected_non_retryable"),
+        [
+            pytest.param(InferenceErrorCategory.TRANSIENT, False, id="transient-retryable"),
+            pytest.param(InferenceErrorCategory.CONFIGURATION, True, id="configuration-non-retryable"),
+            pytest.param(InferenceErrorCategory.CONTENT, True, id="content-non-retryable"),
+            pytest.param(InferenceErrorCategory.CAPACITY, True, id="capacity-non-retryable"),
+            pytest.param(InferenceErrorCategory.UNKNOWN, True, id="unknown-non-retryable"),
+        ],
+    )
+    def test_cogt_error_category_drives_retryability(
+        self,
+        log_mocks: tuple[Any, Any],
+        error_category: InferenceErrorCategory,
+        expected_non_retryable: bool,
+    ) -> None:
+        """A ``CogtError`` with a category sets ``non_retryable = not is_retryable``."""
+        critical_mock, error_mock = log_mocks
+
+        exc = CogtError("boom", error_category=error_category)
+        temporal_error = TemporalError.from_message_exception(exc=exc)
+
+        assert temporal_error.non_retryable is expected_non_retryable
+        assert temporal_error.error_report is not None
+        assert temporal_error.error_report["error_category"] == error_category
+        assert temporal_error.error_report["retryable"] is (not expected_non_retryable)
+
+        if expected_non_retryable:
+            assert critical_mock.call_count == 1
+            assert error_mock.call_count == 0
+        else:
+            assert error_mock.call_count == 1
+            assert critical_mock.call_count == 0
+
+    @pytest.mark.parametrize(
+        ("exc", "expected_non_retryable"),
+        [
+            pytest.param(ModelNotFoundError("missing model"), True, id="listed-name-non-retryable"),
+            pytest.param(UnlistedRuntimeError("hiccup"), False, id="unlisted-name-retryable"),
+        ],
+    )
+    def test_non_cogt_pipelex_error_uses_name_list_fallback(
+        self,
+        exc: PipelexError,
+        expected_non_retryable: bool,
+    ) -> None:
+        """A non-``CogtError`` ``PipelexError`` decides retryability by class name."""
+        temporal_error = TemporalError.from_message_exception(exc=exc)
+
+        assert temporal_error.non_retryable is expected_non_retryable
+        assert temporal_error.error_report is not None
+        assert temporal_error.error_report["error_type"] == type(exc).__name__
+
+    def test_cogt_error_without_category_falls_back_to_name_list(self) -> None:
+        """A ``CogtError`` raised without a category falls back to the name list — no crash."""
+        exc = CogtError("boom")
+        assert exc.error_category is None
+
+        temporal_error = TemporalError.from_message_exception(exc=exc)
+
+        # "CogtError" is not in the default non-retryable list → retryable.
+        assert temporal_error.non_retryable is False
+        assert temporal_error.error_report is not None
+        assert temporal_error.error_report["error_type"] == "CogtError"
+
+    def test_error_report_round_trips_through_temporal_serialization(
+        self,
+        log_mocks: tuple[Any, Any],
+    ) -> None:
+        """The ``ErrorReport`` details payload survives the activity → workflow boundary."""
+        critical_mock, error_mock = log_mocks
+
+        exc = CogtError(
+            "rate limited",
+            error_category=InferenceErrorCategory.CAPACITY,
+            user_action=UserAction(kind=UserActionKind.CHECK_BILLING, detail="check your billing page"),
+        )
+        activity_side = TemporalError.from_message_exception(exc=exc)
+
+        serialized: ApplicationError = _round_trip_application_error(exc=activity_side)
+        workflow_side = TemporalError.from_app_error(exc=serialized)
+
+        assert workflow_side.non_retryable is True
+        report: dict[str, Any] | None = workflow_side.error_report
+        assert report is not None
+        assert report["error_type"] == "CogtError"
+        assert report["message"] == "rate limited"
+        assert report["error_category"] == InferenceErrorCategory.CAPACITY
+        assert report["retryable"] is False
+        assert report["user_action"]["kind"] == UserActionKind.CHECK_BILLING
+        assert report["user_action"]["detail"] == "check your billing page"
+
+        # CAPACITY is non-retryable → both bridge hops log at critical severity.
+        assert critical_mock.call_count == 2
+        assert error_mock.call_count == 0
