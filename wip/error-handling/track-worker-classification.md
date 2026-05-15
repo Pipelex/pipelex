@@ -57,7 +57,7 @@ All workers below catch their SDK's typed exceptions and assign `error_category`
 | Mistral LLM | `pipelex/plugins/mistral/mistral_llm_worker.py` |
 | Mistral extract | `pipelex/plugins/mistral/mistral_extract_worker.py` |
 | AWS Bedrock LLM | `pipelex/plugins/bedrock/bedrock_llm_worker.py` |
-| Azure img-gen | `pipelex/plugins/azure/azure_img_gen_worker.py` |
+| Azure img-gen | `pipelex/plugins/azure_rest/azure_img_gen_worker.py` |
 | FAL img-gen | `pipelex/plugins/fal/fal_img_gen_worker.py` |
 | HuggingFace img-gen | `pipelex/plugins/huggingface/huggingface_img_gen_worker.py` |
 | Docling extract | `pipelex/plugins/docling/docling_extract_worker.py` |

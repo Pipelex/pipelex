@@ -9,6 +9,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import SdkTypeError
+from pipelex.cogt.inference.error_classification import extract_gateway_metadata
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_job import SearchJob
@@ -181,8 +182,15 @@ class GatewaySearchWorker(SearchWorkerAbstract):
         except portkey_exceptions.APIError as exc:
             error_summary = GatewayFactory.make_error_summary_from_portkey_error(exc)
             error_category = GatewayFactory.classify_error_category(exc)
+            user_action = GatewayFactory.make_user_action_from_portkey_error(exc)
+            metadata = extract_gateway_metadata(exc)
             msg = f"Search service error for model '{model}' after {attempt_number} attempt(s): {error_summary}"
-            raise GatewaySearchResponseError(msg, error_category=error_category) from exc
+            raise GatewaySearchResponseError(
+                msg,
+                error_category=error_category,
+                user_action=user_action,
+                provider_metadata=metadata,
+            ) from exc
 
         if response is None:
             msg = f"Could not get a response for model '{model}' via Portkey after {attempt_number} attempts"
