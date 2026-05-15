@@ -56,3 +56,5 @@ Each `track-*.md` follows the same shape:
 ## Historical note
 
 This directory replaces a set of phase-numbered docs (`error-handling-review.md`, `error-handling-phase-{0..7}-*.md`, `worker-error-handling-review.md`, `instructor-unwrap-other-workers.md`) that mixed historical progress with current state. The phase framing was useful when the work was sequenced; it is not useful as a reference for the current state and for planning what's next.
+
+The completed worker-classification sweep (formerly `_tprl/TODOS.md`) is archived here as [archive-worker-classification-sweep.md](archive-worker-classification-sweep.md) — kept for its running notes and checkpoint history.

@@ -40,9 +40,11 @@ These were verified directly — not taken on faith from prior notes.
 ## Sequencing
 
 ```
-Phase 1  Broad-except hygiene sweep        (priority 3 — independent, de-risks classification)
+Phase 1   Broad-except hygiene sweep       (priority 3 — independent, de-risks classification)
    └─ CHECKPOINT A
-Phase 2  error_domain on the error model   (metadata foundation, part 1)
+Phase 1.5 Second-pass narrowing of catches (priority 3 — narrows what Phase 1 noqa'd, finishes the sweep)
+   └─ CHECKPOINT A.5
+Phase 2   error_domain on the error model  (metadata foundation, part 1)
 Phase 3  Class-level metadata on exceptions (metadata foundation, part 2)
 Phase 4  Retire agent-CLI string dicts      (metadata foundation, part 3)
    └─ CHECKPOINT B  — shared foundation landed
@@ -82,11 +84,84 @@ Phases 5–6 (resilience) and Phase 7 (CLI) touch disjoint files and could run i
 
 > ### STOP — CHECKPOINT A: Broad-except sweep landed ✅
 >
-> Update checkboxes, commit, run `make agent-test`. The codebase now satisfies priority 3 and lint guards it. Next session resumes at Phase 2.
+> Update checkboxes, commit, run `make agent-test`. The codebase now satisfies priority 3 and lint guards it. Next session resumes at Phase 1.5.
 >
-> **Status:** landed. `make agent-check` clean (ruff + plxt + pyright + mypy). Triage table and decisions recorded in Running Notes below.
+> **Status:** landed. `make agent-check` clean (ruff + plxt + pyright + mypy). Triage table and decisions recorded in Running Notes below. Phase 1 was deliberately conservative — it parked 93 catches behind `# noqa: BLE001` so the lint guard could land fast; Phase 1.5 narrows the ones that can be narrowed.
 >
 > **Hand-off context to record in Running Notes:** the triage table, any intentional behavior changes from narrowing, and whether `BLE001` was newly enabled or already on.
+
+---
+
+## Phase 1.5 — Second-pass narrowing of the `noqa: BLE001` sites
+
+**Goal:** Phase 1 enabled `BLE001` and parked 93 broad catches behind `# noqa: BLE001` so the lint guard could land fast. That was deliberately conservative — several of those catches *can* be narrowed to the exception(s) the guarded call actually raises, and a few silently swallow. Phase 1.5 revisits every `noqa: BLE001` site, narrows each catch whose raised exceptions are knowable, restructures the silent-swallow sites, and leaves a `# noqa` only where the broad catch is genuinely correct (true CLI / agent command roots, telemetry that must never break the app, `__del__` at interpreter shutdown). Special attention to the `# TODO: wip - do not catch all exceptions` markers.
+
+After this phase every surviving `# noqa: BLE001` carries a one-line justification and represents a real, defended decision — not a deferral.
+
+### RED
+
+- [ ] Re-list every `# noqa: BLE001` site (`grep -rn "noqa: BLE001" pipelex`). Confirm against the triage groups below.
+- [ ] For each site to be narrowed, determine the exact exception set the guarded call can raise — read the callee, do not guess. Where a narrowed catch changes observable behavior (an exception that used to be swallowed now propagates), add or extend a unit test that pins the intended behavior *before* narrowing. List those tests here.
+- [ ] The genuinely-legitimate group (Group F) gets no code change — only a verification pass and a justification comment.
+
+### GREEN
+
+**Group A — `# TODO: wip - do not catch all exceptions` sites (do these first):**
+
+- [ ] `delivery_executor.py:177` `_generate_graph_files` — narrow the catch around `generate_graph_outputs()` to the exception(s) graph generation raises; keep it best-effort (a graph failure must not fail delivery) but only for those types.
+- [ ] `delivery_executor.py:192` `_try_add_rendered_file` — narrow the catch around the render coroutine to the rendering exception(s).
+- [ ] `delivery_executor.py:231` `_deliver_to_storage` — narrow the catch wrapping `storage_provider.store()` into `StorageDeliveryError` to the storage-provider exception type(s). (Re-raises, so not `noqa`'d — but the `# TODO` still applies.)
+- [ ] `delivery_executor.py:265` `_notify_webhook` — narrow the catch wrapping the webhook POST into `WebhookDeliveryError` to `httpx` request/transport errors (`httpx.HTTPStatusError` is already handled separately just above).
+- [ ] `act_assemble_graph.py:52` — Temporal graph-assembly activity. If this is a true activity root, keep the broad catch but replace the `# TODO` with a real justification. Otherwise narrow to the graph-assembly / event-log exception(s).
+- [ ] Remove every `# TODO: wip - do not catch all exceptions` comment as its site is resolved.
+
+**Group B — defensive utilities (narrow to the real exception set):**
+
+- [ ] `json_utils.py:384,444,497` — three identical `kajson.dumps()` fallbacks → narrow to `(TypeError, UnijsonEncoderError)` (kajson's encoder error).
+- [ ] `class_utils.py:97` `are_classes_equivalent` — narrow the catch around `model_json_schema()` to pydantic's schema-generation error(s); the manual-field-comparison fallback stays.
+- [ ] `library_manager.py:1177` — narrow the catch around `structure_class.model_rebuild()` to pydantic rebuild errors (`NameError` / `PydanticUndefinedAnnotation`).
+- [ ] `mistral_factory.py:257` `_clean_base64` — narrow to `(binascii.Error, ValueError)`.
+- [ ] `output_renderer.py:54,92` — narrow the catches around `render_stuff_spec()` to the rendering exception(s).
+- [ ] `dry_run.py:187` and `working_memory_factory.py:190` — narrow the mock-creation fallbacks to the factory / pydantic-validation exception(s) that `make_mock_content` / `TypedNamedStuffSpec.make_from_named` / `StuffFactory.make_stuff` actually raise.
+- [ ] `string_utils.py:58` (`f"{value}"` on arbitrary input) and `structured_content_composer.py:107` (diagnostic string builder) — assess: arbitrary `__str__` / introspection genuinely can raise anything. Either narrow to `(AttributeError, KeyError, TypeError)` or keep with an explicit justification. Record the decision in Running Notes.
+
+**Group C — teardown best-effort cleanup:**
+
+- [ ] `gateway_extract_worker.py:76,78`, `google_img_gen_worker.py:86,89`, `google_llm_worker.py:103,106` — narrow the inner `asyncio.run(... aclose())` catch to `RuntimeError` plus the transport/connection errors `aclose()` raises; narrow or explicitly justify the outer teardown catch. Keep the "log but don't fail teardown" intent.
+
+**Group D — CLI code that is not a true command root (narrow):**
+
+- [ ] `init/ui/backends_ui.py:88` — narrow the file-read catch to `(TomlError, OSError)`.
+- [ ] `show_cmd.py:160` — narrow the routing-profile load catch to the config / IO error(s).
+- [ ] `init/backends.py:137` (extension suggestion), `:168` (save terms), `:176` (disable gateway) — narrow each inner catch to what its called helper raises; the outer `:183` is a command-level boundary (Group F).
+- [ ] `doctor_cmd.py` config-load helpers (`:103`, `:121`, `:320`) — narrow to `(TomlError, OSError)`. Triage the remaining `doctor_cmd.py` catches per-site: the doctor's job is "probe and report", so a broad catch around a whole probe is defensible — keep those with a justification, narrow the ones wrapping a single well-typed call.
+
+**Group E — silent-swallow sites (restructure):**
+
+- [ ] `wf_pipe_router.py:120,165` — `except Exception: pass` (`# noqa: BLE001, S110`). Silent swallow of trace / event-log cleanup. Narrow to the cleanup exception(s); if kept broad, at minimum log at debug level and drop the bare `pass`.
+
+**Group F — genuinely legitimate (verify + justify only, no narrowing):**
+
+- [ ] Agent CLI command roots that convert to `agent_error()` (the documented CLI boundary) — confirm each is at the command root and `agent_error()` is `NoReturn`; keep `# noqa: BLE001`.
+- [ ] Dev CLI command roots (`_dev_cli.py` and `dev_cli/commands/*`) — keep.
+- [ ] Telemetry (`exception_capture.py`, `telemetry_manager.py`, `posthog_span_exporter.py`) — telemetry must never break the app; keep with a justification comment.
+- [ ] `init/command.py:484`, `init/routing.py:156`, `init/backends.py:183` — command-level boundaries; keep.
+- [ ] `ndjson_event_log.py:190` (`__del__`) — interpreter-shutdown safety net; keep.
+- [ ] `pipe_run.py:41` — records `DeliveryStatus.FAILED`. Decide: narrow to `PipelexError` now, or defer to Phase 5 (the PipeRouter retry loop touches this path). Record the decision.
+- [ ] Run `make agent-check` until clean after each group.
+
+### REFACTOR
+
+- [ ] Every surviving `# noqa: BLE001` has a one-line justification comment on the same or an adjacent line.
+- [ ] No `# TODO: wip - do not catch all exceptions` comment remains anywhere.
+- [ ] Run `make agent-test`. For each narrowed site, confirm no test fails because a previously-swallowed exception now propagates — if one does, that is either the intended fix or a sign the narrowing is wrong; resolve per-site.
+- [ ] Record in Running Notes: the final count of surviving `noqa: BLE001`, the per-site decisions for the "assess" sites (Group B last bullet, `doctor_cmd.py`, `pipe_run.py`), and any behavior change where an exception now propagates.
+
+> ### STOP — CHECKPOINT A.5: broad-except sweep fully narrowed
+>
+> Update checkboxes, commit, run `make agent-test`. Every broad catch is now either narrowed or a defended, justified boundary. Next session resumes at Phase 2.
+>
+> **Hand-off context to record in Running Notes:** the final `noqa: BLE001` count, the "assess"-site decisions, and any intentional behavior change from narrowing.
 
 ---
 
