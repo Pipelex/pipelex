@@ -150,9 +150,9 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                     msg = "No output format received from Gateway"
                     raise ImgGenGenerationError(
                         msg,
-                        error_category=InferenceErrorCategory.CONTENT,
+                        error_category=InferenceErrorCategory.UNKNOWN,
                         user_action=UserAction(
-                            kind=UserActionKind.CHANGE_INPUT,
+                            kind=UserActionKind.CHANGE_MODEL,
                             detail="The Gateway returned an image without an output format — try a different model",
                         ),
                         provider_metadata=None,
@@ -162,9 +162,9 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                     msg = f"Size from img gen response is not a string: '{size}'"
                     raise ImgGenGenerationError(
                         msg,
-                        error_category=InferenceErrorCategory.CONTENT,
+                        error_category=InferenceErrorCategory.UNKNOWN,
                         user_action=UserAction(
-                            kind=UserActionKind.CHANGE_INPUT,
+                            kind=UserActionKind.CHANGE_MODEL,
                             detail="The Gateway returned a malformed image size — try a different model",
                         ),
                         provider_metadata=None,
@@ -174,9 +174,9 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                     msg = f"Size from img gen response is not a valid size: '{size}'"
                     raise ImgGenGenerationError(
                         msg,
-                        error_category=InferenceErrorCategory.CONTENT,
+                        error_category=InferenceErrorCategory.UNKNOWN,
                         user_action=UserAction(
-                            kind=UserActionKind.CHANGE_INPUT,
+                            kind=UserActionKind.CHANGE_MODEL,
                             detail="The Gateway returned a malformed image size — try a different model",
                         ),
                         provider_metadata=None,
@@ -223,9 +223,9 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                 msg = f"Could not parse image generation from Gateway response:\n{parsing_errors}"
                 raise ImgGenGenerationError(
                     msg,
-                    error_category=InferenceErrorCategory.CONTENT,
+                    error_category=InferenceErrorCategory.UNKNOWN,
                     user_action=UserAction(
-                        kind=UserActionKind.CHANGE_INPUT,
+                        kind=UserActionKind.CHANGE_MODEL,
                         detail="The Gateway returned an unexpected response shape — try a different model",
                     ),
                     provider_metadata=None,
@@ -263,9 +263,9 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                     msg = "Missing url field in image response"
                     raise ImgGenGenerationError(
                         msg,
-                        error_category=InferenceErrorCategory.CONTENT,
+                        error_category=InferenceErrorCategory.UNKNOWN,
                         user_action=UserAction(
-                            kind=UserActionKind.CHANGE_INPUT,
+                            kind=UserActionKind.CHANGE_MODEL,
                             detail="The Gateway returned an image without a url — try a different model",
                         ),
                         provider_metadata=None,
@@ -275,9 +275,9 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                     msg = "Missing width field in image response"
                     raise ImgGenGenerationError(
                         msg,
-                        error_category=InferenceErrorCategory.CONTENT,
+                        error_category=InferenceErrorCategory.UNKNOWN,
                         user_action=UserAction(
-                            kind=UserActionKind.CHANGE_INPUT,
+                            kind=UserActionKind.CHANGE_MODEL,
                             detail="The Gateway returned an image without a width — try a different model",
                         ),
                         provider_metadata=None,
@@ -287,9 +287,9 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                     msg = "Missing height field in image response"
                     raise ImgGenGenerationError(
                         msg,
-                        error_category=InferenceErrorCategory.CONTENT,
+                        error_category=InferenceErrorCategory.UNKNOWN,
                         user_action=UserAction(
-                            kind=UserActionKind.CHANGE_INPUT,
+                            kind=UserActionKind.CHANGE_MODEL,
                             detail="The Gateway returned an image without a height — try a different model",
                         ),
                         provider_metadata=None,
@@ -299,9 +299,9 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                     msg = "Missing content_type field in image response"
                     raise ImgGenGenerationError(
                         msg,
-                        error_category=InferenceErrorCategory.CONTENT,
+                        error_category=InferenceErrorCategory.UNKNOWN,
                         user_action=UserAction(
-                            kind=UserActionKind.CHANGE_INPUT,
+                            kind=UserActionKind.CHANGE_MODEL,
                             detail="The Gateway returned an image without a content type — try a different model",
                         ),
                         provider_metadata=None,
@@ -316,9 +316,9 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
             msg = f"Unexpected response from model '{self.inference_model.model_id}' has no 'data' or 'images' key"
             raise ImgGenGenerationError(
                 msg,
-                error_category=InferenceErrorCategory.CONTENT,
+                error_category=InferenceErrorCategory.UNKNOWN,
                 user_action=UserAction(
-                    kind=UserActionKind.CHANGE_INPUT,
+                    kind=UserActionKind.CHANGE_MODEL,
                     detail="The Gateway returned an unexpected response shape — try a different model",
                 ),
                 provider_metadata=None,

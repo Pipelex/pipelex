@@ -247,9 +247,9 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
             msg = "No output format received from Azure"
             raise ImgGenGenerationError(
                 msg,
-                error_category=InferenceErrorCategory.CONTENT,
+                error_category=InferenceErrorCategory.UNKNOWN,
                 user_action=UserAction(
-                    kind=UserActionKind.CHANGE_INPUT,
+                    kind=UserActionKind.CHANGE_MODEL,
                     detail="Azure returned an image without an output format — try a different model",
                 ),
                 provider_metadata=None,
@@ -261,9 +261,9 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                 msg = f"Size from img gen response is not a string: '{size}'"
                 raise ImgGenGenerationError(
                     msg,
-                    error_category=InferenceErrorCategory.CONTENT,
+                    error_category=InferenceErrorCategory.UNKNOWN,
                     user_action=UserAction(
-                        kind=UserActionKind.CHANGE_INPUT,
+                        kind=UserActionKind.CHANGE_MODEL,
                         detail="Azure returned a malformed image size — try a different model",
                     ),
                     provider_metadata=None,
@@ -273,9 +273,9 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                 msg = f"Size from img gen response is not a valid size: '{size}'"
                 raise ImgGenGenerationError(
                     msg,
-                    error_category=InferenceErrorCategory.CONTENT,
+                    error_category=InferenceErrorCategory.UNKNOWN,
                     user_action=UserAction(
-                        kind=UserActionKind.CHANGE_INPUT,
+                        kind=UserActionKind.CHANGE_MODEL,
                         detail="Azure returned a malformed image size — try a different model",
                     ),
                     provider_metadata=None,
@@ -307,9 +307,9 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
             msg = f"Unexpected response from model '{self.inference_model.model_id}' has no 'data' or 'images' key"
             raise ImgGenGenerationError(
                 msg,
-                error_category=InferenceErrorCategory.CONTENT,
+                error_category=InferenceErrorCategory.UNKNOWN,
                 user_action=UserAction(
-                    kind=UserActionKind.CHANGE_INPUT,
+                    kind=UserActionKind.CHANGE_MODEL,
                     detail="Azure returned an unexpected response shape — try a different model",
                 ),
                 provider_metadata=None,

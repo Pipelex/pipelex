@@ -281,9 +281,9 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                     msg = "No mime type returned from Google"
                     raise ImgGenGenerationError(
                         msg,
-                        error_category=InferenceErrorCategory.CONTENT,
+                        error_category=InferenceErrorCategory.UNKNOWN,
                         user_action=UserAction(
-                            kind=UserActionKind.CHANGE_INPUT,
+                            kind=UserActionKind.CHANGE_MODEL,
                             detail="Google returned image data without a mime type — try a different model",
                         ),
                         provider_metadata=None,

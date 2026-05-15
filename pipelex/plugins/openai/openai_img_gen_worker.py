@@ -269,9 +269,9 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
             msg = "No size received from OpenAI"
             raise ImgGenGenerationError(
                 msg,
-                error_category=InferenceErrorCategory.CONTENT,
+                error_category=InferenceErrorCategory.UNKNOWN,
                 user_action=UserAction(
-                    kind=UserActionKind.CHANGE_INPUT,
+                    kind=UserActionKind.CHANGE_MODEL,
                     detail="OpenAI returned an image without size metadata — try a different model",
                 ),
                 provider_metadata=None,
@@ -281,9 +281,9 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
             msg = f"Size from OpenAI is not a valid size: '{size}'"
             raise ImgGenGenerationError(
                 msg,
-                error_category=InferenceErrorCategory.CONTENT,
+                error_category=InferenceErrorCategory.UNKNOWN,
                 user_action=UserAction(
-                    kind=UserActionKind.CHANGE_INPUT,
+                    kind=UserActionKind.CHANGE_MODEL,
                     detail="OpenAI returned a malformed image size — try a different model",
                 ),
                 provider_metadata=None,
@@ -297,9 +297,9 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
             msg = "No usage received from OpenAI"
             raise ImgGenGenerationError(
                 msg,
-                error_category=InferenceErrorCategory.CONTENT,
+                error_category=InferenceErrorCategory.UNKNOWN,
                 user_action=UserAction(
-                    kind=UserActionKind.CHANGE_INPUT,
+                    kind=UserActionKind.CHANGE_MODEL,
                     detail="OpenAI returned an image without usage metadata — try a different model",
                 ),
                 provider_metadata=None,

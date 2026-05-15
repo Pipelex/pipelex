@@ -223,9 +223,9 @@ class GatewaySearchWorker(SearchWorkerAbstract):
                 msg = f"Expected string content in response, got {type(content)}"
                 raise GatewaySearchResponseError(
                     msg,
-                    error_category=InferenceErrorCategory.CONTENT,
+                    error_category=InferenceErrorCategory.UNKNOWN,
                     user_action=UserAction(
-                        kind=UserActionKind.CHANGE_INPUT,
+                        kind=UserActionKind.CHANGE_MODEL,
                         detail="The Gateway returned a malformed search response — try a different model",
                     ),
                     provider_metadata=None,
@@ -235,9 +235,9 @@ class GatewaySearchWorker(SearchWorkerAbstract):
             msg = "Could not extract content from gateway search response"
             raise GatewaySearchResponseError(
                 msg,
-                error_category=InferenceErrorCategory.CONTENT,
+                error_category=InferenceErrorCategory.UNKNOWN,
                 user_action=UserAction(
-                    kind=UserActionKind.CHANGE_INPUT,
+                    kind=UserActionKind.CHANGE_MODEL,
                     detail="The Gateway returned a malformed search response — try a different model",
                 ),
                 provider_metadata=None,

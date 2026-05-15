@@ -16,9 +16,9 @@ class FalFactory:
             msg = f"Expected 1 image, got {len(generated_image_list)}"
             raise ImgGenGenerationError(
                 msg,
-                error_category=InferenceErrorCategory.CONTENT,
+                error_category=InferenceErrorCategory.UNKNOWN,
                 user_action=UserAction(
-                    kind=UserActionKind.CHANGE_INPUT,
+                    kind=UserActionKind.CHANGE_MODEL,
                     detail="FAL returned an unexpected number of images — try a different model",
                 ),
                 provider_metadata=None,
@@ -34,9 +34,9 @@ class FalFactory:
                 msg = f"Expected 'images' to be a list, got {type(image_dicts).__name__}"
                 raise ImgGenGenerationError(
                     msg,
-                    error_category=InferenceErrorCategory.CONTENT,
+                    error_category=InferenceErrorCategory.UNKNOWN,
                     user_action=UserAction(
-                        kind=UserActionKind.CHANGE_INPUT,
+                        kind=UserActionKind.CHANGE_MODEL,
                         detail="FAL returned an unexpected response shape — try a different model",
                     ),
                     provider_metadata=None,
@@ -53,9 +53,9 @@ class FalFactory:
             msg = f"Failed to parse image data from fal response: {exc}"
             raise ImgGenGenerationError(
                 msg,
-                error_category=InferenceErrorCategory.CONTENT,
+                error_category=InferenceErrorCategory.UNKNOWN,
                 user_action=UserAction(
-                    kind=UserActionKind.CHANGE_INPUT,
+                    kind=UserActionKind.CHANGE_MODEL,
                     detail="FAL returned a malformed image response — try a different model",
                 ),
                 provider_metadata=None,
