@@ -70,6 +70,13 @@ class GatewayQuotaDetectionTestData:
             InferenceErrorCategory.CONFIGURATION,
         ),
         (
+            "not_found_404_deployment_propagation_race",
+            "NotFoundError",
+            404,
+            "The specified deployment could not be found",
+            InferenceErrorCategory.TRANSIENT,
+        ),
+        (
             "timeout_error",
             "APITimeoutError",
             0,

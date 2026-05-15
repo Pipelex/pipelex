@@ -122,6 +122,16 @@ class GatewayFactory:
         return extra_headers, extra_body
 
     @classmethod
+    def _is_deployment_propagation_race(cls, exc: portkey_exceptions.APIError) -> bool:
+        """Detect a Portkey 404 caused by deployment-propagation lag rather than a real misconfiguration.
+
+        A freshly-routed gateway deployment can briefly 404 with "specified deployment could not be
+        found" before propagation completes — that is a transient race worth retrying, unlike a
+        genuine unknown-model 404.
+        """
+        return isinstance(exc, portkey_exc.NotFoundError) and "specified deployment could not be found" in str(exc).lower()
+
+    @classmethod
     def classify_error_category(cls, exc: portkey_exceptions.APIError) -> InferenceErrorCategory:
         """Classify a Portkey API error into an InferenceErrorCategory.
 
@@ -142,6 +152,8 @@ class GatewayFactory:
             if isinstance(exc, portkey_exc.BadRequestError):
                 return InferenceErrorCategory.CONTENT
             if isinstance(exc, portkey_exc.NotFoundError):
+                if cls._is_deployment_propagation_race(exc):
+                    return InferenceErrorCategory.TRANSIENT
                 return InferenceErrorCategory.CONFIGURATION
             # Unhandled 4xx: a client-side problem, non-retryable.
             if 400 <= status_code < 500:
@@ -171,6 +183,11 @@ class GatewayFactory:
                     detail="Pipelex Gateway rejected the API key — check your credentials",
                 )
             if isinstance(exc, portkey_exc.NotFoundError):
+                if cls._is_deployment_propagation_race(exc):
+                    return UserAction(
+                        kind=UserActionKind.WAIT_AND_RETRY,
+                        detail="The gateway deployment is still propagating — the system will retry automatically",
+                    )
                 return UserAction(
                     kind=UserActionKind.CHANGE_MODEL,
                     detail="The requested model or endpoint was not found — pick an available model",
