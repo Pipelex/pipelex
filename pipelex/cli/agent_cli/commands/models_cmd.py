@@ -43,7 +43,7 @@ def agent_models_cmd(
     except SystemExit:
         # agent_error already handled and called sys.exit
         raise
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         agent_error(f"Failed to list models: {exc}", type(exc).__name__, cause=exc)
     finally:
         Pipelex.teardown_if_needed()

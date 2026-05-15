@@ -131,7 +131,7 @@ def agent_doctor_cmd(
         telemetry_healthy, telemetry_message = check_telemetry_config(config_dir=config_dir)
         backends_healthy, backend_credential_reports, backends_message = check_backend_credentials(config_dir=config_dir)
         models_healthy, models_message, backend_file_reports = check_models(config_dir=config_dir)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         agent_error(f"Health check failed unexpectedly: {exc}", type(exc).__name__, cause=exc)
         # agent_error has NoReturn
 

@@ -129,5 +129,5 @@ def concept_cmd(
     except ValueError as exc:
         agent_error(str(exc), "ValueError", cause=exc)
 
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         agent_error(str(exc), type(exc).__name__, cause=exc)

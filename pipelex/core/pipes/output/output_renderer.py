@@ -51,7 +51,7 @@ def _collect_possible_outputs(
                             "content": content,
                         }
                     )
-                except Exception:
+                except Exception:  # noqa: BLE001
                     # If we can't render this pipe's output, add a placeholder
                     possible_outputs.append(
                         {
@@ -89,7 +89,7 @@ def _collect_possible_outputs(
                         "content": content,
                     }
                 ]
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return []
 
         case (

@@ -144,7 +144,7 @@ def validate_bundle_cmd(
                 agent_error(f"Graph generation failed: {exc}", type(exc).__name__, cause=exc)
             except typer.Exit:
                 raise
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 agent_error(f"Graph generation failed: {exc}", type(exc).__name__, cause=exc)
 
         # Generate view (GraphSpec JSON) if requested and validation succeeded
@@ -171,7 +171,7 @@ def validate_bundle_cmd(
                 agent_error(f"View generation failed: {exc}", type(exc).__name__, cause=exc)
             except typer.Exit:
                 raise
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 agent_error(f"View generation failed: {exc}", type(exc).__name__, cause=exc)
 
         agent_success(result)
@@ -213,7 +213,7 @@ def validate_bundle_cmd(
     except typer.Exit:
         raise
 
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         agent_error(str(exc), type(exc).__name__, cause=exc)
 
     finally:

@@ -81,12 +81,12 @@ class DualClientExceptionCapture:
         if self._custom_client:
             try:
                 self._custom_client.capture_exception(posthog_exc_info, distinct_id=self._custom_distinct_id)
-            except Exception as capture_exc:
+            except Exception as capture_exc:  # noqa: BLE001
                 log.debug(f"Failed to capture exception to custom PostHog: {capture_exc}")
 
         # Send to Pipelex PostHog client
         if self._pipelex_client:
             try:
                 self._pipelex_client.capture_exception(posthog_exc_info, distinct_id=self._pipelex_distinct_id)
-            except Exception as capture_exc:
+            except Exception as capture_exc:  # noqa: BLE001
                 log.debug(f"Failed to capture exception to Pipelex PostHog: {capture_exc}")

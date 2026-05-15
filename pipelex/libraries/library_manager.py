@@ -1174,7 +1174,7 @@ class LibraryManager(LibraryManagerAbstract):
             if structure_class is not None and issubclass(structure_class, BaseModel):
                 try:
                     structure_class.model_rebuild(_types_namespace=namespace)
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     log.debug(f"Could not rebuild model for {concept.concept_ref}: {exc}")
 
     def _detect_concept_cycles(self, concepts: list["Concept"]) -> None:

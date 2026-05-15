@@ -100,7 +100,7 @@ def check_config_files(config_dir: Path | None = None) -> tuple[bool, int, str]:
     # Check for missing files
     try:
         missing_count = init_config(reset=False, dry_run=True, target_dir=str(effective_config_dir))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return False, 0, f"Error checking config files: {exc}"
 
     # Check if main config can be loaded using the hub's setup.
@@ -118,7 +118,7 @@ def check_config_files(config_dir: Path | None = None) -> tuple[bool, int, str]:
             validation_error_msg = report_validation_error(category="config", validation_error=validation_error)
             msg = f"Configuration validation failed:\n{validation_error_msg}"
             return False, 0, msg
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return False, 0, f"Error loading pipelex.toml: {exc}"
 
     # Report results
@@ -228,7 +228,7 @@ def check_backend_credentials(config_dir: Path | None = None) -> tuple[bool, dic
         backends_with_issues = sum(1 for r in backend_reports.values() if not r.all_credentials_valid)
         return False, backend_reports, f"{backends_with_issues} backend(s) have missing or invalid credentials"
 
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return False, {}, f"Error checking backend credentials: {exc}"
 
 
@@ -250,7 +250,7 @@ def check_kit_template_exists(backend_name: str) -> bool:
 
         # For Traversable, we check if it's a file
         return backend_file.is_file()
-    except Exception:
+    except Exception:  # noqa: BLE001
         return False
 
 
@@ -291,7 +291,7 @@ def replace_backend_file(backend_name: str, dry_run: bool = False, config_dir: P
         target_file.write_text(template_content, encoding="utf-8")
         return True
 
-    except Exception:
+    except Exception:  # noqa: BLE001
         return False
 
 
@@ -317,7 +317,7 @@ def check_backend_files(config_dir: Path | None = None) -> tuple[bool, dict[str,
 
     try:
         backends_dict = load_toml_from_path(backends_toml_path)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return False, {}, f"Error loading backends.toml: {exc}"
 
     backend_file_reports: dict[str, BackendFileReport] = {}
@@ -370,7 +370,7 @@ def check_backend_files(config_dir: Path | None = None) -> tuple[bool, dict[str,
                 is_valid = False
                 error_message = error_str
                 all_valid = False
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             # Other errors might also be related to this backend
             error_str = str(exc)
             if backend_name in error_str or backend_file_path in error_str:
@@ -764,7 +764,7 @@ def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, B
                     backend_file_reports[backend_name].is_valid = False
                     backend_file_reports[backend_name].error_message = error_str
         return False, f"Error checking models: {exc}", backend_file_reports
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return False, f"Error checking models: {exc}", backend_file_reports
 
     return True, "Models are valid", backend_file_reports
@@ -782,7 +782,7 @@ def doctor_cmd(
     try:
         do_doctor_cmd(fix=fix)
 
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         # Handle unexpected errors gracefully without printing traces
         console.print()
         console.print(f"[red]✗ Unexpected error: {exc!s}[/red]")
@@ -878,7 +878,7 @@ def do_doctor_cmd(
                     console.print()
                     init_cmd(focus=InitFocus.CONFIG, skip_confirmation=True)
                     console.print("[green]✓[/green] Configuration files installed")
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     console.print(f"[red]Failed to install configuration files: {exc!s}[/red]")
                 console.print()
 
@@ -897,7 +897,7 @@ def do_doctor_cmd(
                     console.print()
                     init_cmd(focus=InitFocus.TELEMETRY, skip_confirmation=True)
                     console.print("[green]✓[/green] Telemetry configured")
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     console.print(f"[red]Failed to configure telemetry: {exc!s}[/red]")
                 console.print()
 
@@ -908,7 +908,7 @@ def do_doctor_cmd(
                     console.print()
                     update_cmd(yes=True)
                     console.print("[green]✓[/green] Model deck updated")
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     console.print(f"[red]Failed to update deck: {exc!s}[/red]")
                 console.print()
 
@@ -934,7 +934,7 @@ def do_doctor_cmd(
                             console.print(f"[green]✓[/green] Replaced {backend_name} backend configuration")
                         else:
                             console.print(f"[red]Failed to replace {backend_name}: Template not found or copy failed[/red]")
-                    except Exception as exc:
+                    except Exception as exc:  # noqa: BLE001
                         console.print(f"[red]Failed to replace {backend_name}: {exc!s}[/red]")
                     console.print()
                 else:

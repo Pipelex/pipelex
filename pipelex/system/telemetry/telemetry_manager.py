@@ -196,7 +196,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         if self._exception_capture:
             try:
                 self._exception_capture.close()
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 log.debug(f"Error closing exception capture: {exc}")
 
         # Then, shutdown the TracerProvider to flush all pending spans
@@ -206,7 +206,7 @@ class TelemetryManager(TelemetryManagerAbstract):
                 log.verbose("Shutting down OTel TracerProvider (flushing pending spans)...")
                 self._tracer_provider.shutdown()
                 log.verbose("OTel TracerProvider shutdown complete")
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 # Suppress any shutdown errors to avoid cascading failures
                 log.debug(f"Error during TracerProvider shutdown: {exc}")
 
@@ -214,7 +214,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         if self.custom_posthog_client:
             try:
                 self.custom_posthog_client.shutdown()
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 # Suppress any shutdown errors to avoid cascading failures
                 log.debug(f"Error during custom PostHog shutdown: {exc}")
 
@@ -222,7 +222,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         if self.pipelex_posthog_client:
             try:
                 self.pipelex_posthog_client.shutdown()
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 # Suppress any shutdown errors to avoid cascading failures
                 log.debug(f"Error during Pipelex PostHog shutdown: {exc}")
 

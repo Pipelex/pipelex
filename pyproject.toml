@@ -413,7 +413,6 @@ ignore = [
   "T201", # `print` found
 
   # TODO: stop ignoring these rules
-  "BLE001",  # Do not catch blind exception: `Exception`
   "B027",    # Checks for empty methods in abstract base classes without an abstract decorator.
   "UP007",   # Use `X | Y` for type annotations
   "UP036",   # Version block is outdated for minimum Python version
@@ -434,6 +433,7 @@ convention = "google"
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = [
   "INP001", # Allow test files to not have __init__.py in their directories (avoids namespace collisions)
+  "BLE001", # Broad `except Exception` is acceptable in tests (asserting failure modes, defensive fixtures)
 ]
 
 [tool.uv]

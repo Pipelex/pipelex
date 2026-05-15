@@ -103,7 +103,7 @@ def agent_check_model_cmd(
         raise
     except ModelReferenceParseError as exc:
         agent_error(f"Invalid model reference: {exc}", "ArgumentError", cause=exc)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         agent_error(f"Failed to check model: {exc}", type(exc).__name__, cause=exc)
     finally:
         Pipelex.teardown_if_needed()

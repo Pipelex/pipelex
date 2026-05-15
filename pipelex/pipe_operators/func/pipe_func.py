@@ -7,6 +7,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, TypedNamedStuffSpec
@@ -193,7 +194,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
                 try:
                     stuff = working_memory.get_stuff(name=input_name)
                     inputs_lines.append(f"    {input_name} = {stuff.content!r}")
-                except Exception:
+                except WorkingMemoryStuffNotFoundError:
                     inputs_lines.append(f"    {input_name} = <not found in working memory>")
 
             inputs_desc = "\n".join(inputs_lines) if inputs_lines else "    none"

@@ -481,7 +481,7 @@ def init_cmd(
     except typer.Exit:
         # Re-raise Exit exceptions
         raise
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         console.print(f"\n[red]⚠ Warning: Initialization failed: {escape(str(exc))}[/red]", style="bold")
         if needs_config:
             console.print("[red]Please run 'pipelex init config' manually.[/red]")

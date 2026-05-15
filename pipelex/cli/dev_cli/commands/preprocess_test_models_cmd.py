@@ -663,7 +663,7 @@ def preprocess_test_models_cmd(
             console.print("  • Verify disk space and filesystem health")
             console.print()
         sys.exit(1)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         # Catch-all for unexpected errors
         if quiet:
             console.print(f"[red]✗ Preprocessing failed:[/red] {escape(str(exc))}")

@@ -254,7 +254,7 @@ class MistralFactory:
 
             log.debug("No image magic number found in first 32 bytes, returning original")
             return base64_str
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             # If anything goes wrong, return the original base64 string
             log.debug(f"Error cleaning base64: {exc}")
             return base64_str

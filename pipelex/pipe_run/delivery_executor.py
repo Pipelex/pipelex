@@ -174,7 +174,7 @@ class DeliveryExecutor:
             self._add_optional_text_file(files, "mermaidflow.mmd", graph_outputs.mermaidflow_mmd, "text/plain")
             self._add_optional_text_file(files, "mermaidflow.html", graph_outputs.mermaidflow_html, "text/html")
             self._add_optional_text_file(files, "reactflow.html", graph_outputs.reactflow_html, "text/html")
-        except Exception:
+        except Exception:  # noqa: BLE001
             # TODO: wip - do not catch all exceptions
             log.warning("Failed to generate graph outputs")
 
@@ -189,7 +189,7 @@ class DeliveryExecutor:
         """Await a render coroutine and store the encoded result; log a warning on failure."""
         try:
             text = await render
-        except Exception:
+        except Exception:  # noqa: BLE001
             # TODO: wip - do not catch all exceptions
             log.warning(f"Failed to render {filename}")
             return

@@ -85,7 +85,7 @@ def get_currently_enabled_backends(backends_toml_path: str, backend_options: lis
                     if backend_section.get("enabled", False) is True:  # type: ignore[union-attr]
                         currently_enabled.append(backend_key_to_index[backend_key])
 
-    except Exception:
+    except Exception:  # noqa: BLE001
         # If we can't read the file, just return empty list (silent failure is acceptable here)
         return []
 

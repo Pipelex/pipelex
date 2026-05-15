@@ -83,10 +83,10 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                 try:
                     asyncio.run(self.genai_async_client.aclose())
                     log.verbose("Closed Google async client using asyncio.run()")
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     # Log but don't fail teardown if cleanup has issues
                     log.verbose(f"Error closing Google async client during teardown: {exc}")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             # Log but don't fail teardown if cleanup has issues
             log.debug(f"Error during Google async client teardown: {exc}")
 

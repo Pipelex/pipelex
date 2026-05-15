@@ -73,9 +73,9 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
                     # No running event loop, best-effort sync close
                     try:
                         asyncio.run(httpx_client.aclose())
-                    except Exception as exc:
+                    except Exception as exc:  # noqa: BLE001
                         log.debug(f"Error closing portkey httpx client during teardown: {exc}")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             log.debug(f"Error during GatewayExtractWorker teardown: {exc}")
 
     def _make_retryer(self) -> AsyncRetrying:

@@ -55,7 +55,7 @@ def can_inject_text(value: Any | None) -> bool:
         return False
     try:
         return has_text(f"{value}")
-    except Exception:
+    except Exception:  # noqa: BLE001
         return False
 
 

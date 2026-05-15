@@ -126,7 +126,7 @@ def run_method_cmd(
             except PipelineRequestError as exc:
                 agent_error(str(exc), "PipelineRequestError", cause=exc)
 
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 agent_error(str(exc), type(exc).__name__, cause=exc)
 
         case RunnerType.PIPELEX:
@@ -179,7 +179,7 @@ def run_method_cmd(
                     availability_extra["pipe_stack"] = exc.pipe_stack
                 agent_error(exc.message, "PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
 
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 agent_error(str(exc), type(exc).__name__, cause=exc)
 
             finally:

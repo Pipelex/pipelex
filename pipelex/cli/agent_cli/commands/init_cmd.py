@@ -382,5 +382,5 @@ def agent_init_cmd(
 
     except typer.Exit:
         raise
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         agent_error(f"Initialization failed: {exc}", type(exc).__name__, cause=exc)

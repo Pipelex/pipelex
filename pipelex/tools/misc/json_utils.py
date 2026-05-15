@@ -381,7 +381,7 @@ def purify_json(
     except TypeError:
         try:
             dict_string = kajson.dumps(data, indent=indent)  # pyright: ignore[reportUnknownMemberType]
-        except Exception:
+        except Exception:  # noqa: BLE001
             if is_warning_enabled:
                 data = cast("dict[Any, Any] | list[Any]", data)
                 data = {"!": data}
@@ -441,7 +441,7 @@ def purify_json_list(
     except TypeError:
         try:
             list_string = kajson.dumps(data, indent=indent)  # pyright: ignore[reportUnknownMemberType]
-        except Exception:
+        except Exception:  # noqa: BLE001
             list_string = json.dumps(data, indent=indent, default=str)
         pure_list = json.loads(list_string)
     return pure_list, list_string
@@ -494,7 +494,7 @@ def purify_json_dict(data: Any, indent: int | None = None, is_warning_enabled: b
     except TypeError:
         try:
             dict_string = kajson.dumps(data, indent=indent)  # pyright: ignore[reportUnknownMemberType]
-        except Exception:
+        except Exception:  # noqa: BLE001
             if is_warning_enabled:
                 data = {"!": data}
             dict_string = json.dumps(data, indent=indent, default=str)

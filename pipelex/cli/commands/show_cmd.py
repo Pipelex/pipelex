@@ -157,7 +157,7 @@ def do_show_backends(show_all: bool = False) -> None:
         else:
             console.print("[dim]No specific routing rules defined.[/dim]")
 
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         console.print(f"[yellow]Warning: Could not load routing profile information: {exc}[/yellow]")
 
     console.print("\n")

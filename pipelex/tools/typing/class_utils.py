@@ -94,7 +94,7 @@ def are_classes_equivalent(class_1: type[Any], class_2: type[Any]) -> bool:
 
         # Compare $defs if present (for nested types)
         return schema_1.get("$defs") == schema_2.get("$defs")
-    except Exception:
+    except Exception:  # noqa: BLE001
         # Fallback to manual field comparison if schema comparison fails
         fields_1: dict[str, FieldInfo] = class_1.model_fields
         fields_2: dict[str, FieldInfo] = class_2.model_fields

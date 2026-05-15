@@ -184,7 +184,7 @@ def convert_to_working_memory_format(needed_inputs_spec: InputStuffSpecs) -> lis
                 )
                 needed_inputs_for_factory.append(text_typed_named_stuff_spec)
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             # Fallback to TextContent for any errors
             log.warning(f"Error getting structure class for concept '{named_stuff_spec.concept.code}': {exc}, falling back to TextContent")
             text_typed_named_stuff_spec = TypedNamedStuffSpec.make_from_named(
