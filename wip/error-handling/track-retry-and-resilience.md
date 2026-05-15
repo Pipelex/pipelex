@@ -126,6 +126,23 @@ Confirm no worker does business-level retries outside of SDK internals. `instruc
 - Gateway workers raise with correct category on first failure (no silent retries).
 - Existing worker error-handling tests still pass unchanged.
 
+## Pillar B — Bounded fan-out concurrency (Phase 5.5, landed)
+
+Retry (above) is one pillar of "resilience without Temporal"; bounded fan-out is the other. A `PipeBatch` over N items previously ended in a single `asyncio.gather` over *all* N branches — N coroutines, N deep-copied working memories, and N simultaneous inference calls at once. A pipe over 1,000 documents would overwhelm asyncio, memory, and provider rate limits. The standalone path now bounds that fan-out; the Temporal path already had task-queue rate limiting.
+
+### Design
+
+- **`gather_bounded`** (`pipelex/tools/misc/async_utils.py`) — a generic helper. It takes a sequence of *factories* (`Callable[[], Awaitable[T]]`), not coroutines, and runs them in chunks of `max_concurrency`. Taking factories is the point: each factory defers its expensive resource (a deep-copied working memory) until its chunk runs, so at most `max_concurrency` of those copies are materialized at once. A bare `asyncio.Semaphore` over already-created coroutines bounds *execution* but not *memory* — chunked factory invocation bounds both. Results are returned in input order. `max_concurrency` is `int | None`; `None`, or a value at least as large as the factory count, means unbounded — every factory in a single chunk. A non-positive int raises `ValueError`.
+- **Chunk-failure semantics** — within a chunk, `asyncio.gather(..., return_exceptions=True)` awaits every branch; the first error *by input index* is then raised, and no later chunk is started. Every branch already in flight in the failing chunk is drained (awaited) — never orphaned or cancelled — before the error propagates. Bounded and unbounded runs share this single code path (unbounded is just one chunk of every factory), so failure semantics do not depend on batch size.
+- **Config** — `max_concurrency` on `PipelineExecutionConfig` (placed beside the Phase 5 retry fields — same "resilience without Temporal" concern, no separate `ConcurrencyConfig`). Typed `Annotated[int, Field(ge=1)] | Literal["unbounded"]` — the explicit `"unbounded"` literal disables the bound rather than a magic `0`. Default `8` in `pipelex/pipelex.toml`. `PipeBatch` maps the `"unbounded"` literal to the helper's `None`.
+- **`PipeBatch`** (`pipelex/pipe_controllers/batch/pipe_batch.py`) builds one factory per branch and calls `gather_bounded`. Item-stuff creation and graph-tracer registration stay in an upfront loop (cheap, synchronous); the working-memory deep copy and run-params copy move into the deferred factory.
+- **`PipeParallel` is not bounded** — it fans over a fixed, pipe-defined branch set (usually small), not a data-driven N. The scaling risk is `PipeBatch`. Left as a plain `gather`.
+- **Graceful-degradation advisory** — when a `PipeBatch` fans out over more than `LARGE_BATCH_ADVISORY_THRESHOLD` (100) items, it logs a one-time advisory naming the Temporal track as the durable, rate-limited path. Advisory, never fatal.
+
+### How Pillars A and B compose
+
+Bounded concurrency *reduces* how often `CAPACITY` (rate-limit) errors are hit in the first place — fewer simultaneous calls means less provider overwhelm. The Phase 5 router retry loop handles the residual `TRANSIENT` failures. Persistent `CAPACITY` under an already-bounded fan-out is the honest "go Temporal" boundary — the advisory points there. Neither pillar attempts durable crash-survival; that remains the Temporal pitch.
+
 ## Related tracks
 
 - [track-worker-classification.md](track-worker-classification.md) — workers must classify before the router can act on the signal. The instructor unwrap gap means structured-gen TRANSIENT errors are currently mis-categorized as `CONTENT` and would not retry; fix that first or in parallel.

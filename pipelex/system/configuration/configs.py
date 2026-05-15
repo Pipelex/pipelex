@@ -1,3 +1,5 @@
+from typing import Annotated, Literal
+
 import shortuuid
 from pydantic import Field, field_validator, model_validator
 
@@ -159,6 +161,10 @@ class PipelineExecutionConfig(ConfigModel):
     transient_retry_base_wait: float = Field(ge=0)
     transient_retry_max_wait: float = Field(ge=0)
     transient_retry_backoff_multiplier: float = Field(ge=1)
+
+    # Bounded fan-out concurrency for PipeBatch (the other resilience-without-Temporal pillar).
+    # An integer caps the number of branches executed at once; the literal "unbounded" disables the bound.
+    max_concurrency: Annotated[int, Field(ge=1)] | Literal["unbounded"]
 
     def with_graph_config_overrides(
         self,

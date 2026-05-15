@@ -292,6 +292,11 @@ transient_retry_base_wait = 2.0          # seconds before the first retry
 transient_retry_max_wait = 30.0          # cap on the per-retry wait
 transient_retry_backoff_multiplier = 2.0 # the wait is multiplied by this on each successive retry
 
+# Bounded fan-out concurrency for PipeBatch: at most this many branches run at once.
+# A modest default keeps a large workload (one pipe over many items) from overwhelming
+# asyncio, memory, and provider rate limits. Set to "unbounded" to disable the bound.
+max_concurrency = 8
+
 [pipelex.pipeline_execution_config.graph_config]
 
 [pipelex.pipeline_execution_config.graph_config.data_inclusion]
