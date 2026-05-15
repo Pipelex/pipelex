@@ -63,6 +63,9 @@ For `bundle`, additional options are available:
 - `--format`, `-f` - Graph output format
 - `--direction` - Graph layout direction
 
+!!! note "Signature pipes"
+    `pipelex-agent validate` accepts [`PipeSignature`](../../building-methods/pipes/signature-pipes.md) placeholders by default. Authoring workflows routinely contain unresolved signatures, so the agent CLI runs lenient validation — there is no flag to make it strict. The main `pipelex validate` is strict by default and needs `--allow-signatures` for the same behavior.
+
 ### Inputs
 
 Generate example input JSON for a pipe, bundle, or method.
