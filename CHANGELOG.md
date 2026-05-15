@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **`PipeLLM` outputting a concept that refines the native `JSON` concept no longer crashes with `NameError: name 'Any' is not defined`.** On a LIVE run, such a concept resolves to a structured-output model carrying a `dict[str, Any]` field inherited from `JSONContent`. `SchemaToModelFactory` generates that model as source with `from __future__ import annotations` (every annotation becomes a string) and then rebuilds each class to resolve the string annotations. The rebuild namespace was assembled from the exec'd user types plus a hand-listed `Literal`, but `typing.Any` is a special form, not a `type`, so it was filtered out — `model_rebuild` then raised `PydanticUndefinedAnnotation` evaluating `"dict[str, Any]"`. The rebuild namespace is now the exec namespace itself (minus `__builtins__`), so it carries exactly the names the generated source was written against and cannot drift as codegen emits other typing constructs. Fixed in `pipelex/cogt/content_generation/schema_to_model_factory.py`; covers both the sender path (`make_from_json_schema`) and the cross-process receiver path (`make_types_from_source`).
+
 ## [v0.28.0] - 2026-05-13
 
 ### Changed
