@@ -55,6 +55,7 @@ pipelex-agent validate method <NAME> [OPTIONS]
 **Common options:**
 
 - `--library-dir`, `-L` - Additional library directory
+- `--allow-signatures` - Accept [`PipeSignature`](../../building-methods/pipes/signature-pipes.md) placeholders in the dependency graph (lenient mode)
 
 For `bundle`, additional options are available:
 
@@ -64,7 +65,7 @@ For `bundle`, additional options are available:
 - `--direction` - Graph layout direction
 
 !!! note "Signature pipes"
-    `pipelex-agent validate` accepts [`PipeSignature`](../../building-methods/pipes/signature-pipes.md) placeholders by default. Authoring workflows routinely contain unresolved signatures, so the agent CLI runs lenient validation — there is no flag to make it strict. The main `pipelex validate` is strict by default and needs `--allow-signatures` for the same behavior.
+    `pipelex-agent validate` is strict by default — same as `pipelex validate`. A bundle whose dependency graph reaches a `PipeSignature` is rejected unless you pass `--allow-signatures`, which dry-runs signatures as mocks.
 
 ### Inputs
 

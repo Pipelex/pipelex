@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipelex.cli.agent_cli.commands.validate._validate_core import validate_bundle_core  # noqa: PLC2701
+from pipelex.pipeline.validate_bundle import ValidateBundleError
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -42,14 +43,26 @@ def agent_signature_bundle_dir() -> Iterator[Path]:
         yield path
 
 
-class TestAgentValidateDefaultsLenient:
-    def test_agent_validate_defaults_to_lenient(self, agent_signature_bundle_dir: Path) -> None:
-        # The agent CLI's validate_bundle_core defaults to lenient — succeeds even when the
-        # bundle contains a signature reachable from another pipe.
+class TestAgentValidateDefaultsStrict:
+    def test_agent_validate_defaults_to_strict(self, agent_signature_bundle_dir: Path) -> None:
+        # The agent CLI's validate_bundle_core defaults to strict — same as `pipelex validate`.
+        # A bundle whose dependency graph reaches a signature is rejected.
+        with pytest.raises(ValidateBundleError) as exc_info:
+            asyncio.run(
+                validate_bundle_core(
+                    bundle_path=agent_signature_bundle_dir / "bundle.mthds",
+                    library_dirs=[agent_signature_bundle_dir],
+                )
+            )
+        assert exc_info.value.signature_check_error is not None
+
+    def test_agent_validate_allow_signatures_succeeds(self, agent_signature_bundle_dir: Path) -> None:
+        # With allow_signatures=True the same bundle validates — signatures dry-run as mocks.
         result = asyncio.run(
             validate_bundle_core(
                 bundle_path=agent_signature_bundle_dir / "bundle.mthds",
                 library_dirs=[agent_signature_bundle_dir],
+                allow_signatures=True,
             )
         )
         assert result["success"] is True

@@ -35,6 +35,13 @@ def validate_method_cmd(
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
     ] = None,
+    allow_signatures: Annotated[
+        bool,
+        typer.Option(
+            "--allow-signatures",
+            help="Accept PipeSignature placeholders in the dependency graph (lenient mode).",
+        ),
+    ] = False,
 ) -> None:
     """Validate an installed method and output JSON results.
 
@@ -44,6 +51,7 @@ def validate_method_cmd(
     Examples:
         pipelex-agent validate method my-method
         pipelex-agent validate method my-method --pipe custom_pipe
+        pipelex-agent validate method my-method --allow-signatures
     """
     pipe_code, method_library_dirs, method = resolve_method_target(
         method_name=name,
@@ -65,10 +73,14 @@ def validate_method_cmd(
     try:
         if pipe:
             # Validate a specific pipe within the method's bundle
-            result = asyncio.run(validate_pipe_in_bundle_core(bundle_path=bundle_path, pipe_code=pipe_code, library_dirs=library_dirs_paths))
+            result = asyncio.run(
+                validate_pipe_in_bundle_core(
+                    bundle_path=bundle_path, pipe_code=pipe_code, library_dirs=library_dirs_paths, allow_signatures=allow_signatures
+                )
+            )
         else:
             # Validate the entire bundle
-            result = asyncio.run(validate_bundle_core(bundle_path=bundle_path, library_dirs=library_dirs_paths))
+            result = asyncio.run(validate_bundle_core(bundle_path=bundle_path, library_dirs=library_dirs_paths, allow_signatures=allow_signatures))
 
         agent_success(result)
 

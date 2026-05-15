@@ -35,6 +35,13 @@ def validate_pipe_cmd(
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
     ] = None,
+    allow_signatures: Annotated[
+        bool,
+        typer.Option(
+            "--allow-signatures",
+            help="Accept PipeSignature placeholders in the dependency graph (lenient mode).",
+        ),
+    ] = False,
 ) -> None:
     """Validate a pipe by code, or all pipes, and output JSON results.
 
@@ -44,6 +51,7 @@ def validate_pipe_cmd(
         pipelex-agent validate pipe my_pipe
         pipelex-agent validate pipe --all
         pipelex-agent validate pipe --all -L ./my_pipes
+        pipelex-agent validate pipe my_draft_pipe --allow-signatures
     """
     library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
 
@@ -55,7 +63,7 @@ def validate_pipe_cmd(
         make_pipelex_for_agent_cli(library_dirs=library_dirs, log_level=ctx.obj["log_level"], needs_inference=False, needs_model_specs=True)
 
         try:
-            result = asyncio.run(validate_all_core(library_dirs=library_dirs))
+            result = asyncio.run(validate_all_core(library_dirs=library_dirs, allow_signatures=allow_signatures))
             agent_success(result)
 
         except ValidateBundleError as exc:
@@ -125,7 +133,7 @@ def validate_pipe_cmd(
     make_pipelex_for_agent_cli(library_dirs=library_dirs, log_level=ctx.obj["log_level"], needs_inference=False, needs_model_specs=True)
 
     try:
-        result = asyncio.run(validate_pipe_core(pipe_code=pipe_code, library_dirs=library_dirs))
+        result = asyncio.run(validate_pipe_core(pipe_code=pipe_code, library_dirs=library_dirs, allow_signatures=allow_signatures))
         agent_success(result)
 
     except PipeNotFoundError as exc:

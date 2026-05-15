@@ -19,14 +19,14 @@ if TYPE_CHECKING:
 
 async def validate_all_core(
     library_dirs: list[Path] | None = None,
-    allow_signatures: bool = True,
+    allow_signatures: bool = False,
 ) -> dict[str, Any]:
     """Validate all pipes in all libraries.
 
     Args:
         library_dirs: List of library directories to search for pipe definitions.
-        allow_signatures: Whether to accept PipeSignature placeholders. The agent CLI defaults
-            to True because authoring workflows routinely contain unresolved signatures.
+        allow_signatures: Whether to accept PipeSignature placeholders in the dependency graph.
+            Defaults to False (strict) — matches `pipelex validate`.
 
     Returns:
         Dictionary with validation results suitable for JSON serialization.
@@ -66,15 +66,15 @@ async def validate_all_core(
 async def validate_bundle_core(
     bundle_path: Path,
     library_dirs: list[Path] | None = None,
-    allow_signatures: bool = True,
+    allow_signatures: bool = False,
 ) -> dict[str, Any]:
     """Validate a bundle file.
 
     Args:
         bundle_path: Path to the bundle file.
         library_dirs: List of library directories to search for pipe definitions.
-        allow_signatures: Whether to accept PipeSignature placeholders. Defaults to True for
-            the agent CLI since signatures are the authoring sweet-spot.
+        allow_signatures: Whether to accept PipeSignature placeholders in the dependency graph.
+            Defaults to False (strict) — matches `pipelex validate`.
 
     Returns:
         Dictionary with validation results suitable for JSON serialization.
@@ -101,15 +101,15 @@ async def validate_bundle_core(
 async def validate_pipe_core(
     pipe_code: str,
     library_dirs: list[Path] | None = None,
-    allow_signatures: bool = True,
+    allow_signatures: bool = False,
 ) -> dict[str, Any]:
     """Validate a single pipe.
 
     Args:
         pipe_code: The pipe code to validate.
         library_dirs: List of library directories to search for pipe definitions.
-        allow_signatures: Whether to accept PipeSignature placeholders. Defaults to True for
-            the agent CLI since signatures are the authoring sweet-spot.
+        allow_signatures: Whether to accept PipeSignature placeholders in the dependency graph.
+            Defaults to False (strict) — matches `pipelex validate`.
 
     Returns:
         Dictionary with validation results suitable for JSON serialization.
@@ -139,7 +139,7 @@ async def validate_pipe_in_bundle_core(
     bundle_path: Path,
     pipe_code: str,
     library_dirs: list[Path] | None = None,
-    allow_signatures: bool = True,
+    allow_signatures: bool = False,
 ) -> dict[str, Any]:
     """Validate a single pipe within a bundle.
 
@@ -150,8 +150,8 @@ async def validate_pipe_in_bundle_core(
         bundle_path: Path to the bundle file.
         pipe_code: The pipe code to validate within the bundle.
         library_dirs: List of library directories to search for pipe definitions.
-        allow_signatures: Whether to accept PipeSignature placeholders. Defaults to True for
-            the agent CLI since signatures are the authoring sweet-spot.
+        allow_signatures: Whether to accept PipeSignature placeholders in the dependency graph.
+            Defaults to False (strict) — matches `pipelex validate`.
 
     Returns:
         Dictionary with validation results suitable for JSON serialization.
