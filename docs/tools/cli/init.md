@@ -66,6 +66,9 @@ This command creates or resets a Pipelex config directory with:
     - `deck/` - AI model aliases and presets
 - **telemetry.toml** - Telemetry and observability settings
 
+!!! note "Offline cache priming"
+    When Pipelex Gateway is enabled, `pipelex init` also primes an on-disk copy of the gateway's remote config at `~/.pipelex/cache/remote_config.json`. This lets later setup, validation, and dry-runs work even when the remote config service is briefly unreachable. If you run `pipelex init` while offline, it prints a yellow warning and skips priming — re-run it online to enable offline dry-runs.
+
 ## Interactive Setup Flow
 
 When you run `pipelex init`, Pipelex can guide you through:
