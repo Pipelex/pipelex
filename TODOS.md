@@ -11,8 +11,8 @@
 
 Three priorities drive the next phase of error-handling work, in priority order:
 
-1. **Resilience** — perfect the Temporal integration, while still working thoroughly and efficiently *without* Temporal.
-2. **Agent CLI delivers errors in plain markdown** — clear and efficiently usable by agents — with JSON available via an explicit option.
+1. **Resilience** — perfect the Temporal integration, while still working thoroughly and efficiently *without* Temporal. "Without Temporal" has **two pillars**: **bounded retry** of transient failures (Phase 5), and **bounded fan-out concurrency** (Phase 5.5) so a large workload — e.g. one pipe over 1,000 documents — degrades gracefully instead of overwhelming asyncio / memory / provider rate limits. Durable crash-survival is explicitly *not* attempted standalone — that is the Temporal pitch, and the standalone path should *advertise* it when limits are hit, not fake it.
+2. **Errors surface cleanly on every delivery surface** — the agent CLI emits plain markdown, clear and efficiently usable by agents, with JSON via an explicit option; and `ErrorReport` carries a documented `error_domain` → HTTP-status mapping so any downstream API (relay, back-office) renders it without reinventing the contract.
 3. **Never catch broad `except Exception`** except at CLI / API boundaries, per the repo's error-handling rules.
 
 The work is sequenced so the **shared foundation lands first**: both the Temporal bridge and the agent markdown renderer draw from `ErrorReport`, which today has no `error_domain` field. Building either consumer before `error_domain` lands means re-touching an incomplete schema. The broad-`except` sweep goes first of all because it is small, independent, and de-risks the classification that the other two priorities consume.
@@ -32,7 +32,8 @@ These were verified directly — not taken on faith from prior notes.
   - **Genuinely narrowable** — `pipe_func.py` (around line 196) catches broadly around `working_memory.get_stuff()` when it should catch only the stuff-not-found exception. Other sites in business logic (`func_registry.py`, `working_memory_factory.py`, `model_lists.py`, `model_deck.py`, `output_renderer.py`, `structured_content_composer.py`, `delivery_executor.py`, and similar) need per-site triage.
   - **Conclusion:** Phase 1 is a correctness/hygiene sweep, not an emergency. The genuinely-wrong narrowing set is small; most sites are either allowed or legitimate-but-broad and need an explicit, justified marker rather than a rewrite.
 - **`InferenceErrorCategory.is_retryable` already exists** — retry *decisions* (the PipeRouter loop, the Temporal `from_message_exception` bridge) are unblocked today. Only the *payloads/renderers* need the completed `ErrorReport`.
-- **PipeRouter has no retry loop** — `PipeRouterProtocol.run()` (`pipelex/pipe_run/pipe_router_protocol.py`) catches only `PipeRunError`. Retry lives inside two gateway workers via `tenacity`.
+- **PipeRouter has no retry loop** — `PipeRouterProtocol.run()` (`pipelex/pipe_run/pipe_router_protocol.py`) catches only `PipeRunError`. Retry lives inside two gateway workers via `tenacity` — vibe-coded, inconsistent (`gateway_extract_worker` retries 500s/timeouts; `gateway_search_worker` retries almost nothing) and with an absurd `max_retries = 50` default.
+- **Fan-out is unbounded** — `PipeBatch` (`pipelex/pipe_controllers/batch/pipe_batch.py`) and `PipeParallel` (`pipelex/pipe_controllers/parallel/pipe_parallel.py`) both end in a plain `asyncio.gather(*tasks)` over *all* branches. A pipe run over N items spawns N coroutines, N deep-copied working memories, and N simultaneous inference calls at once. There is **no semaphore, no chunk size, no `max_concurrency` config** anywhere — the asymmetry is concrete: the Temporal path already has task-queue rate limiting, the standalone path has none.
 - **The Temporal bridge is name-based** — `TemporalError.from_message_exception()` (`pipelex/temporal/tprl/temporal_error.py`) uses the static `non_retryable_error_types` config list and never consults `InferenceErrorCategory.is_retryable`; `ApplicationError.details` is empty.
 
 ---
@@ -48,14 +49,15 @@ Phase 2   error_domain on the error model  (metadata foundation, part 1)
 Phase 3  Class-level metadata on exceptions (metadata foundation, part 2)
 Phase 4  Retire agent-CLI string dicts      (metadata foundation, part 3)
    └─ CHECKPOINT B  — shared foundation landed
-Phase 5  PipeRouter retry loop             (priority 1 — the "works without Temporal" half)
-Phase 6  Temporal bridge: category + details (priority 1 — the Temporal half)
+Phase 5   PipeRouter retry loop            (priority 1 — resilience without Temporal, pillar A)
+Phase 5.5 Bounded fan-out concurrency       (priority 1 — resilience without Temporal, pillar B)
+Phase 6   Temporal bridge: category + details (priority 1 — the Temporal half)
    └─ CHECKPOINT C  — resilience landed
-Phase 7  Agent CLI markdown delivery        (priority 2)
-Phase 8  Full-chain integration coverage    (testing — verifies the above end-to-end)
+Phase 7   Error delivery: CLI markdown + HTTP mapping (priority 2)
+Phase 8   Full-chain integration coverage   (testing — verifies the above end-to-end)
 ```
 
-Phases 5–6 (resilience) and Phase 7 (CLI) touch disjoint files and could run in parallel; the order above keeps priority 1 ahead of priority 2 for a sequential single-session pass.
+Phases 5 and 5.5 are a **coupled pair** — both are "resilience without Temporal". Retry without bounded concurrency amplifies a thundering herd (retrying N failed calls = N more calls), so land both before exercising retry at scale; 5.5 may even precede 5. Phases 5–6 (resilience) and Phase 7 (delivery) touch disjoint files and could run in parallel; the order above keeps priority 1 ahead of priority 2 for a sequential single-session pass.
 
 ---
 
@@ -259,9 +261,14 @@ Reference: [track-metadata-model.md](wip/error-handling/track-metadata-model.md)
 
 ## Phase 5 — PipeRouter retry loop (resilience without Temporal)
 
-**Goal:** `PipeRouter` retries `InferenceErrorCategory.TRANSIENT` failures with exponential backoff, driven by config, disabled by default. This is the application-level resilience layer that must work when Temporal is absent. Retry logic moves out of the two gateway workers into the dispatch layer.
+**Goal:** `PipeRouter` retries `InferenceErrorCategory.TRANSIENT` failures with exponential backoff, driven by config, **enabled by default with a small retry budget**. This is the application-level resilience layer that must work when Temporal is absent. Retry logic moves out of the two gateway workers into the dispatch layer.
 
 Reference: [track-retry-and-resilience.md](wip/error-handling/track-retry-and-resilience.md) followups 1–6.
+
+**Two coherence decisions to settle in this phase (flagged 2026-05-15):**
+
+- **Default retry budget — do not default to 0.** Today the gateway workers retry up to 50× via `tenacity`. Phase 5's REFACTOR removes that. If the new router retry defaults to `max_transient_retries = 0`, the out-of-the-box behavior becomes *no retry at all* — strictly worse than today, and that is **not** "backward compatibility". The default must be a small sane number (recommended: **3**). `0` stays a valid value (explicit opt-out), just not the default.
+- **`CAPACITY` stays out of the fast retry loop.** `InferenceErrorCategory.is_retryable` is `False` for `CAPACITY` — keep it that way; do **not** overload `is_retryable`. A rate-limit (429) is "retryable" only on a much longer timescale and is really an *overwhelm* signal — Phase 5.5 owns it (back off on `provider_metadata.retry_after_seconds`, reduce concurrency, advise Temporal). The router loop retries `TRANSIENT` only.
 
 ### RED
 
@@ -269,13 +276,13 @@ Reference: [track-retry-and-resilience.md](wip/error-handling/track-retry-and-re
   - A `CogtError` with `error_category=TRANSIENT` retries up to `max_transient_retries`, then re-raises the last error (cause chain preserved).
   - A `CogtError` with `CONFIGURATION` / `CONTENT` / `CAPACITY` / `UNKNOWN` fails immediately (no retry).
   - A `PipeRunError` (non-`CogtError`) is unaffected and still wraps as `PipeRouterError`.
-  - `max_transient_retries = 0` disables retry entirely (backward compatibility).
+  - `max_transient_retries = 0` disables retry entirely (explicit opt-out — but it is *not* the default; see the coherence decisions above).
   - Backoff wait increases each attempt; the retry log line includes attempt number, wait duration, and error category.
   - `_before_run()` runs once before the loop; `_after_failing_run()` runs once after retries are exhausted or on a non-retryable error.
 
 ### GREEN
 
-- [ ] Add retry config fields to `PipelineExecutionConfig` (`pipelex/system/configuration/configs.py`): `max_transient_retries: int`, `transient_retry_base_wait: float`, `transient_retry_max_wait: float`, `transient_retry_backoff_multiplier: float`. Per project rules: no defaults in the class body — put defaults in `pipelex/pipelex.toml` with `max_transient_retries = 0`; add commented-out overrides in `.pipelex/pipelex.toml`.
+- [ ] Add retry config fields to `PipelineExecutionConfig` (`pipelex/system/configuration/configs.py`): `max_transient_retries: int`, `transient_retry_base_wait: float`, `transient_retry_max_wait: float`, `transient_retry_backoff_multiplier: float`. Per project rules: no defaults in the class body — put defaults in `pipelex/pipelex.toml` with `max_transient_retries = 3` (a small sane budget — see the coherence decision above; **not** `0`); add commented-out overrides in `.pipelex/pipelex.toml`.
 - [ ] Add the retry loop to `PipeRouterProtocol.run()` (`pipelex/pipe_run/pipe_router_protocol.py`): wrap `_run_pipe_job()`, catch `CogtError` where `error_category is not None and error_category.is_retryable`, sleep with exponential backoff, continue; re-raise on exhaustion; non-retryable categories fail immediately; the existing `PipeRunError` path is unchanged.
 - [ ] Thread the retry config via `get_config()` inside the protocol (Option B in the track doc) — consistent with how `pipeline_execution_config` is already accessed.
 - [ ] Run `make tb` (boot sequence — verifies the config model and the three `pipelex.toml` files agree). Run `make agent-check`.
@@ -285,6 +292,34 @@ Reference: [track-retry-and-resilience.md](wip/error-handling/track-retry-and-re
 - [ ] Remove `tenacity` retry from the gateway extract and search workers (`_make_retryer`, `_is_retryable_portkey_error`, `_log_retry`, the `async for attempt` wrapper). Confirm errors still propagate with the correct `InferenceErrorCategory` on first failure.
 - [ ] Remove `TenacityConfig` from `pipelex/cogt/config_cogt.py` and its `pipelex.toml` entries, **only if** nothing else uses it (`pipelex/plugins/fal/fal_poller.py` still uses tenacity for polling and `log_retry` from `tenacity_utils.py` — verify before removing the `tenacity` dependency or `tenacity_utils.py`).
 - [ ] Add a one-line code comment at the `instructor` `max_retries` call sites noting it retries schema-validation, not transport — out of scope for router retry.
+
+---
+
+## Phase 5.5 — Bounded fan-out concurrency (resilience without Temporal, pillar B)
+
+**Goal:** `PipeBatch` fans out over its N items in **bounded chunks** driven by a `max_concurrency` config, so a large workload — one pipe over 1,000 documents — no longer spawns N coroutines, N deep-copied working memories, and N simultaneous inference calls at once. This is a *basic, honest* backpressure effort with plain Python — **not** durable execution. When the workload is large or `CAPACITY` errors persist, the failure path surfaces a clear `user_action` pointing at the Temporal track as the durable, rate-limited answer. Pillar B of "resilience without Temporal"; coupled with Phase 5 (see Sequencing).
+
+Reference: [track-retry-and-resilience.md](wip/error-handling/track-retry-and-resilience.md) — this is net-new ground the track doc does not yet cover; capture the design back into the track doc as it lands.
+
+### RED
+
+- [ ] Write `tests/unit/pipelex/pipe_controllers/test_pipe_batch_concurrency.py` asserting:
+  - With `max_concurrency = K`, no more than `K` branch coroutines are ever in flight at once (use a probe that increments/decrements a counter on entry/exit and records the peak).
+  - All N items still complete and results preserve input order.
+  - `max_concurrency` unset / very large → behaves as today (single `asyncio.gather`).
+  - A failure in one branch still propagates (define and pin chunk-failure semantics — first error wins; in-flight branches in the failing chunk are awaited or cancelled deterministically).
+
+### GREEN
+
+- [ ] Add a `max_concurrency: int` config field (decide placement: `PipelineExecutionConfig` next to the retry fields, or a small dedicated `ConcurrencyConfig` — record the call). Per project rules: no default in the class body — default in `pipelex/pipelex.toml` (recommended: a sane modest value, **not** unbounded), commented-out override in `.pipelex/pipelex.toml`.
+- [ ] Implement bounded fan-out in `PipeBatch` (`pipelex/pipe_controllers/batch/pipe_batch.py`). Prefer **chunked execution** (process items in chunks of K) over a bare `asyncio.Semaphore`: chunking bounds *memory* — only K working-memory deep-copies are materialized at once — which a semaphore alone does not.
+- [ ] Decide whether `PipeParallel` also needs a bound. It fans over a *fixed, pipe-defined* branch set (usually small), not a data-driven N — the scaling risk is `PipeBatch`. Record the decision in Running Notes.
+- [ ] Run `make tb` (boot sequence — config model ↔ `pipelex.toml` agreement). Run `make agent-check`.
+
+### REFACTOR
+
+- [ ] Graceful-degradation messaging: when a `PipeBatch` workload exceeds a soft threshold, or when `CAPACITY` errors recur, attach an advisory `user_action` / log line naming the **Temporal track** as the durable, rate-limited path. Advisory, never fatal — "we made a basic effort; here is the stronger solution."
+- [ ] Record in Running Notes how this composes with Phase 5: bounded concurrency *reduces* how often `CAPACITY` is hit; the router retry loop handles the residual `TRANSIENT`; persistent `CAPACITY` is the honest "go Temporal" boundary.
 
 ---
 
@@ -317,15 +352,18 @@ Reference: [track-temporal-integration.md](wip/error-handling/track-temporal-int
 
 > ### STOP — CHECKPOINT C: Resilience landed
 >
-> Update checkboxes, commit, run `make agent-test`. Run the Temporal integration tests per `_tprl/CLAUDE.md` (`--temporal-server` options). Priority 1 is complete: Pipelex retries transients standalone and across the Temporal boundary from one shared signal.
+> Update checkboxes, commit, run `make agent-test`. Run the Temporal integration tests per `_tprl/CLAUDE.md` (`--temporal-server` options). Priority 1 is complete: standalone, Pipelex retries transients (Phase 5) and bounds fan-out concurrency (Phase 5.5); across the Temporal boundary, retry flows from the same shared signal (Phase 6).
 >
-> **Hand-off context to record in Running Notes:** whether the gateway-worker tenacity removal changed any timing-sensitive test, the final disposition of the `tenacity` dependency, and how the two retry layers compose.
+> **Hand-off context to record in Running Notes:** whether the gateway-worker tenacity removal changed any timing-sensitive test, the final disposition of the `tenacity` dependency, how the two retry layers compose, the `PipeParallel` bounding decision, and the chosen `max_concurrency` default.
 
 ---
 
-## Phase 7 — Agent CLI markdown delivery
+## Phase 7 — Error delivery: agent CLI markdown + HTTP-status mapping
 
-**Goal:** the agent CLI emits plain markdown by default for `run` / `validate` / `init` and for the error path; JSON is available via `--format json`. The eleven near-identical Rich handlers in `error_handlers.py` collapse onto one panel helper.
+**Goal (priority 2 — errors surface cleanly on every delivery surface):**
+
+- **CLI:** the agent CLI emits plain markdown by default for `run` / `validate` / `init` and for the error path; JSON is available via `--format json`. The eleven near-identical Rich handlers in `error_handlers.py` collapse onto one panel helper.
+- **HTTP:** `pipelex` itself is a library — there is no API server inside the package (verified: zero `fastapi` / `HTTPException` usage). But the HTTP API repos (`pipelex-relay`, `pipelex-back-office`) need to render `ErrorReport` as an HTTP response, and today the `error_domain` → status mapping is implicit and gets reinvented per repo. This phase puts a **documented, authoritative `error_domain` → HTTP-status mapping in the library** so the downstream FastAPI exception handler is a trivial one-screen adapter. The library stays HTTP-agnostic (no FastAPI dependency) — it only owns the mapping table.
 
 Reference: [track-cli-delivery.md](wip/error-handling/track-cli-delivery.md) followups 1–6.
 
@@ -336,9 +374,11 @@ Reference: [track-cli-delivery.md](wip/error-handling/track-cli-delivery.md) fol
   - `run --format json` / `validate --format json` produce valid JSON to stdout.
   - An error with no `--format` produces markdown to stderr; with `--format json`, JSON to stderr.
   - The `inputs` command is unaffected (always JSON per the `agent_cli/CLAUDE.md` contract).
+- [ ] Write `tests/unit/pipelex/test_error_http_status.py` asserting the `error_domain` → HTTP-status mapping: `INPUT` → 422 (unprocessable input the caller can fix), `CONFIG` → 500 (server-side environment/config problem), `RUNTIME` → 500; `error_domain = None` → 500. And: when `provider_metadata.status_code` is a 429, the mapping yields 429 with `retry_after_seconds` exposed for a `Retry-After` header (provider-status passthrough takes precedence over the domain default).
 
 ### GREEN
 
+- [ ] Add `error_domain_to_http_status()` (and/or an `ErrorReport.http_status` property) — recommended location `pipelex/base_exceptions.py`, next to `ErrorDomain` / `ErrorReport`. Pure mapping, no `fastapi` import. It considers `provider_metadata.status_code` (429 passthrough) first, then `error_domain`, then a 500 default.
 - [ ] Add `agent_error_markdown(message, error_type, cause, **extra)` to `agent_output.py` — markdown to stderr (error-type heading, message body, hint as a tip callout, `error_source` as a code block), still `raise typer.Exit(1)`.
 - [ ] Introduce a format-aware error dispatch (explicit `format` argument or a `ContextVar`). Keep JSON as the default when format is unknown (errors during init, before the format option is parsed — see `agent_cli_factory.py`).
 - [ ] Add `--format markdown|json` to `run`, `validate`, `init` (`match/case` on `CliOutputFormat`, default `MARKDOWN`), mirroring `models_cmd.py`. Add the markdown renderers: `_format_run_markdown`, `_format_validate_markdown`, and the `init` confirmation. Files: `commands/run/{pipe,bundle,method}_cmd.py`, `commands/validate/{pipe,bundle,method}_cmd.py`, `commands/init_cmd.py`.
@@ -348,6 +388,7 @@ Reference: [track-cli-delivery.md](wip/error-handling/track-cli-delivery.md) fol
 
 - [ ] Extract `display_error_panel(console, *, title, fields, error_message, tip, links)` in `pipelex/cli/error_handlers.py`; rewrite each `handle_*` to build its field list and call the helper. Exception-specific logic stays in the handler; the panel shape lives in one place.
 - [ ] Update `pipelex/cli/agent_cli/CLAUDE.md`: markdown is the default for `run` / `validate` / `init` / `models` / `doctor` / `check-model`; `--format json` available on all of them; errors respect the same option; document each command's markdown structure.
+- [ ] Document the `error_domain` → HTTP-status mapping where a downstream API author will find it (a docstring on the helper plus a short note in `wip/error-handling/track-cli-delivery.md` or `architecture.md`), including the 429 / `Retry-After` passthrough. The mapping table is authoritative in the library; API repos call the helper, they do not redefine it.
 
 ---
 
