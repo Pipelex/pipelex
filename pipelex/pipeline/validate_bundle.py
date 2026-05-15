@@ -5,7 +5,8 @@ from typing import Sequence
 from pydantic import BaseModel, ValidationError
 
 from pipelex import log
-from pipelex.base_exceptions import PipelexError
+from pipelex.base_exceptions import ErrorDomain, PipelexError
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept import Concept
@@ -38,6 +39,12 @@ class ValidateBundleError(PipelexError):
 
     All errors are categorized and stored in their respective lists.
     """
+
+    error_domain = ErrorDomain.INPUT
+    user_action = UserAction(
+        kind=UserActionKind.CHANGE_INPUT,
+        detail="Check the validation_errors array for specific issues",
+    )
 
     def __init__(
         self,

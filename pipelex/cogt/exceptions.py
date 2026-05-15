@@ -62,6 +62,7 @@ class CogtError(PipelexError):
             error_type=type(self).__name__,
             message=self.message,
             error_category=self.error_category,
+            error_domain=self.error_domain,
             retryable=self.error_category.is_retryable if self.error_category is not None else None,
             user_action=self.user_action,
             model=getattr(self, "model_handle", None),
@@ -75,7 +76,7 @@ class LLMConfigError(CogtError):
 
 
 class ImageContentError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONTENT
 
 
 class CostRegistryError(CogtError):
@@ -87,7 +88,7 @@ class ReportingManagerError(CogtError):
 
 
 class SdkTypeError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONFIGURATION
 
 
 class ModelChoiceNotFoundError(CogtError):
@@ -252,27 +253,27 @@ class LLMAssignmentError(CogtError):
 
 
 class LLMPromptSpecError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONTENT
 
 
 class LLMPromptTemplateInputsError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONTENT
 
 
 class LLMPromptParameterError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONTENT
 
 
 class PromptImageFactoryError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONTENT
 
 
 class PromptImageFormatError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONTENT
 
 
 class PromptDocumentFactoryError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONTENT
 
 
 class ImgGenModelNotFoundError(ModelNotFoundError):
@@ -280,11 +281,11 @@ class ImgGenModelNotFoundError(ModelNotFoundError):
 
 
 class ImgGenPromptError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONTENT
 
 
 class ImgGenParameterError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONTENT
 
 
 class ImgGenGenerationError(CogtError):
@@ -358,7 +359,7 @@ class InferenceBackendCredentialsError(CogtError):
 
 
 class InferenceBackendLibraryError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONFIGURATION
 
 
 class RoutingProfileDisabledBackendError(CogtError):

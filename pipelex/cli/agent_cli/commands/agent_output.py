@@ -17,6 +17,15 @@ class CliOutputFormat(StrEnum):
     MARKDOWN = "markdown"
 
 
+# Fallback error-classification lookups, keyed by error_type name.
+#
+# agent_error() reads error_domain / user_action from a PipelexError cause's
+# to_error_report() first; these dicts are the fallback for error types that
+# cannot self-describe: builtin and third-party exceptions, synthetic error_type
+# labels passed straight to agent_error(), and PipelexError subclasses not yet
+# migrated to class-level metadata. A PipelexError subclass that declares
+# class-level error_domain / user_action must NOT appear here — enforced by
+# tests/unit/pipelex/cli/test_agent_output_drift.py.
 AGENT_ERROR_HINTS: dict[str, str] = {
     # Model/routing errors
     "ModelChoiceNotFoundError": (
@@ -30,10 +39,8 @@ AGENT_ERROR_HINTS: dict[str, str] = {
         "Update the preset model, configure it in an enabled backend, or enable a supporting backend"
     ),
     # Validation errors
-    "ValidateBundleError": "Check the 'validation_errors' array for specific issues to fix",
     "PipeValidationError": "Check pipe inputs, outputs, and concept references for consistency",
     # Execution errors
-    "PipelineExecutionError": "Check 'pipe_stack' to identify which pipe failed and 'cause_type' for the root cause",
     "PipeExecutionError": "A pipe input validation failed during pipeline execution. Check the error message for the failing model and field.",
     # File/input errors
     "FileNotFoundError": "Verify the file path exists and is accessible from the current working directory",
@@ -68,6 +75,8 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "UnknownCommandError": "Check 'valid_commands' in this error response for available commands",
 }
 
+# retryable=True fallback for non-CogtError error types: their ErrorReport
+# carries no `retryable`, unlike CogtError whose error_category drives it.
 RETRYABLE_ERROR_TYPES: set[str] = {
     "RemoteConfigFetchError",
     "PipeOperatorModelAvailabilityError",
@@ -76,14 +85,12 @@ RETRYABLE_ERROR_TYPES: set[str] = {
 AGENT_ERROR_DOMAINS: dict[str, str] = {
     # input = agent can fix (bad .mthds, wrong args, bad JSON)
     "ModelChoiceNotFoundError": "input",
-    "ValidateBundleError": "input",
     "PipeValidationError": "input",
     "FileNotFoundError": "input",
     "JSONDecodeError": "input",
     "JsonTypeError": "input",
     "ArgumentError": "input",
     "MthdsDecodeError": "input",
-    "PipelexInterpreterError": "input",
     "ValidationError": "input",
     "ValueError": "input",
     "BundleError": "input",
@@ -96,16 +103,8 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     "PipeOperatorModelAvailabilityError": "config",
     "ModelDeckPresetValidatonError": "config",
     "TelemetryConfigValidationError": "config",
-    "GatewayTermsNotAcceptedError": "config",
-    "GatewayApiKeyMissingError": "config",
-    "GatewayDoNotTrackConflictError": "config",
-    "RemoteConfigFetchError": "config",
     "BinaryNotFoundError": "config",
-    "RemoteConfigValidationError": "config",
     "InitConfigError": "config",
-    # runtime = execution failure
-    "PipelineExecutionError": "runtime",
-    "PipeExecutionError": "runtime",
 }
 
 
@@ -163,6 +162,7 @@ def agent_error(message: str, error_type: str, cause: BaseException | None = Non
     report_hint: str | None = None
     report_retryable: bool | None = None
     report_category: str | None = None
+    report_domain: str | None = None
     report_extras: dict[str, Any] = {}
 
     if isinstance(cause, PipelexError):
@@ -170,6 +170,7 @@ def agent_error(message: str, error_type: str, cause: BaseException | None = Non
         report_hint = report.user_action_detail()
         report_retryable = report.retryable
         report_category = report.error_category
+        report_domain = report.error_domain
         if report.model:
             report_extras["model"] = report.model
         if report.provider:
@@ -187,8 +188,8 @@ def agent_error(message: str, error_type: str, cause: BaseException | None = Non
     elif error_type in RETRYABLE_ERROR_TYPES:
         error_json["retryable"] = True
 
-    # error_domain: always from lookup dict (independent of error_category)
-    domain = AGENT_ERROR_DOMAINS.get(error_type)
+    # error_domain: report-first (class-level metadata), lookup dict as fallback
+    domain = report_domain or AGENT_ERROR_DOMAINS.get(error_type)
     if domain:
         error_json["error_domain"] = domain
 

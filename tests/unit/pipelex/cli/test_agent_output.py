@@ -8,7 +8,7 @@ import json
 import pytest
 import typer
 
-from pipelex.base_exceptions import PipelexError
+from pipelex.base_exceptions import PipelexConfigError, PipelexError
 from pipelex.cli.agent_cli.commands.agent_output import (
     AGENT_ERROR_DOMAINS,
     AGENT_ERROR_HINTS,
@@ -313,11 +313,11 @@ class TestAgentOutput:
         """agent_error should fall back to lookup when PipelexError has no category/user_action."""
         cause = PipelexError("something failed")
         with pytest.raises(typer.Exit):
-            agent_error("something failed", "ValidateBundleError", cause=cause)
+            agent_error("something failed", "PipeExecutionError", cause=cause)
 
         parsed = json.loads(capsys.readouterr().err)
         # hint should come from AGENT_ERROR_HINTS since PipelexError has no user_action
-        assert parsed["hint"] == AGENT_ERROR_HINTS["ValidateBundleError"]
+        assert parsed["hint"] == AGENT_ERROR_HINTS["PipeExecutionError"]
 
     def test_agent_error_report_hint_overrides_lookup(self, capsys: pytest.CaptureFixture[str]) -> None:
         """When cause has user_action, it should override the lookup dict hint."""
@@ -381,3 +381,21 @@ class TestAgentOutput:
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["error_domain"] == AGENT_ERROR_DOMAINS[error_type]
         assert parsed["error_category"] == "configuration"
+
+    def test_agent_error_uses_report_error_domain(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """agent_error should include error_domain from to_error_report() for a PipelexError cause."""
+        cause = PipelexConfigError("bad config")
+        with pytest.raises(typer.Exit):
+            agent_error("bad config", "PipelexConfigError", cause=cause)
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert parsed["error_domain"] == "config"
+
+    def test_agent_error_error_domain_falls_back_to_dict_for_builtin(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """agent_error should read error_domain from the lookup dict for a non-PipelexError cause."""
+        cause = FileNotFoundError("missing.mthds")
+        with pytest.raises(typer.Exit):
+            agent_error("file not found", "FileNotFoundError", cause=cause)
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert parsed["error_domain"] == "input"

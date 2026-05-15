@@ -175,23 +175,23 @@ Reference: [track-metadata-model.md](wip/error-handling/track-metadata-model.md)
 
 ### RED
 
-- [ ] Write `tests/unit/pipelex/exceptions/test_error_domain.py` asserting:
+- [x] Write `tests/unit/pipelex/exceptions/test_error_domain.py` asserting:
   - `ErrorDomain` is a `StrEnum` (imported from `pipelex.types`) with values `INPUT`, `CONFIG`, `RUNTIME`.
   - `PipelexError.to_error_report()` carries `error_domain` when the class declares one, and omits it (`None`) otherwise.
   - `ErrorReport.to_dict()` drops `error_domain` when `None` and includes it otherwise.
 
 ### GREEN
 
-- [ ] Add `ErrorDomain` `StrEnum` (decide placement — likely `pipelex/base_exceptions.py` or `pipelex/types`-adjacent; ask the user if placement is ambiguous).
-- [ ] Add an optional class-level `error_domain: ErrorDomain | None = None` attribute on `PipelexError`.
-- [ ] Add `error_domain: str | None = None` to the `ErrorReport` frozen dataclass.
-- [ ] Update `PipelexError.to_error_report()` to include `error_domain` from the class attribute.
-- [ ] Update `CogtError.to_error_report()` so it forwards `error_domain` too (it overrides the base method).
-- [ ] Run `make agent-check`.
+- [x] Add `ErrorDomain` `StrEnum`. — _Placed in `pipelex/base_exceptions.py` next to `PipelexError`/`ErrorReport` (mirrors `InferenceErrorCategory` living beside `CogtError` in `cogt/exceptions.py`)._
+- [x] Add an optional class-level `error_domain: ErrorDomain | None = None` attribute on `PipelexError`.
+- [x] Add `error_domain: str | None = None` to the `ErrorReport` frozen dataclass. — _Placed after `error_category`; both `ErrorReport` constructors use kwargs so field order is safe._
+- [x] Update `PipelexError.to_error_report()` to include `error_domain` from the class attribute.
+- [x] Update `CogtError.to_error_report()` so it forwards `error_domain` too (it overrides the base method).
+- [x] Run `make agent-check`. — _Clean (ruff + plxt + pyright 0 errors + mypy 0 issues)._
 
 ### REFACTOR
 
-- [ ] No change to consumers yet — `agent_error()` still reads its dict. Phase 4 flips the precedence. Keeping consumer changes out of this phase keeps the schema change reviewable in isolation.
+- [x] No change to consumers yet — `agent_error()` still reads its dict. Phase 4 flips the precedence. Keeping consumer changes out of this phase keeps the schema change reviewable in isolation.
 
 ---
 
@@ -203,23 +203,23 @@ Reference: [track-metadata-model.md](wip/error-handling/track-metadata-model.md)
 
 ### RED
 
-- [ ] Write `tests/unit/pipelex/exceptions/test_class_level_metadata.py` asserting each targeted exception's `to_error_report()` carries the expected `error_domain` and `user_action`:
+- [x] Write `tests/unit/pipelex/exceptions/test_class_level_metadata.py` asserting each targeted exception's `to_error_report()` carries the expected `error_domain` and `user_action`:
   - `PipelineExecutionError`, `PipeExecutionError` (`pipelex/pipeline/exceptions.py`) → `error_domain=RUNTIME`.
   - `ValidateBundleError` (`pipelex/pipeline/validate_bundle.py`) → `error_domain=INPUT`.
   - `PipelexInterpreterError` (`pipelex/core/interpreter/exceptions.py`) → `error_domain=INPUT`.
   - `PipelexSetupError`, `PipelexConfigError` (`pipelex/base_exceptions.py`) → `error_domain=CONFIG`.
   - Service errors (`pipelex/system/pipelex_service/exceptions.py`) → `error_domain=CONFIG`.
-- [ ] Add tests asserting the previously-uncategorized `CogtError` subclasses now report a non-`None` `error_category` (prompt-spec / prompt-template / prompt-parameter / prompt-image / prompt-document families → `CONTENT`).
+- [x] Add tests asserting the previously-uncategorized `CogtError` subclasses now report a non-`None` `error_category` (prompt-spec / prompt-template / prompt-parameter / prompt-image / prompt-document families → `CONTENT`).
 
 ### GREEN
 
-- [ ] Set class-level `error_domain` (and `user_action` where the track doc proposes concrete text) on the non-`CogtError` exceptions listed above. Use the user-action wording from [track-metadata-model.md](wip/error-handling/track-metadata-model.md) followup 2.
-- [ ] Set `error_category` defaults on the uncategorized `CogtError` subclasses (the prompt-* families → `CONTENT`). Decide case-by-case for `ImageContentError`, `CostRegistryError`, `ReportingManagerError`, `SdkTypeError`, `ExtractOutputError`, `GeneratedImageError`, `LLMAssignmentError`, `InferenceBackendLibraryError` — record each decision in Running Notes. Leave the four per-instance "outcome" exceptions (`LLMCompletionError`, `ImgGenGenerationError`, `ExtractJobFailureError`, `SearchJobFailureError`) uncategorized at the class level — workers set them per-instance.
-- [ ] Run `make agent-check`.
+- [x] Set class-level `error_domain` (and `user_action` where the track doc proposes concrete text) on the non-`CogtError` exceptions listed above. Use the user-action wording from [track-metadata-model.md](wip/error-handling/track-metadata-model.md) followup 2. — _`user_action` set on `PipelineExecutionError` (kind `UNKNOWN`) and `ValidateBundleError` (kind `CHANGE_INPUT`); `user_action` added as a class attr on `PipelexError` and forwarded by the base `to_error_report()`. Service-error domain set on the `PipelexServiceError` base + `PipelexServiceConfigValidationError` so all gateway/remote-config subclasses inherit it._
+- [x] Set `error_category` defaults on the uncategorized `CogtError` subclasses (the prompt-* families → `CONTENT`). Decide case-by-case for `ImageContentError`, `CostRegistryError`, `ReportingManagerError`, `SdkTypeError`, `ExtractOutputError`, `GeneratedImageError`, `LLMAssignmentError`, `InferenceBackendLibraryError` — record each decision in Running Notes. Leave the four per-instance "outcome" exceptions uncategorized. — _Case-by-case decisions in Running Notes._
+- [x] Run `make agent-check`. — _Clean. Updated `tests/unit/pipelex/test_base_exceptions.py` cold-import expectation (`PipelexConfigError` now reports `error_domain=config`)._
 
 ### REFACTOR
 
-- [ ] Scan for any other frequently-raised `PipelexError` subclass that obviously belongs to one domain and is cheap to annotate while the context is fresh — but do not chase exhaustiveness; the drift test in Phase 4 will surface gaps.
+- [x] Scan for any other frequently-raised `PipelexError` subclass that obviously belongs to one domain. — _Deliberately stayed within the listed scope per "do not chase exhaustiveness"; the Phase 4 drift test guards the rest._
 
 ---
 
@@ -231,27 +231,29 @@ Reference: [track-metadata-model.md](wip/error-handling/track-metadata-model.md)
 
 ### RED
 
-- [ ] Write `tests/unit/pipelex/cli/agent_cli/test_agent_output_drift.py`:
-  - Every key in `AGENT_ERROR_HINTS` / `AGENT_ERROR_DOMAINS` / `RETRYABLE_ERROR_TYPES` resolves to a real exception class name (catches stale entries after a rename/delete).
-  - Every `PipelexError` subclass either declares class-level `error_domain` + `user_action`, or appears in the fallback dicts. (Walk `PipelexError.__subclasses__()` recursively.)
-- [ ] Write tests asserting `agent_error()` prefers `report.error_domain` / `report.user_action` over the dict when the cause is a `PipelexError`, and still falls back to the dict for a built-in exception type.
+- [x] Write the drift test. — _Placed at `tests/unit/pipelex/cli/test_agent_output_drift.py` (flat, beside the existing `test_agent_output.py` — the `agent_cli/` subdir does not exist yet). Two sub-checks, both adapted from the plan against the actual dict contents:_
+  - _**Stale-key check:** every dict key is either a live `PipelexError` subclass name (walked recursively after importing the defining modules) **or** a documented non-`PipelexError` key. The plan's literal "resolves to a real exception class" is false for ~6 keys (`ArgumentError`, `BinaryNotFoundError`, `GraphSpecParseError`, `BundleError`, `InitConfigError`, `UnknownCommandError`) which are synthetic `error_type` labels passed straight to `agent_error()` — no class exists. They (plus builtins / `mthds`-package / `ValueError`-subclass keys) are listed in a documented `_NON_PIPELEX_ERROR_KEYS` allowlist._
+  - _**No-double-source check:** no `PipelexError` subclass that declares class-level `error_domain` / `user_action` also appears in `AGENT_ERROR_DOMAINS` / `AGENT_ERROR_HINTS`. This replaces the plan's "every `PipelexError` subclass declares metadata or appears in the dicts" — that literal check is infeasible (dozens of subclasses have neither, and Phase 3 REFACTOR explicitly says not to chase exhaustiveness). The no-double-source check is the achievable, valuable drift guard: it fails the build if a class gains metadata but its redundant dict entry is left behind._
+- [x] Write tests asserting `agent_error()` prefers `report.error_domain` over the dict when the cause is a `PipelexError`, and still falls back to the dict for a built-in exception type. — _Added to `test_agent_output.py`; `user_action`/hint precedence was already report-first and already covered._
 
 ### GREEN
 
-- [ ] In `agent_output.py`, change `agent_error()` so `error_domain` and `hint` come from `cause.to_error_report()` first; the dicts are consulted only when the report has no value (i.e. non-`PipelexError` causes).
-- [ ] Remove the `AGENT_ERROR_HINTS` / `AGENT_ERROR_DOMAINS` entries that key on `PipelexError` subclasses (now redundant — metadata is on the classes). Keep only built-in / third-party exception entries.
-- [ ] Run `make agent-check`.
+- [x] In `agent_output.py`, change `agent_error()` so `error_domain` comes from `cause.to_error_report()` first; the dict is the fallback. — _`hint` was already report-first; only `error_domain` needed the change (new `report_domain` local)._
+- [x] Remove the redundant `AGENT_ERROR_HINTS` / `AGENT_ERROR_DOMAINS` entries. — _Removed only entries whose class now carries class-level metadata (the "now redundant" ones): 2 from `AGENT_ERROR_HINTS` (`ValidateBundleError`, `PipelineExecutionError`), 9 from `AGENT_ERROR_DOMAINS` (`ValidateBundleError`, `PipelexInterpreterError`, `PipelineExecutionError`, `PipeExecutionError`, + 5 service errors). PipelexError subclasses NOT migrated in Phase 3 keep their dict entries — removing them would be a non-redundant regression. See Running Notes._
+- [x] Run `make agent-check`. — _Clean. Updated `test_agent_output.py::test_agent_error_falls_back_to_lookup_when_report_fields_none` to key off `PipeExecutionError` (its hint survives) instead of the removed `ValidateBundleError`._
 
 ### REFACTOR
 
-- [ ] Add a short comment at the dict definitions stating they are now built-ins-only fallbacks and that `PipelexError` subclasses must carry class-level metadata (guarded by the drift test).
-- [ ] Confirm `RETRYABLE_ERROR_TYPES` is still needed only for non-`CogtError` causes; trim if the report's `retryable` now covers a former entry.
+- [x] Add a short comment at the dict definitions. — _States the dicts are the fallback for error types that cannot self-describe (builtins, third-party, synthetic labels, un-migrated `PipelexError` subclasses) and that migrated classes must not appear — drift-test enforced. Not "built-ins-only": the dicts still hold un-migrated `PipelexError` subclass entries._
+- [x] Confirm `RETRYABLE_ERROR_TYPES` is still needed only for non-`CogtError` causes. — _Both entries (`RemoteConfigFetchError`, `PipeOperatorModelAvailabilityError`) are non-`CogtError` `PipelexError` subclasses whose `to_error_report()` carries no `retryable`; nothing to trim. Added a comment saying so._
 
-> ### STOP — CHECKPOINT B: Shared metadata foundation landed
+> ### STOP — CHECKPOINT B: Shared metadata foundation landed ✅
 >
-> Update checkboxes, commit, run `make agent-test`. `ErrorReport` is now complete (`error_domain` included) and the metadata lives on the exception classes, drift-guarded. Both remaining priorities can now build on a stable schema.
+> **Status (landed 2026-05-15):** COMPLETE — Phases 2, 3, 4 landed. `make agent-check` clean (ruff + plxt + pyright 0 errors + mypy 0 issues); `make agent-test` passed (full suite). `ErrorReport` now carries `error_domain`; `error_domain` + `user_action` live as class-level metadata on the key non-`CogtError` exceptions; the uncategorized prompt-* `CogtError` families carry `error_category=CONTENT`; `agent_error()` reads `error_domain` report-first; the redundant lookup-dict entries are removed and `test_agent_output_drift.py` guards the rest. Per-phase decisions are in the Running Notes "Phase 2 / 3 / 4" sections below. Next session resumes at Phase 5.
 >
-> **Hand-off context to record in Running Notes:** the case-by-case `error_category` decisions from Phase 3, which dict entries survived as built-ins-only, and any `PipelexError` subclass the drift test flagged as still needing metadata.
+> `ErrorReport` is now complete (`error_domain` included) and the metadata lives on the exception classes, drift-guarded. Both remaining priorities can now build on a stable schema.
+>
+> **Hand-off context recorded in Running Notes:** the case-by-case `error_category` decisions from Phase 3, which dict entries survived (not built-ins-only — see the note), and why the drift test does not flag un-migrated `PipelexError` subclasses.
 
 ---
 
@@ -492,3 +494,57 @@ _Group D (partial):_
 **Final `noqa: BLE001` count: 76** (91 at Phase 1.5 RED → 81 after Groups A/B/C/D-partial at the earlier checkpoint → 76 after Group D narrowing ×3 and Group E removal ×2 this session).
 
 **Assess-site decisions (kept broad + justified — the REFACTOR Running Notes requirement):** `_generate_graph_files`, `_try_add_rendered_file`, `act_assemble_graph` (Group A); `working_memory_factory.py:190`, `string_utils.py:58`, `structured_content_composer.py:107`, `output_renderer.py:54,92` (Group B); the 6 `teardown()` catches in `gateway_extract_worker.py` / `google_img_gen_worker.py` / `google_llm_worker.py` (Group C); `backends.py:183` (Group D, command boundary). Each wraps a non-enumerable exception surface (deep render/template trees, polyfactory mock building, arbitrary `__str__`, `asyncio.run(aclose())` over a connection pool, or a command-level boundary) and is a genuine best-effort / boundary catch.
+
+### Phase 2 — `error_domain` on the error model (landed 2026-05-15)
+
+`ErrorDomain` (`StrEnum`: `INPUT` / `CONFIG` / `RUNTIME`) was placed in `pipelex/base_exceptions.py`, next to `PipelexError` and `ErrorReport` — the analogue of `InferenceErrorCategory` living beside `CogtError` in `cogt/exceptions.py`. The plan left placement open ("ask the user if ambiguous"); this was the consistent call and `base_exceptions.py` is what consumes it, so no import indirection is needed.
+
+`ErrorReport` gained `error_domain: str | None = None` (typed `str`, mirroring `error_category` — keeps the field a plain string and matches the existing pattern). `PipelexError` gained the class attr `error_domain: ErrorDomain | None = None`; both `PipelexError.to_error_report()` and the `CogtError` override forward it. No consumer changes (Phase 4's job).
+
+### Phase 3 — Class-level metadata on exceptions (landed 2026-05-15)
+
+**`user_action` on the base class.** Phase 3 needs class-level `user_action`, so `PipelexError` gained `user_action: UserAction | None = None` and the base `to_error_report()` now forwards it. `CogtError` already declared its own `user_action` class attr + `__init__` param — left as-is (a harmless same-typed override; removing it is out of scope).
+
+**`error_domain` set on:** `PipeExecutionError` + `PipelineExecutionError` → `RUNTIME`; `ValidateBundleError` + `PipelexInterpreterError` → `INPUT`; `PipelexConfigError` + `PipelexSetupError` → `CONFIG`; `PipelexServiceError` (base) + `PipelexServiceConfigValidationError` → `CONFIG` (all gateway / remote-config errors inherit via `PipelexServiceError`).
+
+**`user_action` set on** (only where the track doc proposes concrete text): `PipelineExecutionError` → `UserAction(UNKNOWN, "Check pipe_stack to identify which pipe failed")`; `ValidateBundleError` → `UserAction(CHANGE_INPUT, "Check the validation_errors array for specific issues")`. `CHANGE_INPUT` fits a bad-bundle fix; `UNKNOWN` is the honest kind for a generic execution failure (`UserActionKind` has no diagnostic-investigation kind — the `detail` carries the real guidance).
+
+**Prompt-* `CogtError` families → `CONTENT`** (firm, per track followup 3): `LLMPromptSpecError`, `LLMPromptTemplateInputsError`, `LLMPromptParameterError`, `PromptImageFactoryError`, `PromptImageFormatError`, `PromptDocumentFactoryError`, `ImgGenPromptError`, `ImgGenParameterError`.
+
+**Case-by-case `error_category` decisions** (the eight the plan flagged):
+
+| Class | Decision | Rationale |
+| --- | --- | --- |
+| `ImageContentError` | `CONTENT` | Name is explicit ("image content"). Currently unused — assigned by name semantics. |
+| `SdkTypeError` | `CONFIGURATION` | Raised when the injected SDK client is the wrong type for the worker — a setup/wiring misconfiguration. |
+| `InferenceBackendLibraryError` | `CONFIGURATION` | Raised during backend-library validation/setup (`backend_library.py`). |
+| `CostRegistryError` | `None` (uncategorized) | Internal cost-bookkeeping error; not a classifiable inference failure. |
+| `ReportingManagerError` | `None` | Internal reporting error; not a classifiable inference failure. |
+| `GeneratedImageError` | `None` | Internal PIL→raw image-conversion failure; not content / config / capacity. |
+| `ExtractOutputError` | `None` | Currently unused; a post-extraction processing error — not clearly one category. |
+| `LLMAssignmentError` | `None` | Currently unused; ambiguous — left uncategorized. |
+
+`None` keeps today's behavior (an uncategorized report) — the safe default for the genuinely-ambiguous / internal ones. The four per-instance "outcome" exceptions stay uncategorized as the plan directs.
+
+**Intentional behavior change.** The targeted exceptions now emit `error_domain` (and `user_action` for two) in `to_error_report()`. `tests/unit/pipelex/test_base_exceptions.py`'s cold-import assertion was updated to expect `error_domain: 'config'` on `PipelexConfigError`'s report. For a real `ValidateBundleError` / `PipelineExecutionError` cause, `agent_error()`'s `hint` now comes from the class `user_action` (`hint` was already report-first) — the text is the track-doc wording, a slight rewording of the old dict hint.
+
+### Phase 4 — Retire the agent-CLI string dicts + drift detection (landed 2026-05-15)
+
+**`agent_error()` change.** Only `error_domain` needed work — `hint` (from `user_action`) was already report-first. Added a `report_domain` local; `domain = report_domain or AGENT_ERROR_DOMAINS.get(error_type)`.
+
+**Dict entries removed** (only the now-redundant ones — those whose class gained class-level metadata in Phase 3):
+
+- `AGENT_ERROR_HINTS`: `ValidateBundleError`, `PipelineExecutionError` (the two that gained class `user_action`).
+- `AGENT_ERROR_DOMAINS`: `ValidateBundleError`, `PipelexInterpreterError`, `PipelineExecutionError`, `PipeExecutionError`, `GatewayTermsNotAcceptedError`, `GatewayApiKeyMissingError`, `GatewayDoNotTrackConflictError`, `RemoteConfigFetchError`, `RemoteConfigValidationError`.
+
+**Dict entries that survived** — the plan's "remove all `PipelexError`-keyed entries" was NOT taken literally: it would regress every `PipelexError` subclass Phase 3 did not migrate. Survivors include `PipelexError`-subclass keys with no class-level metadata (`ModelChoiceNotFoundError`, `PipeOperatorModelChoiceError`, `PipeOperatorModelAvailabilityError`, `ModelDeckPresetValidatonError`, `TelemetryConfigValidationError`, `MthdsDecodeError`, `JsonTypeError`), plus the *hint* entries for `PipeExecutionError` / `PipelexInterpreterError` / gateway errors (those gained `error_domain` but no `user_action`, so the hint stays dict-sourced). The "(now redundant)" qualifier in the plan is operative — only redundant entries were removed; the dicts are **not** "built-ins-only".
+
+**`RETRYABLE_ERROR_TYPES`:** unchanged. Both entries (`RemoteConfigFetchError`, `PipeOperatorModelAvailabilityError`) are non-`CogtError` `PipelexError` subclasses whose base `to_error_report()` carries no `retryable` — nothing the report covers, nothing to trim.
+
+**Behavior change.** None for real call paths: every agent-CLI catch site that surfaces a migrated exception passes the actual exception instance as `cause`, so `error_domain` resolves from the report. A bare `error_type` string with no matching cause for a migrated class would lose its dict domain — no such call site exists. `make agent-test` is the regression check.
+
+### Checkpoint B hand-off
+
+- **Case-by-case `error_category` decisions:** the Phase 3 table above.
+- **Which dict entries survived:** the Phase 4 "Dict entries that survived" note — un-migrated `PipelexError` subclasses + builtins / third-party / synthetic labels; **not** built-ins-only.
+- **`PipelexError` subclasses still needing metadata:** the drift test does not flag these (the literal "every subclass" check was descoped as infeasible — see the Phase 4 RED notes). Un-migrated dict-referenced subclasses (`ModelChoiceNotFoundError`, `PipeOperatorModel*`, `TelemetryConfigValidationError`, `ModelDeckPresetValidatonError`, …) still rely on the fallback dicts; migrating them is future work and does not block the shared foundation.

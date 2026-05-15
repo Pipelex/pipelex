@@ -1,12 +1,19 @@
-from pipelex.base_exceptions import PipelexError, PipelexUnexpectedError
+from pipelex.base_exceptions import ErrorDomain, PipelexError, PipelexUnexpectedError
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 
 
 class PipeExecutionError(PipelexError):
-    pass
+    error_domain = ErrorDomain.RUNTIME
 
 
 class PipelineExecutionError(PipelexError):
+    error_domain = ErrorDomain.RUNTIME
+    user_action = UserAction(
+        kind=UserActionKind.UNKNOWN,
+        detail="Check pipe_stack to identify which pipe failed",
+    )
+
     def __init__(
         self,
         message: str,

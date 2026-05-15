@@ -21,7 +21,7 @@ class TestErrorReportColdImport:
             "direct = ErrorReport(error_type='X', message='m')\n"
             "assert direct.to_dict() == {'error_type': 'X', 'message': 'm'}\n"
             "report = PipelexConfigError('boom').to_error_report()\n"
-            "assert report.to_dict() == {'error_type': 'PipelexConfigError', 'message': 'boom'}\n"
+            "assert report.to_dict() == {'error_type': 'PipelexConfigError', 'message': 'boom', 'error_domain': 'config'}\n"
         )
         result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=False)  # noqa: S603
         assert result.returncode == 0, f"cold-path ErrorReport construction failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"

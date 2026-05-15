@@ -1,10 +1,12 @@
-from pipelex.base_exceptions import PipelexError
+from pipelex.base_exceptions import ErrorDomain, PipelexError
 from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.tools.misc.toml_utils import TomlError
 
 
 class PipelexInterpreterError(PipelexError):
     """Raised when PipelexInterpreter fails."""
+
+    error_domain = ErrorDomain.INPUT
 
     def __init__(
         self,

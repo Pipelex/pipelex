@@ -4,6 +4,20 @@ from pydantic import TypeAdapter
 from pydantic.dataclasses import dataclass
 
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction
+from pipelex.types import StrEnum
+
+
+class ErrorDomain(StrEnum):
+    """Classifies where an error originates, so consumers can route it.
+
+    - INPUT: the caller can fix it (bad .mthds, wrong args, malformed JSON).
+    - CONFIG: an environment or configuration change is needed.
+    - RUNTIME: a failure that occurred during execution.
+    """
+
+    INPUT = "input"
+    CONFIG = "config"
+    RUNTIME = "runtime"
 
 
 @dataclass(frozen=True, config={"extra": "forbid", "arbitrary_types_allowed": True})
@@ -16,6 +30,7 @@ class ErrorReport:
     error_type: str
     message: str
     error_category: str | None = None
+    error_domain: str | None = None
     retryable: bool | None = None
     user_action: UserAction | None = None
     model: str | None = None
@@ -35,6 +50,9 @@ class ErrorReport:
 
 
 class PipelexError(Exception):
+    error_domain: ErrorDomain | None = None
+    user_action: UserAction | None = None
+
     def __init__(self, message: str):
         super().__init__(message)
         self.message = message
@@ -47,6 +65,8 @@ class PipelexError(Exception):
         return ErrorReport(
             error_type=type(self).__name__,
             message=self.message,
+            error_domain=self.error_domain,
+            user_action=self.user_action,
         )
 
 
@@ -55,11 +75,11 @@ class PipelexUnexpectedError(PipelexError):
 
 
 class PipelexConfigError(PipelexError):
-    pass
+    error_domain = ErrorDomain.CONFIG
 
 
 class PipelexSetupError(PipelexError):
-    pass
+    error_domain = ErrorDomain.CONFIG
 
 
 class SecurityError(PipelexError):
