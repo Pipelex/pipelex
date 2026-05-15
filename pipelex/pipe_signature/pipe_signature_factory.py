@@ -30,5 +30,4 @@ class PipeSignatureFactory(PipeFactoryProtocol[PipeSignatureBlueprint, PipeSigna
             inputs=inputs,
             output=output,
             signature_for=blueprint.signature_for,
-            declared_dependencies=list(blueprint.signature_pipe_dependencies),
         )

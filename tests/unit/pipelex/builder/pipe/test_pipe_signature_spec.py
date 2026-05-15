@@ -12,7 +12,6 @@ def _make_minimal_signature(**overrides: object) -> PipeSignature:
         "description": "A signature.",
         "inputs": {"doc": "Document"},
         "output": "Summary",
-        "pipe_dependencies": [],
     }
     kwargs.update(overrides)
     return PipeSignature(**kwargs)  # type: ignore[arg-type]
@@ -47,17 +46,13 @@ class TestPipeSignatureSpec:
         assert "result" not in PipeSignature.model_fields
 
     def test_to_blueprint_returns_signature_blueprint(self) -> None:
-        sig = _make_minimal_signature(
-            signature_for=PipeType.PIPE_LLM,
-            pipe_dependencies=["pipe_a", "pipe_b"],
-        )
+        sig = _make_minimal_signature(signature_for=PipeType.PIPE_LLM)
         blueprint = sig.to_blueprint()
         assert isinstance(blueprint, PipeSignatureBlueprint)
         assert blueprint.description == sig.description
         assert blueprint.inputs == sig.inputs
         assert blueprint.output == sig.output
         assert blueprint.signature_for is PipeType.PIPE_LLM
-        assert blueprint.signature_pipe_dependencies == ["pipe_a", "pipe_b"]
 
     def test_to_blueprint_preserves_input_multiplicity(self) -> None:
         sig = _make_minimal_signature(inputs={"docs": "Document[]"})

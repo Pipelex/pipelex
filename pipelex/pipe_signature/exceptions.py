@@ -46,7 +46,7 @@ class SignaturesNotAllowedError(PipelexError):
             offender_list = ", ".join(f"'{ref}'" for ref in sorted_offenders)
             header = f"The following pipes depend on PipeSignature placeholders that have no implementation: {offender_list}"
         else:
-            header = "Pipes depend on PipeSignature placeholders that have no implementation:"
+            header = "Validation found PipeSignature placeholders that have no implementation:"
         lines: list[str] = [header]
         for sig_ref in sorted(self.signature_refs):
             dep_chain = self.dep_paths.get(sig_ref, [])

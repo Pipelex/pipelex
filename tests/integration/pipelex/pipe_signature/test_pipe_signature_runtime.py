@@ -146,6 +146,27 @@ class TestPipeSignatureRuntime:
             )
         assert runtime.pipe_ref in str(exc_info.value)
 
+    @pytest.mark.asyncio
+    async def test_live_run_via_run_pipe_raises_signature_error_with_missing_inputs(
+        self,
+        setup_signature_library: Callable[[], None],
+        make_signature_blueprint: Callable[..., PipeSignatureBlueprint],
+    ) -> None:
+        # run_pipe runs validate_before_run (which checks for missing inputs) before
+        # dispatching to live execution. A signature must still surface the actionable
+        # PipeSignatureNotExecutableError, not a misleading "missing required inputs".
+        setup_signature_library()
+        blueprint = make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary")
+        runtime = _make_runtime(blueprint, pipe_code="sig_live_run_pipe_fail")
+        working_memory = WorkingMemoryFactory.make_empty()
+        with pytest.raises(PipeSignatureNotExecutableError) as exc_info:
+            await runtime.run_pipe(
+                job_metadata=JobMetadata(user_id=OTelConstants.DEFAULT_USER_ID, pipeline_run_id=SpecialPipelineId.UNTITLED),
+                working_memory=working_memory,
+                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.LIVE),
+            )
+        assert runtime.pipe_ref in str(exc_info.value)
+
     def test_input_multiplicity_in_blueprint(
         self,
         setup_signature_library: Callable[[], None],

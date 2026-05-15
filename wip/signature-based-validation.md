@@ -78,7 +78,7 @@ The current description forbids multiplicity brackets in `inputs`. That's a real
 
 In Pipelex today the output name is caller-assigned (`SubPipeSpec.result` / `SubPipeBlueprint.result` / `SubPipe.output_name`). A `result` on the pipe contract itself departs from that model — either as a hard rule (breaks caller-assigns-name) or as a soft hint (adds a field nobody enforces). Neither is worth the surface area.
 
-Drop the field. The signature contract is `code`, `type`, `description`, `inputs`, `output`, `signature_for`, `pipe_dependencies` — that's enough.
+Drop the field. The signature contract is `code`, `type`, `description`, `inputs`, `output`, `signature_for` — that's enough.
 
 ## Dry-run path for signatures
 
@@ -174,7 +174,7 @@ This is the desired behavior: live execution of a half-built pipeline must fail 
 
 ### Phase 2 — Blueprint and runtime
 
-- `PipeSignatureBlueprint(PipeBlueprint)`: literal type, optional `signature_for`, optional `pipe_dependencies` metadata.
+- `PipeSignatureBlueprint(PipeBlueprint)`: literal type, optional `signature_for`.
 - `PipeSignatureRuntime(PipeAbstract)`: no-op validators; `needed_inputs()` returns declared; `_live_run_pipe` raises; `_dry_run_pipe` mints via `WorkingMemoryFactory.make_mock_content`.
 - `PipeSignatureFactory(PipeFactoryProtocol)`.
 - Add to `PipeBlueprintUnion`.
@@ -215,7 +215,7 @@ Lenient mode:
 - Signature with `Dynamic` output → mock falls back to TextContent.
 - Mixed bundle: agent replaces signature with real pipe → re-validate.
 - Cross-package signature.
-- Cycle: signatures listing each other in `pipe_dependencies` don't cause re-entry.
+- Cycle: controllers whose dependency graphs reference each other don't cause re-entry.
 
 Schema:
 

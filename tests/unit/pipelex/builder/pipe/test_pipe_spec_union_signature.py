@@ -16,7 +16,6 @@ class TestPipeSpecUnionDispatch:
                 "description": "A signature in the union.",
                 "inputs": {"doc": "Document"},
                 "output": "Summary",
-                "pipe_dependencies": [],
             }
         )
         assert isinstance(result, PipeSignature)

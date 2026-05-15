@@ -36,8 +36,6 @@ class PipeSignature(PipeSpec):
     Optional fields:
         - `signature_for`: hint naming the downstream pipe type the signature stands in for
           (e.g. `PipeType.PIPE_LLM`). Tooling-only; cannot itself be `PipeSignature`.
-        - `pipe_dependencies`: pipe codes the signature claims to depend on; metadata for
-          tooling, ignored at runtime.
     """
 
     type: SkipJsonSchema[Literal["PipeSignature"]] = "PipeSignature"
@@ -45,14 +43,6 @@ class PipeSignature(PipeSpec):
     signature_for: PipeType | None = Field(
         default=None,
         description="Intended downstream pipe type when this signature is implemented (optional hint for agents).",
-    )
-    # Stored as `pipe_dependencies` on the spec (user-authoring surface), mapped to
-    # `signature_pipe_dependencies` on the blueprint and `declared_dependencies` on the runtime —
-    # both layers carry `pipe_dependencies` already as a property/method returning `set[str]`,
-    # which a list-typed field would silently shadow.
-    pipe_dependencies: list[str] = Field(
-        default_factory=list,
-        description="Pipes this signature claims to depend on (metadata for tooling).",
     )
 
     @field_validator("signature_for", mode="after")
@@ -70,7 +60,6 @@ class PipeSignature(PipeSpec):
             inputs=self.inputs,
             output=self.output,
             signature_for=self.signature_for,
-            signature_pipe_dependencies=list(self.pipe_dependencies),
         )
 
     @override
@@ -106,7 +95,5 @@ class PipeSignature(PipeSpec):
         pipe_group.renderables.append(Text.from_markup(f"\nOutput concept: [bold green]{self.output}[/bold green]"))
         if self.signature_for is not None:
             pipe_group.renderables.append(Text.from_markup(f"\nSignature for: [bold yellow]{self.signature_for}[/bold yellow]"))
-        if self.pipe_dependencies:
-            pipe_group.renderables.append(Text.from_markup(f"\nDependencies: [red]{', '.join(self.pipe_dependencies)}[/red]"))
 
         return pipe_group

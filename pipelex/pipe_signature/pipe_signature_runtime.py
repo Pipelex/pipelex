@@ -1,6 +1,5 @@
 from typing import TYPE_CHECKING, Literal
 
-from pydantic import Field
 from typing_extensions import override
 
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -29,10 +28,6 @@ class PipeSignatureRuntime(PipeAbstract):
     type: Literal["PipeSignature"] = "PipeSignature"
     pipe_category: Literal["PipeSignature"] = "PipeSignature"
     signature_for: PipeType | None = None
-    declared_dependencies: list[str] = Field(
-        default_factory=list,
-        description="Pipes this signature claims to depend on (metadata for tooling).",
-    )
 
     @override
     def validate_inputs_static(self) -> None:
@@ -57,10 +52,6 @@ class PipeSignatureRuntime(PipeAbstract):
     @override
     def required_variables(self) -> set[str]:
         return set(self.inputs.variables)
-
-    @override
-    def pipe_dependencies(self) -> set[str]:
-        return set(self.declared_dependencies)
 
     @override
     async def _validate_before_run(

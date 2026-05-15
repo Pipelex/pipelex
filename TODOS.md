@@ -151,15 +151,12 @@ Use blueprints constructed in Python — no `.mthds` parsing in this phase.
 - [x] `pipelex/pipe_signature/` — new package directory.
   - `pipelex/pipe_signature/__init__.py` — empty.
   - `pipelex/pipe_signature/pipe_signature_blueprint.py`:
-    - `PipeSignatureBlueprint(PipeBlueprint)` with `type: Literal["PipeSignature"]`, `pipe_category: Literal["PipeSignature"]`, `signature_for: PipeType | None = None`, `pipe_dependencies: list[str] = Field(default_factory=list)` (metadata).
-    > Deviation: the storage field is named `signature_pipe_dependencies`, not `pipe_dependencies`, because `PipeBlueprint` declares `pipe_dependencies` as a `@property` returning `set[str]`. Shadowing the property with a Pydantic field of incompatible type would silently break call sites like `pipe_sorter.py` that iterate it expecting a set/iterable. The spec layer keeps the user-facing name `pipe_dependencies` and `to_blueprint()` maps to `signature_pipe_dependencies`. Apply the same reasoning to the runtime storage field (`declared_dependencies`) noted further below.
+    - `PipeSignatureBlueprint(PipeBlueprint)` with `type: Literal["PipeSignature"]`, `pipe_category: Literal["PipeSignature"]`, `signature_for: PipeType | None = None`.
   - [x] `pipelex/pipe_signature/pipe_signature_runtime.py`:
-    - `PipeSignatureRuntime(PipeAbstract)` with `type: Literal["PipeSignature"]`, `pipe_category: Literal["PipeSignature"]`, `signature_for: PipeType | None = None`, `declared_dependencies: list[str] = Field(default_factory=list, description="Pipes this signature claims to depend on (metadata for tooling).")`.
-    - **No pydantic alias on `declared_dependencies`.** The earlier draft proposed aliasing a `_signature_pipe_dependencies` field to `pipe_dependencies`; that collides with the method name and is fragile under `extra="forbid"` + `strict=True`. Storage field and method name are kept distinct.
+    - `PipeSignatureRuntime(PipeAbstract)` with `type: Literal["PipeSignature"]`, `pipe_category: Literal["PipeSignature"]`, `signature_for: PipeType | None = None`.
     - `validate_inputs_static`, `validate_inputs_with_library`, `validate_output_static`, `validate_output_with_library` → no-ops.
     - `needed_inputs(visited_pipes=None)` → returns `self.inputs` (mirrors operator pattern).
     - `required_variables()` → `set(self.inputs.variables)`.
-    - `pipe_dependencies()` → `set(self.declared_dependencies)`.
     - `_live_run_pipe(...)` → `raise PipeSignatureNotExecutableError(pipe_ref=self.pipe_ref)`.
     - `_dry_run_pipe(...)`:
       1. Convert `self.output` (a `StuffSpec`) into a `TypedNamedStuffSpec` via a new `convert_stuff_spec_to_typed_named` helper in `pipelex/pipe_run/dry_run.py` (sibling of the existing `convert_to_working_memory_format`, but for a single output `StuffSpec` instead of `InputStuffSpecs`).
@@ -201,7 +198,7 @@ Wire the existing `PipeSignature` spec into the `PipeSpecUnion`, fix the three c
   - `test_inputs_accept_multiplicity` — `inputs = {"docs": "Document[]"}` validates; `inputs = {"images": "Image[3]"}` validates.
   - `test_inputs_reject_invalid_concept_syntax` — `inputs = {"bad": "lowercase"}` raises.
   - `test_no_result_field` — `assert "result" not in PipeSignature.model_fields`.
-  - `test_to_blueprint_returns_signature_blueprint` — `PipeSignature(...).to_blueprint()` returns a `PipeSignatureBlueprint` with matching `code`/`description`/`inputs`/`output`/`signature_for`/`pipe_dependencies`.
+  - `test_to_blueprint_returns_signature_blueprint` — `PipeSignature(...).to_blueprint()` returns a `PipeSignatureBlueprint` with matching `code`/`description`/`inputs`/`output`/`signature_for`.
   - `test_to_blueprint_preserves_input_multiplicity` — `inputs = {"docs": "Document[]"}` round-trips through `to_blueprint()` unchanged.
 - [x] `tests/unit/pipelex/builder/pipe/test_pipe_spec_union_signature.py` — `class TestPipeSpecUnionDispatch`:
   - `test_union_dispatches_pipe_signature` — `pydantic.TypeAdapter(PipeSpecUnion).validate_python({"type": "PipeSignature", ...})` returns a `PipeSignature` instance, not another spec type.
@@ -219,7 +216,6 @@ Wire the existing `PipeSignature` spec into the `PipeSpecUnion`, fix the three c
   - Remove the `set_pipe_category` and `validate_type` validators (the literal handles both).
   - **Remove `result` field entirely.**
   - Allow multiplicity in inputs: replace the inputs description and add a `validate_inputs` validator that mirrors `PipeSpec.validate_inputs` (reuse via shared helper or copy).
-  - Add `pipe_dependencies: list[str] = Field(default_factory=list, description="Pipes this signature claims to depend on (metadata for tooling).")`.
   - Add `to_blueprint(self) -> PipeSignatureBlueprint` building the blueprint from the spec fields.
   - Update `rendered_pretty` for the new field surface (drop `result`).
   > Deviation: `PipeSignature` now inherits from `PipeSpec` (was `StructuredContent`), so it gets `pipe_code`/`description`/`inputs`/`output`/`validate_inputs`/`validate_output` for free and slots naturally into `pipe_type_to_spec_class: dict[str, type[PipeSpec]]`. As a consequence the spec uses `pipe_code` rather than the old `code` field name (matching sibling specs).
@@ -518,7 +514,7 @@ Phase 7 picks up by reading the updated "Status" plus the Phase 7 section below.
 - [x] CLI help text — confirm `pipelex validate --help` mentions `--allow-signatures` with a one-line description ("Accept PipeSignature placeholders in the dependency graph (lenient mode).").
   > Already wired by Phase 5 on both `validate_pipe_cmd` and `validate_bundle_cmd` with that exact help string. Also added the flag to `docs/tools/cli/validate.md` under both subcommands' Options blocks with example invocations.
 - [x] `pipelex/builder/pipe/pipe_signature.py`: tighten the class docstring with the new contract (drop the `result` line, mention `signature_for`, mention strict-vs-lenient).
-  > Rewrote the docstring to lead with the design intent (top-down sketching, replace each signature with a real operator), then call out validation behavior (strict / lenient / live), multiplicity, and the optional `signature_for` / `pipe_dependencies` fields. The pre-existing docstring already had no `result` reference, so nothing to drop.
+  > Rewrote the docstring to lead with the design intent (top-down sketching, replace each signature with a real operator), then call out validation behavior (strict / lenient / live), multiplicity, and the optional `signature_for` field. The pre-existing docstring already had no `result` reference, so nothing to drop.
 
 ### Phase 7.2 — CHANGELOG
 

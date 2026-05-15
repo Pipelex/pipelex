@@ -31,7 +31,6 @@ Signatures let an agent (or a human author) build a complete, dry-runnable bundl
 | `inputs`            | object | Mapping of input variable names to concept references. Multiplicity is supported (`Doc[]`, `Image[3]`).      | No       |
 | `output`            | string | The concept the signature promises to produce. Multiplicity is supported.                                    | Yes      |
 | `signature_for`     | string | Optional hint naming the downstream pipe type (e.g. `"PipeLLM"`) the signature stands in for. Tooling-only.  | No       |
-| `pipe_dependencies` | array  | Optional list of pipe codes the signature claims to depend on; metadata for tooling, ignored at runtime.     | No       |
 
 `signature_for` cannot be set to `"PipeSignature"` — a signature standing in for a signature is nonsensical and is rejected at load time.
 

@@ -20,10 +20,6 @@ class PipeSignatureBlueprint(PipeBlueprint):
         default=None,
         description="Intended downstream pipe type when this signature is implemented (optional hint for agents).",
     )
-    signature_pipe_dependencies: list[str] = Field(
-        default_factory=list,
-        description="Pipes this signature claims to depend on (metadata for tooling).",
-    )
 
     @field_validator("signature_for", mode="after")
     @classmethod

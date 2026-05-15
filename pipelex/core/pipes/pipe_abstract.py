@@ -21,6 +21,7 @@ from pipelex.core.pipes.validation import is_variable_satisfied_by_inputs
 from pipelex.graph.graph_tracer_manager import GraphTracerManager, IOSpec, NodeKind
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
+from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.system.telemetry.otel_constants import (
@@ -385,6 +386,11 @@ class PipeAbstract(ABC, BaseModel):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ):
+        # A PipeSignature has no implementation: reject live execution before the input
+        # checks below, so callers get the actionable error, not a misleading "missing inputs".
+        if self.is_signature and pipe_run_params.run_mode.is_live:
+            raise PipeSignatureNotExecutableError(pipe_ref=self.pipe_ref)
+
         # Check that all the needed inputs are actually in the working memory
         missing_input_names: list[str] = []
 

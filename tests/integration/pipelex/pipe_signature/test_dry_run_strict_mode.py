@@ -398,3 +398,62 @@ class TestDryRunStrictMode:
         assert "The following pipes depend on" in message
         assert seq_a.pipe_ref in message
         assert seq_b.pipe_ref in message
+
+    async def test_lone_signature_not_listed_as_offender(
+        self,
+        setup_signature_library: Callable[[], None],
+        make_signature_blueprint: Callable[..., PipeSignatureBlueprint],
+    ) -> None:
+        # A signature validated on its own is the placeholder itself, not a pipe that
+        # "depends on" one: it belongs in signature_refs, never in offending_pipe_refs.
+        setup_signature_library()
+        sig_pipe = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+            domain_code=SIGNATURES_DOMAIN_CODE,
+            pipe_code="lone_sig",
+            blueprint=make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary"),
+            concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
+        )
+        get_pipe_library().add_new_pipe(pipe=sig_pipe)
+
+        with pytest.raises(SignaturesNotAllowedError) as exc_info:
+            await dry_run_pipe(sig_pipe)
+        error = exc_info.value
+        assert sig_pipe.pipe_ref in error.signature_refs
+        assert sig_pipe.pipe_ref not in error.offending_pipe_refs
+        assert error.offending_pipe_refs == set()
+        assert "Validation found PipeSignature placeholders" in str(error)
+
+    async def test_dry_run_pipes_excludes_signature_from_offenders(
+        self,
+        setup_signature_library: Callable[[], None],
+        make_signature_blueprint: Callable[..., PipeSignatureBlueprint],
+    ) -> None:
+        # When the pipe list contains both a signature and a controller that reaches it,
+        # only the controller is an offender — the signature is the placeholder itself.
+        setup_signature_library()
+        sig_pipe = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+            domain_code=SIGNATURES_DOMAIN_CODE,
+            pipe_code="listed_sig",
+            blueprint=make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary"),
+            concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
+        )
+        get_pipe_library().add_new_pipe(pipe=sig_pipe)
+        seq_pipe = PipeFactory[PipeSequence].make_from_blueprint(
+            domain_code=SIGNATURES_DOMAIN_CODE,
+            pipe_code="listed_seq",
+            blueprint=PipeSequenceBlueprint(
+                description="Sequence calling the signature.",
+                inputs={"doc": "SigTestDoc"},
+                output="SigTestSummary",
+                steps=[SubPipeBlueprint(pipe="listed_sig", result="summary")],
+            ),
+            concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
+        )
+        get_pipe_library().add_new_pipe(pipe=seq_pipe)
+
+        with pytest.raises(SignaturesNotAllowedError) as exc_info:
+            await dry_run_pipes(pipes=[sig_pipe, seq_pipe])
+        error = exc_info.value
+        assert error.offending_pipe_refs == {seq_pipe.pipe_ref}
+        assert sig_pipe.pipe_ref not in error.offending_pipe_refs
+        assert sig_pipe.pipe_ref in error.signature_refs

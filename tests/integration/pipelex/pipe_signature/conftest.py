@@ -45,7 +45,6 @@ def make_signature_blueprint() -> Callable[..., PipeSignatureBlueprint]:
         inputs: dict[str, str] | None = None,
         output: str = "Text",
         signature_for: str | None = None,
-        signature_pipe_dependencies: list[str] | None = None,
     ) -> PipeSignatureBlueprint:
         kwargs: dict[str, object] = {
             "description": description,
@@ -54,8 +53,6 @@ def make_signature_blueprint() -> Callable[..., PipeSignatureBlueprint]:
         }
         if signature_for is not None:
             kwargs["signature_for"] = signature_for
-        if signature_pipe_dependencies is not None:
-            kwargs["signature_pipe_dependencies"] = signature_pipe_dependencies
         return PipeSignatureBlueprint(**kwargs)  # type: ignore[arg-type]
 
     return _make

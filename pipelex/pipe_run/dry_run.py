@@ -62,8 +62,11 @@ async def dry_run_pipe(pipe: PipeAbstract, *, allow_signatures: bool = False, ra
     if not allow_signatures:
         signature_refs = pipe.collect_signature_refs(pipe_lookup=get_optional_pipe)
         if signature_refs:
+            # A signature is the placeholder itself, not a pipe that "depends on" one —
+            # only a non-signature caller belongs in the offender list.
+            offending_pipe_refs: set[str] = set() if pipe.is_signature else {pipe.pipe_ref}
             raise SignaturesNotAllowedError(
-                offending_pipe_refs={pipe.pipe_ref},
+                offending_pipe_refs=offending_pipe_refs,
                 signature_refs=signature_refs,
                 dep_paths=pipe.collect_signature_paths(pipe_lookup=get_optional_pipe),
             )
@@ -136,7 +139,9 @@ async def dry_run_pipes(
             sig_refs = pipe.collect_signature_refs(pipe_lookup=get_optional_pipe)
             if not sig_refs:
                 continue
-            offending_pipe_refs.add(pipe.pipe_ref)
+            # A signature is the placeholder itself, not an offender that "depends on" one.
+            if not pipe.is_signature:
+                offending_pipe_refs.add(pipe.pipe_ref)
             all_signature_refs.update(sig_refs)
             for sig_ref, path in pipe.collect_signature_paths(pipe_lookup=get_optional_pipe).items():
                 # Prefer the longest known dep chain so the error message shows the most informative
