@@ -19,7 +19,6 @@ from pipelex.system.pipelex_service.exceptions import (
     GatewayApiKeyMissingError,
     GatewayDoNotTrackConflictError,
     GatewayTermsNotAcceptedError,
-    RemoteConfigFetchError,
     RemoteConfigValidationError,
 )
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
@@ -53,7 +52,6 @@ class TestMakePipelexForAgentCli:
             (GatewayTermsNotAcceptedError, (), "GatewayTermsNotAcceptedError"),
             (GatewayApiKeyMissingError, (), "GatewayApiKeyMissingError"),
             (GatewayDoNotTrackConflictError, ("DO_NOT_TRACK",), "GatewayDoNotTrackConflictError"),
-            (RemoteConfigFetchError, ("cannot reach server",), "RemoteConfigFetchError"),
             (RemoteConfigValidationError, ("bad remote config",), "RemoteConfigValidationError"),
         ],
     )

@@ -21,7 +21,7 @@ _CAPTURED_WARNINGS: list[dict[str, Any]] = []
 def record_setup_warning(warning_payload: dict[str, Any]) -> None:
     """Stash a structured warning for inclusion in the next ``agent_success`` envelope.
 
-    Callers pass a dict shaped like ``{"type": "RemoteConfigStale", "cached_at": "..."}``;
+    Callers pass a dict shaped like ``{"type": "RemoteConfigStale", "message": "..."}``;
     the contents are surfaced verbatim by ``agent_success``.
     """
     _CAPTURED_WARNINGS.append(warning_payload)
@@ -74,7 +74,6 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "GatewayApiKeyMissingError": "Set the PIPELEX_GATEWAY_API_KEY environment variable, or disable pipelex_gateway in backends.toml",
     "GatewayDoNotTrackConflictError": "Unset the DO_NOT_TRACK environment variable, or disable pipelex_gateway in backends.toml",
     "BinaryNotFoundError": "Install pipelex-tools: uv tool install pipelex-tools",
-    "RemoteConfigFetchError": "Check internet connection and firewall settings, or disable pipelex_gateway in backends.toml",
     "RemoteConfigUnavailableError": (
         "Run `pipelex init` while online to prime the cache, or disable pipelex_gateway in backends.toml to operate offline (BYOK)"
     ),
@@ -102,7 +101,6 @@ AGENT_ERROR_HINTS: dict[str, str] = {
 }
 
 RETRYABLE_ERROR_TYPES: set[str] = {
-    "RemoteConfigFetchError",
     "PipeOperatorModelAvailabilityError",
 }
 
@@ -132,7 +130,6 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     "GatewayTermsNotAcceptedError": "config",
     "GatewayApiKeyMissingError": "config",
     "GatewayDoNotTrackConflictError": "config",
-    "RemoteConfigFetchError": "config",
     "RemoteConfigUnavailableError": "config",
     "BinaryNotFoundError": "config",
     "RemoteConfigValidationError": "config",

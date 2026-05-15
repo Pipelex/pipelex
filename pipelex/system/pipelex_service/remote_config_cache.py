@@ -134,7 +134,7 @@ class RemoteConfigCache:
                 os.fsync(tmp_file.fileno())
             finally:
                 tmp_file.close()
-            Path(tmp_path).replace(path)
+            tmp_path.replace(path)
             replaced = True
         finally:
             if not replaced:

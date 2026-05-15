@@ -21,6 +21,7 @@ from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cli.commands.update_cmd import update_cmd
 from pipelex.cogt.exceptions import (
+    GatewayUnknownModelError,
     InferenceBackendCredentialsError,
     InferenceBackendLibraryError,
     InferenceBackendLibraryNotFoundError,
@@ -791,6 +792,7 @@ def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, B
         InferenceBackendLibraryValidationError,
         ModelDeckValidationError,
         InferenceBackendCredentialsError,
+        GatewayUnknownModelError,
     ) as exc:
         return False, f"Error checking models: {exc}", backend_file_reports
 

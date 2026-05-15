@@ -13,7 +13,6 @@ from pipelex.system.pipelex_service.exceptions import (
     GatewayDoNotTrackConflictError,
     GatewayTermsNotAcceptedError,
     InferenceSetupRequiredError,
-    RemoteConfigFetchError,
     RemoteConfigStaleWarning,
     RemoteConfigUnavailableError,
     RemoteConfigValidationError,
@@ -85,8 +84,6 @@ def make_pipelex_for_agent_cli(
         agent_error(exc.message, "GatewayApiKeyMissingError", cause=exc)
     except GatewayDoNotTrackConflictError as exc:
         agent_error(exc.message, "GatewayDoNotTrackConflictError", cause=exc)
-    except RemoteConfigFetchError as exc:
-        agent_error(exc.message, "RemoteConfigFetchError", cause=exc)
     except RemoteConfigUnavailableError as exc:
         agent_error(exc.message, "RemoteConfigUnavailableError", cause=exc)
     except RemoteConfigValidationError as exc:

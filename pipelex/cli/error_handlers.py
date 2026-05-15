@@ -15,7 +15,6 @@ from pipelex.system.pipelex_service.exceptions import (
     GatewayDoNotTrackConflictError,
     GatewayTermsNotAcceptedError,
     InferenceSetupRequiredError,
-    RemoteConfigFetchError,
     RemoteConfigUnavailableError,
     RemoteConfigValidationError,
 )
@@ -357,42 +356,6 @@ def handle_gateway_do_not_track_conflict_error(exc: GatewayDoNotTrackConflictErr
     console.print("  • [cyan]Unset[/cyan] the DO_NOT_TRACK environment variable to use Gateway")
     console.print("  • [cyan]Or[/cyan] disable pipelex_gateway in .pipelex/inference/backends.toml")
     console.print("    and use your own API keys with direct provider backends")
-    console.print()
-
-    console.print(f"[dim]For more information: {URLs.gateway_docs}[/dim]")
-    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
-    raise typer.Exit(1) from exc
-
-
-def handle_remote_config_fetch_error(exc: RemoteConfigFetchError) -> NoReturn:
-    """Handle and display RemoteConfigFetchError with user-friendly guidance.
-
-    This error occurs when Pipelex Gateway is enabled but the remote configuration
-    cannot be fetched (network issues, server unreachable, etc.).
-
-    Args:
-        exc: The remote config fetch error exception
-    """
-    console = get_console()
-    console.print("\n[bold red]❌ Could not connect to Pipelex Gateway[/bold red]\n")
-
-    console.print(
-        "[bold yellow]⚠ Network Issue:[/bold yellow] Pipelex Gateway requires network access to fetch\n"
-        "configuration, but we couldn't reach the Pipelex servers.\n"
-    )
-
-    console.print("[bold cyan]Error details:[/bold cyan]")
-    console.print(f"  {escape(str(exc))}\n")
-
-    console.print("[bold green]💡 To fix:[/bold green]")
-    console.print("  • Check your internet connection")
-    console.print("  • Verify that firewall/proxy settings allow outbound HTTPS requests")
-    console.print("  • Try again in a few moments (servers may be temporarily unavailable)")
-    console.print()
-
-    console.print("[dim]Alternatively, you can:[/dim]")
-    console.print("[dim]  • Disable pipelex_gateway in .pipelex/inference/backends.toml[/dim]")
-    console.print("[dim]  • Use your own API keys with direct provider backends[/dim]")
     console.print()
 
     console.print(f"[dim]For more information: {URLs.gateway_docs}[/dim]")
