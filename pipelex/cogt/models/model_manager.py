@@ -217,15 +217,18 @@ class ModelManager(ModelManagerAbstract):
         aliases: dict[str, str],
         waterfalls: dict[str, list[str]],
         is_fallback_enabled: bool,
-        visited: set[str],
+        visited: set[tuple[ModelReferenceKind, str]],
     ) -> list[str]:
+        # Cycle key is (kind, name): an alias and a waterfall can share a name yet be distinct nodes.
+        visit_key: tuple[ModelReferenceKind, str]
         match ref.kind:
             case ModelReferenceKind.HANDLE:
                 return [ref.name]
             case ModelReferenceKind.ALIAS:
-                if ref.name in visited:
+                visit_key = (ref.kind, ref.name)
+                if visit_key in visited:
                     return []
-                visited.add(ref.name)
+                visited.add(visit_key)
                 target = aliases.get(ref.name)
                 if target is None:
                     return [ref.name]
@@ -241,9 +244,10 @@ class ModelManager(ModelManagerAbstract):
                     visited=visited,
                 )
             case ModelReferenceKind.WATERFALL:
-                if ref.name in visited:
+                visit_key = (ref.kind, ref.name)
+                if visit_key in visited:
                     return []
-                visited.add(ref.name)
+                visited.add(visit_key)
                 fallback_list = waterfalls.get(ref.name)
                 if not fallback_list:
                     return [ref.name]

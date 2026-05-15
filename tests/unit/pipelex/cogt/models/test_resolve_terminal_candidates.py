@@ -135,6 +135,50 @@ class TestResolveTerminalCandidates:
         )
         assert result == ["a", "b"]
 
+    @pytest.mark.parametrize(
+        ("ref_str", "aliases", "waterfalls", "expected"),
+        [
+            ("@shared", {"shared": "~shared"}, {"shared": ["gpt-4o-mini", "claude-haiku"]}, ["gpt-4o-mini", "claude-haiku"]),
+            ("~shared", {"shared": "claude-4.7-opus"}, {"shared": ["@shared"]}, ["claude-4.7-opus"]),
+        ],
+    )
+    def test_shared_name_alias_and_waterfall_is_not_a_cycle(
+        self,
+        ref_str: str,
+        aliases: dict[str, str],
+        waterfalls: dict[str, list[str]],
+        expected: list[str],
+    ) -> None:
+        """An alias and a waterfall may share a name without forming a cycle.
+
+        Aliases and waterfalls live in separate dicts with no cross-validation, so a
+        deck can hold both ``@shared`` and ``~shared``. Cycle detection must key on
+        ``(kind, name)``: keying on name alone false-flags the second node as visited,
+        returns no candidates, and silently skips gateway membership validation.
+        """
+        result = _collect_candidates(
+            ref=ModelReference.parse(ref_str),
+            aliases=aliases,
+            waterfalls=waterfalls,
+            is_fallback_enabled=True,
+            visited=set(),
+        )
+        assert result == expected
+
+    def test_cross_kind_cycle_still_returns_empty(self) -> None:
+        """Keying on ``(kind, name)`` must not disable detection of a genuine cycle that
+        alternates kinds: ``@x`` → ``~x`` → ``@x`` revisits the alias node and short-circuits.
+        """
+        ref = ModelReference.parse("@x")
+        result = _collect_candidates(
+            ref=ref,
+            aliases={"x": "~x"},
+            waterfalls={"x": ["@x"]},
+            is_fallback_enabled=True,
+            visited=set(),
+        )
+        assert result == []
+
     def test_waterfall_with_invalid_entry_skips_only_that_branch(self) -> None:
         """A malformed waterfall entry that fails ``ModelReference.parse`` must not poison
         the rest of the list — the resolver moves on to the next entry.
