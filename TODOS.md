@@ -7,6 +7,24 @@
 
 ---
 
+## ▶ Start here — cold-start status
+
+**This plan is built for cold-start handoff: one phase per session.** Phases 1, 1.5, 2, 3, 4 are **landed and committed** (through CHECKPOINT B — see the checkpoint blocks and Running Notes for what shipped). The plan was **revised 2026-05-15** to make the "resilience without Temporal" strategy explicit: Phase 5.5 (bounded fan-out concurrency) was added as a coupled pillar beside Phase 5, the HTTP-status mapping was folded into Phase 7, and two coherence decisions were flagged in the Phase 5 section.
+
+**Next phase: Phase 5.** (Phases 5 and 5.5 are a coupled pair — see Sequencing. Do Phase 5 first unless you deliberately choose 5.5 first.)
+
+**How to run a phase from a cold start:**
+
+1. Read this section, then "Why this plan exists", "Verification findings", "Sequencing", then the target phase section in full.
+2. Read the `track-*.md` doc the phase references (under `wip/error-handling/`) — that is the verified current-state ground.
+3. Skim the Running Notes at the bottom for prior per-phase decisions.
+4. Work the phase RED → GREEN → REFACTOR. Run `make agent-check` after each step.
+5. At the phase's CHECKPOINT: fill in the **Status** line, record hand-off context in Running Notes, commit, run `make agent-test`, then **stop**. The next phase is a fresh session.
+
+Each phase from 5 onward has its own checkpoint (C, C.5, D, E, FINAL) so no single session carries more than one phase of context.
+
+---
+
 ## Why this plan exists
 
 Three priorities drive the next phase of error-handling work, in priority order:
@@ -50,11 +68,15 @@ Phase 3  Class-level metadata on exceptions (metadata foundation, part 2)
 Phase 4  Retire agent-CLI string dicts      (metadata foundation, part 3)
    └─ CHECKPOINT B  — shared foundation landed
 Phase 5   PipeRouter retry loop            (priority 1 — resilience without Temporal, pillar A)
+   └─ CHECKPOINT C
 Phase 5.5 Bounded fan-out concurrency       (priority 1 — resilience without Temporal, pillar B)
+   └─ CHECKPOINT C.5  — resilience-without-Temporal complete
 Phase 6   Temporal bridge: category + details (priority 1 — the Temporal half)
-   └─ CHECKPOINT C  — resilience landed
+   └─ CHECKPOINT D  — resilience landed
 Phase 7   Error delivery: CLI markdown + HTTP mapping (priority 2)
+   └─ CHECKPOINT E
 Phase 8   Full-chain integration coverage   (testing — verifies the above end-to-end)
+   └─ FINAL
 ```
 
 Phases 5 and 5.5 are a **coupled pair** — both are "resilience without Temporal". Retry without bounded concurrency amplifies a thundering herd (retrying N failed calls = N more calls), so land both before exercising retry at scale; 5.5 may even precede 5. Phases 5–6 (resilience) and Phase 7 (delivery) touch disjoint files and could run in parallel; the order above keeps priority 1 ahead of priority 2 for a sequential single-session pass.
@@ -293,6 +315,16 @@ Reference: [track-retry-and-resilience.md](wip/error-handling/track-retry-and-re
 - [ ] Remove `TenacityConfig` from `pipelex/cogt/config_cogt.py` and its `pipelex.toml` entries, **only if** nothing else uses it (`pipelex/plugins/fal/fal_poller.py` still uses tenacity for polling and `log_retry` from `tenacity_utils.py` — verify before removing the `tenacity` dependency or `tenacity_utils.py`).
 - [ ] Add a one-line code comment at the `instructor` `max_retries` call sites noting it retries schema-validation, not transport — out of scope for router retry.
 
+> ### STOP — CHECKPOINT C: PipeRouter retry loop landed
+>
+> Update checkboxes, run `make agent-check` and `make agent-test`, commit. Then **stop — Phase 5.5 is a fresh session.**
+>
+> **Status:** _(fill in when landed)_
+>
+> **Hand-off context to record in Running Notes:** the two coherence decisions as actually settled (final default `max_transient_retries`; `CAPACITY` disposition); whether removing the gateway-worker `tenacity` changed any timing-sensitive test; the final disposition of the `tenacity` dependency, `TenacityConfig`, and `tenacity_utils.py`; the retry config fields added and their `pipelex.toml` defaults.
+>
+> **Next session resumes at Phase 5.5** — re-read the "Start here" section, "Why this plan exists", the Phase 5.5 section, and [track-retry-and-resilience.md](wip/error-handling/track-retry-and-resilience.md).
+
 ---
 
 ## Phase 5.5 — Bounded fan-out concurrency (resilience without Temporal, pillar B)
@@ -320,6 +352,18 @@ Reference: [track-retry-and-resilience.md](wip/error-handling/track-retry-and-re
 
 - [ ] Graceful-degradation messaging: when a `PipeBatch` workload exceeds a soft threshold, or when `CAPACITY` errors recur, attach an advisory `user_action` / log line naming the **Temporal track** as the durable, rate-limited path. Advisory, never fatal — "we made a basic effort; here is the stronger solution."
 - [ ] Record in Running Notes how this composes with Phase 5: bounded concurrency *reduces* how often `CAPACITY` is hit; the router retry loop handles the residual `TRANSIENT`; persistent `CAPACITY` is the honest "go Temporal" boundary.
+
+> ### STOP — CHECKPOINT C.5: Bounded fan-out concurrency landed — resilience-without-Temporal complete
+>
+> Update checkboxes, run `make tb`, `make agent-check`, and `make agent-test`, commit. Then **stop — Phase 6 is a fresh session.**
+>
+> **Status:** _(fill in when landed)_
+>
+> Both standalone-resilience pillars now stand: Pipelex retries transients (Phase 5) and bounds its fan-out (Phase 5.5) without Temporal.
+>
+> **Hand-off context to record in Running Notes:** the `PipeParallel` bounding decision; the chosen `max_concurrency` default and config placement; the chunk-failure semantics; the graceful-degradation messaging; how Phases 5 + 5.5 compose.
+>
+> **Next session resumes at Phase 6** — re-read the "Start here" section, the Phase 6 section, and [track-temporal-integration.md](wip/error-handling/track-temporal-integration.md).
 
 ---
 
@@ -350,11 +394,17 @@ Reference: [track-temporal-integration.md](wip/error-handling/track-temporal-int
 
 - [ ] Check the in-process PipeRouter retry (Phase 5) and the Temporal retry agree on what "transient" means — both consult `is_retryable`. Note in Running Notes how the two layers compose (Temporal sees a non-retryable error only after the router exhausted its retries, or for non-`TRANSIENT` categories).
 
-> ### STOP — CHECKPOINT C: Resilience landed
+> ### STOP — CHECKPOINT D: Resilience landed (Temporal half)
 >
-> Update checkboxes, commit, run `make agent-test`. Run the Temporal integration tests per `_tprl/CLAUDE.md` (`--temporal-server` options). Priority 1 is complete: standalone, Pipelex retries transients (Phase 5) and bounds fan-out concurrency (Phase 5.5); across the Temporal boundary, retry flows from the same shared signal (Phase 6).
+> Update checkboxes, run `make agent-check` and `make agent-test`, commit. Run the Temporal integration tests per `_tprl/CLAUDE.md` (`--temporal-server` options). Then **stop — Phase 7 is a fresh session.**
 >
-> **Hand-off context to record in Running Notes:** whether the gateway-worker tenacity removal changed any timing-sensitive test, the final disposition of the `tenacity` dependency, how the two retry layers compose, the `PipeParallel` bounding decision, and the chosen `max_concurrency` default.
+> **Status:** _(fill in when landed)_
+>
+> Priority 1 is complete: standalone, Pipelex retries transients and bounds fan-out concurrency; across the Temporal boundary, retry flows from the same `is_retryable` signal and `ErrorReport` round-trips in `ApplicationError.details`.
+>
+> **Hand-off context to record in Running Notes:** how the in-process retry (Phase 5) and Temporal retry compose; whether the Temporal integration suite surfaced any timing-sensitive regression.
+>
+> **Next session resumes at Phase 7** — re-read the "Start here" section, the Phase 7 section, and [track-cli-delivery.md](wip/error-handling/track-cli-delivery.md).
 
 ---
 
@@ -389,6 +439,18 @@ Reference: [track-cli-delivery.md](wip/error-handling/track-cli-delivery.md) fol
 - [ ] Extract `display_error_panel(console, *, title, fields, error_message, tip, links)` in `pipelex/cli/error_handlers.py`; rewrite each `handle_*` to build its field list and call the helper. Exception-specific logic stays in the handler; the panel shape lives in one place.
 - [ ] Update `pipelex/cli/agent_cli/CLAUDE.md`: markdown is the default for `run` / `validate` / `init` / `models` / `doctor` / `check-model`; `--format json` available on all of them; errors respect the same option; document each command's markdown structure.
 - [ ] Document the `error_domain` → HTTP-status mapping where a downstream API author will find it (a docstring on the helper plus a short note in `wip/error-handling/track-cli-delivery.md` or `architecture.md`), including the 429 / `Retry-After` passthrough. The mapping table is authoritative in the library; API repos call the helper, they do not redefine it.
+
+> ### STOP — CHECKPOINT E: Error delivery landed
+>
+> Update checkboxes, run `make agent-check` and `make agent-test`, commit. Then **stop — Phase 8 is a fresh session.**
+>
+> **Status:** _(fill in when landed)_
+>
+> Priority 2 is complete: the agent CLI emits markdown by default with `--format json`, and `ErrorReport` carries a documented `error_domain` → HTTP-status mapping.
+>
+> **Hand-off context to record in Running Notes:** the final HTTP-status mapping table; where the panel helper landed; any Rich-rendering change from the `error_handlers.py` refactor.
+>
+> **Next session resumes at Phase 8** — re-read the "Start here" section, the Phase 8 section, and [track-testing.md](wip/error-handling/track-testing.md).
 
 ---
 
