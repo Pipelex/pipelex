@@ -209,6 +209,8 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
             result_object, completion = await self.instructor_for_objects.responses.create_with_completion(  # pyright: ignore[reportUnknownMemberType]
                 input=cast("list[ChatCompletionMessageParam]", input_items),
                 response_model=schema,
+                # instructor's max_retries retries schema-validation failures only, not transport errors —
+                # transient transport retry is the PipeRouter's job, not this call's.
                 max_retries=llm_job.job_config.max_retries,
                 model=self.inference_model.model_id,
                 instructions=llm_job.llm_prompt.system_text,

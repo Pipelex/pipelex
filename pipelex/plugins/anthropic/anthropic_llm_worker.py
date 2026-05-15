@@ -477,6 +477,8 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
             result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                 messages=messages,
                 response_model=schema,
+                # instructor's max_retries retries schema-validation failures only, not transport errors —
+                # transient transport retry is the PipeRouter's job, not this call's.
                 max_retries=llm_job.job_config.max_retries,
                 model=self.inference_model.model_id,
                 temperature=omit if temperature_unsupported else job_params.temperature,

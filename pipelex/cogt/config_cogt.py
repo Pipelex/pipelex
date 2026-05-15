@@ -1,4 +1,4 @@
-from pydantic import Field, field_validator
+from pydantic import field_validator
 
 from pipelex.cogt.exceptions import LLMConfigError
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams, ImgGenJobParamsDefaults, Quality
@@ -123,20 +123,12 @@ class LLMConfig(ConfigModel):
         return value
 
 
-class TenacityConfig(ConfigModel):
-    max_retries: int = Field(..., ge=1, le=100, description="Maximum number of retry attempts before giving up")
-    wait_multiplier: float = Field(..., ge=0.1, le=10, description="Multiplier applied to the wait time between retries (in seconds)")
-    wait_max: float = Field(..., ge=0.1, le=20, description="Maximum wait time between retries (in seconds)")
-    wait_exp_base: float = Field(..., ge=1.1, le=10, description="Base for exponential backoff calculation")
-
-
 class GatewayTestConfig(ConfigModel):
     config_id_substitutions: dict[str, str]
 
 
 class Cogt(ConfigModel):
     model_deck_config: ModelDeckConfig
-    tenacity_config: TenacityConfig
     llm_config: LLMConfig
     img_gen_config: ImgGenConfig
     extract_config: ExtractConfig

@@ -18,6 +18,8 @@
 
 - **Documented `XHIGH` value on `ReasoningEffort`.** The enum already shipped seven levels; the `under-the-hood/reasoning-controls.md` table listed only six. `XHIGH` sits between `HIGH` and `MAX` and maps to provider-specific xhigh values where supported.
 
+- **Application-level retry of transient inference failures.** `PipeRouter` now retries failures classified as `InferenceErrorCategory.TRANSIENT` (rate limits, timeouts, brief outages) with exponential backoff. This is the resilience layer that works without Temporal — retry now lives in the dispatch layer rather than being scattered inside individual gateway workers. Controlled by four new `[pipelex.pipeline_execution_config]` settings: `max_transient_retries` (default `3`; set to `0` to disable retry entirely), `transient_retry_base_wait`, `transient_retry_max_wait`, `transient_retry_backoff_multiplier`. Non-retryable categories (`CONFIGURATION`, `CONTENT`, `CAPACITY`, `UNKNOWN`) fail immediately as before.
+
 ### Changed
 
 - **Top-level Workflow ID shape change (breaking).** Workflow IDs go from `{env}{session5}-{rand5}-{ClassName}` (e.g. `EdgdJ-HR5fd-TemporalPipeRun-pipe-router`) to `{env_prefix}{pipeline_run_id}` (e.g. `ut-3f9c8b2a-1e4d-4f5b-9c7a-2d8e1f0a6b3c`). The session-id and random-id components and the calling class name are gone; identity flows entirely from Pipelex's existing `JobMetadata.pipeline_run_id`. Operational tooling that grepped for the old shape must update.
@@ -55,6 +57,10 @@
 - **Cluster-wide queue rate cap moved from Python constant to TOML overlay.** `TemporalTaskManager.make_worker` previously hardcoded `max_task_queue_activities_per_second=1000` on the Temporal `Worker(...)` constructor for every queue. It now reads this knob from `queue_options[task_queue].max_task_queue_activities_per_second`; the shipping default `[temporal.queue_options.temporal_task_queue]` sets it to `1000`, so out-of-the-box behavior on the default queue is unchanged. Deployments using non-default queue names should add their own `[temporal.queue_options.<queue>]` entries with the cap appropriate for that backend pool. The per-worker `max_activities_per_second = 1000` lives on the runtime profile and is unchanged.
 
 - **Removed dead code: `pipelex/temporal/wrapper/`.** The `start_tprl_activity` wrapper had zero callers.
+
+- **Retry moved out of the gateway workers; `[cogt.tenacity_config]` removed (breaking).** The `tenacity`-based retry inside `GatewayExtractWorker` and `GatewaySearchWorker` is gone — transient-failure retry is now handled once, at the dispatch layer, by `PipeRouter` (see Added). The `[cogt.tenacity_config]` config block and its `TenacityConfig` model no longer exist. Because config models forbid unknown keys, an existing `~/.pipelex/pipelex.toml` (or any layered override) that still carries `[cogt.tenacity_config]` will fail to load — remove that block from your config. The `tenacity` library itself is still used elsewhere (FAL job polling, remote-config fetch) and remains a dependency.
+
+- **`PipeRouter.run()` now reports `CogtError` failures to the observer.** A `CogtError` raised out of pipe execution previously propagated past `run()` without an `observe_after_failing_run` notification (only `PipeRunError` was caught). It is now observed on the failing path, then re-raised as-is — the cause chain is preserved and it is not wrapped into `PipeRouterError` (only the `PipeRunError` path still wraps).
 
 ### Fixed
 

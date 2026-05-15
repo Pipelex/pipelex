@@ -154,6 +154,12 @@ class PipelineExecutionConfig(ConfigModel):
     is_generate_graph: bool
     graph_config: GraphConfig
 
+    # Application-level retry of transient inference failures (the resilience layer that works without Temporal).
+    max_transient_retries: int
+    transient_retry_base_wait: float
+    transient_retry_max_wait: float
+    transient_retry_backoff_multiplier: float
+
     def with_graph_config_overrides(
         self,
         generate_graph: bool | None = None,

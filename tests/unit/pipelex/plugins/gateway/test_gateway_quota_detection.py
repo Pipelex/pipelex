@@ -62,13 +62,6 @@ def _make_gateway_extract_worker(mocker: MockerFixture) -> GatewayExtractWorker:
     mock_client = mocker.MagicMock()
     worker.portkey_client = mock_client
 
-    mock_tenacity = mocker.MagicMock()
-    mock_tenacity.wait_multiplier = 1
-    mock_tenacity.wait_max = 10
-    mock_tenacity.wait_exp_base = 2
-    mock_tenacity.max_retries = 1
-    worker._tenacity_config = mock_tenacity  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
-
     return worker
 
 
@@ -103,13 +96,6 @@ def _make_gateway_search_worker(mocker: MockerFixture) -> GatewaySearchWorker:
 
     mock_client = mocker.MagicMock()
     worker.portkey_client = mock_client
-
-    mock_tenacity = mocker.MagicMock()
-    mock_tenacity.wait_multiplier = 1
-    mock_tenacity.wait_max = 10
-    mock_tenacity.wait_exp_base = 2
-    mock_tenacity.max_retries = 1
-    worker._tenacity_config = mock_tenacity  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
     return worker
 

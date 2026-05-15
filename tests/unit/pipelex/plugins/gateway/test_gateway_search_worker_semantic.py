@@ -37,13 +37,6 @@ def _make_worker(mocker: MockerFixture) -> GatewaySearchWorker:
     mock_model.extra_headers = {}
     worker.inference_model = mock_model
 
-    mock_tenacity_cfg = mocker.MagicMock()
-    mock_tenacity_cfg.wait_multiplier = 0.0
-    mock_tenacity_cfg.wait_max = 0.0
-    mock_tenacity_cfg.wait_exp_base = 1.0
-    mock_tenacity_cfg.max_retries = 1
-    worker._tenacity_config = mock_tenacity_cfg  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
-
     mock_post = mocker.AsyncMock()
     mock_options = mocker.MagicMock()
     mock_options.post = mock_post

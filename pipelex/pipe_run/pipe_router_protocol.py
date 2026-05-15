@@ -1,14 +1,21 @@
+import asyncio
 from abc import abstractmethod
 from typing import Protocol
 
+from pipelex import log
+from pipelex.cogt.exceptions import CogtError
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.observer.observer_protocol import ObserverProtocol, PayloadKey, PayloadType
 from pipelex.pipe_run.exceptions import PipeRouterError, PipeRunError
 from pipelex.pipe_run.pipe_job import PipeJob
+from pipelex.pipe_run.transient_retry import TransientRetrySettings
 
 
 class PipeRouterProtocol(Protocol):
     observer: ObserverProtocol
+    # Resolved from `PipelineExecutionConfig` by each concrete router at construction time — the protocol
+    # itself cannot read config without forming an import cycle (see `transient_retry.py`).
+    transient_retry_settings: TransientRetrySettings
 
     async def _before_run(
         self,
@@ -50,17 +57,37 @@ class PipeRouterProtocol(Protocol):
     ) -> PipeOutput:
         await self._before_run(pipe_job)
 
-        try:
-            pipe_output = await self._run_pipe_job(pipe_job)
-        except PipeRunError as exc:
-            await self._after_failing_run(pipe_job, exc)
-            raise PipeRouterError(
-                message=exc.message,
-                run_mode=pipe_job.pipe_run_params.run_mode,
-                pipe_code=pipe_job.pipe.code,
-                output_name=pipe_job.output_name,
-                pipe_stack=pipe_job.pipe_run_params.pipe_stack,
-            ) from exc
+        retry_settings = self.transient_retry_settings
+        retry_count = 0
+        while True:
+            try:
+                pipe_output = await self._run_pipe_job(pipe_job)
+                break
+            except CogtError as exc:
+                error_category = exc.error_category
+                is_retryable = error_category is not None and error_category.is_retryable
+                if is_retryable and retry_count < retry_settings.max_transient_retries:
+                    retry_count += 1
+                    wait_seconds = retry_settings.compute_wait(retry_count)
+                    log.warning(
+                        f"Transient inference error ({error_category}) running pipe '{pipe_job.pipe.code}' — "
+                        f"retry {retry_count}/{retry_settings.max_transient_retries} in {wait_seconds:.2f}s: {exc}"
+                    )
+                    await asyncio.sleep(wait_seconds)
+                    continue
+                # Non-retryable category, or the transient-retry budget is exhausted: re-raise the last
+                # error as-is so the cause chain is preserved (the existing PipeRunError path still wraps).
+                await self._after_failing_run(pipe_job, exc)
+                raise
+            except PipeRunError as exc:
+                await self._after_failing_run(pipe_job, exc)
+                raise PipeRouterError(
+                    message=exc.message,
+                    run_mode=pipe_job.pipe_run_params.run_mode,
+                    pipe_code=pipe_job.pipe.code,
+                    output_name=pipe_job.output_name,
+                    pipe_stack=pipe_job.pipe_run_params.pipe_stack,
+                ) from exc
 
         await self._after_successful_run(pipe_job, pipe_output)
 

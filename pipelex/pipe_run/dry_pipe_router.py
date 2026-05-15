@@ -3,12 +3,14 @@ from typing_extensions import override
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.observer.observer_protocol import ObserverNoOp, ObserverProtocol
 from pipelex.pipe_run.pipe_job import PipeJob
+from pipelex.pipe_run.pipe_router import make_transient_retry_settings
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 
 
 class DryPipeRouter(PipeRouterProtocol):
     def __init__(self, observer: ObserverProtocol | None = None):
         self.observer = observer or ObserverNoOp()
+        self.transient_retry_settings = make_transient_retry_settings()
 
     @override
     async def _run_pipe_job(

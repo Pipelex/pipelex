@@ -9,9 +9,9 @@
 
 ## ▶ Start here — cold-start status
 
-**This plan is built for cold-start handoff: one phase per session.** Phases 1, 1.5, 2, 3, 4 are **landed and committed** (through CHECKPOINT B — see the checkpoint blocks and Running Notes for what shipped). The plan was **revised 2026-05-15** to make the "resilience without Temporal" strategy explicit: Phase 5.5 (bounded fan-out concurrency) was added as a coupled pillar beside Phase 5, the HTTP-status mapping was folded into Phase 7, and two coherence decisions were flagged in the Phase 5 section.
+**This plan is built for cold-start handoff: one phase per session.** Phases 1, 1.5, 2, 3, 4, 5 are **landed and committed** (through CHECKPOINT C — see the checkpoint blocks and Running Notes for what shipped). The plan was **revised 2026-05-15** to make the "resilience without Temporal" strategy explicit: Phase 5.5 (bounded fan-out concurrency) was added as a coupled pillar beside Phase 5, the HTTP-status mapping was folded into Phase 7, and two coherence decisions were flagged in the Phase 5 section.
 
-**Next phase: Phase 5.** (Phases 5 and 5.5 are a coupled pair — see Sequencing. Do Phase 5 first unless you deliberately choose 5.5 first.)
+**Next phase: Phase 5.5.** (Phases 5 and 5.5 are a coupled pair — Phase 5 landed; 5.5 is the remaining pillar.)
 
 **How to run a phase from a cold start:**
 
@@ -294,7 +294,7 @@ Reference: [track-retry-and-resilience.md](wip/error-handling/track-retry-and-re
 
 ### RED
 
-- [ ] Write `tests/unit/pipelex/pipe_run/test_pipe_router_retry.py` asserting:
+- [x] Write `tests/unit/pipelex/pipe_run/test_pipe_router_retry.py` asserting:
   - A `CogtError` with `error_category=TRANSIENT` retries up to `max_transient_retries`, then re-raises the last error (cause chain preserved).
   - A `CogtError` with `CONFIGURATION` / `CONTENT` / `CAPACITY` / `UNKNOWN` fails immediately (no retry).
   - A `PipeRunError` (non-`CogtError`) is unaffected and still wraps as `PipeRouterError`.
@@ -304,22 +304,22 @@ Reference: [track-retry-and-resilience.md](wip/error-handling/track-retry-and-re
 
 ### GREEN
 
-- [ ] Add retry config fields to `PipelineExecutionConfig` (`pipelex/system/configuration/configs.py`): `max_transient_retries: int`, `transient_retry_base_wait: float`, `transient_retry_max_wait: float`, `transient_retry_backoff_multiplier: float`. Per project rules: no defaults in the class body — put defaults in `pipelex/pipelex.toml` with `max_transient_retries = 3` (a small sane budget — see the coherence decision above; **not** `0`); add commented-out overrides in `.pipelex/pipelex.toml`.
-- [ ] Add the retry loop to `PipeRouterProtocol.run()` (`pipelex/pipe_run/pipe_router_protocol.py`): wrap `_run_pipe_job()`, catch `CogtError` where `error_category is not None and error_category.is_retryable`, sleep with exponential backoff, continue; re-raise on exhaustion; non-retryable categories fail immediately; the existing `PipeRunError` path is unchanged.
-- [ ] Thread the retry config via `get_config()` inside the protocol (Option B in the track doc) — consistent with how `pipeline_execution_config` is already accessed.
-- [ ] Run `make tb` (boot sequence — verifies the config model and the three `pipelex.toml` files agree). Run `make agent-check`.
+- [x] Add retry config fields to `PipelineExecutionConfig` (`pipelex/system/configuration/configs.py`): `max_transient_retries: int`, `transient_retry_base_wait: float`, `transient_retry_max_wait: float`, `transient_retry_backoff_multiplier: float`. Per project rules: no defaults in the class body — put defaults in `pipelex/pipelex.toml` with `max_transient_retries = 3` (a small sane budget — see the coherence decision above; **not** `0`); add commented-out overrides in `.pipelex/pipelex.toml`. — _Done; commented-out overrides also added to `pipelex/kit/configs/pipelex.toml` (kept in sync with `.pipelex/`)._
+- [x] Add the retry loop to `PipeRouterProtocol.run()` (`pipelex/pipe_run/pipe_router_protocol.py`): wrap `_run_pipe_job()`, catch `CogtError` where `error_category is not None and error_category.is_retryable`, sleep with exponential backoff, continue; re-raise on exhaustion; non-retryable categories fail immediately; the existing `PipeRunError` path is unchanged.
+- [x] Thread the retry config via `get_config()` inside the protocol (Option B in the track doc) — consistent with how `pipeline_execution_config` is already accessed. — _DEVIATION: Option B as literally written is impossible. `pipelex.config` imports `pipelex.hub`, and `hub` type-imports `PipeRouterProtocol` — any `config` import in `pipe_router_protocol.py` (module **or** function scope) trips pyright's `reportImportCycles`. Resolved with a hybrid: a dependency-free `TransientRetrySettings` model (`pipelex/pipe_run/transient_retry.py`) the protocol carries as an instance attribute, populated from `get_config()` by each concrete router at construction via `make_transient_retry_settings()` in `pipe_router.py`. See Running Notes._
+- [x] Run `make tb` (boot sequence — verifies the config model and the three `pipelex.toml` files agree). Run `make agent-check`.
 
 ### REFACTOR
 
-- [ ] Remove `tenacity` retry from the gateway extract and search workers (`_make_retryer`, `_is_retryable_portkey_error`, `_log_retry`, the `async for attempt` wrapper). Confirm errors still propagate with the correct `InferenceErrorCategory` on first failure.
-- [ ] Remove `TenacityConfig` from `pipelex/cogt/config_cogt.py` and its `pipelex.toml` entries, **only if** nothing else uses it (`pipelex/plugins/fal/fal_poller.py` still uses tenacity for polling and `log_retry` from `tenacity_utils.py` — verify before removing the `tenacity` dependency or `tenacity_utils.py`).
-- [ ] Add a one-line code comment at the `instructor` `max_retries` call sites noting it retries schema-validation, not transport — out of scope for router retry.
+- [x] Remove `tenacity` retry from the gateway extract and search workers (`_make_retryer`, `_is_retryable_portkey_error`, `_log_retry`, the `async for attempt` wrapper). Confirm errors still propagate with the correct `InferenceErrorCategory` on first failure. — _Done. The now-dead `response is None` defensive branches (and `attempt_number` tracking) were also removed._
+- [x] Remove `TenacityConfig` from `pipelex/cogt/config_cogt.py` and its `pipelex.toml` entries, **only if** nothing else uses it (`pipelex/plugins/fal/fal_poller.py` still uses tenacity for polling and `log_retry` from `tenacity_utils.py` — verify before removing the `tenacity` dependency or `tenacity_utils.py`). — _`TenacityConfig` removed. `tenacity` dependency and `tenacity_utils.py` KEPT — `fal_poller.py` and `remote_config_fetcher.py` still use them. See Running Notes for the breaking-change note on stale user configs._
+- [x] Add a one-line code comment at the `instructor` `max_retries` call sites noting it retries schema-validation, not transport — out of scope for router retry. — _Done in the four LLM workers (google, anthropic, openai completions, openai responses)._
 
 > ### STOP — CHECKPOINT C: PipeRouter retry loop landed
 >
 > Update checkboxes, run `make agent-check` and `make agent-test`, commit. Then **stop — Phase 5.5 is a fresh session.**
 >
-> **Status:** _(fill in when landed)_
+> **Status (landed 2026-05-15):** COMPLETE — RED, GREEN, REFACTOR all landed. `make agent-check` clean (ruff + plxt + pyright 0 errors + mypy 0 issues); `make tb` passes; `make agent-test` passed. Per-decision detail in the "Phase 5" section of Running Notes below.
 >
 > **Hand-off context to record in Running Notes:** the two coherence decisions as actually settled (final default `max_transient_retries`; `CAPACITY` disposition); whether removing the gateway-worker `tenacity` changed any timing-sensitive test; the final disposition of the `tenacity` dependency, `TenacityConfig`, and `tenacity_utils.py`; the retry config fields added and their `pipelex.toml` defaults.
 >
@@ -651,3 +651,30 @@ _Group D (partial):_
 - **Case-by-case `error_category` decisions:** the Phase 3 table above.
 - **Which dict entries survived:** the Phase 4 "Dict entries that survived" note — un-migrated `PipelexError` subclasses + builtins / third-party / synthetic labels; **not** built-ins-only.
 - **`PipelexError` subclasses still needing metadata:** the drift test does not flag these (the literal "every subclass" check was descoped as infeasible — see the Phase 4 RED notes). Un-migrated dict-referenced subclasses (`ModelChoiceNotFoundError`, `PipeOperatorModel*`, `TelemetryConfigValidationError`, `ModelDeckPresetValidatonError`, …) still rely on the fallback dicts; migrating them is future work and does not block the shared foundation.
+
+### Phase 5 — PipeRouter retry loop (landed 2026-05-15)
+
+**Coherence decision 1 — default retry budget:** settled as recommended. `pipelex/pipelex.toml` ships `max_transient_retries = 3`, `transient_retry_base_wait = 2.0`, `transient_retry_max_wait = 30.0`, `transient_retry_backoff_multiplier = 2.0`. `0` is a valid explicit opt-out, not the default. Commented-out overrides added to both `.pipelex/pipelex.toml` and `pipelex/kit/configs/pipelex.toml`.
+
+**Coherence decision 2 — `CAPACITY`:** untouched. `InferenceErrorCategory.is_retryable` still returns `False` for `CAPACITY` (and `CONFIGURATION` / `CONTENT` / `UNKNOWN`); the router loop retries `TRANSIENT` only. `CAPACITY` (rate-limit / overwhelm) is Phase 5.5's concern.
+
+**Import-cycle deviation (the big one).** The track doc's "Option B — call `get_config()` directly inside `PipeRouterProtocol.run()`" is **not achievable**. `pipelex.config` imports `pipelex.hub`, and `hub.py` references `PipeRouterProtocol` (as a type). Any import of `pipelex.config` / `pipelex.hub` / `pipelex.system.configuration.configs` from `pipe_router_protocol.py` — at module scope **or** inside a function, and even under `TYPE_CHECKING` — trips pyright's `reportImportCycles` (verified: pyright counts function-local and TYPE_CHECKING imports for cycle detection). Resolution:
+
+- New dependency-free module `pipelex/pipe_run/transient_retry.py` holds `TransientRetrySettings` (a plain `BaseModel`: `max_transient_retries`, `base_wait`, `max_wait`, `backoff_multiplier`, plus `compute_wait(retry_count)` for the exponential backoff). It imports only pydantic, so `pipe_router_protocol.py` can import it cycle-free.
+- `PipeRouterProtocol` carries `transient_retry_settings: TransientRetrySettings` as an instance attribute (alongside `observer`). `run()` reads `self.transient_retry_settings` — no config import.
+- `make_transient_retry_settings()` in `pipe_router.py` reads `get_config().pipelex.pipeline_execution_config` and builds the model. All three concrete routers (`PipeRouter`, `DryPipeRouter`, `TemporalPipeRouter`) call it in `__init__` to populate the attribute. `dry_pipe_router.py` and `temporal_pipe_router.py` import the helper from `pipe_router.py` (none of those modules are in the `hub` import chain, so no cycle).
+- `hub.py`: `PipeRouterProtocol` import moved into the `TYPE_CHECKING` block (it was only ever a type there); the three function annotations referencing it were quoted. This is clean regardless of the cycle and was kept.
+
+Net: config is read at router **construction** time, not per-`run()`. Acceptable — retry config is static for the process lifetime. The retry loop itself lives exactly where the plan wants it (`PipeRouterProtocol.run()`).
+
+**Gateway worker `tenacity` removal.** `_make_retryer` / `_is_retryable_portkey_error` / `_log_retry` and the `async for attempt in retryer` wrappers removed from `gateway_extract_worker.py` and `gateway_search_worker.py`. The now-dead `response is None` defensive branches (only reachable if the retryer looped zero times) and the `attempt_number` counters were removed too; error messages dropped the "after N attempt(s)" phrasing. No timing-sensitive test broke — `make agent-test` passed. Three gateway test files (`test_gateway_quota_detection.py`, `test_gateway_search_worker_semantic.py`, `test_gateway_extract_worker_semantic.py`) had `worker._tenacity_config = MagicMock()` setup blocks; those are now dead and were removed.
+
+**`tenacity` dependency / `tenacity_utils.py`: KEPT.** `pipelex/plugins/fal/fal_poller.py` (polling) and `pipelex/system/pipelex_service/remote_config_fetcher.py` both still use `tenacity` directly; `fal_poller.py` uses `log_retry` from `tenacity_utils.py`. Only `TenacityConfig` (the config model) and `Cogt.tenacity_config` were removed.
+
+**Breaking change — stale `[cogt.tenacity_config]` in user configs.** `extra="forbid"` on `ConfigModel` means an existing `~/.pipelex/pipelex.toml` (or any layered override) that still carries `[cogt.tenacity_config]` now fails config load with `extra_forbidden`. Removed the section from the repo's three toml files (`pipelex/pipelex.toml`, `.pipelex/pipelex.toml`, `pipelex/kit/configs/pipelex.toml`) **and** from this machine's global `~/.pipelex/pipelex.toml` (which a prior `pipelex init` had populated — that is what surfaced the failure during testing). Users upgrading must remove `[cogt.tenacity_config]` from their global config — noted in CHANGELOG.
+
+**`instructor` `max_retries`.** A one-line comment was added at the four LLM-worker call sites (`google_llm_worker.py`, `anthropic_llm_worker.py`, `openai_completions_llm_worker.py`, `openai_responses_llm_worker.py`) noting it retries schema-validation failures only, not transport — out of scope for router retry.
+
+**Intentional behavior changes.** (1) `_after_failing_run()` now fires for a `CogtError` too (previously only `PipeRunError` was caught by `run()`; a `CogtError` propagated raw without notifying the observer). (2) An exhausted-retry or non-retryable `CogtError` is re-raised **as-is** (cause chain preserved) — it is *not* wrapped into `PipeRouterError`; only the pre-existing `PipeRunError` path still wraps.
+
+**Aside:** `make cleanderived` during this phase erased the generated `tests/integration/pipelex/fixtures/_generated_model_sets.py`; `make rtm` regenerated it. Unrelated to retry work.
