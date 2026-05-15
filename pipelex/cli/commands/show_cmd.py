@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Annotated, cast
 import typer
 from posthog import tag
 from rich import box
+from rich.errors import MarkupError
 from rich.table import Table
 
 from pipelex import pretty_print
@@ -157,8 +158,8 @@ def do_show_backends(show_all: bool = False) -> None:
         else:
             console.print("[dim]No specific routing rules defined.[/dim]")
 
-    except Exception as exc:  # noqa: BLE001
-        console.print(f"[yellow]Warning: Could not load routing profile information: {exc}[/yellow]")
+    except MarkupError as exc:
+        console.print(f"[yellow]Warning: Could not display routing profile information: {exc}[/yellow]")
 
     console.print("\n")
 

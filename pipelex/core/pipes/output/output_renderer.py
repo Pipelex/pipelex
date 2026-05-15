@@ -52,7 +52,7 @@ def _collect_possible_outputs(
                         }
                     )
                 except Exception:  # noqa: BLE001
-                    # If we can't render this pipe's output, add a placeholder
+                    # Best-effort: output-spec rendering can fail many ways for dynamic concepts; show a placeholder.
                     possible_outputs.append(
                         {
                             "concept_ref": mapped_pipe.output.concept.concept_ref,
@@ -90,6 +90,7 @@ def _collect_possible_outputs(
                     }
                 ]
             except Exception:  # noqa: BLE001
+                # Best-effort: output-spec rendering can fail many ways for dynamic concepts; report no possible outputs.
                 return []
 
         case (

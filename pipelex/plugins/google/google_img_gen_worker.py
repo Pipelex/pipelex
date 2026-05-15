@@ -84,10 +84,10 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                     asyncio.run(self.genai_async_client.aclose())
                     log.verbose("Closed Google async client using asyncio.run()")
                 except Exception as exc:  # noqa: BLE001
-                    # Log but don't fail teardown if cleanup has issues
+                    # Best-effort: asyncio.run() runs aclose(), whose failure surface is not enumerable; teardown must never fail.
                     log.verbose(f"Error closing Google async client during teardown: {exc}")
         except Exception as exc:  # noqa: BLE001
-            # Log but don't fail teardown if cleanup has issues
+            # Best-effort cleanup boundary: teardown must never fail, whatever client/event-loop close throws.
             log.debug(f"Error during Google async client teardown: {exc}")
 
     def _classify_google_client_error(self, exc: genai_errors.ClientError) -> ImgGenGenerationError:

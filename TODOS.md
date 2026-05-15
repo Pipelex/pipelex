@@ -100,41 +100,41 @@ After this phase every surviving `# noqa: BLE001` carries a one-line justificati
 
 ### RED
 
-- [ ] Re-list every `# noqa: BLE001` site (`grep -rn "noqa: BLE001" pipelex`). Confirm against the triage groups below.
-- [ ] For each site to be narrowed, determine the exact exception set the guarded call can raise — read the callee, do not guess. Where a narrowed catch changes observable behavior (an exception that used to be swallowed now propagates), add or extend a unit test that pins the intended behavior *before* narrowing. List those tests here.
+- [x] Re-list every `# noqa: BLE001` site (`grep -rn "noqa: BLE001" pipelex`). Confirm against the triage groups below.
+- [x] For each site to be narrowed, determine the exact exception set the guarded call can raise — read the callee, do not guess. Where a narrowed catch changes observable behavior (an exception that used to be swallowed now propagates), add or extend a unit test that pins the intended behavior *before* narrowing. List those tests here. — _No new pinning tests: every narrowing catches the same real exception set on the expected path; none is an intended behavior change. `make agent-test` (REFACTOR step) is the regression check._
 - [ ] The genuinely-legitimate group (Group F) gets no code change — only a verification pass and a justification comment.
 
 ### GREEN
 
 **Group A — `# TODO: wip - do not catch all exceptions` sites (do these first):**
 
-- [ ] `delivery_executor.py:177` `_generate_graph_files` — narrow the catch around `generate_graph_outputs()` to the exception(s) graph generation raises; keep it best-effort (a graph failure must not fail delivery) but only for those types.
-- [ ] `delivery_executor.py:192` `_try_add_rendered_file` — narrow the catch around the render coroutine to the rendering exception(s).
-- [ ] `delivery_executor.py:231` `_deliver_to_storage` — narrow the catch wrapping `storage_provider.store()` into `StorageDeliveryError` to the storage-provider exception type(s). (Re-raises, so not `noqa`'d — but the `# TODO` still applies.)
-- [ ] `delivery_executor.py:265` `_notify_webhook` — narrow the catch wrapping the webhook POST into `WebhookDeliveryError` to `httpx` request/transport errors (`httpx.HTTPStatusError` is already handled separately just above).
-- [ ] `act_assemble_graph.py:52` — Temporal graph-assembly activity. If this is a true activity root, keep the broad catch but replace the `# TODO` with a real justification. Otherwise narrow to the graph-assembly / event-log exception(s).
-- [ ] Remove every `# TODO: wip - do not catch all exceptions` comment as its site is resolved.
+- [x] `delivery_executor.py:177` `_generate_graph_files` — narrow the catch around `generate_graph_outputs()` to the exception(s) graph generation raises; keep it best-effort (a graph failure must not fail delivery) but only for those types. — _ASSESS: kept broad + justified; deep mermaid/reactflow/jinja2 render tree._
+- [x] `delivery_executor.py:192` `_try_add_rendered_file` — narrow the catch around the render coroutine to the rendering exception(s). — _ASSESS: kept broad + justified; renders include the jinja2 stuff-viewer template._
+- [x] `delivery_executor.py:231` `_deliver_to_storage` — narrow the catch wrapping `storage_provider.store()` into `StorageDeliveryError` to the storage-provider exception type(s). (Re-raises, so not `noqa`'d — but the `# TODO` still applies.) — _Kept broad `except Exception` (re-raises as `StorageDeliveryError`; ruff exempts re-raising handlers); TODO replaced with a real comment._
+- [x] `delivery_executor.py:265` `_notify_webhook` — narrow the catch wrapping the webhook POST into `WebhookDeliveryError` to `httpx` request/transport errors (`httpx.HTTPStatusError` is already handled separately just above). — _Narrowed → `except httpx.RequestError`._
+- [x] `act_assemble_graph.py:52` — Temporal graph-assembly activity. If this is a true activity root, keep the broad catch but replace the `# TODO` with a real justification. Otherwise narrow to the graph-assembly / event-log exception(s). — _Kept broad + justified (true activity root)._
+- [x] Remove every `# TODO: wip - do not catch all exceptions` comment as its site is resolved.
 
 **Group B — defensive utilities (narrow to the real exception set):**
 
-- [ ] `json_utils.py:384,444,497` — three identical `kajson.dumps()` fallbacks → narrow to `(TypeError, UnijsonEncoderError)` (kajson's encoder error).
-- [ ] `class_utils.py:97` `are_classes_equivalent` — narrow the catch around `model_json_schema()` to pydantic's schema-generation error(s); the manual-field-comparison fallback stays.
-- [ ] `library_manager.py:1177` — narrow the catch around `structure_class.model_rebuild()` to pydantic rebuild errors (`NameError` / `PydanticUndefinedAnnotation`).
-- [ ] `mistral_factory.py:257` `_clean_base64` — narrow to `(binascii.Error, ValueError)`.
-- [ ] `output_renderer.py:54,92` — narrow the catches around `render_stuff_spec()` to the rendering exception(s).
-- [ ] `dry_run.py:187` and `working_memory_factory.py:190` — narrow the mock-creation fallbacks to the factory / pydantic-validation exception(s) that `make_mock_content` / `TypedNamedStuffSpec.make_from_named` / `StuffFactory.make_stuff` actually raise.
-- [ ] `string_utils.py:58` (`f"{value}"` on arbitrary input) and `structured_content_composer.py:107` (diagnostic string builder) — assess: arbitrary `__str__` / introspection genuinely can raise anything. Either narrow to `(AttributeError, KeyError, TypeError)` or keep with an explicit justification. Record the decision in Running Notes.
+- [x] `json_utils.py:384,444,497` — three identical `kajson.dumps()` fallbacks → narrow to `(TypeError, UnijsonEncoderError)` (kajson's encoder error). — _Narrowed; added `from kajson.exceptions import UnijsonEncoderError`._
+- [x] `class_utils.py:97` `are_classes_equivalent` — narrow the catch around `model_json_schema()` to pydantic's schema-generation error(s); the manual-field-comparison fallback stays. — _Narrowed → `(PydanticUserError, PydanticUndefinedAnnotation)`._
+- [x] `library_manager.py:1177` — narrow the catch around `structure_class.model_rebuild()` to pydantic rebuild errors (`NameError` / `PydanticUndefinedAnnotation`). — _Narrowed → `(NameError, PydanticUserError)`._
+- [x] `mistral_factory.py:257` `_clean_base64` — narrow to `(binascii.Error, ValueError)`. — _Narrowed → `except ValueError` (covers `binascii.Error`/`UnicodeDecodeError`, both `ValueError` subclasses)._
+- [x] `output_renderer.py:54,92` — narrow the catches around `render_stuff_spec()` to the rendering exception(s). — _ASSESS: kept broad + justified; `render_concept_representation` spans concept-structure resolution + pydantic schema generation over dynamic concepts._
+- [x] `dry_run.py:187` and `working_memory_factory.py:190` — narrow the mock-creation fallbacks to the factory / pydantic-validation exception(s) that `make_mock_content` / `TypedNamedStuffSpec.make_from_named` / `StuffFactory.make_stuff` actually raise. — _`dry_run.py:187` narrowed → `except ValidationError`. `working_memory_factory.py:190` ASSESS: kept broad + justified (polyfactory mock build over arbitrary dynamic classes)._
+- [x] `string_utils.py:58` (`f"{value}"` on arbitrary input) and `structured_content_composer.py:107` (diagnostic string builder) — assess: arbitrary `__str__` / introspection genuinely can raise anything. Either narrow to `(AttributeError, KeyError, TypeError)` or keep with an explicit justification. Record the decision in Running Notes. — _Both KEPT broad + justified (a partial narrow would be wrong: arbitrary `__str__`/`__format__` can raise any exception). `structured_content_composer.py:107` already had a justification — left unchanged._
 
 **Group C — teardown best-effort cleanup:**
 
-- [ ] `gateway_extract_worker.py:76,78`, `google_img_gen_worker.py:86,89`, `google_llm_worker.py:103,106` — narrow the inner `asyncio.run(... aclose())` catch to `RuntimeError` plus the transport/connection errors `aclose()` raises; narrow or explicitly justify the outer teardown catch. Keep the "log but don't fail teardown" intent.
+- [x] `gateway_extract_worker.py:76,78`, `google_img_gen_worker.py:86,89`, `google_llm_worker.py:103,106` — narrow the inner `asyncio.run(... aclose())` catch to `RuntimeError` plus the transport/connection errors `aclose()` raises; narrow or explicitly justify the outer teardown catch. Keep the "log but don't fail teardown" intent. — _ASSESS: kept broad `except Exception` + `# noqa: BLE001` + justification. First narrowed to `except RuntimeError`; code review flagged that the inner catch wraps `asyncio.run(aclose())` which genuinely runs `aclose()` — a non-enumerable failure surface over a duck-typed/deep connection pool — so narrowing defeats the "never fail teardown" contract. Reverted; matches Phase 1's "too broad to narrow safely" note._
 
 **Group D — CLI code that is not a true command root (narrow):**
 
-- [ ] `init/ui/backends_ui.py:88` — narrow the file-read catch to `(TomlError, OSError)`.
-- [ ] `show_cmd.py:160` — narrow the routing-profile load catch to the config / IO error(s).
-- [ ] `init/backends.py:137` (extension suggestion), `:168` (save terms), `:176` (disable gateway) — narrow each inner catch to what its called helper raises; the outer `:183` is a command-level boundary (Group F).
-- [ ] `doctor_cmd.py` config-load helpers (`:103`, `:121`, `:320`) — narrow to `(TomlError, OSError)`. Triage the remaining `doctor_cmd.py` catches per-site: the doctor's job is "probe and report", so a broad catch around a whole probe is defensible — keep those with a justification, narrow the ones wrapping a single well-typed call.
+- [x] `init/ui/backends_ui.py:88` — narrow the file-read catch to `(TomlError, OSError)`. — _Narrowed._
+- [x] `show_cmd.py:160` — narrow the routing-profile load catch to the config / IO error(s). — _Narrowed → `except MarkupError`. NOTE: not a "load" catch — `routing_profile` is already loaded; the block prints Rich markup with interpolated config strings, so `rich.errors.MarkupError` is the real failure mode._
+- [x] `init/backends.py:137` (extension suggestion), `:168` (save terms), `:176` (disable gateway) — narrow each inner catch to what its called helper raises; the outer `:183` is a command-level boundary (Group F). — _`:137` → `except EOFError` (no-stdin `Confirm.ask`); `:168`/`:176` → `(OSError, TOMLKitError)`; `:183` kept broad + justified (command-level boundary)._
+- [ ] `doctor_cmd.py` config-load helpers (`:103`, `:121`, `:320`) — narrow to `(TomlError, OSError)`. Triage the remaining `doctor_cmd.py` catches per-site: the doctor's job is "probe and report", so a broad catch around a whole probe is defensible — keep those with a justification, narrow the ones wrapping a single well-typed call. — _NOT DONE — only remaining Group D work; decisions pre-made, see Running Notes._
 
 **Group E — silent-swallow sites (restructure):**
 
@@ -158,6 +158,8 @@ After this phase every surviving `# noqa: BLE001` carries a one-line justificati
 - [ ] Record in Running Notes: the final count of surviving `noqa: BLE001`, the per-site decisions for the "assess" sites (Group B last bullet, `doctor_cmd.py`, `pipe_run.py`), and any behavior change where an exception now propagates.
 
 > ### STOP — CHECKPOINT A.5: broad-except sweep fully narrowed
+>
+> **Status (checkpoint 2026-05-15):** IN PROGRESS — Groups A, B, C landed; Group D partially landed (`doctor_cmd.py` remains); Groups E, F and REFACTOR not started. `make agent-check` clean; `make agent-test` not yet run. The resume point and every per-site decision are in the "Phase 1.5" section of Running Notes below.
 >
 > Update checkboxes, commit, run `make agent-test`. Every broad catch is now either narrowed or a defended, justified boundary. Next session resumes at Phase 2.
 >
@@ -409,3 +411,70 @@ _Append decisions, surprises, and hand-off context here as each phase lands. Kee
 - `model_deck.py:707` — catch around `load_toml_from_path_if_exists()` narrowed to `(TomlError, OSError)` (TOML parse failure / unreadable file), matching the method's docstring "if the file can't be read or parsed".
 
 `noqa` directives for the 93 legitimate sites were applied with `ruff check --select BLE001 --add-noqa`. Most sites already carry an adjacent explanatory comment that serves as the justification.
+
+### Phase 1.5 — Second-pass narrowing of `noqa: BLE001` sites (IN PROGRESS — checkpoint 2026-05-15)
+
+**Checkpoint state:** Groups A, B, C landed; Group D partially landed; Groups E, F and REFACTOR not started. `make agent-check` is clean (ruff + plxt + pyright 0 errors + mypy 0 issues). `make agent-test` not yet run — that is a REFACTOR-step task. An independent code review of the staged diff ran at this checkpoint; its one finding (the Group C teardown narrowing) has been applied — see the Group C entry below.
+
+**RED findings:**
+
+- 91 `# noqa: BLE001` sites found (the plan estimated 93 — line drift since Phase 1, no material difference). 5 `# TODO: wip - do not catch all exceptions` markers (`delivery_executor.py` ×4, `act_assemble_graph.py` ×1).
+- **No new pinning tests were added.** Every narrowing catches the *same real exception set* the guarded call raises on its expected path — none is an *intended* behavior change. Behavior only differs if a latent bug raises an unexpected type; `make agent-test` (the REFACTOR step) is the regression check for exactly that, as the plan frames it.
+- The editor's inline pyright surfaces many `reportMissingImports` for optional inference SDKs (`anthropic`, `google.genai`, `mistralai`, `fal_client`, `botocore`, `docling`, `temporalio`). That is an artifact of the editor's diagnostic environment — the real `make agent-check` pyright (run with `--pythonpath .venv/bin/python`) reports 0 errors. Ignore the inline noise.
+
+**Landed — per-site dispositions (all pass `make agent-check`):**
+
+_Group A (`delivery_executor.py`, `act_assemble_graph.py`) — all 5 `# TODO: wip` comments removed:_
+
+| Site | Disposition |
+| --- | --- |
+| `_generate_graph_files` | KEPT broad `# noqa: BLE001` + justification. ASSESS — `generate_graph_outputs()` is a deep mermaid/reactflow/jinja2 render tree; surface not enumerable; best-effort (a graph failure must not fail delivery). |
+| `_try_add_rendered_file` | KEPT broad `# noqa: BLE001` + justification. ASSESS — renders include the jinja2 stuff-viewer template. |
+| `_store_results` | KEPT broad `except Exception` — re-raises as `StorageDeliveryError`; ruff exempts re-raising handlers so no `noqa`. TODO replaced with a real comment. Wraps `generate_result_files()` (deep). |
+| `_notify_webhook` | NARROWED → `except httpx.RequestError` (re-raises as `WebhookDeliveryError`; `httpx.HTTPStatusError` handled just above). |
+| `act_assemble_graph` | KEPT broad `# noqa: BLE001` + justification — true Temporal activity root; best-effort observability, degrades to `None`. |
+
+_Group B:_
+
+| Site | Disposition |
+| --- | --- |
+| `json_utils.py:384,444,497` | NARROWED → `(TypeError, UnijsonEncoderError)`; added `from kajson.exceptions import UnijsonEncoderError`. |
+| `class_utils.py:97` | NARROWED → `(PydanticUserError, PydanticUndefinedAnnotation)`; added pydantic import. |
+| `library_manager.py:1177` | NARROWED → `(NameError, PydanticUserError)`. |
+| `mistral_factory.py:257` | NARROWED → `except ValueError` — `binascii.Error` and `UnicodeDecodeError` are both `ValueError` subclasses, so `ValueError` is the correct minimal catch (the plan's `(binascii.Error, ValueError)` is redundant). |
+| `dry_run.py:187` | NARROWED → `except ValidationError` (`TypedNamedStuffSpec.make_from_named` is a pydantic construction). |
+| `working_memory_factory.py:190` | KEPT broad + justification. ASSESS — `make_mock_content` builds mocks via polyfactory over arbitrary dynamic structure classes; wide unstable surface; falls back to text content. |
+| `string_utils.py:58` | KEPT broad + justification. ASSESS — `f"{value}"` invokes arbitrary `__str__`/`__format__`; can raise anything; a partial narrow would be wrong. |
+| `structured_content_composer.py:107` | KEPT broad, unchanged — already had a justification comment. |
+| `output_renderer.py:54,92` | KEPT broad + justification. ASSESS — `render_stuff_spec` → `render_concept_representation` spans concept-structure resolution + pydantic schema generation over dynamic concepts. |
+
+_Group C — all 6 teardown sites (`gateway_extract_worker.py`, `google_img_gen_worker.py`, `google_llm_worker.py`):_ KEPT broad `except Exception` + `# noqa: BLE001` + justification (ASSESS). First narrowed to `except RuntimeError`, but the code review correctly flagged that the inner catch wraps `asyncio.run(aclose())` — which genuinely runs `aclose()`; its failure surface over a duck-typed/deep connection pool is not enumerable, and the teardown contract is "never fail". Reverted; this matches Phase 1's original "`aclose()` raises too broad a set to narrow safely" note.
+
+_Group D (partial):_
+
+| Site | Disposition |
+| --- | --- |
+| `backends_ui.py:88` | NARROWED → `(TomlError, OSError)`. |
+| `show_cmd.py:160` | NARROWED → `except MarkupError`. NOT a "load" catch (the plan misread it) — `routing_profile` is already loaded; the block prints Rich markup with interpolated config strings, so `rich.errors.MarkupError` is the real mode. |
+| `backends.py:137` | NARROWED → `except EOFError` (`suggest_extension_install_if_needed`'s only uncaught exception is `EOFError` from `Confirm.ask` with no stdin). |
+| `backends.py:168,176` | NARROWED → `(OSError, TOMLKitError)`; added `from tomlkit.exceptions import TOMLKitError`. |
+| `backends.py:183` | KEPT broad + justification — command-level boundary (Group F category). |
+
+**Checkpoint fix:** the first `make agent-check` flagged 8 `E501` (justification comments >150 chars); all shortened; re-check clean.
+
+**RESUME HERE — remaining work:**
+
+1. **Group D — `doctor_cmd.py` (13 sites). Decisions pre-made:**
+   - NARROW `:103` (`init_config`) → `(PipelexCLIError, OSError)` — add `from pipelex.cli.exceptions import PipelexCLIError`; `init_config` only does os/shutil + raises `PipelexCLIError`, no TOML.
+   - NARROW `:121` (`load_config` + `model_validate`) → `(TomlError, OSError)` — `TomlError` already imported; `ValidationError` is caught separately just above.
+   - NARROW `:320` (`load_toml_from_path`) → `(TomlError, OSError)`.
+   - KEEP + justify: `:231` (whole credential probe), `:253` (`check_kit_template_exists` bool helper), `:294` (`replace_backend_file` bool helper), `:373` (`check_backend_files` inner — probe, after `except InferenceBackendLibraryError`), `:767` (`check_models` inner — probe, after `except InferenceBackendLibraryError`), `:881`/`:900`/`:911`/`:937` (doctor `--fix` handlers wrapping whole sub-commands `init_cmd`/`update_cmd`/`replace_backend_file`).
+   - `:785` (`doctor_cmd` command root) — already has a justification comment; leave unchanged.
+
+2. **Group E — `wf_pipe_router.py:120,165`.** DECISION: **remove both `try/except Exception: pass` blocks entirely.** `event_log` is always a `BufferingEventLog` (constructed at ~line 81; both call sites are inside `if event_log is not None:`), and `BufferingEventLog.close()` is a verified no-op (empty body) — it cannot raise. Replace each `try: event_log.close() except Exception: pass` with a bare `event_log.close()`.
+
+3. **Group F — verify + justify (~60 sites, no narrowing).** Confirm each is a true boundary; ensure a one-line justification comment exists. Categories: agent-CLI command handlers (`cli/agent_cli/commands/**`), dev CLI (`_dev_cli.py`, `dev_cli/commands/*`), telemetry (`exception_capture.py`, `posthog_span_exporter.py`, `telemetry_manager.py`), `wf_pipe_router.py:108,115,145,160` (workflow tracing-setup catches — observe/log), `init/command.py:484`, `init/routing.py:156`, `init/backends.py:183` (done this checkpoint), `ndjson_event_log.py:190` (`__del__`), `pipe_run.py:41`. **PENDING DECISION — `pipe_run.py:41`:** the plan offers "narrow to `PipelexError` now" or "defer to Phase 5"; recommend deferring to Phase 5 (the PipeRouter retry loop touches that path) — record when decided.
+
+4. **REFACTOR:** verify every surviving `# noqa: BLE001` has a one-line justification; confirm `grep -rn "TODO: wip - do not catch all exceptions" pipelex` returns nothing (Group A removed all 5); run `make agent-test`; record the final `noqa: BLE001` count.
+
+**Assess-site decisions (kept broad + justified — the REFACTOR Running Notes requirement):** `_generate_graph_files`, `_try_add_rendered_file`, `act_assemble_graph` (Group A); `working_memory_factory.py:190`, `string_utils.py:58`, `structured_content_composer.py:107`, `output_renderer.py:54,92` (Group B); the 6 `teardown()` catches in `gateway_extract_worker.py` / `google_img_gen_worker.py` / `google_llm_worker.py` (Group C); `backends.py:183` (Group D, command boundary). Each wraps a non-enumerable exception surface (deep render/template trees, polyfactory mock building, arbitrary `__str__`, `asyncio.run(aclose())` over a connection pool, or a command-level boundary) and is a genuine best-effort / boundary catch.

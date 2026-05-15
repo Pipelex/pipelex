@@ -188,6 +188,7 @@ class WorkingMemoryFactory(BaseModel):
                     working_memory.add_new_stuff(name=typed_named_stuff_spec.variable_name, stuff=mock_stuff)
 
             except Exception as exc:  # noqa: BLE001
+                # Best-effort: polyfactory mock build over dynamic classes can fail many ways; fall back to text content.
                 log.warning(
                     f"Failed to create mock for '{typed_named_stuff_spec.variable_name}' ({typed_named_stuff_spec.concept.code}): "
                     f"{exc}. Using fallback text content."

@@ -74,8 +74,10 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
                     try:
                         asyncio.run(httpx_client.aclose())
                     except Exception as exc:  # noqa: BLE001
+                        # Best-effort: asyncio.run() runs aclose(), whose failure surface is not enumerable; teardown must never fail.
                         log.debug(f"Error closing portkey httpx client during teardown: {exc}")
         except Exception as exc:  # noqa: BLE001
+            # Best-effort cleanup boundary: teardown must never fail, whatever client/event-loop close throws.
             log.debug(f"Error during GatewayExtractWorker teardown: {exc}")
 
     def _make_retryer(self) -> AsyncRetrying:

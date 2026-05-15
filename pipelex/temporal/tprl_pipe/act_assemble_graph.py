@@ -50,6 +50,6 @@ async def act_assemble_graph(arg: AssembleGraphArg) -> GraphSpec | None:  # noqa
         finally:
             event_log.close()
     except Exception as exc:  # noqa: BLE001
-        # TODO: wip - do not catch all exceptions
+        # Temporal activity root: graph assembly is best-effort observability — any failure degrades to None rather than failing the workflow.
         log.warning(f"Graph assembly activity failed: {exc}")
         return None

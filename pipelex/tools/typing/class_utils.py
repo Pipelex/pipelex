@@ -1,6 +1,8 @@
 import types
 from typing import TYPE_CHECKING, Annotated, Any, Union, cast, get_args, get_origin
 
+from pydantic import PydanticUndefinedAnnotation, PydanticUserError
+
 if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
 
@@ -94,8 +96,8 @@ def are_classes_equivalent(class_1: type[Any], class_2: type[Any]) -> bool:
 
         # Compare $defs if present (for nested types)
         return schema_1.get("$defs") == schema_2.get("$defs")
-    except Exception:  # noqa: BLE001
-        # Fallback to manual field comparison if schema comparison fails
+    except (PydanticUserError, PydanticUndefinedAnnotation):
+        # Fallback to manual field comparison if pydantic cannot generate a JSON schema for one of the classes
         fields_1: dict[str, FieldInfo] = class_1.model_fields
         fields_2: dict[str, FieldInfo] = class_2.model_fields
 
