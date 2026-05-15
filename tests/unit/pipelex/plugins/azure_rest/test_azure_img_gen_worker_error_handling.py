@@ -155,6 +155,22 @@ class TestAzureImgGenWorkerSemantic:
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
 
+    async def test_raw_response_body_excluded_from_message(self, mocker: MockerFixture) -> None:
+        """The raw Azure response body must not leak into the exception message; it stays only on provider_metadata.body."""
+        worker = _make_worker(mocker)
+        secret_body = "SENSITIVE-DEPLOYMENT-SECRET-xyz789"
+        sdk_exc = _make_status_error(429, text=secret_body)
+        _patch_httpx_status_error(mocker, sdk_exc)
+
+        with pytest.raises(ImgGenGenerationError) as exc_info:
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert secret_body not in exc_info.value.message
+        assert secret_body not in str(exc_info.value)
+        metadata = exc_info.value.provider_metadata
+        assert metadata is not None
+        assert metadata.body == secret_body
+
     async def test_connect_error_is_wait_and_retry(self, mocker: MockerFixture) -> None:
         worker = _make_worker(mocker)
         request = httpx.Request("POST", "https://test.azure.com/api")

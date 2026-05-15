@@ -237,6 +237,8 @@ class TestGoogleLLMWorkerObjectErrorHandling:
         assert exc_info.value.error_category is InferenceErrorCategory.UNKNOWN
         assert exc_info.value.__cause__ is wrapped
         assert exc_info.value.provider_metadata is None
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.CONTACT_SUPPORT
 
     async def test_real_instructor_wraps_client_error_and_unwraps_correctly(self, mocker: MockerFixture) -> None:
         """End-to-end: drive the real instructor library with a ``ClientError`` and

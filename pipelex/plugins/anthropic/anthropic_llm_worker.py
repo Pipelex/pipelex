@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, Any
 
 from anthropic import (
     APIConnectionError,
+    APIStatusError,
     APITimeoutError,
     AsyncAnthropic,
     AsyncAnthropicBedrock,
@@ -347,6 +348,33 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
             msg = f"Anthropic credentials error: {sdk_exc}"
             raise AnthropicCredentialsError(msg, provider_metadata=metadata) from cause
 
+        if isinstance(sdk_exc, APIStatusError):
+            # Unhandled APIStatusError (e.g. 404 Not Found, 409 Conflict, 422
+            # Unprocessable Entity, 500 Internal Server Error): split 4xx
+            # (non-retryable client error) from 5xx (retryable server error).
+            status_code = sdk_exc.status_code
+            if 400 <= status_code < 500:
+                msg = f"Anthropic client error (HTTP {status_code}) for model '{self.inference_model.desc}': {sdk_exc}"
+                raise LLMCompletionError(
+                    msg,
+                    error_category=InferenceErrorCategory.CONFIGURATION,
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_INPUT,
+                        detail="Anthropic rejected the request — review the prompt, parameters, and model configuration",
+                    ),
+                    provider_metadata=metadata,
+                ) from cause
+            msg = f"Anthropic API error (HTTP {status_code}) for model '{self.inference_model.desc}': {sdk_exc}"
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Anthropic returned an error — the system will retry automatically",
+                ),
+                provider_metadata=metadata,
+            ) from cause
+
     @override
     async def _gen_text(
         self,
@@ -373,14 +401,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                 output_config=thinking_params.output_config or omit,
             ) as stream:
                 final_message: Message = await stream.get_final_message()
-        except (
-            RateLimitError,
-            APITimeoutError,
-            BadRequestError,
-            APIConnectionError,
-            PermissionDeniedError,
-            AuthenticationError,
-        ) as sdk_exc:
+        except (APIStatusError, APIConnectionError) as sdk_exc:
             self._raise_categorized_anthropic_sdk_error(sdk_exc=sdk_exc)
             raise  # unreachable: helper always raises for these types
 
@@ -472,15 +493,15 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                 f"Anthropic structured generation via 'instructor' failed with model: {self.inference_model.desc} "
                 f"trying to generate schema: {schema} with error: {instructor_exc}"
             )
-            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.UNKNOWN) from instructor_exc
-        except (
-            RateLimitError,
-            APITimeoutError,
-            BadRequestError,
-            APIConnectionError,
-            PermissionDeniedError,
-            AuthenticationError,
-        ) as sdk_exc:
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.UNKNOWN,
+                user_action=UserAction(
+                    kind=UserActionKind.CONTACT_SUPPORT,
+                    detail="Structured generation failed for an unrecognized reason — retry, and report this if it persists",
+                ),
+            ) from instructor_exc
+        except (APIStatusError, APIConnectionError) as sdk_exc:
             self._raise_categorized_anthropic_sdk_error(sdk_exc=sdk_exc)
             raise  # unreachable: helper always raises for these types
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):

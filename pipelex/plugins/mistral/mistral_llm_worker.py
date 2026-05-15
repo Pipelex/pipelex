@@ -337,7 +337,14 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
             if isinstance(underlying_exc, MistralError):
                 raise self._classify_mistral_error(underlying_exc) from instructor_exc
             msg = f"Mistral structured generation failed after retries for model '{self.inference_model.desc}': {instructor_exc}"
-            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.UNKNOWN) from instructor_exc
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.UNKNOWN,
+                user_action=UserAction(
+                    kind=UserActionKind.CONTACT_SUPPORT,
+                    detail="Structured generation failed for an unrecognized reason — retry, and report this if it persists",
+                ),
+            ) from instructor_exc
         except MistralError as exc:
             raise self._classify_mistral_error(exc) from exc
 

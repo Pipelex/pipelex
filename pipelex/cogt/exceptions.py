@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
-from pydantic.dataclasses import rebuild_dataclass
 from typing_extensions import override
 
 from pipelex.base_exceptions import ErrorReport, PipelexError
@@ -12,11 +11,6 @@ from pipelex.types import StrEnum
 if TYPE_CHECKING:
     from pipelex.cogt.model_backends.model_type import ModelType
     from pipelex.cogt.models.model_reference import ModelReferenceKind
-
-rebuild_dataclass(
-    cast("Any", ErrorReport),
-    _types_namespace={"ProviderErrorMetadata": ProviderErrorMetadata, "UserAction": UserAction},
-)
 
 
 class InferenceErrorCategory(StrEnum):

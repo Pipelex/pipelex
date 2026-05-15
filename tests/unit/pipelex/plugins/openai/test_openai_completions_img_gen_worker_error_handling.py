@@ -207,3 +207,33 @@ class TestOpenAICompletionsImgGenWorkerErrorHandling:
         assert exc_info.value.user_action.kind is UserActionKind.CHANGE_MODEL
         assert exc_info.value.provider_metadata is not None
         assert exc_info.value.provider_metadata.status_code == 404
+
+    async def test_generic_status_error_409_is_configuration(self, mocker: MockerFixture) -> None:
+        """An unhandled 4xx APIStatusError (409 Conflict) is categorized CONFIGURATION via the generic fallback."""
+        worker = _make_worker(mocker)
+        sdk_exc = openai.ConflictError("conflict", response=_make_response(409), body=None)
+        worker.openai_client.chat.completions.create.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        with pytest.raises(ImgGenGenerationError) as exc_info:
+            await worker._gen_image(img_gen_job=_make_img_gen_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.CHANGE_INPUT
+        assert exc_info.value.provider_metadata is not None
+        assert exc_info.value.provider_metadata.status_code == 409
+
+    async def test_generic_status_error_503_is_transient(self, mocker: MockerFixture) -> None:
+        """An unhandled 5xx APIStatusError is categorized TRANSIENT via the generic fallback."""
+        worker = _make_worker(mocker)
+        sdk_exc = openai.APIStatusError("service unavailable", response=_make_response(503), body=None)
+        worker.openai_client.chat.completions.create.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        with pytest.raises(ImgGenGenerationError) as exc_info:
+            await worker._gen_image(img_gen_job=_make_img_gen_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
+        assert exc_info.value.provider_metadata is not None
+        assert exc_info.value.provider_metadata.status_code == 503

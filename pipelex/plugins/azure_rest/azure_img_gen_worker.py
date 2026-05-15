@@ -62,7 +62,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
         metadata = extract_azure_metadata(exc)
 
         if status_code == 429:
-            msg = f"Azure rate limit exceeded for model '{self.inference_model.desc}': {error_body}"
+            msg = f"Azure rate limit exceeded for model '{self.inference_model.desc}' (HTTP {status_code})"
             raise ImgGenGenerationError(
                 msg,
                 error_category=InferenceErrorCategory.TRANSIENT,
@@ -73,7 +73,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                 provider_metadata=metadata,
             ) from exc
         if status_code == 402:
-            msg = f"Azure quota exhausted for model '{self.inference_model.desc}': {error_body}"
+            msg = f"Azure quota exhausted for model '{self.inference_model.desc}' (HTTP {status_code})"
             raise ImgGenGenerationError(
                 msg,
                 error_category=InferenceErrorCategory.CAPACITY,
@@ -84,7 +84,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                 provider_metadata=metadata,
             ) from exc
         if status_code in {401, 403}:
-            msg = f"Azure authentication error for model '{self.inference_model.desc}': {error_body}"
+            msg = f"Azure authentication error for model '{self.inference_model.desc}' (HTTP {status_code})"
             raise ImgGenGenerationError(
                 msg,
                 error_category=InferenceErrorCategory.CONFIGURATION,
@@ -95,7 +95,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                 provider_metadata=metadata,
             ) from exc
         if status_code == 404:
-            msg = f"Azure deployment not found for model '{self.inference_model.desc}': {error_body}"
+            msg = f"Azure deployment not found for model '{self.inference_model.desc}' (HTTP {status_code})"
             raise ImgGenGenerationError(
                 msg,
                 error_category=InferenceErrorCategory.CONFIGURATION,
@@ -107,7 +107,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
             ) from exc
         if status_code == 400:
             if is_content_policy_violation(error_body):
-                msg = f"Content rejected by safety filters for model '{self.inference_model.desc}': {error_body}"
+                msg = f"Content rejected by safety filters for model '{self.inference_model.desc}' (HTTP {status_code})"
                 raise ImgGenGenerationError(
                     msg,
                     error_category=InferenceErrorCategory.CONTENT,
@@ -117,7 +117,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                     ),
                     provider_metadata=metadata,
                 ) from exc
-            msg = f"Azure bad request for model '{self.inference_model.desc}': {error_body}"
+            msg = f"Azure bad request for model '{self.inference_model.desc}' (HTTP {status_code})"
             raise ImgGenGenerationError(
                 msg,
                 error_category=InferenceErrorCategory.CONTENT,
@@ -128,7 +128,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                 provider_metadata=metadata,
             ) from exc
         if status_code >= 500:
-            msg = f"Azure server error ({status_code}) for model '{self.inference_model.desc}': {error_body}"
+            msg = f"Azure server error (HTTP {status_code}) for model '{self.inference_model.desc}'"
             raise ImgGenGenerationError(
                 msg,
                 error_category=InferenceErrorCategory.TRANSIENT,
@@ -138,7 +138,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                 ),
                 provider_metadata=metadata,
             ) from exc
-        msg = f"Azure API error ({status_code}) for model '{self.inference_model.desc}': {error_body}"
+        msg = f"Azure API error (HTTP {status_code}) for model '{self.inference_model.desc}'"
         raise ImgGenGenerationError(
             msg,
             error_category=InferenceErrorCategory.CONFIGURATION,

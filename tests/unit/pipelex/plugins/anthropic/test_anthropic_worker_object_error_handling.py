@@ -55,6 +55,14 @@ def _make_anthropic_permission_denied_error(message: str) -> anthropic.Permissio
     return anthropic.PermissionDeniedError(message, response=_mock_httpx_response(403), body=None)
 
 
+def _make_anthropic_internal_server_error(message: str) -> anthropic.InternalServerError:
+    return anthropic.InternalServerError(message, response=_mock_httpx_response(500), body=None)
+
+
+def _make_anthropic_conflict_error(message: str) -> anthropic.ConflictError:
+    return anthropic.ConflictError(message, response=_mock_httpx_response(409), body=None)
+
+
 def _make_worker(mocker: MockerFixture) -> AnthropicLLMWorker:
     worker = object.__new__(AnthropicLLMWorker)
     mock_model = mocker.MagicMock()
@@ -201,6 +209,42 @@ class TestAnthropicWorkerObjectErrorHandling:
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.CHECK_BILLING
 
+    async def test_wrapped_server_error_is_transient(self, mocker: MockerFixture) -> None:
+        """A wrapped 5xx APIStatusError is categorized TRANSIENT via the generic fallback branch."""
+        _patch_gen_object_dependencies(mocker)
+        worker = _make_worker(mocker)
+        wrapped = wrap_in_instructor_retry(_make_anthropic_internal_server_error("Internal server error"))
+        worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        with pytest.raises(LLMCompletionError) as exc_info:
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
+        metadata = exc_info.value.provider_metadata
+        assert metadata is not None
+        assert metadata.status_code == 500
+        assert metadata.sdk_exception_type == "InternalServerError"
+
+    async def test_wrapped_generic_status_error_is_configuration(self, mocker: MockerFixture) -> None:
+        """A wrapped unhandled 4xx APIStatusError (e.g. 409 Conflict) is categorized CONFIGURATION."""
+        _patch_gen_object_dependencies(mocker)
+        worker = _make_worker(mocker)
+        wrapped = wrap_in_instructor_retry(_make_anthropic_conflict_error("Conflict"))
+        worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        with pytest.raises(LLMCompletionError) as exc_info:
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.CHANGE_INPUT
+        metadata = exc_info.value.provider_metadata
+        assert metadata is not None
+        assert metadata.status_code == 409
+        assert metadata.sdk_exception_type == "ConflictError"
+
     async def test_unrecognized_underlying_falls_back_to_unknown(self, mocker: MockerFixture) -> None:
         """A wrapped non-SDK exception (e.g. validation failure) routes to UNKNOWN, not CONTENT."""
         _patch_gen_object_dependencies(mocker)
@@ -213,6 +257,8 @@ class TestAnthropicWorkerObjectErrorHandling:
 
         assert exc_info.value.error_category is InferenceErrorCategory.UNKNOWN
         assert exc_info.value.__cause__ is wrapped
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.CONTACT_SUPPORT
 
     async def test_provider_metadata_is_serialized_in_error_report(self, mocker: MockerFixture) -> None:
         """``to_error_report()`` must surface ``provider_metadata`` so downstream consumers see it."""
