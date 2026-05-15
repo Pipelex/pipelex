@@ -247,12 +247,28 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
         # Extract image from response
         if not response.candidates:
             msg = f"No candidates returned from model: {self.inference_model.desc}"
-            raise ImgGenGenerationError(msg)
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Google returned no image candidates — try rephrasing the prompt or using a different model",
+                ),
+                provider_metadata=None,
+            )
 
         candidate = response.candidates[0]
         if not candidate.content or not candidate.content.parts:
             msg = f"No content parts in response from model: {self.inference_model.desc}"
-            raise ImgGenGenerationError(msg)
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Google returned an empty response — try rephrasing the prompt or using a different model",
+                ),
+                provider_metadata=None,
+            )
 
         # Look for image data in response parts
         for part in candidate.content.parts:
@@ -263,7 +279,15 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                 mime_type = part.inline_data.mime_type
                 if not mime_type:
                     msg = "No mime type returned from Google"
-                    raise ImgGenGenerationError(msg)
+                    raise ImgGenGenerationError(
+                        msg,
+                        error_category=InferenceErrorCategory.CONTENT,
+                        user_action=UserAction(
+                            kind=UserActionKind.CHANGE_INPUT,
+                            detail="Google returned image data without a mime type — try a different model",
+                        ),
+                        provider_metadata=None,
+                    )
                 return GeneratedImageRawDetails(
                     actual_bytes=image_bytes,
                     size=ImageSize(width=width, height=height),
@@ -271,7 +295,15 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                 )
 
         msg = f"No image data in response from model: {self.inference_model.desc}"
-        raise ImgGenGenerationError(msg)
+        raise ImgGenGenerationError(
+            msg,
+            error_category=InferenceErrorCategory.CONTENT,
+            user_action=UserAction(
+                kind=UserActionKind.CHANGE_INPUT,
+                detail="Google returned no image data — try rephrasing the prompt or using a different model",
+            ),
+            provider_metadata=None,
+        )
 
     @override
     async def _gen_image_list(

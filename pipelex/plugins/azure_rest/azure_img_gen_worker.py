@@ -245,17 +245,41 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
         response_output_format: str | None = response_dict.get("output_format")
         if not response_output_format:
             msg = "No output format received from Azure"
-            raise ImgGenGenerationError(msg)
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Azure returned an image without an output format — try a different model",
+                ),
+                provider_metadata=None,
+            )
         generated_images: list[GeneratedImageRawDetails] = []
         if images := response_dict.get("data"):
             size = response_dict.get("size")
             if not isinstance(size, str):
                 msg = f"Size from img gen response is not a string: '{size}'"
-                raise ImgGenGenerationError(msg)
+                raise ImgGenGenerationError(
+                    msg,
+                    error_category=InferenceErrorCategory.CONTENT,
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_INPUT,
+                        detail="Azure returned a malformed image size — try a different model",
+                    ),
+                    provider_metadata=None,
+                )
             size_split = size.split("x")
             if len(size_split) != 2:
                 msg = f"Size from img gen response is not a valid size: '{size}'"
-                raise ImgGenGenerationError(msg)
+                raise ImgGenGenerationError(
+                    msg,
+                    error_category=InferenceErrorCategory.CONTENT,
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_INPUT,
+                        detail="Azure returned a malformed image size — try a different model",
+                    ),
+                    provider_metadata=None,
+                )
             width_str, height_str = size_split
             width = int(width_str)
             height = int(height_str)
@@ -263,7 +287,15 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                 base64_str = image.get("b64_json")
                 if not isinstance(base64_str, str):
                     msg = f"No base64 image data received from model '{self.inference_model.model_id}'"
-                    raise ImgGenGenerationError(msg)
+                    raise ImgGenGenerationError(
+                        msg,
+                        error_category=InferenceErrorCategory.CONTENT,
+                        user_action=UserAction(
+                            kind=UserActionKind.CHANGE_INPUT,
+                            detail="Azure returned no image data — try rephrasing the prompt or using a different model",
+                        ),
+                        provider_metadata=None,
+                    )
                 generated_images.append(
                     GeneratedImageRawDetails(
                         base64_str=base64_str,
@@ -273,6 +305,14 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                 )
         else:
             msg = f"Unexpected response from model '{self.inference_model.model_id}' has no 'data' or 'images' key"
-            raise ImgGenGenerationError(msg)
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Azure returned an unexpected response shape — try a different model",
+                ),
+                provider_metadata=None,
+            )
 
         return generated_images

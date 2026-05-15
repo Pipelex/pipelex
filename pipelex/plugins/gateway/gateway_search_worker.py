@@ -8,8 +8,8 @@ from tenacity import AsyncRetrying, RetryCallState, retry_if_exception, stop_aft
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import SdkTypeError
-from pipelex.cogt.inference.error_classification import extract_gateway_metadata
+from pipelex.cogt.exceptions import InferenceErrorCategory, SdkTypeError
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_gateway_metadata
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_job import SearchJob
@@ -194,7 +194,15 @@ class GatewaySearchWorker(SearchWorkerAbstract):
 
         if response is None:
             msg = f"Could not get a response for model '{model}' via Portkey after {attempt_number} attempts"
-            raise GatewaySearchResponseError(msg)
+            raise GatewaySearchResponseError(
+                msg,
+                error_category=InferenceErrorCategory.UNKNOWN,
+                user_action=UserAction(
+                    kind=UserActionKind.CONTACT_SUPPORT,
+                    detail="The Gateway returned no response — retry, and report this if it persists",
+                ),
+                provider_metadata=None,
+            )
 
         if not isinstance(response, GenericResponse):
             msg = "Response is not of type GenericResponse"
@@ -213,11 +221,27 @@ class GatewaySearchWorker(SearchWorkerAbstract):
             content = cast("object", choice["message"]["content"])
             if not isinstance(content, str):
                 msg = f"Expected string content in response, got {type(content)}"
-                raise GatewaySearchResponseError(msg)
+                raise GatewaySearchResponseError(
+                    msg,
+                    error_category=InferenceErrorCategory.CONTENT,
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_INPUT,
+                        detail="The Gateway returned a malformed search response — try a different model",
+                    ),
+                    provider_metadata=None,
+                )
             return content
         except (KeyError, IndexError, TypeError) as exc:
             msg = "Could not extract content from gateway search response"
-            raise GatewaySearchResponseError(msg) from exc
+            raise GatewaySearchResponseError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="The Gateway returned a malformed search response — try a different model",
+                ),
+                provider_metadata=None,
+            ) from exc
 
     def _is_retryable_portkey_error(self, exc: BaseException) -> bool:
         if isinstance(exc, portkey_exceptions.NotFoundError):

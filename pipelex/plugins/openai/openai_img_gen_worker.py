@@ -253,17 +253,41 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
 
         if not images_response.data:
             msg = "No result from OpenAI"
-            raise ImgGenGenerationError(msg)
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="OpenAI returned no image — try rephrasing the prompt or using a different model",
+                ),
+                provider_metadata=None,
+            )
 
         response_output_format: str | None = images_response.output_format
         size: str | None = images_response.size or self._get_requested_size(args_dict=args_dict)
         if not size:
             msg = "No size received from OpenAI"
-            raise ImgGenGenerationError(msg)
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="OpenAI returned an image without size metadata — try a different model",
+                ),
+                provider_metadata=None,
+            )
         size_split = size.split("x")
         if len(size_split) != 2:
             msg = f"Size from OpenAI is not a valid size: '{size}'"
-            raise ImgGenGenerationError(msg)
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="OpenAI returned a malformed image size — try a different model",
+                ),
+                provider_metadata=None,
+            )
         width_str, height_str = size_split
         width = int(width_str)
         height = int(height_str)
@@ -271,7 +295,15 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
         usage: Usage | None = images_response.usage
         if not usage:
             msg = "No usage received from OpenAI"
-            raise ImgGenGenerationError(msg)
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="OpenAI returned an image without usage metadata — try a different model",
+                ),
+                provider_metadata=None,
+            )
 
         if img_gen_tokens_usage := img_gen_job.job_report.img_gen_tokens_usage:
             nb_tokens: NbTokensByCategoryDict = {
@@ -285,7 +317,15 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
             base64_str = image_data.b64_json
             if not base64_str:
                 msg = "No base64 image data received from OpenAI"
-                raise ImgGenGenerationError(msg)
+                raise ImgGenGenerationError(
+                    msg,
+                    error_category=InferenceErrorCategory.CONTENT,
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_INPUT,
+                        detail="OpenAI returned no image data — try rephrasing the prompt or using a different model",
+                    ),
+                    provider_metadata=None,
+                )
 
             image_format = response_output_format
             if image_format is None:

@@ -11,12 +11,12 @@ from portkey_ai.api_resources.utils import GenericResponse
 from pydantic import ValidationError
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError, SdkTypeError
+from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError, InferenceErrorCategory, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
-from pipelex.cogt.inference.error_classification import extract_gateway_metadata
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_gateway_metadata
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.fal.fal_poller import FalPoller
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
@@ -95,7 +95,15 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
 
         if response is None:
             msg = f"Could not get a response for model '{self.inference_model.model_id}' via Portkey"
-            raise ImgGenGenerationError(msg)
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.UNKNOWN,
+                user_action=UserAction(
+                    kind=UserActionKind.CONTACT_SUPPORT,
+                    detail="The Gateway returned no response — retry, and report this if it persists",
+                ),
+                provider_metadata=None,
+            )
 
         if not isinstance(response, GenericResponse):
             msg = "Response is not of type GenericResponse"
@@ -140,15 +148,39 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                 image_format = response_dict.get("output_format")
                 if not image_format:
                     msg = "No output format received from Gateway"
-                    raise ImgGenGenerationError(msg)
+                    raise ImgGenGenerationError(
+                        msg,
+                        error_category=InferenceErrorCategory.CONTENT,
+                        user_action=UserAction(
+                            kind=UserActionKind.CHANGE_INPUT,
+                            detail="The Gateway returned an image without an output format — try a different model",
+                        ),
+                        provider_metadata=None,
+                    )
                 size = response_dict.get("size")
                 if not isinstance(size, str):
                     msg = f"Size from img gen response is not a string: '{size}'"
-                    raise ImgGenGenerationError(msg)
+                    raise ImgGenGenerationError(
+                        msg,
+                        error_category=InferenceErrorCategory.CONTENT,
+                        user_action=UserAction(
+                            kind=UserActionKind.CHANGE_INPUT,
+                            detail="The Gateway returned a malformed image size — try a different model",
+                        ),
+                        provider_metadata=None,
+                    )
                 size_split = size.split("x")
                 if len(size_split) != 2:
                     msg = f"Size from img gen response is not a valid size: '{size}'"
-                    raise ImgGenGenerationError(msg)
+                    raise ImgGenGenerationError(
+                        msg,
+                        error_category=InferenceErrorCategory.CONTENT,
+                        user_action=UserAction(
+                            kind=UserActionKind.CHANGE_INPUT,
+                            detail="The Gateway returned a malformed image size — try a different model",
+                        ),
+                        provider_metadata=None,
+                    )
                 width_str, height_str = size_split
                 width = int(width_str)
                 height = int(height_str)
@@ -157,11 +189,27 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                 first_image = images[0] if images else None
                 if not first_image:
                     msg = "No images in Flux 2 Pro response"
-                    raise ImgGenGenerationError(msg)
+                    raise ImgGenGenerationError(
+                        msg,
+                        error_category=InferenceErrorCategory.CONTENT,
+                        user_action=UserAction(
+                            kind=UserActionKind.CHANGE_INPUT,
+                            detail="The Gateway returned no image — try rephrasing the prompt or using a different model",
+                        ),
+                        provider_metadata=None,
+                    )
                 first_base64 = first_image.get("b64_json")
                 if not isinstance(first_base64, str):
                     msg = f"No base64 image data in first image from model '{self.inference_model.model_id}'"
-                    raise ImgGenGenerationError(msg)
+                    raise ImgGenGenerationError(
+                        msg,
+                        error_category=InferenceErrorCategory.CONTENT,
+                        user_action=UserAction(
+                            kind=UserActionKind.CHANGE_INPUT,
+                            detail="The Gateway returned no image data — try rephrasing the prompt or using a different model",
+                        ),
+                        provider_metadata=None,
+                    )
 
                 # Decode base64 once and detect file type and dimensions
                 image_bytes = base64.b64decode(first_base64)
@@ -173,13 +221,29 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                     width, height = pil_img.size
             else:
                 msg = f"Could not parse image generation from Gateway response:\n{parsing_errors}"
-                raise ImgGenGenerationError(msg)
+                raise ImgGenGenerationError(
+                    msg,
+                    error_category=InferenceErrorCategory.CONTENT,
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_INPUT,
+                        detail="The Gateway returned an unexpected response shape — try a different model",
+                    ),
+                    provider_metadata=None,
+                )
 
             for image in images:
                 base64_str = image.get("b64_json")
                 if not isinstance(base64_str, str):
                     msg = f"No base64 image data received from model '{self.inference_model.model_id}'"
-                    raise ImgGenGenerationError(msg)
+                    raise ImgGenGenerationError(
+                        msg,
+                        error_category=InferenceErrorCategory.CONTENT,
+                        user_action=UserAction(
+                            kind=UserActionKind.CHANGE_INPUT,
+                            detail="The Gateway returned no image data — try rephrasing the prompt or using a different model",
+                        ),
+                        provider_metadata=None,
+                    )
                 generated_images.append(
                     GeneratedImageRawDetails(
                         base64_str=base64_str,
@@ -197,19 +261,51 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                 url = image.get("url")
                 if not isinstance(url, str):
                     msg = "Missing url field in image response"
-                    raise ImgGenGenerationError(msg)
+                    raise ImgGenGenerationError(
+                        msg,
+                        error_category=InferenceErrorCategory.CONTENT,
+                        user_action=UserAction(
+                            kind=UserActionKind.CHANGE_INPUT,
+                            detail="The Gateway returned an image without a url — try a different model",
+                        ),
+                        provider_metadata=None,
+                    )
                 fal_width = image.get("width")
                 if not isinstance(fal_width, int):
                     msg = "Missing width field in image response"
-                    raise ImgGenGenerationError(msg)
+                    raise ImgGenGenerationError(
+                        msg,
+                        error_category=InferenceErrorCategory.CONTENT,
+                        user_action=UserAction(
+                            kind=UserActionKind.CHANGE_INPUT,
+                            detail="The Gateway returned an image without a width — try a different model",
+                        ),
+                        provider_metadata=None,
+                    )
                 fal_height = image.get("height")
                 if not isinstance(fal_height, int):
                     msg = "Missing height field in image response"
-                    raise ImgGenGenerationError(msg)
+                    raise ImgGenGenerationError(
+                        msg,
+                        error_category=InferenceErrorCategory.CONTENT,
+                        user_action=UserAction(
+                            kind=UserActionKind.CHANGE_INPUT,
+                            detail="The Gateway returned an image without a height — try a different model",
+                        ),
+                        provider_metadata=None,
+                    )
                 content_type = image.get("content_type")
                 if not isinstance(content_type, str):
                     msg = "Missing content_type field in image response"
-                    raise ImgGenGenerationError(msg)
+                    raise ImgGenGenerationError(
+                        msg,
+                        error_category=InferenceErrorCategory.CONTENT,
+                        user_action=UserAction(
+                            kind=UserActionKind.CHANGE_INPUT,
+                            detail="The Gateway returned an image without a content type — try a different model",
+                        ),
+                        provider_metadata=None,
+                    )
                 generated_image = GeneratedImageRawDetails(
                     actual_url_or_prefixed_base64=url,
                     size=ImageSize(width=fal_width, height=fal_height),
@@ -218,6 +314,14 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                 generated_images.append(generated_image)
         else:
             msg = f"Unexpected response from model '{self.inference_model.model_id}' has no 'data' or 'images' key"
-            raise ImgGenGenerationError(msg)
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="The Gateway returned an unexpected response shape — try a different model",
+                ),
+                provider_metadata=None,
+            )
 
         return generated_images

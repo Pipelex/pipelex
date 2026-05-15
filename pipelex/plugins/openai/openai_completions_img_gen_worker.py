@@ -251,7 +251,15 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
                         extracted = extract_base64_str_from_base64_url_if_possible(possibly_base64_url=the_url)
                         if not extracted:
                             msg = "No base64 string found in ImgGenCompletions response message (images)"
-                            raise ImgGenGenerationError(msg)
+                            raise ImgGenGenerationError(
+                                msg,
+                                error_category=InferenceErrorCategory.CONTENT,
+                                user_action=UserAction(
+                                    kind=UserActionKind.CHANGE_INPUT,
+                                    detail="The provider returned no image data — try rephrasing the prompt or using a different model",
+                                ),
+                                provider_metadata=None,
+                            )
                         base64_str, base64_extracted_mime_type = extracted
         elif (content := openai_message.content) and content.startswith("http"):
             # OpenAI response message is a URL, this happens with blackboxai and pipelex_gateway which have a fixed output format.
@@ -273,12 +281,28 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
                             extracted = extract_base64_str_from_base64_url_if_possible(possibly_base64_url=the_url)
                             if not extracted:
                                 msg = "No base64 string found in ImgGenCompletions response message"
-                                raise ImgGenGenerationError(msg)
+                                raise ImgGenGenerationError(
+                                    msg,
+                                    error_category=InferenceErrorCategory.CONTENT,
+                                    user_action=UserAction(
+                                        kind=UserActionKind.CHANGE_INPUT,
+                                        detail="The provider returned no image data — try rephrasing the prompt or using a different model",
+                                    ),
+                                    provider_metadata=None,
+                                )
                             base64_str, base64_extracted_mime_type = extracted
                             break
         if not base64_str and not actual_url:
             msg = f"ImgGenCompletions response has no image. Model: {self.inference_model.desc}"
-            raise ImgGenGenerationError(msg)
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="The provider returned no image — try rephrasing the prompt or using a different model",
+                ),
+                provider_metadata=None,
+            )
 
         if (img_gen_tokens_usage := img_gen_job.job_report.img_gen_tokens_usage) and (usage := response.usage):
             img_gen_tokens_usage.nb_tokens_by_category = self.openai_completions_factory.make_nb_tokens_by_category(usage=usage)
