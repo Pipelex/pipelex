@@ -106,6 +106,36 @@ class TestGatewayUnknownModel:
             Pipelex.teardown_if_needed()
             log.reset()
 
+    def test_dummy_specs_path_skips_membership_check(self, mocker: MockerFixture) -> None:
+        """When gateway is enabled but ``needs_model_specs=False``, ``Pipelex.setup`` builds a
+        dummy ``RemoteConfig`` with empty ``backend_model_specs``. The membership check must NOT
+        run on this path — its provenance is "no live gateway data," so validating the deck's
+        gateway handles against an empty spec set would always fail. This covers read-only
+        flows like ``pipelex-agent models`` (no ``--backend``) where the user did not opt in to
+        fetching specs.
+        """
+        Pipelex.teardown_if_needed()
+        mocker.patch(f"{PIPELEX_MODULE}.is_pipelex_gateway_enabled", return_value=True)
+        mocker.patch(
+            "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
+            new_callable=mocker.PropertyMock,
+            return_value=False,
+        )
+        # Spy on the real fetcher: setup must not call it when needs_model_specs=False.
+        fetch_spy = mocker.spy(RemoteConfigFetcher, "fetch_remote_config")
+
+        try:
+            # No ``pytest.raises`` — the contract here is exactly that setup succeeds.
+            Pipelex.make(
+                integration_mode=IntegrationMode.PYTEST,
+                needs_inference=False,
+                needs_model_specs=False,
+            )
+            assert fetch_spy.call_count == 0, "needs_model_specs=False must skip the remote fetch entirely (dummy config path)"
+        finally:
+            Pipelex.teardown_if_needed()
+            log.reset()
+
     def test_unknown_model_cached_raises_with_stale_hint(self, mocker: MockerFixture) -> None:
         """Same scenario as fresh, but the gateway config came from the cache → the error
         message must point at ``pipelex init`` (while online) to refresh the cache.

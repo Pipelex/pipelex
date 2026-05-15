@@ -102,6 +102,12 @@ class ModelManager(ModelManagerAbstract):
 
         We only fire the check when both ``gateway_config`` and ``gateway_config_source`` are
         set — that is, when the gateway is actually live in this setup pass.
+
+        Waterfall semantics: a waterfall reference is "known" if AT LEAST ONE of its
+        fallbacks resolves to a known handle. At runtime the deck walks the list and uses
+        the first available model (when ``is_model_fallback_enabled`` is true, the default),
+        so a deck like ``["future-model", "current-model"]`` is perfectly valid as long as
+        ``current-model`` is in the gateway specs.
         """
         if gateway_config is None or gateway_config_source is None:
             return
@@ -113,14 +119,14 @@ class ModelManager(ModelManagerAbstract):
                 ref = ModelReference.parse(handle)
             except ModelReferenceParseError:
                 continue
-            terminal_name = self._resolve_terminal_handle(deck=deck, ref=ref, model_type=model_type)
-            if terminal_name is None:
+            candidates = self._resolve_terminal_candidates(deck=deck, ref=ref, model_type=model_type)
+            if not candidates:
                 continue
-            if terminal_name in deck.inference_models:
+            if any(candidate in deck.inference_models or candidate in gateway_spec_names for candidate in candidates):
                 continue
-            if terminal_name in gateway_spec_names:
-                continue
-            raise GatewayUnknownModelError(model_name=terminal_name, source=gateway_config_source)
+            # No candidate resolves to a known handle. Report the first one — it's the
+            # primary the user is asking for; subsequent entries are fallbacks.
+            raise GatewayUnknownModelError(model_name=candidates[0], source=gateway_config_source)
 
     @classmethod
     def _collect_deck_referenced_handles(cls, deck: ModelDeck) -> list[tuple[str, ModelType]]:
@@ -142,10 +148,19 @@ class ModelManager(ModelManagerAbstract):
             references.append((llm_object_handle, ModelType.LLM))
         for extract_setting in deck.extract_presets.values():
             references.append((extract_setting.model, ModelType.TEXT_EXTRACTOR))
+        extract_default_handle = cls._extract_choice_handle(deck.extract_choice_default)
+        if extract_default_handle is not None:
+            references.append((extract_default_handle, ModelType.TEXT_EXTRACTOR))
         for img_gen_setting in deck.img_gen_presets.values():
             references.append((img_gen_setting.model, ModelType.IMG_GEN))
+        img_gen_default_handle = cls._extract_choice_handle(deck.img_gen_choice_default)
+        if img_gen_default_handle is not None:
+            references.append((img_gen_default_handle, ModelType.IMG_GEN))
         for search_setting in deck.search_presets.values():
             references.append((search_setting.model, ModelType.SEARCH))
+        search_default_handle = cls._extract_choice_handle(deck.search_choice_default)
+        if search_default_handle is not None:
+            references.append((search_default_handle, ModelType.SEARCH))
         return references
 
     @classmethod
@@ -164,44 +179,97 @@ class ModelManager(ModelManagerAbstract):
         return choice.model
 
     @classmethod
-    def _resolve_terminal_handle(
+    def _resolve_terminal_candidates(
         cls,
         deck: ModelDeck,
         ref: ModelReference,
         model_type: ModelType,
-    ) -> str | None:
-        """Follow aliases/waterfalls down to a concrete handle name, or ``None`` when the
-        reference is a preset (presets cannot themselves be handles) or the chain dead-ends
-        without a resolvable target.
+    ) -> list[str]:
+        """Return every terminal handle reachable from ``ref`` via aliases/waterfalls.
+
+        For ``HANDLE`` references: returns ``[name]`` (bare strings are HANDLEs by design —
+        see ``ModelReference.parse`` for the BREAKING CHANGE note).
+
+        For ``ALIAS`` references: follows the alias target. Cycles return ``[]``.
+
+        For ``WATERFALL`` references: follows EVERY fallback in order (or only the first
+        when ``model_deck_config.is_model_fallback_enabled`` is false, matching runtime
+        behaviour at ``model_deck._get_optional_inference_model_with_fallback``). Cycles
+        across either alias or waterfall keys return ``[]`` for the cycling branch but do
+        not poison the rest of the candidate list.
+
+        For ``PRESET`` references: returns ``[]`` (presets are not handles).
         """
         aliases, waterfalls = deck.get_aliases_and_waterfalls_for_type(model_type)
-        visited: set[str] = set()
-        current = ref
-        while True:
-            match current.kind:
-                case ModelReferenceKind.HANDLE:
-                    return current.name
-                case ModelReferenceKind.ALIAS:
-                    if current.name in visited:
-                        return None
-                    visited.add(current.name)
-                    target = aliases.get(current.name)
-                    if target is None:
-                        return current.name
+        is_fallback_enabled = deck.model_deck_config.is_model_fallback_enabled
+        return cls._collect_candidates(
+            ref=ref,
+            aliases=aliases,
+            waterfalls=waterfalls,
+            is_fallback_enabled=is_fallback_enabled,
+            visited=set(),
+        )
+
+    @classmethod
+    def _collect_candidates(
+        cls,
+        ref: ModelReference,
+        aliases: dict[str, str],
+        waterfalls: dict[str, list[str]],
+        is_fallback_enabled: bool,
+        visited: set[str],
+    ) -> list[str]:
+        match ref.kind:
+            case ModelReferenceKind.HANDLE:
+                return [ref.name]
+            case ModelReferenceKind.ALIAS:
+                if ref.name in visited:
+                    return []
+                visited.add(ref.name)
+                target = aliases.get(ref.name)
+                if target is None:
+                    return [ref.name]
+                try:
+                    next_ref = ModelReference.parse(target)
+                except ModelReferenceParseError:
+                    return []
+                return cls._collect_candidates(
+                    ref=next_ref,
+                    aliases=aliases,
+                    waterfalls=waterfalls,
+                    is_fallback_enabled=is_fallback_enabled,
+                    visited=visited,
+                )
+            case ModelReferenceKind.WATERFALL:
+                if ref.name in visited:
+                    return []
+                visited.add(ref.name)
+                fallback_list = waterfalls.get(ref.name)
+                if not fallback_list:
+                    return [ref.name]
+                # Runtime only tries the first fallback when fallback is disabled; mirror
+                # that here so the membership check stays consistent with what actually runs.
+                entries = fallback_list if is_fallback_enabled else fallback_list[:1]
+                candidates: list[str] = []
+                for entry in entries:
                     try:
-                        current = ModelReference.parse(target)
+                        next_ref = ModelReference.parse(entry)
                     except ModelReferenceParseError:
-                        return None
-                case ModelReferenceKind.WATERFALL:
-                    fallback_list = waterfalls.get(current.name)
-                    if not fallback_list:
-                        return current.name
-                    try:
-                        current = ModelReference.parse(fallback_list[0])
-                    except ModelReferenceParseError:
-                        return None
-                case ModelReferenceKind.PRESET:
-                    return None
+                        continue
+                    # Fresh visited set per branch so two waterfall entries that legitimately
+                    # share an alias don't kill the second one.
+                    candidates.extend(
+                        cls._collect_candidates(
+                            ref=next_ref,
+                            aliases=aliases,
+                            waterfalls=waterfalls,
+                            is_fallback_enabled=is_fallback_enabled,
+                            visited=set(visited),
+                        )
+                    )
+                return candidates
+            case ModelReferenceKind.PRESET:
+                return []
 
     @override
     def validate_model_deck(self):

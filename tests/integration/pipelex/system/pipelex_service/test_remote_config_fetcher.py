@@ -26,6 +26,7 @@ from pipelex.system.pipelex_service.exceptions import (
     RemoteConfigUnavailableError,
     RemoteConfigValidationError,
 )
+from pipelex.system.pipelex_service.remote_config import RemoteConfig
 from pipelex.system.pipelex_service.remote_config_cache import RemoteConfigCache
 from pipelex.system.pipelex_service.remote_config_fetcher import (
     RemoteConfigFetcher,
@@ -288,3 +289,37 @@ class TestRemoteConfigFetcher:
             "RemoteConfigUnavailableError must chain from the original RemoteConfigFetchError "
             "so existing surfaces (doctor, agent hints) can keep reading the inner exception"
         )
+
+    @pytest.mark.usefixtures("isolated_cache_dir")
+    def test_cache_store_oserror_does_not_abort_fresh_fetch(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+        """Cache write is opportunistic — a read-only ``$HOME``, full disk, or permission
+        error on the cache directory must not kill an otherwise-successful online fetch.
+        ``fetch_remote_config`` should warn to stderr and still return ``source=FRESH``.
+        """
+        payload = _valid_remote_config_payload()
+        mocker.patch("httpx.get", return_value=_make_httpx_response(payload))
+        mocker.patch.object(RemoteConfigCache, "store", side_effect=OSError("read-only filesystem"))
+
+        result = RemoteConfigFetcher.fetch_remote_config()
+
+        assert result.source == RemoteConfigSource.FRESH
+        assert result.config.aws_region == "eu-west-3"
+        captured = capsys.readouterr()
+        assert "failed to persist remote config cache" in captured.err, (
+            f"cache-write failure must surface as a warning on stderr; got stderr={captured.err!r}"
+        )
+
+    @pytest.mark.usefixtures("isolated_cache_dir")
+    def test_fresh_path_validates_payload_only_once(self, mocker: MockerFixture) -> None:
+        """``_fetch_fresh`` already validates the payload; the outer flow must reuse the
+        parsed config rather than re-validating it. We spy on ``RemoteConfig.model_validate``
+        and assert it was called exactly once for a fresh fetch.
+        """
+        payload = _valid_remote_config_payload()
+        mocker.patch("httpx.get", return_value=_make_httpx_response(payload))
+        validate_spy = mocker.spy(RemoteConfig, "model_validate")
+
+        result = RemoteConfigFetcher.fetch_remote_config()
+
+        assert result.source == RemoteConfigSource.FRESH
+        assert validate_spy.call_count == 1, f"fresh path must validate exactly once; got {validate_spy.call_count} calls"

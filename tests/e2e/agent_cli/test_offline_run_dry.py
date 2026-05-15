@@ -65,22 +65,39 @@ def _run_agent_bundle(bundle_dir: Path, env: dict[str, str], cwd: Path) -> subpr
 
 
 def _parse_agent_json(output: str) -> dict[str, object]:
-    """Parse the last JSON object in agent CLI output (it sometimes prefixes log lines)."""
+    """Parse the last TOP-LEVEL JSON object in agent CLI output.
+
+    Walks the output forward; on each successful ``raw_decode`` we advance past the entire
+    decoded object so nested dicts inside an already-decoded envelope are NOT re-parsed.
+    Without that skip, ``json.dumps(envelope, indent=2)`` of a nested-dict payload would
+    cause the helper to return whichever inner dict ``raw_decode`` lands on last.
+
+    Returning the last top-level dict (rather than the first) handles the case where the
+    agent CLI emits a structured-log preamble before the real ``agent_success`` /
+    ``agent_error`` envelope.
+    """
     output = output.strip()
     if not output:
         msg = "Expected JSON output from agent CLI but got empty string"
         raise AssertionError(msg)
     decoder = json.JSONDecoder()
-    # Find the last balanced JSON object — agent_success / agent_error write a single dict.
-    for start in range(len(output)):
-        if output[start] == "{":
-            try:
-                parsed, _ = decoder.raw_decode(output[start:])
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(parsed, dict):
-                continue
-            return cast("dict[str, object]", parsed)
+    last_parsed: dict[str, object] | None = None
+    start = 0
+    while start < len(output):
+        if output[start] != "{":
+            start += 1
+            continue
+        try:
+            parsed, consumed = decoder.raw_decode(output[start:])
+        except json.JSONDecodeError:
+            start += 1
+            continue
+        if isinstance(parsed, dict):
+            last_parsed = cast("dict[str, object]", parsed)
+        # Skip past the entire decoded value so we don't re-enter nested dicts.
+        start += consumed
+    if last_parsed is not None:
+        return last_parsed
     msg = f"Could not find JSON object in agent output: {output!r}"
     raise AssertionError(msg)
 
@@ -173,6 +190,36 @@ def _cached_remote_config_payload() -> dict[str, object]:
 
 @pytest.mark.gha_disabled  # Slow subprocess-based E2E; runs locally and on PR-gated workflows.
 class TestOfflineDryRun:
+    def test_parse_agent_json_returns_last_when_preamble_present(self) -> None:
+        """Regression: a JSON-shaped log preamble must not shadow the real agent envelope.
+
+        Agent CLI output sometimes begins with structured log lines before the
+        ``agent_success`` / ``agent_error`` envelope. ``_parse_agent_json`` must walk past
+        the preamble and return the LAST top-level decoded dict.
+        """
+        output = '{"level": "info", "msg": "starting"}\n{"text": "real result"}'
+        parsed = _parse_agent_json(output)
+        assert parsed == {"text": "real result"}, parsed
+
+    def test_parse_agent_json_returns_envelope_not_nested_dict(self) -> None:
+        """Regression: a pretty-printed envelope with nested dicts must surface the OUTER
+        envelope, not the last nested object.
+
+        ``json.dumps(payload, indent=2)`` puts every nested ``{`` on its own line. A naive
+        walker would re-decode each nested dict at its own start position and overwrite
+        ``last_parsed`` with the deepest one — which would silently break every assertion
+        in this test class that reads envelope-level keys (``"error"``, ``"text"``, etc.).
+        The helper must advance past the entire decoded value after each top-level parse.
+        """
+        envelope = {
+            "text": "mock result",
+            "warnings": [{"id": "WARN-1", "type": "RemoteConfigStale"}],
+        }
+        parsed = _parse_agent_json(json.dumps(envelope, indent=2))
+        assert parsed == envelope, parsed
+        assert "text" in parsed, f"the outer envelope (with 'text') must be returned, not a nested dict: {parsed!r}"
+        assert "warnings" in parsed, f"the outer envelope (with 'warnings') must be returned: {parsed!r}"
+
     def test_byok_offline_succeeds(self, hermetic_home: Path, offline_subprocess_env: dict[str, str]) -> None:
         """Gateway disabled + no network + no cache → dry-run exits 0 with structured success JSON."""
         pipelex_dir = hermetic_home / ".pipelex"

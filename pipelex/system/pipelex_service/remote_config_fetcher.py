@@ -129,10 +129,11 @@ class RemoteConfigFetcher:
         )
 
     @classmethod
-    def _fetch_fresh(cls, url: str) -> dict[str, Any]:
+    def _fetch_fresh(cls, url: str) -> tuple[dict[str, Any], RemoteConfig]:
         """Fetch and validate-parse the remote payload. Raises ``RemoteConfigFetchError`` on
         network/HTTP failure and ``RemoteConfigValidationError`` on schema breaks. Returns the
-        raw JSON payload so callers can persist it to the cache verbatim.
+        raw JSON payload (for cache persistence) alongside the already-parsed config so the
+        caller does not have to revalidate.
         """
         try:
             response = cls._fetch_remote_config_with_retry(url)
@@ -153,13 +154,13 @@ class RemoteConfigFetcher:
             raise RemoteConfigValidationError(msg) from parse_exc
 
         try:
-            RemoteConfig.model_validate(payload)
+            config = RemoteConfig.model_validate(payload)
         except ValidationError as validation_error:
             formatted = format_pydantic_validation_error(validation_error)
             msg = f"Remote configuration validation failed: {formatted}"
             raise RemoteConfigValidationError(msg) from validation_error
 
-        return payload
+        return payload, config
 
     @classmethod
     def _build_unavailable_error(
@@ -220,7 +221,7 @@ class RemoteConfigFetcher:
         url = PipelexDetails.remote_config_url()
 
         try:
-            payload = cls._fetch_fresh(url)
+            payload, config = cls._fetch_fresh(url)
         except RemoteConfigFetchError as fetch_error:
             if require_fresh:
                 raise cls._build_unavailable_error(fetch_error, cache_refused=True) from fetch_error
@@ -233,7 +234,18 @@ class RemoteConfigFetcher:
                 cached_at=cached.cached_at,
             )
 
-        # Fresh path: persist the raw payload for future offline fallback.
-        RemoteConfigCache.store(payload)
-        config = RemoteConfig.model_validate(payload)
+        # Fresh path: persist the raw payload for future offline fallback. The cache is
+        # opportunistic — a write failure (read-only $HOME, full disk, permission denied) must
+        # not abort an otherwise-successful online fetch. We warn so the user can see why a
+        # later offline run might have to fail loudly with ``RemoteConfigUnavailableError``,
+        # then return the fresh config regardless.
+        try:
+            RemoteConfigCache.store(payload)
+        except OSError as cache_write_error:
+            warning_msg = (
+                f"Warning: failed to persist remote config cache at {RemoteConfigCache.cache_path()}: "
+                f"{cache_write_error}. Continuing with the fresh fetch; future offline runs may "
+                "be unable to fall back to a cached config until this is fixed."
+            )
+            print_to_stderr(warning_msg)
         return RemoteConfigResult(config=config, source=RemoteConfigSource.FRESH, cached_at=None)

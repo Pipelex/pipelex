@@ -42,15 +42,23 @@ def load_pipelex_service_config_if_exists(config_dir: Path) -> PipelexServiceCon
         raise PipelexServiceConfigValidationError(msg) from exc
 
 
-def is_pipelex_gateway_enabled() -> bool:
+def is_pipelex_gateway_enabled(backends_file_path: Path | None = None) -> bool:
     """Check if pipelex_gateway is enabled in the backends configuration.
 
     This reads the backends.toml file directly without loading the full backend library.
 
+    Args:
+        backends_file_path: Explicit path to the ``backends.toml`` file to inspect. When
+            ``None`` (default), uses the layered/project-preferred path from
+            ``config_manager.backends_file_path``. Callers that act on a specific target
+            directory (e.g. ``pipelex init`` / ``pipelex init --local``) should pass the
+            target's ``backends.toml`` so they don't accidentally branch on a sibling config.
+
     Returns:
         True if pipelex_gateway is enabled, False otherwise.
     """
-    backends_toml = load_toml_from_path_if_exists(config_manager.backends_file_path)
+    resolved_path = backends_file_path if backends_file_path is not None else config_manager.backends_file_path
+    backends_toml = load_toml_from_path_if_exists(resolved_path)
     if backends_toml is None:
         return False
 

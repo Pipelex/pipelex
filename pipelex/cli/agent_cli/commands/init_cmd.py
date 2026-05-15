@@ -371,8 +371,10 @@ def agent_init_cmd(
 
         # Step 5: Prime the remote-config cache so subsequent offline dry-runs can fall back.
         # No-op when gateway is disabled or terms have not been accepted; surfaces failure as
-        # structured fields on the success envelope rather than crashing init.
-        priming_result = attempt_prime_remote_config_cache()
+        # structured fields on the success envelope rather than crashing init. We forward the
+        # init target directory so the gateway-enabled check inspects the backends.toml we
+        # just wrote, not a sibling layered config.
+        priming_result = attempt_prime_remote_config_cache(target_config_dir=target_dir)
         result_payload: dict[str, Any] = {
             "success": True,
             "target_dir": str(target_dir),

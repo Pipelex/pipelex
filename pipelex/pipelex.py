@@ -65,7 +65,6 @@ from pipelex.system.pipelex_service.pipelex_service_config import (
     load_pipelex_service_config_if_exists,
 )
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
-from pipelex.system.pipelex_service.types import RemoteConfigSource
 from pipelex.system.registries.func_registry import FuncRegistry, func_registry
 from pipelex.system.registries.singleton import MetaSingleton
 from pipelex.system.runtime import IntegrationMode, runtime_manager
@@ -90,6 +89,7 @@ from pipelex.urls import URLs
 
 if TYPE_CHECKING:
     from pipelex.system.pipelex_service.remote_config import RemoteConfig
+    from pipelex.system.pipelex_service.types import RemoteConfigSource
 
 PACKAGE_NAME, PACKAGE_VERSION = get_package_info()
 
@@ -216,7 +216,11 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                     model_specs=gateway_model_specs,
                     aws_region=remote_config.aws_region,
                 )
-                gateway_config_source = RemoteConfigSource.FRESH
+                # Keep ``gateway_config_source`` as ``None``: the dummy specs are an empty
+                # placeholder, not real Gateway data. ``ModelManager._enforce_gateway_model_membership``
+                # treats ``source is None`` as "nothing to validate against," so the membership
+                # check is skipped on this path — which is what we want for read-only flows like
+                # ``pipelex-agent models`` without ``--backend``.
                 log.verbose("Using dummy remote config (inference not needed)")
             else:
                 # Terms acceptance is only required for actual inference usage, not for

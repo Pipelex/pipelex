@@ -186,6 +186,94 @@ class TestCachePriming:
         assert stale_on_disk_after == stale_on_disk_before, "stale cache must be left intact when priming refuses to use it"
 
     @pytest.mark.usefixtures("isolated_cache_dir")
+    def test_priming_reads_backends_toml_from_target_dir(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """``target_config_dir`` overrides the layered backends.toml so global vs local init
+        primes based on the directory being initialized — not on whatever the layered config
+        resolves to first.
+
+        Setup:
+        - layered ``backends.toml`` (default ``config_manager.backends_file_path``) has gateway DISABLED.
+        - target_config_dir's ``backends.toml`` has gateway ENABLED.
+
+        Expected: priming runs (gateway enabled at the target). Without the fix, the helper
+        would consult the layered file and skip priming entirely.
+        """
+        # Layered config says gateway is disabled — without the fix, this is what gets read.
+        layered_dir = tmp_path / "layered_dir"
+        layered_backends = layered_dir / "inference" / "backends.toml"
+        layered_backends.parent.mkdir(parents=True, exist_ok=True)
+        layered_backends.write_text("[pipelex_gateway]\nenabled = false\n", encoding="utf-8")
+        mocker.patch.object(
+            ConfigLoader,
+            "backends_file_path",
+            new_callable=mocker.PropertyMock,
+            return_value=layered_backends,
+        )
+
+        # Target init dir says gateway IS enabled. The priming helper must read THIS file.
+        target_dir = tmp_path / "target_dir"
+        target_backends = target_dir / "inference" / "backends.toml"
+        target_backends.parent.mkdir(parents=True, exist_ok=True)
+        target_backends.write_text("[pipelex_gateway]\nenabled = true\n", encoding="utf-8")
+
+        # Terms-accepted check still consults the global pipelex_service.toml — keep that mocked
+        # as before. Make the fetcher succeed so we can assert the cache is actually written.
+        mocker.patch(
+            f"{INIT_COMMAND_MODULE}.load_pipelex_service_config_if_exists",
+            return_value=_accepted_service_config(),
+        )
+        mocker.patch(
+            "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
+            new_callable=mocker.PropertyMock,
+            return_value=False,
+        )
+        mocker.patch.object(RemoteConfigFetcher, "fetch_remote_config", _ORIGINAL_FETCH_REMOTE_CONFIG)
+        mocker.patch("httpx.get", return_value=_make_httpx_response(_fake_remote_payload()))
+
+        console = mocker.create_autospec(Console, instance=True)
+        prime_remote_config_cache(console, target_config_dir=target_dir)
+
+        assert RemoteConfigCache.cache_path().exists(), (
+            "priming must run (and write the cache) when the TARGET backends.toml has gateway "
+            "enabled, even if the layered backends.toml says otherwise"
+        )
+
+    @pytest.mark.usefixtures("isolated_cache_dir")
+    def test_priming_skips_when_target_dir_says_gateway_disabled(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """Inverse of the above: target says gateway disabled, layered says enabled → skip.
+
+        Without the fix, the helper would see the layered "enabled" file, try to fetch, and
+        write a cache the user did not opt in to. We assert no fetch attempt and no cache file.
+        """
+        # Layered says gateway enabled — without the fix, this is what gets read.
+        layered_dir = tmp_path / "layered_dir"
+        layered_backends = layered_dir / "inference" / "backends.toml"
+        layered_backends.parent.mkdir(parents=True, exist_ok=True)
+        layered_backends.write_text("[pipelex_gateway]\nenabled = true\n", encoding="utf-8")
+        mocker.patch.object(
+            ConfigLoader,
+            "backends_file_path",
+            new_callable=mocker.PropertyMock,
+            return_value=layered_backends,
+        )
+
+        # Target says gateway disabled — priming should respect that and become a no-op.
+        target_dir = tmp_path / "target_dir"
+        target_backends = target_dir / "inference" / "backends.toml"
+        target_backends.parent.mkdir(parents=True, exist_ok=True)
+        target_backends.write_text("[pipelex_gateway]\nenabled = false\n", encoding="utf-8")
+
+        fetch_spy = mocker.spy(RemoteConfigFetcher, "fetch_remote_config")
+        httpx_get_mock = mocker.patch("httpx.get", side_effect=httpx.ConnectError("should not be called"))
+
+        console = mocker.create_autospec(Console, instance=True)
+        prime_remote_config_cache(console, target_config_dir=target_dir)
+
+        assert fetch_spy.call_count == 0, "target dir disables the gateway — priming must NOT consult the layered backends.toml"
+        assert httpx_get_mock.call_count == 0
+        assert not RemoteConfigCache.cache_path().exists()
+
+    @pytest.mark.usefixtures("isolated_cache_dir")
     def test_init_does_not_double_prime(self, mocker: MockerFixture) -> None:
         """When a cache already exists, priming online overwrites it (refresh, not skip)."""
         # Pre-populate the cache with a stale snapshot so we can prove the file gets rewritten.

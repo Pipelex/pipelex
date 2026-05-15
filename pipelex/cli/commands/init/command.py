@@ -31,7 +31,7 @@ from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.models.deck_manifest import compute_kit_manifest, write_manifest
 from pipelex.hub import get_console
 from pipelex.kit.paths import get_kit_configs_dir
-from pipelex.system.configuration.config_loader import config_manager
+from pipelex.system.configuration.config_loader import BACKENDS_FILE_NAME, INFERENCE_DIR_NAME, config_manager
 from pipelex.system.pipelex_service.exceptions import RemoteConfigFetchError, RemoteConfigUnavailableError
 from pipelex.system.pipelex_service.pipelex_service_agreement import update_service_terms_acceptance
 from pipelex.system.pipelex_service.pipelex_service_config import (
@@ -58,7 +58,7 @@ class CachePrimingResult(BaseModel):
     error_message: str | None = None
 
 
-def attempt_prime_remote_config_cache() -> CachePrimingResult:
+def attempt_prime_remote_config_cache(target_config_dir: Path | None = None) -> CachePrimingResult:
     """Prime the on-disk remote-config cache so later offline runs can fall back to it.
 
     Pure-logic variant: no I/O on the way out, so both the interactive (`pipelex init`) and
@@ -78,8 +78,20 @@ def attempt_prime_remote_config_cache() -> CachePrimingResult:
     ``RemoteConfigValidationError`` is intentionally NOT caught: a server-side schema break is a
     real bug (we control the back-office) and should surface loudly rather than be hidden by the
     priming step.
+
+    Args:
+        target_config_dir: When set, read the ``backends.toml`` *at that directory* to decide
+            whether the gateway is enabled. ``pipelex init`` and ``pipelex init --local``
+            target different ``.pipelex/`` directories — using the layered/project-preferred
+            config here would let priming branch on the wrong file. ``None`` (default) falls
+            back to the layered path. The terms-acceptance check always reads the *global*
+            ``pipelex_service.toml`` by design.
     """
-    if not is_pipelex_gateway_enabled():
+    if target_config_dir is not None:
+        backends_file_path = target_config_dir / INFERENCE_DIR_NAME / BACKENDS_FILE_NAME
+    else:
+        backends_file_path = None
+    if not is_pipelex_gateway_enabled(backends_file_path=backends_file_path):
         return CachePrimingResult(primed=False)
 
     service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
@@ -93,13 +105,16 @@ def attempt_prime_remote_config_cache() -> CachePrimingResult:
     return CachePrimingResult(primed=True)
 
 
-def prime_remote_config_cache(console: Console) -> None:
+def prime_remote_config_cache(console: Console, target_config_dir: Path | None = None) -> None:
     """Interactive-surface wrapper around :func:`attempt_prime_remote_config_cache`.
 
     Prints a yellow warning to the console when a fetch was attempted and failed; otherwise
     silent. Used by ``pipelex init`` so the user knows priming didn't happen and how to retry.
+
+    ``target_config_dir`` is forwarded so the gateway-enabled check inspects the directory
+    being initialized rather than the layered config (see ``attempt_prime_remote_config_cache``).
     """
-    result = attempt_prime_remote_config_cache()
+    result = attempt_prime_remote_config_cache(target_config_dir=target_config_dir)
     if result.error_message is not None:
         console.print(f"[yellow]⚠ Could not prime remote config cache: {escape(result.error_message)}[/yellow]")
         console.print("[dim]Re-run 'pipelex init' while online to prime the cache for offline dry-runs.[/dim]")
@@ -372,8 +387,10 @@ def execute_initialization(
         setup_telemetry(console, telemetry_config_path, for_project=for_project)
 
     # Step 5: Prime the remote-config cache so dry-runs and validate can fall back offline.
-    # No-op when gateway is disabled or terms have not been accepted.
-    prime_remote_config_cache(console)
+    # No-op when gateway is disabled or terms have not been accepted. We forward
+    # ``target_config_dir`` so the gateway-enabled check inspects the directory we just
+    # initialized (matters for ``--local`` vs default init).
+    prime_remote_config_cache(console, target_config_dir=target_config_dir)
 
     console.print()
 
