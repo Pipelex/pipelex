@@ -102,6 +102,7 @@ def check_config_sync_command(
     try:
         check_config_sync_cmd(show_diff=show_diff, leading=leading, quiet=quiet)
     except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
         console.print("[bold red]Unexpected error occurred[/bold red]")
@@ -119,6 +120,7 @@ def check_rules_command(
     try:
         check_rules_sync_cmd(show_diff=show_diff, quiet=quiet)
     except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
         console.print("[bold red]Unexpected error occurred[/bold red]")
@@ -136,6 +138,7 @@ def check_urls_command(
     try:
         check_urls_cmd(quiet=quiet, timeout=timeout)
     except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
         console.print("[bold red]Unexpected error occurred[/bold red]")
@@ -154,6 +157,7 @@ def generate_mthds_schema_command(
         output_path = Path(output) if output else None
         generate_mthds_schema_cmd(output=output_path, quiet=quiet)
     except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
         console.print("[bold red]Unexpected error occurred[/bold red]")
@@ -171,6 +175,7 @@ def check_gateway_models_command(
     try:
         check_gateway_models_cmd(show_diff=show_diff, quiet=quiet)
     except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
         console.print("[bold red]Unexpected error occurred[/bold red]")
@@ -188,6 +193,7 @@ def check_mthds_schema_command(
     try:
         check_mthds_schema_cmd(show_diff=show_diff, quiet=quiet)
     except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
         console.print("[bold red]Unexpected error occurred[/bold red]")
@@ -210,6 +216,7 @@ def sync_main_config_command(
     try:
         sync_main_config_cmd(target=target, dry_run=dry_run, quiet=quiet, show_diff=show_diff)
     except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
         console.print("[bold red]Unexpected error occurred[/bold red]")
@@ -229,6 +236,7 @@ def preprocess_test_models_command(
     try:
         preprocess_test_models_cmd(profile=profile, generate_fixtures=generate_fixtures, output_json=output_json, quiet=quiet)
     except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
         console.print("[bold red]Unexpected error occurred[/bold red]")
@@ -260,6 +268,7 @@ def refresh_graph_ui_sri_command(
             quiet=quiet,
         )
     except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
         console.print("[bold red]Unexpected error occurred[/bold red]")
@@ -276,6 +285,7 @@ def update_gateway_models_command(
     try:
         update_gateway_models_cmd(quiet=quiet)
     except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
         console.print("[bold red]Unexpected error occurred[/bold red]")

@@ -32,6 +32,7 @@ def agent_accept_gateway_terms_cmd() -> None:
     except typer.Exit:
         raise
     except Exception as exc:  # noqa: BLE001
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
         agent_error(
             f"Failed to accept gateway terms: {exc}",
             type(exc).__name__,

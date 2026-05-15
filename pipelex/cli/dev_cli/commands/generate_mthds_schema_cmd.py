@@ -36,6 +36,7 @@ def generate_mthds_schema_cmd(output: Path | None = None, quiet: bool = False) -
     try:
         schema = generate_mthds_schema()
     except Exception:  # noqa: BLE001
+        # Dev CLI command root: any schema-generation failure is reported as a FAILED status line; exit non-zero.
         if quiet:
             console.print("[red]\u2717 MTHDS schema generation: FAILED[/red]")
         else:

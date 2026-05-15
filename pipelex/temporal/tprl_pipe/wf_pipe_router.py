@@ -106,6 +106,7 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                         pipeline_run_id=pipeline_run_id,
                     )
                 except Exception as exc:  # noqa: BLE001
+                    # Best-effort: per-workflow tracing setup must never fail the workflow — log and continue without it.
                     workflow_log.warning(f"Failed to set up per-workflow tracing, continuing without: {exc}")
                     # Clean up partially initialized resources before nulling (the finally block
                     # won't be able to clean up after we null these references)
@@ -113,12 +114,10 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                         try:
                             wf_graph_tracer_manager.close_tracer(wf_tracer_key)
                         except Exception as tracer_exc:  # noqa: BLE001
+                            # Best-effort cleanup: closing a partially-initialized tracer must not mask the setup failure.
                             workflow_log.warning(f"Failed to close partially initialized tracer: {tracer_exc}")
                     if event_log is not None:
-                        try:
-                            event_log.close()
-                        except Exception:  # noqa: BLE001, S110
-                            pass
+                        event_log.close()
                     get_report_delegate().clear_event_log(context_key=wf_workflow_id)
                     event_log = None
                     wf_graph_tracer_manager = None
@@ -143,6 +142,7 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                     if graph_spec is not None and pipe_output is not None:
                         pipe_output.graph_spec = graph_spec
                 except Exception as tracer_exc:  # noqa: BLE001
+                    # Best-effort: tracer close in the finally block must never fail the workflow — log and continue.
                     workflow_log.warning(f"Failed to close per-workflow tracer: {tracer_exc}")
 
             # Flush trace events and clean up event log
@@ -158,12 +158,10 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                             retry_policy=RetryPolicy(maximum_attempts=3),
                         )
                     except Exception as flush_exc:  # noqa: BLE001
+                        # Best-effort: trace-event flush in the finally block must never fail the workflow — log and continue.
                         workflow_log.warning(f"Failed to flush trace events: {flush_exc}")
 
-                try:
-                    event_log.close()
-                except Exception:  # noqa: BLE001, S110
-                    pass
+                event_log.close()
 
                 # Clear stale event log state from the report delegate
                 if wf_tracer_key is not None:

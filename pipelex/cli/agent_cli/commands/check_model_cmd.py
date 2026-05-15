@@ -104,6 +104,7 @@ def agent_check_model_cmd(
     except ModelReferenceParseError as exc:
         agent_error(f"Invalid model reference: {exc}", "ArgumentError", cause=exc)
     except Exception as exc:  # noqa: BLE001
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
         agent_error(f"Failed to check model: {exc}", type(exc).__name__, cause=exc)
     finally:
         Pipelex.teardown_if_needed()

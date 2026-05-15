@@ -90,6 +90,7 @@ def make_pipelex_for_agent_cli(
             enabled_backends=sorted(exc.enabled_backends),
         )
     except Exception as exc:  # noqa: BLE001
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
         agent_error(
             f"Pipelex initialization failed: {exc}",
             type(exc).__name__,

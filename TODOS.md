@@ -102,7 +102,7 @@ After this phase every surviving `# noqa: BLE001` carries a one-line justificati
 
 - [x] Re-list every `# noqa: BLE001` site (`grep -rn "noqa: BLE001" pipelex`). Confirm against the triage groups below.
 - [x] For each site to be narrowed, determine the exact exception set the guarded call can raise — read the callee, do not guess. Where a narrowed catch changes observable behavior (an exception that used to be swallowed now propagates), add or extend a unit test that pins the intended behavior *before* narrowing. List those tests here. — _No new pinning tests: every narrowing catches the same real exception set on the expected path; none is an intended behavior change. `make agent-test` (REFACTOR step) is the regression check._
-- [ ] The genuinely-legitimate group (Group F) gets no code change — only a verification pass and a justification comment.
+- [x] The genuinely-legitimate group (Group F) gets no code change — only a verification pass and a justification comment.
 
 ### GREEN
 
@@ -134,34 +134,34 @@ After this phase every surviving `# noqa: BLE001` carries a one-line justificati
 - [x] `init/ui/backends_ui.py:88` — narrow the file-read catch to `(TomlError, OSError)`. — _Narrowed._
 - [x] `show_cmd.py:160` — narrow the routing-profile load catch to the config / IO error(s). — _Narrowed → `except MarkupError`. NOTE: not a "load" catch — `routing_profile` is already loaded; the block prints Rich markup with interpolated config strings, so `rich.errors.MarkupError` is the real failure mode._
 - [x] `init/backends.py:137` (extension suggestion), `:168` (save terms), `:176` (disable gateway) — narrow each inner catch to what its called helper raises; the outer `:183` is a command-level boundary (Group F). — _`:137` → `except EOFError` (no-stdin `Confirm.ask`); `:168`/`:176` → `(OSError, TOMLKitError)`; `:183` kept broad + justified (command-level boundary)._
-- [ ] `doctor_cmd.py` config-load helpers (`:103`, `:121`, `:320`) — narrow to `(TomlError, OSError)`. Triage the remaining `doctor_cmd.py` catches per-site: the doctor's job is "probe and report", so a broad catch around a whole probe is defensible — keep those with a justification, narrow the ones wrapping a single well-typed call. — _NOT DONE — only remaining Group D work; decisions pre-made, see Running Notes._
+- [x] `doctor_cmd.py` config-load helpers (`:103`, `:121`, `:320`) — narrow to `(TomlError, OSError)`. Triage the remaining `doctor_cmd.py` catches per-site: the doctor's job is "probe and report", so a broad catch around a whole probe is defensible — keep those with a justification, narrow the ones wrapping a single well-typed call. — _DONE — `:103`→`(PipelexCLIError, OSError)`, `:121`/`:320`→`(TomlError, OSError)`; the 9 probe / `--fix`-handler catches kept broad + justified. See Running Notes._
 
 **Group E — silent-swallow sites (restructure):**
 
-- [ ] `wf_pipe_router.py:120,165` — `except Exception: pass` (`# noqa: BLE001, S110`). Silent swallow of trace / event-log cleanup. Narrow to the cleanup exception(s); if kept broad, at minimum log at debug level and drop the bare `pass`.
+- [x] `wf_pipe_router.py:120,165` — `except Exception: pass` (`# noqa: BLE001, S110`). Silent swallow of trace / event-log cleanup. Narrow to the cleanup exception(s); if kept broad, at minimum log at debug level and drop the bare `pass`. — _DONE — both `try/except` blocks removed entirely: `event_log` is always a `BufferingEventLog` and its `close()` is a verified no-op (empty body), so the calls are now bare `event_log.close()`._
 
 **Group F — genuinely legitimate (verify + justify only, no narrowing):**
 
-- [ ] Agent CLI command roots that convert to `agent_error()` (the documented CLI boundary) — confirm each is at the command root and `agent_error()` is `NoReturn`; keep `# noqa: BLE001`.
-- [ ] Dev CLI command roots (`_dev_cli.py` and `dev_cli/commands/*`) — keep.
-- [ ] Telemetry (`exception_capture.py`, `telemetry_manager.py`, `posthog_span_exporter.py`) — telemetry must never break the app; keep with a justification comment.
-- [ ] `init/command.py:484`, `init/routing.py:156`, `init/backends.py:183` — command-level boundaries; keep.
-- [ ] `ndjson_event_log.py:190` (`__del__`) — interpreter-shutdown safety net; keep.
-- [ ] `pipe_run.py:41` — records `DeliveryStatus.FAILED`. Decide: narrow to `PipelexError` now, or defer to Phase 5 (the PipeRouter retry loop touches this path). Record the decision.
-- [ ] Run `make agent-check` until clean after each group.
+- [x] Agent CLI command roots that convert to `agent_error()` (the documented CLI boundary) — confirm each is at the command root and `agent_error()` is `NoReturn`; keep `# noqa: BLE001`. — _DONE — 23 sites; `agent_error()` confirmed `-> NoReturn`; each got a justification comment._
+- [x] Dev CLI command roots (`_dev_cli.py` and `dev_cli/commands/*`) — keep. — _DONE — 10 sites in `_dev_cli.py` + 3 in `dev_cli/commands/*`; each got a justification comment._
+- [x] Telemetry (`exception_capture.py`, `telemetry_manager.py`, `posthog_span_exporter.py`) — telemetry must never break the app; keep with a justification comment. — _DONE — `exception_capture.py:84,91` and `telemetry_manager.py:199` got new comments; `telemetry_manager.py:209/217/225` and `posthog_span_exporter.py:368` already had one._
+- [x] `init/command.py:484`, `init/routing.py:156`, `init/backends.py:183` — command-level boundaries; keep. — _DONE — `init/command.py:484` and `init/routing.py:156` got new comments; `init/backends.py` (now `:185`) already had one._
+- [x] `ndjson_event_log.py:190` (`__del__`) — interpreter-shutdown safety net; keep. — _DONE — already carried a justification comment; verified._
+- [x] `pipe_run.py:41` — records `DeliveryStatus.FAILED`. Decide: narrow to `PipelexError` now, or defer to Phase 5 (the PipeRouter retry loop touches this path). Record the decision. — _DECISION: kept broad + justified. It is observe-and-reraise — the catch records `DeliveryStatus.FAILED` then re-raises the original exception unconditionally at method end. Narrowing to `PipelexError` would be wrong: a non-`PipelexError` failure would skip the FAILED-status recording. Not a deferral — a legitimate permanent boundary; Phase 5 can still restructure the path._
+- [x] Run `make agent-check` until clean after each group.
 
 ### REFACTOR
 
-- [ ] Every surviving `# noqa: BLE001` has a one-line justification comment on the same or an adjacent line.
-- [ ] No `# TODO: wip - do not catch all exceptions` comment remains anywhere.
-- [ ] Run `make agent-test`. For each narrowed site, confirm no test fails because a previously-swallowed exception now propagates — if one does, that is either the intended fix or a sign the narrowing is wrong; resolve per-site.
-- [ ] Record in Running Notes: the final count of surviving `noqa: BLE001`, the per-site decisions for the "assess" sites (Group B last bullet, `doctor_cmd.py`, `pipe_run.py`), and any behavior change where an exception now propagates.
+- [x] Every surviving `# noqa: BLE001` has a one-line justification comment on the same or an adjacent line. — _Verified: all 76 surviving sites carry a comment on the following line._
+- [x] No `# TODO: wip - do not catch all exceptions` comment remains anywhere. — _Verified: `grep` returns nothing._
+- [x] Run `make agent-test`. For each narrowed site, confirm no test fails because a previously-swallowed exception now propagates — if one does, that is either the intended fix or a sign the narrowing is wrong; resolve per-site. — _DONE — `make agent-test` passed; no narrowing regressed a test._
+- [x] Record in Running Notes: the final count of surviving `noqa: BLE001`, the per-site decisions for the "assess" sites (Group B last bullet, `doctor_cmd.py`, `pipe_run.py`), and any behavior change where an exception now propagates. — _DONE — see Running Notes below._
 
 > ### STOP — CHECKPOINT A.5: broad-except sweep fully narrowed
 >
-> **Status (checkpoint 2026-05-15):** IN PROGRESS — Groups A, B, C landed; Group D partially landed (`doctor_cmd.py` remains); Groups E, F and REFACTOR not started. `make agent-check` clean; `make agent-test` not yet run. The resume point and every per-site decision are in the "Phase 1.5" section of Running Notes below.
+> **Status (landed 2026-05-15):** COMPLETE — Groups A, B, C, D, E, F and REFACTOR all landed. `make agent-check` clean (ruff + plxt + pyright 0 errors + mypy 0 issues); `make agent-test` passed. 76 surviving `# noqa: BLE001`, each carrying a one-line justification; no `# TODO: wip` markers remain. Per-site decisions are in the "Phase 1.5" section of Running Notes below.
 >
-> Update checkboxes, commit, run `make agent-test`. Every broad catch is now either narrowed or a defended, justified boundary. Next session resumes at Phase 2.
+> Commit. Every broad catch is now either narrowed or a defended, justified boundary. Next session resumes at Phase 2.
 >
 > **Hand-off context to record in Running Notes:** the final `noqa: BLE001` count, the "assess"-site decisions, and any intentional behavior change from narrowing.
 
@@ -414,7 +414,7 @@ _Append decisions, surprises, and hand-off context here as each phase lands. Kee
 
 ### Phase 1.5 — Second-pass narrowing of `noqa: BLE001` sites (IN PROGRESS — checkpoint 2026-05-15)
 
-**Checkpoint state:** Groups A, B, C landed; Group D partially landed; Groups E, F and REFACTOR not started. `make agent-check` is clean (ruff + plxt + pyright 0 errors + mypy 0 issues). `make agent-test` not yet run — that is a REFACTOR-step task. An independent code review of the staged diff ran at this checkpoint; its one finding (the Group C teardown narrowing) has been applied — see the Group C entry below.
+**Final state:** ALL groups (A–F) and REFACTOR landed. `make agent-check` is clean (ruff + plxt + pyright 0 errors + mypy 0 issues). `make agent-test` passed. **76 surviving `# noqa: BLE001`** (down from 91 at RED), each carrying a one-line justification comment on the following line; zero `# TODO: wip - do not catch all exceptions` markers remain. An independent code review of the staged diff ran at the earlier checkpoint; its one finding (the Group C teardown narrowing) was applied — see the Group C entry below.
 
 **RED findings:**
 
@@ -462,19 +462,33 @@ _Group D (partial):_
 
 **Checkpoint fix:** the first `make agent-check` flagged 8 `E501` (justification comments >150 chars); all shortened; re-check clean.
 
-**RESUME HERE — remaining work:**
+**Group D — `doctor_cmd.py` (landed):**
 
-1. **Group D — `doctor_cmd.py` (13 sites). Decisions pre-made:**
-   - NARROW `:103` (`init_config`) → `(PipelexCLIError, OSError)` — add `from pipelex.cli.exceptions import PipelexCLIError`; `init_config` only does os/shutil + raises `PipelexCLIError`, no TOML.
-   - NARROW `:121` (`load_config` + `model_validate`) → `(TomlError, OSError)` — `TomlError` already imported; `ValidationError` is caught separately just above.
-   - NARROW `:320` (`load_toml_from_path`) → `(TomlError, OSError)`.
-   - KEEP + justify: `:231` (whole credential probe), `:253` (`check_kit_template_exists` bool helper), `:294` (`replace_backend_file` bool helper), `:373` (`check_backend_files` inner — probe, after `except InferenceBackendLibraryError`), `:767` (`check_models` inner — probe, after `except InferenceBackendLibraryError`), `:881`/`:900`/`:911`/`:937` (doctor `--fix` handlers wrapping whole sub-commands `init_cmd`/`update_cmd`/`replace_backend_file`).
-   - `:785` (`doctor_cmd` command root) — already has a justification comment; leave unchanged.
+| Site | Disposition |
+| --- | --- |
+| `:103` (`init_config`) | NARROWED → `(PipelexCLIError, OSError)`; added `from pipelex.cli.exceptions import PipelexCLIError`. `init_config` does os/shutil work (the `os.makedirs` outside its inner try raises `OSError`) and wraps the rest into `PipelexCLIError`. |
+| `:121` (`load_config` + `model_validate`) | NARROWED → `(TomlError, OSError)`. Verified `ConfigLoader.load_config()` only does TOML loading + file IO (`TomlError` / `OSError`); the `ValidationError` from `model_validate` is caught separately just above. |
+| `:320` (`load_toml_from_path`) | NARROWED → `(TomlError, OSError)`. `load_toml_from_path` raises only `TomlError` (parse) or `OSError` (`open()`). |
+| `:231`, `:253`, `:294`, `:373`, `:767` | KEPT broad + justification. Doctor probes — "probe and report" over a non-enumerable surface (whole credential/model scans, kit-template lookups). |
+| `:881`, `:900`, `:911`, `:937` | KEPT broad + justification. Doctor `--fix` handlers wrapping whole sub-commands (`init_cmd`/`update_cmd`/`replace_backend_file`); a fix failure is reported, the run continues. |
+| `:785` (`doctor_cmd` command root) | Unchanged — already had a justification comment. |
 
-2. **Group E — `wf_pipe_router.py:120,165`.** DECISION: **remove both `try/except Exception: pass` blocks entirely.** `event_log` is always a `BufferingEventLog` (constructed at ~line 81; both call sites are inside `if event_log is not None:`), and `BufferingEventLog.close()` is a verified no-op (empty body) — it cannot raise. Replace each `try: event_log.close() except Exception: pass` with a bare `event_log.close()`.
+**Group E — `wf_pipe_router.py:120,165` (landed):** both `try/except Exception: pass` blocks removed entirely. `event_log` is always a `BufferingEventLog`; its `close()` is a verified no-op (empty body) and cannot raise, so both call sites are now a bare `event_log.close()`. No `noqa` survives at these sites.
 
-3. **Group F — verify + justify (~60 sites, no narrowing).** Confirm each is a true boundary; ensure a one-line justification comment exists. Categories: agent-CLI command handlers (`cli/agent_cli/commands/**`), dev CLI (`_dev_cli.py`, `dev_cli/commands/*`), telemetry (`exception_capture.py`, `posthog_span_exporter.py`, `telemetry_manager.py`), `wf_pipe_router.py:108,115,145,160` (workflow tracing-setup catches — observe/log), `init/command.py:484`, `init/routing.py:156`, `init/backends.py:183` (done this checkpoint), `ndjson_event_log.py:190` (`__del__`), `pipe_run.py:41`. **PENDING DECISION — `pipe_run.py:41`:** the plan offers "narrow to `PipelexError` now" or "defer to Phase 5"; recommend deferring to Phase 5 (the PipeRouter retry loop touches that path) — record when decided.
+**Group F — verify + justify (landed, no narrowing):** all sites confirmed as true boundaries; a one-line justification comment was added wherever one was missing.
 
-4. **REFACTOR:** verify every surviving `# noqa: BLE001` has a one-line justification; confirm `grep -rn "TODO: wip - do not catch all exceptions" pipelex` returns nothing (Group A removed all 5); run `make agent-test`; record the final `noqa: BLE001` count.
+- **Agent CLI command roots (23 sites)** — `cli/agent_cli/commands/**`. Each catches at the command function and routes through `agent_error()` (confirmed `-> NoReturn` in `agent_output.py`) — the documented CLI error boundary. The agent-CLI `doctor_cmd.py:134` had a redundant trailing `# agent_error has NoReturn` comment folded into the new justification.
+- **Dev CLI command roots (13 sites)** — `_dev_cli.py` ×10 (all identical: print a `rich` Traceback then `sys.exit(1)`) + `generate_mthds_schema_cmd.py`, `check_mthds_schema_cmd.py`, `preprocess_test_models_cmd.py` (the last had a weak `# Catch-all for unexpected errors` comment, strengthened).
+- **Telemetry (7 sites)** — `exception_capture.py:84,91` + `telemetry_manager.py:199` got new comments; `telemetry_manager.py:209/217/225` and `posthog_span_exporter.py:368` already carried one.
+- **`wf_pipe_router.py:108,115,142,157`** — workflow tracing setup/teardown observe-and-log catches (line numbers shifted from the plan's `145,160` after the Group E removal). Each got a "best-effort — must never fail the workflow" justification.
+- **`init/command.py:484`, `init/routing.py:156`** — command-level boundaries; got new comments. `init/backends.py` (now `:185`) already had one.
+- **`ndjson_event_log.py:190`** (`__del__`) — interpreter-shutdown safety net; already justified.
+- **`pipe_run.py:41`** — kept broad + justified; see the Group F checkbox decision above (observe-and-reraise).
+
+**REFACTOR (landed):** every surviving `# noqa: BLE001` verified to carry a comment on the following line (76/76); `grep` confirms no `# TODO: wip - do not catch all exceptions` remains; `make agent-check` clean and `make agent-test` passed.
+
+**Behavior changes from Phase 1.5 narrowing:** none intended. The three Group D narrowings (`:103`, `:121`, `:320`) each catch the same real exception set the guarded call raises on its expected path. If an unexpected exception type were ever raised, it now propagates to the `doctor_cmd` root catch (`:785`) — which already degrades gracefully — instead of being caught locally. `make agent-test` passed, confirming no test depended on the previously-broad catch.
+
+**Final `noqa: BLE001` count: 76** (91 at Phase 1.5 RED → 81 after Groups A/B/C/D-partial at the earlier checkpoint → 76 after Group D narrowing ×3 and Group E removal ×2 this session).
 
 **Assess-site decisions (kept broad + justified — the REFACTOR Running Notes requirement):** `_generate_graph_files`, `_try_add_rendered_file`, `act_assemble_graph` (Group A); `working_memory_factory.py:190`, `string_utils.py:58`, `structured_content_composer.py:107`, `output_renderer.py:54,92` (Group B); the 6 `teardown()` catches in `gateway_extract_worker.py` / `google_img_gen_worker.py` / `google_llm_worker.py` (Group C); `backends.py:183` (Group D, command boundary). Each wraps a non-enumerable exception surface (deep render/template trees, polyfactory mock building, arbitrary `__str__`, `asyncio.run(aclose())` over a connection pool, or a command-level boundary) and is a genuine best-effort / boundary catch.

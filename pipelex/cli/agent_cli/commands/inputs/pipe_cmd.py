@@ -116,6 +116,7 @@ def inputs_pipe_cmd(
         raise
 
     except Exception as exc:  # noqa: BLE001
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
         agent_error(str(exc), type(exc).__name__, cause=exc)
 
     finally:

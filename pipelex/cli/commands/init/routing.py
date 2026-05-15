@@ -154,5 +154,6 @@ def customize_routing_profile(selected_backend_keys: list[str], target_config_di
         console.print("[dim]You can further customize which models get used on which backend by editing the routes section.[/dim]")
 
     except Exception as exc:  # noqa: BLE001
+        # Command-level boundary: routing customization is optional during init — any failure is reported and init continues.
         console.print(f"[yellow]⚠ Warning: Failed to customize routing profile: {escape(str(exc))}[/yellow]")
         console.print("[dim]You can manually edit .pipelex/inference/routing_profiles.toml later[/dim]")

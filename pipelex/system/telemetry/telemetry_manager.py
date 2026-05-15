@@ -197,6 +197,7 @@ class TelemetryManager(TelemetryManagerAbstract):
             try:
                 self._exception_capture.close()
             except Exception as exc:  # noqa: BLE001
+                # Telemetry teardown must never break the app: a close failure is logged at debug and swallowed.
                 log.debug(f"Error closing exception capture: {exc}")
 
         # Then, shutdown the TracerProvider to flush all pending spans

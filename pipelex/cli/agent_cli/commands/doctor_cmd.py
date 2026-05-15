@@ -132,8 +132,8 @@ def agent_doctor_cmd(
         backends_healthy, backend_credential_reports, backends_message = check_backend_credentials(config_dir=config_dir)
         models_healthy, models_message, backend_file_reports = check_models(config_dir=config_dir)
     except Exception as exc:  # noqa: BLE001
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
         agent_error(f"Health check failed unexpectedly: {exc}", type(exc).__name__, cause=exc)
-        # agent_error has NoReturn
 
     all_healthy = config_healthy and telemetry_healthy and backends_healthy and models_healthy
 

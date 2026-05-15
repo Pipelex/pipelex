@@ -170,6 +170,7 @@ def run_bundle_cmd(
                 agent_error(str(exc), "PipelineRequestError", cause=exc)
 
             except Exception as exc:  # noqa: BLE001
+                # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
                 agent_error(str(exc), type(exc).__name__, cause=exc)
 
         case RunnerType.PIPELEX:
@@ -223,6 +224,7 @@ def run_bundle_cmd(
                 agent_error(exc.message, "PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
 
             except Exception as exc:  # noqa: BLE001
+                # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
                 agent_error(str(exc), type(exc).__name__, cause=exc)
 
             finally:

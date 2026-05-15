@@ -145,6 +145,7 @@ def validate_bundle_cmd(
             except typer.Exit:
                 raise
             except Exception as exc:  # noqa: BLE001
+                # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
                 agent_error(f"Graph generation failed: {exc}", type(exc).__name__, cause=exc)
 
         # Generate view (GraphSpec JSON) if requested and validation succeeded
@@ -172,6 +173,7 @@ def validate_bundle_cmd(
             except typer.Exit:
                 raise
             except Exception as exc:  # noqa: BLE001
+                # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
                 agent_error(f"View generation failed: {exc}", type(exc).__name__, cause=exc)
 
         agent_success(result)
@@ -214,6 +216,7 @@ def validate_bundle_cmd(
         raise
 
     except Exception as exc:  # noqa: BLE001
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
         agent_error(str(exc), type(exc).__name__, cause=exc)
 
     finally:

@@ -261,4 +261,5 @@ def pipe_cmd(
         agent_error(str(exc), "ValueError", cause=exc)
 
     except Exception as exc:  # noqa: BLE001
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
         agent_error(str(exc), type(exc).__name__, cause=exc)
