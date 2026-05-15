@@ -4,7 +4,7 @@
 
 Every inference worker that calls a third-party SDK must catch the SDK's typed exceptions and re-raise a `CogtError` subclass with an `InferenceErrorCategory`, a `user_action` hint, the model descriptor in the message, and `from exc` to preserve the cause chain. This is the foundation that everything downstream depends on — retry policy, agent hints, Temporal `non_retryable` decisions, human Rich panels.
 
-The work to lift every worker to this standard **has landed**, including the four LLM workers that previously mis-categorized `instructor`-wrapped errors. OpenAI Completions, OpenAI Responses, Mistral, and Google all now unwrap `InstructorRetryException` and dispatch through the same categorization helper their `_gen_text` paths use. The five LLM workers in scope (Anthropic + four) additionally carry beyond-reference upgrades: `InferenceErrorCategory.UNKNOWN` for unrecognized-underlying fallbacks (instead of mis-categorizing as `CONTENT`), structured `ProviderErrorMetadata` (status_code, request_id, retry_after_seconds, provider_error_code, body) on every raised inference error, and structured `UserAction(kind, detail)` with semantic `UserActionKind` values.
+The work to lift every worker to this standard **has landed across all worker kinds** (LLM, img-gen, extract, search), including the four LLM workers that previously mis-categorized `instructor`-wrapped errors. OpenAI Completions, OpenAI Responses, Mistral, and Google all now unwrap `InstructorRetryException` and dispatch through the same categorization helper their `_gen_text` paths use. Every worker additionally carries the beyond-reference upgrades: `InferenceErrorCategory.UNKNOWN` for unrecognized-underlying fallbacks (instead of mis-categorizing as `CONTENT`), structured `ProviderErrorMetadata` (status_code, request_id, retry_after_seconds, provider_error_code, body) on every raised inference error, and structured `UserAction(kind, detail)` with semantic `UserActionKind` values.
 
 ## Current state
 
@@ -91,14 +91,13 @@ The end-to-end test `tests/unit/pipelex/plugins/anthropic/test_anthropic_worker_
 
 ## Open gaps
 
-The LLM-side gaps have been closed across Anthropic, OpenAI Completions, OpenAI Responses, Mistral, and Google. Open gaps that remain are scoped to non-LLM workers:
+The classification + beyond-reference upgrades have landed across every worker kind — LLM, img-gen, extract, and search (plus AWS Bedrock LLM). The only residual note:
 
-- **Beyond-reference upgrades on remaining workers.** Img-gen, extract, and search workers (and AWS Bedrock LLM, which does not use `instructor` and so was never affected by the unwrap defect) still need migration to the three beyond-reference upgrades — `UNKNOWN` category for unrecognized fallback paths, `ProviderErrorMetadata` on every raise, and semantic `UserActionKind` values on `UserAction`. Tracked in Phases 10–11 of `_tprl/TODOS.md`.
 - **`pydantic.ValidationError` now routes to `UNKNOWN`.** When the LLM returns JSON that doesn't match the schema, `instructor` raises `InstructorRetryException` with a `ValidationError` (or `JSONDecodeError`) at `failed_attempts[-1].exception`. The unwrap branch returns it, the per-provider SDK categorization helpers don't recognize it, and the `UNKNOWN` fallback (introduced by Phase 2's upgrade A) catches it — distinguishing schema-mismatch from genuine `CONTENT`-policy violations. If we ever want a dedicated SCHEMA_MISMATCH category, the categorization helpers can be extended to recognize `pydantic.ValidationError` explicitly. Not a regression.
 
 ## Followups
 
-The major followups from this track have landed (`extract_underlying_sdk_exception` is shared in `pipelex/cogt/inference/error_classification.py`; OpenAI Completions, OpenAI Responses, Mistral, and Google now unwrap-and-dispatch; per-provider test parity with the Anthropic suite is in place; the `instructor.exceptions` → `instructor.core` import migration is complete). Remaining followups are about extending the same standard to non-LLM workers (tracked in `_tprl/TODOS.md` Phases 10–12) and the deeper Extract/Classify/Render refactor that consolidates the per-worker pipeline ([track-extract-classify-render.md](track-extract-classify-render.md)).
+The followups from this track have landed (`extract_underlying_sdk_exception` is shared in `pipelex/cogt/inference/error_classification.py`; OpenAI Completions, OpenAI Responses, Mistral, and Google now unwrap-and-dispatch; per-provider test parity with the Anthropic suite is in place; the `instructor.exceptions` → `instructor.core` import migration is complete; img-gen, extract, and search workers plus AWS Bedrock LLM all carry the beyond-reference upgrades). The one remaining followup is the deeper Extract/Classify/Render refactor that consolidates the per-worker pipeline ([track-extract-classify-render.md](track-extract-classify-render.md)).
 
 ### Risks and gotchas (for future similar work)
 
@@ -115,4 +114,4 @@ The major followups from this track have landed (`extract_underlying_sdk_excepti
 
 ## Historical snapshot (2026-04-05)
 
-Before Phases 0–3, a tier review classified every worker as Tier 1 (gold standard), Tier 2 (partial coverage), or Tier 3 (minimal / no error handling). At the time, Google, Mistral (LLM + extract), Azure img-gen, FAL, HuggingFace, Docling, Linkup, and pypdfium2 had no SDK exception handling at all. Phases 2 and 3 closed those gaps and the tier ranking no longer reflects current reality — every worker is at the Tier 1 standard except for the residual `instructor` unwrap on OpenAI / Mistral / Google. This historical detail is preserved here so the "what motivated this work" context isn't lost.
+Before Phases 0–3, a tier review classified every worker as Tier 1 (gold standard), Tier 2 (partial coverage), or Tier 3 (minimal / no error handling). At the time, Google, Mistral (LLM + extract), Azure img-gen, FAL, HuggingFace, Docling, Linkup, and pypdfium2 had no SDK exception handling at all. The sweep closed those gaps and the tier ranking no longer reflects current reality — every worker is now at the Tier 1 standard. This historical detail is preserved here so the "what motivated this work" context isn't lost.
