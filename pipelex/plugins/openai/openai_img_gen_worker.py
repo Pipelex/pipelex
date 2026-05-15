@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, cast
 import openai
 from openai import (
     APIConnectionError,
+    APIStatusError,
     APITimeoutError,
     AuthenticationError,
     BadRequestError,
@@ -185,6 +186,32 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
                 provider_metadata=metadata,
             ) from sdk_exc
 
+        if isinstance(sdk_exc, APIStatusError):
+            # Unhandled APIStatusError (e.g. 409 Conflict, 422 Unprocessable
+            # Entity): split 4xx (non-retryable) from 5xx (retryable).
+            status_code = sdk_exc.status_code
+            if 400 <= status_code < 500:
+                msg = f"OpenAI ImgGen client error (HTTP {status_code}) for model '{self.inference_model.desc}': {sdk_exc}"
+                raise ImgGenGenerationError(
+                    msg,
+                    error_category=InferenceErrorCategory.CONFIGURATION,
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_INPUT,
+                        detail="OpenAI rejected the request — review the prompt, parameters, and model configuration",
+                    ),
+                    provider_metadata=metadata,
+                ) from sdk_exc
+            msg = f"OpenAI ImgGen API error (HTTP {status_code}) for model '{self.inference_model.desc}': {sdk_exc}"
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="OpenAI returned an error — the system will retry automatically",
+                ),
+                provider_metadata=metadata,
+            ) from sdk_exc
+
     @override
     async def _gen_image(
         self,
@@ -220,16 +247,7 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
                 images_response = cast("ImagesResponse", await self.openai_client.images.edit(**args_dict))
             else:
                 images_response = cast("ImagesResponse", await self.openai_client.images.generate(**args_dict))
-        except (
-            NotFoundError,
-            RateLimitError,
-            APITimeoutError,
-            APIConnectionError,
-            InternalServerError,
-            BadRequestError,
-            PermissionDeniedError,
-            AuthenticationError,
-        ) as sdk_exc:
+        except (APIStatusError, APIConnectionError) as sdk_exc:
             self._raise_categorized_openai_sdk_error(sdk_exc=sdk_exc)
             raise  # unreachable: helper always raises for these types
 

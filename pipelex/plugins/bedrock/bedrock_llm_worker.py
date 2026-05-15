@@ -180,6 +180,17 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
             )
 
         msg = f"AWS error for model '{self.inference_model.desc}' ({error_code}): {error_msg}"
+        status_code = metadata.status_code
+        if status_code is not None and 400 <= status_code < 500:
+            return LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.CONFIGURATION,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="AWS rejected the request — review request parameters and model configuration",
+                ),
+                provider_metadata=metadata,
+            )
         return LLMCompletionError(
             msg,
             error_category=InferenceErrorCategory.TRANSIENT,

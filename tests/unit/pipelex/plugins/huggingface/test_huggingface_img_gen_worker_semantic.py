@@ -61,6 +61,9 @@ class TestHuggingFaceImgGenWorkerSemantic:
             (403, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHECK_CREDENTIALS),
             (404, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHANGE_MODEL),
             (400, InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
+            # Unhandled 4xx: non-retryable client error, not TRANSIENT.
+            (409, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHANGE_INPUT),
+            (422, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHANGE_INPUT),
             (500, InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
         ],
     )

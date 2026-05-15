@@ -93,6 +93,17 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
                 ),
                 provider_metadata=metadata,
             ) from exc
+        if 400 <= status_code < 500:
+            msg = f"FAL client error ({status_code}) for model '{self.inference_model.desc}': {exc}"
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.CONFIGURATION,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="FAL rejected the request — review the prompt, parameters, and model configuration",
+                ),
+                provider_metadata=metadata,
+            ) from exc
         msg = f"FAL API error ({status_code}) for model '{self.inference_model.desc}': {exc}"
         raise ImgGenGenerationError(
             msg,

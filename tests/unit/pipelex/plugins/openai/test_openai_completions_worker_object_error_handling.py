@@ -18,7 +18,7 @@ from instructor.core import InstructorRetryException
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
+from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, LLMModelNotFoundError
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.plugins.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker
 from tests.helpers.instructor_test_utils import DummySchema, make_llm_job, wrap_in_instructor_retry
@@ -224,7 +224,7 @@ class TestOpenAICompletionsWorkerObjectErrorHandling:
         wrapped = wrap_in_instructor_retry(_make_openai_not_found_error("Model gpt-99 not found"))
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
-        with pytest.raises(LLMCompletionError) as exc_info:
+        with pytest.raises(LLMModelNotFoundError) as exc_info:
             await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION

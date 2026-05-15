@@ -15,7 +15,9 @@ from pipelex.cogt.exceptions import (
     ImgGenGenerationError,
     InferenceErrorCategory,
     LLMCompletionError,
+    LLMModelNotFoundError,
 )
+from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.plugins.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker
 from pipelex.plugins.openai.openai_img_gen_worker import OpenAIImgGenWorker
 from pipelex.plugins.openai.openai_responses_llm_worker import OpenAIResponsesLLMWorker
@@ -52,6 +54,14 @@ def _make_openai_not_found_error(message: str) -> openai.NotFoundError:
 
 def _make_openai_auth_error(message: str) -> openai.AuthenticationError:
     return openai.AuthenticationError(message, response=_mock_httpx_response(401), body=None)
+
+
+def _make_openai_conflict_error(message: str) -> openai.ConflictError:
+    return openai.ConflictError(message, response=_mock_httpx_response(409), body=None)
+
+
+def _make_openai_unprocessable_error(message: str) -> openai.UnprocessableEntityError:
+    return openai.UnprocessableEntityError(message, response=_mock_httpx_response(422), body=None)
 
 
 def _make_completions_llm_worker(mocker: MockerFixture) -> OpenAICompletionsLLMWorker:
@@ -236,12 +246,12 @@ class TestOpenAIWorkerErrorHandling:
     # ---- Existing exception categories ----
 
     async def test_completions_llm_not_found_has_configuration_category(self, mocker: MockerFixture) -> None:
-        """NotFoundError should be categorized as CONFIGURATION."""
+        """NotFoundError is specialized to LLMModelNotFoundError and categorized as CONFIGURATION."""
         worker = _make_completions_llm_worker(mocker)
         sdk_exc = _make_openai_not_found_error("model gpt-99 not found")
         worker.openai_client_for_text.chat.completions.create.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
-        with pytest.raises(LLMCompletionError) as exc_info:
+        with pytest.raises(LLMModelNotFoundError) as exc_info:
             await worker._gen_text(llm_job=_make_llm_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
@@ -267,6 +277,51 @@ class TestOpenAIWorkerErrorHandling:
 
         with pytest.raises(LLMCompletionError) as exc_info:
             await worker._gen_text(llm_job=_make_llm_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
+        assert exc_info.value.__cause__ is sdk_exc
+
+    # ---- Unhandled 4xx APIStatusError fallback (409 Conflict, 422 Unprocessable) ----
+
+    @pytest.mark.parametrize("make_error", [_make_openai_conflict_error, _make_openai_unprocessable_error])
+    async def test_completions_llm_unhandled_4xx_is_configuration(
+        self,
+        mocker: MockerFixture,
+        make_error: Any,
+    ) -> None:
+        """Unhandled 4xx APIStatusError (e.g. 409/422) is non-retryable CONFIGURATION, not TRANSIENT."""
+        worker = _make_completions_llm_worker(mocker)
+        sdk_exc = make_error("client error")
+        worker.openai_client_for_text.chat.completions.create.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        with pytest.raises(LLMCompletionError) as exc_info:
+            await worker._gen_text(llm_job=_make_llm_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.CHANGE_INPUT
+        assert exc_info.value.__cause__ is sdk_exc
+
+    async def test_responses_llm_unhandled_4xx_is_configuration(self, mocker: MockerFixture) -> None:
+        """Responses worker: unhandled 4xx APIStatusError is non-retryable CONFIGURATION."""
+        worker = _make_responses_llm_worker(mocker)
+        sdk_exc = _make_openai_conflict_error("conflict")
+        worker.openai_client_for_responses.responses.create.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        with pytest.raises(LLMCompletionError) as exc_info:
+            await worker._gen_text(llm_job=_make_llm_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
+        assert exc_info.value.__cause__ is sdk_exc
+
+    async def test_img_gen_unhandled_4xx_is_configuration(self, mocker: MockerFixture) -> None:
+        """ImgGen worker: unhandled 4xx APIStatusError (409) no longer leaks raw — categorized CONFIGURATION."""
+        worker = _make_img_gen_worker(mocker)
+        sdk_exc = _make_openai_unprocessable_error("unprocessable")
+        worker.openai_client.images.generate.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        with pytest.raises(ImgGenGenerationError) as exc_info:
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
         assert exc_info.value.__cause__ is sdk_exc

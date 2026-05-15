@@ -71,6 +71,8 @@ class TestBedrockWorkerSemantic:
             ("ModelNotReadyException", "Model not ready", 503, InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
             ("ServiceUnavailableException", "Service unavailable", 503, InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
             ("ResourceNotFoundException", "Model not found", 404, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHANGE_MODEL),
+            # Unhandled error code on a 4xx status: non-retryable client error, not TRANSIENT.
+            ("UnknownAWSException", "Mystery client failure", 409, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHANGE_INPUT),
             ("UnknownAWSException", "Mystery failure", 500, InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
         ],
     )

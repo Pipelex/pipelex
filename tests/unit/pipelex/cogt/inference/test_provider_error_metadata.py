@@ -58,10 +58,24 @@ class TestProviderErrorMetadata:
             sdk_exception_type="RateLimitError",
             status_code=429,
             retry_after_seconds=5.0,
-            body={"error": {"type": "rate_limit_error"}},
         )
 
         dumped = metadata.model_dump()
         rebuilt = ProviderErrorMetadata.model_validate(dumped)
 
         assert rebuilt == metadata
+
+    def test_body_is_excluded_from_serialization(self) -> None:
+        """``body`` may carry account ids or credential fragments, so it is dropped
+        from serialization while staying readable in-process.
+        """
+        metadata = ProviderErrorMetadata(
+            provider="anthropic",
+            sdk_exception_type="RateLimitError",
+            status_code=429,
+            body={"error": {"type": "rate_limit_error", "account_id": "acct_secret"}},
+        )
+
+        assert metadata.body == {"error": {"type": "rate_limit_error", "account_id": "acct_secret"}}
+        assert "body" not in metadata.model_dump()
+        assert "acct_secret" not in metadata.model_dump_json()

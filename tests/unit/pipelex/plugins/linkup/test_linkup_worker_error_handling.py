@@ -5,12 +5,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from linkup import LinkupAuthenticationError, LinkupTooManyRequestsError
+from linkup import LinkupAuthenticationError, LinkupInsufficientCreditError, LinkupTooManyRequestsError
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 from pipelex.cogt.exceptions import ExtractJobFailureError, InferenceErrorCategory, SearchJobFailureError
+from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.plugins.linkup.linkup_extract_worker import LinkupExtractWorker
 from pipelex.plugins.linkup.linkup_search_worker import LinkupSearchWorker
 from tests.unit.pipelex.plugins.linkup.test_data import LinkupExtractErrorHandlingTestData, LinkupSearchErrorHandlingTestData
@@ -137,6 +138,33 @@ class TestLinkupWorkerErrorHandling:
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.__cause__ is sdk_exc
         assert expected_message_substring in exc_info.value.args[0].lower()
+
+    # ---- User action semantics ----
+
+    @pytest.mark.parametrize(
+        ("exception_class", "expected_kind"),
+        [
+            (LinkupAuthenticationError, UserActionKind.CHECK_CREDENTIALS),
+            (LinkupInsufficientCreditError, UserActionKind.CHECK_BILLING),
+            (LinkupTooManyRequestsError, UserActionKind.WAIT_AND_RETRY),
+        ],
+    )
+    async def test_search_user_action_uses_specific_kind(
+        self,
+        mocker: MockerFixture,
+        exception_class: type[Exception],
+        expected_kind: UserActionKind,
+    ) -> None:
+        """Known Linkup error types carry a specific UserActionKind, not UNKNOWN."""
+        worker = _make_linkup_search_worker(mocker)
+        sdk_exc = exception_class("linkup error")
+        _get_linkup_client(worker).async_search.side_effect = sdk_exc
+
+        with pytest.raises(SearchJobFailureError) as exc_info:
+            await worker._search_sourced_answer(search_job=_make_search_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is expected_kind
 
     # ---- Error report tests ----
 

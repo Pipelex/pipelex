@@ -143,6 +143,9 @@ class GatewayFactory:
                 return InferenceErrorCategory.CONTENT
             if isinstance(exc, portkey_exc.NotFoundError):
                 return InferenceErrorCategory.CONFIGURATION
+            # Unhandled 4xx: a client-side problem, non-retryable.
+            if 400 <= status_code < 500:
+                return InferenceErrorCategory.CONFIGURATION
         if isinstance(exc, (portkey_exc.APITimeoutError, portkey_exc.APIConnectionError)):
             return InferenceErrorCategory.TRANSIENT
         return InferenceErrorCategory.TRANSIENT
@@ -176,6 +179,12 @@ class GatewayFactory:
                 return UserAction(
                     kind=UserActionKind.CHANGE_INPUT,
                     detail="Pipelex Gateway rejected the request — review the prompt and parameters",
+                )
+            # Unhandled 4xx: a client-side problem, non-retryable.
+            if 400 <= status_code < 500:
+                return UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Pipelex Gateway rejected the request — review the prompt, parameters, and model configuration",
                 )
         if isinstance(exc, (portkey_exc.APITimeoutError, portkey_exc.APIConnectionError)):
             return UserAction(

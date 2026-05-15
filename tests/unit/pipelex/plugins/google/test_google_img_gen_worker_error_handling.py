@@ -155,6 +155,19 @@ class TestGoogleImgGenWorkerErrorHandling:
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.CHANGE_INPUT
 
+    async def test_unhandled_4xx_is_change_input(self, mocker: MockerFixture) -> None:
+        """A ClientError with an unhandled 4xx status is non-retryable CONFIGURATION, not TRANSIENT."""
+        worker = _make_worker(mocker)
+        sdk_exc = _make_google_client_error(409, "Conflict: resource already exists")
+        worker.genai_async_client.models.generate_content.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        with pytest.raises(ImgGenGenerationError) as exc_info:
+            await worker._gen_image(img_gen_job=_make_img_gen_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.CHANGE_INPUT
+
     async def test_server_error_500_is_wait_and_retry(self, mocker: MockerFixture) -> None:
         worker = _make_worker(mocker)
         sdk_exc = _make_google_server_error(500, "Internal server error")

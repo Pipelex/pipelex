@@ -79,7 +79,7 @@ class GoogleErrorHandlingTestData:
             "other_client_error_fallback",
             422,
             "Unprocessable entity",
-            InferenceErrorCategory.TRANSIENT,
-            None,
+            InferenceErrorCategory.CONFIGURATION,
+            "review",
         ),
     ]

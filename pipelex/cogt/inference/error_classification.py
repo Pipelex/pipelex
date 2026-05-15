@@ -7,9 +7,11 @@ wraps when ``instructor`` exhausts its retry loop.
 """
 
 import json
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from typing import Any, cast
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from pipelex.types import StrEnum
 
@@ -27,7 +29,10 @@ class ProviderErrorMetadata(BaseModel):
     request_id: str | None = None
     retry_after_seconds: float | None = None
     provider_error_code: str | None = None
-    body: Any | None = None
+    # Raw provider response body — can carry account ids, billing details, or
+    # credential fragments, so it is excluded from serialization (CLI JSON,
+    # agent output, Temporal error details) while staying available in-process.
+    body: Any | None = Field(default=None, exclude=True)
 
 
 class UserActionKind(StrEnum):
@@ -207,12 +212,28 @@ def extract_underlying_sdk_exception(instructor_exc: Any) -> BaseException | Non
 
 
 def _parse_retry_after_seconds(value: Any) -> float | None:
+    """Parse a ``Retry-After`` header value into a delay in seconds.
+
+    The HTTP spec allows two forms: a non-negative number of seconds, or an
+    HTTP-date. Numeric values are returned directly; HTTP-date values are
+    converted to a delay relative to now, clamped to ``0.0`` when already past.
+    """
     if value is None:
         return None
     try:
         return float(value)
     except (TypeError, ValueError):
+        pass
+    if not isinstance(value, str):
         return None
+    try:
+        retry_date = parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return None
+    if retry_date.tzinfo is None:
+        retry_date = retry_date.replace(tzinfo=timezone.utc)
+    delta_seconds = (retry_date - datetime.now(timezone.utc)).total_seconds()
+    return max(delta_seconds, 0.0)
 
 
 def _provider_error_code_from_body(body: Any) -> str | None:

@@ -158,6 +158,18 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
                 provider_metadata=metadata,
             )
 
+        if 400 <= status_code < 500:
+            msg = f"Mistral client error for model '{self.inference_model.desc}': {exc}"
+            return LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.CONFIGURATION,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Mistral rejected the request — review the prompt, parameters, and model configuration",
+                ),
+                provider_metadata=metadata,
+            )
+
         msg = f"Mistral API error for model '{self.inference_model.desc}': {exc}"
         return LLMCompletionError(
             msg,

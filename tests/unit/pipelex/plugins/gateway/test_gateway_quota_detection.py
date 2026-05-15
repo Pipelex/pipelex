@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 from pipelex.cogt.exceptions import ExtractJobFailureError, ImgGenGenerationError, InferenceErrorCategory
+from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.plugins.gateway.gateway_exceptions import GatewaySearchResponseError
 from pipelex.plugins.gateway.gateway_extract_worker import GatewayExtractWorker
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
@@ -137,6 +138,20 @@ class TestGatewayQuotaDetection:
         result = GatewayFactory.classify_error_category(exc)
 
         assert result is expected_category
+
+    async def test_classify_unhandled_4xx_status_error_is_configuration(self) -> None:
+        """A generic 4xx APIStatusError is non-retryable CONFIGURATION, not TRANSIENT."""
+        exc = _make_portkey_exception("APIStatusError", 409, "Conflict")
+
+        assert GatewayFactory.classify_error_category(exc) is InferenceErrorCategory.CONFIGURATION
+
+    async def test_user_action_for_unhandled_4xx_is_change_input(self) -> None:
+        """A generic 4xx APIStatusError yields a corrective CHANGE_INPUT action, not WAIT_AND_RETRY."""
+        exc = _make_portkey_exception("APIStatusError", 409, "Conflict")
+
+        action = GatewayFactory.make_user_action_from_portkey_error(exc)
+
+        assert action.kind is UserActionKind.CHANGE_INPUT
 
     # ---- Full flow tests: verify the exception propagates with category ----
 

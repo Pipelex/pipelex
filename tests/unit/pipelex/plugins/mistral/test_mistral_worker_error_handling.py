@@ -16,6 +16,7 @@ from pipelex.cogt.exceptions import (
     InferenceErrorCategory,
     LLMCompletionError,
 )
+from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.plugins.mistral.mistral_extract_worker import MistralExtractWorker
 from pipelex.plugins.mistral.mistral_llm_worker import MistralLLMWorker
 from tests.unit.pipelex.plugins.mistral.test_data import (
@@ -120,6 +121,20 @@ class TestMistralWorkerErrorHandling:
         if expected_action_substring:
             assert exc_info.value.user_action is not None
             assert expected_action_substring in exc_info.value.user_action.detail.lower()
+
+    async def test_llm_worker_unhandled_4xx_is_configuration(self, mocker: MockerFixture) -> None:
+        """A MistralError with an unhandled 4xx status is non-retryable CONFIGURATION, not TRANSIENT."""
+        worker = _make_mistral_llm_worker(mocker)
+        sdk_exc = _make_mistral_error(409, "Conflict")
+        worker.mistral_client_for_text.chat.complete_async.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        with pytest.raises(LLMCompletionError) as exc_info:
+            await worker._gen_text(llm_job=_make_llm_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.CHANGE_INPUT
+        assert exc_info.value.__cause__ is sdk_exc
 
     # ---- MistralExtractWorker error handling ----
 

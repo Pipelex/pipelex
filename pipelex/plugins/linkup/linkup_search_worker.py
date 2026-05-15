@@ -47,7 +47,7 @@ class LinkupSearchWorker(SearchWorkerAbstract):
                 msg,
                 error_category=InferenceErrorCategory.CONFIGURATION,
                 user_action=UserAction(
-                    kind=UserActionKind.UNKNOWN,
+                    kind=UserActionKind.CHECK_CREDENTIALS,
                     detail="Check that the LINKUP_API_KEY environment variable is set",
                 ),
             )
@@ -57,7 +57,7 @@ class LinkupSearchWorker(SearchWorkerAbstract):
                 msg,
                 error_category=InferenceErrorCategory.CAPACITY,
                 user_action=UserAction(
-                    kind=UserActionKind.UNKNOWN,
+                    kind=UserActionKind.CHECK_BILLING,
                     detail=f"Your Linkup account has insufficient credits — check billing at {URLs.linkup_billing}",
                 ),
             )
@@ -67,7 +67,7 @@ class LinkupSearchWorker(SearchWorkerAbstract):
                 msg,
                 error_category=InferenceErrorCategory.TRANSIENT,
                 user_action=UserAction(
-                    kind=UserActionKind.UNKNOWN,
+                    kind=UserActionKind.WAIT_AND_RETRY,
                     detail="Rate limited by Linkup — the system will retry automatically",
                 ),
             )

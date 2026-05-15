@@ -192,13 +192,15 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
                 provider_metadata=metadata,
             )
 
+        # Fallback for other 4xx errors: a ClientError is always 4xx, so it is a
+        # non-retryable client-side problem — not a transient one.
         msg = f"Google API client error for model '{self.inference_model.desc}': {exc}"
         return LLMCompletionError(
             msg,
-            error_category=InferenceErrorCategory.TRANSIENT,
+            error_category=InferenceErrorCategory.CONFIGURATION,
             user_action=UserAction(
-                kind=UserActionKind.WAIT_AND_RETRY,
-                detail="Google API returned an unexpected client error — the system will retry automatically",
+                kind=UserActionKind.CHANGE_INPUT,
+                detail="Google rejected the request — review the prompt, parameters, and model configuration",
             ),
             provider_metadata=metadata,
         )

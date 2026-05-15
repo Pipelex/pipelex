@@ -13,6 +13,9 @@ payload. It must tolerate the SDK's two exception shapes:
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+from email.utils import format_datetime
+
 import httpx
 import openai
 
@@ -56,6 +59,43 @@ class TestExtractOpenAIMetadata:
         exc = openai.RateLimitError(
             "rate limited",
             response=_make_response(429),
+            body=None,
+        )
+
+        metadata = extract_openai_metadata(exc)
+
+        assert metadata.retry_after_seconds is None
+
+    def test_retry_after_seconds_parses_future_http_date(self) -> None:
+        """``Retry-After`` may be an HTTP-date, not just a number of seconds."""
+        future = format_datetime(datetime.now(timezone.utc) + timedelta(hours=1), usegmt=True)
+        exc = openai.RateLimitError(
+            "rate limited",
+            response=_make_response(429, headers={"retry-after": future}),
+            body=None,
+        )
+
+        metadata = extract_openai_metadata(exc)
+
+        assert metadata.retry_after_seconds is not None
+        assert metadata.retry_after_seconds > 0.0
+
+    def test_retry_after_seconds_clamps_past_http_date_to_zero(self) -> None:
+        past = format_datetime(datetime.now(timezone.utc) - timedelta(hours=1), usegmt=True)
+        exc = openai.RateLimitError(
+            "rate limited",
+            response=_make_response(429, headers={"retry-after": past}),
+            body=None,
+        )
+
+        metadata = extract_openai_metadata(exc)
+
+        assert metadata.retry_after_seconds == 0.0
+
+    def test_retry_after_seconds_is_none_for_unparseable_value(self) -> None:
+        exc = openai.RateLimitError(
+            "rate limited",
+            response=_make_response(429, headers={"retry-after": "not-a-date"}),
             body=None,
         )
 
