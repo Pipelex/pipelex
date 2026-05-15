@@ -10,8 +10,8 @@ from pipelex.pipe_run.dry_run import DryRunStatus, convert_to_working_memory_for
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError
+from pipelex.pipe_signature.pipe_signature import PipeSignature
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
-from pipelex.pipe_signature.pipe_signature_runtime import PipeSignatureRuntime
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.system.telemetry.otel_constants import OTelConstants
@@ -21,8 +21,8 @@ if TYPE_CHECKING:
     from pipelex.core.stuffs.text_content import TextContent
 
 
-def _make_runtime(blueprint: PipeSignatureBlueprint, pipe_code: str = "sig_pipe") -> PipeSignatureRuntime:
-    return PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+def _make_runtime(blueprint: PipeSignatureBlueprint, pipe_code: str = "sig_pipe") -> PipeSignature:
+    return PipeFactory[PipeSignature].make_from_blueprint(
         domain_code=SIGNATURES_DOMAIN_CODE,
         pipe_code=pipe_code,
         blueprint=blueprint,
@@ -30,7 +30,7 @@ def _make_runtime(blueprint: PipeSignatureBlueprint, pipe_code: str = "sig_pipe"
     )
 
 
-class TestPipeSignatureRuntime:
+class TestPipeSignature:
     def test_factory_produces_runtime_from_blueprint(
         self,
         setup_signature_library: Callable[[], None],
@@ -39,7 +39,7 @@ class TestPipeSignatureRuntime:
         setup_signature_library()
         blueprint = make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary")
         runtime = _make_runtime(blueprint)
-        assert isinstance(runtime, PipeSignatureRuntime)
+        assert isinstance(runtime, PipeSignature)
         assert runtime.type == PipeType.PIPE_SIGNATURE
         assert runtime.pipe_category == PipeCategory.PIPE_SIGNATURE
 

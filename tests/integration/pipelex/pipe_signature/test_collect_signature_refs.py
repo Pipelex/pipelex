@@ -13,8 +13,8 @@ from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequen
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
+from pipelex.pipe_signature.pipe_signature import PipeSignature
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
-from pipelex.pipe_signature.pipe_signature_runtime import PipeSignatureRuntime
 from tests.integration.pipelex.pipe_signature.conftest import SIGNATURES_DOMAIN_CODE
 
 
@@ -44,7 +44,7 @@ class TestCollectSignatureRefs:
     ) -> None:
         setup_signature_library()
         blueprint = make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary")
-        runtime = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+        runtime = PipeFactory[PipeSignature].make_from_blueprint(
             domain_code=SIGNATURES_DOMAIN_CODE,
             pipe_code="self_signature",
             blueprint=blueprint,
@@ -59,7 +59,7 @@ class TestCollectSignatureRefs:
     ) -> None:
         setup_signature_library()
         sig_blueprint = make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary")
-        sig_pipe = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+        sig_pipe = PipeFactory[PipeSignature].make_from_blueprint(
             domain_code=SIGNATURES_DOMAIN_CODE,
             pipe_code="seq_sig_step",
             blueprint=sig_blueprint,
@@ -90,7 +90,7 @@ class TestCollectSignatureRefs:
     ) -> None:
         setup_signature_library()
         sig_blueprint = make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary")
-        sig_pipe = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+        sig_pipe = PipeFactory[PipeSignature].make_from_blueprint(
             domain_code=SIGNATURES_DOMAIN_CODE,
             pipe_code="par_sig_branch",
             blueprint=sig_blueprint,
@@ -122,14 +122,14 @@ class TestCollectSignatureRefs:
     ) -> None:
         setup_signature_library()
         sig_blueprint_a = make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary")
-        sig_a = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+        sig_a = PipeFactory[PipeSignature].make_from_blueprint(
             domain_code=SIGNATURES_DOMAIN_CODE,
             pipe_code="cond_sig_a",
             blueprint=sig_blueprint_a,
             concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
         )
         sig_blueprint_b = make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary")
-        sig_b = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+        sig_b = PipeFactory[PipeSignature].make_from_blueprint(
             domain_code=SIGNATURES_DOMAIN_CODE,
             pipe_code="cond_sig_b",
             blueprint=sig_blueprint_b,
@@ -162,7 +162,7 @@ class TestCollectSignatureRefs:
     ) -> None:
         setup_signature_library()
         sig_blueprint = make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary")
-        sig_pipe = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+        sig_pipe = PipeFactory[PipeSignature].make_from_blueprint(
             domain_code=SIGNATURES_DOMAIN_CODE,
             pipe_code="batch_sig_branch",
             blueprint=sig_blueprint,
@@ -194,7 +194,7 @@ class TestCollectSignatureRefs:
         make_signature_blueprint: Callable[..., PipeSignatureBlueprint],
     ) -> None:
         setup_signature_library()
-        sig_pipe = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+        sig_pipe = PipeFactory[PipeSignature].make_from_blueprint(
             domain_code=SIGNATURES_DOMAIN_CODE,
             pipe_code="nested_sig",
             blueprint=make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary"),
@@ -236,7 +236,7 @@ class TestCollectSignatureRefs:
         make_signature_blueprint: Callable[..., PipeSignatureBlueprint],
     ) -> None:
         setup_signature_library()
-        sig_pipe = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+        sig_pipe = PipeFactory[PipeSignature].make_from_blueprint(
             domain_code=SIGNATURES_DOMAIN_CODE,
             pipe_code="cycle_sig",
             blueprint=make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary"),
@@ -270,7 +270,7 @@ class TestCollectSignatureRefs:
         make_signature_blueprint: Callable[..., PipeSignatureBlueprint],
     ) -> None:
         setup_signature_library()
-        sig_pipe = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+        sig_pipe = PipeFactory[PipeSignature].make_from_blueprint(
             domain_code=SIGNATURES_DOMAIN_CODE,
             pipe_code="reachable_sig",
             blueprint=make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary"),

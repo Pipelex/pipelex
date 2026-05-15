@@ -17,8 +17,8 @@ if TYPE_CHECKING:
     from pipelex.libraries.library_crate import LibraryCrate
 
 
-class PipeSignatureRuntime(PipeAbstract):
-    """Runtime stand-in for a contract-only `PipeSignature`.
+class PipeSignature(PipeAbstract):
+    """Runtime stand-in for a contract-only `PipeSignatureSpec`.
 
     Dry-run mints a mock output via the declared `StuffSpec`. Live-run raises
     `PipeSignatureNotExecutableError` to enforce that signatures must be replaced with

@@ -13,8 +13,8 @@ from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_run.dry_run import DryRunStatus, dry_run_pipe, dry_run_pipes
 from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
+from pipelex.pipe_signature.pipe_signature import PipeSignature
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
-from pipelex.pipe_signature.pipe_signature_runtime import PipeSignatureRuntime
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 from tests.integration.pipelex.pipe_signature.conftest import SIGNATURES_DOMAIN_CODE
 
@@ -85,7 +85,7 @@ class TestDryRunStrictMode:
         make_signature_blueprint: Callable[..., PipeSignatureBlueprint],
     ) -> None:
         setup_signature_library()
-        sig_pipe = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+        sig_pipe = PipeFactory[PipeSignature].make_from_blueprint(
             domain_code=SIGNATURES_DOMAIN_CODE,
             pipe_code="strict_sig_step",
             blueprint=make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary"),
@@ -115,7 +115,7 @@ class TestDryRunStrictMode:
         make_signature_blueprint: Callable[..., PipeSignatureBlueprint],
     ) -> None:
         setup_signature_library()
-        sig_pipe = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+        sig_pipe = PipeFactory[PipeSignature].make_from_blueprint(
             domain_code=SIGNATURES_DOMAIN_CODE,
             pipe_code="lenient_sig_step",
             blueprint=make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary"),
@@ -144,13 +144,13 @@ class TestDryRunStrictMode:
         make_signature_blueprint: Callable[..., PipeSignatureBlueprint],
     ) -> None:
         setup_signature_library()
-        sig_a = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+        sig_a = PipeFactory[PipeSignature].make_from_blueprint(
             domain_code=SIGNATURES_DOMAIN_CODE,
             pipe_code="multi_sig_a",
             blueprint=make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary"),
             concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
         )
-        sig_b = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+        sig_b = PipeFactory[PipeSignature].make_from_blueprint(
             domain_code=SIGNATURES_DOMAIN_CODE,
             pipe_code="multi_sig_b",
             blueprint=make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary"),
@@ -184,7 +184,7 @@ class TestDryRunStrictMode:
         make_signature_blueprint: Callable[..., PipeSignatureBlueprint],
     ) -> None:
         setup_signature_library()
-        sig_pipe = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+        sig_pipe = PipeFactory[PipeSignature].make_from_blueprint(
             domain_code=SIGNATURES_DOMAIN_CODE,
             pipe_code="dep_sig",
             blueprint=make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary"),
@@ -243,13 +243,13 @@ class TestDryRunStrictMode:
         # Regression: when multiple pipes in the batch each reach distinct signatures, the strict
         # pre-check must surface every offender in a single error, not short-circuit on the first.
         setup_signature_library()
-        sig_a = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+        sig_a = PipeFactory[PipeSignature].make_from_blueprint(
             domain_code=SIGNATURES_DOMAIN_CODE,
             pipe_code="agg_sig_a",
             blueprint=make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary"),
             concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
         )
-        sig_b = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+        sig_b = PipeFactory[PipeSignature].make_from_blueprint(
             domain_code=SIGNATURES_DOMAIN_CODE,
             pipe_code="agg_sig_b",
             blueprint=make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary"),
@@ -316,7 +316,7 @@ class TestDryRunStrictMode:
         )
         get_pipe_library().add_new_pipe(pipe=innocent_op)
 
-        hidden_sig = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+        hidden_sig = PipeFactory[PipeSignature].make_from_blueprint(
             domain_code=SIGNATURES_DOMAIN_CODE,
             pipe_code="hidden_sig",
             blueprint=make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary"),
@@ -353,13 +353,13 @@ class TestDryRunStrictMode:
         # Regression: when multiple pipes each reach distinct signatures, all offenders must be
         # reported — not just one. Multi-offender message uses a plural header.
         setup_signature_library()
-        sig_a = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+        sig_a = PipeFactory[PipeSignature].make_from_blueprint(
             domain_code=SIGNATURES_DOMAIN_CODE,
             pipe_code="multi_off_sig_a",
             blueprint=make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary"),
             concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
         )
-        sig_b = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+        sig_b = PipeFactory[PipeSignature].make_from_blueprint(
             domain_code=SIGNATURES_DOMAIN_CODE,
             pipe_code="multi_off_sig_b",
             blueprint=make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary"),
@@ -407,7 +407,7 @@ class TestDryRunStrictMode:
         # A signature validated on its own is the placeholder itself, not a pipe that
         # "depends on" one: it belongs in signature_refs, never in offending_pipe_refs.
         setup_signature_library()
-        sig_pipe = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+        sig_pipe = PipeFactory[PipeSignature].make_from_blueprint(
             domain_code=SIGNATURES_DOMAIN_CODE,
             pipe_code="lone_sig",
             blueprint=make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary"),
@@ -431,7 +431,7 @@ class TestDryRunStrictMode:
         # When the pipe list contains both a signature and a controller that reaches it,
         # only the controller is an offender — the signature is the placeholder itself.
         setup_signature_library()
-        sig_pipe = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+        sig_pipe = PipeFactory[PipeSignature].make_from_blueprint(
             domain_code=SIGNATURES_DOMAIN_CODE,
             pipe_code="listed_sig",
             blueprint=make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary"),

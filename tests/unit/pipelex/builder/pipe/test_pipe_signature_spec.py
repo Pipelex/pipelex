@@ -1,12 +1,12 @@
 import pytest
 from pydantic import ValidationError
 
-from pipelex.builder.pipe.pipe_signature import PipeSignature
+from pipelex.builder.pipe.pipe_signature_spec import PipeSignatureSpec
 from pipelex.core.pipes.pipe_blueprint import PipeType
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
 
 
-def _make_minimal_signature(**overrides: object) -> PipeSignature:
+def _make_minimal_signature(**overrides: object) -> PipeSignatureSpec:
     kwargs: dict[str, object] = {
         "pipe_code": "sig_pipe",
         "description": "A signature.",
@@ -14,7 +14,7 @@ def _make_minimal_signature(**overrides: object) -> PipeSignature:
         "output": "Summary",
     }
     kwargs.update(overrides)
-    return PipeSignature(**kwargs)  # type: ignore[arg-type]
+    return PipeSignatureSpec(**kwargs)  # type: ignore[arg-type]
 
 
 class TestPipeSignatureSpec:
@@ -43,7 +43,7 @@ class TestPipeSignatureSpec:
             _make_minimal_signature(inputs={"bad": "lowercase"})
 
     def test_no_result_field(self) -> None:
-        assert "result" not in PipeSignature.model_fields
+        assert "result" not in PipeSignatureSpec.model_fields
 
     def test_to_blueprint_returns_signature_blueprint(self) -> None:
         sig = _make_minimal_signature(signature_for=PipeType.PIPE_LLM)

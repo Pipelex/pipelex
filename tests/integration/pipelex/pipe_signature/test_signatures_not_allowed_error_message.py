@@ -6,8 +6,8 @@ from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
+from pipelex.pipe_signature.pipe_signature import PipeSignature
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
-from pipelex.pipe_signature.pipe_signature_runtime import PipeSignatureRuntime
 from tests.integration.pipelex.pipe_signature.conftest import SIGNATURES_DOMAIN_CODE
 
 
@@ -15,8 +15,8 @@ class TestSignaturesNotAllowedErrorMessage:
     def _build_sequence_with_signature(
         self,
         make_signature_blueprint: Callable[..., PipeSignatureBlueprint],
-    ) -> tuple[PipeSignatureRuntime, PipeSequence]:
-        sig_pipe = PipeFactory[PipeSignatureRuntime].make_from_blueprint(
+    ) -> tuple[PipeSignature, PipeSequence]:
+        sig_pipe = PipeFactory[PipeSignature].make_from_blueprint(
             domain_code=SIGNATURES_DOMAIN_CODE,
             pipe_code="msg_inner_sig",
             blueprint=make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary"),

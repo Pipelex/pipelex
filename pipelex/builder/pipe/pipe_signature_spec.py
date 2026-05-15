@@ -13,7 +13,7 @@ from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBluepri
 from pipelex.tools.misc.pretty import PrettyPrintable
 
 
-class PipeSignature(PipeSpec):
+class PipeSignatureSpec(PipeSpec):
     """A contract-only pipe: inputs, output, and purpose declared without an implementation.
 
     Use signatures to sketch a pipeline top-down — author the controller and stub each step

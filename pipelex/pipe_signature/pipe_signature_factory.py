@@ -5,11 +5,11 @@ from typing_extensions import override
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
+from pipelex.pipe_signature.pipe_signature import PipeSignature
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
-from pipelex.pipe_signature.pipe_signature_runtime import PipeSignatureRuntime
 
 
-class PipeSignatureFactory(PipeFactoryProtocol[PipeSignatureBlueprint, PipeSignatureRuntime]):
+class PipeSignatureFactory(PipeFactoryProtocol[PipeSignatureBlueprint, PipeSignature]):
     @classmethod
     @override
     def make(
@@ -22,8 +22,8 @@ class PipeSignatureFactory(PipeFactoryProtocol[PipeSignatureBlueprint, PipeSigna
         inputs: InputStuffSpecs,
         output: StuffSpec,
         blueprint: PipeSignatureBlueprint,
-    ) -> PipeSignatureRuntime:
-        return PipeSignatureRuntime(
+    ) -> PipeSignature:
+        return PipeSignature(
             domain_code=domain_code,
             code=pipe_code,
             description=description,

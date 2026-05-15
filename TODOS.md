@@ -2,7 +2,7 @@
 
 Status: Phases 1–7.3 landed (plus Phase 5.2 lenient-summary polish) (2026-05-14); Phase 7.4 open and tracked as a merge-gate. **The branch is in a consistent, reviewable state** — the runtime accepts `type = "PipeSignature"`, and `.pipelex/plxt.toml` declares the matching schema source of truth (`derived/mthds_schema.json`) via a `[[rule]] / [rule.schema] path = ...` block scoped to `**/*.mthds`. That block is the intended configuration on this branch, not a workaround: the bundled `plxt` schema doesn't yet describe `PipeSignature`, so the local schema is the only correct one to validate against here. At merge time, once `vscode-pipelex` ships an updated bundled schema, the `[[rule]]` block is removed in the same commit and the bundled schema takes over again — that swap is the Phase 7.4 merge-gate item. Docs (new `signature-pipes.md` page + nav + cross-links + CLI reference + tightened spec docstring) and CHANGELOG (`[Unreleased]` Added/Changed) are in. `make agent-check` and `make agent-test` are green on this branch. Reviewers: please treat the `[[rule]]` block in `.pipelex/plxt.toml` as load-bearing for the branch — not as a smell to fix.
 
-Current state: A `PipeSignature` can be authored as a spec (`pipelex/builder/pipe/pipe_signature.py`), compiled to a blueprint (`pipelex/pipe_signature/pipe_signature_blueprint.py`), instantiated as a runtime (`pipelex/pipe_signature/pipe_signature_runtime.py`) via the registered `PipeSignatureFactory`, dry-run (yields a mock `Stuff` from the declared output `StuffSpec`), and rejected on live-run (`PipeSignatureNotExecutableError`). Signatures slot into `PipeBlueprintUnion` and `PipeSpecUnion`. Strict-mode gating is live: `PipeAbstract.collect_signature_refs(pipe_lookup=...)` walks the dependency graph; `dry_run_pipe(..., allow_signatures=False)` (the default) raises `SignaturesNotAllowedError` carrying both `signature_refs` and the qualified `dep_paths` chain. `dry_run_pipes` does a pre-pass that aggregates signature refs across all pipes in the batch so the user sees every offender in one error (post-review fix). `validate_bundle` and `validate_bundles_from_directory` catch the error and surface it via `ValidateBundleError.signature_check_error`. CLI surface: `pipelex validate pipe`/`bundle` now take `--allow-signatures` (default off); `pipelex validate --all` filters signature pipes out of the strict iteration; the agent CLI's `validate_*_core` functions default to lenient. Signatures still raise `PipeSignatureNotExecutableError` on live run. End-to-end `.mthds` parsing works: the interpreter happily round-trips `type = "PipeSignature"` through `PipelexBundleBlueprint` → library → runtime → dry-run, in both strict and lenient mode. The schema generator was updated to strip `pipe_category` from `PipeSignatureBlueprint`, but the JSON Schema file lives in `vscode-pipelex/` (not this repo) so no schema artifact needed regeneration here. Surprise: `pipe_abstract.py` could not import from `pipelex.hub` (even via a function-local import) because pyright's `reportImportCycles` is on and the cycle pipe_abstract → hub → libraries.library → libraries.pipe.pipe_library → pipe_abstract is real. The walker therefore takes a `pipe_lookup` callable parameter (typically `pipelex.hub.get_optional_pipe`) — slightly more explicit than the plan's pseudocode, but cycle-free. Walker iterates `sorted(pipe_dependencies())` so the dep chain rendered in `SignaturesNotAllowedError` is deterministic (post-review fix). Phase 6 surfaced one design gap: `dry_run_pipes` aggregated dep paths with a "first wins" rule, which lost the informative controller chain when the signature pipe was iterated first; the aggregator now prefers the longest known dep chain so the error message always shows the most useful path.
+Current state: A `PipeSignature` can be authored as a spec (`pipelex/builder/pipe/pipe_signature_spec.py`), compiled to a blueprint (`pipelex/pipe_signature/pipe_signature_blueprint.py`), instantiated as a runtime (`pipelex/pipe_signature/pipe_signature.py`) via the registered `PipeSignatureFactory`, dry-run (yields a mock `Stuff` from the declared output `StuffSpec`), and rejected on live-run (`PipeSignatureNotExecutableError`). Signatures slot into `PipeBlueprintUnion` and `PipeSpecUnion`. Strict-mode gating is live: `PipeAbstract.collect_signature_refs(pipe_lookup=...)` walks the dependency graph; `dry_run_pipe(..., allow_signatures=False)` (the default) raises `SignaturesNotAllowedError` carrying both `signature_refs` and the qualified `dep_paths` chain. `dry_run_pipes` does a pre-pass that aggregates signature refs across all pipes in the batch so the user sees every offender in one error (post-review fix). `validate_bundle` and `validate_bundles_from_directory` catch the error and surface it via `ValidateBundleError.signature_check_error`. CLI surface: `pipelex validate pipe`/`bundle` now take `--allow-signatures` (default off); `pipelex validate --all` filters signature pipes out of the strict iteration; the agent CLI's `validate_*_core` functions default to lenient. Signatures still raise `PipeSignatureNotExecutableError` on live run. End-to-end `.mthds` parsing works: the interpreter happily round-trips `type = "PipeSignature"` through `PipelexBundleBlueprint` → library → runtime → dry-run, in both strict and lenient mode. The schema generator was updated to strip `pipe_category` from `PipeSignatureBlueprint`, but the JSON Schema file lives in `vscode-pipelex/` (not this repo) so no schema artifact needed regeneration here. Surprise: `pipe_abstract.py` could not import from `pipelex.hub` (even via a function-local import) because pyright's `reportImportCycles` is on and the cycle pipe_abstract → hub → libraries.library → libraries.pipe.pipe_library → pipe_abstract is real. The walker therefore takes a `pipe_lookup` callable parameter (typically `pipelex.hub.get_optional_pipe`) — slightly more explicit than the plan's pseudocode, but cycle-free. Walker iterates `sorted(pipe_dependencies())` so the dep chain rendered in `SignaturesNotAllowedError` is deterministic (post-review fix). Phase 6 surfaced one design gap: `dry_run_pipes` aggregated dep paths with a "first wins" rule, which lost the informative controller chain when the signature pipe was iterated first; the aggregator now prefers the longest known dep chain so the error message always shows the most useful path.
 
 Known gaps after Phase 6 — **closed out at merge time via Phase 7.4**:
 
@@ -52,9 +52,9 @@ If `make` isn't available, run the agent-check steps manually (see Makefile's `a
 ```
 PipeType.PIPE_SIGNATURE   ←  new enum value, category PipeCategory.PIPE_SIGNATURE
 
-spec     PipeSignature             — corrected (literal type, multiplicity inputs, no `result`)
+spec     PipeSignatureSpec         — corrected (literal type, multiplicity inputs, no `result`)
 blueprint PipeSignatureBlueprint   — new
-runtime  PipeSignatureRuntime      — new; _dry_run mocks, _live_run raises
+runtime  PipeSignature             — new; _dry_run mocks, _live_run raises
 
 PipeAbstract gains:  is_signature (property), pipe_dependencies() (default empty),
                      collect_signature_refs() (graph walk)
@@ -130,8 +130,8 @@ Use blueprints constructed in Python — no `.mthds` parsing in this phase.
   - `pipelex_for_signatures` — Pipelex setup with a tiny library containing a `Text` concept and one PipeSignature pipe (used by multiple tests).
   - `make_signature_blueprint(...)` factory helper.
   > Deviation: the per-test setup fixture was named `setup_signature_library` (rather than `pipelex_for_signatures`) and shaped as a callable, mirroring the existing `load_empty_library` pattern. The concepts registered are `SigTestDoc` / `SigTestSummary` rather than `Document` / `Summary` because both `Document` and `Summary` collide with native concept names.
-- [x] `tests/integration/pipelex/pipe_signature/test_pipe_signature_runtime.py` — `class TestPipeSignatureRuntime` (one class only — split into multiple test methods, parametrized where useful):
-  - `test_factory_produces_runtime_from_blueprint` — `PipeFactory.make_from_blueprint` on a `PipeSignatureBlueprint` returns a `PipeSignatureRuntime`.
+- [x] `tests/integration/pipelex/pipe_signature/test_pipe_signature.py` — `class TestPipeSignature` (one class only — split into multiple test methods, parametrized where useful):
+  - `test_factory_produces_runtime_from_blueprint` — `PipeFactory.make_from_blueprint` on a `PipeSignatureBlueprint` returns a `PipeSignature`.
   - `test_is_signature_true` — `runtime.is_signature is True`; `is_controller is False`.
   - `test_needed_inputs_returns_declared` — runtime with declared inputs `{"doc": "Text"}` returns that set from `needed_inputs()`.
   - `test_required_variables_returns_input_names` — same, `required_variables()` returns `{"doc"}` (no dotted paths).
@@ -152,8 +152,8 @@ Use blueprints constructed in Python — no `.mthds` parsing in this phase.
   - `pipelex/pipe_signature/__init__.py` — empty.
   - `pipelex/pipe_signature/pipe_signature_blueprint.py`:
     - `PipeSignatureBlueprint(PipeBlueprint)` with `type: Literal["PipeSignature"]`, `pipe_category: Literal["PipeSignature"]`, `signature_for: PipeType | None = None`.
-  - [x] `pipelex/pipe_signature/pipe_signature_runtime.py`:
-    - `PipeSignatureRuntime(PipeAbstract)` with `type: Literal["PipeSignature"]`, `pipe_category: Literal["PipeSignature"]`, `signature_for: PipeType | None = None`.
+  - [x] `pipelex/pipe_signature/pipe_signature.py`:
+    - `PipeSignature(PipeAbstract)` with `type: Literal["PipeSignature"]`, `pipe_category: Literal["PipeSignature"]`, `signature_for: PipeType | None = None`.
     - `validate_inputs_static`, `validate_inputs_with_library`, `validate_output_static`, `validate_output_with_library` → no-ops.
     - `needed_inputs(visited_pipes=None)` → returns `self.inputs` (mirrors operator pattern).
     - `required_variables()` → `set(self.inputs.variables)`.
@@ -163,13 +163,13 @@ Use blueprints constructed in Python — no `.mthds` parsing in this phase.
       2. Mint a single `Stuff` via a new `WorkingMemoryFactory.make_mock_stuff(typed_named_stuff_spec)` (a refactor — see below).
       3. Write to `working_memory.set_new_main_stuff(...)` and return `PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.pipeline_run_id)`.
     - `_validate_before_run`, `_validate_after_run` → no-ops.
-    - **Error-handling rule for new code:** do NOT introduce new `except Exception` catches in `PipeSignatureRuntime`, the new helpers in `WorkingMemoryFactory`, or `convert_stuff_spec_to_typed_named`. Let mock-construction errors propagate (e.g. `DryRunFactory` failures, `ClassRegistryNotFoundError`). A separate worktree owns the error-handling refactor of the pre-existing `except Exception` in `WorkingMemoryFactory.make_mock_inputs:190` — do not replicate that pattern.
+    - **Error-handling rule for new code:** do NOT introduce new `except Exception` catches in `PipeSignature`, the new helpers in `WorkingMemoryFactory`, or `convert_stuff_spec_to_typed_named`. Let mock-construction errors propagate (e.g. `DryRunFactory` failures, `ClassRegistryNotFoundError`). A separate worktree owns the error-handling refactor of the pre-existing `except Exception` in `WorkingMemoryFactory.make_mock_inputs:190` — do not replicate that pattern.
   - [x] `pipelex/pipe_signature/pipe_signature_factory.py`:
-    - `PipeSignatureFactory(PipeFactoryProtocol[PipeSignatureBlueprint, PipeSignatureRuntime])` with a `make(...)` classmethod that builds the runtime from the blueprint + parsed inputs/output.
+    - `PipeSignatureFactory(PipeFactoryProtocol[PipeSignatureBlueprint, PipeSignature])` with a `make(...)` classmethod that builds the runtime from the blueprint + parsed inputs/output.
   - [x] `pipelex/pipe_signature/exceptions.py`:
     - `PipeSignatureNotExecutableError(PipelexError)` with a `pipe_ref` field and a clear message.
 - [x] Register `PipeSignatureFactory` in the class registry so `PipeFactory.make_from_blueprint` dispatches via the existing `f"{pipe_type.value}Factory"` convention. (Look at how other factories are registered — probably in `pipelex/__init__.py` or via auto-import; mirror.)
-  > Registered alongside `PipeSignatureRuntime` in `CoreRegistryModels.PIPE_SIGNATURES` / `PIPE_SIGNATURES_FACTORY`. `RegistryModels.get_all_models()` walks every list-valued class attribute, so the new lists are auto-discovered.
+  > Registered alongside `PipeSignature` in `CoreRegistryModels.PIPE_SIGNATURES` / `PIPE_SIGNATURES_FACTORY`. `RegistryModels.get_all_models()` walks every list-valued class attribute, so the new lists are auto-discovered.
 - [x] `pipelex/core/bundles/pipelex_bundle_blueprint.py`:
   - Add `PipeSignatureBlueprint` to `PipeBlueprintUnion`.
 - [x] `pipelex/core/memory/working_memory_factory.py`:
@@ -258,7 +258,7 @@ Add `collect_signature_refs`, `SignaturesNotAllowedError`, and thread `allow_sig
 - [x] `tests/integration/pipelex/pipe_signature/test_collect_signature_refs.py` — `class TestCollectSignatureRefs`:
   - Fixtures construct mini libraries in Python with mixed pipe types.
   - `test_operator_returns_empty` — a real `PipeLLM`'s `collect_signature_refs()` returns `set()`.
-  - `test_signature_returns_self` — a `PipeSignatureRuntime`'s `collect_signature_refs()` returns `{self.pipe_ref}`.
+  - `test_signature_returns_self` — a `PipeSignature`'s `collect_signature_refs()` returns `{self.pipe_ref}`.
   - `test_controller_sequence_walks_steps` — a `PipeSequence` whose step references a signature returns `{sig.pipe_ref}`.
   - `test_controller_parallel_walks_branches` — a `PipeParallel` whose branch references a signature returns `{sig.pipe_ref}`.
   - `test_controller_condition_walks_outcomes` — a `PipeCondition` whose `outcomes` map (and `default_outcome`) references signatures returns the union of those signature `pipe_ref`s.
@@ -589,7 +589,7 @@ Tests:
 - `tests/unit/pipelex/builder/pipe/test_pipe_signature_spec.py`
 - `tests/unit/pipelex/builder/pipe/test_pipe_spec_union_signature.py`
 - `tests/integration/pipelex/pipe_signature/conftest.py`
-- `tests/integration/pipelex/pipe_signature/test_pipe_signature_runtime.py`
+- `tests/integration/pipelex/pipe_signature/test_pipe_signature.py`
 - `tests/integration/pipelex/pipe_signature/test_pipe_signature_in_blueprint_union.py`
 - `tests/integration/pipelex/pipe_signature/test_collect_signature_refs.py`
 - `tests/integration/pipelex/pipe_signature/test_signatures_not_allowed_error_message.py`

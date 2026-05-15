@@ -1,7 +1,7 @@
 from pydantic import TypeAdapter
 
 from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
-from pipelex.builder.pipe.pipe_signature import PipeSignature
+from pipelex.builder.pipe.pipe_signature_spec import PipeSignatureSpec
 from pipelex.builder.pipe.pipe_spec_union import PipeSpecUnion
 
 
@@ -18,7 +18,7 @@ class TestPipeSpecUnionDispatch:
                 "output": "Summary",
             }
         )
-        assert isinstance(result, PipeSignature)
+        assert isinstance(result, PipeSignatureSpec)
 
     def test_union_dispatches_pipe_llm_unchanged(self) -> None:
         adapter: TypeAdapter[PipeSpecUnion] = TypeAdapter(PipeSpecUnion)

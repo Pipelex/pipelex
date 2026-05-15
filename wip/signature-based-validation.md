@@ -51,9 +51,9 @@ The two modes are complementary, not redundant, with live-run safety:
 Three layers, parallel additions:
 
 ```
-spec/builder    PipeSignature          ← already defined; needs fixes (below)
+spec/builder    PipeSignatureSpec      ← already defined; needs fixes (below)
 blueprint/core  PipeSignatureBlueprint
-runtime         PipeSignatureRuntime : PipeAbstract
+runtime         PipeSignature : PipeAbstract
 ```
 
 New enum values: `PipeType.PIPE_SIGNATURE = "PipeSignature"`, `PipeCategory.PIPE_SIGNATURE`. The discriminator on `PipeSpecUnion` / `PipeBlueprintUnion` stays `type` — no machinery changes.
@@ -82,7 +82,7 @@ Drop the field. The signature contract is `code`, `type`, `description`, `inputs
 
 ## Dry-run path for signatures
 
-`PipeSignatureRuntime._dry_run_pipe` does exactly one thing: mint a `Stuff` of the declared output concept and multiplicity, named by the caller's `output_name`, written into `working_memory`. No content generator, no LLM-mock, no image-mock — just `WorkingMemoryFactory.make_mock_content` (which already handles all concept structure classes via `DryRunFactory`).
+`PipeSignature._dry_run_pipe` does exactly one thing: mint a `Stuff` of the declared output concept and multiplicity, named by the caller's `output_name`, written into `working_memory`. No content generator, no LLM-mock, no image-mock — just `WorkingMemoryFactory.make_mock_content` (which already handles all concept structure classes via `DryRunFactory`).
 
 `needed_inputs()` returns the declared inputs verbatim. `required_variables()` returns the set of declared input names — no dotted-path expansion since signatures have no prompt or template to reference nested attrs from. `validate_inputs_static`, `validate_inputs_with_library`, `validate_output_static`, `validate_output_with_library` are no-ops.
 
@@ -175,7 +175,7 @@ This is the desired behavior: live execution of a half-built pipeline must fail 
 ### Phase 2 — Blueprint and runtime
 
 - `PipeSignatureBlueprint(PipeBlueprint)`: literal type, optional `signature_for`.
-- `PipeSignatureRuntime(PipeAbstract)`: no-op validators; `needed_inputs()` returns declared; `_live_run_pipe` raises; `_dry_run_pipe` mints via `WorkingMemoryFactory.make_mock_content`.
+- `PipeSignature(PipeAbstract)`: no-op validators; `needed_inputs()` returns declared; `_live_run_pipe` raises; `_dry_run_pipe` mints via `WorkingMemoryFactory.make_mock_content`.
 - `PipeSignatureFactory(PipeFactoryProtocol)`.
 - Add to `PipeBlueprintUnion`.
 
