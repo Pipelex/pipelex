@@ -90,7 +90,7 @@ async def act_llm_gen_text(llm_assignment: LLMAssignment) -> str:
 
 **Recommendation:** out of scope for the *wiring* but record it. Either (a) leave as-is and note it, or (b) small follow-up: make `_log_critical` / `_log_error` pick `activity_log` when `activity.in_activity()` is true, else `workflow_log`. Do **not** silently change Phase 6 bridge behavior inside this task without calling it out — the bridge unit test patches `_log_critical` / `_log_error` and would still pass, so the change is safe but should be deliberate.
 
-> **DECISION:** Option (b) — fix it in this task. `_log_critical` / `_log_error` select `activity_log` when `activity.in_activity()`, else `workflow_log`. Done deliberately in **Phase 4**; the bridge unit test still passes (it patches both helpers). Add a unit test asserting the activity-context branch picks `activity_log`.
+> **DECISION:** Option (b) — fix it in this task. `_log_critical` / `_log_error` select `activity_log` when `activity.in_activity()`, else `workflow_log`. **Pulled forward into Phase 2** — it turned out to be a hard blocker, not a nicety: `workflow.logger` raises `_NotInWorkflowEventLoopError` (not a silent no-op) outside a workflow event loop, so `from_message_exception` crashed the moment an activity called it. Done via a `_context_logger()` helper. The bridge unit test still passes (it patches both helpers). A dedicated unit test asserting the activity-context branch picks `activity_log` is still **TODO in Phase 4**.
 
 ---
 
@@ -206,7 +206,7 @@ make agent-check
 
 All three Phase 1 cases must pass: `CONFIGURATION` → `non_retryable True` + populated report; `TRANSIENT` → `non_retryable False`; category-less → `non_retryable False` + report present.
 
-> **CHECKPOINT 2 — GREEN for one activity.** The bridge is proven live across a real worker boundary. The mechanism is settled. Phase 3 is mechanical replication. Commit here.
+> **CHECKPOINT 2 — GREEN for one activity.** ✅ Done. `convert_pipelex_errors` lives in `pipelex/temporal/tprl/activity_error_boundary.py`; applied beneath `@activity.defn` on `act_llm_gen_text`. All 3 integration cases pass (1.30s); the bridge unit test still passes (9); `make agent-check` clean. Decision 3's logger fix was pulled forward (see above) — it was a hard blocker. The bridge is proven live across a real worker boundary; the mechanism is settled. Phase 3 is mechanical replication. Next session: Phase 3.
 
 ---
 
@@ -242,7 +242,7 @@ make agent-check
 
 - Re-read the decorator and the wired activities for consistency: decorator order identical everywhere (`@activity.defn` above `@convert_pipelex_errors`), no stray imports, `make fix-unused-imports` clean.
 - Docstring on `convert_pipelex_errors`: state that it is the activity-side half of the bridge whose workflow-side half is `from_app_error`, and that it catches `PipelexError` (not `Exception`) by design.
-- If Decision 3 was taken (b), apply the `activity_log` / `workflow_log` selection and note it in the changelog.
+- Decision 3's `activity_log` / `workflow_log` selection already landed in Phase 2 (it was a blocker). Remaining here: add a dedicated unit test to `test_temporal_error_bridge.py` asserting `_context_logger()` picks `activity_log` when `activity.in_activity()` is true and `workflow_log` otherwise (mock `activity.in_activity`). Note the logger fix in the changelog.
 - `CHANGELOG.md` — under `[Unreleased]` (per project memory: never add a versioned header on a work branch), add an entry: Temporal activities now convert `PipelexError` to a category-aware `TemporalError` at their boundary, so retry decisions and the structured `ErrorReport` survive into workflow code.
 - Update [wip/error-handling/track-temporal-integration.md](wip/error-handling/track-temporal-integration.md): mark Followup 5 as landed. Delete or mark done the stub [wip/error-handling/todos-temporal-activity-boundary.md](wip/error-handling/todos-temporal-activity-boundary.md).
 
