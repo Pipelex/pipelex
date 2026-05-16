@@ -65,7 +65,7 @@ class TestLinkupExtractWorkerSemantic:
             (LinkupFetchResponseTooLargeError, InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
             (LinkupFetchUrlIsFileError, InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
             (LinkupFailedFetchError, InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
-            (LinkupNoResultError, InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
+            (LinkupNoResultError, InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
             (LinkupUnknownError, InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
         ],
     )

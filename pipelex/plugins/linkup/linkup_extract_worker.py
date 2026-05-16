@@ -118,6 +118,17 @@ class LinkupExtractWorker(ExtractWorkerAbstract):
                 ),
                 provider_metadata=metadata,
             )
+        if isinstance(exc, LinkupNoResultError):
+            msg = f"Linkup found no results: {exc}"
+            return ExtractJobFailureError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Linkup found no results — broaden or rephrase the request",
+                ),
+                provider_metadata=metadata,
+            )
         msg = f"Linkup error: {exc}"
         return ExtractJobFailureError(
             msg,

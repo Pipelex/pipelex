@@ -16,7 +16,7 @@ class DoclingErrorHandlingTestData:
             "file_not_found",
             FileNotFoundError,
             "No such file: /tmp/missing.pdf",
-            InferenceErrorCategory.CONFIGURATION,
+            InferenceErrorCategory.CONTENT,
             "file not found",
         ),
         (

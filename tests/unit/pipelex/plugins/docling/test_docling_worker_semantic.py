@@ -41,7 +41,7 @@ class TestDoclingWorkerSemantic:
     @pytest.mark.parametrize(
         ("exception_class", "exception_message", "expected_category", "expected_kind"),
         [
-            (FileNotFoundError, "No such file", InferenceErrorCategory.CONFIGURATION, UserActionKind.CHANGE_INPUT),
+            (FileNotFoundError, "No such file", InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
             (ValueError, "Unsupported format", InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
             (RuntimeError, "Conversion failed", InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
             (OSError, "Disk read error", InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),

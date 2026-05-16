@@ -85,8 +85,8 @@ class LinkupExtractErrorHandlingTestData:
             "no_result",
             LinkupNoResultError,
             "No results found",
-            InferenceErrorCategory.TRANSIENT,
-            "linkup error",
+            InferenceErrorCategory.CONTENT,
+            "no results",
         ),
         (
             "unknown_error",
@@ -144,8 +144,8 @@ class LinkupSearchErrorHandlingTestData:
             "no_result",
             LinkupNoResultError,
             "No results found",
-            InferenceErrorCategory.TRANSIENT,
-            "linkup error",
+            InferenceErrorCategory.CONTENT,
+            "no results",
         ),
         (
             "unknown_error",

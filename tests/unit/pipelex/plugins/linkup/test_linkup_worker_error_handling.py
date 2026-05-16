@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from linkup import LinkupAuthenticationError, LinkupInsufficientCreditError, LinkupTooManyRequestsError
+from linkup import LinkupAuthenticationError, LinkupInsufficientCreditError, LinkupNoResultError, LinkupTooManyRequestsError
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -194,3 +194,29 @@ class TestLinkupWorkerErrorHandling:
         report = exc_info.value.to_error_report()
         assert report.error_category == "transient"
         assert report.retryable is True
+
+    async def test_search_error_report_for_no_result(self, mocker: MockerFixture) -> None:
+        """to_error_report() for no-result error has CONTENT category and is not retryable."""
+        worker = _make_linkup_search_worker(mocker)
+        sdk_exc = LinkupNoResultError("No results found")
+        _get_linkup_client(worker).async_search.side_effect = sdk_exc
+
+        with pytest.raises(SearchJobFailureError) as exc_info:
+            await worker._search_sourced_answer(search_job=_make_search_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        report = exc_info.value.to_error_report()
+        assert report.error_category == "content"
+        assert report.retryable is False
+
+    async def test_extract_error_report_for_no_result(self, mocker: MockerFixture) -> None:
+        """to_error_report() for no-result error has CONTENT category and is not retryable."""
+        worker = _make_linkup_extract_worker(mocker)
+        sdk_exc = LinkupNoResultError("No results found")
+        _get_linkup_client(worker).async_fetch.side_effect = sdk_exc
+
+        with pytest.raises(ExtractJobFailureError) as exc_info:
+            await worker._extract_pages(extract_job=_make_extract_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        report = exc_info.value.to_error_report()
+        assert report.error_category == "content"
+        assert report.retryable is False

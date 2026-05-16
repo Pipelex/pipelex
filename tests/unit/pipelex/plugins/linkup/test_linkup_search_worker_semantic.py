@@ -62,7 +62,7 @@ class TestLinkupSearchWorkerSemantic:
             (LinkupTooManyRequestsError, InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
             (LinkupTimeoutError, InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
             (LinkupInvalidRequestError, InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
-            (LinkupNoResultError, InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
+            (LinkupNoResultError, InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
             (LinkupUnknownError, InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
         ],
     )
