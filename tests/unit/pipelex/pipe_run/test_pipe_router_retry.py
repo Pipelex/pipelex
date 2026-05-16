@@ -172,7 +172,7 @@ class TestPipeRouterRetry:
         assert sleep_mock.call_count == 0
 
     async def test_pipe_run_error_still_wraps_as_pipe_router_error(self, mocker: MockerFixture) -> None:
-        """A non-CogtError PipeRunError is unaffected by retry and still wraps as PipeRouterError."""
+        """A PipeRunError with no retryable CogtError cause is not retried and still wraps as PipeRouterError."""
         sleep_mock = mocker.patch("pipelex.pipe_run.pipe_router_protocol.asyncio.sleep")
 
         pipe_run_error = PipeRunError(message="bad pipe", run_mode=PipeRunMode.LIVE, pipe_code="stub_pipe")
@@ -206,3 +206,33 @@ class TestPipeRouterRetry:
 
         assert result is expected_output
         assert router.call_count == 3
+
+    async def test_pipe_run_error_wrapping_transient_cogt_error_retries(self, mocker: MockerFixture) -> None:
+        """A PipeRunError whose __cause__ is a TRANSIENT CogtError is retried, then wrapped.
+
+        This is the LLM-operator path: PipeLLM / PipeStructure wrap the worker's
+        LLMCompletionError into a PipeRunError, so the retryable CogtError reaches
+        the router as the `__cause__` of a PipeRunError rather than as a raw CogtError.
+        These tests drive `_run_pipe_job` directly; end-to-end coverage through a real
+        operator lives in tests/integration/pipelex/pipes/operator/test_operator_transient_retry.py.
+        """
+        sleep_mock = mocker.patch("pipelex.pipe_run.pipe_router_protocol.asyncio.sleep")
+
+        def _wrapped_transient() -> PipeRunError:
+            cogt_error = CogtError(message="rate limited", error_category=InferenceErrorCategory.TRANSIENT)
+            pipe_run_error = PipeRunError(message="operator wrap", run_mode=PipeRunMode.LIVE, pipe_code="stub_pipe")
+            pipe_run_error.__cause__ = cogt_error
+            return pipe_run_error
+
+        failures = [_wrapped_transient() for _ in range(4)]
+        router = _StubPipeRouter(failures=failures, transient_retry_settings=_make_retry_settings(3))
+
+        with pytest.raises(PipeRouterError) as exc_info:
+            await router.run(_make_pipe_job())
+
+        assert router.call_count == 4
+        assert sleep_mock.call_count == 3
+        wrapped_cause = exc_info.value.__cause__
+        assert wrapped_cause is failures[-1]
+        assert isinstance(wrapped_cause, PipeRunError)
+        assert isinstance(wrapped_cause.__cause__, CogtError)
