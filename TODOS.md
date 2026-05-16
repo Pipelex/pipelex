@@ -6,6 +6,25 @@
 
 ---
 
+## Status — as of 2026-05-16
+
+**Phases 0, 1, 2 are complete and committed** on branch `fix/temporal-activity-error-boundary` (through commit `18e0135b`). **The next session starts at Phase 3.**
+
+What is in the code right now:
+
+- **`pipelex/temporal/tprl/activity_error_boundary.py`** (new) — the `convert_pipelex_errors` decorator. Catches `PipelexError` raised inside an activity and re-raises it as `TemporalError.from_message_exception(exc)`.
+- **`pipelex/temporal/tprl_content_generation/act_llm_generate.py`** — `@convert_pipelex_errors` applied beneath `@activity.defn` on **`act_llm_gen_text` only**. The other ~7 in-scope activities are still unwired — that is Phase 3.
+- **`pipelex/temporal/tprl/temporal_error.py`** — `_log_critical` / `_log_error` now branch inline on `activity.in_activity()` to pick `activity_log` vs `workflow_log` (Decision 3, pulled forward into Phase 2 — it was a hard blocker: `workflow.logger` raises `_NotInWorkflowEventLoopError` outside a workflow event loop). There is **no `_context_logger()` helper** — an earlier version had one; a code-review pass removed it (its `WorkflowLog | ActivityLog` union return was a type smell).
+- **`tests/integration/pipelex/temporal/test_activity_error_boundary.py`** (new) — the RED→GREEN integration test. 3 parametrized cases, all passing.
+
+`make agent-check` is clean; the integration test and the bridge unit test are green.
+
+The detailed Phase 0/1/2 sections below are the **historical TDD record** — already implemented; do not redo them. Where this doc's early code sketches differ from the repo (the Phase 1 sketch predates the code-review refinements), **the committed files are authoritative**.
+
+Commits: `8acdae1f` (plan) → `ee0e7852` (Phase 0 decisions) → `e0580e89` (Phase 1 RED) → `3bb28ae4` (Phase 2 GREEN) → `18e0135b` (code-review fixes).
+
+---
+
 ## The gap
 
 Phase 6 built `TemporalError.from_message_exception()` — category-aware retry decisions (`InferenceErrorCategory.is_retryable`) plus packing `to_error_report().to_dict()` into `ApplicationError.details`. **No activity calls it.** The activity functions in `pipelex/temporal/tprl_content_generation/act_*.py` and `pipelex/temporal/tprl_pipe/act_*.py` raise raw `CogtError` / `PipelexError`. Temporal's default failure converter auto-wraps them: it does not pack our `ErrorReport` into `details` and leaves `non_retryable=False`.
@@ -90,11 +109,13 @@ async def act_llm_gen_text(llm_assignment: LLMAssignment) -> str:
 
 **Recommendation:** out of scope for the *wiring* but record it. Either (a) leave as-is and note it, or (b) small follow-up: make `_log_critical` / `_log_error` pick `activity_log` when `activity.in_activity()` is true, else `workflow_log`. Do **not** silently change Phase 6 bridge behavior inside this task without calling it out — the bridge unit test patches `_log_critical` / `_log_error` and would still pass, so the change is safe but should be deliberate.
 
-> **DECISION:** Option (b) — fix it in this task. `_log_critical` / `_log_error` select `activity_log` when `activity.in_activity()`, else `workflow_log`. **Pulled forward into Phase 2** — it turned out to be a hard blocker, not a nicety: `workflow.logger` raises `_NotInWorkflowEventLoopError` (not a silent no-op) outside a workflow event loop, so `from_message_exception` crashed the moment an activity called it. Done via a `_context_logger()` helper. The bridge unit test still passes (it patches both helpers). A dedicated unit test asserting the activity-context branch picks `activity_log` is still **TODO in Phase 4**.
+> **DECISION:** Option (b) — fix it in this task. ✅ Done in Phase 2. `_log_critical` / `_log_error` branch inline on `activity.in_activity()` to select `activity_log` vs `workflow_log`. **Pulled forward into Phase 2** — it turned out to be a hard blocker, not a nicety: `workflow.logger` raises `_NotInWorkflowEventLoopError` (not a silent no-op) outside a workflow event loop, so `from_message_exception` crashed the moment an activity called it. (An interim `_context_logger()` helper was tried, then removed in code review: returning `WorkflowLog | ActivityLog` — two unrelated concrete classes — was the type smell the project's Protocols rule warns against; the branch is inlined instead.) The bridge unit test still passes (it patches both helpers). A dedicated unit test asserting the activity-context branch picks `activity_log` is still **TODO in Phase 4**.
 
 ---
 
-## Phase 1 — RED: failing integration test across a real activity → workflow boundary
+## Phase 1 — RED: failing integration test across a real activity → workflow boundary ✅ DONE
+
+> ✅ **Implemented and committed.** The section below is the historical record. The committed `tests/integration/pipelex/temporal/test_activity_error_boundary.py` is authoritative — it differs from the sketch below in spots refined during the Phase 2 code review (e.g. the probe workflow raises a descriptive `TypeError` on a non-`ApplicationError` cause; the category-less case asserts `"retryable" not in error_report`).
 
 Goal: a test that drives a **real activity** through a **real Temporal worker**, has the activity raise a real `CogtError`, and asserts what `from_app_error` receives on the workflow side. It must **fail today** (fallback branch) and **pass after Phase 2/3**.
 
@@ -180,7 +201,9 @@ Expected failure today: `error_report is None` (Temporal's default converter pac
 
 ---
 
-## Phase 2 — GREEN (minimal): wire one activity, make the test pass
+## Phase 2 — GREEN (minimal): wire one activity, make the test pass ✅ DONE
+
+> ✅ **Implemented and committed.** The section below is the historical record. See CHECKPOINT 2 for the as-built outcome.
 
 Implement the decision from Phase 0. For Option B (recommended):
 
@@ -246,7 +269,7 @@ make agent-check
 
 - Re-read the decorator and the wired activities for consistency: decorator order identical everywhere (`@activity.defn` above `@convert_pipelex_errors`), no stray imports, `make fix-unused-imports` clean.
 - Docstring on `convert_pipelex_errors`: state that it is the activity-side half of the bridge whose workflow-side half is `from_app_error`, and that it catches `PipelexError` (not `Exception`) by design.
-- Decision 3's `activity_log` / `workflow_log` selection already landed in Phase 2 (it was a blocker). Remaining here: add a dedicated unit test to `test_temporal_error_bridge.py` asserting `_context_logger()` picks `activity_log` when `activity.in_activity()` is true and `workflow_log` otherwise (mock `activity.in_activity`). Note the logger fix in the changelog.
+- Decision 3's `activity_log` / `workflow_log` selection already landed in Phase 2 (it was a blocker). Remaining here: add a dedicated unit test to `test_temporal_error_bridge.py` asserting `_log_critical` / `_log_error` route to `activity_log` when `activity.in_activity()` is true and to `workflow_log` otherwise (patch `temporalio.activity.in_activity` and the two loggers, assert which received the call). Note the logger fix in the changelog.
 - `CHANGELOG.md` — under `[Unreleased]` (per project memory: never add a versioned header on a work branch), add an entry: Temporal activities now convert `PipelexError` to a category-aware `TemporalError` at their boundary, so retry decisions and the structured `ErrorReport` survive into workflow code.
 - Update [wip/error-handling/track-temporal-integration.md](wip/error-handling/track-temporal-integration.md): mark Followup 5 as landed. Delete or mark done the stub [wip/error-handling/todos-temporal-activity-boundary.md](wip/error-handling/todos-temporal-activity-boundary.md).
 
