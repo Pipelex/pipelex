@@ -105,7 +105,9 @@ class PipeRouterProtocol(Protocol):
                         run_mode=pipe_job.pipe_run_params.run_mode,
                         pipe_code=pipe_job.pipe.code,
                         output_name=pipe_job.output_name,
-                        pipe_stack=pipe_job.pipe_run_params.pipe_stack,
+                        # run_pipe() has already popped the failed pipe's own frame; re-append
+                        # its code so the reported stack still ends with the pipe that failed.
+                        pipe_stack=[*pipe_job.pipe_run_params.pipe_stack, pipe_job.pipe.code],
                     ) from exc
                 raise
 

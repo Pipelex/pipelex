@@ -32,7 +32,7 @@ class PipelineExecutionError(PipelexError):
         self.run_mode = run_mode
         self.pipe_code = pipe_code
         self.output_name = output_name
-        self.pipe_stack = pipe_stack
+        self.pipe_stack = list(pipe_stack)  # snapshot: the live stack unwinds after this error is raised
         super().__init__(message)
 
     @override
@@ -51,7 +51,7 @@ class PipelineExecutionError(PipelexError):
 class PipeStackOverflowError(PipelexError):
     def __init__(self, message: str, limit: int, pipe_stack: list[str]):
         self.limit = limit
-        self.pipe_stack = pipe_stack
+        self.pipe_stack = list(pipe_stack)  # snapshot: the live stack unwinds after this error is raised
         super().__init__(message)
 
 

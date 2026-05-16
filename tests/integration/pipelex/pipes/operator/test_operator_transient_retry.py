@@ -60,6 +60,9 @@ class TestOperatorTransientRetry:
         pipe_run_error = exc_info.value.__cause__
         assert isinstance(pipe_run_error, PipeRunError)
         assert isinstance(pipe_run_error.__cause__, LLMCompletionError)
+        # Each failed attempt's run_pipe() pops its own frame, so retries leave no residue on the stack.
+        assert pipe_job.pipe_run_params.pipe_stack == [], "failed retries must not accumulate entries on pipe_stack"
+        assert exc_info.value.pipe_stack[-1] == "greet", "the PipeRouterError snapshot must still name the failed pipe"
 
     async def test_pipe_structure_transient_failure_is_retried(
         self,
@@ -112,3 +115,6 @@ class TestOperatorTransientRetry:
         pipe_run_error = exc_info.value.__cause__
         assert isinstance(pipe_run_error, PipeRunError)
         assert isinstance(pipe_run_error.__cause__, LLMCompletionError)
+        # Each failed attempt's run_pipe() pops its own frame, so retries leave no residue on the stack.
+        assert pipe_job.pipe_run_params.pipe_stack == [], "failed retries must not accumulate entries on pipe_stack"
+        assert exc_info.value.pipe_stack[-1] == "adhoc_for_test_transient_retry", "the PipeRouterError snapshot must still name the failed pipe"
