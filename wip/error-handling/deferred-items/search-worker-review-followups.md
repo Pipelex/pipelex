@@ -6,21 +6,9 @@ Three minor, non-blocking observations from the code review. None is a Phase 12 
 
 ---
 
-## 1. `LinkupNoResultError` classified as `TRANSIENT` / `WAIT_AND_RETRY`
+## 1. `LinkupNoResultError` classified as `TRANSIENT` / `WAIT_AND_RETRY` — LANDED
 
-`_classify_linkup_error` (in all three Linkup workers — search, extract, and the shared fallback) classifies `LinkupNoResultError` as `error_category=TRANSIENT` with `UserActionKind.WAIT_AND_RETRY`.
-
-For a search, "no result" is arguably *not* transient — retrying the identical query will return no result again. A non-retryable category (e.g. `CONTENT` with `CHANGE_INPUT`, "broaden or rephrase the query") would be more accurate.
-
-**Why we kept it in Phase 12:** the pre-existing `linkup_search_worker.py` already routed `LinkupNoResultError` through the `TRANSIENT` fallback, and the reference `linkup_extract_worker.py` does the same. Phase 12's goal was sibling consistency, so it mirrored the established pattern rather than drifting.
-
-**Resolution:** when revisited, fix it across all three Linkup workers together (search, extract, and any shared fallback) so they stay consistent. Check the existing `test_linkup_worker_error_handling.py` test data — it locks in `no_result → TRANSIENT` / `"linkup error"` substring — and update those expectations.
-
-**Affected files:**
-
-- `pipelex/plugins/linkup/linkup_search_worker.py` (`_classify_linkup_error` fallback branch)
-- `pipelex/plugins/linkup/linkup_extract_worker.py` (`_classify_linkup_error` fallback branch)
-- `tests/unit/pipelex/plugins/linkup/test_data.py` (`SEARCH_ERROR_CASES` / `EXTRACT_ERROR_CASES` lock in `TRANSIENT`)
+**Status:** resolved on branch `fix/error-classification-categories`. `_classify_linkup_error` now has an explicit `LinkupNoResultError` branch — `CONTENT` + `CHANGE_INPUT` — in both the search and the extract worker, placed before the `TRANSIENT` catch-all. The `test_data.py` `no_result` cases were updated to expect `CONTENT`, and explicit `to_error_report()` no-result tests assert `retryable is False`. Only two Linkup worker files exist (no third site / shared fallback); both were fixed together.
 
 ---
 

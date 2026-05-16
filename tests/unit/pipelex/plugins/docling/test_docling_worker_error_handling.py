@@ -73,7 +73,7 @@ class TestDoclingWorkerErrorHandling:
         assert expected_message_substring in exc_info.value.args[0].lower()
 
     async def test_error_report_for_file_not_found(self, mocker: MockerFixture) -> None:
-        """to_error_report() for FileNotFoundError has CONFIGURATION category."""
+        """to_error_report() for FileNotFoundError has CONTENT category."""
         worker = _make_docling_extract_worker(mocker)
         sdk_exc = FileNotFoundError("No such file: /tmp/missing.pdf")
 
@@ -92,7 +92,7 @@ class TestDoclingWorkerErrorHandling:
             await worker._extract_from_source(source_uri="/tmp/test.pdf")  # noqa: SLF001, S108  # pyright: ignore[reportPrivateUsage]
 
         report = exc_info.value.to_error_report()
-        assert report.error_category == "configuration"
+        assert report.error_category == "content"
         assert report.retryable is False
         assert report.error_type == "ExtractJobFailureError"
 
