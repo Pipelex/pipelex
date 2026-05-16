@@ -6,6 +6,7 @@ from pytest_mock import MockerFixture
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.observer.observer_protocol import ObserverNoOp
@@ -236,3 +237,28 @@ class TestPipeRouterRetry:
         assert wrapped_cause is failures[-1]
         assert isinstance(wrapped_cause, PipeRunError)
         assert isinstance(wrapped_cause.__cause__, CogtError)
+
+    async def test_deeply_nested_transient_cogt_error_retries(self, mocker: MockerFixture) -> None:
+        """A PipeRunError wrapping an intermediate PipelexError that wraps a TRANSIENT CogtError is still retried.
+
+        The retry decision walks the full __cause__ chain, so an extra wrapper layer between the
+        PipeRunError and the underlying CogtError does not silently disable transient retries.
+        """
+        sleep_mock = mocker.patch("pipelex.pipe_run.pipe_router_protocol.asyncio.sleep")
+
+        def _deeply_wrapped_transient() -> PipeRunError:
+            cogt_error = CogtError(message="rate limited", error_category=InferenceErrorCategory.TRANSIENT)
+            intermediate = PipelexError("operator-specific wrap")
+            intermediate.__cause__ = cogt_error
+            pipe_run_error = PipeRunError(message="operator wrap", run_mode=PipeRunMode.LIVE, pipe_code="stub_pipe")
+            pipe_run_error.__cause__ = intermediate
+            return pipe_run_error
+
+        failures = [_deeply_wrapped_transient() for _ in range(4)]
+        router = _StubPipeRouter(failures=failures, transient_retry_settings=_make_retry_settings(3))
+
+        with pytest.raises(PipeRouterError):
+            await router.run(_make_pipe_job())
+
+        assert router.call_count == 4
+        assert sleep_mock.call_count == 3

@@ -80,7 +80,7 @@ def format_run_markdown(result: dict[str, Any]) -> str:
         result_payload: Any | None = None
         if isinstance(main_stuff, dict):
             result_payload = cast("dict[str, Any]", main_stuff).get("json")
-        if result_payload is None:
+        if result_payload is None and not isinstance(main_stuff, dict):
             body = {key: value for key, value in result.items() if key not in _RUN_ENVELOPE_KEYS}
             result_payload = body or None
         if result_payload is not None:

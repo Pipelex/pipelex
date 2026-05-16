@@ -11,6 +11,21 @@ from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.transient_retry import TransientRetrySettings
 
 
+def _find_cogt_error_in_chain(exc: BaseException) -> CogtError | None:
+    """Return the first CogtError found by walking the exception's ``__cause__`` chain.
+
+    Operators wrap the worker's CogtError into a PipeRunError (and a nested pipe may add
+    further layers); the transient-retry decision needs the underlying CogtError's category
+    regardless of how many wrapper layers sit in between.
+    """
+    current: BaseException | None = exc
+    while current is not None:
+        if isinstance(current, CogtError):
+            return current
+        current = current.__cause__
+    return None
+
+
 class PipeRouterProtocol(Protocol):
     observer: ObserverProtocol
     # Resolved from `PipelineExecutionConfig` by each concrete router at construction time — the protocol
@@ -67,9 +82,9 @@ class PipeRouterProtocol(Protocol):
                 # The transient-retry decision is driven by the underlying inference error's
                 # category. The LLM operators (PipeLLM, PipeStructure) wrap the worker's
                 # CogtError into a PipeRunError before it reaches here, so the retryable
-                # CogtError may be `exc` itself or its direct `__cause__`.
-                cogt_error = exc if isinstance(exc, CogtError) else exc.__cause__
-                error_category = cogt_error.error_category if isinstance(cogt_error, CogtError) else None
+                # CogtError is located by walking the full `__cause__` chain to any depth.
+                cogt_error = _find_cogt_error_in_chain(exc)
+                error_category = cogt_error.error_category if cogt_error is not None else None
                 is_retryable = error_category is not None and error_category.is_retryable
                 if is_retryable and retry_count < retry_settings.max_transient_retries:
                     retry_count += 1

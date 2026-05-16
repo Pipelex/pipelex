@@ -47,3 +47,14 @@ class TestFormatRunMarkdown:
         result: dict[str, Any] = {"main_stuff": {}, "working_memory": {"root": {}}}
         markdown = format_run_markdown(result)
         assert "_The pipeline produced no main output._" in markdown
+
+    def test_main_stuff_dict_without_json_does_not_leak_metadata(self) -> None:
+        """A dict main_stuff lacking a json payload must not surface envelope metadata as the Result."""
+        result: dict[str, Any] = {
+            "main_stuff": {"markdown": "", "html": ""},
+            "working_memory": {"root": {}},
+            "pipeline_run_id": "run-456",
+        }
+        markdown = format_run_markdown(result)
+        assert "_The pipeline produced no main output._" in markdown
+        assert "run-456" not in markdown, "envelope metadata must not stand in for a missing result"

@@ -8,6 +8,7 @@ import typer
 from posthog import tag
 from rich import box
 from rich.errors import MarkupError
+from rich.markup import escape
 from rich.table import Table
 
 from pipelex import pretty_print
@@ -159,7 +160,9 @@ def do_show_backends(show_all: bool = False) -> None:
             console.print("[dim]No specific routing rules defined.[/dim]")
 
     except MarkupError as exc:
-        console.print(f"[yellow]Warning: Could not display routing profile information: {exc}[/yellow]")
+        # Escape the MarkupError text: its message quotes the offending `[`/`]`, which would
+        # otherwise be re-parsed as Rich markup and raise a second, uncaught MarkupError.
+        console.print(f"[yellow]Warning: Could not display routing profile information: {escape(str(exc))}[/yellow]")
 
     console.print("\n")
 

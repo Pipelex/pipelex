@@ -1,6 +1,7 @@
 import json
 from typing import TYPE_CHECKING, Any, cast
 
+from pipelex.base_exceptions import PipelexError
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
@@ -51,8 +52,9 @@ def _collect_possible_outputs(
                             "content": content,
                         }
                     )
-                except Exception:  # noqa: BLE001
-                    # Best-effort: output-spec rendering can fail many ways for dynamic concepts; show a placeholder.
+                except (PipelexError, ValueError):
+                    # A dynamic concept whose structure cannot be rendered (unresolved structure
+                    # class, unsupported shape): show a placeholder. Unexpected errors propagate.
                     possible_outputs.append(
                         {
                             "concept_ref": mapped_pipe.output.concept.concept_ref,
@@ -89,8 +91,9 @@ def _collect_possible_outputs(
                         "content": content,
                     }
                 ]
-            except Exception:  # noqa: BLE001
-                # Best-effort: output-spec rendering can fail many ways for dynamic concepts; report no possible outputs.
+            except (PipelexError, ValueError):
+                # A dynamic concept whose structure cannot be rendered (unresolved structure
+                # class, unsupported shape): report no possible outputs. Unexpected errors propagate.
                 return []
 
         case (
