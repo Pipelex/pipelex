@@ -1,15 +1,19 @@
-"""RED integration test for the Temporal activity error boundary (Followup 5).
+"""Integration test for the Temporal activity error boundary (Followup 5).
 
-Drives the real ``act_llm_gen_text`` activity through a real Temporal worker,
-makes its inner ``llm_gen_text`` raise a real ``CogtError``, and asserts what
-``TemporalError.from_app_error`` observes on the workflow side.
+Drives a real activity through a real Temporal worker, makes its inner generate
+call raise a real ``CogtError``, and asserts what ``TemporalError.from_app_error``
+observes on the workflow side.
 
-Today this test FAILS: the activities raise raw ``CogtError`` and Temporal's
-default failure converter auto-wraps them without packing ``to_error_report()``
-into ``ApplicationError.details`` and without setting ``non_retryable``. So
-``from_app_error`` lands in its ``error_report is None`` fallback branch and the
-category-aware retry decision never runs. It turns GREEN once each activity
-converts ``PipelexError`` to ``TemporalError`` at its boundary.
+Each in-scope activity is decorated with ``@convert_pipelex_errors``, so a raised
+``PipelexError`` becomes a ``TemporalError`` that packs ``to_error_report()`` into
+``ApplicationError.details`` and derives ``non_retryable`` from the error's
+``InferenceErrorCategory``. Without that boundary, Temporal's default failure
+converter auto-wraps the raw error, ``from_app_error`` lands in its
+``error_report is None`` fallback, and the category-aware retry decision never runs.
+
+Two probe workflows exercise the boundary: one over an LLM activity
+(``act_llm_gen_text``) and one over a non-LLM activity
+(``act_extract_gen_extract_pages``), proving the wiring is not LLM-specific.
 """
 
 import uuid
@@ -26,12 +30,15 @@ from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
 from pipelex import log
-from pipelex.cogt.content_generation.assignment_models import LLMAssignment
+from pipelex.cogt.content_generation.assignment_models import ExtractAssignment, LLMAssignment
 from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory
+from pipelex.cogt.extract.extract_input import ExtractInput
+from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.hub import get_model_deck
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.temporal.tprl.temporal_error import TemporalError
+from pipelex.temporal.tprl_content_generation.act_extract_generate import act_extract_gen_extract_pages
 from pipelex.temporal.tprl_content_generation.act_llm_generate import act_llm_gen_text
 
 ACTIVITY_FAILURE_MESSAGE = "simulated activity failure"
@@ -48,13 +55,31 @@ class ErrorBoundaryProbeResult(BaseModel):
     error_report: dict[str, Any] | None = None
 
 
+def _probe_result_from_activity_error(exc: ActivityError, activity_name: str) -> ErrorBoundaryProbeResult:
+    """Run the workflow-side bridge on an ``ActivityError`` and capture the conversion.
+
+    Temporal wraps an activity failure's cause as an ``ApplicationError``; anything
+    else (a timeout, a cancellation) means the probe never reached the bridge and
+    is a hard test error.
+    """
+    cause = exc.cause
+    if not isinstance(cause, ApplicationError):
+        unexpected_cause_msg = f"{activity_name} should fail with an ApplicationError cause, got {type(cause).__name__}: {cause}"
+        raise TypeError(unexpected_cause_msg) from exc
+    temporal_error = TemporalError.from_app_error(exc=cause)
+    return ErrorBoundaryProbeResult(
+        non_retryable=temporal_error.non_retryable,
+        error_report=temporal_error.error_report,
+    )
+
+
 @workflow.defn(name="wf_error_boundary_probe")
 class WfErrorBoundaryProbe:
-    """Executes one real activity, expects it to fail, and reports the conversion.
+    """Executes the real ``act_llm_gen_text`` activity, expects it to fail, and reports the conversion.
 
     ``maximum_attempts=1`` on the activity retry policy is mandatory: a failure
-    that is (today, wrongly) classified retryable would otherwise loop until the
-    timeout and hang the test. The probe only cares about the first hop.
+    that is (wrongly) classified retryable would otherwise loop until the timeout
+    and hang the test. The probe only cares about the first hop.
     """
 
     @workflow.run
@@ -67,18 +92,31 @@ class WfErrorBoundaryProbe:
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
         except ActivityError as exc:
-            cause = exc.cause
-            if not isinstance(cause, ApplicationError):
-                # Temporal wraps an activity failure's cause as ApplicationError; anything
-                # else (a timeout, a cancellation) means the probe never reached the bridge.
-                unexpected_cause_msg = f"act_llm_gen_text should fail with an ApplicationError cause, got {type(cause).__name__}: {cause}"
-                raise TypeError(unexpected_cause_msg) from exc
-            temporal_error = TemporalError.from_app_error(exc=cause)
-            return ErrorBoundaryProbeResult(
-                non_retryable=temporal_error.non_retryable,
-                error_report=temporal_error.error_report,
-            )
+            return _probe_result_from_activity_error(exc=exc, activity_name="act_llm_gen_text")
         unreachable_msg = "act_llm_gen_text was expected to fail"
+        raise AssertionError(unreachable_msg)
+
+
+@workflow.defn(name="wf_extract_error_boundary_probe")
+class WfExtractErrorBoundaryProbe:
+    """Same probe over the non-LLM ``act_extract_gen_extract_pages`` activity.
+
+    Proves the error boundary is wired on every in-scope activity, not just the
+    LLM ones. See ``WfErrorBoundaryProbe`` for why ``maximum_attempts=1`` is set.
+    """
+
+    @workflow.run
+    async def run(self, extract_assignment: ExtractAssignment) -> ErrorBoundaryProbeResult:
+        try:
+            await workflow.execute_activity(
+                act_extract_gen_extract_pages,
+                arg=extract_assignment,
+                start_to_close_timeout=timedelta(seconds=30),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+        except ActivityError as exc:
+            return _probe_result_from_activity_error(exc=exc, activity_name="act_extract_gen_extract_pages")
+        unreachable_msg = "act_extract_gen_extract_pages was expected to fail"
         raise AssertionError(unreachable_msg)
 
 
@@ -151,3 +189,53 @@ class TestActivityErrorBoundary:
             # A category-less CogtError has no retryability signal — to_error_report()
             # drops the None-valued field, so the key is absent from the report.
             assert "retryable" not in result.error_report, "a category-less CogtError must carry no retryability signal in its report"
+
+    async def test_real_non_llm_activity_failure_surfaces_error_report_on_workflow_side(
+        self,
+        temporal_client: TemporalClient,
+        mocker: MockerFixture,
+    ) -> None:
+        """The boundary is wired on non-LLM activities too: a ``CogtError`` raised
+        inside ``act_extract_gen_extract_pages`` must reach the workflow side as a
+        ``TemporalError`` with a populated ``ErrorReport`` and category-aware
+        ``non_retryable``.
+        """
+        raised_error = CogtError(ACTIVITY_FAILURE_MESSAGE, error_category=InferenceErrorCategory.CONFIGURATION)
+        mocker.patch(
+            "pipelex.temporal.tprl_content_generation.act_extract_generate.extract_gen_pages_and_store",
+            new=mocker.AsyncMock(side_effect=raised_error),
+        )
+
+        extract_assignment = ExtractAssignment(
+            job_metadata=JobMetadata(user_id="test", pipeline_run_id="test"),
+            extract_handle="extract-handle-never-reached",
+            extract_input=ExtractInput(document_uri="file://never-reached.pdf"),
+            extract_job_params=ExtractJobParams.make_default_extract_job_params(),
+            extract_job_config=ExtractJobConfig(),
+        )
+
+        task_queue = f"q_err_boundary_{uuid.uuid4().hex[:8]}"
+        workflow_id = f"wf_err_boundary_{uuid.uuid4().hex[:8]}"
+
+        async with Worker(
+            temporal_client,
+            task_queue=task_queue,
+            workflows=[WfExtractErrorBoundaryProbe],
+            activities=[act_extract_gen_extract_pages],
+            workflow_runner=UnsandboxedWorkflowRunner(),
+        ):
+            result: ErrorBoundaryProbeResult = await temporal_client.execute_workflow(  # pyright: ignore[reportUnknownMemberType]
+                WfExtractErrorBoundaryProbe.run,
+                arg=extract_assignment,
+                id=workflow_id,
+                task_queue=task_queue,
+            )
+
+        log.info(f"ErrorBoundaryProbeResult: {result}")
+
+        assert result.non_retryable is True, "a CONFIGURATION CogtError must be non-retryable on the workflow side"
+        assert result.error_report is not None, "the structured ErrorReport must survive the activity → workflow boundary"
+        assert result.error_report["error_type"] == "CogtError"
+        assert result.error_report["message"] == ACTIVITY_FAILURE_MESSAGE
+        assert result.error_report["error_category"] == InferenceErrorCategory.CONFIGURATION
+        assert result.error_report["retryable"] is False

@@ -15,12 +15,14 @@ async def act_llm_gen_text(llm_assignment: LLMAssignment) -> str:
 
 
 @activity.defn
+@convert_pipelex_errors
 async def act_llm_gen_object(object_assignment: ObjectAssignment) -> BaseModel:
     log.dev("act_llm_gen_object")
     return await llm_gen_object(object_assignment=object_assignment)
 
 
 @activity.defn
+@convert_pipelex_errors
 async def act_llm_gen_object_list(object_assignment: ObjectAssignment) -> list[BaseModel]:
     log.dev("act_llm_gen_object_list")
     return await llm_gen_object_list(object_assignment=object_assignment)

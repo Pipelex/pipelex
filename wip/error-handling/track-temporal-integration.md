@@ -52,7 +52,7 @@ The composition is **additive** across worker → queue → handle layers (see c
 
 ## Followups
 
-> **Status:** Followups 1–4 landed in Phase 6 (commit `f5176d39`). Followup 5 is open — see below. It is the wiring step that makes 1–4 actually run in production.
+> **Status:** Followups 1–4 landed in Phase 6 (commit `f5176d39`). Followup 5 **landed** on branch `fix/temporal-activity-error-boundary` — see below. The wiring that makes 1–4 actually run in production is now in place.
 
 ### 1. Use `is_retryable` in `from_message_exception`
 
@@ -85,24 +85,24 @@ Update the docstring of `RetryPolicyConfig.non_retryable_error_types` and `non_r
 - `ApplicationError.details` round-trips through Temporal's serialization with all `ErrorReport` fields intact.
 - Log severity (critical / error) matches the retry decision in both paths.
 
-### 5. Wire `from_message_exception` into the activity boundary (OPEN)
+### 5. Wire `from_message_exception` into the activity boundary (LANDED)
 
-Phase 6 implemented `from_message_exception` (category-aware retry decision + `ErrorReport` details packing) but **no activity calls it**. The activity functions in `pipelex/temporal/tprl_content_generation/act_*.py` and `pipelex/temporal/tprl_pipe/act_*.py` raise raw `CogtError` / `PipelexError`, and Temporal's default failure converter auto-wraps them — that converter does not pack our `ErrorReport` into `details` and leaves `non_retryable=False`.
+Phase 6 implemented `from_message_exception` (category-aware retry decision + `ErrorReport` details packing) but no activity called it, so `from_app_error` always landed in its `error_report is None` fallback branch and the category-aware retry decision never ran.
 
-Consequence: in production today, `from_app_error` always lands in its `error_report is None` fallback branch, and the category-aware retry decision never runs. The Phase 6 unit test (`test_temporal_error_bridge.py`) exercises the bridge methods directly and proves a self-consistent round-trip, but no integration test crosses a real activity → workflow boundary through this bridge.
-
-To close the gap, each activity entry point should convert at its boundary, e.g.:
+**Landed on branch `fix/temporal-activity-error-boundary`.** Rather than a per-activity `try/except`, a shared decorator `convert_pipelex_errors` (new module `pipelex/temporal/tprl/activity_error_boundary.py`) is applied beneath `@activity.defn` on every in-scope activity:
 
 ```python
 @activity.defn
+@convert_pipelex_errors
 async def act_llm_gen_text(llm_assignment: LLMAssignment) -> str:
-    try:
-        return await llm_gen_text(llm_assignment=llm_assignment)
-    except PipelexError as exc:
-        raise TemporalError.from_message_exception(exc=exc) from exc
+    return await llm_gen_text(llm_assignment=llm_assignment)
 ```
 
-This is ~8 activity functions plus an integration test that raises a real `CogtError` from an activity and asserts what `from_app_error` receives on the workflow side. It was deliberately scoped out of Phase 6 (whose plan named only the bridge methods) and recorded here as the next coherent unit of work.
+The decorator catches `PipelexError` only (never the generic `Exception`) and re-raises `TemporalError.from_message_exception(exc=exc) from exc`. Wired: `act_llm_gen_text` / `act_llm_gen_object` / `act_llm_gen_object_list`, `act_img_gen_images`, `act_extract_gen_extract_pages`, `act_jinja2_gen_text`, `act_render_page_views`, `act_deliver`, `act_flush_trace_events`. Deliberately **not** wired: `act_assemble_graph` — it is best-effort observability that swallows every failure and degrades to `None`, so no error ever crosses its boundary.
+
+Also fixed under this followup: `TemporalError._log_critical` / `_log_error` now select `activity_log` vs `workflow_log` via `activity.in_activity()`, because `workflow.logger` raises `_NotInWorkflowEventLoopError` outside a workflow event loop and `from_message_exception` runs activity-side.
+
+Tests: an integration test (`tests/integration/pipelex/temporal/test_activity_error_boundary.py`) drives a real `CogtError` from a real activity through a real worker and asserts what `from_app_error` receives on the workflow side, over both an LLM and a non-LLM activity; a decorator unit test (`tests/unit/pipelex/temporal/test_activity_error_boundary.py`) pins the `functools.wraps` invariants and the `PipelexError`-only catch.
 
 ## Prerequisites
 

@@ -8,20 +8,23 @@
 
 ## Status — as of 2026-05-16
 
-**Phases 0, 1, 2 are complete and committed** on branch `fix/temporal-activity-error-boundary` (through commit `18e0135b`). **The next session starts at Phase 3.**
+**All phases (0–5) are complete** on branch `fix/temporal-activity-error-boundary`. Phases 0–2 were committed (through `18e0135b`); Phase 3, Phase 4, and Phase 5 verification are done in the working tree and **not yet committed**. `make agent-check` clean, full `make agent-test` green.
 
 What is in the code right now:
 
-- **`pipelex/temporal/tprl/activity_error_boundary.py`** (new) — the `convert_pipelex_errors` decorator. Catches `PipelexError` raised inside an activity and re-raises it as `TemporalError.from_message_exception(exc)`.
-- **`pipelex/temporal/tprl_content_generation/act_llm_generate.py`** — `@convert_pipelex_errors` applied beneath `@activity.defn` on **`act_llm_gen_text` only**. The other ~7 in-scope activities are still unwired — that is Phase 3.
-- **`pipelex/temporal/tprl/temporal_error.py`** — `_log_critical` / `_log_error` now branch inline on `activity.in_activity()` to pick `activity_log` vs `workflow_log` (Decision 3, pulled forward into Phase 2 — it was a hard blocker: `workflow.logger` raises `_NotInWorkflowEventLoopError` outside a workflow event loop). There is **no `_context_logger()` helper** — an earlier version had one; a code-review pass removed it (its `WorkflowLog | ActivityLog` union return was a type smell).
-- **`tests/integration/pipelex/temporal/test_activity_error_boundary.py`** (new) — the RED→GREEN integration test. 3 parametrized cases, all passing.
+- **`pipelex/temporal/tprl/activity_error_boundary.py`** — the `convert_pipelex_errors` decorator. Catches `PipelexError` raised inside an activity and re-raises it as `TemporalError.from_message_exception(exc)`.
+- **All in-scope activities wired.** `@convert_pipelex_errors` is applied beneath `@activity.defn` on `act_llm_gen_text` / `act_llm_gen_object` / `act_llm_gen_object_list`, `act_img_gen_images`, `act_extract_gen_extract_pages`, `act_jinja2_gen_text`, `act_render_page_views`, `act_deliver`, `act_flush_trace_events`. `act_assemble_graph` is deliberately **not** wired (Decision 2) — it carries a one-line comment saying so.
+- **`pipelex/temporal/tprl/temporal_error.py`** — `_log_critical` / `_log_error` branch inline on `activity.in_activity()` to pick `activity_log` vs `workflow_log` (Decision 3, landed in Phase 2). There is **no `_context_logger()` helper** — a code-review pass removed it (its `WorkflowLog | ActivityLog` union return was a type smell).
+- **`tests/integration/pipelex/temporal/test_activity_error_boundary.py`** — integration test, two probe workflows (LLM `act_llm_gen_text` + non-LLM `act_extract_gen_extract_pages`), all cases passing.
+- **`tests/unit/pipelex/temporal/test_activity_error_boundary.py`** (new) — decorator unit test pinning the `functools.wraps` invariants and the `PipelexError`-only catch.
+- **`tests/unit/pipelex/temporal/test_temporal_error_bridge.py`** — added `test_log_helpers_route_to_the_active_temporal_context`; the `log_mocks` fixture is no longer `autouse` (the routing test needs the real helpers) — the other tests opt in explicitly.
+- **`CHANGELOG.md`** — `[Unreleased]` entry added. **`wip/error-handling/track-temporal-integration.md`** — Followup 5 marked landed. The stub `wip/error-handling/todos-temporal-activity-boundary.md` was deleted.
 
-`make agent-check` is clean; the integration test and the bridge unit test are green.
+`make agent-check` is clean; the full temporal suite (`tests/unit/pipelex/temporal/ tests/integration/pipelex/temporal/`) is green.
 
-The detailed Phase 0/1/2 sections below are the **historical TDD record** — already implemented; do not redo them. Where this doc's early code sketches differ from the repo (the Phase 1 sketch predates the code-review refinements), **the committed files are authoritative**.
+The detailed Phase 0/1/2 sections below are the **historical TDD record** — already implemented; do not redo them. Where this doc's early code sketches differ from the repo, **the committed files are authoritative**.
 
-Commits: `8acdae1f` (plan) → `ee0e7852` (Phase 0 decisions) → `e0580e89` (Phase 1 RED) → `3bb28ae4` (Phase 2 GREEN) → `18e0135b` (code-review fixes).
+Commits: `8acdae1f` (plan) → `ee0e7852` (Phase 0 decisions) → `e0580e89` (Phase 1 RED) → `3bb28ae4` (Phase 2 GREEN) → `18e0135b` (code-review fixes). Phase 3+4 are uncommitted.
 
 ---
 
@@ -233,18 +236,18 @@ All three Phase 1 cases must pass: `CONFIGURATION` → `non_retryable True` + po
 
 ---
 
-## Phase 3 — Wire the remaining activities
+## Phase 3 — Wire the remaining activities ✅ DONE
 
-Apply the same decorator (or per-activity `try/except`, per Decision 1) to every remaining in-scope activity:
+Applied the shared `@convert_pipelex_errors` decorator (Decision 1, Option B) to every remaining in-scope activity:
 
-- [ ] `act_llm_gen_object`, `act_llm_gen_object_list` (`act_llm_generate.py`)
-- [ ] `act_img_gen_images` (`act_img_gen_generate.py`)
-- [ ] `act_extract_gen_extract_pages` (`act_extract_generate.py`)
-- [ ] `act_jinja2_gen_text` (`act_jinja2_generate.py`)
-- [ ] `act_render_page_views` (`act_render_page_views.py`)
-- [ ] `act_deliver` (`act_deliver.py`)
-- [ ] `act_flush_trace_events` (`act_flush_trace_events.py`) — per Decision 2
-- [ ] `act_assemble_graph` — **deliberately NOT wired** (Decision 2). Add a one-line comment in the file stating why, so the omission reads as intentional.
+- [x] `act_llm_gen_object`, `act_llm_gen_object_list` (`act_llm_generate.py`)
+- [x] `act_img_gen_images` (`act_img_gen_generate.py`)
+- [x] `act_extract_gen_extract_pages` (`act_extract_generate.py`)
+- [x] `act_jinja2_gen_text` (`act_jinja2_generate.py`)
+- [x] `act_render_page_views` (`act_render_page_views.py`)
+- [x] `act_deliver` (`act_deliver.py`)
+- [x] `act_flush_trace_events` (`act_flush_trace_events.py`) — per Decision 2
+- [x] `act_assemble_graph` — **deliberately NOT wired** (Decision 2). Carries a one-line comment stating why, so the omission reads as intentional.
 
 ### Extend the integration test
 
@@ -256,29 +259,27 @@ Also confirm no double-wrapping: `content_generator_in_workflow.py` and `wf_pipe
 
 `convert_pipelex_errors`'s correctness hinges on `functools.wraps` preserving `__name__` (load-bearing — `content_generator_in_workflow.py` reads `act_llm_gen_text.__name__` for dispatch routing) and `__annotations__` (Temporal's `@activity.defn` reads them for payload typing). Add a unit test (`tests/unit/pipelex/temporal/test_activity_error_boundary.py`) that wraps a sample async function and asserts: the wrapped callable keeps the original `__name__`; a raised `PipelexError` comes out as a `TemporalError`; a non-`PipelexError` propagates untouched. This pins the invariant a future non-`wraps` refactor would silently break (code-review finding #3, deferred from Phase 2).
 
-### Verify
+### Verify ✅ DONE
 
-```bash
-.venv/bin/pytest tests/integration/pipelex/temporal/test_activity_error_boundary.py tests/unit/pipelex/temporal/test_temporal_error_bridge.py -q
-make agent-check
-```
+The integration test gained a second probe workflow (`WfExtractErrorBoundaryProbe`) over the non-LLM `act_extract_gen_extract_pages`, plus a shared `_probe_result_from_activity_error` helper. The decorator unit test (`tests/unit/pipelex/temporal/test_activity_error_boundary.py`) was added. No double-wrapping: the activity side had no prior conversion. `make agent-check` clean; targeted temporal suite green.
 
 ---
 
-## Phase 4 — REFACTOR + docs
+## Phase 4 — REFACTOR + docs ✅ DONE
 
-- Re-read the decorator and the wired activities for consistency: decorator order identical everywhere (`@activity.defn` above `@convert_pipelex_errors`), no stray imports, `make fix-unused-imports` clean.
-- Docstring on `convert_pipelex_errors`: state that it is the activity-side half of the bridge whose workflow-side half is `from_app_error`, and that it catches `PipelexError` (not `Exception`) by design.
-- Decision 3's `activity_log` / `workflow_log` selection already landed in Phase 2 (it was a blocker). Remaining here: add a dedicated unit test to `test_temporal_error_bridge.py` asserting `_log_critical` / `_log_error` route to `activity_log` when `activity.in_activity()` is true and to `workflow_log` otherwise (patch `temporalio.activity.in_activity` and the two loggers, assert which received the call). Note the logger fix in the changelog.
-- `CHANGELOG.md` — under `[Unreleased]` (per project memory: never add a versioned header on a work branch), add an entry: Temporal activities now convert `PipelexError` to a category-aware `TemporalError` at their boundary, so retry decisions and the structured `ErrorReport` survive into workflow code.
-- Update [wip/error-handling/track-temporal-integration.md](wip/error-handling/track-temporal-integration.md): mark Followup 5 as landed. Delete or mark done the stub [wip/error-handling/todos-temporal-activity-boundary.md](wip/error-handling/todos-temporal-activity-boundary.md).
+- [x] Decorator order is identical everywhere (`@activity.defn` above `@convert_pipelex_errors`); `make fix-unused-imports` / `make agent-check` clean.
+- [x] `convert_pipelex_errors` docstring states it is the activity-side half of the bridge, names `from_app_error` as the workflow-side half, and that it catches `PipelexError` (not `Exception`) by design.
+- [x] Added `test_log_helpers_route_to_the_active_temporal_context` to `test_temporal_error_bridge.py` — asserts `_log_critical` / `_log_error` route to `activity_log` when `activity.in_activity()` is true and `workflow_log` otherwise. The `log_mocks` fixture is no longer `autouse` (this new test needs the real helpers); the other tests opt in explicitly.
+- [x] `CHANGELOG.md` — `[Unreleased]` entry added (covers the boundary wiring and the logger fix).
+- [x] `wip/error-handling/track-temporal-integration.md` — Followup 5 marked landed. Stub `wip/error-handling/todos-temporal-activity-boundary.md` deleted.
 
 ---
 
 ## Phase 5 — Full verification
 
-- [ ] `make agent-check` — clean.
-- [ ] `make agent-test` — full suite (this touches `pipelex/temporal/` broadly; the targeted run is `tests/unit/pipelex/temporal/ tests/integration/pipelex/temporal/`, but run the full suite before wrapping up per `_tprl/CLAUDE.md`).
+- [x] `make agent-check` — clean.
+- [x] Targeted temporal suite (`tests/unit/pipelex/temporal/ tests/integration/pipelex/temporal/`) — green.
+- [x] `make agent-test` — full suite green (exit 0).
 - [ ] Optionally, against a real server: `.venv/bin/pytest tests/integration/pipelex/temporal/test_activity_error_boundary.py --temporal-server local` — confirms cross-process serialization (the in-process test server already exercises the real failure converter, so this is a confidence check, not strictly required).
 - [ ] Watch for zombie Temporal processes if a run stalls (project memory `feedback_test_timeouts`).
 
