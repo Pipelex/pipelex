@@ -166,6 +166,16 @@ class PipelineExecutionConfig(ConfigModel):
     # An integer caps the number of branches executed at once; the literal "unbounded" disables the bound.
     max_concurrency: Annotated[int, Field(ge=1)] | Literal["unbounded"]
 
+    @model_validator(mode="after")
+    def _validate_transient_retry_timing(self) -> Self:
+        if self.transient_retry_max_wait < self.transient_retry_base_wait:
+            msg = (
+                f"transient_retry_max_wait ({self.transient_retry_max_wait}) must not be "
+                f"lower than transient_retry_base_wait ({self.transient_retry_base_wait})"
+            )
+            raise ValueError(msg)
+        return self
+
     def with_graph_config_overrides(
         self,
         generate_graph: bool | None = None,

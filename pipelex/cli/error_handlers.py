@@ -120,7 +120,7 @@ def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, con
     report = exc.to_error_report()
     fields: list[tuple[str, str]] = [
         ("Pipe", f"[yellow]'{escape(exc.pipe_code)}'[/yellow] [dim]({escape(exc.pipe_type)})[/dim]"),
-        ("Model", f"[yellow]'{escape(exc.model_handle)}'[/yellow]"),
+        ("Model", f"[yellow]'{escape(exc.model_handle or '')}'[/yellow]"),
     ]
     if exc.fallback_list:
         fallbacks_str = ", ".join([f"[yellow]{escape(fallback)}[/yellow]" for fallback in exc.fallback_list])
@@ -153,10 +153,11 @@ def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, context: 
         context: Context for the error message
     """
     report = exc.to_error_report()
+    model_handle = exc.model_handle or ""
     fields: list[tuple[str, str]] = [
         ("Preset ID", f"[yellow]'{escape(exc.preset_id)}'[/yellow]"),
         ("Model Type", f"[yellow]'{escape(exc.model_type)}'[/yellow]"),
-        ("Model Handle", f"[yellow]'{escape(exc.model_handle)}'[/yellow]"),
+        ("Model Handle", f"[yellow]'{escape(model_handle)}'[/yellow]"),
     ]
     if exc.enabled_backends:
         backends_str = ", ".join([f"[yellow]{escape(backend)}[/yellow]" for backend in sorted(exc.enabled_backends)])
@@ -169,7 +170,7 @@ def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, context: 
         tip_lines: list[str] = [
             (
                 f"The preset [yellow]'{escape(exc.preset_id)}'[/yellow] references model handle "
-                f"[yellow]'{escape(exc.model_handle)}'[/yellow] which is not available in any enabled backend."
+                f"[yellow]'{escape(model_handle)}'[/yellow] which is not available in any enabled backend."
             )
         ]
         if exc.enabled_backends:
@@ -178,8 +179,8 @@ def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, context: 
         tip_lines.append(
             "[bold]Possible solutions:[/bold]\n"
             "  1. Update the preset to use a different model\n"
-            f"  2. Configure model '{escape(exc.model_handle)}' in one of your enabled backends\n"
-            f"  3. Enable a backend that supports [yellow]'{escape(exc.model_handle)}'[/yellow]"
+            f"  2. Configure model '{escape(model_handle)}' in one of your enabled backends\n"
+            f"  3. Enable a backend that supports [yellow]'{escape(model_handle)}'[/yellow]"
         )
         tip = "\n".join(tip_lines)
 

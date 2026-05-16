@@ -4,6 +4,7 @@ from typing import Any
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.exceptions import CogtError
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.search.search_job import SearchJob
@@ -37,7 +38,11 @@ class SearchWorkerAbstract(InferenceWorkerAbstract):
         search_job.job_metadata.unit_job_id = UnitJobId.SEARCH_SOURCED_ANSWER
         search_job.search_job_before_start(inference_model=self.inference_model)
 
-        result = await self._search_sourced_answer(search_job=search_job)
+        try:
+            result = await self._search_sourced_answer(search_job=search_job)
+        except CogtError as exc:
+            exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
+            raise
 
         search_job.search_job_after_complete()
         if self.reporting_delegate:
@@ -56,7 +61,11 @@ class SearchWorkerAbstract(InferenceWorkerAbstract):
         search_job.job_metadata.unit_job_id = UnitJobId.SEARCH_STRUCTURED
         search_job.search_job_before_start(inference_model=self.inference_model)
 
-        result = await self._search_structured(search_job=search_job, schema=schema)
+        try:
+            result = await self._search_structured(search_job=search_job, schema=schema)
+        except CogtError as exc:
+            exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
+            raise
 
         search_job.search_job_after_complete()
         if self.reporting_delegate:

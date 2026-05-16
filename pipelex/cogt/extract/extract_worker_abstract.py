@@ -4,7 +4,7 @@ from typing import Any
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import ExtractCapabilityError
+from pipelex.cogt.exceptions import CogtError, ExtractCapabilityError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
@@ -86,7 +86,11 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
         extract_job.extract_job_before_start(inference_model=self.inference_model)
 
         # Execute job
-        result = await self._extract_pages(extract_job=extract_job)
+        try:
+            result = await self._extract_pages(extract_job=extract_job)
+        except CogtError as exc:
+            exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
+            raise
 
         # Populate page count as fallback usage (only if no real usage was reported)
         if (extract_tokens_usage := extract_job.job_report.extract_tokens_usage) and not extract_tokens_usage.nb_tokens_by_category:

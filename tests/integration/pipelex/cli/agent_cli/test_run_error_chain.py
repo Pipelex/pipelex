@@ -50,10 +50,10 @@ class TestRunErrorChain:
         mocker.patch(f"{RUN_PIPE_MODULE}.parse_cli_inputs", return_value=None)
 
         transient_error = LLMCompletionError(WORKER_ERROR_MESSAGE, error_category=InferenceErrorCategory.TRANSIENT)
-        # model_handle / backend_name are the duck-typed attributes CogtError.to_error_report()
-        # reads via getattr — set them so the report carries model + provider.
-        setattr(transient_error, "model_handle", WORKER_MODEL)  # noqa: B010
-        setattr(transient_error, "backend_name", WORKER_PROVIDER)  # noqa: B010
+        # model_handle / backend_name are declared on CogtError; a real worker fills them at
+        # its public-method chokepoint. This test mocks above the worker, so set them directly.
+        transient_error.model_handle = WORKER_MODEL
+        transient_error.backend_name = WORKER_PROVIDER
         mocker.patch.object(ContentGenerator, "make_llm_text", side_effect=transient_error)
 
         ctx = mocker.MagicMock()
