@@ -75,14 +75,14 @@ async def act_llm_gen_text(llm_assignment: LLMAssignment) -> str:
 
 **Recommendation: Option B.** New module `pipelex/temporal/tprl/activity_error_boundary.py` exposing `convert_pipelex_errors`. It catches `PipelexError` only (never `Exception` — the project bans the generic catch) and re-raises `TemporalError.from_message_exception(exc=exc) from exc`. A non-`PipelexError` propagates untouched and Temporal's default converter handles it as before.
 
-> **DECISION (fill in):** ______________________
+> **DECISION:** Option B — shared decorator `convert_pipelex_errors` in `pipelex/temporal/tprl/activity_error_boundary.py`.
 
 ### Decision 2 — Which activities get the boundary
 
 - `act_assemble_graph` (`tprl_pipe/act_assemble_graph.py`) **must NOT be wired.** It already wraps its body in `except Exception` (best-effort observability) and degrades to `return None` — it never propagates an error across the boundary. Converting it would be dead code. Leave it; note it explicitly so a future reader does not "fix" the omission.
 - `act_flush_trace_events` (`tprl_pipe/act_flush_trace_events.py`) **does** propagate errors and is observability-only. **Recommendation: wire it** for consistency — a failed flush is a real error and should carry a structured report — but flag it as the lowest-value target. If the team prefers it stay best-effort, that is a separate decision (make it swallow like `act_assemble_graph`), out of scope here.
 
-> **DECISION (fill in):** ______________________
+> **DECISION:** Wire `act_flush_trace_events`; leave `act_assemble_graph` unwired (it already swallows and degrades to `None`).
 
 ### Decision 3 — `from_message_exception` logs through `workflow_log` but runs activity-side
 
@@ -90,7 +90,7 @@ async def act_llm_gen_text(llm_assignment: LLMAssignment) -> str:
 
 **Recommendation:** out of scope for the *wiring* but record it. Either (a) leave as-is and note it, or (b) small follow-up: make `_log_critical` / `_log_error` pick `activity_log` when `activity.in_activity()` is true, else `workflow_log`. Do **not** silently change Phase 6 bridge behavior inside this task without calling it out — the bridge unit test patches `_log_critical` / `_log_error` and would still pass, so the change is safe but should be deliberate.
 
-> **DECISION (fill in):** ______________________
+> **DECISION:** Option (b) — fix it in this task. `_log_critical` / `_log_error` select `activity_log` when `activity.in_activity()`, else `workflow_log`. Done deliberately in **Phase 4**; the bridge unit test still passes (it patches both helpers). Add a unit test asserting the activity-context branch picks `activity_log`.
 
 ---
 
