@@ -40,7 +40,7 @@ class TestPypdfium2WorkerSemantic:
     @pytest.mark.parametrize(
         ("exception_class", "exception_message", "expected_category", "expected_kind"),
         [
-            (FileNotFoundError, "No such file", InferenceErrorCategory.CONFIGURATION, UserActionKind.CHANGE_INPUT),
+            (FileNotFoundError, "No such file", InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
             (ValueError, "Invalid PDF", InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
             (RuntimeError, "PDF parsing failed", InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
             (OSError, "Disk read error", InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),

@@ -98,7 +98,7 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
             msg = f"Document file not found for Docling extraction: {exc}"
             raise ExtractJobFailureError(
                 msg,
-                error_category=InferenceErrorCategory.CONFIGURATION,
+                error_category=InferenceErrorCategory.CONTENT,
                 user_action=UserAction(
                     kind=UserActionKind.CHANGE_INPUT,
                     detail="The source document path could not be found — check the URI or file path",
