@@ -8,7 +8,7 @@
 
 ## Status — as of 2026-05-16
 
-**All phases (0–5) are complete** on branch `fix/temporal-activity-error-boundary`. Phases 0–2 were committed (through `18e0135b`); Phase 3, Phase 4, and Phase 5 verification are done in the working tree and **not yet committed**. `make agent-check` clean, full `make agent-test` green.
+**All phases (0–5) are complete and committed** on branch `fix/temporal-activity-error-boundary`. Phases 0–2 landed through `18e0135b`; Phases 3–4 landed in `cda61bae` ("feat: category-aware error boundary on all Temporal activities"). Phase 5 is verification only — `make agent-check` clean, full `make agent-test` green.
 
 What is in the code right now:
 
@@ -24,7 +24,7 @@ What is in the code right now:
 
 The detailed Phase 0/1/2 sections below are the **historical TDD record** — already implemented; do not redo them. Where this doc's early code sketches differ from the repo, **the committed files are authoritative**.
 
-Commits: `8acdae1f` (plan) → `ee0e7852` (Phase 0 decisions) → `e0580e89` (Phase 1 RED) → `3bb28ae4` (Phase 2 GREEN) → `18e0135b` (code-review fixes). Phase 3+4 are uncommitted.
+Commits: `8acdae1f` (plan) → `ee0e7852` (Phase 0 decisions) → `e0580e89` (Phase 1 RED) → `3bb28ae4` (Phase 2 GREEN) → `18e0135b` (code-review fixes) → `cda61bae` (Phase 3 wiring + Phase 4 docs/tests).
 
 ---
 

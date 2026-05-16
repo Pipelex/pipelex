@@ -104,6 +104,8 @@ Also fixed under this followup: `TemporalError._log_critical` / `_log_error` now
 
 Tests: an integration test (`tests/integration/pipelex/temporal/test_activity_error_boundary.py`) drives a real `CogtError` from a real activity through a real worker and asserts what `from_app_error` receives on the workflow side, over both an LLM and a non-LLM activity; a decorator unit test (`tests/unit/pipelex/temporal/test_activity_error_boundary.py`) pins the `functools.wraps` invariants and the `PipelexError`-only catch.
 
+Two non-blocking observations from the code review of `cda61bae` are recorded in [deferred-items/temporal-activity-boundary-review-followups.md](deferred-items/temporal-activity-boundary-review-followups.md): the integration test verifies the converted payload rather than Temporal's retry behavior, and `_error_report_from_details` identifies the report by dict shape. Both are deliberate scope choices, optional to revisit.
+
 ## Prerequisites
 
 - [track-worker-classification.md](track-worker-classification.md) — every inference worker classifies before this bridge is meaningful (done, modulo the `instructor` unwrap on OpenAI / Mistral / Google).
