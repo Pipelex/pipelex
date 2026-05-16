@@ -73,9 +73,18 @@ def format_run_markdown(result: dict[str, Any]) -> str:
     if rendered_markdown is not None:
         lines += ["## Result", "", rendered_markdown]
     else:
-        body = {key: value for key, value in result.items() if key not in _RUN_ENVELOPE_KEYS}
-        if body:
-            lines += ["## Result", "", "```json", clean_json_dumps(body, indent=2), "```"]
+        # No rendered markdown — e.g. the API runner cannot render it and leaves `markdown`
+        # empty. Surface the structured `json` payload `main_stuff` still carries rather than
+        # dropping it (it sits under an excluded envelope key). Only with no `main_stuff` at
+        # all do we fall back to the remaining non-envelope keys.
+        result_payload: Any | None = None
+        if isinstance(main_stuff, dict):
+            result_payload = cast("dict[str, Any]", main_stuff).get("json")
+        if result_payload is None:
+            body = {key: value for key, value in result.items() if key not in _RUN_ENVELOPE_KEYS}
+            result_payload = body or None
+        if result_payload is not None:
+            lines += ["## Result", "", "```json", clean_json_dumps(result_payload, indent=2), "```"]
         else:
             lines.append("_The pipeline produced no main output._")
 

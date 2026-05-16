@@ -63,8 +63,13 @@ class PipeRouterProtocol(Protocol):
             try:
                 pipe_output = await self._run_pipe_job(pipe_job)
                 break
-            except CogtError as exc:
-                error_category = exc.error_category
+            except (CogtError, PipeRunError) as exc:
+                # The transient-retry decision is driven by the underlying inference error's
+                # category. The LLM operators (PipeLLM, PipeStructure) wrap the worker's
+                # CogtError into a PipeRunError before it reaches here, so the retryable
+                # CogtError may be `exc` itself or its direct `__cause__`.
+                cogt_error = exc if isinstance(exc, CogtError) else exc.__cause__
+                error_category = cogt_error.error_category if isinstance(cogt_error, CogtError) else None
                 is_retryable = error_category is not None and error_category.is_retryable
                 if is_retryable and retry_count < retry_settings.max_transient_retries:
                     retry_count += 1
@@ -75,19 +80,19 @@ class PipeRouterProtocol(Protocol):
                     )
                     await asyncio.sleep(wait_seconds)
                     continue
-                # Non-retryable category, or the transient-retry budget is exhausted: re-raise the last
-                # error as-is so the cause chain is preserved (the existing PipeRunError path still wraps).
+                # Non-retryable category, or the transient-retry budget is exhausted. A PipeRunError
+                # still wraps into PipeRouterError (preserving the pipe location context); a raw
+                # CogtError is re-raised as-is so its cause chain is preserved.
                 await self._after_failing_run(pipe_job, exc)
+                if isinstance(exc, PipeRunError):
+                    raise PipeRouterError(
+                        message=exc.message,
+                        run_mode=pipe_job.pipe_run_params.run_mode,
+                        pipe_code=pipe_job.pipe.code,
+                        output_name=pipe_job.output_name,
+                        pipe_stack=pipe_job.pipe_run_params.pipe_stack,
+                    ) from exc
                 raise
-            except PipeRunError as exc:
-                await self._after_failing_run(pipe_job, exc)
-                raise PipeRouterError(
-                    message=exc.message,
-                    run_mode=pipe_job.pipe_run_params.run_mode,
-                    pipe_code=pipe_job.pipe.code,
-                    output_name=pipe_job.output_name,
-                    pipe_stack=pipe_job.pipe_run_params.pipe_stack,
-                ) from exc
 
         await self._after_successful_run(pipe_job, pipe_output)
 
