@@ -6,6 +6,17 @@
 
 ---
 
+## ✅ Outcome (archived — done)
+
+**Option B** (centralized enrichment at the worker base class) was implemented:
+
+- `CogtError` declares `model_handle` / `backend_name` (`str | None`); `to_error_report()` reads them directly (no more `getattr`). A new `CogtError.fill_model_and_provider()` fills them only when unset and skips the `"unknown"` placeholder.
+- Each worker family enriches at its public-method chokepoint: LLM `gen_text` / `gen_object` (inside the existing handler, guarded by `isinstance(exc, CogtError)`); img-gen / extract / search wrap the abstract-impl call in a dedicated `except CogtError`.
+- One unforeseen ripple: declaring the fields on the base widens `model_handle` / `backend_name` to `str | None` for the always-set subclasses (pyright forbids narrowing a mutable inherited attribute). They are now uniformly `str | None` across the hierarchy; the few `str`-strict sinks (`ModelDeckPresetValidatonError`, `PipeOperatorModelAvailabilityError`, `make_one_variable_missing_error_msg`, the Rich `escape()` calls in `error_handlers.py`) were adjusted to match.
+- RED test: `tests/unit/pipelex/cogt/test_worker_error_enrichment.py` (all four families). The Phase 8 full-chain test's `setattr(...)  # noqa: B010` workaround was replaced with plain typed assignment.
+
+---
+
 ## ▶ Start here — cold-start context
 
 The error-handling Phase-2 work (archived at [wip/error-handling/archive-error-handling-2.md](wip/error-handling/archive-error-handling-2.md)) built a structured `ErrorReport` that flows from a failing inference worker all the way to the CLI / HTTP boundary. Two of its fields — `model` and `provider` — are **never populated for a real production failure**. This TODO is the follow-up the Phase 8 archive notes flagged as "a separate, smaller follow-up" and that the LLM-retry-loop fix ([wip/error-handling/todos-llm-retry-loop-bypass.md](wip/error-handling/todos-llm-retry-loop-bypass.md)) listed as out of scope.
@@ -73,22 +84,22 @@ Record the decision in the commit message / a short note here. Whatever the choi
 
 ## RED
 
-- [ ] Write a worker-level test for one LLM provider (Anthropic or OpenAI-completions are good picks — both have a clear SDK try/except). Mock the provider SDK call to raise a recognized SDK exception; call the worker's `gen_text` (and/or `gen_object`); catch the resulting `LLMCompletionError`; assert `exc.to_error_report().model` equals the worker's model handle and `.provider` equals its backend name. This fails today: both come back `None`. Check for an existing worker error-classification unit test under `tests/unit/pipelex/plugins/` (or `tests/unit/pipelex/cogt/`) to extend rather than starting fresh.
-- [ ] Cover the img-gen, extract, and search families too (one provider each is enough; parametrize where cheap).
+- [x] Write a worker-level test for one LLM provider (Anthropic or OpenAI-completions are good picks — both have a clear SDK try/except). Mock the provider SDK call to raise a recognized SDK exception; call the worker's `gen_text` (and/or `gen_object`); catch the resulting `LLMCompletionError`; assert `exc.to_error_report().model` equals the worker's model handle and `.provider` equals its backend name. This fails today: both come back `None`. Check for an existing worker error-classification unit test under `tests/unit/pipelex/plugins/` (or `tests/unit/pipelex/cogt/`) to extend rather than starting fresh.
+- [x] Cover the img-gen, extract, and search families too (one provider each is enough; parametrize where cheap).
 
 ## GREEN
 
-- [ ] Apply the chosen option (recommended: B) so a `CogtError` from any inference worker reaches `to_error_report()` with `model_handle` / `backend_name` populated. Minimal change to make the RED tests pass.
-- [ ] Run `make agent-check`.
+- [x] Apply the chosen option (recommended: B) so a `CogtError` from any inference worker reaches `to_error_report()` with `model_handle` / `backend_name` populated. Minimal change to make the RED tests pass.
+- [x] Run `make agent-check`.
 
 ## REFACTOR
 
-- [ ] Confirm all four worker families (LLM, img-gen, extract, search) enrich at their chokepoint — sweep, don't stop at LLM.
-- [ ] Clean up `tests/integration/pipelex/cli/agent_cli/test_run_error_chain.py`: with `model_handle` / `backend_name` now declared on `CogtError`, replace the `setattr(...)  # noqa: B010` workaround with plain typed attribute assignment. (Or, better, re-point that test so the failure is injected at the SDK boundary inside a real worker instead of mocking `ContentGenerator.make_llm_text` — then it needs no manual set at all. Optional, larger.)
-- [ ] Run `make agent-test`. Run the worker error-classification unit tests and the Phase 8 full-chain test.
-- [ ] Update the CHANGELOG (`### Fixed`) — inference-failure `ErrorReport`s now carry `model` / `provider` in production.
-- [ ] Flip the relevant note in [wip/error-handling/README.md](wip/error-handling/README.md) (metadata-model / worker-classification track) — the "model/provider come back `None` in production" gap is closed.
-- [ ] Archive this `TODOS.md` into `wip/error-handling/` (e.g. `todos-error-report-model-provider.md`).
+- [x] Confirm all four worker families (LLM, img-gen, extract, search) enrich at their chokepoint — sweep, don't stop at LLM.
+- [x] Clean up `tests/integration/pipelex/cli/agent_cli/test_run_error_chain.py`: with `model_handle` / `backend_name` now declared on `CogtError`, replace the `setattr(...)  # noqa: B010` workaround with plain typed attribute assignment. (Or, better, re-point that test so the failure is injected at the SDK boundary inside a real worker instead of mocking `ContentGenerator.make_llm_text` — then it needs no manual set at all. Optional, larger.)
+- [x] Run `make agent-test`. Run the worker error-classification unit tests and the Phase 8 full-chain test.
+- [x] Update the CHANGELOG (`### Fixed`) — inference-failure `ErrorReport`s now carry `model` / `provider` in production.
+- [x] Flip the relevant note in [wip/error-handling/README.md](wip/error-handling/README.md) (metadata-model / worker-classification track) — the "model/provider come back `None` in production" gap is closed.
+- [x] Archive this `TODOS.md` into `wip/error-handling/` (e.g. `todos-error-report-model-provider.md`).
 
 ---
 
