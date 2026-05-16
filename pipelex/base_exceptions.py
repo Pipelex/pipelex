@@ -96,15 +96,49 @@ class PipelexError(Exception):
         self.message = message
 
     def to_error_report(self) -> ErrorReport:
-        """Return a structured error report.
+        """Return a structured error report, enriched from the ``__cause__`` chain.
 
-        Subclasses override to include additional fields (error_category, model, etc.).
+        Wrapper exceptions (``PipeRunError`` -> ``PipeRouterError`` ->
+        ``PipelineExecutionError``) carry no ``error_category`` / ``retryable`` /
+        ``model`` / ``provider`` of their own. This surfaces those classification
+        fields from the underlying exception (typically a ``CogtError``) so they
+        survive every wrapping layer up to the CLI / HTTP boundary.
+
+        Subclasses override to include additional fields (error_category, model,
+        etc.); an override must end with ``self._enrich_error_report_from_cause(report)``
+        so the cause-chain enrichment stays uniform across the hierarchy.
         """
-        return ErrorReport(
+        report = ErrorReport(
             error_type=type(self).__name__,
             message=self.message,
             error_domain=self.error_domain,
             user_action=self.user_action,
+        )
+        return self._enrich_error_report_from_cause(report)
+
+    def _enrich_error_report_from_cause(self, report: ErrorReport) -> ErrorReport:
+        """Fill the ``None`` classification fields of ``report`` from the ``__cause__`` chain.
+
+        A wrapper keeps its own ``error_type`` and ``message`` but inherits every
+        classification field it does not set itself — ``error_category``,
+        ``error_domain``, ``retryable``, ``user_action``, ``model``, ``provider``,
+        ``provider_metadata`` — from the underlying ``PipelexError`` that knows them.
+        ``to_error_report()`` overrides call this so enrichment stays uniform.
+        """
+        cause = self.__cause__
+        if not isinstance(cause, PipelexError):
+            return report
+        cause_report = cause.to_error_report()
+        return ErrorReport(
+            error_type=report.error_type,
+            message=report.message,
+            error_category=report.error_category or cause_report.error_category,
+            error_domain=report.error_domain or cause_report.error_domain,
+            retryable=report.retryable if report.retryable is not None else cause_report.retryable,
+            user_action=report.user_action or cause_report.user_action,
+            model=report.model or cause_report.model,
+            provider=report.provider or cause_report.provider,
+            provider_metadata=report.provider_metadata or cause_report.provider_metadata,
         )
 
 

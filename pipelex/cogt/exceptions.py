@@ -58,7 +58,7 @@ class CogtError(PipelexError):
 
     @override
     def to_error_report(self) -> ErrorReport:
-        return ErrorReport(
+        report = ErrorReport(
             error_type=type(self).__name__,
             message=self.message,
             error_category=self.error_category,
@@ -69,6 +69,7 @@ class CogtError(PipelexError):
             provider=getattr(self, "backend_name", None),
             provider_metadata=self.provider_metadata,
         )
+        return self._enrich_error_report_from_cause(report)
 
 
 class LLMConfigError(CogtError):

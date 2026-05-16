@@ -1,8 +1,8 @@
 # TODOS — Error Handling, Phase 2: Resilience, Agent Delivery, Broad-Except Hygiene
 
 > **Branch:** `feature/Error-handling-2`
-> **Current-state reference:** [wip/error-handling/README.md](wip/error-handling/README.md) and the `track-*.md` docs it links.
-> **Prior sweep (completed, archived):** [wip/error-handling/archive-worker-classification-sweep.md](wip/error-handling/archive-worker-classification-sweep.md).
+> **Current-state reference:** [wip/error-handling/README.md](README.md) and the `track-*.md` docs it links.
+> **Prior sweep (completed, archived):** [wip/error-handling/archive-worker-classification-sweep.md](archive-worker-classification-sweep.md).
 > **Discipline:** every phase runs RED (failing test) → GREEN (minimal code to pass) → REFACTOR (clean up). Run `make agent-check` after every phase; `make agent-test` at each checkpoint.
 
 ---
@@ -195,7 +195,7 @@ After this phase every surviving `# noqa: BLE001` carries a one-line justificati
 
 **Goal:** `error_domain` becomes a first-class field on the exception hierarchy and on `ErrorReport`, so it no longer depends on the agent-CLI string dict. This is the schema change both downstream consumers (Temporal, CLI markdown) need before they are built.
 
-Reference: [track-metadata-model.md](wip/error-handling/track-metadata-model.md) followups 1.
+Reference: [track-metadata-model.md](track-metadata-model.md) followups 1.
 
 ### RED
 
@@ -223,7 +223,7 @@ Reference: [track-metadata-model.md](wip/error-handling/track-metadata-model.md)
 
 **Goal:** the key non-`CogtError` exceptions self-describe `error_domain` and `user_action` at the class level, and the uncategorized `CogtError` subclasses get their `error_category` defaults. After this phase, the metadata lives on the classes — the string dicts become removable in Phase 4.
 
-Reference: [track-metadata-model.md](wip/error-handling/track-metadata-model.md) followups 2–3.
+Reference: [track-metadata-model.md](track-metadata-model.md) followups 2–3.
 
 ### RED
 
@@ -237,7 +237,7 @@ Reference: [track-metadata-model.md](wip/error-handling/track-metadata-model.md)
 
 ### GREEN
 
-- [x] Set class-level `error_domain` (and `user_action` where the track doc proposes concrete text) on the non-`CogtError` exceptions listed above. Use the user-action wording from [track-metadata-model.md](wip/error-handling/track-metadata-model.md) followup 2. — _`user_action` set on `PipelineExecutionError` (kind `UNKNOWN`) and `ValidateBundleError` (kind `CHANGE_INPUT`); `user_action` added as a class attr on `PipelexError` and forwarded by the base `to_error_report()`. Service-error domain set on the `PipelexServiceError` base + `PipelexServiceConfigValidationError` so all gateway/remote-config subclasses inherit it._
+- [x] Set class-level `error_domain` (and `user_action` where the track doc proposes concrete text) on the non-`CogtError` exceptions listed above. Use the user-action wording from [track-metadata-model.md](track-metadata-model.md) followup 2. — _`user_action` set on `PipelineExecutionError` (kind `UNKNOWN`) and `ValidateBundleError` (kind `CHANGE_INPUT`); `user_action` added as a class attr on `PipelexError` and forwarded by the base `to_error_report()`. Service-error domain set on the `PipelexServiceError` base + `PipelexServiceConfigValidationError` so all gateway/remote-config subclasses inherit it._
 - [x] Set `error_category` defaults on the uncategorized `CogtError` subclasses (the prompt-* families → `CONTENT`). Decide case-by-case for `ImageContentError`, `CostRegistryError`, `ReportingManagerError`, `SdkTypeError`, `ExtractOutputError`, `GeneratedImageError`, `LLMAssignmentError`, `InferenceBackendLibraryError` — record each decision in Running Notes. Leave the four per-instance "outcome" exceptions uncategorized. — _Case-by-case decisions in Running Notes._
 - [x] Run `make agent-check`. — _Clean. Updated `tests/unit/pipelex/test_base_exceptions.py` cold-import expectation (`PipelexConfigError` now reports `error_domain=config`)._
 
@@ -251,7 +251,7 @@ Reference: [track-metadata-model.md](wip/error-handling/track-metadata-model.md)
 
 **Goal:** `agent_error()` reads class-level metadata first and falls back to the string dicts *only* for non-`PipelexError` built-ins (`FileNotFoundError`, `JSONDecodeError`, `ValidationError`, …) that cannot carry class attributes. A drift-detection test guards the remaining dict entries.
 
-Reference: [track-metadata-model.md](wip/error-handling/track-metadata-model.md) followups 4–6, [track-testing.md](wip/error-handling/track-testing.md) followup 2.
+Reference: [track-metadata-model.md](track-metadata-model.md) followups 4–6, [track-testing.md](track-testing.md) followup 2.
 
 ### RED
 
@@ -285,7 +285,7 @@ Reference: [track-metadata-model.md](wip/error-handling/track-metadata-model.md)
 
 **Goal:** `PipeRouter` retries `InferenceErrorCategory.TRANSIENT` failures with exponential backoff, driven by config, **enabled by default with a small retry budget**. This is the application-level resilience layer that must work when Temporal is absent. Retry logic moves out of the two gateway workers into the dispatch layer.
 
-Reference: [track-retry-and-resilience.md](wip/error-handling/track-retry-and-resilience.md) followups 1–6.
+Reference: [track-retry-and-resilience.md](track-retry-and-resilience.md) followups 1–6.
 
 **Two coherence decisions to settle in this phase (flagged 2026-05-15):**
 
@@ -323,7 +323,7 @@ Reference: [track-retry-and-resilience.md](wip/error-handling/track-retry-and-re
 >
 > **Hand-off context to record in Running Notes:** the two coherence decisions as actually settled (final default `max_transient_retries`; `CAPACITY` disposition); whether removing the gateway-worker `tenacity` changed any timing-sensitive test; the final disposition of the `tenacity` dependency, `TenacityConfig`, and `tenacity_utils.py`; the retry config fields added and their `pipelex.toml` defaults.
 >
-> **Next session resumes at Phase 5.5** — re-read the "Start here" section, "Why this plan exists", the Phase 5.5 section, and [track-retry-and-resilience.md](wip/error-handling/track-retry-and-resilience.md).
+> **Next session resumes at Phase 5.5** — re-read the "Start here" section, "Why this plan exists", the Phase 5.5 section, and [track-retry-and-resilience.md](track-retry-and-resilience.md).
 
 ---
 
@@ -331,7 +331,7 @@ Reference: [track-retry-and-resilience.md](wip/error-handling/track-retry-and-re
 
 **Goal:** `PipeBatch` fans out over its N items in **bounded chunks** driven by a `max_concurrency` config, so a large workload — one pipe over 1,000 documents — no longer spawns N coroutines, N deep-copied working memories, and N simultaneous inference calls at once. This is a *basic, honest* backpressure effort with plain Python — **not** durable execution. When the workload is large or `CAPACITY` errors persist, the failure path surfaces a clear `user_action` pointing at the Temporal track as the durable, rate-limited answer. Pillar B of "resilience without Temporal"; coupled with Phase 5 (see Sequencing).
 
-Reference: [track-retry-and-resilience.md](wip/error-handling/track-retry-and-resilience.md) — this is net-new ground the track doc does not yet cover; capture the design back into the track doc as it lands.
+Reference: [track-retry-and-resilience.md](track-retry-and-resilience.md) — this is net-new ground the track doc does not yet cover; capture the design back into the track doc as it lands.
 
 ### RED
 
@@ -364,7 +364,7 @@ Reference: [track-retry-and-resilience.md](wip/error-handling/track-retry-and-re
 >
 > **Hand-off context to record in Running Notes:** the `PipeParallel` bounding decision; the chosen `max_concurrency` default and config placement; the chunk-failure semantics; the graceful-degradation messaging; how Phases 5 + 5.5 compose.
 >
-> **Next session resumes at Phase 6** — re-read the "Start here" section, the Phase 6 section, and [track-temporal-integration.md](wip/error-handling/track-temporal-integration.md).
+> **Next session resumes at Phase 6** — re-read the "Start here" section, the Phase 6 section, and [track-temporal-integration.md](track-temporal-integration.md).
 
 ---
 
@@ -372,7 +372,7 @@ Reference: [track-retry-and-resilience.md](wip/error-handling/track-retry-and-re
 
 **Goal:** Temporal's retry decision flows from `InferenceErrorCategory.is_retryable` (the same signal as the PipeRouter loop), and `ApplicationError.details` carries the full `ErrorReport` across the activity → workflow boundary.
 
-Reference: [track-temporal-integration.md](wip/error-handling/track-temporal-integration.md) followups 1–4.
+Reference: [track-temporal-integration.md](track-temporal-integration.md) followups 1–4.
 
 ### RED
 
@@ -405,7 +405,7 @@ Reference: [track-temporal-integration.md](wip/error-handling/track-temporal-int
 >
 > **Hand-off context:** the in-process retry (Phase 5) and Temporal retry compose as nested layers agreeing on `is_retryable` — see "How Phases 5 and 6 compose" in Running Notes. The Temporal integration suite surfaced no timing-sensitive regression.
 >
-> **Next session resumes at Phase 7** — re-read the "Start here" section, the Phase 7 section, and [track-cli-delivery.md](wip/error-handling/track-cli-delivery.md).
+> **Next session resumes at Phase 7** — re-read the "Start here" section, the Phase 7 section, and [track-cli-delivery.md](track-cli-delivery.md).
 
 ---
 
@@ -416,7 +416,7 @@ Reference: [track-temporal-integration.md](wip/error-handling/track-temporal-int
 - **CLI:** the agent CLI emits plain markdown by default for `run` / `validate` / `init` and for the error path; JSON is available via `--format json`. The eleven near-identical Rich handlers in `error_handlers.py` collapse onto one panel helper.
 - **HTTP:** `pipelex` itself is a library — there is no API server inside the package (verified: zero `fastapi` / `HTTPException` usage). But the HTTP API repos (`pipelex-relay`, `pipelex-back-office`) need to render `ErrorReport` as an HTTP response, and today the `error_domain` → status mapping is implicit and gets reinvented per repo. This phase puts a **documented, authoritative `error_domain` → HTTP-status mapping in the library** so the downstream FastAPI exception handler is a trivial one-screen adapter. The library stays HTTP-agnostic (no FastAPI dependency) — it only owns the mapping table.
 
-Reference: [track-cli-delivery.md](wip/error-handling/track-cli-delivery.md) followups 1–6.
+Reference: [track-cli-delivery.md](track-cli-delivery.md) followups 1–6.
 
 ### RED
 
@@ -452,7 +452,7 @@ Reference: [track-cli-delivery.md](wip/error-handling/track-cli-delivery.md) fol
 >
 > **Hand-off context to record in Running Notes:** the final HTTP-status mapping table; where the panel helper landed; any Rich-rendering change from the `error_handlers.py` refactor.
 >
-> **Next session resumes at Phase 8** — re-read the "Start here" section, the Phase 8 section, and [track-testing.md](wip/error-handling/track-testing.md).
+> **Next session resumes at Phase 8** — re-read the "Start here" section, the Phase 8 section, and [track-testing.md](track-testing.md).
 
 ---
 
@@ -460,33 +460,37 @@ Reference: [track-cli-delivery.md](wip/error-handling/track-cli-delivery.md) fol
 
 **Goal:** prove the whole pipeline — worker error → pipe operators → `PipelineExecutionError` → `agent_error()` → stderr — produces correct structured output, in both JSON and markdown. This catches wiring regressions no per-worker test can.
 
-Reference: [track-testing.md](wip/error-handling/track-testing.md) followups 1 and 3.
+Reference: [track-testing.md](track-testing.md) followups 1 and 3.
 
 ### RED
 
-- [ ] Add a full-chain test under `tests/integration/pipelex/cli/agent_cli/`: a minimal pipeline where one pipe fails with a deterministic worker error (mocked `LLMCompletionError`, `error_category=TRANSIENT`, model + provider set). Run `pipelex-agent run` via the CLI harness, capture stderr.
+- [x] Add a full-chain test under `tests/integration/pipelex/cli/agent_cli/`: a minimal pipeline where one pipe fails with a deterministic worker error (mocked `LLMCompletionError`, `error_category=TRANSIENT`, model + provider set). Run `pipelex-agent run` via the CLI harness, capture stderr. — _Landed as `test_run_error_chain.py` (`TestRunErrorChain`). Invokes the real `run_pipe_cmd` against a minimal `error_chain.mthds` bundle (one `PipeLLM` pipe `greet`); `ContentGenerator.make_llm_text` is mocked to raise `LLMCompletionError(TRANSIENT)` with duck-typed `model_handle`/`backend_name`. The command's own boot/teardown is stubbed (the module-scoped conftest already boots Pipelex); every layer below the CLI — PipeLLM → PipeRouter → PipelexRunner → `PipelineExecutionError` — runs for real._
   - **JSON path:** assert the JSON has `error: true`, `error_type`, `message`, `error_category: "transient"`, `retryable: true`, `error_domain`, `model`, `provider`, and an `error_source` chain in order (worker → pipe operator → router → runner → CLI).
   - **Markdown path:** assert the markdown contains the error type, message, hint, and source frames.
-- [ ] Add a snapshot test for one or two representative Rich error outputs (`error_handlers.py`) to confirm the Phase 7 panel-helper refactor introduced no rendering drift.
+- [x] Add a snapshot test for one or two representative Rich error outputs (`error_handlers.py`) to confirm the Phase 7 panel-helper refactor introduced no rendering drift. — _Landed as `tests/unit/pipelex/cli/test_error_handlers_snapshot.py` (`TestErrorHandlersSnapshot`): exact plain-text snapshots of `handle_model_choice_error` and `handle_model_availability_error` rendered through `display_error_panel` via a fixed-width, color-free Rich console (no `syrupy` in the repo — snapshots are inline string constants)._
 
 ### GREEN
 
-- [ ] Fix any wiring gap the full-chain test exposes (a wrapper exception dropping `error_category`, `agent_error()` not forwarding a field, `_build_error_source()` degrading the chain, an enum serialized as a Python repr instead of its `StrEnum` value).
+- [x] Fix any wiring gap the full-chain test exposes (a wrapper exception dropping `error_category`, `agent_error()` not forwarding a field, `_build_error_source()` degrading the chain, an enum serialized as a Python repr instead of its `StrEnum` value). — _The gap was exactly "a wrapper exception dropping `error_category`". `PipelexError.to_error_report()` now enriches from the `__cause__` chain — see Running Notes._
 
 ### REFACTOR
 
-- [ ] If the full-chain test reveals a recurring forwarding bug, fix it at the source (the wrapper exception) rather than patching the renderer.
+- [x] If the full-chain test reveals a recurring forwarding bug, fix it at the source (the wrapper exception) rather than patching the renderer. — _Fixed at the source: the enrichment lives on `PipelexError.to_error_report()` (the exception layer), not in `agent_output.py`'s renderer. A second, deeper bug surfaced and is flagged as a follow-up — see Running Notes "Phase 8" and "Followup — PipeLLM wrapping defeats the router retry loop"._
 
 > ### STOP — FINAL: All three priorities landed
 >
-> Run `make agent-check` and `make agent-test`. Run the Temporal integration suite. Update [wip/error-handling/README.md](wip/error-handling/README.md) — flip the CLI delivery, retry & resilience, Temporal integration, and testing tracks to their new status. Archive this `TODOS.md` into `wip/error-handling/` alongside the prior sweep.
+> **Status (landed 2026-05-16):** COMPLETE — RED, GREEN, REFACTOR all landed. `make agent-check` clean (ruff + plxt + pyright 0 errors + mypy 0 issues); `make agent-test` passed (full suite); the Temporal integration suite passed (`tests/integration/pipelex/temporal/`, in-process server — 94 passed, 4 xpassed, 0 failures; the 4 xpassed are the pre-existing xdist-flaky tests noted in Phase 6, not a regression). Per-decision detail in the "Phase 8" section of Running Notes below.
+>
+> All three priorities are landed: standalone resilience (Phases 5/5.5), the Temporal retry bridge (Phase 6), markdown/HTTP error delivery (Phase 7), and now full-chain integration coverage proving a worker error surfaces correctly through every wrapping layer to the CLI in both JSON and markdown.
+>
+> Run `make agent-check` and `make agent-test`. Run the Temporal integration suite. Update [wip/error-handling/README.md](README.md) — flip the CLI delivery, retry & resilience, Temporal integration, and testing tracks to their new status. Archive this `TODOS.md` into `wip/error-handling/` alongside the prior sweep.
 
 ---
 
 ## Out of scope
 
-- **Extract / Classify / Render decomposition** ([track-extract-classify-render.md](wip/error-handling/track-extract-classify-render.md)) — unblocked but a separate, large refactor. Do not pull forward.
-- **`FileNotFoundError` category/action mismatch** ([wip/error-handling/deferred-items/file-not-found-category-mismatch.md](wip/error-handling/deferred-items/file-not-found-category-mismatch.md)) — resolve only when a concrete consumer benefits.
+- **Extract / Classify / Render decomposition** ([track-extract-classify-render.md](track-extract-classify-render.md)) — unblocked but a separate, large refactor. Do not pull forward.
+- **`FileNotFoundError` category/action mismatch** ([wip/error-handling/deferred-items/file-not-found-category-mismatch.md](deferred-items/file-not-found-category-mismatch.md)) — resolve only when a concrete consumer benefits.
 
 ---
 
@@ -721,7 +725,7 @@ Net: config is read at router **construction** time, not per-`run()`. Acceptable
 
 **How Phases 5 and 6 compose.** The two retry layers are nested and agree on "transient" — both read `InferenceErrorCategory.is_retryable`. The Phase 5 PipeRouter loop runs *inside* the activity: it retries a `TRANSIENT` `CogtError` up to `max_transient_retries`, sleeping between attempts. Only after that budget is exhausted (or immediately, for a non-`TRANSIENT` category) does the exception leave the activity and hit the Temporal bridge. So Temporal sees a `non_retryable=False` error only after the in-process loop already gave up on it — Temporal's own retry policy (durable, cross-worker) then gets another crack; a non-`TRANSIENT` category arrives as `non_retryable=True` and Temporal does not retry. Fast in-process retry first, durable Temporal retry on the residual.
 
-**Known follow-up — `from_message_exception` is not yet wired (deferred, by decision).** A post-landing code review surfaced that `from_message_exception` — the activity-side half of the bridge, where the category-aware decision and `ErrorReport` details-packing live — has no production caller. Activities raise raw `CogtError` / `PipelexError`; Temporal's default failure converter auto-wraps them without packing our `ErrorReport`, so `from_app_error` currently always takes its `error_report is None` fallback branch and the category-aware path is inert in production. The Phase 6 unit test proves a self-consistent bridge round-trip but does not cross a real activity → workflow boundary. This was deliberately scoped out of Phase 6 (whose plan named only the bridge methods, not the activity wiring); it is recorded as **Followup 5** in [track-temporal-integration.md](wip/error-handling/track-temporal-integration.md) — wiring the ~8 `act_*` functions plus a real-boundary integration test is the next coherent unit of work.
+**Known follow-up — `from_message_exception` is not yet wired (deferred, by decision).** A post-landing code review surfaced that `from_message_exception` — the activity-side half of the bridge, where the category-aware decision and `ErrorReport` details-packing live — has no production caller. Activities raise raw `CogtError` / `PipelexError`; Temporal's default failure converter auto-wraps them without packing our `ErrorReport`, so `from_app_error` currently always takes its `error_report is None` fallback branch and the category-aware path is inert in production. The Phase 6 unit test proves a self-consistent bridge round-trip but does not cross a real activity → workflow boundary. This was deliberately scoped out of Phase 6 (whose plan named only the bridge methods, not the activity wiring); it is recorded as **Followup 5** in [track-temporal-integration.md](track-temporal-integration.md) — wiring the ~8 `act_*` functions plus a real-boundary integration test is the next coherent unit of work.
 
 ### Phase 7 — Error delivery: agent CLI markdown + HTTP-status mapping (landed 2026-05-16)
 
@@ -742,3 +746,19 @@ Net: config is read at router **construction** time, not per-`run()`. Acceptable
 **ContextVar leakage in tests.** The format ContextVar is process-global (fine in production — one command per process). The new `tests/unit/pipelex/cli/agent_cli/conftest.py` has an autouse fixture resetting it to JSON before and after each test so it does not leak between tests.
 
 **Post-landing code review fixes.** An independent review of the diff caught: (1) `format_validate_markdown` rendered only `validated_pipes` — it silently dropped the `graph_files` / `graphspec` keys that `validate bundle --graph` / `--view` merge into the result, so markdown mode (now the default) lost the graph-file pointers. Fixed: the renderer now surfaces a "Graph files" section and a GraphSpec note. (2) Two short loop variables (`fb`, `p`) in the rewritten `handle_model_availability_error` were left below the 3-char minimum — renamed to `fallback` / `stacked_pipe`. The reviewer's other points (the `error_domain_to_http_status` exhaustive `match` without a final return, and the ContextVar lacking `Token`/`reset`) were assessed and left as-is: pyright accepts the exhaustive match (the desired "linter catches a new enum member" guard — adding `case _` is forbidden), and the CLI is one-shot per process so `set()` without `reset()` is correct; the test conftest already isolates the ContextVar.
+
+### Phase 8 — Full-chain integration coverage (landed 2026-05-16)
+
+**The wiring gap (RED → GREEN).** The full-chain test exposed exactly the gap the plan named: *a wrapper exception dropping `error_category`*. An LLM-worker failure travels up as `LLMCompletionError` (a `CogtError`, carries `error_category` / `retryable` / `model` / `provider`) → wrapped by `PipeLLM` into `PipeRunError` → wrapped by `PipeRouter` into `PipeRouterError` → wrapped by `PipelexRunner` into `PipelineExecutionError`. The `__cause__` chain is preserved at every `raise ... from`, but `PipeRunError` / `PipeRouterError` / `PipelineExecutionError` are plain `PipelexError` subclasses that carry none of the inference metadata, and `PipelexError.to_error_report()` did not consult the cause chain — so `agent_error()` received a `PipelineExecutionError` whose report had `error_type` / `message` / `error_domain=runtime` / `user_action` and **nothing else**. RED failed with `KeyError: 'error_category'`.
+
+**The fix (at the source — the wrapper exception layer).** `PipelexError.to_error_report()` now enriches from the immediate `__cause__`: it builds its own report, then fills every `None` classification field (`error_category`, `error_domain`, `retryable`, `user_action`, `model`, `provider`, `provider_metadata`) from `cause.to_error_report()` when `__cause__` is a `PipelexError`. Because each layer recurses into its own cause, the deepest `CogtError`'s metadata propagates all the way up; a wrapper keeps its own `error_type` / `message` and its own non-`None` fields (so `PipelineExecutionError` keeps `error_domain=runtime` and its `user_action`). The enrichment is a protected method `PipelexError._enrich_error_report_from_cause(report)` so it composes uniformly: a `to_error_report()` override ends with `return self._enrich_error_report_from_cause(report)`. `CogtError.to_error_report()` (a full `@override`) was updated to do exactly that — a post-review fix: `CogtError` is *usually* a leaf (its cause is an SDK exception), but it is a `PipelexError` subclass like any other and must honor the documented "enriches from the `__cause__` chain" contract rather than silently opting out. The fix is in the exception layer, not the `agent_output.py` renderer — as the REFACTOR step directs.
+
+**Why this is the right generic fix.** Three distinct wrappers had the same bug; a per-wrapper `to_error_report()` override would triplicate the logic. Enriching once on the base class fixes every current and future wrapper, and is what makes the track-testing.md failure mode ("a new wrapper exception silently swallowing `error_category`") impossible to reintroduce.
+
+**Full-chain test design.** `tests/integration/pipelex/cli/agent_cli/test_run_error_chain.py` invokes the real `run_pipe_cmd`. `make_pipelex_for_agent_cli` and `Pipelex.teardown_if_needed` are stubbed in the command module — the module-scoped `reset_pipelex_config_fixture` already boots Pipelex, and letting the command tear it down would break sibling tests. `resolve_pipe_from_exports` / `parse_cli_inputs` are stubbed (avoid stdin / installed-method lookups). The pipe is loaded via `--library-dir` pointing at the test's own `error_chain.mthds` (one model-less `PipeLLM` pipe `greet` — model-less so the default LLM setting resolves without a backend). `ContentGenerator.make_llm_text` is mocked to raise; `model_handle` / `backend_name` are set on the error via `setattr` (string literals — lint-safe; this is the same duck-typed contract `CogtError.to_error_report()` reads with `getattr`, since worker code does not set them either — see the follow-up note). Both JSON and markdown paths are asserted, including the outermost-first `error_source` order (`PipelineExecutionError` → `PipeRouterError` → `PipeRunError` → `LLMCompletionError`).
+
+**Snapshot test.** The repo has no `syrupy`; the "snapshot" is an exact-match against inline string constants. `handle_model_choice_error` and `handle_model_availability_error` are rendered through `display_error_panel` via `Console(width=80, record=True, color_system=None)` (fixed width + no color → deterministic plain text) and compared to the baked-in expected layout. The availability case exercises the helper's conditional `Fallbacks` / `Pipe Stack` fields. A snapshot is intentionally exact — an intentional URL/wording change fails the test and the dev re-bakes the constant.
+
+**Followup — PipeLLM wrapping defeats the Phase 5 router retry loop (flagged, not fixed; by decision).** While tracing the chain, a second, deeper bug surfaced: `PipeLLM` catches `LLMCompletionError` and re-raises it as a plain `PipeRunError` (`pipe_llm.py` ~241/356/373) *before* the router sees it. The Phase 5 `PipeRouter` retry loop branches on `except CogtError` and consults `error_category.is_retryable` — but for the `PipeLLM` path the router only ever sees a `PipeRunError`, so its `except CogtError` retry branch is **dead** and a `TRANSIENT` LLM failure is never retried in-process. `test_pipe_router_retry.py` does not catch this because it mocks `_run_pipe_job` to raise a raw `CogtError`, which `PipeLLM` never actually lets through. This is a Phase 5 resilience bug, not a Phase 8 error-delivery bug; per the user's decision (2026-05-16) it is scoped out of Phase 8 — fixing it (have `PipeLLM` let the `CogtError` propagate, or have `PipeRunError` carry the category) changes the pipe-operator exception contract and resilience behavior and deserves its own focused change. Recorded as a follow-up for the retry-and-resilience track. (The delivery fix above is unaffected: `to_error_report()` enrichment surfaces the worker's `error_category` regardless of how many plain wrappers sit in between — which is exactly why the full-chain test passes despite this bug.)
+
+**Aside — worker errors do not set `model` / `provider`.** `CogtError.to_error_report()` reads `model` / `provider` via `getattr(self, "model_handle"/"backend_name", None)`, but the LLM workers raise `LLMCompletionError` without setting those attributes (the model is only in the message text). So in production a transient LLM failure currently delivers `model=None` / `provider=None`. The full-chain test sets them explicitly (as the track doc's "model + provider set" directs) to prove the *delivery wiring* carries them when present. Populating them on real worker errors is worker-construction work, out of Phase 8's delivery-wiring scope — noted alongside the retry follow-up.
