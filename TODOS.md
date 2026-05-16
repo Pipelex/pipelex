@@ -206,7 +206,7 @@ make agent-check
 
 All three Phase 1 cases must pass: `CONFIGURATION` → `non_retryable True` + populated report; `TRANSIENT` → `non_retryable False`; category-less → `non_retryable False` + report present.
 
-> **CHECKPOINT 2 — GREEN for one activity.** ✅ Done. `convert_pipelex_errors` lives in `pipelex/temporal/tprl/activity_error_boundary.py`; applied beneath `@activity.defn` on `act_llm_gen_text`. All 3 integration cases pass (1.30s); the bridge unit test still passes (9); `make agent-check` clean. Decision 3's logger fix was pulled forward (see above) — it was a hard blocker. The bridge is proven live across a real worker boundary; the mechanism is settled. Phase 3 is mechanical replication. Next session: Phase 3.
+> **CHECKPOINT 2 — GREEN for one activity.** ✅ Done. `convert_pipelex_errors` lives in `pipelex/temporal/tprl/activity_error_boundary.py`; applied beneath `@activity.defn` on `act_llm_gen_text`. All 3 integration cases pass; the bridge unit test still passes; `make agent-check` clean. Decision 3's logger fix was pulled forward (see above) — it was a hard blocker. A code-review pass followed: the `_context_logger()` helper was dropped (its `WorkflowLog | ActivityLog` union return was the smell the Protocols rule warns against) — the context branch is now inlined into `_log_critical` / `_log_error`; the probe workflow now fails loudly on a non-`ApplicationError` cause; the category-less case now asserts the report carries no `retryable` key. The bridge is proven live across a real worker boundary; the mechanism is settled. Phase 3 is mechanical replication. Next session: Phase 3.
 
 ---
 
@@ -228,6 +228,10 @@ Apply the same decorator (or per-activity `try/except`, per Decision 1) to every
 Add at least one more probe workflow + case covering a non-LLM activity — `act_img_gen_images` or `act_extract_gen_extract_pages` — patching its inner generate function to raise a `CogtError`. This proves the wiring is not LLM-specific. Keep it in the same `TestClass` (one class per module); add a second probe workflow class at module scope and a parametrized case, or a second test method.
 
 Also confirm no double-wrapping: `content_generator_in_workflow.py` and `wf_pipe_router.py` already call `from_app_error` on the workflow side — that is the *receiving* end and is correct. The activity side had no conversion before; there is nothing to un-wrap. Verify no activity already has a competing `try/except` that would convert differently.
+
+### Add a dedicated decorator unit test
+
+`convert_pipelex_errors`'s correctness hinges on `functools.wraps` preserving `__name__` (load-bearing — `content_generator_in_workflow.py` reads `act_llm_gen_text.__name__` for dispatch routing) and `__annotations__` (Temporal's `@activity.defn` reads them for payload typing). Add a unit test (`tests/unit/pipelex/temporal/test_activity_error_boundary.py`) that wraps a sample async function and asserts: the wrapped callable keeps the original `__name__`; a raised `PipelexError` comes out as a `TemporalError`; a non-`PipelexError` propagates untouched. This pins the invariant a future non-`wraps` refactor would silently break (code-review finding #3, deferred from Phase 2).
 
 ### Verify
 

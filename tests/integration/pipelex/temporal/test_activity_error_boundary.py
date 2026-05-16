@@ -67,13 +67,17 @@ class WfErrorBoundaryProbe:
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
         except ActivityError as exc:
-            if isinstance(exc.cause, ApplicationError):
-                temporal_error = TemporalError.from_app_error(exc=exc.cause)
-                return ErrorBoundaryProbeResult(
-                    non_retryable=temporal_error.non_retryable,
-                    error_report=temporal_error.error_report,
-                )
-            raise
+            cause = exc.cause
+            if not isinstance(cause, ApplicationError):
+                # Temporal wraps an activity failure's cause as ApplicationError; anything
+                # else (a timeout, a cancellation) means the probe never reached the bridge.
+                unexpected_cause_msg = f"act_llm_gen_text should fail with an ApplicationError cause, got {type(cause).__name__}: {cause}"
+                raise TypeError(unexpected_cause_msg) from exc
+            temporal_error = TemporalError.from_app_error(exc=cause)
+            return ErrorBoundaryProbeResult(
+                non_retryable=temporal_error.non_retryable,
+                error_report=temporal_error.error_report,
+            )
         unreachable_msg = "act_llm_gen_text was expected to fail"
         raise AssertionError(unreachable_msg)
 
@@ -143,3 +147,7 @@ class TestActivityErrorBoundary:
         if error_category is not None:
             assert result.error_report["error_category"] == error_category
             assert result.error_report["retryable"] is (not expected_non_retryable)
+        else:
+            # A category-less CogtError has no retryability signal — to_error_report()
+            # drops the None-valued field, so the key is absent from the report.
+            assert "retryable" not in result.error_report, "a category-less CogtError must carry no retryability signal in its report"
