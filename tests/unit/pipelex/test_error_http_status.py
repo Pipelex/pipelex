@@ -68,3 +68,8 @@ class TestErrorHttpStatus:
             provider_metadata=provider_metadata,
         )
         assert report.http_status == 422
+
+    def test_unknown_error_domain_falls_back_to_500(self) -> None:
+        """An unrecognized error_domain string (e.g. from a newer Pipelex) yields 500, not a crash."""
+        report = ErrorReport(error_type="SomeError", message="boom", error_domain="domain-from-the-future")
+        assert report.http_status == 500
