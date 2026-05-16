@@ -38,4 +38,4 @@ List both in the plan, weigh them, recommend one.
 ## Out of scope
 
 - The retry loop itself — landed in PR #903.
-- The Temporal-side retry path — its activity-boundary wiring is a separate follow-up, see [todos-temporal-activity-boundary.md](todos-temporal-activity-boundary.md).
+- The Temporal-side retry path — its activity-boundary wiring landed; see Followup 5 in [track-temporal-integration.md](track-temporal-integration.md).

@@ -1,7 +1,7 @@
 # TODOS — Wire `from_message_exception` into the Temporal activity boundary
 
 > **Type:** TDD plan (RED → GREEN → REFACTOR), multi-phase with checkpoints.
-> **Source:** Followup 5 of [wip/error-handling/track-temporal-integration.md](wip/error-handling/track-temporal-integration.md) and the stub [wip/error-handling/todos-temporal-activity-boundary.md](wip/error-handling/todos-temporal-activity-boundary.md).
+> **Source:** Followup 5 of [wip/error-handling/track-temporal-integration.md](wip/error-handling/track-temporal-integration.md).
 > **Branch:** `fix/temporal-activity-error-boundary`.
 
 ---
