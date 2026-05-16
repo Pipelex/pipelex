@@ -176,7 +176,7 @@ Run the new test against today's code:
 
 Expected failure today: `error_report is None` (Temporal's default converter packed no `details`) and `non_retryable is False` even for the `CONFIGURATION` case (auto-wrap leaves `non_retryable=False`; `from_app_error`'s name-list fallback does not list `CogtError`). Record the exact failure output here, then proceed.
 
-> **CHECKPOINT 1 — RED confirmed.** The test exists, fails for the documented reason, and is committed (a committed failing test is the TDD record). Update this section with the observed failure before moving on.
+> **CHECKPOINT 1 — RED confirmed.** ✅ Test `tests/integration/pipelex/temporal/test_activity_error_boundary.py` written and committed. All 3 parametrized cases fail for the documented reason — the workflow side observed `ErrorBoundaryProbeResult: non_retryable=False error_report=None` (log line `Error from ApplicationError[CogtError]: ...` confirms `from_app_error` hit the name-list fallback). The test asserts `error_report is not None` (fails) and, for `configuration-non-retryable`, `non_retryable is True` (fails — got `False`). The worker → activity → workflow boundary mechanics all work; `make agent-check` clean. Phase 0 decisions recorded above. Next session: Phase 2.
 
 ---
 
