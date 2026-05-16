@@ -1,5 +1,6 @@
 import asyncio
 import functools
+from collections.abc import Awaitable, Callable
 
 import pytest
 
@@ -89,6 +90,31 @@ class TestGatherBounded:
             await gather_bounded(factories, max_concurrency=2)
 
         assert probe.ran_indices == {0, 1, 2, 3}, "the failing chunk is drained (2 and 3 both run) and no later chunk starts (4, 5 never run)"
+
+    async def test_synchronous_factory_error_is_captured_and_chunk_is_drained(self) -> None:
+        """A factory raising synchronously is captured per-task: the chunk still drains and the lowest-index error wins."""
+        probe = _ConcurrencyProbe()
+
+        def sync_raiser(index: int) -> Awaitable[int]:
+            msg = f"branch {index} raised synchronously"
+            raise RuntimeError(msg)
+
+        # max_concurrency=4 → chunks [0,1,2,3] [4,5]. Index 1 raises synchronously and index 3
+        # fails asynchronously; index 1 wins by input index. Indices 0 and 2 must still run
+        # (the chunk drains despite the synchronous raise) and the later chunk never starts.
+        factories: list[Callable[[], Awaitable[int]]] = [
+            functools.partial(probe.run, 0),
+            functools.partial(sync_raiser, 1),
+            functools.partial(probe.run, 2),
+            functools.partial(probe.fail, 3, 0.01),
+            functools.partial(probe.run, 4),
+            functools.partial(probe.run, 5),
+        ]
+
+        with pytest.raises(RuntimeError, match="branch 1 raised synchronously"):
+            await gather_bounded(factories, max_concurrency=4)
+
+        assert probe.ran_indices == {0, 2, 3}, "the chunk drains (0, 2, 3 run despite the sync raise) and no later chunk starts"
 
     @pytest.mark.parametrize("bad_max_concurrency", [0, -1])
     async def test_non_positive_max_concurrency_is_rejected(self, bad_max_concurrency: int) -> None:

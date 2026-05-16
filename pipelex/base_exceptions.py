@@ -80,10 +80,21 @@ class ErrorReport:
         ``Retry-After`` header from ``provider_metadata.retry_after_seconds``;
         otherwise the status follows ``error_domain`` (see
         :func:`error_domain_to_http_status`).
+
+        An ``error_domain`` string this version does not recognize (e.g. a
+        report serialized by a newer Pipelex) is treated as unclassified
+        rather than crashing the HTTP response rendering.
         """
         if self.provider_metadata is not None and self.provider_metadata.status_code == 429:
             return 429
-        domain = ErrorDomain(self.error_domain) if self.error_domain is not None else None
+        domain: ErrorDomain | None
+        if self.error_domain is None:
+            domain = None
+        else:
+            try:
+                domain = ErrorDomain(self.error_domain)
+            except ValueError:
+                domain = None
         return error_domain_to_http_status(domain)
 
 

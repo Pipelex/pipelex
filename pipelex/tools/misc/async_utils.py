@@ -5,6 +5,17 @@ from typing import TypeVar, cast
 _T = TypeVar("_T")
 
 
+async def _invoke(factory: Callable[[], Awaitable[_T]]) -> _T:
+    """Call `factory` and await its result, both inside a coroutine.
+
+    Calling `factory()` here — rather than where `gather` builds its arguments — means a
+    factory that raises *synchronously* fails inside the gathered task. `asyncio.gather`
+    with `return_exceptions=True` then captures that error like any other failure, instead
+    of it propagating out before `gather` runs and orphaning the chunk's other coroutines.
+    """
+    return await factory()
+
+
 async def gather_bounded(
     task_factories: Sequence[Callable[[], Awaitable[_T]]],
     max_concurrency: int | None,
@@ -42,7 +53,7 @@ async def gather_bounded(
     results: list[_T] = []
     for chunk_start in range(0, len(task_factories), chunk_size):
         chunk = task_factories[chunk_start : chunk_start + chunk_size]
-        chunk_outcomes = await asyncio.gather(*(factory() for factory in chunk), return_exceptions=True)
+        chunk_outcomes = await asyncio.gather(*(_invoke(factory) for factory in chunk), return_exceptions=True)
         for outcome in chunk_outcomes:
             if isinstance(outcome, BaseException):
                 raise outcome
