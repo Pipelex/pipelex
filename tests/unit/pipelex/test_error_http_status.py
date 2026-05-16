@@ -16,10 +16,14 @@ class TestErrorHttpStatus:
             (ErrorDomain.CONFIG, 500),
             (ErrorDomain.RUNTIME, 500),
             (None, 500),
+            ("input", 422),
+            ("config", 500),
+            ("runtime", 500),
+            ("domain-from-the-future", 500),
         ],
     )
-    def test_error_domain_to_http_status(self, error_domain: ErrorDomain | None, expected_status: int) -> None:
-        """The pure mapping yields 422 for INPUT and 500 for CONFIG/RUNTIME/None."""
+    def test_error_domain_to_http_status(self, error_domain: ErrorDomain | str | None, expected_status: int) -> None:
+        """The mapping yields 422 for INPUT and 500 for CONFIG/RUNTIME/unknown/None, for enum or raw-string input."""
         assert error_domain_to_http_status(error_domain) == expected_status
 
     @pytest.mark.parametrize(
