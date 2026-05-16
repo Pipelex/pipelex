@@ -1,12 +1,13 @@
 from collections.abc import Sequence
 from typing import Any, cast
 
+from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.exceptions import CogtError
 from pipelex.config import get_config
-from pipelex.temporal.log_temporal import workflow_log
+from pipelex.temporal.log_temporal import activity_log, workflow_log
 from pipelex.types import Self
 
 
@@ -57,13 +58,27 @@ class TemporalError(ApplicationError):
 
     @classmethod
     def _log_critical(cls, message: str) -> None:
-        """Log a non-retryable error at critical severity."""
-        workflow_log.critical(message)
+        """Log a non-retryable error at critical severity, in the active Temporal context.
+
+        ``from_message_exception`` runs activity-side and ``from_app_error``
+        workflow-side; ``workflow.logger`` raises ``_NotInWorkflowEventLoopError``
+        outside a workflow event loop, so the logger must match the context.
+        """
+        if activity.in_activity():
+            activity_log.critical(message)
+        else:
+            workflow_log.critical(message)
 
     @classmethod
     def _log_error(cls, message: str) -> None:
-        """Log a retryable error at error severity."""
-        workflow_log.error(message)
+        """Log a retryable error at error severity, in the active Temporal context.
+
+        See ``_log_critical`` for why the logger must match the Temporal context.
+        """
+        if activity.in_activity():
+            activity_log.error(message)
+        else:
+            workflow_log.error(message)
 
     @classmethod
     def _error_type_in_name_list(cls, error_type: str | None) -> bool:

@@ -50,9 +50,14 @@ def _round_trip_application_error(exc: ApplicationError) -> ApplicationError:
 
 
 class TestTemporalErrorBridge:
-    @pytest.fixture(autouse=True)
+    @pytest.fixture
     def log_mocks(self, mocker: MockerFixture) -> tuple[Any, Any]:
-        """Replace the workflow-log helpers — they require a live workflow event loop.
+        """Replace the whole ``_log_critical`` / ``_log_error`` helpers — they
+        require a live Temporal context.
+
+        Not ``autouse``: ``test_log_helpers_route_to_the_active_temporal_context``
+        needs the real helpers. Every other test must opt in, since
+        ``from_message_exception`` / ``from_app_error`` log unconditionally.
 
         Returns the ``(critical, error)`` mocks so a test can assert which
         severity the retry decision routed the log line to.
@@ -104,18 +109,21 @@ class TestTemporalErrorBridge:
     )
     def test_non_cogt_pipelex_error_uses_name_list_fallback(
         self,
+        log_mocks: tuple[Any, Any],
         exc: PipelexError,
         expected_non_retryable: bool,
     ) -> None:
         """A non-``CogtError`` ``PipelexError`` decides retryability by class name."""
+        _ = log_mocks  # silences the bridge log helpers; severity is asserted elsewhere
         temporal_error = TemporalError.from_message_exception(exc=exc)
 
         assert temporal_error.non_retryable is expected_non_retryable
         assert temporal_error.error_report is not None
         assert temporal_error.error_report["error_type"] == type(exc).__name__
 
-    def test_cogt_error_without_category_falls_back_to_name_list(self) -> None:
+    def test_cogt_error_without_category_falls_back_to_name_list(self, log_mocks: tuple[Any, Any]) -> None:
         """A ``CogtError`` raised without a category falls back to the name list — no crash."""
+        _ = log_mocks  # silences the bridge log helpers; severity is asserted elsewhere
         exc = CogtError("boom")
         assert exc.error_category is None
 
@@ -156,3 +164,40 @@ class TestTemporalErrorBridge:
         # CAPACITY is non-retryable → both bridge hops log at critical severity.
         assert critical_mock.call_count == 2
         assert error_mock.call_count == 0
+
+    @pytest.mark.parametrize(
+        "in_activity",
+        [
+            pytest.param(True, id="in-activity-uses-activity-log"),
+            pytest.param(False, id="not-in-activity-uses-workflow-log"),
+        ],
+    )
+    def test_log_helpers_route_to_the_active_temporal_context(
+        self,
+        mocker: MockerFixture,
+        in_activity: bool,
+    ) -> None:
+        """``_log_critical`` / ``_log_error`` route through ``activity_log`` inside an
+        activity and ``workflow_log`` otherwise.
+
+        ``from_message_exception`` runs activity-side and ``from_app_error``
+        workflow-side; ``workflow.logger`` raises ``_NotInWorkflowEventLoopError``
+        outside a workflow event loop, so the logger must follow the context.
+        """
+        mocker.patch("pipelex.temporal.tprl.temporal_error.activity.in_activity", return_value=in_activity)
+        activity_log_mock = mocker.patch("pipelex.temporal.tprl.temporal_error.activity_log")
+        workflow_log_mock = mocker.patch("pipelex.temporal.tprl.temporal_error.workflow_log")
+
+        TemporalError._log_critical("non-retryable message")  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        TemporalError._log_error("retryable message")  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+
+        if in_activity:
+            activity_log_mock.critical.assert_called_once_with("non-retryable message")
+            activity_log_mock.error.assert_called_once_with("retryable message")
+            workflow_log_mock.critical.assert_not_called()
+            workflow_log_mock.error.assert_not_called()
+        else:
+            workflow_log_mock.critical.assert_called_once_with("non-retryable message")
+            workflow_log_mock.error.assert_called_once_with("retryable message")
+            activity_log_mock.critical.assert_not_called()
+            activity_log_mock.error.assert_not_called()
