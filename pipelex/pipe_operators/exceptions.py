@@ -10,7 +10,7 @@ class PipeOperatorModelAvailabilityError(PipelexError):
         pipe_type: str,
         pipe_code: str,
         pipe_stack: list[str],
-        model_handle: str,
+        model_handle: str | None,
         fallback_list: list[str] | None = None,
     ):
         self.run_mode = run_mode

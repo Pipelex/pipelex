@@ -8,6 +8,7 @@ from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, S
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.exceptions import CogtError
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.usage.token_category import TokenCategory
@@ -371,7 +372,8 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         try:
             text_result = await self._gen_text(llm_job=llm_job)
-        except Exception as exc:
+        except CogtError as exc:
+            exc.fill_model_and_provider(model_handle=self._get_request_model_name(), backend_name=self._get_provider_name())
             self._end_otel_span_with_error(span=span, llm_job=llm_job, error=exc)
             raise
 
@@ -408,7 +410,8 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             # Cleanup result
             if hasattr(object_result, "_raw_response"):
                 delattr(object_result, "_raw_response")
-        except Exception as exc:
+        except CogtError as exc:
+            exc.fill_model_and_provider(model_handle=self._get_request_model_name(), backend_name=self._get_provider_name())
             self._end_otel_span_with_error(span=span, llm_job=llm_job, error=exc)
             raise
 

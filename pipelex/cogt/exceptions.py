@@ -40,6 +40,8 @@ class CogtError(PipelexError):
     error_category: InferenceErrorCategory | None = None
     user_action: UserAction | None = None
     provider_metadata: ProviderErrorMetadata | None = None
+    model_handle: str | None = None
+    backend_name: str | None = None
 
     def __init__(
         self,
@@ -56,6 +58,25 @@ class CogtError(PipelexError):
         if provider_metadata is not None:
             self.provider_metadata = provider_metadata
 
+    def fill_model_and_provider(self, model_handle: str | None, backend_name: str | None) -> None:
+        """Fill ``model_handle`` / ``backend_name`` from the worker, only when still unset.
+
+        Inference-failure leaf errors raised deep inside a provider plugin
+        (``LLMCompletionError``, ``ImgGenGenerationError``, ...) carry no model
+        or provider of their own. Each worker family calls this at its
+        public-method chokepoint — where model and provider are unambiguously
+        known — so the eventual ``ErrorReport`` can attribute the failure.
+
+        Never overwrites a value an inner error already set (e.g.
+        ``LLMModelNotFoundError`` setting its own ``model_handle``), and skips
+        the ``"unknown"`` placeholder a worker returns when it does not know
+        its own provider/model (external plugins not overriding the getters).
+        """
+        if self.model_handle is None and model_handle is not None and model_handle != "unknown":
+            self.model_handle = model_handle
+        if self.backend_name is None and backend_name is not None and backend_name != "unknown":
+            self.backend_name = backend_name
+
     @override
     def to_error_report(self) -> ErrorReport:
         report = ErrorReport(
@@ -65,8 +86,8 @@ class CogtError(PipelexError):
             error_domain=self.error_domain,
             retryable=self.error_category.is_retryable if self.error_category is not None else None,
             user_action=self.user_action,
-            model=getattr(self, "model_handle", None),
-            provider=getattr(self, "backend_name", None),
+            model=self.model_handle,
+            provider=self.backend_name,
             provider_metadata=self.provider_metadata,
         )
         return self._enrich_error_report_from_cause(report)
@@ -155,7 +176,7 @@ class ModelDeckPresetValidatonError(ModelDeckValidatonError):
         message: str,
         model_type: ModelType,
         preset_id: str,
-        model_handle: str,
+        model_handle: str | None,
         enabled_backends: set[str] | None = None,
     ):
         self.model_type = model_type

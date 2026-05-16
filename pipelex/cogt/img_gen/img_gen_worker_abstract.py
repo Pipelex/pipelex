@@ -3,6 +3,7 @@ from abc import abstractmethod
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.exceptions import CogtError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
@@ -57,7 +58,11 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
         img_gen_job.img_gen_job_before_start(inference_model=self.inference_model)
 
         # Execute job
-        result = await self._gen_image(img_gen_job=img_gen_job)
+        try:
+            result = await self._gen_image(img_gen_job=img_gen_job)
+        except CogtError as exc:
+            exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
+            raise
 
         # Report job
         img_gen_job.img_gen_job_after_complete()
@@ -93,7 +98,11 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
         img_gen_job.img_gen_job_before_start(inference_model=self.inference_model)
 
         # Execute job
-        result = await self._gen_image_list(img_gen_job=img_gen_job, nb_images=nb_images)
+        try:
+            result = await self._gen_image_list(img_gen_job=img_gen_job, nb_images=nb_images)
+        except CogtError as exc:
+            exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
+            raise
 
         # Report job
         img_gen_job.img_gen_job_after_complete()
