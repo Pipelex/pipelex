@@ -102,6 +102,17 @@ class LinkupSearchWorker(SearchWorkerAbstract):
                 ),
                 provider_metadata=metadata,
             )
+        if isinstance(exc, LinkupNoResultError):
+            msg = f"Linkup found no results: {exc}"
+            return SearchJobFailureError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Linkup found no results — broaden or rephrase the query",
+                ),
+                provider_metadata=metadata,
+            )
         msg = f"Linkup error: {exc}"
         return SearchJobFailureError(
             msg,
