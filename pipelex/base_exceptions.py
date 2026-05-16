@@ -20,6 +20,30 @@ class ErrorDomain(StrEnum):
     RUNTIME = "runtime"
 
 
+def error_domain_to_http_status(error_domain: ErrorDomain | None) -> int:
+    """Map an :class:`ErrorDomain` to an HTTP status code.
+
+    Authoritative mapping for downstream HTTP APIs (``pipelex-relay``,
+    ``pipelex-back-office``): those repos call this helper instead of
+    redefining the contract. The library itself stays HTTP-agnostic — no
+    web-framework import lives here, only the mapping table.
+
+    - ``INPUT`` -> 422: the caller sent something it can fix (bad input).
+    - ``CONFIG`` / ``RUNTIME`` -> 500: a server-side problem.
+    - ``None`` -> 500: unclassified, treated as a server-side problem.
+
+    This is the *domain* default. A provider 429 (rate-limit) passthrough is
+    layered on top by :attr:`ErrorReport.http_status`.
+    """
+    match error_domain:
+        case ErrorDomain.INPUT:
+            return 422
+        case ErrorDomain.CONFIG | ErrorDomain.RUNTIME:
+            return 500
+        case None:
+            return 500
+
+
 @dataclass(frozen=True, config={"extra": "forbid", "arbitrary_types_allowed": True})
 class ErrorReport:
     """Structured error report — single source of truth for all error serialization.
@@ -47,6 +71,20 @@ class ErrorReport:
     def user_action_detail(self) -> str | None:
         """Return the free-form advice text on ``user_action``, or ``None`` when absent."""
         return self.user_action.detail if self.user_action is not None else None
+
+    @property
+    def http_status(self) -> int:
+        """HTTP status code for this error, for downstream HTTP API adapters.
+
+        A provider 429 (rate limit) takes precedence so the API can surface a
+        ``Retry-After`` header from ``provider_metadata.retry_after_seconds``;
+        otherwise the status follows ``error_domain`` (see
+        :func:`error_domain_to_http_status`).
+        """
+        if self.provider_metadata is not None and self.provider_metadata.status_code == 429:
+            return 429
+        domain = ErrorDomain(self.error_domain) if self.error_domain is not None else None
+        return error_domain_to_http_status(domain)
 
 
 class PipelexError(Exception):

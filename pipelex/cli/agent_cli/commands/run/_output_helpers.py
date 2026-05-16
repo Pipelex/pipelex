@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
+
+from pipelex.tools.misc.json_utils import clean_json_dumps
+
+# Envelope keys that carry metadata rather than the pipeline's main result;
+# excluded from the markdown "Result" JSON block so it stays focused.
+_RUN_ENVELOPE_KEYS: frozenset[str] = frozenset({"working_memory", "main_stuff", "output_file", "graph_files"})
 
 
 def build_run_output(
@@ -40,3 +46,47 @@ def build_run_output(
     if compact_result is not None:
         return compact_result
     return {}
+
+
+def format_run_markdown(result: dict[str, Any]) -> str:
+    """Render a pipeline-run result dict as agent-readable markdown.
+
+    Handles both shapes ``build_run_output()`` produces: the full envelope
+    (``with_memory=True`` — ``main_stuff`` carries a rendered ``markdown``
+    representation) and the compact concept JSON (``with_memory=False``).
+
+    Args:
+        result: The JSON-mode result dict for the run.
+
+    Returns:
+        A markdown string for stdout.
+    """
+    lines: list[str] = ["# Pipeline run complete", ""]
+
+    main_stuff = result.get("main_stuff")
+    rendered_markdown: str | None = None
+    if isinstance(main_stuff, dict):
+        candidate = cast("dict[str, Any]", main_stuff).get("markdown")
+        if isinstance(candidate, str) and candidate:
+            rendered_markdown = candidate
+
+    if rendered_markdown is not None:
+        lines += ["## Result", "", rendered_markdown]
+    else:
+        body = {key: value for key, value in result.items() if key not in _RUN_ENVELOPE_KEYS}
+        if body:
+            lines += ["## Result", "", "```json", clean_json_dumps(body, indent=2), "```"]
+        else:
+            lines.append("_The pipeline produced no main output._")
+
+    output_file = result.get("output_file")
+    if isinstance(output_file, str):
+        lines += ["", f"**Output file:** `{output_file}`"]
+
+    graph_files = result.get("graph_files")
+    if isinstance(graph_files, dict):
+        graph_html = cast("dict[str, Any]", graph_files).get("graph_html")
+        if isinstance(graph_html, str):
+            lines += ["", f"**Graph:** `{graph_html}`"]
+
+    return "\n".join(lines)

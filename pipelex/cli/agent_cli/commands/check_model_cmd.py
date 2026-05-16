@@ -6,7 +6,7 @@ import typer
 
 from pipelex.builder.operations.models_ops import CATEGORY_TO_MODEL_TYPE, ModelCategory
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
-from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success, set_agent_cli_output_format
 from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceParseError
 from pipelex.cogt.models.model_suggestion import (
     KIND_LABELS,
@@ -70,6 +70,7 @@ def agent_check_model_cmd(
     Parses the reference (with sigil prefix if present), validates it against the
     model deck, and on failure provides fuzzy suggestions and wrong-sigil hints.
     """
+    set_agent_cli_output_format(output_format)
     try:
         make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"], needs_inference=False, needs_model_specs=True)
 

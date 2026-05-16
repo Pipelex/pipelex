@@ -9,7 +9,12 @@ from typing import Annotated, Any, cast
 import typer
 from tomlkit import table
 
-from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
+from pipelex.cli.agent_cli.commands.agent_output import (
+    CliOutputFormat,
+    agent_error,
+    agent_success_formatted,
+    set_agent_cli_output_format,
+)
 from pipelex.cli.commands.init.backends import get_selected_backend_keys, update_backends_in_toml
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.ui.backends_ui import get_backend_options_from_toml
@@ -58,6 +63,23 @@ def _parse_config_arg(config_arg: str | None) -> dict[str, Any]:
             agent_error(f"Failed to parse config file JSON: {exc}", "JSONDecodeError", cause=exc)
 
     return {}
+
+
+def _format_init_markdown(result: dict[str, Any]) -> str:
+    """Render an init result dict as agent-readable markdown."""
+    backends_enabled: list[str] = result.get("backends_enabled") or []
+    lines: list[str] = [
+        "# Pipelex initialized",
+        "",
+        f"**Target directory:** `{result['target_dir']}`",
+        "",
+        f"**Backends enabled:** {', '.join(backends_enabled) or 'none'}",
+        "",
+        f"**Routing profile:** `{result['routing_profile']}`",
+        "",
+        f"**Inference setup completed:** {result.get('inference_setup_completed', False)}",
+    ]
+    return "\n".join(lines)
 
 
 def _resolve_target_dir(global_: bool) -> Path:
@@ -312,6 +334,10 @@ def agent_init_cmd(
             help="Force global ~/.pipelex/ directory.",
         ),
     ] = False,
+    output_format: Annotated[
+        CliOutputFormat,
+        typer.Option("--format", help="Output format: markdown (default) or json (structured)"),
+    ] = CliOutputFormat.MARKDOWN,
 ) -> None:
     """Initialize Pipelex configuration (non-interactive).
 
@@ -339,6 +365,8 @@ def agent_init_cmd(
     off; project init drops in a commented-out template that inherits the user's global
     telemetry settings via layered loading. Edit `telemetry.toml` to enable destinations.
     """
+    set_agent_cli_output_format(output_format)
+
     try:
         # Parse config
         parsed_config = _parse_config_arg(config)
@@ -369,7 +397,7 @@ def agent_init_cmd(
         update_inference_setup_completed(completed=True, config_dir=config_manager.global_config_dir)
 
         # Output result
-        agent_success(
+        agent_success_formatted(
             {
                 "success": True,
                 "target_dir": str(target_dir),
@@ -377,7 +405,8 @@ def agent_init_cmd(
                 "backends_enabled": backends_enabled,
                 "routing_profile": routing_profile,
                 "inference_setup_completed": True,
-            }
+            },
+            _format_init_markdown,
         )
 
     except typer.Exit:

@@ -154,6 +154,15 @@ Once the markdown defaults are in, refresh the doc:
 - `inputs` command is unaffected (always JSON).
 - After the panel-helper refactor: representative Rich error outputs match a snapshot to confirm no rendering drift.
 
+## HTTP-status mapping (authoritative)
+
+`pipelex` is a library — there is no API server in the package. But the HTTP API repos (`pipelex-relay`, `pipelex-back-office`) must render an `ErrorReport` as an HTTP response, and the `error_domain` → status mapping was being reinvented per repo. The mapping now lives in the library, in `pipelex/base_exceptions.py`:
+
+- `error_domain_to_http_status(error_domain)` — the pure domain → status table: `INPUT` → 422, `CONFIG`/`RUNTIME` → 500, `None` → 500.
+- `ErrorReport.http_status` — the full property: a provider 429 (`provider_metadata.status_code == 429`) takes precedence so the API can emit a `Retry-After` header from `provider_metadata.retry_after_seconds`; otherwise it follows `error_domain`.
+
+The library stays HTTP-agnostic — no web-framework import, only the mapping table. Downstream FastAPI exception handlers call `ErrorReport.http_status` and are a trivial adapter; they must not redefine the contract.
+
 ## Related tracks
 
 - [track-metadata-model.md](track-metadata-model.md) — `to_error_report()` is the canonical data source for both delivery paths; the dict drift it discusses is the metadata that feeds these renderers.
