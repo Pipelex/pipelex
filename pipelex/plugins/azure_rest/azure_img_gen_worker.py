@@ -205,10 +205,10 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                 return http_response
 
         try:
-            # Image generation is a billable, non-idempotent POST: an ambiguous 5xx may mean Azure
-            # already generated (and billed) the image before the response failed, so it must not
-            # be retried. retry_on_ambiguous_failure=False keeps the retry to failures that prove
-            # the request did not take effect — connection errors and 408 / 409 / 429.
+            # Image generation is a billable, non-idempotent POST: once the request reaches Azure,
+            # a retry could generate (and bill) a second image. retry_on_ambiguous_failure=False
+            # keeps the retry to failures that prove Azure did no work — the request was never
+            # delivered (connect / pool errors), or Azure rejected it before generating (408 / 429).
             response = await request_with_transport_retry(
                 send_request=_post_image_request,
                 max_retries=get_config().cogt.transport_max_retries,

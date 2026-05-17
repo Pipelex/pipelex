@@ -18,12 +18,25 @@ from datetime import datetime, timezone
 import httpx
 from tenacity import AsyncRetrying, RetryCallState, retry_if_exception, stop_after_attempt, wait_exponential
 
-# Transient HTTP statuses worth retrying. Connection-level failures (no HTTP response at all) are
+# Transient HTTP statuses worth retrying in the default (ambiguous-failure-tolerant) mode — the
+# same floor the provider SDKs apply. Connection-level failures (no HTTP response at all) are
 # handled separately by the exception-type check.
 _TRANSIENT_STATUS_CODES: frozenset[int] = frozenset({408, 409, 429, 500, 502, 503, 504})
-# 5xx is the ambiguous case: the server may have processed the request before failing, so a retry
-# of a non-idempotent submit-style POST could duplicate the job (double billing, double output).
-_SERVER_ERROR_STATUS_CODES: frozenset[int] = frozenset({500, 502, 503, 504})
+# The subset of transient statuses still safe to retry for a non-idempotent submit-style POST,
+# because the server proved it did no billable work: 408 — the request body never fully arrived;
+# 429 — the request was rejected at the rate-limit gate before any processing. Every other
+# transient status is withheld in that mode: an ambiguous 5xx may have been processed before the
+# server failed, and a 409 means the server processed the request far enough to detect a conflict.
+_SUBMIT_SAFE_STATUS_CODES: frozenset[int] = frozenset({408, 429})
+# Transport failures still safe to retry for a non-idempotent submit-style POST: the connection
+# was never established (ConnectError / ConnectTimeout) or never acquired from the pool
+# (PoolTimeout), so the request was never delivered. A ReadTimeout / WriteTimeout / ReadError can
+# fire after the request reached the server, so the broader TransportError family is withheld.
+_PRE_REQUEST_TRANSPORT_ERRORS: tuple[type[httpx.TransportError], ...] = (
+    httpx.ConnectError,
+    httpx.ConnectTimeout,
+    httpx.PoolTimeout,
+)
 # The OpenAI / Anthropic SDKs honor Retry-After only up to ~60s, then fall back to backoff; match
 # that boundary — a longer wait is the Temporal line, not something to chase in direct mode.
 _MAX_RETRY_AFTER_SECONDS: float = 60.0
@@ -44,6 +57,10 @@ def _parse_retry_after(raw_value: str | None) -> float | None:
         parsed_date = email.utils.parsedate_to_datetime(cleaned)
     except (TypeError, ValueError):
         return None
+    if parsed_date.tzinfo is None:
+        # A zoneless or "-0000" HTTP-date parses to a naive datetime; subtracting it from an
+        # aware "now" would raise TypeError. Treat such a malformed header as unusable.
+        return None
     return max((parsed_date - datetime.now(timezone.utc)).total_seconds(), 0.0)
 
 
@@ -60,19 +77,30 @@ def _transport_retry_wait(retry_state: RetryCallState) -> float:
 
 
 def _make_retry_predicate(retry_on_ambiguous_failure: bool) -> Callable[[BaseException], bool]:
-    """Build the retry predicate: connection failures always, transient statuses conditionally."""
+    """Build the retry predicate for the configured idempotency posture.
+
+    With ``retry_on_ambiguous_failure`` True the predicate retries the full transient set — every
+    transient HTTP status and the whole ``TransportError`` family — matching the provider SDKs'
+    retry floor. With it False (a non-idempotent submit-style POST), it retries only failures that
+    prove the server did no billable work: the request was never delivered, or the server rejected
+    it before acting on it.
+    """
 
     def should_retry(exc: BaseException) -> bool:
         if isinstance(exc, httpx.HTTPStatusError):
             status_code = exc.response.status_code
             if status_code not in _TRANSIENT_STATUS_CODES:
                 return False
-            # A submit-style POST must not be retried on an ambiguous 5xx — the request may have
-            # already landed. Connection-proven failures (TransportError) and non-5xx transient
-            # statuses stay retryable because they prove the request did not take effect.
-            return retry_on_ambiguous_failure or status_code not in _SERVER_ERROR_STATUS_CODES
-        # TransportError covers connection errors and timeouts — the request did not complete.
-        return isinstance(exc, httpx.TransportError)
+            # A submit-style POST must not be retried once the request reached the server: an
+            # ambiguous 5xx may have been processed before it failed, and a 409 means a conflict
+            # was already detected. Only 408 / 429 prove the server rejected it before any work.
+            return retry_on_ambiguous_failure or status_code in _SUBMIT_SAFE_STATUS_CODES
+        if retry_on_ambiguous_failure:
+            # TransportError covers connection errors and timeouts — the request did not complete.
+            return isinstance(exc, httpx.TransportError)
+        # A submit-style POST may only be retried on a transport failure that proves the request
+        # was never delivered: a ReadTimeout can fire after the server received and started it.
+        return isinstance(exc, _PRE_REQUEST_TRANSPORT_ERRORS)
 
     return should_retry
 
