@@ -31,6 +31,17 @@ if TYPE_CHECKING:
 LARGE_BATCH_ADVISORY_THRESHOLD = 100
 
 
+def resolve_batch_max_concurrency(max_concurrency_setting: int | str) -> int | None:
+    """Translate the ``pipeline_execution_config.max_concurrency`` setting into a ``gather_bounded`` bound.
+
+    The config exposes the explicit literal ``"unbounded"``; ``gather_bounded`` takes ``None`` for no
+    bound. Any int value is passed through unchanged. Centralizing this guards against passing the
+    raw ``"unbounded"`` string into ``gather_bounded``, which would raise ``TypeError`` on its
+    ``max_concurrency < 1`` check.
+    """
+    return None if isinstance(max_concurrency_setting, str) else max_concurrency_setting
+
+
 class PipeBatch(PipeController):
     type: Literal["PipeBatch"] = "PipeBatch"
 
@@ -128,8 +139,7 @@ class PipeBatch(PipeController):
 
         item_count = len(input_content.items)
         max_concurrency_setting = get_config().pipelex.pipeline_execution_config.max_concurrency
-        # The config exposes the explicit literal "unbounded"; gather_bounded takes None for no bound.
-        max_concurrency = None if isinstance(max_concurrency_setting, str) else max_concurrency_setting
+        max_concurrency = resolve_batch_max_concurrency(max_concurrency_setting)
         if item_count > LARGE_BATCH_ADVISORY_THRESHOLD:
             log.warning(
                 f"PipeBatch '{self.code}' is fanning out over {item_count} items. Bounded fan-out "

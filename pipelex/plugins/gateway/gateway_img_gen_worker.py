@@ -182,8 +182,20 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                         provider_metadata=None,
                     )
                 width_str, height_str = size_split
-                width = int(width_str)
-                height = int(height_str)
+                try:
+                    width = int(width_str)
+                    height = int(height_str)
+                except ValueError as exc:
+                    msg = f"Size from img gen response has non-numeric dimensions: '{size}'"
+                    raise ImgGenGenerationError(
+                        msg,
+                        error_category=InferenceErrorCategory.UNKNOWN,
+                        user_action=UserAction(
+                            kind=UserActionKind.CHANGE_MODEL,
+                            detail="The Gateway returned a malformed image size — try a different model",
+                        ),
+                        provider_metadata=None,
+                    ) from exc
             elif flux_2_pro_image:
                 # Detect size and format from the first image's data
                 first_image = images[0] if images else None
@@ -211,14 +223,29 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                         provider_metadata=None,
                     )
 
-                # Decode base64 once and detect file type and dimensions
-                image_bytes = base64.b64decode(first_base64)
-                file_type = detect_file_type_from_bytes(image_bytes)
-                image_format = ImageFormat.from_mime_type(
-                    mime_type=file_type.mime,
-                ).value
-                with Image.open(io.BytesIO(image_bytes)) as pil_img:
-                    width, height = pil_img.size
+                # Decode base64 once and detect file type and dimensions. A malformed
+                # success body (invalid base64, an unrecognized/truncated image) must
+                # surface as a categorized ImgGenGenerationError, not a raw
+                # binascii/PIL exception — the latter escapes the Temporal PipelexError
+                # bridge and gets retried, duplicating a billable generation.
+                try:
+                    image_bytes = base64.b64decode(first_base64)
+                    image_format = ImageFormat.from_mime_type(
+                        mime_type=detect_file_type_from_bytes(image_bytes).mime,
+                    ).value
+                    with Image.open(io.BytesIO(image_bytes)) as pil_img:
+                        width, height = pil_img.size
+                except (ValueError, OSError) as exc:
+                    msg = f"Could not decode the image returned by the Gateway for model '{self.inference_model.model_id}'"
+                    raise ImgGenGenerationError(
+                        msg,
+                        error_category=InferenceErrorCategory.UNKNOWN,
+                        user_action=UserAction(
+                            kind=UserActionKind.CHANGE_MODEL,
+                            detail="The Gateway returned a malformed image — try a different model",
+                        ),
+                        provider_metadata=None,
+                    ) from exc
             else:
                 msg = f"Could not parse image generation from Gateway response:\n{parsing_errors}"
                 raise ImgGenGenerationError(

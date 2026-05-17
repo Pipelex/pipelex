@@ -98,6 +98,25 @@ def _patch_httpx_malformed_json(mocker: MockerFixture, raw_body: str) -> None:
     )
 
 
+def _patch_httpx_success_json(mocker: MockerFixture, response_dict: dict[str, Any]) -> None:
+    """Patch httpx so the request succeeds (2xx) and ``response.json()`` returns the given body dict."""
+    mock_client = mocker.MagicMock()
+    mock_response = mocker.MagicMock()
+    mock_response.raise_for_status.return_value = None
+    mock_response.status_code = 200
+    mock_response.headers = httpx.Headers({})
+    mock_response.json.return_value = response_dict
+    mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
+    mock_client.post = mocker.AsyncMock(return_value=mock_response)
+    mocker.patch("pipelex.plugins.azure_rest.azure_img_gen_worker.httpx.AsyncClient", return_value=mock_client)
+    mocker.patch(
+        "pipelex.plugins.azure_rest.azure_img_gen_worker.ImgGenArgsFactory.make_args_for_model",
+        new_callable=mocker.AsyncMock,
+        return_value={"prompt": "test"},
+    )
+
+
 @pytest.mark.asyncio(loop_scope="class")
 class TestAzureImgGenWorkerSemantic:
     """Each branch carries semantic UserActionKind + provider_metadata."""
@@ -269,3 +288,23 @@ class TestAzureImgGenWorkerSemantic:
         assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
         assert exc_info.value.provider_metadata is not None
         assert exc_info.value.provider_metadata.sdk_exception_type == exc_class.__name__
+
+    @pytest.mark.parametrize("malformed_size", ["axb", "1024xfoo", "wide x tall"])
+    async def test_malformed_size_is_wrapped(self, mocker: MockerFixture, malformed_size: str) -> None:
+        """A 2xx body whose ``size`` has non-numeric dimensions must surface as a categorized
+        ImgGenGenerationError, not a raw ValueError escaping the ``int()`` parse — that raw error
+        would slip past the Temporal PipelexError bridge and get the billable generation retried.
+        """
+        worker = _make_worker(mocker)
+        _patch_httpx_success_json(
+            mocker,
+            response_dict={"output_format": "png", "data": [{"b64_json": "aGVsbG8="}], "size": malformed_size},
+        )
+
+        with pytest.raises(ImgGenGenerationError) as exc_info:
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.UNKNOWN
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.CHANGE_MODEL
+        assert "non-numeric" in exc_info.value.message

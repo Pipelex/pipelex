@@ -189,11 +189,14 @@ class PipeRunParams(BaseModel):
         return isinstance(self.output_multiplicity, int) and self.output_multiplicity > 1
 
     def push_pipe_to_stack(self, pipe_code: str) -> None:
-        self.pipe_stack.append(pipe_code)
         limit = self.pipe_stack_limit
-        if len(self.pipe_stack) > limit:
+        if len(self.pipe_stack) >= limit:
+            # Check the limit *before* appending: run_pipe() calls push_pipe_to_stack()
+            # outside its push/pop try/finally, so a frame appended here on overflow
+            # would never be popped and would corrupt the stack of any later reuse.
             msg = f"Exceeded pipe stack limit of {limit}. You can raise that limit in the config. Stack:\n{self.pipe_stack}"
             raise PipeStackOverflowError(message=msg, limit=limit, pipe_stack=self.pipe_stack)
+        self.pipe_stack.append(pipe_code)
 
     def pop_pipe_from_stack(self, pipe_code: str) -> None:
         popped_pipe_code = self.pipe_stack.pop()

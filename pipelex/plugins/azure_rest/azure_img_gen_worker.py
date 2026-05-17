@@ -368,8 +368,20 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                     provider_metadata=None,
                 )
             width_str, height_str = size_split
-            width = int(width_str)
-            height = int(height_str)
+            try:
+                width = int(width_str)
+                height = int(height_str)
+            except ValueError as exc:
+                msg = f"Size from img gen response has non-numeric dimensions: '{size}'"
+                raise ImgGenGenerationError(
+                    msg,
+                    error_category=InferenceErrorCategory.UNKNOWN,
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_MODEL,
+                        detail="Azure returned a malformed image size — try a different model",
+                    ),
+                    provider_metadata=None,
+                ) from exc
             for image in images:
                 base64_str = image.get("b64_json")
                 if not isinstance(base64_str, str):
