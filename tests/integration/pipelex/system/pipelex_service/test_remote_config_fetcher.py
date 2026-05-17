@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 import pytest
+from pydantic import ValidationError
 
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.system.pipelex_service.exceptions import (
@@ -150,6 +151,30 @@ class TestRemoteConfigFetcher:
 
         assert expected_cache_path in str(exc_info.value), "error message must name the cache path so users can prime it"
         assert "pipelex init" in str(exc_info.value), "error message must point at the remediation command"
+
+    @pytest.mark.usefixtures("isolated_cache_dir")
+    def test_network_failure_with_invalid_cache_raises_unavailable(self, mocker: MockerFixture) -> None:
+        """A cache with a valid wrapper but a stale/malformed ``raw_config`` must be treated
+        as unusable. ``RemoteConfigCache.load()`` only validates the wrapper, so the offline
+        path must catch the inner ``RemoteConfig`` validation failure and raise
+        ``RemoteConfigUnavailableError`` with the normal remediation message — never let a
+        raw Pydantic ``ValidationError`` escape.
+        """
+        # store() does not validate raw_config against RemoteConfig, so this writes a
+        # cache whose wrapper is valid but whose payload cannot parse as RemoteConfig.
+        RemoteConfigCache.store({"bogus": "payload"})
+
+        mocker.patch("httpx.get", side_effect=httpx.ConnectError("no network"))
+        mocker.patch.object(RemoteConfigFetcher, "FETCH_MAX_RETRIES", 1)
+
+        with pytest.raises(RemoteConfigUnavailableError) as exc_info:
+            RemoteConfigFetcher.fetch_remote_config()
+
+        assert "pipelex init" in str(exc_info.value), "invalid cache must surface the normal offline remediation, not a raw ValidationError"
+        assert isinstance(exc_info.value.__cause__, ValidationError), (
+            "the unavailable error must chain from the inner RemoteConfig ValidationError, "
+            "proving the malformed-cache branch (not the missing-cache branch) was exercised"
+        )
 
     @pytest.mark.usefixtures("isolated_cache_dir")
     def test_http_error_with_cache_returns_cached(self, mocker: MockerFixture) -> None:

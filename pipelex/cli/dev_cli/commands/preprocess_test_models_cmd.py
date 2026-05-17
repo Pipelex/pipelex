@@ -93,12 +93,19 @@ def _fetch_gateway_models() -> dict[str, list[str]]:
 
     Returns:
         Dictionary mapping model_type to list of model handles.
+
+    Raises:
+        RemoteConfigUnavailableError: The Gateway config is unreachable and no usable cache
+            exists — ``require_fresh=True`` refuses any cached fallback.
+        RemoteConfigValidationError: The Gateway responded with a payload that does not match
+            the expected schema.
     """
-    try:
-        result = RemoteConfigFetcher.fetch_remote_config(require_fresh=True)
-        model_specs = dict(result.config.backend_model_specs)
-    except (RemoteConfigUnavailableError, RemoteConfigValidationError):
-        return {"llm": [], "img_gen": [], "text_extractor": [], "search": []}
+    # ``require_fresh=True`` guarantees we never bake stale or missing Gateway model specs
+    # into committed files. Any ``RemoteConfigUnavailableError`` / ``RemoteConfigValidationError``
+    # propagates so the command refuses to proceed rather than writing fixtures silently
+    # missing every ``pipelex_gateway`` model.
+    result = RemoteConfigFetcher.fetch_remote_config(require_fresh=True)
+    model_specs = dict(result.config.backend_model_specs)
 
     # Get defaults
     defaults = model_specs.get("defaults", {})
@@ -661,6 +668,26 @@ def preprocess_test_models_cmd(
             console.print("[bold yellow]Recommended Actions:[/bold yellow]")
             console.print(f"  • Check file permissions in: [cyan]{backends_dir}[/cyan]")
             console.print("  • Verify disk space and filesystem health")
+            console.print()
+        sys.exit(1)
+    except (RemoteConfigUnavailableError, RemoteConfigValidationError) as exc:
+        # Pipelex Gateway remote config is unavailable or stale. This command regenerates
+        # committed files (model_availability.json, _generated_model_sets.py), so it must
+        # refuse rather than write fixtures missing every pipelex_gateway model.
+        if quiet:
+            console.print(f"[red]✗ Preprocessing failed:[/red] Gateway config unavailable - {escape(str(exc))}")
+        else:
+            error_panel = Panel(
+                f"[red]✗[/red] Pipelex Gateway remote configuration is unavailable\n\n[dim]{escape(str(exc))}[/dim]",
+                title="[bold red]Gateway Config Unavailable[/bold red]",
+                border_style="red",
+                padding=(1, 2),
+            )
+            console.print(error_panel)
+            console.print()
+            console.print("[bold yellow]Recommended Actions:[/bold yellow]")
+            console.print("  • Run [cyan]pipelex init[/cyan] while online to prime the remote config cache")
+            console.print("  • Fixture generation must not proceed without fresh Gateway model specs")
             console.print()
         sys.exit(1)
     except Exception as exc:
