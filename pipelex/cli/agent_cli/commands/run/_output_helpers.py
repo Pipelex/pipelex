@@ -48,25 +48,57 @@ def build_run_output(
     return {}
 
 
-def format_run_markdown(result: dict[str, Any]) -> str:
+def _render_json_payload_lines(result_payload: Any) -> list[str]:
+    """Render a structured payload as a fenced ``## Result`` json block.
+
+    The local runner stores ``json`` as a kajson-encoded string (kajson.dumps of
+    smart_dump, carrying ``__class__`` metadata for custom types). Decode it with
+    kajson — the symmetric decoder — so custom types are reconstituted and then
+    rendered cleanly by clean_json_dumps; plain json.loads would leave datetimes
+    and the like as raw tagged dicts. A string that does not decode is rendered as-is.
+    """
+    if isinstance(result_payload, str):
+        try:
+            result_payload = kajson.loads(result_payload)
+        except (json.JSONDecodeError, KajsonException):
+            pass
+    return ["## Result", "", "```json", clean_json_dumps(result_payload, indent=2), "```"]
+
+
+def format_run_markdown(result: dict[str, Any], with_memory: bool) -> str:
     """Render a pipeline-run result dict as agent-readable markdown.
 
-    Handles both shapes ``build_run_output()`` produces: the full envelope
-    (``with_memory=True`` — ``main_stuff`` carries a rendered ``markdown``
-    representation) and the compact concept JSON (``with_memory=False``).
+    Handles both shapes ``build_run_output()`` produces, disambiguated by the
+    authoritative ``with_memory`` flag rather than guessed from the dict's keys:
+    the full envelope (``with_memory=True`` — ``main_stuff`` carries a rendered
+    ``markdown`` representation) and the compact concept JSON (``with_memory=False``).
 
     Args:
         result: The JSON-mode result dict for the run.
+        with_memory: True when ``result`` is the full envelope (``main_stuff`` +
+            ``working_memory`` + side-effect metadata); False when ``result`` is
+            the bare compact concept JSON.
 
     Returns:
         A markdown string for stdout.
     """
     lines: list[str] = ["# Pipeline run complete", ""]
 
+    if not with_memory:
+        # Compact mode: `result` IS the bare concept JSON, not an envelope — render it whole.
+        # Probing for envelope keys here would misread a concept field that happens to be
+        # named like one (e.g. a dict-valued `main_stuff`) and silently drop the real result.
+        if result:
+            lines += _render_json_payload_lines(result)
+        else:
+            lines.append("_The pipeline produced no main output._")
+        return "\n".join(lines)
+
     main_stuff = result.get("main_stuff")
+    main_stuff_dict = cast("dict[str, Any]", main_stuff) if isinstance(main_stuff, dict) else None
     rendered_markdown: str | None = None
-    if isinstance(main_stuff, dict):
-        candidate = cast("dict[str, Any]", main_stuff).get("markdown")
+    if main_stuff_dict is not None:
+        candidate = main_stuff_dict.get("markdown")
         if isinstance(candidate, str) and candidate:
             rendered_markdown = candidate
 
@@ -75,31 +107,15 @@ def format_run_markdown(result: dict[str, Any]) -> str:
     else:
         # No rendered markdown — e.g. the API runner cannot render it and leaves `markdown`
         # empty. Surface the structured `json` payload `main_stuff` still carries rather than
-        # dropping it (it sits under an excluded envelope key). Only with no `main_stuff` at
-        # all do we fall back to the remaining non-envelope keys.
-        result_payload: Any | None = None
-        if isinstance(main_stuff, dict):
-            result_payload = cast("dict[str, Any]", main_stuff).get("json")
-        if result_payload is None and not isinstance(main_stuff, dict):
-            # Compact mode: `result` is the bare concept JSON, not an envelope — render it whole.
-            # Filtering by envelope-key names here would silently drop a concept field that
-            # happens to be named like one (e.g. `output_file`).
-            result_payload = result or None
+        # dropping it (it sits under an excluded envelope key).
+        result_payload = main_stuff_dict.get("json") if main_stuff_dict is not None else None
         if result_payload is not None:
-            if isinstance(result_payload, str):
-                # The local runner stores `json` as a kajson-encoded string (kajson.dumps of
-                # smart_dump, carrying `__class__` metadata for custom types). Decode it with
-                # kajson — the symmetric decoder — so custom types are reconstituted and then
-                # rendered cleanly by clean_json_dumps; plain json.loads would leave datetimes
-                # and the like as raw tagged dicts. A string that does not decode is rendered as-is.
-                try:
-                    result_payload = kajson.loads(result_payload)
-                except (json.JSONDecodeError, KajsonException):
-                    pass
-            lines += ["## Result", "", "```json", clean_json_dumps(result_payload, indent=2), "```"]
+            lines += _render_json_payload_lines(result_payload)
         else:
             lines.append("_The pipeline produced no main output._")
 
+    # output_file / graph_files are envelope-only side-effect metadata — build_run_output
+    # merges them solely under with_memory — so they are read only on this branch.
     output_file = result.get("output_file")
     if isinstance(output_file, str):
         lines += ["", f"**Output file:** `{output_file}`"]

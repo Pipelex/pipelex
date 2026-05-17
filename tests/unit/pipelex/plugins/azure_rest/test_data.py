@@ -66,8 +66,10 @@ class AzureErrorHandlingTestData:
 
     TIMEOUT_ERROR_CASES: ClassVar[list[tuple[str, InferenceErrorCategory, str]]] = [
         (
-            "request_timeout",
-            InferenceErrorCategory.TRANSIENT,
+            # A ReadTimeout fires after the request reached Azure — the outcome is ambiguous on a
+            # non-idempotent image submit, so it is categorized AMBIGUOUS (non-retryable).
+            "read_timeout",
+            InferenceErrorCategory.AMBIGUOUS,
             "timed out",
         ),
     ]

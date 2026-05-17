@@ -94,6 +94,7 @@ class TestTemporalErrorBridge:
             pytest.param(InferenceErrorCategory.CONFIGURATION, True, id="configuration-non-retryable"),
             pytest.param(InferenceErrorCategory.CONTENT, True, id="content-non-retryable"),
             pytest.param(InferenceErrorCategory.CAPACITY, True, id="capacity-non-retryable"),
+            pytest.param(InferenceErrorCategory.AMBIGUOUS, True, id="ambiguous-non-retryable"),
             pytest.param(InferenceErrorCategory.UNKNOWN, True, id="unknown-non-retryable"),
         ],
     )
@@ -162,6 +163,7 @@ class TestTemporalErrorBridge:
             pytest.param(InferenceErrorCategory.CONFIGURATION, True, id="configuration-non-retryable"),
             pytest.param(InferenceErrorCategory.CONTENT, True, id="content-non-retryable"),
             pytest.param(InferenceErrorCategory.CAPACITY, True, id="capacity-non-retryable"),
+            pytest.param(InferenceErrorCategory.AMBIGUOUS, True, id="ambiguous-non-retryable"),
             pytest.param(InferenceErrorCategory.UNKNOWN, True, id="unknown-non-retryable"),
         ],
     )

@@ -20,6 +20,10 @@ class InferenceErrorCategory(StrEnum):
     CONFIGURATION = "configuration"
     CONTENT = "content"
     CAPACITY = "capacity"
+    # The error type is known, but the outcome is not: the operation may or may not have committed
+    # (e.g. a connection dropped mid-request). A blind retry is unsafe for a non-idempotent
+    # operation, so this is non-retryable — distinct from UNKNOWN, which means "could not classify".
+    AMBIGUOUS = "ambiguous"
     UNKNOWN = "unknown"
 
     @property
@@ -31,6 +35,7 @@ class InferenceErrorCategory(StrEnum):
                 InferenceErrorCategory.CONFIGURATION
                 | InferenceErrorCategory.CONTENT
                 | InferenceErrorCategory.CAPACITY
+                | InferenceErrorCategory.AMBIGUOUS
                 | InferenceErrorCategory.UNKNOWN
             ):
                 return False

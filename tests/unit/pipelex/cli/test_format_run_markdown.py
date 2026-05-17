@@ -19,7 +19,7 @@ class TestFormatRunMarkdown:
             "main_stuff": {"json": {"a": 1}, "markdown": "# Hello\n\nWorld", "html": ""},
             "working_memory": {"root": {}},
         }
-        markdown = format_run_markdown(result)
+        markdown = format_run_markdown(result, with_memory=True)
         assert "## Result" in markdown
         assert "# Hello" in markdown
         assert "World" in markdown
@@ -31,16 +31,16 @@ class TestFormatRunMarkdown:
             "working_memory": {"root": {}},
             "pipeline_run_id": "run-123",
         }
-        markdown = format_run_markdown(result)
+        markdown = format_run_markdown(result, with_memory=True)
         assert "## Result" in markdown
         assert "answer" in markdown, "the pipeline result must appear in the Result section"
         assert "42" in markdown
         assert "run-123" not in markdown, "envelope metadata must not stand in for the result"
 
     def test_no_main_stuff_falls_back_to_body(self) -> None:
-        """A compact-shape result with no main_stuff key renders its non-envelope keys as the body."""
+        """A compact-shape result renders its concept JSON as the body."""
         result: dict[str, Any] = {"clauses": [{"id": 1, "text": "clause one"}]}
-        markdown = format_run_markdown(result)
+        markdown = format_run_markdown(result, with_memory=False)
         assert "## Result" in markdown
         assert "clauses" in markdown
         assert "clause one" in markdown
@@ -48,7 +48,7 @@ class TestFormatRunMarkdown:
     def test_no_main_output_message(self) -> None:
         """An empty main_stuff with no other payload yields the explicit no-output message."""
         result: dict[str, Any] = {"main_stuff": {}, "working_memory": {"root": {}}}
-        markdown = format_run_markdown(result)
+        markdown = format_run_markdown(result, with_memory=True)
         assert "_The pipeline produced no main output._" in markdown
 
     def test_main_stuff_dict_without_json_does_not_leak_metadata(self) -> None:
@@ -58,7 +58,7 @@ class TestFormatRunMarkdown:
             "working_memory": {"root": {}},
             "pipeline_run_id": "run-456",
         }
-        markdown = format_run_markdown(result)
+        markdown = format_run_markdown(result, with_memory=True)
         assert "_The pipeline produced no main output._" in markdown
         assert "run-456" not in markdown, "envelope metadata must not stand in for a missing result"
 
@@ -72,7 +72,7 @@ class TestFormatRunMarkdown:
             "main_stuff": {"json": payload, "markdown": "", "html": ""},
             "working_memory": {"root": {}},
         }
-        markdown = format_run_markdown(result)
+        markdown = format_run_markdown(result, with_memory=True)
         assert "## Result" in markdown
         assert '"answer": 42' in markdown, "the kajson string payload must be rendered as structured JSON"
         assert '\\"answer\\"' not in markdown, "the payload must be decoded, not escaped"
@@ -85,7 +85,20 @@ class TestFormatRunMarkdown:
         an envelope key (e.g. 'main_stuff') must survive into the rendered Result block.
         """
         result: dict[str, Any] = {"summary": "done", "main_stuff": "important value"}
-        markdown = format_run_markdown(result)
+        markdown = format_run_markdown(result, with_memory=False)
         assert "## Result" in markdown
         assert "important value" in markdown, "a concept field colliding with an envelope key must not be dropped"
+        assert "summary" in markdown
+
+    def test_compact_result_with_dict_valued_main_stuff_is_not_dropped(self) -> None:
+        """A compact concept JSON carrying a dict-valued 'main_stuff' field must not be misread as
+        the run envelope: with with_memory=False the result is rendered whole, not dropped as
+        'no main output' just because a field happens to be named like an envelope key.
+        """
+        result: dict[str, Any] = {"summary": "done", "main_stuff": {"foo": "bar"}}
+        markdown = format_run_markdown(result, with_memory=False)
+        assert "## Result" in markdown
+        assert "_The pipeline produced no main output._" not in markdown, "the real result must not be dropped"
+        assert "foo" in markdown, "a dict-valued concept field must survive into the Result block"
+        assert "bar" in markdown
         assert "summary" in markdown

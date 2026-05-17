@@ -63,6 +63,20 @@ def _patch_httpx_status_error(mocker: MockerFixture, sdk_exc: httpx.HTTPStatusEr
     )
 
 
+def _patch_httpx_post_raises(mocker: MockerFixture, sdk_exc: httpx.HTTPError) -> None:
+    """Patch the worker's ``httpx.AsyncClient`` so ``.post()`` raises the given transport exception."""
+    mock_client = mocker.MagicMock()
+    mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
+    mock_client.post = mocker.AsyncMock(side_effect=sdk_exc)
+    mocker.patch("pipelex.plugins.azure_rest.azure_img_gen_worker.httpx.AsyncClient", return_value=mock_client)
+    mocker.patch(
+        "pipelex.plugins.azure_rest.azure_img_gen_worker.ImgGenArgsFactory.make_args_for_model",
+        new_callable=mocker.AsyncMock,
+        return_value={"prompt": "test"},
+    )
+
+
 @pytest.mark.asyncio(loop_scope="class")
 class TestAzureImgGenWorkerSemantic:
     """Each branch carries semantic UserActionKind + provider_metadata."""
@@ -171,55 +185,44 @@ class TestAzureImgGenWorkerSemantic:
         assert metadata is not None
         assert metadata.body == secret_body
 
-    async def test_connect_error_is_wait_and_retry(self, mocker: MockerFixture) -> None:
-        worker = _make_worker(mocker)
-        request = httpx.Request("POST", "https://test.azure.com/api")
-        sdk_exc = httpx.ConnectError("Connection refused", request=request)
-
-        mock_client = mocker.MagicMock()
-        mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
-        mock_client.post = mocker.AsyncMock(side_effect=sdk_exc)
-        mocker.patch("pipelex.plugins.azure_rest.azure_img_gen_worker.httpx.AsyncClient", return_value=mock_client)
-        mocker.patch(
-            "pipelex.plugins.azure_rest.azure_img_gen_worker.ImgGenArgsFactory.make_args_for_model",
-            new_callable=mocker.AsyncMock,
-            return_value={"prompt": "test"},
-        )
-
-        with pytest.raises(ImgGenGenerationError) as exc_info:
-            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
-
-        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
-        assert exc_info.value.user_action is not None
-        assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
-        assert exc_info.value.provider_metadata is not None
-        assert exc_info.value.provider_metadata.sdk_exception_type == "ConnectError"
-
-    async def test_read_error_is_wait_and_retry(self, mocker: MockerFixture) -> None:
-        """A mid-request httpx.ReadError (a TransportError subclass not covered by the connect/timeout
-        handlers) must still be wrapped in ImgGenGenerationError, not escape as a raw httpx exception.
+    @pytest.mark.parametrize(
+        ("exc_class", "expected_category"),
+        [
+            # Pre-request transport failures — the request never reached Azure, so no billable
+            # work was done — stay retryable (TRANSIENT).
+            (httpx.ConnectError, InferenceErrorCategory.TRANSIENT),
+            (httpx.ConnectTimeout, InferenceErrorCategory.TRANSIENT),
+            (httpx.PoolTimeout, InferenceErrorCategory.TRANSIENT),
+            # Mid-/post-request transport failures — the request may have reached Azure and
+            # generated (and billed) an image — are ambiguous on this non-idempotent submit, so
+            # they are categorized AMBIGUOUS (non-retryable) to keep Temporal from re-submitting.
+            (httpx.ReadTimeout, InferenceErrorCategory.AMBIGUOUS),
+            (httpx.WriteTimeout, InferenceErrorCategory.AMBIGUOUS),
+            (httpx.ReadError, InferenceErrorCategory.AMBIGUOUS),
+            (httpx.WriteError, InferenceErrorCategory.AMBIGUOUS),
+            (httpx.RemoteProtocolError, InferenceErrorCategory.AMBIGUOUS),
+        ],
+    )
+    async def test_transport_failure_categorization(
+        self,
+        mocker: MockerFixture,
+        exc_class: type[httpx.TransportError],
+        expected_category: InferenceErrorCategory,
+    ) -> None:
+        """Each httpx transport failure is wrapped in ImgGenGenerationError with a category that
+        matches idempotency safety: pre-request failures stay retryable, ambiguous mid-request
+        failures are non-retryable so Temporal does not re-submit the billable image generation.
         """
         worker = _make_worker(mocker)
         request = httpx.Request("POST", "https://test.azure.com/api")
-        sdk_exc = httpx.ReadError("Connection reset while reading the response", request=request)
-
-        mock_client = mocker.MagicMock()
-        mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
-        mock_client.post = mocker.AsyncMock(side_effect=sdk_exc)
-        mocker.patch("pipelex.plugins.azure_rest.azure_img_gen_worker.httpx.AsyncClient", return_value=mock_client)
-        mocker.patch(
-            "pipelex.plugins.azure_rest.azure_img_gen_worker.ImgGenArgsFactory.make_args_for_model",
-            new_callable=mocker.AsyncMock,
-            return_value={"prompt": "test"},
-        )
+        sdk_exc = exc_class("transport failure", request=request)
+        _patch_httpx_post_raises(mocker, sdk_exc)
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
             await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
-        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.error_category is expected_category
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
         assert exc_info.value.provider_metadata is not None
-        assert exc_info.value.provider_metadata.sdk_exception_type == "ReadError"
+        assert exc_info.value.provider_metadata.sdk_exception_type == exc_class.__name__

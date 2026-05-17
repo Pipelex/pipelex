@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -169,7 +170,7 @@ def run_bundle_cmd(
                         with_memory=with_memory,
                     )
                 )
-                agent_success_formatted(result, format_run_markdown)
+                agent_success_formatted(result, functools.partial(format_run_markdown, with_memory=with_memory))
 
             except ClientAuthenticationError as exc:
                 agent_error(str(exc), "ClientAuthenticationError", cause=exc)
@@ -198,7 +199,7 @@ def run_bundle_cmd(
                         with_memory=with_memory,
                     )
                 )
-                agent_success_formatted(result, format_run_markdown)
+                agent_success_formatted(result, functools.partial(format_run_markdown, with_memory=with_memory))
 
             except PipelineExecutionError as exc:
                 extra_fields: dict[str, Any] = {

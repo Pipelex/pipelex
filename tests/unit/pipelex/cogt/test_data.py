@@ -10,4 +10,5 @@ class ExceptionTestData:
         ("configuration_not_retryable", InferenceErrorCategory.CONFIGURATION, False),
         ("content_not_retryable", InferenceErrorCategory.CONTENT, False),
         ("capacity_not_retryable", InferenceErrorCategory.CAPACITY, False),
+        ("ambiguous_not_retryable", InferenceErrorCategory.AMBIGUOUS, False),
     ]

@@ -230,15 +230,36 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                 ),
                 provider_metadata=metadata,
             ) from exc
-        except httpx.TimeoutException as exc:
+        except (httpx.ConnectTimeout, httpx.PoolTimeout) as exc:
+            # Pre-request timeouts: the connection was never established (ConnectTimeout) or never
+            # acquired from the pool (PoolTimeout), so the request never reached Azure and no
+            # billable work was done. Safe to retry — categorized TRANSIENT. Must precede the
+            # httpx.TimeoutException clause below, of which both are subclasses.
             metadata = extract_azure_metadata(exc)
-            msg = f"Azure request timed out for model '{self.inference_model.desc}': {exc}"
+            msg = f"Azure request timed out before reaching the server for model '{self.inference_model.desc}': {exc}"
             raise ImgGenGenerationError(
                 msg,
                 error_category=InferenceErrorCategory.TRANSIENT,
                 user_action=UserAction(
                     kind=UserActionKind.WAIT_AND_RETRY,
-                    detail="Azure request timed out — the system will retry automatically",
+                    detail="Azure request timed out before reaching the server — the system will retry automatically",
+                ),
+                provider_metadata=metadata,
+            ) from exc
+        except httpx.TimeoutException as exc:
+            # Remaining timeouts — ReadTimeout / WriteTimeout — fire after the request reached
+            # Azure, so the outcome is ambiguous: Azure may have generated (and billed) the image.
+            # Image generation is a non-idempotent POST, so this is categorized AMBIGUOUS
+            # (non-retryable) — an automatic Temporal retry could duplicate the generation. The
+            # pre-request timeouts are peeled off by the clause above.
+            metadata = extract_azure_metadata(exc)
+            msg = f"Azure request timed out mid-request for model '{self.inference_model.desc}': {exc}"
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.AMBIGUOUS,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Azure timed out mid-request — the outcome is unknown; retry manually after checking for a duplicate image",
                 ),
                 provider_metadata=metadata,
             ) from exc
@@ -247,14 +268,17 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
             # RemoteProtocolError and the like — which fire when the connection drops mid-request.
             # The connect/timeout handlers above are also TransportError subclasses, so this clause
             # must stay last; without it these escape unwrapped, bypassing the categorized error.
+            # The outcome is ambiguous — the request may have reached Azure and generated (and
+            # billed) an image — so for this non-idempotent POST it is categorized AMBIGUOUS
+            # (non-retryable): an automatic Temporal retry could duplicate the generation.
             metadata = extract_azure_metadata(exc)
             msg = f"Azure transport error for model '{self.inference_model.desc}': {exc}"
             raise ImgGenGenerationError(
                 msg,
-                error_category=InferenceErrorCategory.TRANSIENT,
+                error_category=InferenceErrorCategory.AMBIGUOUS,
                 user_action=UserAction(
                     kind=UserActionKind.WAIT_AND_RETRY,
-                    detail="The connection to Azure failed mid-request — the system will retry automatically",
+                    detail="The connection to Azure failed mid-request — the outcome is unknown; retry manually after checking for a duplicate image",
                 ),
                 provider_metadata=metadata,
             ) from exc
