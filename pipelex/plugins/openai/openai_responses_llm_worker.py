@@ -22,6 +22,7 @@ from pipelex.cogt.inference.error_classification import (
     UserActionKind,
     extract_underlying_sdk_exception,
 )
+from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
@@ -209,10 +210,12 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
             result_object, completion = await self.instructor_for_objects.responses.create_with_completion(  # pyright: ignore[reportUnknownMemberType]
                 input=cast("list[ChatCompletionMessageParam]", input_items),
                 response_model=schema,
-                # NB: instructor's max_retries is NOT schema-validation-only. Passed an int, it
-                # builds a tenacity loop whose default predicate retries ANY exception — so it
-                # retries transport/API errors too, nested on top of the SDK client's own retry.
-                max_retries=llm_job.job_config.max_retries,
+                # instructor's retry is confined to schema re-ask: this validation-only AsyncRetrying
+                # re-asks on a malformed/invalid output but lets a transport error propagate as the raw
+                # SDK exception — transport retry is the SDK client floor (Tier 1) alone.
+                # The arg-type ignore below is because instructor's `responses` path is stub-typed
+                # `int | Retrying`, but `initialize_retrying` accepts (and the async path needs) an `AsyncRetrying`.
+                max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.max_retries),  # type: ignore[arg-type]
                 model=self.inference_model.model_id,
                 instructions=llm_job.llm_prompt.system_text,
                 temperature=job_params.temperature,

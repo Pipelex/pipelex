@@ -124,6 +124,7 @@ bedrock_access_variant = "aws_access"
 ####################################################################################################
 
 [cogt]
+transport_max_retries = 2
 
 [cogt.model_deck_config]
 is_model_fallback_enabled = true

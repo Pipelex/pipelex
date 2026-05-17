@@ -1,6 +1,6 @@
 # Track — Retry and Resilience (Target Architecture)
 
-> **This is a target-architecture doc, not a current-state description.** It supersedes the earlier version of this track, which described the pre-Phase-5 world plus followups that have since landed — and are now partly being reversed. The directory README's status row still reflects landed code; treat this doc as the forward plan that row will eventually be synced to.
+> **Both workstreams have landed.** Workstream 1 (remove the `PipeRouter` transient-retry loop) shipped as PR #909; Workstream 2 (make Tier 1 transport retry explicit and uniform, and confine `instructor` to schema re-ask) has landed on `feature/Error-handling-4`. This doc now reads as a current-state description; the status table and prose below reflect landed code.
 
 ## Premise
 
@@ -22,31 +22,31 @@ This track defines where retry legitimately lives, removes the layer where the d
 
 | Layer | What it does | Scope | Owned by | Status |
 |---|---|---|---|---|
-| **Tier 1 — transport retry** | Retries connection errors / 408 / 409 / 429 / 5xx, honoring `Retry-After`; bounded (SDK default `max_retries` = 2) | inside the SDK / HTTP client; both paths | the provider SDKs, configured by Pipelex | exists for SDK-backed workers — make explicit, cover the gaps |
-| `instructor` structured-output retry | Re-asks the model on schema-validation failure. **Today also** re-runs the completion on transport / API errors (any exception) — a second retry loop nested on Tier 1 | structured-output path; both paths | `instructor`, configured by Pipelex | confine to schema re-ask only — Workstream 2 |
+| **Tier 1 — transport retry** | Retries connection errors / 408 / 409 / 429 / 5xx, honoring `Retry-After`; bounded (`cogt.transport_max_retries`, default 2) | inside the SDK / HTTP client; both paths | the provider SDKs, configured by Pipelex | landed (W2) — explicit, uniform, gaps covered |
+| `instructor` structured-output retry | Re-asks the model on schema-validation failure only | structured-output path; both paths | `instructor`, configured by Pipelex | landed (W2) — confined to schema re-ask |
 | **Tier 2 — Temporal durability** | Activity retry keyed off `InferenceErrorCategory.is_retryable`; workflow-level durability and redelivery | Temporal path only | platform (worker / queue config) | landed |
-| ~~PipeRouter transient-retry loop~~ | ~~Re-ran a whole pipe on a transient inference error~~ | ~~direct path only~~ | — | to remove |
+| ~~PipeRouter transient-retry loop~~ | ~~Re-ran a whole pipe on a transient inference error~~ | ~~direct path only~~ | — | removed (W1) |
 | Bounded fan-out | Caps simultaneous branches in `PipeBatch` so a large batch does not storm the provider | both paths | platform (`max_concurrency`) | landed, stays |
 
 Between Tier 1 and Tier 2 there is nothing on the direct path, by design. Direct execution retries transient *transport* failures (via the SDK) and then surfaces the error — it does not retry at the pipeline level, and it does not survive a crash. That is the honest contract.
 
 ## Current state vs target
 
-**Tier 1 — transport retry.** *Exists for the SDK-backed workers; not uniform, not explicit.* The OpenAI and Anthropic SDKs default to `max_retries = 2` and retry 408 / 409 / 429 / 5xx / connection errors, honoring `Retry-After` (`retry-after` / `retry-after-ms`; the SDKs honor the header value when it is ≤ 60s, else fall back to exponential backoff). The client factories under `pipelex/plugins/*/` construct the clients **without** passing `max_retries`, so the retry is live but inherited as a silent third-party default. The Portkey gateway client is itself an `openai.AsyncOpenAI`, so the gateway extract / search / img-gen `.post()` calls are covered. Not covered: the raw-`httpx` `azure_rest` image-gen worker (no SDK retry layer), the Mistral SDK (retry is off unless a `RetryConfig` is passed — the factory passes none), and the Google `genai` SDK (defaults to a never-retry stop strategy unless `HttpOptions.retry_options` is set). Out of scope and staying as-is: `fal_poller.py`'s `tenacity` (job-status *polling*, not error-retry). The previously-removed gateway `tenacity` sat on top of the openai client's own retry and was redundant — its removal was correct.
+**Tier 1 — transport retry.** *Landed — explicit, uniform, gaps covered.* A `cogt.transport_max_retries` setting (default 2, matching the prior SDK default) is wired explicitly into every inference SDK client factory under `pipelex/plugins/*/` — Anthropic, OpenAI / Azure OpenAI, the Portkey-backed gateway OpenAI clients, Mistral, and Google — instead of inheriting the silent SDK default. The two families that defaulted to *no* transport retry are brought up to the floor: the Mistral client is built with a bounded-backoff `RetryConfig` (`retry_connection_errors=True`), the Google `genai` client with `HttpOptions(retry_options=...)`. The genuinely SDK-less path — the raw-`httpx` `azure_rest` image-gen worker — gets a `tenacity`-based transport-retry wrapper (`pipelex/cogt/inference/transport_retry.py`) that retries connection failures and transient HTTP statuses and honors `Retry-After`; for a non-idempotent submit-style POST it narrows the retry to failures that prove the request did no work, declining an ambiguous 5xx, a 409, and a post-delivery timeout. FAL rides the `fal_client` SDK, which has its own internal transport retry, so it is left as-is. The `portkey-ai` SDK exposes no `max_retries` knob and carries its own internal retry, so the gateway's `AsyncPortkey` client is left as-is. Out of scope and staying as-is: `fal_poller.py`'s `tenacity` (job-status *polling*, not error-retry).
 
-**The `instructor` retry layer — structured output.** *A second transport-retry loop, not just schema re-ask.* The structured-output path (`PipeLLM` / `PipeStructure` — the dominant path) wraps each completion with `instructor`. `instructor` wraps the *factory-built* SDK client (`from_openai(client=...)`, `from_anthropic(...)`, `from_mistral(...)`, `from_genai(...)`), so Tier 1's configured `max_retries` does reach structured calls — good. But `instructor`'s *own* `max_retries`, passed as an `int` (`llm_job.job_config.max_retries`, default 3), builds a `tenacity` loop whose default predicate retries **any** exception. When the SDK exhausts its transport retries and raises (`RateLimitError`, `APIConnectionError`, 5xx), `instructor` catches it and re-runs the whole completion — an application-level transport-retry loop, `job_config.max_retries` deep, nested on Tier 1, with no `Retry-After` between attempts. Worst case ≈ `job_config.max_retries × (max_retries + 1)` attempts per structured call. Verified against `instructor` 1.15.1 (`instructor/core/retry.py`); the worker comments that called this "schema-validation only" were wrong. Workstream 2 confines `instructor` to genuine schema re-ask.
+**The `instructor` retry layer — structured output.** *Landed — confined to schema re-ask.* The structured-output path (`PipeLLM` / `PipeStructure`) wraps each completion with `instructor`, which wraps the *factory-built* SDK client — so Tier 1's configured retry already reaches structured calls. Previously `instructor`'s *own* `max_retries`, passed as a bare `int`, built a `tenacity` loop whose predicate retried **any** exception, re-running the whole completion on transport / API errors — a second retry loop nested on Tier 1. Each `instructor` call site now passes a `tenacity.AsyncRetrying` (built by `pipelex/cogt/llm/instructor_retry.py`) whose predicate matches only validation failures, so a transport error propagates immediately as the raw SDK exception and Tier 1 is the sole transport-retry layer. Consequence handled: the Google and Mistral structured workers gained an `httpx.TransportError` `except` clause, since those SDKs let raw connection / timeout errors propagate outside their own exception hierarchies.
 
 **Tier 2 — Temporal durability.** *Landed.* `TemporalError.from_message_exception()` sets `non_retryable = not InferenceErrorCategory.is_retryable`; every in-scope activity is wrapped by `@convert_pipelex_errors`; `RetryPolicyConfig` composes baseline + per-queue + per-handle `non_retryable_error_types`. This is the resilience tier and needs no change here — only a review of whether its defaults (which categories retry, attempt caps, backoff) are right for the hosted product.
 
-**PipeRouter transient-retry loop.** *Landed, to be removed.* See the decision above.
+**PipeRouter transient-retry loop.** *Removed (Workstream 1).* See the decision above.
 
 **Bounded fan-out.** *Landed, stays.* `gather_bounded` in `pipelex/tools/misc/async_utils.py`, `max_concurrency` on `PipelineExecutionConfig`, consumed by `PipeBatch`.
 
-## What changes
+## What changed
 
-Two independent workstreams — either can be done first.
+Two independent workstreams — both landed.
 
-### Workstream 1 — Remove the PipeRouter transient-retry loop
+### Workstream 1 — Remove the PipeRouter transient-retry loop *(landed, PR #909)*
 
 - `pipelex/pipe_run/pipe_router_protocol.py` — `run()` drops the retry `while` loop and calls `_run_pipe_job()` once. The `except (CogtError, PipeRunError)` handler **stays**: wrapping a `PipeRunError` into `PipeRouterError` and re-raising a raw `CogtError` as-is is error propagation, not retry. Remove the `transient_retry_settings` Protocol attribute and the chain-walking retry classification.
 - Delete `pipelex/pipe_run/transient_retry.py` (`TransientRetrySettings`).
@@ -57,14 +57,14 @@ Two independent workstreams — either can be done first.
 - The operator wrapping (`PipeLLM` / `PipeStructure` catching `LLMCompletionError` and re-raising as `PipeRunError`) **stays** — it is error-context propagation. The `__cause__`-walking fix from `todos-llm-retry-loop-bypass.md` existed only to feed the retry loop; with the loop gone, that classification logic in the router goes too. The same `is_retryable` signal still drives Temporal's retry decision (Tier 2), unaffected.
 - CHANGELOG — the Phase 5 "application-level retry of transient inference failures" entry is reversed.
 
-### Workstream 2 — Make Tier 1 explicit and uniform
+### Workstream 2 — Make Tier 1 explicit and uniform *(landed)*
 
-Not a new retry layer — the SDKs already retry. The work makes that retry a deliberate, uniform, configured policy.
+Not a new retry layer — the SDKs already retry. The work made that retry a deliberate, uniform, configured policy.
 
-- Add a small inference-client retry setting to the `cogt` config (`max_retries`, default matching today's SDK default of 2 so behavior is unchanged until deliberately tuned); each SDK client factory under `pipelex/plugins/*/` passes it explicitly at construction instead of inheriting the silent default.
-- Confine `instructor`'s structured-output retry to schema re-ask: pass it a `tenacity.AsyncRetrying` with a `retry_if_exception_type((ValidationError, JSONDecodeError))` predicate instead of a bare `int`, so transport / API errors fall straight through to the Tier 1 floor instead of being re-run as whole completions (`instructor` accepts a pre-built retrying object). Consequence to handle: transport errors then surface as raw SDK exceptions, not wrapped in `InstructorRetryException` — the workers' error classification must catch the raw SDK types directly.
-- Audit the worker families that do not ride a retrying SDK — the raw-`httpx` `azure_rest` image-gen path, and the Mistral / Google / FAL paths — and bring them to the same floor: the configured `max_retries`, retrying transient transport failures and honoring `Retry-After`. A small `httpx`-level retry is fine for the paths that genuinely lack SDK retry; do not add one on top of a retrying SDK.
-- Keep `Retry-After` honoring as the SDK / HTTP-client's job — do not hand-roll it.
+- Added `cogt.transport_max_retries` (default 2, matching the prior SDK default so behavior is unchanged until deliberately tuned); each SDK client factory under `pipelex/plugins/*/` now passes it explicitly at construction instead of inheriting the silent default. It is named distinctly from `llm_job.job_config.max_retries` (`instructor`'s schema re-ask count) — the two are different concerns.
+- Confined `instructor`'s structured-output retry to schema re-ask: each call site passes a `tenacity.AsyncRetrying` whose predicate matches only validation failures (`pydantic.ValidationError`, `json.JSONDecodeError`, and `instructor`'s own validation-error types) instead of a bare `int`, so transport / API errors fall straight through to the Tier 1 floor. Consequence handled: transport errors now surface as raw SDK exceptions, not wrapped in `InstructorRetryException`, so the Google and Mistral structured workers gained an `httpx.TransportError` `except` clause to catch the raw connection / timeout errors those SDKs let propagate.
+- Covered the worker families that do not ride a retrying SDK: the raw-`httpx` `azure_rest` image-gen path gets a `tenacity`-based `httpx` retry wrapper at the configured budget. FAL rides the `fal_client` SDK (internal transport retry), and the `portkey-ai` gateway SDK carries its own internal retry — neither gets a wrapper layered on top.
+- `Retry-After` honoring stays the SDK / HTTP-client's job; the SDK-less wrapper parses it directly because there is no SDK to do it.
 - `retry_after_seconds` stays captured in `ProviderErrorMetadata` for the error report; that is a reporting use, not a retry consumer.
 
 ## The honest contract

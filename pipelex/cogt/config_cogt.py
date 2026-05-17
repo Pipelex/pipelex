@@ -1,4 +1,4 @@
-from pydantic import field_validator
+from pydantic import Field, field_validator
 
 from pipelex.cogt.exceptions import LLMConfigError
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams, ImgGenJobParamsDefaults, Quality
@@ -128,6 +128,12 @@ class GatewayTestConfig(ConfigModel):
 
 
 class Cogt(ConfigModel):
+    # Tier 1 transport retry: the number of times an inference SDK client retries a transient
+    # transport failure (connection error, 408/409/429/5xx, honoring Retry-After) on top of the
+    # initial attempt. Wired explicitly into every SDK client factory so the retry posture is a
+    # deliberate, uniform policy rather than a silently-inherited SDK default. Distinct from
+    # llm_job_config.max_retries, which is instructor's schema re-ask count — a different concern.
+    transport_max_retries: int = Field(ge=0, le=10)
     model_deck_config: ModelDeckConfig
     llm_config: LLMConfig
     img_gen_config: ImgGenConfig
