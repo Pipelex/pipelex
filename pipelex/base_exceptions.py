@@ -136,6 +136,16 @@ class PipelexError(Exception):
         cause = self.__cause__
         if not isinstance(cause, PipelexError):
             return report
+        # Guard against a cyclic __cause__ chain: if self is reachable from cause, recursing
+        # into cause.to_error_report() would never terminate. Bail out with the enrichment
+        # gathered so far rather than raising a RecursionError from the error-reporting path.
+        node: BaseException | None = cause
+        seen: set[int] = set()
+        while node is not None and id(node) not in seen:
+            if node is self:
+                return report
+            seen.add(id(node))
+            node = node.__cause__
         cause_report = cause.to_error_report()
         return ErrorReport(
             error_type=report.error_type,

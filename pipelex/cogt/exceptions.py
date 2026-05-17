@@ -105,9 +105,15 @@ def find_inference_error_category_in_chain(exc: BaseException) -> InferenceError
     Both the in-process ``PipeRouter`` transient-retry loop and the Temporal activity error
     boundary call this so their retry decisions agree. A ``CogtError`` carrying no category
     is skipped — the walk continues to the first one that actually classifies the failure.
+
+    The ``id()`` set guards against a cyclic ``__cause__`` chain: without it a cycle would
+    spin this loop forever — and it runs on the error path, so the failure being classified
+    would be lost to a hang rather than reported.
     """
     current: BaseException | None = exc
-    while current is not None:
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
         if isinstance(current, CogtError) and current.error_category is not None:
             return current.error_category
         current = current.__cause__
