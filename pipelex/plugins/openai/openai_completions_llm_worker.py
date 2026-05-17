@@ -15,6 +15,7 @@ from pipelex.cogt.inference.error_classification import (
     UserActionKind,
     extract_underlying_sdk_exception,
 )
+from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
@@ -223,10 +224,10 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
                 seed=job_params.seed,
                 messages=messages,
                 response_model=schema,
-                # NB: instructor's max_retries is NOT schema-validation-only. Passed an int, it
-                # builds a tenacity loop whose default predicate retries ANY exception — so it
-                # retries transport/API errors too, nested on top of the SDK client's own retry.
-                max_retries=llm_job.job_config.max_retries,
+                # instructor's retry is confined to schema re-ask: this validation-only AsyncRetrying
+                # re-asks on a malformed/invalid output but lets a transport error propagate as the raw
+                # SDK exception — transport retry is the SDK client floor (Tier 1) alone.
+                max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.max_retries),
                 extra_headers=extra_headers,
                 extra_body=extra_body,
             )

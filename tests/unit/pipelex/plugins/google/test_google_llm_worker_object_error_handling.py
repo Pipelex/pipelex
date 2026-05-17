@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING
 import httpx
 import pytest
 from google.genai import errors as genai_errors
-from instructor.core import InstructorRetryException
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -240,15 +239,11 @@ class TestGoogleLLMWorkerObjectErrorHandling:
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.CONTACT_SUPPORT
 
-    async def test_real_instructor_wraps_client_error_and_unwraps_correctly(self, mocker: MockerFixture) -> None:
-        """End-to-end: drive the real instructor library with a ``ClientError`` and
-        verify the worker still categorizes it as TRANSIENT, attaches metadata,
-        and surfaces a semantic ``UserActionKind``.
-
-        Locks in two assumptions our unit tests rely on:
-        1. instructor wraps ``ClientError`` in ``InstructorRetryException``.
-        2. ``InstructorRetryException.failed_attempts[-1].exception`` is the
-           original SDK exception, so our extractor recovers the right object.
+    async def test_real_instructor_propagates_client_error_raw(self, mocker: MockerFixture) -> None:
+        """End-to-end: drive the real instructor library with a ``ClientError`` and verify the
+        W2.3 behavior — instructor, confined to schema re-ask, does NOT retry the transport error
+        and does NOT wrap it in ``InstructorRetryException``. It propagates as the raw
+        ``ClientError``, which the worker classifies as TRANSIENT with provider metadata.
         """
         import instructor  # noqa: PLC0415
         from google.genai import Client as GoogleGenAiClient  # noqa: PLC0415
@@ -282,7 +277,34 @@ class TestGoogleLLMWorkerObjectErrorHandling:
         assert metadata is not None
         assert metadata.provider == "google"
         assert metadata.status_code == 429
-        cause = exc_info.value.__cause__
-        assert isinstance(cause, InstructorRetryException)
-        assert cause.failed_attempts is not None
-        assert isinstance(cause.failed_attempts[-1].exception, genai_errors.ClientError)
+        # The raw SDK exception propagates and chains directly — instructor no longer wraps it.
+        assert exc_info.value.__cause__ is sdk_exc
+
+    @pytest.mark.parametrize(
+        ("sdk_exc", "expected_category"),
+        [
+            (_make_server_error(500, "Internal server error"), InferenceErrorCategory.TRANSIENT),
+            (_make_server_error(503, "Service unavailable"), InferenceErrorCategory.TRANSIENT),
+            (httpx.ConnectError("Connection refused"), InferenceErrorCategory.TRANSIENT),
+            (httpx.ReadTimeout("Read timed out"), InferenceErrorCategory.TRANSIENT),
+        ],
+    )
+    async def test_raw_sdk_transport_error_is_classified(
+        self,
+        mocker: MockerFixture,
+        sdk_exc: Exception,
+        expected_category: InferenceErrorCategory,
+    ) -> None:
+        """W2.3 regression: a raw SDK / httpx transport exception from ``create_with_completion`` is
+        classified, never flattened to ``UNKNOWN``. The ``httpx`` cases cover the Google GenAI SDK's
+        habit of letting raw connection / timeout errors propagate — they are NOT wrapped into
+        ``ServerError`` / ``ClientError`` — which the worker's widened ``except`` clause now catches.
+        """
+        worker = _make_worker(mocker)
+        worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        with pytest.raises(LLMCompletionError) as exc_info:
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is expected_category
+        assert exc_info.value.__cause__ is sdk_exc

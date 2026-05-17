@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING
 import httpx
 import openai
 import pytest
-from instructor.core import InstructorRetryException
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -255,14 +254,11 @@ class TestOpenAIResponsesWorkerObjectErrorHandling:
         assert exc_info.value.__cause__ is wrapped
         assert exc_info.value.provider_metadata is None
 
-    async def test_real_instructor_wraps_rate_limit_and_fix_unwraps_correctly(self, mocker: MockerFixture) -> None:
-        """End-to-end: drive the real instructor library with an SDK exception and
-        verify the worker still categorizes it as TRANSIENT, attaches metadata,
-        and surfaces a semantic ``UserActionKind``.
-
-        Locks in the assumption that instructor's Responses adapter wraps SDK
-        exceptions the same way the Chat Completions adapter does, and that our
-        extractor recovers the underlying SDK exception correctly.
+    async def test_real_instructor_propagates_transport_error_raw(self, mocker: MockerFixture) -> None:
+        """End-to-end: drive the real instructor library (Responses adapter) with an SDK transport
+        exception and verify the W2.3 behavior — instructor, confined to schema re-ask, does NOT
+        retry the transport error and does NOT wrap it in ``InstructorRetryException``. It
+        propagates raw, and the worker classifies it as TRANSIENT with provider metadata.
         """
         import instructor  # noqa: PLC0415  # imported here to mirror runtime usage
 
@@ -283,7 +279,32 @@ class TestOpenAIResponsesWorkerObjectErrorHandling:
         assert metadata is not None
         assert metadata.provider == "openai"
         assert metadata.status_code == 429
-        cause = exc_info.value.__cause__
-        assert isinstance(cause, InstructorRetryException)
-        assert cause.failed_attempts is not None
-        assert isinstance(cause.failed_attempts[-1].exception, openai.RateLimitError)
+        # The raw SDK exception propagates and chains directly — instructor no longer wraps it.
+        assert exc_info.value.__cause__ is sdk_exc
+
+    @pytest.mark.parametrize(
+        ("sdk_exc", "expected_category"),
+        [
+            (_make_openai_connection_error(), InferenceErrorCategory.TRANSIENT),
+            (_make_openai_timeout_error(), InferenceErrorCategory.TRANSIENT),
+            (_make_openai_rate_limit_error("Rate limit exceeded — please retry"), InferenceErrorCategory.TRANSIENT),
+        ],
+    )
+    async def test_raw_sdk_transport_error_is_classified(
+        self,
+        mocker: MockerFixture,
+        sdk_exc: Exception,
+        expected_category: InferenceErrorCategory,
+    ) -> None:
+        """W2.3 regression: now that ``instructor`` no longer retries transport errors, a raw SDK
+        transport exception is the primary path out of ``create_with_completion`` — it must be
+        classified into the right category, never flattened to ``UNKNOWN``, never escape unhandled.
+        """
+        worker = _make_worker(mocker)
+        worker.instructor_for_objects.responses.create_with_completion.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        with pytest.raises(LLMCompletionError) as exc_info:
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is expected_category
+        assert exc_info.value.__cause__ is sdk_exc

@@ -1,6 +1,7 @@
 import asyncio
 from typing import TYPE_CHECKING, cast
 
+import httpx
 from google.genai import errors as genai_errors
 from google.genai import types as genai_types
 from google.genai.client import Client as GoogleGenAiClient
@@ -17,6 +18,7 @@ from pipelex.cogt.inference.error_classification import (
     is_content_policy_violation,
     is_quota_exhaustion_google,
 )
+from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
@@ -216,7 +218,10 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
         ``sdk_exc``) and the wrapped path (where ``chain_from`` is the
         ``InstructorRetryException``). ``ServerError`` is handled directly here
         — it doesn't need the 4xx discriminator in
-        ``_classify_google_client_error``.
+        ``_classify_google_client_error``. ``httpx.TransportError`` is also
+        handled: the Google GenAI SDK does not wrap connection / timeout
+        failures into ``ServerError`` / ``ClientError`` — it lets the raw
+        ``httpx`` exception propagate — so it must be categorized here too.
 
         Args:
             sdk_exc: The Google SDK exception to categorize.
@@ -236,6 +241,17 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
             ) from cause
         if isinstance(sdk_exc, genai_errors.ClientError):
             raise self._classify_google_client_error(sdk_exc) from cause
+        if isinstance(sdk_exc, httpx.TransportError):
+            msg = f"Google API transport error for model '{self.inference_model.desc}': {sdk_exc}"
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Could not reach Google — the system will retry automatically",
+                ),
+                provider_metadata=None,
+            ) from cause
 
     #########################################################
     # Reasoning helpers
@@ -351,7 +367,7 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
                 contents=contents,
                 config=generation_config,
             )
-        except (genai_errors.ServerError, genai_errors.ClientError) as exc:
+        except (genai_errors.ServerError, genai_errors.ClientError, httpx.TransportError) as exc:
             self._raise_categorized_google_sdk_error(sdk_exc=exc)
             raise  # unreachable: helper always raises for these types
 
@@ -390,10 +406,10 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
             result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                 messages=[cast("ChatCompletionMessageParam", contents)],
                 response_model=schema,
-                # NB: instructor's max_retries is NOT schema-validation-only. Passed an int, it
-                # builds a tenacity loop whose default predicate retries ANY exception — so it
-                # retries transport/API errors too, nested on top of the SDK client's own retry.
-                max_retries=llm_job.job_config.max_retries,
+                # instructor's retry is confined to schema re-ask: this validation-only AsyncRetrying
+                # re-asks on a malformed/invalid output but lets a transport error propagate as the raw
+                # SDK exception — transport retry is the SDK client floor (Tier 1) alone.
+                max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.max_retries),
                 model=self.inference_model.model_id,
                 generation_config=generation_config,
             )
@@ -412,7 +428,7 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
                     detail="Structured generation failed for an unrecognized reason — retry, and report this if it persists",
                 ),
             ) from instructor_exc
-        except (genai_errors.ServerError, genai_errors.ClientError) as exc:
+        except (genai_errors.ServerError, genai_errors.ClientError, httpx.TransportError) as exc:
             self._raise_categorized_google_sdk_error(sdk_exc=exc)
             raise  # unreachable: helper always raises for these types
 
