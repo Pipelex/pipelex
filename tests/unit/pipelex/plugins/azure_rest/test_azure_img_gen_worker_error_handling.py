@@ -7,6 +7,7 @@ through ``error_category``; this module asserts the upgrade-A/B/C contract
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -69,6 +70,26 @@ def _patch_httpx_post_raises(mocker: MockerFixture, sdk_exc: httpx.HTTPError) ->
     mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
     mock_client.post = mocker.AsyncMock(side_effect=sdk_exc)
+    mocker.patch("pipelex.plugins.azure_rest.azure_img_gen_worker.httpx.AsyncClient", return_value=mock_client)
+    mocker.patch(
+        "pipelex.plugins.azure_rest.azure_img_gen_worker.ImgGenArgsFactory.make_args_for_model",
+        new_callable=mocker.AsyncMock,
+        return_value={"prompt": "test"},
+    )
+
+
+def _patch_httpx_malformed_json(mocker: MockerFixture, raw_body: str) -> None:
+    """Patch httpx so the request succeeds (2xx) but ``response.json()`` raises on a non-JSON body."""
+    mock_client = mocker.MagicMock()
+    mock_response = mocker.MagicMock()
+    mock_response.raise_for_status.return_value = None
+    mock_response.status_code = 200
+    mock_response.headers = httpx.Headers({})
+    mock_response.text = raw_body
+    mock_response.json.side_effect = json.JSONDecodeError("Expecting value", raw_body, 0)
+    mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
+    mock_client.post = mocker.AsyncMock(return_value=mock_response)
     mocker.patch("pipelex.plugins.azure_rest.azure_img_gen_worker.httpx.AsyncClient", return_value=mock_client)
     mocker.patch(
         "pipelex.plugins.azure_rest.azure_img_gen_worker.ImgGenArgsFactory.make_args_for_model",
@@ -157,7 +178,10 @@ class TestAzureImgGenWorkerSemantic:
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.CHANGE_INPUT
 
-    async def test_server_error_500_is_wait_and_retry(self, mocker: MockerFixture) -> None:
+    async def test_server_error_500_is_ambiguous(self, mocker: MockerFixture) -> None:
+        """A 5xx reaches Azure on a non-idempotent POST, so it is AMBIGUOUS (non-retryable)
+        to keep the Temporal bridge from resubmitting and duplicating a billed generation.
+        """
         worker = _make_worker(mocker)
         sdk_exc = _make_status_error(500, text="server error")
         _patch_httpx_status_error(mocker, sdk_exc)
@@ -165,9 +189,28 @@ class TestAzureImgGenWorkerSemantic:
         with pytest.raises(ImgGenGenerationError) as exc_info:
             await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
-        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.error_category is InferenceErrorCategory.AMBIGUOUS
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
+
+    async def test_malformed_json_response_is_wrapped(self, mocker: MockerFixture) -> None:
+        """A 2xx response with a non-JSON body must surface as a categorized
+        ImgGenGenerationError, not a raw json.JSONDecodeError escaping the handlers.
+        """
+        worker = _make_worker(mocker)
+        raw_body = "<html>gateway error</html>"
+        _patch_httpx_malformed_json(mocker, raw_body=raw_body)
+
+        with pytest.raises(ImgGenGenerationError) as exc_info:
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.UNKNOWN
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.CONTACT_SUPPORT
+        metadata = exc_info.value.provider_metadata
+        assert metadata is not None
+        assert metadata.provider == "azure"
+        assert metadata.body == raw_body
 
     async def test_raw_response_body_excluded_from_message(self, mocker: MockerFixture) -> None:
         """The raw Azure response body must not leak into the exception message; it stays only on provider_metadata.body."""

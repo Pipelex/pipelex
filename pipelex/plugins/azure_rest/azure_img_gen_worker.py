@@ -1,3 +1,5 @@
+import json
+
 import httpx
 from typing_extensions import override
 
@@ -7,7 +9,13 @@ from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
-from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_azure_metadata, is_content_policy_violation
+from pipelex.cogt.inference.error_classification import (
+    UserAction,
+    UserActionKind,
+    extract_azure_metadata,
+    extract_azure_metadata_from_response,
+    is_content_policy_violation,
+)
 from pipelex.cogt.inference.transport_retry import request_with_transport_retry
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
@@ -219,7 +227,6 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                 max_retries=get_config().cogt.transport_max_retries,
                 retry_on_ambiguous_failure=False,
             )
-            response_dict = response.json()
         except httpx.HTTPStatusError as exc:
             self._raise_categorized_azure_status_error(exc)
             raise  # unreachable: helper always raises
@@ -284,6 +291,24 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                 user_action=UserAction(
                     kind=UserActionKind.WAIT_AND_RETRY,
                     detail="The connection to Azure failed mid-request — the outcome is unknown; retry manually after checking for a duplicate image",
+                ),
+                provider_metadata=metadata,
+            ) from exc
+
+        # The HTTP status was successful, but Azure (or an intermediary gateway) can still
+        # return a malformed or non-JSON body. json() raises a json.JSONDecodeError here, so
+        # categorize it as a worker error rather than letting a raw ValueError escape uncategorized.
+        try:
+            response_dict = response.json()
+        except json.JSONDecodeError as exc:
+            metadata = extract_azure_metadata_from_response(response, type(exc).__name__)
+            msg = f"Azure returned a malformed JSON response for model '{self.inference_model.desc}': {exc}"
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.UNKNOWN,
+                user_action=UserAction(
+                    kind=UserActionKind.CONTACT_SUPPORT,
+                    detail="Azure returned a malformed response — retry later or contact support if this persists",
                 ),
                 provider_metadata=metadata,
             ) from exc

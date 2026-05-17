@@ -442,7 +442,21 @@ def extract_azure_metadata(exc: BaseException) -> ProviderErrorMetadata:
     best-effort basis. ``httpx.ConnectError`` / ``httpx.TimeoutException`` carry
     only a request; every status-related field comes back as ``None``.
     """
-    response = getattr(exc, "response", None)
+    return _build_azure_metadata(response=getattr(exc, "response", None), sdk_exception_type=type(exc).__name__)
+
+
+def extract_azure_metadata_from_response(response: Any, sdk_exception_type: str) -> ProviderErrorMetadata:
+    """Distill a *successful* Azure REST response into a ``ProviderErrorMetadata``.
+
+    Used when the HTTP status was fine but the body failed to parse (malformed
+    JSON): there is no ``httpx`` exception carrying the response, so the caller
+    passes the ``httpx.Response`` directly along with the failure's type name.
+    """
+    return _build_azure_metadata(response=response, sdk_exception_type=sdk_exception_type)
+
+
+def _build_azure_metadata(response: Any, sdk_exception_type: str) -> ProviderErrorMetadata:
+    """Read status code, headers, and body off an Azure ``httpx.Response`` on a best-effort basis."""
     status_code = getattr(response, "status_code", None)
     if not isinstance(status_code, int):
         status_code = None
@@ -457,7 +471,7 @@ def extract_azure_metadata(exc: BaseException) -> ProviderErrorMetadata:
     body, provider_error_code = _parse_response_text_body(response)
     return ProviderErrorMetadata(
         provider="azure",
-        sdk_exception_type=type(exc).__name__,
+        sdk_exception_type=sdk_exception_type,
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
