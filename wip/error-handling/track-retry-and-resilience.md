@@ -1,150 +1,93 @@
-# Track — Retry and Resilience
+# Track — Retry and Resilience (Target Architecture)
 
-## What this track is
+> **This is a target-architecture doc, not a current-state description.** It supersedes the earlier version of this track, which described the pre-Phase-5 world plus followups that have since landed — and are now partly being reversed. The directory README's status row still reflects landed code; treat this doc as the forward plan that row will eventually be synced to.
 
-How Pipelex recovers from **transient** failures (rate limits, brief network outages, 5xx server errors) without operator intervention, and how that retry responsibility is split across layers.
+## Premise
 
-Today retry lives **inside two gateway workers** via `tenacity`. The `PipeRouter` — the dispatch layer that sits between pipeline orchestration and pipe execution — has no retry loop. The goal is to invert that: workers classify errors (already true after worker classification landed), and `PipeRouter` retries based on `InferenceErrorCategory.is_retryable`.
+Resilience is Temporal's job. Pipelex integrates Temporal precisely so that durability, redelivery, and retry-under-failure are handled by a system built for it. Direct (non-Temporal) execution must **not** try to reproduce that. Direct execution should be clean and honest about what it is: a single-attempt runner. The value of the direct path is simplicity and zero infrastructure — not resilience.
 
-## Design principle — three retry layers
+This track defines where retry legitimately lives, removes the layer where the direct path was over-reaching, and keeps one small thing at the worker layer because it is protocol fidelity rather than resilience.
 
-| Layer | What | Retries on | Controlled by |
-|---|---|---|---|
-| SDK transport | Connection resets, DNS failures, 503 | Built into OpenAI / Anthropic / Google SDKs | SDK defaults |
-| **PipeRouter (not yet)** | **`InferenceErrorCategory.TRANSIENT` after SDK retries exhausted** | **Rate limits, timeouts, brief outages** | **`pipelex.toml` config (not yet)** |
-| Temporal (future) | Longer failures, workflow-level retry | Service outages, cascading errors | Temporal retry policy |
+## Decisions taken
 
-`PipeRouter` retry is complementary to Temporal: it handles fast transients (seconds); Temporal handles longer failures (minutes). Without Temporal, `PipeRouter` retry is the only application-level retry — Pipelex must remain usable and resilient standalone.
+- **No application-level transient-retry loop in direct execution.** The `PipeRouter` transient-retry loop (Phase 5) is removed. A transient failure in direct mode surfaces immediately, on the first attempt. Rationale: the loop only ever runs on the direct path anyway — it is dead code on the Temporal path, because `_run_pipe_job` there raises `WorkflowExecutionError` / `TemporalError`, which the loop's `except (CogtError, PipeRunError)` never catches. It also re-runs at the wrong granularity (a whole pipe, re-rendering prompts), ignores the provider's `Retry-After`, and carries a per-run/global config bug (the retry budget is snapshotted from global config at router construction, so a per-run `execution_config` is silently ignored). Fixing all of that for a path that is deliberately the non-resilient one is not worth it. Removing it is.
 
-## Current state
+- **A thin, shared, in-worker retry that honors the provider's `Retry-After`.** When a provider returns a rate-limit error that explicitly states a wait duration, the worker waits that long and retries, with a small bounded attempt count. Rationale: the classifier already extracts `retry_after_seconds` into `ProviderErrorMetadata` on every inference error — capturing it and never consuming it is the dishonest state. Obeying an explicit "wait N seconds" is correct API citizenship; ignoring it and retrying sooner (blind backoff, or Temporal's static backoff) wastes calls and is worse provider behavior. This is protocol fidelity, not durable resilience — it is small, bounded, and lives in worker code so it serves both paths.
 
-### Gateway workers retry with tenacity
+- **Bounded fan-out stays.** `PipeBatch`'s `gather_bounded` / `max_concurrency` is admission control, not retry — it stops a large batch from causing a self-inflicted rate-limit storm. It is honest, cheap, and prevents a problem rather than recovering from one. It stays as-is.
 
-`pipelex/plugins/gateway/gateway_extract_worker.py` and `pipelex/plugins/gateway/gateway_search_worker.py` each build a tenacity `AsyncRetrying` from `get_config().cogt.tenacity_config` (defined in `pipelex/cogt/config_cogt.py` as `TenacityConfig`). The retry predicate `_is_retryable_portkey_error` discriminates between retryable and non-retryable Portkey errors. The retry wrapper wraps the SDK call in `async for attempt in self._make_retryer():`.
+## The model — where retry lives
 
-### Other tenacity usage that is not ad-hoc business retry
+| Layer | What it does | Scope | Owned by | Status |
+|---|---|---|---|---|
+| SDK transport | Connection resets, DNS, some 5xx — retried inside the OpenAI / Anthropic / Google SDKs | below Pipelex | SDK defaults | exists, not ours |
+| **Tier 1 — rate-limit fidelity** | Honors a provider's explicit `Retry-After`: wait the stated time, retry, small bounded count | inside the worker; both paths | platform (worker config) | **to build** |
+| **Tier 2 — Temporal durability** | Activity retry keyed off `InferenceErrorCategory.is_retryable`; workflow-level durability and redelivery | Temporal path only | platform (worker / queue config) | **landed** |
+| ~~PipeRouter transient-retry loop~~ | ~~Re-ran a whole pipe on a transient inference error~~ | ~~direct path only~~ | — | **to remove** |
+| Bounded fan-out | Caps simultaneous branches in `PipeBatch` so a large batch does not storm the provider | both paths | platform (`max_concurrency`) | landed, stays |
 
-- `pipelex/plugins/fal/fal_poller.py` uses tenacity for polling FAL job status — this is polling behavior, not retry on error, and is **not** in scope for the PipeRouter-level retry rewrite. It stays as-is.
-- `instructor`'s internal `max_retries` for structured generation retries on schema-validation failure, not on transport errors. This is acceptable and stays as-is; document with a code comment if not already.
+The deliberate gap: between Tier 1 and Tier 2 there is **nothing** on the direct path. That is the honest contract — direct execution attempts once (modulo the SDK's own transport retries and Tier 1's `Retry-After` obedience) and then surfaces the error.
 
-### PipeRouter has no retry loop
+## Current state vs target
 
-`PipeRouterProtocol.run()` (`pipelex/pipe_run/pipe_router_protocol.py`) currently:
+**SDK transport.** The provider SDKs retry connection-level failures and some 5xx by default. Not ours to design; it means Tier 1 does not need to handle bare connection blips.
 
-```python
-async def run(self, pipe_job: PipeJob) -> PipeOutput:
-    await self._before_run(pipe_job)
-    try:
-        pipe_output = await self._run_pipe_job(pipe_job)
-    except PipeRunError as exc:
-        await self._after_failing_run(pipe_job, exc)
-        raise PipeRouterError(
-            message=exc.message,
-            run_mode=pipe_job.pipe_run_params.run_mode,
-            pipe_code=pipe_job.pipe.code,
-            output_name=pipe_job.output_name,
-            pipe_stack=pipe_job.pipe_run_params.pipe_stack,
-        ) from exc
-    await self._after_successful_run(pipe_job, pipe_output)
-    return pipe_output
-```
+**Tier 1 — rate-limit fidelity.** *Missing.* The gateway workers previously had a `tenacity` retry; it was removed deliberately (it was quick-and-dirty and Portkey-specific) to be rebuilt once the resilience picture was clear — this doc is that picture. `fal_poller.py` uses `tenacity` for *polling* job status, which is not error-retry and is out of scope. `instructor`'s `max_retries` retries structured-output schema-validation failures, not transport errors — also out of scope. Net: today there is no Pipelex-owned `Retry-After` handling.
 
-It only catches `PipeRunError`. There is no retry loop around `_run_pipe_job()` and no consumption of `InferenceErrorCategory.is_retryable`.
+**Tier 2 — Temporal durability.** *Landed.* `TemporalError.from_message_exception()` sets `non_retryable = not InferenceErrorCategory.is_retryable`; every in-scope activity is wrapped by `@convert_pipelex_errors`; `RetryPolicyConfig` composes baseline + per-queue + per-handle `non_retryable_error_types`. This is the resilience tier and needs no change here — only a review of whether its defaults (which categories retry, attempt caps, backoff) are right for the hosted product.
 
-### Config
+**PipeRouter transient-retry loop.** *Landed, to be removed.* See decision above.
 
-`PipelineExecutionConfig` (`pipelex/system/configuration/configs.py`) carries `is_normalize_data_urls_to_storage`, `is_mock_inputs`, `is_generate_graph`, `graph_config`. **No retry settings exist yet.** The config flows through `get_config().pipelex.pipeline_execution_config` and is already accessible from `PipeRouterProtocol.run()` via the singleton.
+**Bounded fan-out.** *Landed, stays.* `gather_bounded` in `pipelex/tools/misc/async_utils.py`, `max_concurrency` on `PipelineExecutionConfig`, consumed by `PipeBatch`.
 
-## Open gaps
+## What changes
 
-- **PipeRouter does not retry on `TRANSIENT`.** A rate-limit or timeout from a worker propagates immediately out of the router; only the two gateway workers retry locally, and only on Portkey-specific errors.
-- **Retry logic is duplicated and scoped to two workers.** `_make_retryer`, `_is_retryable_portkey_error`, `_log_retry` exist in each gateway worker; the dispatch layer remains retry-blind.
-- **No standardized config for application-level retry.** `TenacityConfig` exists only for the gateway workers; there is no top-level `max_transient_retries` / backoff settings on `PipelineExecutionConfig`.
+Two independent workstreams — either can be done first.
 
-## Followups
+### Workstream 1 — Remove the PipeRouter transient-retry loop
 
-These can be done in either order, but inverting (router-first) means the gateway workers stop retrying earlier than they do today during a brief overlap. The order below assumes router-first with retry disabled by default for backward compatibility, then removing the gateway worker tenacity in a second step.
+- `pipelex/pipe_run/pipe_router_protocol.py` — `run()` drops the retry `while` loop and calls `_run_pipe_job()` once. The `except (CogtError, PipeRunError)` handler **stays**: wrapping a `PipeRunError` into `PipeRouterError` and re-raising a raw `CogtError` as-is is error propagation, not retry. Remove the `transient_retry_settings` Protocol attribute and the chain-walking retry classification.
+- Delete `pipelex/pipe_run/transient_retry.py` (`TransientRetrySettings`).
+- `pipelex/pipe_run/pipe_router.py` — delete `make_transient_retry_settings()`; `PipeRouter.__init__` no longer sets `transient_retry_settings`. Same removal in `DryPipeRouter` and `TemporalPipeRouter` (the latter's was dead code anyway).
+- `pipelex/system/configuration/configs.py` — remove the transient-retry fields from `PipelineExecutionConfig` and the `_validate_transient_retry_timing` validator. Keep `max_concurrency`.
+- Remove the transient-retry settings from `pipelex/pipelex.toml` and `pipelex/kit/configs/pipelex.toml`.
+- Tests — delete `test_pipe_router_retry.py` and `test_operator_transient_retry.py`; update `test_pipeline_execution_config.py`.
+- The operator wrapping (`PipeLLM` / `PipeStructure` catching `LLMCompletionError` and re-raising as `PipeRunError`) **stays** — it is error-context propagation. The `__cause__`-walking fix from `todos-llm-retry-loop-bypass.md` existed only to feed the retry loop; with the loop gone, that classification logic in the router goes too. The same `is_retryable` signal still drives Temporal's retry decision (Tier 2), unaffected.
+- CHANGELOG — the Phase 5 "application-level retry of transient inference failures" entry is reversed.
 
-### 1. Add retry config to `PipelineExecutionConfig`
+### Workstream 2 — Build Tier 1 (Retry-After fidelity)
 
-In `pipelex/system/configuration/configs.py` add:
+- A single shared async helper under `pipelex/cogt/inference/` — **one** implementation, not per-worker copies (the per-worker duplication was exactly why the old gateway retry was quick-and-dirty). It wraps a classified inference call: if the outcome is a rate-limit `CogtError` (category `TRANSIENT` carrying `provider_metadata.retry_after_seconds`) and attempts remain, sleep the stated duration (capped) and retry; otherwise raise.
+- A small config block in the cogt config: a max attempt count and a cap on the longest `Retry-After` honored. Deliberately smaller than the removed `TenacityConfig`, and not Portkey-specific.
+- Applied uniformly at the SDK-call / classification chokepoint across the LLM, img-gen, extract, and search workers.
+- **Scope boundary — Tier 1 does exactly one thing.** It acts only on an explicit `Retry-After`. A `TRANSIENT` error without one is not Tier 1's concern: the SDK transport layer below has already had its turn, and above it Temporal handles it (hosted) or it surfaces (direct). Keeping this boundary tight is what makes Tier 1 honest rather than a creeping general retry.
+- **Layering with Temporal.** Tier 1 runs inside Temporal activities too. If it exhausts its small budget the activity fails and Tier 2 retries — bounded × bounded, fine. Keep Tier 1 small precisely because Tier 2 is the real budget on the hosted path. Sleeping inside an activity holds a worker slot for the `Retry-After` duration; a later refinement could surface the delay via `ApplicationError.next_retry_delay` so Temporal reschedules without holding a slot — verify SDK support before relying on it; not needed for the first version.
+- **Graph tracing is unaffected.** A worker-level retry sits below the pipe / graph-node layer, so a retried-then-succeeded call yields a single clean pipe node — none of the duplicate-node problem the removed loop had.
 
-```
-max_transient_retries: int                  # 0 = disabled (default)
-transient_retry_base_wait: float            # seconds, e.g. 2.0
-transient_retry_max_wait: float             # seconds, e.g. 30.0
-transient_retry_backoff_multiplier: float   # e.g. 2.0
-```
+## The honest contract
 
-Per project rules, do not set defaults in the class body. Put the defaults in `pipelex/pipelex.toml` with `max_transient_retries = 0` so behavior is unchanged for existing installs. Add commented-out overrides in `.pipelex/pipelex.toml` as an invitation to enable.
+- **Direct execution** — single attempt. The SDK retries transport blips; Tier 1 obeys an explicit `Retry-After`. Beyond that, a transient failure is a failure. No durability, no crash survival. This is intended, not a gap.
+- **Temporal execution** — Tier 1 still obeys `Retry-After`; Tier 2 (activity `RetryPolicy` + workflow durability) provides retry-under-failure and crash survival. This is the resilient path.
+- The product pitch stays clean: *direct for simplicity, Temporal for resilience* — with no half-measure in between pretending otherwise.
 
-### 2. Add retry loop to `PipeRouterProtocol.run()`
+## Out of scope — dependencies, not part of this track
 
-Modify `pipelex/pipe_run/pipe_router_protocol.py`:
+These are real and belong to the hosted product, but they are platform/product concerns, not the engine's retry behavior. They live in [../temporal-next/00-enterprise-readiness-analysis.md](../temporal-next/00-enterprise-readiness-analysis.md).
 
-- Wrap the `_run_pipe_job()` call in a retry loop.
-- Catch `CogtError` where `error_category is not None and error_category.is_retryable` is `True`.
-- On retryable error: log attempt number + wait duration + error category, sleep with exponential backoff, continue loop.
-- On non-retryable error (`CONFIGURATION`, `CONTENT`, `CAPACITY`): fail immediately (no retry).
-- On max retries exhausted: re-raise the last error as-is (preserve the cause chain).
-- On `PipeRunError` (existing path): unchanged — still wraps as `PipeRouterError`.
-- `_before_run()` is called once (before the loop), not on each retry.
-- `_after_failing_run()` is called once (after all retries exhausted or non-retryable).
+- **Multi-tenant admission control and per-tenant quotas / rate limits** — enterprise-readiness gap #7 / Phase 4. Tier 1 obeys a rate limit *after* hitting it; proactive pacing keyed to a provider account so you rarely hit one is separate, and is platform-global, not per-run.
+- **Caller-supplied run deadline / budget** — the legitimate caller-facing lever: a ceiling on total time or spend that bounds every tier, as opposed to a retry dial. Not designed; belongs with the API submission envelope.
+- **Idempotency model** — the prerequisite for any future "re-submit the whole run" feature. Not designed.
+- **Circuit breaking** on a provider that is down. Not designed.
 
-### 3. Thread the retry config to the router
+## Side effects — what removing the loop resolves
 
-Two options:
+- The per-run/global config bug (retry budget snapshotted from global config, ignoring a per-run `execution_config`) — moot; the code is gone.
+- [todos-retry-graph-trace.md](todos-retry-graph-trace.md) — a retried pipe leaving a phantom error node in the graph. The PipeRouter loop was the only source of that bug; it can be marked resolved-by-removal.
+- The dead, misleading `transient_retry_settings` carried on `TemporalPipeRouter` — gone.
 
-- **Option A** — add `execution_config` to `PipeJob`. Explicit, but changes the model.
-- **Option B** — access via `get_config()` directly inside the protocol. Simple, uses the existing singleton; consistent with how `pipeline_execution_config` is already accessed elsewhere.
+## Related tracks and docs
 
-Option B is the lower-friction choice unless `PipeJob` already has a natural slot for it.
-
-### 4. Remove `tenacity` from gateway workers
-
-After the router-level retry is in place and verified:
-
-- Remove `_make_retryer()`, `_is_retryable_portkey_error()`, `_log_retry()`, tenacity imports, and the `async for attempt in self._make_retryer():` wrapper from `pipelex/plugins/gateway/gateway_extract_worker.py` and `pipelex/plugins/gateway/gateway_search_worker.py`.
-- Remove `TenacityConfig` from `pipelex/cogt/config_cogt.py` and the `tenacity_config` field from `Cogt`.
-- Remove corresponding entries from `pipelex/pipelex.toml`.
-- Remove `tenacity` from project dependencies if no longer used (note that `pipelex/plugins/fal/fal_poller.py` still uses it for polling — confirm before removing the dependency).
-- Remove `pipelex/tools/misc/tenacity_utils.py` if no longer referenced anywhere (FAL still references `log_retry` from it).
-- Verify errors still propagate with the correct `InferenceErrorCategory` (existing classification tests should cover this).
-
-### 5. Audit workers for ad-hoc retry
-
-Confirm no worker does business-level retries outside of SDK internals. `instructor`'s `max_retries` for schema-validation retries on the structured-gen path is acceptable — add a one-line code comment at the call site documenting why.
-
-### 6. Tests
-
-- `CogtError` with `TRANSIENT` retries up to max, then raises.
-- `CogtError` with `CONFIGURATION` / `CONTENT` / `CAPACITY` fails immediately.
-- `PipeRunError` (non-`CogtError`) is unaffected by retry logic.
-- `max_transient_retries = 0` disables retry (backward compatibility).
-- Retry log includes attempt number, wait duration, error category.
-- Backoff increases with each attempt.
-- Gateway workers raise with correct category on first failure (no silent retries).
-- Existing worker error-handling tests still pass unchanged.
-
-## Pillar B — Bounded fan-out concurrency (Phase 5.5, landed)
-
-Retry (above) is one pillar of "resilience without Temporal"; bounded fan-out is the other. A `PipeBatch` over N items previously ended in a single `asyncio.gather` over *all* N branches — N coroutines, N deep-copied working memories, and N simultaneous inference calls at once. A pipe over 1,000 documents would overwhelm asyncio, memory, and provider rate limits. The standalone path now bounds that fan-out; the Temporal path already had task-queue rate limiting.
-
-### Design
-
-- **`gather_bounded`** (`pipelex/tools/misc/async_utils.py`) — a generic helper. It takes a sequence of *factories* (`Callable[[], Awaitable[T]]`), not coroutines, and runs them in chunks of `max_concurrency`. Taking factories is the point: each factory defers its expensive resource (a deep-copied working memory) until its chunk runs, so at most `max_concurrency` of those copies are materialized at once. A bare `asyncio.Semaphore` over already-created coroutines bounds *execution* but not *memory* — chunked factory invocation bounds both. Results are returned in input order. `max_concurrency` is `int | None`; `None`, or a value at least as large as the factory count, means unbounded — every factory in a single chunk. A non-positive int raises `ValueError`.
-- **Chunk-failure semantics** — within a chunk, `asyncio.gather(..., return_exceptions=True)` awaits every branch; the first error *by input index* is then raised, and no later chunk is started. Every branch already in flight in the failing chunk is drained (awaited) — never orphaned or cancelled — before the error propagates. Bounded and unbounded runs share this single code path (unbounded is just one chunk of every factory), so failure semantics do not depend on batch size.
-- **Config** — `max_concurrency` on `PipelineExecutionConfig` (placed beside the Phase 5 retry fields — same "resilience without Temporal" concern, no separate `ConcurrencyConfig`). Typed `Annotated[int, Field(ge=1)] | Literal["unbounded"]` — the explicit `"unbounded"` literal disables the bound rather than a magic `0`. Default `8` in `pipelex/pipelex.toml`. `PipeBatch` maps the `"unbounded"` literal to the helper's `None`.
-- **`PipeBatch`** (`pipelex/pipe_controllers/batch/pipe_batch.py`) builds one factory per branch and calls `gather_bounded`. Item-stuff creation and graph-tracer registration stay in an upfront loop (cheap, synchronous); the working-memory deep copy and run-params copy move into the deferred factory.
-- **`PipeParallel` is not bounded** — it fans over a fixed, pipe-defined branch set (usually small), not a data-driven N. The scaling risk is `PipeBatch`. Left as a plain `gather`.
-- **Graceful-degradation advisory** — when a `PipeBatch` fans out over more than `LARGE_BATCH_ADVISORY_THRESHOLD` (100) items, it logs a one-time advisory naming the Temporal track as the durable, rate-limited path. Advisory, never fatal.
-
-### How Pillars A and B compose
-
-Bounded concurrency *reduces* how often `CAPACITY` (rate-limit) errors are hit in the first place — fewer simultaneous calls means less provider overwhelm. The Phase 5 router retry loop handles the residual `TRANSIENT` failures. Persistent `CAPACITY` under an already-bounded fan-out is the honest "go Temporal" boundary — the advisory points there. Neither pillar attempts durable crash-survival; that remains the Temporal pitch.
-
-## Related tracks
-
-- [track-worker-classification.md](track-worker-classification.md) — workers must classify before the router can act on the signal. The instructor unwrap gap means structured-gen TRANSIENT errors are currently mis-categorized as `CONTENT` and would not retry; fix that first or in parallel.
-- [track-temporal-integration.md](track-temporal-integration.md) — Temporal's retry policy is the third layer; the router-level retry feeds into it (Temporal sees a non-retryable error only after the router has exhausted its retries, or for non-`TRANSIENT` categories).
-- [track-metadata-model.md](track-metadata-model.md) — `is_retryable` is the property of `InferenceErrorCategory` that drives the router decision.
+- [track-temporal-integration.md](track-temporal-integration.md) — Tier 2: how `InferenceErrorCategory` drives Temporal's retry decision.
+- [track-worker-classification.md](track-worker-classification.md) — Tier 1 depends on workers classifying rate-limit errors and populating `retry_after_seconds`.
+- [track-metadata-model.md](track-metadata-model.md) — `ProviderErrorMetadata.retry_after_seconds` is the field Tier 1 consumes.
+- [../temporal-next/00-enterprise-readiness-analysis.md](../temporal-next/00-enterprise-readiness-analysis.md) — the multi-tenant / hosted concerns scoped out above.
