@@ -24,7 +24,7 @@ Every provider worker under `pipelex/plugins/*/` catches the SDK's typed excepti
 
 Pure classification helpers live in `pipelex/cogt/inference/error_classification.py`: `is_quota_exhaustion_openai`, `is_quota_exhaustion_anthropic`, `is_quota_exhaustion_google`, `is_quota_exhaustion_mistral`, `is_quota_exhaustion_aws`, `is_quota_exhaustion_gateway`, and `is_content_policy_violation`. Per-provider quota and content-policy patterns are defined alongside as module constants.
 
-See [track-worker-classification.md](track-worker-classification.md) for the per-worker inventory and the remaining `instructor` unwrap gap.
+See [track-worker-classification.md](track-worker-classification.md) for the per-worker inventory.
 
 ### Layer 1 → 2: Pipe operators
 
@@ -49,10 +49,10 @@ Pipe operators define thin wrapper exceptions in `pipelex/pipe_operators/*/excep
 
 ### Layer 4 → 5: Delivery
 
-- **Human CLI** — Rich console; each error type has its own `handle_*` function in `error_handlers.py` (red banner, structured fields, tip, doc/Discord links, `raise typer.Exit(1) from exc`).
-- **Agent CLI** — Structured JSON via `agent_error()`. For `PipelexError` subclasses it reads `to_error_report()` and merges `hint` / `error_domain` / `retryable` from the lookup dicts when not present on the report.
+- **Human CLI** — Rich console; each error type has its own `handle_*` function in `error_handlers.py`, all building their panel through the shared `display_error_panel()` helper (red banner, structured fields, tip, doc/Discord links, `raise typer.Exit(1) from exc`).
+- **Agent CLI** — Structured JSON or markdown via `agent_error()`, dispatched on the `--format` option (markdown default; carried by a per-invocation `ContextVar`). For `PipelexError` subclasses it reads `to_error_report()` and merges `hint` / `error_domain` / `retryable` from the lookup dicts only when not present on the report.
 - **Bundle validation** — `ValidateBundleError` aggregates blueprint, factory, validation, and instantiation errors; `extract_validation_errors()` in `agent_output.py` flattens them into a list per-category.
-- **Markdown special case** — `InferenceSetupRequiredError` is rendered as markdown to stdout (exit 0) for first-run guidance. Generalizing markdown delivery is open work in [track-cli-delivery.md](track-cli-delivery.md).
+- **Markdown special case** — `InferenceSetupRequiredError` is rendered as markdown to stdout (exit 0) for first-run guidance, independent of the `--format` option.
 
 ## Class hierarchy
 
@@ -120,18 +120,20 @@ Notes:
 
 ```
 ErrorReport
-  error_type:     str
-  message:        str
-  error_category: str | None
-  retryable:      bool | None
-  user_action:    str | None
-  model:          str | None
-  provider:       str | None
+  error_type:        str
+  message:           str
+  error_category:    str | None
+  error_domain:      str | None
+  retryable:         bool | None
+  user_action:       UserAction | None
+  model:             str | None
+  provider:          str | None
+  provider_metadata: ProviderErrorMetadata | None
 ```
 
-`to_dict()` drops `None` fields. `PipelexError.to_error_report()` returns a bare `ErrorReport(error_type, message)`. `CogtError.to_error_report()` overrides to include `error_category`, `retryable` (derived from category), `user_action`, and reads `model_handle` / `backend_name` when present on the instance.
+`to_dict()` drops `None` fields. `PipelexError.to_error_report()` returns `error_type`, `message`, and the class-level `error_domain`. `CogtError.to_error_report()` overrides to add `error_category`, `retryable` (derived from category), `user_action`, `provider_metadata`, and reads `model_handle` / `backend_name` when present on the instance. `to_error_report()` enriches from the `__cause__` chain, so a wrapper exception surfaces the inference metadata of the underlying `CogtError`.
 
-See [track-metadata-model.md](track-metadata-model.md) for the two-system gap: inference errors self-describe via `to_error_report()`, but non-inference exceptions still depend on the lookup dicts in `pipelex/cli/agent_cli/commands/agent_output.py` for `hint` / `error_domain` / `retryable`.
+See [track-metadata-model.md](track-metadata-model.md) for the remaining gap: `error_domain` is now a class-level attribute and inference errors fully self-describe, but a long tail of non-inference `PipelexError` subclasses still depend on the lookup dicts in `pipelex/cli/agent_cli/commands/agent_output.py` for their `hint` / `error_domain`.
 
 ## Open hierarchy issues
 

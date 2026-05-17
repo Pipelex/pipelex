@@ -79,15 +79,11 @@ Each provides at minimum: catch SDK errors, classify, assign category, attach mo
 
 `ModelNotFoundError` is the parent of `LLMModelNotFoundError`, `ImgGenModelNotFoundError`, and `ModelWaterfallError`. The waterfall variant adds `fallback_list`.
 
-### Anthropic `instructor` unwrap (the reference fix)
+### The `instructor` unwrap
 
-`pipelex/plugins/anthropic/anthropic_llm_worker.py` defines:
+`extract_underlying_sdk_exception(instructor_exc)` (shared, in `pipelex/cogt/inference/error_classification.py`) recovers the SDK exception from `failed_attempts[-1].exception`, falling back to `__cause__.last_attempt._exception` (tenacity's storage). Each LLM worker's `_gen_object` path catches `InstructorRetryException`, unwraps it through that helper, and routes the result through the same per-provider categorization helper its `_gen_text` path uses; only truly unrecognized inner exceptions keep the `UNKNOWN` fallback.
 
-- `_extract_underlying_sdk_exception(instructor_exc)` — recovers the SDK exception from `failed_attempts[-1].exception`, falling back to `__cause__.last_attempt._exception` (tenacity's storage).
-- `_raise_categorized_anthropic_sdk_error(sdk_exc, chain_from=None)` — single classification helper shared between `_gen_text` and `_gen_object`.
-- `_gen_object`'s `InstructorRetryException` branch unwraps and routes through the helper; only truly unrecognized inner exceptions (e.g. `pydantic.ValidationError` from a schema mismatch) keep the `CONTENT` fallback.
-
-The end-to-end test `tests/unit/pipelex/plugins/anthropic/test_anthropic_worker_object_error_handling.py::test_real_instructor_wraps_rate_limit_and_fix_unwraps_correctly` locks in the assumption against real `instructor.from_anthropic(...)`.
+Note the interaction with the retry track: since `instructor`'s retry predicate is now confined to schema re-ask ([track-retry-and-resilience.md](track-retry-and-resilience.md)), a transport error is no longer wrapped in `InstructorRetryException` — it propagates as the raw SDK exception and is caught by the worker's SDK-exception `except` clauses directly. `InstructorRetryException` now carries only genuine schema-validation failures. The end-to-end test `tests/unit/pipelex/plugins/anthropic/test_anthropic_worker_object_error_handling.py::test_real_instructor_propagates_transport_error_raw` locks that behavior in against real `instructor.from_anthropic(...)`.
 
 ## Open gaps
 
@@ -95,9 +91,9 @@ The classification + beyond-reference upgrades have landed across every worker k
 
 - **`pydantic.ValidationError` now routes to `UNKNOWN`.** When the LLM returns JSON that doesn't match the schema, `instructor` raises `InstructorRetryException` with a `ValidationError` (or `JSONDecodeError`) at `failed_attempts[-1].exception`. The unwrap branch returns it, the per-provider SDK categorization helpers don't recognize it, and the `UNKNOWN` fallback (introduced by Phase 2's upgrade A) catches it — distinguishing schema-mismatch from genuine `CONTENT`-policy violations. If we ever want a dedicated SCHEMA_MISMATCH category, the categorization helpers can be extended to recognize `pydantic.ValidationError` explicitly. Not a regression.
 
-## Followups
+## What's left
 
-The followups from this track have landed (`extract_underlying_sdk_exception` is shared in `pipelex/cogt/inference/error_classification.py`; OpenAI Completions, OpenAI Responses, Mistral, and Google now unwrap-and-dispatch; per-provider test parity with the Anthropic suite is in place; the `instructor.exceptions` → `instructor.core` import migration is complete; img-gen, extract, and search workers plus AWS Bedrock LLM all carry the beyond-reference upgrades). The one remaining followup is the deeper Extract/Classify/Render refactor that consolidates the per-worker pipeline ([track-extract-classify-render.md](track-extract-classify-render.md)).
+Worker classification itself is complete — there is no remaining per-worker work. The only open item is the deeper **Extract / Classify / Render** refactor that consolidates the now-duplicated per-worker pipeline into one per-provider Extract function plus a shared Classify + Render. It is proposed but not started — see [track-extract-classify-render.md](track-extract-classify-render.md).
 
 ### Risks and gotchas (for future similar work)
 

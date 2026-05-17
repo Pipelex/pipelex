@@ -2,94 +2,80 @@
 
 ## What this track is
 
-The contract for **what every exception carries** so it can be rendered identically to humans, agents, and Temporal: `error_type`, `message`, `error_category` (TRANSIENT / CONFIGURATION / CONTENT / CAPACITY), `error_domain` (input / config / runtime), `user_action`, `retryable`, optional `model` and `provider`. The goal is to push this metadata onto the exception class itself so there is a single source of truth.
+The contract for **what every exception carries** so it can be rendered identically to humans, agents, and Temporal: `error_type`, `message`, `error_category` (TRANSIENT / CONFIGURATION / CONTENT / CAPACITY / UNKNOWN), `error_domain` (input / config / runtime), `user_action`, `retryable`, optional `model`, `provider`, and `provider_metadata`. The metadata lives on the exception class itself so there is a single source of truth.
 
-Today the metadata model is **partially landed**: inference errors (`CogtError` and subclasses) self-describe via class-level attributes, but non-inference exceptions still depend on string-keyed dicts in `pipelex/cli/agent_cli/commands/agent_output.py` (`AGENT_ERROR_HINTS`, `AGENT_ERROR_DOMAINS`, `RETRYABLE_ERROR_TYPES`).
+The model is **landed for inference errors and the major pipeline/interpreter/service exceptions** — they self-describe via class-level attributes consumed through `to_error_report()`. The remaining work is closing the long tail: a handful of `CogtError` subclasses still carry no class-level `error_category`, and several `PipelexError` subclasses still depend on the fallback dicts in `agent_output.py` rather than carrying their own `error_domain` / `user_action`.
 
 ## Current state
 
-### What every error already exposes
+### `ErrorReport` — the serialization schema
 
-`ErrorReport` (`pipelex/base_exceptions.py`) is the serialization schema. It is a frozen pydantic dataclass with `extra="forbid"` and fields: `error_type`, `message`, `error_category`, `retryable`, `user_action`, `model`, `provider`. `to_dict()` drops `None` fields.
+`ErrorReport` (`pipelex/base_exceptions.py`) is a frozen pydantic dataclass with `extra="forbid"`:
 
-`PipelexError.to_error_report()` returns a bare report (`error_type`, `message`) for any subclass that doesn't override it.
+```
+ErrorReport
+  error_type:        str
+  message:           str
+  error_category:    str | None
+  error_domain:      str | None
+  retryable:         bool | None
+  user_action:       UserAction | None
+  model:             str | None
+  provider:          str | None
+  provider_metadata: ProviderErrorMetadata | None
+```
 
-`CogtError.to_error_report()` (`pipelex/cogt/exceptions.py`) overrides it to include `error_category`, `retryable` (derived from category via `InferenceErrorCategory.is_retryable`), `user_action`, and reads `model_handle` / `backend_name` from the instance when present.
+`to_dict()` drops `None` fields. `http_status` maps the report to an HTTP status for downstream API adapters (see [track-cli-delivery.md](track-cli-delivery.md)).
+
+`PipelexError.to_error_report()` returns `error_type`, `message`, and the class-level `error_domain`. `CogtError.to_error_report()` overrides it to add `error_category`, `retryable` (derived from category via `InferenceErrorCategory.is_retryable`), `user_action`, `provider_metadata`, and reads `model_handle` / `backend_name` from the instance when present. `to_error_report()` also enriches from the `__cause__` chain, so a wrapper exception surfaces the inference metadata of the underlying `CogtError`.
 
 ### Inference categories
 
-`InferenceErrorCategory` (`pipelex/cogt/exceptions.py`) is a `StrEnum` with values `TRANSIENT`, `CONFIGURATION`, `CONTENT`, `CAPACITY` and an `is_retryable` property — `True` only for `TRANSIENT`. Implemented with `match/case` per the project's enum style.
+`InferenceErrorCategory` (`pipelex/cogt/exceptions.py`) is a `StrEnum` with values `TRANSIENT`, `CONFIGURATION`, `CONTENT`, `CAPACITY`, `UNKNOWN` and an `is_retryable` property — `True` only for `TRANSIENT`. Implemented with `match/case` per the project's enum style.
 
-### Class-level defaults already set
+### Error domains
 
-Many `CogtError` subclasses now declare `error_category` as a class attribute (defaults to `CONFIGURATION` for most of them):
+`ErrorDomain` (`StrEnum`) has values `INPUT`, `CONFIG`, `RUNTIME`. `PipelexError` declares an optional class-level `error_domain: ErrorDomain | None`. Class-level domains are set on:
 
-- Routing / backend / model-deck families: `RoutingProfileDisabledBackendError`, `InferenceBackendCredentialsError`, `LLMSettingsValidationError`, `ImgGenSettingsValidationError`, `ModelDeckValidatonError`, `ModelDeckPresetValidatonError`, `ModelNotFoundError` (and `LLMModelNotFoundError`, `ImgGenModelNotFoundError`, `ModelWaterfallError` via inheritance).
-- Handle-not-found family: `LLMHandleNotFoundError`, `ImgGenHandleNotFoundError`, `ExtractHandleNotFoundError`, `SearchHandleNotFoundError`.
-- Capability errors: `LLMCapabilityError`, `ExtractCapabilityError`.
-- Choice errors: `ModelChoiceNotFoundError`.
-- Config error: `LLMConfigError`.
+- `PipelexSetupError`, `PipelexConfigError` (`pipelex/base_exceptions.py`) → `CONFIG`.
+- `PipeExecutionError` (`pipelex/pipeline/exceptions.py`) → `RUNTIME`; `PipelineExecutionError` injects `RUNTIME` + a `user_action` in its `to_error_report()` override.
+- `ValidateBundleError` (`pipelex/pipeline/validate_bundle.py`) → `INPUT` + a `user_action`.
+- `PipelexInterpreterError` (`pipelex/core/interpreter/exceptions.py`) → `INPUT`.
+- `PipelexServiceError` and its subclasses (`pipelex/system/pipelex_service/exceptions.py`) → `CONFIG`.
 
-`InferenceBackendCredentialsError` also declares a class-level `user_action` (`"Check that the required API key environment variable is set"`) — the canonical pattern for the rest of the metadata to follow.
+### Inference class-level defaults
 
-### What is intentionally left dynamic
+Many `CogtError` subclasses declare `error_category` as a class attribute:
 
-The four "outcome" exceptions are uncategorized at the class level and set their category per-instance from the worker that raised them (so the same exception type can carry TRANSIENT / CONFIGURATION / CONTENT / CAPACITY depending on the underlying SDK error):
+- Routing / backend / model-deck families default to `CONFIGURATION` (e.g. `RoutingProfileDisabledBackendError`, `InferenceBackendCredentialsError`, `LLMSettingsValidationError`, `ModelNotFoundError` and its subclasses).
+- Handle-not-found family (`LLMHandleNotFoundError`, etc.), capability errors, choice errors, `LLMConfigError`, `SdkTypeError`, `InferenceBackendLibraryError` — all categorized.
+- The prompt / parameter family (`LLMPromptSpecError`, `LLMPromptTemplateInputsError`, `LLMPromptParameterError`, `PromptImageFactoryError`, `PromptImageFormatError`, `PromptDocumentFactoryError`, `ImgGenPromptError`, `ImgGenParameterError`, `ImageContentError`) → `CONTENT`.
 
-- `LLMCompletionError`
-- `ImgGenGenerationError`
-- `ExtractJobFailureError`
-- `SearchJobFailureError`
+`InferenceBackendCredentialsError` also declares a class-level `user_action` — the canonical pattern.
 
-### What is uncategorized and unintentional
+The four "outcome" exceptions stay **intentionally** uncategorized at the class level and take their category per-instance from the worker that raised them: `LLMCompletionError`, `ImgGenGenerationError`, `ExtractJobFailureError`, `SearchJobFailureError`.
 
-Still uncategorized at the class level (likely `CONTENT` once decided): `LLMPromptSpecError`, `LLMPromptTemplateInputsError`, `LLMPromptParameterError`, `PromptImageFactoryError`, `PromptImageFormatError`, `PromptDocumentFactoryError`, `ImgGenPromptError`, `ImgGenParameterError`.
+### How delivery consumes this
 
-Case-by-case: `ImageContentError`, `CostRegistryError`, `ReportingManagerError`, `SdkTypeError`, `ExtractOutputError`, `GeneratedImageError`, `LLMAssignmentError`, `InferenceBackendLibraryError`.
-
-### How `agent_error()` consumes this today
-
-In `pipelex/cli/agent_cli/commands/agent_output.py`, `agent_error()` does the right thing for `PipelexError` already:
-
-- Calls `cause.to_error_report()` when `cause` is a `PipelexError`.
-- Pulls `user_action`, `retryable`, `error_category`, `model`, `provider` from the report.
-- Falls back to `AGENT_ERROR_HINTS.get(error_type)` for `hint` when the report has none.
-- Reads `RETRYABLE_ERROR_TYPES` only when the report didn't say.
-- Reads `AGENT_ERROR_DOMAINS.get(error_type)` for `error_domain` **unconditionally** — the report has no `error_domain` field yet, so the dict is the only source.
-
-### How `error_handlers.py` consumes this today
-
-Each Rich handler in `pipelex/cli/error_handlers.py` builds the panel from a mix of instance attributes and `report = exc.to_error_report()` (using `report.user_action` as the tip). The Phase 1 wiring landed; the eleven near-identical handler bodies are a separate concern, addressed in [track-cli-delivery.md](track-cli-delivery.md).
+`agent_error()` (`pipelex/cli/agent_cli/commands/agent_output.py`) calls `cause.to_error_report()` when `cause` is a `PipelexError` and reads `user_action`, `retryable`, `error_category`, `error_domain`, `model`, `provider` from the report **first**; the string-keyed dicts (`AGENT_ERROR_HINTS`, `AGENT_ERROR_DOMAINS`, `RETRYABLE_ERROR_TYPES`) are a fallback only. The Rich handlers in `error_handlers.py` likewise build panels from `report.user_action`. The `agent_output.py` dicts are guarded by a drift-detection test (see [track-testing.md](track-testing.md)).
 
 ## Open gaps
 
-- **No `error_domain` on `PipelexError`.** `ErrorReport` has no `error_domain` field; `to_error_report()` doesn't carry it; `agent_error()` reads it only from the dict. As long as `error_domain` lives only in the dict, every new `PipelexError` subclass risks shipping without an entry.
-- **`user_action` for non-inference exceptions lives only in the dict.** `PipelineExecutionError`, `PipeExecutionError`, `ValidateBundleError`, `PipelexInterpreterError`, `PipelexSetupError`, `PipelexConfigError`, and the `PipelexService` family all return a bare `ErrorReport`. Hints come from `AGENT_ERROR_HINTS`.
-- **Some `CogtError` subclasses still have `error_category = None`.** Listed above. When raised without an instance-level override they produce empty reports.
-- **Dict drift.** `AGENT_ERROR_HINTS`, `AGENT_ERROR_DOMAINS`, and `RETRYABLE_ERROR_TYPES` are string-keyed by class name. Renaming an exception silently breaks the lookup; adding a new exception silently leaves agents without a hint or domain.
+These are the genuine remainder — the metadata model is otherwise landed.
+
+- **A few `CogtError` subclasses still have no class-level `error_category`.** `CostRegistryError`, `ReportingManagerError`, `ExtractOutputError`, `GeneratedImageError`, `LLMAssignmentError`, and parts of the routing / model-deck family (`RoutingProfileLibraryError`, `ModelManagerError`, `ModelDeckNotFoundError`, `ModelDeckValidationError`, and similar). When raised without an instance-level override they produce an `error_category`-less report. Decide a default per class.
+- **Several `PipelexError` subclasses still depend on the fallback dicts.** Types caught by the agent CLI — `PipeOperatorModelChoiceError`, `ModelDeckPresetValidatonError`, the gateway-config family, `PipelexInterpreterError`'s hint, etc. — have their `hint` (and sometimes `error_domain`) only in `AGENT_ERROR_HINTS` / `AGENT_ERROR_DOMAINS`, not as class-level `user_action` / `error_domain`. The migration moves those onto the classes; the dicts then keep only built-in / third-party types (`FileNotFoundError`, `JSONDecodeError`, `ValidationError`, …) that can't carry attributes.
 
 ## Followups
 
-The work below closes the gap. It can be tackled in any order — there are no hard ordering constraints.
+The work below closes the two gaps. Either can be tackled independently.
 
-1. **Add `error_domain` to `PipelexError` and `ErrorReport`.** Optional class-level attribute (values: `"input"`, `"config"`, `"runtime"`). Update `PipelexError.to_error_report()` to include it. Modify `pipelex/base_exceptions.py`.
-2. **Set class-level `error_domain` and `user_action` on key non-`CogtError` exceptions.** Targets and proposed values:
-   - `PipelineExecutionError` (`pipelex/pipeline/exceptions.py`): domain=`"runtime"`, user_action=`"Check pipe_stack to identify which pipe failed"`.
-   - `PipeExecutionError` (`pipelex/pipeline/exceptions.py`): domain=`"runtime"`.
-   - `ValidateBundleError` (`pipelex/pipeline/validate_bundle.py`): domain=`"input"`, user_action=`"Check the validation_errors array for specific issues"`.
-   - `PipelexInterpreterError` (`pipelex/core/interpreter/exceptions.py`): domain=`"input"`.
-   - `PipelexSetupError`, `PipelexConfigError` (`pipelex/base_exceptions.py`): domain=`"config"`.
-   - Service errors (`pipelex/system/pipelex_service/exceptions.py`): domain=`"config"`.
-3. **Set defaults on uncategorized `CogtError` subclasses.** `LLMPromptSpecError`, `LLMPromptTemplateInputsError`, `LLMPromptParameterError`, `PromptImageFactoryError`, `PromptImageFormatError`, `PromptDocumentFactoryError`, `ImgGenPromptError`, `ImgGenParameterError` → `CONTENT`. Decide case-by-case for `ImageContentError`, `CostRegistryError`, `ReportingManagerError`, `SdkTypeError`, `ExtractOutputError`, `GeneratedImageError`, `LLMAssignmentError`, `InferenceBackendLibraryError`. Leave `LLMCompletionError` / `ImgGenGenerationError` / `ExtractJobFailureError` / `SearchJobFailureError` as None — workers set them per-instance.
-4. **Migrate `AGENT_ERROR_HINTS` entries for `PipelexError` types onto the classes as `user_action`.** Keep dict entries only for built-in / non-`PipelexError` types (`FileNotFoundError`, `JSONDecodeError`, `ValidationError`, etc.) since attributes can't be added to those.
-5. **Migrate `AGENT_ERROR_DOMAINS` entries for `PipelexError` types onto the classes as `error_domain`.** Same exception as above — built-ins stay in the dict.
-6. **`agent_error()` reads class metadata first, dict as fallback only.** The `report.user_action` and `report.error_domain` (new) become the primary source; the dicts are touched only for non-`PipelexError` types.
-
-The drift-detection unit test that guards the dicts lives in [track-testing.md](track-testing.md).
+1. **Finish class-level `error_category` on the uncategorized `CogtError` subclasses** listed above. Leave the four outcome exceptions (`LLMCompletionError` / `ImgGenGenerationError` / `ExtractJobFailureError` / `SearchJobFailureError`) as `None` — workers set them per-instance.
+2. **Migrate the remaining `PipelexError`-keyed dict entries onto the classes** as class-level `user_action` (from `AGENT_ERROR_HINTS`) and `error_domain` (from `AGENT_ERROR_DOMAINS`). Keep dict entries only for non-`PipelexError` types. The drift-detection test ([track-testing.md](track-testing.md)) already enforces that every `PipelexError` subclass is covered one way or the other.
 
 ## Related tracks
 
-- [track-worker-classification.md](track-worker-classification.md) — where per-instance `error_category` and `user_action` are set on `LLMCompletionError` / `ImgGenGenerationError` / `ExtractJobFailureError` / `SearchJobFailureError`.
-- [track-cli-delivery.md](track-cli-delivery.md) — how the human Rich handlers and the agent JSON path consume `to_error_report()`.
-- [track-testing.md](track-testing.md) — drift-detection test that ensures every `PipelexError` either has class-level metadata or appears in the fallback dicts.
-- [track-temporal-integration.md](track-temporal-integration.md) — packing `to_error_report()` into `ApplicationError.details`.
+- [track-worker-classification.md](track-worker-classification.md) — where per-instance `error_category` and `user_action` are set on the four outcome exceptions.
+- [track-cli-delivery.md](track-cli-delivery.md) — how the human Rich handlers and the agent JSON/markdown path consume `to_error_report()`.
+- [track-testing.md](track-testing.md) — the drift-detection test that keeps the dicts and the class-level metadata in sync.
+- [track-temporal-integration.md](track-temporal-integration.md) — packs `to_error_report()` into `ApplicationError.details`.

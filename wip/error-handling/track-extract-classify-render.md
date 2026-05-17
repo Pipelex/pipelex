@@ -6,11 +6,11 @@ Today every inference worker performs three logically separate steps inline insi
 
 This track proposes decomposing the pipeline so that only the **Extract** step is per-provider. **Classify** and **Render** become provider-agnostic and share a single implementation across all 18+ workers.
 
-This track is **out of scope for the current "make every worker excellent" sweep** (tracked in `TODOS.md` at the repo root). It is the natural next step *after* that sweep lands: once every worker is uniformly attaching `ProviderErrorMetadata` and a structured `UserAction`, the duplication across workers becomes the dominant complexity, and decomposition is the obvious cleanup.
+This track is **proposed but not started.** It is the natural next step after the worker-classification sweep, which has landed ([archive-worker-classification-sweep.md](archive-worker-classification-sweep.md)): now that every worker uniformly attaches `ProviderErrorMetadata` and a structured `UserAction`, the duplication across workers is the dominant complexity, and decomposition is the obvious cleanup.
 
-## Current state (assumed post-TODOS.md sweep)
+## Current state
 
-After the `TODOS.md` sweep, a worker looks like this:
+After the worker-classification sweep, a worker looks like this:
 
 ```python
 except RateLimitError as exc:
@@ -207,7 +207,7 @@ Some providers don't always populate every field (e.g. Google's `genai_errors.Cl
 - `ClassificationResult` (Pydantic `BaseModel`): `category: InferenceErrorCategory`, `user_action_kind: UserActionKind`
 - `ProviderName` (`StrEnum` from `pipelex.types`): one value per provider plugin (`ANTHROPIC`, `OPENAI`, `MISTRAL`, `GOOGLE`, `BEDROCK`, `AZURE`, `FAL`, `HUGGINGFACE`, `DOCLING`, `LINKUP`, `GATEWAY`, ...)
 
-`SDKErrorEnvelope` is likely identical to the `ProviderErrorMetadata` introduced in `TODOS.md` Phase 3 — rename rather than reintroduce.
+`SDKErrorEnvelope` is likely identical to the existing `ProviderErrorMetadata` (`pipelex/cogt/inference/error_classification.py`) — rename rather than reintroduce.
 
 ### 2. Write the Classify function first (TDD)
 
@@ -254,18 +254,18 @@ Either way, the per-worker callers go away.
 
 Once all workers are migrated, write a meta-test that exercises every (provider, error-category) pair: given each provider's Extract function and a synthetic exception per category, verify the rendered error has the expected category, user_action_kind, and a populated request_id. Catches "we added a provider and forgot to wire it up" regressions.
 
-## Prerequisites
+## Prerequisites — all met
 
-This refactor depends on the `TODOS.md` sweep being landed first. Specifically:
+This refactor depended on the worker-classification sweep landing first. Those prerequisites are all in place:
 
-- `InferenceErrorCategory.UNKNOWN` exists (Phase 2 of TODOS).
-- `ProviderErrorMetadata` exists as a Pydantic model with the right field shape — likely renamed to `SDKErrorEnvelope` when this refactor starts (Phase 3 of TODOS).
-- `UserAction` is structured (`UserActionKind` enum + `detail` string) (Phase 4 of TODOS).
-- The instructor-unwrap fix is landed on OpenAI Completions, OpenAI Responses, Mistral, Google (Phases 5–8 of TODOS). Otherwise those four workers don't yet have a clean post-unwrap call site to refactor.
+- `InferenceErrorCategory.UNKNOWN` exists (`pipelex/cogt/exceptions.py`).
+- `ProviderErrorMetadata` exists as a Pydantic model with the right field shape — likely renamed to `SDKErrorEnvelope` when this refactor starts (`pipelex/cogt/inference/error_classification.py`).
+- `UserAction` is structured (`UserActionKind` enum + `detail` string).
+- The `instructor`-unwrap fix is landed on every LLM worker, so each has a clean post-unwrap call site to refactor.
 
-Without these, the envelope schema would have to evolve mid-refactor.
+The refactor can start whenever it is prioritized; nothing blocks it.
 
-**Estimated effort once prerequisites land:** 2–3 days of focused work — mostly mechanical migration after the schemas are right.
+**Estimated effort:** 2–3 days of focused work — mostly mechanical migration after the schemas are right.
 
 ## Related tracks
 
