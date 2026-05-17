@@ -223,8 +223,9 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
                 seed=job_params.seed,
                 messages=messages,
                 response_model=schema,
-                # instructor's max_retries retries schema-validation failures only, not transport errors —
-                # transient transport retry is the PipeRouter's job, not this call's.
+                # NB: instructor's max_retries is NOT schema-validation-only. Passed an int, it
+                # builds a tenacity loop whose default predicate retries ANY exception — so it
+                # retries transport/API errors too, nested on top of the SDK client's own retry.
                 max_retries=llm_job.job_config.max_retries,
                 extra_headers=extra_headers,
                 extra_body=extra_body,

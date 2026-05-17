@@ -1,22 +1,25 @@
-# TODOS — Retry & Resilience: remove the PipeRouter loop, build Tier 1 (Retry-After)
+# TODOS — Retry & Resilience: remove the PipeRouter loop, make Tier 1 (transport retry) explicit
 
-> **Type:** Implementation plan — two independent workstreams. Workstream 1 is a removal; Workstream 2 is a TDD build (RED → GREEN → REFACTOR).
+> **Type:** Implementation plan — two independent workstreams. Workstream 1 is a removal; Workstream 2 is config + factory wiring + a worker audit.
 > **Source / intent:** [wip/error-handling/track-retry-and-resilience.md](wip/error-handling/track-retry-and-resilience.md) — the target-architecture doc. Where this plan and that doc differ, the doc is authoritative for *intent*; this plan is authoritative for *steps*.
-> **Branch:** off `feature/Error-handling-2` — it carries the Phase 5 retry loop being removed and the error-metadata model Tier 1 consumes; `main` has neither. One branch for both workstreams is fine; they don't conflict.
+> **Branch:** working on `feature/Error-handling-3` (branched off `feature/Error-handling-2` to polish this plan). The base carries the Phase 5 retry loop being removed and the error-metadata model; `main` has neither.
+> **Packaging:** ship as **two PRs** — land Workstream 1 (removal) first; it is self-contained, small, and independently verifiable with `make agent-test`. Workstream 2 (Tier 1 explicit) follows as a second PR. The two workstreams don't conflict, but separate PRs keep each review scoped to one concern.
 > **Discipline:** `make agent-check` after each step; `make agent-test` before wrapping up. After deleting test files, `make cleanderived` if collection misbehaves. After config/toml changes, `make tb` (boot test — config model and toml must stay in sync).
 
 ## Status
 
-**Not started.** Both workstreams open. They are independent — either order, or in parallel.
+**Not started.** Both workstreams open. They are independent in content, but ship as two PRs — Workstream 1 (removal) first, Workstream 2 (Tier 1 explicit) second (see **Packaging** above).
 
 ## Cold-start context
 
-Pipelex's resilience story is Temporal. Direct (non-Temporal) execution is a single-attempt runner and should stay clean and honest about that — it must not reproduce Temporal's durability. The full reasoning, the tier model, and the decisions are in the architecture doc linked above. The two concrete consequences this plan executes:
+Pipelex's resilience story is Temporal. Direct (non-Temporal) execution makes one pipeline-level attempt on top of a transport that already retries brief blips — it should stay clean and honest about that, and not reproduce Temporal's durability. The full reasoning, the tier model, and the decisions are in the architecture doc linked above. The two concrete consequences this plan executes:
 
-- **Remove the `PipeRouter` application-level transient-retry loop (Phase 5).** It only ever runs on the direct path — it is dead code on the Temporal path, because `_run_pipe_job` there raises `WorkflowExecutionError` / `TemporalError`, which the loop's `except (CogtError, PipeRunError)` never catches. It also re-runs at the wrong granularity, ignores the provider's `Retry-After`, and carries a per-run/global config bug (the retry budget is snapshotted from global config at router construction, so a per-run `execution_config` is silently ignored). Removing it is cleaner than fixing it for a path that is deliberately not the resilient one.
-- **Build "Tier 1" — a thin, shared, in-worker retry that honors a provider's `Retry-After`.** Protocol fidelity, not durability: when a rate-limit error explicitly states a wait, the worker waits it and retries, small bounded count. It lives in worker code, so it serves both the direct and Temporal paths.
+- **Remove the `PipeRouter` application-level transient-retry loop (Phase 5).** It only ever runs on the direct path — it is dead code on the Temporal path, because `_run_pipe_job` there raises `WorkflowExecutionError` / `TemporalError`, which the loop's `except (CogtError, PipeRunError)` never catches. It also re-runs at the wrong granularity and carries a per-run/global config bug (the retry budget is snapshotted from global config at router construction, so a per-run `execution_config` is silently ignored). Removing it is cleaner than fixing it for a path that is deliberately not the resilient one.
+- **Make "Tier 1" — transport retry — an explicit, uniform policy.** The provider SDKs already retry transient transport failures (OpenAI / Anthropic: `max_retries = 2`, retry 408 / 409 / 429 / 5xx / connection errors, honor `Retry-After`); the worker factories inherit that silently, and workers not on a retrying SDK (the raw-`httpx` `azure_rest` image-gen path; the Mistral and Google SDKs, both of which default to **no** transport retry; the FAL submit path) don't get it. The work is to make the retry posture deliberate and uniform — set `max_retries` explicitly from config, and bring the SDK-less paths up to the same floor — **not** to build a Pipelex retry layer, which would duplicate the SDK.
 
-What stays untouched: `PipeBatch` bounded fan-out (`gather_bounded` / `max_concurrency`) — admission control, not retry. Temporal Tier 2 (activity `RetryPolicy` keyed off `InferenceErrorCategory`). The operator wrapping in `PipeLLM` / `PipeStructure` (`LLMCompletionError` → `PipeRunError`) — error-context propagation.
+What stays untouched: `PipeBatch` bounded fan-out (`gather_bounded` / `max_concurrency`) — admission control, not retry. Temporal Tier 2 (activity `RetryPolicy` keyed off `InferenceErrorCategory`). The operator wrapping in `PipeLLM` / `PipeStructure` (`LLMCompletionError` → `PipeRunError`) — error-context propagation. The provider SDKs' own retry logic — Workstream 2 *configures* it, it does not replace it.
+
+**A correction the v1 plan got wrong:** it scoped `instructor`'s `max_retries` out as "schema-validation retry, not transport." Verified false against `instructor` 1.15.1 (`instructor/core/retry.py`): passed an `int`, `instructor` retries **any** exception — transport / API errors included. The structured-output path (`PipeLLM` / `PipeStructure`) therefore already runs an application-level transport-retry loop nested on the SDK's own. Confining `instructor` to genuine schema re-ask is Workstream 2.3.
 
 ---
 
@@ -42,7 +45,8 @@ A removal, not a TDD build. Delete in the order below, then verify. One small gu
 
 - [ ] `pipelex/system/configuration/configs.py` — from `PipelineExecutionConfig` (around lines 153–177) remove the transient-retry fields and the `_validate_transient_retry_timing` validator. **Keep `max_concurrency`** — it is the bounded-fan-out pillar and stays.
 - [ ] `pipelex/pipelex.toml` — remove the transient-retry settings (around lines 290–293).
-- [ ] `pipelex/kit/configs/pipelex.toml` — remove the commented-out transient-retry block (around lines 40–44).
+- [ ] `pipelex/kit/configs/pipelex.toml` — remove the commented-out transient-retry block (around lines 41–44).
+- [ ] `.pipelex/pipelex.toml` — remove the commented-out transient-retry block (around lines 40–44, including the `# Uncomment and adjust...` lead-in). It is commented so boot won't fail, but a user uncommenting `max_transient_retries` after this change would hit a config-load failure against the removed field.
 - [ ] `make tb` — confirm the boot sequence still loads the config (model ↔ toml in sync).
 
 ### 1.4 — Tests
@@ -50,7 +54,7 @@ A removal, not a TDD build. Delete in the order below, then verify. One small gu
 - [ ] Delete `tests/unit/pipelex/pipe_run/test_pipe_router_retry.py`.
 - [ ] Delete `tests/integration/pipelex/pipes/operator/test_operator_transient_retry.py`.
 - [ ] `tests/unit/pipelex/system/configuration/test_pipeline_execution_config.py` — drop expectations on the removed retry fields.
-- [ ] Add one small guard test: a transient `CogtError` from `_run_pipe_job` surfaces on the **first** attempt (`_run_pipe_job` called exactly once) — pins the "direct = single attempt" contract against a future re-introduction of a loop.
+- [ ] Add one small guard test pinning **both** branches of the kept handler: (a) a transient `CogtError` from `_run_pipe_job` surfaces on the **first** attempt (`_run_pipe_job` called exactly once) — pins the "direct = single pipeline-level attempt" contract against a future re-introduction of a loop; (b) a `PipeRunError` from `_run_pipe_job` surfaces as `PipeRouterError` with the pipe-stack context intact — pins the "keep the handler" contract against a future accidental handler deletion.
 
 ### 1.5 — Docs
 
@@ -62,43 +66,58 @@ A removal, not a TDD build. Delete in the order below, then verify. One small gu
 
 ---
 
-## Workstream 2 — Build Tier 1: Retry-After fidelity
+## Workstream 2 — Make Tier 1 (transport retry) explicit and uniform
 
-A TDD build. Settle the design first (2.0), then RED → GREEN → REFACTOR.
+Not a TDD build of a new layer — the SDK-backed paths already retry transient transport failures. This makes that retry a deliberate, uniform, configured policy, closes the worker families that don't get it (the Mistral and Google SDKs default to no transport retry), and confines `instructor`'s structured-output retry to genuine schema re-ask so the SDK floor is the *only* transport-retry layer.
 
-### 2.0 — Design decisions (settle first, record the outcome here)
+### 2.1 — Config
 
-- [ ] **D1 — Helper shape.** A shared async helper under `pipelex/cogt/inference/` (e.g. `rate_limit_retry.py`). Recommended: an `async` function that runs a classified inference call, inspects the resulting `CogtError`, and loops. Confirm function-vs-decorator and the module name.
-- [ ] **D2 — Trigger condition.** Retry only when the classified error is a rate-limit signal carrying an explicit wait: `error_category` is `TRANSIENT` **and** `provider_metadata.retry_after_seconds is not None`. A `TRANSIENT` error *without* `retry_after_seconds` is **not** Tier 1's business — it surfaces (direct) or Temporal handles it (hosted). Confirm this boundary.
-- [ ] **D3 — Config.** A small block in `pipelex/cogt/config_cogt.py` (`Cogt`): a max attempt count and a cap on the longest `Retry-After` honored. Defaults in `pipelex/pipelex.toml`. Do not revive the removed `TenacityConfig` — this is smaller and provider-agnostic. Confirm field names and placement.
-- [ ] **D4 — Application point.** Wrap at each inference worker's SDK-call / classification chokepoint, uniformly across LLM / img-gen / extract / search workers. Map the exact call sites before coding (see Key files).
+- [ ] Add an inference-client transport-retry setting to the `cogt` config (`pipelex/cogt/config_cogt.py`). **Name it distinctly** — `transport_max_retries` (or `sdk_client_max_retries`) — **not** `max_retries`: a bare `max_retries` collides with `llm_job.job_config.max_retries`, which is `instructor`'s schema-re-ask count (`stop_after_attempt`). The two are different things — transport floor vs. schema re-ask — and must read as different. Placement: a small transport-scoped block, or `LLMConfig`. **Do not put it in `InstructorConfig`** — it configures the SDK transport client, not `instructor`. Decide whether request `timeout` joins it or stays per-provider (Anthropic already derives its own from `structured_output_timeout_seconds` — leaving timeout per-provider is fine).
+- [ ] Defaults in `pipelex/pipelex.toml` — `transport_max_retries = 2`, matching the current SDK default so behavior is unchanged until deliberately tuned. `make tb` to confirm the config loads.
 
-### 2.1 — RED
+### 2.2 — Wire the SDK client factories
 
-- [ ] Write a failing test for the helper: a classified call that raises a rate-limit `CogtError` with `retry_after_seconds` set is retried after waiting that long, up to the bounded count, then surfaces; a `TRANSIENT` error with no `retry_after_seconds` is **not** retried; a non-`TRANSIENT` error is **not** retried. Mock `asyncio.sleep` so the test does not actually wait. Assert the honored wait equals `retry_after_seconds` (capped per D3).
-- [ ] Confirm it fails today (no helper exists).
+- [ ] Each inference client factory passes `transport_max_retries` explicitly when constructing the SDK client, from the config — instead of inheriting the silent SDK default. **Verified list of factories that actually construct a client** (the others under `pipelex/plugins/*/` are message/param helpers and build nothing):
+  - `anthropic/anthropic_factory.py` — `AsyncAnthropic` (L53), `AsyncAnthropicBedrock` (L62/68).
+  - `openai/openai_client_factory.py` — `AsyncAzureOpenAI` (L55), `AsyncOpenAI` (L68).
+  - `gateway/gateway_factory.py` — `AsyncPortkey` (L67) **and** the `AsyncOpenAI` clients for completions/responses (`make_portkey_openai_client_for_*`). **Note:** the gateway client is `AsyncPortkey` (the `portkey-ai` SDK), **not** `openai.AsyncOpenAI` as the track doc states. The `*_completions_factory.py` / `*_responses_factory.py` files are helpers — `gateway_factory.py` is where construction lives.
+  - `portkey/portkey_completions_factory.py` — `AsyncOpenAI` (L110); `portkey/portkey_responses_factory.py` — `AsyncOpenAI` (L37).
+  - `mistral/mistral_factory.py` — `Mistral` (L52).
+  - `google/google_factory.py` — `GoogleGenAiClient` (L22).
+- [ ] `AsyncOpenAI` / `AsyncAnthropic` accept `max_retries` directly. **Verify `AsyncPortkey`'s retry parameter before wiring** — the `portkey-ai` SDK may not expose `max_retries` the same way as `openai.AsyncOpenAI`; if it doesn't, the gateway path becomes a 2.4 case. For the `Mistral` SDK and the Google SDK, find the equivalent option (Speakeasy-style `retry_config`, `HttpOptions.retry_options`, etc.).
 
-### 2.2 — GREEN
+> **CHECKPOINT — SDK-backed workers explicit.** _Fill when reached:_ record where the config landed and its field name(s); confirm `make agent-check` clean; note any SDK that doesn't expose a `max_retries` equivalent (it then becomes a 2.4 case).
 
-- [ ] Implement the helper + config per 2.0. Apply it to **one** worker family (LLM is the obvious first). Make the RED test pass.
-- [ ] `make agent-check`.
+### 2.3 — Confine `instructor` to schema re-ask
 
-> **CHECKPOINT — Tier 1 helper proven on one worker.** _Fill when reached:_ record D1–D4 as decided; confirm the RED test is green; note the helper's final signature. The rest is mechanical replication.
+The structured-output path (`PipeLLM` / `PipeStructure`) wraps each completion with `instructor`. `instructor` wraps the *factory-built* SDK client (`from_openai(client=...)`, `from_anthropic(...)`, `from_mistral(...)`, `from_genai(...)`), so 2.2's factory `max_retries` does reach structured calls. But `instructor`'s own `max_retries`, passed as an `int` (`llm_job.job_config.max_retries`, default 3), builds a `tenacity` loop whose default predicate retries **any** exception — so it re-runs the whole completion on transport / API errors too, a second retry loop nested on the SDK floor (worst case ≈ `job_config.max_retries × (cogt.max_retries + 1)` attempts). This is the layer the v1 plan wrongly scoped out as "schema-validation only."
 
-### 2.3 — Apply to the remaining workers
+- [ ] Add a shared helper returning a `tenacity.AsyncRetrying` whose `retry=` predicate is `retry_if_exception_type((pydantic.ValidationError, json.JSONDecodeError))` and whose `stop` is `stop_after_attempt(job_config.max_retries)`. `instructor.core.retry.initialize_retrying()` accepts a pre-built `AsyncRetrying` and uses it as-is.
+- [ ] In the four `instructor` call sites — `openai_completions_llm_worker.py`, `openai_responses_llm_worker.py`, `anthropic_llm_worker.py`, `google_llm_worker.py` — replace `max_retries=llm_job.job_config.max_retries` (the bare `int`) with that `AsyncRetrying`. `mistral_llm_worker.py` passes no `max_retries` today (so `instructor` defaults to 1 — no re-ask; and the Mistral SDK has no transport retry either): give it the same `AsyncRetrying` so structured Mistral gets schema re-ask.
+- [ ] **Behavior change to handle:** with a validation-only predicate a transport error is no longer retried by `instructor` and no longer wrapped in `InstructorRetryException` — it propagates as the raw SDK exception. All five `_gen_object` paths **already have** a second `except` after `except InstructorRetryException` (anthropic `except (APIStatusError, APIConnectionError)` L507; openai_completions L254; openai_responses L244; google `except (genai_errors.ServerError, genai_errors.ClientError)` L415; mistral `except MistralError` L348). The task is therefore **verify-coverage, not add-catch**: confirm each raw-SDK `except` clause is **exhaustive** for every transport exception type that will now propagate, and widen it where it is not. Specifically check: is `anthropic.APITimeoutError` a subclass of `APIConnectionError` (caught) or not? Does bare `except MistralError` cover Mistral's connection/timeout failures, or do those surface as `httpx`-level errors outside the `MistralError` hierarchy? Do `genai` `ServerError` / `ClientError` cover both rate-limit and connection failures? Any uncovered type now escapes as an unhandled raw SDK exception instead of a classified `LLMCompletionError`.
+- [ ] Update the worker comments at the `max_retries=` call sites — they were corrected during this plan markup to describe *current* (retries-everything) behavior; once this step lands, update them to the new (re-ask-only) behavior.
+- [ ] `CHANGELOG.md` `[Unreleased]` — record that `instructor`'s structured-output retry no longer re-runs completions on transport errors; transport retry is solely the SDK floor.
 
-- [ ] Apply the helper to the remaining inference worker families (img-gen, extract, search), uniformly.
-- [ ] Extend the test to cover at least one non-LLM worker, proving the helper is not LLM-specific.
+### 2.4 — Cover the non-SDK / weak-SDK workers
 
-### 2.4 — REFACTOR + docs
+- [ ] Audit the workers that do not ride a retrying SDK and verify the rest:
+  - `pipelex/plugins/azure_rest/azure_img_gen_worker.py` — raw `httpx.AsyncClient` (`timeout=600.0`, L189-199), **no** retry layer. Genuinely SDK-less — gets the retry floor (see below).
+  - FAL — `fal/fal_img_gen_worker.py` submits via the **`fal_client` SDK** (`AsyncClient.submit()`, L138-154), **not** raw `httpx`. Task: verify whether `fal_client` retries transient transport failures internally; bring to the floor **only if** it has none. `fal_poller.py`'s `tenacity` is job-status *polling*, not submit-retry — leave it.
+  - **Idempotency caveat for submit-style POSTs:** a FAL `submit()` enqueues a generation job. Retry it only on errors that prove the request did **not** land — connection errors, 408 — never on an ambiguous 5xx where the job may already be queued. Retrying a landed submit means a duplicate job: double billing, double image.
+  - Mistral / Google — verify whether their SDKs retry transient transport failures by default; if not, treat as below.
+- [ ] Bring each genuine gap up to the same floor: retry transient transport failures (connection / 408 / 409 / 429 / 5xx, honoring `Retry-After`) with the configured `transport_max_retries`. For the SDK-less paths, build the floor on **`tenacity`** — the same library W2.3 introduces for the `instructor` `AsyncRetrying` — as a small shared async wrapper: a retry predicate on connection errors + the transient statuses, a `wait` callable that honors `Retry-After`, `stop_after_attempt(transport_max_retries)`. Reuses a tested backoff library and keeps one retry mechanism across W2; do **not** hand-roll status classification / `Retry-After` parsing, and do **not** layer a wrapper on top of a retrying SDK.
 
-- [ ] One shared implementation, no per-worker copies (per-worker duplication is what made the old gateway `tenacity` quick-and-dirty).
-- [ ] Code comment at the helper: it honors an explicit `Retry-After` only; it is protocol fidelity, not durable resilience; on the Temporal path it runs inside the activity and is deliberately small because Temporal Tier 2 is the real budget.
-- [ ] `CHANGELOG.md` `[Unreleased]` — record the new behavior.
-- [ ] `wip/error-handling/README.md` + `track-retry-and-resilience.md` — flip Tier 1 from "to build" to landed.
+### 2.5 — Tests + docs
+
+- [ ] Test that each factory builds its client with the configured `transport_max_retries` (a construction test — do not try to unit-test SDK retry over the network).
+- [ ] Test the `instructor` retrying helper (2.3): a transport-style exception is **not** retried (the predicate excludes it) and propagates raw; a `pydantic.ValidationError` **is** retried up to `stop_after_attempt`.
+- [ ] **CRITICAL — regression coverage for the 2.3 behavior change.** 2.3 changes the *primary* path for a transport error in every `_gen_object` from "wrapped in `InstructorRetryException`" to "raw SDK exception" — the existing suite mostly exercises the wrapped branch, so the raw branch is now under-tested exactly where it became load-bearing. Add, **per worker** (anthropic / openai_completions / openai_responses / google / mistral): a test that a raw SDK transport exception raised from `create_with_completion` is classified into the correct `InferenceErrorCategory` — not flattened to `UNKNOWN`, not escaping unhandled. This is the proof the `instructor`-confinement change did not silently break error classification.
+- [ ] Test the new `tenacity`-based SDK-less retry wrapper (2.4): mock the `httpx` transport, assert it retries the transient statuses and honors `Retry-After`, mock `asyncio.sleep`; assert a submit-style call is **not** retried on an ambiguous 5xx (idempotency caveat).
+- [ ] `CHANGELOG.md` `[Unreleased]` — record that inference-client transient retry is now an explicit, uniform policy.
+- [ ] `wip/error-handling/README.md` + `track-retry-and-resilience.md` — flip Tier 1 status to landed.
 - [ ] `make agent-test`.
 
-> **CHECKPOINT — Workstream 2 complete.** _Fill when reached:_ `make agent-test` green; confirm uniform application across worker families; record commit(s).
+> **CHECKPOINT — Workstream 2 complete.** _Fill when reached:_ `make agent-test` green; confirm every inference worker family now has a defined transient-retry floor; record commit(s).
 
 ---
 
@@ -112,18 +131,19 @@ A TDD build. Settle the design first (2.0), then RED → GREEN → REFACTOR.
 - `pipelex/pipelex.toml`, `pipelex/kit/configs/pipelex.toml`.
 - Tests: `tests/unit/pipelex/pipe_run/test_pipe_router_retry.py`, `tests/integration/pipelex/pipes/operator/test_operator_transient_retry.py`, `tests/unit/pipelex/system/configuration/test_pipeline_execution_config.py`.
 
-**Workstream 2 (build Tier 1):**
+**Workstream 2 (make Tier 1 explicit):**
 
-- `pipelex/cogt/inference/error_classification.py` — where SDK errors are classified and `retry_after_seconds` is extracted into `ProviderErrorMetadata`.
-- `pipelex/cogt/exceptions.py` — `InferenceErrorCategory`, `CogtError`, `ProviderErrorMetadata`.
-- `pipelex/cogt/config_cogt.py` — `Cogt` config; where `TenacityConfig` used to live before removal — the new small config goes here.
-- Example worker for the call+classify pattern: `pipelex/plugins/anthropic/anthropic_llm_worker.py`. The gateway workers `pipelex/plugins/gateway/gateway_extract_worker.py` / `gateway_search_worker.py` once carried the `tenacity` retry — `git log` for its removal shows where worker-level retry used to attach.
+- `pipelex/cogt/config_cogt.py` — `Cogt` config; the new `transport_max_retries` setting goes here (not in `InstructorConfig`). `pipelex/pipelex.toml` — its default.
+- SDK client factories (verified — those that construct a client): `pipelex/plugins/anthropic/anthropic_factory.py`, `pipelex/plugins/openai/openai_client_factory.py`, `pipelex/plugins/gateway/gateway_factory.py` (`AsyncPortkey` + the gateway `AsyncOpenAI` clients), `pipelex/plugins/portkey/portkey_completions_factory.py` + `portkey_responses_factory.py`, `pipelex/plugins/mistral/mistral_factory.py`, `pipelex/plugins/google/google_factory.py`.
+- Non-SDK / weak-SDK workers: `pipelex/plugins/azure_rest/azure_img_gen_worker.py`, the FAL submit path, plus Mistral / Google verification.
+- `instructor` call sites (2.3): `pipelex/plugins/openai/openai_completions_llm_worker.py`, `openai/openai_responses_llm_worker.py`, `anthropic/anthropic_llm_worker.py`, `google/google_llm_worker.py`, `mistral/mistral_llm_worker.py`. `instructor`'s retry implementation: `.venv/.../instructor/core/retry.py` (`initialize_retrying`, `retry_async`).
+- Reference for what "transient" means: `pipelex/cogt/inference/error_classification.py` and `InferenceErrorCategory` in `pipelex/cogt/exceptions.py`. The installed SDKs' retry logic is in `.venv/.../openai/_base_client.py` and `.venv/.../anthropic/_base_client.py` (`DEFAULT_MAX_RETRIES`, `_should_retry`).
 
 ## Out of scope
 
 - Multi-tenant rate pacing / quotas, caller run deadline/budget, idempotency model, circuit breaking — platform/product concerns; see [wip/temporal-next/00-enterprise-readiness-analysis.md](wip/temporal-next/00-enterprise-readiness-analysis.md).
 - Temporal Tier 2 changes — only a review of whether its `RetryPolicy` defaults are right for the hosted product; not this plan.
-- The `ApplicationError.next_retry_delay` refinement (let Temporal reschedule on the provider's `Retry-After` instead of sleeping inside the activity) — a known later refinement; verify SDK support if picked up.
+- `fal_poller.py`'s `tenacity` (job-status polling) — not transport-error retry; stays as-is. (`instructor`'s `max_retries` was listed here in the v1 plan — wrongly; it retries transport errors too and is now Workstream 2.3.)
 
 ## Risks / gotchas
 
@@ -131,5 +151,19 @@ A TDD build. Settle the design first (2.0), then RED → GREEN → REFACTOR.
 - **Do not touch `gather_bounded` / `max_concurrency`** — easy to over-delete when removing "resilience" config; it is the bounded-fan-out pillar and stays.
 - **Do not revert the operator wrapping** (`PipeLLM` / `PipeStructure` catching `LLMCompletionError` → `PipeRunError`) — propagation, not retry.
 - **`make tb` after config/toml edits** — the config model and every `pipelex.toml` must stay structurally in sync or boot fails.
-- **Tier 1 patch target in tests** — patch where the *worker module* imports the SDK call, not the source module (a recurring mocking gotcha).
-- **Tier 1 stays small** — it honors one explicit `Retry-After`, bounded. It must not grow into a general transient-retry; that pulls the direct path back toward pretending to be resilient.
+- **Configure the SDK retry; do not replace it.** Disabling SDK retries (`max_retries = 0`) to hand-roll a Pipelex retry would re-implement well-tested SDK behavior (status classification, `Retry-After` parsing, backoff) — over-engineering. Only the genuinely SDK-less paths (Workstream 2.3) get a Pipelex `httpx`-level retry.
+- **`Retry-After` is the SDK's job.** The OpenAI / Anthropic SDKs honor `Retry-After` only when ≤ 60s, else exponential backoff — accept that boundary; a longer wait is the Temporal line, not something to chase in direct mode.
+- **`instructor` is a second transport-retry loop.** Passed an `int`, `instructor`'s `max_retries` retries any exception, transport included (Workstream 2.3). Making Tier 1 "explicit" by touching only the factories and leaving `instructor` as an `int` leaves the structured-output floor non-uniform (`job_config.max_retries × cogt.transport_max_retries`) and unmeasured — do not skip 2.3.
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR (PLAN) | 7 issues + 1 regression, all resolved into the plan |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | not applicable (backend/infra) |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
+
+- **UNRESOLVED:** 0
+- **VERDICT:** ENG CLEARED — plan amended, ready to implement. Ship as two PRs (W1 then W2).
