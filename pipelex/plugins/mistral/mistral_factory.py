@@ -18,6 +18,7 @@ from mistralai.models import (
     UsageInfo,
     UserMessage,
 )
+from mistralai.utils import BackoffStrategy, RetryConfig
 
 if TYPE_CHECKING:
     # Deferred import: avoid pulling heavy SDK at module-load time
@@ -35,6 +36,7 @@ from pipelex.cogt.image.prompt_image_utils import prep_prompt_images, prepare_pr
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
+from pipelex.config import get_config
 from pipelex.plugins.mistral.mistral_exceptions import MistralExtractResponseError
 from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
 
@@ -49,7 +51,20 @@ class MistralFactory:
         cls,
         backend: InferenceBackend,
     ) -> Mistral:
-        return Mistral(api_key=backend.api_key)
+        # Tier 1 transport retry: the Mistral SDK does NOT retry transient transport failures by
+        # default. Wire it explicitly from config so it matches the other SDK-backed workers.
+        # Note: the Mistral SDK's retry is backoff/time-budget based — it has no attempt-count
+        # knob — so transport_max_retries acts here as an on/off switch (a positive value enables
+        # a bounded-backoff retry of transient transport failures, including connection errors).
+        transport_max_retries = get_config().cogt.transport_max_retries
+        retry_config: RetryConfig | None = None
+        if transport_max_retries > 0:
+            retry_config = RetryConfig(
+                strategy="backoff",
+                backoff=BackoffStrategy(initial_interval=500, max_interval=60000, exponent=1.5, max_elapsed_time=30000),
+                retry_connection_errors=True,
+            )
+        return Mistral(api_key=backend.api_key, retry_config=retry_config)
 
     #########################################################
     # Message

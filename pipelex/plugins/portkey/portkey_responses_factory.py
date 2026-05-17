@@ -8,6 +8,7 @@ from portkey_ai import (
 )
 from typing_extensions import override
 
+from pipelex.config import get_config
 from pipelex.plugins.openai.openai_responses_factory import OpenAIResponsesFactory
 from pipelex.plugins.portkey.portkey_constants import PortkeyOpenAISdkVariant
 from pipelex.plugins.portkey.portkey_exceptions import PortkeyFactoryError
@@ -40,6 +41,8 @@ class PortkeyResponsesFactory(OpenAIResponsesFactory):
             # not the OpenAI Authorization header. The SDK rejects an empty api_key since
             # 2.34.0, so we pass a non-empty placeholder; the gateway ignores it.
             api_key="unused-auth-via-portkey-headers",
+            # Tier 1 transport retry: set explicitly from config rather than inheriting the SDK default.
+            max_retries=get_config().cogt.transport_max_retries,
             default_headers=createHeaders(
                 api_key=api_key,
                 debug=is_debug_enabled,

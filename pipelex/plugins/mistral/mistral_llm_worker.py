@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Any
 
+import httpx
 from mistralai import Mistral, MistralError
 from mistralai.models import MistralPromptMode, TextChunk, ThinkChunk
 from mistralai.types import UNSET
@@ -15,6 +16,7 @@ from pipelex.cogt.inference.error_classification import (
     is_content_policy_violation,
     is_quota_exhaustion_mistral,
 )
+from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
@@ -181,6 +183,24 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
             provider_metadata=metadata,
         )
 
+    def _classify_mistral_transport_error(self, exc: httpx.TransportError) -> LLMCompletionError:
+        """Classify a raw ``httpx`` transport error into a categorized ``LLMCompletionError``.
+
+        The Mistral SDK does not wrap connection / timeout failures into ``MistralError`` — it lets
+        the raw ``httpx`` exception propagate — so a transport failure must be categorized here
+        rather than in ``_classify_mistral_error`` (which keys off ``MistralError.status_code``).
+        """
+        msg = f"Mistral API transport error for model '{self.inference_model.desc}': {exc}"
+        return LLMCompletionError(
+            msg,
+            error_category=InferenceErrorCategory.TRANSIENT,
+            user_action=UserAction(
+                kind=UserActionKind.WAIT_AND_RETRY,
+                detail="Could not reach Mistral — the system will retry automatically",
+            ),
+            provider_metadata=None,
+        )
+
     def _resolve_prompt_mode(self, job_params: LLMJobParams) -> "OptionalNullable[MistralPromptMode]":
         """Resolve reasoning parameters to a Mistral prompt_mode value.
 
@@ -242,6 +262,8 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
             )
         except MistralError as exc:
             raise self._classify_mistral_error(exc) from exc
+        except httpx.TransportError as exc:
+            raise self._classify_mistral_transport_error(exc) from exc
 
         if not response:
             msg = "Mistral response is None"
@@ -329,6 +351,11 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
                 model=self.inference_model.model_id,
                 temperature=job_params.temperature,
                 max_tokens=job_params.max_tokens or self.default_max_tokens,
+                # instructor's retry is confined to schema re-ask: this validation-only AsyncRetrying
+                # re-asks on a malformed/invalid output but lets a transport error propagate as the raw
+                # SDK exception — transport retry is the SDK client floor (Tier 1) alone. Without this
+                # the Mistral worker passed no max_retries at all, so structured Mistral got no re-ask.
+                max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.max_retries),
             )
         except InstructorRetryException as instructor_exc:
             # instructor wraps SDK exceptions during retries; recover the underlying
@@ -347,6 +374,8 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
             ) from instructor_exc
         except MistralError as exc:
             raise self._classify_mistral_error(exc) from exc
+        except httpx.TransportError as exc:
+            raise self._classify_mistral_transport_error(exc) from exc
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
             llm_tokens_usage.nb_tokens_by_category = self.mistral_factory.make_nb_tokens_by_category(usage=usage)

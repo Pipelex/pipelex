@@ -415,9 +415,9 @@ class PipeAbstract(ABC, BaseModel):
         library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
         # Push the pipe's frame onto the stack, run it, and always pop it — even on failure —
-        # so a failed pipe never leaves its frame behind: a stale frame would let retries
-        # accumulate entries on the shared pipe_stack and trip PipeStackOverflowError before
-        # the transient-retry budget is used. Required cleanup belongs in a `finally` block.
+        # so a failed pipe never leaves a stale frame behind on the shared pipe_stack, where it
+        # could accumulate entries and trip PipeStackOverflowError. Required cleanup belongs in a
+        # `finally` block.
         pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
         try:
             return await self._run_pipe_traced(

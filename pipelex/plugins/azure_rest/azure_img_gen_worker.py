@@ -8,8 +8,10 @@ from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_azure_metadata, is_content_policy_violation
+from pipelex.cogt.inference.transport_retry import request_with_transport_retry
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
+from pipelex.config import get_config
 from pipelex.hub import get_models_manager
 from pipelex.plugins.plugin import Plugin
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -185,9 +187,12 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
         params = f"?api-version={self.api_version}"
         generation_url = f"{self.endpoint}/{base_path}/generations{params}"
 
-        try:
+        # Tier 1 transport retry: this is a genuinely SDK-less path (raw httpx, no retrying SDK
+        # in between), so it gets the transport-retry floor explicitly, from the same config
+        # budget as the SDK-backed workers.
+        async def _post_image_request() -> httpx.Response:
             async with httpx.AsyncClient() as client:
-                response = await client.post(
+                http_response = await client.post(
                     generation_url,
                     headers={
                         "Api-Key": self.api_key,
@@ -196,8 +201,20 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                     json=args_dict,
                     timeout=600.0,
                 )
-                response.raise_for_status()
-                response_dict = response.json()
+                http_response.raise_for_status()
+                return http_response
+
+        try:
+            # Image generation is a billable, non-idempotent POST: once the request reaches Azure,
+            # a retry could generate (and bill) a second image. retry_on_ambiguous_failure=False
+            # keeps the retry to failures that prove Azure did no work — the request was never
+            # delivered (connect / pool errors), or Azure rejected it before generating (408 / 429).
+            response = await request_with_transport_retry(
+                send_request=_post_image_request,
+                max_retries=get_config().cogt.transport_max_retries,
+                retry_on_ambiguous_failure=False,
+            )
+            response_dict = response.json()
         except httpx.HTTPStatusError as exc:
             self._raise_categorized_azure_status_error(exc)
             raise  # unreachable: helper always raises

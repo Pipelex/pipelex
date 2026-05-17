@@ -156,25 +156,9 @@ class PipelineExecutionConfig(ConfigModel):
     is_generate_graph: bool
     graph_config: GraphConfig
 
-    # Application-level retry of transient inference failures (the resilience layer that works without Temporal).
-    max_transient_retries: int = Field(ge=0)
-    transient_retry_base_wait: float = Field(ge=0)
-    transient_retry_max_wait: float = Field(ge=0)
-    transient_retry_backoff_multiplier: float = Field(ge=1)
-
-    # Bounded fan-out concurrency for PipeBatch (the other resilience-without-Temporal pillar).
+    # Bounded fan-out concurrency for PipeBatch (the resilience-without-Temporal pillar).
     # An integer caps the number of branches executed at once; the literal "unbounded" disables the bound.
     max_concurrency: Annotated[int, Field(ge=1)] | Literal["unbounded"]
-
-    @model_validator(mode="after")
-    def _validate_transient_retry_timing(self) -> Self:
-        if self.transient_retry_max_wait < self.transient_retry_base_wait:
-            msg = (
-                f"transient_retry_max_wait ({self.transient_retry_max_wait}) must not be "
-                f"lower than transient_retry_base_wait ({self.transient_retry_base_wait})"
-            )
-            raise ValueError(msg)
-        return self
 
     def with_graph_config_overrides(
         self,

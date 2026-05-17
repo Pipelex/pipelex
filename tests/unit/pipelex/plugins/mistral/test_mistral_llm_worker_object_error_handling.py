@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING
 
 import httpx
 import pytest
-from instructor.core import InstructorRetryException
 from mistralai import Mistral, MistralError
 
 if TYPE_CHECKING:
@@ -225,15 +224,11 @@ class TestMistralLLMWorkerObjectErrorHandling:
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.CONTACT_SUPPORT
 
-    async def test_real_instructor_wraps_mistral_error_and_unwraps_correctly(self, mocker: MockerFixture) -> None:
-        """End-to-end: drive the real instructor library with a ``MistralError`` and
-        verify the worker still categorizes it as TRANSIENT, attaches metadata,
-        and surfaces a semantic ``UserActionKind``.
-
-        Locks in two assumptions our unit tests rely on:
-        1. instructor wraps ``MistralError`` in ``InstructorRetryException``.
-        2. ``InstructorRetryException.failed_attempts[-1].exception`` is the
-           original SDK exception, so our extractor recovers the right object.
+    async def test_real_instructor_propagates_transport_error_raw(self, mocker: MockerFixture) -> None:
+        """End-to-end: drive the real instructor library with a ``MistralError`` and verify the
+        W2.3 behavior — instructor, confined to schema re-ask, does NOT retry the transport error
+        and does NOT wrap it in ``InstructorRetryException``. It propagates as the raw
+        ``MistralError``, which the worker classifies as TRANSIENT with provider metadata.
         """
         import instructor  # noqa: PLC0415
 
@@ -254,7 +249,34 @@ class TestMistralLLMWorkerObjectErrorHandling:
         assert metadata is not None
         assert metadata.provider == "mistral"
         assert metadata.status_code == 429
-        cause = exc_info.value.__cause__
-        assert isinstance(cause, InstructorRetryException)
-        assert cause.failed_attempts is not None
-        assert isinstance(cause.failed_attempts[-1].exception, MistralError)
+        # The raw SDK exception propagates and chains directly — instructor no longer wraps it.
+        assert exc_info.value.__cause__ is sdk_exc
+
+    @pytest.mark.parametrize(
+        ("sdk_exc", "expected_category"),
+        [
+            (_make_mistral_error(500, "Internal server error"), InferenceErrorCategory.TRANSIENT),
+            (_make_mistral_error(429, "Rate limit exceeded. Please retry after 20s"), InferenceErrorCategory.TRANSIENT),
+            (httpx.ConnectError("Connection refused"), InferenceErrorCategory.TRANSIENT),
+            (httpx.ReadTimeout("Read timed out"), InferenceErrorCategory.TRANSIENT),
+        ],
+    )
+    async def test_raw_sdk_transport_error_is_classified(
+        self,
+        mocker: MockerFixture,
+        sdk_exc: Exception,
+        expected_category: InferenceErrorCategory,
+    ) -> None:
+        """W2.3 regression: a raw ``MistralError`` / ``httpx`` transport exception from
+        ``create_with_completion`` is classified, never flattened to ``UNKNOWN``. The ``httpx``
+        cases cover the Mistral SDK's habit of letting raw connection / timeout errors propagate
+        outside the ``MistralError`` hierarchy — which the worker's added ``except`` clause catches.
+        """
+        worker = _make_worker(mocker)
+        worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        with pytest.raises(LLMCompletionError) as exc_info:
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is expected_category
+        assert exc_info.value.__cause__ is sdk_exc
