@@ -48,10 +48,13 @@ class AzureErrorHandlingTestData:
             "bad request",
         ),
         (
+            # A 5xx is returned after the request reached Azure — Azure may have generated (and
+            # billed) the image — so for a non-idempotent image submit it is categorized
+            # AMBIGUOUS (non-retryable), consistent with mid-request timeout handling.
             "server_error_500",
             500,
             "Internal server error",
-            InferenceErrorCategory.TRANSIENT,
+            InferenceErrorCategory.AMBIGUOUS,
             "server error",
         ),
     ]

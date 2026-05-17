@@ -130,13 +130,18 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                 provider_metadata=metadata,
             ) from exc
         if status_code >= 500:
+            # A 5xx is raised by raise_for_status(), so the request reached Azure and got a real
+            # HTTP response — Azure may have generated (and billed) the image before failing.
+            # Image generation is a non-idempotent POST, so this is categorized AMBIGUOUS
+            # (non-retryable) — consistent with the mid-request timeout / transport-error handling
+            # below — to prevent the Temporal bridge from automatically resubmitting the generation.
             msg = f"Azure server error (HTTP {status_code}) for model '{self.inference_model.desc}'"
             raise ImgGenGenerationError(
                 msg,
-                error_category=InferenceErrorCategory.TRANSIENT,
+                error_category=InferenceErrorCategory.AMBIGUOUS,
                 user_action=UserAction(
                     kind=UserActionKind.WAIT_AND_RETRY,
-                    detail="Azure server error — the system will retry automatically",
+                    detail="Azure server error after submission — the outcome is unknown; retry manually after checking for a duplicate image",
                 ),
                 provider_metadata=metadata,
             ) from exc
