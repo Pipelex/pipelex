@@ -9,7 +9,7 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path_and_merge_with_ove
 CONFIG_DIR_NAME = ".pipelex"
 CONFIG_NAME = "pipelex.toml"
 
-PROJECT_ROOT_MARKERS: frozenset[str] = frozenset({".git", "pyproject.toml", "setup.py", "setup.cfg", "package.json", ".hg"})
+PROJECT_ROOT_MARKERS: frozenset[str] = frozenset({CONFIG_DIR_NAME, ".git", "pyproject.toml", "setup.py", "setup.cfg", "package.json", ".hg"})
 
 INFERENCE_DIR_NAME = "inference"
 BACKENDS_FILE_NAME = "backends.toml"
@@ -33,7 +33,8 @@ class ConfigLoader:
         """Walk up from start_dir looking for project root markers.
 
         Excludes the home directory, which may contain stray marker files
-        (e.g. package.json) but is never a real project root.
+        (e.g. the global ~/.pipelex/ or a stray package.json) but is never a
+        real project root.
 
         Returns the directory containing the marker, or None if not found.
         """

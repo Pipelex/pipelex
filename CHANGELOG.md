@@ -15,6 +15,10 @@
 - **`ModelManager.setup()` and `BackendLibrary._load_gateway_model_specs()` accept a new `gateway_config_source: RemoteConfigSource | None` parameter.** Passed through from `Pipelex.setup()` so the deck-level gateway membership check can branch its error message on `FRESH` vs `CACHED`. `GatewayConfig` itself stays `extra="forbid"` and source-free — provenance is plumbed alongside, not baked in.
 - **`RemoteConfigUnavailableError` message branches on whether the cache was refused vs absent.** When `require_fresh=True` (dev-CLI generators) refuses to fall back to an existing cache, the message now reads "the local cache at `<path>` was refused because a fresh fetch is required" instead of the previously misleading "no local cache is available at `<path>`". The cache-truly-missing path keeps its original wording.
 
+### Fixed
+
+- **A directory containing a `.pipelex/` config dir is now recognized as a project root.** `.pipelex` was added to `PROJECT_ROOT_MARKERS`, so project-level config (e.g. `.pipelex/inference/backends.toml`) is honored even when the directory has no `.git`, `pyproject.toml`, or other source-project marker. Previously such a directory fell through to the global `~/.pipelex/` config, silently ignoring the project's own overrides — so a backend disabled in the project's `backends.toml` could still demand credentials because the global config (where it was enabled) was loaded instead. The home directory remains excluded from project-root detection, so the global `~/.pipelex/` is unaffected.
+
 ## [v0.28.0] - 2026-05-13
 
 ### Changed
