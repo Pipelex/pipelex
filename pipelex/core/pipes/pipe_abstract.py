@@ -522,6 +522,11 @@ class PipeAbstract(ABC, BaseModel):
                 job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
             )
         except Exception as exc:
+            # Broad catch is intentional: graph tracing must record EVERY failure mode,
+            # including unexpected ones — an untraced failure is an observability hole.
+            # This observes-and-re-raises (no swallow, no convert), so no bug is hidden.
+            # Can't be a `finally`: the success/error paths record different things and
+            # the error path needs the exception object.
             # Record graph tracing error
             if tracer_manager is not None and parent_graph_context is not None:
                 error_stack: str | None = None
@@ -630,6 +635,8 @@ class PipeAbstract(ABC, BaseModel):
                 library_crate=library_crate,
             )
         except Exception as exc:
+            # Broad catch is intentional: the OTel span must be closed with ERROR status
+            # on any failure. Observes-and-re-raises — see note on the catch in _run_pipe_traced.
             self._end_pipe_span_error(span, error=exc, is_root_span=is_root_span)
             raise
 
