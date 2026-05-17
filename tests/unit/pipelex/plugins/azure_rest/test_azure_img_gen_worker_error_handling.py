@@ -195,3 +195,31 @@ class TestAzureImgGenWorkerSemantic:
         assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
         assert exc_info.value.provider_metadata is not None
         assert exc_info.value.provider_metadata.sdk_exception_type == "ConnectError"
+
+    async def test_read_error_is_wait_and_retry(self, mocker: MockerFixture) -> None:
+        """A mid-request httpx.ReadError (a TransportError subclass not covered by the connect/timeout
+        handlers) must still be wrapped in ImgGenGenerationError, not escape as a raw httpx exception.
+        """
+        worker = _make_worker(mocker)
+        request = httpx.Request("POST", "https://test.azure.com/api")
+        sdk_exc = httpx.ReadError("Connection reset while reading the response", request=request)
+
+        mock_client = mocker.MagicMock()
+        mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
+        mock_client.post = mocker.AsyncMock(side_effect=sdk_exc)
+        mocker.patch("pipelex.plugins.azure_rest.azure_img_gen_worker.httpx.AsyncClient", return_value=mock_client)
+        mocker.patch(
+            "pipelex.plugins.azure_rest.azure_img_gen_worker.ImgGenArgsFactory.make_args_for_model",
+            new_callable=mocker.AsyncMock,
+            return_value={"prompt": "test"},
+        )
+
+        with pytest.raises(ImgGenGenerationError) as exc_info:
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
+        assert exc_info.value.provider_metadata is not None
+        assert exc_info.value.provider_metadata.sdk_exception_type == "ReadError"

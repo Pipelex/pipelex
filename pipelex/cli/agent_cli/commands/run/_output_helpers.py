@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any, cast
 
-from pipelex.tools.misc.json_utils import clean_json_dumps
+from kajson import kajson
+from kajson.exceptions import KajsonException
 
-# Envelope keys that carry metadata rather than the pipeline's main result;
-# excluded from the markdown "Result" JSON block so it stays focused.
-_RUN_ENVELOPE_KEYS: frozenset[str] = frozenset({"working_memory", "main_stuff", "output_file", "graph_files"})
+from pipelex.tools.misc.json_utils import clean_json_dumps
 
 
 def build_run_output(
@@ -81,9 +81,21 @@ def format_run_markdown(result: dict[str, Any]) -> str:
         if isinstance(main_stuff, dict):
             result_payload = cast("dict[str, Any]", main_stuff).get("json")
         if result_payload is None and not isinstance(main_stuff, dict):
-            body = {key: value for key, value in result.items() if key not in _RUN_ENVELOPE_KEYS}
-            result_payload = body or None
+            # Compact mode: `result` is the bare concept JSON, not an envelope — render it whole.
+            # Filtering by envelope-key names here would silently drop a concept field that
+            # happens to be named like one (e.g. `output_file`).
+            result_payload = result or None
         if result_payload is not None:
+            if isinstance(result_payload, str):
+                # The local runner stores `json` as a kajson-encoded string (kajson.dumps of
+                # smart_dump, carrying `__class__` metadata for custom types). Decode it with
+                # kajson — the symmetric decoder — so custom types are reconstituted and then
+                # rendered cleanly by clean_json_dumps; plain json.loads would leave datetimes
+                # and the like as raw tagged dicts. A string that does not decode is rendered as-is.
+                try:
+                    result_payload = kajson.loads(result_payload)
+                except (json.JSONDecodeError, KajsonException):
+                    pass
             lines += ["## Result", "", "```json", clean_json_dumps(result_payload, indent=2), "```"]
         else:
             lines.append("_The pipeline produced no main output._")

@@ -242,6 +242,22 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                 ),
                 provider_metadata=metadata,
             ) from exc
+        except httpx.TransportError as exc:
+            # Catch-all for the remaining httpx.TransportError family — ReadError / WriteError /
+            # RemoteProtocolError and the like — which fire when the connection drops mid-request.
+            # The connect/timeout handlers above are also TransportError subclasses, so this clause
+            # must stay last; without it these escape unwrapped, bypassing the categorized error.
+            metadata = extract_azure_metadata(exc)
+            msg = f"Azure transport error for model '{self.inference_model.desc}': {exc}"
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="The connection to Azure failed mid-request — the system will retry automatically",
+                ),
+                provider_metadata=metadata,
+            ) from exc
 
         # Extract usage tokens if available
         if (usage_dict := response_dict.get("usage")) and (img_gen_tokens_usage := img_gen_job.job_report.img_gen_tokens_usage):
