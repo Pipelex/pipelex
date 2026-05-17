@@ -66,3 +66,14 @@ class TestRecoverErrorReport:
         """A failure with no ``ApplicationError`` in its ``__cause__`` chain yields ``None``."""
         failure = _workflow_failure(RuntimeError("plain non-Temporal failure"))
         assert recover_error_report(failure) is None
+
+    def test_recovers_report_past_report_less_wrapper_application_error(self) -> None:
+        """A report-less wrapper ``ApplicationError`` (e.g. a ``WorkflowExecutionError`` raised
+        when a workflow wraps a failed child workflow) does not hide the report-carrying
+        ``ApplicationError`` deeper in the ``__cause__`` chain.
+        """
+        inner = _app_error(_FULL_REPORT.to_dict())
+        wrapper = ApplicationError("workflow wrapping a failed child workflow", type="WorkflowExecutionError")
+        wrapper.__cause__ = inner
+        failure = _workflow_failure(wrapper)
+        assert recover_error_report(failure) == _FULL_REPORT

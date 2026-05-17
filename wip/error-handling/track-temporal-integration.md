@@ -61,4 +61,4 @@ Two optional refinements from the activity-boundary code review are recorded in 
 - [track-retry-and-resilience.md](track-retry-and-resilience.md) — this is Tier 2; direct execution has no pipeline-level retry tier below it.
 - [track-worker-classification.md](track-worker-classification.md) — every inference worker classifies before this bridge is meaningful.
 - [track-metadata-model.md](track-metadata-model.md) — the `error_category` / `user_action` / `model` / `provider` on `to_error_report()` are what the details payload carries.
-- [track-cli-delivery.md](track-cli-delivery.md) — the delivery surfaces consume `to_error_report()`; the submitter-side gap above is why that data source is degraded for a Temporal-run pipe.
+- [track-cli-delivery.md](track-cli-delivery.md) — the delivery surfaces consume `to_error_report()`; with submitter-side recovery now landed, Temporal-run pipes preserve the same structured error data path as local runs.

@@ -27,22 +27,28 @@ def error_report_dict_from_details(details: Sequence[Any]) -> dict[str, Any] | N
     return None
 
 
-def _find_application_error(exc: BaseException) -> ApplicationError | None:
-    """Return the first ``ApplicationError`` in the ``__cause__`` chain of ``exc``.
+def _find_error_report_dict(exc: BaseException) -> dict[str, Any] | None:
+    """Return the first details-packed ``ErrorReport`` dict in the ``__cause__`` chain of ``exc``.
 
     Temporal sets ``__cause__`` on the ``WorkflowFailureError`` raised by
     ``client.execute_workflow`` to the deserialized failure; the structured
-    ``ErrorReport`` packed by the activity bridge rides on that
-    ``ApplicationError``'s ``details``. The child-workflow boundary exposes its
-    failure via ``ChildWorkflowError.cause`` rather than ``__cause__``, so its
-    caller passes ``exc.cause`` straight in — already an ``ApplicationError``,
-    it is returned on the first iteration.
+    ``ErrorReport`` packed by the activity bridge rides on an
+    ``ApplicationError``'s ``details``. A workflow that wraps a failed child
+    workflow re-raises its own failure — Temporal serializes that re-raised
+    ``WorkflowExecutionError`` as an outer ``ApplicationError`` whose ``details``
+    are empty, with the report-carrying child ``ApplicationError`` deeper in the
+    chain. The walk therefore continues past a report-less ``ApplicationError``
+    rather than stopping at the first one. The child-workflow boundary exposes
+    its failure via ``ChildWorkflowError.cause`` rather than ``__cause__``, so
+    its caller passes ``exc.cause`` straight in.
     """
     node: BaseException | None = exc
     seen: set[int] = set()
     while node is not None and id(node) not in seen:
         if isinstance(node, ApplicationError):
-            return node
+            report_dict = error_report_dict_from_details(node.details)
+            if report_dict is not None:
+                return report_dict
         seen.add(id(node))
         node = node.__cause__
     return None
@@ -62,10 +68,7 @@ def recover_error_report(exc: BaseException) -> ErrorReport | None:
     otherwise schema-drifted payload) yields ``None`` rather than propagating a
     ``ValidationError`` out of the error-recovery path.
     """
-    app_error = _find_application_error(exc)
-    if app_error is None:
-        return None
-    report_dict = error_report_dict_from_details(app_error.details)
+    report_dict = _find_error_report_dict(exc)
     if report_dict is None:
         return None
     known_fields = {field.name for field in fields(ErrorReport)}
