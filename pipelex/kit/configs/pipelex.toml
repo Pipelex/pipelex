@@ -36,13 +36,6 @@ is_normalize_data_urls_to_storage = true
 # Set to false to disable generation of execution graphs
 is_generate_graph = true
 
-# Retry of transient inference failures (rate limits, timeouts, brief outages) at the dispatch layer.
-# Uncomment and adjust to override the defaults; set max_transient_retries = 0 to disable retry entirely.
-# max_transient_retries = 3
-# transient_retry_base_wait = 2.0
-# transient_retry_max_wait = 30.0
-# transient_retry_backoff_multiplier = 2.0
-
 # Bounded fan-out concurrency for PipeBatch: at most this many branches run at once.
 # Uncomment to override; set max_concurrency = "unbounded" to disable the bound.
 # max_concurrency = 8

@@ -198,10 +198,12 @@ class PipeRunParams(BaseModel):
     def pop_pipe_from_stack(self, pipe_code: str) -> None:
         popped_pipe_code = self.pipe_stack.pop()
         if popped_pipe_code != pipe_code:
-            # raise PipeRunError(f"Pipe code '{pipe_code}' was not the last pipe in the stack, it was '{popped_pipe_code}'")
+            # A mismatch means the push/pop discipline was broken upstream. run_pipe() pushes
+            # and pops each frame in a `try`/`finally`, so a frame stays balanced even when its
+            # pipe fails — a mismatch here should not happen in normal flow. We log rather than
+            # raise: this runs inside run_pipe()'s `finally`, where raising would mask the
+            # in-flight exception.
             log.error(f"Pipe code '{pipe_code}' was not the last pipe in the stack, it was '{popped_pipe_code}'")
-            # TODO: investigate how this can happen, maybe due to a shared object between branches of PipeBatch or PipeParallel
-            # (which should be copied instead)
 
     def push_pipe_layer(self, pipe_code: str) -> None:
         if self.pipe_layers and self.pipe_layers[-1] == pipe_code:

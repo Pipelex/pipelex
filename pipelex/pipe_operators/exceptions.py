@@ -16,7 +16,7 @@ class PipeOperatorModelAvailabilityError(PipelexError):
         self.run_mode = run_mode
         self.pipe_type = pipe_type
         self.pipe_code = pipe_code
-        self.pipe_stack = pipe_stack
+        self.pipe_stack = list(pipe_stack)  # snapshot: the live stack unwinds after this error is raised
         self.model_handle = model_handle
         self.fallback_list = fallback_list
         super().__init__(message)

@@ -414,8 +414,36 @@ class PipeAbstract(ABC, BaseModel):
         output_name: str | None = None,
         library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
+        # Push the pipe's frame onto the stack, run it, and always pop it — even on failure —
+        # so a failed pipe never leaves a stale frame behind on the shared pipe_stack, where it
+        # could accumulate entries and trip PipeStackOverflowError. Required cleanup belongs in a
+        # `finally` block.
         pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
+        try:
+            return await self._run_pipe_traced(
+                job_metadata=job_metadata,
+                working_memory=working_memory,
+                pipe_run_params=pipe_run_params,
+                output_name=output_name,
+                library_crate=library_crate,
+            )
+        finally:
+            pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
 
+    @final
+    async def _run_pipe_traced(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: str | None = None,
+        library_crate: "LibraryCrate | None" = None,
+    ) -> PipeOutput:
+        """Run the pipe with graph tracing — the inner body of `run_pipe()`.
+
+        Split out so `run_pipe()` stays a thin push / `try`-`finally` / pop wrapper that
+        keeps the pipe's `pipe_stack` frame balanced on every exit path.
+        """
         # Handle graph tracing if enabled
         graph_node_id: str | None = None
         child_graph_context: GraphContext | None = None
@@ -539,7 +567,6 @@ class PipeAbstract(ABC, BaseModel):
                 output_concept_data=output_concept_data,
             )
 
-        pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
         return pipe_output
 
     @final

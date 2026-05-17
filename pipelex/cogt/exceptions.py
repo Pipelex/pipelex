@@ -93,6 +93,33 @@ class CogtError(PipelexError):
         return self._enrich_error_report_from_cause(report)
 
 
+def find_inference_error_category_in_chain(exc: BaseException) -> InferenceErrorCategory | None:
+    """Return the first ``InferenceErrorCategory`` found on the exception's ``__cause__`` chain.
+
+    By the time a retry decision is made, the categorized ``CogtError`` a worker raised is
+    usually buried: operators wrap it into a ``PipeRunError``, the ``PipeRouter`` into a
+    ``PipeRouterError``, the pipeline runner into a ``PipelineExecutionError`` — none of
+    which are ``CogtError`` subclasses. Walking ``__cause__`` recovers the category
+    regardless of wrapper depth.
+
+    The Temporal activity error boundary calls this to derive its retry decision
+    (``non_retryable``) from the underlying failure's category. A ``CogtError`` carrying no
+    category is skipped — the walk continues to the first one that actually classifies the failure.
+
+    The ``id()`` set guards against a cyclic ``__cause__`` chain: without it a cycle would
+    spin this loop forever — and it runs on the error path, so the failure being classified
+    would be lost to a hang rather than reported.
+    """
+    current: BaseException | None = exc
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, CogtError) and current.error_category is not None:
+            return current.error_category
+        current = current.__cause__
+    return None
+
+
 class LLMConfigError(CogtError):
     error_category = InferenceErrorCategory.CONFIGURATION
 

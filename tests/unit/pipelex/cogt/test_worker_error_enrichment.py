@@ -185,6 +185,27 @@ class TestWorkerErrorEnrichment:
         assert report.model == WORKER_MODEL
         assert report.provider is None
 
+    @pytest.mark.parametrize(
+        "raised_error",
+        [
+            RuntimeError("unexpected worker bug"),
+            LLMCompletionError("transient failure", error_category=InferenceErrorCategory.TRANSIENT),
+        ],
+    )
+    async def test_llm_worker_closes_span_on_failure(self, mocker: MockerFixture, raised_error: Exception) -> None:
+        """gen_text always closes the OTel span on failure — for a CogtError and for an unexpected non-CogtError alike."""
+        worker = _StubLLMWorker(model_handle=WORKER_MODEL, provider_name=WORKER_PROVIDER, error=raised_error)
+        fake_span = mocker.MagicMock()
+        fake_span.is_recording.return_value = True
+        mocker.patch.object(worker, "_start_otel_span_llm", return_value=fake_span)
+        end_with_error = mocker.patch.object(worker, "_end_otel_span_with_error")
+
+        with pytest.raises(type(raised_error)):
+            await worker.gen_text(llm_job=_make_llm_job(mocker))
+
+        end_with_error.assert_called_once()
+        assert end_with_error.call_args.kwargs["error"] is raised_error
+
     @pytest.mark.parametrize("use_list", [False, True])
     async def test_img_gen_worker_enriches_error(self, mocker: MockerFixture, use_list: bool) -> None:
         """gen_image / gen_image_list stamp model and provider onto a bare ImgGenGenerationError."""

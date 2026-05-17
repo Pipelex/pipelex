@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
@@ -290,7 +291,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         span.set_status(Status(StatusCode.OK))
         span.end()
 
-    def _end_otel_span_with_error(self, span: Span | None, llm_job: LLMJob, error: Exception) -> None:
+    def _end_otel_span_with_error(self, span: Span | None, llm_job: LLMJob, error: BaseException) -> None:
         """End the OTel span, recording the error. Safe to call if span is None."""
         if span is None:
             return
@@ -372,14 +373,18 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         try:
             text_result = await self._gen_text(llm_job=llm_job)
+            await self._after_text_job(span=span, llm_job=llm_job, result_text=text_result)
+            return text_result
         except CogtError as exc:
             exc.fill_model_and_provider(model_handle=self._get_request_model_name(), backend_name=self._get_provider_name())
-            self._end_otel_span_with_error(span=span, llm_job=llm_job, error=exc)
             raise
-
-        await self._after_text_job(span=span, llm_job=llm_job, result_text=text_result)
-
-        return text_result
+        finally:
+            # `_gen_text` / `_after_text_job` raised before the span was ended — close it with the
+            # in-flight error (a CogtError, or any unexpected failure) so no span leaks and the
+            # failure stays in telemetry. On success `_after_text_job` already ended the span.
+            pending_error = sys.exc_info()[1]
+            if pending_error is not None and span is not None and span.is_recording():
+                self._end_otel_span_with_error(span=span, llm_job=llm_job, error=pending_error)
 
     @abstractmethod
     async def _gen_text(
@@ -410,14 +415,19 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             # Cleanup result
             if hasattr(object_result, "_raw_response"):
                 delattr(object_result, "_raw_response")
+
+            await self._after_object_job(span=span, llm_job=llm_job, result_object=object_result)
+            return object_result
         except CogtError as exc:
             exc.fill_model_and_provider(model_handle=self._get_request_model_name(), backend_name=self._get_provider_name())
-            self._end_otel_span_with_error(span=span, llm_job=llm_job, error=exc)
             raise
-
-        await self._after_object_job(span=span, llm_job=llm_job, result_object=object_result)
-
-        return object_result
+        finally:
+            # `_gen_object` / `_after_object_job` raised before the span was ended — close it with
+            # the in-flight error (a CogtError, or any unexpected failure) so no span leaks and the
+            # failure stays in telemetry. On success `_after_object_job` already ended the span.
+            pending_error = sys.exc_info()[1]
+            if pending_error is not None and span is not None and span.is_recording():
+                self._end_otel_span_with_error(span=span, llm_job=llm_job, error=pending_error)
 
     @abstractmethod
     async def _gen_object(

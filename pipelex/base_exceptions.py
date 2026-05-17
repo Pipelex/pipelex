@@ -20,21 +20,28 @@ class ErrorDomain(StrEnum):
     RUNTIME = "runtime"
 
 
-def error_domain_to_http_status(error_domain: ErrorDomain | None) -> int:
-    """Map an :class:`ErrorDomain` to an HTTP status code.
+def error_domain_to_http_status(error_domain: ErrorDomain | str | None) -> int:
+    """Map an error domain to an HTTP status code.
 
-    Authoritative mapping for downstream HTTP APIs (``pipelex-relay``,
-    ``pipelex-back-office``): those repos call this helper instead of
-    redefining the contract. The library itself stays HTTP-agnostic — no
-    web-framework import lives here, only the mapping table.
+    Domain-level building block for downstream HTTP APIs (``pipelex-relay``,
+    ``pipelex-back-office``). When you have a full :class:`ErrorReport`, prefer
+    :attr:`ErrorReport.http_status` — it layers the provider 429 (rate-limit)
+    passthrough on top of this mapping. The library itself stays HTTP-agnostic —
+    no web-framework import lives here, only the mapping table.
+
+    Accepts a raw ``str`` because ``ErrorReport.error_domain`` is serialized as
+    one. A value this version does not recognize (e.g. a report serialized by a
+    newer Pipelex) is treated as unclassified rather than crashing rendering.
 
     - ``INPUT`` -> 422: the caller sent something it can fix (bad input).
     - ``CONFIG`` / ``RUNTIME`` -> 500: a server-side problem.
-    - ``None`` -> 500: unclassified, treated as a server-side problem.
-
-    This is the *domain* default. A provider 429 (rate-limit) passthrough is
-    layered on top by :attr:`ErrorReport.http_status`.
+    - unknown / ``None`` -> 500: unclassified, treated as a server-side problem.
     """
+    if isinstance(error_domain, str):
+        try:
+            error_domain = ErrorDomain(error_domain)
+        except ValueError:
+            error_domain = None
     match error_domain:
         case ErrorDomain.INPUT:
             return 422
@@ -79,23 +86,13 @@ class ErrorReport:
         A provider 429 (rate limit) takes precedence so the API can surface a
         ``Retry-After`` header from ``provider_metadata.retry_after_seconds``;
         otherwise the status follows ``error_domain`` (see
-        :func:`error_domain_to_http_status`).
-
-        An ``error_domain`` string this version does not recognize (e.g. a
-        report serialized by a newer Pipelex) is treated as unclassified
-        rather than crashing the HTTP response rendering.
+        :func:`error_domain_to_http_status`, which also tolerates an
+        ``error_domain`` string this version does not recognize — e.g. a report
+        serialized by a newer Pipelex — rather than crashing response rendering).
         """
         if self.provider_metadata is not None and self.provider_metadata.status_code == 429:
             return 429
-        domain: ErrorDomain | None
-        if self.error_domain is None:
-            domain = None
-        else:
-            try:
-                domain = ErrorDomain(self.error_domain)
-            except ValueError:
-                domain = None
-        return error_domain_to_http_status(domain)
+        return error_domain_to_http_status(self.error_domain)
 
 
 class PipelexError(Exception):
@@ -139,6 +136,16 @@ class PipelexError(Exception):
         cause = self.__cause__
         if not isinstance(cause, PipelexError):
             return report
+        # Guard against a cyclic __cause__ chain: if self is reachable from cause, recursing
+        # into cause.to_error_report() would never terminate. Bail out with the enrichment
+        # gathered so far rather than raising a RecursionError from the error-reporting path.
+        node: BaseException | None = cause
+        seen: set[int] = set()
+        while node is not None and id(node) not in seen:
+            if node is self:
+                return report
+            seen.add(id(node))
+            node = node.__cause__
         cause_report = cause.to_error_report()
         return ErrorReport(
             error_type=report.error_type,

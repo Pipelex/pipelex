@@ -241,3 +241,51 @@ class TestBackendCustomization:
 
         # Verify warning was printed
         mock_console.print.assert_called()
+
+    def test_customize_backends_disables_gateway_when_terms_save_raises_type_error(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """A TypeError from terms persistence (malformed [agreement] TOML) still triggers the gateway-disable safety fallback."""
+        inference_dir = tmp_path / ".pipelex" / "inference"
+        inference_dir.mkdir(parents=True)
+
+        actual_backends = Path(str(get_kit_configs_dir())) / "inference" / "backends.toml"
+        test_backends = inference_dir / "backends.toml"
+        shutil.copy2(actual_backends, test_backends)
+
+        mock_config_manager = mocker.MagicMock()
+        mock_config_manager.pipelex_config_dir = tmp_path / ".pipelex"
+        mock_config_manager.global_config_dir = tmp_path / ".pipelex"
+        mocker.patch("pipelex.cli.commands.init.backends.config_manager", mock_config_manager)
+        mocker.patch("pipelex.cli.commands.init.backends.get_console", return_value=mocker.MagicMock())
+
+        # Terms persistence fails with a TypeError, as a malformed [agreement] section would produce.
+        mocker.patch(
+            "pipelex.cli.commands.init.backends.update_service_terms_acceptance",
+            side_effect=TypeError("'str' object does not support item assignment"),
+        )
+
+        prompt_inputs = ["1"]  # Select pipelex_gateway
+        confirm_inputs = [True]  # Accept gateway terms
+
+        def prompt_side_effect(*args: Any, **_kwargs: Any) -> str:
+            if not prompt_inputs:
+                question = str(args[0]) if args else "<unknown prompt>"
+                msg = f"Unexpected prompt without predefined input: {question}"
+                raise AssertionError(msg)
+            return prompt_inputs.pop(0)
+
+        def confirm_side_effect(*args: Any, **_kwargs: Any) -> bool:
+            if not confirm_inputs:
+                question = str(args[0]) if args else "<unknown confirmation>"
+                msg = f"Unexpected confirm without predefined input: {question}"
+                raise AssertionError(msg)
+            return confirm_inputs.pop(0)
+
+        mocker.patch("rich.prompt.Prompt.ask", side_effect=prompt_side_effect)
+        mocker.patch("rich.prompt.Confirm.ask", side_effect=confirm_side_effect)
+
+        # Execute - the TypeError must be caught so the safety fallback runs.
+        customize_backends_config()
+
+        # The gateway must be disabled since its terms could not be recorded.
+        toml_doc = load_toml_with_tomlkit(str(test_backends))
+        assert toml_doc[PipelexBackend.GATEWAY]["enabled"] is False  # type: ignore[index]

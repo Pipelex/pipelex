@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING
 import anthropic
 import httpx
 import pytest
-from instructor.core import InstructorRetryException
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -285,16 +284,11 @@ class TestAnthropicWorkerObjectErrorHandling:
         assert user_action_dict["kind"] == UserActionKind.CHECK_BILLING
         assert isinstance(user_action_dict["detail"], str)
 
-    async def test_real_instructor_wraps_rate_limit_and_fix_unwraps_correctly(self, mocker: MockerFixture) -> None:
-        """End-to-end: drive the real instructor library with an SDK exception and
-        verify the worker still categorizes it as TRANSIENT.
-
-        This locks in two assumptions our unit tests rely on:
-        1. instructor really does wrap ``RateLimitError`` in ``InstructorRetryException``
-           (if a future instructor version stops doing this, the bug disappears and
-           this test should be revisited).
-        2. ``InstructorRetryException.failed_attempts[-1].exception`` is the original
-           SDK exception, so our extractor recovers the right object.
+    async def test_real_instructor_propagates_transport_error_raw(self, mocker: MockerFixture) -> None:
+        """End-to-end: drive the real instructor library with an SDK transport exception and
+        verify the W2.3 behavior — instructor, confined to schema re-ask, does NOT retry the
+        transport error and does NOT wrap it in ``InstructorRetryException``. It propagates as
+        the raw SDK exception, which the worker's ``except`` clause classifies as TRANSIENT.
         """
         import instructor  # noqa: PLC0415  # imported here to mirror runtime usage
 
@@ -310,9 +304,34 @@ class TestAnthropicWorkerObjectErrorHandling:
             await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
-        # The ``from`` chain should preserve the wrapper (not the raw SDK exc),
-        # so traceback shows the full instructor → tenacity → SDK story.
-        cause = exc_info.value.__cause__
-        assert isinstance(cause, InstructorRetryException)
-        assert cause.failed_attempts is not None
-        assert isinstance(cause.failed_attempts[-1].exception, anthropic.RateLimitError)
+        # The raw SDK exception propagates and chains directly — instructor no longer wraps it.
+        assert exc_info.value.__cause__ is sdk_exc
+
+    @pytest.mark.parametrize(
+        ("sdk_exc", "expected_category"),
+        [
+            (_make_anthropic_connection_error(), InferenceErrorCategory.TRANSIENT),
+            (_make_anthropic_timeout_error(), InferenceErrorCategory.TRANSIENT),
+            (_make_anthropic_internal_server_error("Internal server error"), InferenceErrorCategory.TRANSIENT),
+            (_make_anthropic_rate_limit_error("Number of request tokens has exceeded your per-minute limit"), InferenceErrorCategory.TRANSIENT),
+        ],
+    )
+    async def test_raw_sdk_transport_error_is_classified(
+        self,
+        mocker: MockerFixture,
+        sdk_exc: Exception,
+        expected_category: InferenceErrorCategory,
+    ) -> None:
+        """W2.3 regression: now that ``instructor`` no longer retries transport errors, a raw SDK
+        transport exception is the primary path out of ``create_with_completion`` — it must be
+        classified into the right category, never flattened to ``UNKNOWN``, never escape unhandled.
+        """
+        _patch_gen_object_dependencies(mocker)
+        worker = _make_worker(mocker)
+        worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        with pytest.raises(LLMCompletionError) as exc_info:
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is expected_category
+        assert exc_info.value.__cause__ is sdk_exc
