@@ -10,7 +10,6 @@ from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.observer.observer_protocol import ObserverNoOp
 from pipelex.pipe_run.pipe_job import PipeJob
-from pipelex.pipe_run.pipe_router import make_transient_retry_settings
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 from pipelex.temporal.exceptions import WorkflowExecutionError
 from pipelex.temporal.temporal_manager import TemporalWorkerEnvironment
@@ -51,7 +50,6 @@ class TemporalPipeRouter(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtoc
             worker_environment=worker_environment,
         )
         self.observer = ObserverNoOp()
-        self.transient_retry_settings = make_transient_retry_settings()
 
     @override
     @with_conditional_worker

@@ -8,7 +8,7 @@
 
 ## Status
 
-**Not started.** Both workstreams open. They are independent in content, but ship as two PRs — Workstream 1 (removal) first, Workstream 2 (Tier 1 explicit) second (see **Packaging** above).
+**Workstream 1 complete** (`make agent-check` clean, `make agent-test` green). **Workstream 2 not started.** They are independent in content, but ship as two PRs — Workstream 1 (removal) first, Workstream 2 (Tier 1 explicit) second (see **Packaging** above).
 
 ## Cold-start context
 
@@ -29,40 +29,47 @@ A removal, not a TDD build. Delete in the order below, then verify. One small gu
 
 ### 1.1 — Strip the retry loop from the protocol
 
-- [ ] `pipelex/pipe_run/pipe_router_protocol.py` — in `run()` (around lines 54–100), remove the `while True` retry loop, the backoff `asyncio.sleep`, the retry logging, and the `find_inference_error_category_in_chain` call. The resulting `run()`: `_before_run` → one `_run_pipe_job` call → `_after_successful_run` on success; on `except (CogtError, PipeRunError)`, call `_after_failing_run`, then wrap a `PipeRunError` into `PipeRouterError` / re-raise a raw `CogtError` as-is. **Keep that handler** — it is error propagation (pipe-stack context), not retry.
-- [ ] Same file — remove the `transient_retry_settings: TransientRetrySettings` attribute from `PipeRouterProtocol`.
-- [ ] Let `make fix-unused-imports` clean the now-unused imports (`asyncio`, `log`, `find_inference_error_category_in_chain`, `TransientRetrySettings`).
-- [ ] Leave `find_inference_error_category_in_chain` in `pipelex/cogt/exceptions.py` — Temporal still uses it (`temporal_error.py`). Only the router's *use* of it goes.
+- [x] `pipelex/pipe_run/pipe_router_protocol.py` — in `run()` (around lines 54–100), remove the `while True` retry loop, the backoff `asyncio.sleep`, the retry logging, and the `find_inference_error_category_in_chain` call. The resulting `run()`: `_before_run` → one `_run_pipe_job` call → `_after_successful_run` on success; on `except (CogtError, PipeRunError)`, call `_after_failing_run`, then wrap a `PipeRunError` into `PipeRouterError` / re-raise a raw `CogtError` as-is. **Keep that handler** — it is error propagation (pipe-stack context), not retry.
+- [x] Same file — remove the `transient_retry_settings: TransientRetrySettings` attribute from `PipeRouterProtocol`.
+- [x] Let `make fix-unused-imports` clean the now-unused imports (`asyncio`, `log`, `find_inference_error_category_in_chain`, `TransientRetrySettings`).
+- [x] Leave `find_inference_error_category_in_chain` in `pipelex/cogt/exceptions.py` — Temporal still uses it (`temporal_error.py`). Only the router's *use* of it goes.
 
 ### 1.2 — Delete the retry plumbing
 
-- [ ] Delete `pipelex/pipe_run/transient_retry.py` (`TransientRetrySettings`).
-- [ ] `pipelex/pipe_run/pipe_router.py` — delete `make_transient_retry_settings()`; drop `self.transient_retry_settings` from `PipeRouter.__init__`.
-- [ ] `pipelex/pipe_run/dry_pipe_router.py` — drop `transient_retry_settings` from `DryPipeRouter` (around line 13) and its import.
-- [ ] `pipelex/temporal/tprl_pipe/temporal_pipe_router.py` — drop `transient_retry_settings` from `TemporalPipeRouter` (around line 54) and its import. This was dead code.
+- [x] Delete `pipelex/pipe_run/transient_retry.py` (`TransientRetrySettings`).
+- [x] `pipelex/pipe_run/pipe_router.py` — delete `make_transient_retry_settings()`; drop `self.transient_retry_settings` from `PipeRouter.__init__`.
+- [x] `pipelex/pipe_run/dry_pipe_router.py` — drop `transient_retry_settings` from `DryPipeRouter` (around line 13) and its import.
+- [x] `pipelex/temporal/tprl_pipe/temporal_pipe_router.py` — drop `transient_retry_settings` from `TemporalPipeRouter` (around line 54) and its import. This was dead code.
 
 ### 1.3 — Remove the config
 
-- [ ] `pipelex/system/configuration/configs.py` — from `PipelineExecutionConfig` (around lines 153–177) remove the transient-retry fields and the `_validate_transient_retry_timing` validator. **Keep `max_concurrency`** — it is the bounded-fan-out pillar and stays.
-- [ ] `pipelex/pipelex.toml` — remove the transient-retry settings (around lines 290–293).
-- [ ] `pipelex/kit/configs/pipelex.toml` — remove the commented-out transient-retry block (around lines 41–44).
-- [ ] `.pipelex/pipelex.toml` — remove the commented-out transient-retry block (around lines 40–44, including the `# Uncomment and adjust...` lead-in). It is commented so boot won't fail, but a user uncommenting `max_transient_retries` after this change would hit a config-load failure against the removed field.
-- [ ] `make tb` — confirm the boot sequence still loads the config (model ↔ toml in sync).
+- [x] `pipelex/system/configuration/configs.py` — from `PipelineExecutionConfig` (around lines 153–177) remove the transient-retry fields and the `_validate_transient_retry_timing` validator. **Keep `max_concurrency`** — it is the bounded-fan-out pillar and stays.
+- [x] `pipelex/pipelex.toml` — remove the transient-retry settings (around lines 290–293).
+- [x] `pipelex/kit/configs/pipelex.toml` — remove the commented-out transient-retry block (around lines 41–44).
+- [x] `.pipelex/pipelex.toml` — remove the commented-out transient-retry block (around lines 40–44, including the `# Uncomment and adjust...` lead-in). It is commented so boot won't fail, but a user uncommenting `max_transient_retries` after this change would hit a config-load failure against the removed field.
+- [x] `make tb` — confirm the boot sequence still loads the config (model ↔ toml in sync).
 
 ### 1.4 — Tests
 
-- [ ] Delete `tests/unit/pipelex/pipe_run/test_pipe_router_retry.py`.
-- [ ] Delete `tests/integration/pipelex/pipes/operator/test_operator_transient_retry.py`.
-- [ ] `tests/unit/pipelex/system/configuration/test_pipeline_execution_config.py` — drop expectations on the removed retry fields.
-- [ ] Add one small guard test pinning **both** branches of the kept handler: (a) a transient `CogtError` from `_run_pipe_job` surfaces on the **first** attempt (`_run_pipe_job` called exactly once) — pins the "direct = single pipeline-level attempt" contract against a future re-introduction of a loop; (b) a `PipeRunError` from `_run_pipe_job` surfaces as `PipeRouterError` with the pipe-stack context intact — pins the "keep the handler" contract against a future accidental handler deletion.
+- [x] Delete `tests/unit/pipelex/pipe_run/test_pipe_router_retry.py`.
+- [x] Delete `tests/integration/pipelex/pipes/operator/test_operator_transient_retry.py`.
+- [x] `tests/unit/pipelex/system/configuration/test_pipeline_execution_config.py` — drop expectations on the removed retry fields.
+- [x] Add one small guard test pinning **both** branches of the kept handler: (a) a transient `CogtError` from `_run_pipe_job` surfaces on the **first** attempt (`_run_pipe_job` called exactly once) — pins the "direct = single pipeline-level attempt" contract against a future re-introduction of a loop; (b) a `PipeRunError` from `_run_pipe_job` surfaces as `PipeRouterError` with the pipe-stack context intact — pins the "keep the handler" contract against a future accidental handler deletion.
 
 ### 1.5 — Docs
 
-- [ ] `CHANGELOG.md` `[Unreleased]` — record the removal (reverses the Phase 5 "application-level retry of transient inference failures" entry).
-- [ ] `wip/error-handling/todos-retry-graph-trace.md` — mark resolved-by-removal (the PipeRouter loop was the sole cause of the phantom-error-node bug it describes).
-- [ ] `wip/error-handling/README.md` — update the Retry & resilience status row: the loop is now removed (the row currently carries a "Superseded" pointer plus a "Landed in current code" description that becomes false here).
+- [x] `CHANGELOG.md` `[Unreleased]` — record the removal (reverses the Phase 5 "application-level retry of transient inference failures" entry).
+- [x] `wip/error-handling/todos-retry-graph-trace.md` — mark resolved-by-removal (the PipeRouter loop was the sole cause of the phantom-error-node bug it describes).
+- [x] `wip/error-handling/README.md` — update the Retry & resilience status row: the loop is now removed (the row currently carries a "Superseded" pointer plus a "Landed in current code" description that becomes false here).
 
-> **CHECKPOINT — Workstream 1 complete.** _Fill when reached:_ `make agent-check` clean, `make agent-test` green; note any deviation from the steps above; confirm `max_concurrency` and the operator wrapping were left intact; record the commit(s).
+> **CHECKPOINT — Workstream 1 complete.**
+> - `make agent-check` clean (ruff, plxt, pyright 0 errors, mypy clean); `make tb` green (config model ↔ toml in sync); `make agent-test` green (full suite).
+> - `max_concurrency` left intact in `PipelineExecutionConfig` and all three `pipelex.toml` files; the `except (CogtError, PipeRunError)` handler in `run()` kept (now without the loop); the `PipeLLM` / `PipeStructure` operator wrapping untouched; `find_inference_error_category_in_chain` left in `cogt/exceptions.py` for Temporal's use.
+> - **Deviations from the steps:**
+>   - 1.4 — `test_pipeline_execution_config.py` was *deleted entirely* rather than "drop expectations": both its test functions targeted only the removed `_validate_transient_retry_timing` validator, so dropping the retry expectations left an empty file.
+>   - 1.4 — the guard test landed in a new file `tests/unit/pipelex/pipe_run/test_pipe_router_run.py` (`TestPipeRouterRun`), since `test_pipe_router_retry.py` was deleted.
+>   - 1.5 — `CHANGELOG.md`: the "Application-level retry of transient inference failures" entry was *removed* from `[Unreleased]` rather than reversed with a "Removed" entry — it was never in a release, so a Removed line would only confuse release-notes readers. Two cross-references were also corrected: the `PipeBatch` entry ("second resilience pillar beside transient retry" → "the resilience-without-Temporal pillar") and the Temporal activity-boundary entry (dropped the "Temporal-side twin of the non-Temporal `PipeRouter` transient-retry path" sentence).
+> - Not committed — left for the user / the W1 PR step.
 
 ---
 

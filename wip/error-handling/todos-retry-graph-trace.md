@@ -1,6 +1,6 @@
 # TODO — Drop failed-attempt graph nodes when the PipeRouter retries
 
-> **Status:** Not started — minimal stub. **Design the full plan in a fresh session** (see "How to expand" below).
+> **Status:** RESOLVED BY REMOVAL. The phantom-error-node bug existed only because the `PipeRouter` retry loop reran a failed pipe within a single `run()`. That loop has been removed (Workstream 1 of the retry-and-resilience plan — see [track-retry-and-resilience.md](track-retry-and-resilience.md)): direct execution is now a single pipeline-level attempt, so a pipe runs at most once per `run()` and there is no duplicate error/success node to discard. The rest of this doc is kept only as a record of the original gap.
 > **Source:** Follow-up to the `PipeRouter` transient-retry loop — see [track-retry-and-resilience.md](track-retry-and-resilience.md). Raised as a review comment on PR #903.
 
 ---

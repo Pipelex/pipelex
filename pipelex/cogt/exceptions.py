@@ -102,9 +102,9 @@ def find_inference_error_category_in_chain(exc: BaseException) -> InferenceError
     which are ``CogtError`` subclasses. Walking ``__cause__`` recovers the category
     regardless of wrapper depth.
 
-    Both the in-process ``PipeRouter`` transient-retry loop and the Temporal activity error
-    boundary call this so their retry decisions agree. A ``CogtError`` carrying no category
-    is skipped — the walk continues to the first one that actually classifies the failure.
+    The Temporal activity error boundary calls this to derive its retry decision
+    (``non_retryable``) from the underlying failure's category. A ``CogtError`` carrying no
+    category is skipped — the walk continues to the first one that actually classifies the failure.
 
     The ``id()`` set guards against a cyclic ``__cause__`` chain: without it a cycle would
     spin this loop forever — and it runs on the error path, so the failure being classified
