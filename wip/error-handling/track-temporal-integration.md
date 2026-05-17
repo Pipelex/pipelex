@@ -46,6 +46,8 @@ The bridge moves the `ErrorReport` activity → workflow, and `from_app_error` r
 
 Net effect: a pipe failure on a Temporal worker now reaches every `to_error_report()` consumer — agent CLI JSON/markdown, the Rich human CLI, the `ErrorReport.http_status` mapping for HTTP adapters — with the same `error_category` / `retryable` / `model` / `provider` / `user_action` classification as the identical failure run locally.
 
+**Coverage:** beyond the unit tests that pin `recover_error_report` and `WorkflowExecutionError` against synthetic failures, an integration parity pair exercises the full chain: `tests/integration/pipelex/temporal/test_workflow_error_report_full_chain.py` runs a real `WfPipeRouter` workflow on the in-process Temporal server through `WorkflowExecutor.execute_workflow` with the LLM call mocked to fail — the genuine activity → workflow → submitter serialization round-trip — and `tests/integration/pipelex/error_handling/test_error_report_local_full_chain.py` runs the same pipe locally. Both assert the same `ErrorReportParityTestData` constants, so local/Temporal `ErrorReport` parity is locked.
+
 **Design:** `WorkflowExecutionError` holds the `ErrorReport` as an optional attribute and overrides `to_error_report()` — option (a). This keeps `raise WorkflowExecutionError(msg) from exc` so the Temporal `WorkflowFailureError` stays in the traceback for free. Rejected option (b) (a `RemotePipelexError` carrier in the `__cause__` chain) for forcing a new public exception class plus manual `__cause__` wiring.
 
 ### Child-workflow boundary recovery (landed)
