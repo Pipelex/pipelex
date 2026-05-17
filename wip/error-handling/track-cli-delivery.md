@@ -88,12 +88,14 @@ The library stays HTTP-agnostic — no web-framework import, only the mapping ta
 
 ## Open gaps
 
-Delivery itself is landed — the Rich handlers and the agent JSON/markdown path faithfully consume `to_error_report()`. But that data source has a hole under Temporal: when a pipe runs on a Temporal worker, a worker-side failure reaches delivery as a generic `PipelineExecutionError` stripped of its classification (`error_category` / `retryable` / `model` / `provider` / specific `user_action`), because the structured report is dropped on the workflow → submitter hop rather than recovered from `ApplicationError.details`. The renderers are correct; the report handed to them is degraded. This is a gap in the Temporal error bridge, not in delivery — it is owned by [track-temporal-integration.md](track-temporal-integration.md) (Open gaps), with the full trace and fix options in `TODOS.md` at the repo root.
+Delivery itself is landed — the Rich handlers and the agent JSON/markdown path faithfully consume `to_error_report()`. The Temporal hole in that data source is now closed: the submitter-side recovery (`recover_error_report` → `WorkflowExecutionError(error_report=...)`, owned by [track-temporal-integration.md](track-temporal-integration.md)) rebuilds the structured report from `ApplicationError.details`, so a worker-side failure now reaches delivery with the same `error_category` / `retryable` / `model` / `provider` / `user_action` classification as a local run. The fix lived entirely in the Temporal bridge — delivery and `pipelex/cli/agent_cli/` stay Temporal-agnostic.
+
+The recovered report is carried on `WorkflowExecutionError` as an optional attribute, with a `to_error_report()` override — option (a) from the eng review (2026-05-17). Option (b) (a `RemotePipelexError` carrier in the `__cause__` chain) was rejected: (a) keeps `raise WorkflowExecutionError(msg) from exc` so the Temporal `WorkflowFailureError` stays in the traceback for free, and the override mirrors the 3-line pattern `PipelineExecutionError.to_error_report()` already uses.
 
 The remaining delivery-adjacent work is the metadata migration tracked in [track-metadata-model.md](track-metadata-model.md): while delivery reads `to_error_report()` first, several `PipelexError` subclasses still depend on the fallback dicts because they carry no class-level `error_domain` / `user_action`.
 
 ## Related tracks
 
 - [track-metadata-model.md](track-metadata-model.md) — `to_error_report()` is the canonical data source for both delivery paths; the dict fallback it discusses is the metadata that feeds these renderers.
-- [track-temporal-integration.md](track-temporal-integration.md) — owns the Temporal error bridge; its workflow → submitter gap is why delivery's `to_error_report()` data is degraded for a Temporal-run pipe.
+- [track-temporal-integration.md](track-temporal-integration.md) — owns the Temporal error bridge; its submitter-side recovery is what keeps delivery's `to_error_report()` data fully classified for a Temporal-run pipe.
 - [track-testing.md](track-testing.md) — the full-chain integration snapshot and the Rich-panel snapshot tests that cover this track.

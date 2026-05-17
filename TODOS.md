@@ -1,8 +1,8 @@
 # TODOS
 
-## [open] Recover the structured error report across the Temporal submitter boundary
+## [done] Recover the structured error report across the Temporal submitter boundary
 
-**Status:** open · **Filed:** 2026-05-17 · **Branch:** `feature/Error-handling-2` · **Severity:** medium — correctness degradation under distributed execution; no crash, graceful fallback to a generic error.
+**Status:** done (landed 2026-05-17 on `feature/Temporal-error-report`) · **Filed:** 2026-05-17 · **Severity:** medium — correctness degradation under distributed execution; no crash, graceful fallback to a generic error.
 **Area:** error handling — Temporal integration; the symptom surfaces in CLI delivery.
 **Tracks:** primary home is `wip/error-handling/track-temporal-integration.md` (Open gaps); cross-referenced from `wip/error-handling/track-cli-delivery.md`. Context on the activity-side half of the bridge: `wip/error-handling/archive-temporal-activity-boundary.md` (the #911 work).
 
@@ -101,15 +101,15 @@ Rejected as the primary fix: it pulls a `temporalio` dependency and Temporal-sha
 
 ### Implementation checklist
 
-- [ ] `ErrorReport.from_dict` added (strict inverse of `to_dict`) and unit-tested for round-trip, including nested `UserAction` / `ProviderErrorMetadata` and a `provider_metadata` 429.
-- [ ] `_error_report_from_details` renamed to a public name and reused (not duplicated) on the submitter side; existing `from_app_error` caller updated.
-- [ ] `execute_workflow`'s combined `except` split into a dedicated `except WorkflowFailureError` clause + a combined `except (WorkflowAlreadyStartedError, RPCError)` clause.
-- [ ] Recovery guarded: a `ValidationError` from `from_dict` falls back to a generic `WorkflowExecutionError`; unknown keys dropped before validating (version-skew tolerance).
-- [ ] `WorkflowExecutionError` carries and exposes the recovered report via option (a) — attribute + `to_error_report()` override that ends with `_enrich_error_report_from_cause` when no report is present; the no-report arms left intact.
-- [ ] Real failure message propagated (Option A step 4).
-- [ ] Decision (a)/(b) recorded — done in this doc ("Resolved design decision"); mirror the pointer into `wip/error-handling/track-cli-delivery.md`.
-- [ ] `track-temporal-integration.md` "Open gaps" updated to reflect the fix once landed (with the cli-delivery and README pointers); this `TODOS.md` entry marked `[done]` or removed.
-- [ ] Run `make agent-check` and `make agent-test`.
+- [x] `ErrorReport.from_dict` added (strict inverse of `to_dict`) and unit-tested for round-trip, including nested `UserAction` / `ProviderErrorMetadata` and a `provider_metadata` 429.
+- [x] `_error_report_from_details` renamed to `error_report_dict_from_details` and reused (not duplicated) on the submitter side; existing `from_app_error` caller updated.
+- [x] `execute_workflow`'s combined `except` split into a dedicated `except WorkflowFailureError` clause + a combined `except (WorkflowAlreadyStartedError, RPCError)` clause.
+- [x] Recovery guarded: a `ValidationError` from `from_dict` falls back to a generic `WorkflowExecutionError`; unknown keys dropped before validating (version-skew tolerance).
+- [x] `WorkflowExecutionError` carries and exposes the recovered report via option (a) — attribute + `to_error_report()` override that falls through to base `_enrich_error_report_from_cause` when no report is present; the no-report arms left intact.
+- [x] Real failure message propagated (Option A step 4).
+- [x] Decision (a)/(b) recorded — done in this doc ("Resolved design decision") and mirrored into `wip/error-handling/track-cli-delivery.md`.
+- [x] `track-temporal-integration.md` "Open gaps" updated to reflect the fix; this `TODOS.md` entry marked `[done]`.
+- [x] Run `make agent-check` and `make agent-test`.
 
 ### Testing
 
@@ -142,9 +142,9 @@ Rejected as the primary fix: it pulls a `temporalio` dependency and Temporal-sha
 
 ---
 
-## [open] Recover the structured error report on the Temporal child-workflow boundary
+## [done] Recover the structured error report on the Temporal child-workflow boundary
 
-**Status:** open · **Filed:** 2026-05-17 (surfaced by the eng review of the submitter-boundary fix) · **Severity:** low — latent; the affected methods are not on Pipelex's traced execution paths.
+**Status:** done (landed 2026-05-17 on `feature/Temporal-error-report`) · **Filed:** 2026-05-17 (surfaced by the eng review of the submitter-boundary fix) · **Severity:** low — latent; the affected methods are not on Pipelex's traced execution paths.
 **Depends on:** the submitter-boundary fix above landing first (it builds `error_report_dict_from_details` and `WorkflowExecutionError.error_report`).
 
 ### TL;DR
@@ -155,9 +155,11 @@ Rejected as the primary fix: it pulls a `temporalio` dependency and Temporal-sha
 
 Both methods carry a docstring (`workflow_caller.py:180`) stating that Pipelex's in-workflow child-spawn sites (`tprl_pipe.wf_pipe_run`, `tprl_pipe.temporal_pipe_router`) deliberately bypass these wrappers and call `workflow.execute_child_workflow(...)` directly to stay replay-deterministic. The workflow → workflow hop is already covered by `TemporalError.from_app_error`. So the bug is latent on public surface, not on a path Pipelex exercises.
 
-### Fix
+### Fix (landed)
 
-Once the submitter-boundary fix lands, the change is mechanical: in each `except ChildWorkflowError` block, when `exc.cause` is an `ApplicationError`, recover the report with `error_report_dict_from_details(exc.cause.details)` → `ErrorReport.from_dict` (guarded against `ValidationError`) and pass it into `WorkflowExecutionError(error_report=...)`, exactly as the `execute_workflow` clause does. Add unit coverage mirroring G3 / G4.
+In each `except ChildWorkflowError` block of `execute_child_workflow` / `start_child_workflow`, when `exc.cause` is an `ApplicationError` the handler now calls `recover_error_report(exc.cause)` — `recover_error_report` accepts the `ApplicationError` directly and returns it on the first chain-walk iteration. On a recovered report it raises `WorkflowExecutionError(error_report.message, error_report=...)`, mirroring `execute_workflow`; otherwise it falls back to the prior generic `WorkflowExecutionError`. The `_find_application_error` docstring was updated to note callers may pass `ChildWorkflowError.cause` straight in.
+
+Unit coverage in `tests/unit/pipelex/temporal/test_workflow_caller_child_error_recovery.py` mirrors the submitter-boundary tests (recovery success, G3 malformed details → generic, G4 no report payload → generic, non-`ApplicationError` cause → generic), parametrized across both methods. `make agent-check` and the temporal unit suite pass.
 
 ---
 

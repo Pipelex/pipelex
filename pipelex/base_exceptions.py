@@ -75,6 +75,22 @@ class ErrorReport:
             TypeAdapter(type(self)).dump_python(self, mode="python", exclude_none=True),
         )
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ErrorReport":
+        """Rebuild an ``ErrorReport`` from a :meth:`to_dict` payload — the strict inverse of :meth:`to_dict`.
+
+        Used to recover a report that crossed a serialization boundary (e.g. a
+        Temporal ``ApplicationError.details`` payload) so it re-enters the
+        ``to_error_report()`` world. The nested ``UserAction`` /
+        ``ProviderErrorMetadata`` models round-trip through their dict form.
+
+        Strict: ``ErrorReport`` is ``extra="forbid"``, so a malformed or
+        schema-drifted dict raises :class:`pydantic.ValidationError`. Robustness
+        against that failure (version skew, corrupted payload) belongs at the
+        recovery call site, not here.
+        """
+        return cast("ErrorReport", TypeAdapter(cls).validate_python(data))
+
     def user_action_detail(self) -> str | None:
         """Return the free-form advice text on ``user_action``, or ``None`` when absent."""
         return self.user_action.detail if self.user_action is not None else None

@@ -15,6 +15,7 @@ from pipelex import log
 from pipelex.config import get_config
 from pipelex.temporal.exceptions import WorkflowExecutionError
 from pipelex.temporal.temporal_manager import TemporalWorkerEnvironment, get_temporal_client, get_temporal_manager
+from pipelex.temporal.tprl.temporal_error import recover_error_report
 
 T = TypeVar("T")
 WorkflowOutput = TypeVar("WorkflowOutput", covariant=True)
@@ -119,7 +120,19 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
                 static_details=static_details,
                 memo=memo,
             )
-        except (WorkflowAlreadyStartedError, RPCError, WorkflowFailureError) as exc:
+        except WorkflowFailureError as exc:
+            # The activity bridge packs the structured ErrorReport into the
+            # failed workflow's ApplicationError.details; recover it so the
+            # classification survives the workflow -> submitter hop instead of
+            # flooring to a generic RUNTIME error.
+            error_report = recover_error_report(exc)
+            if error_report is not None:
+                log.error(f"Failed to execute workflow {workflow_class.__name__}: {error_report.message}")
+                raise WorkflowExecutionError(error_report.message, error_report=error_report) from exc
+            log.error(f"Failed to execute workflow {workflow_class.__name__}: {exc}")
+            msg = f"Failed to execute workflow {workflow_class.__name__}"
+            raise WorkflowExecutionError(msg) from exc
+        except (WorkflowAlreadyStartedError, RPCError) as exc:
             log.error(f"Failed to execute workflow {workflow_class.__name__}: {exc}")
             msg = f"Failed to execute workflow {workflow_class.__name__}"
             raise WorkflowExecutionError(msg) from exc
@@ -221,8 +234,14 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
         except ChildWorkflowError as exc:
             log.error(f"ChildWorkflowError in {workflow_class.__name__} caused by: {exc.cause}")
             if isinstance(exc.cause, ApplicationError):
+                # Mirror execute_workflow: the activity bridge packs the structured
+                # ErrorReport into the child's ApplicationError.details — recover it
+                # so the classification survives the child-workflow boundary.
+                error_report = recover_error_report(exc.cause)
+                if error_report is not None:
+                    raise WorkflowExecutionError(error_report.message, error_report=error_report) from exc
                 msg = f"Application error in child workflow {workflow_class.__name__}"
-                raise WorkflowExecutionError(msg) from exc.cause
+                raise WorkflowExecutionError(msg) from exc
             msg = f"Failed to execute child workflow {workflow_class.__name__}"
             raise WorkflowExecutionError(msg) from exc
 
@@ -267,8 +286,14 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
         except ChildWorkflowError as exc:
             log.error(f"ChildWorkflowError in {workflow_class.__name__} caused by: {exc.cause}")
             if isinstance(exc.cause, ApplicationError):
+                # Mirror execute_workflow: the activity bridge packs the structured
+                # ErrorReport into the child's ApplicationError.details — recover it
+                # so the classification survives the child-workflow boundary.
+                error_report = recover_error_report(exc.cause)
+                if error_report is not None:
+                    raise WorkflowExecutionError(error_report.message, error_report=error_report) from exc
                 msg = f"Application error in child workflow {workflow_class.__name__}"
-                raise WorkflowExecutionError(msg) from exc.cause
+                raise WorkflowExecutionError(msg) from exc
             msg = f"Failed to start child workflow {workflow_class.__name__}"
             raise WorkflowExecutionError(msg) from exc
 

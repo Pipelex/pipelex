@@ -1,17 +1,19 @@
 from collections.abc import Sequence
+from dataclasses import fields
 from typing import Any, cast
 
+from pydantic import ValidationError
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
-from pipelex.base_exceptions import PipelexError
+from pipelex.base_exceptions import ErrorReport, PipelexError
 from pipelex.cogt.exceptions import find_inference_error_category_in_chain
 from pipelex.config import get_config
 from pipelex.temporal.log_temporal import activity_log, workflow_log
 from pipelex.types import Self
 
 
-def _error_report_from_details(details: Sequence[Any]) -> dict[str, Any] | None:
+def error_report_dict_from_details(details: Sequence[Any]) -> dict[str, Any] | None:
     """Recover the ``ErrorReport`` dict packed into ``ApplicationError.details``.
 
     The bridge packs ``exc.to_error_report().to_dict()`` as the first details
@@ -23,6 +25,55 @@ def _error_report_from_details(details: Sequence[Any]) -> dict[str, Any] | None:
         if isinstance(entry, dict) and "error_type" in entry and "message" in entry:
             return cast("dict[str, Any]", entry)
     return None
+
+
+def _find_application_error(exc: BaseException) -> ApplicationError | None:
+    """Return the first ``ApplicationError`` in the ``__cause__`` chain of ``exc``.
+
+    Temporal sets ``__cause__`` on the ``WorkflowFailureError`` raised by
+    ``client.execute_workflow`` to the deserialized failure; the structured
+    ``ErrorReport`` packed by the activity bridge rides on that
+    ``ApplicationError``'s ``details``. The child-workflow boundary exposes its
+    failure via ``ChildWorkflowError.cause`` rather than ``__cause__``, so its
+    caller passes ``exc.cause`` straight in — already an ``ApplicationError``,
+    it is returned on the first iteration.
+    """
+    node: BaseException | None = exc
+    seen: set[int] = set()
+    while node is not None and id(node) not in seen:
+        if isinstance(node, ApplicationError):
+            return node
+        seen.add(id(node))
+        node = node.__cause__
+    return None
+
+
+def recover_error_report(exc: BaseException) -> ErrorReport | None:
+    """Recover the structured ``ErrorReport`` from a Temporal failure.
+
+    Walks the ``__cause__`` chain for an ``ApplicationError`` carrying a
+    details-packed report (see :func:`error_report_dict_from_details`) and
+    rebuilds an :class:`ErrorReport` from it. Returns ``None`` when no such
+    payload is present, so the caller can fall back to a generic error.
+
+    Tolerant of worker/submitter version skew (normal during a rolling deploy):
+    unknown keys — a field a newer worker added — are dropped before validation,
+    and a dict that still fails ``ErrorReport.from_dict`` (a malformed or
+    otherwise schema-drifted payload) yields ``None`` rather than propagating a
+    ``ValidationError`` out of the error-recovery path.
+    """
+    app_error = _find_application_error(exc)
+    if app_error is None:
+        return None
+    report_dict = error_report_dict_from_details(app_error.details)
+    if report_dict is None:
+        return None
+    known_fields = {field.name for field in fields(ErrorReport)}
+    trimmed = {key: value for key, value in report_dict.items() if key in known_fields}
+    try:
+        return ErrorReport.from_dict(trimmed)
+    except ValidationError:
+        return None
 
 
 class TemporalError(ApplicationError):
@@ -107,7 +158,7 @@ class TemporalError(ApplicationError):
         """
         message = exc.message
         error_type = exc.type
-        error_report = _error_report_from_details(exc.details)
+        error_report = error_report_dict_from_details(exc.details)
         non_retryable = exc.non_retryable
         if not non_retryable and error_report is None:
             non_retryable = cls._error_type_in_name_list(error_type)
