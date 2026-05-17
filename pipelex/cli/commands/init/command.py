@@ -38,6 +38,7 @@ from pipelex.system.pipelex_service.pipelex_service_config import (
     is_pipelex_gateway_enabled,
     load_pipelex_service_config_if_exists,
 )
+from pipelex.system.pipelex_service.remote_config_cache import RemoteConfigCache
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
 from pipelex.tools.misc.file_utils import path_exists
@@ -46,10 +47,11 @@ from pipelex.tools.misc.file_utils import path_exists
 class CachePrimingResult(BaseModel):
     """Outcome of an attempt to prime the on-disk remote-config cache.
 
-    ``primed`` is ``True`` only when a fresh fetch succeeded and the cache was written.
-    ``error_message`` is populated only when the fetch was attempted but failed (offline at init
-    time); ``None`` means priming was skipped (gateway disabled or terms not accepted) or that
-    it succeeded.
+    ``primed`` is ``True`` only when a fresh fetch succeeded *and* a usable cache exists on disk
+    afterwards. ``error_message`` is populated when the fetch was attempted but failed (offline at
+    init time) *or* when the fetch succeeded but the cache could not be persisted/read back (e.g.
+    a read-only or full cache directory). ``None`` means priming was skipped (gateway disabled or
+    terms not accepted) or that it succeeded.
     """
 
     model_config = ConfigDict(extra="forbid", strict=True)
@@ -102,6 +104,18 @@ def attempt_prime_remote_config_cache(target_config_dir: Path | None = None) -> 
         RemoteConfigFetcher.fetch_remote_config(require_fresh=True)
     except RemoteConfigUnavailableError as exc:
         return CachePrimingResult(primed=False, error_message=str(exc))
+
+    # A successful fetch does NOT guarantee the cache was written: ``RemoteConfigFetcher`` treats
+    # the cache write as opportunistic and swallows OSErrors (read-only / full cache dir) with
+    # only a stderr warning. Verify a usable cache actually exists, otherwise priming would
+    # misreport success and later offline runs would hit ``RemoteConfigUnavailableError``.
+    if RemoteConfigCache.load() is None:
+        msg = (
+            f"Remote config was fetched but the cache at {RemoteConfigCache.cache_path()} "
+            "could not be written or read back; offline dry-runs will not have a fallback. "
+            "Check that the directory is writable."
+        )
+        return CachePrimingResult(primed=False, error_message=msg)
     return CachePrimingResult(primed=True)
 
 

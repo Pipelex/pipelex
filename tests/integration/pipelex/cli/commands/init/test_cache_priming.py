@@ -274,6 +274,37 @@ class TestCachePriming:
         assert not RemoteConfigCache.cache_path().exists()
 
     @pytest.mark.usefixtures("isolated_cache_dir")
+    def test_init_warns_when_cache_write_fails(self, mocker: MockerFixture) -> None:
+        """Online fetch succeeds but the cache write fails → priming reports failure, not success.
+
+        The fetcher treats the cache write as opportunistic and swallows OSErrors with only a
+        stderr warning. If priming trusted the fetch result alone it would report ``primed=True``
+        while no usable cache exists, so ``pipelex-agent init`` would emit ``cache_primed: true``
+        and a later offline run would hit ``RemoteConfigUnavailableError``.
+        """
+        mocker.patch(f"{INIT_COMMAND_MODULE}.is_pipelex_gateway_enabled", return_value=True)
+        mocker.patch(
+            f"{INIT_COMMAND_MODULE}.load_pipelex_service_config_if_exists",
+            return_value=_accepted_service_config(),
+        )
+        mocker.patch(
+            "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
+            new_callable=mocker.PropertyMock,
+            return_value=False,
+        )
+        mocker.patch.object(RemoteConfigFetcher, "fetch_remote_config", _ORIGINAL_FETCH_REMOTE_CONFIG)
+        mocker.patch("httpx.get", return_value=_make_httpx_response(_fake_remote_payload()))
+        mocker.patch.object(RemoteConfigCache, "store", side_effect=OSError("read-only cache directory"))
+
+        console = mocker.create_autospec(Console, instance=True)
+        prime_remote_config_cache(console)  # must NOT raise
+
+        cache_path = RemoteConfigCache.cache_path()
+        assert not cache_path.exists(), "no cache file should exist when the write failed"
+        printed = " ".join(str(call_args) for call_args in console.print.call_args_list)
+        assert "yellow" in printed.lower(), f"a failed cache write must surface a yellow warning; got: {printed!r}"
+
+    @pytest.mark.usefixtures("isolated_cache_dir")
     def test_init_does_not_double_prime(self, mocker: MockerFixture) -> None:
         """When a cache already exists, priming online overwrites it (refresh, not skip)."""
         # Pre-populate the cache with a stale snapshot so we can prove the file gets rewritten.
