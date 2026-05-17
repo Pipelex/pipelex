@@ -36,7 +36,7 @@ import threading
 from collections import OrderedDict
 from enum import Enum
 from pathlib import Path
-from typing import Any, ClassVar, Literal, cast
+from typing import Any, ClassVar, cast
 
 from pydantic import BaseModel, RootModel
 
@@ -268,7 +268,17 @@ class SchemaToModelFactory:
         # type annotations into strings. Rebuild every BaseModel so forward refs (including
         # references to generated Enum classes for choices fields, and Literal annotations
         # produced by `enum_field_as_literal=All`) resolve against the full type namespace.
-        rebuild_namespace: dict[str, Any] = {**all_user_types, "Literal": Literal}
+        #
+        # The rebuild namespace must carry every name the generated source was written
+        # against — not just the user-defined types. The exec namespace already holds
+        # exactly that: the generated `from typing import ...` / `from pydantic import ...`
+        # imports landed there alongside the user types. Reusing it (minus `__builtins__`)
+        # keeps the namespace correct even as codegen starts emitting other typing
+        # constructs. `all_user_types` alone is NOT enough: it filters the namespace to
+        # `type` instances, which drops typing special forms like `Any` (not a `type`),
+        # so a `dict[str, Any]` field — e.g. one inherited from `JSONContent` by a concept
+        # refining the native `JSON` concept — would fail with `NameError: name 'Any'`.
+        rebuild_namespace: dict[str, Any] = {key: value for key, value in namespace.items() if key != "__builtins__"}
         for candidate in all_user_types.values():
             if issubclass(candidate, BaseModel):
                 candidate.model_rebuild(_types_namespace=rebuild_namespace)
