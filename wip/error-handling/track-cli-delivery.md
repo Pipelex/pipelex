@@ -88,9 +88,12 @@ The library stays HTTP-agnostic — no web-framework import, only the mapping ta
 
 ## Open gaps
 
-None for delivery itself. The remaining work is the metadata migration in [track-metadata-model.md](track-metadata-model.md): while delivery reads `to_error_report()` first, several `PipelexError` subclasses still depend on the fallback dicts because they carry no class-level `error_domain` / `user_action`.
+Delivery itself is landed — the Rich handlers and the agent JSON/markdown path faithfully consume `to_error_report()`. But that data source has a hole under Temporal: when a pipe runs on a Temporal worker, a worker-side failure reaches delivery as a generic `PipelineExecutionError` stripped of its classification (`error_category` / `retryable` / `model` / `provider` / specific `user_action`), because the structured report is dropped on the workflow → submitter hop rather than recovered from `ApplicationError.details`. The renderers are correct; the report handed to them is degraded. This is a gap in the Temporal error bridge, not in delivery — it is owned by [track-temporal-integration.md](track-temporal-integration.md) (Open gaps), with the full trace and fix options in `TODOS.md` at the repo root.
+
+The remaining delivery-adjacent work is the metadata migration tracked in [track-metadata-model.md](track-metadata-model.md): while delivery reads `to_error_report()` first, several `PipelexError` subclasses still depend on the fallback dicts because they carry no class-level `error_domain` / `user_action`.
 
 ## Related tracks
 
 - [track-metadata-model.md](track-metadata-model.md) — `to_error_report()` is the canonical data source for both delivery paths; the dict fallback it discusses is the metadata that feeds these renderers.
+- [track-temporal-integration.md](track-temporal-integration.md) — owns the Temporal error bridge; its workflow → submitter gap is why delivery's `to_error_report()` data is degraded for a Temporal-run pipe.
 - [track-testing.md](track-testing.md) — the full-chain integration snapshot and the Rich-panel snapshot tests that cover this track.

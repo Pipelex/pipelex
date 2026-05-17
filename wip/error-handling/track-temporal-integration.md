@@ -4,7 +4,7 @@
 
 How Pipelex errors cross the Temporal boundary: activities raise Pipelex exceptions, the bridge converts them to `TemporalError(ApplicationError)`, and Temporal's retry policy uses the error to decide whether to retry. Temporal's retry decision flows from the same `InferenceErrorCategory.is_retryable` signal that classification produces — not from a static class-name list.
 
-This is landed end-to-end: the bridge is category-aware, the full `ErrorReport` travels in `ApplicationError.details`, and every in-scope activity routes through the conversion decorator.
+The activity → workflow half of the bridge is landed end-to-end: the conversion is category-aware, the full `ErrorReport` travels in `ApplicationError.details`, and every in-scope activity routes through the conversion decorator. The symmetric workflow → submitter recovery — reading that report back out of `details` once the failure returns to the process that submitted the workflow — is not built; see Open gaps.
 
 ## Current state
 
@@ -38,11 +38,22 @@ The class-name list is documented as a **fallback only**: a `CogtError` carrying
 
 ## Open gaps
 
-None. Two optional refinements from the activity-boundary code review are recorded in [deferred-items/temporal-activity-boundary-review-followups.md](deferred-items/temporal-activity-boundary-review-followups.md): the integration test verifies the converted payload rather than Temporal's retry-engine behavior, and `_error_report_from_details` identifies the report by dict shape. Both are deliberate scope choices, optional to revisit.
+### The structured report is packed into `ApplicationError.details` but never recovered on the submitter side
+
+The bridge moves the `ErrorReport` activity → workflow correctly, and `from_app_error` recovers it for workflow code. But when the workflow fails and the failure returns to the **submitter** — the process that called `execute_workflow`, typically the `pipelex` / `pipelex-agent` CLI — the report is dropped:
+
+- `WorkflowExecutor.execute_workflow` (`pipelex/temporal/tprl/workflow_caller.py`) catches `WorkflowFailureError` and re-raises a bare `WorkflowExecutionError` — message `"Failed to execute workflow WfPipeRun"`, no metadata — discarding the deserialized `ApplicationError` whose `.details` still carries the report dict.
+- `PipelexRunner.execute_pipeline` re-wraps that as `PipelineExecutionError`, whose `to_error_report()` enriches from the `__cause__` chain. But `PipelexError._enrich_error_report_from_cause` (`pipelex/base_exceptions.py`) stops at the first link that is not a `PipelexError` instance, and Temporal serialization inserts exactly such a link — `WorkflowFailureError`. The walk terminates at the boundary; the report floors to a generic `RUNTIME` / `UNKNOWN`.
+
+Net effect: a pipe failure on a Temporal worker reaches every `to_error_report()` consumer — agent CLI JSON/markdown, the Rich human CLI, the `ErrorReport.http_status` mapping for HTTP adapters — as a generic `PipelineExecutionError` stripped of `error_category` / `retryable` / `model` / `provider` / specific `user_action`, where the identical failure run locally is fully classified. `_error_report_from_details` already reads the report out of `details`, but today it runs only workflow-side (`from_app_error`); the fix is the symmetric submitter-side recovery, so a properly classified `PipelexError` re-enters the `to_error_report()` world. Full trace and fix options: `TODOS.md` at the repo root.
+
+### Deferred review followups
+
+Two optional refinements from the activity-boundary code review are recorded in [deferred-items/temporal-activity-boundary-review-followups.md](deferred-items/temporal-activity-boundary-review-followups.md): the integration test verifies the converted payload rather than Temporal's retry-engine behavior, and `_error_report_from_details` identifies the report by dict shape. Both are deliberate scope choices, optional to revisit.
 
 ## Related tracks
 
 - [track-retry-and-resilience.md](track-retry-and-resilience.md) — this is Tier 2; direct execution has no pipeline-level retry tier below it.
 - [track-worker-classification.md](track-worker-classification.md) — every inference worker classifies before this bridge is meaningful.
 - [track-metadata-model.md](track-metadata-model.md) — the `error_category` / `user_action` / `model` / `provider` on `to_error_report()` are what the details payload carries.
-- [track-cli-delivery.md](track-cli-delivery.md) — once `ApplicationError.details` carries the full report, the Temporal-side CLI / Web UI can render the same structured information as the agent JSON path.
+- [track-cli-delivery.md](track-cli-delivery.md) — the delivery surfaces consume `to_error_report()`; the submitter-side gap above is why that data source is degraded for a Temporal-run pipe.
