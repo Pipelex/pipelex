@@ -36,15 +36,19 @@ def normalize_for_comparison(content: str) -> str:
 def fetch_gateway_model_specs() -> BackendModelSpecs:
     """Fetch model specifications from Pipelex Gateway remote config.
 
+    Uses ``require_fresh=True`` so a stale cache never gets baked into the committed
+    reference docs this command regenerates.
+
     Returns:
         Dictionary of model specifications.
 
     Raises:
-        RemoteConfigFetchError: If the remote config cannot be fetched.
+        RemoteConfigUnavailableError: If the network is unreachable (cache fallback is
+            explicitly refused here).
         RemoteConfigValidationError: If the remote config is invalid.
     """
-    remote_config = RemoteConfigFetcher.fetch_remote_config()
-    return dict(remote_config.backend_model_specs)
+    result = RemoteConfigFetcher.fetch_remote_config(require_fresh=True)
+    return dict(result.config.backend_model_specs)
 
 
 def extract_reference_data(model_specs: BackendModelSpecs) -> dict[str, list[dict[str, Any]]]:

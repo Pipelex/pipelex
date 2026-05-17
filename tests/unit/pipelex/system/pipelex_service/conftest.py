@@ -22,4 +22,5 @@ def mock_log(mocker: MockerFixture):
     """Mock the log module for all tests in this package."""
     mock_logger = mocker.MagicMock()
     mocker.patch("pipelex.system.pipelex_service.gateway_config_merger.log", mock_logger)
+    mocker.patch("pipelex.system.pipelex_service.remote_config_cache.log", mock_logger)
     return mock_logger

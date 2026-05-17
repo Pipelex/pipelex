@@ -56,8 +56,7 @@ class TestModelDeckReferences:
         known_handles.update(self._get_local_backend_models())
 
         # 2. Get gateway models from cached remote config
-        remote_config = RemoteConfigFetcher.fetch_remote_config()  # Uses cached version
-        gateway_specs = remote_config.backend_model_specs
+        gateway_specs = RemoteConfigFetcher.fetch_remote_config().config.backend_model_specs  # Uses cached version
 
         # Get default model_type from gateway defaults section (same pattern as local backends)
         gateway_defaults = gateway_specs.get("defaults", {})
