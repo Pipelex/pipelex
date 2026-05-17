@@ -26,6 +26,11 @@ if TYPE_CHECKING:
 # detection recognizes it as a PNG, but PIL cannot open it (raises OSError).
 _PNG_HEADER_GARBAGE = base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"\x00" * 40).decode("ascii")
 
+# Valid base64 that decodes to bytes with no recognizable file signature: file-type
+# detection cannot identify it and raises FileTypeError (a PipelexError, not a
+# ValueError/OSError) — so it must be in the wrapper's except clause too.
+_UNRECOGNIZED_BYTES = base64.b64encode(b"plainly not an image" + b"\x00" * 40).decode("ascii")
+
 
 def _make_worker(mocker: MockerFixture) -> GatewayImgGenWorker:
     worker = object.__new__(GatewayImgGenWorker)
@@ -99,13 +104,14 @@ class TestGatewayImgGenWorkerMalformedBody:
 
     @pytest.mark.parametrize(
         "malformed_base64",
-        ["abc", _PNG_HEADER_GARBAGE],
-        ids=["invalid-base64-padding", "corrupt-image-bytes"],
+        ["abc", _PNG_HEADER_GARBAGE, _UNRECOGNIZED_BYTES],
+        ids=["invalid-base64-padding", "corrupt-image-bytes", "unrecognized-file-type"],
     )
     async def test_flux_2_pro_undecodable_image_is_wrapped(self, mocker: MockerFixture, malformed_base64: str) -> None:
-        """A Flux-2-Pro body carrying invalid base64 or undecodable image bytes must surface as a
-        categorized ImgGenGenerationError, not a raw binascii.Error / PIL OSError. The body omits
-        ``size``/``output_format`` so GPT-Image validation fails and the Flux-2-Pro branch is taken.
+        """A Flux-2-Pro body carrying invalid base64, undecodable image bytes, or bytes with no
+        recognizable file signature must surface as a categorized ImgGenGenerationError, not a raw
+        binascii.Error / PIL OSError / FileTypeError. The body omits ``size``/``output_format`` so
+        GPT-Image validation fails and the Flux-2-Pro branch is taken.
         """
         worker = _make_worker(mocker)
         response = GenericResponse.model_validate({"success": True, "data": [{"b64_json": malformed_base64}]})

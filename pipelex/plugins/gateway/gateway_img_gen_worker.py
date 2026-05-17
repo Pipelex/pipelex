@@ -22,7 +22,7 @@ from pipelex.plugins.fal.fal_poller import FalPoller
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
 from pipelex.plugins.gateway.gateway_schemas import GatewayImgGenAzureFlux2Pro, GatewayImgGenAzureGptImage
-from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
+from pipelex.tools.misc.filetype_utils import FileTypeError, detect_file_type_from_bytes
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
@@ -235,7 +235,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                     ).value
                     with Image.open(io.BytesIO(image_bytes)) as pil_img:
                         width, height = pil_img.size
-                except (ValueError, OSError) as exc:
+                except (ValueError, OSError, FileTypeError) as exc:
                     msg = f"Could not decode the image returned by the Gateway for model '{self.inference_model.model_id}'"
                     raise ImgGenGenerationError(
                         msg,
