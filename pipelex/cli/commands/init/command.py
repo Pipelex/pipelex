@@ -5,7 +5,7 @@ import shutil
 from pathlib import Path
 
 import typer
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError
 from rich.console import Console
 from rich.markup import escape
 from rich.prompt import Confirm
@@ -49,9 +49,9 @@ class CachePrimingResult(BaseModel):
 
     ``primed`` is ``True`` only when a fresh fetch succeeded *and* a usable cache exists on disk
     afterwards. ``error_message`` is populated when the fetch was attempted but failed (offline at
-    init time) *or* when the fetch succeeded but the cache could not be persisted/read back (e.g.
-    a read-only or full cache directory). ``None`` means priming was skipped (gateway disabled or
-    terms not accepted) or that it succeeded.
+    init time) *or* when the fetch succeeded but the cache could not be persisted, read back, or
+    validated as a usable ``RemoteConfig`` (e.g. a read-only or full cache directory). ``None``
+    means priming was skipped (gateway disabled or terms not accepted) or that it succeeded.
     """
 
     model_config = ConfigDict(extra="forbid", strict=True)
@@ -105,15 +105,24 @@ def attempt_prime_remote_config_cache(target_config_dir: Path | None = None) -> 
     except RemoteConfigUnavailableError as exc:
         return CachePrimingResult(primed=False, error_message=str(exc))
 
-    # A successful fetch does NOT guarantee the cache was written: ``RemoteConfigFetcher`` treats
-    # the cache write as opportunistic and swallows OSErrors (read-only / full cache dir) with
-    # only a stderr warning. Verify a usable cache actually exists, otherwise priming would
-    # misreport success and later offline runs would hit ``RemoteConfigUnavailableError``.
-    if RemoteConfigCache.load() is None:
+    # A successful fetch does NOT guarantee a usable cache. ``RemoteConfigFetcher`` treats the
+    # cache write as opportunistic and swallows OSErrors (read-only / full cache dir) with only a
+    # stderr warning. And even when a file is written, ``RemoteConfigCache.load()`` validates only
+    # the cache *wrapper* — a malformed inner ``raw_config`` would still pass it but break later
+    # offline runs (see the matching check in ``RemoteConfigFetcher.fetch_remote_config``). Verify
+    # both: the wrapper loads AND its payload re-validates as a ``RemoteConfig``. Otherwise priming
+    # would misreport success and later offline runs would hit ``RemoteConfigUnavailableError``.
+    cached = RemoteConfigCache.load()
+    if cached is not None:
+        try:
+            cached.to_remote_config()
+        except ValidationError:
+            cached = None
+    if cached is None:
         msg = (
             f"Remote config was fetched but the cache at {RemoteConfigCache.cache_path()} "
-            "could not be written or read back; offline dry-runs will not have a fallback. "
-            "Check that the directory is writable."
+            "could not be written, read back, or validated; offline dry-runs will not have a "
+            "fallback. Check that the directory is writable."
         )
         return CachePrimingResult(primed=False, error_message=msg)
     return CachePrimingResult(primed=True)

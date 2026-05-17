@@ -14,6 +14,7 @@ These tests pin the helper's behaviour:
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path  # noqa: TC003 — referenced by pytest fixture type hints at runtime
 from typing import TYPE_CHECKING
 
@@ -28,7 +29,11 @@ from pipelex.system.pipelex_service.pipelex_service_agreement import (
     PipelexServiceOnboarding,
 )
 from pipelex.system.pipelex_service.pipelex_service_config import PipelexServiceConfig
-from pipelex.system.pipelex_service.remote_config_cache import RemoteConfigCache
+from pipelex.system.pipelex_service.remote_config_cache import (
+    CACHE_SCHEMA_VERSION,
+    CachedRemoteConfig,
+    RemoteConfigCache,
+)
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 
 if TYPE_CHECKING:
@@ -61,6 +66,24 @@ def _fake_remote_payload() -> dict[str, object]:
         "backend_model_specs": {},
         "aws_region": "us-east-1",
     }
+
+
+def _store_malformed_cache(remote_config_payload: dict[str, object]) -> None:
+    """Drop-in for ``RemoteConfigCache.store`` that writes a structurally valid cache *wrapper*
+    whose inner ``raw_config`` does NOT validate as a ``RemoteConfig``.
+
+    Reproduces the case where ``RemoteConfigCache.load()`` succeeds (the wrapper is fine) but the
+    cached payload is unusable for offline runs.
+    """
+    del remote_config_payload  # intentionally discarded — we write a deliberately broken payload
+    cached = CachedRemoteConfig(
+        schema_version=CACHE_SCHEMA_VERSION,
+        cached_at=datetime.now(tz=timezone.utc),
+        raw_config={},
+    )
+    cache_path = RemoteConfigCache.cache_path()
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    cache_path.write_text(cached.model_dump_json(), encoding="utf-8")
 
 
 def _make_httpx_response(payload: dict[str, object]) -> httpx.Response:
@@ -303,6 +326,36 @@ class TestCachePriming:
         assert not cache_path.exists(), "no cache file should exist when the write failed"
         printed = " ".join(str(call_args) for call_args in console.print.call_args_list)
         assert "yellow" in printed.lower(), f"a failed cache write must surface a yellow warning; got: {printed!r}"
+
+    @pytest.mark.usefixtures("isolated_cache_dir")
+    def test_init_warns_when_cached_payload_is_malformed(self, mocker: MockerFixture) -> None:
+        """Online fetch succeeds and a cache file is written, but its inner ``raw_config`` is not
+        a valid ``RemoteConfig`` → priming reports failure, not success.
+
+        ``RemoteConfigCache.load()`` validates only the cache *wrapper*, so a malformed inner
+        payload would still pass an ``is None`` check. Priming must re-validate the payload as a
+        ``RemoteConfig``, otherwise ``pipelex-agent init`` would emit ``cache_primed: true`` while
+        a later offline run hits ``RemoteConfigUnavailableError``.
+        """
+        mocker.patch(f"{INIT_COMMAND_MODULE}.is_pipelex_gateway_enabled", return_value=True)
+        mocker.patch(
+            f"{INIT_COMMAND_MODULE}.load_pipelex_service_config_if_exists",
+            return_value=_accepted_service_config(),
+        )
+        mocker.patch(
+            "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
+            new_callable=mocker.PropertyMock,
+            return_value=False,
+        )
+        mocker.patch.object(RemoteConfigFetcher, "fetch_remote_config", _ORIGINAL_FETCH_REMOTE_CONFIG)
+        mocker.patch("httpx.get", return_value=_make_httpx_response(_fake_remote_payload()))
+        mocker.patch.object(RemoteConfigCache, "store", side_effect=_store_malformed_cache)
+
+        console = mocker.create_autospec(Console, instance=True)
+        prime_remote_config_cache(console)  # must NOT raise
+
+        printed = " ".join(str(call_args) for call_args in console.print.call_args_list)
+        assert "yellow" in printed.lower(), f"a malformed cached payload must surface a yellow warning; got: {printed!r}"
 
     @pytest.mark.usefixtures("isolated_cache_dir")
     def test_init_does_not_double_prime(self, mocker: MockerFixture) -> None:
