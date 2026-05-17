@@ -31,6 +31,25 @@ class RemoteConfigValidationError(PipelexServiceError):
     """
 
 
+class RemoteConfigUnavailableError(PipelexServiceError):
+    """Raised when a fresh fetch failed AND no usable cached fallback exists.
+
+    This is the user-facing offline-mode error: the gateway is enabled but we have neither
+    a working network path nor a primed local cache to fall back on. The message names the
+    cache file path and the remediation (``pipelex init`` while online; or disabling the
+    gateway in ``backends.toml`` for permanent offline operation).
+    """
+
+
+class RemoteConfigStaleWarning(UserWarning):
+    """Emitted when setup completes using a cached remote-config fallback instead of a fresh fetch.
+
+    Indicates the network was unreachable but a prior ``pipelex init`` had primed the cache.
+    Stale operation is intentionally safe for dry-run/validation flows; real inference calls
+    still require network at call time.
+    """
+
+
 class InferenceSetupRequiredError(PipelexServiceError):
     """Raised when inference is requested but no inference setup has been completed.
 

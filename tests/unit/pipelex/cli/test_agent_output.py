@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import json
+from typing import TYPE_CHECKING, Any
 
 import pytest
 import typer
@@ -15,7 +16,9 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     _build_error_source,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
     agent_error,
     agent_success,
+    consume_setup_warnings,
     extract_validation_errors,
+    record_setup_warning,
 )
 from pipelex.cogt.exceptions import CogtError, InferenceBackendCredentialsError, InferenceBackendCredentialsErrorType, InferenceErrorCategory
 from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
@@ -23,9 +26,23 @@ from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidat
 from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
 from pipelex.pipeline.validate_bundle import ValidateBundleError
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
 
 class TestAgentOutput:
     """Tests for agent_error, agent_success, and extract_validation_errors."""
+
+    @pytest.fixture(autouse=True)
+    def _drain_warnings_buffer(self) -> Iterator[None]:
+        """Isolate the module-level ``_CAPTURED_WARNINGS`` global across tests.
+
+        The buffer is a process-wide global; without this drain a recorded warning
+        could leak into an unrelated test's envelope.
+        """
+        consume_setup_warnings()
+        yield
+        consume_setup_warnings()
 
     def test_agent_error_outputs_json_to_stderr(self, capsys: pytest.CaptureFixture[str]) -> None:
         """agent_error should print valid JSON to stderr and exit with code 1."""
@@ -371,3 +388,65 @@ class TestAgentOutput:
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["error_domain"] == AGENT_ERROR_DOMAINS[error_type]
         assert parsed["error_category"] == "configuration"
+
+    # -------------------------------------------------------------------------
+    # Setup-warnings buffer tests (record_setup_warning / consume_setup_warnings
+    # / the warnings-merge branch of agent_success)
+    # -------------------------------------------------------------------------
+
+    def test_agent_success_attaches_recorded_warning(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """A warning recorded via record_setup_warning surfaces in the envelope's warnings array."""
+        record_setup_warning({"type": "RemoteConfigStale", "message": "cache is stale"})
+        agent_success({"success": True})
+
+        parsed = json.loads(capsys.readouterr().out)
+        assert parsed["warnings"] == [{"type": "RemoteConfigStale", "message": "cache is stale"}]
+
+    def test_agent_success_does_not_re_emit_drained_warnings(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """A second agent_success in the same process emits no stale warnings (drain+clear)."""
+        record_setup_warning({"type": "RemoteConfigStale", "message": "cache is stale"})
+        agent_success({"success": True})
+        capsys.readouterr()  # discard the first envelope
+
+        agent_success({"success": True})
+        parsed = json.loads(capsys.readouterr().out)
+        assert "warnings" not in parsed
+
+    def test_consume_setup_warnings_drains_and_clears(self) -> None:
+        """consume_setup_warnings returns the recorded list and empties the buffer."""
+        record_setup_warning({"type": "RemoteConfigStale", "message": "first"})
+        record_setup_warning({"type": "RemoteConfigStale", "message": "second"})
+
+        drained = consume_setup_warnings()
+        assert drained == [
+            {"type": "RemoteConfigStale", "message": "first"},
+            {"type": "RemoteConfigStale", "message": "second"},
+        ]
+        assert consume_setup_warnings() == []
+
+    def test_agent_success_appends_captured_after_caller_warnings(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Caller-supplied result['warnings'] are kept; captured ones are appended after them."""
+        record_setup_warning({"type": "RemoteConfigStale", "message": "captured"})
+        agent_success({"success": True, "warnings": [{"type": "CallerWarning", "message": "caller"}]})
+
+        parsed = json.loads(capsys.readouterr().out)
+        assert parsed["warnings"] == [
+            {"type": "CallerWarning", "message": "caller"},
+            {"type": "RemoteConfigStale", "message": "captured"},
+        ]
+
+    def test_agent_success_tolerates_non_list_caller_warnings(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """A non-list result['warnings'] is treated as empty rather than crashing (isinstance guard)."""
+        record_setup_warning({"type": "RemoteConfigStale", "message": "captured"})
+        agent_success({"success": True, "warnings": "not-a-list"})
+
+        parsed = json.loads(capsys.readouterr().out)
+        assert parsed["warnings"] == [{"type": "RemoteConfigStale", "message": "captured"}]
+
+    def test_agent_success_does_not_mutate_caller_result(self) -> None:
+        """agent_success copies result before merging captured warnings; the caller dict is untouched."""
+        record_setup_warning({"type": "RemoteConfigStale", "message": "captured"})
+        result: dict[str, Any] = {"success": True}
+        agent_success(result)
+
+        assert "warnings" not in result

@@ -5,7 +5,7 @@ import typer
 from rich.console import Console
 from rich.markup import escape
 
-from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
+from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelDeckPresetValidatonError
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.hub import get_console
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
@@ -16,9 +16,10 @@ from pipelex.system.pipelex_service.exceptions import (
     GatewayDoNotTrackConflictError,
     GatewayTermsNotAcceptedError,
     InferenceSetupRequiredError,
-    RemoteConfigFetchError,
+    RemoteConfigUnavailableError,
     RemoteConfigValidationError,
 )
+from pipelex.system.pipelex_service.types import RemoteConfigSource
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 from pipelex.types import StrEnum
 from pipelex.urls import URLs
@@ -385,42 +386,6 @@ def handle_gateway_do_not_track_conflict_error(exc: GatewayDoNotTrackConflictErr
     raise typer.Exit(1) from exc
 
 
-def handle_remote_config_fetch_error(exc: RemoteConfigFetchError) -> NoReturn:
-    """Handle and display RemoteConfigFetchError with user-friendly guidance.
-
-    This error occurs when Pipelex Gateway is enabled but the remote configuration
-    cannot be fetched (network issues, server unreachable, etc.).
-
-    Args:
-        exc: The remote config fetch error exception
-    """
-    console = get_console()
-    console.print("\n[bold red]❌ Could not connect to Pipelex Gateway[/bold red]\n")
-
-    console.print(
-        "[bold yellow]⚠ Network Issue:[/bold yellow] Pipelex Gateway requires network access to fetch\n"
-        "configuration, but we couldn't reach the Pipelex servers.\n"
-    )
-
-    console.print("[bold cyan]Error details:[/bold cyan]")
-    console.print(f"  {escape(str(exc))}\n")
-
-    console.print("[bold green]💡 To fix:[/bold green]")
-    console.print("  • Check your internet connection")
-    console.print("  • Verify that firewall/proxy settings allow outbound HTTPS requests")
-    console.print("  • Try again in a few moments (servers may be temporarily unavailable)")
-    console.print()
-
-    console.print("[dim]Alternatively, you can:[/dim]")
-    console.print("[dim]  • Disable pipelex_gateway in .pipelex/inference/backends.toml[/dim]")
-    console.print("[dim]  • Use your own API keys with direct provider backends[/dim]")
-    console.print()
-
-    console.print(f"[dim]For more information: {URLs.gateway_docs}[/dim]")
-    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
-    raise typer.Exit(1) from exc
-
-
 def handle_remote_config_validation_error(exc: RemoteConfigValidationError) -> NoReturn:
     """Handle and display RemoteConfigValidationError with user-friendly guidance.
 
@@ -454,4 +419,69 @@ def handle_remote_config_validation_error(exc: RemoteConfigValidationError) -> N
     console.print()
 
     console.print(f"[dim]For more information: {URLs.gateway_docs}[/dim]\n")
+    raise typer.Exit(1) from exc
+
+
+def handle_remote_config_unavailable_error(exc: RemoteConfigUnavailableError) -> NoReturn:
+    """Handle and display RemoteConfigUnavailableError with user-friendly guidance.
+
+    Raised when a fresh fetch failed AND no usable cached fallback exists. The gateway
+    is enabled but we have neither network nor a primed local cache.
+
+    Args:
+        exc: The remote config unavailable error exception
+    """
+    console = get_console()
+    console.print("\n[bold red]❌ Pipelex Gateway is unreachable and no cached config is available[/bold red]\n")
+
+    console.print(
+        "[bold yellow]⚠ Offline + Cold Cache:[/bold yellow] Pipelex Gateway requires a config\n"
+        "either fetched fresh or restored from a local cache, but neither is available.\n"
+    )
+
+    console.print("[bold cyan]Error details:[/bold cyan]")
+    console.print(f"  {escape(str(exc))}\n")
+
+    console.print("[bold green]💡 To fix:[/bold green]")
+    console.print("  • Reconnect to the network and run [cyan]pipelex init[/cyan] to prime the cache")
+    console.print(
+        "  • Or disable [cyan]pipelex_gateway[/cyan] in [cyan].pipelex/inference/backends.toml[/cyan] for permanent offline (BYOK) operation"
+    )
+    console.print()
+
+    console.print(f"[dim]For more information: {URLs.gateway_docs}[/dim]")
+    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
+    raise typer.Exit(1) from exc
+
+
+def handle_gateway_unknown_model_error(exc: GatewayUnknownModelError) -> NoReturn:
+    """Handle and display GatewayUnknownModelError with user-friendly guidance.
+
+    Raised when the active model deck references a gateway model handle that doesn't exist
+    in the gateway specs (either freshly fetched or loaded from cache). Branches the
+    remediation on the provenance of the gateway config.
+
+    Args:
+        exc: The gateway unknown model error exception
+    """
+    console = get_console()
+    console.print("\n[bold red]❌ Unknown gateway model handle[/bold red]\n")
+
+    console.print(f"[bold cyan]Model handle:[/bold cyan] [yellow]'{escape(exc.model_name)}'[/yellow]")
+    console.print(f"[bold cyan]Config source:[/bold cyan] [yellow]{escape(exc.source)}[/yellow]")
+    console.print(f"\n[bold red]Error:[/bold red] {escape(str(exc))}\n")
+
+    console.print("[bold green]💡 To fix:[/bold green]")
+    match exc.source:
+        case RemoteConfigSource.FRESH:
+            console.print("  • Check the model handle for typos against [cyan]pipelex doctor[/cyan]")
+            console.print("  • Update the deck to reference a model the gateway currently exposes")
+            console.print("  • Or disable [cyan]pipelex_gateway[/cyan] in [cyan].pipelex/inference/backends.toml[/cyan] to fall back to BYOK")
+        case RemoteConfigSource.CACHED:
+            console.print("  • The on-disk cache may be stale — run [cyan]pipelex init[/cyan] while online to refresh it")
+            console.print("  • Or disable [cyan]pipelex_gateway[/cyan] in [cyan].pipelex/inference/backends.toml[/cyan] to operate offline (BYOK)")
+    console.print()
+
+    console.print(f"[dim]For more information: {URLs.gateway_docs}[/dim]")
+    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
     raise typer.Exit(1) from exc

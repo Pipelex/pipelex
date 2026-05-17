@@ -117,6 +117,20 @@ Commands use different stdout formats depending on their purpose:
 
 JSON commands return the result object directly. They are not wrapped in a `status` or `data` envelope.
 
+**Warnings** — non-fatal setup conditions are surfaced on a top-level `warnings` array of the success envelope, so consumers don't have to parse stderr. The field is absent when there is nothing to report. Each entry is an object with a `type` and a `message`:
+
+```json
+{
+  "success": true,
+  "target_dir": "/path/to/.pipelex",
+  "warnings": [
+    { "type": "RemoteConfigStale", "message": "Using a cached gateway config; run `pipelex init` while online to refresh." }
+  ]
+}
+```
+
+`RemoteConfigStale` is emitted when the gateway is enabled but the remote config service is unreachable and Pipelex falls back to its on-disk cache (offline mode).
+
 **Error** — written to stderr:
 
 ```json
