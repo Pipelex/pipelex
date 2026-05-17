@@ -2,13 +2,15 @@
 
 > **Type:** Implementation plan — two independent workstreams. Workstream 1 is a removal; Workstream 2 is config + factory wiring + a worker audit.
 > **Source / intent:** [wip/error-handling/track-retry-and-resilience.md](wip/error-handling/track-retry-and-resilience.md) — the target-architecture doc. Where this plan and that doc differ, the doc is authoritative for *intent*; this plan is authoritative for *steps*.
-> **Branch:** working on `feature/Error-handling-3` (branched off `feature/Error-handling-2` to polish this plan). The base carries the Phase 5 retry loop being removed and the error-metadata model; `main` has neither.
-> **Packaging:** ship as **two PRs** — land Workstream 1 (removal) first; it is self-contained, small, and independently verifiable with `make agent-test`. Workstream 2 (Tier 1 explicit) follows as a second PR. The two workstreams don't conflict, but separate PRs keep each review scoped to one concern.
+> **Branch:** Workstream 2 runs on `feature/Error-handling-4` (branched off `feature/Error-handling-3`, which carries the landed Workstream 1 removal). Workstream 1 shipped as PR #909 (`feature/Error-handling-3` → `feature/Error-handling-2`); commits `bd089c2a` (removal) + `22932ae2` (CHANGELOG cleanup). `feature/Error-handling-3` carries the error-metadata model and the now-removed Phase 5 retry loop's *absence*; `main` has neither.
+> **Packaging:** ship as **two PRs** — Workstream 1 (removal) landed first as PR #909. Workstream 2 (Tier 1 explicit) follows as a second PR off `feature/Error-handling-4`. The two workstreams don't conflict, but separate PRs keep each review scoped to one concern.
 > **Discipline:** `make agent-check` after each step; `make agent-test` before wrapping up. After deleting test files, `make cleanderived` if collection misbehaves. After config/toml changes, `make tb` (boot test — config model and toml must stay in sync).
 
 ## Status
 
-**Workstream 1 complete** (`make agent-check` clean, `make agent-test` green). **Workstream 2 not started.** They are independent in content, but ship as two PRs — Workstream 1 (removal) first, Workstream 2 (Tier 1 explicit) second (see **Packaging** above).
+**Workstream 1 complete and shipped** as PR #909 (`make agent-check` clean, `make agent-test` green; see the Workstream 1 checkpoint below). **Workstream 2 not started** — this is the active work; start at step 2.1. They are independent in content, but ship as two PRs — Workstream 1 (removal) first, Workstream 2 (Tier 1 explicit) second (see **Packaging** above).
+
+**Cold-start for Workstream 2:** read **Cold-start context** below (the tier model and what Workstream 2 is *not*), then the **Workstream 2** section in full, then **Key files** and **Risks / gotchas**. Workstream 2 is config + SDK-factory wiring + a worker audit — it makes the provider SDKs' existing transport retry an explicit, uniform, configured policy and brings the SDK-less paths up to that floor; it does **not** build a Pipelex retry layer. The critical correction the v1 plan got wrong (`instructor`'s `max_retries` retries transport errors too, not just schema validation) is in **Cold-start context** and drives step 2.3 — do not skip it.
 
 ## Cold-start context
 
