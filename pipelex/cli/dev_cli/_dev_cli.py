@@ -235,7 +235,8 @@ def sync_kit_configs_command(
     """Mirror the .pipelex/ directory into pipelex/kit/configs/."""
     try:
         sync_kit_configs_cmd(quiet=quiet, dry_run=dry_run)
-    except Exception:
+    except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
         console.print("[bold red]Unexpected error occurred[/bold red]")
