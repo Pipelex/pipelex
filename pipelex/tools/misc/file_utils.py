@@ -240,14 +240,15 @@ class MirrorDirResult(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     copied_files: list[str] = Field(default_factory=list)
+    created_dirs: list[str] = Field(default_factory=list)
     deleted_files: list[str] = Field(default_factory=list)
     deleted_dirs: list[str] = Field(default_factory=list)
     dry_run: bool = False
 
     @property
     def change_count(self) -> int:
-        """Total number of files copied plus files and directories deleted."""
-        return len(self.copied_files) + len(self.deleted_files) + len(self.deleted_dirs)
+        """Total number of files copied, directories created, and files and directories deleted."""
+        return len(self.copied_files) + len(self.created_dirs) + len(self.deleted_files) + len(self.deleted_dirs)
 
     @property
     def has_changes(self) -> bool:
@@ -284,10 +285,12 @@ def mirror_dir(
         dry_run (bool): If True, report changes without touching the filesystem.
 
     Returns:
-        MirrorDirResult: The files copied and the files and directories deleted,
-        with paths relative to the target directory.
+        MirrorDirResult: The files copied, directories created, and files and
+        directories deleted, with paths relative to the target directory.
 
     Raises:
+        FileNotFoundError: If source_dir does not exist.
+        NotADirectoryError: If source_dir exists but is not a directory.
         OSError: If the filesystem walk or a copy/delete operation fails.
     """
     source_root = Path(source_dir)
@@ -295,8 +298,19 @@ def mirror_dir(
     excluded_files = exclude_files or frozenset()
     excluded_dirs = exclude_dirs or frozenset()
 
+    # Validate the source before Pass 1: an invalid source makes every
+    # is_dir()/is_file() probe return false, which would delete the entire
+    # target tree before Pass 2's walk gets a chance to fail.
+    if not source_root.exists():
+        msg = f"mirror_dir source directory does not exist: {source_root}"
+        raise FileNotFoundError(msg)
+    if not source_root.is_dir():
+        msg = f"mirror_dir source path is not a directory: {source_root}"
+        raise NotADirectoryError(msg)
+
     deleted_files: list[str] = []
     deleted_dirs: list[str] = []
+    created_dirs: list[str] = []
     copied_files: list[str] = []
 
     # Pass 1: delete target entries absent from the source. Done before the copy
@@ -313,7 +327,12 @@ def mirror_dir(
                     continue
                 deleted_dirs.append((relative_root / dir_name).as_posix())
                 if not dry_run:
-                    remove_folder(str(Path(current_root) / dir_name))
+                    dir_to_remove = Path(current_root) / dir_name
+                    # shutil.rmtree raises on directory symlinks; unlink them instead.
+                    if dir_to_remove.is_symlink():
+                        dir_to_remove.unlink()
+                    else:
+                        remove_folder(str(dir_to_remove))
             dir_names[:] = kept_dir_names
             for file_name in sorted(file_names):
                 if file_name in excluded_files:
@@ -328,8 +347,13 @@ def mirror_dir(
     for current_root, dir_names, file_names in os.walk(source_root, topdown=True, onerror=_reraise_walk_error):
         dir_names[:] = sorted(dir_name for dir_name in dir_names if dir_name not in excluded_dirs)
         relative_root = Path(current_root).relative_to(source_root)
+        target_subdir = target_root / relative_root
+        # Record directories created in the target so an added empty directory
+        # still counts as a change (and a dry run reports it accurately).
+        if relative_root.parts and not target_subdir.is_dir():
+            created_dirs.append(relative_root.as_posix())
         if not dry_run:
-            ensure_directory_exists(str(target_root / relative_root))
+            ensure_directory_exists(str(target_subdir))
         for file_name in sorted(file_names):
             if file_name in excluded_files:
                 continue
@@ -343,6 +367,7 @@ def mirror_dir(
 
     return MirrorDirResult(
         copied_files=sorted(copied_files),
+        created_dirs=sorted(created_dirs),
         deleted_files=sorted(deleted_files),
         deleted_dirs=sorted(deleted_dirs),
         dry_run=dry_run,

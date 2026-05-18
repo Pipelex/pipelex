@@ -1,6 +1,8 @@
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from pipelex.tools.misc.diff import has_diff_dirs
 from pipelex.tools.misc.file_utils import mirror_dir
 
@@ -94,7 +96,7 @@ class TestMirrorDir:
             assert (target / "inference" / "deck" / "llm.toml").read_text(encoding="utf-8") == "llm"
 
     def test_creates_empty_source_subdir(self):
-        """An empty source subdirectory is recreated in the target."""
+        """An empty source subdirectory is recreated in the target and recorded as a change."""
         with tempfile.TemporaryDirectory() as temp_dir:
             source = Path(temp_dir) / "source"
             target = Path(temp_dir) / "target"
@@ -103,8 +105,23 @@ class TestMirrorDir:
 
             result = mirror_dir(source, target)
 
-            assert result.has_changes is False
+            assert result.created_dirs == ["empty_dir"]
+            assert result.has_changes is True
             assert (target / "empty_dir").is_dir()
+
+    def test_dry_run_reports_created_dir_without_creating_it(self):
+        """dry_run records an added empty source directory without creating it on disk."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "source"
+            target = Path(temp_dir) / "target"
+            (source / "empty_dir").mkdir(parents=True)
+            target.mkdir()
+
+            result = mirror_dir(source, target, dry_run=True)
+
+            assert result.created_dirs == ["empty_dir"]
+            assert result.has_changes is True
+            assert not (target / "empty_dir").exists()
 
     def test_excluded_file_target_only_is_preserved(self):
         """An excluded file present only in the target is not deleted."""
@@ -227,3 +244,46 @@ class TestMirrorDir:
             assert (target / "telemetry.toml").read_text(encoding="utf-8") == "target-side excluded"
             assert (target / "storage" / "cached.bin").exists()
             assert not (target / "stale.toml").exists()
+
+    def test_raises_when_source_missing(self):
+        """A missing source raises FileNotFoundError before the delete pass touches the target."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "does_not_exist"
+            target = Path(temp_dir) / "target"
+            _write(target / "keep.toml", "precious")
+
+            with pytest.raises(FileNotFoundError):
+                mirror_dir(source, target)
+
+            assert (target / "keep.toml").read_text(encoding="utf-8") == "precious"
+
+    def test_raises_when_source_is_a_file(self):
+        """A source path that is a file raises NotADirectoryError without wiping the target."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "source"
+            target = Path(temp_dir) / "target"
+            source.write_text("i am a file", encoding="utf-8")
+            _write(target / "keep.toml", "precious")
+
+            with pytest.raises(NotADirectoryError):
+                mirror_dir(source, target)
+
+            assert (target / "keep.toml").read_text(encoding="utf-8") == "precious"
+
+    def test_deletes_target_only_directory_symlink(self):
+        """A target-only directory symlink is unlinked instead of aborting the sync on rmtree."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "source"
+            target = Path(temp_dir) / "target"
+            source.mkdir()
+            real_dir = Path(temp_dir) / "real_dir"
+            _write(real_dir / "payload.toml", "data")
+            target.mkdir()
+            (target / "linked_dir").symlink_to(real_dir, target_is_directory=True)
+
+            result = mirror_dir(source, target)
+
+            assert result.deleted_dirs == ["linked_dir"]
+            assert not (target / "linked_dir").exists()
+            # The symlink is removed, but its target directory is left intact.
+            assert (real_dir / "payload.toml").read_text(encoding="utf-8") == "data"

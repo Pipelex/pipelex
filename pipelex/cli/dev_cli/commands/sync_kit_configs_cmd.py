@@ -25,7 +25,10 @@ def _display_result(result: MirrorDirResult, quiet: bool) -> None:
 
     if quiet:
         if result.has_changes:
-            console.print(f"[green]✓ Kit config sync:[/green] {prefix}{len(result.copied_files)} copied, {deleted_count} deleted")
+            console.print(
+                f"[green]✓ Kit config sync:[/green] {prefix}{len(result.copied_files)} copied, "
+                f"{len(result.created_dirs)} dir(s) created, {deleted_count} deleted"
+            )
         else:
             console.print(f"[green]✓ Kit config sync:[/green] {prefix}already in sync")
         return
@@ -51,6 +54,8 @@ def _display_result(result: MirrorDirResult, quiet: bool) -> None:
     table.add_column("Path", style="cyan")
     for path in result.copied_files:
         table.add_row("[green]copied[/green]", path)
+    for path in result.created_dirs:
+        table.add_row("[green]created dir[/green]", path)
     for path in result.deleted_dirs:
         table.add_row("[red]deleted dir[/red]", path)
     for path in result.deleted_files:
@@ -58,7 +63,10 @@ def _display_result(result: MirrorDirResult, quiet: bool) -> None:
     console.print(table)
     console.print()
 
-    summary = f"{len(result.copied_files)} file(s) copied, {len(result.deleted_files)} file(s) and {len(result.deleted_dirs)} dir(s) deleted."
+    summary = (
+        f"{len(result.copied_files)} file(s) copied, {len(result.created_dirs)} dir(s) created, "
+        f"{len(result.deleted_files)} file(s) and {len(result.deleted_dirs)} dir(s) deleted."
+    )
     if result.dry_run:
         title = "Kit Config Sync: PREVIEW"
         summary += "\n[dim]Run without --dry-run to apply.[/dim]"
@@ -89,12 +97,12 @@ def sync_kit_configs_cmd(quiet: bool = False, dry_run: bool = False) -> None:
     console = get_console()
 
     source_dir = Path(PIPELEX_DIR)
-    if not source_dir.exists():
+    if not source_dir.is_dir():
         if quiet:
-            console.print(f"[red]✗ Kit config sync: FAILED[/red] - {PIPELEX_DIR} does not exist")
+            console.print(f"[red]✗ Kit config sync: FAILED[/red] - {PIPELEX_DIR} does not exist or is not a directory")
         else:
             console.print()
-            console.print(f"[red]✗[/red] Directory [cyan]{PIPELEX_DIR}[/cyan] does not exist")
+            console.print(f"[red]✗[/red] Directory [cyan]{PIPELEX_DIR}[/cyan] does not exist or is not a directory")
             console.print()
         sys.exit(1)
 

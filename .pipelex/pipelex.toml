@@ -258,7 +258,7 @@ default_activity_start_to_close_timeout = "0:10:00"
 # image pool, isolated Mistral OCR), with optional per-handle queue overrides and
 # rare per-handle option overrides. See pipelex/kit/configs/pipelex.toml for the
 # full schema and examples.
-activity_queues = {}
+[temporal.worker_config.activity_queues]
 
 [temporal.worker_config.retry_policy_config]
 initial_interval = "0:00:03"
