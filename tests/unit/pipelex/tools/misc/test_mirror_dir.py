@@ -270,6 +270,42 @@ class TestMirrorDir:
 
             assert (target / "keep.toml").read_text(encoding="utf-8") == "precious"
 
+    def test_replaces_target_file_symlink(self):
+        """A target file symlink is replaced with a real copy, leaving the file it pointed to intact."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "source"
+            target = Path(temp_dir) / "target"
+            _write(source / "config.toml", "real config")
+            external = Path(temp_dir) / "external.toml"
+            external.write_text("external content", encoding="utf-8")
+            target.mkdir()
+            (target / "config.toml").symlink_to(external)
+
+            result = mirror_dir(source, target)
+
+            assert result.copied_files == ["config.toml"]
+            assert not (target / "config.toml").is_symlink()
+            assert (target / "config.toml").read_text(encoding="utf-8") == "real config"
+            # The stale symlink is replaced, but the file it pointed to is left untouched.
+            assert external.read_text(encoding="utf-8") == "external content"
+
+    def test_dry_run_reports_target_file_symlink_without_touching_filesystem(self):
+        """dry_run reports a target file symlink as a change without unlinking or copying."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "source"
+            target = Path(temp_dir) / "target"
+            _write(source / "config.toml", "real config")
+            external = Path(temp_dir) / "external.toml"
+            external.write_text("external content", encoding="utf-8")
+            target.mkdir()
+            (target / "config.toml").symlink_to(external)
+
+            result = mirror_dir(source, target, dry_run=True)
+
+            assert result.copied_files == ["config.toml"]
+            assert (target / "config.toml").is_symlink()
+            assert external.read_text(encoding="utf-8") == "external content"
+
     def test_deletes_target_only_directory_symlink(self):
         """A target-only directory symlink is unlinked instead of aborting the sync on rmtree."""
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -359,7 +359,13 @@ def mirror_dir(
                 continue
             source_file = Path(current_root) / file_name
             target_file = target_root / relative_root / file_name
-            if target_file.is_file() and filecmp.cmp(str(source_file), str(target_file), shallow=False):
+            # A target symlink must be replaced by the real source file, not written
+            # through: copy_file() would otherwise overwrite whatever the link points
+            # to, leaving the mirror tree in the wrong shape.
+            if target_file.is_symlink():
+                if not dry_run:
+                    target_file.unlink()
+            elif target_file.is_file() and filecmp.cmp(str(source_file), str(target_file), shallow=False):
                 continue
             if not dry_run:
                 copy_file(source_path=str(source_file), target_path=str(target_file))
