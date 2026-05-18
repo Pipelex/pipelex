@@ -257,14 +257,14 @@ class TestConfigResolution:
 
     @pytest.mark.parametrize(
         "marker",
-        [".git", "pyproject.toml", "setup.py", "setup.cfg", "package.json", ".hg"],
+        [".pipelex", ".git", "pyproject.toml", "setup.py", "setup.cfg", "package.json", ".hg"],
     )
     def test_find_project_root_all_markers(self, tmp_path: Path, marker: str) -> None:
         """All supported markers are recognized."""
         project_dir = tmp_path / "project"
         project_dir.mkdir(parents=True)
         marker_path = project_dir / marker
-        if marker in {".git", ".hg"}:
+        if marker in {".pipelex", ".git", ".hg"}:
             marker_path.mkdir()
         else:
             marker_path.write_text("")
@@ -274,6 +274,22 @@ class TestConfigResolution:
         result = ConfigLoader.find_project_root(sub_dir)
 
         assert result == project_dir.resolve()
+
+    def test_project_config_dir_found_via_pipelex_marker_only(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """A folder containing only a .pipelex/ directory (no .git, no pyproject.toml) is a project root.
+
+        Regression: without .pipelex as a project root marker, such a folder fell through to the
+        global ~/.pipelex/ config, silently ignoring the project's own .pipelex/ overrides.
+        """
+        project_dir = tmp_path / "project"
+        (project_dir / ".pipelex").mkdir(parents=True)
+
+        mocker.patch.object(Path, "cwd", return_value=project_dir)
+        mocker.patch.object(Path, "home", return_value=tmp_path / "home")
+
+        loader = ConfigLoader()
+
+        assert loader.project_config_dir == (project_dir / ".pipelex").resolve()
 
     def test_cross_platform_paths(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Config paths use Path throughout, no hardcoded separators."""

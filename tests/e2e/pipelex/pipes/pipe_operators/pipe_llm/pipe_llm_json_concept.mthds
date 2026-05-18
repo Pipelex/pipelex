@@ -1,0 +1,18 @@
+domain      = "pipe_llm_json_concept_e2e"
+description = "Test PipeLLM whose output concept refines the native JSON concept"
+
+[concept.VectorIndex]
+description = "An indexed collection of vectors organized as a free-form JSON object"
+refines     = "JSON"
+
+[pipe.build_index]
+type = "PipeLLM"
+description = "Organize text into a structured JSON index"
+inputs = { text = "Text" }
+output = "VectorIndex"
+prompt = """
+Organize the following text into a structured index. Produce a JSON object with
+top-level categories as keys and lists of related terms as values.
+
+@text
+"""

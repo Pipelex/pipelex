@@ -7,7 +7,7 @@ import io
 import os
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ValidationError
 from rich.panel import Panel
@@ -20,7 +20,17 @@ from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cli.commands.update_cmd import update_cmd
-from pipelex.cogt.exceptions import InferenceBackendLibraryError
+from pipelex.cogt.exceptions import (
+    GatewayUnknownModelError,
+    InferenceBackendCredentialsError,
+    InferenceBackendLibraryError,
+    InferenceBackendLibraryNotFoundError,
+    InferenceBackendLibraryValidationError,
+    ModelDeckNotFoundError,
+    ModelDeckValidationError,
+    RoutingProfileDisabledBackendError,
+    RoutingProfileLibraryNotFoundError,
+)
 from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsErrorMsgFactory
 from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport, InferenceBackendLibrary
 from pipelex.cogt.model_backends.gateway_config import GatewayConfig
@@ -33,7 +43,10 @@ from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.environment import get_optional_env
-from pipelex.system.pipelex_service.exceptions import RemoteConfigFetchError, RemoteConfigValidationError
+from pipelex.system.pipelex_service.exceptions import (
+    RemoteConfigUnavailableError,
+    RemoteConfigValidationError,
+)
 from pipelex.system.pipelex_service.pipelex_service_config import (
     is_pipelex_gateway_enabled,
     load_pipelex_service_config_if_exists,
@@ -45,6 +58,9 @@ from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.placeholder import value_is_placeholder
 from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_path
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
+
+if TYPE_CHECKING:
+    from pipelex.system.pipelex_service.types import RemoteConfigSource
 
 
 class ConfigLocationInfo(BaseModel):
@@ -730,6 +746,7 @@ def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, B
 
     # Fetch gateway model specs if Gateway is enabled
     gateway_config: GatewayConfig | None = None
+    gateway_config_source: RemoteConfigSource | None = None
     if is_pipelex_gateway_enabled():
         pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
         if pipelex_service_config is None:
@@ -737,12 +754,14 @@ def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, B
         if not pipelex_service_config.agreement.terms_accepted:
             return False, "Pipelex Gateway is enabled but terms have not been accepted", backend_file_reports
         try:
-            remote_config = RemoteConfigFetcher.fetch_remote_config()
+            result = RemoteConfigFetcher.fetch_remote_config()
+            remote_config = result.config
+            gateway_config_source = result.source
             gateway_config = GatewayConfig(
                 model_specs=remote_config.backend_model_specs,
                 aws_region=remote_config.aws_region,
             )
-        except (RemoteConfigFetchError, RemoteConfigValidationError) as exc:
+        except (RemoteConfigUnavailableError, RemoteConfigValidationError) as exc:
             return False, f"Failed to fetch Pipelex Gateway remote configuration: {exc}", backend_file_reports
 
     models_manager = ModelManager()
@@ -751,6 +770,7 @@ def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, B
         models_manager.setup(
             secrets_provider=secrets_provider,
             gateway_config=gateway_config,
+            gateway_config_source=gateway_config_source,
         )
         models_manager.validate_model_deck()
     except InferenceBackendLibraryError as exc:
@@ -764,7 +784,16 @@ def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, B
                     backend_file_reports[backend_name].is_valid = False
                     backend_file_reports[backend_name].error_message = error_str
         return False, f"Error checking models: {exc}", backend_file_reports
-    except Exception as exc:
+    except (
+        RoutingProfileLibraryNotFoundError,
+        InferenceBackendLibraryNotFoundError,
+        ModelDeckNotFoundError,
+        RoutingProfileDisabledBackendError,
+        InferenceBackendLibraryValidationError,
+        ModelDeckValidationError,
+        InferenceBackendCredentialsError,
+        GatewayUnknownModelError,
+    ) as exc:
         return False, f"Error checking models: {exc}", backend_file_reports
 
     return True, "Models are valid", backend_file_reports
