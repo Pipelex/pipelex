@@ -1,6 +1,6 @@
 # Concurrency & batching — design doc
 
-Status: **design scoping**. Quick wins below are specced enough to implement; the hard part (rate limiting) is split into [`rate-limiting.md`](rate-limiting.md).
+Status: **design scoping**. The quick wins below are specced enough to implement; the two larger pieces of design work are split into their own docs — [`rate-limiting.md`](rate-limiting.md) and [`batch-partial-failure.md`](batch-partial-failure.md).
 
 ## Context & scope
 
@@ -84,21 +84,19 @@ Effort: small, isolated. Highest impact-per-line. Do first.
 
 Effort: tiny.
 
-### QW3 — per-item failure policy for large batches
+There is no QW3. An earlier draft listed "per-item batch failure policy" as a quick win — it is not. The `gather_bounded` part is trivial, but deciding what `PipeBatch` does with a partial result touches the type system, the MTHDS language contract, reporting, the graph tracer, and the Temporal boundary. It is now its own design doc — see below.
 
-`gather_bounded` raises on the first exception (first-error-aborts): one malformed document discards 999 good results. For batch fan-out, collecting per-item errors and returning partial results is usually preferable.
+## Larger design work — separate docs
 
-This is a quick *code* change but carries a **policy decision** and a **surface change** (what a partial-failure `PipeOutput` / `BatchParams` looks like), so it needs sign-off, not just implementation.
+Two pieces of design work are too large to spec inline. Each has its own doc.
 
-**Direct vs Temporal:** Runs as workflow code; deterministic; compatible. *More* valuable under Temporal — each batch branch is a durably-executed child workflow, so first-error-aborts discards durably-completed work. Aggregating per-branch `ChildWorkflowError`s is the Temporal-mode shape of the same change.
+### Rate limiting — [`rate-limiting.md`](rate-limiting.md)
 
-Effort: small code, but gated on a policy decision (default fail-fast vs collect-partial) and a surface design.
+Weaknesses 2 + 3 — a per-`PipeBatch` (not global) bound, and the absence of any RPM/TPM limiter — are the real cause of the crash at scale. The fix is genuinely mode-dependent: direct mode needs an in-process limiter, Temporal mode needs server-side task-queue limits. It is **not one system that works in both modes**. The doc also records the finding that the Temporal-mode machinery already exists.
 
-## The hard part: rate limiting
+### Batch partial failure — [`batch-partial-failure.md`](batch-partial-failure.md)
 
-Weaknesses 2 + 3 — a per-`PipeBatch` (not global) bound, and the absence of any RPM/TPM limiter — are the real cause of the crash at scale, and the fix is genuinely mode-dependent: direct mode needs an in-process limiter, Temporal mode needs server-side task-queue limits. It is **not one system that works in both modes.**
-
-That design — including the finding that the Temporal-mode machinery already exists — is in **[`rate-limiting.md`](rate-limiting.md)**.
+`gather_bounded` raises on the first exception, so one malformed document discards every good result in the batch. Collecting partial results sounds like a small change, but it forces a decision on the *type* of a batch output — and the options range from a sparse list to an envelope concept, the latter being an MTHDS language-semantics change. The doc lays out the blast radius and the open questions.
 
 ## Layering summary
 
@@ -111,4 +109,4 @@ That design — including the finding that the Temporal-mode machinery already e
 
 ## Suggested next step
 
-Land QW1 (and optionally QW2) — they are self-contained and unblock nothing else. Then take up [`rate-limiting.md`](rate-limiting.md) as its own design session.
+Land QW1 (and optionally QW2) — they are self-contained and unblock nothing else. Then take up [`rate-limiting.md`](rate-limiting.md) and [`batch-partial-failure.md`](batch-partial-failure.md), each as its own design session — they are independent of each other.
