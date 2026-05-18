@@ -1,27 +1,37 @@
 # TODOS
 
-No open work items. This branch (`feature/Error-handling-2`, branched from `feature/Temporal-merge-3`) is the error-handling overhaul — what follows is a guide for reviewing it.
+Branch: `feature/Concurrency`. Design context lives in [`wip/concurrency/`](wip/concurrency/) — start with [`wip/concurrency/README.md`](wip/concurrency/README.md).
 
-## Reviewing this branch
+## Done — retry-jitter quick win
 
-The current-state reference is **`wip/error-handling/`**. Start with [`wip/error-handling/README.md`](wip/error-handling/README.md): its status table and suggested read order map every track to its doc and say what landed vs. what is still only proposed.
+Status: **landed** on `feature/Concurrency`. The one self-contained change from the concurrency design doc (see [`wip/concurrency/README.md`](wip/concurrency/README.md#the-one-quick-win--retry-jitter)). Everything else in that doc carries a design decision and is tracked in its own sub-doc.
 
-Each track is a self-contained concern. Suggested review path:
+### Problem
 
-1. [`architecture.md`](wip/error-handling/architecture.md) — layer model, exception hierarchy, `ErrorReport` shape. Read first; every track refers back to it.
-2. [`track-metadata-model.md`](wip/error-handling/track-metadata-model.md) — the data contract: `error_category`, `error_domain`, `user_action`, `ProviderErrorMetadata`. Key files: `pipelex/base_exceptions.py`, `pipelex/cogt/exceptions.py`.
-3. [`track-worker-classification.md`](wip/error-handling/track-worker-classification.md) — SDK → domain error mapping in every inference worker. Key files: `pipelex/plugins/*/`, `pipelex/cogt/inference/error_classification.py`, `pipelex/plugins/openai/openai_error_classification.py`.
-4. [`track-retry-and-resilience.md`](wip/error-handling/track-retry-and-resilience.md) — explicit transport retry, removal of the `PipeRouter` retry loop, bounded `PipeBatch` fan-out. Key files: `pipelex/cogt/inference/transport_retry.py`, `pipelex/cogt/llm/instructor_retry.py`, `pipelex/pipe_controllers/batch/pipe_batch.py`, `pipelex/tools/misc/async_utils.py`.
-5. [`track-cli-delivery.md`](wip/error-handling/track-cli-delivery.md) — markdown/JSON agent-CLI delivery, `error_domain` → HTTP-status mapping. Key files: `pipelex/cli/agent_cli/commands/agent_output.py`, `pipelex/cli/error_handlers.py`.
-6. [`track-temporal-integration.md`](wip/error-handling/track-temporal-integration.md) — `ErrorReport` carried across the activity → workflow → submitter boundary. Key files: `pipelex/temporal/tprl/temporal_error.py`, `pipelex/temporal/tprl/activity_error_boundary.py`, `pipelex/temporal/tprl/workflow_caller.py`.
-7. [`track-testing.md`](wip/error-handling/track-testing.md) — cross-cutting; verifies the rest.
+`transport_retry.py` builds its backoff with `wait_exponential` — every retry of a given attempt waits the *same* deterministic interval. Under a 429 storm, all the in-flight requests that got rate-limited at the same moment retry in lockstep, re-firing the storm as a thundering herd. Full jitter (`wait_random_exponential`) spreads the retries across the interval and breaks the synchronization.
 
-## What is intentionally left open
+### Scope
 
-So these are not flagged as missing during review:
+- One-line change in `pipelex/cogt/inference/transport_retry.py`: `wait_exponential` → `wait_random_exponential`.
+- `Retry-After` handling is unaffected — `_transport_retry_wait` returns the header value directly and only falls back to the exponential wait when no header is present.
+- Behaves identically in direct mode and Temporal mode: `transport_retry` runs inside the activity in both, where non-determinism is allowed.
 
-- **Extract / Classify / Render decomposition** — a proposed, not-started refactor; out of scope for this branch. See [`track-extract-classify-render.md`](wip/error-handling/track-extract-classify-render.md).
-- **Metadata-model long tail** — a few non-inference `PipelexError` subclasses still rely on the `agent_output.py` fallback dicts for `hint` / `error_domain` instead of class-level metadata. See the Followups in [`track-metadata-model.md`](wip/error-handling/track-metadata-model.md).
-- Optional, non-blocking review followups are collected in [`wip/error-handling/deferred-items/`](wip/error-handling/deferred-items/).
+### What was done
 
-Completed plans are archived under `wip/error-handling/archive-*.md` — kept for their running notes, not authoritative for the current state.
+- [x] Changed the `tenacity` import in `transport_retry.py` from `wait_exponential` to `wait_random_exponential`.
+- [x] Updated the `_exponential_wait` binding to `wait_random_exponential(multiplier=1.0, max=_MAX_RETRY_AFTER_SECONDS)` with a comment explaining the full-jitter rationale.
+- [x] Updated the `_transport_retry_wait` docstring to say "full-jitter exponential backoff".
+- [x] Changelog: folded the full-jitter detail into the existing `[Unreleased]` Added entry for `transport_retry.py` (the module is new in this same cycle, so a separate "Changed" entry would be wrong).
+- [x] `make agent-check` — ruff, plxt, pyright, mypy all clean.
+
+### No dedicated test — deliberate
+
+The TDD plan originally called for a test. On review, that was dropped: this is a one-line swap to a different variant of a well-tested third-party function (`tenacity`). Jitter vs. no-jitter has no observable behavioral contract of *our own* to pin — any test would either reason statistically about `random` or mock `tenacity`'s internal `random.uniform` call, i.e. test the library, not our code. The existing `TestRequestWithTransportRetry` suite already covers that retry, `Retry-After` precedence, backoff fallback, and budget exhaustion all still work.
+
+## Larger concurrency design work — not quick wins
+
+Tracked in their own design docs, each needs a dedicated session:
+
+- [`wip/concurrency/fan-out-scheduling.md`](wip/concurrency/fan-out-scheduling.md) — replace `gather_bounded` chunking with a sliding-window semaphore.
+- [`wip/concurrency/rate-limiting.md`](wip/concurrency/rate-limiting.md) — per-`PipeBatch` bound + RPM/TPM limiter.
+- [`wip/concurrency/batch-partial-failure.md`](wip/concurrency/batch-partial-failure.md) — collecting partial batch results.

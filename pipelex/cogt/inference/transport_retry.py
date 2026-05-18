@@ -16,7 +16,7 @@ from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
 
 import httpx
-from tenacity import AsyncRetrying, RetryCallState, retry_if_exception, stop_after_attempt, wait_exponential
+from tenacity import AsyncRetrying, RetryCallState, retry_if_exception, stop_after_attempt, wait_random_exponential
 
 # Transient HTTP statuses worth retrying in the default (ambiguous-failure-tolerant) mode — the
 # same floor the provider SDKs apply. Connection-level failures (no HTTP response at all) are
@@ -41,7 +41,9 @@ _PRE_REQUEST_TRANSPORT_ERRORS: tuple[type[httpx.TransportError], ...] = (
 # that boundary — a longer wait is the Temporal line, not something to chase in direct mode.
 _MAX_RETRY_AFTER_SECONDS: float = 60.0
 
-_exponential_wait = wait_exponential(multiplier=1.0, max=_MAX_RETRY_AFTER_SECONDS)
+# Full-jitter exponential backoff: each wait is drawn from uniform(0, exponential_bound) so
+# retries that were rate-limited together do not re-fire in lockstep as a thundering herd.
+_exponential_wait = wait_random_exponential(multiplier=1.0, max=_MAX_RETRY_AFTER_SECONDS)
 
 
 def _parse_retry_after(raw_value: str | None) -> float | None:
@@ -65,7 +67,7 @@ def _parse_retry_after(raw_value: str | None) -> float | None:
 
 
 def _transport_retry_wait(retry_state: RetryCallState) -> float:
-    """Honor a ``Retry-After`` header when the failure carried one, else exponential backoff."""
+    """Honor a ``Retry-After`` header when the failure carried one, else full-jitter exponential backoff."""
     outcome = retry_state.outcome
     if outcome is not None and outcome.failed:
         exc = outcome.exception()
