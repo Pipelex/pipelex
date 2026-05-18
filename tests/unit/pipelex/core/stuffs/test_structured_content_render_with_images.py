@@ -58,7 +58,7 @@ class TestData:
     """Expected values for render_with_images tests."""
 
     EXPECTED_PLAIN_LIST = "title: Test Document\n[Image 1]\n[Image 2]\n[Image 3]"
-    EXPECTED_DICT = "title: Gallery\n[Image 1]\n[Image 2]"
+    EXPECTED_DICT = "title: Gallery\ncover: [Image 1]\nbackground: [Image 2]"
     EXPECTED_MIXED_DICT = "title: Mixed Gallery\nmixed_map: cover: [Image 1]\nnote: Keep this context"
     EXPECTED_NESTED_LIST = "title: Nested Gallery\n[Image 1]\n[Image 2]\n[Image 3]"
     EXPECTED_TUPLE = "title: Tuple Gallery\n[Image 1]\n[Image 2]"

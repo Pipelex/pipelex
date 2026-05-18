@@ -182,14 +182,10 @@ class StructuredContent(StuffContent):
         if isinstance(value, dict):
             dict_parts: list[str] = []
             dict_value = cast("dict[str, Any]", value)
-            hide_keys = self._is_image_collection_value(value)
             for key, val in dict_value.items():
                 rendered = self._render_value_with_images(val, registry, text_format)
                 if rendered:
-                    if hide_keys:
-                        dict_parts.append(rendered)
-                    else:
-                        dict_parts.append(f"{key}: {rendered}")
+                    dict_parts.append(f"{key}: {rendered}")
             return "\n".join(dict_parts)
         if isinstance(value, StuffContent):
             return value.rendered_for_prompt(text_format)
