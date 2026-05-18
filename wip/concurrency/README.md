@@ -54,6 +54,21 @@ Providers rate-limit on **requests-per-minute (RPM)** and **tokens-per-minute (T
 
 Weaknesses 1 and the retry-jitter gap are **quick wins** (below). Weaknesses 2 + 3 are the hard part — a real rate limiter — covered in [`rate-limiting.md`](rate-limiting.md).
 
+## Where `max_concurrency` lives today
+
+`max_concurrency` is a field on `PipelineExecutionConfig` (`pipelex/system/configuration/configs.py`), read at `pipe_batch.py` via `get_config().pipelex.pipeline_execution_config.max_concurrency`. It is an `int >= 1` or the literal `"unbounded"`, set to `8` in `pipelex.toml`.
+
+So today it is **one global config value**, not a per-`PipeBatch` setting — `BatchParams` carries only the input list/item names, no concurrency field. Every `PipeBatch` reads the same global number and applies it **independently** to its own fan-out.
+
+Scope across processes:
+
+- **Direct mode** — the submitter is the only process, so the global config value is global to everything.
+- **Temporal mode** — `PipeBatch` runs as workflow code on a worker, and `get_config()` reads *that worker's* config. So the value comes from the worker, not the submitter — incidentally, because config is per-process. It is **not** the Temporal worker-runtime knob (`WorkerRuntimeProfile.max_concurrent_activities` & co. in `config_temporal.py` are separate); `max_concurrency` is a pure Pipelex setting the controller reads wherever it runs.
+
+This is the mechanism behind weakness 2: a global *number* applied per-batch is not a global *bound*. Each `PipeBatch` independently permits `max_concurrency` branches, so sibling batches sum and nested batches multiply (`max_concurrency²`).
+
+**Design option — make it per-`PipeBatch`.** An optional `max_concurrency` field could be added to `BatchParams` (the per-`PipeBatch` object parsed from `.mthds`), falling back to the global config. This is a *fan-out shape* knob — useful, but it does not fix weakness 2, since shape knobs still multiply under nesting. It carries one Temporal advantage worth noting: a value on `BatchParams` is part of the fixed pipe blueprint / workflow input, so it replays deterministically — strictly safer than `PipeBatch` reading global config inside workflow code, which `wf_pipe_run.py` already warns against for "config-derived" values that "change across deploys". Tracked as an open question — see [`rate-limiting.md`](rate-limiting.md).
+
 ## Quick wins — do these first
 
 Small, isolated, low-risk. None of them is the full fix, but each removes a sharp edge and they are independent of the rate-limiting design.
@@ -70,7 +85,7 @@ async def _run(factory):
 results = await asyncio.gather(*(_run(f) for f in factories), return_exceptions=True)
 ```
 
-Same memory guarantee — at most `max_concurrency` deep-copied working memories alive at once, the property the comment in `async_utils.py` protects — but no head-of-line blocking: as soon as one finishes, the next starts.
+Same memory guarantee — at most `max_concurrency` deep-copied working memories alive at once **per `PipeBatch`**, the property the comment in `async_utils.py` protects — but no head-of-line blocking: as soon as one finishes, the next starts. Note the "per `PipeBatch`" scope: this is *not* a global guarantee. Each `PipeBatch` has its own bound, so sibling batches sum and nested batches multiply (weakness 2). QW1 fixes head-of-line blocking only; it does not make the bound global — that is the job of the gate in [`rate-limiting.md`](rate-limiting.md).
 
 **Direct vs Temporal:** Mode-agnostic improvement. `gather_bounded` runs as workflow code under Temporal; it is not disabled. `asyncio.Semaphore` involves no wall-clock — acquisition order follows task scheduling, which Temporal replays deterministically — so it is workflow-safe (the current chunking is too; worth a sanity check against the workflow sandbox). Under Temporal its meaning shifts from "in-flight coroutines" to "concurrent child-workflow starts", which is still a useful bound.
 

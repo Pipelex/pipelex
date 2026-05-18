@@ -64,7 +64,7 @@ Implementation options: `aiolimiter.AsyncLimiter` is the standard asyncio token 
 - How is the rate-limit config keyed and sourced — per `(provider, model)`, per account? Does it belong in the existing backend TOML configs alongside the provider definitions, so both the direct gate and the Temporal queue config can read one source?
 - TPM limiting needs a pre-call token estimate. Is one already available, or is RPM-only acceptable for v1?
 - Add `aiolimiter` as a dependency, or hand-roll the token bucket?
-- Does `PipeBatch.max_concurrency` survive as a fan-out shape knob, or fold entirely into the global gate?
+- Does `max_concurrency` survive as a fan-out shape knob once the global gate exists, or fold entirely into it? And if it survives, should it become per-`PipeBatch` — an optional field on `BatchParams`, falling back to the global config — rather than today's single global value? (Per-`PipeBatch` is also more Temporal-determinism-safe: a value on `BatchParams` is fixed workflow input, vs. `PipeBatch` reading global config inside workflow code. See the README's "Where `max_concurrency` lives today".)
 - How does the gate interact with `transport_retry`? A 429 that slips through should feed back into the limiter (back off the bucket), not just retry blindly.
 
 ## Suggested next step
