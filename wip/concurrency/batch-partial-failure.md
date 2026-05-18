@@ -1,6 +1,6 @@
 # Batch partial failure — design notes
 
-Status: **design scoping**, not yet a plan. Split out of [`README.md`](README.md) because it was mis-categorized as a quick win. Read the README's "direct mode vs Temporal mode" section first — this doc assumes that frame.
+Status: **design scoping**, not yet a plan. One of the design tracks of the concurrency & batching work — see [`README.md`](README.md) for the overview. Read the README's "direct mode vs Temporal mode" section first — this doc assumes that frame.
 
 ## Why this is its own doc
 

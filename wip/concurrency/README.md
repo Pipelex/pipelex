@@ -75,9 +75,7 @@ This is the mechanism behind weakness 2: a global *number* applied per-batch is 
 
 **Direct vs Temporal:** `transport_retry` runs inside the activity in both modes — jitter is fine there (non-determinism allowed in activities). Pre-existing nuance, not worsened by this change: under Temporal there are already two retry layers — `tenacity` inside the activity and Temporal's activity `RetryPolicy` outside it. Whether the activity should fail faster and let `RetryPolicy` own retries is a separate, existing design question.
 
-Effort: tiny — a one-line change. This is the only genuinely isolated change in this investigation; everything else carries a design decision.
-
-An earlier draft also listed "semaphore fan-out in `gather_bounded`" and "per-item batch failure policy" as quick wins. Neither survived scrutiny — both carry a design decision and a blast radius, and each is now its own doc (see below).
+Effort: tiny — a one-line change. This is the only genuinely isolated change here; everything else carries a design decision and is covered below.
 
 ## Larger design work — separate docs
 
