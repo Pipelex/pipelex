@@ -478,7 +478,8 @@ start_delay = "0:00:00"
 rpc_timeout = "1:00:00"
 # Baseline activity timeout used when no per-queue or per-handle overlay applies.
 default_activity_start_to_close_timeout = "0:10:00"
-activity_queues = {}
+
+[temporal.worker_config.activity_queues]
 
 [temporal.worker_config.retry_policy_config]
 initial_interval = "0:00:03"

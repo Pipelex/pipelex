@@ -1,4 +1,4 @@
-"""Command to verify the Pipelex Gateway models reference file is up-to-date."""
+"""Command to verify the Pipelex Gateway models reference files are up-to-date."""
 
 from __future__ import annotations
 
@@ -15,21 +15,21 @@ from pipelex.cli.dev_cli.commands.gateway_models_generator import (
     generate_reference_pure_markdown,
     normalize_for_comparison,
 )
-from pipelex.cli.dev_cli.commands.update_gateway_models_cmd import (
-    GATEWAY_MODELS_PLAIN_REFERENCE_PATH,
-    GATEWAY_MODELS_REFERENCE_PATH,
-)
+from pipelex.cli.dev_cli.commands.update_gateway_models_cmd import gateway_models_reference_files
 from pipelex.hub import get_console
 from pipelex.system.pipelex_service.exceptions import RemoteConfigFetchError, RemoteConfigValidationError
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from rich.console import Console
 
 
 def check_gateway_models_cmd(show_diff: bool = True, quiet: bool = False) -> None:
     """Verify that the Pipelex Gateway models reference files are up-to-date.
 
-    Compares the existing reference files against the current remote config.
+    Compares the existing reference files — both the .pipelex/ copies and the
+    packaged kit/configs/ copies — against the current remote config.
 
     Args:
         show_diff: If True, display the differences when found.
@@ -42,13 +42,11 @@ def check_gateway_models_cmd(show_diff: bool = True, quiet: bool = False) -> Non
         console.print("[bold]Checking Pipelex Gateway models reference files...[/bold]")
         console.print()
 
-    # Check if both reference files exist
-    missing_files: list[str] = []
-    if not GATEWAY_MODELS_REFERENCE_PATH.exists():
-        missing_files.append(str(GATEWAY_MODELS_REFERENCE_PATH))
-    if not GATEWAY_MODELS_PLAIN_REFERENCE_PATH.exists():
-        missing_files.append(str(GATEWAY_MODELS_PLAIN_REFERENCE_PATH))
+    reference_files = gateway_models_reference_files()
+    all_paths: list[Path] = [path for pair in reference_files for path in pair]
 
+    # Check that every reference file exists
+    missing_files = [str(path) for path in all_paths if not path.exists()]
     if missing_files:
         if quiet:
             console.print("[red]✗ Gateway models check: FAILED[/red] - Reference file(s) do not exist")
@@ -97,16 +95,28 @@ def check_gateway_models_cmd(show_diff: bool = True, quiet: bool = False) -> Non
             console.print()
         sys.exit(1)
 
-    # Generate expected content for both files
+    # Generate expected content for both file variants
     expected_html_content = generate_reference_markdown(model_specs)
     expected_plain_content = generate_reference_pure_markdown(model_specs)
+    expected_html_normalized = normalize_for_comparison(expected_html_content)
+    expected_plain_normalized = normalize_for_comparison(expected_plain_content)
 
-    # Read existing content for both files
+    # Compare every reference file against the expected content (ignoring the
+    # timestamp line). Collect out-of-date files and the diffs to display.
+    out_of_date_files: list[str] = []
+    pending_diffs: list[tuple[str, str, str]] = []
     try:
-        existing_html_content = GATEWAY_MODELS_REFERENCE_PATH.read_text(encoding="utf-8")
-        existing_plain_content = GATEWAY_MODELS_PLAIN_REFERENCE_PATH.read_text(encoding="utf-8")
+        for html_path, plain_path in reference_files:
+            existing_html_content = html_path.read_text(encoding="utf-8")
+            existing_plain_content = plain_path.read_text(encoding="utf-8")
+            if normalize_for_comparison(existing_html_content) != expected_html_normalized:
+                out_of_date_files.append(str(html_path))
+                pending_diffs.append((str(html_path), existing_html_content, expected_html_content))
+            if normalize_for_comparison(existing_plain_content) != expected_plain_normalized:
+                out_of_date_files.append(str(plain_path))
+                pending_diffs.append((str(plain_path), existing_plain_content, expected_plain_content))
     except OSError as exc:
-        # Handle race condition where file is deleted after exists() check
+        # Handle race condition where a file is deleted after the exists() check
         # or other filesystem errors (permissions, etc.)
         if quiet:
             console.print(f"[red]✗ Gateway models check: FAILED[/red] - File system error: {escape(str(exc))}")
@@ -121,19 +131,14 @@ def check_gateway_models_cmd(show_diff: bool = True, quiet: bool = False) -> Non
             console.print()
         sys.exit(1)
 
-    # Compare content (ignoring timestamp line for comparison)
-    html_matches = normalize_for_comparison(existing_html_content) == normalize_for_comparison(expected_html_content)
-    plain_matches = normalize_for_comparison(existing_plain_content) == normalize_for_comparison(expected_plain_content)
-
-    if html_matches and plain_matches:
-        # No differences found in either file
+    if not out_of_date_files:
+        # No differences found in any file
         if quiet:
             console.print("[green]✓ Gateway models check: PASSED[/green]")
         else:
+            files_block = "\n".join(f"[dim]  - {path}[/dim]" for path in all_paths)
             success_panel = Panel(
-                f"[green]✓[/green] Reference files are up-to-date!\n\n"
-                f"[dim]HTML-styled: {GATEWAY_MODELS_REFERENCE_PATH}[/dim]\n"
-                f"[dim]Plain text:  {GATEWAY_MODELS_PLAIN_REFERENCE_PATH}[/dim]",
+                f"[green]✓[/green] Reference files are up-to-date!\n\n{files_block}",
                 title="[bold green]Gateway Models Check: PASSED[/bold green]",
                 border_style="green",
                 padding=(1, 2),
@@ -142,12 +147,6 @@ def check_gateway_models_cmd(show_diff: bool = True, quiet: bool = False) -> Non
             console.print()
     else:
         # Differences found in at least one file
-        out_of_date_files: list[str] = []
-        if not html_matches:
-            out_of_date_files.append(str(GATEWAY_MODELS_REFERENCE_PATH))
-        if not plain_matches:
-            out_of_date_files.append(str(GATEWAY_MODELS_PLAIN_REFERENCE_PATH))
-
         if quiet:
             console.print("[red]✗ Gateway models check: FAILED[/red] - Reference file(s) out of date")
         else:
@@ -163,12 +162,9 @@ def check_gateway_models_cmd(show_diff: bool = True, quiet: bool = False) -> Non
             console.print()
 
             if show_diff:
-                if not html_matches:
-                    console.print(f"[bold]Differences in {GATEWAY_MODELS_REFERENCE_PATH}:[/bold]")
-                    _display_diff(existing_html_content, expected_html_content, console)
-                if not plain_matches:
-                    console.print(f"[bold]Differences in {GATEWAY_MODELS_PLAIN_REFERENCE_PATH}:[/bold]")
-                    _display_diff(existing_plain_content, expected_plain_content, console)
+                for path_str, existing_content, expected_content in pending_diffs:
+                    console.print(f"[bold]Differences in {path_str}:[/bold]")
+                    _display_diff(existing_content, expected_content, console)
 
             console.print("[bold yellow]Recommended Action:[/bold yellow]")
             console.print("  Run: [cyan]make update-gateway-models[/cyan] or [cyan]make ugm[/cyan]")

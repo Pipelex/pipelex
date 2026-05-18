@@ -289,20 +289,12 @@ cu: env
 	$(call PRINT_TITLE,"Checking URLs in pipelex/urls.py for broken links with detailed output")
 	$(VENV_PIPELEX_DEV) check-urls
 
-up-kit-configs:
+# Kit configs are mirrored from .pipelex/ by the pipelex-dev CLI, which derives its
+# exclude list from the single source of truth in pipelex/kit/paths.py — the same sets
+# `make check-config-sync` enforces, so a sync is always followed by a passing check.
+up-kit-configs: env
 	$(call PRINT_TITLE,"Updating kit configs from .pipelex/")
-	@rsync -av --delete \
-		--exclude='.DS_Store' \
-		--exclude='pipelex_service.toml' \
-		--exclude='pipelex_override.toml' \
-		--exclude='telemetry_override.toml' \
-		--exclude='storage' \
-		--exclude='temporal-payload-store' \
-		--exclude='traces' \
-		--exclude='x_custom_llm_deck.toml' \
-		--exclude='x_custom_extract_deck.toml' \
-		--exclude='mthds_schema.json' \
-		.pipelex/ pipelex/kit/configs/
+	$(VENV_PIPELEX_DEV) sync-kit-configs
 
 ukc: up-kit-configs
 	@echo "> done: ukc = up-kit-configs"
