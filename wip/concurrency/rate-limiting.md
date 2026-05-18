@@ -4,7 +4,7 @@ Status: **design scoping**, not yet a plan. Split out of [`README.md`](README.md
 
 ## Why this is its own doc
 
-The quick wins in the README (semaphore fan-out, retry jitter, per-item failure policy) are small, isolated, and mostly mode-agnostic. Rate limiting is none of those things:
+The retry-jitter quick win in the README is small, isolated, and mode-agnostic. Rate limiting is none of those things:
 
 - it is the change that actually prevents the crash at scale;
 - it is genuinely **two different mechanisms** in the two execution modes;

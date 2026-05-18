@@ -1,6 +1,6 @@
 # Concurrency & batching — design doc
 
-Status: **design scoping**. The quick wins below are specced enough to implement; the two larger pieces of design work are split into their own docs — [`rate-limiting.md`](rate-limiting.md) and [`batch-partial-failure.md`](batch-partial-failure.md).
+Status: **design scoping**. Exactly one change is a genuine quick win (retry jitter, below). The three larger pieces of design work are split into their own docs — [`fan-out-scheduling.md`](fan-out-scheduling.md), [`rate-limiting.md`](rate-limiting.md), and [`batch-partial-failure.md`](batch-partial-failure.md).
 
 ## Context & scope
 
@@ -52,7 +52,7 @@ Three distinct weaknesses, and they compound under load. Code inspected: `pipele
 
 Providers rate-limit on **requests-per-minute (RPM)** and **tokens-per-minute (TPM)**, not on concurrency. 8 concurrent calls each finishing in ~200ms = ~40 RPS = ~2400 RPM, which blows a 500-RPM tier instantly. The result is a 429 storm; `transport_retry` then re-fires that storm, and because the exponential backoff has no jitter, the retries re-synchronize into a thundering herd.
 
-Weaknesses 1 and the retry-jitter gap are **quick wins** (below). Weaknesses 2 + 3 are the hard part — a real rate limiter — covered in [`rate-limiting.md`](rate-limiting.md).
+Only the retry-jitter gap is a true quick win (below). Weakness 1 looked like one but is not — fixing it correctly carries a design decision, so it has its own doc, [`fan-out-scheduling.md`](fan-out-scheduling.md). Weaknesses 2 + 3 are the hard part — a real rate limiter — covered in [`rate-limiting.md`](rate-limiting.md).
 
 ## Where `max_concurrency` lives today
 
@@ -69,41 +69,23 @@ This is the mechanism behind weakness 2: a global *number* applied per-batch is 
 
 **Design option — make it per-`PipeBatch`.** An optional `max_concurrency` field could be added to `BatchParams` (the per-`PipeBatch` object parsed from `.mthds`), falling back to the global config. This is a *fan-out shape* knob — useful, but it does not fix weakness 2, since shape knobs still multiply under nesting. It carries one Temporal advantage worth noting: a value on `BatchParams` is part of the fixed pipe blueprint / workflow input, so it replays deterministically — strictly safer than `PipeBatch` reading global config inside workflow code, which `wf_pipe_run.py` already warns against for "config-derived" values that "change across deploys". Tracked as an open question — see [`rate-limiting.md`](rate-limiting.md).
 
-## Quick wins — do these first
-
-Small, isolated, low-risk. None of them is the full fix, but each removes a sharp edge and they are independent of the rate-limiting design.
-
-### QW1 — semaphore fan-out in `gather_bounded`
-
-Replace `gather_bounded`'s chunking with a semaphore acquired *before* the factory is called:
-
-```python
-sem = asyncio.Semaphore(max_concurrency)
-async def _run(factory):
-    async with sem:          # acquired before factory() → materialization still bounded
-        return await factory()
-results = await asyncio.gather(*(_run(f) for f in factories), return_exceptions=True)
-```
-
-Same memory guarantee — at most `max_concurrency` deep-copied working memories alive at once **per `PipeBatch`**, the property the comment in `async_utils.py` protects — but no head-of-line blocking: as soon as one finishes, the next starts. Note the "per `PipeBatch`" scope: this is *not* a global guarantee. Each `PipeBatch` has its own bound, so sibling batches sum and nested batches multiply (weakness 2). QW1 fixes head-of-line blocking only; it does not make the bound global — that is the job of the gate in [`rate-limiting.md`](rate-limiting.md).
-
-**Direct vs Temporal:** Mode-agnostic improvement. `gather_bounded` runs as workflow code under Temporal; it is not disabled. `asyncio.Semaphore` involves no wall-clock — acquisition order follows task scheduling, which Temporal replays deterministically — so it is workflow-safe (the current chunking is too; worth a sanity check against the workflow sandbox). Under Temporal its meaning shifts from "in-flight coroutines" to "concurrent child-workflow starts", which is still a useful bound.
-
-Effort: small, isolated. Highest impact-per-line. Do first.
-
-### QW2 — jitter in `transport_retry`
+## The one quick win — retry jitter
 
 `wait_exponential` in `transport_retry.py` is jitter-free; under a 429 storm every retry re-fires in lockstep. Switch to `wait_random_exponential` (full jitter).
 
 **Direct vs Temporal:** `transport_retry` runs inside the activity in both modes — jitter is fine there (non-determinism allowed in activities). Pre-existing nuance, not worsened by this change: under Temporal there are already two retry layers — `tenacity` inside the activity and Temporal's activity `RetryPolicy` outside it. Whether the activity should fail faster and let `RetryPolicy` own retries is a separate, existing design question.
 
-Effort: tiny.
+Effort: tiny — a one-line change. This is the only genuinely isolated change in this investigation; everything else carries a design decision.
 
-There is no QW3. An earlier draft listed "per-item batch failure policy" as a quick win — it is not. The `gather_bounded` part is trivial, but deciding what `PipeBatch` does with a partial result touches the type system, the MTHDS language contract, reporting, the graph tracer, and the Temporal boundary. It is now its own design doc — see below.
+An earlier draft also listed "semaphore fan-out in `gather_bounded`" and "per-item batch failure policy" as quick wins. Neither survived scrutiny — both carry a design decision and a blast radius, and each is now its own doc (see below).
 
 ## Larger design work — separate docs
 
-Two pieces of design work are too large to spec inline. Each has its own doc.
+Three pieces of design work are too large to spec inline. Each has its own doc. They are related — all three touch `gather_bounded` or the inference path — but can be taken in separate sessions, with one coupling noted below.
+
+### Fan-out scheduling — [`fan-out-scheduling.md`](fan-out-scheduling.md)
+
+Replacing `gather_bounded`'s chunking with a sliding-window semaphore (weakness 1) is a real throughput win — idle slots disappear and a slow branch stops blocking its neighbors. But the obvious one-liner silently regresses fail-fast: it would run all branches even when branch 3 fails fatally, burning ~997 needless LLM calls in a 1000-document batch. Doing it right needs sibling cancellation, which **couples this doc to `batch-partial-failure.md`** (the cancellation behavior depends on the fail-fast vs collect-partial policy) and raises a Python-version question (`asyncio.TaskGroup` is 3.11+; the project still supports 3.10).
 
 ### Rate limiting — [`rate-limiting.md`](rate-limiting.md)
 
@@ -117,11 +99,11 @@ Weaknesses 2 + 3 — a per-`PipeBatch` (not global) bound, and the absence of an
 
 | Layer | Responsibility |
 | --- | --- |
-| `PipeBatch` | Fan-out *shape* — how work is split (QW1 fixes the primitive) |
+| `PipeBatch` | Fan-out *shape* — how work is split (scheduling redesign in `fan-out-scheduling.md`) |
 | Inference rate/concurrency gate | The actual backpressure — see `rate-limiting.md` |
-| `transport_retry` | Residual 429/5xx — QW2 adds jitter |
+| `transport_retry` | Residual 429/5xx — the retry-jitter quick win adds full jitter |
 | Temporal | Durability — out of scope here |
 
 ## Suggested next step
 
-Land QW1 (and optionally QW2) — they are self-contained and unblock nothing else. Then take up [`rate-limiting.md`](rate-limiting.md) and [`batch-partial-failure.md`](batch-partial-failure.md), each as its own design session — they are independent of each other.
+Land the retry-jitter quick win — it is the only self-contained change. Then take up the three design docs as design sessions: [`fan-out-scheduling.md`](fan-out-scheduling.md) and [`batch-partial-failure.md`](batch-partial-failure.md) are coupled through the failure-handling policy and are best taken together (or in that order); [`rate-limiting.md`](rate-limiting.md) is independent of both.

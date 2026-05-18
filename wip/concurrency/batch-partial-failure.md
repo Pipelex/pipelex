@@ -8,6 +8,8 @@ Status: **design scoping**, not yet a plan. Split out of [`README.md`](README.md
 
 But that part is worthless on its own. The value is entirely in what `PipeBatch` does with a partial result, and that is a cross-cutting design problem: it touches the type system, the MTHDS language contract, the reporting layer, the graph tracer, and the Temporal boundary.
 
+This doc is **coupled to [`fan-out-scheduling.md`](fan-out-scheduling.md)**: the failure *policy* decided here (fail-fast vs collect-partial) determines whether that doc's semaphore fan-out needs sibling cancellation. The two should be decided together, or this one first.
+
 ## The constraining fact: a failed branch leaves nothing behind
 
 Today, a failed branch produces **no `PipeOutput` at all**. The exception propagates out of `get_pipe_router().run(...)` inside `PipeBatch._run_branch`, through the factory, and would be captured by `gather_bounded` as an exception object. The branch's deep-copied `branch_memory` is discarded — the parent only ever harvests `pipe_output.main_stuff`.
@@ -66,7 +68,7 @@ The decision logic is the same in both modes — the change runs as workflow cod
 - If envelope: what is `BatchItemOutcome` exactly, and how does the concept system express "list of outcomes of concept X"?
 - Exit-code / success semantics for a partially-failed batch at the CLI and agent-output layer.
 - Does a downstream pipe ever need to *consume* a partial batch (branch on per-item success), or is partial failure always terminal reporting?
-- Interaction with QW1: once `gather_bounded` uses `return_exceptions=True` internally, the README's QW1 snippet already returns results-or-exceptions — this design decides who interprets them and how.
+- Interaction with [`fan-out-scheduling.md`](fan-out-scheduling.md): the failure policy chosen here drives whether the semaphore fan-out cancels siblings on first error (fail-fast) or runs every branch (collect-partial). This design also decides who interprets the results-or-exceptions list `gather_bounded` would return, and how.
 
 ## Suggested next step
 
