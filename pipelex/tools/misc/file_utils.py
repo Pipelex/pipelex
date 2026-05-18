@@ -1,9 +1,11 @@
+import filecmp
 import importlib.resources
 import os
 import shutil
 from pathlib import Path
 
 import aiofiles
+from pydantic import BaseModel, ConfigDict, Field
 
 MAX_FILE_PATH_LENGTH = 4096
 
@@ -227,6 +229,124 @@ def remove_folder(folder_path: str) -> None:
     """
     if Path(folder_path).exists():
         shutil.rmtree(folder_path)
+
+
+class MirrorDirResult(BaseModel):
+    """Outcome of a mirror_dir operation.
+
+    Paths are relative to the target directory, in POSIX form, and sorted.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    copied_files: list[str] = Field(default_factory=list)
+    deleted_files: list[str] = Field(default_factory=list)
+    deleted_dirs: list[str] = Field(default_factory=list)
+    dry_run: bool = False
+
+    @property
+    def change_count(self) -> int:
+        """Total number of files copied plus files and directories deleted."""
+        return len(self.copied_files) + len(self.deleted_files) + len(self.deleted_dirs)
+
+    @property
+    def has_changes(self) -> bool:
+        """Whether the mirror operation copied or deleted anything."""
+        return self.change_count > 0
+
+
+def _reraise_walk_error(walk_error: OSError) -> None:
+    """Re-raise errors from os.walk so mirror_dir fails loudly instead of silently skipping."""
+    raise walk_error
+
+
+def mirror_dir(
+    source_dir: str | Path,
+    target_dir: str | Path,
+    exclude_files: frozenset[str] | None = None,
+    exclude_dirs: frozenset[str] | None = None,
+    dry_run: bool = False,
+) -> MirrorDirResult:
+    """Mirrors a source directory onto a target directory (recursive copy + delete).
+
+    Recursively copies files that are new or whose content differs, and deletes
+    files and directories present in the target but absent from the source.
+    Excluded files and directories are matched by basename and skipped for both
+    copying and deletion, so an excluded entry that exists only on the target
+    side is preserved. Operates on regular files and directories only; symlinks
+    are not specially preserved.
+
+    Args:
+        source_dir (str | Path): The reference directory to mirror from. Must exist.
+        target_dir (str | Path): The directory brought in sync. Created if missing.
+        exclude_files (frozenset[str] | None): File basenames to skip entirely.
+        exclude_dirs (frozenset[str] | None): Directory basenames to skip entirely.
+        dry_run (bool): If True, report changes without touching the filesystem.
+
+    Returns:
+        MirrorDirResult: The files copied and the files and directories deleted,
+        with paths relative to the target directory.
+
+    Raises:
+        OSError: If the filesystem walk or a copy/delete operation fails.
+    """
+    source_root = Path(source_dir)
+    target_root = Path(target_dir)
+    excluded_files = exclude_files or frozenset()
+    excluded_dirs = exclude_dirs or frozenset()
+
+    deleted_files: list[str] = []
+    deleted_dirs: list[str] = []
+    copied_files: list[str] = []
+
+    # Pass 1: delete target entries absent from the source. Done before the copy
+    # pass so a name that flips between file and directory is cleared first.
+    if target_root.exists():
+        for current_root, dir_names, file_names in os.walk(target_root, topdown=True, onerror=_reraise_walk_error):
+            relative_root = Path(current_root).relative_to(target_root)
+            kept_dir_names: list[str] = []
+            for dir_name in sorted(dir_names):
+                if dir_name in excluded_dirs:
+                    continue
+                if (source_root / relative_root / dir_name).is_dir():
+                    kept_dir_names.append(dir_name)
+                    continue
+                deleted_dirs.append((relative_root / dir_name).as_posix())
+                if not dry_run:
+                    remove_folder(str(Path(current_root) / dir_name))
+            dir_names[:] = kept_dir_names
+            for file_name in sorted(file_names):
+                if file_name in excluded_files:
+                    continue
+                if (source_root / relative_root / file_name).is_file():
+                    continue
+                deleted_files.append((relative_root / file_name).as_posix())
+                if not dry_run:
+                    remove_file(str(Path(current_root) / file_name))
+
+    # Pass 2: copy new or changed files from the source into the target.
+    for current_root, dir_names, file_names in os.walk(source_root, topdown=True, onerror=_reraise_walk_error):
+        dir_names[:] = sorted(dir_name for dir_name in dir_names if dir_name not in excluded_dirs)
+        relative_root = Path(current_root).relative_to(source_root)
+        if not dry_run:
+            ensure_directory_exists(str(target_root / relative_root))
+        for file_name in sorted(file_names):
+            if file_name in excluded_files:
+                continue
+            source_file = Path(current_root) / file_name
+            target_file = target_root / relative_root / file_name
+            if target_file.is_file() and filecmp.cmp(str(source_file), str(target_file), shallow=False):
+                continue
+            if not dry_run:
+                copy_file(source_path=str(source_file), target_path=str(target_file))
+            copied_files.append((relative_root / file_name).as_posix())
+
+    return MirrorDirResult(
+        copied_files=sorted(copied_files),
+        deleted_files=sorted(deleted_files),
+        deleted_dirs=sorted(deleted_dirs),
+        dry_run=dry_run,
+    )
 
 
 ########################################################
