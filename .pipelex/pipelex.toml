@@ -222,13 +222,13 @@ is_enabled = false
 
 # Custom Temporal search attributes Pipelex populates on every workflow start
 # so the dashboard can group/filter by PipeCode, PipelineRunId, SessionId,
-# UserId, and DomainCode. Uncomment to override the default (all five enabled).
-# Setting `enabled = false` skips both the worker-boot registration check and
-# the per-workflow attribute attachment — useful when the operator owns the
-# namespace policy and can't grant search-attribute admin to the worker.
-# [temporal.search_attributes]
-# enabled = true
-# attributes = ["PipeCode", "PipelineRunId", "SessionId", "UserId", "DomainCode"]
+# UserId, and DomainCode. Set `enabled = false` to skip both the worker-boot
+# registration check and the per-workflow attribute attachment — useful when
+# the operator owns the namespace policy and can't grant search-attribute
+# admin to the worker.
+[temporal.search_attributes]
+enabled = true
+attributes = ["PipeCode", "PipelineRunId", "SessionId", "UserId", "DomainCode"]
 
 [temporal.payload_codec_config]
 is_enabled = false
@@ -252,43 +252,13 @@ rpc_timeout = "1:00:00"
 # Baseline activity timeout. Per-queue and per-handle overlays in
 # [temporal.queue_options] / activity_queues.*.handle_options can override.
 default_activity_start_to_close_timeout = "0:10:00"
-
-# Per-activity, per-handle routing. Each entry declares:
-#   default   = the queue used when no per-handle override matches
-#   by_handle = optional { handle_name -> queue }
-#   handle_options = rare per-handle option overrides (e.g. long-context model
-#                    on one queue needs a longer timeout than the queue baseline)
-# Activities not listed here resolve to `default_task_queue` above. Empty by
-# default means every activity lands on `temporal_task_queue` — same as legacy
-# behavior.
-#
-# Example: route OpenAI vs Anthropic to separate worker pools, send image
-# generation to a dedicated heavy-payload pool, and isolate Mistral OCR.
-# Uncomment and adapt to your deployment topology. Each named queue requires
-# at least one worker listening on it (see `pipelex worker --task-queue ...`).
-#
-# [temporal.worker_config.activity_queues.act_llm_gen_text]
-# default = "inference_q"
-# by_handle = { "claude-4.7-opus" = "anthropic_q", "gpt-5.5" = "openai_q" }
-#
-# [temporal.worker_config.activity_queues.act_llm_gen_object]
-# default = "inference_q"
-# by_handle = { "claude-4.7-opus" = "anthropic_q", "gpt-5.5" = "openai_q" }
-#
-# [temporal.worker_config.activity_queues.act_img_gen_images]
-# default = "image_gen_q"
-# by_handle = { "flux-1.1-pro" = "fal_q", "gpt-image-2" = "openai_image_q" }
-#
-# [temporal.worker_config.activity_queues.act_extract_gen_extract_pages]
-# default = "extract_q"
-# by_handle = { "mistral-ocr" = "mistral_extract_q" }
-#
-# Rare: a single handle on the LLM queue that needs a longer timeout than the
-# queue baseline (e.g. a 1M-context model). Add only when one handle truly
-# differs from its queue peers — otherwise leave the queue baseline alone.
-#
-# [temporal.worker_config.activity_queues.act_llm_gen_text.handle_options."claude-opus-4-7-1m"]
-# start_to_close_timeout = "0:25:00"
+# Per-activity, per-handle routing. Empty by default — every activity lands on
+# `default_task_queue` above (same as legacy behavior). Populate this to route
+# activities to dedicated worker pools (e.g. OpenAI vs Anthropic, a heavy-payload
+# image pool, isolated Mistral OCR), with optional per-handle queue overrides and
+# rare per-handle option overrides. See pipelex/kit/configs/pipelex.toml for the
+# full schema and examples.
+activity_queues = {}
 
 [temporal.worker_config.retry_policy_config]
 initial_interval = "0:00:03"
@@ -309,91 +279,38 @@ non_retryable_error_types = [
 # not accept it.
 
 # Per-queue submitter options. Layer on top of worker_config defaults at
-# dispatch time. Set timeouts to match each backend pool's latency profile
-# and use `max_task_queue_activities_per_second` for cluster-wide rate caps
-# (server-enforced — every worker on the queue sends the same value).
-#
-# [temporal.queue_options.anthropic_q]
-# start_to_close_timeout = "0:05:00"
-# max_task_queue_activities_per_second = 50
-#
-# [temporal.queue_options.anthropic_q.retry_policy_config]
-# initial_interval = "0:00:05"
-# backoff_coefficient = 2.0
-# maximum_interval = "0:02:00"
-# maximum_attempts = 6
-# non_retryable_error_types_extra = []
-#
-# [temporal.queue_options.openai_q]
-# start_to_close_timeout = "0:05:00"
-# max_task_queue_activities_per_second = 80
-#
-# [temporal.queue_options.image_gen_q]
-# start_to_close_timeout = "0:10:00"
-#
-# [temporal.queue_options.extract_q]
-# start_to_close_timeout = "0:30:00"           # extract can be slow
+# dispatch time. Add `[temporal.queue_options.<queue>]` entries to match each
+# backend pool's latency/retry profile (timeouts, retry policy, cluster-wide
+# rate caps). See pipelex/kit/configs/pipelex.toml for examples.
+[temporal.queue_options]
 
-# Named worker-runtime profiles selectable per worker process via `--profile`.
-# Pipelex ships a `default` profile in pipelex/pipelex.toml that mirrors the
-# pre-v2 hardcoded knobs. Add profiles here to shape pools differently — e.g.
+# Default cluster-wide rate cap on the worker's home queue. Mirrors the pre-v2
+# hardcoded `max_task_queue_activities_per_second=1000` so existing deployments
+# on `temporal_task_queue` keep the same server-enforced cap.
+[temporal.queue_options.temporal_task_queue]
+max_task_queue_activities_per_second = 1000
+
+# Named worker-runtime profiles. A worker process selects one via `--profile`.
+# The `default` profile below mirrors the pre-v2 hardcoded knobs, so default
+# behavior is unchanged. Add more profiles to shape pools differently — e.g.
 # small concurrency on a GPU pool sitting next to a high-throughput LLM pool.
-#
-# [temporal.worker_runtime_profiles.profiles.anthropic-tier4]
-# tuning_mode = "explicit"
-# max_cached_workflows = 10000
-# max_concurrent_workflow_tasks = 1000
-# max_concurrent_activities = 100
-# max_concurrent_local_activities = 1000
-# max_concurrent_workflow_task_polls = 100
-# max_concurrent_activity_task_polls = 20
-# max_activities_per_second = 60               # ~match Anthropic tier
-# sticky_queue_schedule_to_start_timeout = "0:30:00"
-# max_heartbeat_throttle_interval = "1:00:00"
-# default_heartbeat_throttle_interval = "1:00:00"
-# graceful_shutdown_timeout = "0:30:00"
-#
-# [temporal.worker_runtime_profiles.profiles.image-gen-heavy]
-# tuning_mode = "explicit"
-# max_cached_workflows = 10000
-# max_concurrent_workflow_tasks = 1000
-# max_concurrent_activities = 4                # small parallelism, large payloads
-# max_concurrent_local_activities = 1000
-# max_concurrent_workflow_task_polls = 100
-# max_concurrent_activity_task_polls = 100
-# max_activities_per_second = 4
-# sticky_queue_schedule_to_start_timeout = "0:30:00"
-# max_heartbeat_throttle_interval = "1:00:00"
-# default_heartbeat_throttle_interval = "1:00:00"
-# graceful_shutdown_timeout = "0:10:00"
-#
-# [temporal.worker_runtime_profiles.profiles.jinja2-burst]
-# tuning_mode = "explicit"
-# max_cached_workflows = 10000
-# max_concurrent_workflow_tasks = 1000
-# max_concurrent_activities = 200              # cheap, fast
-# max_concurrent_local_activities = 1000
-# max_concurrent_workflow_task_polls = 100
-# max_concurrent_activity_task_polls = 100
-# max_activities_per_second = 5000
-# sticky_queue_schedule_to_start_timeout = "0:30:00"
-# max_heartbeat_throttle_interval = "1:00:00"
-# default_heartbeat_throttle_interval = "1:00:00"
-# graceful_shutdown_timeout = "0:30:00"
-#
-# [temporal.worker_runtime_profiles.profiles.router]
-# tuning_mode = "explicit"
-# max_cached_workflows = 10000
-# max_concurrent_workflow_tasks = 500
-# max_concurrent_activities = 0                # workflow-only worker; counterpart of runners
-# max_concurrent_local_activities = 1000
-# max_concurrent_workflow_task_polls = 100
-# max_concurrent_activity_task_polls = 100
-# max_activities_per_second = 1000
-# sticky_queue_schedule_to_start_timeout = "0:30:00"
-# max_heartbeat_throttle_interval = "1:00:00"
-# default_heartbeat_throttle_interval = "1:00:00"
-# graceful_shutdown_timeout = "0:30:00"
+# See pipelex/kit/configs/pipelex.toml for examples.
+[temporal.worker_runtime_profiles]
+default_profile = "default"
+
+[temporal.worker_runtime_profiles.profiles.default]
+tuning_mode = "explicit"
+max_cached_workflows = 10000
+max_concurrent_workflow_tasks = 1000
+max_concurrent_activities = 1000
+max_concurrent_local_activities = 1000
+max_concurrent_workflow_task_polls = 100
+max_concurrent_activity_task_polls = 100
+max_activities_per_second = 1000
+sticky_queue_schedule_to_start_timeout = "0:30:00"
+max_heartbeat_throttle_interval = "1:00:00"
+default_heartbeat_throttle_interval = "1:00:00"
+graceful_shutdown_timeout = "0:30:00"
 
 [temporal.temporal_config]
 selected_server = "local"
