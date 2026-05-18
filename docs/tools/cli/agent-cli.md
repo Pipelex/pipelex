@@ -4,7 +4,7 @@ description: "Use the pipelex-agent CLI for machine-oriented output — designed
 
 # Agent CLI (`pipelex-agent`)
 
-The `pipelex-agent` CLI is a machine-oriented companion to the main `pipelex` CLI. It is designed for programmatic consumption by AI agents, IDE extensions, and other automation tools. Output format varies by command — JSON, raw TOML, or markdown — with no Rich formatting or interactive prompts. Structured commands emit JSON errors to stderr; `fmt` and `lint` pass through native `plxt` output.
+The `pipelex-agent` CLI is a machine-oriented companion to the main `pipelex` CLI. It is designed for programmatic consumption by AI agents, IDE extensions, and other automation tools. Output format varies by command — markdown or JSON, raw TOML, or `plxt` passthrough — with no Rich formatting or interactive prompts. Structured commands emit errors to stderr (markdown by default, JSON with `--format json`); `fmt` and `lint` pass through native `plxt` output.
 
 It is consumed by the `mthds-agent` CLI (from the `mthds` npm package) which itself is used by Claude Code skills, the VS Code extension, and can be called directly from the command line.
 
@@ -22,7 +22,7 @@ The agent CLI mirrors the main CLI's subcommand structure for `run`, `validate`,
 
 ### Run
 
-Execute a pipeline and return results as JSON.
+Execute a pipeline. Output is markdown by default, or JSON with `--format json`.
 
 ```bash
 pipelex-agent run pipe <PIPE_CODE> [OPTIONS]
@@ -38,12 +38,13 @@ pipelex-agent run method <NAME> [OPTIONS]
 - `--graph` / `--no-graph` - Enable/disable execution graph (enabled by default)
 - `--library-dir`, `-L` - Additional library directory
 - `--with-memory` - Include full working memory in output
+- `--format` - Output format: `markdown` (default) or `json`
 
 For `bundle` and `method`, use `--pipe` to target a specific pipe.
 
 ### Validate
 
-Validate pipes, bundles, or methods and return status as JSON.
+Validate pipes, bundles, or methods. Output is markdown by default, or JSON with `--format json`.
 
 ```bash
 pipelex-agent validate pipe <PIPE_CODE> [OPTIONS]
@@ -55,12 +56,13 @@ pipelex-agent validate method <NAME> [OPTIONS]
 **Common options:**
 
 - `--library-dir`, `-L` - Additional library directory
+- `--format` - Output format: `markdown` (default) or `json`
 
 For `bundle`, additional options are available:
 
 - `--pipe` - Require a specific pipe in the bundle
 - `--graph`, `-g` - Generate an execution graph visualization
-- `--format`, `-f` - Graph output format
+- `--graph-format`, `-f` - Graph output format (`mermaidflow`, `reactflow`, or `both`)
 - `--direction` - Graph layout direction
 
 ### Inputs
@@ -96,9 +98,9 @@ These commands do not have subcommands:
 
 Commands use different stdout formats depending on their purpose:
 
-- **JSON**: `run`, `validate`, `inputs`, `init` — structured JSON via `agent_success()`
+- **Markdown or JSON**: `run`, `validate`, `init`, `models`, `doctor` — markdown by default, JSON with `--format json`
+- **JSON**: `inputs` — structured JSON via `agent_success()`
 - **Raw TOML**: `concept`, `pipe` — TOML text printed directly to stdout
-- **Markdown or JSON**: `models`, `doctor` — markdown by default, JSON with `--format json`
 - **Passthrough**: `fmt`, `lint` — raw `plxt` output
 
 **JSON success** — written to stdout:
