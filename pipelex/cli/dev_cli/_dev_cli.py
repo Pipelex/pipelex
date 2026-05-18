@@ -19,6 +19,7 @@ from pipelex.cli.dev_cli.commands.generate_mthds_schema_cmd import generate_mthd
 from pipelex.cli.dev_cli.commands.kit_cmd import kit_app
 from pipelex.cli.dev_cli.commands.preprocess_test_models_cmd import preprocess_test_models_cmd
 from pipelex.cli.dev_cli.commands.refresh_graph_ui_sri_cmd import refresh_graph_ui_sri_cmd
+from pipelex.cli.dev_cli.commands.sync_kit_configs_cmd import sync_kit_configs_cmd
 from pipelex.cli.dev_cli.commands.sync_main_config_cmd import SyncTarget, sync_main_config_cmd
 from pipelex.cli.dev_cli.commands.update_gateway_models_cmd import update_gateway_models_cmd
 from pipelex.hub import get_console
@@ -41,6 +42,7 @@ class PipelexDevCLI(TyperGroup):
             "kit",
             "preprocess-test-models",
             "refresh-graph-ui-sri",
+            "sync-kit-configs",
             "sync-main-config",
             "update-gateway-models",
         ]
@@ -217,6 +219,23 @@ def sync_main_config_command(
         sync_main_config_cmd(target=target, dry_run=dry_run, quiet=quiet, show_diff=show_diff)
     except Exception:  # noqa: BLE001
         # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
+        console = get_console()
+        console.print()
+        console.print("[bold red]Unexpected error occurred[/bold red]")
+        console.print()
+        console.print(Traceback())
+        sys.exit(1)
+
+
+@app.command(name="sync-kit-configs", help="Mirror .pipelex/ into pipelex/kit/configs/")
+def sync_kit_configs_command(
+    dry_run: Annotated[bool, typer.Option("--dry-run", "-n", help="Preview changes without applying")] = False,
+    quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only a single status line")] = False,
+) -> None:
+    """Mirror the .pipelex/ directory into pipelex/kit/configs/."""
+    try:
+        sync_kit_configs_cmd(quiet=quiet, dry_run=dry_run)
+    except Exception:
         console = get_console()
         console.print()
         console.print("[bold red]Unexpected error occurred[/bold red]")
