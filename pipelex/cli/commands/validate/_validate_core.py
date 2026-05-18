@@ -20,7 +20,6 @@ from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.hub import (
     get_console,
     get_library_manager,
-    get_optional_pipe,
     get_required_pipe,
     get_telemetry_manager,
     resolve_library_dirs,
@@ -30,6 +29,7 @@ from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
 from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
+from pipelex.pipe_signature.signature_walk import collect_signature_refs
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 from pipelex.system.runtime import IntegrationMode
@@ -149,7 +149,7 @@ async def _validate_pipe_or_bundle(
             )
         except SignaturesNotAllowedError as sig_error:
             handle_signatures_not_allowed_error(sig_error, context=ErrorContext.VALIDATION)
-        signature_count = len(pipe.collect_signature_refs(pipe_lookup=get_optional_pipe))
+        signature_count = len(collect_signature_refs(pipe=pipe))
         typer.secho(
             f"Successfully validated pipe '{pipe_code}'{_format_signatures_summary_suffix(signature_count)}",
             fg=typer.colors.GREEN,

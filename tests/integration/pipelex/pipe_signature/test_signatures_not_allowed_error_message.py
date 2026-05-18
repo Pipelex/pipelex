@@ -1,13 +1,14 @@
 from typing import Callable
 
 from pipelex.core.pipes.pipe_factory import PipeFactory
-from pipelex.hub import get_optional_pipe, get_pipe_library
+from pipelex.hub import get_pipe_library
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 from pipelex.pipe_signature.pipe_signature import PipeSignature
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
+from pipelex.pipe_signature.signature_walk import collect_signature_paths, collect_signature_refs
 from tests.integration.pipelex.pipe_signature.conftest import SIGNATURES_DOMAIN_CODE
 
 
@@ -61,8 +62,8 @@ class TestSignaturesNotAllowedErrorMessage:
 
         error = SignaturesNotAllowedError(
             offending_pipe_refs={outer_seq.pipe_ref},
-            signature_refs=outer_seq.collect_signature_refs(pipe_lookup=get_optional_pipe),
-            dep_paths=outer_seq.collect_signature_paths(pipe_lookup=get_optional_pipe),
+            signature_refs=collect_signature_refs(pipe=outer_seq),
+            dep_paths=collect_signature_paths(pipe=outer_seq),
         )
         assert sig_pipe.pipe_ref in error.dep_paths
         for key in error.dep_paths:
@@ -82,8 +83,8 @@ class TestSignaturesNotAllowedErrorMessage:
 
         error = SignaturesNotAllowedError(
             offending_pipe_refs={outer_seq.pipe_ref},
-            signature_refs=outer_seq.collect_signature_refs(pipe_lookup=get_optional_pipe),
-            dep_paths=outer_seq.collect_signature_paths(pipe_lookup=get_optional_pipe),
+            signature_refs=collect_signature_refs(pipe=outer_seq),
+            dep_paths=collect_signature_paths(pipe=outer_seq),
         )
         message = str(error)
         assert sig_pipe.pipe_ref in message
@@ -99,8 +100,8 @@ class TestSignaturesNotAllowedErrorMessage:
 
         error = SignaturesNotAllowedError(
             offending_pipe_refs={outer_seq.pipe_ref},
-            signature_refs=outer_seq.collect_signature_refs(pipe_lookup=get_optional_pipe),
-            dep_paths=outer_seq.collect_signature_paths(pipe_lookup=get_optional_pipe),
+            signature_refs=collect_signature_refs(pipe=outer_seq),
+            dep_paths=collect_signature_paths(pipe=outer_seq),
         )
         message = str(error)
         assert "--allow-signatures" in message

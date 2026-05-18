@@ -13,7 +13,9 @@ class TestDryRun:
         """A pipe that raises PipeNotFoundError should be reported as SKIPPED, not SUCCESS."""
         mock_pipe = mocker.MagicMock()
         mock_pipe.code = "test_pipe"
-        mock_pipe.collect_signature_refs.return_value = set()
+        mock_pipe.pipe_ref = "test_domain.test_pipe"
+        mock_pipe.is_signature = False
+        mock_pipe.pipe_dependencies.return_value = set()
         mock_pipe.needed_inputs.side_effect = PipeNotFoundError("dep->some_domain.some_pipe not found")
 
         result = await dry_run_pipe(mock_pipe)
@@ -27,7 +29,9 @@ class TestDryRun:
         """Ensure skipped pipes are NOT counted as successful."""
         mock_pipe = mocker.MagicMock()
         mock_pipe.code = "test_pipe"
-        mock_pipe.collect_signature_refs.return_value = set()
+        mock_pipe.pipe_ref = "test_domain.test_pipe"
+        mock_pipe.is_signature = False
+        mock_pipe.pipe_dependencies.return_value = set()
         mock_pipe.needed_inputs.side_effect = PipeNotFoundError("dep->some_domain.some_pipe not found")
 
         result = await dry_run_pipe(mock_pipe)
@@ -41,7 +45,8 @@ class TestDryRun:
         mock_successful_pipe = mocker.MagicMock()
         mock_successful_pipe.code = "successful_pipe"
         mock_successful_pipe.pipe_ref = "test_domain.successful_pipe"
-        mock_successful_pipe.collect_signature_refs.return_value = set()
+        mock_successful_pipe.is_signature = False
+        mock_successful_pipe.pipe_dependencies.return_value = set()
         mock_successful_pipe.needed_inputs.return_value = mocker.MagicMock(named_stuff_specs=[])
         mock_successful_pipe.validate_with_libraries.return_value = None
         mock_successful_pipe.run_pipe = mocker.AsyncMock(return_value=None)
@@ -49,7 +54,8 @@ class TestDryRun:
         mock_skipped_pipe = mocker.MagicMock()
         mock_skipped_pipe.code = "skipped_pipe"
         mock_skipped_pipe.pipe_ref = "test_domain.skipped_pipe"
-        mock_skipped_pipe.collect_signature_refs.return_value = set()
+        mock_skipped_pipe.is_signature = False
+        mock_skipped_pipe.pipe_dependencies.return_value = set()
         mock_skipped_pipe.needed_inputs.side_effect = PipeNotFoundError("dep->domain.pipe not found")
 
         results = await dry_run_pipes(
@@ -65,7 +71,9 @@ class TestDryRun:
         """A skipped pipe should not be treated as a failure either."""
         mock_pipe = mocker.MagicMock()
         mock_pipe.code = "test_pipe"
-        mock_pipe.collect_signature_refs.return_value = set()
+        mock_pipe.pipe_ref = "test_domain.test_pipe"
+        mock_pipe.is_signature = False
+        mock_pipe.pipe_dependencies.return_value = set()
         mock_pipe.needed_inputs.side_effect = PipeNotFoundError("missing dep")
 
         result = await dry_run_pipe(mock_pipe)

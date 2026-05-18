@@ -11,13 +11,14 @@ from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_class_registry, get_optional_pipe
+from pipelex.hub import get_class_registry
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_operators.compose.exceptions import PipeComposeError
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
+from pipelex.pipe_signature.signature_walk import collect_signature_paths, collect_signature_refs
 from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
@@ -60,7 +61,7 @@ class DryRunOutput(BaseModel):
 
 async def dry_run_pipe(pipe: PipeAbstract, *, allow_signatures: bool = False, raise_on_failure: bool = False) -> DryRunOutput:
     if not allow_signatures:
-        signature_refs = pipe.collect_signature_refs(pipe_lookup=get_optional_pipe)
+        signature_refs = collect_signature_refs(pipe=pipe)
         if signature_refs:
             # A signature is the placeholder itself, not a pipe that "depends on" one —
             # only a non-signature caller belongs in the offender list.
@@ -68,7 +69,7 @@ async def dry_run_pipe(pipe: PipeAbstract, *, allow_signatures: bool = False, ra
             raise SignaturesNotAllowedError(
                 offending_pipe_refs=offending_pipe_refs,
                 signature_refs=signature_refs,
-                dep_paths=pipe.collect_signature_paths(pipe_lookup=get_optional_pipe),
+                dep_paths=collect_signature_paths(pipe=pipe),
             )
     try:
         needed_inputs_for_factory = convert_to_working_memory_format(needed_inputs_spec=pipe.needed_inputs())
@@ -136,14 +137,14 @@ async def dry_run_pipes(
         all_dep_paths: dict[str, list[str]] = {}
         offending_pipe_refs: set[str] = set()
         for pipe in pipes:
-            sig_refs = pipe.collect_signature_refs(pipe_lookup=get_optional_pipe)
+            sig_refs = collect_signature_refs(pipe=pipe)
             if not sig_refs:
                 continue
             # A signature is the placeholder itself, not an offender that "depends on" one.
             if not pipe.is_signature:
                 offending_pipe_refs.add(pipe.pipe_ref)
             all_signature_refs.update(sig_refs)
-            for sig_ref, path in pipe.collect_signature_paths(pipe_lookup=get_optional_pipe).items():
+            for sig_ref, path in collect_signature_paths(pipe=pipe).items():
                 # Prefer the longest known dep chain so the error message shows the most informative
                 # path (a chain rooted at a controller is more useful than an empty chain rooted at
                 # the signature itself, which can happen when the signature pipe is iterated first).

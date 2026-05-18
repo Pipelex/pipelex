@@ -1,7 +1,7 @@
 from typing import Callable
 
 from pipelex.core.pipes.pipe_factory import PipeFactory
-from pipelex.hub import get_optional_pipe, get_pipe_library
+from pipelex.hub import get_pipe_library
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
@@ -15,6 +15,7 @@ from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_signature.pipe_signature import PipeSignature
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
+from pipelex.pipe_signature.signature_walk import collect_signature_refs
 from tests.integration.pipelex.pipe_signature.conftest import SIGNATURES_DOMAIN_CODE
 
 
@@ -35,7 +36,7 @@ class TestCollectSignatureRefs:
             ),
             concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
         )
-        assert pipe_llm.collect_signature_refs(pipe_lookup=get_optional_pipe) == set()
+        assert collect_signature_refs(pipe=pipe_llm) == set()
 
     def test_signature_returns_self(
         self,
@@ -50,7 +51,7 @@ class TestCollectSignatureRefs:
             blueprint=blueprint,
             concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
         )
-        assert runtime.collect_signature_refs(pipe_lookup=get_optional_pipe) == {runtime.pipe_ref}
+        assert collect_signature_refs(pipe=runtime) == {runtime.pipe_ref}
 
     def test_controller_sequence_walks_steps(
         self,
@@ -81,7 +82,7 @@ class TestCollectSignatureRefs:
         )
         get_pipe_library().add_new_pipe(pipe=seq_pipe)
 
-        assert seq_pipe.collect_signature_refs(pipe_lookup=get_optional_pipe) == {sig_pipe.pipe_ref}
+        assert collect_signature_refs(pipe=seq_pipe) == {sig_pipe.pipe_ref}
 
     def test_controller_parallel_walks_branches(
         self,
@@ -113,7 +114,7 @@ class TestCollectSignatureRefs:
         )
         get_pipe_library().add_new_pipe(pipe=par_pipe)
 
-        assert par_pipe.collect_signature_refs(pipe_lookup=get_optional_pipe) == {sig_pipe.pipe_ref}
+        assert collect_signature_refs(pipe=par_pipe) == {sig_pipe.pipe_ref}
 
     def test_controller_condition_walks_outcomes(
         self,
@@ -153,7 +154,7 @@ class TestCollectSignatureRefs:
         )
         get_pipe_library().add_new_pipe(pipe=cond_pipe)
 
-        assert cond_pipe.collect_signature_refs(pipe_lookup=get_optional_pipe) == {sig_a.pipe_ref, sig_b.pipe_ref}
+        assert collect_signature_refs(pipe=cond_pipe) == {sig_a.pipe_ref, sig_b.pipe_ref}
 
     def test_controller_batch_walks_branch(
         self,
@@ -186,7 +187,7 @@ class TestCollectSignatureRefs:
         )
         get_pipe_library().add_new_pipe(pipe=batch_pipe)
 
-        assert batch_pipe.collect_signature_refs(pipe_lookup=get_optional_pipe) == {sig_pipe.pipe_ref}
+        assert collect_signature_refs(pipe=batch_pipe) == {sig_pipe.pipe_ref}
 
     def test_nested_controller_walks_deeply(
         self,
@@ -228,7 +229,7 @@ class TestCollectSignatureRefs:
         )
         get_pipe_library().add_new_pipe(pipe=outer_seq)
 
-        assert outer_seq.collect_signature_refs(pipe_lookup=get_optional_pipe) == {sig_pipe.pipe_ref}
+        assert collect_signature_refs(pipe=outer_seq) == {sig_pipe.pipe_ref}
 
     def test_cycle_protection(
         self,
@@ -262,7 +263,7 @@ class TestCollectSignatureRefs:
         get_pipe_library().add_new_pipe(pipe=seq_a)
 
         # Walk terminates and returns the signature reachable through the non-cycle step.
-        assert seq_a.collect_signature_refs(pipe_lookup=get_optional_pipe) == {sig_pipe.pipe_ref}
+        assert collect_signature_refs(pipe=seq_a) == {sig_pipe.pipe_ref}
 
     def test_unresolved_cross_package_dep_skipped(
         self,
@@ -296,4 +297,4 @@ class TestCollectSignatureRefs:
         get_pipe_library().add_new_pipe(pipe=seq_pipe)
 
         # Unresolved dep is skipped silently; reachable signature is still found.
-        assert seq_pipe.collect_signature_refs(pipe_lookup=get_optional_pipe) == {sig_pipe.pipe_ref}
+        assert collect_signature_refs(pipe=seq_pipe) == {sig_pipe.pipe_ref}

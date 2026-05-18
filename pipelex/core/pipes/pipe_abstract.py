@@ -38,13 +38,8 @@ from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import Self
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-    from typing import TypeAlias
-
     from pipelex.graph.graph_context import GraphContext
     from pipelex.libraries.library_crate import LibraryCrate
-
-    PipeLookupCallable: TypeAlias = Callable[[str], "PipeAbstract | None"]
 
 PipeAbstractType = type["PipeAbstract"]
 
@@ -84,77 +79,6 @@ class PipeAbstract(ABC, BaseModel):
         override this to return the codes of pipes they orchestrate.
         """
         return set()
-
-    def collect_signature_refs(
-        self,
-        pipe_lookup: "PipeLookupCallable",
-        visited: set[str] | None = None,
-    ) -> set[str]:
-        """Return the qualified pipe_refs of every signature reachable from this pipe.
-
-        Walks `pipe_dependencies()` via the caller-supplied `pipe_lookup` (typically
-        `pipelex.hub.get_optional_pipe`). The lookup is a parameter rather than an internal
-        import to keep `pipe_abstract` free of import cycles. Unresolved dependencies are
-        skipped silently. Cycles are broken via the `visited` set keyed by qualified pipe_ref.
-        """
-        if visited is None:
-            visited = set()
-        if self.pipe_ref in visited:
-            return set()
-        visited.add(self.pipe_ref)
-
-        found: set[str] = set()
-        if self.is_signature:
-            found.add(self.pipe_ref)
-        # Sort dep iteration so traversal order — and thus the dep chain recorded in
-        # `collect_signature_paths` — is stable across runs (sets have insertion-order
-        # iteration but the values are derived from set ops elsewhere).
-        for dep_code in sorted(self.pipe_dependencies()):
-            dep_pipe = pipe_lookup(dep_code)
-            if dep_pipe is None:
-                continue
-            found.update(dep_pipe.collect_signature_refs(pipe_lookup=pipe_lookup, visited=visited))
-        return found
-
-    def collect_signature_paths(
-        self,
-        pipe_lookup: "PipeLookupCallable",
-        visited: set[str] | None = None,
-        current_path: list[str] | None = None,
-    ) -> dict[str, list[str]]:
-        """Return mapping from signature pipe_ref to the dep chain that reached it.
-
-        Each value is the ordered list of controller pipe_refs traversed (entry-point first).
-        Keys and path entries are qualified pipe_refs. Companion of `collect_signature_refs`
-        used to render the dep chain in `SignaturesNotAllowedError`. See that method for
-        the rationale behind requiring `pipe_lookup` as a parameter.
-        """
-        if visited is None:
-            visited = set()
-        if current_path is None:
-            current_path = []
-        if self.pipe_ref in visited:
-            return {}
-        visited.add(self.pipe_ref)
-
-        paths: dict[str, list[str]] = {}
-        next_path = [*current_path, self.pipe_ref]
-        if self.is_signature:
-            paths[self.pipe_ref] = list(current_path)
-        # Sort dep iteration for stable dep-chain output (see `collect_signature_refs`).
-        for dep_code in sorted(self.pipe_dependencies()):
-            dep_pipe = pipe_lookup(dep_code)
-            if dep_pipe is None:
-                continue
-            sub_paths = dep_pipe.collect_signature_paths(
-                pipe_lookup=pipe_lookup,
-                visited=visited,
-                current_path=next_path,
-            )
-            for sig_ref, sub_path in sub_paths.items():
-                if sig_ref not in paths:
-                    paths[sig_ref] = sub_path
-        return paths
 
     @property
     def concept_dependencies(self) -> list[Concept]:
