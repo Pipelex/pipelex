@@ -146,6 +146,7 @@ class TestPromptImageExtraction:
         assert llm_prompt.user_text is not None
         assert "[Image 1]" in llm_prompt.user_text
         assert "[Image 2]" in llm_prompt.user_text
+        assert "page_view: [Image 2]" in llm_prompt.user_text
 
         # Images should be extracted to user_images
         assert llm_prompt.user_images is not None
