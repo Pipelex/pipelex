@@ -48,6 +48,7 @@ def register_test_concepts(load_test_library: Callable[[list[Path]], None]):
         ("PersonWithOptionalImage", "A person with optional image", "PersonWithOptionalImage", None),
         ("GalleryWithImageList", "A gallery with a list of images", "GalleryWithImageList", None),
         ("PersonWithImageTuple", "A person with a tuple of images", "PersonWithImageTuple", None),
+        ("GalleryWithImageDict", "A gallery with a dict of images", "GalleryWithImageDict", None),
         ("PhotoAlbumItem", "An item in a photo album", "PhotoAlbumItem", None),
         ("PhotoAlbumWithNestedImages", "A photo album with nested images in list items", "PhotoAlbumWithNestedImages", None),
         ("MediaFrame", "A frame containing an image", "MediaFrame", None),

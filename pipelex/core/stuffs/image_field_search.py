@@ -54,12 +54,13 @@ def search_for_nested_image_fields(
             # Get the corresponding field type with full generic info
             current_field_type = potential_field_types[idx]
 
-            # Check if it's a list or tuple generic type (e.g., list[ImageContent], tuple[ImageContent, ...])
-            if hasattr(field_specific_type, "__origin__") and field_specific_type.__origin__ in {list, tuple}:  # type: ignore[union-attr]
-                # Check if this container or its nested contents have images
+            # Check if it's a generic container type (list/tuple/dict).
+            # Example: list[ImageContent], tuple[ImageContent, ...], dict[str, ImageContent].
+            if hasattr(field_specific_type, "__origin__") and field_specific_type.__origin__ in {list, tuple, dict}:  # type: ignore[union-attr]
+                # Check if this container or its nested contents have images.
                 if check_generic_container_for_images(field_specific_type):
                     paths.append(field_path)
-                continue  # Move to next field after handling list/tuple
+                continue  # Move to next field after handling generic containers
 
             # Skip if field type is not a class
             if not isinstance(field_specific_type, type):
@@ -129,10 +130,11 @@ def search_for_nested_image_fields(
 def check_generic_container_for_images(container_type: Any) -> bool:
     """Recursively check if a generic container type contains images at any depth.
 
-    Handles nested generics like list[tuple[list[MediaCollection]]] with arbitrary depth.
+    Handles nested generics like list[tuple[list[MediaCollection]]] or
+    dict[str, list[ImageContent]] with arbitrary depth.
 
     Args:
-        container_type: A generic type like list[...], tuple[...]
+        container_type: A generic type like list[...], tuple[...], dict[..., ...]
 
     Returns:
         True if the container or its nested contents contain ImageContent
@@ -143,8 +145,8 @@ def check_generic_container_for_images(container_type: Any) -> bool:
     # Get the args (item types) from the generic
     container_args = getattr(container_type, "__args__", ())
     for arg_type in container_args:
-        # Check if arg_type is itself a generic (nested list/tuple) - recurse!
-        if hasattr(arg_type, "__origin__") and arg_type.__origin__ in {list, tuple}:  # type: ignore[union-attr]
+        # Check if arg_type is itself a generic container - recurse!
+        if hasattr(arg_type, "__origin__") and arg_type.__origin__ in {list, tuple, dict}:  # type: ignore[union-attr]
             if check_generic_container_for_images(arg_type):
                 return True
         # Check if it's a regular type

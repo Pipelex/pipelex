@@ -71,6 +71,13 @@ class PersonWithImageTuple(StructuredContent):
     before_after: tuple[ImageContent, ImageContent]
 
 
+class GalleryWithImageDict(StructuredContent):
+    """A gallery with a dict of images."""
+
+    title: TextContent
+    photos_by_role: dict[str, ImageContent]
+
+
 class PhotoAlbumItem(StructuredContent):
     """An item in a photo album with nested image."""
 
@@ -164,6 +171,8 @@ class TestData:
         ("GalleryWithImageList", ["photos"]),
         # Tuple of images
         ("PersonWithImageTuple", ["before_after"]),
+        # Dict of images
+        ("GalleryWithImageDict", ["photos_by_role"]),
         # List with nested images in items
         ("PhotoAlbumWithNestedImages", ["album_items"]),
         # Complex deeply nested structure
