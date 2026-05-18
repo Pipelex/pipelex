@@ -37,8 +37,8 @@ is_normalize_data_urls_to_storage = true
 is_generate_graph = true
 
 # Bounded fan-out concurrency for PipeBatch: at most this many branches run at once.
-# Uncomment to override; set max_concurrency = "unbounded" to disable the bound.
-# max_concurrency = 8
+# Set max_concurrency = "unbounded" to disable the bound.
+max_concurrency = 8
 
 [pipelex.pipeline_execution_config.graph_config.data_inclusion]
 # Control what data is included in graph outputs
