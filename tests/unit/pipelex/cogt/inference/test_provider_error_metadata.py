@@ -87,16 +87,40 @@ class TestProviderErrorMetadata:
         assert metadata.message == ""
 
     @pytest.mark.parametrize(
-        ("_topic", "provider", "message", "status_code", "expected"),
+        ("_topic", "provider", "message", "status_code", "provider_error_code", "expected"),
         [
-            ("openai_quota", ProviderName.OPENAI, "You exceeded your current quota", None, True),
-            ("openai_rate_limit", ProviderName.OPENAI, "Rate limit reached", None, False),
-            ("anthropic_credit_balance", ProviderName.ANTHROPIC, "Your credit balance is too low", None, True),
-            ("mistral_402_is_quota", ProviderName.MISTRAL, "payment required", 402, True),
-            ("mistral_429_quota_pattern", ProviderName.MISTRAL, "quota exceeded", 429, True),
-            ("mistral_429_plain_rate_limit", ProviderName.MISTRAL, "too many requests", 429, False),
-            ("gateway_402_is_quota", ProviderName.GATEWAY, "payment required", 402, True),
-            ("azure_never_quota", ProviderName.AZURE, "quota exceeded", 429, False),
+            ("openai_quota", ProviderName.OPENAI, "You exceeded your current quota", None, None, True),
+            ("openai_rate_limit", ProviderName.OPENAI, "Rate limit reached", None, None, False),
+            ("anthropic_credit_balance", ProviderName.ANTHROPIC, "Your credit balance is too low", None, None, True),
+            ("mistral_402_is_quota", ProviderName.MISTRAL, "payment required", 402, None, True),
+            ("mistral_429_quota_pattern", ProviderName.MISTRAL, "quota exceeded", 429, None, True),
+            ("mistral_429_plain_rate_limit", ProviderName.MISTRAL, "too many requests", 429, None, False),
+            ("gateway_402_is_quota", ProviderName.GATEWAY, "payment required", 402, None, True),
+            ("azure_never_quota", ProviderName.AZURE, "quota exceeded", 429, None, False),
+            (
+                "bedrock_quota_by_aws_code_no_message_hint",
+                ProviderName.BEDROCK,
+                "An error occurred",
+                400,
+                "ServiceQuotaExceededException",
+                True,
+            ),
+            (
+                "bedrock_quota_message_keyword",
+                ProviderName.BEDROCK,
+                "Service quota exceeded for this model",
+                400,
+                None,
+                True,
+            ),
+            (
+                "bedrock_plain_validation_not_quota",
+                ProviderName.BEDROCK,
+                "Validation failed for input",
+                400,
+                "ValidationException",
+                False,
+            ),
         ],
     )
     def test_is_quota_exhaustion_dispatches_on_provider(
@@ -105,6 +129,7 @@ class TestProviderErrorMetadata:
         provider: ProviderName,
         message: str,
         status_code: int | None,
+        provider_error_code: str | None,
         expected: bool,
     ) -> None:
         metadata = ProviderErrorMetadata(
@@ -112,26 +137,57 @@ class TestProviderErrorMetadata:
             sdk_exception_type="RateLimitError",
             message=message,
             status_code=status_code,
+            provider_error_code=provider_error_code,
         )
 
         assert metadata.is_quota_exhaustion is expected
 
     @pytest.mark.parametrize(
-        ("_topic", "message", "expected"),
+        ("_topic", "message", "provider_error_code", "expected"),
         [
-            ("safety_system", "Request blocked by safety system", True),
-            ("content_filter", "content_filter triggered", True),
-            ("plain_message", "Something else went wrong", False),
+            ("safety_system", "Request blocked by safety system", None, True),
+            ("content_filter", "content_filter triggered", None, True),
+            ("plain_message", "Something else went wrong", None, False),
+            ("fal_content_policy_violation_code", "Request rejected by provider", "ContentPolicyViolation", True),
+            ("non_content_provider_error_code", "Some error", "ValidationError", False),
         ],
     )
-    def test_is_content_policy_violation(self, _topic: str, message: str, expected: bool) -> None:
+    def test_is_content_policy_violation(self, _topic: str, message: str, provider_error_code: str | None, expected: bool) -> None:
         metadata = ProviderErrorMetadata(
             provider=ProviderName.OPENAI,
             sdk_exception_type="BadRequestError",
             message=message,
+            provider_error_code=provider_error_code,
         )
 
         assert metadata.is_content_policy_violation is expected
+
+    def test_is_content_policy_violation_scans_body_when_message_is_empty(self) -> None:
+        """Azure REST puts safety phrasing only in the response body; the message stays the
+        ``HTTPStatusError`` envelope. The probe must still detect the violation by scanning
+        the in-process ``body`` field.
+        """
+        metadata = ProviderErrorMetadata(
+            provider=ProviderName.AZURE,
+            sdk_exception_type="HTTPStatusError",
+            message="Client error '400 Bad Request' for url 'https://test.azure.com'",
+            status_code=400,
+            body={"error": {"code": "content_filter", "message": "Your prompt was blocked"}},
+        )
+
+        assert metadata.is_content_policy_violation is True
+
+    def test_is_content_policy_violation_with_raw_string_body(self) -> None:
+        """Body may also be a raw string when JSON parsing fails (e.g. HTML error page)."""
+        metadata = ProviderErrorMetadata(
+            provider=ProviderName.AZURE,
+            sdk_exception_type="HTTPStatusError",
+            message="Client error",
+            status_code=400,
+            body="Blocked by safety filter",
+        )
+
+        assert metadata.is_content_policy_violation is True
 
     @pytest.mark.parametrize(
         ("_topic", "sdk_exception_type", "status_code", "expected"),

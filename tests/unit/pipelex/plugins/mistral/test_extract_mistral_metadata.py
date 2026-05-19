@@ -134,3 +134,22 @@ class TestExtractMistralMetadata:
         assert metadata.status_code == 401
         assert metadata.request_id == "req_auth_xyz"
         assert metadata.provider_error_code == "invalid_request_error"
+
+    def test_httpx_read_error_marked_as_network_error(self) -> None:
+        """httpx.TransportError subclasses like ``ReadError`` should classify as network errors even though
+        the class name does not contain ``timeout`` / ``connect`` / ``transport``.
+        """
+        exc = httpx.ReadError("connection reset")
+
+        metadata = extract_mistral_metadata(exc)
+
+        assert metadata.status_code is None
+        assert metadata.is_network_error is True
+
+    def test_httpx_remote_protocol_error_marked_as_network_error(self) -> None:
+        exc = httpx.RemoteProtocolError("server disconnected")
+
+        metadata = extract_mistral_metadata(exc)
+
+        assert metadata.status_code is None
+        assert metadata.is_network_error is True

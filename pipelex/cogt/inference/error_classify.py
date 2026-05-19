@@ -157,8 +157,16 @@ def classify_inference_error(metadata: SDKErrorEnvelope) -> ClassificationResult
         )
 
     if status_code >= 400:
-        # Unrecognized 4xx (e.g. 405, 409, 422) — 5xx is handled above, so any
-        # remaining >= 400 status is a non-retryable client/configuration error.
+        # Unrecognized 4xx (e.g. 405, 409, 422) — 5xx is handled above. A safety/content
+        # policy rejection routed as 422 (FAL surfaces these here, signalled by
+        # ``provider_error_code = "ContentPolicyViolation"``) is rejected content, not a
+        # configuration issue — keep it CONTENT so downstream reporting and retry policy
+        # treat it as bad input.
+        if metadata.is_content_policy_violation:
+            return ClassificationResult(
+                category=InferenceErrorCategory.CONTENT,
+                user_action_kind=UserActionKind.CHANGE_INPUT,
+            )
         return ClassificationResult(
             category=InferenceErrorCategory.CONFIGURATION,
             user_action_kind=UserActionKind.CHANGE_INPUT,

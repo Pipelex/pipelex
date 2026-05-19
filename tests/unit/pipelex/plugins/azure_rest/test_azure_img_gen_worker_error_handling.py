@@ -185,6 +185,7 @@ class TestAzureImgGenWorkerSemantic:
         assert exc_info.value.error_category is InferenceErrorCategory.CONTENT
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.CHANGE_INPUT
+        assert exc_info.value.user_action.detail == "Content was rejected by the provider's safety filters — revise the prompt."
 
     async def test_generic_400_is_change_input(self, mocker: MockerFixture) -> None:
         worker = _make_worker(mocker)

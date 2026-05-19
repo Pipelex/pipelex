@@ -41,4 +41,18 @@ class DoclingErrorHandlingTestData:
             InferenceErrorCategory.TRANSIENT,
             UserActionKind.WAIT_AND_RETRY,
         ),
+        (
+            "permission_error_subclass_of_os_error",
+            PermissionError,
+            "Permission denied: /tmp/restricted.pdf",
+            InferenceErrorCategory.TRANSIENT,
+            UserActionKind.WAIT_AND_RETRY,
+        ),
+        (
+            "not_implemented_error_subclass_of_runtime_error",
+            NotImplementedError,
+            "Conversion path not implemented",
+            InferenceErrorCategory.CONTENT,
+            UserActionKind.CHANGE_INPUT,
+        ),
     ]

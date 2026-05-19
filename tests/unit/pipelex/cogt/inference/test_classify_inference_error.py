@@ -245,6 +245,70 @@ class _TestCases:
 
 class TestClassifyInferenceError:
     @pytest.mark.parametrize(
+        ("_topic", "provider", "sdk_exception_type", "message", "status_code", "provider_error_code", "expected_category"),
+        [
+            (
+                "fal_content_policy_on_422",
+                ProviderName.FAL,
+                "FalClientHTTPError",
+                "Image rejected",
+                422,
+                "ContentPolicyViolation",
+                InferenceErrorCategory.CONTENT,
+            ),
+            (
+                "content_policy_message_on_422",
+                ProviderName.OPENAI,
+                "UnprocessableEntityError",
+                "content_filter triggered for prompt",
+                422,
+                None,
+                InferenceErrorCategory.CONTENT,
+            ),
+            (
+                "plain_422_stays_configuration",
+                ProviderName.OPENAI,
+                "UnprocessableEntityError",
+                "Unprocessable entity",
+                422,
+                None,
+                InferenceErrorCategory.CONFIGURATION,
+            ),
+            (
+                "bedrock_service_quota_via_error_code",
+                ProviderName.BEDROCK,
+                "ClientError",
+                "An error occurred",
+                400,
+                "ServiceQuotaExceededException",
+                InferenceErrorCategory.CAPACITY,
+            ),
+        ],
+    )
+    def test_classify_extra_signals(
+        self,
+        _topic: str,
+        provider: ProviderName,
+        sdk_exception_type: str,
+        message: str,
+        status_code: int | None,
+        provider_error_code: str | None,
+        expected_category: InferenceErrorCategory,
+    ) -> None:
+        """Extra signals beyond status code: provider_error_code and content-policy detection."""
+        metadata = ProviderErrorMetadata(
+            provider=provider,
+            sdk_exception_type=sdk_exception_type,
+            message=message,
+            status_code=status_code,
+            provider_error_code=provider_error_code,
+        )
+
+        result = classify_inference_error(metadata)
+
+        assert result.category == expected_category
+
+    @pytest.mark.parametrize(
         (
             "_topic",
             "provider",
