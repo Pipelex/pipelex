@@ -227,7 +227,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
                 # instructor's retry is confined to schema re-ask: this validation-only AsyncRetrying
                 # re-asks on a malformed/invalid output but lets a transport error propagate as the raw
                 # SDK exception — transport retry is the SDK client floor (Tier 1) alone.
-                max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.max_retries),
+                max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.schema_reask_max_attempts),
                 extra_headers=extra_headers,
                 extra_body=extra_body,
             )

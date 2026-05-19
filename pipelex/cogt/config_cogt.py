@@ -2,7 +2,7 @@ from pydantic import Field, field_validator
 
 from pipelex.cogt.exceptions import LLMConfigError
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams, ImgGenJobParamsDefaults, Quality
-from pipelex.cogt.llm.llm_job_components import LLMJobConfig, ReasoningEffort
+from pipelex.cogt.llm.llm_job_components import ReasoningEffort
 from pipelex.cogt.models.model_deck_config import ModelDeckConfig
 from pipelex.plugins.anthropic.anthropic_config import AnthropicConfig
 from pipelex.plugins.google.google_config import GoogleConfig
@@ -75,7 +75,10 @@ class LLMConfig(ConfigModel):
     anthropic_config: AnthropicConfig
     google_config: GoogleConfig
     mistral_config: MistralConfig
-    llm_job_config: LLMJobConfig
+    # instructor's schema re-ask budget: the total number of attempts (initial + re-asks) allowed
+    # when a structured-output call fails schema validation. Distinct from cogt.transport_max_retries,
+    # which is the transport-level retry count, measured as retries beyond the initial attempt.
+    schema_reask_max_attempts: int = Field(ge=1, le=10)
     is_structure_prompt_enabled: bool
     default_max_images: int
     is_dump_text_prompts_enabled: bool
@@ -132,7 +135,7 @@ class Cogt(ConfigModel):
     # transport failure (connection error, 408/409/429/5xx, honoring Retry-After) on top of the
     # initial attempt. Wired explicitly into every SDK client factory so the retry posture is a
     # deliberate, uniform policy rather than a silently-inherited SDK default. Distinct from
-    # llm_job_config.max_retries, which is instructor's schema re-ask count — a different concern.
+    # llm_config.schema_reask_max_attempts, which is instructor's schema re-ask count — a different concern.
     transport_max_retries: int = Field(ge=0, le=10)
     model_deck_config: ModelDeckConfig
     llm_config: LLMConfig

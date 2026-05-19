@@ -355,7 +355,7 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
                 # re-asks on a malformed/invalid output but lets a transport error propagate as the raw
                 # SDK exception — transport retry is the SDK client floor (Tier 1) alone. Without this
                 # the Mistral worker passed no max_retries at all, so structured Mistral got no re-ask.
-                max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.max_retries),
+                max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.schema_reask_max_attempts),
             )
         except InstructorRetryException as instructor_exc:
             # instructor wraps SDK exceptions during retries; recover the underlying

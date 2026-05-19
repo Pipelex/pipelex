@@ -45,7 +45,7 @@ def _make_llm_job(pipeline_run_id: str) -> LLMJob:
         job_metadata=job_metadata,
         llm_prompt=LLMPrompt(),
         job_params=LLMJobParams(temperature=0.5),
-        job_config=LLMJobConfig(max_retries=1),
+        job_config=LLMJobConfig(schema_reask_max_attempts=1),
         job_report=LLMJobReport(llm_tokens_usage=tokens_usage),
     )
 
