@@ -4,7 +4,7 @@
 
 Branch: `refactor/ECR` (worktree at `_tprl/`).
 
-**Status:** Checkpoints 1–4 of 5 done. CP1+2+3 landed in commit **`6c9415de`**; CP4 lives in the working tree (uncommitted). `make agent-check` + `make agent-test` green. Plan + cold-start handoff: [`~/.claude/plans/ok-let-s-do-ecr-reflective-dahl.md`](file:///Users/lchoquel/.claude/plans/ok-let-s-do-ecr-reflective-dahl.md).
+**Status:** Checkpoints 1–4 of 5 done. CP1+2+3 in commit **`6c9415de`**; CP4 in commit **`9c7a6ee1`** "Migrate extract and search workers to the shared ECR error pipeline". Branch `refactor/ECR` is 2 ahead of `origin/refactor/ECR` (not yet pushed). `make agent-check` + `make agent-test` green. Working tree clean. Plan + cold-start handoff: [`~/.claude/plans/ok-let-s-do-ecr-reflective-dahl.md`](file:///Users/lchoquel/.claude/plans/ok-let-s-do-ecr-reflective-dahl.md).
 
 | CP | Status | Scope |
 |---|---|---|
