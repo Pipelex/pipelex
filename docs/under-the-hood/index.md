@@ -14,6 +14,7 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - **Execution Graph Tracing** - How pipeline executions are captured as graphs for visualization
 - **Image Handling in LLM Prompts** - How images flow from inputs to LLM calls
 - **Reasoning Controls** - How reasoning effort/budget flows to each provider's SDK
+- **Error Model** - How errors are classified, carried across every layer, and reported to humans, agents, and HTTP APIs
 - **StuffArtefact & Image Rendering** - How template access and image extraction work
 - **Test Profile Configuration** - How to configure which models are used in tests
 - **Dry Run Mock Generation** - How mock objects satisfy field validation constraints
@@ -42,6 +43,7 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - [:material-flask-outline: Dry Run Mock Generation](./dry-run-mock-generation.md){ .md-button }
 - [:material-console: Init CLI Flows](./init-cli-flows.md){ .md-button }
 - [:material-pipe: Pipe Routing & Execution](./pipe-routing-and-execution.md){ .md-button }
+- [:material-alert-circle-outline: Error Model](./error-model.md){ .md-button }
 - [:material-cloud-sync: Temporal Integration](./temporal-integration.md){ .md-button }
 - [:material-swap-horizontal: Distributed Content Generation](./distributed-content-generation.md){ .md-button }
 

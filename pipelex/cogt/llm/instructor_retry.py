@@ -18,7 +18,7 @@ def make_instructor_schema_retrying(max_attempts: int) -> AsyncRetrying:
 
     Args:
         max_attempts: Total number of attempts for the schema re-ask loop — the caller passes
-            ``llm_job.job_config.max_retries``.
+            ``llm_job.job_config.schema_reask_max_attempts``.
 
     Returns:
         A fresh ``AsyncRetrying`` whose retry predicate matches only validation failures.

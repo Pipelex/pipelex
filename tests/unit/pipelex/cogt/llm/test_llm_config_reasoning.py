@@ -1,7 +1,8 @@
 import pytest
+from pydantic import ValidationError
 
 from pipelex.cogt.config_cogt import LLMConfig
-from pipelex.cogt.llm.llm_job_components import LLMJobConfig, ReasoningEffort
+from pipelex.cogt.llm.llm_job_components import ReasoningEffort
 from pipelex.system.exceptions import ConfigValidationError
 
 _DEFAULT_EFFORT_TO_BUDGET_MAPS: dict[str, dict[str, int]] = {
@@ -56,6 +57,7 @@ def _make_llm_config(
     anthropic_level_map: dict[str, str] | None = None,
     google_level_map: dict[str, str] | None = None,
     mistral_level_map: dict[str, str] | None = None,
+    schema_reask_max_attempts: int = 3,
 ) -> LLMConfig:
     """Helper to build a minimal LLMConfig for testing."""
     maps: dict[str, dict[str, int]] = _DEFAULT_EFFORT_TO_BUDGET_MAPS if effort_to_budget_maps is None else effort_to_budget_maps
@@ -72,7 +74,7 @@ def _make_llm_config(
         },
         google_config={"effort_to_level_map": google_level_map or _DEFAULT_GOOGLE_LEVEL_MAP},  # type: ignore[arg-type]
         mistral_config={"effort_to_level_map": mistral_level_map or _DEFAULT_MISTRAL_LEVEL_MAP},  # type: ignore[arg-type]
-        llm_job_config=LLMJobConfig(max_retries=3),
+        schema_reask_max_attempts=schema_reask_max_attempts,
         is_structure_prompt_enabled=True,
         default_max_images=100,
         is_dump_text_prompts_enabled=False,
@@ -83,7 +85,7 @@ def _make_llm_config(
 
 
 class TestLLMConfigReasoning:
-    """Tests for effort_to_budget_maps validation, get_reasoning_budget, and effort_to_level_map get_reasoning_level."""
+    """Tests for LLMConfig validation: effort budget maps, reasoning-level lookup, and schema_reask_max_attempts bounds."""
 
     def test_get_reasoning_budget_valid(self):
         config = _make_llm_config()
@@ -129,6 +131,12 @@ class TestLLMConfigReasoning:
         """An empty dict of maps is valid — no targets means nothing to validate."""
         config = _make_llm_config(effort_to_budget_maps={})
         assert config.effort_to_budget_maps == {}
+
+    @pytest.mark.parametrize("invalid_attempts", [0, 11, -1])
+    def test_schema_reask_max_attempts_out_of_range_raises(self, invalid_attempts: int):
+        """schema_reask_max_attempts outside ge=1/le=10 is rejected when the config is built, not deferred to runtime."""
+        with pytest.raises(ValidationError, match="schema_reask_max_attempts"):
+            _make_llm_config(schema_reask_max_attempts=invalid_attempts)
 
     @pytest.mark.parametrize(
         "effort",
@@ -208,7 +216,7 @@ class TestLLMConfigReasoning:
                 },
                 google_config={"effort_to_level_map": _DEFAULT_GOOGLE_LEVEL_MAP},  # type: ignore[arg-type]
                 mistral_config={"effort_to_level_map": _DEFAULT_MISTRAL_LEVEL_MAP},  # type: ignore[arg-type]
-                llm_job_config=LLMJobConfig(max_retries=3),
+                schema_reask_max_attempts=3,
                 is_structure_prompt_enabled=True,
                 default_max_images=100,
                 is_dump_text_prompts_enabled=False,
@@ -243,7 +251,7 @@ class TestLLMConfigReasoning:
                 },
                 google_config={"effort_to_level_map": _DEFAULT_GOOGLE_LEVEL_MAP},  # type: ignore[arg-type]
                 mistral_config={"effort_to_level_map": _DEFAULT_MISTRAL_LEVEL_MAP},  # type: ignore[arg-type]
-                llm_job_config=LLMJobConfig(max_retries=3),
+                schema_reask_max_attempts=3,
                 is_structure_prompt_enabled=True,
                 default_max_images=100,
                 is_dump_text_prompts_enabled=False,

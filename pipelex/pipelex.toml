@@ -135,6 +135,7 @@ default_max_images = 100
 is_structure_prompt_enabled = true
 is_dump_text_prompts_enabled = false
 is_dump_response_text_enabled = false
+schema_reask_max_attempts = 3
 
 [cogt.llm_config.instructor_config]
 is_dump_kwargs_enabled = false
@@ -179,9 +180,6 @@ medium = "reasoning"
 high = "reasoning"
 xhigh = "reasoning"
 max = "reasoning"
-
-[cogt.llm_config.llm_job_config]
-max_retries = 3
 
 [cogt.llm_config.effort_to_budget_maps.anthropic]
 none = 0      # Required by validator; unreachable at runtime (level map gates NONE as disabled before budget lookup)

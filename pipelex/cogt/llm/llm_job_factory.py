@@ -18,7 +18,7 @@ class LLMJobFactory:
         llm_config = config.cogt.llm_config
         job_metadata.job_category = JobCategory.LLM_JOB
         job_params = llm_job_params
-        job_config = llm_job_config or llm_config.llm_job_config
+        job_config = llm_job_config or LLMJobConfig(schema_reask_max_attempts=llm_config.schema_reask_max_attempts)
 
         return LLMJob(
             job_metadata=job_metadata,

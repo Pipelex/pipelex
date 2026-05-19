@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Error Handling Overhaul — Co-developer Briefing</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #181b24;
+    --panel-2: #1f232f;
+    --ink: #e6e8ee;
+    --ink-dim: #9aa0ad;
+    --line: #2c313f;
+    --accent: #7c83ff;
+    --accent-soft: #2a2d56;
+    --green: #4ade80;
+    --amber: #fbbf24;
+    --red: #f87171;
+    --blue: #60a5fa;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 28px 120px; }
+  header {
+    padding: 64px 0 40px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 44px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 14px;
+  }
+  h1 {
+    font-size: 38px;
+    line-height: 1.18;
+    margin: 0 0 18px;
+    letter-spacing: -.02em;
+  }
+  .lede { font-size: 18px; color: var(--ink-dim); margin: 0 0 20px; max-width: 70ch; }
+  .branchline {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--ink-dim);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: inline-block;
+  }
+  .branchline b { color: var(--accent); }
+  h2 {
+    font-size: 25px;
+    margin: 60px 0 8px;
+    letter-spacing: -.015em;
+    scroll-margin-top: 20px;
+  }
+  h2 .num {
+    font-family: var(--mono);
+    font-size: 15px;
+    color: var(--accent);
+    margin-right: 12px;
+  }
+  h3 { font-size: 18px; margin: 32px 0 8px; }
+  .section-sub { color: var(--ink-dim); margin: 4px 0 22px; }
+  p { margin: 14px 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: var(--mono);
+    font-size: .88em;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 1px 6px;
+  }
+  strong { color: #fff; }
+
+  /* TOC */
+  nav.toc {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 22px 26px;
+    margin-bottom: 24px;
+  }
+  nav.toc h4 {
+    margin: 0 0 12px;
+    font-size: 12.5px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    font-family: var(--mono);
+  }
+  nav.toc ol {
+    margin: 0; padding: 0;
+    list-style: none;
+    columns: 2;
+    column-gap: 36px;
+  }
+  nav.toc li {
+    font-size: 14.5px;
+    padding: 4px 0;
+    counter-increment: toc;
+  }
+  nav.toc li::before {
+    content: counter(toc, decimal-leading-zero);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    margin-right: 10px;
+  }
+  nav.toc ol { counter-reset: toc; }
+
+  /* Cards / callouts */
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin: 20px 0;
+  }
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--panel);
+    border-radius: 0 10px 10px 0;
+    padding: 14px 20px;
+    margin: 22px 0;
+  }
+  .callout.why { border-color: var(--amber); }
+  .callout.why .lbl { color: var(--amber); }
+  .callout .lbl {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  /* Figures */
+  figure {
+    margin: 30px 0;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 26px 24px 14px;
+    text-align: center;
+  }
+  figure svg { max-width: 100%; height: auto; }
+  figcaption {
+    font-size: 13px;
+    color: var(--ink-dim);
+    margin-top: 14px;
+    text-align: center;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 22px 0;
+    font-size: 14.5px;
+  }
+  th, td {
+    text-align: left;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  th {
+    font-size: 12px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    font-weight: 600;
+  }
+  tr:last-child td { border-bottom: none; }
+  td code { white-space: nowrap; }
+
+  .pill {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 9px;
+    border-radius: 20px;
+    letter-spacing: .03em;
+  }
+  .pill.landed { background: rgba(74,222,128,.13); color: var(--green); border: 1px solid rgba(74,222,128,.3); }
+  .pill.open  { background: rgba(251,191,36,.13); color: var(--amber); border: 1px solid rgba(251,191,36,.3); }
+
+  /* Code blocks / diffs */
+  .code {
+    background: #0b0d13;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    margin: 20px 0;
+    overflow: hidden;
+  }
+  .code .filename {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-dim);
+    padding: 9px 16px;
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--line);
+  }
+  .code pre {
+    margin: 0;
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 12.8px;
+    line-height: 1.6;
+  }
+  .code pre .add { color: var(--green); display: block; background: rgba(74,222,128,.07); }
+  .code pre .del { color: var(--red); display: block; background: rgba(248,113,113,.07); }
+  .code pre .ctx { color: var(--ink-dim); display: block; }
+  .code pre .hdr { color: var(--accent); display: block; }
+  .code pre .cmt { color: #6b7280; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 720px) {
+    .grid2 { grid-template-columns: 1fr; }
+    nav.toc ol { columns: 1; }
+    h1 { font-size: 30px; }
+  }
+
+  .footer {
+    margin-top: 70px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    color: var(--ink-dim);
+    font-size: 13.5px;
+  }
+  .tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 2px 8px;
+    border-radius: 5px;
+  }
+  ul.tight li { margin: 5px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">Co-developer Briefing</p>
+  <h1>The Error-Handling Overhaul</h1>
+  <p class="lede">A single, structured error model that travels intact from a raw provider SDK exception, through every wrapping layer, across the Temporal boundary, and out to humans, agents, and HTTP APIs — classified the same way at every stop.</p>
+  <span class="branchline">branch <b>feature/Error-handling-2</b> &nbsp;←&nbsp; branched from <b>feature/Temporal-merge-3</b></span>
+</header>
+
+<div class="card">
+  <strong>TL;DR for the busy reviewer.</strong>
+  <p style="margin-bottom:6px">Before this branch, an error meant whatever the layer that caught it decided to do — some swallowed it, some re-wrapped it losing the cause, some had no SDK handling at all. After this branch:</p>
+  <ul class="tight" style="margin-top:6px">
+    <li>Every inference worker turns SDK exceptions into a <strong>classified domain error</strong> (<code>InferenceErrorCategory</code> + structured metadata).</li>
+    <li><code>ErrorReport</code> is the <strong>one serialization schema</strong> — CLI JSON, Rich panels, HTTP status, and Temporal <code>details</code> all read from it.</li>
+    <li>Classification <strong>survives every wrapper</strong> via <code>__cause__</code>-chain enrichment, and <strong>survives the Temporal boundary</strong> activity → workflow → submitter.</li>
+    <li>Retry is now an <strong>honest, explicit model</strong>: transport retry in the SDK, durability in Temporal, and nothing fake in between.</li>
+    <li><code>except Exception</code> is banned in business logic — <strong>ruff <code>BLE001</code> enforces it</strong>.</li>
+  </ul>
+  <p style="margin-bottom:0">~250 files, +17k/−2.7k lines. Six independent tracks, all landed except one proposed refactor.</p>
+</div>
+
+<nav class="toc">
+  <h4>Contents</h4>
+  <ol>
+    <li><a href="#why">Why we did this</a></li>
+    <li><a href="#layers">The layer model</a></li>
+    <li><a href="#journey">The error's journey</a></li>
+    <li><a href="#report">ErrorReport — the schema</a></li>
+    <li><a href="#workers">Worker classification</a></li>
+    <li><a href="#retry">Retry &amp; resilience</a></li>
+    <li><a href="#temporal">The Temporal boundary</a></li>
+    <li><a href="#delivery">CLI &amp; HTTP delivery</a></li>
+    <li><a href="#tests">Testing</a></li>
+    <li><a href="#open">What's still open</a></li>
+  </ol>
+</nav>
+
+<!-- ================================================================ -->
+<h2 id="why"><span class="num">01</span>Why we did this</h2>
+<p class="section-sub">The state we started from, and the principle we settled on.</p>
+
+<p>On <code>feature/Temporal-merge-3</code>, error handling was inconsistent. A tier review classified inference workers into three buckets — and a large share of them (Google, Mistral, Azure img-gen, FAL, HuggingFace, Docling, Linkup, pypdfium2) had <strong>no SDK exception handling at all</strong>: a raw provider error propagated up as-is, untyped, uncategorized. Other layers caught errors and re-wrapped them, sometimes dropping the <code>__cause__</code>. There was a <code>PipeRouter</code> retry loop that only ever ran on the direct path, re-ran at the wrong granularity, and carried a config bug. And <code>except Exception</code> appeared throughout business logic, silently swallowing bugs.</p>
+
+<div class="callout why">
+  <span class="lbl">The principle</span>
+  An error is <strong>data</strong>, not a control-flow accident. It is classified once, at the layer that knows the most (the worker), and that classification must reach every consumer unchanged — the human reading a Rich panel, the agent parsing JSON, the Temporal retry engine, the HTTP adapter picking a status code. No layer in between is allowed to lose it.
+</div>
+
+<p>Three cross-cutting rules now hold everywhere and the tracks build on them:</p>
+<ul class="tight">
+  <li><strong>Single-rooted hierarchy.</strong> Every custom exception inherits from <code>pipelex.base_exceptions.PipelexError</code>.</li>
+  <li><strong>No broad catches in business logic.</strong> <code>except Exception</code> is allowed only at CLI entry points and async task roots — and ruff rule <code>BLE001</code> is enabled to enforce it.</li>
+  <li><strong>Workers transform SDK errors into domain errors.</strong> Catch the SDK's typed exceptions, attach an <code>InferenceErrorCategory</code>, chain via <code>from exc</code>.</li>
+</ul>
+
+<!-- ================================================================ -->
+<h2 id="layers"><span class="num">02</span>The layer model</h2>
+<p class="section-sub">Errors flow up through six layers. Each one has exactly one job.</p>
+
+<figure>
+<svg viewBox="0 0 760 430" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, Menlo, monospace">
+  <defs>
+    <marker id="arrowUp" markerWidth="10" markerHeight="10" refX="5" refY="2" orient="auto">
+      <path d="M0,8 L5,0 L10,8 Z" fill="#7c83ff"/>
+    </marker>
+  </defs>
+  <!-- layers -->
+  <g font-size="13">
+    <!-- L5 -->
+    <rect x="120" y="20"  width="540" height="52" rx="8" fill="#1f232f" stroke="#2c313f"/>
+    <text x="140" y="42" fill="#e6e8ee" font-size="13" font-weight="bold">Layer 5 · CLI entry points</text>
+    <text x="140" y="60" fill="#9aa0ad" font-size="11.5">catch + format for human (Rich) / agent (JSON·MD) / HTTP status</text>
+    <!-- L4 -->
+    <rect x="120" y="84" width="540" height="52" rx="8" fill="#1f232f" stroke="#2c313f"/>
+    <text x="140" y="106" fill="#e6e8ee" font-size="13" font-weight="bold">Layer 4 · CLI factories</text>
+    <text x="140" y="124" fill="#9aa0ad" font-size="11.5">catch setup errors, route to handlers</text>
+    <!-- L3 -->
+    <rect x="120" y="148" width="540" height="52" rx="8" fill="#1f232f" stroke="#2c313f"/>
+    <text x="140" y="170" fill="#e6e8ee" font-size="13" font-weight="bold">Layer 3 · Pipeline runner</text>
+    <text x="140" y="188" fill="#9aa0ad" font-size="11.5">catch + wrap as PipelineExecutionError</text>
+    <!-- L2 -->
+    <rect x="120" y="212" width="540" height="52" rx="8" fill="#1f232f" stroke="#2c313f"/>
+    <text x="140" y="234" fill="#e6e8ee" font-size="13" font-weight="bold">Layer 2 · Pipe router / operators</text>
+    <text x="140" y="252" fill="#9aa0ad" font-size="11.5">catch + wrap with pipe context (pipe_code, pipe_stack…)</text>
+    <!-- L1 -->
+    <rect x="120" y="276" width="540" height="52" rx="8" fill="#2a2d56" stroke="#7c83ff"/>
+    <text x="140" y="298" fill="#fff" font-size="13" font-weight="bold">Layer 1 · Workers / SDK calls  ◀ classification happens here</text>
+    <text x="140" y="316" fill="#c7c9f0" font-size="11.5">catch third-party exception → CogtError + InferenceErrorCategory</text>
+    <!-- L0 -->
+    <rect x="120" y="340" width="540" height="52" rx="8" fill="#181b24" stroke="#2c313f" stroke-dasharray="4 3"/>
+    <text x="140" y="362" fill="#9aa0ad" font-size="13" font-weight="bold">Layer 0 · Third-party SDKs</text>
+    <text x="140" y="380" fill="#6b7280" font-size="11.5">raw OpenAI / Anthropic / Google / Mistral / … exceptions</text>
+  </g>
+  <!-- up arrow -->
+  <line x1="58" y1="392" x2="58" y2="40" stroke="#7c83ff" stroke-width="2" marker-end="url(#arrowUp)"/>
+  <text x="36" y="220" fill="#7c83ff" font-size="11.5" transform="rotate(-90 36 220)" text-anchor="middle">error propagates up — classification preserved at every layer</text>
+</svg>
+<figcaption>Errors originate at Layer 0, are classified at Layer 1, and accumulate context (pipe code, stack, run mode) as they rise. No layer drops the classification.</figcaption>
+</figure>
+
+<!-- ================================================================ -->
+<h2 id="journey"><span class="num">03</span>The error's journey</h2>
+<p class="section-sub">From a raw SDK exception to four different rendered outputs — one schema throughout.</p>
+
+<figure>
+<svg viewBox="0 0 760 410" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, Menlo, monospace">
+  <defs>
+    <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#7c83ff"/>
+    </marker>
+  </defs>
+  <!-- SDK exc -->
+  <rect x="20" y="40" width="150" height="64" rx="8" fill="#181b24" stroke="#2c313f" stroke-dasharray="4 3"/>
+  <text x="95" y="66" text-anchor="middle" fill="#9aa0ad" font-size="12" font-weight="bold">RateLimitError</text>
+  <text x="95" y="84" text-anchor="middle" fill="#6b7280" font-size="10.5">raw SDK exception</text>
+
+  <!-- worker classify -->
+  <rect x="215" y="28" width="170" height="88" rx="8" fill="#2a2d56" stroke="#7c83ff"/>
+  <text x="300" y="52" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">Worker classifies</text>
+  <text x="300" y="71" text-anchor="middle" fill="#c7c9f0" font-size="10">is_quota_exhaustion_*()</text>
+  <text x="300" y="86" text-anchor="middle" fill="#c7c9f0" font-size="10">→ CAPACITY vs TRANSIENT</text>
+  <text x="300" y="104" text-anchor="middle" fill="#c7c9f0" font-size="10">raise CogtError(…) from exc</text>
+
+  <!-- ErrorReport -->
+  <rect x="430" y="20" width="170" height="104" rx="8" fill="#1f232f" stroke="#7c83ff" stroke-width="1.5"/>
+  <text x="515" y="42" text-anchor="middle" fill="#7c83ff" font-size="12" font-weight="bold">ErrorReport</text>
+  <text x="515" y="60" text-anchor="middle" fill="#9aa0ad" font-size="9.5">error_category · error_domain</text>
+  <text x="515" y="74" text-anchor="middle" fill="#9aa0ad" font-size="9.5">retryable · user_action</text>
+  <text x="515" y="88" text-anchor="middle" fill="#9aa0ad" font-size="9.5">model · provider</text>
+  <text x="515" y="102" text-anchor="middle" fill="#9aa0ad" font-size="9.5">provider_metadata</text>
+  <text x="515" y="117" text-anchor="middle" fill="#6b7280" font-size="9">via to_error_report()</text>
+
+  <!-- wrapping note -->
+  <rect x="430" y="148" width="310" height="46" rx="8" fill="#181b24" stroke="#2c313f"/>
+  <text x="585" y="167" text-anchor="middle" fill="#e6e8ee" font-size="10.5" font-weight="bold">wrapped by Pipe / Router / Runner layers…</text>
+  <text x="585" y="183" text-anchor="middle" fill="#9aa0ad" font-size="9.5">__cause__-chain enrichment keeps the classification</text>
+
+  <!-- consumers -->
+  <g font-size="10">
+    <rect x="20"  y="250" width="165" height="56" rx="8" fill="#1f232f" stroke="#2c313f"/>
+    <text x="102" y="273" text-anchor="middle" fill="#e6e8ee" font-weight="bold">Human CLI</text>
+    <text x="102" y="290" text-anchor="middle" fill="#9aa0ad">Rich error panel</text>
+
+    <rect x="205" y="250" width="165" height="56" rx="8" fill="#1f232f" stroke="#2c313f"/>
+    <text x="287" y="273" text-anchor="middle" fill="#e6e8ee" font-weight="bold">Agent CLI</text>
+    <text x="287" y="290" text-anchor="middle" fill="#9aa0ad">JSON / Markdown</text>
+
+    <rect x="390" y="250" width="165" height="56" rx="8" fill="#1f232f" stroke="#2c313f"/>
+    <text x="472" y="273" text-anchor="middle" fill="#e6e8ee" font-weight="bold">HTTP adapters</text>
+    <text x="472" y="290" text-anchor="middle" fill="#9aa0ad">.http_status → 4xx/5xx</text>
+
+    <rect x="575" y="250" width="165" height="56" rx="8" fill="#1f232f" stroke="#2c313f"/>
+    <text x="657" y="273" text-anchor="middle" fill="#e6e8ee" font-weight="bold">Temporal</text>
+    <text x="657" y="290" text-anchor="middle" fill="#9aa0ad">retry decision + details</text>
+  </g>
+
+  <!-- arrows -->
+  <line x1="172" y1="72" x2="210" y2="72" stroke="#7c83ff" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="387" y1="72" x2="426" y2="72" stroke="#7c83ff" stroke-width="2" marker-end="url(#ar)"/>
+  <path d="M515 124 L515 144" stroke="#7c83ff" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+  <!-- fan-out -->
+  <path d="M500 196 C500 224, 102 222, 102 246" stroke="#7c83ff" stroke-width="1.6" fill="none" marker-end="url(#ar)"/>
+  <path d="M520 196 C520 224, 287 222, 287 246" stroke="#7c83ff" stroke-width="1.6" fill="none" marker-end="url(#ar)"/>
+  <path d="M560 196 C560 224, 472 222, 472 246" stroke="#7c83ff" stroke-width="1.6" fill="none" marker-end="url(#ar)"/>
+  <path d="M600 196 C600 224, 657 222, 657 246" stroke="#7c83ff" stroke-width="1.6" fill="none" marker-end="url(#ar)"/>
+  <text x="380" y="364" text-anchor="middle" fill="#6b7280" font-size="10.5">one schema · four renderers · identical classification at every stop</text>
+</svg>
+<figcaption>The same <code>ErrorReport</code> drives all four delivery surfaces. Wrapper exceptions inherit the underlying classification through <code>__cause__</code>-chain enrichment.</figcaption>
+</figure>
+
+<h3>The six tracks at a glance</h3>
+<table>
+  <thead><tr><th>Track</th><th>Status</th><th>What it delivers</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Metadata model</strong></td><td><span class="pill landed">Landed</span></td><td>The data contract — <code>error_category</code>, <code>error_domain</code>, <code>user_action</code>, <code>ProviderErrorMetadata</code> — carried on the exception class.</td></tr>
+    <tr><td><strong>Worker classification</strong></td><td><span class="pill landed">Landed</span></td><td>Every LLM / img-gen / extract / search worker maps SDK exceptions → categorized <code>CogtError</code>.</td></tr>
+    <tr><td><strong>Retry &amp; resilience</strong></td><td><span class="pill landed">Landed</span></td><td>Removed the fake <code>PipeRouter</code> loop; explicit transport retry; bounded <code>PipeBatch</code> fan-out.</td></tr>
+    <tr><td><strong>CLI delivery</strong></td><td><span class="pill landed">Landed</span></td><td>Agent CLI markdown/JSON; <code>error_domain</code> → HTTP-status mapping; shared Rich panel helper.</td></tr>
+    <tr><td><strong>Temporal integration</strong></td><td><span class="pill landed">Landed</span></td><td><code>ErrorReport</code> carried across activity → workflow → submitter; category-aware retry.</td></tr>
+    <tr><td><strong>Testing</strong></td><td><span class="pill landed">Landed</span></td><td>Per-worker classification, full-chain snapshot, local/Temporal parity, dict drift-detection.</td></tr>
+    <tr><td>Extract / Classify / Render</td><td><span class="pill open">Proposed</span></td><td>Decompose the per-worker pipeline — out of scope for this branch, now unblocked.</td></tr>
+  </tbody>
+</table>
+
+<!-- ================================================================ -->
+<h2 id="report"><span class="num">04</span>ErrorReport — the schema</h2>
+<p class="section-sub">One frozen dataclass. <code>pipelex/base_exceptions.py</code>.</p>
+
+<p><code>ErrorReport</code> is a frozen pydantic dataclass with <code>extra="forbid"</code>. It is the single source of truth for error serialization — <code>to_dict()</code> drops <code>None</code> fields, <code>from_dict()</code> is its strict inverse (used to recover a report that crossed the Temporal boundary), and <code>http_status</code> maps it to an HTTP code for downstream APIs.</p>
+
+<div class="code">
+  <div class="filename">pipelex/base_exceptions.py — ErrorReport gains classification + domain fields</div>
+<pre><span class="ctx"> @dataclass(frozen=True, config={"extra": "forbid"})</span>
+<span class="ctx"> class ErrorReport:</span>
+<span class="ctx">     error_type: str</span>
+<span class="ctx">     message: str</span>
+<span class="ctx">     error_category: str | None = None</span>
+<span class="add">+    error_domain: str | None = None          # input / config / runtime</span>
+<span class="ctx">     retryable: bool | None = None</span>
+<span class="del">-    user_action: str | None = None</span>
+<span class="add">+    user_action: UserAction | None = None    # typed: kind + detail</span>
+<span class="ctx">     model: str | None = None</span>
+<span class="ctx">     provider: str | None = None</span>
+<span class="add">+    provider_metadata: ProviderErrorMetadata | None = None</span>
+</pre>
+</div>
+
+<p>The most important behaviour change is on <code>PipelexError</code> itself. A wrapper exception (<code>PipeRunError</code> → <code>PipeRouterError</code> → <code>PipelineExecutionError</code>) carries no category of its own. <code>to_error_report()</code> now enriches the report from the <code>__cause__</code> chain, so the inference classification survives every wrapping layer:</p>
+
+<div class="code">
+  <div class="filename">pipelex/base_exceptions.py — cause-chain enrichment (new)</div>
+<pre><span class="add">+def _enrich_error_report_from_cause(self, report: ErrorReport) -> ErrorReport:</span>
+<span class="add">+    """Fill the None classification fields of `report` from the __cause__ chain."""</span>
+<span class="add">+    cause = self.__cause__</span>
+<span class="add">+    if not isinstance(cause, PipelexError):</span>
+<span class="add">+        return report</span>
+<span class="add">+    # ... cyclic-chain guard omitted ...</span>
+<span class="add">+    cause_report = cause.to_error_report()</span>
+<span class="add">+    return ErrorReport(</span>
+<span class="add">+        error_type=report.error_type,                                  # keep own identity</span>
+<span class="add">+        message=report.message,</span>
+<span class="add">+        error_category=report.error_category or cause_report.error_category,</span>
+<span class="add">+        error_domain=report.error_domain or cause_report.error_domain,</span>
+<span class="add">+        retryable=report.retryable if report.retryable is not None else cause_report.retryable,</span>
+<span class="add">+        user_action=report.user_action or cause_report.user_action,</span>
+<span class="add">+        model=report.model or cause_report.model,</span>
+<span class="add">+        provider=report.provider or cause_report.provider,</span>
+<span class="add">+        provider_metadata=report.provider_metadata or cause_report.provider_metadata,</span>
+<span class="add">+    )</span>
+</pre>
+</div>
+
+<div class="callout">
+  <span class="lbl">Watch for</span>
+  A <code>to_error_report()</code> override on a subclass <strong>must</strong> end with <code>self._enrich_error_report_from_cause(report)</code> — otherwise that subclass becomes a black hole that drops the cause's classification. The cyclic-<code>__cause__</code> guard exists because a malformed chain must never turn the error-reporting path into a <code>RecursionError</code>.
+</div>
+
+<h3>Two enums you'll see everywhere</h3>
+<div class="grid2">
+  <div class="card">
+    <strong><code>InferenceErrorCategory</code></strong>
+    <p style="font-size:14px;color:var(--ink-dim);margin:8px 0 0">Drives retry decisions. Only <code>TRANSIENT</code> is retryable.</p>
+    <ul class="tight" style="font-size:13.5px">
+      <li><code>TRANSIENT</code> — retry it</li>
+      <li><code>CONFIGURATION</code> — fix the setup</li>
+      <li><code>CONTENT</code> — fix the input/prompt</li>
+      <li><code>CAPACITY</code> — quota / billing</li>
+      <li><code>AMBIGUOUS</code> — outcome unknown, unsafe to retry</li>
+      <li><code>UNKNOWN</code> — could not classify</li>
+    </ul>
+  </div>
+  <div class="card">
+    <strong><code>ErrorDomain</code></strong>
+    <p style="font-size:14px;color:var(--ink-dim);margin:8px 0 0">Drives HTTP status. Class-level on the exception.</p>
+    <ul class="tight" style="font-size:13.5px">
+      <li><code>INPUT</code> → HTTP <strong>422</strong> — caller can fix it</li>
+      <li><code>CONFIG</code> → HTTP <strong>500</strong> — env change needed</li>
+      <li><code>RUNTIME</code> → HTTP <strong>500</strong> — failure during execution</li>
+    </ul>
+    <p style="font-size:13px;color:var(--ink-dim);margin:10px 0 0">A provider 429 in <code>provider_metadata</code> overrides this so the API can emit <code>Retry-After</code>.</p>
+  </div>
+</div>
+
+<!-- ================================================================ -->
+<h2 id="workers"><span class="num">05</span>Worker classification</h2>
+<p class="section-sub">The foundation. Every inference worker, one uniform shape.</p>
+
+<p>Every provider worker under <code>pipelex/plugins/*/</code> catches its SDK's typed exceptions and re-raises a categorized <code>CogtError</code>. The discriminators — quota-exhaustion vs rate-limit, content-policy vs bad-request — are pure functions in <code>pipelex/cogt/inference/error_classification.py</code>. The canonical pattern:</p>
+
+<div class="code">
+  <div class="filename">pipelex/plugins/*/…_llm_worker.py — the uniform classification shape</div>
+<pre><span class="ctx">except RateLimitError as exc:</span>
+<span class="add">+   if is_quota_exhaustion_openai(str(exc)):                 # quota ≠ rate-limit</span>
+<span class="add">+       msg = f"OpenAI quota exhausted for model '{self.inference_model.desc}': {exc}"</span>
+<span class="add">+       raise LLMCompletionError(</span>
+<span class="add">+           message=msg,</span>
+<span class="add">+           error_category=InferenceErrorCategory.CAPACITY,    # billing, not transient</span>
+<span class="add">+           user_action=UserAction(kind=UserActionKind.CHECK_BILLING, detail="…"),</span>
+<span class="add">+       ) from exc</span>
+<span class="add">+   msg = f"Rate limited by OpenAI for model '{self.inference_model.desc}': {exc}"</span>
+<span class="add">+   raise LLMCompletionError(</span>
+<span class="add">+       message=msg,</span>
+<span class="add">+       error_category=InferenceErrorCategory.TRANSIENT,       # the system will retry</span>
+<span class="add">+       user_action=UserAction(kind=UserActionKind.WAIT_AND_RETRY, detail="…"),</span>
+<span class="add">+   ) from exc</span>
+</pre>
+</div>
+
+<p>This sweep lifted <strong>every worker kind</strong> — LLM, img-gen, extract, search, plus AWS Bedrock — to the same standard. The workers that previously had zero SDK handling (Google, Mistral, Azure img-gen, FAL, HuggingFace, Docling, Linkup, pypdfium2) now all classify. Three further refinements landed alongside:</p>
+
+<ul class="tight">
+  <li><strong>The <code>instructor</code> unwrap.</strong> On structured-generation paths, <code>extract_underlying_sdk_exception()</code> recovers the real SDK exception out of <code>InstructorRetryException</code>, so it routes through the same per-provider categorization as the plain-text path.</li>
+  <li><strong><code>UNKNOWN</code> instead of mis-labelling.</strong> An unrecognized inner exception (e.g. a <code>pydantic.ValidationError</code> from a schema mismatch) now lands in <code>UNKNOWN</code> rather than being mis-categorized as a real <code>CONTENT</code>-policy violation.</li>
+  <li><strong><code>ProviderErrorMetadata</code>.</strong> Every raised inference error carries <code>status_code</code>, <code>request_id</code>, <code>retry_after_seconds</code>, <code>provider_error_code</code>. The raw response <code>body</code> is held in-process but <code>exclude</code>d from serialization — it can carry credentials.</li>
+</ul>
+
+<!-- ================================================================ -->
+<h2 id="retry"><span class="num">06</span>Retry &amp; resilience</h2>
+<p class="section-sub">An honest model — and removing the loop that pretended otherwise.</p>
+
+<p>The headline change: <strong>the <code>PipeRouter</code> transient-retry loop was removed.</strong> It only ever ran on the direct (non-Temporal) path, re-ran at the wrong granularity, and carried a per-run/global config bug. Rather than fix a retry loop for a path that is <em>deliberately</em> not the resilient one, it was deleted (PR #909).</p>
+
+<div class="callout why">
+  <span class="lbl">The product line</span>
+  <strong>Direct execution for simplicity. Temporal for resilience.</strong> Nothing fake in between. Direct execution makes one pipeline-level attempt on top of a transport that already shrugs off brief blips — and then surfaces the error. That is the honest contract.
+</div>
+
+<figure>
+<svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, Menlo, monospace">
+  <!-- Direct path -->
+  <text x="190" y="30" text-anchor="middle" fill="#e6e8ee" font-size="13" font-weight="bold">Direct execution — simplicity</text>
+  <rect x="40" y="48" width="300" height="50" rx="8" fill="#1f232f" stroke="#2c313f"/>
+  <text x="190" y="69" text-anchor="middle" fill="#e6e8ee" font-size="11.5" font-weight="bold">Tier 1 · Transport retry</text>
+  <text x="190" y="86" text-anchor="middle" fill="#9aa0ad" font-size="10">SDK retries conn / 408 / 409 / 429 / 5xx · Retry-After</text>
+
+  <rect x="40" y="110" width="300" height="44" rx="8" fill="#181b24" stroke="#2c313f" stroke-dasharray="4 3"/>
+  <text x="190" y="131" text-anchor="middle" fill="#6b7280" font-size="10.5">— nothing here, by design —</text>
+  <text x="190" y="146" text-anchor="middle" fill="#6b7280" font-size="9">(the removed PipeRouter loop lived here)</text>
+
+  <rect x="40" y="166" width="300" height="44" rx="8" fill="#1f232f" stroke="#2c313f"/>
+  <text x="190" y="187" text-anchor="middle" fill="#e6e8ee" font-size="11" font-weight="bold">single pipeline attempt → surface the error</text>
+  <text x="190" y="202" text-anchor="middle" fill="#9aa0ad" font-size="9.5">no durability, no crash survival</text>
+
+  <!-- Temporal path -->
+  <text x="570" y="30" text-anchor="middle" fill="#e6e8ee" font-size="13" font-weight="bold">Temporal execution — resilience</text>
+  <rect x="420" y="48" width="300" height="50" rx="8" fill="#1f232f" stroke="#2c313f"/>
+  <text x="570" y="69" text-anchor="middle" fill="#e6e8ee" font-size="11.5" font-weight="bold">Tier 1 · Transport retry</text>
+  <text x="570" y="86" text-anchor="middle" fill="#9aa0ad" font-size="10">same SDK-level retry as direct</text>
+
+  <rect x="420" y="110" width="300" height="100" rx="8" fill="#2a2d56" stroke="#7c83ff"/>
+  <text x="570" y="133" text-anchor="middle" fill="#fff" font-size="11.5" font-weight="bold">Tier 2 · Temporal durability</text>
+  <text x="570" y="152" text-anchor="middle" fill="#c7c9f0" font-size="10">activity RetryPolicy keyed off</text>
+  <text x="570" y="167" text-anchor="middle" fill="#c7c9f0" font-size="10">InferenceErrorCategory.is_retryable</text>
+  <text x="570" y="186" text-anchor="middle" fill="#c7c9f0" font-size="10">workflow-level durability + redelivery</text>
+  <text x="570" y="201" text-anchor="middle" fill="#c7c9f0" font-size="10">survives a worker crash</text>
+</svg>
+<figcaption>Two tiers, two paths. The gap on the direct path between Tier 1 and Tier 2 is intentional — that gap <em>is</em> the difference between the two products.</figcaption>
+</figure>
+
+<p>Supporting changes that landed under this track:</p>
+<ul class="tight">
+  <li><strong>Tier 1 made explicit.</strong> <code>cogt.transport_max_retries</code> (default 2) is wired into every inference SDK client factory. The two families that defaulted to <em>no</em> transport retry (Mistral, Google) are brought up to the floor. The SDK-less <code>azure_rest</code> img-gen path gets a <code>tenacity</code>-based wrapper (<code>transport_retry.py</code>) that narrows retries for non-idempotent POSTs.</li>
+  <li><strong><code>instructor</code> confined to schema re-ask.</strong> Its retry predicate now matches <em>only</em> validation failures — a transport error propagates raw instead of being wrapped, so Tier 1 stays the sole transport-retry layer.</li>
+  <li><strong>Bounded fan-out.</strong> <code>PipeBatch</code> uses <code>gather_bounded()</code> (<code>max_concurrency</code>, default 8) — admission control so a big batch doesn't trigger a self-inflicted rate-limit storm. This is not retry; it stays.</li>
+</ul>
+
+<!-- ================================================================ -->
+<h2 id="temporal"><span class="num">07</span>The Temporal boundary</h2>
+<p class="section-sub">Keeping the classification intact across process boundaries.</p>
+
+<p>When a pipe runs on a Temporal worker, the error has to survive serialization across the activity → workflow → submitter boundary. Temporal's default failure converter would auto-wrap a raw <code>PipelexError</code> — losing both our structured <code>ErrorReport</code> and the category-aware retry decision. The bridge closes that gap.</p>
+
+<figure>
+<svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, Menlo, monospace">
+  <defs>
+    <marker id="ar2" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#7c83ff"/>
+    </marker>
+  </defs>
+  <!-- Activity -->
+  <rect x="20" y="60" width="210" height="150" rx="10" fill="#1f232f" stroke="#2c313f"/>
+  <text x="125" y="84" text-anchor="middle" fill="#e6e8ee" font-size="12" font-weight="bold">Activity process</text>
+  <rect x="40" y="100" width="170" height="44" rx="6" fill="#181b24" stroke="#2c313f"/>
+  <text x="125" y="118" text-anchor="middle" fill="#9aa0ad" font-size="9.5">worker raises CogtError</text>
+  <text x="125" y="132" text-anchor="middle" fill="#9aa0ad" font-size="9.5">(error_category set)</text>
+  <rect x="40" y="152" width="170" height="44" rx="6" fill="#2a2d56" stroke="#7c83ff"/>
+  <text x="125" y="170" text-anchor="middle" fill="#fff" font-size="9.5" font-weight="bold">@convert_pipelex_errors</text>
+  <text x="125" y="184" text-anchor="middle" fill="#c7c9f0" font-size="9">→ TemporalError</text>
+
+  <!-- Workflow -->
+  <rect x="275" y="60" width="210" height="150" rx="10" fill="#1f232f" stroke="#2c313f"/>
+  <text x="380" y="84" text-anchor="middle" fill="#e6e8ee" font-size="12" font-weight="bold">Workflow</text>
+  <rect x="295" y="100" width="170" height="44" rx="6" fill="#181b24" stroke="#2c313f"/>
+  <text x="380" y="118" text-anchor="middle" fill="#9aa0ad" font-size="9.5">RetryPolicy reads</text>
+  <text x="380" y="132" text-anchor="middle" fill="#9aa0ad" font-size="9.5">non_retryable flag</text>
+  <rect x="295" y="152" width="170" height="44" rx="6" fill="#181b24" stroke="#2c313f"/>
+  <text x="380" y="170" text-anchor="middle" fill="#9aa0ad" font-size="9.5">from_app_error()</text>
+  <text x="380" y="184" text-anchor="middle" fill="#9aa0ad" font-size="9.5">recovers details</text>
+
+  <!-- Submitter -->
+  <rect x="530" y="60" width="210" height="150" rx="10" fill="#1f232f" stroke="#2c313f"/>
+  <text x="635" y="84" text-anchor="middle" fill="#e6e8ee" font-size="12" font-weight="bold">Submitter process</text>
+  <rect x="550" y="100" width="170" height="44" rx="6" fill="#2a2d56" stroke="#7c83ff"/>
+  <text x="635" y="118" text-anchor="middle" fill="#fff" font-size="9.5" font-weight="bold">recover_error_report()</text>
+  <text x="635" y="132" text-anchor="middle" fill="#c7c9f0" font-size="9">ErrorReport.from_dict()</text>
+  <rect x="550" y="152" width="170" height="44" rx="6" fill="#181b24" stroke="#2c313f"/>
+  <text x="635" y="170" text-anchor="middle" fill="#9aa0ad" font-size="9.5">WorkflowExecutionError</text>
+  <text x="635" y="184" text-anchor="middle" fill="#9aa0ad" font-size="9.5">(error_report=…)</text>
+
+  <!-- arrows -->
+  <line x1="232" y1="135" x2="272" y2="135" stroke="#7c83ff" stroke-width="2" marker-end="url(#ar2)"/>
+  <line x1="487" y1="135" x2="527" y2="135" stroke="#7c83ff" stroke-width="2" marker-end="url(#ar2)"/>
+  <text x="380" y="244" text-anchor="middle" fill="#7c83ff" font-size="10.5">ErrorReport travels in ApplicationError.details — serialized, recovered, re-classified</text>
+  <text x="380" y="266" text-anchor="middle" fill="#6b7280" font-size="10">a Temporal-run pipe failure reaches the CLI with the SAME classification as a local run</text>
+</svg>
+<figcaption>The activity-side decorator converts the error; the submitter side recovers the full report. Worker/submitter version skew is tolerated — unknown keys are dropped.</figcaption>
+</figure>
+
+<div class="code">
+  <div class="filename">pipelex/temporal/tprl/activity_error_boundary.py — the activity-side decorator (new)</div>
+<pre><span class="add">+@functools.wraps(func)</span>
+<span class="add">+async def wrapper(*args, **kwargs):</span>
+<span class="add">+    try:</span>
+<span class="add">+        return await func(*args, **kwargs)</span>
+<span class="add">+    except PipelexError as exc:                # ONLY PipelexError — never bare Exception</span>
+<span class="add">+        raise TemporalError.from_message_exception(exc=exc) from exc</span>
+</pre>
+</div>
+
+<p>Applied beneath <code>@activity.defn</code> on every in-scope activity. <code>from_message_exception()</code> derives <code>non_retryable</code> from <code>InferenceErrorCategory.is_retryable</code> (the class-name list is now only a <em>fallback</em> for category-less errors) and packs <code>to_error_report().to_dict()</code> into <code>ApplicationError.details</code>. On the way back, <code>recover_error_report()</code> walks the <code>__cause__</code> chain, pulls the dict, and rebuilds the <code>ErrorReport</code> — tolerating version skew so the error path never crashes on a rolling deploy.</p>
+
+<div class="callout">
+  <span class="lbl">Net effect</span>
+  A pipe that fails on a Temporal worker now reaches the agent CLI JSON, the Rich human panel, and the HTTP-status mapping with the <strong>same</strong> <code>error_category</code> / <code>retryable</code> / <code>model</code> / <code>provider</code> / <code>user_action</code> as the identical failure run locally. An integration parity pair locks this by construction.
+</div>
+
+<!-- ================================================================ -->
+<h2 id="delivery"><span class="num">08</span>CLI &amp; HTTP delivery</h2>
+<p class="section-sub">Where the classified error finally gets rendered.</p>
+
+<div class="grid2">
+  <div class="card">
+    <strong>Human CLI — Rich panels</strong>
+    <p style="font-size:14px;color:var(--ink-dim);margin:8px 0 0">Every <code>handle_*</code> function builds its panel through one shared <code>display_error_panel()</code> helper — red banner, structured fields, <code>user_action</code> tip, doc/Discord links. Exception-specific logic stays in the handler; the panel shape lives in one place.</p>
+  </div>
+  <div class="card">
+    <strong>Agent CLI — JSON / Markdown</strong>
+    <p style="font-size:14px;color:var(--ink-dim);margin:8px 0 0"><code>run</code> / <code>validate</code> / <code>init</code> / <code>models</code> / <code>doctor</code> / <code>check-model</code> default to <strong>markdown</strong>, with <code>--format json</code> available. The format is set once per invocation via a <code>ContextVar</code>, so the error path inherits it without threading an argument through.</p>
+  </div>
+</div>
+
+<p>The agent JSON error payload is the structured shape downstream agents parse:</p>
+<div class="code">
+  <div class="filename">agent CLI — JSON error payload</div>
+<pre><span class="ctx">{</span>
+<span class="ctx">  "error": true,</span>
+<span class="ctx">  "error_type": "LLMCompletionError",</span>
+<span class="ctx">  "message": "...",</span>
+<span class="ctx">  "hint": "...",</span>
+<span class="ctx">  "retryable": true,</span>
+<span class="ctx">  "error_domain": "runtime",</span>
+<span class="ctx">  "error_category": "transient",</span>
+<span class="ctx">  "model": "gpt-4o",</span>
+<span class="ctx">  "provider": "openai",</span>
+<span class="ctx">  "error_source": ["LLMCompletionError @ .../worker.py:152 (in _gen_text)"]</span>
+<span class="ctx">}</span>
+</pre>
+</div>
+
+<p><strong>HTTP-status mapping lives in the library.</strong> <code>pipelex</code> has no API server, but <code>pipelex-relay</code> and <code>pipelex-back-office</code> both render an <code>ErrorReport</code> as an HTTP response — and were reinventing the mapping. It now lives once in <code>base_exceptions.py</code>: <code>error_domain_to_http_status()</code> is the pure table, <code>ErrorReport.http_status</code> layers the provider-429 passthrough on top. Downstream FastAPI handlers become a trivial adapter and must not redefine the contract.</p>
+
+<!-- ================================================================ -->
+<h2 id="tests"><span class="num">09</span>Testing</h2>
+<p class="section-sub">What proves the system behaves — and what stops it rotting.</p>
+
+<table>
+  <thead><tr><th>Test layer</th><th>What it locks in</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Per-worker classification</strong></td><td>Mocks each SDK to raise every typed exception; asserts the resulting <code>CogtError</code> has the expected <code>error_category</code>, <code>user_action</code>, <code>provider_metadata</code>.</td></tr>
+    <tr><td><strong><code>instructor</code> unwrap</strong></td><td>One end-to-end test per provider against real <code>instructor.from_*(…)</code> so the unwrap can't silently rot if <code>instructor</code>'s wrapping shape changes.</td></tr>
+    <tr><td><strong>Full-chain snapshot</strong></td><td>Builds a pipeline where one pipe fails, runs the agent CLI, asserts the JSON carries the classification + an <code>error_source</code> chain in order. Catches a wrapper silently swallowing <code>error_category</code>.</td></tr>
+    <tr><td><strong>Local / Temporal parity</strong></td><td>Runs the same pipe locally and on the in-process Temporal server; asserts an <em>identical</em> <code>ErrorReport</code>. Parity holds by construction.</td></tr>
+    <tr><td><strong>Dict drift-detection</strong></td><td>Walks the <code>PipelexError</code> hierarchy and asserts every subclass is covered by class-level metadata <em>or</em> a fallback dict entry — closes the "silent breakage when a class is renamed" failure mode.</td></tr>
+  </tbody>
+</table>
+
+<!-- ================================================================ -->
+<h2 id="open"><span class="num">10</span>What's still open</h2>
+<p class="section-sub">Deliberately scoped out — flagged here so review doesn't treat it as missing.</p>
+
+<p>The bulk of the work has landed. Two items remain, both intentionally left for after this branch:</p>
+
+<div class="card">
+  <strong>1 · Extract / Classify / Render decomposition</strong> <span class="pill open">Proposed</span>
+  <p style="margin:8px 0 0;font-size:14.5px">The per-worker classification pipeline is now uniform but <em>duplicated</em> across 18+ workers. This refactor consolidates it into one per-provider Extract function plus a shared Classify + Render. Its prerequisites are all met — the worker-classification sweep it depended on has landed — so it is unblocked, but not started. See <code>track-extract-classify-render.md</code>.</p>
+</div>
+
+<div class="card">
+  <strong>2 · Metadata-model long tail</strong> <span class="pill open">Partial</span>
+  <p style="margin:8px 0 0;font-size:14.5px">A handful of <code>CogtError</code> subclasses still carry no class-level <code>error_category</code>, and several non-inference <code>PipelexError</code> subclasses still rely on the <code>agent_output.py</code> fallback dicts for <code>hint</code> / <code>error_domain</code> rather than class-level metadata. The drift-detection test already enforces coverage one way or the other — the migration just moves entries onto the classes. See the Followups in <code>track-metadata-model.md</code>.</p>
+</div>
+
+<p style="margin-top:24px">Everything else — the metadata model, worker classification, retry &amp; resilience, CLI delivery, the Temporal bridge, and the test coverage — is landed and described in current-state terms in the track docs.</p>
+
+<div class="callout">
+  <span class="lbl">Suggested review path</span>
+  Start with <code>wip/error-handling/README.md</code> (status table + read order), then <code>architecture.md</code> (layer model, hierarchy, <code>ErrorReport</code> shape). Each <code>track-*.md</code> is a self-contained concern — read them in any order. Completed plans are archived under <code>archive-*.md</code> for their running notes.
+</div>
+
+<div class="footer">
+  <p><span class="tag">briefing</span> &nbsp; Generated for co-developer review of <code>feature/Error-handling-2</code>. Source of truth: <code>wip/error-handling/</code>. This page summarizes; the track docs are authoritative.</p>
+</div>
+
+</div>
+</body>
+</html>
