@@ -215,7 +215,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
                 # SDK exception — transport retry is the SDK client floor (Tier 1) alone.
                 # The arg-type ignore below is because instructor's `responses` path is stub-typed
                 # `int | Retrying`, but `initialize_retrying` accepts (and the async path needs) an `AsyncRetrying`.
-                max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.max_retries),  # type: ignore[arg-type]
+                max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.schema_reask_max_attempts),  # type: ignore[arg-type]
                 model=self.inference_model.model_id,
                 instructions=llm_job.llm_prompt.system_text,
                 temperature=job_params.temperature,

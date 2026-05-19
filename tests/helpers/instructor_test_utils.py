@@ -63,6 +63,6 @@ def make_llm_job(mocker: MockerFixture) -> Any:
     job.job_params.max_tokens = None
     job.job_params.reasoning_effort = None
     job.job_params.reasoning_budget = None
-    job.job_config.max_retries = 1
+    job.job_config.schema_reask_max_attempts = 1
     job.job_report.llm_tokens_usage = None
     return job

@@ -70,7 +70,7 @@ def _report_dry_llm_job(job_metadata: JobMetadata, llm_setting: LLMSetting, llm_
         job_metadata=synthetic_metadata,
         llm_prompt=llm_prompt,
         job_params=llm_setting.make_llm_job_params(),
-        job_config=LLMJobConfig(max_retries=1),
+        job_config=LLMJobConfig(schema_reask_max_attempts=1),
         job_report=LLMJobReport(llm_tokens_usage=tokens_usage),
     )
     get_report_delegate().report_inference_job(inference_job=synthetic_job)

@@ -308,6 +308,7 @@ plugins:
         - under-the-hood/test-profile-configuration.md: "Test Profile Configuration"
         - under-the-hood/init-cli-flows.md: "Init CLI Flows"
         - under-the-hood/pipe-routing-and-execution.md: "Pipe Routing & Execution"
+        - under-the-hood/error-model.md: "Error Model"
         - under-the-hood/temporal-integration.md: "Temporal Integration"
         - under-the-hood/temporal-deployment.md: "Temporal Deployment"
         - under-the-hood/distributed-content-generation.md: "Distributed Content Generation"
@@ -377,6 +378,7 @@ nav:
     - Viewpoint:
       - The Know-How Graph: viewpoint/viewpoint.md
   - Guide:
+    - Retries & Resilience: reliability/retries-and-resilience.md
     - Distributed Execution with Temporal:
       - Overview: distributed-execution/index.md
       - Cluster Setup: distributed-execution/cluster-setup.md
@@ -505,6 +507,7 @@ nav:
       - Test Profile Configuration: under-the-hood/test-profile-configuration.md
       - Init CLI Flows: under-the-hood/init-cli-flows.md
       - Pipe Routing & Execution: under-the-hood/pipe-routing-and-execution.md
+      - Error Model: under-the-hood/error-model.md
       - Temporal Integration: under-the-hood/temporal-integration.md
       - Distributed Content Generation: under-the-hood/distributed-content-generation.md
   - Project:
