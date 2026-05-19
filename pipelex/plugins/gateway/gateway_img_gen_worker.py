@@ -11,7 +11,7 @@ from portkey_ai.api_resources.utils import GenericResponse
 from pydantic import ValidationError
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError, InferenceErrorCategory, SdkTypeError
+from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundError, ImgGenParameterError, InferenceErrorCategory, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
@@ -81,10 +81,22 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                 **args_dict,
             )
         except portkey_exceptions.APIError as exc:
+            metadata = extract_gateway_metadata(exc)
+            if GatewayFactory.is_genuine_model_not_found(exc):
+                msg = f"Gateway model not found for '{self.inference_model.desc}': {exc}"
+                raise ImgGenModelNotFoundError(
+                    message=msg,
+                    model_handle=self.inference_model.name,
+                    error_category=InferenceErrorCategory.CONFIGURATION,
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_MODEL,
+                        detail=f"Model '{self.inference_model.model_id}' was not found — pick an available model",
+                    ),
+                    provider_metadata=metadata,
+                ) from exc
             error_summary = GatewayFactory.make_error_summary_from_portkey_error(exc)
             error_category = GatewayFactory.classify_error_category(exc)
             user_action = GatewayFactory.make_user_action_from_portkey_error(exc)
-            metadata = extract_gateway_metadata(exc)
             msg = f"Image generation service error for model '{self.inference_model.model_id}': {error_summary}"
             raise ImgGenGenerationError(
                 msg,

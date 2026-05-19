@@ -132,6 +132,15 @@ class GatewayFactory:
         return isinstance(exc, portkey_exc.NotFoundError) and "specified deployment could not be found" in str(exc).lower()
 
     @classmethod
+    def is_genuine_model_not_found(cls, exc: portkey_exceptions.APIError) -> bool:
+        """True for a real unknown-model 404, excluding the transient deployment-propagation race.
+
+        A genuine 404 should specialize to a ``*ModelNotFoundError`` (CONFIGURATION, CHANGE_MODEL);
+        a propagation-race 404 stays a retryable transient error (see ``_is_deployment_propagation_race``).
+        """
+        return isinstance(exc, portkey_exc.NotFoundError) and not cls._is_deployment_propagation_race(exc)
+
+    @classmethod
     def classify_error_category(cls, exc: portkey_exceptions.APIError) -> InferenceErrorCategory:
         """Classify a Portkey API error into an InferenceErrorCategory.
 

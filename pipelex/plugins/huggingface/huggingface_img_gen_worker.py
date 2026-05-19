@@ -6,7 +6,7 @@ from PIL import Image
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError, InferenceErrorCategory, SdkTypeError
+from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundError, ImgGenParameterError, InferenceErrorCategory, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
@@ -74,8 +74,9 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
             ) from exc
         if status_code == 404:
             msg = f"HuggingFace model not found for '{self.inference_model.desc}': {exc}"
-            raise ImgGenGenerationError(
-                msg,
+            raise ImgGenModelNotFoundError(
+                message=msg,
+                model_handle=self.inference_model.name,
                 error_category=InferenceErrorCategory.CONFIGURATION,
                 user_action=UserAction(
                     kind=UserActionKind.CHANGE_MODEL,

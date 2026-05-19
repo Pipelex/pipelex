@@ -4,7 +4,7 @@ from botocore.exceptions import ClientError
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
+from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, LLMModelNotFoundError, SdkTypeError
 from pipelex.cogt.inference.error_classification import (
     UserAction,
     UserActionKind,
@@ -85,12 +85,13 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
             llm_tokens_usage.nb_tokens_by_category = nb_tokens_by_category
         return bedrock_response_text
 
-    def _classify_bedrock_client_error(self, exc: ClientError) -> LLMCompletionError:
-        """Classify a botocore ``ClientError`` into a categorized ``LLMCompletionError``.
+    def _classify_bedrock_client_error(self, exc: ClientError) -> LLMCompletionError | LLMModelNotFoundError:
+        """Classify a botocore ``ClientError`` into a categorized error.
 
-        The returned error carries a structured ``provider_metadata`` and a
-        semantic ``UserActionKind`` so downstream consumers (retry, CLI,
-        telemetry) get uniform shape across providers.
+        A ``ResourceNotFoundException`` specializes to ``LLMModelNotFoundError`` so callers
+        can swap models; every other error code yields ``LLMCompletionError``. The returned
+        error carries a structured ``provider_metadata`` and a semantic ``UserActionKind`` so
+        downstream consumers (retry, CLI, telemetry) get uniform shape across providers.
         """
         error_code = exc.response.get("Error", {}).get("Code", "")
         error_msg = exc.response.get("Error", {}).get("Message", str(exc))
@@ -169,8 +170,9 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
 
         if error_code == "ResourceNotFoundException":
             msg = f"AWS resource not found for model '{self.inference_model.desc}': {error_msg}"
-            return LLMCompletionError(
-                msg,
+            return LLMModelNotFoundError(
+                message=msg,
+                model_handle=self.inference_model.name,
                 error_category=InferenceErrorCategory.CONFIGURATION,
                 user_action=UserAction(
                     kind=UserActionKind.CHANGE_MODEL,

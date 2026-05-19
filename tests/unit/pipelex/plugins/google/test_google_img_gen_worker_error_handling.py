@@ -15,7 +15,7 @@ from google.genai import errors as genai_errors
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategory
+from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundError, InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.plugins.google.google_img_gen_worker import GoogleImgGenWorker
 
@@ -71,12 +71,13 @@ class TestGoogleImgGenWorkerErrorHandling:
         sdk_exc = _make_google_client_error(404, "Model gemini-99 not found", status="NOT_FOUND")
         worker.genai_async_client.models.generate_content.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
-        with pytest.raises(ImgGenGenerationError) as exc_info:
+        with pytest.raises(ImgGenModelNotFoundError) as exc_info:
             await worker._gen_image(img_gen_job=_make_img_gen_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.CHANGE_MODEL
+        assert exc_info.value.model_handle == "imagen-3.0-generate-002"
         assert exc_info.value.provider_metadata is not None
         assert exc_info.value.provider_metadata.status_code == 404
         assert exc_info.value.provider_metadata.provider == "google"

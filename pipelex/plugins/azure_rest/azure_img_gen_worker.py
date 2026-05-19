@@ -3,7 +3,7 @@ import json
 import httpx
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import CogtError, ImgGenGenerationError, ImgGenParameterError, InferenceErrorCategory
+from pipelex.cogt.exceptions import CogtError, ImgGenGenerationError, ImgGenModelNotFoundError, ImgGenParameterError, InferenceErrorCategory
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
@@ -106,8 +106,9 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
             ) from exc
         if status_code == 404:
             msg = f"Azure deployment not found for model '{self.inference_model.desc}' (HTTP {status_code})"
-            raise ImgGenGenerationError(
-                msg,
+            raise ImgGenModelNotFoundError(
+                message=msg,
+                model_handle=self.inference_model.name,
                 error_category=InferenceErrorCategory.CONFIGURATION,
                 user_action=UserAction(
                     kind=UserActionKind.CHANGE_MODEL,

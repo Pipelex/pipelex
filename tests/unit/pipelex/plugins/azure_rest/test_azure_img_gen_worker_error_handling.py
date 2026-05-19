@@ -16,7 +16,7 @@ import pytest
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategory
+from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundError, InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.plugins.azure_rest.azure_img_gen_worker import AzureImgGenWorker
 
@@ -161,17 +161,18 @@ class TestAzureImgGenWorkerSemantic:
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.CHECK_CREDENTIALS
 
-    async def test_not_found_404_is_change_model(self, mocker: MockerFixture) -> None:
+    async def test_not_found_404_raises_img_gen_model_not_found_error(self, mocker: MockerFixture) -> None:
         worker = _make_worker(mocker)
         sdk_exc = _make_status_error(404, text="deployment not found")
         _patch_httpx_status_error(mocker, sdk_exc)
 
-        with pytest.raises(ImgGenGenerationError) as exc_info:
+        with pytest.raises(ImgGenModelNotFoundError) as exc_info:
             await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.CHANGE_MODEL
+        assert exc_info.value.model_handle == "dall-e-3"
 
     async def test_content_policy_400_is_change_input(self, mocker: MockerFixture) -> None:
         worker = _make_worker(mocker)

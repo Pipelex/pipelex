@@ -11,7 +11,7 @@ from fal_client.client import FalClientError, FalClientHTTPError, FalClientTimeo
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategory
+from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundError, InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.plugins.fal.fal_img_gen_worker import FalImgGenWorker
 
@@ -55,7 +55,6 @@ class TestFalImgGenWorkerSemantic:
             (429, InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
             (401, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHECK_CREDENTIALS),
             (403, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHECK_CREDENTIALS),
-            (404, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHANGE_MODEL),
             (400, InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
             # Unhandled 4xx: non-retryable client error, not TRANSIENT.
             (409, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHANGE_INPUT),
@@ -89,6 +88,28 @@ class TestFalImgGenWorkerSemantic:
         assert exc_info.value.provider_metadata is not None
         assert exc_info.value.provider_metadata.provider == "fal"
         assert exc_info.value.provider_metadata.status_code == status_code
+
+    async def test_not_found_404_raises_img_gen_model_not_found_error(self, mocker: MockerFixture) -> None:
+        """A 404 specializes to ImgGenModelNotFoundError (CONFIGURATION, CHANGE_MODEL)."""
+        worker = _make_worker(mocker)
+        sdk_exc = _make_fal_http_error(404, message="model not found")
+        worker.fal_async_client.submit.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        mocker.patch(
+            "pipelex.plugins.fal.fal_img_gen_worker.ImgGenArgsFactory.make_args_for_model",
+            new_callable=mocker.AsyncMock,
+            return_value={"prompt": "test", "model": "test-model-id"},
+        )
+
+        with pytest.raises(ImgGenModelNotFoundError) as exc_info:
+            await worker._submit_and_get_result(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.CHANGE_MODEL
+        assert exc_info.value.model_handle == "flux-dev"
+        assert exc_info.value.provider_metadata is not None
+        assert exc_info.value.provider_metadata.status_code == 404
 
     async def test_timeout_carries_metadata(self, mocker: MockerFixture) -> None:
         worker = _make_worker(mocker)

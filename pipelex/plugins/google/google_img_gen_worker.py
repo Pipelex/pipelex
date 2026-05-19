@@ -8,7 +8,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
-from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategory, SdkTypeError
+from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundError, InferenceErrorCategory, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
@@ -90,23 +90,22 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
             # Best-effort cleanup boundary: teardown must never fail, whatever client/event-loop close throws.
             log.debug(f"Error during Google async client teardown: {exc}")
 
-    def _classify_google_client_error(self, exc: genai_errors.ClientError) -> ImgGenGenerationError:
-        """Classify a Google GenAI ClientError into a categorized ``ImgGenGenerationError``.
+    def _classify_google_client_error(self, exc: genai_errors.ClientError) -> ImgGenGenerationError | ImgGenModelNotFoundError:
+        """Classify a Google GenAI ClientError into a categorized error.
 
-        Attaches ``provider_metadata`` and a semantic ``UserAction`` on every branch.
+        A 404 specializes to ``ImgGenModelNotFoundError`` so callers can swap models; every
+        other branch returns ``ImgGenGenerationError``. Attaches ``provider_metadata`` and a
+        semantic ``UserAction`` on every branch.
         """
         error_message = str(exc)
         status_code = exc.code
         metadata = extract_google_metadata(exc)
 
         if status_code == 404:
-            # Img-gen 404s stay as a plain ImgGenGenerationError. The LLM path specializes
-            # 404 to LLMModelNotFoundError (see classify_google_sdk_error in
-            # google_error_classification.py); the equivalent ImgGenModelNotFoundError
-            # specialization for image-generation workers is intentionally out of scope here.
             msg = f"Google model '{self.inference_model.desc}' not found: {exc}"
-            return ImgGenGenerationError(
-                msg,
+            return ImgGenModelNotFoundError(
+                message=msg,
+                model_handle=self.inference_model.name,
                 error_category=InferenceErrorCategory.CONFIGURATION,
                 user_action=UserAction(
                     kind=UserActionKind.CHANGE_MODEL,

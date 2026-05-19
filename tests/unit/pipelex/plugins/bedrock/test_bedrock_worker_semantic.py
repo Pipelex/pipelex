@@ -10,7 +10,7 @@ from botocore.exceptions import ClientError
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
+from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, LLMModelNotFoundError
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.plugins.bedrock.bedrock_llm_worker import BedrockLLMWorker
 
@@ -70,7 +70,6 @@ class TestBedrockWorkerSemantic:
             ("ValidationException", "Invalid request", 400, InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
             ("ModelNotReadyException", "Model not ready", 503, InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
             ("ServiceUnavailableException", "Service unavailable", 503, InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
-            ("ResourceNotFoundException", "Model not found", 404, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHANGE_MODEL),
             # Unhandled error code on a 4xx status: non-retryable client error, not TRANSIENT.
             ("UnknownAWSException", "Mystery client failure", 409, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHANGE_INPUT),
             ("UnknownAWSException", "Mystery failure", 500, InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
@@ -108,4 +107,28 @@ class TestBedrockWorkerSemantic:
         assert exc_info.value.provider_metadata.status_code == status_code
         assert exc_info.value.provider_metadata.request_id == "aws-req-1"
         assert exc_info.value.provider_metadata.provider_error_code == error_code
+        assert exc_info.value.__cause__ is sdk_exc
+
+    async def test_resource_not_found_raises_llm_model_not_found_error(self, mocker: MockerFixture) -> None:
+        """A ResourceNotFoundException specializes to LLMModelNotFoundError (CONFIGURATION, CHANGE_MODEL)."""
+        worker = _make_worker(mocker)
+        sdk_exc = _make_bedrock_client_error("ResourceNotFoundException", "Model not found", status_code=404, request_id="aws-req-1")
+        worker.bedrock_client_for_text.chat.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        mock_message = mocker.MagicMock()
+        mock_message.to_dict_list = mocker.MagicMock(return_value=[{"role": "user", "content": "test"}])
+        mocker.patch(
+            "pipelex.plugins.bedrock.bedrock_llm_worker.BedrockFactory.make_simple_message",
+            return_value=mock_message,
+        )
+
+        with pytest.raises(LLMModelNotFoundError) as exc_info:
+            await worker._gen_text(llm_job=_make_llm_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.CHANGE_MODEL
+        assert exc_info.value.model_handle == "anthropic.claude-3"
+        assert exc_info.value.provider_metadata is not None
+        assert exc_info.value.provider_metadata.status_code == 404
         assert exc_info.value.__cause__ is sdk_exc

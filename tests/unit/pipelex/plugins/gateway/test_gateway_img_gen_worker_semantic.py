@@ -11,7 +11,7 @@ from portkey_ai.api_resources import exceptions as portkey_exc
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategory
+from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundError, InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.plugins.gateway.gateway_img_gen_worker import GatewayImgGenWorker
 
@@ -63,7 +63,6 @@ class TestGatewayImgGenWorkerSemantic:
             (portkey_exc.RateLimitError, 429, InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
             (portkey_exc.AuthenticationError, 401, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHECK_CREDENTIALS),
             (portkey_exc.PermissionDeniedError, 403, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHECK_CREDENTIALS),
-            (portkey_exc.NotFoundError, 404, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHANGE_MODEL),
             (portkey_exc.BadRequestError, 400, InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
         ],
     )
@@ -98,6 +97,65 @@ class TestGatewayImgGenWorkerSemantic:
         assert exc_info.value.provider_metadata is not None
         assert exc_info.value.provider_metadata.provider == "gateway"
         assert exc_info.value.provider_metadata.status_code == status_code
+
+    async def test_genuine_not_found_404_raises_img_gen_model_not_found_error(self, mocker: MockerFixture) -> None:
+        """A genuine unknown-model 404 specializes to ImgGenModelNotFoundError (CONFIGURATION, CHANGE_MODEL)."""
+        worker = _make_worker(mocker)
+        sdk_exc = _make_status_error(portkey_exc.NotFoundError, 404)
+        worker.portkey_client.with_options.return_value.post.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        mocker.patch(
+            "pipelex.plugins.gateway.gateway_img_gen_worker.ImgGenArgsFactory.make_args_for_model",
+            new_callable=mocker.AsyncMock,
+            return_value={"prompt": "test"},
+        )
+        mocker.patch(
+            "pipelex.plugins.gateway.gateway_img_gen_worker.GatewayDeck.get_config_id",
+            return_value="cfg-1",
+        )
+
+        with pytest.raises(ImgGenModelNotFoundError) as exc_info:
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.CHANGE_MODEL
+        assert exc_info.value.model_handle == "gpt-image-1"
+        assert exc_info.value.provider_metadata is not None
+        assert exc_info.value.provider_metadata.status_code == 404
+
+    async def test_deployment_propagation_race_404_stays_transient(self, mocker: MockerFixture) -> None:
+        """A 404 caused by deployment-propagation lag stays a retryable ImgGenGenerationError —
+        it is not specialized to ImgGenModelNotFoundError (a separate exception hierarchy that
+        ``pytest.raises(ImgGenGenerationError)`` would not catch), since the model does exist.
+        """
+        worker = _make_worker(mocker)
+        request = httpx.Request("POST", "https://api.portkey.ai/v1/images/generations")
+        response = _make_response(404)
+        sdk_exc = portkey_exc.NotFoundError(
+            message="The specified deployment could not be found",
+            request=request,
+            response=response,
+            body={"error": {"message": "The specified deployment could not be found"}},
+        )
+        worker.portkey_client.with_options.return_value.post.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        mocker.patch(
+            "pipelex.plugins.gateway.gateway_img_gen_worker.ImgGenArgsFactory.make_args_for_model",
+            new_callable=mocker.AsyncMock,
+            return_value={"prompt": "test"},
+        )
+        mocker.patch(
+            "pipelex.plugins.gateway.gateway_img_gen_worker.GatewayDeck.get_config_id",
+            return_value="cfg-1",
+        )
+
+        with pytest.raises(ImgGenGenerationError) as exc_info:
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
 
     async def test_quota_keywords_in_rate_limit_message_is_check_billing(self, mocker: MockerFixture) -> None:
         worker = _make_worker(mocker)
