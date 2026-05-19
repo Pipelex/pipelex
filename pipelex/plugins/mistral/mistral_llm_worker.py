@@ -363,6 +363,8 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
             underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
             if isinstance(underlying_exc, MistralError):
                 raise self._classify_mistral_error(underlying_exc) from instructor_exc
+            if isinstance(underlying_exc, httpx.TransportError):
+                raise self._classify_mistral_transport_error(underlying_exc) from instructor_exc
             msg = f"Mistral structured generation failed after retries for model '{self.inference_model.desc}': {instructor_exc}"
             raise LLMCompletionError(
                 msg,

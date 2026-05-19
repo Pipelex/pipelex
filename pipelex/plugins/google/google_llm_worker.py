@@ -417,7 +417,7 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
             # instructor wraps SDK exceptions during retries; recover the underlying
             # one so transient/capacity/auth errors aren't all flattened to UNKNOWN.
             underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
-            if isinstance(underlying_exc, (genai_errors.ServerError, genai_errors.ClientError)):
+            if underlying_exc is not None:
                 self._raise_categorized_google_sdk_error(sdk_exc=underlying_exc, chain_from=instructor_exc)
             msg = f"Google structured generation failed after retries for model '{self.inference_model.desc}': {instructor_exc}"
             raise LLMCompletionError(
