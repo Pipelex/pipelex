@@ -358,7 +358,15 @@ class ExtractJobFailureError(CogtError):
     pass
 
 
+class ExtractModelNotFoundError(ModelNotFoundError):
+    pass
+
+
 class SearchJobFailureError(CogtError):
+    pass
+
+
+class SearchModelNotFoundError(ModelNotFoundError):
     pass
 
 

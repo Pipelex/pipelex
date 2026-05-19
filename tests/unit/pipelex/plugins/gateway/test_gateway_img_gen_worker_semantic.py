@@ -124,39 +124,6 @@ class TestGatewayImgGenWorkerSemantic:
         assert exc_info.value.provider_metadata is not None
         assert exc_info.value.provider_metadata.status_code == 404
 
-    async def test_deployment_propagation_race_404_stays_transient(self, mocker: MockerFixture) -> None:
-        """A 404 caused by deployment-propagation lag stays a retryable ImgGenGenerationError —
-        it is not specialized to ImgGenModelNotFoundError (a separate exception hierarchy that
-        ``pytest.raises(ImgGenGenerationError)`` would not catch), since the model does exist.
-        """
-        worker = _make_worker(mocker)
-        request = httpx.Request("POST", "https://api.portkey.ai/v1/images/generations")
-        response = _make_response(404)
-        sdk_exc = portkey_exc.NotFoundError(
-            message="The specified deployment could not be found",
-            request=request,
-            response=response,
-            body={"error": {"message": "The specified deployment could not be found"}},
-        )
-        worker.portkey_client.with_options.return_value.post.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
-
-        mocker.patch(
-            "pipelex.plugins.gateway.gateway_img_gen_worker.ImgGenArgsFactory.make_args_for_model",
-            new_callable=mocker.AsyncMock,
-            return_value={"prompt": "test"},
-        )
-        mocker.patch(
-            "pipelex.plugins.gateway.gateway_img_gen_worker.GatewayDeck.get_config_id",
-            return_value="cfg-1",
-        )
-
-        with pytest.raises(ImgGenGenerationError) as exc_info:
-            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
-
-        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
-        assert exc_info.value.user_action is not None
-        assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
-
     async def test_quota_keywords_in_rate_limit_message_is_check_billing(self, mocker: MockerFixture) -> None:
         worker = _make_worker(mocker)
         # The classify path inspects str(exc); the constructor message becomes the str repr.

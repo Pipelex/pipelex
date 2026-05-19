@@ -21,7 +21,7 @@ class LLMWorkerFactory:
         match plugin.sdk:
             case "gateway_completions":
                 from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletionsFactory  # noqa: PLC0415
-                from pipelex.plugins.gateway.gateway_completions_llm_worker import GatewayCompletionsLLMWorker  # noqa: PLC0415
+                from pipelex.plugins.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker  # noqa: PLC0415
 
                 sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
@@ -33,7 +33,7 @@ class LLMWorkerFactory:
 
                 gateway_completions_factory = GatewayCompletionsFactory(is_http_url_enabled=False)
 
-                llm_worker = GatewayCompletionsLLMWorker(
+                llm_worker = OpenAICompletionsLLMWorker(
                     openai_completions_factory=gateway_completions_factory,
                     sdk_instance=sdk_instance,
                     inference_model=inference_model,
@@ -41,7 +41,7 @@ class LLMWorkerFactory:
                 )
             case "gateway_responses":
                 from pipelex.plugins.gateway.gateway_responses_factory import GatewayResponsesFactory  # noqa: PLC0415
-                from pipelex.plugins.gateway.gateway_responses_llm_worker import GatewayResponsesLLMWorker  # noqa: PLC0415
+                from pipelex.plugins.openai.openai_responses_llm_worker import OpenAIResponsesLLMWorker  # noqa: PLC0415
 
                 sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
@@ -53,7 +53,7 @@ class LLMWorkerFactory:
 
                 gateway_responses_factory = GatewayResponsesFactory(is_http_url_enabled=False)
 
-                llm_worker = GatewayResponsesLLMWorker(
+                llm_worker = OpenAIResponsesLLMWorker(
                     openai_responses_factory=gateway_responses_factory,
                     sdk_instance=sdk_instance,
                     inference_model=inference_model,

@@ -16,7 +16,6 @@ from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.inference.error_classification import (
     UserAction,
     UserActionKind,
-    is_deployment_propagation_race_message,
     is_quota_exhaustion_gateway,
 )
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
@@ -123,25 +122,6 @@ class GatewayFactory:
         return extra_headers, extra_body
 
     @classmethod
-    def _is_deployment_propagation_race(cls, exc: portkey_exceptions.APIError) -> bool:
-        """Detect a Portkey 404 caused by deployment-propagation lag rather than a real misconfiguration.
-
-        A freshly-routed gateway deployment can briefly 404 with "specified deployment could not be
-        found" before propagation completes — that is a transient race worth retrying, unlike a
-        genuine unknown-model 404.
-        """
-        return isinstance(exc, portkey_exc.NotFoundError) and is_deployment_propagation_race_message(str(exc))
-
-    @classmethod
-    def is_genuine_model_not_found(cls, exc: portkey_exceptions.APIError) -> bool:
-        """True for a real unknown-model 404, excluding the transient deployment-propagation race.
-
-        A genuine 404 should specialize to a ``*ModelNotFoundError`` (CONFIGURATION, CHANGE_MODEL);
-        a propagation-race 404 stays a retryable transient error (see ``_is_deployment_propagation_race``).
-        """
-        return isinstance(exc, portkey_exc.NotFoundError) and not cls._is_deployment_propagation_race(exc)
-
-    @classmethod
     def classify_error_category(cls, exc: portkey_exceptions.APIError) -> InferenceErrorCategory:
         """Classify a Portkey API error into an InferenceErrorCategory.
 
@@ -162,8 +142,6 @@ class GatewayFactory:
             if isinstance(exc, portkey_exc.BadRequestError):
                 return InferenceErrorCategory.CONTENT
             if isinstance(exc, portkey_exc.NotFoundError):
-                if cls._is_deployment_propagation_race(exc):
-                    return InferenceErrorCategory.TRANSIENT
                 return InferenceErrorCategory.CONFIGURATION
             # Unhandled 4xx: a client-side problem, non-retryable.
             if 400 <= status_code < 500:
@@ -193,11 +171,6 @@ class GatewayFactory:
                     detail="Pipelex Gateway rejected the API key — check your credentials",
                 )
             if isinstance(exc, portkey_exc.NotFoundError):
-                if cls._is_deployment_propagation_race(exc):
-                    return UserAction(
-                        kind=UserActionKind.WAIT_AND_RETRY,
-                        detail="The gateway deployment is still propagating — the system will retry automatically",
-                    )
                 return UserAction(
                     kind=UserActionKind.CHANGE_MODEL,
                     detail="The requested model or endpoint was not found — pick an available model",

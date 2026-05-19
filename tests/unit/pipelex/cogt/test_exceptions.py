@@ -6,6 +6,8 @@ import pytest
 from pipelex.base_exceptions import ErrorReport, PipelexError
 from pipelex.cogt.exceptions import (
     CogtError,
+    ExtractJobFailureError,
+    ExtractModelNotFoundError,
     ImgGenGenerationError,
     ImgGenModelNotFoundError,
     InferenceBackendCredentialsError,
@@ -16,6 +18,8 @@ from pipelex.cogt.exceptions import (
     LLMModelNotFoundError,
     ModelNotFoundError,
     ModelWaterfallError,
+    SearchJobFailureError,
+    SearchModelNotFoundError,
 )
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from tests.unit.pipelex.cogt.test_data import ExceptionTestData
@@ -239,3 +243,13 @@ class TestErrorCategoryInfrastructure:
         """ImgGenModelNotFoundError is a ModelNotFoundError, NOT an ImgGenGenerationError — same reroute invariant."""
         assert issubclass(ImgGenModelNotFoundError, ModelNotFoundError)
         assert not issubclass(ImgGenModelNotFoundError, ImgGenGenerationError)
+
+    def test_extract_model_not_found_is_model_not_found_not_job_failure_error(self) -> None:
+        """ExtractModelNotFoundError is a ModelNotFoundError, NOT an ExtractJobFailureError — same reroute invariant."""
+        assert issubclass(ExtractModelNotFoundError, ModelNotFoundError)
+        assert not issubclass(ExtractModelNotFoundError, ExtractJobFailureError)
+
+    def test_search_model_not_found_is_model_not_found_not_job_failure_error(self) -> None:
+        """SearchModelNotFoundError is a ModelNotFoundError, NOT a SearchJobFailureError — same reroute invariant."""
+        assert issubclass(SearchModelNotFoundError, ModelNotFoundError)
+        assert not issubclass(SearchModelNotFoundError, SearchJobFailureError)

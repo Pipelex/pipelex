@@ -7,7 +7,7 @@ from portkey_ai.api_resources.utils import GenericResponse
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import InferenceErrorCategory, SdkTypeError
+from pipelex.cogt.exceptions import InferenceErrorCategory, SdkTypeError, SearchModelNotFoundError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_gateway_metadata
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.search.search_depth import SearchDepth
@@ -157,10 +157,22 @@ class GatewaySearchWorker(SearchWorkerAbstract):
                 messages=messages,
             )
         except portkey_exceptions.APIError as exc:
+            metadata = extract_gateway_metadata(exc)
+            if isinstance(exc, portkey_exceptions.NotFoundError):
+                msg = f"Gateway search model not found for '{model}': {exc}"
+                raise SearchModelNotFoundError(
+                    message=msg,
+                    model_handle=self.inference_model.name,
+                    error_category=InferenceErrorCategory.CONFIGURATION,
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_MODEL,
+                        detail=f"Model '{model}' was not found — pick an available model",
+                    ),
+                    provider_metadata=metadata,
+                ) from exc
             error_summary = GatewayFactory.make_error_summary_from_portkey_error(exc)
             error_category = GatewayFactory.classify_error_category(exc)
             user_action = GatewayFactory.make_user_action_from_portkey_error(exc)
-            metadata = extract_gateway_metadata(exc)
             msg = f"Search service error for model '{model}': {error_summary}"
             raise GatewaySearchResponseError(
                 msg,

@@ -7,12 +7,12 @@ from portkey_ai.api_resources.utils import GenericResponse
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import ExtractCapabilityError, ExtractJobFailureError, SdkTypeError
+from pipelex.cogt.exceptions import ExtractCapabilityError, ExtractJobFailureError, ExtractModelNotFoundError, InferenceErrorCategory, SdkTypeError
 from pipelex.cogt.extract.extract_input import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
-from pipelex.cogt.inference.error_classification import extract_gateway_metadata
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_gateway_metadata
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import TokenCategory
@@ -156,10 +156,22 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
                 messages=messages,
             )
         except portkey_exceptions.APIError as exc:
+            metadata = extract_gateway_metadata(exc)
+            if isinstance(exc, portkey_exceptions.NotFoundError):
+                msg = f"Gateway extract model not found for '{self.inference_model.tag}': {exc}"
+                raise ExtractModelNotFoundError(
+                    message=msg,
+                    model_handle=self.inference_model.name,
+                    error_category=InferenceErrorCategory.CONFIGURATION,
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_MODEL,
+                        detail=f"Model '{self.inference_model.model_id}' was not found — pick an available model",
+                    ),
+                    provider_metadata=metadata,
+                ) from exc
             error_summary = GatewayFactory.make_error_summary_from_portkey_error(exc)
             error_category = GatewayFactory.classify_error_category(exc)
             user_action = GatewayFactory.make_user_action_from_portkey_error(exc)
-            metadata = extract_gateway_metadata(exc)
             msg = f"Web fetch service error for URL '{document_uri}' via model '{self.inference_model.tag}': {error_summary}"
             raise ExtractJobFailureError(
                 msg,
@@ -217,10 +229,22 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
                 **extra_body,
             )
         except portkey_exceptions.APIError as exc:
+            metadata = extract_gateway_metadata(exc)
+            if isinstance(exc, portkey_exceptions.NotFoundError):
+                msg = f"Gateway extract model not found for '{self.inference_model.tag}': {exc}"
+                raise ExtractModelNotFoundError(
+                    message=msg,
+                    model_handle=self.inference_model.name,
+                    error_category=InferenceErrorCategory.CONFIGURATION,
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_MODEL,
+                        detail=f"Model '{self.inference_model.model_id}' was not found — pick an available model",
+                    ),
+                    provider_metadata=metadata,
+                ) from exc
             error_summary = GatewayFactory.make_error_summary_from_portkey_error(exc)
             error_category = GatewayFactory.classify_error_category(exc)
             user_action = GatewayFactory.make_user_action_from_portkey_error(exc)
-            metadata = extract_gateway_metadata(exc)
             msg = f"Extract service error for model '{self.inference_model.tag}': {error_summary}"
             raise ExtractJobFailureError(
                 msg,

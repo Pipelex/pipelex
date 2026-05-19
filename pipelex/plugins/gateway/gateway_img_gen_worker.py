@@ -82,7 +82,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
             )
         except portkey_exceptions.APIError as exc:
             metadata = extract_gateway_metadata(exc)
-            if GatewayFactory.is_genuine_model_not_found(exc):
+            if isinstance(exc, portkey_exceptions.NotFoundError):
                 msg = f"Gateway model not found for '{self.inference_model.desc}': {exc}"
                 raise ImgGenModelNotFoundError(
                     message=msg,

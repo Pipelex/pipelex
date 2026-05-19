@@ -11,7 +11,7 @@ from portkey_ai.api_resources import exceptions as portkey_exc
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-from pipelex.cogt.exceptions import InferenceErrorCategory
+from pipelex.cogt.exceptions import InferenceErrorCategory, SearchModelNotFoundError
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.plugins.gateway.gateway_exceptions import GatewaySearchResponseError
 from pipelex.plugins.gateway.gateway_search_worker import GatewaySearchWorker
@@ -70,7 +70,6 @@ class TestGatewaySearchWorkerSemantic:
             (portkey_exc.RateLimitError, 429, InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
             (portkey_exc.AuthenticationError, 401, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHECK_CREDENTIALS),
             (portkey_exc.PermissionDeniedError, 403, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHECK_CREDENTIALS),
-            (portkey_exc.NotFoundError, 404, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHANGE_MODEL),
             (portkey_exc.BadRequestError, 400, InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
         ],
     )
@@ -103,3 +102,25 @@ class TestGatewaySearchWorkerSemantic:
         assert exc_info.value.provider_metadata.status_code == status_code
         assert exc_info.value.provider_metadata.request_id == "pk-search-1"
         assert exc_info.value.__cause__ is sdk_exc
+
+    async def test_genuine_not_found_404_raises_search_model_not_found_error(self, mocker: MockerFixture) -> None:
+        """A 404 specializes to SearchModelNotFoundError (CONFIGURATION, CHANGE_MODEL) so it reroutes."""
+        worker = _make_worker(mocker)
+        sdk_exc = _make_status_error(portkey_exc.NotFoundError, 404)
+        client: Any = worker.portkey_client
+        client.with_options.return_value.post.side_effect = sdk_exc
+
+        mocker.patch(
+            "pipelex.plugins.gateway.gateway_search_worker.GatewayDeck.get_config_id",
+            return_value="linkup-sourced-answer",
+        )
+
+        with pytest.raises(SearchModelNotFoundError) as exc_info:
+            await worker._search_sourced_answer(search_job=_make_search_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.CHANGE_MODEL
+        assert exc_info.value.model_handle == "linkup-sourced-answer"
+        assert exc_info.value.provider_metadata is not None
+        assert exc_info.value.provider_metadata.status_code == 404
