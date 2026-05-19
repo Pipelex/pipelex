@@ -11,9 +11,8 @@ from portkey_ai.api_resources import exceptions as portkey_exc
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-from pipelex.cogt.exceptions import InferenceErrorCategory, SearchModelNotFoundError
+from pipelex.cogt.exceptions import InferenceErrorCategory, SearchJobFailureError, SearchModelNotFoundError
 from pipelex.cogt.inference.error_classification import UserActionKind
-from pipelex.plugins.gateway.gateway_exceptions import GatewaySearchResponseError
 from pipelex.plugins.gateway.gateway_search_worker import GatewaySearchWorker
 
 
@@ -91,7 +90,7 @@ class TestGatewaySearchWorkerSemantic:
             return_value="linkup-sourced-answer",
         )
 
-        with pytest.raises(GatewaySearchResponseError) as exc_info:
+        with pytest.raises(SearchJobFailureError) as exc_info:
             await worker._search_sourced_answer(search_job=_make_search_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category

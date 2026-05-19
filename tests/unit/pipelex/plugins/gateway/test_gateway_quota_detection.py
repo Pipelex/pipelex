@@ -11,9 +11,8 @@ from portkey_ai.api_resources import exceptions as portkey_exceptions
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-from pipelex.cogt.exceptions import ExtractJobFailureError, ImgGenGenerationError, InferenceErrorCategory
+from pipelex.cogt.exceptions import ExtractJobFailureError, ImgGenGenerationError, InferenceErrorCategory, SearchJobFailureError
 from pipelex.cogt.inference.error_classification import UserActionKind
-from pipelex.plugins.gateway.gateway_exceptions import GatewaySearchResponseError
 from pipelex.plugins.gateway.gateway_extract_worker import GatewayExtractWorker
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
 from pipelex.plugins.gateway.gateway_img_gen_worker import GatewayImgGenWorker
@@ -172,7 +171,7 @@ class TestGatewayQuotaDetection:
         assert exc_info.value.__cause__ is sdk_exc
 
     async def test_search_worker_propagates_auth_error_as_configuration(self, mocker: MockerFixture) -> None:
-        """GatewaySearchWorker raises GatewaySearchResponseError with CONFIGURATION for auth error."""
+        """GatewaySearchWorker raises SearchJobFailureError with CONFIGURATION for auth error."""
         worker = _make_gateway_search_worker(mocker)
         sdk_exc = _make_portkey_exception("AuthenticationError", 401, "Invalid API key")
 
@@ -184,12 +183,8 @@ class TestGatewayQuotaDetection:
             "pipelex.plugins.gateway.gateway_search_worker.GatewayDeck.get_config_id",
             return_value="test-config",
         )
-        mocker.patch(
-            "pipelex.plugins.gateway.gateway_search_worker.GatewayFactory.make_error_summary_from_portkey_error",
-            return_value="Invalid API key",
-        )
 
-        with pytest.raises(GatewaySearchResponseError) as exc_info:
+        with pytest.raises(SearchJobFailureError) as exc_info:
             await worker._call_relay(model="linkup/standard", content='{"query": "test"}')  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION

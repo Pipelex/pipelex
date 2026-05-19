@@ -108,13 +108,8 @@ class MistralExtractErrorHandlingTestData:
             InferenceErrorCategory.CONFIGURATION,
             None,
         ),
-        (
-            "model_not_found_404",
-            404,
-            "Model mistral-ocr-unknown not found",
-            InferenceErrorCategory.CONFIGURATION,
-            None,
-        ),
+        # NOTE: a 404 is not in this parametrized set — the Extract worker specializes
+        # it to ExtractModelNotFoundError, covered by its own dedicated test.
         (
             "bad_request_content_policy_400",
             400,

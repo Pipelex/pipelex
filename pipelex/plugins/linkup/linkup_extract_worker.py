@@ -16,16 +16,16 @@ from linkup import (
 )
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import ExtractJobFailureError, InferenceErrorCategory
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
-from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_linkup_metadata
+from pipelex.cogt.inference.error_classification import extract_linkup_metadata
+from pipelex.cogt.inference.error_classify import classify_inference_error
+from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.hub import get_secrets_provider
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.urls import URLs
 
 
 class LinkupExtractWorker(ExtractWorkerAbstract):
@@ -43,102 +43,6 @@ class LinkupExtractWorker(ExtractWorkerAbstract):
         )
         api_key = get_secrets_provider().get_secret(secret_id="LINKUP_API_KEY")
         self._linkup_client = LinkupClient(api_key=api_key)
-
-    def _classify_linkup_error(self, exc: Exception) -> ExtractJobFailureError:
-        """Classify a Linkup SDK error into a categorized ExtractJobFailureError.
-
-        The returned error carries a structured ``provider_metadata`` and a
-        semantic ``UserActionKind`` so downstream consumers (retry, CLI,
-        telemetry) get uniform shape across providers.
-        """
-        metadata = extract_linkup_metadata(exc)
-        if isinstance(exc, LinkupAuthenticationError):
-            msg = f"Linkup authentication error: {exc}"
-            return ExtractJobFailureError(
-                msg,
-                error_category=InferenceErrorCategory.CONFIGURATION,
-                user_action=UserAction(
-                    kind=UserActionKind.CHECK_CREDENTIALS,
-                    detail="Check that the LINKUP_API_KEY environment variable is set",
-                ),
-                provider_metadata=metadata,
-            )
-        if isinstance(exc, LinkupInsufficientCreditError):
-            msg = f"Linkup credits exhausted: {exc}"
-            return ExtractJobFailureError(
-                msg,
-                error_category=InferenceErrorCategory.CAPACITY,
-                user_action=UserAction(
-                    kind=UserActionKind.CHECK_BILLING,
-                    detail=f"Your Linkup account has insufficient credits — check billing at {URLs.linkup_billing}",
-                ),
-                provider_metadata=metadata,
-            )
-        if isinstance(exc, LinkupTooManyRequestsError):
-            msg = f"Linkup rate limit exceeded: {exc}"
-            return ExtractJobFailureError(
-                msg,
-                error_category=InferenceErrorCategory.TRANSIENT,
-                user_action=UserAction(
-                    kind=UserActionKind.WAIT_AND_RETRY,
-                    detail="Rate limited by Linkup — the system will retry automatically",
-                ),
-                provider_metadata=metadata,
-            )
-        if isinstance(exc, LinkupTimeoutError):
-            msg = f"Linkup request timed out: {exc}"
-            return ExtractJobFailureError(
-                msg,
-                error_category=InferenceErrorCategory.TRANSIENT,
-                user_action=UserAction(
-                    kind=UserActionKind.WAIT_AND_RETRY,
-                    detail="Linkup request timed out — the system will retry automatically",
-                ),
-                provider_metadata=metadata,
-            )
-        if isinstance(exc, LinkupInvalidRequestError):
-            msg = f"Linkup invalid request: {exc}"
-            return ExtractJobFailureError(
-                msg,
-                error_category=InferenceErrorCategory.CONTENT,
-                user_action=UserAction(
-                    kind=UserActionKind.CHANGE_INPUT,
-                    detail="Linkup rejected the request — review the URL and parameters",
-                ),
-                provider_metadata=metadata,
-            )
-        if isinstance(exc, (LinkupFetchResponseTooLargeError, LinkupFetchUrlIsFileError)):
-            msg = f"Linkup fetch error: {exc}"
-            return ExtractJobFailureError(
-                msg,
-                error_category=InferenceErrorCategory.CONTENT,
-                user_action=UserAction(
-                    kind=UserActionKind.CHANGE_INPUT,
-                    detail="Linkup could not fetch the URL — the target may be too large or not a web page",
-                ),
-                provider_metadata=metadata,
-            )
-        if isinstance(exc, LinkupNoResultError):
-            msg = f"Linkup found no results: {exc}"
-            return ExtractJobFailureError(
-                msg,
-                error_category=InferenceErrorCategory.CONTENT,
-                user_action=UserAction(
-                    kind=UserActionKind.CHANGE_INPUT,
-                    detail="Linkup found no results — broaden or rephrase the request",
-                ),
-                provider_metadata=metadata,
-            )
-        msg = f"Linkup error: {exc}"
-        return ExtractJobFailureError(
-            msg,
-            error_category=InferenceErrorCategory.TRANSIENT,
-            user_action=UserAction(
-                kind=UserActionKind.WAIT_AND_RETRY,
-                detail="Linkup returned an unexpected error — the system will retry automatically",
-            ),
-            provider_metadata=metadata,
-        )
 
     @override
     async def _extract_pages(
@@ -171,8 +75,16 @@ class LinkupExtractWorker(ExtractWorkerAbstract):
             LinkupFailedFetchError,
             LinkupNoResultError,
             LinkupUnknownError,
-        ) as exc:
-            raise self._classify_linkup_error(exc) from exc
+        ) as sdk_exc:
+            metadata = extract_linkup_metadata(sdk_exc)
+            classification = classify_inference_error(metadata)
+            raise render_inference_error(
+                metadata=metadata,
+                classification=classification,
+                family=InferenceErrorFamily.EXTRACT,
+                model_desc=self.inference_model.desc,
+                model_handle=self.inference_model.name,
+            ) from sdk_exc
 
         # Per-request cost model: costs are defined per million, so 1 request = 1_000_000
         if extract_tokens_usage := extract_job.job_report.extract_tokens_usage:

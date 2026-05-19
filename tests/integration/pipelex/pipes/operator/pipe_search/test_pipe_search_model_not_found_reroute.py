@@ -3,7 +3,7 @@ from typing import Callable
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.cogt.exceptions import InferenceErrorCategory, SearchModelNotFoundError
+from pipelex.cogt.exceptions import InferenceErrorCategory, SearchJobFailureError, SearchModelNotFoundError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.pipe_factory import PipeFactory
@@ -15,7 +15,6 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.plugins.gateway.gateway_exceptions import GatewaySearchResponseError
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -71,7 +70,9 @@ class TestPipeSearchModelNotFoundReroute:
         assert availability_error.pipe_type == "PipeSearch"
         assert availability_error.pipe_code == "adhoc_for_test_search_model_not_found_reroute"
         assert isinstance(availability_error.__cause__, SearchModelNotFoundError)
-        # The reroute hinges on this: SearchModelNotFoundError is a sibling of GatewaySearchResponseError.
-        assert not isinstance(availability_error.__cause__, GatewaySearchResponseError)
+        # The reroute hinges on this: SearchModelNotFoundError is a sibling of SearchJobFailureError —
+        # they share no inheritance, so the model-not-found case takes the specialized class and reroutes,
+        # while every other SDK error stays on SearchJobFailureError and surfaces as a hard failure.
+        assert not isinstance(availability_error.__cause__, SearchJobFailureError)
         assert availability_error.__cause__.error_category is InferenceErrorCategory.CONFIGURATION
         assert availability_error.__cause__.error_category.is_retryable is False

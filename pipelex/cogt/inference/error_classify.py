@@ -39,12 +39,19 @@ class ClassificationResult(BaseModel):
 _STATUSLESS_BY_TYPE_NAME: dict[str, tuple[InferenceErrorCategory, UserActionKind]] = {
     # pydantic / instructor schema-validation failure
     "ValidationError": (InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
-    # Linkup typed SDK exceptions
+    # Linkup typed SDK exceptions. ``LinkupTimeoutError`` and any
+    # connection-shaped variants flow through ``is_network_error`` (the
+    # ``_NETWORK_ERROR_TOKENS`` check matches "timeout"/"connect"), so they are
+    # intentionally absent from this map.
     "LinkupAuthenticationError": (InferenceErrorCategory.CONFIGURATION, UserActionKind.CHECK_CREDENTIALS),
     "LinkupInsufficientCreditError": (InferenceErrorCategory.CAPACITY, UserActionKind.CHECK_BILLING),
     "LinkupTooManyRequestsError": (InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
     "LinkupInvalidRequestError": (InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
     "LinkupNoResultError": (InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
+    "LinkupFetchResponseTooLargeError": (InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
+    "LinkupFetchUrlIsFileError": (InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
+    "LinkupFailedFetchError": (InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
+    "LinkupUnknownError": (InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
     # FAL's typed credential failure — raised before any HTTP call when the API key is unset
     "MissingCredentialsError": (InferenceErrorCategory.CONFIGURATION, UserActionKind.CHECK_CREDENTIALS),
     # FAL's generic SDK error (base class) — caught last in the worker; HTTP/timeout variants
