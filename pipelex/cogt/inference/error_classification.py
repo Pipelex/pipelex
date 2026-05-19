@@ -119,6 +119,10 @@ _GATEWAY_QUOTA_PATTERNS: tuple[str, ...] = (
     "credits exhausted",
 )
 
+# A freshly-routed Pipelex Gateway deployment briefly returns a 404 with this phrase
+# before propagation completes — see is_deployment_propagation_race_message().
+_DEPLOYMENT_PROPAGATION_RACE_PHRASE: str = "specified deployment could not be found"
+
 
 def is_quota_exhaustion_openai(error_message: str) -> bool:
     """Check if an OpenAI error message indicates quota/credits exhaustion rather than rate limiting."""
@@ -172,6 +176,18 @@ def is_content_policy_violation(error_message: str) -> bool:
     """Check if an error message indicates a content policy or safety filter violation."""
     lower_message = error_message.lower()
     return any(pattern in lower_message for pattern in _CONTENT_POLICY_PATTERNS)
+
+
+def is_deployment_propagation_race_message(error_text: str) -> bool:
+    """Check if an error message indicates a Pipelex Gateway deployment-propagation race.
+
+    A freshly-routed gateway deployment can briefly return a 404 carrying
+    "specified deployment could not be found" before propagation completes — a
+    transient race worth retrying, unlike a genuine unknown-model 404. Shared by
+    the Portkey-SDK img-gen path and the OpenAI-SDK gateway LLM path, which see
+    different exception types but the same response body text.
+    """
+    return _DEPLOYMENT_PROPAGATION_RACE_PHRASE in error_text.lower()
 
 
 def extract_underlying_sdk_exception(instructor_exc: Any) -> BaseException | None:

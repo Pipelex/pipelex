@@ -131,6 +131,15 @@ class TestClassifyOpenAISdkError:
         assert result.provider_metadata is not None
         assert result.provider_metadata.status_code == 404
 
+    def test_not_found_with_propagation_race_phrase_still_yields_model_not_found(self) -> None:
+        """The shared classifier stays gateway-agnostic: a 404 carrying the gateway deployment-
+        propagation-race phrase is still LLMModelNotFoundError. Only the gateway LLM workers demote
+        it (see tests/unit/pipelex/plugins/gateway/test_gateway_llm_worker_error_handling.py).
+        """
+        result = _classify(openai.NotFoundError("The specified deployment could not be found", response=_response(404), body=None))
+        assert isinstance(result, LLMModelNotFoundError)
+        assert result.error_category is InferenceErrorCategory.CONFIGURATION
+
     def test_unrecognized_exception_returns_none(self) -> None:
         """A non-SDK exception is not classified — the caller applies its own fallback."""
         assert _classify(ValueError("not an SDK error")) is None

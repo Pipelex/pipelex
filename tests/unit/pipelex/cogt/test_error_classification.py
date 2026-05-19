@@ -6,6 +6,7 @@ import pytest
 
 from pipelex.cogt.inference.error_classification import (
     is_content_policy_violation,
+    is_deployment_propagation_race_message,
     is_quota_exhaustion_anthropic,
     is_quota_exhaustion_aws,
     is_quota_exhaustion_gateway,
@@ -108,6 +109,14 @@ class _TestCases:
         ("case_insensitive", "Content_Policy violation detected", True),
     ]
 
+    DEPLOYMENT_PROPAGATION_RACE_CASES: ClassVar[list[tuple[str, str, bool]]] = [
+        ("exact_phrase", "Error code: 404 - the specified deployment could not be found", True),
+        ("case_insensitive", "The Specified Deployment Could Not Be Found", True),
+        ("genuine_model_not_found", "Error code: 404 - the model gpt-99 does not exist", False),
+        ("empty_message", "", False),
+        ("unrelated_error", "Rate limit exceeded, please retry", False),
+    ]
+
 
 class TestErrorClassification:
     """Tests for quota detection and content policy classification helpers."""
@@ -167,3 +176,11 @@ class TestErrorClassification:
     def test_is_quota_exhaustion_gateway(self, _topic: str, error_message: str, status_code: int, expected: bool) -> None:
         """Discriminate Gateway quota exhaustion from generic rate limiting."""
         assert is_quota_exhaustion_gateway(error_message, status_code) == expected
+
+    @pytest.mark.parametrize(
+        ("_topic", "error_message", "expected"),
+        _TestCases.DEPLOYMENT_PROPAGATION_RACE_CASES,
+    )
+    def test_is_deployment_propagation_race_message(self, _topic: str, error_message: str, expected: bool) -> None:
+        """Detect the Pipelex Gateway deployment-propagation-race 404 phrase."""
+        assert is_deployment_propagation_race_message(error_message) == expected

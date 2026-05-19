@@ -9,7 +9,7 @@ from openai.types.chat import ChatCompletionReasoningEffort
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
+from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, LLMModelNotFoundError, SdkTypeError
 from pipelex.cogt.inference.error_classification import (
     UserAction,
     UserActionKind,
@@ -122,6 +122,21 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
 
         return None
 
+    def _classify_sdk_error(self, sdk_exc: BaseException) -> LLMCompletionError | LLMModelNotFoundError | None:
+        """Classify an OpenAI SDK exception into a categorized pipelex error.
+
+        Overridable hook: the base implementation delegates to the shared
+        ``classify_openai_sdk_error``. Gateway-backed subclasses override this to demote a
+        transient deployment-propagation-race 404 to a retryable error. Returns ``None`` for
+        an exception type the classifier does not recognize.
+        """
+        return classify_openai_sdk_error(
+            sdk_exc=sdk_exc,
+            model_desc=self.inference_model.desc,
+            model_id=self.inference_model.model_id,
+            model_handle=self.inference_model.name,
+        )
+
     @override
     async def _gen_text(
         self,
@@ -148,12 +163,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
                 extra_body=extra_body,
             )
         except (openai.APIStatusError, openai.APIConnectionError) as sdk_exc:
-            categorized = classify_openai_sdk_error(
-                sdk_exc=sdk_exc,
-                model_desc=self.inference_model.desc,
-                model_id=self.inference_model.model_id,
-                model_handle=self.inference_model.name,
-            )
+            categorized = self._classify_sdk_error(sdk_exc=sdk_exc)
             if categorized is None:
                 raise  # defensive: every caught type is recognized by the classifier
             raise categorized from sdk_exc
@@ -235,16 +245,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
             # instructor wraps SDK exceptions during retries; recover the underlying
             # one so transient/capacity/auth errors aren't all flattened to UNKNOWN.
             underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
-            categorized = (
-                classify_openai_sdk_error(
-                    sdk_exc=underlying_exc,
-                    model_desc=self.inference_model.desc,
-                    model_id=self.inference_model.model_id,
-                    model_handle=self.inference_model.name,
-                )
-                if underlying_exc is not None
-                else None
-            )
+            categorized = self._classify_sdk_error(sdk_exc=underlying_exc) if underlying_exc is not None else None
             if categorized is not None:
                 raise categorized from instructor_exc
             msg = (
@@ -253,12 +254,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
             )
             raise LLMCompletionError(msg, error_category=InferenceErrorCategory.UNKNOWN) from instructor_exc
         except (openai.APIStatusError, openai.APIConnectionError) as sdk_exc:
-            categorized = classify_openai_sdk_error(
-                sdk_exc=sdk_exc,
-                model_desc=self.inference_model.desc,
-                model_id=self.inference_model.model_id,
-                model_handle=self.inference_model.name,
-            )
+            categorized = self._classify_sdk_error(sdk_exc=sdk_exc)
             if categorized is None:
                 raise  # defensive: every caught type is recognized by the classifier
             raise categorized from sdk_exc

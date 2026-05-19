@@ -16,6 +16,7 @@ from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.inference.error_classification import (
     UserAction,
     UserActionKind,
+    is_deployment_propagation_race_message,
     is_quota_exhaustion_gateway,
 )
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
@@ -129,7 +130,7 @@ class GatewayFactory:
         found" before propagation completes — that is a transient race worth retrying, unlike a
         genuine unknown-model 404.
         """
-        return isinstance(exc, portkey_exc.NotFoundError) and "specified deployment could not be found" in str(exc).lower()
+        return isinstance(exc, portkey_exc.NotFoundError) and is_deployment_propagation_race_message(str(exc))
 
     @classmethod
     def is_genuine_model_not_found(cls, exc: portkey_exceptions.APIError) -> bool:

@@ -95,6 +95,8 @@ The classification + beyond-reference upgrades have landed across every worker k
 
 Worker classification itself is complete — there is no remaining per-worker work. The only open item is the deeper **Extract / Classify / Render** refactor that consolidates the now-duplicated per-worker pipeline into one per-provider Extract function plus a shared Classify + Render. It is proposed but not started — see [track-extract-classify-render.md](track-extract-classify-render.md).
 
+A second, smaller consistency gap sits alongside that refactor. The LLM workers now classify SDK errors through extracted `classify_*_sdk_error()` free functions in `pipelex/plugins/*/*_error_classification.py` that *return* a categorized error for the caller to raise. The img-gen workers were never brought to that shape — they still classify inline via `_raise_categorized_*` instance methods that *raise* directly (and `google_img_gen_worker._classify_google_client_error` *returns*, inconsistent even within img-gen). This is a structural/design-consistency difference, not a behavior gap — every img-gen worker categorizes correctly today — and it folds naturally into the Extract / Classify / Render pass.
+
 ### Risks and gotchas (for future similar work)
 
 - The categorization helpers expect a raw SDK exception, not the wrapped one. The unwrap step in each worker preserves this contract.
