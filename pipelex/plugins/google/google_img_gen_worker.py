@@ -100,9 +100,10 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
         metadata = extract_google_metadata(exc)
 
         if status_code == 404:
-            # Stays as ImgGenGenerationError (not ImgGenModelNotFoundError) to match
-            # google_llm_worker._classify_google_client_error's 404 branch — the LLM
-            # side never specialised to LLMModelNotFoundError either.
+            # Img-gen 404s stay as a plain ImgGenGenerationError. The LLM path specializes
+            # 404 to LLMModelNotFoundError (see classify_google_sdk_error in
+            # google_error_classification.py); the equivalent ImgGenModelNotFoundError
+            # specialization for image-generation workers is intentionally out of scope here.
             msg = f"Google model '{self.inference_model.desc}' not found: {exc}"
             return ImgGenGenerationError(
                 msg,

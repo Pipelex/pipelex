@@ -15,6 +15,7 @@ from pipelex.cogt.exceptions import (
     ExtractJobFailureError,
     InferenceErrorCategory,
     LLMCompletionError,
+    LLMModelNotFoundError,
 )
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.plugins.mistral.mistral_extract_worker import MistralExtractWorker
@@ -134,6 +135,20 @@ class TestMistralWorkerErrorHandling:
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.CHANGE_INPUT
+        assert exc_info.value.__cause__ is sdk_exc
+
+    async def test_llm_worker_not_found_raises_llm_model_not_found_error(self, mocker: MockerFixture) -> None:
+        """A 404 MistralError specializes to LLMModelNotFoundError (CONFIGURATION) on the LLM path."""
+        worker = _make_mistral_llm_worker(mocker)
+        sdk_exc = _make_mistral_error(404, "Model mistral-unknown not found")
+        worker.mistral_client_for_text.chat.complete_async.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        with pytest.raises(LLMModelNotFoundError) as exc_info:
+            await worker._gen_text(llm_job=_make_llm_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.CHANGE_MODEL
         assert exc_info.value.__cause__ is sdk_exc
 
     # ---- MistralExtractWorker error handling ----

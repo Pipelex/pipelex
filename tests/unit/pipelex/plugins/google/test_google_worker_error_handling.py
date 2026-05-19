@@ -14,7 +14,9 @@ from pipelex.cogt.exceptions import (
     ImgGenGenerationError,
     InferenceErrorCategory,
     LLMCompletionError,
+    LLMModelNotFoundError,
 )
+from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.plugins.google.google_img_gen_worker import GoogleImgGenWorker
 from pipelex.plugins.google.google_llm_worker import GoogleLLMWorker
 from tests.unit.pipelex.plugins.google.test_data import GoogleErrorHandlingTestData
@@ -117,7 +119,7 @@ class TestGoogleWorkerErrorHandling:
 
     @pytest.mark.parametrize(
         ("_topic", "status_code", "error_message", "expected_category", "expected_action_substring"),
-        GoogleErrorHandlingTestData.CLIENT_ERROR_CASES,
+        GoogleErrorHandlingTestData.LLM_CLIENT_ERROR_CASES,
     )
     async def test_llm_client_error(
         self,
@@ -154,6 +156,22 @@ class TestGoogleWorkerErrorHandling:
             await worker._gen_text(llm_job=_make_llm_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.__cause__ is sdk_exc
+
+    # ---- LLM worker not-found test (404 specializes to LLMModelNotFoundError) ----
+
+    async def test_llm_not_found_raises_llm_model_not_found_error(self, mocker: MockerFixture) -> None:
+        """A 404 ClientError specializes to LLMModelNotFoundError (CONFIGURATION) on the LLM path."""
+        worker = _make_google_llm_worker(mocker)
+        sdk_exc = _make_google_client_error(code=404, message="Model gemini-99 not found")
+        worker.genai_async_client.models.generate_content.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        with pytest.raises(LLMModelNotFoundError) as exc_info:
+            await worker._gen_text(llm_job=_make_llm_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.CHANGE_MODEL
         assert exc_info.value.__cause__ is sdk_exc
 
     # ---- ImgGen worker ClientError tests (parametrized) ----

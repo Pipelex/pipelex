@@ -11,7 +11,7 @@ import pytest
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
+from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, LLMModelNotFoundError
 from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicCredentialsError
 from pipelex.plugins.anthropic.anthropic_llm_worker import AnthropicLLMWorker
 from tests.unit.pipelex.plugins.anthropic.test_data import AnthropicErrorHandlingTestData
@@ -55,6 +55,10 @@ def _make_anthropic_internal_server_error(message: str) -> anthropic.InternalSer
 
 def _make_anthropic_conflict_error(message: str) -> anthropic.ConflictError:
     return anthropic.ConflictError(message, response=_mock_httpx_response(409), body=None)
+
+
+def _make_anthropic_not_found_error(message: str) -> anthropic.NotFoundError:
+    return anthropic.NotFoundError(message, response=_mock_httpx_response(404), body=None)
 
 
 def _make_worker(mocker: MockerFixture) -> AnthropicLLMWorker:
@@ -248,6 +252,21 @@ class TestAnthropicWorkerErrorHandling:
         metadata = exc_info.value.provider_metadata
         assert metadata is not None
         assert metadata.status_code == 409
+
+    # ---- NotFoundError specialization ----
+
+    async def test_not_found_raises_llm_model_not_found_error(self, mocker: MockerFixture) -> None:
+        """A 404 NotFoundError specializes to LLMModelNotFoundError (CONFIGURATION) carrying the model handle."""
+        worker = _make_worker(mocker)
+        sdk_exc = _make_anthropic_not_found_error("Model claude-99 not found")
+        worker.anthropic_async_client.messages.stream.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        with pytest.raises(LLMModelNotFoundError) as exc_info:
+            await worker._gen_text(llm_job=_make_llm_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
+        assert exc_info.value.model_handle == "claude-sonnet-4"
+        assert exc_info.value.__cause__ is sdk_exc
 
     # ---- to_error_report() integration ----
 

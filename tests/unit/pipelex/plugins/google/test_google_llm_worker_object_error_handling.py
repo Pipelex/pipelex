@@ -18,7 +18,7 @@ from google.genai import errors as genai_errors
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
+from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, LLMModelNotFoundError
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.plugins.google.google_llm_worker import GoogleLLMWorker
 from tests.helpers.instructor_test_utils import DummySchema, make_llm_job, wrap_in_instructor_retry
@@ -208,13 +208,13 @@ class TestGoogleLLMWorkerObjectErrorHandling:
         assert metadata is not None
         assert metadata.status_code == 403
 
-    async def test_wrapped_not_found_is_configuration(self, mocker: MockerFixture) -> None:
+    async def test_wrapped_not_found_raises_llm_model_not_found_error(self, mocker: MockerFixture) -> None:
         worker = _make_worker(mocker)
         sdk_exc = _make_client_error(404, "Model gemini-99 not found", status="NOT_FOUND")
         wrapped = wrap_in_instructor_retry(sdk_exc)
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
-        with pytest.raises(LLMCompletionError) as exc_info:
+        with pytest.raises(LLMModelNotFoundError) as exc_info:
             await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION

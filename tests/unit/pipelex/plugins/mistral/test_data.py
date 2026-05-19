@@ -47,13 +47,8 @@ class MistralLLMErrorHandlingTestData:
             InferenceErrorCategory.CONFIGURATION,
             None,
         ),
-        (
-            "model_not_found_404",
-            404,
-            "Model mistral-unknown not found",
-            InferenceErrorCategory.CONFIGURATION,
-            None,
-        ),
+        # NOTE: a 404 is not in this parametrized set — the LLM worker specializes
+        # it to LLMModelNotFoundError, covered by its own dedicated test.
         (
             "bad_request_content_policy_400",
             400,
