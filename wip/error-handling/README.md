@@ -24,7 +24,7 @@ The bulk of the error-handling work has landed. What remains:
 
 1. **Metadata-model long tail** — a handful of `CogtError` subclasses still carry no class-level `error_category`, and several non-inference `PipelexError` subclasses still depend on the `agent_output.py` fallback dicts for `hint` / `error_domain` rather than carrying class-level metadata. See the Followups in [track-metadata-model.md](track-metadata-model.md).
 
-Everything else is landed and described in current-state terms in the track docs below. Optional, non-blocking review followups are collected in [deferred-items/](deferred-items/).
+Everything else is landed and described in current-state terms in the track docs below. Optional, non-blocking review notes — observations that were deliberately not acted on, each with a conditional trigger for when to revisit — are collected in [review-notes/](review-notes/).
 
 ## Suggested read order
 
@@ -62,6 +62,7 @@ This directory replaces a set of phase-numbered docs (`error-handling-review.md`
 Completed sweeps and plans are archived here, kept for their running notes and checkpoint history. They describe *what was done*, not the current state — the `track-*.md` docs above are authoritative for the current state.
 
 - [archive-worker-classification-sweep.md](archive-worker-classification-sweep.md) — the worker-classification sweep.
+- [archive-extract-classify-render.md](archive-extract-classify-render.md) — the ECR decomposition (5 checkpoints on `refactor/ECR`), with the key deviations from the original design.
 - [archive-error-handling-2.md](archive-error-handling-2.md) — the error-handling Phase 2 sweep (broad-except hygiene, `error_domain` metadata, retry & resilience, Temporal bridge, CLI/HTTP delivery, full-chain coverage).
 - [archive-temporal-activity-boundary.md](archive-temporal-activity-boundary.md) — wiring `from_message_exception` into every in-scope Temporal activity.
 - [archive-temporal-submitter-boundary.md](archive-temporal-submitter-boundary.md) — recovering the structured `ErrorReport` on the workflow → submitter and child-workflow → parent boundaries.

@@ -278,7 +278,7 @@
     <li>Retry is now an <strong>honest, explicit model</strong>: transport retry in the SDK, durability in Temporal, and nothing fake in between.</li>
     <li><code>except Exception</code> is banned in business logic — <strong>ruff <code>BLE001</code> enforces it</strong>.</li>
   </ul>
-  <p style="margin-bottom:0">~250 files, +17k/−2.7k lines. Six independent tracks, all landed except one proposed refactor.</p>
+  <p style="margin-bottom:0">~250 files, +17k/−2.7k lines. Seven independent tracks, all landed.</p>
 </div>
 
 <nav class="toc">
@@ -440,7 +440,7 @@
     <tr><td><strong>CLI delivery</strong></td><td><span class="pill landed">Landed</span></td><td>Agent CLI markdown/JSON; <code>error_domain</code> → HTTP-status mapping; shared Rich panel helper.</td></tr>
     <tr><td><strong>Temporal integration</strong></td><td><span class="pill landed">Landed</span></td><td><code>ErrorReport</code> carried across activity → workflow → submitter; category-aware retry.</td></tr>
     <tr><td><strong>Testing</strong></td><td><span class="pill landed">Landed</span></td><td>Per-worker classification, full-chain snapshot, local/Temporal parity, dict drift-detection.</td></tr>
-    <tr><td>Extract / Classify / Render</td><td><span class="pill open">Proposed</span></td><td>Decompose the per-worker pipeline — out of scope for this branch, now unblocked.</td></tr>
+    <tr><td><strong>Extract / Classify / Render</strong></td><td><span class="pill landed">Landed</span></td><td>Per-worker pipeline decomposed into one per-provider Extract + shared Classify + shared Render. Branch <code>refactor/ECR</code>.</td></tr>
   </tbody>
 </table>
 
@@ -730,15 +730,10 @@
 <h2 id="open"><span class="num">10</span>What's still open</h2>
 <p class="section-sub">Deliberately scoped out — flagged here so review doesn't treat it as missing.</p>
 
-<p>The bulk of the work has landed. Two items remain, both intentionally left for after this branch:</p>
+<p>The bulk of the work has landed. One item remains, intentionally left for after this branch:</p>
 
 <div class="card">
-  <strong>1 · Extract / Classify / Render decomposition</strong> <span class="pill open">Proposed</span>
-  <p style="margin:8px 0 0;font-size:14.5px">The per-worker classification pipeline is now uniform but <em>duplicated</em> across 18+ workers. This refactor consolidates it into one per-provider Extract function plus a shared Classify + Render. Its prerequisites are all met — the worker-classification sweep it depended on has landed — so it is unblocked, but not started. See <code>track-extract-classify-render.md</code>.</p>
-</div>
-
-<div class="card">
-  <strong>2 · Metadata-model long tail</strong> <span class="pill open">Partial</span>
+  <strong>Metadata-model long tail</strong> <span class="pill open">Partial</span>
   <p style="margin:8px 0 0;font-size:14.5px">A handful of <code>CogtError</code> subclasses still carry no class-level <code>error_category</code>, and several non-inference <code>PipelexError</code> subclasses still rely on the <code>agent_output.py</code> fallback dicts for <code>hint</code> / <code>error_domain</code> rather than class-level metadata. The drift-detection test already enforces coverage one way or the other — the migration just moves entries onto the classes. See the Followups in <code>track-metadata-model.md</code>.</p>
 </div>
 

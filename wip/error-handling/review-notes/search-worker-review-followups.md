@@ -1,4 +1,4 @@
-# Deferred — Phase 12 search worker review follow-ups
+# Review note — Phase 12 search worker follow-ups
 
 **Surfaced during:** Phase 12 (`_tprl/TODOS.md`) code review of `ca2763c2` "feat: Phase 12 search worker audits".
 
