@@ -98,6 +98,7 @@ async def _prepare_runner_core(
     try:
         the_pipe = get_required_pipe(pipe_code=pipe_code)
     except Exception as exc:
+        # CLI command boundary: any failure resolving the pipe is reported to the user and exits via typer.Exit.
         typer.secho(f"Error: Could not find pipe '{pipe_code}': {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
 
@@ -154,6 +155,7 @@ async def _prepare_runner_core(
     try:
         runner_code = generate_runner_code(pipe=the_pipe, output_multiplicity=output_is_list, library_dir=pipelex_library_dir)
     except Exception as exc:
+        # CLI command boundary: any failure generating the runner code is reported to the user and exits via typer.Exit.
         typer.secho(f"Error generating runner code: {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
 
@@ -162,6 +164,7 @@ async def _prepare_runner_core(
         save_text_to_path(text=runner_code, path=str(final_output_path))
         typer.secho(f"Generated runner file: {final_output_path}", fg=typer.colors.GREEN)
     except Exception as exc:
+        # CLI command boundary: any failure writing the file is reported to the user and exits via typer.Exit.
         typer.secho(f"Error saving file: {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
 

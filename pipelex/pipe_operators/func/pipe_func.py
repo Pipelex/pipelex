@@ -188,6 +188,8 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             else:
                 func_output_object = await asyncio.to_thread(function, working_memory=working_memory)
         except Exception as exc:
+            # PipeFunc invokes an arbitrary user-registered function whose failure surface is not enumerable;
+            # any failure is wrapped into a diagnostic PipeRunError below. Re-raises, never swallows.
             # Build informative error message with actual input values from working memory
             inputs_lines: list[str] = []
             for input_name in self.inputs.root:

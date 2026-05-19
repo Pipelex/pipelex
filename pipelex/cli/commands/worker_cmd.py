@@ -66,6 +66,7 @@ def worker_cmd(
     except KeyboardInterrupt:
         log.info("Worker stopped by user")
     except Exception as exc:
+        # CLI command root: any unexpected failure is reported to the user and exits non-zero via typer.Exit.
         log.error(f"Worker failed: {exc}")
         typer.secho(f"Worker failed: {exc}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1) from exc

@@ -136,7 +136,7 @@ def find_class_names_in_file(file_path: str, base_class_names: list[str] | None 
         # Read and parse the file
         source = Path(file_path).read_text(encoding="utf-8")
         tree = ast.parse(source, filename=file_path)
-    except Exception as exc:
+    except (OSError, SyntaxError, ValueError) as exc:
         msg = f"Failed to parse {file_path}: {exc}"
         raise ModuleFileError(msg) from exc
 
@@ -199,7 +199,7 @@ def find_decorated_function_names_in_file(
         # Read and parse the file
         source = Path(file_path).read_text(encoding="utf-8")
         tree = ast.parse(source, filename=file_path)
-    except Exception as exc:
+    except (OSError, SyntaxError, ValueError) as exc:
         msg = f"Failed to parse {file_path}: {exc}"
         raise ModuleFileError(msg) from exc
 
