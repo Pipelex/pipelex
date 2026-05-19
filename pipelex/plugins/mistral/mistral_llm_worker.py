@@ -11,8 +11,11 @@ from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, 
 from pipelex.cogt.inference.error_classification import (
     UserAction,
     UserActionKind,
+    extract_mistral_metadata,
     extract_underlying_sdk_exception,
 )
+from pipelex.cogt.inference.error_classify import classify_inference_error
+from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
@@ -20,7 +23,6 @@ from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstr
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
-from pipelex.plugins.mistral.mistral_error_classification import classify_mistral_sdk_error
 from pipelex.plugins.mistral.mistral_exceptions import MistralWorkerConfigurationError
 from pipelex.plugins.mistral.mistral_factory import MistralFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -123,15 +125,15 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
                 prompt_mode=prompt_mode,
             )
         except (MistralError, httpx.TransportError) as sdk_exc:
-            categorized = classify_mistral_sdk_error(
-                sdk_exc=sdk_exc,
+            metadata = extract_mistral_metadata(sdk_exc)
+            classification = classify_inference_error(metadata)
+            raise render_inference_error(
+                metadata=metadata,
+                classification=classification,
+                family=InferenceErrorFamily.LLM,
                 model_desc=self.inference_model.desc,
-                model_id=self.inference_model.model_id,
                 model_handle=self.inference_model.name,
-            )
-            if categorized is None:
-                raise  # defensive: every caught type is recognized by the classifier
-            raise categorized from sdk_exc
+            ) from sdk_exc
 
         if not response:
             msg = "Mistral response is None"
@@ -229,18 +231,16 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
             # instructor wraps SDK exceptions during retries; recover the underlying
             # one so transient/capacity/auth errors aren't all flattened to UNKNOWN.
             underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
-            categorized = (
-                classify_mistral_sdk_error(
-                    sdk_exc=underlying_exc,
+            if underlying_exc is not None:
+                metadata = extract_mistral_metadata(underlying_exc)
+                classification = classify_inference_error(metadata)
+                raise render_inference_error(
+                    metadata=metadata,
+                    classification=classification,
+                    family=InferenceErrorFamily.LLM,
                     model_desc=self.inference_model.desc,
-                    model_id=self.inference_model.model_id,
                     model_handle=self.inference_model.name,
-                )
-                if underlying_exc is not None
-                else None
-            )
-            if categorized is not None:
-                raise categorized from instructor_exc
+                ) from instructor_exc
             msg = f"Mistral structured generation failed after retries for model '{self.inference_model.desc}': {instructor_exc}"
             raise LLMCompletionError(
                 msg,
@@ -251,15 +251,15 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
                 ),
             ) from instructor_exc
         except (MistralError, httpx.TransportError) as sdk_exc:
-            categorized = classify_mistral_sdk_error(
-                sdk_exc=sdk_exc,
+            metadata = extract_mistral_metadata(sdk_exc)
+            classification = classify_inference_error(metadata)
+            raise render_inference_error(
+                metadata=metadata,
+                classification=classification,
+                family=InferenceErrorFamily.LLM,
                 model_desc=self.inference_model.desc,
-                model_id=self.inference_model.model_id,
                 model_handle=self.inference_model.name,
-            )
-            if categorized is None:
-                raise  # defensive: every caught type is recognized by the classifier
-            raise categorized from sdk_exc
+            ) from sdk_exc
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
             llm_tokens_usage.nb_tokens_by_category = self.mistral_factory.make_nb_tokens_by_category(usage=usage)

@@ -10,6 +10,7 @@ from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput, Page
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_local_extract_metadata
+from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.hub import get_storage_provider
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -97,7 +98,7 @@ class Pypdfium2Worker(ExtractWorkerAbstract):
                     kind=UserActionKind.CHANGE_INPUT,
                     detail="The PDF path could not be found — check the URI or file path",
                 ),
-                provider_metadata=extract_local_extract_metadata(exc, provider="pypdfium2"),
+                provider_metadata=extract_local_extract_metadata(exc, provider=ProviderName.PYPDFIUM2),
             ) from exc
         except ValueError as exc:
             msg = f"Invalid PDF format: {exc}"
@@ -108,7 +109,7 @@ class Pypdfium2Worker(ExtractWorkerAbstract):
                     kind=UserActionKind.CHANGE_INPUT,
                     detail="pypdfium2 could not parse the PDF — the file may be corrupt or password-protected",
                 ),
-                provider_metadata=extract_local_extract_metadata(exc, provider="pypdfium2"),
+                provider_metadata=extract_local_extract_metadata(exc, provider=ProviderName.PYPDFIUM2),
             ) from exc
         except RuntimeError as exc:
             msg = f"PDF extraction failed: {exc}"
@@ -119,7 +120,7 @@ class Pypdfium2Worker(ExtractWorkerAbstract):
                     kind=UserActionKind.CHANGE_INPUT,
                     detail="pypdfium2 failed during PDF extraction — the file may be corrupt or unsupported",
                 ),
-                provider_metadata=extract_local_extract_metadata(exc, provider="pypdfium2"),
+                provider_metadata=extract_local_extract_metadata(exc, provider=ProviderName.PYPDFIUM2),
             ) from exc
         except OSError as exc:
             msg = f"I/O error during PDF extraction: {exc}"
@@ -130,7 +131,7 @@ class Pypdfium2Worker(ExtractWorkerAbstract):
                     kind=UserActionKind.WAIT_AND_RETRY,
                     detail="I/O error during PDF extraction — the system will retry automatically",
                 ),
-                provider_metadata=extract_local_extract_metadata(exc, provider="pypdfium2"),
+                provider_metadata=extract_local_extract_metadata(exc, provider=ProviderName.PYPDFIUM2),
             ) from exc
         pages: dict[int, Page] = {}
         total_images_count = 0

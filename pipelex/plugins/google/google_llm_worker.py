@@ -13,8 +13,11 @@ from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, 
 from pipelex.cogt.inference.error_classification import (
     UserAction,
     UserActionKind,
+    extract_google_metadata,
     extract_underlying_sdk_exception,
 )
+from pipelex.cogt.inference.error_classify import classify_inference_error
+from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
@@ -24,7 +27,6 @@ from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
-from pipelex.plugins.google.google_error_classification import classify_google_sdk_error
 from pipelex.plugins.google.google_factory import GoogleFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
@@ -221,15 +223,15 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
                 config=generation_config,
             )
         except (genai_errors.ServerError, genai_errors.ClientError, httpx.TransportError) as sdk_exc:
-            categorized = classify_google_sdk_error(
-                sdk_exc=sdk_exc,
+            metadata = extract_google_metadata(sdk_exc)
+            classification = classify_inference_error(metadata)
+            raise render_inference_error(
+                metadata=metadata,
+                classification=classification,
+                family=InferenceErrorFamily.LLM,
                 model_desc=self.inference_model.desc,
-                model_id=self.inference_model.model_id,
                 model_handle=self.inference_model.name,
-            )
-            if categorized is None:
-                raise  # defensive: every caught type is recognized by the classifier
-            raise categorized from sdk_exc
+            ) from sdk_exc
 
         # Extract text from response (skips thinking parts)
         text_content = GoogleFactory.extract_text_from_response(response=response, model_desc=self.inference_model.desc)
@@ -277,18 +279,16 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
             # instructor wraps SDK exceptions during retries; recover the underlying
             # one so transient/capacity/auth errors aren't all flattened to UNKNOWN.
             underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
-            categorized = (
-                classify_google_sdk_error(
-                    sdk_exc=underlying_exc,
+            if underlying_exc is not None:
+                metadata = extract_google_metadata(underlying_exc)
+                classification = classify_inference_error(metadata)
+                raise render_inference_error(
+                    metadata=metadata,
+                    classification=classification,
+                    family=InferenceErrorFamily.LLM,
                     model_desc=self.inference_model.desc,
-                    model_id=self.inference_model.model_id,
                     model_handle=self.inference_model.name,
-                )
-                if underlying_exc is not None
-                else None
-            )
-            if categorized is not None:
-                raise categorized from instructor_exc
+                ) from instructor_exc
             msg = f"Google structured generation failed after retries for model '{self.inference_model.desc}': {instructor_exc}"
             raise LLMCompletionError(
                 msg,
@@ -299,15 +299,15 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
                 ),
             ) from instructor_exc
         except (genai_errors.ServerError, genai_errors.ClientError, httpx.TransportError) as sdk_exc:
-            categorized = classify_google_sdk_error(
-                sdk_exc=sdk_exc,
+            metadata = extract_google_metadata(sdk_exc)
+            classification = classify_inference_error(metadata)
+            raise render_inference_error(
+                metadata=metadata,
+                classification=classification,
+                family=InferenceErrorFamily.LLM,
                 model_desc=self.inference_model.desc,
-                model_id=self.inference_model.model_id,
                 model_handle=self.inference_model.name,
-            )
-            if categorized is None:
-                raise  # defensive: every caught type is recognized by the classifier
-            raise categorized from sdk_exc
+            ) from sdk_exc
 
         if not isinstance(result_object, schema):
             msg = f"Google Gemini API returned an object that is not of type {schema}: {result_object}"

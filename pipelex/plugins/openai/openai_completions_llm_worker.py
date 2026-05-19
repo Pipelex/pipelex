@@ -13,8 +13,11 @@ from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, 
 from pipelex.cogt.inference.error_classification import (
     UserAction,
     UserActionKind,
+    extract_openai_metadata,
     extract_underlying_sdk_exception,
 )
+from pipelex.cogt.inference.error_classify import classify_inference_error
+from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
@@ -25,7 +28,6 @@ from pipelex.cogt.model_backends.constraints import ListedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
 from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory
-from pipelex.plugins.openai.openai_error_classification import classify_openai_sdk_error
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.telemetry.otel_constants import InferenceOutputType
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
@@ -148,15 +150,15 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
                 extra_body=extra_body,
             )
         except (openai.APIStatusError, openai.APIConnectionError) as sdk_exc:
-            categorized = classify_openai_sdk_error(
-                sdk_exc=sdk_exc,
+            metadata = extract_openai_metadata(sdk_exc)
+            classification = classify_inference_error(metadata)
+            raise render_inference_error(
+                metadata=metadata,
+                classification=classification,
+                family=InferenceErrorFamily.LLM,
                 model_desc=self.inference_model.desc,
-                model_id=self.inference_model.model_id,
                 model_handle=self.inference_model.name,
-            )
-            if categorized is None:
-                raise  # defensive: every caught type is recognized by the classifier
-            raise categorized from sdk_exc
+            ) from sdk_exc
 
         if not response.choices:
             msg = f"OpenAI chat completion response choices are empty with model: {self.inference_model.desc}"
@@ -235,33 +237,31 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
             # instructor wraps SDK exceptions during retries; recover the underlying
             # one so transient/capacity/auth errors aren't all flattened to UNKNOWN.
             underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
-            categorized = (
-                classify_openai_sdk_error(
-                    sdk_exc=underlying_exc,
+            if underlying_exc is not None:
+                metadata = extract_openai_metadata(underlying_exc)
+                classification = classify_inference_error(metadata)
+                raise render_inference_error(
+                    metadata=metadata,
+                    classification=classification,
+                    family=InferenceErrorFamily.LLM,
                     model_desc=self.inference_model.desc,
-                    model_id=self.inference_model.model_id,
                     model_handle=self.inference_model.name,
-                )
-                if underlying_exc is not None
-                else None
-            )
-            if categorized is not None:
-                raise categorized from instructor_exc
+                ) from instructor_exc
             msg = (
                 f"OpenAI structured generation via 'instructor' failed with model: {self.inference_model.desc} "
                 f"trying to generate schema: {schema} with error: {instructor_exc}"
             )
             raise LLMCompletionError(msg, error_category=InferenceErrorCategory.UNKNOWN) from instructor_exc
         except (openai.APIStatusError, openai.APIConnectionError) as sdk_exc:
-            categorized = classify_openai_sdk_error(
-                sdk_exc=sdk_exc,
+            metadata = extract_openai_metadata(sdk_exc)
+            classification = classify_inference_error(metadata)
+            raise render_inference_error(
+                metadata=metadata,
+                classification=classification,
+                family=InferenceErrorFamily.LLM,
                 model_desc=self.inference_model.desc,
-                model_id=self.inference_model.model_id,
                 model_handle=self.inference_model.name,
-            )
-            if categorized is None:
-                raise  # defensive: every caught type is recognized by the classifier
-            raise categorized from sdk_exc
+            ) from sdk_exc
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
             llm_tokens_usage.nb_tokens_by_category = self.openai_completions_factory.make_nb_tokens_by_category(usage=usage)

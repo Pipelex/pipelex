@@ -18,7 +18,6 @@ if TYPE_CHECKING:
 
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, LLMModelNotFoundError
 from pipelex.cogt.inference.error_classification import UserActionKind
-from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicCredentialsError
 from pipelex.plugins.anthropic.anthropic_llm_worker import AnthropicLLMWorker
 from tests.helpers.instructor_test_utils import DummySchema, make_llm_job, wrap_in_instructor_retry
 
@@ -186,13 +185,13 @@ class TestAnthropicWorkerObjectErrorHandling:
 
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
 
-    async def test_wrapped_auth_error_raises_credentials_error(self, mocker: MockerFixture) -> None:
+    async def test_wrapped_auth_error_is_configuration(self, mocker: MockerFixture) -> None:
         _patch_gen_object_dependencies(mocker)
         worker = _make_worker(mocker)
         wrapped = wrap_in_instructor_retry(_make_anthropic_auth_error("Invalid API key"))
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
-        with pytest.raises(AnthropicCredentialsError) as exc_info:
+        with pytest.raises(LLMCompletionError) as exc_info:
             await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION

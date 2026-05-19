@@ -54,11 +54,13 @@ class TestExtractBedrockMetadata:
         assert body["Error"]["Code"] == "ThrottlingException"
 
     def test_minimal_response_no_metadata(self) -> None:
+        """With no ``ResponseMetadata``, the HTTP status is derived from the AWS error code."""
         sdk_exc = _make_client_error(error_code="ValidationException", error_message="Invalid parameter")
         metadata = extract_bedrock_metadata(sdk_exc)
         assert metadata.provider == "bedrock"
         assert metadata.sdk_exception_type == "ClientError"
-        assert metadata.status_code is None
+        # No HTTPStatusCode in the response — status is derived from the error code.
+        assert metadata.status_code == 400
         assert metadata.request_id is None
         assert metadata.retry_after_seconds is None
         assert metadata.provider_error_code == "ValidationException"

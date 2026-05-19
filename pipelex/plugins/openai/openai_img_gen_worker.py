@@ -5,37 +5,25 @@ import openai
 from openai import (
     APIConnectionError,
     APIStatusError,
-    APITimeoutError,
-    AuthenticationError,
-    BadRequestError,
-    InternalServerError,
-    NotFoundError,
-    PermissionDeniedError,
-    RateLimitError,
 )
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundError, ImgGenParameterError, InferenceErrorCategory, SdkTypeError
+from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError, InferenceErrorCategory, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
-from pipelex.cogt.inference.error_classification import (
-    UserAction,
-    UserActionKind,
-    extract_openai_metadata,
-    is_content_policy_violation,
-    is_quota_exhaustion_openai,
-)
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_openai_metadata
+from pipelex.cogt.inference.error_classify import classify_inference_error
+from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.base64_utils import extract_base64_str_from_base64_url_if_possible
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
 from pipelex.tools.misc.image_utils import ImageFormat
-from pipelex.urls import URLs
 
 if TYPE_CHECKING:
     from openai.types.images_response import ImagesResponse, Usage
@@ -55,162 +43,6 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
             raise SdkTypeError(msg)
 
         self.openai_client = sdk_instance
-
-    def _raise_categorized_openai_sdk_error(self, sdk_exc: BaseException) -> None:
-        """Categorize an OpenAI SDK exception and raise the matching pipelex error.
-
-        ``NotFoundError`` is specialized to ``ImgGenModelNotFoundError`` so callers
-        can swap models; every other SDK type raises ``ImgGenGenerationError`` with
-        the appropriate ``error_category`` and a semantic ``UserAction``.
-        """
-        metadata = extract_openai_metadata(sdk_exc)
-
-        if isinstance(sdk_exc, NotFoundError):
-            msg = f"ImgGen model or deployment not found: {self.inference_model.desc}: {sdk_exc}"
-            raise ImgGenModelNotFoundError(
-                message=msg,
-                model_handle=self.inference_model.name,
-                error_category=InferenceErrorCategory.CONFIGURATION,
-                user_action=UserAction(
-                    kind=UserActionKind.CHANGE_MODEL,
-                    detail=f"Model '{self.inference_model.model_id}' was not found — pick an available model",
-                ),
-                provider_metadata=metadata,
-            ) from sdk_exc
-
-        if isinstance(sdk_exc, RateLimitError):
-            error_message = str(sdk_exc)
-            if is_quota_exhaustion_openai(error_message):
-                msg = f"OpenAI quota exhausted for model '{self.inference_model.desc}': {sdk_exc}"
-                raise ImgGenGenerationError(
-                    msg,
-                    error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=UserAction(
-                        kind=UserActionKind.CHECK_BILLING,
-                        detail=f"Your OpenAI account has exceeded its quota — check billing at {URLs.openai_billing}",
-                    ),
-                    provider_metadata=metadata,
-                ) from sdk_exc
-            msg = f"OpenAI rate limit exceeded for model '{self.inference_model.desc}': {sdk_exc}"
-            raise ImgGenGenerationError(
-                msg,
-                error_category=InferenceErrorCategory.TRANSIENT,
-                user_action=UserAction(
-                    kind=UserActionKind.WAIT_AND_RETRY,
-                    detail="Rate limited by OpenAI — the system will retry automatically",
-                ),
-                provider_metadata=metadata,
-            ) from sdk_exc
-
-        if isinstance(sdk_exc, APITimeoutError):
-            msg = f"OpenAI API request timed out for model '{self.inference_model.desc}': {sdk_exc}"
-            raise ImgGenGenerationError(
-                msg,
-                error_category=InferenceErrorCategory.TRANSIENT,
-                user_action=UserAction(
-                    kind=UserActionKind.WAIT_AND_RETRY,
-                    detail="OpenAI API request timed out — the system will retry automatically",
-                ),
-                provider_metadata=metadata,
-            ) from sdk_exc
-
-        if isinstance(sdk_exc, APIConnectionError):
-            msg = f"OpenAI ImgGen API connection error: {sdk_exc}"
-            raise ImgGenGenerationError(
-                msg,
-                error_category=InferenceErrorCategory.TRANSIENT,
-                user_action=UserAction(
-                    kind=UserActionKind.WAIT_AND_RETRY,
-                    detail="Could not reach OpenAI — the system will retry automatically",
-                ),
-                provider_metadata=metadata,
-            ) from sdk_exc
-
-        if isinstance(sdk_exc, InternalServerError):
-            msg = f"OpenAI ImgGen API server error for model '{self.inference_model.desc}': {sdk_exc}"
-            raise ImgGenGenerationError(
-                msg,
-                error_category=InferenceErrorCategory.TRANSIENT,
-                user_action=UserAction(
-                    kind=UserActionKind.WAIT_AND_RETRY,
-                    detail="OpenAI server error — the system will retry automatically",
-                ),
-                provider_metadata=metadata,
-            ) from sdk_exc
-
-        if isinstance(sdk_exc, BadRequestError):
-            error_message = str(sdk_exc)
-            if is_content_policy_violation(error_message):
-                msg = f"Content rejected by safety filters for model '{self.inference_model.desc}': {sdk_exc}"
-                raise ImgGenGenerationError(
-                    msg,
-                    error_category=InferenceErrorCategory.CONTENT,
-                    user_action=UserAction(
-                        kind=UserActionKind.CHANGE_INPUT,
-                        detail="Content was rejected by safety filters — revise the prompt",
-                    ),
-                    provider_metadata=metadata,
-                ) from sdk_exc
-            msg = f"OpenAI ImgGen bad request error with model '{self.inference_model.desc}': {sdk_exc}"
-            raise ImgGenGenerationError(
-                msg,
-                error_category=InferenceErrorCategory.CONTENT,
-                user_action=UserAction(
-                    kind=UserActionKind.CHANGE_INPUT,
-                    detail="OpenAI rejected the request — review the prompt and parameters",
-                ),
-                provider_metadata=metadata,
-            ) from sdk_exc
-
-        if isinstance(sdk_exc, PermissionDeniedError):
-            msg = f"OpenAI ImgGen permission denied: {sdk_exc}"
-            raise ImgGenGenerationError(
-                msg,
-                error_category=InferenceErrorCategory.CONFIGURATION,
-                user_action=UserAction(
-                    kind=UserActionKind.CHECK_CREDENTIALS,
-                    detail="OpenAI denied permission — check your API key permissions",
-                ),
-                provider_metadata=metadata,
-            ) from sdk_exc
-
-        if isinstance(sdk_exc, AuthenticationError):
-            msg = f"OpenAI ImgGen authentication error: {sdk_exc}"
-            raise ImgGenGenerationError(
-                msg,
-                error_category=InferenceErrorCategory.CONFIGURATION,
-                user_action=UserAction(
-                    kind=UserActionKind.CHECK_CREDENTIALS,
-                    detail="OpenAI rejected the API key — check your credentials",
-                ),
-                provider_metadata=metadata,
-            ) from sdk_exc
-
-        if isinstance(sdk_exc, APIStatusError):
-            # Unhandled APIStatusError (e.g. 409 Conflict, 422 Unprocessable
-            # Entity): split 4xx (non-retryable) from 5xx (retryable).
-            status_code = sdk_exc.status_code
-            if 400 <= status_code < 500:
-                msg = f"OpenAI ImgGen client error (HTTP {status_code}) for model '{self.inference_model.desc}': {sdk_exc}"
-                raise ImgGenGenerationError(
-                    msg,
-                    error_category=InferenceErrorCategory.CONFIGURATION,
-                    user_action=UserAction(
-                        kind=UserActionKind.CHANGE_INPUT,
-                        detail="OpenAI rejected the request — review the prompt, parameters, and model configuration",
-                    ),
-                    provider_metadata=metadata,
-                ) from sdk_exc
-            msg = f"OpenAI ImgGen API error (HTTP {status_code}) for model '{self.inference_model.desc}': {sdk_exc}"
-            raise ImgGenGenerationError(
-                msg,
-                error_category=InferenceErrorCategory.TRANSIENT,
-                user_action=UserAction(
-                    kind=UserActionKind.WAIT_AND_RETRY,
-                    detail="OpenAI returned an error — the system will retry automatically",
-                ),
-                provider_metadata=metadata,
-            ) from sdk_exc
 
     @override
     async def _gen_image(
@@ -248,8 +80,15 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
             else:
                 images_response = cast("ImagesResponse", await self.openai_client.images.generate(**args_dict))
         except (APIStatusError, APIConnectionError) as sdk_exc:
-            self._raise_categorized_openai_sdk_error(sdk_exc=sdk_exc)
-            raise  # unreachable: helper always raises for these types
+            metadata = extract_openai_metadata(sdk_exc)
+            classification = classify_inference_error(metadata)
+            raise render_inference_error(
+                metadata=metadata,
+                classification=classification,
+                family=InferenceErrorFamily.IMG_GEN,
+                model_desc=self.inference_model.desc,
+                model_handle=self.inference_model.name,
+            ) from sdk_exc
 
         if not images_response.data:
             msg = "No result from OpenAI"

@@ -14,6 +14,7 @@ from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.file.file_preparation_utils import prepare_file_from_uri
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_local_extract_metadata
+from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.docling.docling_factory import DoclingFactory
 from pipelex.plugins.docling.docling_sdk import DoclingSdk
@@ -103,7 +104,7 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
                     kind=UserActionKind.CHANGE_INPUT,
                     detail="The source document path could not be found — check the URI or file path",
                 ),
-                provider_metadata=extract_local_extract_metadata(exc, provider="docling"),
+                provider_metadata=extract_local_extract_metadata(exc, provider=ProviderName.DOCLING),
             ) from exc
         except ValueError as exc:
             msg = f"Invalid document format for Docling extraction: {exc}"
@@ -114,7 +115,7 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
                     kind=UserActionKind.CHANGE_INPUT,
                     detail="Docling could not parse the document — verify the format is supported",
                 ),
-                provider_metadata=extract_local_extract_metadata(exc, provider="docling"),
+                provider_metadata=extract_local_extract_metadata(exc, provider=ProviderName.DOCLING),
             ) from exc
         except RuntimeError as exc:
             msg = f"Docling conversion failed: {exc}"
@@ -125,7 +126,7 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
                     kind=UserActionKind.CHANGE_INPUT,
                     detail="Docling failed to convert the document — the file may be corrupt or unsupported",
                 ),
-                provider_metadata=extract_local_extract_metadata(exc, provider="docling"),
+                provider_metadata=extract_local_extract_metadata(exc, provider=ProviderName.DOCLING),
             ) from exc
         except OSError as exc:
             msg = f"I/O error during Docling extraction: {exc}"
@@ -136,7 +137,7 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
                     kind=UserActionKind.WAIT_AND_RETRY,
                     detail="I/O error during Docling extraction — the system will retry automatically",
                 ),
-                provider_metadata=extract_local_extract_metadata(exc, provider="docling"),
+                provider_metadata=extract_local_extract_metadata(exc, provider=ProviderName.DOCLING),
             ) from exc
         finally:
             if temp_path:

@@ -1,8 +1,24 @@
 # TODOS
 
-No open work items. This branch (`feature/Error-handling-2`, branched from `feature/Temporal-merge-3`) is the error-handling overhaul — what follows is a guide for reviewing it.
+## In progress — Extract / Classify / Render (ECR) decomposition
 
-## Reviewing this branch
+Branch: `feature/Inference-error-tweaks` (branched on top of the error-handling overhaul).
+
+**Status (mid-execution, uncommitted in working tree):** Checkpoints 1, 2 & 3 of 5 complete. `make agent-check` + `make agent-test` green. Plan + cold-start handoff: [`~/.claude/plans/ok-let-s-do-ecr-reflective-dahl.md`](file:///Users/lchoquel/.claude/plans/ok-let-s-do-ecr-reflective-dahl.md).
+
+| CP | Status | Scope |
+|---|---|---|
+| 1 | ✅ done | New `provider_name.py`, `error_classify.py`, `error_render.py`; `ProviderErrorMetadata` gains `message` + 3 properties; 12 `extract_*` functions updated |
+| 2 | ✅ done | 6 LLM workers migrated (anthropic, openai completions+responses, mistral, google, bedrock); bedrock instance-method classifier deleted |
+| 3 | ✅ done | 7 img-gen workers migrated (openai, openai-completions, fal, huggingface, azure_rest, google, gateway); Azure keeps AMBIGUOUS branches for non-idempotent 5xx + post-flight transport errors; statusless map gains `MissingCredentialsError` + `FalClientError` |
+| 4 | ⬜ next | 6 extract + search workers (mistral, linkup ×2, gateway ×2, docling, pypdfium2) |
+| 5 | ⬜ | Delete the 4 `classify_*_sdk_error` files + `AnthropicCredentialsError`; privatize quota helpers; cross-provider parity meta-test |
+
+Key deviations from the original design (recorded in the plan file): `message` defaults to `""`; early `is_quota_exhaustion` check in classify; `extract_bedrock_metadata` derives status from AWS error code; `_classify_statusless` is provider-aware; HTTP 422 → CONFIGURATION; `SDKErrorEnvelope` is a real `TypeAlias`; user-facing `UserAction.detail` is provider-agnostic now; Azure ImgGen keeps two AMBIGUOUS branches (5xx + post-flight transport) outside the shared classifier because they encode operation idempotency, not error nature.
+
+---
+
+## Reviewing the underlying error-handling branch
 
 The current-state reference is **`wip/error-handling/`**. Start with [`wip/error-handling/README.md`](wip/error-handling/README.md): its status table and suggested read order map every track to its doc and say what landed vs. what is still only proposed.
 

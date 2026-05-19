@@ -159,10 +159,6 @@ class TestGatewayQuotaDetection:
             "pipelex.plugins.gateway.gateway_img_gen_worker.GatewayDeck.get_config_id",
             return_value="test-config",
         )
-        mocker.patch(
-            "pipelex.plugins.gateway.gateway_img_gen_worker.GatewayFactory.make_error_summary_from_portkey_error",
-            return_value="Rate limit exceeded",
-        )
 
         img_gen_job = mocker.MagicMock()
         img_gen_job.job_report.img_gen_tokens_usage = None
@@ -171,6 +167,8 @@ class TestGatewayQuotaDetection:
             await worker._gen_image_list(img_gen_job=img_gen_job, nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
         assert exc_info.value.__cause__ is sdk_exc
 
     async def test_search_worker_propagates_auth_error_as_configuration(self, mocker: MockerFixture) -> None:

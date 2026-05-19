@@ -9,11 +9,18 @@ wraps when ``instructor`` exhausts its retry loop.
 import json
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-from typing import Any, cast
+from typing import Any, TypeAlias, cast
 
 from pydantic import BaseModel, Field
 
+from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.types import StrEnum
+
+# SDK exception class-name substrings that identify a network/transport failure
+# (no HTTP status reached us). Matched case-insensitively against
+# ``sdk_exception_type`` — covers httpx transport errors, SDK timeout/connection
+# errors, Mistral's ``NoResponseError``, and builtin ``TimeoutError``.
+_NETWORK_ERROR_TOKENS: tuple[str, ...] = ("timeout", "connect", "transport", "noresponse")
 
 
 class ProviderErrorMetadata(BaseModel):
@@ -23,8 +30,12 @@ class ProviderErrorMetadata(BaseModel):
     without having to scrape it back from the exception chain.
     """
 
-    provider: str
+    provider: ProviderName
     sdk_exception_type: str
+    # Human-readable error text from the SDK exception (``str(exc)``). Both the
+    # Classify step (quota / content-policy discrimination) and the Render step
+    # (message composition) read it, so the Extract step must capture it.
+    message: str = ""
     status_code: int | None = None
     request_id: str | None = None
     retry_after_seconds: float | None = None
@@ -33,6 +44,49 @@ class ProviderErrorMetadata(BaseModel):
     # credential fragments, so it is excluded from serialization (CLI JSON,
     # agent output, Temporal error details) while staying available in-process.
     body: Any | None = Field(default=None, exclude=True)
+
+    @property
+    def is_quota_exhaustion(self) -> bool:
+        """Whether this error is a quota/credits exhaustion rather than rate limiting.
+
+        Dispatches on ``provider`` because each provider phrases quota
+        exhaustion differently; Mistral and Gateway also use HTTP 402.
+        """
+        match self.provider:
+            case ProviderName.OPENAI:
+                return is_quota_exhaustion_openai(self.message)
+            case ProviderName.ANTHROPIC:
+                return is_quota_exhaustion_anthropic(self.message)
+            case ProviderName.GOOGLE:
+                return is_quota_exhaustion_google(self.message)
+            case ProviderName.MISTRAL:
+                return is_quota_exhaustion_mistral(self.message, self.status_code or 0)
+            case ProviderName.BEDROCK:
+                return is_quota_exhaustion_aws(self.message)
+            case ProviderName.GATEWAY:
+                return is_quota_exhaustion_gateway(self.message, self.status_code or 0)
+            case (
+                ProviderName.AZURE | ProviderName.FAL | ProviderName.HUGGINGFACE | ProviderName.LINKUP | ProviderName.DOCLING | ProviderName.PYPDFIUM2
+            ):
+                return False
+
+    @property
+    def is_content_policy_violation(self) -> bool:
+        """Whether the error message indicates a content policy / safety filter violation."""
+        return is_content_policy_violation(self.message)
+
+    @property
+    def is_network_error(self) -> bool:
+        """Whether this is a network/transport failure that never reached an HTTP status."""
+        if self.status_code is not None:
+            return False
+        lowered = self.sdk_exception_type.lower()
+        return any(token in lowered for token in _NETWORK_ERROR_TOKENS)
+
+
+# Readable alias for the Classify / Render pipeline: the metadata model is the
+# structured envelope those steps consume.
+SDKErrorEnvelope: TypeAlias = ProviderErrorMetadata
 
 
 class UserActionKind(StrEnum):
@@ -285,8 +339,9 @@ def extract_openai_metadata(exc: BaseException) -> ProviderErrorMetadata:
     elif isinstance(error_code, str):
         provider_error_code = error_code
     return ProviderErrorMetadata(
-        provider="openai",
+        provider=ProviderName.OPENAI,
         sdk_exception_type=type(exc).__name__,
+        message=str(exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -319,8 +374,9 @@ def extract_anthropic_metadata(exc: BaseException) -> ProviderErrorMetadata:
         retry_after_seconds = _parse_retry_after_seconds(headers.get("retry-after"))
     body = getattr(exc, "body", None)
     return ProviderErrorMetadata(
-        provider="anthropic",
+        provider=ProviderName.ANTHROPIC,
         sdk_exception_type=type(exc).__name__,
+        message=str(exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -423,8 +479,9 @@ def extract_google_metadata(exc: BaseException) -> ProviderErrorMetadata:
         retry_after_seconds = _parse_retry_after_seconds(headers.get("retry-after"))
     details = getattr(exc, "details", None)
     return ProviderErrorMetadata(
-        provider="google",
+        provider=ProviderName.GOOGLE,
         sdk_exception_type=type(exc).__name__,
+        message=str(exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -442,20 +499,25 @@ def extract_azure_metadata(exc: BaseException) -> ProviderErrorMetadata:
     best-effort basis. ``httpx.ConnectError`` / ``httpx.TimeoutException`` carry
     only a request; every status-related field comes back as ``None``.
     """
-    return _build_azure_metadata(response=getattr(exc, "response", None), sdk_exception_type=type(exc).__name__)
+    return _build_azure_metadata(
+        response=getattr(exc, "response", None),
+        sdk_exception_type=type(exc).__name__,
+        message=str(exc),
+    )
 
 
-def extract_azure_metadata_from_response(response: Any, sdk_exception_type: str) -> ProviderErrorMetadata:
+def extract_azure_metadata_from_response(response: Any, sdk_exception_type: str, message: str) -> ProviderErrorMetadata:
     """Distill a *successful* Azure REST response into a ``ProviderErrorMetadata``.
 
     Used when the HTTP status was fine but the body failed to parse (malformed
     JSON): there is no ``httpx`` exception carrying the response, so the caller
-    passes the ``httpx.Response`` directly along with the failure's type name.
+    passes the ``httpx.Response`` directly along with the failure's type name
+    and message.
     """
-    return _build_azure_metadata(response=response, sdk_exception_type=sdk_exception_type)
+    return _build_azure_metadata(response=response, sdk_exception_type=sdk_exception_type, message=message)
 
 
-def _build_azure_metadata(response: Any, sdk_exception_type: str) -> ProviderErrorMetadata:
+def _build_azure_metadata(response: Any, sdk_exception_type: str, message: str) -> ProviderErrorMetadata:
     """Read status code, headers, and body off an Azure ``httpx.Response`` on a best-effort basis."""
     status_code = getattr(response, "status_code", None)
     if not isinstance(status_code, int):
@@ -470,8 +532,9 @@ def _build_azure_metadata(response: Any, sdk_exception_type: str) -> ProviderErr
         retry_after_seconds = _parse_retry_after_seconds(headers.get("retry-after"))
     body, provider_error_code = _parse_response_text_body(response)
     return ProviderErrorMetadata(
-        provider="azure",
+        provider=ProviderName.AZURE,
         sdk_exception_type=sdk_exception_type,
+        message=message,
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -508,8 +571,9 @@ def extract_fal_metadata(exc: BaseException) -> ProviderErrorMetadata:
     # code recovered from the body.
     provider_error_code = base_provider_error_code or parsed_provider_error_code
     return ProviderErrorMetadata(
-        provider="fal",
+        provider=ProviderName.FAL,
         sdk_exception_type=type(exc).__name__,
+        message=str(exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -540,8 +604,9 @@ def extract_huggingface_metadata(exc: BaseException) -> ProviderErrorMetadata:
         retry_after_seconds = _parse_retry_after_seconds(headers.get("retry-after"))
     body, provider_error_code = _parse_response_text_body(response)
     return ProviderErrorMetadata(
-        provider="huggingface",
+        provider=ProviderName.HUGGINGFACE,
         sdk_exception_type=type(exc).__name__,
+        message=str(exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -573,8 +638,9 @@ def extract_gateway_metadata(exc: BaseException) -> ProviderErrorMetadata:
     body: Any = getattr(exc, "body", None)
     provider_error_code = _provider_error_code_from_body(body) or _provider_error_code_from_flat_body(body)
     return ProviderErrorMetadata(
-        provider="gateway",
+        provider=ProviderName.GATEWAY,
         sdk_exception_type=type(exc).__name__,
+        message=str(exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -620,14 +686,34 @@ def extract_mistral_metadata(exc: BaseException) -> ProviderErrorMetadata:
             body = parsed_dict
             provider_error_code = _provider_error_code_from_flat_body(parsed_dict) or _provider_error_code_from_body(parsed_dict)
     return ProviderErrorMetadata(
-        provider="mistral",
+        provider=ProviderName.MISTRAL,
         sdk_exception_type=type(exc).__name__,
+        message=str(exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
         provider_error_code=provider_error_code,
         body=body,
     )
+
+
+# AWS Bedrock surfaces its canonical error signal as a code string; a
+# hand-built ``ClientError`` (and some botocore paths) may carry no HTTP status.
+# This maps the documented Bedrock error codes to an HTTP status so the
+# provider-blind Classify step can treat Bedrock uniformly. Used only as a
+# fallback when ``ResponseMetadata.HTTPStatusCode`` is absent.
+_AWS_ERROR_CODE_TO_STATUS: dict[str, int] = {
+    "ThrottlingException": 429,
+    "ServiceQuotaExceededException": 400,
+    "AccessDeniedException": 403,
+    "UnauthorizedException": 401,
+    "ValidationException": 400,
+    "ModelNotReadyException": 429,
+    "ServiceUnavailableException": 503,
+    "InternalServerException": 500,
+    "ResourceNotFoundException": 404,
+    "ModelNotFoundException": 404,
+}
 
 
 def extract_bedrock_metadata(exc: BaseException) -> ProviderErrorMetadata:
@@ -663,9 +749,12 @@ def extract_bedrock_metadata(exc: BaseException) -> ProviderErrorMetadata:
         retry_after_seconds = _parse_retry_after_seconds(cast("dict[str, Any]", headers).get("retry-after"))
     error_code = error_section.get("Code")
     provider_error_code = error_code if isinstance(error_code, str) else None
+    if status_code is None and provider_error_code is not None:
+        status_code = _AWS_ERROR_CODE_TO_STATUS.get(provider_error_code)
     return ProviderErrorMetadata(
-        provider="bedrock",
+        provider=ProviderName.BEDROCK,
         sdk_exception_type=type(exc).__name__,
+        message=str(exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -687,8 +776,9 @@ def extract_linkup_metadata(exc: BaseException) -> ProviderErrorMetadata:
     importing the Linkup SDK at the call site.
     """
     return ProviderErrorMetadata(
-        provider="linkup",
+        provider=ProviderName.LINKUP,
         sdk_exception_type=type(exc).__name__,
+        message=str(exc),
         status_code=None,
         request_id=None,
         retry_after_seconds=None,
@@ -697,7 +787,7 @@ def extract_linkup_metadata(exc: BaseException) -> ProviderErrorMetadata:
     )
 
 
-def extract_local_extract_metadata(exc: BaseException, provider: str) -> ProviderErrorMetadata:
+def extract_local_extract_metadata(exc: BaseException, provider: ProviderName) -> ProviderErrorMetadata:
     """Distill a local (non-HTTP) extraction exception into a ``ProviderErrorMetadata``.
 
     Local extractors (``docling``, ``pypdfium2`` …) run in-process against the
@@ -711,6 +801,7 @@ def extract_local_extract_metadata(exc: BaseException, provider: str) -> Provide
     return ProviderErrorMetadata(
         provider=provider,
         sdk_exception_type=type(exc).__name__,
+        message=str(exc),
         status_code=None,
         request_id=None,
         retry_after_seconds=None,

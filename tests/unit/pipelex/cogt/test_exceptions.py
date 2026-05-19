@@ -22,6 +22,7 @@ from pipelex.cogt.exceptions import (
     SearchModelNotFoundError,
 )
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
+from pipelex.cogt.inference.provider_name import ProviderName
 from tests.unit.pipelex.cogt.test_data import ExceptionTestData
 
 
@@ -82,7 +83,7 @@ class TestErrorCategoryInfrastructure:
         """LLMModelNotFoundError accepts user_action and provider_metadata via the widened
         ModelNotFoundError.__init__, so worker-side categorization can attach SDK metadata.
         """
-        metadata = ProviderErrorMetadata(provider="openai", sdk_exception_type="NotFoundError", status_code=404)
+        metadata = ProviderErrorMetadata(provider=ProviderName.OPENAI, sdk_exception_type="NotFoundError", status_code=404)
         user_action = UserAction(kind=UserActionKind.CHANGE_MODEL, detail="pick another model")
         err = LLMModelNotFoundError(
             message="model gpt-99 not found",

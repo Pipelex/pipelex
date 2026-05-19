@@ -6,6 +6,7 @@ import pytest
 
 from pipelex.base_exceptions import ErrorDomain, ErrorReport, error_domain_to_http_status
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata
+from pipelex.cogt.inference.provider_name import ProviderName
 
 
 class TestErrorHttpStatus:
@@ -43,7 +44,7 @@ class TestErrorHttpStatus:
     def test_provider_429_takes_precedence_over_domain(self) -> None:
         """A provider 429 overrides the domain default and exposes retry_after_seconds."""
         provider_metadata = ProviderErrorMetadata(
-            provider="openai",
+            provider=ProviderName.OPENAI,
             sdk_exception_type="RateLimitError",
             status_code=429,
             retry_after_seconds=12.0,
@@ -61,7 +62,7 @@ class TestErrorHttpStatus:
     def test_non_429_provider_status_does_not_override_domain(self) -> None:
         """A non-429 provider status code leaves the domain default in place."""
         provider_metadata = ProviderErrorMetadata(
-            provider="openai",
+            provider=ProviderName.OPENAI,
             sdk_exception_type="BadRequestError",
             status_code=400,
         )

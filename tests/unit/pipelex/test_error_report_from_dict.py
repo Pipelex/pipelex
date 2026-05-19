@@ -14,6 +14,7 @@ from pydantic import ValidationError
 
 from pipelex.base_exceptions import ErrorDomain, ErrorReport
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
+from pipelex.cogt.inference.provider_name import ProviderName
 
 
 class TestErrorReportFromDict:
@@ -41,7 +42,7 @@ class TestErrorReportFromDict:
                     error_category="capacity",
                     retryable=True,
                     provider_metadata=ProviderErrorMetadata(
-                        provider="openai",
+                        provider=ProviderName.OPENAI,
                         sdk_exception_type="RateLimitError",
                         status_code=429,
                         retry_after_seconds=12.0,

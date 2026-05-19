@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, LLMModelNotFoundError
-from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicCredentialsError
+from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.plugins.anthropic.anthropic_llm_worker import AnthropicLLMWorker
 from tests.unit.pipelex.plugins.anthropic.test_data import AnthropicErrorHandlingTestData
 
@@ -186,15 +186,17 @@ class TestAnthropicWorkerErrorHandling:
         assert exc_info.value.__cause__ is sdk_exc
 
     async def test_auth_error_is_configuration(self, mocker: MockerFixture) -> None:
-        """AuthenticationError raises AnthropicCredentialsError with CONFIGURATION category."""
+        """AuthenticationError is categorized CONFIGURATION with a CHECK_CREDENTIALS action."""
         worker = _make_worker(mocker)
         sdk_exc = _make_anthropic_auth_error("Invalid API key")
         worker.anthropic_async_client.messages.stream.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
-        with pytest.raises(AnthropicCredentialsError) as exc_info:
+        with pytest.raises(LLMCompletionError) as exc_info:
             await worker._gen_text(llm_job=_make_llm_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.CHECK_CREDENTIALS
         assert exc_info.value.__cause__ is sdk_exc
 
     # ---- PermissionDeniedError tests ----

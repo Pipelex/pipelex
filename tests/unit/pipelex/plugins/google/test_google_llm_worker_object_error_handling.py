@@ -235,7 +235,8 @@ class TestGoogleLLMWorkerObjectErrorHandling:
 
         assert exc_info.value.error_category is InferenceErrorCategory.UNKNOWN
         assert exc_info.value.__cause__ is wrapped
-        assert exc_info.value.provider_metadata is None
+        assert exc_info.value.provider_metadata is not None
+        assert exc_info.value.provider_metadata.sdk_exception_type == "ValueError"
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.CONTACT_SUPPORT
 
