@@ -15,6 +15,7 @@ from linkup import (
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import InferenceErrorCategory, SearchJobFailureError
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_linkup_metadata
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_job import SearchJob
@@ -39,39 +40,89 @@ class LinkupSearchWorker(SearchWorkerAbstract):
         self._linkup_client = LinkupClient(api_key=api_key)
 
     def _classify_linkup_error(self, exc: Exception) -> SearchJobFailureError:
-        """Classify a Linkup SDK error into a categorized SearchJobFailureError."""
+        """Classify a Linkup SDK error into a categorized SearchJobFailureError.
+
+        The returned error carries a structured ``provider_metadata`` and a
+        semantic ``UserActionKind`` so downstream consumers (retry, CLI,
+        telemetry) get uniform shape across providers.
+        """
+        metadata = extract_linkup_metadata(exc)
         if isinstance(exc, LinkupAuthenticationError):
             msg = f"Linkup authentication error: {exc}"
             return SearchJobFailureError(
                 msg,
                 error_category=InferenceErrorCategory.CONFIGURATION,
-                user_action="Check that the LINKUP_API_KEY environment variable is set",
+                user_action=UserAction(
+                    kind=UserActionKind.CHECK_CREDENTIALS,
+                    detail="Check that the LINKUP_API_KEY environment variable is set",
+                ),
+                provider_metadata=metadata,
             )
         if isinstance(exc, LinkupInsufficientCreditError):
             msg = f"Linkup credits exhausted: {exc}"
             return SearchJobFailureError(
                 msg,
                 error_category=InferenceErrorCategory.CAPACITY,
-                user_action=f"Your Linkup account has insufficient credits — check billing at {URLs.linkup_billing}",
+                user_action=UserAction(
+                    kind=UserActionKind.CHECK_BILLING,
+                    detail=f"Your Linkup account has insufficient credits — check billing at {URLs.linkup_billing}",
+                ),
+                provider_metadata=metadata,
             )
         if isinstance(exc, LinkupTooManyRequestsError):
             msg = f"Linkup rate limit exceeded: {exc}"
             return SearchJobFailureError(
                 msg,
                 error_category=InferenceErrorCategory.TRANSIENT,
-                user_action="Rate limited by Linkup — the system will retry automatically",
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Rate limited by Linkup — the system will retry automatically",
+                ),
+                provider_metadata=metadata,
             )
         if isinstance(exc, LinkupTimeoutError):
             msg = f"Linkup request timed out: {exc}"
-            return SearchJobFailureError(msg, error_category=InferenceErrorCategory.TRANSIENT)
+            return SearchJobFailureError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Linkup request timed out — the system will retry automatically",
+                ),
+                provider_metadata=metadata,
+            )
         if isinstance(exc, LinkupInvalidRequestError):
             msg = f"Linkup invalid request: {exc}"
-            return SearchJobFailureError(msg, error_category=InferenceErrorCategory.CONTENT)
-        if isinstance(exc, (LinkupNoResultError, LinkupUnknownError)):
-            msg = f"Linkup error: {exc}"
-            return SearchJobFailureError(msg, error_category=InferenceErrorCategory.TRANSIENT)
+            return SearchJobFailureError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Linkup rejected the request — review the query and parameters",
+                ),
+                provider_metadata=metadata,
+            )
+        if isinstance(exc, LinkupNoResultError):
+            msg = f"Linkup found no results: {exc}"
+            return SearchJobFailureError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Linkup found no results — broaden or rephrase the query",
+                ),
+                provider_metadata=metadata,
+            )
         msg = f"Linkup error: {exc}"
-        return SearchJobFailureError(msg, error_category=InferenceErrorCategory.TRANSIENT)
+        return SearchJobFailureError(
+            msg,
+            error_category=InferenceErrorCategory.TRANSIENT,
+            user_action=UserAction(
+                kind=UserActionKind.WAIT_AND_RETRY,
+                detail="Linkup returned an unexpected error — the system will retry automatically",
+            ),
+            provider_metadata=metadata,
+        )
 
     def _parse_date(self, date_str: str | None) -> date | None:
         if date_str is None:

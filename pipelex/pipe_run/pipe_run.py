@@ -38,7 +38,8 @@ class PipeRun(PipeRunProtocol):
 
         try:
             pipe_output = await self._pipe_router.run(pipe_job)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
+            # Observe-and-reraise: records FAILED status so the finally delivery sees it, then re-raises the original error below.
             status = DeliveryStatus.FAILED
             execution_error = exc
             log.error(f"Pipe execution failed for pipeline_run_id={pipeline_run_id}: {exc}")

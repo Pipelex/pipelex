@@ -48,10 +48,13 @@ class AzureErrorHandlingTestData:
             "bad request",
         ),
         (
+            # A 5xx is returned after the request reached Azure — Azure may have generated (and
+            # billed) the image — so for a non-idempotent image submit it is categorized
+            # AMBIGUOUS (non-retryable), consistent with mid-request timeout handling.
             "server_error_500",
             500,
             "Internal server error",
-            InferenceErrorCategory.TRANSIENT,
+            InferenceErrorCategory.AMBIGUOUS,
             "server error",
         ),
     ]
@@ -66,8 +69,10 @@ class AzureErrorHandlingTestData:
 
     TIMEOUT_ERROR_CASES: ClassVar[list[tuple[str, InferenceErrorCategory, str]]] = [
         (
-            "request_timeout",
-            InferenceErrorCategory.TRANSIENT,
+            # A ReadTimeout fires after the request reached Azure — the outcome is ambiguous on a
+            # non-idempotent image submit, so it is categorized AMBIGUOUS (non-retryable).
+            "read_timeout",
+            InferenceErrorCategory.AMBIGUOUS,
             "timed out",
         ),
     ]

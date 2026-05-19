@@ -124,22 +124,18 @@ bedrock_access_variant = "aws_access"
 ####################################################################################################
 
 [cogt]
+transport_max_retries = 2
 
 [cogt.model_deck_config]
 is_model_fallback_enabled = true
 missing_presets_reaction = "log"
-
-[cogt.tenacity_config]
-max_retries = 50      # Maximum number of retry attempts before giving up
-wait_multiplier = 0.2 # Multiplier applied to the wait time between retries (in seconds)
-wait_max = 20         # Maximum wait time between retries (in seconds)
-wait_exp_base = 1.3   # Base for exponential backoff calculation
 
 [cogt.llm_config]
 default_max_images = 100
 is_structure_prompt_enabled = true
 is_dump_text_prompts_enabled = false
 is_dump_response_text_enabled = false
+schema_reask_max_attempts = 3
 
 [cogt.llm_config.instructor_config]
 is_dump_kwargs_enabled = false
@@ -184,9 +180,6 @@ medium = "reasoning"
 high = "reasoning"
 xhigh = "reasoning"
 max = "reasoning"
-
-[cogt.llm_config.llm_job_config]
-max_retries = 3
 
 [cogt.llm_config.effort_to_budget_maps.anthropic]
 none = 0      # Required by validator; unreachable at runtime (level map gates NONE as disabled before budget lookup)
@@ -291,6 +284,11 @@ pipe_stack_limit = 20
 is_normalize_data_urls_to_storage = true
 is_mock_inputs = false
 is_generate_graph = true
+
+# Bounded fan-out concurrency for PipeBatch: at most this many branches run at once.
+# A modest default keeps a large workload (one pipe over many items) from overwhelming
+# asyncio, memory, and provider rate limits. Set to "unbounded" to disable the bound.
+max_concurrency = 8
 
 [pipelex.pipeline_execution_config.graph_config]
 

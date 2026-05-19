@@ -187,6 +187,6 @@ class NdjsonEventLog(EventLogProtocol):
     def __del__(self) -> None:
         try:
             self.close()
-        except Exception:  # noqa: S110
+        except Exception:  # noqa: BLE001, S110
             # Safety net during interpreter shutdown — logging may not be available
             pass

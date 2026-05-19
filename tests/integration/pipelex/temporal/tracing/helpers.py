@@ -228,7 +228,7 @@ async def _runner_isolated_act_llm_gen_text(llm_assignment: LLMAssignment) -> st
         job_metadata=synthetic_metadata,
         llm_prompt=llm_assignment.llm_prompt,
         job_params=llm_assignment.llm_setting.make_llm_job_params(),
-        job_config=LLMJobConfig(max_retries=1),
+        job_config=LLMJobConfig(schema_reask_max_attempts=1),
         job_report=LLMJobReport(llm_tokens_usage=tokens_usage),
     )
     delegate.report_inference_job(inference_job=synthetic_job)

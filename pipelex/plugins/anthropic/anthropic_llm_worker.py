@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, Any
 
 from anthropic import (
     APIConnectionError,
+    APIStatusError,
     APITimeoutError,
     AsyncAnthropic,
     AsyncAnthropicBedrock,
@@ -18,9 +19,14 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
 from pipelex.cogt.inference.error_classification import (
+    UserAction,
+    UserActionKind,
+    extract_anthropic_metadata,
+    extract_underlying_sdk_exception,
     is_content_policy_violation,
     is_quota_exhaustion_anthropic,
 )
+from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
 from pipelex.cogt.llm.llm_utils import (
@@ -224,29 +230,6 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                 msg = f"Model '{self.inference_model.desc}' does not support reasoning (thinking_mode=none)"
                 raise LLMCapabilityError(msg)
 
-    @staticmethod
-    def _extract_underlying_sdk_exception(instructor_exc: Any) -> BaseException | None:
-        """Recover the SDK exception that caused an ``InstructorRetryException``.
-
-        instructor's retry loop wraps the last failed attempt's exception inside
-        ``InstructorRetryException``. We prefer ``failed_attempts[-1].exception``
-        (the documented public attribute) and fall back to walking ``__cause__``
-        (a tenacity ``RetryError`` whose ``last_attempt._exception`` holds the
-        original exception) when ``failed_attempts`` is unset.
-        """
-        failed_attempts = getattr(instructor_exc, "failed_attempts", None)
-        if failed_attempts:
-            last_exc = getattr(failed_attempts[-1], "exception", None)
-            if isinstance(last_exc, BaseException):
-                return last_exc
-        cause = instructor_exc.__cause__
-        last_attempt = getattr(cause, "last_attempt", None)
-        if last_attempt is not None:
-            underlying = getattr(last_attempt, "_exception", None)
-            if isinstance(underlying, BaseException):
-                return underlying
-        return None
-
     def _raise_categorized_anthropic_sdk_error(
         self,
         sdk_exc: BaseException,
@@ -264,6 +247,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
 
         """
         cause = chain_from if chain_from is not None else sdk_exc
+        metadata = extract_anthropic_metadata(sdk_exc)
 
         if isinstance(sdk_exc, RateLimitError):
             error_message = str(sdk_exc)
@@ -272,18 +256,34 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                 raise LLMCompletionError(
                     msg,
                     error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=f"Your Anthropic account has exceeded its quota — check billing at {URLs.anthropic_billing}",
+                    user_action=UserAction(
+                        kind=UserActionKind.CHECK_BILLING,
+                        detail=f"Your Anthropic account has exceeded its quota — check billing at {URLs.anthropic_billing}",
+                    ),
+                    provider_metadata=metadata,
                 ) from cause
             msg = f"Anthropic rate limit exceeded for model '{self.inference_model.desc}': {sdk_exc}"
             raise LLMCompletionError(
                 msg,
                 error_category=InferenceErrorCategory.TRANSIENT,
-                user_action="Rate limited by Anthropic — the system will retry automatically",
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Rate limited by Anthropic — the system will retry automatically",
+                ),
+                provider_metadata=metadata,
             ) from cause
 
         if isinstance(sdk_exc, APITimeoutError):
             msg = f"Anthropic API request timed out for model '{self.inference_model.desc}': {sdk_exc}"
-            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT) from cause
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Anthropic API request timed out — the system will retry automatically",
+                ),
+                provider_metadata=metadata,
+            ) from cause
 
         if isinstance(sdk_exc, BadRequestError):
             error_message = str(sdk_exc)
@@ -292,14 +292,34 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                 raise LLMCompletionError(
                     msg,
                     error_category=InferenceErrorCategory.CONTENT,
-                    user_action="Content was rejected by safety filters — revise the prompt",
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_INPUT,
+                        detail="Content was rejected by safety filters — revise the prompt",
+                    ),
+                    provider_metadata=metadata,
                 ) from cause
             msg = f"Anthropic bad request error: {sdk_exc}"
-            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT) from cause
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Anthropic rejected the request — review the prompt and parameters",
+                ),
+                provider_metadata=metadata,
+            ) from cause
 
         if isinstance(sdk_exc, APIConnectionError):
             msg = f"Anthropic API connection error: {sdk_exc}"
-            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT) from cause
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Could not reach Anthropic — the system will retry automatically",
+                ),
+                provider_metadata=metadata,
+            ) from cause
 
         if isinstance(sdk_exc, PermissionDeniedError):
             error_message = str(sdk_exc)
@@ -308,14 +328,53 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                 raise LLMCompletionError(
                     msg,
                     error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=f"Your Anthropic account has exceeded its quota — check billing at {URLs.anthropic_billing}",
+                    user_action=UserAction(
+                        kind=UserActionKind.CHECK_BILLING,
+                        detail=f"Your Anthropic account has exceeded its quota — check billing at {URLs.anthropic_billing}",
+                    ),
+                    provider_metadata=metadata,
                 ) from cause
             msg = f"Anthropic permission denied: {sdk_exc}"
-            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from cause
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.CONFIGURATION,
+                user_action=UserAction(
+                    kind=UserActionKind.CHECK_CREDENTIALS,
+                    detail="Anthropic denied permission — check your API key permissions",
+                ),
+                provider_metadata=metadata,
+            ) from cause
 
         if isinstance(sdk_exc, AuthenticationError):
             msg = f"Anthropic credentials error: {sdk_exc}"
-            raise AnthropicCredentialsError(msg) from cause
+            raise AnthropicCredentialsError(msg, provider_metadata=metadata) from cause
+
+        if isinstance(sdk_exc, APIStatusError):
+            # Unhandled APIStatusError (e.g. 404 Not Found, 409 Conflict, 422
+            # Unprocessable Entity, 500 Internal Server Error): split 4xx
+            # (non-retryable client error) from 5xx (retryable server error).
+            status_code = sdk_exc.status_code
+            if 400 <= status_code < 500:
+                msg = f"Anthropic client error (HTTP {status_code}) for model '{self.inference_model.desc}': {sdk_exc}"
+                raise LLMCompletionError(
+                    msg,
+                    error_category=InferenceErrorCategory.CONFIGURATION,
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_INPUT,
+                        detail="Anthropic rejected the request — review the prompt, parameters, and model configuration",
+                    ),
+                    provider_metadata=metadata,
+                ) from cause
+            msg = f"Anthropic API error (HTTP {status_code}) for model '{self.inference_model.desc}': {sdk_exc}"
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Anthropic returned an error — the system will retry automatically",
+                ),
+                provider_metadata=metadata,
+            ) from cause
 
     @override
     async def _gen_text(
@@ -343,14 +402,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                 output_config=thinking_params.output_config or omit,
             ) as stream:
                 final_message: Message = await stream.get_final_message()
-        except (
-            RateLimitError,
-            APITimeoutError,
-            BadRequestError,
-            APIConnectionError,
-            PermissionDeniedError,
-            AuthenticationError,
-        ) as sdk_exc:
+        except (APIStatusError, APIConnectionError) as sdk_exc:
             self._raise_categorized_anthropic_sdk_error(sdk_exc=sdk_exc)
             raise  # unreachable: helper always raises for these types
 
@@ -377,7 +429,18 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                 f"model: {self.inference_model.desc}\nstop_reason: {final_message.stop_reason}\n"
                 f"content_block_types: {block_types}"
             )
-            raise LLMCompletionError(msg)
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                provider_metadata=None,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail=(
+                        "Model produced no answer (likely exhausted token budget on reasoning)"
+                        " — shorten the prompt, raise max_tokens, or disable thinking"
+                    ),
+                ),
+            )
 
         full_reply_content = "\n\n".join(text_parts)
 
@@ -415,7 +478,10 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
             result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                 messages=messages,
                 response_model=schema,
-                max_retries=llm_job.job_config.max_retries,
+                # instructor's retry is confined to schema re-ask: this validation-only AsyncRetrying
+                # re-asks on a malformed/invalid output but lets a transport error propagate as the raw
+                # SDK exception — transport retry is the SDK client floor (Tier 1) alone.
+                max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.schema_reask_max_attempts),
                 model=self.inference_model.model_id,
                 temperature=omit if temperature_unsupported else job_params.temperature,
                 max_tokens=effective_max_tokens,
@@ -423,23 +489,23 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
             )
         except InstructorRetryException as instructor_exc:
             # instructor wraps SDK exceptions during retries; recover the underlying
-            # one so transient/capacity/auth errors aren't all flattened to CONTENT.
-            underlying_exc = self._extract_underlying_sdk_exception(instructor_exc=instructor_exc)
+            # one so transient/capacity/auth errors aren't all flattened to UNKNOWN.
+            underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
             if underlying_exc is not None:
                 self._raise_categorized_anthropic_sdk_error(sdk_exc=underlying_exc, chain_from=instructor_exc)
             msg = (
                 f"Anthropic structured generation via 'instructor' failed with model: {self.inference_model.desc} "
                 f"trying to generate schema: {schema} with error: {instructor_exc}"
             )
-            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT) from instructor_exc
-        except (
-            RateLimitError,
-            APITimeoutError,
-            BadRequestError,
-            APIConnectionError,
-            PermissionDeniedError,
-            AuthenticationError,
-        ) as sdk_exc:
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.UNKNOWN,
+                user_action=UserAction(
+                    kind=UserActionKind.CONTACT_SUPPORT,
+                    detail="Structured generation failed for an unrecognized reason — retry, and report this if it persists",
+                ),
+            ) from instructor_exc
+        except (APIStatusError, APIConnectionError) as sdk_exc:
             self._raise_categorized_anthropic_sdk_error(sdk_exc=sdk_exc)
             raise  # unreachable: helper always raises for these types
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):

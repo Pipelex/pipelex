@@ -7,7 +7,14 @@ from typing import Annotated, Any
 import typer
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
-from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success, extract_validation_errors
+from pipelex.cli.agent_cli.commands.agent_output import (
+    CliOutputFormat,
+    agent_error,
+    agent_success_formatted,
+    extract_validation_errors,
+    set_agent_cli_output_format,
+)
+from pipelex.cli.agent_cli.commands.validate._output_helpers import format_validate_markdown
 from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_all_core,
     validate_pipe_core,
@@ -35,16 +42,23 @@ def validate_pipe_cmd(
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
     ] = None,
+    output_format: Annotated[
+        CliOutputFormat,
+        typer.Option("--format", help="Output format: markdown (default) or json (structured)"),
+    ] = CliOutputFormat.MARKDOWN,
 ) -> None:
-    """Validate a pipe by code, or all pipes, and output JSON results.
+    """Validate a pipe by code, or all pipes, and output the results.
 
-    Outputs JSON to stdout on success, JSON to stderr on error with exit code 1.
+    Default output is markdown; use --format json for structured JSON.
+    Results go to stdout on success, errors to stderr with exit code 1.
 
     Examples:
         pipelex-agent validate pipe my_pipe
         pipelex-agent validate pipe --all
         pipelex-agent validate pipe --all -L ./my_pipes
     """
+    set_agent_cli_output_format(output_format)
+
     library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
 
     # Handle --all flag
@@ -56,7 +70,7 @@ def validate_pipe_cmd(
 
         try:
             result = asyncio.run(validate_all_core(library_dirs=library_dirs))
-            agent_success(result)
+            agent_success_formatted(result, format_validate_markdown)
 
         except ValidateBundleError as exc:
             validation_errors = extract_validation_errors(exc)
@@ -84,7 +98,8 @@ def validate_pipe_cmd(
                 model_handle=exc.model_handle,
             )
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
+            # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
             agent_error(str(exc), type(exc).__name__, cause=exc)
 
         finally:
@@ -126,7 +141,7 @@ def validate_pipe_cmd(
 
     try:
         result = asyncio.run(validate_pipe_core(pipe_code=pipe_code, library_dirs=library_dirs))
-        agent_success(result)
+        agent_success_formatted(result, format_validate_markdown)
 
     except PipeNotFoundError as exc:
         error_message = str(exc)
@@ -165,7 +180,8 @@ def validate_pipe_cmd(
     except typer.Exit:
         raise
 
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
         agent_error(str(exc), type(exc).__name__, cause=exc)
 
     finally:

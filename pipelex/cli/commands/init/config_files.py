@@ -66,7 +66,7 @@ def init_config(reset: bool = False, dry_run: bool = False, target_dir: str | No
         if dry_run:
             return len(copied_files)
 
-    except Exception as exc:
+    except OSError as exc:
         msg = f"Failed to initialize configuration: {exc}"
         raise PipelexCLIError(msg) from exc
 

@@ -6,7 +6,7 @@ import typer
 
 from pipelex.builder.operations.models_ops import ModelCategory, format_models_markdown, list_models
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
-from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success, set_agent_cli_output_format
 from pipelex.pipelex import Pipelex
 
 
@@ -30,6 +30,7 @@ def agent_models_cmd(
     Outputs model configuration that an agent needs to reference when building pipelines.
     Default output is markdown; use --format json for structured JSON.
     """
+    set_agent_cli_output_format(output_format)
     try:
         make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"], needs_inference=False, needs_model_specs=backend is not None)
 
@@ -43,7 +44,8 @@ def agent_models_cmd(
     except SystemExit:
         # agent_error already handled and called sys.exit
         raise
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
         agent_error(f"Failed to list models: {exc}", type(exc).__name__, cause=exc)
     finally:
         Pipelex.teardown_if_needed()

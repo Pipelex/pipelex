@@ -1,6 +1,21 @@
 # Agent CLI (`pipelex-agent`)
 
-Machine-first CLI for running and validating Pipelex method bundles (`.mthds` files). All output is structured JSON to stdout (success) or stderr (error). No Rich formatting, no interactive prompts.
+Machine-first CLI for running and validating Pipelex method bundles (`.mthds` files). No Rich formatting, no interactive prompts.
+
+## Output format
+
+Most commands accept `--format markdown|json` and **default to markdown** — `run`, `validate`, `init`, `models`, `check-model`, `doctor`. Markdown goes to stdout on success; `--format json` switches to the structured JSON payload. Errors follow the same option: they render as markdown to stderr by default, JSON to stderr with `--format json`. The format is set once per invocation (a `ContextVar` in `agent_output.py`), so every `agent_error()` call in a command inherits it.
+
+`inputs`, `concept`, `pipe`, `fmt`, `lint` are **always JSON / raw passthrough** — they have no `--format` option.
+
+Any error raised before a command opts into a format (the app callback, unknown-command handling) stays JSON — JSON is the `ContextVar` default.
+
+Markdown structure per command:
+
+- `run`: `# Pipeline run complete`, a `## Result` section (the rendered `main_stuff` markdown with `--with-memory`, otherwise the concept JSON in a fenced block), and output / graph file paths.
+- `validate`: `# Validation passed`, the bundle path when relevant, and a list of validated pipes with their status.
+- `init`: `# Pipelex initialized` with target directory, enabled backends, and routing profile.
+- error path: `# Error: <error_type>`, the message, the hint as a `> 💡` callout, a `## Details` section, and `## Error source` as a code block.
 
 ## Companion: Agent Skills
 
@@ -57,9 +72,9 @@ commands/
 
 | Command | Does |
 |---------|------|
-| `init` | Initializes Pipelex configuration (non-interactive). Defaults to project `.pipelex/` at detected project root. Use `--global`/`-g` to target `~/.pipelex/`. Accepts `--config`/`-c` with inline JSON or file path for backends, routing, telemetry, and gateway terms. |
-| `run` | Executes a pipeline (pipe\|bundle\|method subcommands), returns JSON with main_stuff + working_memory. Graph visualizations on by default (`--no-graph` to disable). |
-| `validate` | Dry-runs pipes/bundles/methods (pipe\|bundle\|method subcommands), returns validation status per pipe. Bundle subcommand supports `--graph` for graph visualization. |
+| `init` | Initializes Pipelex configuration (non-interactive). Defaults to project `.pipelex/` at detected project root. Use `--global`/`-g` to target `~/.pipelex/`. Accepts `--config`/`-c` with inline JSON or file path for backends, routing, telemetry, and gateway terms. `--format markdown\|json` (default: markdown). |
+| `run` | Executes a pipeline (pipe\|bundle\|method subcommands), returns main_stuff + working_memory. Graph visualizations on by default (`--no-graph` to disable). `--format markdown\|json` (default: markdown). |
+| `validate` | Dry-runs pipes/bundles/methods (pipe\|bundle\|method subcommands), returns validation status per pipe. Bundle subcommand supports `--graph` for graph visualization (with `--graph-format` for the graph renderer). `--format markdown\|json` (default: markdown). |
 | `fmt` | Formats a .mthds/.toml/.plx file in-place (delegates to plxt) |
 | `lint` | Lints a .mthds/.toml/.plx file for errors (delegates to plxt) |
 | `inputs` | Generates example input JSON for a pipe/bundle/method (pipe\|bundle\|method subcommands) |
@@ -71,8 +86,8 @@ commands/
 
 ## Key Patterns
 
-- **Output contract**: Most commands return via `agent_success(dict)` or `agent_error(message, error_type, cause)`. Exceptions that print directly to stdout: `fmt`/`lint` (plxt passthrough), `concept`/`pipe` (raw TOML), `models`/`doctor` in markdown mode. Errors always go via `agent_error()` regardless of format.
-- **Error classification**: Each error type maps to a domain (`input`, `config`, `runtime`), a hint string, and a `retryable` flag. See `AGENT_ERROR_HINTS` dict in `agent_output.py`.
+- **Output contract**: Commands with `--format` emit success via `agent_success_formatted(result, markdown_renderer)` — JSON or a markdown renderer per the active format. `agent_error(message, error_type, cause)` likewise dispatches JSON or markdown. Exceptions that print directly to stdout: `fmt`/`lint` (plxt passthrough), `concept`/`pipe` (raw TOML). Markdown renderers: `format_run_markdown` (`run/_output_helpers.py`), `format_validate_markdown` (`validate/_output_helpers.py`), `_format_init_markdown` (`init_cmd.py`).
+- **Error classification**: Each error type maps to a domain (`input`, `config`, `runtime`), a hint string, and a `retryable` flag. See `AGENT_ERROR_HINTS` dict in `agent_output.py`. The `error_domain` also drives the HTTP-status mapping for downstream APIs — see `error_domain_to_http_status()` in `pipelex/base_exceptions.py`.
 - **Init**: All commands that need Pipelex use `make_pipelex_for_agent_cli(library_dirs)`. It catches init errors and routes them through `agent_error()`.
 - **Async core**: Run and validate are async — commands use `asyncio.run()`.
 - **File convention**: Generated outputs go to `mthds-wip/` with incremental naming (`pipeline_01/`, `pipeline_02/`).

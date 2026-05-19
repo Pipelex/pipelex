@@ -8,7 +8,7 @@ from mthds.package.dependency_resolver import ResolvedDependency, determine_expo
 from mthds.package.discovery import find_package_manifest
 from mthds.package.exceptions import DependencyResolveError, ManifestError
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION, MethodsManifest
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, PydanticUserError, ValidationError
 from typing_extensions import override
 
 import pipelex.builder as builder_pkg  # package import — used for __file__ path
@@ -1174,7 +1174,7 @@ class LibraryManager(LibraryManagerAbstract):
             if structure_class is not None and issubclass(structure_class, BaseModel):
                 try:
                     structure_class.model_rebuild(_types_namespace=namespace)
-                except Exception as exc:
+                except (NameError, PydanticUserError) as exc:
                     log.debug(f"Could not rebuild model for {concept.concept_ref}: {exc}")
 
     def _detect_concept_cycles(self, concepts: list["Concept"]) -> None:

@@ -1,7 +1,15 @@
-"""Helpers for structured JSON output in agent CLI commands."""
+"""Helpers for structured output in agent CLI commands.
+
+Output is JSON by default; commands that accept ``--format`` opt into
+markdown by calling :func:`set_agent_cli_output_format`. The error path
+inherits the same format option through a module-level ``ContextVar`` —
+see :func:`agent_error`.
+"""
 
 import sys
 import traceback
+from collections.abc import Callable
+from contextvars import ContextVar
 from typing import Any, NoReturn
 
 import typer
@@ -17,6 +25,33 @@ class CliOutputFormat(StrEnum):
     MARKDOWN = "markdown"
 
 
+# The active output format for the current agent-CLI invocation. JSON is the
+# default so any error raised before a command opts into markdown (the app
+# callback, unknown-command handling, init failures) stays machine-parseable.
+# A command with a ``--format`` option calls set_agent_cli_output_format() at
+# its start, and both the success path and agent_error() then follow it.
+_agent_cli_output_format: ContextVar[CliOutputFormat] = ContextVar("agent_cli_output_format", default=CliOutputFormat.JSON)
+
+
+def set_agent_cli_output_format(output_format: CliOutputFormat) -> None:
+    """Set the active output format for the current agent-CLI invocation."""
+    _agent_cli_output_format.set(output_format)
+
+
+def get_agent_cli_output_format() -> CliOutputFormat:
+    """Return the active output format (``JSON`` until a command opts in)."""
+    return _agent_cli_output_format.get()
+
+
+# Fallback error-classification lookups, keyed by error_type name.
+#
+# agent_error() reads error_domain / user_action from a PipelexError cause's
+# to_error_report() first; these dicts are the fallback for error types that
+# cannot self-describe: builtin and third-party exceptions, synthetic error_type
+# labels passed straight to agent_error(), and PipelexError subclasses not yet
+# migrated to class-level metadata. A PipelexError subclass that declares
+# class-level error_domain / user_action must NOT appear here — enforced by
+# tests/unit/pipelex/cli/test_agent_output_drift.py.
 AGENT_ERROR_HINTS: dict[str, str] = {
     # Model/routing errors
     "ModelChoiceNotFoundError": (
@@ -30,10 +65,8 @@ AGENT_ERROR_HINTS: dict[str, str] = {
         "Update the preset model, configure it in an enabled backend, or enable a supporting backend"
     ),
     # Validation errors
-    "ValidateBundleError": "Check the 'validation_errors' array for specific issues to fix",
     "PipeValidationError": "Check pipe inputs, outputs, and concept references for consistency",
     # Execution errors
-    "PipelineExecutionError": "Check 'pipe_stack' to identify which pipe failed and 'cause_type' for the root cause",
     "PipeExecutionError": "A pipe input validation failed during pipeline execution. Check the error message for the failing model and field.",
     # File/input errors
     "FileNotFoundError": "Verify the file path exists and is accessible from the current working directory",
@@ -68,6 +101,8 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "UnknownCommandError": "Check 'valid_commands' in this error response for available commands",
 }
 
+# retryable=True fallback for non-CogtError error types: their ErrorReport
+# carries no `retryable`, unlike CogtError whose error_category drives it.
 RETRYABLE_ERROR_TYPES: set[str] = {
     "RemoteConfigFetchError",
     "PipeOperatorModelAvailabilityError",
@@ -76,14 +111,12 @@ RETRYABLE_ERROR_TYPES: set[str] = {
 AGENT_ERROR_DOMAINS: dict[str, str] = {
     # input = agent can fix (bad .mthds, wrong args, bad JSON)
     "ModelChoiceNotFoundError": "input",
-    "ValidateBundleError": "input",
     "PipeValidationError": "input",
     "FileNotFoundError": "input",
     "JSONDecodeError": "input",
     "JsonTypeError": "input",
     "ArgumentError": "input",
     "MthdsDecodeError": "input",
-    "PipelexInterpreterError": "input",
     "ValidationError": "input",
     "ValueError": "input",
     "BundleError": "input",
@@ -96,16 +129,8 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     "PipeOperatorModelAvailabilityError": "config",
     "ModelDeckPresetValidatonError": "config",
     "TelemetryConfigValidationError": "config",
-    "GatewayTermsNotAcceptedError": "config",
-    "GatewayApiKeyMissingError": "config",
-    "GatewayDoNotTrackConflictError": "config",
-    "RemoteConfigFetchError": "config",
     "BinaryNotFoundError": "config",
-    "RemoteConfigValidationError": "config",
     "InitConfigError": "config",
-    # runtime = execution failure
-    "PipelineExecutionError": "runtime",
-    "PipeExecutionError": "runtime",
 }
 
 
@@ -143,15 +168,13 @@ def _build_error_source(exc: BaseException) -> list[str]:
     return sources
 
 
-def agent_error(message: str, error_type: str, cause: BaseException | None = None, **extra: Any) -> NoReturn:
-    """Print a structured JSON error to stderr and exit with code 1.
+def _assemble_error_payload(message: str, error_type: str, cause: BaseException | None, extra: dict[str, Any]) -> dict[str, Any]:
+    """Build the structured error payload shared by the JSON and markdown renderers.
 
-    Args:
-        message: Human-readable error message.
-        error_type: Error class name for programmatic matching.
-        cause: Optional exception to chain with ``raise ... from``.
-        **extra: Additional fields merged into the JSON object.
-                 Can override the auto-added ``hint`` field.
+    Sources ``hint`` / ``retryable`` / ``error_domain`` / ``error_category`` /
+    ``model`` / ``provider`` from a ``PipelexError`` cause's ``to_error_report()``
+    first, falling back to the lookup dicts for error types that cannot
+    self-describe. ``extra`` is merged last and overrides everything.
     """
     error_json: dict[str, Any] = {
         "error": True,
@@ -163,13 +186,15 @@ def agent_error(message: str, error_type: str, cause: BaseException | None = Non
     report_hint: str | None = None
     report_retryable: bool | None = None
     report_category: str | None = None
+    report_domain: str | None = None
     report_extras: dict[str, Any] = {}
 
     if isinstance(cause, PipelexError):
         report = cause.to_error_report()
-        report_hint = report.user_action
+        report_hint = report.user_action_detail()
         report_retryable = report.retryable
         report_category = report.error_category
+        report_domain = report.error_domain
         if report.model:
             report_extras["model"] = report.model
         if report.provider:
@@ -187,8 +212,8 @@ def agent_error(message: str, error_type: str, cause: BaseException | None = Non
     elif error_type in RETRYABLE_ERROR_TYPES:
         error_json["retryable"] = True
 
-    # error_domain: always from lookup dict (independent of error_category)
-    domain = AGENT_ERROR_DOMAINS.get(error_type)
+    # error_domain: report-first (class-level metadata), lookup dict as fallback
+    domain = report_domain or AGENT_ERROR_DOMAINS.get(error_type)
     if domain:
         error_json["error_domain"] = domain
 
@@ -204,8 +229,83 @@ def agent_error(message: str, error_type: str, cause: BaseException | None = Non
 
     # **extra overrides everything
     error_json.update(extra)
-    print(clean_json_dumps(error_json, indent=2), file=sys.stderr)
+    return error_json
+
+
+# Payload keys that the markdown renderer treats specially (heading / body /
+# tip / code block) rather than listing under the "Details" section.
+_MARKDOWN_RESERVED_KEYS: frozenset[str] = frozenset({"error", "error_type", "message", "hint", "error_source"})
+
+
+def _render_error_markdown(payload: dict[str, Any]) -> str:
+    """Render an assembled error payload as agent-readable markdown."""
+    lines: list[str] = [f"# Error: {payload['error_type']}", "", str(payload["message"])]
+
+    hint = payload.get("hint")
+    if hint:
+        lines += ["", f"> 💡 **Hint:** {hint}"]
+
+    detail_keys = [key for key in payload if key not in _MARKDOWN_RESERVED_KEYS]
+    if detail_keys:
+        lines += ["", "## Details", ""]
+        for key in detail_keys:
+            value = payload[key]
+            if isinstance(value, (str, int, float, bool)):
+                lines.append(f"- **{key}:** {value}")
+            else:
+                lines += [f"- **{key}:**", "", "```json", clean_json_dumps(value, indent=2), "```", ""]
+
+    error_source = payload.get("error_source")
+    if error_source:
+        lines += ["", "## Error source", "", "```", *(str(frame) for frame in error_source), "```"]
+
+    return "\n".join(lines)
+
+
+def _agent_error_json(message: str, error_type: str, cause: BaseException | None, extra: dict[str, Any]) -> NoReturn:
+    """Print a structured JSON error to stderr and exit with code 1."""
+    payload = _assemble_error_payload(message, error_type, cause, extra)
+    print(clean_json_dumps(payload, indent=2), file=sys.stderr)
     raise typer.Exit(1) from cause
+
+
+def agent_error_markdown(message: str, error_type: str, cause: BaseException | None = None, **extra: Any) -> NoReturn:
+    """Print a markdown-rendered error to stderr and exit with code 1.
+
+    The markdown sibling of :func:`agent_error`'s JSON path: an error-type
+    heading, the message body, the hint as a tip callout, structured fields
+    under a Details section, and ``error_source`` as a code block.
+
+    Args:
+        message: Human-readable error message.
+        error_type: Error class name for programmatic matching.
+        cause: Optional exception to chain with ``raise ... from``.
+        **extra: Additional fields merged into the payload.
+    """
+    payload = _assemble_error_payload(message, error_type, cause, extra)
+    print(_render_error_markdown(payload), file=sys.stderr)
+    raise typer.Exit(1) from cause
+
+
+def agent_error(message: str, error_type: str, cause: BaseException | None = None, **extra: Any) -> NoReturn:
+    """Emit a structured error to stderr and exit with code 1.
+
+    Dispatches on the active output format (see :func:`set_agent_cli_output_format`):
+    JSON by default, markdown when a command has opted in. All existing
+    ``agent_error(...)`` call sites therefore follow ``--format`` for free.
+
+    Args:
+        message: Human-readable error message.
+        error_type: Error class name for programmatic matching.
+        cause: Optional exception to chain with ``raise ... from``.
+        **extra: Additional fields merged into the payload.
+                 Can override the auto-added ``hint`` field.
+    """
+    match get_agent_cli_output_format():
+        case CliOutputFormat.JSON:
+            _agent_error_json(message, error_type, cause, extra)
+        case CliOutputFormat.MARKDOWN:
+            agent_error_markdown(message, error_type, cause, **extra)
 
 
 def agent_success(result: dict[str, Any]) -> None:
@@ -215,6 +315,23 @@ def agent_success(result: dict[str, Any]) -> None:
         result: Dictionary to serialize as JSON.
     """
     print(clean_json_dumps(result, indent=2))
+
+
+def agent_success_formatted(result: dict[str, Any], markdown_renderer: Callable[[dict[str, Any]], str]) -> None:
+    """Emit a success result respecting the active CLI output format.
+
+    JSON format serializes ``result`` to stdout; markdown format prints the
+    output of ``markdown_renderer(result)`` to stdout.
+
+    Args:
+        result: The structured result dict (the JSON-mode payload).
+        markdown_renderer: Renders ``result`` into a markdown string.
+    """
+    match get_agent_cli_output_format():
+        case CliOutputFormat.JSON:
+            agent_success(result)
+        case CliOutputFormat.MARKDOWN:
+            print(markdown_renderer(result))
 
 
 def extract_validation_errors(exc: ValidateBundleError) -> list[dict[str, Any]]:

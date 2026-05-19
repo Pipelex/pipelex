@@ -5,12 +5,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from linkup import LinkupAuthenticationError, LinkupTooManyRequestsError
+from linkup import LinkupAuthenticationError, LinkupInsufficientCreditError, LinkupNoResultError, LinkupTooManyRequestsError
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 from pipelex.cogt.exceptions import ExtractJobFailureError, InferenceErrorCategory, SearchJobFailureError
+from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.plugins.linkup.linkup_extract_worker import LinkupExtractWorker
 from pipelex.plugins.linkup.linkup_search_worker import LinkupSearchWorker
 from tests.unit.pipelex.plugins.linkup.test_data import LinkupExtractErrorHandlingTestData, LinkupSearchErrorHandlingTestData
@@ -138,6 +139,33 @@ class TestLinkupWorkerErrorHandling:
         assert exc_info.value.__cause__ is sdk_exc
         assert expected_message_substring in exc_info.value.args[0].lower()
 
+    # ---- User action semantics ----
+
+    @pytest.mark.parametrize(
+        ("exception_class", "expected_kind"),
+        [
+            (LinkupAuthenticationError, UserActionKind.CHECK_CREDENTIALS),
+            (LinkupInsufficientCreditError, UserActionKind.CHECK_BILLING),
+            (LinkupTooManyRequestsError, UserActionKind.WAIT_AND_RETRY),
+        ],
+    )
+    async def test_search_user_action_uses_specific_kind(
+        self,
+        mocker: MockerFixture,
+        exception_class: type[Exception],
+        expected_kind: UserActionKind,
+    ) -> None:
+        """Known Linkup error types carry a specific UserActionKind, not UNKNOWN."""
+        worker = _make_linkup_search_worker(mocker)
+        sdk_exc = exception_class("linkup error")
+        _get_linkup_client(worker).async_search.side_effect = sdk_exc
+
+        with pytest.raises(SearchJobFailureError) as exc_info:
+            await worker._search_sourced_answer(search_job=_make_search_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is expected_kind
+
     # ---- Error report tests ----
 
     async def test_extract_error_report_for_auth(self, mocker: MockerFixture) -> None:
@@ -166,3 +194,29 @@ class TestLinkupWorkerErrorHandling:
         report = exc_info.value.to_error_report()
         assert report.error_category == "transient"
         assert report.retryable is True
+
+    async def test_search_error_report_for_no_result(self, mocker: MockerFixture) -> None:
+        """to_error_report() for no-result error has CONTENT category and is not retryable."""
+        worker = _make_linkup_search_worker(mocker)
+        sdk_exc = LinkupNoResultError("No results found")
+        _get_linkup_client(worker).async_search.side_effect = sdk_exc
+
+        with pytest.raises(SearchJobFailureError) as exc_info:
+            await worker._search_sourced_answer(search_job=_make_search_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        report = exc_info.value.to_error_report()
+        assert report.error_category == "content"
+        assert report.retryable is False
+
+    async def test_extract_error_report_for_no_result(self, mocker: MockerFixture) -> None:
+        """to_error_report() for no-result error has CONTENT category and is not retryable."""
+        worker = _make_linkup_extract_worker(mocker)
+        sdk_exc = LinkupNoResultError("No results found")
+        _get_linkup_client(worker).async_fetch.side_effect = sdk_exc
+
+        with pytest.raises(ExtractJobFailureError) as exc_info:
+            await worker._extract_pages(extract_job=_make_extract_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        report = exc_info.value.to_error_report()
+        assert report.error_category == "content"
+        assert report.retryable is False

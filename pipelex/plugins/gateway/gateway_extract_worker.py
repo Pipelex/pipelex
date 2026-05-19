@@ -4,7 +4,6 @@ from typing import Any
 from portkey_ai import AsyncPortkey
 from portkey_ai.api_resources import exceptions as portkey_exceptions
 from portkey_ai.api_resources.utils import GenericResponse
-from tenacity import AsyncRetrying, RetryCallState, retry_if_exception, stop_after_attempt, wait_random_exponential
 from typing_extensions import override
 
 from pipelex import log
@@ -13,10 +12,10 @@ from pipelex.cogt.extract.extract_input import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
+from pipelex.cogt.inference.error_classification import extract_gateway_metadata
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import TokenCategory
-from pipelex.config import get_config
 from pipelex.hub import get_storage_provider
 from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletionsFactory
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
@@ -46,7 +45,6 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
             raise SdkTypeError(msg)
 
         self.portkey_client: AsyncPortkey = sdk_instance
-        self._tenacity_config = get_config().cogt.tenacity_config
 
     @override
     def teardown(self):
@@ -72,28 +70,12 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
                     # No running event loop, best-effort sync close
                     try:
                         asyncio.run(httpx_client.aclose())
-                    except Exception as exc:
+                    except Exception as exc:  # noqa: BLE001
+                        # Best-effort: asyncio.run() runs aclose(), whose failure surface is not enumerable; teardown must never fail.
                         log.debug(f"Error closing portkey httpx client during teardown: {exc}")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
+            # Best-effort cleanup boundary: teardown must never fail, whatever client/event-loop close throws.
             log.debug(f"Error during GatewayExtractWorker teardown: {exc}")
-
-    def _make_retryer(self) -> AsyncRetrying:
-        """Create a fresh AsyncRetrying instance for each extraction call.
-
-        This is necessary because AsyncRetrying is stateful and cannot be shared
-        across parallel async calls without causing race conditions.
-        """
-        return AsyncRetrying(
-            retry=retry_if_exception(self._is_retryable_portkey_error),
-            before_sleep=self._log_retry,
-            wait=wait_random_exponential(
-                multiplier=self._tenacity_config.wait_multiplier,
-                max=self._tenacity_config.wait_max,
-                exp_base=self._tenacity_config.wait_exp_base,
-            ),
-            reraise=True,
-            stop=stop_after_attempt(self._tenacity_config.max_retries),
-        )
 
     @override
     async def _extract_pages(
@@ -167,30 +149,24 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
 
         messages: list[dict[str, str]] = [{"role": "user", "content": fetch_params.model_dump_json()}]
 
-        attempt_number = 0
-        response: GenericResponse | None = None
-        retryer = self._make_retryer()
         try:
-            async for attempt in retryer:
-                with attempt:
-                    attempt_number += 1
-                    response = await self.portkey_client.with_options(config=config_id).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-                        "/chat/completions",
-                        model=self.inference_model.model_id,
-                        messages=messages,
-                    )
+            response = await self.portkey_client.with_options(config=config_id).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                "/chat/completions",
+                model=self.inference_model.model_id,
+                messages=messages,
+            )
         except portkey_exceptions.APIError as exc:
             error_summary = GatewayFactory.make_error_summary_from_portkey_error(exc)
             error_category = GatewayFactory.classify_error_category(exc)
-            msg = (
-                f"Web fetch service error for URL '{document_uri}' via model '{self.inference_model.tag}' "
-                f"after {attempt_number} attempt(s): {error_summary}"
-            )
-            raise ExtractJobFailureError(msg, error_category=error_category) from exc
-
-        if response is None:
-            msg = f"Could not get a response for model '{self.inference_model.tag}' via Portkey after {attempt_number} attempts"
-            raise ExtractJobFailureError(msg)
+            user_action = GatewayFactory.make_user_action_from_portkey_error(exc)
+            metadata = extract_gateway_metadata(exc)
+            msg = f"Web fetch service error for URL '{document_uri}' via model '{self.inference_model.tag}': {error_summary}"
+            raise ExtractJobFailureError(
+                msg,
+                error_category=error_category,
+                user_action=user_action,
+                provider_metadata=metadata,
+            ) from exc
 
         if not isinstance(response, GenericResponse):
             msg = "Response is not of type GenericResponse"
@@ -221,62 +197,40 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
         config_id = GatewayDeck.get_config_id(headers=self.inference_model.extra_headers or {})
         log.dev(f"Extracting using config '{config_id}' with should_include_images: {should_include_images}")
 
-        attempt_number = 0
-        response: GenericResponse | None = None
-        retryer = self._make_retryer()
+        extra_headers, extra_body = GatewayFactory.make_extras(
+            inference_model=self.inference_model, inference_job=extract_job, output_desc=InferenceOutputType.PAGES
+        )
+        # Encode document/image as an image_url content part inside messages.
+        # Portkey forwards messages but strips custom top-level fields like document/image.
+        if extra_body.get("messages"):
+            first_msg = extra_body["messages"][0]
+            text_content = first_msg["content"]
+            first_msg["content"] = [
+                {"type": "text", "text": text_content},
+                {"type": "image_url", "image_url": {"url": base64_url}},
+            ]
         try:
-            extra_headers, extra_body = GatewayFactory.make_extras(
-                inference_model=self.inference_model, inference_job=extract_job, output_desc=InferenceOutputType.PAGES
+            response = await self.portkey_client.with_options(config=config_id).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                "/chat/completions",
+                model=self.inference_model.model_id,
+                headers=extra_headers,
+                **extra_body,
             )
-            # Encode document/image as an image_url content part inside messages.
-            # Portkey forwards messages but strips custom top-level fields like document/image.
-            if extra_body.get("messages"):
-                first_msg = extra_body["messages"][0]
-                text_content = first_msg["content"]
-                first_msg["content"] = [
-                    {"type": "text", "text": text_content},
-                    {"type": "image_url", "image_url": {"url": base64_url}},
-                ]
-            async for attempt in retryer:
-                with attempt:
-                    attempt_number += 1
-                    response = await self.portkey_client.with_options(config=config_id).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-                        "/chat/completions",
-                        model=self.inference_model.model_id,
-                        headers=extra_headers,
-                        **extra_body,
-                    )
         except portkey_exceptions.APIError as exc:
             error_summary = GatewayFactory.make_error_summary_from_portkey_error(exc)
             error_category = GatewayFactory.classify_error_category(exc)
-            msg = f"Extract service error for model '{self.inference_model.tag}' after {attempt_number} attempt(s): {error_summary}"
-            raise ExtractJobFailureError(msg, error_category=error_category) from exc
-
-        if response is None:
-            msg = f"Could not get a response for model '{self.inference_model.tag}' via Portkey after {attempt_number} attempts"
-            raise ExtractJobFailureError(msg)
+            user_action = GatewayFactory.make_user_action_from_portkey_error(exc)
+            metadata = extract_gateway_metadata(exc)
+            msg = f"Extract service error for model '{self.inference_model.tag}': {error_summary}"
+            raise ExtractJobFailureError(
+                msg,
+                error_category=error_category,
+                user_action=user_action,
+                provider_metadata=metadata,
+            ) from exc
 
         if not isinstance(response, GenericResponse):
             msg = "Response is not of type GenericResponse"
             raise TypeError(msg)
 
         return GatewayCompletionsFactory.make_extract_output_from_response(inference_model=self.inference_model, response=response)
-
-    def _is_retryable_portkey_error(self, exc: BaseException) -> bool:
-        if isinstance(exc, portkey_exceptions.NotFoundError):
-            msg = str(exc).lower()
-            return "specified deployment could not be found" in msg
-        # Transient upstream gateway failures (e.g. openrouter 500s during batch fetches)
-        # should be retried rather than killing the whole batch on the first hiccup.
-        return isinstance(exc, (portkey_exceptions.InternalServerError, portkey_exceptions.APITimeoutError, portkey_exceptions.APIConnectionError))
-
-    def _log_retry(self, retry_state: RetryCallState) -> None:
-        """Called before sleeping between retries."""
-        if not retry_state.outcome:
-            log.error("Tenacity retry state outcome is None")
-            return
-        exc = retry_state.outcome.exception()
-        attempt = retry_state.attempt_number
-        wait_duration = retry_state.next_action.sleep if retry_state.next_action else 0.0
-        log.dev(f"{self.__class__.__name__} retry #{attempt} for '{self.inference_model.model_id}' due to '{type(exc).__name__}' (service is flaky).")
-        log.verbose(f"Wait duration before next attempt: {wait_duration:.4f}s")

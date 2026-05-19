@@ -1,3 +1,5 @@
+from typing import Annotated, Literal
+
 import shortuuid
 from pydantic import Field, field_validator, model_validator
 
@@ -153,6 +155,10 @@ class PipelineExecutionConfig(ConfigModel):
     is_mock_inputs: bool
     is_generate_graph: bool
     graph_config: GraphConfig
+
+    # Bounded fan-out concurrency for PipeBatch (the resilience-without-Temporal pillar).
+    # An integer caps the number of branches executed at once; the literal "unbounded" disables the bound.
+    max_concurrency: Annotated[int, Field(ge=1)] | Literal["unbounded"]
 
     def with_graph_config_overrides(
         self,

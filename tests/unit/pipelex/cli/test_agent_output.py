@@ -7,17 +7,22 @@ import json
 
 import pytest
 import typer
+from typer.testing import CliRunner
 
-from pipelex.base_exceptions import PipelexError
+from pipelex.base_exceptions import PipelexConfigError, PipelexError
+from pipelex.cli.agent_cli._agent_cli import app  # noqa: PLC2701
 from pipelex.cli.agent_cli.commands.agent_output import (
     AGENT_ERROR_DOMAINS,
     AGENT_ERROR_HINTS,
+    CliOutputFormat,
     _build_error_source,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
     agent_error,
     agent_success,
     extract_validation_errors,
+    set_agent_cli_output_format,
 )
 from pipelex.cogt.exceptions import CogtError, InferenceBackendCredentialsError, InferenceBackendCredentialsErrorType, InferenceErrorCategory
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
@@ -270,7 +275,10 @@ class TestAgentOutput:
 
     def test_agent_error_uses_report_hint_from_cogt_error(self, capsys: pytest.CaptureFixture[str]) -> None:
         """agent_error should use user_action from to_error_report() as the hint field."""
-        cause = CogtError("inference failed", user_action="Check your API key and try again")
+        cause = CogtError(
+            "inference failed",
+            user_action=UserAction(kind=UserActionKind.CHECK_CREDENTIALS, detail="Check your API key and try again"),
+        )
         with pytest.raises(typer.Exit):
             agent_error("inference failed", "CogtError", cause=cause)
 
@@ -309,16 +317,19 @@ class TestAgentOutput:
         """agent_error should fall back to lookup when PipelexError has no category/user_action."""
         cause = PipelexError("something failed")
         with pytest.raises(typer.Exit):
-            agent_error("something failed", "ValidateBundleError", cause=cause)
+            agent_error("something failed", "PipeExecutionError", cause=cause)
 
         parsed = json.loads(capsys.readouterr().err)
         # hint should come from AGENT_ERROR_HINTS since PipelexError has no user_action
-        assert parsed["hint"] == AGENT_ERROR_HINTS["ValidateBundleError"]
+        assert parsed["hint"] == AGENT_ERROR_HINTS["PipeExecutionError"]
 
     def test_agent_error_report_hint_overrides_lookup(self, capsys: pytest.CaptureFixture[str]) -> None:
         """When cause has user_action, it should override the lookup dict hint."""
         # Use an error_type that exists in AGENT_ERROR_HINTS
-        cause = CogtError("model not found", user_action="Use pipelex-agent models to list available models")
+        cause = CogtError(
+            "model not found",
+            user_action=UserAction(kind=UserActionKind.CHANGE_MODEL, detail="Use pipelex-agent models to list available models"),
+        )
         with pytest.raises(typer.Exit):
             agent_error("model not found", "ModelChoiceNotFoundError", cause=cause)
 
@@ -328,7 +339,10 @@ class TestAgentOutput:
 
     def test_agent_error_extra_still_overrides_report(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Explicit **extra kwargs should override report-derived fields."""
-        cause = CogtError("failed", user_action="from report")
+        cause = CogtError(
+            "failed",
+            user_action=UserAction(kind=UserActionKind.UNKNOWN, detail="from report"),
+        )
         with pytest.raises(typer.Exit):
             agent_error("failed", "CogtError", cause=cause, hint="custom override")
 
@@ -371,3 +385,37 @@ class TestAgentOutput:
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["error_domain"] == AGENT_ERROR_DOMAINS[error_type]
         assert parsed["error_category"] == "configuration"
+
+    def test_agent_error_uses_report_error_domain(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """agent_error should include error_domain from to_error_report() for a PipelexError cause."""
+        cause = PipelexConfigError("bad config")
+        with pytest.raises(typer.Exit):
+            agent_error("bad config", "PipelexConfigError", cause=cause)
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert parsed["error_domain"] == "config"
+
+    def test_agent_error_error_domain_falls_back_to_dict_for_builtin(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """agent_error should read error_domain from the lookup dict for a non-PipelexError cause."""
+        cause = FileNotFoundError("missing.mthds")
+        with pytest.raises(typer.Exit):
+            agent_error("file not found", "FileNotFoundError", cause=cause)
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert parsed["error_domain"] == "input"
+
+    def test_app_callback_resets_output_format_to_json(self) -> None:
+        """The output-format ContextVar must be reset per invocation: a markdown command leaving
+        it set must not leak markdown into a later JSON-only command in the same process.
+        """
+        # Simulate a prior markdown command having left the ContextVar set.
+        set_agent_cli_output_format(CliOutputFormat.MARKDOWN)
+
+        # `concept` is a JSON-only command with no --format option; invoked with no spec it
+        # errors via agent_error(). Its error must be JSON, proving the callback reset the format.
+        result = CliRunner().invoke(app, ["concept"])
+
+        assert result.exit_code == 1
+        parsed = json.loads(result.stderr)
+        assert parsed["error"] is True
+        assert parsed["error_type"] == "ArgumentError"

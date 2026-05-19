@@ -295,6 +295,7 @@ def execute_run(
         raise typer.Exit(1) from exc
 
     except Exception as exc:
+        # CLI command root: any unexpected failure is reported to the user and exits non-zero via typer.Exit.
         log.error(f"Error executing pipeline: {exc}")
         console = get_console()
         console.print("\n[bold red]Failed to execute pipeline[/bold red]\n")

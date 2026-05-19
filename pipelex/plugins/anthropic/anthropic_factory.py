@@ -48,11 +48,16 @@ class AnthropicFactory:
             msg = f"Plugin '{plugin}' is not supported by AnthropicFactory"
             raise AnthropicFactoryError(msg) from exc
 
+        # Tier 1 transport retry: set the SDK client's retry budget explicitly from config
+        # instead of inheriting the silent SDK default (anthropic's own DEFAULT_MAX_RETRIES).
+        transport_max_retries = get_config().cogt.transport_max_retries
+
         match sdk_variant:
             case AnthropicSdkVariant.ANTHROPIC:
                 return AsyncAnthropic(
                     api_key=backend.api_key,
                     base_url=backend.endpoint,
+                    max_retries=transport_max_retries,
                 )
             case AnthropicSdkVariant.BEDROCK_ANTHROPIC:
                 aws_config = get_config().pipelex.aws_config
@@ -63,10 +68,12 @@ class AnthropicFactory:
                             aws_secret_key=aws_secret_access_key,
                             aws_access_key=aws_access_key_id,
                             aws_region=aws_region,
+                            max_retries=transport_max_retries,
                         )
                     case BedrockAccessVariant.BEDROCK_TOKEN:
                         return AsyncAnthropicBedrock(
                             api_key=aws_config.get_bedrock_token(),
+                            max_retries=transport_max_retries,
                         )
 
     @staticmethod

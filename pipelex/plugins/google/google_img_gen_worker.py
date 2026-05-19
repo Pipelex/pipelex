@@ -14,6 +14,9 @@ from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.error_classification import (
+    UserAction,
+    UserActionKind,
+    extract_google_metadata,
     is_content_policy_violation,
     is_quota_exhaustion_google,
 )
@@ -80,25 +83,48 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                 try:
                     asyncio.run(self.genai_async_client.aclose())
                     log.verbose("Closed Google async client using asyncio.run()")
-                except Exception as exc:
-                    # Log but don't fail teardown if cleanup has issues
+                except Exception as exc:  # noqa: BLE001
+                    # Best-effort: asyncio.run() runs aclose(), whose failure surface is not enumerable; teardown must never fail.
                     log.verbose(f"Error closing Google async client during teardown: {exc}")
-        except Exception as exc:
-            # Log but don't fail teardown if cleanup has issues
+        except Exception as exc:  # noqa: BLE001
+            # Best-effort cleanup boundary: teardown must never fail, whatever client/event-loop close throws.
             log.debug(f"Error during Google async client teardown: {exc}")
 
     def _classify_google_client_error(self, exc: genai_errors.ClientError) -> ImgGenGenerationError:
-        """Classify a Google GenAI ClientError into a categorized ImgGenGenerationError."""
+        """Classify a Google GenAI ClientError into a categorized ``ImgGenGenerationError``.
+
+        Attaches ``provider_metadata`` and a semantic ``UserAction`` on every branch.
+        """
         error_message = str(exc)
         status_code = exc.code
+        metadata = extract_google_metadata(exc)
 
         if status_code == 404:
+            # Stays as ImgGenGenerationError (not ImgGenModelNotFoundError) to match
+            # google_llm_worker._classify_google_client_error's 404 branch — the LLM
+            # side never specialised to LLMModelNotFoundError either.
             msg = f"Google model '{self.inference_model.desc}' not found: {exc}"
-            return ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
+            return ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.CONFIGURATION,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_MODEL,
+                    detail=f"Model '{self.inference_model.model_id}' was not found — pick an available model",
+                ),
+                provider_metadata=metadata,
+            )
 
         if status_code in {401, 403}:
             msg = f"Google API permission denied for model '{self.inference_model.desc}': {exc}"
-            return ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
+            return ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.CONFIGURATION,
+                user_action=UserAction(
+                    kind=UserActionKind.CHECK_CREDENTIALS,
+                    detail="Google denied access — check your API credentials",
+                ),
+                provider_metadata=metadata,
+            )
 
         if status_code == 429:
             if is_quota_exhaustion_google(error_message):
@@ -106,13 +132,21 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                 return ImgGenGenerationError(
                     msg,
                     error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=f"Your Google Cloud account has exceeded its quota — check billing at {URLs.google_billing}",
+                    user_action=UserAction(
+                        kind=UserActionKind.CHECK_BILLING,
+                        detail=f"Your Google Cloud account has exceeded its quota — check billing at {URLs.google_billing}",
+                    ),
+                    provider_metadata=metadata,
                 )
             msg = f"Google rate limit exceeded for model '{self.inference_model.desc}': {exc}"
             return ImgGenGenerationError(
                 msg,
                 error_category=InferenceErrorCategory.TRANSIENT,
-                user_action="Rate limited by Google — the system will retry automatically",
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Rate limited by Google — the system will retry automatically",
+                ),
+                provider_metadata=metadata,
             )
 
         if status_code == 400:
@@ -121,14 +155,35 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                 return ImgGenGenerationError(
                     msg,
                     error_category=InferenceErrorCategory.CONTENT,
-                    user_action="Content was rejected by safety filters — revise the prompt",
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_INPUT,
+                        detail="Content was rejected by safety filters — revise the prompt",
+                    ),
+                    provider_metadata=metadata,
                 )
             msg = f"Google bad request error for model '{self.inference_model.desc}': {exc}"
-            return ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONTENT)
+            return ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Google rejected the request — review the prompt and parameters",
+                ),
+                provider_metadata=metadata,
+            )
 
-        # Fallback for other 4xx errors
+        # Fallback for other 4xx errors: a ClientError is always 4xx, so it is a
+        # non-retryable client-side problem — not a transient one.
         msg = f"Google API client error for model '{self.inference_model.desc}': {exc}"
-        return ImgGenGenerationError(msg, error_category=InferenceErrorCategory.TRANSIENT)
+        return ImgGenGenerationError(
+            msg,
+            error_category=InferenceErrorCategory.CONFIGURATION,
+            user_action=UserAction(
+                kind=UserActionKind.CHANGE_INPUT,
+                detail="Google rejected the request — review the prompt, parameters, and model configuration",
+            ),
+            provider_metadata=metadata,
+        )
 
     @override
     async def _gen_image(
@@ -164,8 +219,17 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                 config=generation_config,
             )
         except genai_errors.ServerError as exc:
+            metadata = extract_google_metadata(exc)
             msg = f"Google API server error for model '{self.inference_model.desc}': {exc}"
-            raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Google server error — the system will retry automatically",
+                ),
+                provider_metadata=metadata,
+            ) from exc
         except genai_errors.ClientError as exc:
             raise self._classify_google_client_error(exc) from exc
 
@@ -183,12 +247,28 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
         # Extract image from response
         if not response.candidates:
             msg = f"No candidates returned from model: {self.inference_model.desc}"
-            raise ImgGenGenerationError(msg)
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Google returned no image candidates — try rephrasing the prompt or using a different model",
+                ),
+                provider_metadata=None,
+            )
 
         candidate = response.candidates[0]
         if not candidate.content or not candidate.content.parts:
             msg = f"No content parts in response from model: {self.inference_model.desc}"
-            raise ImgGenGenerationError(msg)
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Google returned an empty response — try rephrasing the prompt or using a different model",
+                ),
+                provider_metadata=None,
+            )
 
         # Look for image data in response parts
         for part in candidate.content.parts:
@@ -199,7 +279,15 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                 mime_type = part.inline_data.mime_type
                 if not mime_type:
                     msg = "No mime type returned from Google"
-                    raise ImgGenGenerationError(msg)
+                    raise ImgGenGenerationError(
+                        msg,
+                        error_category=InferenceErrorCategory.UNKNOWN,
+                        user_action=UserAction(
+                            kind=UserActionKind.CHANGE_MODEL,
+                            detail="Google returned image data without a mime type — try a different model",
+                        ),
+                        provider_metadata=None,
+                    )
                 return GeneratedImageRawDetails(
                     actual_bytes=image_bytes,
                     size=ImageSize(width=width, height=height),
@@ -207,7 +295,15 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                 )
 
         msg = f"No image data in response from model: {self.inference_model.desc}"
-        raise ImgGenGenerationError(msg)
+        raise ImgGenGenerationError(
+            msg,
+            error_category=InferenceErrorCategory.CONTENT,
+            user_action=UserAction(
+                kind=UserActionKind.CHANGE_INPUT,
+                detail="Google returned no image data — try rephrasing the prompt or using a different model",
+            ),
+            provider_metadata=None,
+        )
 
     @override
     async def _gen_image_list(

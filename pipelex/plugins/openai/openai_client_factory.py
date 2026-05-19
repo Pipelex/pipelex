@@ -3,6 +3,7 @@ import openai
 from pipelex import log
 from pipelex.cogt.exceptions import CogtError
 from pipelex.cogt.model_backends.backend import InferenceBackend
+from pipelex.config import get_config
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.types import StrEnum
 
@@ -45,6 +46,10 @@ class OpenAIClientFactory:
         # which the local server (Ollama, etc.) ignores.
         api_key = backend.api_key or "unused-no-auth-needed"
 
+        # Tier 1 transport retry: set the SDK client's retry budget explicitly from config
+        # instead of inheriting the silent SDK default (openai's own DEFAULT_MAX_RETRIES).
+        transport_max_retries = get_config().cogt.transport_max_retries
+
         the_client: openai.AsyncOpenAI
         match sdk_variant:
             case OpenAISdkVariant.AZURE_OPENAI | OpenAISdkVariant.AZURE_OPENAI_RESPONSES:
@@ -56,6 +61,7 @@ class OpenAIClientFactory:
                     azure_endpoint=backend.endpoint,
                     api_key=api_key,
                     api_version=backend.get_extra_config(AzureExtraField.API_VERSION),
+                    max_retries=transport_max_retries,
                 )
             case (
                 OpenAISdkVariant.OPENAI
@@ -68,6 +74,7 @@ class OpenAIClientFactory:
                 the_client = openai.AsyncOpenAI(
                     api_key=api_key,
                     base_url=backend.endpoint,
+                    max_retries=transport_max_retries,
                 )
 
         return the_client

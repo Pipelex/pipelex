@@ -48,7 +48,7 @@ class TestLLMReasoning:
             llm_prompt=LLMPrompt(user_text=prompt_text),
             job_metadata=job_metadata,
             llm_job_params=llm_job_params,
-            llm_job_config=LLMJobConfig(max_retries=3),
+            llm_job_config=LLMJobConfig(schema_reask_max_attempts=3),
         )
         try:
             generated_text = await llm_worker.gen_text(llm_job=llm_job)
@@ -86,7 +86,7 @@ class TestLLMReasoning:
             llm_prompt=LLMPrompt(user_text=prompt_text),
             job_metadata=job_metadata,
             llm_job_params=llm_job_params,
-            llm_job_config=LLMJobConfig(max_retries=3),
+            llm_job_config=LLMJobConfig(schema_reask_max_attempts=3),
         )
         try:
             generated_text = await llm_worker.gen_text(llm_job=llm_job)
@@ -114,7 +114,7 @@ class TestLLMReasoning:
             llm_prompt=LLMPrompt(user_text=prompt_text),
             job_metadata=job_metadata,
             llm_job_params=llm_job_params,
-            llm_job_config=LLMJobConfig(max_retries=3),
+            llm_job_config=LLMJobConfig(schema_reask_max_attempts=3),
         )
         generated_text = await llm_worker.gen_text(llm_job=llm_job)
         assert generated_text

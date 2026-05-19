@@ -6,6 +6,7 @@ import typer
 from posthog import tag
 from typing_extensions import Annotated
 
+from pipelex.base_exceptions import PipelexError
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import ErrorContext
 from pipelex.cli.exceptions import PipelexCLIError
@@ -114,7 +115,7 @@ def agent_rules(
                 cleanup=cleanup,
             )
 
-    except Exception as exc:
+    except (PipelexError, OSError) as exc:
         msg = f"Failed to sync kit assets for agent rules: {exc}"
         raise PipelexCLIError(msg) from exc
     finally:

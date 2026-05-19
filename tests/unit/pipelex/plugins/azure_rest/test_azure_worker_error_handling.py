@@ -127,14 +127,17 @@ class TestAzureWorkerErrorHandling:
         ("_topic", "expected_category", "expected_message_substring"),
         AzureErrorHandlingTestData.TIMEOUT_ERROR_CASES,
     )
-    async def test_timeout_error_is_transient(
+    async def test_read_timeout_is_ambiguous(
         self,
         mocker: MockerFixture,
         _topic: str,
         expected_category: InferenceErrorCategory,
         expected_message_substring: str,
     ) -> None:
-        """TimeoutException is caught and categorized as TRANSIENT."""
+        """A ReadTimeout fires after the request reached Azure — the outcome is ambiguous on a
+        non-idempotent submit — so it is caught and categorized AMBIGUOUS (non-retryable),
+        not TRANSIENT.
+        """
         worker = _make_azure_img_gen_worker(mocker)
         sdk_exc = httpx.ReadTimeout("Request timed out")
 

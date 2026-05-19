@@ -9,7 +9,7 @@ from rich.text import Text
 
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.string_utils import snake_to_capitalize_first_letter
-from pipelex.tools.misc.toml_utils import load_toml_from_path
+from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_path
 
 
 def get_backend_options_from_toml(template_path: str, existing_path: str | None = None) -> list[tuple[str, str]]:
@@ -85,8 +85,8 @@ def get_currently_enabled_backends(backends_toml_path: str, backend_options: lis
                     if backend_section.get("enabled", False) is True:  # type: ignore[union-attr]
                         currently_enabled.append(backend_key_to_index[backend_key])
 
-    except Exception:
-        # If we can't read the file, just return empty list (silent failure is acceptable here)
+    except (TomlError, OSError):
+        # If the file can't be read or parsed, just return empty list (silent failure is acceptable here)
         return []
 
     return sorted(currently_enabled)

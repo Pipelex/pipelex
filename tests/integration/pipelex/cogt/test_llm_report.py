@@ -38,7 +38,7 @@ class TestLLMReport:
             ),
             job_metadata=job_metadata,
             llm_job_config=LLMJobConfig(
-                max_retries=3,
+                schema_reask_max_attempts=3,
             ),
             llm_job_params=llm_job_params,
         )

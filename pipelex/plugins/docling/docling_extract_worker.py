@@ -13,6 +13,7 @@ from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.file.file_preparation_utils import prepare_file_from_uri
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_local_extract_metadata
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.docling.docling_factory import DoclingFactory
 from pipelex.plugins.docling.docling_sdk import DoclingSdk
@@ -95,16 +96,48 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
         # corrupt/unreadable documents, unsupported formats, or file system issues.
         except FileNotFoundError as exc:
             msg = f"Document file not found for Docling extraction: {exc}"
-            raise ExtractJobFailureError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from exc
+            raise ExtractJobFailureError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="The source document path could not be found — check the URI or file path",
+                ),
+                provider_metadata=extract_local_extract_metadata(exc, provider="docling"),
+            ) from exc
         except ValueError as exc:
             msg = f"Invalid document format for Docling extraction: {exc}"
-            raise ExtractJobFailureError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
+            raise ExtractJobFailureError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Docling could not parse the document — verify the format is supported",
+                ),
+                provider_metadata=extract_local_extract_metadata(exc, provider="docling"),
+            ) from exc
         except RuntimeError as exc:
             msg = f"Docling conversion failed: {exc}"
-            raise ExtractJobFailureError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
+            raise ExtractJobFailureError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Docling failed to convert the document — the file may be corrupt or unsupported",
+                ),
+                provider_metadata=extract_local_extract_metadata(exc, provider="docling"),
+            ) from exc
         except OSError as exc:
             msg = f"I/O error during Docling extraction: {exc}"
-            raise ExtractJobFailureError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
+            raise ExtractJobFailureError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="I/O error during Docling extraction — the system will retry automatically",
+                ),
+                provider_metadata=extract_local_extract_metadata(exc, provider="docling"),
+            ) from exc
         finally:
             if temp_path:
                 temp_path.unlink(missing_ok=True)

@@ -29,7 +29,7 @@ def get_worker_and_job(llm_preset_id: str, user_text: str, job_metadata: JobMeta
         job_metadata=job_metadata,
         llm_job_params=llm_job_params,
         llm_job_config=LLMJobConfig(
-            max_retries=3,
+            schema_reask_max_attempts=3,
         ),
     )
     return llm_worker, llm_job
@@ -57,7 +57,7 @@ class TestLLMGenText:
             job_metadata=job_metadata,
             llm_job_params=llm_job_params,
             llm_job_config=LLMJobConfig(
-                max_retries=3,
+                schema_reask_max_attempts=3,
             ),
         )
         generated_text = await llm_worker.gen_text(llm_job=llm_job)
