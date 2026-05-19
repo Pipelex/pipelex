@@ -14,11 +14,9 @@ if TYPE_CHECKING:
 from pipelex.cogt.exceptions import ExtractJobFailureError, ImgGenGenerationError, InferenceErrorCategory, SearchJobFailureError
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.plugins.gateway.gateway_extract_worker import GatewayExtractWorker
-from pipelex.plugins.gateway.gateway_factory import GatewayFactory
 from pipelex.plugins.gateway.gateway_img_gen_worker import GatewayImgGenWorker
 from pipelex.plugins.gateway.gateway_protocols import GatewayExtractProtocol
 from pipelex.plugins.gateway.gateway_search_worker import GatewaySearchWorker
-from tests.unit.pipelex.plugins.gateway.test_data import GatewayQuotaDetectionTestData
 
 
 def _make_portkey_exception(exception_type_name: str, status_code: int, message: str) -> portkey_exceptions.APIError:
@@ -103,43 +101,6 @@ def _make_gateway_search_worker(mocker: MockerFixture) -> GatewaySearchWorker:
 class TestGatewayQuotaDetection:
     """Tests for Portkey error classification across gateway workers."""
 
-    # ---- Classification method tests (direct unit tests) ----
-
-    @pytest.mark.parametrize(
-        ("_topic", "exception_type_name", "status_code", "error_message", "expected_category"),
-        GatewayQuotaDetectionTestData.CLASSIFY_CASES,
-    )
-    async def test_classify_error_category(
-        self,
-        _topic: str,
-        exception_type_name: str,
-        status_code: int,
-        error_message: str,
-        expected_category: InferenceErrorCategory,
-    ) -> None:
-        """GatewayFactory.classify_error_category returns correct category for Portkey errors."""
-        exc = _make_portkey_exception(exception_type_name, status_code, error_message)
-
-        result = GatewayFactory.classify_error_category(exc)
-
-        assert result is expected_category
-
-    async def test_classify_unhandled_4xx_status_error_is_configuration(self) -> None:
-        """A generic 4xx APIStatusError is non-retryable CONFIGURATION, not TRANSIENT."""
-        exc = _make_portkey_exception("APIStatusError", 409, "Conflict")
-
-        assert GatewayFactory.classify_error_category(exc) is InferenceErrorCategory.CONFIGURATION
-
-    async def test_user_action_for_unhandled_4xx_is_change_input(self) -> None:
-        """A generic 4xx APIStatusError yields a corrective CHANGE_INPUT action, not WAIT_AND_RETRY."""
-        exc = _make_portkey_exception("APIStatusError", 409, "Conflict")
-
-        action = GatewayFactory.make_user_action_from_portkey_error(exc)
-
-        assert action.kind is UserActionKind.CHANGE_INPUT
-
-    # ---- Full flow tests: verify the exception propagates with category ----
-
     async def test_imggen_worker_propagates_rate_limit_as_transient(self, mocker: MockerFixture) -> None:
         """GatewayImgGenWorker raises ImgGenGenerationError with TRANSIENT for rate limit."""
         worker = _make_gateway_img_gen_worker(mocker)
@@ -202,10 +163,6 @@ class TestGatewayQuotaDetection:
         mocker.patch(
             "pipelex.plugins.gateway.gateway_extract_worker.GatewayDeck.get_config_id",
             return_value="test-config",
-        )
-        mocker.patch(
-            "pipelex.plugins.gateway.gateway_extract_worker.GatewayFactory.make_error_summary_from_portkey_error",
-            return_value="Quota exhausted",
         )
         mocker.patch(
             "pipelex.plugins.gateway.gateway_extract_worker.GatewayFactory.make_extras",

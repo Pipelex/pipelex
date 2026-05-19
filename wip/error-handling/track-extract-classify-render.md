@@ -1,5 +1,9 @@
 # Track — Extract / Classify / Render Decomposition
 
+> **Status: landed on `refactor/ECR`.** Every inference worker's `except` block now collapses to `extract → classify → raise render(...) from exc`. **Classify** lives in `pipelex/cogt/inference/error_classify.py`, **Render** in `error_render.py`; the per-provider `extract_*_metadata` functions stay in `pipelex/cogt/inference/error_classification.py`. The per-provider `*_error_classification.py` files, `AnthropicCredentialsError`, and the dead `GatewayFactory` Portkey-classify helpers are deleted. Per-provider quota probes are now module-private (`_is_quota_exhaustion_*`), reachable only through `ProviderErrorMetadata.is_quota_exhaustion`. A new parity meta-test (`tests/unit/pipelex/cogt/inference/test_provider_classification_parity.py`) walks every `ProviderName` against the extract-fn registry, so adding a new provider without wiring it fails fast.
+>
+> The rest of this doc describes the **pre-refactor problem and the design** that the refactor implements. It is kept as the historical motivation; the code is now in its post-refactor state.
+
 ## What this track is
 
 Today every inference worker performs three logically separate steps inline inside its `except` blocks: (1) **Extract** structured metadata from the SDK exception (status code, request id, retry-after, error code, body), (2) **Classify** the error into an `InferenceErrorCategory` + `UserActionKind`, and (3) **Render** a `CogtError` subclass with a human-readable message and the categorization attached. The three steps are tangled together, and every new provider duplicates the entire pipeline.

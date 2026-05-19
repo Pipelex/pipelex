@@ -54,17 +54,17 @@ class ProviderErrorMetadata(BaseModel):
         """
         match self.provider:
             case ProviderName.OPENAI:
-                return is_quota_exhaustion_openai(self.message)
+                return _is_quota_exhaustion_openai(self.message)
             case ProviderName.ANTHROPIC:
-                return is_quota_exhaustion_anthropic(self.message)
+                return _is_quota_exhaustion_anthropic(self.message)
             case ProviderName.GOOGLE:
-                return is_quota_exhaustion_google(self.message)
+                return _is_quota_exhaustion_google(self.message)
             case ProviderName.MISTRAL:
-                return is_quota_exhaustion_mistral(self.message, self.status_code or 0)
+                return _is_quota_exhaustion_mistral(self.message, self.status_code or 0)
             case ProviderName.BEDROCK:
-                return is_quota_exhaustion_aws(self.message)
+                return _is_quota_exhaustion_aws(self.message)
             case ProviderName.GATEWAY:
-                return is_quota_exhaustion_gateway(self.message, self.status_code or 0)
+                return _is_quota_exhaustion_gateway(self.message, self.status_code or 0)
             case (
                 ProviderName.AZURE | ProviderName.FAL | ProviderName.HUGGINGFACE | ProviderName.LINKUP | ProviderName.DOCLING | ProviderName.PYPDFIUM2
             ):
@@ -73,7 +73,7 @@ class ProviderErrorMetadata(BaseModel):
     @property
     def is_content_policy_violation(self) -> bool:
         """Whether the error message indicates a content policy / safety filter violation."""
-        return is_content_policy_violation(self.message)
+        return _is_content_policy_violation(self.message)
 
     @property
     def is_network_error(self) -> bool:
@@ -174,25 +174,25 @@ _GATEWAY_QUOTA_PATTERNS: tuple[str, ...] = (
 )
 
 
-def is_quota_exhaustion_openai(error_message: str) -> bool:
+def _is_quota_exhaustion_openai(error_message: str) -> bool:
     """Check if an OpenAI error message indicates quota/credits exhaustion rather than rate limiting."""
     lower_message = error_message.lower()
     return any(pattern in lower_message for pattern in _OPENAI_QUOTA_PATTERNS)
 
 
-def is_quota_exhaustion_anthropic(error_message: str) -> bool:
+def _is_quota_exhaustion_anthropic(error_message: str) -> bool:
     """Check if an Anthropic error message indicates quota/credits exhaustion rather than rate limiting."""
     lower_message = error_message.lower()
     return any(pattern in lower_message for pattern in _ANTHROPIC_QUOTA_PATTERNS)
 
 
-def is_quota_exhaustion_google(error_message: str) -> bool:
+def _is_quota_exhaustion_google(error_message: str) -> bool:
     """Check if a Google error message indicates quota/credits exhaustion rather than rate limiting."""
     lower_message = error_message.lower()
     return any(pattern in lower_message for pattern in _GOOGLE_QUOTA_PATTERNS)
 
 
-def is_quota_exhaustion_mistral(error_message: str, status_code: int) -> bool:
+def _is_quota_exhaustion_mistral(error_message: str, status_code: int) -> bool:
     """Check if a Mistral error indicates quota/credits exhaustion.
 
     HTTP 402 (Payment Required) is a definitive quota signal.
@@ -204,13 +204,13 @@ def is_quota_exhaustion_mistral(error_message: str, status_code: int) -> bool:
     return status_code == 429 and any(pattern in lower_message for pattern in _MISTRAL_QUOTA_PATTERNS)
 
 
-def is_quota_exhaustion_aws(error_message: str) -> bool:
+def _is_quota_exhaustion_aws(error_message: str) -> bool:
     """Check if an AWS error message indicates quota/credits exhaustion rather than rate limiting."""
     lower_message = error_message.lower()
     return any(pattern in lower_message for pattern in _AWS_QUOTA_PATTERNS)
 
 
-def is_quota_exhaustion_gateway(error_message: str, status_code: int) -> bool:
+def _is_quota_exhaustion_gateway(error_message: str, status_code: int) -> bool:
     """Check if a Portkey/Gateway error indicates quota/credits exhaustion.
 
     HTTP 402 (Payment Required) is a definitive quota signal.
@@ -222,7 +222,7 @@ def is_quota_exhaustion_gateway(error_message: str, status_code: int) -> bool:
     return status_code == 429 and any(pattern in lower_message for pattern in _GATEWAY_QUOTA_PATTERNS)
 
 
-def is_content_policy_violation(error_message: str) -> bool:
+def _is_content_policy_violation(error_message: str) -> bool:
     """Check if an error message indicates a content policy or safety filter violation."""
     lower_message = error_message.lower()
     return any(pattern in lower_message for pattern in _CONTENT_POLICY_PATTERNS)

@@ -1,10 +1,10 @@
 # TODOS
 
-## In progress — Extract / Classify / Render (ECR) decomposition
+## Done — Extract / Classify / Render (ECR) decomposition
 
 Branch: `refactor/ECR` (worktree at `_tprl/`).
 
-**Status:** Checkpoints 1–4 of 5 done. CP1+2+3 in commit **`6c9415de`**; CP4 in commit **`9c7a6ee1`** "Migrate extract and search workers to the shared ECR error pipeline". Branch `refactor/ECR` is ahead of `origin/refactor/ECR` — not yet pushed; check `git status` for the exact lead. `make agent-check` + `make agent-test` green. Working tree clean. Plan + cold-start handoff: [`~/.claude/plans/ok-let-s-do-ecr-reflective-dahl.md`](file:///Users/lchoquel/.claude/plans/ok-let-s-do-ecr-reflective-dahl.md).
+**Status:** All 5 checkpoints done. `make agent-check` + `make agent-test` green. Branch ahead of `origin/refactor/ECR` (not yet pushed). Plan: [`~/.claude/plans/ok-let-s-do-ecr-reflective-dahl.md`](file:///Users/lchoquel/.claude/plans/ok-let-s-do-ecr-reflective-dahl.md).
 
 | CP | Status | Scope |
 |---|---|---|
@@ -12,7 +12,7 @@ Branch: `refactor/ECR` (worktree at `_tprl/`).
 | 2 | ✅ done | 6 LLM workers migrated (anthropic, openai completions+responses, mistral, google, bedrock); bedrock instance-method classifier deleted |
 | 3 | ✅ done | 7 img-gen workers migrated (openai, openai-completions, fal, huggingface, azure_rest, google, gateway); Azure keeps AMBIGUOUS branches for non-idempotent 5xx + post-flight transport errors; statusless map gains `MissingCredentialsError` + `FalClientError` |
 | 4 | ✅ done | 7 extract + search workers migrated (mistral, linkup ×2, gateway ×2, docling, pypdfium2); all `_classify_*_error` instance methods + inline `GatewayFactory.*_from_portkey_error` calls deleted from worker bodies; statusless map gains the remaining 4 Linkup typed exceptions; mistral & gateway-search now specialize 404 to `ExtractModelNotFoundError` / `SearchModelNotFoundError` |
-| 5 | ⬜ **next** | Delete the 4 `classify_*_sdk_error` files + `AnthropicCredentialsError`; privatize quota helpers; delete `GatewayFactory.classify_error_category` / `make_user_action_from_portkey_error` / `make_error_summary_from_portkey_error` + their tests; cross-provider parity meta-test |
+| 5 | ✅ done | Deleted the per-provider `*_error_classification.py` files (+ matching tests) and `AnthropicCredentialsError`; deleted `GatewayFactory.classify_error_category` / `make_user_action_from_portkey_error` / `make_error_summary_from_portkey_error` and their direct tests; privatized quota helpers (`_is_quota_exhaustion_*`, `_is_content_policy_violation`) and rewrote `test_error_classification.py` to exercise the public `ProviderErrorMetadata` properties; new parity meta-test `test_provider_classification_parity.py` walks every `ProviderName` against the extract-fn registry |
 
 Key deviations from the original design (recorded in the plan file): `message` defaults to `""`; early `is_quota_exhaustion` check in classify; `extract_bedrock_metadata` derives status from AWS error code; `_classify_statusless` is provider-aware; HTTP 422 → CONFIGURATION; `SDKErrorEnvelope` is a real `TypeAlias`; user-facing `UserAction.detail` is provider-agnostic now; Azure ImgGen keeps two AMBIGUOUS branches (5xx + post-flight transport) outside the shared classifier because they encode operation idempotency, not error nature.
 
@@ -36,7 +36,6 @@ Each track is a self-contained concern. Suggested review path:
 
 So these are not flagged as missing during review:
 
-- **Extract / Classify / Render decomposition** — a proposed, not-started refactor; out of scope for this branch. See [`track-extract-classify-render.md`](wip/error-handling/track-extract-classify-render.md).
 - **Metadata-model long tail** — a few non-inference `PipelexError` subclasses still rely on the `agent_output.py` fallback dicts for `hint` / `error_domain` instead of class-level metadata. See the Followups in [`track-metadata-model.md`](wip/error-handling/track-metadata-model.md).
 - Optional, non-blocking review followups are collected in [`wip/error-handling/deferred-items/`](wip/error-handling/deferred-items/).
 
