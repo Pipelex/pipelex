@@ -146,7 +146,7 @@ All model types support the same routing, aliasing, and preset systems.
 ### LLM Configuration
 - Temperature must be between 0 and 1
 - Max tokens must be positive
-- Max retries must be between 1 and 10
+- Schema re-ask attempts must be between 1 and 10
 - Seeds must be non-negative
 
 ### ImageGen Configuration

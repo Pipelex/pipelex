@@ -7,7 +7,7 @@ description: "How Pipelex classifies, carries, and reports errors — the ErrorR
 
 In Pipelex, an error is **data**, not a control-flow accident. Every failure is classified once — at the layer that knows the most about it — and that classification travels intact to every consumer: the human reading a Rich panel, the agent parsing JSON, the Temporal retry engine, and the HTTP adapter picking a status code.
 
-This page covers the contract that makes that possible: the `ErrorReport` schema, the two classification enums, how inference workers classify SDK exceptions, how classification survives every wrapping layer, and how it crosses the Temporal boundary.
+This page covers the contract that makes that possible: the `ErrorReport` schema, the classification enums, how inference workers classify SDK exceptions, how classification survives every wrapping layer, and how it crosses the Temporal boundary.
 
 ---
 
@@ -28,7 +28,7 @@ Three rules hold across the codebase, and everything else builds on them.
 
 ## The Layer Model
 
-An error rises through six layers. Each layer has exactly one job.
+An error rises through a series of layers. Each layer has exactly one job.
 
 | Layer | Role | What it does with errors |
 |-------|------|--------------------------|
@@ -348,7 +348,7 @@ Exception
 | **Raise time** | Per-instance `error_category`, `user_action`, `provider_metadata` | Constructor args — set by the worker that classified the failure |
 | **Report time** | `model`, `provider`, cause-chain fields | `fill_model_and_provider()` at the worker chokepoint; `_enrich_error_report_from_cause()` on `to_error_report()` |
 
-The four "outcome" exceptions (`LLMCompletionError`, `ImgGenGenerationError`, `ExtractJobFailureError`, `SearchJobFailureError`) intentionally carry **no** class-level `error_category` — their category is genuinely per-instance, decided by the worker.
+The "outcome" exceptions (`LLMCompletionError`, `ImgGenGenerationError`, `ExtractJobFailureError`, `SearchJobFailureError`) intentionally carry **no** class-level `error_category` — their category is genuinely per-instance, decided by the worker.
 
 ---
 
