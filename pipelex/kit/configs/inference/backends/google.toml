@@ -87,6 +87,15 @@ max_prompt_images = 3000
 costs = { input = 2, output = 12.0 }
 thinking_mode = "adaptive"
 
+# --- Gemini 3.5 Series ----------------------------------------
+["gemini-3.5-flash"]
+model_id = "gemini-3.5-flash"
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 1.5, output = 9.0 }
+thinking_mode = "adaptive"
+
 # --- Latest Aliases (point to current generation, change over time) -----------
 ["gemini-pro-latest"]
 inputs = ["text", "images", "pdf"]

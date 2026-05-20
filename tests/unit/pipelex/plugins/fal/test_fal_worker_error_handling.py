@@ -4,22 +4,22 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+import httpx
 import pytest
 from fal_client.auth import MissingCredentialsError
 from fal_client.client import FalClientError, FalClientHTTPError, FalClientTimeoutError
 
-if TYPE_CHECKING:
-    from pytest_mock import MockerFixture
-
 from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategory
+from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.plugins.fal.fal_img_gen_worker import FalImgGenWorker
 from tests.unit.pipelex.plugins.fal.test_data import FalErrorHandlingTestData
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 
 def _make_fal_http_error(status_code: int, message: str) -> FalClientHTTPError:
     """Create a FalClientHTTPError for testing."""
-    import httpx  # noqa: PLC0415
-
     request = httpx.Request("POST", "https://fal.ai/test")
     response = httpx.Response(status_code=status_code, request=request, text=message)
     return FalClientHTTPError(message=message, status_code=status_code, response_headers={}, response=response)
@@ -70,7 +70,7 @@ class TestFalWorkerErrorHandling:
     """Tests for FAL ImgGen worker SDK exception handling and error categorization."""
 
     @pytest.mark.parametrize(
-        ("_topic", "status_code", "message", "expected_category", "expected_message_substring"),
+        ("_topic", "status_code", "message", "expected_category", "expected_user_action_kind"),
         FalErrorHandlingTestData.HTTP_ERROR_CASES,
     )
     async def test_http_error_categorization(
@@ -80,7 +80,7 @@ class TestFalWorkerErrorHandling:
         status_code: int,
         message: str,
         expected_category: InferenceErrorCategory,
-        expected_message_substring: str,
+        expected_user_action_kind: UserActionKind,
     ) -> None:
         """FalClientHTTPError is caught and categorized correctly based on status code."""
         worker = _make_fal_img_gen_worker(mocker)
@@ -97,11 +97,12 @@ class TestFalWorkerErrorHandling:
             await worker._submit_and_get_result(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is expected_user_action_kind
         assert exc_info.value.__cause__ is sdk_exc
-        assert expected_message_substring in exc_info.value.args[0].lower()
 
     @pytest.mark.parametrize(
-        ("_topic", "expected_category", "expected_message_substring"),
+        ("_topic", "expected_category", "expected_user_action_kind"),
         FalErrorHandlingTestData.MISSING_CREDENTIALS_CASES,
     )
     async def test_missing_credentials_is_configuration(
@@ -109,7 +110,7 @@ class TestFalWorkerErrorHandling:
         mocker: MockerFixture,
         _topic: str,
         expected_category: InferenceErrorCategory,
-        expected_message_substring: str,
+        expected_user_action_kind: UserActionKind,
     ) -> None:
         """MissingCredentialsError is caught and categorized as CONFIGURATION."""
         worker = _make_fal_img_gen_worker(mocker)
@@ -126,11 +127,12 @@ class TestFalWorkerErrorHandling:
             await worker._submit_and_get_result(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is expected_user_action_kind
         assert exc_info.value.__cause__ is sdk_exc
-        assert expected_message_substring in exc_info.value.args[0].lower()
 
     @pytest.mark.parametrize(
-        ("_topic", "expected_category", "expected_message_substring"),
+        ("_topic", "expected_category", "expected_user_action_kind"),
         FalErrorHandlingTestData.TIMEOUT_CASES,
     )
     async def test_timeout_error_is_transient(
@@ -138,7 +140,7 @@ class TestFalWorkerErrorHandling:
         mocker: MockerFixture,
         _topic: str,
         expected_category: InferenceErrorCategory,
-        expected_message_substring: str,
+        expected_user_action_kind: UserActionKind,
     ) -> None:
         """FalClientTimeoutError is caught and categorized as TRANSIENT."""
         worker = _make_fal_img_gen_worker(mocker)
@@ -155,11 +157,12 @@ class TestFalWorkerErrorHandling:
             await worker._submit_and_get_result(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is expected_user_action_kind
         assert exc_info.value.__cause__ is sdk_exc
-        assert expected_message_substring in exc_info.value.args[0].lower()
 
     @pytest.mark.parametrize(
-        ("_topic", "expected_category", "expected_message_substring"),
+        ("_topic", "expected_category", "expected_user_action_kind"),
         FalErrorHandlingTestData.GENERIC_CLIENT_ERROR_CASES,
     )
     async def test_generic_client_error_is_transient(
@@ -167,7 +170,7 @@ class TestFalWorkerErrorHandling:
         mocker: MockerFixture,
         _topic: str,
         expected_category: InferenceErrorCategory,
-        expected_message_substring: str,
+        expected_user_action_kind: UserActionKind,
     ) -> None:
         """FalClientError is caught and categorized as TRANSIENT."""
         worker = _make_fal_img_gen_worker(mocker)
@@ -184,8 +187,9 @@ class TestFalWorkerErrorHandling:
             await worker._submit_and_get_result(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is expected_user_action_kind
         assert exc_info.value.__cause__ is sdk_exc
-        assert expected_message_substring in exc_info.value.args[0].lower()
 
     async def test_error_report_includes_category(self, mocker: MockerFixture) -> None:
         """to_error_report() includes error_category and retryable from the exception."""
@@ -206,3 +210,6 @@ class TestFalWorkerErrorHandling:
         assert report.error_category == "capacity"
         assert report.retryable is False
         assert report.error_type == "ImgGenGenerationError"
+        assert exc_info.value.error_category is InferenceErrorCategory.CAPACITY
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.CHECK_BILLING

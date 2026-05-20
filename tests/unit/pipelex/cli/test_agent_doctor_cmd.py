@@ -121,7 +121,7 @@ class TestAgentDoctorCmd:
         )
 
         with pytest.raises(typer.Exit) as exc_info:
-            agent_doctor_cmd()
+            agent_doctor_cmd(output_format=CliOutputFormat.JSON)
         assert exc_info.value.exit_code == 1
 
         parsed = json.loads(capsys.readouterr().err)

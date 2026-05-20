@@ -137,7 +137,6 @@ class BatchParams(BaseModel):
 class PipeRunParams(BaseModel):
     run_mode: PipeRunMode = PipeRunMode.LIVE
     final_stuff_code: str | None = None
-    is_with_preliminary_text: bool | None = None
     output_multiplicity: VariableMultiplicity | None = None
     dynamic_output_concept_ref: str | None = None
     batch_params: BatchParams | None = None
@@ -171,7 +170,6 @@ class PipeRunParams(BaseModel):
         cls,
         pipe_run_params: Self,
         applied_output_multiplicity: VariableMultiplicity | None,
-        is_with_preliminary_text: bool | None = None,
     ) -> Self:
         """Copy the run params the nb_output into the params, and remove the attribute.
         This is useful to make a single prompt with multiple outputs.
@@ -184,8 +182,6 @@ class PipeRunParams(BaseModel):
         elif isinstance(applied_output_multiplicity, int):
             new_run_params.output_multiplicity = False
             new_run_params.params[PipeRunParamKey.NB_OUTPUT] = applied_output_multiplicity
-        if is_with_preliminary_text is not None:
-            new_run_params.is_with_preliminary_text = is_with_preliminary_text
         return new_run_params
 
     @property
@@ -193,19 +189,24 @@ class PipeRunParams(BaseModel):
         return isinstance(self.output_multiplicity, int) and self.output_multiplicity > 1
 
     def push_pipe_to_stack(self, pipe_code: str) -> None:
-        self.pipe_stack.append(pipe_code)
         limit = self.pipe_stack_limit
-        if len(self.pipe_stack) > limit:
+        if len(self.pipe_stack) >= limit:
+            # Check the limit *before* appending: run_pipe() calls push_pipe_to_stack()
+            # outside its push/pop try/finally, so a frame appended here on overflow
+            # would never be popped and would corrupt the stack of any later reuse.
             msg = f"Exceeded pipe stack limit of {limit}. You can raise that limit in the config. Stack:\n{self.pipe_stack}"
             raise PipeStackOverflowError(message=msg, limit=limit, pipe_stack=self.pipe_stack)
+        self.pipe_stack.append(pipe_code)
 
     def pop_pipe_from_stack(self, pipe_code: str) -> None:
         popped_pipe_code = self.pipe_stack.pop()
         if popped_pipe_code != pipe_code:
-            # raise PipeRunError(f"Pipe code '{pipe_code}' was not the last pipe in the stack, it was '{popped_pipe_code}'")
+            # A mismatch means the push/pop discipline was broken upstream. run_pipe() pushes
+            # and pops each frame in a `try`/`finally`, so a frame stays balanced even when its
+            # pipe fails — a mismatch here should not happen in normal flow. We log rather than
+            # raise: this runs inside run_pipe()'s `finally`, where raising would mask the
+            # in-flight exception.
             log.error(f"Pipe code '{pipe_code}' was not the last pipe in the stack, it was '{popped_pipe_code}'")
-            # TODO: investigate how this can happen, maybe due to a shared object between branches of PipeBatch or PipeParallel
-            # (which should be copied instead)
 
     def push_pipe_layer(self, pipe_code: str) -> None:
         if self.pipe_layers and self.pipe_layers[-1] == pipe_code:

@@ -58,6 +58,7 @@ plugins:
       separator: '[\s\-\.]+'
   - redirects:
       redirect_maps:
+        'under-the-hood/temporal-deployment.md': 'distributed-execution/cluster-setup.md'
         'home/1-features/advanced-customizations.md': 'features/advanced-customizations.md'
         'home/1-features/claude-code-skills-plugin.md': 'features/claude-code-skills-plugin.md'
         'home/1-features/cli.md': 'features/cli.md'
@@ -117,8 +118,9 @@ plugins:
         'home/6-build-reliable-ai-workflows/configure-ai-llm-to-optimize-methods.md': 'building-methods/configure-ai-llm-to-optimize-methods.md'
         'home/6-build-reliable-ai-workflows/domain.md': 'building-methods/domain.md'
         'home/6-build-reliable-ai-workflows/kick-off-a-methods-project.md': 'building-methods/kick-off-a-methods-project.md'
+        'home/6-build-reliable-ai-workflows/llm-structured-generation-config.md': 'under-the-hood/build-time-elaboration.md'
+        'building-methods/llm-structured-generation-config.md': 'under-the-hood/build-time-elaboration.md'
         'home/6-build-reliable-ai-workflows/libraries.md': 'building-methods/libraries.md'
-        'home/6-build-reliable-ai-workflows/llm-structured-generation-config.md': 'building-methods/llm-structured-generation-config.md'
         'home/6-build-reliable-ai-workflows/packages.md': 'building-methods/packages.md'
         'home/6-build-reliable-ai-workflows/pipelex-bundle-specification.md': 'building-methods/pipelex-bundle-specification.md'
         'home/6-build-reliable-ai-workflows/pipes/executing-pipelines.md': 'building-methods/pipes/executing-pipelines.md'
@@ -243,6 +245,7 @@ plugins:
         - building-methods/pipes/understanding-multiplicity.md: "Understanding Multiplicity"
         - building-methods/pipes/pipe-operators/index.md: "Pipe Operators Overview"
         - building-methods/pipes/pipe-operators/PipeLLM.md: "PipeLLM"
+        - building-methods/pipes/pipe-operators/PipeStructure.md: "PipeStructure"
         - building-methods/pipes/pipe-operators/PipeExtract.md: "PipeExtract"
         - building-methods/pipes/pipe-operators/PipeImgGen.md: "PipeImgGen"
         - building-methods/pipes/pipe-operators/PipeSearch.md: "PipeSearch"
@@ -254,7 +257,6 @@ plugins:
         - building-methods/pipes/pipe-controllers/PipeBatch.md: "PipeBatch"
         - building-methods/pipes/pipe-controllers/PipeCondition.md: "PipeCondition"
         - building-methods/configure-ai-llm-to-optimize-methods.md: "Optimize Cost & Quality"
-        - building-methods/llm-structured-generation-config.md: "LLM Structured Generation"
         - building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md: "LLM Prompting Style"
         Reference:
         - tools/cli/index.md: "CLI Reference Overview"
@@ -297,6 +299,7 @@ plugins:
         Under the Hood:
         - under-the-hood/index.md: "Under the Hood Overview"
         - under-the-hood/architecture-overview.md: "Architecture Overview"
+        - under-the-hood/build-time-elaboration.md: "Build-time Elaboration"
         - under-the-hood/dry-run-mock-generation.md: "Dry Run Mock Generation"
         - under-the-hood/execution-graph-tracing.md: "Execution Graph Tracing"
         - under-the-hood/image-handling-in-llm-prompts.md: "Image Handling in LLM Prompts"
@@ -305,7 +308,9 @@ plugins:
         - under-the-hood/test-profile-configuration.md: "Test Profile Configuration"
         - under-the-hood/init-cli-flows.md: "Init CLI Flows"
         - under-the-hood/pipe-routing-and-execution.md: "Pipe Routing & Execution"
+        - under-the-hood/error-model.md: "Error Model"
         - under-the-hood/temporal-integration.md: "Temporal Integration"
+        - under-the-hood/temporal-deployment.md: "Temporal Deployment"
         - under-the-hood/distributed-content-generation.md: "Distributed Content Generation"
         Project:
         - contributing.md: "Contributing"
@@ -373,6 +378,13 @@ nav:
     - Viewpoint:
       - The Know-How Graph: viewpoint/viewpoint.md
   - Guide:
+    - Retries & Resilience: reliability/retries-and-resilience.md
+    - Distributed Execution with Temporal:
+      - Overview: distributed-execution/index.md
+      - Cluster Setup: distributed-execution/cluster-setup.md
+      - Worker Deployment: distributed-execution/workers.md
+      - Task-Queue Routing: distributed-execution/task-routing.md
+      - Workflow Observability: distributed-execution/observability.md
     - Features:
       - Overview: features/index.md
       - Declarative AI Methods:
@@ -393,6 +405,7 @@ nav:
         - Execution Graph Visualization: features/execution-graph.md
       - Production & Operations:
         - Validation & Dry Run: features/validation-dry-run.md
+        - Distributed Execution with Temporal: features/distributed-execution.md
         - Telemetry & Observability: features/telemetry.md
         - Cloud Storage: features/cloud-storage.md
         - Cost Tracking & Reporting: features/cost-tracking.md
@@ -421,6 +434,7 @@ nav:
         - Pipe Operators:
           - Overview: building-methods/pipes/pipe-operators/index.md
           - PipeLLM: building-methods/pipes/pipe-operators/PipeLLM.md
+          - PipeStructure: building-methods/pipes/pipe-operators/PipeStructure.md
           - PipeExtract: building-methods/pipes/pipe-operators/PipeExtract.md
           - PipeImgGen: building-methods/pipes/pipe-operators/PipeImgGen.md
           - PipeSearch: building-methods/pipes/pipe-operators/PipeSearch.md
@@ -433,7 +447,6 @@ nav:
           - PipeBatch: building-methods/pipes/pipe-controllers/PipeBatch.md
           - PipeCondition: building-methods/pipes/pipe-controllers/PipeCondition.md
       - Optimize Cost & Quality: building-methods/configure-ai-llm-to-optimize-methods.md
-      - LLM Structured Generation: building-methods/llm-structured-generation-config.md
       - LLM Prompting Style: building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
   - Reference:
     - CLI Reference:
@@ -485,6 +498,7 @@ nav:
     - Under the Hood:
       - Overview: under-the-hood/index.md
       - Architecture Overview: under-the-hood/architecture-overview.md
+      - Build-time Elaboration: under-the-hood/build-time-elaboration.md
       - Dry Run Mock Generation: under-the-hood/dry-run-mock-generation.md
       - Execution Graph Tracing: under-the-hood/execution-graph-tracing.md
       - Image Handling in LLM Prompts: under-the-hood/image-handling-in-llm-prompts.md
@@ -493,6 +507,7 @@ nav:
       - Test Profile Configuration: under-the-hood/test-profile-configuration.md
       - Init CLI Flows: under-the-hood/init-cli-flows.md
       - Pipe Routing & Execution: under-the-hood/pipe-routing-and-execution.md
+      - Error Model: under-the-hood/error-model.md
       - Temporal Integration: under-the-hood/temporal-integration.md
       - Distributed Content Generation: under-the-hood/distributed-content-generation.md
   - Project:

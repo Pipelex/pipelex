@@ -5,6 +5,7 @@ from pipelex.cogt.model_backends.gateway_config import GatewayConfig
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
+from pipelex.system.pipelex_service.types import RemoteConfigSource
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
 
@@ -22,6 +23,7 @@ class ModelManagerAbstract(ABC):
         self,
         secrets_provider: SecretsProviderAbstract,
         gateway_config: GatewayConfig | None,
+        gateway_config_source: RemoteConfigSource | None,
         needs_inference: bool = True,
     ) -> None:
         pass

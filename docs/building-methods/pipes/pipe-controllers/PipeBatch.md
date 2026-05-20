@@ -4,7 +4,7 @@ description: "PipeBatch maps a single pipe over a list of items in parallel. Pro
 
 # PipeBatch
 
-The `PipeBatch` controller provides a powerful "map" operation for your pipelines. It takes a list of items as input and runs the same pipe on each item in the list, executing them all in parallel for maximum efficiency.
+The `PipeBatch` controller provides a powerful "map" operation for your pipelines. It takes a list of items as input and runs the same pipe on each item in the list, executing the branches concurrently for efficiency.
 
 This is the ideal controller for processing collections of documents, images, or any other data records where the same logic needs to be applied to each one independently.
 
@@ -15,8 +15,18 @@ This is the ideal controller for processing collections of documents, images, or
 1.  **Input List**: It identifies an input list from the working memory.
 2.  **Branching**: For each item in the input list, it creates a new, isolated execution branch.
 3.  **Isolation & Injection**: Each branch gets a deep copy of the `WorkingMemory`. The specific item for that branch is injected into this memory with a defined name.
-4.  **Concurrent Execution**: The specified `branch_pipe_code` is executed in all branches simultaneously. Each branch pipe operates only on its own item.
+4.  **Concurrent Execution**: The specified `branch_pipe_code` runs across the branches concurrently — in bounded chunks, by default at most `max_concurrency` branches at a time. Each branch pipe operates only on its own item.
 5.  **Aggregation**: After all branches have completed, `PipeBatch` collects the individual output from each one and aggregates them into a single new list. This list becomes the final output of the `PipeBatch` pipe.
+
+## Concurrency
+
+`PipeBatch` does not spawn every branch at once. Branches run in bounded concurrent chunks, capped by the `max_concurrency` setting under `[pipelex.pipeline_execution_config]` (default `8`). This keeps a large batch — one pipe over thousands of items — from overwhelming memory, the asyncio event loop, and provider rate limits.
+
+To restore unbounded fan-out (every branch started at once), set `max_concurrency = "unbounded"`.
+
+Results always preserve input order regardless of the concurrency bound. If a branch fails, the failure propagates and the first error by input index wins.
+
+For durable, rate-limited execution of very large batches, run the pipeline on the Temporal track.
 
 ## Configuration
 
@@ -69,7 +79,7 @@ How this works:
 2.  `PipeBatch` creates 10 parallel branches.
 3.  In branch #1, it takes the first article from `ArticleList`, puts it into the branch's isolated working memory, and gives it the name `ArticleText` (as specified by `input_item_name`).
 4.  The `summarize_one_article` pipe is then executed in branch #1. It looks for an input named `ArticleText`, finds the injected article, and produces a summary.
-5.  Steps 3 and 4 happen simultaneously for all 10 articles in their respective branches.
+5.  Steps 3 and 4 run concurrently across branches, up to `max_concurrency` at a time (8 by default), until all 10 articles are processed.
 6.  Once all `summarize_one_article` pipes are done, `PipeBatch` collects the 10 `ArticleSummary` outputs and bundles them into a single `SummaryList`. This list is the final result.
 
 ## Related Documentation

@@ -7,6 +7,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, TypedNamedStuffSpec
@@ -187,13 +188,15 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             else:
                 func_output_object = await asyncio.to_thread(function, working_memory=working_memory)
         except Exception as exc:
+            # PipeFunc invokes an arbitrary user-registered function whose failure surface is not enumerable;
+            # any failure is wrapped into a diagnostic PipeRunError below. Re-raises, never swallows.
             # Build informative error message with actual input values from working memory
             inputs_lines: list[str] = []
             for input_name in self.inputs.root:
                 try:
                     stuff = working_memory.get_stuff(name=input_name)
                     inputs_lines.append(f"    {input_name} = {stuff.content!r}")
-                except Exception:
+                except WorkingMemoryStuffNotFoundError:
                     inputs_lines.append(f"    {input_name} = <not found in working memory>")
 
             inputs_desc = "\n".join(inputs_lines) if inputs_lines else "    none"

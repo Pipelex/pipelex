@@ -18,7 +18,7 @@ Two approaches for structured outputs:
 - **Two-step** — Generate text first, then parse into a structured concept. More reliable for complex schemas.
 - **Direct JSON** — Generate structured JSON directly from the LLM using provider-native structured output features.
 
-See [LLM Structured Generation](../building-methods/llm-structured-generation-config.md).
+See [`PipeStructure`](../building-methods/pipes/pipe-operators/PipeStructure.md) for direct text-to-structure conversion, [`PipeLLM`](../building-methods/pipes/pipe-operators/PipeLLM.md) for direct JSON generation, and [Build-time Elaboration](../under-the-hood/build-time-elaboration.md) for how `structuring_method = "preliminary_text"` is rewritten into a two-step sequence at load time.
 
 ## Vision Language Models
 

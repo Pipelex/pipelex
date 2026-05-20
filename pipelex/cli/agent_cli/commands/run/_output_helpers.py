@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any
+import json
+from typing import Any, cast
+
+from kajson import kajson
+from kajson.exceptions import KajsonException
+
+from pipelex.tools.misc.json_utils import clean_json_dumps
 
 
 def build_run_output(
@@ -40,3 +46,84 @@ def build_run_output(
     if compact_result is not None:
         return compact_result
     return {}
+
+
+def _render_json_payload_lines(result_payload: Any) -> list[str]:
+    """Render a structured payload as a fenced ``## Result`` json block.
+
+    The local runner stores ``json`` as a kajson-encoded string (kajson.dumps of
+    smart_dump, carrying ``__class__`` metadata for custom types). Decode it with
+    kajson — the symmetric decoder — so custom types are reconstituted and then
+    rendered cleanly by clean_json_dumps; plain json.loads would leave datetimes
+    and the like as raw tagged dicts. A string that does not decode is rendered as-is.
+    """
+    if isinstance(result_payload, str):
+        try:
+            result_payload = kajson.loads(result_payload)
+        except (json.JSONDecodeError, KajsonException):
+            pass
+    return ["## Result", "", "```json", clean_json_dumps(result_payload, indent=2), "```"]
+
+
+def format_run_markdown(result: dict[str, Any], with_memory: bool) -> str:
+    """Render a pipeline-run result dict as agent-readable markdown.
+
+    Handles both shapes ``build_run_output()`` produces, disambiguated by the
+    authoritative ``with_memory`` flag rather than guessed from the dict's keys:
+    the full envelope (``with_memory=True`` — ``main_stuff`` carries a rendered
+    ``markdown`` representation) and the compact concept JSON (``with_memory=False``).
+
+    Args:
+        result: The JSON-mode result dict for the run.
+        with_memory: True when ``result`` is the full envelope (``main_stuff`` +
+            ``working_memory`` + side-effect metadata); False when ``result`` is
+            the bare compact concept JSON.
+
+    Returns:
+        A markdown string for stdout.
+    """
+    lines: list[str] = ["# Pipeline run complete", ""]
+
+    if not with_memory:
+        # Compact mode: `result` IS the bare concept JSON, not an envelope — render it whole.
+        # Probing for envelope keys here would misread a concept field that happens to be
+        # named like one (e.g. a dict-valued `main_stuff`) and silently drop the real result.
+        if result:
+            lines += _render_json_payload_lines(result)
+        else:
+            lines.append("_The pipeline produced no main output._")
+        return "\n".join(lines)
+
+    main_stuff = result.get("main_stuff")
+    main_stuff_dict = cast("dict[str, Any]", main_stuff) if isinstance(main_stuff, dict) else None
+    rendered_markdown: str | None = None
+    if main_stuff_dict is not None:
+        candidate = main_stuff_dict.get("markdown")
+        if isinstance(candidate, str) and candidate:
+            rendered_markdown = candidate
+
+    if rendered_markdown is not None:
+        lines += ["## Result", "", rendered_markdown]
+    else:
+        # No rendered markdown — e.g. the API runner cannot render it and leaves `markdown`
+        # empty. Surface the structured `json` payload `main_stuff` still carries rather than
+        # dropping it (it sits under an excluded envelope key).
+        result_payload = main_stuff_dict.get("json") if main_stuff_dict is not None else None
+        if result_payload is not None:
+            lines += _render_json_payload_lines(result_payload)
+        else:
+            lines.append("_The pipeline produced no main output._")
+
+    # output_file / graph_files are envelope-only side-effect metadata — build_run_output
+    # merges them solely under with_memory — so they are read only on this branch.
+    output_file = result.get("output_file")
+    if isinstance(output_file, str):
+        lines += ["", f"**Output file:** `{output_file}`"]
+
+    graph_files = result.get("graph_files")
+    if isinstance(graph_files, dict):
+        graph_html = cast("dict[str, Any]", graph_files).get("graph_html")
+        if isinstance(graph_html, str):
+            lines += ["", f"**Graph:** `{graph_html}`"]
+
+    return "\n".join(lines)

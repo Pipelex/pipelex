@@ -7,7 +7,7 @@ import io
 import os
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ValidationError
 from rich.panel import Panel
@@ -20,7 +20,18 @@ from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cli.commands.update_cmd import update_cmd
-from pipelex.cogt.exceptions import InferenceBackendLibraryError
+from pipelex.cli.exceptions import PipelexCLIError
+from pipelex.cogt.exceptions import (
+    GatewayUnknownModelError,
+    InferenceBackendCredentialsError,
+    InferenceBackendLibraryError,
+    InferenceBackendLibraryNotFoundError,
+    InferenceBackendLibraryValidationError,
+    ModelDeckNotFoundError,
+    ModelDeckValidationError,
+    RoutingProfileDisabledBackendError,
+    RoutingProfileLibraryNotFoundError,
+)
 from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsErrorMsgFactory
 from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport, InferenceBackendLibrary
 from pipelex.cogt.model_backends.gateway_config import GatewayConfig
@@ -33,7 +44,10 @@ from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.environment import get_optional_env
-from pipelex.system.pipelex_service.exceptions import RemoteConfigFetchError, RemoteConfigValidationError
+from pipelex.system.pipelex_service.exceptions import (
+    RemoteConfigUnavailableError,
+    RemoteConfigValidationError,
+)
 from pipelex.system.pipelex_service.pipelex_service_config import (
     is_pipelex_gateway_enabled,
     load_pipelex_service_config_if_exists,
@@ -45,6 +59,9 @@ from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.placeholder import value_is_placeholder
 from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_path
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
+
+if TYPE_CHECKING:
+    from pipelex.system.pipelex_service.types import RemoteConfigSource
 
 
 class ConfigLocationInfo(BaseModel):
@@ -100,7 +117,7 @@ def check_config_files(config_dir: Path | None = None) -> tuple[bool, int, str]:
     # Check for missing files
     try:
         missing_count = init_config(reset=False, dry_run=True, target_dir=str(effective_config_dir))
-    except Exception as exc:
+    except (PipelexCLIError, OSError) as exc:
         return False, 0, f"Error checking config files: {exc}"
 
     # Check if main config can be loaded using the hub's setup.
@@ -118,7 +135,7 @@ def check_config_files(config_dir: Path | None = None) -> tuple[bool, int, str]:
             validation_error_msg = report_validation_error(category="config", validation_error=validation_error)
             msg = f"Configuration validation failed:\n{validation_error_msg}"
             return False, 0, msg
-        except Exception as exc:
+        except (TomlError, OSError) as exc:
             return False, 0, f"Error loading pipelex.toml: {exc}"
 
     # Report results
@@ -228,7 +245,8 @@ def check_backend_credentials(config_dir: Path | None = None) -> tuple[bool, dic
         backends_with_issues = sum(1 for r in backend_reports.values() if not r.all_credentials_valid)
         return False, backend_reports, f"{backends_with_issues} backend(s) have missing or invalid credentials"
 
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
+        # Doctor probe: the credential scan spans TOML load, env lookups and placeholder checks; any failure is reported as a finding.
         return False, {}, f"Error checking backend credentials: {exc}"
 
 
@@ -250,7 +268,8 @@ def check_kit_template_exists(backend_name: str) -> bool:
 
         # For Traversable, we check if it's a file
         return backend_file.is_file()
-    except Exception:
+    except Exception:  # noqa: BLE001
+        # Doctor probe: kit-template existence is a best-effort bool check; any lookup failure means "no template".
         return False
 
 
@@ -291,7 +310,8 @@ def replace_backend_file(backend_name: str, dry_run: bool = False, config_dir: P
         target_file.write_text(template_content, encoding="utf-8")
         return True
 
-    except Exception:
+    except Exception:  # noqa: BLE001
+        # Doctor --fix helper: the kit-template copy is best-effort; any failure means "could not replace" (returns False).
         return False
 
 
@@ -317,7 +337,7 @@ def check_backend_files(config_dir: Path | None = None) -> tuple[bool, dict[str,
 
     try:
         backends_dict = load_toml_from_path(backends_toml_path)
-    except Exception as exc:
+    except (TomlError, OSError) as exc:
         return False, {}, f"Error loading backends.toml: {exc}"
 
     backend_file_reports: dict[str, BackendFileReport] = {}
@@ -370,8 +390,8 @@ def check_backend_files(config_dir: Path | None = None) -> tuple[bool, dict[str,
                 is_valid = False
                 error_message = error_str
                 all_valid = False
-        except Exception as exc:
-            # Other errors might also be related to this backend
+        except Exception as exc:  # noqa: BLE001
+            # Doctor probe: a backend load can fail in many ways; any error naming this backend is recorded as its validation failure.
             error_str = str(exc)
             if backend_name in error_str or backend_file_path in error_str:
                 is_valid = False
@@ -730,6 +750,7 @@ def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, B
 
     # Fetch gateway model specs if Gateway is enabled
     gateway_config: GatewayConfig | None = None
+    gateway_config_source: RemoteConfigSource | None = None
     if is_pipelex_gateway_enabled():
         pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
         if pipelex_service_config is None:
@@ -737,12 +758,14 @@ def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, B
         if not pipelex_service_config.agreement.terms_accepted:
             return False, "Pipelex Gateway is enabled but terms have not been accepted", backend_file_reports
         try:
-            remote_config = RemoteConfigFetcher.fetch_remote_config()
+            result = RemoteConfigFetcher.fetch_remote_config()
+            remote_config = result.config
+            gateway_config_source = result.source
             gateway_config = GatewayConfig(
                 model_specs=remote_config.backend_model_specs,
                 aws_region=remote_config.aws_region,
             )
-        except (RemoteConfigFetchError, RemoteConfigValidationError) as exc:
+        except (RemoteConfigUnavailableError, RemoteConfigValidationError) as exc:
             return False, f"Failed to fetch Pipelex Gateway remote configuration: {exc}", backend_file_reports
 
     models_manager = ModelManager()
@@ -751,6 +774,7 @@ def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, B
         models_manager.setup(
             secrets_provider=secrets_provider,
             gateway_config=gateway_config,
+            gateway_config_source=gateway_config_source,
         )
         models_manager.validate_model_deck()
     except InferenceBackendLibraryError as exc:
@@ -764,7 +788,16 @@ def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, B
                     backend_file_reports[backend_name].is_valid = False
                     backend_file_reports[backend_name].error_message = error_str
         return False, f"Error checking models: {exc}", backend_file_reports
-    except Exception as exc:
+    except (
+        RoutingProfileLibraryNotFoundError,
+        InferenceBackendLibraryNotFoundError,
+        ModelDeckNotFoundError,
+        RoutingProfileDisabledBackendError,
+        InferenceBackendLibraryValidationError,
+        ModelDeckValidationError,
+        InferenceBackendCredentialsError,
+        GatewayUnknownModelError,
+    ) as exc:
         return False, f"Error checking models: {exc}", backend_file_reports
 
     return True, "Models are valid", backend_file_reports
@@ -782,7 +815,7 @@ def doctor_cmd(
     try:
         do_doctor_cmd(fix=fix)
 
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         # Handle unexpected errors gracefully without printing traces
         console.print()
         console.print(f"[red]✗ Unexpected error: {exc!s}[/red]")
@@ -878,7 +911,8 @@ def do_doctor_cmd(
                     console.print()
                     init_cmd(focus=InitFocus.CONFIG, skip_confirmation=True)
                     console.print("[green]✓[/green] Configuration files installed")
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
+                    # Doctor --fix handler: wraps the whole init_cmd sub-command; a fix failure is reported and the doctor run continues.
                     console.print(f"[red]Failed to install configuration files: {exc!s}[/red]")
                 console.print()
 
@@ -897,7 +931,8 @@ def do_doctor_cmd(
                     console.print()
                     init_cmd(focus=InitFocus.TELEMETRY, skip_confirmation=True)
                     console.print("[green]✓[/green] Telemetry configured")
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
+                    # Doctor --fix handler: wraps the whole init_cmd sub-command; a fix failure is reported and the doctor run continues.
                     console.print(f"[red]Failed to configure telemetry: {exc!s}[/red]")
                 console.print()
 
@@ -908,7 +943,8 @@ def do_doctor_cmd(
                     console.print()
                     update_cmd(yes=True)
                     console.print("[green]✓[/green] Model deck updated")
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
+                    # Doctor --fix handler: wraps the whole update_cmd sub-command; a fix failure is reported and the doctor run continues.
                     console.print(f"[red]Failed to update deck: {exc!s}[/red]")
                 console.print()
 
@@ -934,7 +970,8 @@ def do_doctor_cmd(
                             console.print(f"[green]✓[/green] Replaced {backend_name} backend configuration")
                         else:
                             console.print(f"[red]Failed to replace {backend_name}: Template not found or copy failed[/red]")
-                    except Exception as exc:
+                    except Exception as exc:  # noqa: BLE001
+                        # Doctor --fix handler: wraps replace_backend_file; a fix failure is reported and the doctor run continues.
                         console.print(f"[red]Failed to replace {backend_name}: {exc!s}[/red]")
                     console.print()
                 else:

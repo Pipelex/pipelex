@@ -476,6 +476,14 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         ``{"items": [...]}``.  This removes the ambiguity at hydration time: a
         ``list`` content value is always a ListContent, a ``dict`` is always a
         single StuffContent.
+
+        Per-item type metadata for the list path is written under the
+        pipelex-private keys ``__pipelex_class__`` / ``__pipelex_module__``
+        rather than kajson's reserved ``__class__`` / ``__module__``.  This
+        keeps kajson's universal decoder out of the loop at the Temporal
+        data-converter boundary — pipelex's hydrator binds the class against
+        the per-workflow ``ClassRegistry`` instead, which is the only place
+        dynamic-concept classes are registered in a true 3-process topology.
         """
         raw = self.model_dump(serialize_as_any=True)
         raw_root = raw.get("root", {})
@@ -486,10 +494,15 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
                 serialized_items: list[dict[str, Any]] = []
                 for item in list_content.items:
                     item_dict = item.model_dump(serialize_as_any=True)
-                    # Preserve type metadata for items under Anything concepts so
-                    # the hydration side can reconstruct the correct content class.
-                    item_dict["__class__"] = type(item).__name__
-                    item_dict["__module__"] = type(item).__module__
+                    # Preserve per-item type metadata for the hydration side.
+                    # These keys are deliberately in pipelex's private namespace
+                    # (NOT kajson's `__class__` / `__module__`) so that kajson's
+                    # universal decoder leaves the nested dict alone at the
+                    # Temporal data-converter boundary — class binding is
+                    # pipelex's job, not kajson's, since the dynamic class may
+                    # only exist in a per-workflow ClassRegistry.
+                    item_dict["__pipelex_class__"] = type(item).__name__
+                    item_dict["__pipelex_module__"] = type(item).__module__
                     serialized_items.append(item_dict)
                 raw_root[stuff_name]["content"] = serialized_items
         return raw

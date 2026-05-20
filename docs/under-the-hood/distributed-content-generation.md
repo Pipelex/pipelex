@@ -5,6 +5,8 @@ description: "How Pipelex serializes dynamic Pydantic models and large binary co
 
 # Distributed Content Generation
 
+This page is for contributors working on Pipelex internals. If you're deploying or operating Pipelex on Temporal, see the user-facing [Distributed Execution with Temporal](../distributed-execution/index.md) guide instead.
+
 This page covers the serialization mechanisms that enable content generation (LLM structured output, image generation, PDF extraction) to run across Temporal worker processes. For the broader Temporal architecture — LibraryCrate propagation, deferred hydration, per-workflow scoping — see [Temporal Integration](./temporal-integration.md).
 
 ---

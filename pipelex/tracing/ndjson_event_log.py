@@ -74,12 +74,17 @@ class NdjsonEventLog(EventLogProtocol):
     def _file_name_for(workflow_id: str, writer_id: str) -> str:
         """File name for a (workflow_id, writer_id) pair.
 
+        Child workflow IDs now use ``/`` as a path separator (e.g.
+        ``ut-{uuid}/step_two-9a262f1f``); replace it with ``__`` so the
+        derived file name stays flat inside the run directory.
+
         The legacy single-writer name is preserved when writer_id="primary"
         so existing files continue to be written and read correctly.
         """
+        safe_id = workflow_id.replace("/", "__")
         if writer_id == "primary":
-            return f"wf_{workflow_id}.ndjson"
-        return f"wf_{workflow_id}__w_{writer_id}.ndjson"
+            return f"wf_{safe_id}.ndjson"
+        return f"wf_{safe_id}__w_{writer_id}.ndjson"
 
     # ------------------------------------------------------------------
     # Write
@@ -182,6 +187,6 @@ class NdjsonEventLog(EventLogProtocol):
     def __del__(self) -> None:
         try:
             self.close()
-        except Exception:  # noqa: S110
+        except Exception:  # noqa: BLE001, S110
             # Safety net during interpreter shutdown — logging may not be available
             pass

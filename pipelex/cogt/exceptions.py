@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING
 from typing_extensions import override
 
 from pipelex.base_exceptions import ErrorReport, PipelexError
+from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
+from pipelex.system.pipelex_service.types import RemoteConfigSource
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
@@ -19,43 +21,109 @@ class InferenceErrorCategory(StrEnum):
     CONFIGURATION = "configuration"
     CONTENT = "content"
     CAPACITY = "capacity"
+    # The error type is known, but the outcome is not: the operation may or may not have committed
+    # (e.g. a connection dropped mid-request). A blind retry is unsafe for a non-idempotent
+    # operation, so this is non-retryable — distinct from UNKNOWN, which means "could not classify".
+    AMBIGUOUS = "ambiguous"
+    UNKNOWN = "unknown"
 
     @property
     def is_retryable(self) -> bool:
         match self:
             case InferenceErrorCategory.TRANSIENT:
                 return True
-            case InferenceErrorCategory.CONFIGURATION | InferenceErrorCategory.CONTENT | InferenceErrorCategory.CAPACITY:
+            case (
+                InferenceErrorCategory.CONFIGURATION
+                | InferenceErrorCategory.CONTENT
+                | InferenceErrorCategory.CAPACITY
+                | InferenceErrorCategory.AMBIGUOUS
+                | InferenceErrorCategory.UNKNOWN
+            ):
                 return False
 
 
 class CogtError(PipelexError):
     error_category: InferenceErrorCategory | None = None
-    user_action: str | None = None
+    user_action: UserAction | None = None
+    provider_metadata: ProviderErrorMetadata | None = None
+    model_handle: str | None = None
+    backend_name: str | None = None
 
     def __init__(
         self,
         message: str,
         error_category: InferenceErrorCategory | None = None,
-        user_action: str | None = None,
+        user_action: UserAction | None = None,
+        provider_metadata: ProviderErrorMetadata | None = None,
     ):
         super().__init__(message)
         if error_category is not None:
             self.error_category = error_category
         if user_action is not None:
             self.user_action = user_action
+        if provider_metadata is not None:
+            self.provider_metadata = provider_metadata
+
+    def fill_model_and_provider(self, model_handle: str | None, backend_name: str | None) -> None:
+        """Fill ``model_handle`` / ``backend_name`` from the worker, only when still unset.
+
+        Inference-failure leaf errors raised deep inside a provider plugin
+        (``LLMCompletionError``, ``ImgGenGenerationError``, ...) carry no model
+        or provider of their own. Each worker family calls this at its
+        public-method chokepoint — where model and provider are unambiguously
+        known — so the eventual ``ErrorReport`` can attribute the failure.
+
+        Never overwrites a value an inner error already set (e.g.
+        ``LLMModelNotFoundError`` setting its own ``model_handle``), and skips
+        the ``"unknown"`` placeholder a worker returns when it does not know
+        its own provider/model (external plugins not overriding the getters).
+        """
+        if self.model_handle is None and model_handle is not None and model_handle != "unknown":
+            self.model_handle = model_handle
+        if self.backend_name is None and backend_name is not None and backend_name != "unknown":
+            self.backend_name = backend_name
 
     @override
     def to_error_report(self) -> ErrorReport:
-        return ErrorReport(
+        report = ErrorReport(
             error_type=type(self).__name__,
             message=self.message,
             error_category=self.error_category,
+            error_domain=self.error_domain,
             retryable=self.error_category.is_retryable if self.error_category is not None else None,
             user_action=self.user_action,
-            model=getattr(self, "model_handle", None),
-            provider=getattr(self, "backend_name", None),
+            model=self.model_handle,
+            provider=self.backend_name,
+            provider_metadata=self.provider_metadata,
         )
+        return self._enrich_error_report_from_cause(report)
+
+
+def find_inference_error_category_in_chain(exc: BaseException) -> InferenceErrorCategory | None:
+    """Return the first ``InferenceErrorCategory`` found on the exception's ``__cause__`` chain.
+
+    By the time a retry decision is made, the categorized ``CogtError`` a worker raised is
+    usually buried: operators wrap it into a ``PipeRunError``, the ``PipeRouter`` into a
+    ``PipeRouterError``, the pipeline runner into a ``PipelineExecutionError`` — none of
+    which are ``CogtError`` subclasses. Walking ``__cause__`` recovers the category
+    regardless of wrapper depth.
+
+    The Temporal activity error boundary calls this to derive its retry decision
+    (``non_retryable``) from the underlying failure's category. A ``CogtError`` carrying no
+    category is skipped — the walk continues to the first one that actually classifies the failure.
+
+    The ``id()`` set guards against a cyclic ``__cause__`` chain: without it a cycle would
+    spin this loop forever — and it runs on the error path, so the failure being classified
+    would be lost to a hang rather than reported.
+    """
+    current: BaseException | None = exc
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, CogtError) and current.error_category is not None:
+            return current.error_category
+        current = current.__cause__
+    return None
 
 
 class LLMConfigError(CogtError):
@@ -63,7 +131,7 @@ class LLMConfigError(CogtError):
 
 
 class ImageContentError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONTENT
 
 
 class CostRegistryError(CogtError):
@@ -75,7 +143,7 @@ class ReportingManagerError(CogtError):
 
 
 class SdkTypeError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONFIGURATION
 
 
 class ModelChoiceNotFoundError(CogtError):
@@ -141,7 +209,7 @@ class ModelDeckPresetValidatonError(ModelDeckValidatonError):
         message: str,
         model_type: ModelType,
         preset_id: str,
-        model_handle: str,
+        model_handle: str | None,
         enabled_backends: set[str] | None = None,
     ):
         self.model_type = model_type
@@ -154,9 +222,21 @@ class ModelDeckPresetValidatonError(ModelDeckValidatonError):
 class ModelNotFoundError(CogtError):
     error_category = InferenceErrorCategory.CONFIGURATION
 
-    def __init__(self, message: str, model_handle: str):
+    def __init__(
+        self,
+        message: str,
+        model_handle: str,
+        error_category: InferenceErrorCategory | None = None,
+        user_action: UserAction | None = None,
+        provider_metadata: ProviderErrorMetadata | None = None,
+    ):
         self.model_handle = model_handle
-        super().__init__(message)
+        super().__init__(
+            message=message,
+            error_category=error_category,
+            user_action=user_action,
+            provider_metadata=provider_metadata,
+        )
 
 
 class ModelWaterfallError(ModelNotFoundError):
@@ -228,27 +308,27 @@ class LLMAssignmentError(CogtError):
 
 
 class LLMPromptSpecError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONTENT
 
 
 class LLMPromptTemplateInputsError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONTENT
 
 
 class LLMPromptParameterError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONTENT
 
 
 class PromptImageFactoryError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONTENT
 
 
 class PromptImageFormatError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONTENT
 
 
 class PromptDocumentFactoryError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONTENT
 
 
 class ImgGenModelNotFoundError(ModelNotFoundError):
@@ -256,11 +336,11 @@ class ImgGenModelNotFoundError(ModelNotFoundError):
 
 
 class ImgGenPromptError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONTENT
 
 
 class ImgGenParameterError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONTENT
 
 
 class ImgGenGenerationError(CogtError):
@@ -279,7 +359,15 @@ class ExtractJobFailureError(CogtError):
     pass
 
 
+class ExtractModelNotFoundError(ModelNotFoundError):
+    pass
+
+
 class SearchJobFailureError(CogtError):
+    pass
+
+
+class SearchModelNotFoundError(ModelNotFoundError):
     pass
 
 
@@ -315,7 +403,10 @@ class InferenceBackendCredentialsErrorType(StrEnum):
 
 class InferenceBackendCredentialsError(CogtError):
     error_category = InferenceErrorCategory.CONFIGURATION
-    user_action = "Check that the required API key environment variable is set"
+    user_action = UserAction(
+        kind=UserActionKind.CHECK_CREDENTIALS,
+        detail="Check that the required API key environment variable is set",
+    )
 
     def __init__(
         self,
@@ -331,7 +422,7 @@ class InferenceBackendCredentialsError(CogtError):
 
 
 class InferenceBackendLibraryError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONFIGURATION
 
 
 class RoutingProfileDisabledBackendError(CogtError):
@@ -348,3 +439,36 @@ class ModelDeckNotFoundError(CogtError):
 
 class ModelDeckValidationError(CogtError):
     pass
+
+
+class GatewayUnknownModelError(CogtError):
+    """A model handle referenced by the deck cannot be located in the active gateway specs.
+
+    Carries the provenance of the gateway config (``FRESH`` vs ``CACHED``) so the message can
+    branch: a cached-source failure suggests stale gateway specs and points the user at
+    ``pipelex init`` to refresh while online; a fresh-source failure is a genuine
+    misconfiguration.
+    """
+
+    error_category = InferenceErrorCategory.CONFIGURATION
+
+    def __init__(self, model_name: str, source: RemoteConfigSource) -> None:
+        self.model_name = model_name
+        self.source = source
+        match source:
+            case RemoteConfigSource.FRESH:
+                msg = (
+                    f"Model handle '{model_name}' is referenced by the active model deck but is not present "
+                    "in the Pipelex Gateway specs we just fetched. Either the model name is wrong, the gateway "
+                    "no longer offers it, or your deck overrides need updating.\n"
+                    "  - Run `pipelex doctor` to inspect the active gateway models.\n"
+                    "  - Disable pipelex_gateway in .pipelex/inference/backends.toml to fall back to BYOK."
+                )
+            case RemoteConfigSource.CACHED:
+                msg = (
+                    f"Model handle '{model_name}' is referenced by the active model deck but is not present "
+                    "in the Pipelex Gateway specs loaded from the on-disk cache. The cache may be stale.\n"
+                    "  - Run `pipelex init` while online to refresh the cached gateway config.\n"
+                    "  - Or disable pipelex_gateway in .pipelex/inference/backends.toml to operate offline (BYOK)."
+                )
+        super().__init__(msg)

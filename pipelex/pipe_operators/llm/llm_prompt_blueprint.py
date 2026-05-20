@@ -53,11 +53,7 @@ class LLMPromptBlueprint(BaseModel):
             required_variables.update(get_root_from_dotted_path(path) for path in self.prompt_blueprint.required_variables())
         if self.system_prompt_blueprint:
             required_variables.update(get_root_from_dotted_path(path) for path in self.system_prompt_blueprint.required_variables())
-        return {
-            variable_name
-            for variable_name in required_variables
-            if not variable_name.startswith("_") and variable_name not in {"preliminary_text", "place_holder"}
-        }
+        return {variable_name for variable_name in required_variables if not variable_name.startswith("_") and variable_name != "place_holder"}
 
     # TODO: make this consistent with `LLMPromptFactoryAbstract` or `LLMPromptTemplate`,
     # let's get back to it when we have a better solution for structuring_method

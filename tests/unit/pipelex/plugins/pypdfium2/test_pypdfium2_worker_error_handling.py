@@ -9,6 +9,8 @@ import pytest
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
+    from pipelex.cogt.inference.error_classification import UserActionKind
+
 from pipelex.cogt.exceptions import ExtractJobFailureError, InferenceErrorCategory
 from pipelex.plugins.pypdfium2.pypdfium2_worker import Pypdfium2Worker
 from tests.unit.pipelex.plugins.pypdfium2.test_data import Pypdfium2ErrorHandlingTestData
@@ -40,7 +42,7 @@ class TestPypdfium2WorkerErrorHandling:
     """Tests for pypdfium2 extract worker exception handling and error categorization."""
 
     @pytest.mark.parametrize(
-        ("_topic", "exception_class", "exception_message", "expected_category", "expected_message_substring"),
+        ("_topic", "exception_class", "exception_message", "expected_category", "expected_user_action_kind"),
         Pypdfium2ErrorHandlingTestData.EXTRACTION_ERROR_CASES,
     )
     async def test_extraction_error_categorization(
@@ -50,7 +52,7 @@ class TestPypdfium2WorkerErrorHandling:
         exception_class: type[Exception],
         exception_message: str,
         expected_category: InferenceErrorCategory,
-        expected_message_substring: str,
+        expected_user_action_kind: UserActionKind,
     ) -> None:
         """PDF extraction errors are caught and categorized correctly."""
         worker = _make_pypdfium2_worker(mocker)
@@ -76,10 +78,11 @@ class TestPypdfium2WorkerErrorHandling:
 
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.__cause__ is sdk_exc
-        assert expected_message_substring in exc_info.value.args[0].lower()
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is expected_user_action_kind
 
     async def test_error_report_for_file_not_found(self, mocker: MockerFixture) -> None:
-        """to_error_report() for FileNotFoundError has CONFIGURATION category."""
+        """to_error_report() for FileNotFoundError has CONTENT category."""
         worker = _make_pypdfium2_worker(mocker)
         sdk_exc = FileNotFoundError("No such file: /tmp/missing.pdf")
 
@@ -99,7 +102,7 @@ class TestPypdfium2WorkerErrorHandling:
             await worker._extract_pages(extract_job=_make_extract_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         report = exc_info.value.to_error_report()
-        assert report.error_category == "configuration"
+        assert report.error_category == "content"
         assert report.retryable is False
         assert report.error_type == "ExtractJobFailureError"
 

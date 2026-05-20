@@ -4,6 +4,7 @@ from temporalio import activity
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus
 from pipelex.pipe_run.delivery_executor import DeliveryExecutor
+from pipelex.temporal.tprl.activity_error_boundary import convert_pipelex_errors
 
 
 class DeliveryActivityArg(BaseModel):
@@ -17,6 +18,7 @@ class DeliveryActivityArg(BaseModel):
 
 
 @activity.defn(name="act_deliver")
+@convert_pipelex_errors
 async def act_deliver(arg: DeliveryActivityArg) -> None:
     """Temporal activity that executes the full delivery (storage + webhooks)."""
     executor = DeliveryExecutor()

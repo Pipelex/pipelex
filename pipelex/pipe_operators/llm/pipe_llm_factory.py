@@ -145,6 +145,5 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             output=output,
             llm_prompt_spec=llm_prompt_spec,
             llm_choices=llm_choices,
-            structuring_method=blueprint.structuring_method,
             output_multiplicity=output_multiplicity,
         )

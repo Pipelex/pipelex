@@ -5,6 +5,7 @@ import importlib.util
 from rich.markup import escape
 
 from pipelex.cli.exceptions import PipelexCLIError
+from pipelex.cogt.exceptions import ModelManagerError
 from pipelex.exceptions import MissingDependencyError
 from pipelex.hub import get_console, get_models_manager
 
@@ -26,16 +27,18 @@ class ModelLister:
         """
         try:
             backend = get_models_manager().get_required_inference_backend(backend_name)
-        except Exception as exc:
-            msg = f"Backend '{backend_name}' not found: {exc}"
-            # TODO: This should not raise this error in here.
-            raise PipelexCLIError(msg) from exc
+        except ModelManagerError as exc:
+            # CLI boundary: convert the domain error to a ClickException so Typer renders it cleanly (no traceback).
+            raise PipelexCLIError(str(exc)) from exc
 
-        # Determine which SDKs are used in this backend
+        # A backend with no model specs is a valid config state — there is simply nothing to list.
         if not backend.model_specs:
-            msg = f"Backend '{backend_name}' has no model specifications"
-            # TODO: This should not raise this error in here.
-            raise PipelexCLIError(msg)
+            console = get_console()
+            if flat:
+                console.print(f"# Note: Backend '{escape(backend_name)}' has no models configured")
+            else:
+                console.print(f"\n[yellow]Note: Backend '{escape(backend_name)}' has no models configured.[/yellow]\n")
+            return
 
         # Group models by SDK
         models_by_sdk: dict[str, list[str]] = {}
@@ -172,6 +175,8 @@ class ModelLister:
             except PipelexCLIError:
                 raise
             except Exception as exc:
+                # Per-SDK boundary: SDK list calls (plugin imports, network, remote APIs) have a non-enumerable
+                # failure surface; any failure is converted to PipelexCLIError with context. Re-raises, never swallows.
                 msg = f"Error listing models for SDK '{sdk}' in backend '{backend_name}': {exc}"
                 raise PipelexCLIError(msg) from exc
 

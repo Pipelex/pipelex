@@ -174,8 +174,8 @@ class DeliveryExecutor:
             self._add_optional_text_file(files, "mermaidflow.mmd", graph_outputs.mermaidflow_mmd, "text/plain")
             self._add_optional_text_file(files, "mermaidflow.html", graph_outputs.mermaidflow_html, "text/html")
             self._add_optional_text_file(files, "reactflow.html", graph_outputs.reactflow_html, "text/html")
-        except Exception:
-            # TODO: wip - do not catch all exceptions
+        except Exception:  # noqa: BLE001
+            # Best-effort: graph generation spans a deep mermaid/reactflow render tree; a graph failure must never fail result delivery.
             log.warning("Failed to generate graph outputs")
 
     @classmethod
@@ -189,8 +189,8 @@ class DeliveryExecutor:
         """Await a render coroutine and store the encoded result; log a warning on failure."""
         try:
             text = await render
-        except Exception:
-            # TODO: wip - do not catch all exceptions
+        except Exception:  # noqa: BLE001
+            # Best-effort: per-format rendering (incl. jinja2 viewer); a single render failure must not drop the other result files.
             log.warning(f"Failed to render {filename}")
             return
         files[filename] = ResultFile(data=text.encode("utf-8"), content_type=content_type)
@@ -229,7 +229,7 @@ class DeliveryExecutor:
             log.info(f"Storage delivery completed: pipeline_run_id={pipeline_run_id}, files={len(result_files)}")
             return result_url
         except Exception as exc:
-            # TODO: wip - do not catch all exceptions
+            # Delivery boundary: any failure across result-file generation or storage is converted to StorageDeliveryError. Re-raises, never swallows.
             msg = f"Storage delivery failed for pipeline_run_id={pipeline_run_id}"
             raise StorageDeliveryError(msg) from exc
 
@@ -262,7 +262,6 @@ class DeliveryExecutor:
         except httpx.HTTPStatusError as exc:
             msg = f"Webhook delivery failed for pipeline_run_id={pipeline_run_id}: HTTP {exc.response.status_code}"
             raise WebhookDeliveryError(msg) from exc
-        except Exception as exc:
-            # TODO: wip - do not catch all exceptions
+        except httpx.RequestError as exc:
             msg = f"Webhook delivery failed for pipeline_run_id={pipeline_run_id}: {exc}"
             raise WebhookDeliveryError(msg) from exc

@@ -7,12 +7,16 @@ from typing import Any
 import aiofiles
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import ExtractJobFailureError, InferenceErrorCategory, SdkTypeError
+from pipelex.cogt.exceptions import ExtractJobFailureError, SdkTypeError
 from pipelex.cogt.extract.extract_input import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.file.file_preparation_utils import prepare_file_from_uri
+from pipelex.cogt.inference.error_classification import extract_local_extract_metadata
+from pipelex.cogt.inference.error_classify import classify_inference_error
+from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.docling.docling_factory import DoclingFactory
 from pipelex.plugins.docling.docling_sdk import DoclingSdk
@@ -93,18 +97,16 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
             raise
         # The exceptions below are raised by docling's document_converter.convert() for
         # corrupt/unreadable documents, unsupported formats, or file system issues.
-        except FileNotFoundError as exc:
-            msg = f"Document file not found for Docling extraction: {exc}"
-            raise ExtractJobFailureError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from exc
-        except ValueError as exc:
-            msg = f"Invalid document format for Docling extraction: {exc}"
-            raise ExtractJobFailureError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
-        except RuntimeError as exc:
-            msg = f"Docling conversion failed: {exc}"
-            raise ExtractJobFailureError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
-        except OSError as exc:
-            msg = f"I/O error during Docling extraction: {exc}"
-            raise ExtractJobFailureError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
+        except (FileNotFoundError, ValueError, RuntimeError, OSError) as sdk_exc:
+            metadata = extract_local_extract_metadata(sdk_exc, provider=ProviderName.DOCLING)
+            classification = classify_inference_error(metadata)
+            raise render_inference_error(
+                metadata=metadata,
+                classification=classification,
+                family=InferenceErrorFamily.EXTRACT,
+                model_desc=self.inference_model.desc,
+                model_handle=self.inference_model.name,
+            ) from sdk_exc
         finally:
             if temp_path:
                 temp_path.unlink(missing_ok=True)

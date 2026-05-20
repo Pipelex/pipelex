@@ -1,4 +1,5 @@
 import types
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -57,6 +58,7 @@ from pipelex.system.environment import get_pipelexpath_dirs
 from pipelex.system.pipelex_service.exceptions import (
     GatewayTermsNotAcceptedError,
     InferenceSetupRequiredError,
+    RemoteConfigStaleWarning,
 )
 from pipelex.system.pipelex_service.pipelex_service_config import (
     is_pipelex_gateway_enabled,
@@ -87,6 +89,7 @@ from pipelex.urls import URLs
 
 if TYPE_CHECKING:
     from pipelex.system.pipelex_service.remote_config import RemoteConfig
+    from pipelex.system.pipelex_service.types import RemoteConfigSource
 
 PACKAGE_NAME, PACKAGE_VERSION = get_package_info()
 
@@ -203,6 +206,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         remote_config: RemoteConfig | None = None
         gateway_config: GatewayConfig | None = None
+        gateway_config_source: RemoteConfigSource | None = None
         if is_pipelex_service_enabled:
             if not effective_needs_model_specs:
                 # Use dummy config when inference is not needed (for testing without network access)
@@ -212,6 +216,11 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                     model_specs=gateway_model_specs,
                     aws_region=remote_config.aws_region,
                 )
+                # Keep ``gateway_config_source`` as ``None``: the dummy specs are an empty
+                # placeholder, not real Gateway data. ``ModelManager._enforce_gateway_model_membership``
+                # treats ``source is None`` as "nothing to validate against," so the membership
+                # check is skipped on this path — which is what we want for read-only flows like
+                # ``pipelex-agent models`` without ``--backend``.
                 log.verbose("Using dummy remote config (inference not needed)")
             else:
                 # Terms acceptance is only required for actual inference usage, not for
@@ -231,17 +240,35 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                     # who disabled gateway via init skip this entire block.
                     if not pipelex_service_config.agreement.terms_accepted:
                         raise GatewayTermsNotAcceptedError
-                # Fetch remote configuration
-                remote_config = RemoteConfigFetcher.fetch_remote_config()
-                log.verbose("Successfully fetched Pipelex Gateway remote configuration")
+                # Fetch remote configuration (may fall back to on-disk cache when offline).
+                remote_config_result = RemoteConfigFetcher.fetch_remote_config()
+                remote_config = remote_config_result.config
+                gateway_config_source = remote_config_result.source
+                log.verbose(f"Successfully fetched Pipelex Gateway remote configuration (source={gateway_config_source})")
                 gateway_model_specs = remote_config.backend_model_specs
                 gateway_config = GatewayConfig(
                     model_specs=gateway_model_specs,
                     aws_region=remote_config.aws_region,
                 )
+                # Stale operation: warn loudly so machine consumers can re-surface the provenance.
+                # Emission lives at this orchestration layer (not in the fetcher) so the fetcher
+                # stays a pure data-returning function — and so test fixtures that swap in a
+                # cached fetcher (tests/conftest.py) don't need to special-case warning replay.
+                if gateway_config_source.is_cached:
+                    cached_at_iso = remote_config_result.cached_at.isoformat() if remote_config_result.cached_at else "unknown"
+                    warnings.warn(
+                        f"Pipelex Gateway is running off a cached remote config (snapshot: {cached_at_iso}). "
+                        "Run `pipelex init` while online to refresh.",
+                        RemoteConfigStaleWarning,
+                        stacklevel=2,
+                    )
 
-        # Disable Pipelex telemetry when inference is not needed (no remote config available)
-        is_pipelex_telemetry_enabled = is_pipelex_service_enabled and needs_inference
+        # Disable Pipelex telemetry when:
+        # - inference is not needed (no live runs to track), OR
+        # - the gateway config came from the cache (stale specs imply potentially stale model
+        #   identities; phoning home about pipe runs in that state would pollute metrics).
+        gateway_source_is_cached = gateway_config_source is not None and gateway_config_source.is_cached
+        is_pipelex_telemetry_enabled = is_pipelex_service_enabled and needs_inference and not gateway_source_is_cached
         self.telemetry_manager = TelemetryFactory.make_telemetry_manager(
             secrets_provider=secrets_provider,
             integration_mode=integration_mode,
@@ -302,6 +329,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             self.models_manager.setup(
                 secrets_provider=secrets_provider,
                 gateway_config=gateway_config,
+                gateway_config_source=gateway_config_source,
                 needs_inference=needs_inference,
             )
         except RoutingProfileLibraryNotFoundError as routing_not_found_exc:
@@ -339,10 +367,12 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             if not needs_inference:
                 content_generator = ContentGeneratorDry()
             elif get_config().temporal.is_enabled:
-                from pipelex.temporal.tprl_content_generation.content_generator_child_factory import ContentGeneratorChildFactory  # noqa: PLC0415
+                from pipelex.temporal.tprl_content_generation.content_generator_in_workflow_factory import (  # noqa: PLC0415
+                    ContentGeneratorInWorkflowFactory,
+                )
 
                 generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
-                content_generator = ContentGeneratorChildFactory.make_content_generator_child(
+                content_generator = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow(
                     generated_content_factory=generated_content_factory,
                 )
             else:

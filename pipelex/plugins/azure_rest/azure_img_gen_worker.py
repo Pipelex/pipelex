@@ -1,3 +1,5 @@
+import json
+
 import httpx
 from typing_extensions import override
 
@@ -7,9 +9,18 @@ from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
-from pipelex.cogt.inference.error_classification import is_content_policy_violation
+from pipelex.cogt.inference.error_classification import (
+    UserAction,
+    UserActionKind,
+    extract_azure_metadata,
+    extract_azure_metadata_from_response,
+)
+from pipelex.cogt.inference.error_classify import classify_inference_error
+from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.transport_retry import request_with_transport_retry
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
+from pipelex.config import get_config
 from pipelex.hub import get_models_manager
 from pipelex.plugins.plugin import Plugin
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -55,6 +66,36 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
         # This can be overridden by subclasses for specific checks
         pass
 
+    def _raise_categorized_azure_status_error(self, exc: httpx.HTTPStatusError) -> None:
+        """Categorize an ``httpx.HTTPStatusError`` and raise the matching ``ImgGenGenerationError``.
+
+        4xx statuses route through the shared Classify+Render pipeline; 5xx stays a worker-specific
+        ``AMBIGUOUS`` branch because image generation is a non-idempotent POST and the shared
+        classifier (which is operation-agnostic) would mis-mark these as ``TRANSIENT`` and let
+        the Temporal bridge auto-retry — duplicating a billed generation.
+        """
+        metadata = extract_azure_metadata(exc)
+        status_code = exc.response.status_code
+        if status_code >= 500:
+            msg = f"Azure server error (HTTP {status_code}) for model '{self.inference_model.desc}'"
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.AMBIGUOUS,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Azure server error after submission — the outcome is unknown; retry manually after checking for a duplicate image",
+                ),
+                provider_metadata=metadata,
+            ) from exc
+        classification = classify_inference_error(metadata)
+        raise render_inference_error(
+            metadata=metadata,
+            classification=classification,
+            family=InferenceErrorFamily.IMG_GEN,
+            model_desc=self.inference_model.desc,
+            model_handle=self.inference_model.name,
+        ) from exc
+
     @override
     async def _gen_image(
         self,
@@ -91,9 +132,12 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
         params = f"?api-version={self.api_version}"
         generation_url = f"{self.endpoint}/{base_path}/generations{params}"
 
-        try:
+        # Tier 1 transport retry: this is a genuinely SDK-less path (raw httpx, no retrying SDK
+        # in between), so it gets the transport-retry floor explicitly, from the same config
+        # budget as the SDK-backed workers.
+        async def _post_image_request() -> httpx.Response:
             async with httpx.AsyncClient() as client:
-                response = await client.post(
+                http_response = await client.post(
                     generation_url,
                     headers={
                         "Api-Key": self.api_key,
@@ -102,45 +146,89 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                     json=args_dict,
                     timeout=600.0,
                 )
-                response.raise_for_status()
-                response_dict = response.json()
+                http_response.raise_for_status()
+                return http_response
+
+        try:
+            # Image generation is a billable, non-idempotent POST: once the request reaches Azure,
+            # a retry could generate (and bill) a second image. retry_on_ambiguous_failure=False
+            # keeps the retry to failures that prove Azure did no work — the request was never
+            # delivered (connect / pool errors), or Azure rejected it before generating (408 / 429).
+            response = await request_with_transport_retry(
+                send_request=_post_image_request,
+                max_retries=get_config().cogt.transport_max_retries,
+                retry_on_ambiguous_failure=False,
+            )
         except httpx.HTTPStatusError as exc:
-            status_code = exc.response.status_code
-            error_body = exc.response.text
-            if status_code == 429:
-                msg = f"Azure rate limit exceeded for model '{self.inference_model.desc}': {error_body}"
-                raise ImgGenGenerationError(
-                    msg,
-                    error_category=InferenceErrorCategory.TRANSIENT,
-                    user_action="Rate limited by Azure — the system will retry automatically",
-                ) from exc
-            if status_code == 402:
-                msg = f"Azure quota exhausted for model '{self.inference_model.desc}': {error_body}"
-                raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CAPACITY) from exc
-            if status_code in {401, 403}:
-                msg = f"Azure authentication error for model '{self.inference_model.desc}': {error_body}"
-                raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from exc
-            if status_code == 400:
-                if is_content_policy_violation(error_body):
-                    msg = f"Content rejected by safety filters for model '{self.inference_model.desc}': {error_body}"
-                    raise ImgGenGenerationError(
-                        msg,
-                        error_category=InferenceErrorCategory.CONTENT,
-                        user_action="Content was rejected by safety filters — revise the prompt",
-                    ) from exc
-                msg = f"Azure bad request for model '{self.inference_model.desc}': {error_body}"
-                raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
-            if status_code >= 500:
-                msg = f"Azure server error ({status_code}) for model '{self.inference_model.desc}': {error_body}"
-                raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
-            msg = f"Azure API error ({status_code}) for model '{self.inference_model.desc}': {error_body}"
-            raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from exc
-        except httpx.ConnectError as exc:
-            msg = f"Azure connection error for model '{self.inference_model.desc}': {exc}"
-            raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
+            self._raise_categorized_azure_status_error(exc)
+            raise  # unreachable: helper always raises
+        except (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout) as exc:
+            # Pre-request transport failures: the request never reached Azure (the connection was
+            # never established or never acquired from the pool), so no billable work was done.
+            # Safe to retry — routed through the shared classifier, which maps these to TRANSIENT.
+            # Must precede the httpx.TimeoutException clause below (ConnectTimeout / PoolTimeout are
+            # subclasses).
+            metadata = extract_azure_metadata(exc)
+            classification = classify_inference_error(metadata)
+            raise render_inference_error(
+                metadata=metadata,
+                classification=classification,
+                family=InferenceErrorFamily.IMG_GEN,
+                model_desc=self.inference_model.desc,
+                model_handle=self.inference_model.name,
+            ) from exc
         except httpx.TimeoutException as exc:
-            msg = f"Azure request timed out for model '{self.inference_model.desc}': {exc}"
-            raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
+            # Remaining timeouts — ReadTimeout / WriteTimeout — fire after the request reached
+            # Azure, so the outcome is ambiguous: Azure may have generated (and billed) the image.
+            # Image generation is a non-idempotent POST, so this is categorized AMBIGUOUS
+            # (non-retryable) — an automatic Temporal retry could duplicate the generation. The
+            # pre-request timeouts are peeled off by the clause above.
+            metadata = extract_azure_metadata(exc)
+            msg = f"Azure request timed out mid-request for model '{self.inference_model.desc}': {exc}"
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.AMBIGUOUS,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Azure timed out mid-request — the outcome is unknown; retry manually after checking for a duplicate image",
+                ),
+                provider_metadata=metadata,
+            ) from exc
+        except httpx.TransportError as exc:
+            # Catch-all for the remaining httpx.TransportError family — ReadError / WriteError /
+            # RemoteProtocolError and the like — which fire when the connection drops mid-request.
+            # The connect/timeout handlers above are also TransportError subclasses, so this clause
+            # must stay last; without it these escape unwrapped, bypassing the categorized error.
+            # The outcome is ambiguous — the request may have reached Azure and generated (and
+            # billed) an image — so for this non-idempotent POST it is categorized AMBIGUOUS
+            # (non-retryable): an automatic Temporal retry could duplicate the generation.
+            metadata = extract_azure_metadata(exc)
+            msg = f"Azure transport error for model '{self.inference_model.desc}': {exc}"
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.AMBIGUOUS,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="The connection to Azure failed mid-request — the outcome is unknown; retry manually after checking for a duplicate image",
+                ),
+                provider_metadata=metadata,
+            ) from exc
+
+        # The HTTP status was successful, but Azure (or an intermediary gateway) can still
+        # return a malformed or non-JSON body. json() raises a json.JSONDecodeError here, so
+        # categorize it as a worker error rather than letting a raw ValueError escape uncategorized.
+        try:
+            response_dict = response.json()
+        except json.JSONDecodeError as exc:
+            metadata = extract_azure_metadata_from_response(response, type(exc).__name__, message=str(exc))
+            classification = classify_inference_error(metadata)
+            raise render_inference_error(
+                metadata=metadata,
+                classification=classification,
+                family=InferenceErrorFamily.IMG_GEN,
+                model_desc=self.inference_model.desc,
+                model_handle=self.inference_model.name,
+            ) from exc
 
         # Extract usage tokens if available
         if (usage_dict := response_dict.get("usage")) and (img_gen_tokens_usage := img_gen_job.job_report.img_gen_tokens_usage):
@@ -161,25 +249,69 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
         response_output_format: str | None = response_dict.get("output_format")
         if not response_output_format:
             msg = "No output format received from Azure"
-            raise ImgGenGenerationError(msg)
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.UNKNOWN,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_MODEL,
+                    detail="Azure returned an image without an output format — try a different model",
+                ),
+                provider_metadata=None,
+            )
         generated_images: list[GeneratedImageRawDetails] = []
         if images := response_dict.get("data"):
             size = response_dict.get("size")
             if not isinstance(size, str):
                 msg = f"Size from img gen response is not a string: '{size}'"
-                raise ImgGenGenerationError(msg)
+                raise ImgGenGenerationError(
+                    msg,
+                    error_category=InferenceErrorCategory.UNKNOWN,
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_MODEL,
+                        detail="Azure returned a malformed image size — try a different model",
+                    ),
+                    provider_metadata=None,
+                )
             size_split = size.split("x")
             if len(size_split) != 2:
                 msg = f"Size from img gen response is not a valid size: '{size}'"
-                raise ImgGenGenerationError(msg)
+                raise ImgGenGenerationError(
+                    msg,
+                    error_category=InferenceErrorCategory.UNKNOWN,
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_MODEL,
+                        detail="Azure returned a malformed image size — try a different model",
+                    ),
+                    provider_metadata=None,
+                )
             width_str, height_str = size_split
-            width = int(width_str)
-            height = int(height_str)
+            try:
+                width = int(width_str)
+                height = int(height_str)
+            except ValueError as exc:
+                msg = f"Size from img gen response has non-numeric dimensions: '{size}'"
+                raise ImgGenGenerationError(
+                    msg,
+                    error_category=InferenceErrorCategory.UNKNOWN,
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_MODEL,
+                        detail="Azure returned a malformed image size — try a different model",
+                    ),
+                    provider_metadata=None,
+                ) from exc
             for image in images:
                 base64_str = image.get("b64_json")
                 if not isinstance(base64_str, str):
                     msg = f"No base64 image data received from model '{self.inference_model.model_id}'"
-                    raise ImgGenGenerationError(msg)
+                    raise ImgGenGenerationError(
+                        msg,
+                        error_category=InferenceErrorCategory.CONTENT,
+                        user_action=UserAction(
+                            kind=UserActionKind.CHANGE_INPUT,
+                            detail="Azure returned no image data — try rephrasing the prompt or using a different model",
+                        ),
+                        provider_metadata=None,
+                    )
                 generated_images.append(
                     GeneratedImageRawDetails(
                         base64_str=base64_str,
@@ -189,6 +321,14 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                 )
         else:
             msg = f"Unexpected response from model '{self.inference_model.model_id}' has no 'data' or 'images' key"
-            raise ImgGenGenerationError(msg)
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.UNKNOWN,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_MODEL,
+                    detail="Azure returned an unexpected response shape — try a different model",
+                ),
+                provider_metadata=None,
+            )
 
         return generated_images

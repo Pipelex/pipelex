@@ -1,0 +1,12 @@
+domain      = "offline_gateway_unknown"
+description = "Pipeline referencing a gateway model that does NOT exist in the cached gateway specs"
+main_pipe   = "gateway_unknown_pipe"
+
+[pipe]
+[pipe.gateway_unknown_pipe]
+type        = "PipeLLM"
+description = "Single LLM step using a gateway model handle that is intentionally absent from the test fixture"
+inputs      = { topic = "Text" }
+output      = "Text"
+model       = "gpt-future-fake-99"
+prompt      = "Write a single sentence about $topic.text."

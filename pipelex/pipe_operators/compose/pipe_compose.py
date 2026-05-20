@@ -83,7 +83,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         roots: set[str] = set()
         for path in full_paths:
             root = get_root_from_dotted_path(path)
-            if not root.startswith("_") and root not in {"preliminary_text", "place_holder"}:
+            if not root.startswith("_") and root != "place_holder":
                 roots.add(root)
         return roots
 

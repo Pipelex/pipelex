@@ -1,0 +1,49 @@
+domain      = "structured_output_test"
+description = "Pipelines exercising act_llm_gen_object / act_llm_gen_object_list across the Temporal data converter (custom Invoice concept with nested Customer + LineItem list)"
+
+[concept.LineItem]
+description = "A single line item in an invoice"
+
+[concept.LineItem.structure]
+product_name = { type = "text", description = "Name of the product", required = true }
+quantity     = { type = "integer", description = "Quantity ordered", required = true }
+unit_price   = { type = "number", description = "Price per unit", required = true }
+
+[concept.Customer]
+description = "A customer for an invoice"
+
+[concept.Customer.structure]
+name  = { type = "text", description = "Customer's full name", required = true }
+email = { type = "text", description = "Customer's email address", required = true }
+
+[concept.Invoice]
+description = "A structured invoice with nested customer + line items"
+
+[concept.Invoice.structure]
+invoice_number = { type = "text", description = "Unique invoice identifier", required = true }
+customer       = { type = "concept", concept_ref = "structured_output_test.Customer", description = "The customer for this invoice", required = true }
+line_items     = { type = "list", item_type = "concept", item_concept_ref = "structured_output_test.LineItem", description = "List of line items in the invoice", required = true }
+total_amount   = { type = "number", description = "Total invoice amount", required = true }
+
+[pipe]
+[pipe.generate_invoice_single]
+type = "PipeLLM"
+description = "Generate a single Invoice (exercises act_llm_gen_object cross-process round-trip)"
+output = "Invoice"
+model = "$testing-structured"
+prompt = """
+Generate a single complete invoice for customer 'Alice Chen' (alice@example.com)
+with two line items: 'Widget' x3 at 9.99 and 'Gadget' x1 at 49.50.
+Use invoice_number INV-2026-001 and total_amount 79.47.
+"""
+
+[pipe.generate_invoice_list]
+type = "PipeLLM"
+description = "Generate multiple Invoices (exercises act_llm_gen_object_list cross-process round-trip)"
+output = "Invoice[2]"
+model = "$testing-structured"
+prompt = """
+Generate 2 distinct invoices, each with at least one nested LineItem.
+Use unique invoice_number values (INV-2026-A, INV-2026-B) so the round-trip
+test can distinguish them.
+"""

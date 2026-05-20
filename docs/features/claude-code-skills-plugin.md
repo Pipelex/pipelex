@@ -22,7 +22,7 @@ Install from [mthds-ai/mthds-plugins](https://github.com/mthds-ai/mthds-plugins)
 | `/mthds-edit` | Modify existing bundles — change pipes, update prompts, add or remove steps |
 | `/mthds-explain` | Explain and document existing workflows in plain language |
 | `/mthds-fix` | Automatically fix validation errors in a loop |
-| `/mthds-run` | Execute methods and interpret JSON output (supports dry runs and graph generation) |
+| `/mthds-run` | Execute methods and interpret the results (supports dry runs and graph generation) |
 | `/mthds-inputs` | Prepare inputs: placeholder templates, synthetic test data, or user-provided files |
 | `/mthds-install` | Install method packages from GitHub or local directories |
 | `/mthds-pkg` | Manage package manifests and related package workflows |
@@ -46,6 +46,6 @@ Once installed, type `/mthds-build` in Claude Code to create your first method f
 
 ## Related Documentation
 
-- [Agent CLI](../tools/cli/agent-cli.md) - JSON contract used under the hood
+- [Agent CLI](../tools/cli/agent-cli.md) - Machine-oriented interface used under the hood
 - [Packages](../building-methods/packages.md) - `METHODS.toml` manifest workflow
 - [Package Commands](../tools/cli/pkg.md) - Current `mthds package` commands

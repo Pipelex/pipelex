@@ -3,6 +3,7 @@ from collections.abc import Callable, Generator
 from pathlib import Path
 
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.hub import get_library_manager, get_report_delegate, get_required_pipe, set_current_library, teardown_current_library
@@ -44,6 +45,7 @@ def pipe_job_from_library(
     pipe_code: str,
     pipe_run_mode: PipeRunMode = PipeRunMode.DRY,
     isolated_registry: bool = False,
+    working_memory_builder: Callable[[PipeAbstract], WorkingMemory] | None = None,
 ) -> Generator[PipeJob, None, None]:
     """Shared fixture skeleton: open library, load via load_fn, build PipeJob, yield, teardown.
 
@@ -55,6 +57,10 @@ def pipe_job_from_library(
             concept classes are registered there instead of the global KajsonManager
             registry. This simulates a clean worker process where the global registry
             has no dynamic classes, forcing the deferred hydration path.
+        working_memory_builder: Optional builder invoked with the looked-up pipe to
+            produce a pre-populated working memory (e.g. mock inputs synthesized from
+            ``pipe.needed_inputs()``). When omitted, the job carries an empty working
+            memory.
     """
     library_manager = get_library_manager()
     library_id, library = library_manager.open_library()
@@ -83,6 +89,8 @@ def pipe_job_from_library(
         pipe = get_required_pipe(pipe_code=pipe_code)
         library_crate = library_manager.get_crate(library_id=library_id)
         pipe_job = build_pipe_job(pipe=pipe, library_crate=library_crate, pipe_run_mode=pipe_run_mode, pipeline_run_id=pipeline_run_id)
+        if working_memory_builder is not None:
+            pipe_job = pipe_job.model_copy(update={"working_memory": working_memory_builder(pipe)})
 
         yield pipe_job
     finally:

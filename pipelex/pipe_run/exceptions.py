@@ -46,6 +46,6 @@ class PipeRouterError(PipelexError):
         self.run_mode = run_mode
         self.pipe_code = pipe_code
         self.output_name = output_name
-        self.pipe_stack = pipe_stack
+        self.pipe_stack = list(pipe_stack)  # snapshot: the live stack unwinds after this error is raised
         self.missing_inputs = missing_inputs
         super().__init__(message)
