@@ -1,0 +1,53 @@
+name: Lint fresh (post-merge guarantee)
+
+# Runs on push to dev/main and weekly on a cron. No mypy cache restore — a
+# from-scratch type-check that acts as the safety net behind the cached PR
+# checks in lint-check.yml. If incremental mypy ever quietly drifts from what
+# a fresh run would say, this catches it within minutes of merge (or once a
+# week on the cron) instead of letting bad state accumulate.
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+  schedule:
+    # Mondays at 04:00 UTC — catches drift even on quiet weeks.
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-typecheck-fresh:
+    name: Typecheck fresh (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/.venv
+      PYTHON_VERSION: "3.11"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install dependencies
+        run: PYTHON_VERSION=3.11 TEST_PROFILE=ci make install
+
+      # No mypy cache restore here — that is the whole point of this workflow.
+
+      - name: Run pyright merge check (Python ${{ matrix.python-version }})
+        run: LINT_PYTHON_VERSION=${{ matrix.python-version }} make merge-check-pyright
+
+      - name: Run mypy merge check (Python ${{ matrix.python-version }}, fresh)
+        run: LINT_PYTHON_VERSION=${{ matrix.python-version }} make merge-check-mypy

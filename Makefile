@@ -430,7 +430,7 @@ gha-tests: env
 	@echo "• Regenerating test model fixtures with ci profile"
 	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile ci
 	@echo "• Running unit tests for github actions (excluding inference and gha_disabled)"
-	$(VENV_PYTEST) -n auto --max-worker-restart=2 --timeout=180 --timeout-method=thread --tb=short -m "(dry_runnable or not inference) and not (gha_disabled or pipelex_api)" || [ $$? = 5 ]
+	$(VENV_PYTEST) -n auto --dist=worksteal --max-worker-restart=2 --timeout=180 --timeout-method=thread --tb=line -p no:cacheprovider --no-header -m "(dry_runnable or not inference) and not (gha_disabled or pipelex_api)" || [ $$? = 5 ]
 
 run-all-tests: env
 	$(call PRINT_TITLE,"Running all unit tests")
