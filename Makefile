@@ -66,6 +66,7 @@ make plxt-format              - Format MTHDS/TOML/PLX files with plxt
 make plxt-lint                - Lint MTHDS/TOML/PLX files with plxt
 
 make rules                    - Install agent rules for contributing to Pipelex
+make rules-claude-standalone  - Install a standalone CLAUDE.md (full ruleset, for contributors without the Pipelex workspace)
 make up-kit-configs           - Update kit configs from .pipelex/
 make ukc                      - Shorthand -> up-kit-configs
 make check-config-sync        - Verify .pipelex and pipelex/kit/configs are in sync
@@ -175,7 +176,7 @@ export HELP
 .PHONY: \
 	all help env env-verbose check-uv check-uv-verbose lock install update build \
 	format lint ruff-format ruff-lint pyright mypy pylint plxt plxt-format plxt-lint \
-    rules up-kit-configs ukc check-config-sync ccs check-rules check-urls cu insert-skeleton \
+    rules rules-claude-standalone up-kit-configs ukc check-config-sync ccs check-rules check-urls cu insert-skeleton \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
 	test-llm tl test-img-gen tg test-extract te test-temporal ttm codex-tests gha-tests \
@@ -276,6 +277,10 @@ build: env
 rules: env
 	$(call PRINT_TITLE,"Installing agent rules for contributing to Pipelex")
 	$(VENV_PIPELEX_DEV) kit rules --set all
+
+rules-claude-standalone: env
+	$(call PRINT_TITLE,"Installing standalone CLAUDE.md with the full ruleset for contributors without the Pipelex workspace")
+	$(VENV_PIPELEX_DEV) kit rules --set standalone --targets claude
 
 check-rules: env
 	$(call PRINT_TITLE,"Checking installed agent rules against templates")

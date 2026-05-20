@@ -33,6 +33,7 @@ def _sync_agent_rules(
     agent_set: str | None,
     cleanup: bool,
     kit_index: KitIndex | None = None,
+    targets_filter: list[AgentTarget] | None = None,
 ) -> None:
     resolved_repo_root = repo_root if repo_root is not None else Path()
     loaded_kit_index = load_index() if kit_index is None else kit_index
@@ -40,6 +41,13 @@ def _sync_agent_rules(
 
     config = get_config()
     preferred_targets: list[AgentTarget] = list(config.pipelex.kit_config.preferred_agent_targets)
+
+    if targets_filter is not None:
+        unknown = [target for target in targets_filter if target not in preferred_targets]
+        if unknown:
+            msg = f"--targets values {unknown} are not in preferred_agent_targets {preferred_targets}"
+            raise PipelexCLIError(msg)
+        preferred_targets = [target for target in preferred_targets if target in targets_filter]
 
     # The config validator guarantees CURSOR cannot coexist with other targets,
     # so a simple membership check is enough to pick the branch.
@@ -102,8 +110,27 @@ def agent_rules(
     repo_root: Annotated[Path | None, typer.Option("--repo-root", dir_okay=True, writable=True, help="Repository root directory")] = None,
     agent_set: Annotated[str | None, typer.Option("--set", help="Agent rule set to sync (use 'pipelex' for Pipelex repo)")] = None,
     cleanup: Annotated[bool, typer.Option("--cleanup", help="Delete Pipelex rules files from other agent targets")] = False,
+    targets: Annotated[
+        str | None,
+        typer.Option(
+            "--targets",
+            help="Comma-separated subset of preferred_agent_targets to update (e.g. 'claude'). Defaults to all preferred targets.",
+        ),
+    ] = None,
 ) -> None:
     try:
+        targets_filter: list[AgentTarget] | None = None
+        if targets is not None:
+            try:
+                targets_filter = [AgentTarget(item.strip()) for item in targets.split(",") if item.strip()]
+            except ValueError as exc:
+                valid_targets = list(AgentTarget)
+                msg = f"Invalid --targets value: {exc}. Valid targets: {valid_targets}"
+                raise PipelexCLIError(msg) from exc
+            if not targets_filter:
+                msg = "--targets must contain at least one target when provided"
+                raise PipelexCLIError(msg)
+
         make_pipelex_for_cli(context=ErrorContext.KIT)
         with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
@@ -113,6 +140,7 @@ def agent_rules(
                 repo_root=repo_root,
                 agent_set=agent_set,
                 cleanup=cleanup,
+                targets_filter=targets_filter,
             )
 
     except (PipelexError, OSError) as exc:

@@ -13,7 +13,6 @@ all = [
   "pipelex_standards.md",
   "pytest_standards.md",
   "docs.md",
-  "tdd.md",
 ]
 
 [agent_rules.cursor.front_matter]
@@ -39,10 +38,6 @@ globs = ["docs/**/*.md"]
 description = "Guidelines for running commands"
 alwaysApply = true
 
-[agent_rules.cursor.files.tdd.front_matter]
-description = "Guidelines for writing test-driven development code"
-globs = []
-
 [agent_rules.targets.agents]
 path = "AGENTS.md"
 
@@ -53,8 +48,21 @@ all = [
   "pipelex_standards.md",
   "pytest_standards.md",
   "docs.md",
-  "tdd.md",
 ]
 
 [agent_rules.targets.claude]
 path = "CLAUDE.md"
+
+[agent_rules.targets.claude.sets]
+all = [
+  "commands.md",
+  "pipelex_standards.md",
+  "docs.md",
+]
+standalone = [
+  "commands.md",
+  "python_standards.md",
+  "pipelex_standards.md",
+  "pytest_standards.md",
+  "docs.md",
+]
