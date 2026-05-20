@@ -9,11 +9,38 @@ wraps when ``instructor`` exhausts its retry loop.
 import json
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-from typing import Any, cast
+from typing import Any, TypeAlias, cast
 
+import httpx
 from pydantic import BaseModel, Field
 
+from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.types import StrEnum
+
+# SDK exception class-name substrings that identify a network/transport failure
+# (no HTTP status reached us). Matched case-insensitively against
+# ``sdk_exception_type`` — covers httpx transport errors, SDK timeout/connection
+# errors, Mistral's ``NoResponseError``, and builtin ``TimeoutError``.
+_NETWORK_ERROR_TOKENS: tuple[str, ...] = ("timeout", "connect", "transport", "noresponse")
+
+
+def _resolve_sdk_exception_type(exc: BaseException, status_code: int | None) -> str:
+    """Return the ``sdk_exception_type`` name, normalizing status-less httpx transport errors.
+
+    Some ``httpx.TransportError`` subclasses (``ReadError``, ``WriteError``,
+    ``CloseError``, ``RemoteProtocolError``, ``ProxyError``, ``UnsupportedProtocol``,
+    ``NetworkError``) have names that contain none of the recognized
+    ``_NETWORK_ERROR_TOKENS``, so without normalization the classifier would treat
+    them as ``UNKNOWN`` instead of transient transport failures. We surface them
+    as ``"TransportError"`` only when the original name lacks a recognized token —
+    ``ConnectError`` / ``ReadTimeout`` / ``ConnectTimeout`` etc. already match
+    and stay unchanged so their semantic stays in the metadata.
+    """
+    raw = type(exc).__name__
+    if status_code is None and isinstance(exc, httpx.TransportError):
+        if not any(token in raw.lower() for token in _NETWORK_ERROR_TOKENS):
+            return "TransportError"
+    return raw
 
 
 class ProviderErrorMetadata(BaseModel):
@@ -23,8 +50,12 @@ class ProviderErrorMetadata(BaseModel):
     without having to scrape it back from the exception chain.
     """
 
-    provider: str
+    provider: ProviderName
     sdk_exception_type: str
+    # Human-readable error text from the SDK exception (``str(exc)``). Both the
+    # Classify step (quota / content-policy discrimination) and the Render step
+    # (message composition) read it, so the Extract step must capture it.
+    message: str = ""
     status_code: int | None = None
     request_id: str | None = None
     retry_after_seconds: float | None = None
@@ -33,6 +64,61 @@ class ProviderErrorMetadata(BaseModel):
     # credential fragments, so it is excluded from serialization (CLI JSON,
     # agent output, Temporal error details) while staying available in-process.
     body: Any | None = Field(default=None, exclude=True)
+
+    @property
+    def is_quota_exhaustion(self) -> bool:
+        """Whether this error is a quota/credits exhaustion rather than rate limiting.
+
+        Dispatches on ``provider`` because each provider phrases quota
+        exhaustion differently; Mistral and Gateway also use HTTP 402.
+        """
+        match self.provider:
+            case ProviderName.OPENAI:
+                return _is_quota_exhaustion_openai(self.message)
+            case ProviderName.ANTHROPIC:
+                return _is_quota_exhaustion_anthropic(self.message)
+            case ProviderName.GOOGLE:
+                return _is_quota_exhaustion_google(self.message)
+            case ProviderName.MISTRAL:
+                return _is_quota_exhaustion_mistral(self.message, self.status_code or 0)
+            case ProviderName.BEDROCK:
+                return _is_quota_exhaustion_aws(self.message, self.provider_error_code)
+            case ProviderName.GATEWAY:
+                return _is_quota_exhaustion_gateway(self.message, self.status_code or 0)
+            case (
+                ProviderName.AZURE | ProviderName.FAL | ProviderName.HUGGINGFACE | ProviderName.LINKUP | ProviderName.DOCLING | ProviderName.PYPDFIUM2
+            ):
+                return False
+
+    @property
+    def is_content_policy_violation(self) -> bool:
+        """Whether the error indicates a content policy / safety filter violation.
+
+        Checks the structured ``provider_error_code`` (e.g. FAL surfaces
+        ``ContentPolicyViolation`` here without echoing it into the message),
+        the rendered ``message``, and the in-process ``body`` payload. ``body``
+        is scanned because Azure REST returns the safety phrasing only in the
+        response body — never in the ``HTTPStatusError`` message — and ``body``
+        is ``exclude=True`` on serialization so the scan stays in-process.
+        """
+        if self.provider_error_code and "contentpolicy" in self.provider_error_code.lower():
+            return True
+        if _is_content_policy_violation(self.message):
+            return True
+        return self.body is not None and _is_content_policy_violation(_stringify_for_scan(self.body))
+
+    @property
+    def is_network_error(self) -> bool:
+        """Whether this is a network/transport failure that never reached an HTTP status."""
+        if self.status_code is not None:
+            return False
+        lowered = self.sdk_exception_type.lower()
+        return any(token in lowered for token in _NETWORK_ERROR_TOKENS)
+
+
+# Readable alias for the Classify / Render pipeline: the metadata model is the
+# structured envelope those steps consume.
+SDKErrorEnvelope: TypeAlias = ProviderErrorMetadata
 
 
 class UserActionKind(StrEnum):
@@ -120,25 +206,25 @@ _GATEWAY_QUOTA_PATTERNS: tuple[str, ...] = (
 )
 
 
-def is_quota_exhaustion_openai(error_message: str) -> bool:
+def _is_quota_exhaustion_openai(error_message: str) -> bool:
     """Check if an OpenAI error message indicates quota/credits exhaustion rather than rate limiting."""
     lower_message = error_message.lower()
     return any(pattern in lower_message for pattern in _OPENAI_QUOTA_PATTERNS)
 
 
-def is_quota_exhaustion_anthropic(error_message: str) -> bool:
+def _is_quota_exhaustion_anthropic(error_message: str) -> bool:
     """Check if an Anthropic error message indicates quota/credits exhaustion rather than rate limiting."""
     lower_message = error_message.lower()
     return any(pattern in lower_message for pattern in _ANTHROPIC_QUOTA_PATTERNS)
 
 
-def is_quota_exhaustion_google(error_message: str) -> bool:
+def _is_quota_exhaustion_google(error_message: str) -> bool:
     """Check if a Google error message indicates quota/credits exhaustion rather than rate limiting."""
     lower_message = error_message.lower()
     return any(pattern in lower_message for pattern in _GOOGLE_QUOTA_PATTERNS)
 
 
-def is_quota_exhaustion_mistral(error_message: str, status_code: int) -> bool:
+def _is_quota_exhaustion_mistral(error_message: str, status_code: int) -> bool:
     """Check if a Mistral error indicates quota/credits exhaustion.
 
     HTTP 402 (Payment Required) is a definitive quota signal.
@@ -150,13 +236,22 @@ def is_quota_exhaustion_mistral(error_message: str, status_code: int) -> bool:
     return status_code == 429 and any(pattern in lower_message for pattern in _MISTRAL_QUOTA_PATTERNS)
 
 
-def is_quota_exhaustion_aws(error_message: str) -> bool:
-    """Check if an AWS error message indicates quota/credits exhaustion rather than rate limiting."""
+def _is_quota_exhaustion_aws(error_message: str, provider_error_code: str | None) -> bool:
+    """Check if an AWS error indicates quota/credits exhaustion rather than rate limiting.
+
+    AWS botocore puts the canonical signal in the error ``Code`` (e.g.
+    ``ServiceQuotaExceededException``), which ``extract_bedrock_metadata`` surfaces
+    as ``provider_error_code``. Some payloads also echo the situation in the
+    ``Message`` text — we check both so a quota exception with a vague message is
+    still detected.
+    """
+    if provider_error_code == "ServiceQuotaExceededException":
+        return True
     lower_message = error_message.lower()
     return any(pattern in lower_message for pattern in _AWS_QUOTA_PATTERNS)
 
 
-def is_quota_exhaustion_gateway(error_message: str, status_code: int) -> bool:
+def _is_quota_exhaustion_gateway(error_message: str, status_code: int) -> bool:
     """Check if a Portkey/Gateway error indicates quota/credits exhaustion.
 
     HTTP 402 (Payment Required) is a definitive quota signal.
@@ -168,10 +263,24 @@ def is_quota_exhaustion_gateway(error_message: str, status_code: int) -> bool:
     return status_code == 429 and any(pattern in lower_message for pattern in _GATEWAY_QUOTA_PATTERNS)
 
 
-def is_content_policy_violation(error_message: str) -> bool:
+def _is_content_policy_violation(error_message: str) -> bool:
     """Check if an error message indicates a content policy or safety filter violation."""
     lower_message = error_message.lower()
     return any(pattern in lower_message for pattern in _CONTENT_POLICY_PATTERNS)
+
+
+def _stringify_for_scan(body: Any) -> str:
+    """Render a metadata body into a lowercase string for content-policy / quota probing.
+
+    Used only by in-process scanners that need to inspect the response payload; the
+    return value is never surfaced to users (``body`` is ``exclude=True``).
+    """
+    if isinstance(body, str):
+        return body
+    try:
+        return json.dumps(body, default=str)
+    except (TypeError, ValueError):
+        return str(body)
 
 
 def extract_underlying_sdk_exception(instructor_exc: Any) -> BaseException | None:
@@ -285,8 +394,9 @@ def extract_openai_metadata(exc: BaseException) -> ProviderErrorMetadata:
     elif isinstance(error_code, str):
         provider_error_code = error_code
     return ProviderErrorMetadata(
-        provider="openai",
+        provider=ProviderName.OPENAI,
         sdk_exception_type=type(exc).__name__,
+        message=str(exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -319,8 +429,9 @@ def extract_anthropic_metadata(exc: BaseException) -> ProviderErrorMetadata:
         retry_after_seconds = _parse_retry_after_seconds(headers.get("retry-after"))
     body = getattr(exc, "body", None)
     return ProviderErrorMetadata(
-        provider="anthropic",
+        provider=ProviderName.ANTHROPIC,
         sdk_exception_type=type(exc).__name__,
+        message=str(exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -423,8 +534,9 @@ def extract_google_metadata(exc: BaseException) -> ProviderErrorMetadata:
         retry_after_seconds = _parse_retry_after_seconds(headers.get("retry-after"))
     details = getattr(exc, "details", None)
     return ProviderErrorMetadata(
-        provider="google",
-        sdk_exception_type=type(exc).__name__,
+        provider=ProviderName.GOOGLE,
+        sdk_exception_type=_resolve_sdk_exception_type(exc, status_code),
+        message=str(exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -442,20 +554,25 @@ def extract_azure_metadata(exc: BaseException) -> ProviderErrorMetadata:
     best-effort basis. ``httpx.ConnectError`` / ``httpx.TimeoutException`` carry
     only a request; every status-related field comes back as ``None``.
     """
-    return _build_azure_metadata(response=getattr(exc, "response", None), sdk_exception_type=type(exc).__name__)
+    return _build_azure_metadata(
+        response=getattr(exc, "response", None),
+        sdk_exception_type=type(exc).__name__,
+        message=str(exc),
+    )
 
 
-def extract_azure_metadata_from_response(response: Any, sdk_exception_type: str) -> ProviderErrorMetadata:
+def extract_azure_metadata_from_response(response: Any, sdk_exception_type: str, message: str) -> ProviderErrorMetadata:
     """Distill a *successful* Azure REST response into a ``ProviderErrorMetadata``.
 
     Used when the HTTP status was fine but the body failed to parse (malformed
     JSON): there is no ``httpx`` exception carrying the response, so the caller
-    passes the ``httpx.Response`` directly along with the failure's type name.
+    passes the ``httpx.Response`` directly along with the failure's type name
+    and message.
     """
-    return _build_azure_metadata(response=response, sdk_exception_type=sdk_exception_type)
+    return _build_azure_metadata(response=response, sdk_exception_type=sdk_exception_type, message=message)
 
 
-def _build_azure_metadata(response: Any, sdk_exception_type: str) -> ProviderErrorMetadata:
+def _build_azure_metadata(response: Any, sdk_exception_type: str, message: str) -> ProviderErrorMetadata:
     """Read status code, headers, and body off an Azure ``httpx.Response`` on a best-effort basis."""
     status_code = getattr(response, "status_code", None)
     if not isinstance(status_code, int):
@@ -470,8 +587,9 @@ def _build_azure_metadata(response: Any, sdk_exception_type: str) -> ProviderErr
         retry_after_seconds = _parse_retry_after_seconds(headers.get("retry-after"))
     body, provider_error_code = _parse_response_text_body(response)
     return ProviderErrorMetadata(
-        provider="azure",
+        provider=ProviderName.AZURE,
         sdk_exception_type=sdk_exception_type,
+        message=message,
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -508,8 +626,9 @@ def extract_fal_metadata(exc: BaseException) -> ProviderErrorMetadata:
     # code recovered from the body.
     provider_error_code = base_provider_error_code or parsed_provider_error_code
     return ProviderErrorMetadata(
-        provider="fal",
+        provider=ProviderName.FAL,
         sdk_exception_type=type(exc).__name__,
+        message=str(exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -540,8 +659,9 @@ def extract_huggingface_metadata(exc: BaseException) -> ProviderErrorMetadata:
         retry_after_seconds = _parse_retry_after_seconds(headers.get("retry-after"))
     body, provider_error_code = _parse_response_text_body(response)
     return ProviderErrorMetadata(
-        provider="huggingface",
+        provider=ProviderName.HUGGINGFACE,
         sdk_exception_type=type(exc).__name__,
+        message=str(exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -573,8 +693,9 @@ def extract_gateway_metadata(exc: BaseException) -> ProviderErrorMetadata:
     body: Any = getattr(exc, "body", None)
     provider_error_code = _provider_error_code_from_body(body) or _provider_error_code_from_flat_body(body)
     return ProviderErrorMetadata(
-        provider="gateway",
+        provider=ProviderName.GATEWAY,
         sdk_exception_type=type(exc).__name__,
+        message=str(exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -620,14 +741,34 @@ def extract_mistral_metadata(exc: BaseException) -> ProviderErrorMetadata:
             body = parsed_dict
             provider_error_code = _provider_error_code_from_flat_body(parsed_dict) or _provider_error_code_from_body(parsed_dict)
     return ProviderErrorMetadata(
-        provider="mistral",
-        sdk_exception_type=type(exc).__name__,
+        provider=ProviderName.MISTRAL,
+        sdk_exception_type=_resolve_sdk_exception_type(exc, status_code),
+        message=str(exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
         provider_error_code=provider_error_code,
         body=body,
     )
+
+
+# AWS Bedrock surfaces its canonical error signal as a code string; a
+# hand-built ``ClientError`` (and some botocore paths) may carry no HTTP status.
+# This maps the documented Bedrock error codes to an HTTP status so the
+# provider-blind Classify step can treat Bedrock uniformly. Used only as a
+# fallback when ``ResponseMetadata.HTTPStatusCode`` is absent.
+_AWS_ERROR_CODE_TO_STATUS: dict[str, int] = {
+    "ThrottlingException": 429,
+    "ServiceQuotaExceededException": 400,
+    "AccessDeniedException": 403,
+    "UnauthorizedException": 401,
+    "ValidationException": 400,
+    "ModelNotReadyException": 429,
+    "ServiceUnavailableException": 503,
+    "InternalServerException": 500,
+    "ResourceNotFoundException": 404,
+    "ModelNotFoundException": 404,
+}
 
 
 def extract_bedrock_metadata(exc: BaseException) -> ProviderErrorMetadata:
@@ -663,9 +804,12 @@ def extract_bedrock_metadata(exc: BaseException) -> ProviderErrorMetadata:
         retry_after_seconds = _parse_retry_after_seconds(cast("dict[str, Any]", headers).get("retry-after"))
     error_code = error_section.get("Code")
     provider_error_code = error_code if isinstance(error_code, str) else None
+    if status_code is None and provider_error_code is not None:
+        status_code = _AWS_ERROR_CODE_TO_STATUS.get(provider_error_code)
     return ProviderErrorMetadata(
-        provider="bedrock",
+        provider=ProviderName.BEDROCK,
         sdk_exception_type=type(exc).__name__,
+        message=str(exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -687,8 +831,9 @@ def extract_linkup_metadata(exc: BaseException) -> ProviderErrorMetadata:
     importing the Linkup SDK at the call site.
     """
     return ProviderErrorMetadata(
-        provider="linkup",
+        provider=ProviderName.LINKUP,
         sdk_exception_type=type(exc).__name__,
+        message=str(exc),
         status_code=None,
         request_id=None,
         retry_after_seconds=None,
@@ -697,23 +842,43 @@ def extract_linkup_metadata(exc: BaseException) -> ProviderErrorMetadata:
     )
 
 
-def extract_local_extract_metadata(exc: BaseException, provider: str) -> ProviderErrorMetadata:
+_LOCAL_EXTRACT_TYPE_HIERARCHY: tuple[tuple[type[BaseException], str], ...] = (
+    # ``FileNotFoundError`` is itself an ``OSError`` subclass, so it must be probed
+    # first; otherwise a missing file would normalize to ``OSError`` → TRANSIENT
+    # instead of CONTENT.
+    (FileNotFoundError, "FileNotFoundError"),
+    (ValueError, "ValueError"),
+    (RuntimeError, "RuntimeError"),
+    (OSError, "OSError"),
+)
+
+
+def extract_local_extract_metadata(exc: BaseException, provider: ProviderName) -> ProviderErrorMetadata:
     """Distill a local (non-HTTP) extraction exception into a ``ProviderErrorMetadata``.
 
     Local extractors (``docling``, ``pypdfium2`` …) run in-process against the
     file system; there is no HTTP response, no request id, no retry-after.
     The only meaningful signal is the underlying exception class
     (``FileNotFoundError``, ``ValueError``, ``RuntimeError``, ``OSError``),
-    which we expose as ``sdk_exception_type`` and ``provider_error_code`` so
-    downstream consumers can branch without importing the underlying library
-    at the call site.
+    which we expose as ``sdk_exception_type``. The classifier matches on exact
+    type names, so we normalize ``sdk_exception_type`` to the recognized ancestor
+    here — a ``PermissionError`` from docling becomes ``"OSError"`` and routes to
+    TRANSIENT instead of falling through to UNKNOWN. The original subclass name
+    is preserved in ``provider_error_code`` for traceability.
     """
+    raw_type_name = type(exc).__name__
+    normalized_type_name = raw_type_name
+    for ancestor_cls, ancestor_name in _LOCAL_EXTRACT_TYPE_HIERARCHY:
+        if isinstance(exc, ancestor_cls):
+            normalized_type_name = ancestor_name
+            break
     return ProviderErrorMetadata(
         provider=provider,
-        sdk_exception_type=type(exc).__name__,
+        sdk_exception_type=normalized_type_name,
+        message=str(exc),
         status_code=None,
         request_id=None,
         retry_after_seconds=None,
-        provider_error_code=type(exc).__name__,
+        provider_error_code=raw_type_name,
         body=None,
     )

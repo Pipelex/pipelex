@@ -88,7 +88,7 @@ class TestLinkupWorkerErrorHandling:
     # ---- Extract worker tests ----
 
     @pytest.mark.parametrize(
-        ("_topic", "exception_class", "exception_message", "expected_category", "expected_message_substring"),
+        ("_topic", "exception_class", "exception_message", "expected_category", "expected_user_action_kind"),
         LinkupExtractErrorHandlingTestData.EXTRACT_ERROR_CASES,
     )
     async def test_extract_error_categorization(
@@ -98,7 +98,7 @@ class TestLinkupWorkerErrorHandling:
         exception_class: type[Exception],
         exception_message: str,
         expected_category: InferenceErrorCategory,
-        expected_message_substring: str,
+        expected_user_action_kind: UserActionKind,
     ) -> None:
         """Linkup extract errors are caught and categorized correctly."""
         worker = _make_linkup_extract_worker(mocker)
@@ -110,12 +110,13 @@ class TestLinkupWorkerErrorHandling:
 
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.__cause__ is sdk_exc
-        assert expected_message_substring in exc_info.value.args[0].lower()
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is expected_user_action_kind
 
     # ---- Search worker tests ----
 
     @pytest.mark.parametrize(
-        ("_topic", "exception_class", "exception_message", "expected_category", "expected_message_substring"),
+        ("_topic", "exception_class", "exception_message", "expected_category", "expected_user_action_kind"),
         LinkupSearchErrorHandlingTestData.SEARCH_ERROR_CASES,
     )
     async def test_search_error_categorization(
@@ -125,7 +126,7 @@ class TestLinkupWorkerErrorHandling:
         exception_class: type[Exception],
         exception_message: str,
         expected_category: InferenceErrorCategory,
-        expected_message_substring: str,
+        expected_user_action_kind: UserActionKind,
     ) -> None:
         """Linkup search errors are caught and categorized correctly."""
         worker = _make_linkup_search_worker(mocker)
@@ -137,7 +138,8 @@ class TestLinkupWorkerErrorHandling:
 
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.__cause__ is sdk_exc
-        assert expected_message_substring in exc_info.value.args[0].lower()
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is expected_user_action_kind
 
     # ---- User action semantics ----
 

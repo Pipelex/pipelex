@@ -6,15 +6,23 @@ import pytest
 from pipelex.base_exceptions import ErrorReport, PipelexError
 from pipelex.cogt.exceptions import (
     CogtError,
+    ExtractJobFailureError,
+    ExtractModelNotFoundError,
+    ImgGenGenerationError,
+    ImgGenModelNotFoundError,
     InferenceBackendCredentialsError,
     InferenceBackendCredentialsErrorType,
     InferenceErrorCategory,
     LLMCapabilityError,
     LLMCompletionError,
     LLMModelNotFoundError,
+    ModelNotFoundError,
     ModelWaterfallError,
+    SearchJobFailureError,
+    SearchModelNotFoundError,
 )
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
+from pipelex.cogt.inference.provider_name import ProviderName
 from tests.unit.pipelex.cogt.test_data import ExceptionTestData
 
 
@@ -75,7 +83,7 @@ class TestErrorCategoryInfrastructure:
         """LLMModelNotFoundError accepts user_action and provider_metadata via the widened
         ModelNotFoundError.__init__, so worker-side categorization can attach SDK metadata.
         """
-        metadata = ProviderErrorMetadata(provider="openai", sdk_exception_type="NotFoundError", status_code=404)
+        metadata = ProviderErrorMetadata(provider=ProviderName.OPENAI, sdk_exception_type="NotFoundError", status_code=404)
         user_action = UserAction(kind=UserActionKind.CHANGE_MODEL, detail="pick another model")
         err = LLMModelNotFoundError(
             message="model gpt-99 not found",
@@ -219,3 +227,30 @@ class TestErrorCategoryInfrastructure:
         assert exc_info.value.__cause__ is original
         report = exc_info.value.to_error_report()
         assert report.error_category == "transient"
+
+    # --- ModelNotFoundError hierarchy: the load-bearing reroute invariant ---
+
+    def test_llm_model_not_found_is_model_not_found_not_completion_error(self) -> None:
+        """LLMModelNotFoundError is a ModelNotFoundError, NOT an LLMCompletionError.
+
+        The whole provider-404 reroute depends on this: a 404 must escape PipeLLM's
+        `except LLMCompletionError` and reach `except ModelNotFoundError` in PipeOperator.
+        Reparenting LLMModelNotFoundError under LLMCompletionError would silently break it.
+        """
+        assert issubclass(LLMModelNotFoundError, ModelNotFoundError)
+        assert not issubclass(LLMModelNotFoundError, LLMCompletionError)
+
+    def test_img_gen_model_not_found_is_model_not_found_not_generation_error(self) -> None:
+        """ImgGenModelNotFoundError is a ModelNotFoundError, NOT an ImgGenGenerationError — same reroute invariant."""
+        assert issubclass(ImgGenModelNotFoundError, ModelNotFoundError)
+        assert not issubclass(ImgGenModelNotFoundError, ImgGenGenerationError)
+
+    def test_extract_model_not_found_is_model_not_found_not_job_failure_error(self) -> None:
+        """ExtractModelNotFoundError is a ModelNotFoundError, NOT an ExtractJobFailureError — same reroute invariant."""
+        assert issubclass(ExtractModelNotFoundError, ModelNotFoundError)
+        assert not issubclass(ExtractModelNotFoundError, ExtractJobFailureError)
+
+    def test_search_model_not_found_is_model_not_found_not_job_failure_error(self) -> None:
+        """SearchModelNotFoundError is a ModelNotFoundError, NOT a SearchJobFailureError — same reroute invariant."""
+        assert issubclass(SearchModelNotFoundError, ModelNotFoundError)
+        assert not issubclass(SearchModelNotFoundError, SearchJobFailureError)

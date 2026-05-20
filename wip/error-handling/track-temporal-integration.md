@@ -56,7 +56,7 @@ The child-workflow boundary (`execute_child_workflow` / `start_child_workflow` i
 
 ### Deferred review followups
 
-Two optional refinements from the activity-boundary code review are recorded in [deferred-items/temporal-activity-boundary-review-followups.md](deferred-items/temporal-activity-boundary-review-followups.md): the integration test verifies the converted payload rather than Temporal's retry-engine behavior, and `error_report_dict_from_details` identifies the report by dict shape. Both are deliberate scope choices, optional to revisit.
+Two optional refinements from the activity-boundary code review are recorded in [review-notes/temporal-activity-boundary-review-followups.md](review-notes/temporal-activity-boundary-review-followups.md): the integration test verifies the converted payload rather than Temporal's retry-engine behavior, and `error_report_dict_from_details` identifies the report by dict shape. Both are deliberate scope choices, optional to revisit.
 
 ## Related tracks
 

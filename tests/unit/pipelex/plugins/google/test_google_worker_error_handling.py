@@ -12,9 +12,12 @@ if TYPE_CHECKING:
 
 from pipelex.cogt.exceptions import (
     ImgGenGenerationError,
+    ImgGenModelNotFoundError,
     InferenceErrorCategory,
     LLMCompletionError,
+    LLMModelNotFoundError,
 )
+from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.plugins.google.google_img_gen_worker import GoogleImgGenWorker
 from pipelex.plugins.google.google_llm_worker import GoogleLLMWorker
 from tests.unit.pipelex.plugins.google.test_data import GoogleErrorHandlingTestData
@@ -156,6 +159,22 @@ class TestGoogleWorkerErrorHandling:
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
         assert exc_info.value.__cause__ is sdk_exc
 
+    # ---- LLM worker not-found test (404 specializes to LLMModelNotFoundError) ----
+
+    async def test_llm_not_found_raises_llm_model_not_found_error(self, mocker: MockerFixture) -> None:
+        """A 404 ClientError specializes to LLMModelNotFoundError (CONFIGURATION) on the LLM path."""
+        worker = _make_google_llm_worker(mocker)
+        sdk_exc = _make_google_client_error(code=404, message="Model gemini-99 not found")
+        worker.genai_async_client.models.generate_content.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        with pytest.raises(LLMModelNotFoundError) as exc_info:
+            await worker._gen_text(llm_job=_make_llm_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.CHANGE_MODEL
+        assert exc_info.value.__cause__ is sdk_exc
+
     # ---- ImgGen worker ClientError tests (parametrized) ----
 
     @pytest.mark.parametrize(
@@ -184,6 +203,23 @@ class TestGoogleWorkerErrorHandling:
         if expected_action_substring:
             assert exc_info.value.user_action is not None
             assert expected_action_substring in exc_info.value.user_action.detail.lower()
+
+    # ---- ImgGen worker not-found test (404 specializes to ImgGenModelNotFoundError) ----
+
+    async def test_img_gen_not_found_raises_img_gen_model_not_found_error(self, mocker: MockerFixture) -> None:
+        """A 404 ClientError specializes to ImgGenModelNotFoundError (CONFIGURATION) on the ImgGen path."""
+        worker = _make_google_img_gen_worker(mocker)
+        sdk_exc = _make_google_client_error(code=404, message="Model gemini-99 not found")
+        worker.genai_async_client.models.generate_content.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        with pytest.raises(ImgGenModelNotFoundError) as exc_info:
+            await worker._gen_image(img_gen_job=_make_img_gen_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.CHANGE_MODEL
+        assert exc_info.value.model_handle == "imagen-3.0-generate-002"
+        assert exc_info.value.__cause__ is sdk_exc
 
     # ---- ImgGen worker ServerError test ----
 

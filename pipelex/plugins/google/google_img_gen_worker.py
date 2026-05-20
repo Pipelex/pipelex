@@ -1,6 +1,7 @@
 import asyncio
 from typing import Any
 
+import httpx
 from google.genai import errors as genai_errors
 from google.genai import types as genai_types
 from google.genai.client import Client as GoogleGenAiClient
@@ -13,18 +14,13 @@ from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
-from pipelex.cogt.inference.error_classification import (
-    UserAction,
-    UserActionKind,
-    extract_google_metadata,
-    is_content_policy_violation,
-    is_quota_exhaustion_google,
-)
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_google_metadata
+from pipelex.cogt.inference.error_classify import classify_inference_error
+from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.google.google_factory import GoogleFactory
 from pipelex.plugins.google.google_img_gen_factory import GoogleImgGenFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.urls import URLs
 
 
 class GoogleImgGenWorkerError(PipelexError):
@@ -90,101 +86,6 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
             # Best-effort cleanup boundary: teardown must never fail, whatever client/event-loop close throws.
             log.debug(f"Error during Google async client teardown: {exc}")
 
-    def _classify_google_client_error(self, exc: genai_errors.ClientError) -> ImgGenGenerationError:
-        """Classify a Google GenAI ClientError into a categorized ``ImgGenGenerationError``.
-
-        Attaches ``provider_metadata`` and a semantic ``UserAction`` on every branch.
-        """
-        error_message = str(exc)
-        status_code = exc.code
-        metadata = extract_google_metadata(exc)
-
-        if status_code == 404:
-            # Stays as ImgGenGenerationError (not ImgGenModelNotFoundError) to match
-            # google_llm_worker._classify_google_client_error's 404 branch — the LLM
-            # side never specialised to LLMModelNotFoundError either.
-            msg = f"Google model '{self.inference_model.desc}' not found: {exc}"
-            return ImgGenGenerationError(
-                msg,
-                error_category=InferenceErrorCategory.CONFIGURATION,
-                user_action=UserAction(
-                    kind=UserActionKind.CHANGE_MODEL,
-                    detail=f"Model '{self.inference_model.model_id}' was not found — pick an available model",
-                ),
-                provider_metadata=metadata,
-            )
-
-        if status_code in {401, 403}:
-            msg = f"Google API permission denied for model '{self.inference_model.desc}': {exc}"
-            return ImgGenGenerationError(
-                msg,
-                error_category=InferenceErrorCategory.CONFIGURATION,
-                user_action=UserAction(
-                    kind=UserActionKind.CHECK_CREDENTIALS,
-                    detail="Google denied access — check your API credentials",
-                ),
-                provider_metadata=metadata,
-            )
-
-        if status_code == 429:
-            if is_quota_exhaustion_google(error_message):
-                msg = f"Google quota exhausted for model '{self.inference_model.desc}': {exc}"
-                return ImgGenGenerationError(
-                    msg,
-                    error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=UserAction(
-                        kind=UserActionKind.CHECK_BILLING,
-                        detail=f"Your Google Cloud account has exceeded its quota — check billing at {URLs.google_billing}",
-                    ),
-                    provider_metadata=metadata,
-                )
-            msg = f"Google rate limit exceeded for model '{self.inference_model.desc}': {exc}"
-            return ImgGenGenerationError(
-                msg,
-                error_category=InferenceErrorCategory.TRANSIENT,
-                user_action=UserAction(
-                    kind=UserActionKind.WAIT_AND_RETRY,
-                    detail="Rate limited by Google — the system will retry automatically",
-                ),
-                provider_metadata=metadata,
-            )
-
-        if status_code == 400:
-            if is_content_policy_violation(error_message):
-                msg = f"Content rejected by safety filters for model '{self.inference_model.desc}': {exc}"
-                return ImgGenGenerationError(
-                    msg,
-                    error_category=InferenceErrorCategory.CONTENT,
-                    user_action=UserAction(
-                        kind=UserActionKind.CHANGE_INPUT,
-                        detail="Content was rejected by safety filters — revise the prompt",
-                    ),
-                    provider_metadata=metadata,
-                )
-            msg = f"Google bad request error for model '{self.inference_model.desc}': {exc}"
-            return ImgGenGenerationError(
-                msg,
-                error_category=InferenceErrorCategory.CONTENT,
-                user_action=UserAction(
-                    kind=UserActionKind.CHANGE_INPUT,
-                    detail="Google rejected the request — review the prompt and parameters",
-                ),
-                provider_metadata=metadata,
-            )
-
-        # Fallback for other 4xx errors: a ClientError is always 4xx, so it is a
-        # non-retryable client-side problem — not a transient one.
-        msg = f"Google API client error for model '{self.inference_model.desc}': {exc}"
-        return ImgGenGenerationError(
-            msg,
-            error_category=InferenceErrorCategory.CONFIGURATION,
-            user_action=UserAction(
-                kind=UserActionKind.CHANGE_INPUT,
-                detail="Google rejected the request — review the prompt, parameters, and model configuration",
-            ),
-            provider_metadata=metadata,
-        )
-
     @override
     async def _gen_image(
         self,
@@ -218,20 +119,16 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                 contents=prompt_text,
                 config=generation_config,
             )
-        except genai_errors.ServerError as exc:
+        except (genai_errors.ServerError, genai_errors.ClientError, httpx.TransportError) as exc:
             metadata = extract_google_metadata(exc)
-            msg = f"Google API server error for model '{self.inference_model.desc}': {exc}"
-            raise ImgGenGenerationError(
-                msg,
-                error_category=InferenceErrorCategory.TRANSIENT,
-                user_action=UserAction(
-                    kind=UserActionKind.WAIT_AND_RETRY,
-                    detail="Google server error — the system will retry automatically",
-                ),
-                provider_metadata=metadata,
+            classification = classify_inference_error(metadata)
+            raise render_inference_error(
+                metadata=metadata,
+                classification=classification,
+                family=InferenceErrorFamily.IMG_GEN,
+                model_desc=self.inference_model.desc,
+                model_handle=self.inference_model.name,
             ) from exc
-        except genai_errors.ClientError as exc:
-            raise self._classify_google_client_error(exc) from exc
 
         usage_metadata: genai_types.GenerateContentResponseUsageMetadata | None = response.usage_metadata
         if not usage_metadata:

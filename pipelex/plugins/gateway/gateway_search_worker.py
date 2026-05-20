@@ -9,6 +9,8 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import InferenceErrorCategory, SdkTypeError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_gateway_metadata
+from pipelex.cogt.inference.error_classify import classify_inference_error
+from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_job import SearchJob
@@ -18,7 +20,6 @@ from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
 from pipelex.plugins.gateway.gateway_exceptions import GatewaySearchResponseError
-from pipelex.plugins.gateway.gateway_factory import GatewayFactory
 from pipelex.plugins.gateway.gateway_search_schemas import GatewaySearchRequestParams
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
@@ -156,18 +157,16 @@ class GatewaySearchWorker(SearchWorkerAbstract):
                 model=model,
                 messages=messages,
             )
-        except portkey_exceptions.APIError as exc:
-            error_summary = GatewayFactory.make_error_summary_from_portkey_error(exc)
-            error_category = GatewayFactory.classify_error_category(exc)
-            user_action = GatewayFactory.make_user_action_from_portkey_error(exc)
-            metadata = extract_gateway_metadata(exc)
-            msg = f"Search service error for model '{model}': {error_summary}"
-            raise GatewaySearchResponseError(
-                msg,
-                error_category=error_category,
-                user_action=user_action,
-                provider_metadata=metadata,
-            ) from exc
+        except portkey_exceptions.APIError as sdk_exc:
+            metadata = extract_gateway_metadata(sdk_exc)
+            classification = classify_inference_error(metadata)
+            raise render_inference_error(
+                metadata=metadata,
+                classification=classification,
+                family=InferenceErrorFamily.SEARCH,
+                model_desc=self.inference_model.desc,
+                model_handle=self.inference_model.name,
+            ) from sdk_exc
 
         if not isinstance(response, GenericResponse):
             msg = "Response is not of type GenericResponse"

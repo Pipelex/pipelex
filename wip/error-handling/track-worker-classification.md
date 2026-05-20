@@ -93,7 +93,7 @@ The classification + beyond-reference upgrades have landed across every worker k
 
 ## What's left
 
-Worker classification itself is complete — there is no remaining per-worker work. The only open item is the deeper **Extract / Classify / Render** refactor that consolidates the now-duplicated per-worker pipeline into one per-provider Extract function plus a shared Classify + Render. It is proposed but not started — see [track-extract-classify-render.md](track-extract-classify-render.md).
+Worker classification itself is complete — there is no remaining per-worker work. The deeper **Extract / Classify / Render** refactor that consolidates the now-uniform per-worker pipeline into one per-provider Extract function plus a shared Classify + Render has also landed on `refactor/ECR` — see [track-extract-classify-render.md](track-extract-classify-render.md). The consistency gap noted earlier (LLM workers using `classify_*_sdk_error()` free functions while img-gen workers used inline `_raise_categorized_*` methods) is closed: every worker now goes through `extract → classify → render` and the per-provider `*_error_classification.py` files plus the inline `_raise_categorized_*` methods are deleted.
 
 ### Risks and gotchas (for future similar work)
 

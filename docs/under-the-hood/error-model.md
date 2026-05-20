@@ -131,28 +131,31 @@ class PipelexConfigError(PipelexError):
 
 Layer 0 → Layer 1. Every inference worker under `pipelex/plugins/*/` catches its SDK's typed exceptions and re-raises a categorized `CogtError`.
 
-### The Uniform Shape
+### The Uniform Shape — Extract / Classify / Render
 
-Each worker catches an SDK exception, runs a pure discriminator, attaches a category and a `UserAction`, and chains the original via `from exc`.
+Every inference worker's SDK-exception handler collapses to a three-step pipeline: **Extract** turns the SDK exception into a provider-blind `ProviderErrorMetadata`, **Classify** maps that metadata to a category + user-action, and **Render** picks the `CogtError` subclass to raise.
 
 ```python
-except RateLimitError as exc:
-    if is_quota_exhaustion_openai(str(exc)):           # quota ≠ rate limit
-        msg = f"OpenAI quota exhausted for '{self.inference_model.desc}': {exc}"
-        raise LLMCompletionError(
-            message=msg,
-            error_category=InferenceErrorCategory.CAPACITY,
-            user_action=UserAction(kind=UserActionKind.CHECK_BILLING, detail="..."),
-        ) from exc
-    msg = f"Rate limited by OpenAI for '{self.inference_model.desc}': {exc}"
-    raise LLMCompletionError(
-        message=msg,
-        error_category=InferenceErrorCategory.TRANSIENT,
-        user_action=UserAction(kind=UserActionKind.WAIT_AND_RETRY, detail="..."),
+except (APIError, APIConnectionError, APITimeoutError) as exc:
+    metadata = extract_openai_metadata(exc)
+    classification = classify_inference_error(metadata)
+    raise render_llm_error(
+        family=InferenceErrorFamily.LLM_COMPLETION,
+        metadata=metadata,
+        classification=classification,
+        model_desc=self.inference_model.desc,
     ) from exc
 ```
 
-The discriminators are pure functions in `pipelex/cogt/inference/error_classification.py` — `is_quota_exhaustion_<provider>()` and `is_content_policy_violation()` — with per-provider message patterns as module constants.
+The three steps live in three modules. Only the per-provider Extract functions stay plugin-local; Classify and Render are single shared functions.
+
+| Module | Step | What it owns |
+|--------|------|--------------|
+| `pipelex/cogt/inference/error_classification.py` | Extract | `ProviderErrorMetadata`, `SDKErrorEnvelope`, `UserAction`, `UserActionKind`, the 12 `extract_*_metadata` functions, plus pure discriminators (`is_quota_exhaustion`, `is_content_policy_violation`, `is_network_error`) exposed as `@property` on the metadata |
+| `pipelex/cogt/inference/error_classify.py` | Classify | `classify_inference_error()` — provider-blind mapping from `ProviderErrorMetadata` → `ClassificationResult(category, user_action_kind, is_model_not_found)` |
+| `pipelex/cogt/inference/error_render.py` | Render | `render_llm_error()` / `render_img_gen_error()` / `render_extract_error()` / `render_search_error()` — picks the `CogtError` subclass from `InferenceErrorFamily` plus `is_model_not_found` (e.g. `LLMModelNotFoundError` vs `LLMCompletionError`) |
+
+Provider-specific nuance is normalized away in Extract (e.g. Google's `code` becomes `status_code`; AWS Bedrock error codes are mapped to HTTP statuses), so Classify has no provider branching. HTTP status drives classification; status-less errors dispatch on the SDK exception type name. The `tests/unit/pipelex/cogt/inference/test_provider_classification_parity.py` meta-test walks every `ProviderName` against the extract-fn registry so adding a new provider without wiring it fails fast.
 
 ### ProviderErrorMetadata and UserAction
 
@@ -335,6 +338,9 @@ Exception
     ├── CogtError                  cogt/exceptions.py — error_category, provider_metadata
     │   ├── LLMCompletionError      ← per-instance category from the worker
     │   ├── ImgGenGenerationError   ← per-instance category
+    │   ├── ModelNotFoundError      ← sibling family raised on provider HTTP 404
+    │   │   ├── LLMModelNotFoundError / ImgGenModelNotFoundError
+    │   │   └── ExtractModelNotFoundError / SearchModelNotFoundError
     │   └── ... (see worker classification) ...
     ├── PipelineExecutionError      pipeline/exceptions.py — error_domain = RUNTIME
     └── ... (one exceptions.py per package) ...
@@ -380,7 +386,10 @@ InferenceErrorCategory.TRANSIENT.is_retryable   # True — only TRANSIENT
 |------|---------|
 | `pipelex/base_exceptions.py` | `PipelexError`, `ErrorReport`, `ErrorDomain`, `error_domain_to_http_status()` |
 | `pipelex/cogt/exceptions.py` | `CogtError`, `InferenceErrorCategory` |
-| `pipelex/cogt/inference/error_classification.py` | `ProviderErrorMetadata`, `UserAction`, `UserActionKind`, classification helpers |
+| `pipelex/cogt/inference/error_classification.py` | Extract — `ProviderErrorMetadata`, `SDKErrorEnvelope`, `UserAction`, `UserActionKind`, per-provider `extract_*_metadata` functions, pure discriminators |
+| `pipelex/cogt/inference/error_classify.py` | Classify — `classify_inference_error()`, `ClassificationResult` |
+| `pipelex/cogt/inference/error_render.py` | Render — `render_llm_error()` / `render_img_gen_error()` / `render_extract_error()` / `render_search_error()`, `InferenceErrorFamily` |
+| `pipelex/cogt/inference/provider_name.py` | `ProviderName` enum keying the extract-fn registry |
 | `pipelex/plugins/*/` | Per-provider inference workers — Layer 0 → 1 classification |
 | `pipelex/pipeline/exceptions.py` | `PipelineExecutionError`, `PipeExecutionError` |
 | `pipelex/temporal/tprl/temporal_error.py` | `TemporalError`, `from_message_exception`, `recover_error_report` |
@@ -396,6 +405,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable   # True — only TRANSIENT
 | Rate limit hit | `TRANSIENT` → retryable; transport retry honors `Retry-After` |
 | Quota / billing exhausted | `CAPACITY` → non-retryable; `UserAction(CHECK_BILLING)` |
 | Bad API key | `CONFIGURATION` → non-retryable; `error_domain = CONFIG` → HTTP 500 |
+| Model or deployment not found (provider HTTP 404) | Raises a dedicated `*ModelNotFoundError` sibling (`LLMModelNotFoundError`, `ImgGenModelNotFoundError`, `ExtractModelNotFoundError`, `SearchModelNotFoundError`); operator re-raises `PipeOperatorModelAvailabilityError` |
 | Content-policy violation | `CONTENT` → non-retryable; `UserAction(CHANGE_INPUT)` |
 | LLM returns schema-mismatched JSON | `instructor` re-asks; if exhausted → `UNKNOWN` |
 | Connection dropped mid-request | `AMBIGUOUS` → non-retryable (outcome unknown) |

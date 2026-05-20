@@ -10,7 +10,7 @@ from huggingface_hub.errors import HfHubHTTPError, InferenceTimeoutError
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategory
+from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundError, InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.plugins.huggingface.huggingface_img_gen_worker import HuggingFaceImgGenWorker
 
@@ -59,7 +59,6 @@ class TestHuggingFaceImgGenWorkerSemantic:
             (402, InferenceErrorCategory.CAPACITY, UserActionKind.CHECK_BILLING),
             (401, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHECK_CREDENTIALS),
             (403, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHECK_CREDENTIALS),
-            (404, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHANGE_MODEL),
             (400, InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
             # Unhandled 4xx: non-retryable client error, not TRANSIENT.
             (409, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHANGE_INPUT),
@@ -93,6 +92,28 @@ class TestHuggingFaceImgGenWorkerSemantic:
         assert exc_info.value.provider_metadata is not None
         assert exc_info.value.provider_metadata.provider == "huggingface"
         assert exc_info.value.provider_metadata.status_code == status_code
+
+    async def test_not_found_404_raises_img_gen_model_not_found_error(self, mocker: MockerFixture) -> None:
+        """A 404 specializes to ImgGenModelNotFoundError (CONFIGURATION, CHANGE_MODEL)."""
+        worker = _make_worker(mocker)
+        sdk_exc = _make_hf_http_error(404, message="model not found")
+        worker.hf_async_client.text_to_image.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        mocker.patch(
+            "pipelex.plugins.huggingface.huggingface_img_gen_worker.ImgGenArgsFactory.make_args_for_model",
+            new_callable=mocker.AsyncMock,
+            return_value={"prompt": "test", "model": "test-model-id"},
+        )
+
+        with pytest.raises(ImgGenModelNotFoundError) as exc_info:
+            await worker._generate_single_image(img_gen_job=_make_img_gen_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.CHANGE_MODEL
+        assert exc_info.value.model_handle == "sdxl-base"
+        assert exc_info.value.provider_metadata is not None
+        assert exc_info.value.provider_metadata.status_code == 404
 
     async def test_timeout_carries_metadata(self, mocker: MockerFixture) -> None:
         worker = _make_worker(mocker)

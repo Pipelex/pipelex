@@ -252,7 +252,8 @@ class TestOpenAIResponsesWorkerObjectErrorHandling:
 
         assert exc_info.value.error_category is InferenceErrorCategory.UNKNOWN
         assert exc_info.value.__cause__ is wrapped
-        assert exc_info.value.provider_metadata is None
+        assert exc_info.value.provider_metadata is not None
+        assert exc_info.value.provider_metadata.sdk_exception_type == "ValueError"
 
     async def test_real_instructor_propagates_transport_error_raw(self, mocker: MockerFixture) -> None:
         """End-to-end: drive the real instructor library (Responses adapter) with an SDK transport

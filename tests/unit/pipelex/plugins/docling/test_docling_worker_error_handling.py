@@ -9,6 +9,8 @@ import pytest
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
+    from pipelex.cogt.inference.error_classification import UserActionKind
+
 from pipelex.cogt.exceptions import ExtractJobFailureError, InferenceErrorCategory
 from pipelex.plugins.docling.docling_extract_worker import DoclingExtractWorker
 from pipelex.tools.uri.prepared_file import PreparedFileLocalPath
@@ -36,7 +38,7 @@ class TestDoclingWorkerErrorHandling:
     """Tests for Docling extract worker exception handling and error categorization."""
 
     @pytest.mark.parametrize(
-        ("_topic", "exception_class", "exception_message", "expected_category", "expected_message_substring"),
+        ("_topic", "exception_class", "exception_message", "expected_category", "expected_user_action_kind"),
         DoclingErrorHandlingTestData.EXTRACTION_ERROR_CASES,
     )
     async def test_extraction_error_categorization(
@@ -46,7 +48,7 @@ class TestDoclingWorkerErrorHandling:
         exception_class: type[Exception],
         exception_message: str,
         expected_category: InferenceErrorCategory,
-        expected_message_substring: str,
+        expected_user_action_kind: UserActionKind,
     ) -> None:
         """Docling conversion errors are caught and categorized correctly."""
         worker = _make_docling_extract_worker(mocker)
@@ -70,7 +72,8 @@ class TestDoclingWorkerErrorHandling:
 
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.__cause__ is sdk_exc
-        assert expected_message_substring in exc_info.value.args[0].lower()
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is expected_user_action_kind
 
     async def test_error_report_for_file_not_found(self, mocker: MockerFixture) -> None:
         """to_error_report() for FileNotFoundError has CONTENT category."""

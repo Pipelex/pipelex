@@ -17,10 +17,11 @@ from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_gateway_metadata
+from pipelex.cogt.inference.error_classify import classify_inference_error
+from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.fal.fal_poller import FalPoller
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
-from pipelex.plugins.gateway.gateway_factory import GatewayFactory
 from pipelex.plugins.gateway.gateway_schemas import GatewayImgGenAzureFlux2Pro, GatewayImgGenAzureGptImage
 from pipelex.tools.misc.filetype_utils import FileTypeError, detect_file_type_from_bytes
 from pipelex.tools.misc.image_utils import ImageFormat
@@ -81,16 +82,14 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                 **args_dict,
             )
         except portkey_exceptions.APIError as exc:
-            error_summary = GatewayFactory.make_error_summary_from_portkey_error(exc)
-            error_category = GatewayFactory.classify_error_category(exc)
-            user_action = GatewayFactory.make_user_action_from_portkey_error(exc)
             metadata = extract_gateway_metadata(exc)
-            msg = f"Image generation service error for model '{self.inference_model.model_id}': {error_summary}"
-            raise ImgGenGenerationError(
-                msg,
-                error_category=error_category,
-                user_action=user_action,
-                provider_metadata=metadata,
+            classification = classify_inference_error(metadata)
+            raise render_inference_error(
+                metadata=metadata,
+                classification=classification,
+                family=InferenceErrorFamily.IMG_GEN,
+                model_desc=self.inference_model.desc,
+                model_handle=self.inference_model.name,
             ) from exc
 
         if response is None:

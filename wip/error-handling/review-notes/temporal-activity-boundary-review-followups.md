@@ -1,4 +1,4 @@
-# Deferred — Temporal activity error boundary review follow-ups
+# Review note — Temporal activity error boundary follow-ups
 
 **Surfaced during:** code review of `cda61bae` "feat: category-aware error boundary on all Temporal activities" (Followup 5 of [track-temporal-integration.md](../track-temporal-integration.md), `_tprl/TODOS.md`).
 

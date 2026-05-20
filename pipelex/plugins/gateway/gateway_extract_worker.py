@@ -7,12 +7,14 @@ from portkey_ai.api_resources.utils import GenericResponse
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import ExtractCapabilityError, ExtractJobFailureError, SdkTypeError
+from pipelex.cogt.exceptions import ExtractCapabilityError, SdkTypeError
 from pipelex.cogt.extract.extract_input import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.inference.error_classification import extract_gateway_metadata
+from pipelex.cogt.inference.error_classify import classify_inference_error
+from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import TokenCategory
@@ -155,18 +157,16 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
                 model=self.inference_model.model_id,
                 messages=messages,
             )
-        except portkey_exceptions.APIError as exc:
-            error_summary = GatewayFactory.make_error_summary_from_portkey_error(exc)
-            error_category = GatewayFactory.classify_error_category(exc)
-            user_action = GatewayFactory.make_user_action_from_portkey_error(exc)
-            metadata = extract_gateway_metadata(exc)
-            msg = f"Web fetch service error for URL '{document_uri}' via model '{self.inference_model.tag}': {error_summary}"
-            raise ExtractJobFailureError(
-                msg,
-                error_category=error_category,
-                user_action=user_action,
-                provider_metadata=metadata,
-            ) from exc
+        except portkey_exceptions.APIError as sdk_exc:
+            metadata = extract_gateway_metadata(sdk_exc)
+            classification = classify_inference_error(metadata)
+            raise render_inference_error(
+                metadata=metadata,
+                classification=classification,
+                family=InferenceErrorFamily.EXTRACT,
+                model_desc=self.inference_model.desc,
+                model_handle=self.inference_model.name,
+            ) from sdk_exc
 
         if not isinstance(response, GenericResponse):
             msg = "Response is not of type GenericResponse"
@@ -216,18 +216,16 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
                 headers=extra_headers,
                 **extra_body,
             )
-        except portkey_exceptions.APIError as exc:
-            error_summary = GatewayFactory.make_error_summary_from_portkey_error(exc)
-            error_category = GatewayFactory.classify_error_category(exc)
-            user_action = GatewayFactory.make_user_action_from_portkey_error(exc)
-            metadata = extract_gateway_metadata(exc)
-            msg = f"Extract service error for model '{self.inference_model.tag}': {error_summary}"
-            raise ExtractJobFailureError(
-                msg,
-                error_category=error_category,
-                user_action=user_action,
-                provider_metadata=metadata,
-            ) from exc
+        except portkey_exceptions.APIError as sdk_exc:
+            metadata = extract_gateway_metadata(sdk_exc)
+            classification = classify_inference_error(metadata)
+            raise render_inference_error(
+                metadata=metadata,
+                classification=classification,
+                family=InferenceErrorFamily.EXTRACT,
+                model_desc=self.inference_model.desc,
+                model_handle=self.inference_model.name,
+            ) from sdk_exc
 
         if not isinstance(response, GenericResponse):
             msg = "Response is not of type GenericResponse"
