@@ -4,7 +4,7 @@ description: "Use the pipelex-agent CLI for machine-oriented output — designed
 
 # Agent CLI (`pipelex-agent`)
 
-The `pipelex-agent` CLI is a machine-oriented companion to the main `pipelex` CLI. It is designed for programmatic consumption by AI agents, IDE extensions, and other automation tools. Output format varies by command — markdown or JSON, raw TOML, or `plxt` passthrough — with no Rich formatting or interactive prompts. Structured commands emit errors to stderr (markdown by default, JSON with `--format json`); `fmt` and `lint` pass through native `plxt` output.
+The `pipelex-agent` CLI is a machine-oriented companion to the main `pipelex` CLI. It is designed for programmatic consumption by AI agents, IDE extensions, and other automation tools. Output format varies by command — markdown or JSON, raw TOML, or `plxt` passthrough — with no Rich formatting or interactive prompts. Structured commands emit errors to stderr; the error format is controlled by `--error-format`, which defaults to the value of `--format` (so `--format json` flips both, as before the split). `fmt` and `lint` pass through native `plxt` output.
 
 It is consumed by the `mthds-agent` CLI (from the `mthds` npm package) which itself is used by Claude Code skills, the VS Code extension, and can be called directly from the command line.
 
@@ -22,7 +22,7 @@ The agent CLI mirrors the main CLI's subcommand structure for `run`, `validate`,
 
 ### Run
 
-Execute a pipeline. Output is markdown by default, or JSON with `--format json`.
+Execute a pipeline. Success output is markdown by default, or JSON with `--format json`. Errors follow `--error-format` (defaults to `--format`'s value).
 
 ```bash
 pipelex-agent run pipe <PIPE_CODE> [OPTIONS]
@@ -38,13 +38,14 @@ pipelex-agent run method <NAME> [OPTIONS]
 - `--graph` / `--no-graph` - Enable/disable execution graph (enabled by default)
 - `--library-dir`, `-L` - Additional library directory
 - `--with-memory` - Include full working memory in output
-- `--format` - Output format: `markdown` (default) or `json`
+- `--format` - Success output format: `markdown` (default) or `json`
+- `--error-format` - Error output format: `markdown` or `json` (defaults to `--format`'s value)
 
 For `bundle` and `method`, use `--pipe` to target a specific pipe.
 
 ### Validate
 
-Validate pipes, bundles, or methods. Output is markdown by default, or JSON with `--format json`.
+Validate pipes, bundles, or methods. Success output is markdown by default, or JSON with `--format json`. Errors follow `--error-format` (defaults to `--format`'s value).
 
 ```bash
 pipelex-agent validate pipe <PIPE_CODE> [OPTIONS]
@@ -56,7 +57,8 @@ pipelex-agent validate method <NAME> [OPTIONS]
 **Common options:**
 
 - `--library-dir`, `-L` - Additional library directory
-- `--format` - Output format: `markdown` (default) or `json`
+- `--format` - Success output format: `markdown` (default) or `json`
+- `--error-format` - Error output format: `markdown` or `json` (defaults to `--format`'s value)
 
 For `bundle`, additional options are available:
 
@@ -91,14 +93,14 @@ These commands do not have subcommands:
 | `lint` | Lint a `.mthds`/`.toml`/`.plx` file for errors (delegates to `plxt`) |
 | `concept` | Convert a JSON concept spec into raw TOML (stdout) |
 | `pipe` | Convert a JSON pipe spec into raw TOML (stdout) |
-| `models` | List available model presets, aliases, and waterfalls (`--format markdown\|json`, default: markdown) |
-| `doctor` | Check config, credentials, and model health (`--format markdown\|json`, default: markdown) |
+| `models` | List available model presets, aliases, and waterfalls (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
+| `doctor` | Check config, credentials, and model health (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
 
 ## Output Contract
 
 Commands use different stdout formats depending on their purpose:
 
-- **Markdown or JSON**: `run`, `validate`, `init`, `models`, `doctor` — markdown by default, JSON with `--format json`
+- **Markdown or JSON**: `run`, `validate`, `init`, `models`, `check-model`, `doctor` — markdown by default, JSON with `--format json`. Error format follows `--error-format` (defaults to `--format`'s value, so `--format json` flips both).
 - **JSON**: `inputs` — structured JSON via `agent_success()`
 - **Raw TOML**: `concept`, `pipe` — TOML text printed directly to stdout
 - **Passthrough**: `fmt`, `lint` — raw `plxt` output

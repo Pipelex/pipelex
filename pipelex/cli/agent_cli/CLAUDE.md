@@ -4,11 +4,14 @@ Machine-first CLI for running and validating Pipelex method bundles (`.mthds` fi
 
 ## Output format
 
-Most commands accept `--format markdown|json` and **default to markdown** — `run`, `validate`, `init`, `models`, `check-model`, `doctor`. Markdown goes to stdout on success; `--format json` switches to the structured JSON payload. Errors follow the same option: they render as markdown to stderr by default, JSON to stderr with `--format json`. The format is set once per invocation (a `ContextVar` in `agent_output.py`), so every `agent_error()` call in a command inherits it.
+Two independent options control the two output streams:
 
-`inputs`, `concept`, `pipe`, `fmt`, `lint` are **always JSON / raw passthrough** — they have no `--format` option.
+- `--format markdown|json` — **success/useful output**. Defaults to markdown. Accepted by `run`, `validate`, `init`, `models`, `check-model`, `doctor`. Goes to stdout. Threaded explicitly to `agent_success_formatted()` from each command function — no hidden state.
+- `--error-format markdown|json` — **error reporting** (stderr). Optional. When omitted, **inherits the value of `--format`**, so `--format json` still flips both as it did historically. Accepted by the same commands as `--format`.
 
-Any error raised before a command opts into a format (the app callback, unknown-command handling) stays JSON — JSON is the `ContextVar` default.
+Only the error format is backed by a module-level `ContextVar` in `agent_output.py` (`_agent_cli_error_format`). The reason: `agent_error()` is called from sites that don't see the Typer option — factory init failures (`agent_cli_factory.py`), the unknown-command handler in `PipelexAgentCLI.get_command`, log-level/runner validation in the app callback, and any future site in shared library/runtime code. The ContextVar lets all of them honor `--error-format` (or `--format`'s inherited value) for free. JSON is the default so errors raised before any command opts in stay machine-parseable.
+
+`inputs`, `concept`, `pipe`, `fmt`, `lint`, `accept-gateway-terms` are **always JSON / raw passthrough** — they have neither `--format` nor `--error-format`. Their errors keep flowing through the ContextVar's JSON default.
 
 Markdown structure per command:
 
@@ -72,21 +75,21 @@ commands/
 
 | Command | Does |
 |---------|------|
-| `init` | Initializes Pipelex configuration (non-interactive). Defaults to project `.pipelex/` at detected project root. Use `--global`/`-g` to target `~/.pipelex/`. Accepts `--config`/`-c` with inline JSON or file path for backends, routing, telemetry, and gateway terms. `--format markdown\|json` (default: markdown). |
-| `run` | Executes a pipeline (pipe\|bundle\|method subcommands), returns main_stuff + working_memory. Graph visualizations on by default (`--no-graph` to disable). `--format markdown\|json` (default: markdown). |
-| `validate` | Dry-runs pipes/bundles/methods (pipe\|bundle\|method subcommands), returns validation status per pipe. Bundle subcommand supports `--graph` for graph visualization (with `--graph-format` for the graph renderer). `--format markdown\|json` (default: markdown). |
+| `init` | Initializes Pipelex configuration (non-interactive). Defaults to project `.pipelex/` at detected project root. Use `--global`/`-g` to target `~/.pipelex/`. Accepts `--config`/`-c` with inline JSON or file path for backends, routing, telemetry, and gateway terms. `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value). |
+| `run` | Executes a pipeline (pipe\|bundle\|method subcommands), returns main_stuff + working_memory. Graph visualizations on by default (`--no-graph` to disable). `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value). |
+| `validate` | Dry-runs pipes/bundles/methods (pipe\|bundle\|method subcommands), returns validation status per pipe. Bundle subcommand supports `--graph` for graph visualization (with `--graph-format` for the graph renderer). `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value). |
 | `fmt` | Formats a .mthds/.toml/.plx file in-place (delegates to plxt) |
 | `lint` | Lints a .mthds/.toml/.plx file for errors (delegates to plxt) |
 | `inputs` | Generates example input JSON for a pipe/bundle/method (pipe\|bundle\|method subcommands) |
 | `concept` | Converts a JSON concept spec into raw TOML (stdout) |
 | `pipe` | Converts a JSON pipe spec (typed) into raw TOML (stdout) |
-| `models` | Lists available model presets, aliases, and waterfalls. `--format markdown\|json` (default: markdown) |
-| `check-model` | Validates a model reference and suggests alternatives if invalid. `--type`/`-t` for model category, `--format markdown\|json` (default: markdown) |
-| `doctor` | Checks config, credentials, models health. `--global`/`-g` for global dir. `--format markdown\|json` (default: markdown) |
+| `models` | Lists available model presets, aliases, and waterfalls. `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value) |
+| `check-model` | Validates a model reference and suggests alternatives if invalid. `--type`/`-t` for model category, `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value) |
+| `doctor` | Checks config, credentials, models health. `--global`/`-g` for global dir. `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value) |
 
 ## Key Patterns
 
-- **Output contract**: Commands with `--format` emit success via `agent_success_formatted(result, markdown_renderer)` — JSON or a markdown renderer per the active format. `agent_error(message, error_type, cause)` likewise dispatches JSON or markdown. Exceptions that print directly to stdout: `fmt`/`lint` (plxt passthrough), `concept`/`pipe` (raw TOML). Markdown renderers: `format_run_markdown` (`run/_output_helpers.py`), `format_validate_markdown` (`validate/_output_helpers.py`), `_format_init_markdown` (`init_cmd.py`).
+- **Output contract**: Commands with `--format` emit success via `agent_success_formatted(result, markdown_renderer, output_format)` — JSON or a markdown renderer per the explicit `output_format` argument. `agent_error(message, error_type, cause)` dispatches JSON or markdown by reading the `_agent_cli_error_format` ContextVar, which each `--format`-aware command sets via `set_agent_cli_error_format(error_format or output_format)` at function entry. Exceptions that print directly to stdout: `fmt`/`lint` (plxt passthrough), `concept`/`pipe` (raw TOML). Markdown renderers: `format_run_markdown` (`run/_output_helpers.py`), `format_validate_markdown` (`validate/_output_helpers.py`), `_format_init_markdown` (`init_cmd.py`).
 - **Error classification**: Each error type maps to a domain (`input`, `config`, `runtime`), a hint string, and a `retryable` flag. See `AGENT_ERROR_HINTS` dict in `agent_output.py`. The `error_domain` also drives the HTTP-status mapping for downstream APIs — see `error_domain_to_http_status()` in `pipelex/base_exceptions.py`.
 - **Init**: All commands that need Pipelex use `make_pipelex_for_agent_cli(library_dirs)`. It catches init errors and routes them through `agent_error()`.
 - **Async core**: Run and validate are async — commands use `asyncio.run()`.

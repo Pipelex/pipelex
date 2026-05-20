@@ -6,7 +6,7 @@ import typer
 
 from pipelex.builder.operations.models_ops import ModelCategory, format_models_markdown, list_models
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
-from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success, set_agent_cli_output_format
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success, set_agent_cli_error_format
 from pipelex.pipelex import Pipelex
 
 
@@ -22,15 +22,19 @@ def agent_models_cmd(
     ] = None,
     output_format: Annotated[
         CliOutputFormat,
-        typer.Option("--format", help="Output format: markdown (default) or json (structured)"),
+        typer.Option("--format", help="Success output format: markdown (default) or json (structured)"),
     ] = CliOutputFormat.MARKDOWN,
+    error_format: Annotated[
+        CliOutputFormat | None,
+        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+    ] = None,
 ) -> None:
     """List available model presets, aliases, and waterfalls.
 
     Outputs model configuration that an agent needs to reference when building pipelines.
     Default output is markdown; use --format json for structured JSON.
     """
-    set_agent_cli_output_format(output_format)
+    set_agent_cli_error_format(error_format or output_format)
     try:
         make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"], needs_inference=False, needs_model_specs=backend is not None)
 

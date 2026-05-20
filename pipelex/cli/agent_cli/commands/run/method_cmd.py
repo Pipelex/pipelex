@@ -11,7 +11,7 @@ import typer
 from mthds.runners.types import RunnerType
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
-from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success_formatted, set_agent_cli_output_format
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success_formatted, set_agent_cli_error_format
 from pipelex.cli.agent_cli.commands.run._output_helpers import format_run_markdown
 from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core
 from pipelex.cli.agent_cli.commands.run._run_core_api import run_pipeline_core_api
@@ -60,8 +60,12 @@ def run_method_cmd(
     ] = False,
     output_format: Annotated[
         CliOutputFormat,
-        typer.Option("--format", help="Output format: markdown (default) or json (structured)"),
+        typer.Option("--format", help="Success output format: markdown (default) or json (structured)"),
     ] = CliOutputFormat.MARKDOWN,
+    error_format: Annotated[
+        CliOutputFormat | None,
+        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+    ] = None,
 ) -> None:
     """Execute a pipeline for an installed method and output the results.
 
@@ -74,7 +78,7 @@ def run_method_cmd(
         pipelex-agent run method my-method --pipe custom_pipe
         pipelex-agent run method my-method --dry-run --mock-inputs
     """
-    set_agent_cli_output_format(output_format)
+    set_agent_cli_error_format(error_format or output_format)
 
     # Validate --mock-inputs requires --dry-run
     if mock_inputs and not dry_run:
@@ -127,7 +131,7 @@ def run_method_cmd(
                         with_memory=with_memory,
                     )
                 )
-                agent_success_formatted(result, functools.partial(format_run_markdown, with_memory=with_memory))
+                agent_success_formatted(result, functools.partial(format_run_markdown, with_memory=with_memory), output_format)
 
             except ClientAuthenticationError as exc:
                 agent_error(str(exc), "ClientAuthenticationError", cause=exc)
@@ -156,7 +160,7 @@ def run_method_cmd(
                         with_memory=with_memory,
                     )
                 )
-                agent_success_formatted(result, functools.partial(format_run_markdown, with_memory=with_memory))
+                agent_success_formatted(result, functools.partial(format_run_markdown, with_memory=with_memory), output_format)
 
             except PipelineExecutionError as exc:
                 extra_fields: dict[str, Any] = {

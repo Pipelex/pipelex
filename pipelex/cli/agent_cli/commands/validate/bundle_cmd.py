@@ -13,7 +13,7 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     agent_error,
     agent_success_formatted,
     extract_validation_errors,
-    set_agent_cli_output_format,
+    set_agent_cli_error_format,
 )
 from pipelex.cli.agent_cli.commands.validate._output_helpers import format_validate_markdown
 from pipelex.cli.agent_cli.commands.validate._validate_core import (
@@ -64,8 +64,12 @@ def validate_bundle_cmd(
     ] = None,
     output_format: Annotated[
         CliOutputFormat,
-        typer.Option("--format", help="Output format: markdown (default) or json (structured)"),
+        typer.Option("--format", help="Success output format: markdown (default) or json (structured)"),
     ] = CliOutputFormat.MARKDOWN,
+    error_format: Annotated[
+        CliOutputFormat | None,
+        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+    ] = None,
 ) -> None:
     """Validate a bundle file (.mthds) or pipeline directory and output the results.
 
@@ -79,7 +83,7 @@ def validate_bundle_cmd(
         pipelex-agent validate bundle pipeline_01/
         pipelex-agent validate bundle pipeline_01/ --graph
     """
-    set_agent_cli_output_format(output_format)
+    set_agent_cli_error_format(error_format or output_format)
 
     bundle_path: str | None = None
     target_path = Path(path)
@@ -190,7 +194,7 @@ def validate_bundle_cmd(
                 # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
                 agent_error(f"View generation failed: {exc}", type(exc).__name__, cause=exc)
 
-        agent_success_formatted(result, format_validate_markdown)
+        agent_success_formatted(result, format_validate_markdown, output_format)
 
     except PipeNotFoundError as exc:
         agent_error(str(exc), "PipeNotFoundError", cause=exc)
