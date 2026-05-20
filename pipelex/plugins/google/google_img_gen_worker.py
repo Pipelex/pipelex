@@ -1,6 +1,7 @@
 import asyncio
 from typing import Any
 
+import httpx
 from google.genai import errors as genai_errors
 from google.genai import types as genai_types
 from google.genai.client import Client as GoogleGenAiClient
@@ -118,7 +119,7 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                 contents=prompt_text,
                 config=generation_config,
             )
-        except (genai_errors.ServerError, genai_errors.ClientError) as exc:
+        except (genai_errors.ServerError, genai_errors.ClientError, httpx.TransportError) as exc:
             metadata = extract_google_metadata(exc)
             classification = classify_inference_error(metadata)
             raise render_inference_error(

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+import httpx
 import pytest
 from google.genai import errors as genai_errors
 
@@ -182,6 +183,41 @@ class TestGoogleImgGenWorkerErrorHandling:
         assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
         assert exc_info.value.provider_metadata is not None
         assert exc_info.value.provider_metadata.status_code == 500
+
+    @pytest.mark.parametrize(
+        ("exc_class", "expected_sdk_type"),
+        [
+            (httpx.ConnectError, "ConnectError"),
+            (httpx.ConnectTimeout, "ConnectTimeout"),
+            (httpx.ReadError, "TransportError"),
+            (httpx.RemoteProtocolError, "TransportError"),
+        ],
+    )
+    async def test_httpx_transport_error_is_wrapped_as_transient(
+        self,
+        mocker: MockerFixture,
+        exc_class: type[httpx.TransportError],
+        expected_sdk_type: str,
+    ) -> None:
+        """A direct httpx.TransportError from generate_content() must be caught and routed through
+        the categorizer as a TRANSIENT ImgGenGenerationError, matching the Google LLM worker.
+        """
+        worker = _make_worker(mocker)
+        request = httpx.Request("POST", "https://generativelanguage.googleapis.com/v1/models/imagen-3.0-generate-002:generateContent")
+        sdk_exc = exc_class("transport failure", request=request)
+        worker.genai_async_client.models.generate_content.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        with pytest.raises(ImgGenGenerationError) as exc_info:
+            await worker._gen_image(img_gen_job=_make_img_gen_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
+        assert exc_info.value.provider_metadata is not None
+        assert exc_info.value.provider_metadata.provider == "google"
+        assert exc_info.value.provider_metadata.status_code is None
+        assert exc_info.value.provider_metadata.sdk_exception_type == expected_sdk_type
+        assert exc_info.value.__cause__ is sdk_exc
 
     async def test_to_error_report_serializes_metadata(self, mocker: MockerFixture) -> None:
         worker = _make_worker(mocker)

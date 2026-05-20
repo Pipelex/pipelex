@@ -1,5 +1,6 @@
 from typing import Any
 
+import httpx
 from mistralai import Mistral, MistralError
 from typing_extensions import override
 
@@ -68,7 +69,7 @@ class MistralExtractWorker(ExtractWorkerAbstract):
                 model=self.inference_model.model_id,
                 document=document,
             )
-        except MistralError as sdk_exc:
+        except (MistralError, httpx.TransportError) as sdk_exc:
             metadata = extract_mistral_metadata(sdk_exc)
             classification = classify_inference_error(metadata)
             raise render_inference_error(
@@ -110,7 +111,7 @@ class MistralExtractWorker(ExtractWorkerAbstract):
                 image_limit=image_limit,
                 image_min_size=image_min_size,
             )
-        except MistralError as sdk_exc:
+        except (MistralError, httpx.TransportError) as sdk_exc:
             metadata = extract_mistral_metadata(sdk_exc)
             classification = classify_inference_error(metadata)
             raise render_inference_error(
