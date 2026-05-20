@@ -81,6 +81,13 @@ def run_bundle_cmd(
             help="Concept ref (e.g. 'document_qa.ReferenceCount') used to resolve a pipe whose output is declared as 'Dynamic'.",
         ),
     ] = None,
+    cost_report: Annotated[
+        bool | None,
+        typer.Option(
+            "--cost-report/--no-cost-report",
+            help="Override config: enable or disable printing the aggregated inference cost table after the run",
+        ),
+    ] = None,
 ) -> None:
     """Run a pipeline from a bundle file (.mthds) or pipeline directory.
 
@@ -171,6 +178,7 @@ def run_bundle_cmd(
         dry_run=dry_run,
         mock_inputs=mock_inputs,
         library_dir=library_dir,
+        cost_report=cost_report,
         telemetry_command_label=f"{COMMAND} bundle",
         temporal=temporal,
         dynamic_output_concept_ref=dynamic_output_concept_ref,

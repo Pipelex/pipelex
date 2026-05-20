@@ -51,6 +51,7 @@ async def _execute_run(
     dry_run: bool,
     mock_inputs: bool,
     library_dir: list[str] | None,
+    cost_report: bool | None,
     dynamic_output_concept_ref: str | None = None,
 ) -> None:
     """Core async execution logic for running a pipe.
@@ -213,7 +214,8 @@ async def _execute_run(
         log.verbose(f"Working memory saved to: {working_memory_output_path}")
 
     reporting_config = get_config().pipelex.reporting_config
-    if reporting_config.is_log_costs_to_console or reporting_config.is_generate_cost_report_file_enabled:
+    effective_cost_report = reporting_config.is_log_costs_to_console if cost_report is None else cost_report
+    if effective_cost_report or reporting_config.is_generate_cost_report_file_enabled:
         get_report_delegate().generate_report()
 
     # Print completion recap
@@ -249,6 +251,7 @@ def execute_run(
     dry_run: bool,
     mock_inputs: bool,
     library_dir: list[str] | None,
+    cost_report: bool | None = None,
     telemetry_command_label: str = COMMAND,
     temporal: bool | None = None,
     dynamic_output_concept_ref: str | None = None,
@@ -279,6 +282,7 @@ def execute_run(
                     dry_run=dry_run,
                     mock_inputs=mock_inputs,
                     library_dir=library_dir,
+                    cost_report=cost_report,
                     dynamic_output_concept_ref=dynamic_output_concept_ref,
                 )
             )
