@@ -19,7 +19,7 @@ Pipelex pipelines normally run in-process. With the optional `pipelex[temporal]`
 
 ## Configuration
 
-All knobs live under `[temporal.*]` in `pipelex.toml`:
+All knobs live under `[temporal.*]` in `.pipelex/pipelex.toml`:
 
 - `[temporal.search_attributes]` — custom search attributes attached to every workflow start.
 - `[temporal.worker_config]` — default task queue, workflow and activity timeouts, baseline retry policy.
