@@ -14,7 +14,7 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     agent_error,
     agent_success_formatted,
     extract_validation_errors,
-    set_agent_cli_output_format,
+    set_agent_cli_error_format,
 )
 from pipelex.cli.agent_cli.commands.validate._output_helpers import format_validate_markdown
 from pipelex.cli.agent_cli.commands.validate._validate_core import (
@@ -44,8 +44,12 @@ def validate_method_cmd(
     ] = None,
     output_format: Annotated[
         CliOutputFormat,
-        typer.Option("--format", help="Output format: markdown (default) or json (structured)"),
+        typer.Option("--format", help="Success output format: markdown (default) or json (structured)"),
     ] = CliOutputFormat.MARKDOWN,
+    error_format: Annotated[
+        CliOutputFormat | None,
+        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+    ] = None,
 ) -> None:
     """Validate an installed method and output the results.
 
@@ -57,7 +61,7 @@ def validate_method_cmd(
         pipelex-agent validate method my-method
         pipelex-agent validate method my-method --pipe custom_pipe
     """
-    set_agent_cli_output_format(output_format)
+    set_agent_cli_error_format(error_format or output_format)
 
     pipe_code, method_library_dirs, method = resolve_method_target(
         method_name=name,
@@ -84,7 +88,7 @@ def validate_method_cmd(
             # Validate the entire bundle
             result = asyncio.run(validate_bundle_core(bundle_path=bundle_path, library_dirs=library_dirs_paths))
 
-        agent_success_formatted(result, format_validate_markdown)
+        agent_success_formatted(result, format_validate_markdown, output_format)
 
     except FileNotFoundError as exc:
         agent_error(f"Bundle file not found: {bundle_path}", "FileNotFoundError", cause=exc)

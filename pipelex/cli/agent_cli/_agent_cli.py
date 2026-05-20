@@ -9,7 +9,7 @@ from typer.core import TyperGroup
 from typing_extensions import override
 
 from pipelex.cli.agent_cli.commands.accept_gateway_terms_cmd import agent_accept_gateway_terms_cmd
-from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, set_agent_cli_output_format
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, set_agent_cli_error_format
 from pipelex.cli.agent_cli.commands.check_model_cmd import agent_check_model_cmd
 from pipelex.cli.agent_cli.commands.concept_cmd import concept_cmd
 from pipelex.cli.agent_cli.commands.doctor_cmd import agent_doctor_cmd
@@ -101,10 +101,10 @@ def app_callback(
     ] = "pipelex",
 ) -> None:
     """Agent CLI callback - no logo, minimal output."""
-    # Reset the output-format ContextVar at the single choke point every command passes through, so
+    # Reset the error-format ContextVar at the single choke point every command passes through, so
     # a markdown command cannot leak markdown into a later JSON-only command in the same process.
-    # --format commands override this afterwards; JSON-only commands keep the JSON default.
-    set_agent_cli_output_format(CliOutputFormat.JSON)
+    # --format / --error-format commands override this afterwards; JSON-only commands keep the JSON default.
+    set_agent_cli_error_format(CliOutputFormat.JSON)
 
     ctx.ensure_object(dict)
     try:

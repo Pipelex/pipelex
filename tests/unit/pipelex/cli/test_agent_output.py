@@ -22,7 +22,7 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     consume_setup_warnings,
     extract_validation_errors,
     record_setup_warning,
-    set_agent_cli_output_format,
+    set_agent_cli_error_format,
 )
 from pipelex.cogt.exceptions import CogtError, InferenceBackendCredentialsError, InferenceBackendCredentialsErrorType, InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
@@ -421,14 +421,14 @@ class TestAgentOutput:
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["error_domain"] == "input"
 
-    def test_app_callback_resets_output_format_to_json(self) -> None:
-        """The output-format ContextVar must be reset per invocation: a markdown command leaving
+    def test_app_callback_resets_error_format_to_json(self) -> None:
+        """The error-format ContextVar must be reset per invocation: a markdown command leaving
         it set must not leak markdown into a later JSON-only command in the same process.
         """
         # Simulate a prior markdown command having left the ContextVar set.
-        set_agent_cli_output_format(CliOutputFormat.MARKDOWN)
+        set_agent_cli_error_format(CliOutputFormat.MARKDOWN)
 
-        # `concept` is a JSON-only command with no --format option; invoked with no spec it
+        # `concept` is a JSON-only command with no --format / --error-format option; invoked with no spec it
         # errors via agent_error(). Its error must be JSON, proving the callback reset the format.
         result = CliRunner().invoke(app, ["concept"])
 

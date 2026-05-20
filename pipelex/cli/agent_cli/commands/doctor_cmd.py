@@ -4,7 +4,7 @@ from typing import Annotated, Any
 
 import typer
 
-from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success, set_agent_cli_output_format
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success, set_agent_cli_error_format
 from pipelex.cli.commands.doctor_cmd import (
     ConfigLocationInfo,
     check_backend_credentials,
@@ -98,8 +98,12 @@ def agent_doctor_cmd(
     ] = False,
     output_format: Annotated[
         CliOutputFormat,
-        typer.Option("--format", help="Output format: markdown (default) or json (structured)"),
+        typer.Option("--format", help="Success output format: markdown (default) or json (structured)"),
     ] = CliOutputFormat.MARKDOWN,
+    error_format: Annotated[
+        CliOutputFormat | None,
+        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+    ] = None,
 ) -> None:
     """Check Pipelex configuration health and output a diagnostic report.
 
@@ -112,7 +116,7 @@ def agent_doctor_cmd(
     Target directory: auto-detects project .pipelex/ if present, else ~/.pipelex/.
     Use --global/-g to force checking the global ~/.pipelex/ directory.
     """
-    set_agent_cli_output_format(output_format)
+    set_agent_cli_error_format(error_format or output_format)
     try:
         # When --global, force checking ~/.pipelex/ only; otherwise use layered resolution
         config_dir = config_manager.global_config_dir if global_ else None

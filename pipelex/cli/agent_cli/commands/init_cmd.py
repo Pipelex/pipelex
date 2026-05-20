@@ -13,7 +13,7 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
     agent_error,
     agent_success_formatted,
-    set_agent_cli_output_format,
+    set_agent_cli_error_format,
 )
 from pipelex.cli.commands.init.backends import get_selected_backend_keys, update_backends_in_toml
 from pipelex.cli.commands.init.command import attempt_prime_remote_config_cache
@@ -341,8 +341,12 @@ def agent_init_cmd(
     ] = False,
     output_format: Annotated[
         CliOutputFormat,
-        typer.Option("--format", help="Output format: markdown (default) or json (structured)"),
+        typer.Option("--format", help="Success output format: markdown (default) or json (structured)"),
     ] = CliOutputFormat.MARKDOWN,
+    error_format: Annotated[
+        CliOutputFormat | None,
+        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+    ] = None,
 ) -> None:
     """Initialize Pipelex configuration (non-interactive).
 
@@ -370,7 +374,7 @@ def agent_init_cmd(
     off; project init drops in a commented-out template that inherits the user's global
     telemetry settings via layered loading. Edit `telemetry.toml` to enable destinations.
     """
-    set_agent_cli_output_format(output_format)
+    set_agent_cli_error_format(error_format or output_format)
 
     try:
         # Parse config
@@ -420,7 +424,7 @@ def agent_init_cmd(
             result_payload["cache_priming_error"] = priming_result.error_message
 
         # Output result
-        agent_success_formatted(result_payload, _format_init_markdown)
+        agent_success_formatted(result_payload, _format_init_markdown, output_format)
 
     except typer.Exit:
         raise

@@ -1,9 +1,21 @@
 """Helpers for structured output in agent CLI commands.
 
-Output is JSON by default; commands that accept ``--format`` opt into
-markdown by calling :func:`set_agent_cli_output_format`. The error path
-inherits the same format option through a module-level ``ContextVar`` —
-see :func:`agent_error`.
+Two independent format axes:
+
+- **Success output** is driven by the per-command ``--format`` Typer option, passed
+  explicitly to :func:`agent_success_formatted`. No hidden state — every success
+  call site lives inside a command function that has ``output_format`` in scope.
+- **Error reporting** is driven by ``--error-format`` (or by ``--format``'s value
+  when ``--error-format`` is omitted). Errors must be format-aware from sites far
+  from any Typer command (init failures in ``agent_cli_factory.py``,
+  ``UnknownCommandError`` from the Typer group, validation errors in the app
+  callback, etc.), so the error format is carried in a module-level
+  ``ContextVar``. JSON is the default so any error raised before a command opts
+  in stays machine-parseable.
+
+Commands that don't accept ``--format`` (``inputs``, ``concept``, ``pipe``,
+``fmt``, ``lint``, ``accept-gateway-terms``) never touch the ContextVar and
+therefore emit JSON errors via the default.
 """
 
 import sys
@@ -51,22 +63,24 @@ class CliOutputFormat(StrEnum):
     MARKDOWN = "markdown"
 
 
-# The active output format for the current agent-CLI invocation. JSON is the
+# The active **error** format for the current agent-CLI invocation. JSON is the
 # default so any error raised before a command opts into markdown (the app
-# callback, unknown-command handling, init failures) stays machine-parseable.
-# A command with a ``--format`` option calls set_agent_cli_output_format() at
-# its start, and both the success path and agent_error() then follow it.
-_agent_cli_output_format: ContextVar[CliOutputFormat] = ContextVar("agent_cli_output_format", default=CliOutputFormat.JSON)
+# callback, unknown-command handling, init failures inside the factory) stays
+# machine-parseable. A command with a ``--format`` / ``--error-format`` option
+# calls set_agent_cli_error_format() at its start, and agent_error() follows it.
+# The success path is NOT routed through this var — it threads ``output_format``
+# explicitly to agent_success_formatted().
+_agent_cli_error_format: ContextVar[CliOutputFormat] = ContextVar("agent_cli_error_format", default=CliOutputFormat.JSON)
 
 
-def set_agent_cli_output_format(output_format: CliOutputFormat) -> None:
-    """Set the active output format for the current agent-CLI invocation."""
-    _agent_cli_output_format.set(output_format)
+def set_agent_cli_error_format(error_format: CliOutputFormat) -> None:
+    """Set the active error reporting format for the current agent-CLI invocation."""
+    _agent_cli_error_format.set(error_format)
 
 
-def get_agent_cli_output_format() -> CliOutputFormat:
-    """Return the active output format (``JSON`` until a command opts in)."""
-    return _agent_cli_output_format.get()
+def get_agent_cli_error_format() -> CliOutputFormat:
+    """Return the active error reporting format (``JSON`` until a command opts in)."""
+    return _agent_cli_error_format.get()
 
 
 # Fallback error-classification lookups, keyed by error_type name.
@@ -322,9 +336,11 @@ def agent_error_markdown(message: str, error_type: str, cause: BaseException | N
 def agent_error(message: str, error_type: str, cause: BaseException | None = None, **extra: Any) -> NoReturn:
     """Emit a structured error to stderr and exit with code 1.
 
-    Dispatches on the active output format (see :func:`set_agent_cli_output_format`):
-    JSON by default, markdown when a command has opted in. All existing
-    ``agent_error(...)`` call sites therefore follow ``--format`` for free.
+    Dispatches on the active error format (see :func:`set_agent_cli_error_format`):
+    JSON by default, markdown when a command has opted in via ``--format`` or
+    ``--error-format``. All existing ``agent_error(...)`` call sites therefore
+    follow the active error format for free — including sites in factory /
+    unknown-command code that never see the Typer option.
 
     Args:
         message: Human-readable error message.
@@ -333,7 +349,7 @@ def agent_error(message: str, error_type: str, cause: BaseException | None = Non
         **extra: Additional fields merged into the payload.
                  Can override the auto-added ``hint`` field.
     """
-    match get_agent_cli_output_format():
+    match get_agent_cli_error_format():
         case CliOutputFormat.JSON:
             _agent_error_json(message, error_type, cause, extra)
         case CliOutputFormat.MARKDOWN:
@@ -361,17 +377,27 @@ def agent_success(result: dict[str, Any]) -> None:
     print(clean_json_dumps(envelope, indent=2))
 
 
-def agent_success_formatted(result: dict[str, Any], markdown_renderer: Callable[[dict[str, Any]], str]) -> None:
-    """Emit a success result respecting the active CLI output format.
+def agent_success_formatted(
+    result: dict[str, Any],
+    markdown_renderer: Callable[[dict[str, Any]], str],
+    output_format: CliOutputFormat,
+) -> None:
+    """Emit a success result in the given CLI output format.
 
     JSON format serializes ``result`` to stdout; markdown format prints the
     output of ``markdown_renderer(result)`` to stdout.
 
+    The format is passed explicitly (not read from a ContextVar) because every
+    call site lives inside a command function that already has its ``--format``
+    parameter in scope. Only the error path needs the ContextVar — see
+    :func:`agent_error`.
+
     Args:
         result: The structured result dict (the JSON-mode payload).
         markdown_renderer: Renders ``result`` into a markdown string.
+        output_format: The success output format for this command invocation.
     """
-    match get_agent_cli_output_format():
+    match output_format:
         case CliOutputFormat.JSON:
             agent_success(result)
         case CliOutputFormat.MARKDOWN:

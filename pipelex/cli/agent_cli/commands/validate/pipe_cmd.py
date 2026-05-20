@@ -12,7 +12,7 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     agent_error,
     agent_success_formatted,
     extract_validation_errors,
-    set_agent_cli_output_format,
+    set_agent_cli_error_format,
 )
 from pipelex.cli.agent_cli.commands.validate._output_helpers import format_validate_markdown
 from pipelex.cli.agent_cli.commands.validate._validate_core import (
@@ -44,8 +44,12 @@ def validate_pipe_cmd(
     ] = None,
     output_format: Annotated[
         CliOutputFormat,
-        typer.Option("--format", help="Output format: markdown (default) or json (structured)"),
+        typer.Option("--format", help="Success output format: markdown (default) or json (structured)"),
     ] = CliOutputFormat.MARKDOWN,
+    error_format: Annotated[
+        CliOutputFormat | None,
+        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+    ] = None,
 ) -> None:
     """Validate a pipe by code, or all pipes, and output the results.
 
@@ -57,7 +61,7 @@ def validate_pipe_cmd(
         pipelex-agent validate pipe --all
         pipelex-agent validate pipe --all -L ./my_pipes
     """
-    set_agent_cli_output_format(output_format)
+    set_agent_cli_error_format(error_format or output_format)
 
     library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
 
@@ -70,7 +74,7 @@ def validate_pipe_cmd(
 
         try:
             result = asyncio.run(validate_all_core(library_dirs=library_dirs))
-            agent_success_formatted(result, format_validate_markdown)
+            agent_success_formatted(result, format_validate_markdown, output_format)
 
         except ValidateBundleError as exc:
             validation_errors = extract_validation_errors(exc)
@@ -141,7 +145,7 @@ def validate_pipe_cmd(
 
     try:
         result = asyncio.run(validate_pipe_core(pipe_code=pipe_code, library_dirs=library_dirs))
-        agent_success_formatted(result, format_validate_markdown)
+        agent_success_formatted(result, format_validate_markdown, output_format)
 
     except PipeNotFoundError as exc:
         error_message = str(exc)

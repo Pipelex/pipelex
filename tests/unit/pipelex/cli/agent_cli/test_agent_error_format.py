@@ -11,7 +11,7 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
     agent_error,
     agent_error_markdown,
-    set_agent_cli_output_format,
+    set_agent_cli_error_format,
 )
 
 
@@ -27,8 +27,8 @@ class TestAgentErrorFormat:
         assert parsed["error_type"] == "FooError"
 
     def test_agent_error_emits_markdown_when_format_is_markdown(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """When markdown is the active format, agent_error renders markdown to stderr."""
-        set_agent_cli_output_format(CliOutputFormat.MARKDOWN)
+        """When markdown is the active error format, agent_error renders markdown to stderr."""
+        set_agent_cli_error_format(CliOutputFormat.MARKDOWN)
         with pytest.raises(typer.Exit) as exc_info:
             agent_error("something went wrong", "FooError")
         assert exc_info.value.exit_code == 1

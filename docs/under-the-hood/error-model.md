@@ -268,12 +268,12 @@ The recovered report is carried on `WorkflowExecutionError(error_report=...)`, w
 
 ### CLI
 
-The agent CLI (`pipelex-agent`) emits a structured error to **stderr**, markdown by default, JSON with `--format json`. Both exit with code 1.
+The agent CLI (`pipelex-agent`) emits a structured error to **stderr**, markdown by default and JSON with `--error-format json`. When `--error-format` is omitted it **inherits the value of `--format`** (the success-output flag) — so `--format json` still flips both as it did before the split. Both exit with code 1.
 
 | Command | Error output |
 |---------|--------------|
-| `run`, `validate`, `init` | Markdown (default) or JSON via `--format` |
-| `inputs`, `concept`, `pipe` | JSON only |
+| `run`, `validate`, `init`, `models`, `check-model`, `doctor` | Markdown (default) or JSON via `--error-format` (or via `--format`, which `--error-format` inherits) |
+| `inputs`, `concept`, `pipe`, `fmt`, `lint`, `accept-gateway-terms` | JSON only |
 
 The human CLI (`pipelex`) renders a Rich error panel — red banner, structured fields, the `user_action` tip, doc/Discord links — through the shared `display_error_panel()` helper in `pipelex/cli/error_handlers.py`.
 
