@@ -5,6 +5,10 @@ description = "Pipelex kit configuration for agent rules"
 [agent_rules]
 demote = 1
 default_set = "all"
+# Tombstones: stems that used to ship as agent_rules sources but are no longer present.
+# Cleanup uses this to remove stale generated artifacts (e.g. `.cursor/rules/<stem>.mdc`)
+# from users upgrading across the removal.
+deprecated_rule_stems = ["tdd"]
 
 [agent_rules.sets]
 all = [

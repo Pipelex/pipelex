@@ -98,7 +98,7 @@ def _cleanup_other_targets(
     For single-file targets: deletes the files entirely
     """
     if AgentTarget.CURSOR not in preferred_targets:
-        remove_cursor_rules(repo_root)
+        remove_cursor_rules(repo_root, kit_index=kit_index)
 
     all_targets = kit_index.agent_rules.targets
     targets_to_clean: dict[str, Target] = {target_key: target for target_key, target in all_targets.items() if target_key not in preferred_targets}

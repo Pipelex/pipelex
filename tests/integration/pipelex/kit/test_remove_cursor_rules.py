@@ -44,3 +44,25 @@ class TestRemoveCursorRules:
         remove_cursor_rules(tmp_path)
 
         assert not legacy_path.exists(), "Legacy unmarked .mdc matching a current source must still be deleted"
+
+    def test_removes_legacy_tdd_mdc_without_marker(self, tmp_path: Path):
+        """A pre-marker `tdd.mdc` whose source `tdd.md` has been removed from the kit
+        must still be deleted via the declarative `deprecated_rule_stems` tombstone list.
+
+        Migration regression test: existing Cursor users who ran sync before the
+        `pipelex_managed` marker was introduced have stale `.cursor/rules/tdd.mdc` files.
+        These have neither the marker nor a matching current source, so the only safe
+        way to remove them is via an explicit deprecation list shipped with the kit.
+        """
+        cursor_dir = tmp_path / ".cursor" / "rules"
+        cursor_dir.mkdir(parents=True)
+
+        legacy_tdd = cursor_dir / "tdd.mdc"
+        legacy_tdd.write_text(
+            "---\nalwaysApply: false\ndescription: Test-Driven Development guide\n---\n# TDD\n",
+            encoding="utf-8",
+        )
+
+        remove_cursor_rules(tmp_path)
+
+        assert not legacy_tdd.exists(), "Legacy pre-marker tdd.mdc must be deleted via the deprecated stems list"
