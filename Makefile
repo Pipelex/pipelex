@@ -87,7 +87,7 @@ make rtm                      - Shorthand -> regenerate-test-models
 make insert-skeleton          - Insert skeleton from $(SKELETON_DIR)
 
 make up                       - Shorthand -> generate-mthds-schema update-gateway-models up-kit-configs rules
-make cleanenv                 - Remove virtual env and lock files
+make cleanenv                 - Remove virtual env
 make cleanderived             - Remove extraneous compiled files, caches, logs, etc.
 make cleanall                 - Remove all -> cleanenv + cleanderived
 

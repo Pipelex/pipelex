@@ -178,6 +178,7 @@ minimal = "minimal"
 low = "low"
 medium = "medium"
 high = "high"
+xhigh = "xhigh"
 max = "xhigh"
 ```
 
@@ -188,6 +189,7 @@ max = "xhigh"
 | `LOW` | `"low"` |
 | `MEDIUM` | `"medium"` |
 | `HIGH` | `"high"` |
+| `XHIGH` | `"xhigh"` |
 | `MAX` | `"xhigh"` |
 
 !!! note
@@ -208,6 +210,7 @@ minimal = "low"
 low = "low"
 medium = "medium"
 high = "high"
+xhigh = "xhigh"
 max = "max"
 ```
 
@@ -218,6 +221,7 @@ max = "max"
 | `LOW` | `"low"` |
 | `MEDIUM` | `"medium"` |
 | `HIGH` | `"high"` |
+| `XHIGH` | `"xhigh"` |
 | `MAX` | `"max"` |
 
 Both modes first check `anthropic_config.effort_to_level_map` to gate reasoning. If the map returns `"disabled"` (e.g., for `NONE` effort), thinking is disabled entirely — no `thinking` parameter is sent to the SDK.
@@ -244,6 +248,7 @@ minimal = "low"
 low = "low"
 medium = "medium"
 high = "high"
+xhigh = "high"
 max = "high"
 ```
 
@@ -266,6 +271,7 @@ If the level map returns `"disabled"` (e.g., for `NONE` effort), thinking is dis
 | `LOW` | `1024` |
 | `MEDIUM` | `5000` |
 | `HIGH` | `16384` |
+| `XHIGH` | `32768` |
 | `MAX` | `65536` |
 
 **`reasoning_budget`** (explicit) passes through directly as `thinking_budget`. When `max_tokens` is known, the budget is capped to `min(budget, max_tokens - 1)`.
@@ -289,6 +295,7 @@ minimal = "reasoning"
 low = "reasoning"
 medium = "reasoning"
 high = "reasoning"
+xhigh = "reasoning"
 max = "reasoning"
 ```
 
@@ -340,6 +347,7 @@ minimal = 512
 low = 1024
 medium = 5000
 high = 16384
+xhigh = 32768
 max = 65536
 
 [cogt.llm_config.effort_to_budget_maps.gemini]
@@ -348,6 +356,7 @@ minimal = 512
 low = 1024
 medium = 5000
 high = 16384
+xhigh = 32768
 max = 65536
 ```
 
