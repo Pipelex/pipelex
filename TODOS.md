@@ -19,6 +19,7 @@ The plan reflects these decisions; no further re-litigation in the items below.
 - **`error_category` is kept in STRICT mode** alongside the other stable identifiers. Revisit only if a deployment surfaces it as a data-leak.
 - **Stage 3 acceptance covers the full `WfPipeRun` chain**, not just `WfPipeRouter`. The existing test bypasses `WfPipeRun`; the new test exercises the outer wrap so the inner child's report survives.
 - **`DisclosureMode.STRICT` is a classification-projection for server-side errors, NOT a path-leak shield.** `INPUT`-domain reports pass through unchanged in STRICT mode (caller-influenced; reflecting back is part of the contract). `CONFIG`/`RUNTIME` reports get redacted. This asymmetry is documented on the `DisclosureMode` docstring itself (Item C) — the entry point a developer reads when wondering "what does STRICT mean?" — so the contract can't be silently misread. If an INPUT message could surface a server-resolved path or secret, the fix is to repair the upstream message, not to expand STRICT mode.
+- **`WorkflowExecutionError` is a wrapper-loses exception to the wrapper-wins rule.** At `pipelex/temporal/exceptions.py:35-43`, `WorkflowExecutionError.to_error_report()` returns `self.error_report` verbatim, bypassing `_enrich_error_report_from_cause()`. The recovered inner classification (`error_type` / `title` / `type_uri` / `error_category` / `provider`...) is preserved as-is because the Temporal serialization boundary would otherwise drop it — the *whole point* of recovering the report is to restore the worker-side identity, not to overwrite it with the cross-boundary wrapper's identity. This is the **only** such carve-out in the hierarchy; do NOT "fix" it by adding `_enrich_error_report_from_cause(report)` to the override during Item A implementation. The wrapper-wins rule applies to in-process wrapping (`PipeRouterError(CogtError)`); the wrapper-loses behavior applies to cross-boundary recovery (`WorkflowExecutionError(recovered_report)`).
 
 ---
 
@@ -68,16 +69,35 @@ The plan reflects these decisions; no further re-litigation in the items below.
     Both **required**. `PipelexError.to_error_report()` populates them from `type(self).title()` / `type(self).type_uri()`. They round-trip through `model_dump` / `model_validate`.
 
 - **`_humanize` rule.** Strip a trailing `"Error"` from the class name (if present), then `pascal_case_to_sentence(...)` (existing helper — already handles acronyms like `JSON`, `URL`, `API`). Single-token classes (`CogtError`) become `"Cogt"` — these need a curated `_declared_title` (see next bullet).
+- **`type_uri()` and config readiness.** No fallback constant. `pipelex.errors_config.base_uri` is a required config field with the default value (`"https://pipelex.dev/errors"`) shipped in `pipelex/pipelex.toml`. If config is not loaded when `type_uri()` is called, that is a programmer error and should raise loudly — do not paper over it with a module-level default. Boot-sequence errors that pre-date config load are already extremely rare and surface via other channels.
 - **Curated overrides shipped with this item** (concrete list, not "to be discovered later"):
+    - `PipelexError._declared_title = "Pipelex error"`
+    - `PipelexUnexpectedError._declared_title = "Unexpected internal error"`
+    - `SecurityError._declared_title = "Security policy violation"`
     - `CogtError._declared_title = "AI inference failed"`
     - `EnvVarNotFoundError._declared_title = "Environment variable not set"`
-    - Plus any other auto-derive that reads badly — survey at implementation time and curate in this PR. Do NOT defer to a follow-up.
-- **Tests** (`tests/unit/pipelex/test_base_exceptions.py`):
+    - **Wide sweep at implementation time.** With ~267 `PipelexError` subclasses in the codebase, do a focused pass through every leaf class whose auto-derived title reads as a noun, an awkward fragment, or grammatically wrong. Curate them in this same PR. Do NOT defer to a follow-up.
+- **Migration sweep — raw `ErrorReport(...)` constructions** (must land in the same PR since both fields become required):
+    - **Production sites (3):**
+        - `pipelex/base_exceptions.py:135` — `PipelexError.to_error_report()`: populate `title=type(self).title()`, `type_uri=type(self).type_uri()`.
+        - `pipelex/base_exceptions.py:166` — `_enrich_error_report_from_cause()` rebuild path: propagate `title=report.title`, `type_uri=report.type_uri` (wrapper-wins, per "Decisions locked in").
+        - `pipelex/cogt/exceptions.py:88` — `CogtError.to_error_report()` override: same as the base class.
+    - **Test fixtures (~10):** mixed strategy.
+        - Where the test is *about* serialization / round-trip / disclosure / RFC 7807 (`test_error_report_from_dict.py`, `test_base_exceptions.py`, the new Item C tests): construct with **real** `title="..."` / `type_uri="https://pipelex.dev/errors/..."` values. The test is honest about the contract.
+        - Where the test is about classification / domain / HTTP status and doesn't exercise `title`/`type_uri` (`test_error_http_status.py`, `test_error_domain.py`, the various `test_workflow_*_error_*.py` fixtures): introduce a small helper `make_error_report(...)` in a tests-only conftest with `title="Test error"` / `type_uri="https://test.pipelex.dev/errors/test-error"` defaults, so each fixture line stays a single readable call.
+- **Tests** (`tests/unit/pipelex/test_base_exceptions.py` unless noted):
     - Auto-derive: `class FooBarError(PipelexError): pass` → `FooBarError.title() == "Foo bar"`, `type_uri() == "https://pipelex.dev/errors/foo-bar"`.
     - Override wins: `class X(PipelexError): _declared_title = "Custom"` → `X.title() == "Custom"`.
     - Round-trip: `ErrorReport.model_validate(report.model_dump()).title == report.title` and same for `type_uri`.
     - **Uniqueness guard:** a test that walks `PipelexError.__subclasses__()` recursively (forcing imports of the relevant `*/exceptions.py` modules first) and asserts every class's `type_uri()` is unique. Catches future class-name collisions at CI time, not docs-build time.
-    - `pascal_case_to_kebab`: `"FooBarBaz"` → `"foo-bar-baz"`; `"APIError"` → `"api-error"`; `"EnvVarNotFound"` → `"env-var-not-found"`.
+    - `pascal_case_to_kebab` (in `tests/unit/pipelex/tools/misc/test_string_utils.py`):
+        - Basic: `"FooBarBaz"` → `"foo-bar-baz"`.
+        - Trailing acronym: `"APIError"` → `"api-error"`.
+        - Embedded acronym: `"HTTPError"` → `"http-error"`.
+        - No-acronym multi-word: `"EnvVarNotFound"` → `"env-var-not-found"`.
+        - Numeric + acronym: `"OAuth2"` → `"o-auth2"` (consistent with `pascal_case_to_sentence("OAuth2") == "o auth2"` — pin this in the test).
+        - Numeric mid-string: `"V2APIError"` → `"v2-api-error"`.
+    - **`from_dict` missing-required-fields:** `ErrorReport.from_dict({"error_type": "X", "message": "m"})` raises `pydantic.ValidationError` (no `title`/`type_uri`). This is the path that `recover_error_report` (Item D-1) converts into `UnrecoverableWorkflowFailureError` — pin it here as the unit-level contract.
 - **Acceptance:** consumers never humanize or kebab-case a class name themselves. The API consumes `report.title` / `report.type_uri` directly.
 
 ### [ ] Item B — First-class `request_id` on `JobMetadata` *(spec item 3)*
@@ -149,14 +169,30 @@ The plan reflects these decisions; no further re-litigation in the items below.
     - `INPUT`-domain reports → returned unchanged (the caller's own input; reflecting it back is fine).
     - `CONFIG` / `RUNTIME` reports → `message` replaced with `"An internal error occurred."`; `provider`, `model`, `provider_metadata`, `user_action` dropped.
     - **Kept in all modes** (stable identifiers, RFC 7807-compatible): `error_type`, `error_domain`, `error_category`, `retryable`, `title`, `type_uri`.
-- **`to_problem_document`** builds the RFC 7807 envelope (`type`, `title`, `status`, `detail`, `instance`) from the report's fields; pipelex `ErrorReport` fields ride as extension members. Honors `disclosure_mode` by calling `to_dict(disclosure_mode)` internally. `request_id` lands as the `request_id` extension member. Returns a plain dict — pipelex stays HTTP-agnostic, no FastAPI/Starlette import.
+- **`to_problem_document`** builds the RFC 7807 envelope and maps pipelex fields into the standard slots. Honors `disclosure_mode` by calling `to_dict(disclosure_mode)` internally. `request_id` lands as the `request_id` extension member. Returns a plain dict — pipelex stays HTTP-agnostic, no FastAPI/Starlette import.
+- **RFC 7807 mapping table.** Standard slots get the *value* from the report; pipelex-native names are **dropped** from extensions to avoid a `title` collision and a `title`/`type` semantic split:
+
+    | RFC 7807 standard slot | Source on `ErrorReport` | Note |
+    |---|---|---|
+    | `type` | `report.type_uri` | `type_uri` is removed from extension members |
+    | `title` | `report.title` | `title` is removed from extension members (would otherwise duplicate the standard key) |
+    | `status` | `report.http_status` | already a property |
+    | `detail` | `report.message` (subject to disclosure-mode redaction) | the human-readable per-occurrence text |
+    | `instance` | function argument | per-occurrence URN provided by caller |
+
+    Extension members carry only the pipelex-native classification fields the standard does not cover: `error_type`, `error_domain`, `error_category`, `retryable`, `user_action`, `model`, `provider`, `provider_metadata`. `request_id` rides as an extension when the caller supplies one.
 - **Tests:**
     - Parametrize across the three domains × two disclosure modes (six base cases). Assert INPUT passthrough; CONFIG/RUNTIME redaction-with-stable-identifiers-kept.
     - Parametrize `retryable: True | False | None` × `disclosure_mode: VERBOSE | STRICT`. Assert `retryable` survives both modes for all three values.
     - **INPUT-strict pin test:** an INPUT report whose `message` contains a path like `/Users/alice/secret.mthds` is returned **unchanged** in STRICT mode. Pin the documented contract.
     - RFC 7807 shape: `to_problem_document(instance="urn:p:123", request_id="r-1")` returns a dict with `type`, `title`, `status`, `detail`, `instance="urn:p:123"`, and a `request_id="r-1"` extension member.
+    - **RFC 7807 mapping contract** (single test, two assertions):
+        - Exactly one `title` key in the returned dict (no extension named `title`).
+        - `result["type"] == report.type_uri` and `result["title"] == report.title`.
+        - The extension members do not contain `type_uri` or `title` (they are mapped, not duplicated).
     - Verbose round-trip: `from_dict(report.to_dict(VERBOSE))` equals `report`.
     - Strict non-round-trip: `from_dict(report.to_dict(STRICT))` for a RUNTIME report has `message == "An internal error occurred."` and `provider is None`.
+    - **Receiver-rehydration test:** simulate the API-side consumer. Take a populated `ErrorReport`, render `payload = {"status": "failed", "error": report.to_dict(VERBOSE)}`, then `ErrorReport.from_dict(payload["error"])` and assert it equals the original. Pins the contract pipelex-api will consume on the webhook.
 - **Acceptance:** the API consumes both methods directly. The redaction rule and the envelope shape live exactly once in pipelex; no consumer duplicates them.
 
 ### [ ] Item D-1 — Make `recover_error_report` total
@@ -205,6 +241,7 @@ The plan reflects these decisions; no further re-litigation in the items below.
 
 - **Files:**
     - `pipelex/base_exceptions.py` — the `BaseModel` conversion above.
+    - `pipelex/pipeline/exceptions.py` — **breaks under the BaseModel conversion.** Currently uses `from dataclasses import replace` and `replace(report, error_domain=..., user_action=...)` at `pipeline/exceptions.py:1` and `:44`. After the conversion, this raises at runtime (`replace()` is stdlib-dataclass-only; BaseModel has `model_copy(update={...})`). Migration: drop the `from dataclasses import replace` import and rewrite the call as `report.model_copy(update={"error_domain": ..., "user_action": ...})`. **This must land in the same PR as the BaseModel conversion** — every `PipelineExecutionError.to_error_report()` call breaks without it. Add a regression test (`tests/unit/pipelex/pipeline/test_exceptions.py` or extend `test_base_exceptions.py`) that constructs a `PipelineExecutionError` with no enriching cause, calls `to_error_report()`, and asserts the resulting `error_domain == ErrorDomain.RUNTIME` and `user_action.kind == UserActionKind.UNKNOWN`. Without this test, the converter swap would break the floor behavior silently.
     - `pipelex/pipe_run/delivery_executor.py` — `execute(...)` and `_notify_webhook(...)` accept `error_report: ErrorReport | None = None`. When `status == FAILED` and `error_report is not None`, the webhook payload includes `error = error_report.to_dict(DisclosureMode.VERBOSE)`. The API can choose strict mode at its own HTTP surface.
     - `pipelex/temporal/tprl_pipe/act_deliver.py` — `DeliveryActivityArg` gains `error_report: ErrorReport | None = None`. No `_dict` shim — the data converter handles `BaseModel | None` directly.
     - `pipelex/temporal/tprl_pipe/wf_pipe_run.py` — on the `ChildWorkflowError` catch, call `error_report = recover_error_report(exc.cause)` (total — always a value, see Item D-1). Pass it into `DeliveryActivityArg`.
@@ -398,7 +435,7 @@ The cross-repo counterpart lives in [`../pipelex-api/wip/error-handling/`](../..
 
 | Review | Trigger | Why | Runs | Status | Findings |
 |--------|---------|-----|------|--------|----------|
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | ISSUES_OPEN | 12 issues, 2 critical gaps |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 2 | CLEAR (PLAN) | Round 1: 12 issues / 2 critical gaps (folded). Round 2: 1 P1 + 1 P2 (folded). |
 | CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
 | Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
 | Design Review | `/plan-design-review` | UI/UX gaps | 0 | n/a | not applicable (library plan) |
@@ -406,24 +443,37 @@ The cross-repo counterpart lives in [`../pipelex-api/wip/error-handling/`](../..
 
 **UNRESOLVED:** none.
 
-**Decisions resolved during review discussion:**
+**Decisions resolved across review rounds:**
 - Cause-enrichment policy: **wrapper-wins** for `title`/`type_uri`. Cause-chain serialization deferred (see "Deferred follow-ups" section).
+- `WorkflowExecutionError` is the single **wrapper-loses** carve-out — preserves recovered inner classification across the Temporal serialization boundary. Documented in "Decisions locked in" above.
 - Webhook signing secret source: **env-only** (`PIPELEX_WEBHOOK_SIGNING_SECRET`). No config field. Per the repo policy that no secrets live in committed config.
 - Item F (webhook signing) **split out** of this plan into [`wip/security/webhook-signing.md`](wip/security/webhook-signing.md). The findings A3 (rollout) and A5 (env-vs-config) move with it.
 - `DisclosureMode.STRICT` documented on its own docstring as a classification-projection, NOT a path-leak shield. INPUT-domain reports pass through unchanged in STRICT mode; the contract is pinned in the enum's docstring at the entry point developers read.
 
-**VERDICT:** ENG REVIEW HAS OPEN ISSUES (error-handling track) — 2× P1 architecture + 1× P1 code-quality + 1× P1 test gap require fixes before Stage 1 lands. The plan is **structurally sound** (stage decomposition, hard-stop checkpoints, TDD discipline, no backward-compat shims, no speculative surface). The findings are all **implementation-detail gaps** in otherwise-correct items.
+**VERDICT:** ENG REVIEW (2 rounds) — issues folded into the plan; plan **cleared to implement**. Structurally sound (stage decomposition, hard-stop checkpoints, TDD discipline, no backward-compat shims, no speculative surface). All P1 + P2 items integrated.
 
-**Top P1 items to fold into the plan before starting Item A:**
+**Round 1 — P1 resolution (prior session):**
+1. **Item A migration sweep** — explicit migration step added: 3 production sites (`base_exceptions.py:135`, `base_exceptions.py:166`, `cogt/exceptions.py:88`) + mixed strategy for test fixtures (real values where serialization is under test, conftest helper elsewhere).
+2. **Item C RFC 7807 mapping** — `to_problem_document` maps `type_uri → type` and `title → title`, dropping both from extension members. Single-`title`-key + `type == type_uri` contract test added.
 
-1. **Item A** — add explicit migration step: grep all raw `ErrorReport(...)` constructions (including `cogt/exceptions.py:88` and 4 test fixtures), populate `title`/`type_uri` for each. (A1)
-2. **Item C** — `to_problem_document` must drop `title`/`type_uri` from RFC 7807 extension members (collide with standard `title` / map to `type`). Add a test asserting single-`title`-key contract. (Q1 + T1)
+**Round 1 — P2 resolution (prior session):**
+- `_DEFAULT_ERRORS_BASE_URI` fallback rejected; default lives in `pipelex/pipelex.toml`.
+- Curated `_declared_title` for `PipelexError` / `PipelexUnexpectedError` / `SecurityError` added; wide sweep in scope for Item A's PR.
+- `pascal_case_to_kebab` tests for numerics + trailing acronyms added (including `"OAuth2" → "o-auth2"` pin).
+- `ErrorReport.from_dict` missing-required-fields → `ValidationError` test added.
+- Receiver-rehydration test added to Item C.
 
-**P2 items worth integrating without re-opening the plan:**
-- Add `_DEFAULT_ERRORS_BASE_URI` fallback so `type_uri()` survives config-not-ready (A4)
-- Curate `_declared_title` for `PipelexError`/`SecurityError`/`PipelexUnexpectedError` in Item A's pass (Q4)
-- `pascal_case_to_kebab` numeric + trailing-acronym tests (T2)
-- Explicit ValidationError-on-missing-title synthesis test (T3)
-- Receiver rehydration test (T4)
+**Round 2 — P1 finding (this session):**
+1. **`pipelex/pipeline/exceptions.py:44` uses `dataclasses.replace(report, ...)` — breaks under Item D-2's `BaseModel` conversion.** `dataclasses.replace()` is stdlib-dataclass-only; BaseModel uses `model_copy(update=...)`. Folded into Item D-2's migration sweep: drop the `from dataclasses import replace` import and rewrite the call. Regression test added (`PipelineExecutionError.to_error_report()` floor behavior).
 
-**Full review** with file:line references, test diagram, failure-mode table, and implementation task list is in the conversation that produced this report.
+**Round 2 — P2 finding (this session):**
+- **`WorkflowExecutionError` wrapper-loses carve-out documented in "Decisions locked in"** above. Prevents future implementer from "fixing" the asymmetry by adding `_enrich_error_report_from_cause(report)` to the override during Item A implementation, which would break the Temporal boundary that this exception exists to bridge.
+
+**Round 2 — Informational (not blocking):**
+- Plan's "~267 `PipelexError` subclasses" count is overestimated. Actual: ~77 direct subclasses (`grep "^class .*(.*PipelexError"`); ~257 total `Error`-named classes, but many are stdlib or pydantic-derived. The "wide sweep" is a smaller job than the plan suggests, but the strategy ("focused pass through every leaf class whose auto-derived title reads badly") still applies — just less work than estimated.
+
+**Round 2 — Verifications performed:**
+- All file:line references in the plan verified against the codebase (`base_exceptions.py:135`, `:166`, `cogt/exceptions.py:88`, `workflow_caller.py:128`, `:240`, `:292`).
+- `pascal_case_to_sentence` confirmed present at `pipelex/tools/misc/string_utils.py:121` — `pascal_case_to_kebab` adjacent placement is sound.
+- `JobMetadata` confirmed `BaseModel` already — Item B's `request_id` field is a clean addition.
+- No existing `errors_config` / `error_base_uri` in the codebase — Item A introduces it without conflict.
