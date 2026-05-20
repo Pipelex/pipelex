@@ -2,7 +2,7 @@
 
 This worktree (`feature/API-readiness`) carries the **pipelex-side** companion work for the `pipelex-api` error-handling design. The original per-item spec is in [`wip/error-handling/changes-for-api-early-draft.md`](wip/error-handling/changes-for-api-early-draft.md); the deviations we are taking from that spec — and *why* — are documented in [`wip/error-handling/api-companion-revisions.md`](wip/error-handling/api-companion-revisions.md). The cross-repo consumer (the API) lives in the side-by-side worktree [`../pipelex-api/wip/error-handling/`](../../pipelex-api/wip/error-handling/).
 
-This file is the **execution plan** — what to land, in what order, with hard-stop checkpoints. The 9 items of the original spec consolidate to 6 here. See [`api-companion-revisions.md`](wip/error-handling/api-companion-revisions.md) for the full rationale.
+This file is the **execution plan** — what to land, in what order, with hard-stop checkpoints. It consolidates the error-handling items from the original spec. The original spec's webhook-signing item (item 9) is split out as a separate security track — see [`wip/security/webhook-signing.md`](wip/security/webhook-signing.md). It is security work, not error-handling work; the cross-repo coordination it needs is independent of this plan's PR series. See [`api-companion-revisions.md`](wip/error-handling/api-companion-revisions.md) for the full rationale on the error-handling consolidation.
 
 ---
 
@@ -12,11 +12,13 @@ The plan reflects these decisions; no further re-litigation in the items below.
 
 - **`ErrorReport` becomes a `BaseModel`** (`model_config = ConfigDict(frozen=True, extra="forbid", arbitrary_types_allowed=True)`). We drop the `@pydantic.dataclasses.dataclass` form. The existing Temporal data converter already handles `BaseModel` round-trips — no kajson surgery needed. (Was Item D-2's open question.)
 - **`ErrorReport.title` and `type_uri` are required `str`**, not `str | None`. Every fresh report carries them. A payload missing them fails `from_dict`, which `recover_error_report` synthesizes as `UnrecoverableWorkflowFailureError` (Item D-1) — the correct behavior under "no backward-compat shims."
+- **`title` and `type_uri` are wrapper-wins under cause-chain enrichment.** When `PipeRouterError` wraps `CogtError`, the resulting report carries `error_type="PipeRouterError"`, `title=PipeRouterError.title()`, `type_uri=PipeRouterError.type_uri()` — the identity triplet (`error_type` / `title` / `type_uri`) stays consistent. Classification fields (`error_category`, `provider`, `retryable`, `user_action`, `model`, `provider_metadata`) continue to backfill from the cause as today. The deeper-cause *identity* (its own `error_type` / `title` / `message`) is **not** preserved on the current flat `ErrorReport`; consumers who need Sentry-style cause-trail visibility get it via the deferred `causes` follow-up (see "Deferred follow-ups" below).
 - **`request_id` propagates via `JobMetadata` only.** No ContextVar layer for propagation — Temporal serializes the activity arg; only fields on `JobMetadata` cross the worker boundary. Activity-side log binding reads `arg.<path>.job_metadata.request_id` directly from the arg.
 - **`UnrecoverableWorkflowFailureError` lives in `pipelex/temporal/exceptions.py`**, not `base_exceptions.py`. It's a Temporal-flow-specific synthesis concept.
 - **`errors_config` lives under `Pipelex` config**: `get_config().pipelex.errors_config.base_uri`. Consistent with `pipe_run_config`, `pipeline_execution_config`, etc.
 - **`error_category` is kept in STRICT mode** alongside the other stable identifiers. Revisit only if a deployment surfaces it as a data-leak.
 - **Stage 3 acceptance covers the full `WfPipeRun` chain**, not just `WfPipeRouter`. The existing test bypasses `WfPipeRun`; the new test exercises the outer wrap so the inner child's report survives.
+- **`DisclosureMode.STRICT` is a classification-projection for server-side errors, NOT a path-leak shield.** `INPUT`-domain reports pass through unchanged in STRICT mode (caller-influenced; reflecting back is part of the contract). `CONFIG`/`RUNTIME` reports get redacted. This asymmetry is documented on the `DisclosureMode` docstring itself (Item C) — the entry point a developer reads when wondering "what does STRICT mean?" — so the contract can't be silently misread. If an INPUT message could surface a server-resolved path or secret, the fix is to repair the upstream message, not to expand STRICT mode.
 
 ---
 
@@ -105,6 +107,25 @@ The plan reflects these decisions; no further re-litigation in the items below.
 - **Surface:**
     ```python
     class DisclosureMode(StrEnum):
+        """How much detail to include when serializing an ``ErrorReport`` for external surfaces.
+
+        - ``VERBOSE``: all classification fields plus the original ``message``. Use for
+          internal-trust boundaries (webhook payloads, internal RPCs) where the receiver
+          decides what to expose further downstream.
+
+        - ``STRICT``: stable identifiers only (``error_type``, ``error_domain``,
+          ``error_category``, ``retryable``, ``title``, ``type_uri``). For
+          ``CONFIG`` / ``RUNTIME`` reports, ``message`` is replaced with a generic
+          placeholder and ``provider`` / ``model`` / ``provider_metadata`` /
+          ``user_action`` are dropped.
+
+          **``INPUT``-domain reports are returned unchanged in STRICT mode.** Their
+          ``message`` is caller-influenced and reflecting it back is part of the
+          contract. STRICT is a *classification-projection for server-side errors*,
+          **not a path-leak shield**. If an ``INPUT`` message could surface a
+          server-resolved path or secret, fix the upstream message — don't expand
+          STRICT mode's scope.
+        """
         VERBOSE = "verbose"
         STRICT = "strict"
 
@@ -123,7 +144,7 @@ The plan reflects these decisions; no further re-litigation in the items below.
         @classmethod
         def from_dict(cls, data: dict[str, Any]) -> "ErrorReport": ...
     ```
-- **`from_dict` / `to_dict` semantics.** `to_dict(VERBOSE)` is the inverse of `from_dict`; the round-trip is preserved. `to_dict(STRICT)` is a **lossy** projection — `from_dict(to_dict(report, STRICT))` does not reconstruct the original. Document this on the docstring. Webhook payloads use VERBOSE so receivers can rehydrate (`ErrorReport.from_dict(payload["error"])`); HTTP responses use whatever disclosure the deployment configured.
+- **`from_dict` / `to_dict` semantics.** `to_dict(VERBOSE)` is the inverse of `from_dict`; the round-trip is preserved. `to_dict(STRICT)` is a **lossy** projection — `from_dict(to_dict(report, STRICT))` does not reconstruct the original. Document this on the docstring (with a brief "See `DisclosureMode` for the redaction rule" cross-reference rather than duplicating the rule). Webhook payloads use VERBOSE so receivers can rehydrate (`ErrorReport.from_dict(payload["error"])`); HTTP responses use whatever disclosure the deployment configured.
 - **Strict redaction rule:**
     - `INPUT`-domain reports → returned unchanged (the caller's own input; reflecting it back is fine).
     - `CONFIG` / `RUNTIME` reports → `message` replaced with `"An internal error occurred."`; `provider`, `model`, `provider_metadata`, `user_action` dropped.
@@ -213,37 +234,43 @@ The plan reflects these decisions; no further re-litigation in the items below.
 - **Tests:** unit smoke test that runs the generator against the current hierarchy and asserts (a) no exceptions, (b) one page per non-abstract `PipelexError` subclass, (c) kebab slugs match `pascal_case_to_kebab(cls.__name__)`. (The uniqueness guard from Item A's tests already catches collisions.)
 - **Acceptance:** clicking a `type` URI from a real error response lands on a populated page. Adding a new `PipelexError` subclass produces a new doc page automatically on next `pipelex-dev generate-error-pages` run.
 
-**Checkpoint 4 — End of Stage 4** ⬇ See [Checkpoint 4 brief](#checkpoint-4--end-of-stage-4) below.
-
----
-
-## Stage 5 — Security tightening *(cross-repo coordination needed)*
-
-### [ ] Item F — `X-Completion-Signature` covers the full webhook payload *(spec item 9)*
-
-- **Files:**
-    - `pipelex/system/configuration/configs.py` + `pipelex/pipelex.toml` — new `webhook_signing_secret: str | None` on `PipelineExecutionConfig`. Default `None` (development convenience); production deployments set it.
-    - `pipelex/pipe_run/delivery_executor.py:_notify_webhook` — compute `HMAC-SHA256(secret, request_body_bytes)`, header `X-Completion-Signature: sha256=<hex>`. When the secret is `None` and a webhook is configured, raise `PipelexConfigError("Webhook signing secret not configured; set pipelex.pipeline_execution_config.webhook_signing_secret or PIPELEX_WEBHOOK_SIGNING_SECRET")`. Loud failure, not silent unsigned send. The secret resolves from config OR the `PIPELEX_WEBHOOK_SIGNING_SECRET` environment variable (config takes precedence) for ops convenience.
-    - **Cross-repo:** `pipelex-api/api/routes/pipelex/pipeline.py:_completion_signature` updated to verify the same way (take body bytes, recompute, constant-time compare via `hmac.compare_digest`). Land both PRs in coordinated lockstep.
-- **Tests** (`tests/unit/pipelex/pipe_run/test_delivery_executor.py`):
-    - Signature is deterministic for fixed (secret, body) pairs.
-    - Signature matches what `hmac.new(secret, body, sha256).hexdigest()` produces (compare to the receiver-side computation).
-    - Flipping a single byte in the body produces a different signature.
-    - Missing-secret-with-webhook-configured raises `PipelexConfigError` with the configuration hint in the message.
-    - Webhook with no recipients (empty `delivery_assignment.webhooks`) succeeds without requiring the secret.
-- **Acceptance:** rewriting `status`, `result_url`, or `error` in transit causes signature verification to fail on the receiver. Cross-repo PRs both green.
-
-**Final checkpoint — End of Stage 5** ⬇ See [Final checkpoint brief](#final-checkpoint--end-of-stage-5) below.
+**Checkpoint 4 — End of Stage 4 (final stage)** ⬇ See [Checkpoint 4 brief](#checkpoint-4--end-of-stage-4) below.
 
 ---
 
 ## What we dropped from the original spec
 
-| Spec item | Why dropped |
+| Spec item | Status |
 |---|---|
-| Item 8 — `query_pipeline_state(...)` | Speculative future work; no current consumer needs it. Repo CLAUDE.md: *"Don't design for hypothetical future requirements."* Will be revisited when the first consumer materializes with concrete requirements. |
+| Item 8 — `query_pipeline_state(...)` | **Dropped.** Speculative future work; no current consumer needs it. Repo CLAUDE.md: *"Don't design for hypothetical future requirements."* Will be revisited when the first consumer materializes with concrete requirements. |
+| Item 9 — full-payload webhook signature | **Split out.** Lives at [`wip/security/webhook-signing.md`](wip/security/webhook-signing.md). It is security work, not error-handling — the trust-topology shift (from dispatcher-side signing to worker-side signing) deserves its own review on security merit, and its cross-repo deploy sequence is independent of this plan's. |
 
 See [`api-companion-revisions.md`](wip/error-handling/api-companion-revisions.md) for the full reasoning on this and the consolidations above.
+
+---
+
+## Deferred follow-ups (out of scope for this pass)
+
+Tracked here so the idea doesn't get lost. Each lands when a concrete consumer materializes with requirements.
+
+### Cause-chain serialization on `ErrorReport`
+
+**What.** Add `causes: list[CauseEntry] | None = None` to `ErrorReport`, where each `CauseEntry` carries the identity triplet (`error_type`, `title`, `type_uri`, `message`) of one wrapper layer. `_enrich_error_report_from_cause` already walks `__cause__`; it would also collect entries during the walk.
+
+**Why deferred.** The current flat model satisfies the API-readiness plan: classification fields (`error_category`, `provider`, `retryable`, etc.) already backfill from the cause, which is what consumers need for routing decisions. The cause chain adds Sentry-style debug richness — valuable when a concrete consumer asks for it, speculative without one.
+
+**Why this is additive, not a future refactor.** Every item in this `TODOS.md` stays unchanged when `causes` later lands:
+
+- `title()` / `type_uri()` classmethods (Item A) — unchanged.
+- `recover_error_report` totality (Item D-1) — unchanged.
+- Webhook threading (Item D-2) — unchanged; carries a richer dict.
+- Webhook signing (separate security track) — unchanged; signs whatever body bytes are there.
+- Disclosure-mode redaction (Item C) — extended by adding per-entry redaction to the existing rule, not rewritten.
+- Temporal data converter — unchanged (`BaseModel` round-trips already work).
+
+`extra="forbid"` plus `exclude_none=True` in `to_dict` mean old payloads validate without the new field.
+
+**Triggers for picking it up.** Any of: (a) the CLI gains a verbose error mode operators want for debugging; (b) the API exposes a `?verbose=true` query param or `Accept-Profile` header; (c) a log-shipper consumer requests Sentry-compatible chain output.
 
 ---
 
@@ -257,7 +284,8 @@ See [`api-companion-revisions.md`](wip/error-handling/api-companion-revisions.md
 | D-1 | Total `recover_error_report` | 2 | [ ] |
 | D-2 | `ErrorReport` → `BaseModel`; thread to webhook; full `WfPipeRun` chain test *(spec 5)* | 3 | [ ] |
 | E | Per-class doc pages *(spec 7)* | 4 | [ ] |
-| F | Full-payload webhook signature *(spec 9)* | 5 | [ ] |
+
+The original spec's item 9 (webhook signature) is tracked separately at [`wip/security/webhook-signing.md`](wip/security/webhook-signing.md).
 
 ---
 
@@ -346,26 +374,10 @@ Checkpoints are **hard stops**. Do not pick up the next stage in the same sessio
 - Authored pages list: _TBD_
 - Files touched: _TBD_
 
-**Cold-start for the final checkpoint:**
-- Stage 5 is cross-repo. Confirm with the API team before starting — they own the receiver-side change.
-- Read `pipelex/pipe_run/delivery_executor.py:_notify_webhook` to confirm the current signature shape.
-
----
-
-### Final checkpoint — End of Stage 5
-
-**What should be true:**
-- HMAC over body bytes; `X-Completion-Signature: sha256=<hex>`.
-- pipelex-api signature verification matches; cross-repo PRs both green.
-- Tamper-detection tests cover single-byte body changes; missing-secret-with-webhook-configured raises `PipelexConfigError`.
-- `make agent-check` + `make agent-test` clean.
-
-**Fill in at checkpoint time:**
-- Cross-repo PR link: _TBD_
-- Secret source / rotation story confirmed: _TBD_
-- Files touched: _TBD_
-
-**Post-completion:** mark [`api-companion-revisions.md`](wip/error-handling/api-companion-revisions.md) "current state" section as fully landed; replace this `TODOS.md` with a short pointer to the merged PRs.
+**Post-completion (end of error-handling refactor):**
+- Mark [`api-companion-revisions.md`](wip/error-handling/api-companion-revisions.md) "current state" section as fully landed.
+- Replace this `TODOS.md` with a short pointer to the merged PRs.
+- The webhook-signing security track ([`wip/security/webhook-signing.md`](wip/security/webhook-signing.md)) is independent and can land on its own schedule.
 
 ---
 
@@ -378,4 +390,40 @@ Checkpoints are **hard stops**. Do not pick up the next stage in the same sessio
 5. The most recent checkpoint's "Fill in at checkpoint time" block — running notes from the previous session.
 6. `git log --oneline -20` to see the most recent landings.
 
-The cross-repo counterpart lives in [`../pipelex-api/wip/error-handling/`](../../pipelex-api/wip/error-handling/) — open it side-by-side when reasoning about items D-2 and F.
+The cross-repo counterpart lives in [`../pipelex-api/wip/error-handling/`](../../pipelex-api/wip/error-handling/) — open it side-by-side when reasoning about item D-2. The webhook-signing security track has its own plan at [`wip/security/webhook-signing.md`](wip/security/webhook-signing.md).
+
+---
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | ISSUES_OPEN | 12 issues, 2 critical gaps |
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | n/a | not applicable (library plan) |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
+
+**UNRESOLVED:** none.
+
+**Decisions resolved during review discussion:**
+- Cause-enrichment policy: **wrapper-wins** for `title`/`type_uri`. Cause-chain serialization deferred (see "Deferred follow-ups" section).
+- Webhook signing secret source: **env-only** (`PIPELEX_WEBHOOK_SIGNING_SECRET`). No config field. Per the repo policy that no secrets live in committed config.
+- Item F (webhook signing) **split out** of this plan into [`wip/security/webhook-signing.md`](wip/security/webhook-signing.md). The findings A3 (rollout) and A5 (env-vs-config) move with it.
+- `DisclosureMode.STRICT` documented on its own docstring as a classification-projection, NOT a path-leak shield. INPUT-domain reports pass through unchanged in STRICT mode; the contract is pinned in the enum's docstring at the entry point developers read.
+
+**VERDICT:** ENG REVIEW HAS OPEN ISSUES (error-handling track) — 2× P1 architecture + 1× P1 code-quality + 1× P1 test gap require fixes before Stage 1 lands. The plan is **structurally sound** (stage decomposition, hard-stop checkpoints, TDD discipline, no backward-compat shims, no speculative surface). The findings are all **implementation-detail gaps** in otherwise-correct items.
+
+**Top P1 items to fold into the plan before starting Item A:**
+
+1. **Item A** — add explicit migration step: grep all raw `ErrorReport(...)` constructions (including `cogt/exceptions.py:88` and 4 test fixtures), populate `title`/`type_uri` for each. (A1)
+2. **Item C** — `to_problem_document` must drop `title`/`type_uri` from RFC 7807 extension members (collide with standard `title` / map to `type`). Add a test asserting single-`title`-key contract. (Q1 + T1)
+
+**P2 items worth integrating without re-opening the plan:**
+- Add `_DEFAULT_ERRORS_BASE_URI` fallback so `type_uri()` survives config-not-ready (A4)
+- Curate `_declared_title` for `PipelexError`/`SecurityError`/`PipelexUnexpectedError` in Item A's pass (Q4)
+- `pascal_case_to_kebab` numeric + trailing-acronym tests (T2)
+- Explicit ValidationError-on-missing-title synthesis test (T3)
+- Receiver rehydration test (T4)
+
+**Full review** with file:line references, test diagram, failure-mode table, and implementation task list is in the conversation that produced this report.
