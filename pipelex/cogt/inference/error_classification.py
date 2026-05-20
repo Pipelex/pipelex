@@ -23,6 +23,26 @@ from pipelex.types import StrEnum
 # errors, Mistral's ``NoResponseError``, and builtin ``TimeoutError``.
 _NETWORK_ERROR_TOKENS: tuple[str, ...] = ("timeout", "connect", "transport", "noresponse")
 
+# ``httpx.TransportError`` subclass names whose class names contain none of the
+# ``_NETWORK_ERROR_TOKENS`` and therefore would otherwise fall through to
+# UNKNOWN. These can reach a provider's extract_* helper directly (Azure REST
+# uses raw httpx; OpenAI / Anthropic / Gateway SDKs may also surface them when
+# their connection wrappers are bypassed) without going through the
+# ``_resolve_sdk_exception_type`` normalization, so we recognize them by name
+# here to keep transport failures classified as TRANSIENT.
+_STATUSLESS_TRANSPORT_TYPE_NAMES: frozenset[str] = frozenset(
+    {
+        "TransportError",
+        "ReadError",
+        "WriteError",
+        "CloseError",
+        "RemoteProtocolError",
+        "ProxyError",
+        "UnsupportedProtocol",
+        "NetworkError",
+    }
+)
+
 
 def _resolve_sdk_exception_type(exc: BaseException, status_code: int | None) -> str:
     """Return the ``sdk_exception_type`` name, normalizing status-less httpx transport errors.
@@ -112,6 +132,8 @@ class ProviderErrorMetadata(BaseModel):
         """Whether this is a network/transport failure that never reached an HTTP status."""
         if self.status_code is not None:
             return False
+        if self.sdk_exception_type in _STATUSLESS_TRANSPORT_TYPE_NAMES:
+            return True
         lowered = self.sdk_exception_type.lower()
         return any(token in lowered for token in _NETWORK_ERROR_TOKENS)
 

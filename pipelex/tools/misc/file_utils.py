@@ -341,7 +341,10 @@ def mirror_dir(
                     continue
                 deleted_files.append((relative_root / file_name).as_posix())
                 if not dry_run:
-                    remove_file(str(Path(current_root) / file_name))
+                    # ``unlink(missing_ok=True)`` removes the entry by name regardless of
+                    # whether the target exists, so a broken symlink (which makes
+                    # ``Path.exists()`` return ``False``) is still cleared from the mirror.
+                    (Path(current_root) / file_name).unlink(missing_ok=True)
 
     # Pass 2: copy new or changed files from the source into the target.
     for current_root, dir_names, file_names in os.walk(source_root, topdown=True, onerror=_reraise_walk_error):

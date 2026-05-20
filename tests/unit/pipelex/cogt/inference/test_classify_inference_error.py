@@ -240,6 +240,40 @@ class _TestCases:
             UserActionKind.CONTACT_SUPPORT,
             False,
         ),
+        # httpx TransportError subclasses whose class names lack a recognized network token
+        # (e.g. ReadError, WriteError, CloseError, RemoteProtocolError, ProxyError) must still
+        # classify as TRANSIENT — otherwise genuine transport failures slip through to UNKNOWN
+        # and retry policy is suppressed.
+        (
+            "statusless_httpx_read_error",
+            ProviderName.AZURE,
+            "ReadError",
+            "stream read failed",
+            None,
+            InferenceErrorCategory.TRANSIENT,
+            UserActionKind.WAIT_AND_RETRY,
+            False,
+        ),
+        (
+            "statusless_httpx_remote_protocol_error",
+            ProviderName.AZURE,
+            "RemoteProtocolError",
+            "server disconnected",
+            None,
+            InferenceErrorCategory.TRANSIENT,
+            UserActionKind.WAIT_AND_RETRY,
+            False,
+        ),
+        (
+            "statusless_httpx_proxy_error",
+            ProviderName.AZURE,
+            "ProxyError",
+            "proxy refused",
+            None,
+            InferenceErrorCategory.TRANSIENT,
+            UserActionKind.WAIT_AND_RETRY,
+            False,
+        ),
     ]
 
 

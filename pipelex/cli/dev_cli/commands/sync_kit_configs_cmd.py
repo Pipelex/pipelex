@@ -53,13 +53,13 @@ def _display_result(result: MirrorDirResult, quiet: bool) -> None:
     table.add_column("Change", style="bold")
     table.add_column("Path", style="cyan")
     for path in result.copied_files:
-        table.add_row("[green]copied[/green]", path)
+        table.add_row("[green]copied[/green]", escape(path))
     for path in result.created_dirs:
-        table.add_row("[green]created dir[/green]", path)
+        table.add_row("[green]created dir[/green]", escape(path))
     for path in result.deleted_dirs:
-        table.add_row("[red]deleted dir[/red]", path)
+        table.add_row("[red]deleted dir[/red]", escape(path))
     for path in result.deleted_files:
-        table.add_row("[red]deleted[/red]", path)
+        table.add_row("[red]deleted[/red]", escape(path))
     console.print(table)
     console.print()
 

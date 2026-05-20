@@ -306,6 +306,26 @@ class TestMirrorDir:
             assert (target / "config.toml").is_symlink()
             assert external.read_text(encoding="utf-8") == "external content"
 
+    def test_deletes_target_only_broken_file_symlink(self):
+        """A target-only file symlink whose target no longer exists is unlinked, not just reported."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "source"
+            target = Path(temp_dir) / "target"
+            source.mkdir()
+            external = Path(temp_dir) / "vanished.toml"
+            external.write_text("temporary", encoding="utf-8")
+            target.mkdir()
+            (target / "stale_link.toml").symlink_to(external)
+            # Make the symlink broken by removing the target it points to.
+            external.unlink()
+
+            result = mirror_dir(source, target)
+
+            assert result.deleted_files == ["stale_link.toml"]
+            # The broken symlink itself must actually be gone from the target tree.
+            assert not (target / "stale_link.toml").is_symlink()
+            assert not (target / "stale_link.toml").exists()
+
     def test_deletes_target_only_directory_symlink(self):
         """A target-only directory symlink is unlinked instead of aborting the sync on rmtree."""
         with tempfile.TemporaryDirectory() as temp_dir:

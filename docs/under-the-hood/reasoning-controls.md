@@ -323,7 +323,7 @@ Gateway and proxy backends (Azure OpenAI, Portkey, BlackBoxAI, Pipelex Gateway) 
 
 ## Effort-to-Level Configuration
 
-Each provider has an `effort_to_level_map` in its subconfig within `pipelex.toml` that maps `ReasoningEffort` values to provider-specific level strings. All six `ReasoningEffort` keys must be present in each map (enforced by a validator).
+Each provider has an `effort_to_level_map` in its subconfig within `pipelex.toml` that maps `ReasoningEffort` values to provider-specific level strings. Every `ReasoningEffort` key must be present in each map (enforced by a validator).
 
 The special value `"disabled"` causes the accessor to return `None`, signaling that reasoning should be skipped. OpenAI uses `"none"` as a valid API value instead (not `"disabled"`).
 
