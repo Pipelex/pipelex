@@ -9,7 +9,7 @@ from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
-from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
+from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, StructuringMethod
 from pipelex.tools.misc.pretty import PrettyPrintable
 
 
@@ -34,6 +34,17 @@ class PipeLLMSpec(PipeSpec):
         description="Model preset, alias, waterfall, or direct model handle. Use presets from 'pipelex-agent models'.",
     )
     system_prompt: str | None = Field(default=None, description="A system prompt to guide the LLM's behavior, style and skills. Can be a template.")
+    structuring_method: StructuringMethod | None = Field(
+        default=None,
+        description=(
+            "Build-time directive that controls how the structured output is produced. "
+            "Default (None or 'direct'): a single LLM call produces the structured output directly. "
+            "'preliminary_text': the bundle elaborator splits this pipe into a PipeSequence of "
+            "[PipeLLM(text), PipeStructure], so the LLM first drafts a free-form text and a second "
+            "call structures it. Useful when reasoning is easier in prose than in JSON. "
+            "Cannot be combined with a Text output."
+        ),
+    )
     prompt: str | None = Field(
         default=None,
         description="""A template for the user prompt:
@@ -112,4 +123,5 @@ So, don't have to write a bullet-list of all the attributes definitions yourself
             system_prompt=self.system_prompt,
             prompt=self.prompt,
             model=self.model,
+            structuring_method=self.structuring_method,
         )

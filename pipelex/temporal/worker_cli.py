@@ -3,6 +3,7 @@ python -m pipelex.temporal.worker_cli --is-unit-testing
 python -m pipelex.temporal.worker_cli --is-not-sandboxed
 python -m pipelex.temporal.worker_cli --task-queue my_task_queue
 python -m pipelex.temporal.worker_cli --scope router
+python -m pipelex.temporal.worker_cli --profile anthropic-tier4 --scope runner-llm --task-queue anthropic_q
 """
 
 import asyncio
@@ -27,6 +28,7 @@ async def run_worker(
     is_unit_testing: bool = False,
     task_queue: str | None = None,
     scope_name: str | None = None,
+    profile_name: str | None = None,
 ):
     if project is None:
         log.info(f"Starting worker for current project '{project}', from {os.path.relpath(__file__)}")
@@ -37,6 +39,7 @@ async def run_worker(
         is_unit_testing=is_unit_testing,
         task_queue=task_queue,
         scope_name=scope_name,
+        profile_name=profile_name,
     )
 
 
@@ -47,6 +50,10 @@ def configure(
     is_unit_testing: Annotated[bool, typer.Option(help="Flag to indicate if running unit tests")] = False,
     task_queue: Annotated[str | None, typer.Option(help="The task queue to use")] = None,
     scope: Annotated[str | None, typer.Option(help="Worker scope name from [temporal.worker_scopes.scopes] (defaults to default_scope)")] = None,
+    profile: Annotated[
+        str | None,
+        typer.Option(help="Worker runtime profile name from [temporal.worker_runtime_profiles.profiles] (defaults to default_profile)"),
+    ] = None,
 ):
     if is_unit_testing:
         runtime_manager.set_run_mode(RunMode.UNIT_TEST)
@@ -58,6 +65,14 @@ def configure(
             raise ValueError(msg)
 
     Pipelex.make(temporal_enabled=True)
+
+    # Fast-fail on an unknown --task-queue before doing any heavy boot work
+    # (library load, concept-class generation, kajson registration). Catches
+    # operator typos in seconds instead of after multi-second library init.
+    # The same check runs again inside ``TemporalTaskManager.run_worker`` so
+    # programmatic callers (tests, library code) also benefit.
+    effective_task_queue = task_queue or get_config().temporal.worker_config.default_task_queue
+    get_config().temporal.validate_task_queue_known(effective_task_queue)
 
     # Load base library from PIPELEXPATH at worker startup.
     # This generates dynamic concept classes and registers them with Kajson (fixing deserialization)
@@ -79,7 +94,7 @@ def configure(
         updated_temporal = get_config().temporal.model_copy(update={"is_enabled": True})
         get_config().temporal = updated_temporal
 
-    asyncio.run(run_worker(project, is_not_sandboxed, is_unit_testing, task_queue, scope))
+    asyncio.run(run_worker(project, is_not_sandboxed, is_unit_testing, task_queue, scope, profile))
 
 
 if __name__ == "__main__":

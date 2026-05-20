@@ -6,11 +6,13 @@ from pipelex.cogt.content_generation.generated_content_factory import GeneratedC
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.hub import get_storage_provider
+from pipelex.temporal.tprl.activity_error_boundary import convert_pipelex_errors
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer
 
 
 @activity.defn
+@convert_pipelex_errors
 async def act_render_page_views(render_assignment: RenderPageViewsAssignment) -> list[ImageContent]:
     """Render PDF pages as images, store them, and return lightweight ImageContent references.
 

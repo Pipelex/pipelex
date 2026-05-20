@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from rich.markup import escape
+from tomlkit.exceptions import TOMLKitError
 
 from pipelex import log
 from pipelex.cli.commands.init.ide_extension import suggest_extension_install_if_needed
@@ -134,8 +135,9 @@ def customize_backends_config(is_first_time_setup: bool = False, target_config_d
         # Suggest IDE extension install after backend selection, before gateway terms
         try:
             suggest_extension_install_if_needed(console)
-        except Exception as exc:
-            log.debug(f"IDE extension suggestion failed: {exc}")
+        except EOFError as exc:
+            # No stdin available for the install prompt — skip the optional IDE extension suggestion.
+            log.debug(f"IDE extension suggestion skipped: {exc}")
 
         # Check if pipelex_gateway is selected and handle terms acceptance prompt
         gateway_terms_accepted: bool | None = None
@@ -165,7 +167,9 @@ def customize_backends_config(is_first_time_setup: bool = False, target_config_d
                 global_config_dir = config_manager.global_config_dir
                 global_config_dir.mkdir(parents=True, exist_ok=True)
                 update_service_terms_acceptance(accepted=gateway_terms_accepted, config_dir=global_config_dir)
-            except Exception as terms_exc:
+            except (OSError, TOMLKitError, TypeError) as terms_exc:
+                # TypeError: a malformed service-config TOML (e.g. a scalar [agreement]) makes the
+                # terms writer's dict assignment raise TypeError rather than a TOMLKitError.
                 log.warning(f"Could not save gateway terms acceptance to global config: {terms_exc}")
                 if gateway_terms_accepted:
                     # Gateway enabled in backends.toml but terms not recorded — runtime will fail.
@@ -173,13 +177,14 @@ def customize_backends_config(is_first_time_setup: bool = False, target_config_d
                     try:
                         disable_gateway_backend(backends_toml_path)
                         console.print("[yellow]⚠ Could not save gateway terms. Gateway has been disabled to prevent errors.[/yellow]")
-                    except Exception as disable_exc:
+                    except (OSError, TOMLKitError, TypeError) as disable_exc:
                         log.warning(f"Could not disable gateway backend: {disable_exc}")
                         console.print(
                             "[red]⚠ Could not save gateway terms or disable gateway. Please manually disable pipelex_gateway in backends.toml.[/red]"
                         )
                     console.print("[dim]Re-run 'pipelex init' to set up gateway again.[/dim]")
 
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
+        # Command-level boundary: backend customization is optional during init — any failure is reported and init continues.
         console.print(f"[yellow]⚠ Warning: Failed to customize backends: {escape(str(exc))}[/yellow]")
         console.print("[dim]You can manually edit .pipelex/inference/backends.toml later[/dim]")

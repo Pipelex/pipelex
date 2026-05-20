@@ -23,6 +23,9 @@ class AssembleGraphArg(BaseModel):
     main_pipe_code: str | None = None
 
 
+# Deliberately NOT decorated with @convert_pipelex_errors: this activity is best-effort
+# observability — it swallows every failure and degrades to None, so no error ever
+# crosses the boundary for the decorator to convert.
 @activity.defn(name="act_assemble_graph")
 async def act_assemble_graph(arg: AssembleGraphArg) -> GraphSpec | None:  # noqa: RUF029
     """Read trace events and assemble GraphSpec. Returns None if no events found."""
@@ -49,7 +52,7 @@ async def act_assemble_graph(arg: AssembleGraphArg) -> GraphSpec | None:  # noqa
             return graph_spec
         finally:
             event_log.close()
-    except Exception as exc:
-        # TODO: wip - do not catch all exceptions
+    except Exception as exc:  # noqa: BLE001
+        # Temporal activity root: graph assembly is best-effort observability — any failure degrades to None rather than failing the workflow.
         log.warning(f"Graph assembly activity failed: {exc}")
         return None

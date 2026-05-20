@@ -6,7 +6,7 @@ import typer
 
 from pipelex.builder.operations.models_ops import CATEGORY_TO_MODEL_TYPE, ModelCategory
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
-from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success, set_agent_cli_error_format
 from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceParseError
 from pipelex.cogt.models.model_suggestion import (
     KIND_LABELS,
@@ -62,14 +62,19 @@ def agent_check_model_cmd(
     ],
     output_format: Annotated[
         CliOutputFormat,
-        typer.Option("--format", help="Output format: markdown (default) or json (structured)"),
+        typer.Option("--format", help="Success output format: markdown (default) or json (structured)"),
     ] = CliOutputFormat.MARKDOWN,
+    error_format: Annotated[
+        CliOutputFormat | None,
+        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+    ] = None,
 ) -> None:
     """Check if a model reference is valid and suggest alternatives if not.
 
     Parses the reference (with sigil prefix if present), validates it against the
     model deck, and on failure provides fuzzy suggestions and wrong-sigil hints.
     """
+    set_agent_cli_error_format(error_format or output_format)
     try:
         make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"], needs_inference=False, needs_model_specs=True)
 
@@ -103,7 +108,8 @@ def agent_check_model_cmd(
         raise
     except ModelReferenceParseError as exc:
         agent_error(f"Invalid model reference: {exc}", "ArgumentError", cause=exc)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
         agent_error(f"Failed to check model: {exc}", type(exc).__name__, cause=exc)
     finally:
         Pipelex.teardown_if_needed()

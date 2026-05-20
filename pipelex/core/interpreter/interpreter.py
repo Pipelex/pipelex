@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, ValidationError
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.core.interpreter.bundle_elaborator import BundleElaborator, BundleElaboratorError
 from pipelex.core.interpreter.exceptions import MthdsDecodeError, PipelexInterpreterError
 from pipelex.core.interpreter.validation_error_categorizer import PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD, categorize_blueprint_validation_error
 from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_content, load_toml_from_path
@@ -38,7 +39,6 @@ class PipelexInterpreter(BaseModel):
         try:
             pipelex_bundle_blueprint = PipelexBundleBlueprint.model_validate(blueprint_dict)
             pipelex_bundle_blueprint.source = str(bundle_path) if bundle_path else None
-            return pipelex_bundle_blueprint
         except ValidationError as exc:
             # TODO: Move this to the validate_bundle function
             blueprint_validation_errors: list[PipelexBundleBlueprintValidationErrorData] = []
@@ -52,3 +52,8 @@ class PipelexInterpreter(BaseModel):
                 message=format_pydantic_validation_error(exc),
                 validation_errors=blueprint_validation_errors,
             ) from exc
+
+        try:
+            return BundleElaborator.elaborate(bundle=pipelex_bundle_blueprint)
+        except BundleElaboratorError as exc:
+            raise PipelexInterpreterError(message=str(exc)) from exc

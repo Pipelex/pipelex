@@ -70,31 +70,31 @@ class TestContentGenerator:
 
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_make_object_direct(self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol):
+    async def test_make_object(self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol):
         llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="$testing-structured")
 
-        person_direct: Employee = await content_generator.make_object_direct(
+        person_direct: Employee = await content_generator.make_object(
             job_metadata=job_metadata,
             object_class=Employee,
             llm_prompt_for_object=LLMPrompt(user_text=USER_TEXT_FOR_SINGLE_PERSON),
             llm_setting_for_object=llm_setting_for_object,
         )
-        pretty_print(person_direct, title="make_object_direct")
+        pretty_print(person_direct, title="make_object")
 
         assert isinstance(person_direct, Employee)
 
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_make_object_list_direct(self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol):
+    async def test_make_object_list(self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol):
         llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="$testing-structured")
 
-        person_list_direct: list[Employee] = await content_generator.make_object_list_direct(
+        person_list_direct: list[Employee] = await content_generator.make_object_list(
             job_metadata=job_metadata,
             object_class=Employee,
             llm_prompt_for_object_list=LLMPrompt(user_text=USER_TEXTS_FOR_PEOPLE_STR),
             llm_setting_for_object_list=llm_setting_for_object,
         )
-        pretty_print(person_list_direct, title="make_object_list_direct")
+        pretty_print(person_list_direct, title="make_object_list")
 
         assert isinstance(person_list_direct, list)
         assert all(isinstance(person, Employee) for person in person_list_direct)

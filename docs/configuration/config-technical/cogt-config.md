@@ -10,12 +10,30 @@ The Cogt configuration manages all cognitive tools in Pipelex, including LLM (La
 
 ```toml
 [cogt]
+# Tier 1 transport retry attempts
+transport_max_retries = 2
+
 # Main Cogt configuration sections
 [cogt.inference_manager_config]
 [cogt.llm_config]
 [cogt.img_gen_config]
 [cogt.extract_config]
 ```
+
+## Transport Retry
+
+`transport_max_retries` is a top-level `[cogt]` setting that controls how many times an inference SDK client retries a transient transport failure before giving up.
+
+```toml
+[cogt]
+transport_max_retries = 2
+```
+
+- `transport_max_retries` (int, `0`–`10`, default `2`): the number of retries attempted **on top of** the initial request when a transport-level failure occurs — a connection error, or an HTTP `408` / `409` / `429` / `5xx` response. A value of `2` therefore allows up to 3 attempts total. Retries honor a `Retry-After` response header when present.
+
+This is "Tier 1" of the retry model. It is wired uniformly into every inference SDK client factory — Anthropic, OpenAI / Azure OpenAI, the Pipelex Gateway clients, Mistral, and Google — as well as the raw-`httpx` Azure image-generation path, so the retry posture is a deliberate, uniform policy rather than a per-provider SDK default.
+
+It is distinct from `llm_config.schema_reask_max_attempts`, which is `instructor`'s schema re-ask count for structured-output validation failures — a different concern.
 
 ## Inference Manager Configuration
 
@@ -36,10 +54,7 @@ Configuration for all Language Model interactions:
 [cogt.llm_config]
 default_max_images = 100  # Maximum number of images in prompts
 is_structure_prompt_enabled = false
-
-# Job configuration
-[cogt.llm_config.llm_job_config]
-max_retries = 3  # Between 1 and 10
+schema_reask_max_attempts = 3  # instructor schema re-ask attempts, between 1 and 10
 ```
 
 ### LLM Job Parameters
@@ -131,7 +146,7 @@ All model types support the same routing, aliasing, and preset systems.
 ### LLM Configuration
 - Temperature must be between 0 and 1
 - Max tokens must be positive
-- Max retries must be between 1 and 10
+- Schema re-ask attempts must be between 1 and 10
 - Seeds must be non-negative
 
 ### ImageGen Configuration
@@ -164,6 +179,8 @@ All model types support the same routing, aliasing, and preset systems.
 
 ```toml
 [cogt]
+transport_max_retries = 2
+
 [cogt.inference_manager_config]
 is_auto_setup_preset_llm = true
 is_auto_setup_preset_img_gen = true
@@ -172,9 +189,7 @@ is_auto_setup_preset_extract = true
 [cogt.llm_config]
 default_max_images = 100
 is_structure_prompt_enabled = false
-
-[cogt.llm_config.llm_job_config]
-max_retries = 3
+schema_reask_max_attempts = 3
 
 [cogt.img_gen_config.img_gen_job_config]
 is_sync_mode = false

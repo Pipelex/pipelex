@@ -256,7 +256,7 @@ class ConstructBlueprint(BaseModel):
                         # Extract root names and filter out internal variables (same approach as template mode)
                         for var in template_vars:
                             root_var = get_root_from_dotted_path(var)
-                            if not root_var.startswith("_") and root_var not in {"preliminary_text", "place_holder"}:
+                            if not root_var.startswith("_") and root_var != "place_holder":
                                 required.add(root_var)
 
                 case ConstructFieldMethod.NESTED:

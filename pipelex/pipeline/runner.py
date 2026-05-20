@@ -165,7 +165,9 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
                 run_mode=pipe_job.pipe_run_params.run_mode,
                 pipe_code=pipe_job.pipe.code,
                 output_name=pipe_job.output_name,
-                pipe_stack=pipe_job.pipe_run_params.pipe_stack,
+                # The live pipe_stack has fully unwound by now; PipeRouterError carries the
+                # snapshot taken where the failure occurred.
+                pipe_stack=exc.pipe_stack,
             ) from exc
         except PipelexError as exc:
             # Catch other Pipelex errors that bypass the router's PipeRunError handling

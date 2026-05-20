@@ -26,7 +26,7 @@ def get_async_worker_and_job(llm_preset_id: str, user_text: str, job_metadata: J
         job_metadata=job_metadata,
         llm_job_params=llm_job_params,
         llm_job_config=LLMJobConfig(
-            max_retries=3,
+            schema_reask_max_attempts=3,
         ),
     )
     return llm_worker, llm_job
@@ -55,7 +55,7 @@ class TestLLMGenObject:
             job_metadata=job_metadata,
             llm_job_params=llm_job_params,
             llm_job_config=LLMJobConfig(
-                max_retries=3,
+                schema_reask_max_attempts=3,
             ),
         )
         expected_class = expected_instance.__class__
@@ -99,7 +99,7 @@ class TestLLMGenObject:
                 job_metadata=job_metadata,
                 llm_job_params=llm_job_params,
                 llm_job_config=LLMJobConfig(
-                    max_retries=3,
+                    schema_reask_max_attempts=3,
                 ),
             )
             task: asyncio.Task[BaseModel] = asyncio.create_task(llm_worker.gen_object(llm_job=llm_job, schema=expected_class))
@@ -131,7 +131,7 @@ class TestLLMGenObject:
                 job_metadata=job_metadata,
                 llm_job_params=llm_job.job_params,
                 llm_job_config=LLMJobConfig(
-                    max_retries=3,
+                    schema_reask_max_attempts=3,
                 ),
             )
             task: asyncio.Task[BaseModel] = asyncio.create_task(llm_worker.gen_object(llm_job=llm_job, schema=expected_class))

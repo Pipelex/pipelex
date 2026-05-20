@@ -28,7 +28,6 @@ from pipelex.libraries.library import Library
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.observer.observer_protocol import ObserverProtocol
-from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipeline.pipeline import Pipeline
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
 from pipelex.plugins.plugin_manager import PluginManager
@@ -46,6 +45,7 @@ if TYPE_CHECKING:
     # Deferred import: avoid pulling heavy SDK at module-load time
     from opentelemetry.trace import Tracer as OTelTracer
 
+    from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 
 
@@ -187,7 +187,7 @@ class PipelexHub:
     def set_pipe_library(self, pipe_library: PipeLibraryAbstract):
         self._pipe_library = pipe_library
 
-    def set_pipe_router(self, pipe_router: PipeRouterProtocol):
+    def set_pipe_router(self, pipe_router: "PipeRouterProtocol"):
         self._pipe_router = pipe_router
 
     def set_pipe_run(self, pipe_run: "PipeRunProtocol") -> None:
@@ -304,7 +304,7 @@ class PipelexHub:
             raise RuntimeError(msg)
         return self._pipe_library
 
-    def get_required_pipe_router(self) -> PipeRouterProtocol:
+    def get_required_pipe_router(self) -> "PipeRouterProtocol":
         if self._pipe_router is None:
             msg = "PipeRouter is not initialized"
             raise RuntimeError(msg)
@@ -565,7 +565,7 @@ def get_required_concept(concept_ref: str) -> Concept:
     return get_pipelex_hub().get_library().concept_library.get_required_concept(concept_ref=concept_ref)
 
 
-def get_pipe_router() -> PipeRouterProtocol:
+def get_pipe_router() -> "PipeRouterProtocol":
     return get_pipelex_hub().get_required_pipe_router()
 
 

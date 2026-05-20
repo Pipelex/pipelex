@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 import typer
 
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.validate.bundle_cmd import validate_bundle_cmd
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.exceptions import PipelineExecutionError
@@ -73,6 +74,7 @@ class TestValidateBundleCmd:
                 ctx=agent_ctx,
                 path=str(mthds_file),
                 graph=True,
+                output_format=CliOutputFormat.JSON,
             )
 
         assert exc_info.value.exit_code == 1

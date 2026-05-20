@@ -36,6 +36,10 @@ is_normalize_data_urls_to_storage = true
 # Set to false to disable generation of execution graphs
 is_generate_graph = true
 
+# Bounded fan-out concurrency for PipeBatch: at most this many branches run at once.
+# Set max_concurrency = "unbounded" to disable the bound.
+max_concurrency = 8
+
 [pipelex.pipeline_execution_config.graph_config.data_inclusion]
 # Control what data is included in graph outputs
 stuff_json_content = true
@@ -195,13 +199,6 @@ is_model_fallback_enabled = true
 # Reaction to missing presets: "raise", "log", or "none"
 missing_presets_reaction = "log"
 
-[cogt.tenacity_config]
-# Retry behavior for API calls
-max_retries = 50      # Maximum number of retry attempts before giving up
-wait_multiplier = 0.2 # Multiplier applied to the wait time between retries (in seconds)
-wait_max = 20         # Maximum wait time between retries (in seconds)
-wait_exp_base = 1.3   # Base for exponential backoff calculation
-
 [cogt.llm_config]
 # Enable dumping of LLM inputs/outputs for debugging
 is_dump_text_prompts_enabled = false
@@ -220,6 +217,16 @@ is_dump_error_enabled = false
 [temporal]
 is_enabled = false
 
+# Custom Temporal search attributes Pipelex populates on every workflow start
+# so the dashboard can group/filter by PipeCode, PipelineRunId, SessionId,
+# UserId, and DomainCode. Set `enabled = false` to skip both the worker-boot
+# registration check and the per-workflow attribute attachment — useful when
+# the operator owns the namespace policy and can't grant search-attribute
+# admin to the worker.
+[temporal.search_attributes]
+enabled = true
+attributes = ["PipeCode", "PipelineRunId", "SessionId", "UserId", "DomainCode"]
+
 [temporal.payload_codec_config]
 is_enabled = false
 size_threshold = 1_048_576            # in bytes (~1 MB, well under Temporal's 2 MB hard limit)
@@ -233,12 +240,22 @@ uri_format = "{hash}"
 local_storage_path = ".pipelex/temporal-payload-store"
 
 [temporal.worker_config]
-task_queue = "temporal_task_queue"
-workflow_execution_timeout = "1:00:00"
+default_task_queue = "temporal_task_queue"
+workflow_execution_timeout = "1:00:00"     # workflow-level budget (not the activity timeout)
 run_timeout = "1:00:00"
 task_timeout = "0:00:10"
 start_delay = "0:00:00"
 rpc_timeout = "1:00:00"
+# Baseline activity timeout. Per-queue and per-handle overlays in
+# [temporal.queue_options] / activity_queues.*.handle_options can override.
+default_activity_start_to_close_timeout = "0:10:00"
+# Per-activity, per-handle routing. Empty by default — every activity lands on
+# `default_task_queue` above (same as legacy behavior). Populate this to route
+# activities to dedicated worker pools (e.g. OpenAI vs Anthropic, a heavy-payload
+# image pool, isolated Mistral OCR), with optional per-handle queue overrides and
+# rare per-handle option overrides. See pipelex/kit/configs/pipelex.toml for the
+# full schema and examples.
+[temporal.worker_config.activity_queues]
 
 [temporal.worker_config.retry_policy_config]
 initial_interval = "0:00:03"
@@ -253,6 +270,44 @@ non_retryable_error_types = [
   "ModelNotFoundError",
   "ValidationError",
 ]
+# Per-queue / per-handle overlays add to the list above via the layer-specific
+# `non_retryable_error_types_extra` field (see the commented example below).
+# That field belongs only on overlays — the baseline schema deliberately does
+# not accept it.
+
+# Per-queue submitter options. Layer on top of worker_config defaults at
+# dispatch time. Add `[temporal.queue_options.<queue>]` entries to match each
+# backend pool's latency/retry profile (timeouts, retry policy, cluster-wide
+# rate caps). See pipelex/kit/configs/pipelex.toml for examples.
+[temporal.queue_options]
+
+# Default cluster-wide rate cap on the worker's home queue. Mirrors the pre-v2
+# hardcoded `max_task_queue_activities_per_second=1000` so existing deployments
+# on `temporal_task_queue` keep the same server-enforced cap.
+[temporal.queue_options.temporal_task_queue]
+max_task_queue_activities_per_second = 1000
+
+# Named worker-runtime profiles. A worker process selects one via `--profile`.
+# The `default` profile below mirrors the pre-v2 hardcoded knobs, so default
+# behavior is unchanged. Add more profiles to shape pools differently — e.g.
+# small concurrency on a GPU pool sitting next to a high-throughput LLM pool.
+# See pipelex/kit/configs/pipelex.toml for examples.
+[temporal.worker_runtime_profiles]
+default_profile = "default"
+
+[temporal.worker_runtime_profiles.profiles.default]
+tuning_mode = "explicit"
+max_cached_workflows = 10000
+max_concurrent_workflow_tasks = 1000
+max_concurrent_activities = 1000
+max_concurrent_local_activities = 1000
+max_concurrent_workflow_task_polls = 100
+max_concurrent_activity_task_polls = 100
+max_activities_per_second = 1000
+sticky_queue_schedule_to_start_timeout = "0:30:00"
+max_heartbeat_throttle_interval = "1:00:00"
+default_heartbeat_throttle_interval = "1:00:00"
+graceful_shutdown_timeout = "0:30:00"
 
 [temporal.temporal_config]
 selected_server = "local"

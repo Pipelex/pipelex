@@ -12,6 +12,7 @@ from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.builder.pipe.pipe_search_spec import PipeSearchSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
+from pipelex.builder.pipe.pipe_structure_spec import PipeStructureSpec
 
 PipeSpecUnion = Annotated[
     PipeFuncSpec
@@ -20,6 +21,7 @@ PipeSpecUnion = Annotated[
     | PipeLLMSpec
     | PipeExtractSpec
     | PipeSearchSpec
+    | PipeStructureSpec
     | PipeBatchSpec
     | PipeConditionSpec
     | PipeParallelSpec

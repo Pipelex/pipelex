@@ -54,6 +54,8 @@ def _run_agent_bundle(bundle_dir: Path, env: dict[str, str], cwd: Path) -> subpr
             "--dry-run",
             "--mock-inputs",
             "--no-graph",
+            "--format",
+            "json",
         ],
         env=env,
         cwd=str(cwd),

@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Temporal queues &amp; options — per-activity routing, per-queue tuning, runtime profiles</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #161a22;
+    --panel-2: #1c2230;
+    --line: #2a3142;
+    --fg: #e6e9ef;
+    --muted: #9aa3b2;
+    --accent: #7ad7ff;
+    --accent-2: #c9a8ff;
+    --bad: #ff8e8e;
+    --good: #8ce5b3;
+    --warn: #ffd28a;
+  }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif; line-height: 1.5; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px 64px; }
+  h1 { font-size: 30px; margin: 0 0 8px; font-weight: 700; letter-spacing: -0.01em; }
+  h2 { font-size: 22px; margin: 40px 0 12px; padding-top: 18px; border-top: 1px solid var(--line); letter-spacing: -0.01em; }
+  h3 { font-size: 16px; margin: 22px 0 8px; color: var(--accent); font-weight: 600; }
+  h4 { font-size: 14px; margin: 16px 0 6px; color: var(--accent-2); font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
+  p, li { font-size: 14.5px; }
+  .lede { color: var(--muted); font-size: 15.5px; margin: 0 0 6px; }
+  code, pre, .mono { font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, monospace; }
+  code { background: var(--panel-2); padding: 1px 6px; border-radius: 4px; font-size: 13px; }
+  pre {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 14px 16px; overflow: auto; font-size: 12.5px; line-height: 1.55;
+  }
+  pre.diff .add { color: var(--good); display: block; }
+  pre.diff .del { color: var(--bad); display: block; }
+  pre.diff .ctx { color: var(--muted); display: block; }
+  pre.diff .hdr { color: var(--accent); display: block; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 12px; font-size: 13.5px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .kicker { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--panel-2); color: var(--accent); font-size: 12px; letter-spacing: 0.04em; }
+  .row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .card { flex: 1 1 320px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .card.bad { border-color: #5a2a2a; }
+  .card.good { border-color: #295a3a; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; }
+  .pill.before { background: #3a1d22; color: var(--bad); }
+  .pill.after { background: #1d3a2c; color: var(--good); }
+  .muted { color: var(--muted); }
+  .small { font-size: 12.5px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 720px) { .grid-2 { grid-template-columns: 1fr; } }
+  .note { background: var(--panel-2); border-left: 3px solid var(--accent); padding: 10px 12px; border-radius: 4px; margin: 12px 0; font-size: 13.5px; color: var(--muted); }
+  .note strong { color: var(--fg); }
+  ul.tight li { margin: 2px 0; }
+  .diagram { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin: 8px 0; }
+  /* Layered overlay diagram */
+  .stack { display: flex; flex-direction: column; gap: 8px; max-width: 780px; }
+  .stack .layer {
+    border-radius: 8px; padding: 10px 14px; border: 1px solid var(--line);
+    display: flex; align-items: center; gap: 12px; font-size: 13.5px;
+  }
+  .stack .layer .num {
+    width: 24px; height: 24px; border-radius: 50%; background: var(--panel-2); color: var(--accent);
+    display: inline-flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; font-size: 12px;
+  }
+  .layer.baseline { background: linear-gradient(90deg, #1a1f2c 0%, #161a22 100%); }
+  .layer.queue { background: linear-gradient(90deg, #1d2a3a 0%, #161a22 100%); }
+  .layer.handle { background: linear-gradient(90deg, #2a1d3a 0%, #161a22 100%); }
+  .layer.result { background: linear-gradient(90deg, #1d3a2c 0%, #161a22 100%); border-color: #295a3a; }
+  .layer .label { color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .arrow { color: var(--muted); font-size: 18px; text-align: center; padding: 2px 0; }
+  .pipeflow {
+    display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 8px; align-items: center;
+    font-family: ui-monospace, monospace; font-size: 12.5px;
+  }
+  .pipeflow .box { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; text-align: center; }
+  .pipeflow .sep { color: var(--muted); font-size: 18px; text-align: center; }
+  .legend { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .tag { display: inline-block; padding: 1px 7px; border-radius: 4px; font-size: 11.5px; background: #1d2a3a; color: var(--accent); margin-right: 4px; }
+  .check { color: var(--good); }
+  .x { color: var(--bad); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<span class="kicker">Temporal primitives · session note</span>
+<h1>Temporal queues &amp; options — per-activity routing, per-queue tuning, worker-runtime profiles</h1>
+<p class="lede">The companion to <a href="id-and-naming.html" style="color:var(--accent)">id-and-naming.html</a>. Where the ID work was about <em>identity</em>, this work is about <em>knobs</em>: which task queue an activity dispatches to, what timeouts and retry policy apply, how the worker process itself is tuned. Three independent config layers, each addressing a real operational pain.</p>
+
+<h2>1. The three things this layer lets you do</h2>
+
+<div class="row">
+  <div class="card">
+    <span class="pill after">CAPABILITY #1</span>
+    <h3 style="margin-top:8px">Route by activity and by handle</h3>
+    <p>Send each activity (and optionally each handle within an activity) to a dedicated task queue. Isolate GPU-bound image-gen runners from cheap LLM workers, route a specific OCR backend to a dedicated queue, scale OpenAI vs Anthropic pools independently.</p>
+  </div>
+  <div class="card">
+    <span class="pill after">CAPABILITY #2</span>
+    <h3 style="margin-top:8px">Tune dispatch per queue and per handle</h3>
+    <p>Set <code>start_to_close_timeout</code>, retry policy, heartbeat, and rate caps per task queue. Override for a single handle when one model variant on a backend needs different tuning. The workflow's own deadline is no longer spent by a single in-flight activity.</p>
+  </div>
+  <div class="card">
+    <span class="pill after">CAPABILITY #3</span>
+    <h3 style="margin-top:8px">Specialize worker processes</h3>
+    <p>Named worker-runtime profiles bundle the <code>Worker(...)</code> tuning (slots, pollers, heartbeat throttles, graceful shutdown). One worker process picks one profile via <code>pipelex worker --profile &lt;name&gt;</code>, plus a <code>--scope</code> selecting which activities it registers.</p>
+  </div>
+</div>
+
+<h2>2. The shape of the solution — three orthogonal layers</h2>
+
+<div class="diagram">
+  <div class="pipeflow">
+    <div class="box">
+      <strong>Layer A</strong><br>
+      <span class="muted">where it goes</span><br>
+      <code>activity_queues</code>
+    </div>
+    <div class="sep">+</div>
+    <div class="box">
+      <strong>Layer B</strong><br>
+      <span class="muted">how it's dispatched</span><br>
+      <code>queue_options</code><br>
+      <code>handle_options</code>
+    </div>
+    <div class="sep">+</div>
+    <div class="box">
+      <strong>Layer C</strong><br>
+      <span class="muted">how the worker behaves</span><br>
+      <code>worker_runtime_profiles</code>
+    </div>
+  </div>
+  <p class="legend">
+    <strong>Layer A — routing.</strong> Per activity, per handle, which task queue do we dispatch to? <em>Submitter-side.</em><br>
+    <strong>Layer B — options.</strong> For that resolved queue (and optionally that specific handle), what timeouts and retry policy apply? <em>Submitter-side.</em><br>
+    <strong>Layer C — worker.</strong> Inside one worker process, how do we tune slots/pollers/heartbeats? <em>Worker-side, selected via <code>--profile</code>.</em>
+  </p>
+</div>
+
+<h2>3. Layer A — per-activity, per-handle routing</h2>
+
+<p>The <code>activity_queues</code> table on <code>WorkerConfig</code> is the entry point. Each entry declares a default queue for one activity and an optional <code>by_handle</code> map keyed by runtime handle (LLM model handle, image-gen handle, extract handle).</p>
+
+<pre><span class="mono"># pipelex.toml
+[temporal.worker_config]
+default_task_queue = "temporal_task_queue"
+default_activity_start_to_close_timeout = "0:10:00"
+
+# Route LLM text by model family. Anthropic runs on a dedicated pool;
+# everything else falls back to the activity default.
+[temporal.worker_config.activity_queues.act_llm_gen_text]
+default = "llm-default-queue"
+by_handle = {
+  "claude-4.6-sonnet" = "anthropic-queue",
+  "claude-4.6-opus"   = "anthropic-queue",
+  "gpt-5.1"           = "openai-queue",
+}
+
+# Image generation on a GPU pool.
+[temporal.worker_config.activity_queues.act_img_gen_images]
+default = "img-gen-gpu-queue"
+
+# Extract: route Azure Doc Intel separately from Mistral OCR.
+[temporal.worker_config.activity_queues.act_extract_gen_extract_pages]
+default = "extract-default-queue"
+by_handle = { "azure-doc-intel" = "extract-azure-queue" }</span></pre>
+
+<h3>The resolver — three steps, last-wins</h3>
+<pre class="mono"><span style="color:var(--accent)">WorkerConfig.resolve_queue</span>(activity_name, routing_key) -&gt; str | None
+
+  1. activity_queues[activity_name].by_handle[routing_key]   <span class="muted"># most specific</span>
+  2. activity_queues[activity_name].default                  <span class="muted"># activity-level default</span>
+  3. self.default_task_queue                                 <span class="muted"># worker-wide default</span></pre>
+
+<div class="note">
+  <strong>Hybrid fallback semantic.</strong> When <code>activity_queues</code> is <em>fully empty</em> (default config, no routing configured), <code>resolve_queue</code> returns <code>None</code> — and the dispatch path then <em>omits</em> the <code>task_queue</code> kwarg so Temporal routes the activity to the workflow's own queue. This preserves the pre-v1 single-queue default and the <code>with_conditional_worker</code> test pattern. As soon as any <code>activity_queues</code> entry exists, the operator has opted into routing topology and unmapped activities fall back explicitly to <code>default_task_queue</code>.
+</div>
+
+<h2>4. Layer B — per-queue and per-handle options</h2>
+
+<p><code>queue_options</code> declares the submitter options (timeouts, retry policy, queue-level rate cap) for one task queue. <code>handle_options</code> (inside an <code>activity_queues</code> entry) declares the rare per-handle override on top of the queue's options.</p>
+
+<pre><span class="mono"># pipelex.toml — queue-level submitter options
+[temporal.queue_options.temporal_task_queue]
+start_to_close_timeout = "0:10:00"
+heartbeat_timeout      = "0:01:00"
+max_task_queue_activities_per_second = 1000
+
+[temporal.queue_options.anthropic-queue]
+start_to_close_timeout = "0:05:00"
+heartbeat_timeout      = "0:01:00"
+max_task_queue_activities_per_second = 50
+[temporal.queue_options.anthropic-queue.retry_policy_config]
+initial_interval     = "0:00:01"
+backoff_coefficient  = 2.0
+maximum_interval     = "0:01:00"
+maximum_attempts     = 5
+# IMPORTANT: overlay uses ``_extra`` (additive), not the baseline field name.
+non_retryable_error_types_extra = ["AnthropicAuthError"]
+
+[temporal.queue_options.img-gen-gpu-queue]
+start_to_close_timeout = "0:30:00"     # GPU calls take longer
+heartbeat_timeout      = "0:02:00"
+max_task_queue_activities_per_second = 10
+
+# Rare per-handle override for ONE long-context model on the anthropic queue
+[temporal.worker_config.activity_queues.act_llm_gen_text.handle_options."claude-4.6-opus"]
+start_to_close_timeout = "0:15:00"</span></pre>
+
+<h3>Resolution — three layers, last-wins for scalars</h3>
+<div class="diagram">
+  <div class="stack">
+    <div class="layer baseline">
+      <span class="num">1</span>
+      <div>
+        <span class="label">baseline</span><br>
+        <code>worker_config.default_activity_start_to_close_timeout</code><br>
+        <code>worker_config.default_activity_heartbeat_timeout</code><br>
+        <code>worker_config.retry_policy_config</code>
+      </div>
+    </div>
+    <div class="arrow">↓ overlay</div>
+    <div class="layer queue">
+      <span class="num">2</span>
+      <div>
+        <span class="label">queue_options[resolved_queue]</span><br>
+        Per-queue timeouts, retry overlay, queue-level rate cap.
+      </div>
+    </div>
+    <div class="arrow">↓ overlay</div>
+    <div class="layer handle">
+      <span class="num">3</span>
+      <div>
+        <span class="label">activity_queues[activity].handle_options[handle]</span><br>
+        Per-handle timeout / retry override for a single model variant.
+      </div>
+    </div>
+    <div class="arrow">↓ result</div>
+    <div class="layer result">
+      <span class="num">✓</span>
+      <div>
+        <span class="label">DispatchOptions</span><br>
+        <code>task_queue</code> · <code>start_to_close_timeout</code> · <code>schedule_to_close_timeout</code> · <code>schedule_to_start_timeout</code> · <code>heartbeat_timeout</code> · <code>retry_policy</code>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3>The additive rule for non_retryable_error_types</h3>
+<p>Scalars (timeouts, attempts, intervals) are <strong>last-wins</strong>. <code>non_retryable_error_types</code> is <strong>additive</strong> — every layer can only <em>add</em> to the no-retry list, never remove from it. The schema enforces this asymmetry by splitting the retry-policy model in two:</p>
+
+<table>
+  <thead><tr><th>Layer</th><th>Class</th><th>Field</th></tr></thead>
+  <tbody>
+    <tr><td>Baseline only</td><td><code>RetryPolicyConfig</code></td><td><code>non_retryable_error_types: list[str]</code> — the main list</td></tr>
+    <tr><td>Queue / handle overlay</td><td><code>RetryPolicyConfigOverlay</code></td><td><code>non_retryable_error_types_extra: list[str]</code> — additive</td></tr>
+  </tbody>
+</table>
+<p>Pydantic's <code>extra="forbid"</code> rejects the wrong field on each layer, so a config like <code>queue_options.foo.retry_policy_config.non_retryable_error_types = [...]</code> fails at load time with a clear validation error — you can't accidentally bypass the additive rule.</p>
+
+<h3>The resolver in code</h3>
+<pre class="mono"><span style="color:var(--accent)">WorkerConfig.resolve_dispatch</span>(activity_name, routing_key, queue_options_by_queue, is_traced) -&gt; <span style="color:var(--accent-2)">DispatchOptions</span>
+
+@dataclass
+class <span style="color:var(--accent-2)">DispatchOptions</span>:
+    task_queue: str | None                         <span class="muted"># None ⇒ omit kwarg, ride workflow's queue</span>
+    start_to_close_timeout: timedelta
+    retry_policy: RetryPolicy
+    schedule_to_close_timeout: timedelta | None = None
+    schedule_to_start_timeout: timedelta | None = None
+    heartbeat_timeout: timedelta | None = None
+
+    def <span style="color:var(--accent)">to_execute_kwargs</span>(self) -&gt; dict[str, Any]:
+        <span class="muted"># Splat into workflow.execute_activity(...) — omits keys whose value is None
+        # so the Temporal SDK's own defaults kick in rather than receiving None.</span>
+        ...</pre>
+
+<div class="note">
+  <strong>queue_options without activity_queues — the asymmetry.</strong> If <code>activity_queues</code> is empty (no routing topology) but <code>queue_options[default_task_queue]</code> exists, the resolver <em>still</em> applies that queue's overlay. This lets single-queue deployments tune timeouts/retry/rate without opting into the routing model. Dispatch returns <code>task_queue=None</code> (activity rides the workflow's own queue) but the queue's options still flow through.
+</div>
+
+<h2>5. The call-site shape</h2>
+
+<p>Every <code>workflow.execute_activity(...)</code> in <code>ContentGeneratorInWorkflow</code> splats the resolver output. One uniform pattern across LLM, image-gen, jinja2, and extract calls:</p>
+
+<pre class="mono"><span style="color:var(--accent)">async def</span> make_llm_text(self, job_metadata, llm_setting_main, llm_prompt_for_text):
+    worker_config = get_config().temporal.worker_config
+    dispatch_kwargs = worker_config.resolve_dispatch(
+        activity_name=act_llm_gen_text.__name__,
+        routing_key=llm_assignment.llm_handle,                             <span class="muted"># for by_handle / handle_options</span>
+        queue_options_by_queue=get_config().temporal.queue_options,
+        is_traced=get_config().temporal.temporal_config.temporal_log_config.is_dispatch_resolution_traced,
+    ).to_execute_kwargs()
+    <span style="color:var(--accent)">return await</span> workflow.execute_activity(
+        act_llm_gen_text,
+        arg=llm_assignment,
+        summary=build_activity_summary("LLM text", job_metadata,
+                                       extras={"model": llm_assignment.llm_handle}),
+        **dispatch_kwargs,    <span class="muted"># task_queue + start_to_close + schedule_to_close + heartbeat + retry_policy</span>
+    )</pre>
+
+<h2>6. Layer C — worker-runtime profiles</h2>
+
+<p>A single worker process selects one named profile via <code>pipelex worker --profile &lt;name&gt;</code>. The profile bundles every <code>Worker(...)</code> constructor knob.</p>
+
+<pre><span class="mono">[temporal.worker_runtime_profiles]
+default_profile = "balanced"
+
+[temporal.worker_runtime_profiles.profiles.balanced]
+tuning_mode = "explicit"
+max_cached_workflows               = 1000
+max_concurrent_workflow_tasks      = 100
+max_concurrent_activities          = 100
+max_concurrent_local_activities    = 100
+max_concurrent_workflow_task_polls = 5
+max_concurrent_activity_task_polls = 5
+max_activities_per_second          = 1000          # worker-local rate cap
+sticky_queue_schedule_to_start_timeout = "0:00:10"
+max_heartbeat_throttle_interval        = "0:01:00"
+default_heartbeat_throttle_interval    = "0:00:30"
+graceful_shutdown_timeout              = "0:00:30"
+
+# Router profile — workflow-only, no activities at all.
+[temporal.worker_runtime_profiles.profiles.router]
+tuning_mode = "explicit"
+max_cached_workflows               = 2000
+max_concurrent_workflow_tasks      = 200
+max_concurrent_activities          = 0             # 👈 ge=0 allows workflow-only workers
+max_concurrent_local_activities    = 0
+max_concurrent_workflow_task_polls = 10
+max_concurrent_activity_task_polls = 0
+max_activities_per_second          = 1
+sticky_queue_schedule_to_start_timeout = "0:00:10"
+max_heartbeat_throttle_interval        = "0:01:00"
+default_heartbeat_throttle_interval    = "0:00:30"
+graceful_shutdown_timeout              = "0:00:30"
+
+# GPU profile — small slot count, long heartbeats
+[temporal.worker_runtime_profiles.profiles.gpu]
+tuning_mode = "explicit"
+max_cached_workflows               = 100
+max_concurrent_workflow_tasks      = 10
+max_concurrent_activities          = 4             # GPU memory-bound
+max_concurrent_local_activities    = 0
+max_concurrent_workflow_task_polls = 2
+max_concurrent_activity_task_polls = 2
+max_activities_per_second          = 10
+sticky_queue_schedule_to_start_timeout = "0:00:30"
+max_heartbeat_throttle_interval        = "0:05:00"
+default_heartbeat_throttle_interval    = "0:01:00"
+graceful_shutdown_timeout              = "0:01:00"</span></pre>
+
+<p>Boot a specialized worker:</p>
+<pre class="mono">$ pipelex worker --task-queue img-gen-gpu-queue --profile gpu --scope runner-img-gen
+$ pipelex worker --task-queue temporal_task_queue   --profile router  --scope router
+$ pipelex worker --task-queue anthropic-queue       --profile balanced --scope runner-llm</pre>
+
+<p>Scopes (specialized worker scopes from the same diff): <code>runner-llm</code>, <code>runner-img-gen</code>, <code>runner-extract</code>, <code>runner-jinja2</code>. Each scope registers only its activities. <code>act_render_page_views</code> is registered under both <code>runner-img-gen</code> and <code>runner-extract</code> (belt-and-suspenders for the two paths that need it).</p>
+
+<h2>7. Strict CLI validation</h2>
+
+<p><code>pipelex worker --task-queue X</code> now fast-fails if <code>X</code> isn't declared anywhere — <code>default_task_queue</code>, any <code>activity_queues</code> entry, or any <code>queue_options</code> key. With a Levenshtein "did you mean?" suggestion.</p>
+
+<pre class="mono">$ pipelex worker --task-queue antrhopic-queue
+WorkerTaskQueueUnknownError: task queue 'antrhopic-queue' is not declared in config.
+  Known queues: ['anthropic-queue', 'img-gen-gpu-queue', 'openai-queue',
+                 'temporal_task_queue', 'extract-default-queue', 'extract-azure-queue']
+  Did you mean: 'anthropic-queue'?</pre>
+
+<p>This is the strict counterpart to the lenient WARN at config-load on <code>activity_queues</code> entries that name unknown queues. Routing config can be sloppy in one direction (warn); the worker boot picks one queue and that one must exist (fail).</p>
+
+<h2>8. Dispatch resolution tracing</h2>
+
+<p>Flip a config flag to see exactly which layer each scalar came from on every activity call:</p>
+
+<pre><span class="mono">[temporal.temporal_config.temporal_log_config]
+is_dispatch_resolution_traced = true</span></pre>
+
+<pre class="mono">INFO  dispatch  act_llm_gen_text  routing_key=claude-4.6-opus
+        task_queue=anthropic-queue            (activity_queues.by_handle)
+        start_to_close_timeout=0:15:00        (handle_options)
+        heartbeat_timeout=0:01:00             (queue_options)
+        retry.maximum_attempts=5              (queue_options)
+        retry.non_retryable=['AnthropicAuthError','OAIBillingError']  (baseline + queue_extra)</pre>
+
+<p>Off by default — verbose; turn it on when debugging mis-tuned timeouts or a queue that shouldn't be receiving traffic.</p>
+
+<h2>9. Workflow timeout vs activity timeout — separated</h2>
+
+<p>Two distinct budgets, set in distinct places:</p>
+
+<ul class="tight">
+  <li><code>workflow_execution_timeout</code> on <code>WorkerConfig</code> bounds the workflow as a whole.</li>
+  <li><code>default_activity_start_to_close_timeout</code> on <code>WorkerConfig</code> (ships at 10 min) is the baseline budget on each activity call.</li>
+  <li><code>queue_options[&lt;queue&gt;].start_to_close_timeout</code> overrides the activity budget per queue.</li>
+  <li><code>handle_options[&lt;handle&gt;].start_to_close_timeout</code> overrides it for one specific handle when the queue baseline doesn't fit.</li>
+</ul>
+
+<p>Each kind of activity ends up with a timeout shaped to its real cost — a jinja2 render fails fast, a slow PDF extract gets the headroom it actually needs, and the workflow's own deadline isn't spent by a single in-flight activity.</p>
+
+<h2>10. Rate caps live in two distinct places</h2>
+
+<table>
+  <thead><tr><th>Knob</th><th>Where</th><th>Semantics</th></tr></thead>
+  <tbody>
+    <tr><td><code>max_task_queue_activities_per_second</code></td><td><code>[temporal.queue_options.&lt;queue&gt;]</code></td><td>Cluster-wide cap on this queue. Conveyed to the Temporal server by every worker on the queue. Latest value wins.</td></tr>
+    <tr><td><code>max_activities_per_second</code></td><td><code>[temporal.worker_runtime_profiles.profiles.&lt;name&gt;]</code></td><td>Worker-local cap on this <em>process</em>. Caps what one worker pulls regardless of cluster headroom.</td></tr>
+  </tbody>
+</table>
+
+<p>The shipping default <code>[temporal.queue_options.temporal_task_queue]</code> sets <code>max_task_queue_activities_per_second = 1000</code>. Deployments using non-default queue names should add their own <code>[temporal.queue_options.&lt;queue&gt;]</code> entries with the cap appropriate for that backend pool.</p>
+
+<h2>11. The whole picture, in one example</h2>
+
+<p>Say someone calls a pipe whose router needs an Anthropic Opus completion. Here's the trace from submit to the wire:</p>
+
+<div class="diagram">
+  <ol style="font-family: ui-monospace, monospace; font-size: 12.5px; line-height: 1.7; padding-left: 22px;">
+    <li><span class="muted">// inside WfPipeRouter:</span> <code>content_generator.make_llm_text(...)</code></li>
+    <li><span class="muted">// llm_assignment.llm_handle resolves to</span> <code>"claude-4.6-opus"</code></li>
+    <li><code>worker_config.resolve_dispatch("act_llm_gen_text", routing_key="claude-4.6-opus", queue_options_by_queue=...)</code></li>
+    <li>&nbsp;&nbsp;<span class="muted">// step 1:</span> <code>resolve_queue</code> → <code>activity_queues["act_llm_gen_text"].by_handle["claude-4.6-opus"]</code> = <span style="color:var(--accent)">"anthropic-queue"</span></li>
+    <li>&nbsp;&nbsp;<span class="muted">// step 2:</span> overlay <code>queue_options["anthropic-queue"]</code> → <code>start_to_close=5m, heartbeat=1m, retry: 5 attempts, +AnthropicAuthError</code></li>
+    <li>&nbsp;&nbsp;<span class="muted">// step 3:</span> overlay <code>activity_queues["act_llm_gen_text"].handle_options["claude-4.6-opus"]</code> → <code>start_to_close=15m</code> (longer context)</li>
+    <li>&nbsp;&nbsp;<span class="muted">// step 4:</span> non_retryable composed additively: <span style="color:var(--good)">baseline + queue._extra + handle._extra</span></li>
+    <li>→ <code>DispatchOptions(task_queue="anthropic-queue", start_to_close_timeout=15m, heartbeat_timeout=1m, retry_policy=&lt;5 attempts, no-retry: [...]&gt;)</code></li>
+    <li><code>workflow.execute_activity(act_llm_gen_text, **dispatch_kwargs, summary="LLM text · pipe=translate_doc · model=claude-4.6-opus")</code></li>
+    <li>→ Temporal server routes the task to a worker polling <code>anthropic-queue</code> with the <code>balanced</code> profile.</li>
+  </ol>
+</div>
+
+<h2>12. Where to look</h2>
+
+<ul class="tight">
+  <li>Config models: <code>pipelex/temporal/config_temporal.py</code> — <code>WorkerConfig</code>, <code>QueueOptions</code>, <code>HandleOptions</code>, <code>ActivityRouteConfig</code>, <code>WorkerRuntimeProfile</code>, <code>DispatchOptions</code></li>
+  <li>The two resolvers: <code>WorkerConfig.resolve_queue</code> and <code>WorkerConfig.resolve_dispatch</code> in the same file</li>
+  <li>Call sites that splat the resolver output: <code>pipelex/temporal/tprl_content_generation/content_generator_in_workflow.py</code> — every <code>make_*</code> method</li>
+  <li>Defaults: <code>pipelex/pipelex.toml</code> under <code>[temporal.worker_config]</code>, <code>[temporal.queue_options.*]</code>, <code>[temporal.worker_runtime_profiles.*]</code></li>
+  <li>Override invitations: <code>.pipelex/pipelex.toml</code> ships the same blocks commented out</li>
+  <li>Companion note: <a href="id-and-naming.html" style="color:var(--accent)">id-and-naming.html</a> — Workflow IDs, child IDs, activity IDs, search attributes, summaries</li>
+</ul>
+
+</div>
+</body>
+</html>

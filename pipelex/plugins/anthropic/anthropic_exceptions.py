@@ -1,9 +1,4 @@
-from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory
-
-
-class AnthropicCredentialsError(CogtError):
-    error_category = InferenceErrorCategory.CONFIGURATION
-    user_action = "Check that your Anthropic API key is valid and correctly configured"
+from pipelex.cogt.exceptions import CogtError
 
 
 class AnthropicModelListingError(CogtError):

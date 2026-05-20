@@ -124,22 +124,18 @@ bedrock_access_variant = "aws_access"
 ####################################################################################################
 
 [cogt]
+transport_max_retries = 2
 
 [cogt.model_deck_config]
 is_model_fallback_enabled = true
 missing_presets_reaction = "log"
-
-[cogt.tenacity_config]
-max_retries = 50      # Maximum number of retry attempts before giving up
-wait_multiplier = 0.2 # Multiplier applied to the wait time between retries (in seconds)
-wait_max = 20         # Maximum wait time between retries (in seconds)
-wait_exp_base = 1.3   # Base for exponential backoff calculation
 
 [cogt.llm_config]
 default_max_images = 100
 is_structure_prompt_enabled = true
 is_dump_text_prompts_enabled = false
 is_dump_response_text_enabled = false
+schema_reask_max_attempts = 3
 
 [cogt.llm_config.instructor_config]
 is_dump_kwargs_enabled = false
@@ -185,9 +181,6 @@ high = "reasoning"
 xhigh = "reasoning"
 max = "reasoning"
 
-[cogt.llm_config.llm_job_config]
-max_retries = 3
-
 [cogt.llm_config.effort_to_budget_maps.anthropic]
 none = 0      # Required by validator; unreachable at runtime (level map gates NONE as disabled before budget lookup)
 minimal = 512
@@ -207,33 +200,7 @@ xhigh = 32768
 max = 65536
 
 [cogt.llm_config.generic_templates]
-structure_from_preliminary_text_system = """
-You are a data modeling expert specialized in extracting structure from text.
-"""
-
-structure_from_preliminary_text_user = """
-Extract and structure information from this text:
-
-{{ preliminary_text | tag }}
-
-Now generate the JSON in the required format.
-Do not create information that is not in the text.
-"""
-
 output_structure_prompt = """
-
-
----
-The instance we want to generate will be for the following class:
-{{ class_structure_str }}
-
-Don't bother with JSON formatting, we'll do that as a second step.
-For now, just output markdown with the details of the instance.
-DO NOT create new information.
-If some information is not present for an attribute, output the default value or None according to the field definition.
-"""
-
-output_structure_prompt_no_preliminary_text = """
 
 
 ---
@@ -242,6 +209,13 @@ The instance we want to generate will be for the following class:
 
 DO NOT create information.
 If some information is not present for an attribute, output the default value or None according to the attribute definition.
+"""
+
+structuring_prompt = """
+Read the following text carefully and produce the requested structured output from it.
+
+---
+{{ text }}
 """
 
 ####################################################################################################
@@ -295,9 +269,6 @@ anthropic = { tag_style = "xml" }
 mistral = { tag_style = "square_brackets" }
 gemini = { tag_style = "xml" }
 
-[pipelex.structure_config]
-is_default_text_then_structure = false # turn this to true to get better results: generates text before structuring
-
 ####################################################################################################
 # Pipe run config
 ####################################################################################################
@@ -313,6 +284,11 @@ pipe_stack_limit = 20
 is_normalize_data_urls_to_storage = true
 is_mock_inputs = false
 is_generate_graph = true
+
+# Bounded fan-out concurrency for PipeBatch: at most this many branches run at once.
+# A modest default keeps a large workload (one pipe over many items) from overwhelming
+# asyncio, memory, and provider rate limits. Set to "unbounded" to disable the bound.
+max_concurrency = 8
 
 [pipelex.pipeline_execution_config.graph_config]
 
@@ -434,6 +410,7 @@ img_gen = "model"
 llm_handle = "model"
 llm = "model"
 llm_to_structure = "model_to_structure"
+task_queue = "default_task_queue"
 
 [migration.migration_maps.mthds]
 img_gen = "model"
@@ -467,6 +444,17 @@ preferred_agent_targets = ["claude", "agents"]
 [temporal]
 is_enabled = false
 
+[temporal.search_attributes]
+# Master toggle. When false, workflow starts don't attach any custom search
+# attributes, the worker-boot check is skipped, and the dashboard view falls
+# back to WorkflowType / WorkflowId / StartTime only.
+enabled = true
+# Subset of the five built-in attributes to populate. Names not in this list
+# are skipped at workflow-start time AND not required at worker boot. Pipelex
+# only knows how to populate these five; arbitrary custom names are out of
+# scope (they would require code that knows the value source).
+attributes = ["PipeCode", "PipelineRunId", "SessionId", "UserId", "DomainCode"]
+
 [temporal.payload_codec_config]
 is_enabled = false
 size_threshold = 1_048_576
@@ -480,12 +468,16 @@ uri_format = "{hash}"
 local_storage_path = ".pipelex/temporal-payload-store"
 
 [temporal.worker_config]
-task_queue = "temporal_task_queue"
-workflow_execution_timeout = "1:00:00"
+default_task_queue = "temporal_task_queue"
+workflow_execution_timeout = "1:00:00"     # for the workflow itself (NOT used as activity timeout)
 run_timeout = "1:00:00"
 task_timeout = "0:00:10"
 start_delay = "0:00:00"
 rpc_timeout = "1:00:00"
+# Baseline activity timeout used when no per-queue or per-handle overlay applies.
+default_activity_start_to_close_timeout = "0:10:00"
+
+[temporal.worker_config.activity_queues]
 
 [temporal.worker_config.retry_policy_config]
 initial_interval = "0:00:03"
@@ -500,6 +492,46 @@ non_retryable_error_types = [
   "ModelNotFoundError",
   "ValidationError",
 ]
+# Per-queue and per-handle overlays contribute `non_retryable_error_types_extra`
+# lists; the dispatch resolver unions them on top of the baseline above. That
+# field belongs only on overlays — adding it here would be silently dropped by
+# the resolver, so the baseline schema (RetryPolicyConfig) deliberately does
+# not accept it.
+
+# Per-queue submitter options. Operators populate this when a backend pool
+# needs its own timeout or retry tuning. See pipelex/kit/configs/pipelex.toml
+# for examples.
+[temporal.queue_options]
+
+# Default cluster-wide rate cap on the worker's home queue. Mirrors the pre-v2
+# hardcoded ``max_task_queue_activities_per_second=1000`` on ``Worker(...)`` so
+# existing deployments on ``temporal_task_queue`` keep the same Temporal-server-
+# enforced cap. Deployments using non-default queue names should add their own
+# ``[temporal.queue_options.<queue>]`` entries. The empty-routing hybrid
+# fallback applies these overlays to activities dispatched without an explicit
+# task_queue too.
+[temporal.queue_options.temporal_task_queue]
+max_task_queue_activities_per_second = 1000
+
+# Named worker-runtime profiles. A worker process selects one via --profile.
+# Defaults are lifted verbatim from the pre-v2 hardcoded Worker(...) construction
+# so out-of-the-box behavior is unchanged.
+[temporal.worker_runtime_profiles]
+default_profile = "default"
+
+[temporal.worker_runtime_profiles.profiles.default]
+tuning_mode = "explicit"
+max_cached_workflows = 10000
+max_concurrent_workflow_tasks = 1000
+max_concurrent_activities = 1000
+max_concurrent_local_activities = 1000
+max_concurrent_workflow_task_polls = 100
+max_concurrent_activity_task_polls = 100
+max_activities_per_second = 1000
+sticky_queue_schedule_to_start_timeout = "0:30:00"
+max_heartbeat_throttle_interval = "1:00:00"
+default_heartbeat_throttle_interval = "1:00:00"
+graceful_shutdown_timeout = "0:30:00"
 
 [temporal.temporal_config]
 selected_server = "local"
@@ -532,6 +564,11 @@ managed_loggers = [
   "temporalio.workflow",
   "temporalio.worker._activity",
 ]
+# When true, every workflow.execute_activity dispatch logs the resolved queue +
+# timeout + retry along with the layer each value came from (baseline /
+# queue_options / handle_options). Verbose — enable when debugging mis-tuned
+# timeouts.
+is_dispatch_resolution_traced = false
 
 [temporal.worker_scopes]
 default_scope = "full"
@@ -562,6 +599,56 @@ disable_all_activities = true
 required_tasks_packs = ["crafting", "pipe"]
 required_workflows = []
 required_activities = []
+excluded_workflows = []
+excluded_activities = []
+disable_all_workflows = true
+disable_all_activities = false
+
+# Specialized activity-only scopes for deployment manifests with one worker pool
+# per backend class. Each registers only the activities its name implies — paired
+# with `--task-queue <q>` so the worker pulls only its class of work.
+#
+# Note: `act_render_page_views` is intentionally listed under BOTH `runner-img-gen`
+# (used by single-image / image-list generation paths that may render a layout view)
+# AND `runner-extract` (used by the `make_extract_pages` two-activity branch that
+# pairs OCR with page-view rendering). Belt-and-suspenders: both scopes can render
+# pages, so neither breaks if routing sends the activity to either.
+
+[temporal.worker_scopes.scopes.runner-llm]
+required_tasks_packs = []
+required_workflows = []
+required_activities = [
+  "act_llm_gen_text",
+  "act_llm_gen_object",
+  "act_llm_gen_object_list",
+]
+excluded_workflows = []
+excluded_activities = []
+disable_all_workflows = true
+disable_all_activities = false
+
+[temporal.worker_scopes.scopes.runner-img-gen]
+required_tasks_packs = []
+required_workflows = []
+required_activities = ["act_img_gen_images", "act_render_page_views"]
+excluded_workflows = []
+excluded_activities = []
+disable_all_workflows = true
+disable_all_activities = false
+
+[temporal.worker_scopes.scopes.runner-extract]
+required_tasks_packs = []
+required_workflows = []
+required_activities = ["act_extract_gen_extract_pages", "act_render_page_views"]
+excluded_workflows = []
+excluded_activities = []
+disable_all_workflows = true
+disable_all_activities = false
+
+[temporal.worker_scopes.scopes.runner-jinja2]
+required_tasks_packs = []
+required_workflows = []
+required_activities = ["act_jinja2_gen_text"]
 excluded_workflows = []
 excluded_activities = []
 disable_all_workflows = true

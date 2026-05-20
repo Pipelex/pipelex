@@ -316,7 +316,7 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
         # Get type hints
         try:
             type_hints = get_type_hints(the_function)
-        except Exception as exc:
+        except (NameError, TypeError) as exc:
             return f"could not get type hints: {exc}"
 
         # Check parameter type annotation

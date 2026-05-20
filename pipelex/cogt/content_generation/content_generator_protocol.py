@@ -9,7 +9,6 @@ from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
@@ -49,49 +48,23 @@ class ContentGeneratorProtocol(Protocol):
         job_metadata: JobMetadata,
         llm_setting_main: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
-        wfid: str | None = None,
     ) -> Coroutine[Any, Any, str]: ...
 
-    def make_object_direct(
+    def make_object(
         self,
         job_metadata: JobMetadata,
         object_class: type[BaseModelTypeVar],
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_object: LLMPrompt,
-        wfid: str | None = None,
     ) -> Coroutine[Any, Any, BaseModelTypeVar]: ...
 
-    def make_text_then_object(
-        self,
-        job_metadata: JobMetadata,
-        object_class: type[BaseModelTypeVar],
-        llm_setting_main: LLMSetting,
-        llm_setting_for_object: LLMSetting,
-        llm_prompt_for_text: LLMPrompt,
-        llm_prompt_factory_for_object: LLMPromptFactoryAbstract | None = None,
-        wfid: str | None = None,
-    ) -> Coroutine[Any, Any, BaseModelTypeVar]: ...
-
-    def make_object_list_direct(
+    def make_object_list(
         self,
         job_metadata: JobMetadata,
         object_class: type[BaseModelTypeVar],
         llm_setting_for_object_list: LLMSetting,
         llm_prompt_for_object_list: LLMPrompt,
         nb_items: int | None = None,
-        wfid: str | None = None,
-    ) -> Coroutine[Any, Any, list[BaseModelTypeVar]]: ...
-
-    def make_text_then_object_list(
-        self,
-        job_metadata: JobMetadata,
-        object_class: type[BaseModelTypeVar],
-        llm_setting_main: LLMSetting,
-        llm_setting_for_object_list: LLMSetting,
-        llm_prompt_for_text: LLMPrompt,
-        llm_prompt_factory_for_object_list: LLMPromptFactoryAbstract | None = None,
-        nb_items: int | None = None,
-        wfid: str | None = None,
     ) -> Coroutine[Any, Any, list[BaseModelTypeVar]]: ...
 
     async def make_image_content(
@@ -114,7 +87,6 @@ class ContentGeneratorProtocol(Protocol):
         img_gen_prompt: ImgGenPrompt,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
-        wfid: str | None = None,
     ) -> Coroutine[Any, Any, ImageContent]: ...
 
     def make_image_list(
@@ -125,7 +97,6 @@ class ContentGeneratorProtocol(Protocol):
         nb_images: int,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
-        wfid: str | None = None,
     ) -> Coroutine[Any, Any, list[ImageContent]]: ...
 
     def make_templated_text(
@@ -135,7 +106,6 @@ class ContentGeneratorProtocol(Protocol):
         template: str,
         templating_style: TemplatingStyle | None = None,
         template_category: TemplateCategory | None = None,
-        wfid: str | None = None,
     ) -> Coroutine[Any, Any, str]: ...
 
     def make_render_page_views(
@@ -145,7 +115,6 @@ class ContentGeneratorProtocol(Protocol):
         extract_handle: str,
         extract_job_params: ExtractJobParams | None = None,
         extract_job_config: ExtractJobConfig | None = None,
-        wfid: str | None = None,
     ) -> Coroutine[Any, Any, list[ImageContent]]: ...
 
     def make_extract_pages(
@@ -155,5 +124,4 @@ class ContentGeneratorProtocol(Protocol):
         extract_handle: str,
         extract_job_params: ExtractJobParams,
         extract_job_config: ExtractJobConfig,
-        wfid: str | None = None,
     ) -> Coroutine[Any, Any, list[PageContent]]: ...

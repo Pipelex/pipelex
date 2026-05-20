@@ -174,6 +174,7 @@ def graph_render_cmd(
             )
 
     except Exception as exc:
+        # CLI command root: any unexpected failure is reported to the user and exits non-zero via typer.Exit.
         log.error(f"Error rendering graph: {exc}")
         console = get_console()
         console.print("\n[bold red]Failed to render graph[/bold red]\n")

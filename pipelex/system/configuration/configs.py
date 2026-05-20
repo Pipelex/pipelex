@@ -1,3 +1,5 @@
+from typing import Annotated, Literal
+
 import shortuuid
 from pydantic import Field, field_validator, model_validator
 
@@ -73,10 +75,6 @@ class DryRunConfig(ConfigModel):
             msg = "dry_run_config.image_urls must be a non-empty list"
             raise PipelexConfigError(msg)
         return value
-
-
-class StructureConfig(ConfigModel):
-    is_default_text_then_structure: bool
 
 
 class PromptingConfig(ConfigModel):
@@ -158,6 +156,10 @@ class PipelineExecutionConfig(ConfigModel):
     is_generate_graph: bool
     graph_config: GraphConfig
 
+    # Bounded fan-out concurrency for PipeBatch (the resilience-without-Temporal pillar).
+    # An integer caps the number of branches executed at once; the literal "unbounded" disables the bound.
+    max_concurrency: Annotated[int, Field(ge=1)] | Literal["unbounded"]
+
     def with_graph_config_overrides(
         self,
         generate_graph: bool | None = None,
@@ -206,7 +208,6 @@ class Pipelex(ConfigModel):
     log_config: LogConfig
     aws_config: AwsConfig
 
-    structure_config: StructureConfig
     prompting_config: PromptingConfig
     mthds_config: MthdsConfig
 
