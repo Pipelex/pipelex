@@ -216,7 +216,10 @@ async def _execute_run(
     reporting_config = get_config().pipelex.reporting_config
     effective_cost_report = reporting_config.is_log_costs_to_console if cost_report is None else cost_report
     if effective_cost_report or reporting_config.is_generate_cost_report_file_enabled:
-        get_report_delegate().generate_report()
+        try:
+            get_report_delegate().generate_report(pipeline_run_id=response.pipeline_run_id)
+        except OSError as cost_report_error:
+            log.warning(f"Cost report generation failed (run succeeded): {cost_report_error}")
 
     # Print completion recap
     console = get_console()
