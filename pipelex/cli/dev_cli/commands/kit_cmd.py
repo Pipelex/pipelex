@@ -47,17 +47,19 @@ def _sync_agent_rules(
         if unknown:
             msg = f"--targets values {unknown} are not in preferred_agent_targets {preferred_targets}"
             raise PipelexCLIError(msg)
-        preferred_targets = [target for target in preferred_targets if target in targets_filter]
+        targets_to_update: list[AgentTarget] = [target for target in preferred_targets if target in targets_filter]
+    else:
+        targets_to_update = list(preferred_targets)
 
     # The config validator guarantees CURSOR cannot coexist with other targets,
     # so a simple membership check is enough to pick the branch.
-    if AgentTarget.CURSOR in preferred_targets:
+    if AgentTarget.CURSOR in targets_to_update:
         typer.echo("Updating Cursor rules...")
         update_cursor_rules(resolved_repo_root, loaded_kit_index, agent_set=agent_set)
     else:
         all_targets = loaded_kit_index.agent_rules.targets
         filtered_targets: dict[str, Target] = {}
-        for target_key in preferred_targets:
+        for target_key in targets_to_update:
             if target_key not in all_targets:
                 msg = f"Target '{target_key}' not found in index.toml"
                 raise PipelexCLIError(msg)
@@ -73,6 +75,9 @@ def _sync_agent_rules(
 
     if cleanup:
         typer.echo("Cleaning up rules from other targets...")
+        # Cleanup keep-set must always be the full preferred_targets configured by the user,
+        # NOT the --targets subset — otherwise --targets=claude --cleanup would delete AGENTS.md
+        # for a user whose config still prefers both claude and agents.
         _cleanup_other_targets(
             repo_root=resolved_repo_root,
             kit_index=loaded_kit_index,

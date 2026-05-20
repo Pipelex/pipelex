@@ -1,6 +1,6 @@
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import typer
 import yaml
@@ -9,6 +9,11 @@ from pipelex.kit.exceptions import KitError
 from pipelex.kit.index_models import KitIndex
 from pipelex.kit.paths import get_kit_agents_dir
 from pipelex.types import Traversable
+
+# Marker written into the YAML front-matter of every Pipelex-generated .mdc file so the
+# cleanup path can identify and remove stale files even after their source markdown has
+# been removed from `pipelex/kit/agent_rules/`.
+_PIPELEX_MARKER_KEY = "pipelex_managed"
 
 
 def _iter_agent_files(agents_dir: Traversable) -> Iterable[tuple[str, str]]:
@@ -42,7 +47,30 @@ def _front_matter_for(name: str, kit_index: KitIndex) -> dict[str, Any]:
     # Remove globs if it's an empty list
     if "globs" in base and base["globs"] == []:
         del base["globs"]
+    base[_PIPELEX_MARKER_KEY] = True
     return base
+
+
+def _is_pipelex_managed(mdc_path: Path) -> bool:
+    """Return True if the .mdc file's YAML front-matter carries the Pipelex marker."""
+    try:
+        text = mdc_path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    if not text.startswith("---\n"):
+        return False
+    end = text.find("\n---\n", 4)
+    if end == -1:
+        return False
+    block = text[4:end]
+    try:
+        parsed: Any = yaml.safe_load(block)
+    except yaml.YAMLError:
+        return False
+    if not isinstance(parsed, dict):
+        return False
+    parsed_dict = cast("dict[str, Any]", parsed)
+    return parsed_dict.get(_PIPELEX_MARKER_KEY) is True
 
 
 def update_cursor_rules(repo_root: Path, kit_index: KitIndex, agent_set: str) -> None:
@@ -82,7 +110,12 @@ def update_cursor_rules(repo_root: Path, kit_index: KitIndex, agent_set: str) ->
 
 
 def remove_cursor_rules(repo_root: Path) -> None:
-    """Remove Cursor .mdc files that correspond to agent markdown files.
+    """Remove Pipelex-generated Cursor .mdc files.
+
+    Scans every .mdc file in `.cursor/rules/` and deletes the file when either:
+    - its YAML front-matter carries the Pipelex marker (`pipelex_managed: true`), or
+    - its stem matches a currently-known agent_rules source file (backward compat for
+      files generated before the marker was introduced).
 
     Args:
         repo_root: Repository root directory
@@ -94,13 +127,15 @@ def remove_cursor_rules(repo_root: Path) -> None:
         typer.echo(f"⚠️  Directory {out_dir} does not exist - nothing to remove")
         return
 
-    removed_count = 0
-    for fname, _ in _iter_agent_files(agents_dir):
-        out_path = out_dir / (fname.removesuffix(".md") + ".mdc")
+    current_stems = {fname.removesuffix(".md") for fname, _ in _iter_agent_files(agents_dir)}
 
-        if out_path.exists():
-            out_path.unlink()
-            typer.echo(f"🗑️  Deleted {out_path}")
+    removed_count = 0
+    for mdc_path in sorted(out_dir.glob("*.mdc")):
+        if not mdc_path.is_file():
+            continue
+        if _is_pipelex_managed(mdc_path) or mdc_path.stem in current_stems:
+            mdc_path.unlink()
+            typer.echo(f"🗑️  Deleted {mdc_path}")
             removed_count += 1
 
     if removed_count == 0:
