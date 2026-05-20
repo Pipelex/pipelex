@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **`pipelex run` now prints the aggregated cost table when `[pipelex.reporting_config].is_log_costs_to_console = true`, with `--cost-report/--no-cost-report` to override per invocation.** The `cost-tracking.md` and `reporting-config.md` docs both promised a summary cost table at the end of a CLI run, but `pipelex/cli/commands/run/_run_core.py` never called `get_report_delegate().generate_report()` — the flag only triggered `log.verbose(...)` lines per inference job, which the default `INFO` log level swallows, so the table never appeared. The CLI now calls `generate_report()` after a successful run when either `is_log_costs_to_console` or `is_generate_cost_report_file_enabled` is true, so the Rich table (one row per model, plus a totals row) prints right before the "✓ Pipeline execution completed successfully" recap — and the CSV export branch finally fires too. The new `--cost-report/--no-cost-report` tri-state flag (default unset → use config) lets you force the table on or off without touching `.pipelex/pipelex.toml`. Applies to `pipelex run bundle`, `pipelex run pipe`, and `pipelex run method`; works in dry-run mode as well (synthetic usage rows).
+
 ## [v0.29.0] - 2026-05-20
 
 ### Added
