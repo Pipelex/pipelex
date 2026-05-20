@@ -17,7 +17,7 @@ from pipelex.cli.dev_cli.commands.gateway_models_generator import (
 )
 from pipelex.cli.dev_cli.commands.update_gateway_models_cmd import gateway_models_reference_files
 from pipelex.hub import get_console
-from pipelex.system.pipelex_service.exceptions import RemoteConfigFetchError, RemoteConfigValidationError
+from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableError, RemoteConfigValidationError
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -68,7 +68,7 @@ def check_gateway_models_cmd(show_diff: bool = True, quiet: bool = False) -> Non
     # Fetch remote config
     try:
         model_specs = fetch_gateway_model_specs()
-    except RemoteConfigFetchError as exc:
+    except RemoteConfigUnavailableError as exc:
         if quiet:
             console.print(f"[red]✗ Gateway models check: FAILED[/red] - {escape(str(exc))}")
         else:

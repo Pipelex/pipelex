@@ -10,7 +10,7 @@ import sys
 import traceback
 from collections.abc import Callable
 from contextvars import ContextVar
-from typing import Any, NoReturn
+from typing import Any, NoReturn, cast
 
 import typer
 
@@ -18,6 +18,32 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.pipeline.validate_bundle import ValidateBundleError
 from pipelex.tools.misc.json_utils import clean_json_dumps
 from pipelex.types import StrEnum
+
+# Module-level capture for setup-time warnings (currently used by RemoteConfigStaleWarning).
+# The agent CLI factory writes here when it catches a stale-cache warning during ``Pipelex.make``
+# and ``agent_success`` reads back here to attach the ``warnings`` field to the envelope so
+# machine consumers see the provenance.
+_CAPTURED_WARNINGS: list[dict[str, Any]] = []
+
+
+def record_setup_warning(warning_payload: dict[str, Any]) -> None:
+    """Stash a structured warning for inclusion in the next ``agent_success`` envelope.
+
+    Callers pass a dict shaped like ``{"type": "RemoteConfigStale", "message": "..."}``;
+    the contents are surfaced verbatim by ``agent_success``.
+    """
+    _CAPTURED_WARNINGS.append(warning_payload)
+
+
+def consume_setup_warnings() -> list[dict[str, Any]]:
+    """Drain the captured warnings buffer. Returns whatever was recorded and clears state.
+
+    Called once per envelope so successive commands within a single Python process don't
+    re-emit yesterday's warnings.
+    """
+    drained = list(_CAPTURED_WARNINGS)
+    _CAPTURED_WARNINGS.clear()
+    return drained
 
 
 class CliOutputFormat(StrEnum):
@@ -81,9 +107,15 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "GatewayApiKeyMissingError": "Set the PIPELEX_GATEWAY_API_KEY environment variable, or disable pipelex_gateway in backends.toml",
     "GatewayDoNotTrackConflictError": "Unset the DO_NOT_TRACK environment variable, or disable pipelex_gateway in backends.toml",
     "BinaryNotFoundError": "Install pipelex-tools: uv tool install pipelex-tools",
-    "RemoteConfigFetchError": "Check internet connection and firewall settings, or disable pipelex_gateway in backends.toml",
+    "RemoteConfigUnavailableError": (
+        "Run `pipelex init` while online to prime the cache, or disable pipelex_gateway in backends.toml to operate offline (BYOK)"
+    ),
     "RemoteConfigValidationError": (
         "This is a server-side issue; report it on Discord/GitHub. Disable pipelex_gateway in backends.toml as a workaround"
+    ),
+    "GatewayUnknownModelError": (
+        "The deck references a model the gateway doesn't expose. If the source is `cached`, run `pipelex init` while online to refresh; "
+        "otherwise update the deck or check the model name."
     ),
     # API runner errors
     "ClientAuthenticationError": "Run 'pipelex-agent doctor' to check credentials, or set the PIPELEX_API_KEY environment variable",
@@ -104,7 +136,6 @@ AGENT_ERROR_HINTS: dict[str, str] = {
 # retryable=True fallback for non-CogtError error types: their ErrorReport
 # carries no `retryable`, unlike CogtError whose error_category drives it.
 RETRYABLE_ERROR_TYPES: set[str] = {
-    "RemoteConfigFetchError",
     "PipeOperatorModelAvailabilityError",
 }
 
@@ -130,6 +161,7 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     "ModelDeckPresetValidatonError": "config",
     "TelemetryConfigValidationError": "config",
     "BinaryNotFoundError": "config",
+    "GatewayUnknownModelError": "config",
     "InitConfigError": "config",
 }
 
@@ -311,10 +343,22 @@ def agent_error(message: str, error_type: str, cause: BaseException | None = Non
 def agent_success(result: dict[str, Any]) -> None:
     """Print a structured JSON success result to stdout.
 
+    Any pending setup warnings (e.g. stale gateway cache) recorded via ``record_setup_warning``
+    are drained into a top-level ``warnings`` array on the envelope so machine consumers can
+    surface them without parsing stderr. Callers may pre-populate ``result["warnings"]`` (must
+    be a list) — the captured ones are appended. The caller's ``result`` dict is NOT mutated;
+    a copy is taken before merging.
+
     Args:
         result: Dictionary to serialize as JSON.
     """
-    print(clean_json_dumps(result, indent=2))
+    captured = consume_setup_warnings()
+    envelope: dict[str, Any] = result
+    if captured:
+        existing_raw = result.get("warnings")
+        existing_warnings: list[Any] = cast("list[Any]", existing_raw) if isinstance(existing_raw, list) else []
+        envelope = {**result, "warnings": [*existing_warnings, *captured]}
+    print(clean_json_dumps(envelope, indent=2))
 
 
 def agent_success_formatted(result: dict[str, Any], markdown_renderer: Callable[[dict[str, Any]], str]) -> None:

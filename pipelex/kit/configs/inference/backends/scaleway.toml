@@ -1,10 +1,10 @@
 ################################################################################
-# Groq Backend Configuration
+# Scaleway Backend Configuration
 ################################################################################
 #
 # This file defines the model specifications for Scaleway models.
 # It contains model definitions for various LLM models accessible through
-# the Groq API, including text-only and vision-capable models.
+# the Scaleway API, including text-only and vision-capable models.
 #
 # Configuration structure:
 # - Each model is defined in its own section with the model name as the header

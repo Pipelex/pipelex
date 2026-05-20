@@ -1,0 +1,12 @@
+domain      = "offline_gateway_known"
+description = "Pipeline referencing a gateway model that exists in the cached gateway specs"
+main_pipe   = "gateway_known_pipe"
+
+[pipe]
+[pipe.gateway_known_pipe]
+type        = "PipeLLM"
+description = "Single LLM step using a gateway-listed model handle"
+inputs      = { topic = "Text" }
+output      = "Text"
+model       = "gpt-4o-mini"
+prompt      = "Write a single sentence about $topic.text."

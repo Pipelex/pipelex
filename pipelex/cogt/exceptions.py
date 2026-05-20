@@ -6,6 +6,7 @@ from typing_extensions import override
 
 from pipelex.base_exceptions import ErrorReport, PipelexError
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
+from pipelex.system.pipelex_service.types import RemoteConfigSource
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
@@ -438,3 +439,36 @@ class ModelDeckNotFoundError(CogtError):
 
 class ModelDeckValidationError(CogtError):
     pass
+
+
+class GatewayUnknownModelError(CogtError):
+    """A model handle referenced by the deck cannot be located in the active gateway specs.
+
+    Carries the provenance of the gateway config (``FRESH`` vs ``CACHED``) so the message can
+    branch: a cached-source failure suggests stale gateway specs and points the user at
+    ``pipelex init`` to refresh while online; a fresh-source failure is a genuine
+    misconfiguration.
+    """
+
+    error_category = InferenceErrorCategory.CONFIGURATION
+
+    def __init__(self, model_name: str, source: RemoteConfigSource) -> None:
+        self.model_name = model_name
+        self.source = source
+        match source:
+            case RemoteConfigSource.FRESH:
+                msg = (
+                    f"Model handle '{model_name}' is referenced by the active model deck but is not present "
+                    "in the Pipelex Gateway specs we just fetched. Either the model name is wrong, the gateway "
+                    "no longer offers it, or your deck overrides need updating.\n"
+                    "  - Run `pipelex doctor` to inspect the active gateway models.\n"
+                    "  - Disable pipelex_gateway in .pipelex/inference/backends.toml to fall back to BYOK."
+                )
+            case RemoteConfigSource.CACHED:
+                msg = (
+                    f"Model handle '{model_name}' is referenced by the active model deck but is not present "
+                    "in the Pipelex Gateway specs loaded from the on-disk cache. The cache may be stale.\n"
+                    "  - Run `pipelex init` while online to refresh the cached gateway config.\n"
+                    "  - Or disable pipelex_gateway in .pipelex/inference/backends.toml to operate offline (BYOK)."
+                )
+        super().__init__(msg)
