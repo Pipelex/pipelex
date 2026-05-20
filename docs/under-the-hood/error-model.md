@@ -273,7 +273,8 @@ The agent CLI (`pipelex-agent`) emits a structured error to **stderr**, markdown
 | Command | Error output |
 |---------|--------------|
 | `run`, `validate`, `init`, `models`, `check-model`, `doctor` | Markdown (default) or JSON via `--error-format` (or via `--format`, which `--error-format` inherits) |
-| `inputs`, `concept`, `pipe`, `fmt`, `lint`, `accept-gateway-terms` | JSON only |
+| `inputs`, `concept`, `pipe`, `accept-gateway-terms` | JSON only |
+| `fmt`, `lint` | Native `plxt` output (subprocess passthrough); falls back to JSON only when the `plxt` binary itself is missing |
 
 The human CLI (`pipelex`) renders a Rich error panel — red banner, structured fields, the `user_action` tip, doc/Discord links — through the shared `display_error_panel()` helper in `pipelex/cli/error_handlers.py`.
 
