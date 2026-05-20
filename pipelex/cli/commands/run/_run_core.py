@@ -22,7 +22,7 @@ from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
-from pipelex.hub import get_console, get_telemetry_manager
+from pipelex.hub import get_console, get_report_delegate, get_telemetry_manager
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
@@ -211,6 +211,10 @@ async def _execute_run(
         working_memory_dict = pipe_output.working_memory.smart_dump()
         save_as_json_to_path(object_to_save=working_memory_dict, path=working_memory_output_path)
         log.verbose(f"Working memory saved to: {working_memory_output_path}")
+
+    reporting_config = get_config().pipelex.reporting_config
+    if reporting_config.is_log_costs_to_console or reporting_config.is_generate_cost_report_file_enabled:
+        get_report_delegate().generate_report()
 
     # Print completion recap
     console = get_console()
