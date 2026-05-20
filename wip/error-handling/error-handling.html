@@ -265,7 +265,7 @@
   <p class="eyebrow">Co-developer Briefing</p>
   <h1>The Error-Handling Overhaul</h1>
   <p class="lede">A single, structured error model that travels intact from a raw provider SDK exception, through every wrapping layer, across the Temporal boundary, and out to humans, agents, and HTTP APIs — classified the same way at every stop.</p>
-  <span class="branchline">branch <b>feature/Error-handling-2</b> &nbsp;←&nbsp; branched from <b>feature/Temporal-merge-3</b></span>
+  <span class="branchline">branch <b>refactor/ECR</b> &nbsp;←&nbsp; <b>feature/Error-handling-2</b> &nbsp;←&nbsp; <b>feature/Temporal-merge-3</b></span>
 </header>
 
 <div class="card">
@@ -278,7 +278,7 @@
     <li>Retry is now an <strong>honest, explicit model</strong>: transport retry in the SDK, durability in Temporal, and nothing fake in between.</li>
     <li><code>except Exception</code> is banned in business logic — <strong>ruff <code>BLE001</code> enforces it</strong>.</li>
   </ul>
-  <p style="margin-bottom:0">~250 files, +17k/−2.7k lines. Seven independent tracks, all landed.</p>
+  <p style="margin-bottom:0">Independent tracks across metadata, worker classification, retry &amp; resilience, CLI/HTTP delivery, the Temporal boundary, testing, and the Extract / Classify / Render decomposition — all landed.</p>
 </div>
 
 <nav class="toc">
@@ -430,7 +430,7 @@
 <figcaption>The same <code>ErrorReport</code> drives all four delivery surfaces. Wrapper exceptions inherit the underlying classification through <code>__cause__</code>-chain enrichment.</figcaption>
 </figure>
 
-<h3>The six tracks at a glance</h3>
+<h3>The tracks at a glance</h3>
 <table>
   <thead><tr><th>Track</th><th>Status</th><th>What it delivers</th></tr></thead>
   <tbody>
@@ -524,36 +524,34 @@
 </div>
 
 <!-- ================================================================ -->
-<h2 id="workers"><span class="num">05</span>Worker classification</h2>
-<p class="section-sub">The foundation. Every inference worker, one uniform shape.</p>
+<h2 id="workers"><span class="num">05</span>Worker classification — Extract / Classify / Render</h2>
+<p class="section-sub">Every inference worker collapses to one three-line shape.</p>
 
-<p>Every provider worker under <code>pipelex/plugins/*/</code> catches its SDK's typed exceptions and re-raises a categorized <code>CogtError</code>. The discriminators — quota-exhaustion vs rate-limit, content-policy vs bad-request — are pure functions in <code>pipelex/cogt/inference/error_classification.py</code>. The canonical pattern:</p>
+<p>After the ECR (<code>refactor/ECR</code>) sweep, every provider worker under <code>pipelex/plugins/*/</code> handles SDK exceptions with the same three steps. <strong>Extract</strong> turns the provider's SDK exception into a provider-blind <code>ProviderErrorMetadata</code> envelope. <strong>Classify</strong> is a single shared, provider-blind function mapping that envelope to a <code>ClassificationResult(category, user_action_kind, is_model_not_found)</code>. <strong>Render</strong> is a single shared function per worker family that picks the right <code>CogtError</code> subclass from an <code>InferenceErrorFamily</code> tag plus the <code>is_model_not_found</code> flag (e.g. <code>LLMModelNotFoundError</code> vs <code>LLMCompletionError</code>).</p>
 
 <div class="code">
-  <div class="filename">pipelex/plugins/*/…_llm_worker.py — the uniform classification shape</div>
-<pre><span class="ctx">except RateLimitError as exc:</span>
-<span class="add">+   if is_quota_exhaustion_openai(str(exc)):                 # quota ≠ rate-limit</span>
-<span class="add">+       msg = f"OpenAI quota exhausted for model '{self.inference_model.desc}': {exc}"</span>
-<span class="add">+       raise LLMCompletionError(</span>
-<span class="add">+           message=msg,</span>
-<span class="add">+           error_category=InferenceErrorCategory.CAPACITY,    # billing, not transient</span>
-<span class="add">+           user_action=UserAction(kind=UserActionKind.CHECK_BILLING, detail="…"),</span>
-<span class="add">+       ) from exc</span>
-<span class="add">+   msg = f"Rate limited by OpenAI for model '{self.inference_model.desc}': {exc}"</span>
-<span class="add">+   raise LLMCompletionError(</span>
-<span class="add">+       message=msg,</span>
-<span class="add">+       error_category=InferenceErrorCategory.TRANSIENT,       # the system will retry</span>
-<span class="add">+       user_action=UserAction(kind=UserActionKind.WAIT_AND_RETRY, detail="…"),</span>
+  <div class="filename">pipelex/plugins/*/…_llm_worker.py — the post-ECR uniform shape</div>
+<pre><span class="ctx">except (APIStatusError, APIConnectionError, APITimeoutError) as exc:</span>
+<span class="add">+   metadata = extract_openai_metadata(exc)                                       # provider-specific</span>
+<span class="add">+   classification = classify_inference_error(metadata)                           # shared, provider-blind</span>
+<span class="add">+   raise render_llm_error(                                                       # shared</span>
+<span class="add">+       classification=classification,</span>
+<span class="add">+       metadata=metadata,</span>
+<span class="add">+       family=InferenceErrorFamily.LLM,</span>
+<span class="add">+       model_desc=self.inference_model.desc,</span>
 <span class="add">+   ) from exc</span>
 </pre>
 </div>
 
-<p>This sweep lifted <strong>every worker kind</strong> — LLM, img-gen, extract, search, plus AWS Bedrock — to the same standard. The workers that previously had zero SDK handling (Google, Mistral, Azure img-gen, FAL, HuggingFace, Docling, Linkup, pypdfium2) now all classify. Three further refinements landed alongside:</p>
+<p>Only the per-provider <code>extract_*_metadata</code> functions stay plugin-local — one per SDK family, registered against <code>ProviderName</code>. Classify and Render live once, in <code>pipelex/cogt/inference/error_classify.py</code> and <code>error_render.py</code>. A parity meta-test (<code>test_provider_classification_parity.py</code>) walks every <code>ProviderName</code> against the extract-fn registry and the worker-family map, so adding a new provider without wiring it fails fast.</p>
+
+<p>This sweep lifted <strong>every worker kind</strong> — LLM, img-gen, extract, search, plus AWS Bedrock — to the same standard. The workers that previously had zero SDK handling (Google, Mistral, Azure img-gen, FAL, HuggingFace, Docling, Linkup, pypdfium2) now all classify. Refinements that landed alongside:</p>
 
 <ul class="tight">
-  <li><strong>The <code>instructor</code> unwrap.</strong> On structured-generation paths, <code>extract_underlying_sdk_exception()</code> recovers the real SDK exception out of <code>InstructorRetryException</code>, so it routes through the same per-provider categorization as the plain-text path.</li>
+  <li><strong>Per-provider concern confined to Extract.</strong> Quota-vs-rate-limit, content-policy-vs-bad-request, model-not-found-vs-other-404 discriminators now live as <code>@property</code> accessors on <code>ProviderErrorMetadata</code> (<code>is_quota_exhaustion</code>, <code>is_content_policy_violation</code>, <code>is_network_error</code>) or as a flag the Extract fn sets. Classify reads them; the worker no longer branches on them.</li>
+  <li><strong>The <code>instructor</code> unwrap.</strong> On structured-generation paths, <code>extract_underlying_sdk_exception()</code> recovers the real SDK exception out of <code>InstructorRetryException</code>, so it routes through the same Extract → Classify → Render chain as the plain-text path.</li>
   <li><strong><code>UNKNOWN</code> instead of mis-labelling.</strong> An unrecognized inner exception (e.g. a <code>pydantic.ValidationError</code> from a schema mismatch) now lands in <code>UNKNOWN</code> rather than being mis-categorized as a real <code>CONTENT</code>-policy violation.</li>
-  <li><strong><code>ProviderErrorMetadata</code>.</strong> Every raised inference error carries <code>status_code</code>, <code>request_id</code>, <code>retry_after_seconds</code>, <code>provider_error_code</code>. The raw response <code>body</code> is held in-process but <code>exclude</code>d from serialization — it can carry credentials.</li>
+  <li><strong><code>ProviderErrorMetadata</code>.</strong> Every raised inference error carries <code>status_code</code>, <code>request_id</code>, <code>retry_after_seconds</code>, <code>provider_error_code</code>, and the human <code>message</code>. The raw response <code>body</code> is held in-process but <code>exclude</code>d from serialization — it can carry credentials.</li>
 </ul>
 
 <!-- ================================================================ -->
@@ -745,7 +743,7 @@
 </div>
 
 <div class="footer">
-  <p><span class="tag">briefing</span> &nbsp; Generated for co-developer review of <code>feature/Error-handling-2</code>. Source of truth: <code>wip/error-handling/</code>. This page summarizes; the track docs are authoritative.</p>
+  <p><span class="tag">briefing</span> &nbsp; Co-developer review entry point: <code>TODOS.md</code>. Source of truth: <code>wip/error-handling/</code> (track docs) and <code>docs/under-the-hood/error-model.md</code> (shipped user-facing doc). This page summarizes; the track docs are authoritative.</p>
 </div>
 
 </div>

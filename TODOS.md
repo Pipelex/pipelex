@@ -4,7 +4,7 @@ No open work items. This branch (`refactor/ECR`, branched from `feature/Temporal
 
 ## Reviewing this branch
 
-The current-state reference is **`wip/error-handling/`**. Start with [`wip/error-handling/README.md`](wip/error-handling/README.md): its status table and suggested read order map every track to its doc and say what landed vs. what is still only proposed.
+The current-state reference is **`wip/error-handling/`**. Start with [`wip/error-handling/README.md`](wip/error-handling/README.md): its status table and suggested read order map every track to its doc and say what landed vs. what is still only proposed. For the shipped, user-facing version of the same material, see [`docs/under-the-hood/error-model.md`](docs/under-the-hood/error-model.md) — including its "The Uniform Shape — Extract / Classify / Render" section.
 
 This branch is scoped to the ECR refactor. The single most relevant doc is:
 
