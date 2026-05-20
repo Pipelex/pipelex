@@ -1878,6 +1878,10 @@ This section covers all Pipelex capabilities, organized by area.
 
     Pipeline validation without execution, dry run with mocked LLM responses, input validation, and allowed-to-fail pipes.
 
+-   **[Distributed Execution with Temporal](distributed-execution.md)**
+
+    Run pipelines as durable Temporal workflows across worker pools. Per-activity routing, named runtime profiles, dashboard observability with custom search attributes.
+
 -   **[Telemetry & Observability](telemetry.md)**
 
     Production monitoring with Langfuse, OpenTelemetry, and PostHog integration. Gateway telemetry, span tracing, and custom destinations.
@@ -2141,6 +2145,15 @@ Routing profiles control which backend handles each model. Define pattern-based 
 
 See [Configure AI Providers](../get-started/configure-ai-providers.md) for setup details.
 
+## Offline Behavior
+
+The Gateway fetches its model catalog from a remote config service. Pipelex stays usable when that service is briefly unreachable:
+
+- **Gateway disabled (Bring Your Own Keys)** — no remote fetch is attempted at all. Setup, validation, and dry-runs are fully offline.
+- **Gateway enabled** — Pipelex primes an on-disk copy of the remote config at `~/.pipelex/cache/remote_config.json` on every successful fetch and during `pipelex init` while online. If a later fetch fails, it falls back to this cache so setup, validation, and `--dry-run` still complete. When the cache is in use, a `RemoteConfigStale` warning is emitted (the agent CLI surfaces it on the JSON `warnings` array).
+
+Only the actual inference call needs the network at runtime — offline support covers setup and dry-run, not live model calls. If the Gateway is enabled, the fetch fails, and no cache has ever been primed, setup raises `RemoteConfigUnavailableError`: run `pipelex init` while online to prime the cache, or disable `pipelex_gateway` for permanent offline (BYOK) operation.
+
 
 ## LLM Integration
 
@@ -2159,7 +2172,7 @@ Two approaches for structured outputs:
 - **Two-step** — Generate text first, then parse into a structured concept. More reliable for complex schemas.
 - **Direct JSON** — Generate structured JSON directly from the LLM using provider-native structured output features.
 
-See [LLM Structured Generation](../building-methods/llm-structured-generation-config.md).
+See [`PipeStructure`](../building-methods/pipes/pipe-operators/PipeStructure.md) for direct text-to-structure conversion, [`PipeLLM`](../building-methods/pipes/pipe-operators/PipeLLM.md) for direct JSON generation, and [Build-time Elaboration](../under-the-hood/build-time-elaboration.md) for how `structuring_method = "preliminary_text"` is rewritten into a two-step sequence at load time.
 
 ## Vision Language Models
 
@@ -2314,7 +2327,7 @@ Install from [mthds-ai/mthds-plugins](https://github.com/mthds-ai/mthds-plugins)
 | `/mthds-edit` | Modify existing bundles — change pipes, update prompts, add or remove steps |
 | `/mthds-explain` | Explain and document existing workflows in plain language |
 | `/mthds-fix` | Automatically fix validation errors in a loop |
-| `/mthds-run` | Execute methods and interpret JSON output (supports dry runs and graph generation) |
+| `/mthds-run` | Execute methods and interpret the results (supports dry runs and graph generation) |
 | `/mthds-inputs` | Prepare inputs: placeholder templates, synthetic test data, or user-provided files |
 | `/mthds-install` | Install method packages from GitHub or local directories |
 | `/mthds-pkg` | Manage package manifests and related package workflows |
@@ -2338,7 +2351,7 @@ Once installed, type `/mthds-build` in Claude Code to create your first method f
 
 ## Related Documentation
 
-- [Agent CLI](../tools/cli/agent-cli.md) - JSON contract used under the hood
+- [Agent CLI](../tools/cli/agent-cli.md) - Machine-oriented interface used under the hood
 - [Packages](../building-methods/packages.md) - `METHODS.toml` manifest workflow
 - [Package Commands](../tools/cli/pkg.md) - Current `mthds package` commands
 
@@ -2384,20 +2397,20 @@ Package manifest management is currently exposed through the lowercase `mthds` C
 
 ## Agent CLI
 
-The `pipelex-agent` CLI is a machine-first interface designed for automated environments like Claude Code skills. Output format varies by command — JSON, raw TOML, or markdown — with no interactive prompts or Rich formatting. Structured commands emit JSON errors to stderr; `fmt` and `lint` pass through native `plxt` output.
+The `pipelex-agent` CLI is a machine-first interface designed for automated environments like Claude Code skills. Output format varies by command — markdown or JSON, raw TOML, or `plxt` passthrough — with no interactive prompts or Rich formatting. Structured commands emit errors to stderr; the error format is controlled by `--error-format` and defaults to the value of `--format` (so `--format json` flips both). `fmt` and `lint` pass through native `plxt` output.
 
 | Command | Description |
 |---------|-------------|
-| `init` | Non-interactive configuration setup |
-| `run` | Execute a pipeline and output JSON results |
-| `validate` | Validate pipes, bundles, or methods with JSON output |
+| `init` | Non-interactive configuration setup (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
+| `run` | Execute a pipeline (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
+| `validate` | Validate pipes, bundles, or methods (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
 | `fmt` | Format `.mthds`, `.toml`, or `.plx` files in-place |
 | `lint` | Lint files for errors |
 | `inputs` | Generate example input JSON for a pipe |
 | `concept` | Convert a JSON concept spec into raw TOML (stdout) |
 | `pipe` | Convert a JSON pipe spec into raw TOML (stdout) |
-| `models` | List available model presets, aliases, and waterfalls (`--format markdown\|json`, default: markdown) |
-| `doctor` | Check configuration health (`--format markdown\|json`, default: markdown) |
+| `models` | List available model presets, aliases, and waterfalls (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
+| `doctor` | Check configuration health (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
 
 For detailed CLI documentation, see the [CLI reference](../tools/cli/index.md).
 
@@ -6962,12 +6975,12 @@ Searches the web and returns structured results with sources.
 
 At its core, `PipeLLM` constructs a detailed prompt from various inputs and templates, sends it to a specified LLM, and processes the output. It can produce simple text or complex structured data (in the form of Pydantic models).
 
-For structured data output, `PipeLLM` employs two main strategies:
+For structured outputs, you have two options:
 
-1.  **Direct Mode**: The LLM is prompted to directly generate a JSON object that conforms to the target Pydantic model's schema. This is fast but relies on the LLM's ability to generate well-formed JSON.
-2.  **Preliminary Text Mode**: This is a more robust two-step process:
-    a. First, the LLM generates a free-form text based on the initial prompt.
-    b. Second, another LLM call is made with a specific prompt designed to extract and structure the information from the generated text into the target Pydantic model.
+1. **Direct (default)** — `PipeLLM` asks the LLM to fill the target Pydantic schema in a single call. Fast and cheap; relies on the model's structured-output quality.
+2. **Preliminary text** — set `structuring_method = "preliminary_text"`. Pipelex rewrites the pipe at load time into a `PipeSequence` of two pipes: a `PipeLLM` that produces free-form text, then a [`PipeStructure`](./PipeStructure.md) that turns that text into the target concept. Two LLM calls per invocation, but the prose stage is unconstrained by JSON. See [Structuring Method (preliminary_text)](#structuring-method-preliminary-text) below.
+
+If you already have text from elsewhere (a PDF extraction, a search result, an upstream pipe), call [`PipeStructure`](./PipeStructure.md) directly — there's no need to wrap a `PipeLLM` around it.
 
 ## Working with Images (Vision Language Models)
 
@@ -7171,10 +7184,10 @@ Analyze the document and explain how it relates to the context: $reference_doc
 | `inputs`                    | dictionary          | The input concept(s) for the LLM operation, as a dictionary mapping input names to concept codes. For images within structured content, use dot notation (e.g., `"page.image_argurment"`)
 | `output`                    | string              | The output concept produced by the LLM operation with multiplicity notation using brackets (e.g., `"Text"`, `"Text[]"`, `"Text[3]"`).                                                | Yes      |
 | `model`                       | string or table     | Specifies the LLM choice by name, setting, or preset to use.              | No       |
-| `model_to_structure`                       | string or table     | Specifies the LLM choice by name, setting, or preset to use for structuring after preliminary text generation.              | No       |
+| `model_to_structure`                       | string or table     | LLM choice used whenever this `PipeLLM` produces a structured output. Applies both to direct structured generation and to the structuring step when `structuring_method = "preliminary_text"` is set. | No       |
 | `system_prompt`             | string              | A system-level prompt to guide the LLM's behavior (e.g., "You are a helpful assistant"). Supports the same variable syntax as `prompt`, including image and document references.  | No       |
 | `prompt`           | string              | A template for the user prompt. Use `$` for inline variables (e.g., `$topic`). Use `@input_name` as a block sigil on its own line to insert the content of an entire input — inline `@var` raises `TemplateSigilSyntaxError` when `var` collides with a declared input. Image and document variables follow the same rules. Escape with `@@` or `$$` to emit a literal `@` or `$` (e.g., `@@font-face` inside a `<style>` block). | No       |
-| `structuring_method`        | string              | The method for generating structured output. Can be `direct` or `preliminary_text`. Defaults to the global configuration.                                                      | No       |
+| `structuring_method`        | string              | `"direct"` (default) generates the structured output in one LLM call. `"preliminary_text"` expands the pipe at load time into a `PipeLLM` (text) + [`PipeStructure`](./PipeStructure.md) sequence — two LLM calls. Cannot be combined with a `Text` output. | No       |
 
 ### LLM Setting Fields
 
@@ -7215,6 +7228,46 @@ output = "Headline[3]"
 
 !!! info "Learn More About Multiplicity"
     For a comprehensive guide on output multiplicity, input multiplicity, and the philosophy behind how Pipelex handles single items versus collections, see [Understanding Multiplicity](../understanding-multiplicity.md).
+
+## Structuring Method (preliminary_text) { #structuring-method-preliminary-text }
+
+By default, `PipeLLM` asks the LLM to produce the target structured output in a single call. For some tasks — especially complex extractions from images or documents where the model thinks better in prose than in JSON — you can opt into a two-stage approach:
+
+```toml
+[pipe.review_restaurant]
+type = "PipeLLM"
+description = "Write a structured review of a restaurant from a transcript"
+inputs = { transcript = "Text" }
+output = "RestaurantReview"
+structuring_method = "preliminary_text"
+prompt = """
+Write a thorough review of this restaurant based on the transcript:
+
+@transcript
+"""
+```
+
+### What happens at load time
+
+When Pipelex parses a `.mthds` file with `structuring_method = "preliminary_text"`, it rewrites the pipe **before any execution** into a [`PipeSequence`](../pipe-controllers/PipeSequence.md):
+
+1. **Step 1 — `<pipe_code>__draft_text`**: a `PipeLLM` that inherits your original `inputs`, `system_prompt`, `prompt`, and `model`. Its output is always a single `Text`. This is the "write the prose" call.
+2. **Step 2 — `<pipe_code>__structure`**: a [`PipeStructure`](./PipeStructure.md) that takes the draft text and produces your declared output (preserving multiplicity — `Foo`, `Foo[]`, or `Foo[N]`). It uses `model_to_structure` if set, otherwise the default LLM choice for object generation.
+
+The wrapping `PipeSequence` keeps your original `pipe_code`, so anything that calls or references your pipe (other pipes, `main_pipe`, the run API) keeps working unchanged.
+
+### Trade-offs
+
+- **Two LLM calls per invocation** instead of one — slower and more expensive.
+- **Better quality on complex schemas**, especially with vision models: the prose stage isn't constrained by the JSON schema, then a focused structuring call extracts the typed result.
+- **Independent model choice for the structuring step** via `model_to_structure` — pair an expensive vision model for step 1 with a cheap fast model for step 2.
+- **Output cannot be `Text`** — there's nothing to structure. Pipelex rejects this at load time.
+
+### When to choose what
+
+- **Stick with `direct`** for most structured outputs — modern models handle them well and one call is always cheaper.
+- **Switch to `preliminary_text`** when you're extracting from images or PDFs and a single-call structured output keeps missing fields, or when your schema is deep and the model produces better content in prose first.
+- **Use [`PipeStructure`](./PipeStructure.md) directly** when the text already exists (extracted, searched, generated upstream).
 
 ## Examples
 
@@ -7336,6 +7389,142 @@ Analyze the following topic in depth, considering multiple perspectives:
 - [Table Extraction Example](../../../cookbook/extract-table.md) - Extract and correct tables from images
 - [Gantt Extraction Example](../../../cookbook/extract-gantt.md) - Extract Gantt chart data from documents
 
+## PipeStructure
+
+# PipeStructure
+
+`PipeStructure` is the operator that turns text into structured data. It takes a single `Text`-compatible input, asks an LLM to extract the requested structure, and produces a typed object (or list of objects) matching your output concept.
+
+Use `PipeStructure` whenever the source of the text is not the LLM call itself — for example when text comes from a PDF extraction, a web search result, a user message, or an upstream `PipeLLM` step that intentionally produced free-form prose.
+
+## How it works
+
+1. The operator reads the single declared input from the working memory and renders the built-in `structuring_prompt` template against it.
+2. It appends a JSON-schema description of the target concept (the same helper `PipeLLM` uses for object generation) so the model knows which fields to fill.
+3. It picks an LLM setting using the same precedence as `PipeLLM` for object generation: explicit `model` on the pipe → `llm_choice_overrides.for_object` → `llm_choice_defaults.for_object`.
+4. It calls `make_object` (or `make_object_list` when the output multiplicity is a list) and emits the result as the pipe's output.
+
+`PipeStructure` does not accept user-controlled prompt templates. The structuring prompt lives in `pipelex.toml` under `[cogt.llm_config.generic_templates] structuring_prompt`; the only variable rendered into it is `text`, fed automatically from the declared input.
+
+## Configuration
+
+`PipeStructure` is configured in your pipeline's `.mthds` file.
+
+### MTHDS Parameters
+
+| Parameter | Type | Description | Required |
+| --- | --- | --- | --- |
+| `type` | string | The type of the pipe: `PipeStructure` | Yes |
+| `description` | string | A description of what this structuring step produces. | Yes |
+| `inputs` | dictionary | Exactly one input. Its concept must be `Text` or refine `Text` (e.g. `Document` is not allowed; a domain concept that `refines = "Text"` is). | Yes |
+| `output` | string | The target structured concept, with optional multiplicity (`Foo`, `Foo[]`, `Foo[3]`). Cannot be `Text` or `Text`-compatible. | Yes |
+| `model` | string or table | The LLM choice used for the structuring call. Defaults to the `for_object` LLM choice (override → default). | No |
+
+### LLM Setting Fields
+
+When `model` is given as a table, it accepts the same fields as `PipeLLM`'s inline LLM setting (`model`, `temperature`, `max_tokens`, `reasoning_effort`, `reasoning_budget`, `description`). See [PipeLLM › LLM Setting Fields](./PipeLLM.md#llm-setting-fields).
+
+!!! note "No images, no documents"
+    `PipeStructure` is intentionally narrow: it takes one `Text` input. To structure an image or a PDF page, run an upstream extraction step (e.g. `PipeExtract` or a vision `PipeLLM`) and feed its text output into `PipeStructure`.
+
+### Output Multiplicity
+
+Use bracket notation in the `output` field to control how many items the LLM should return:
+
+- `output = "Review"` — exactly one item.
+- `output = "Review[]"` — the model decides how many.
+- `output = "Review[3]"` — exactly three.
+
+See [Understanding Multiplicity](../understanding-multiplicity.md) for the full picture.
+
+## Examples
+
+### Structure free-form text into a typed object
+
+```toml
+[concept.RestaurantReview]
+description = "A structured restaurant review extracted from prose"
+
+[concept.RestaurantReview.structure]
+restaurant_name = { type = "text", description = "Name of the restaurant" }
+overall_rating  = { type = "integer", description = "Overall rating from 1 to 5" }
+highlights      = { type = "list", item_type = "text", description = "Standout positives" }
+complaints      = { type = "list", item_type = "text", description = "Issues mentioned" }
+
+[pipe.structure_review]
+type = "PipeStructure"
+description = "Turn a free-form review into a RestaurantReview"
+inputs = { review_text = "Text" }
+output = "RestaurantReview"
+```
+
+### Structure a list of objects
+
+```toml
+[pipe.structure_review_batch]
+type = "PipeStructure"
+description = "Extract one or more reviews from a transcript"
+inputs = { transcript = "Text" }
+output = "RestaurantReview[]"
+```
+
+### After a document extraction step
+
+`PipeStructure` shines as the second stage of a sequence whose first stage produces text from a non-text source.
+
+```toml
+[pipe.invoice_to_record]
+type = "PipeSequence"
+description = "Read an invoice PDF and turn it into an InvoiceRecord"
+inputs = { invoice_pdf = "Document" }
+output = "InvoiceRecord"
+steps = [
+  { pipe = "extract_invoice_text", result = "invoice_text" },
+  { pipe = "structure_invoice",    result = "invoice_record" },
+]
+
+[pipe.extract_invoice_text]
+type = "PipeLLM"
+description = "Read the invoice PDF and produce a faithful textual transcript"
+inputs = { invoice_pdf = "Document" }
+output = "Text"
+prompt = """
+Read this invoice and produce a faithful textual transcript of every line item, total, and metadata: @invoice_pdf
+"""
+
+[pipe.structure_invoice]
+type = "PipeStructure"
+description = "Turn the invoice transcript into an InvoiceRecord"
+inputs = { invoice_text = "Text" }
+output = "InvoiceRecord"
+```
+
+### Pick a different model for the structuring step
+
+```toml
+[pipe.structure_review_premium]
+type = "PipeStructure"
+description = "Use a stronger model for tricky structurings"
+inputs = { review_text = "Text" }
+output = "RestaurantReview"
+model = "@default-premium"
+```
+
+## When to reach for `PipeStructure`
+
+- You already have text and you want it as a typed object.
+- You want a deterministic boundary between "writing prose" and "filling a schema" — for example to make the prose call cheaper, or to swap the structuring model independently.
+- You want the same structuring step reused across several upstream sources (extraction, search, generation).
+
+For the common case where the text is freshly produced by an LLM and you want a single declaration, see [`structuring_method = "preliminary_text"` on PipeLLM](./PipeLLM.md#structuring-method-preliminary-text), which expands at build time into a `PipeSequence` of `PipeLLM` (text) + `PipeStructure`.
+
+## Related Documentation
+
+- [PipeLLM](./PipeLLM.md) — direct structured generation in a single call, plus the `preliminary_text` shorthand.
+- [PipeExtract](./PipeExtract.md) — produces text from PDFs and images, a natural upstream step.
+- [Understanding Multiplicity](../understanding-multiplicity.md) — single vs list outputs.
+
+
 ## PipeExtract
 
 # PipeExtract
@@ -7396,6 +7585,8 @@ Extraction presets are defined in your model deck configuration and can include 
 | `page_views`                | boolean | If `true`, a high-fidelity image of each page will be included in the `page_view` field. Defaults to `false`.                              | No       |
 | `page_views_dpi`            | integer | The resolution (in Dots Per Inch) for the generated page views when processing a PDF. Defaults to `150`.                                 | No       |
 | `page_image_captions`       | boolean | If `true`, the OCR service may attempt to generate captions for the images found. *Note: This feature depends on the OCR provider.*        | No       |
+| `render_js`                 | boolean | For web-page extraction: if `true`, the extraction backend renders JavaScript before fetching the page content. Defaults to `false`. *Note: Only honored by backends that support headless rendering.* | No       |
+| `include_raw_html`          | boolean | For web-page extraction: if `true`, the extracted `Page` populates its `raw_html` field with the fetched page's HTML. Defaults to `false`. | No       |
 | `model`                       | string  | The Extract model choice by name, setting, or preset to use (e.g., `"mistral-document-ai-2505"`, `"@default-extract-document"`). Defaults to the model specified in the global config. | No       |
 
 ### Example: Processing a PDF
@@ -8225,7 +8416,7 @@ How this works:
 
 # PipeBatch
 
-The `PipeBatch` controller provides a powerful "map" operation for your pipelines. It takes a list of items as input and runs the same pipe on each item in the list, executing them all in parallel for maximum efficiency.
+The `PipeBatch` controller provides a powerful "map" operation for your pipelines. It takes a list of items as input and runs the same pipe on each item in the list, executing the branches concurrently for efficiency.
 
 This is the ideal controller for processing collections of documents, images, or any other data records where the same logic needs to be applied to each one independently.
 
@@ -8236,8 +8427,18 @@ This is the ideal controller for processing collections of documents, images, or
 1.  **Input List**: It identifies an input list from the working memory.
 2.  **Branching**: For each item in the input list, it creates a new, isolated execution branch.
 3.  **Isolation & Injection**: Each branch gets a deep copy of the `WorkingMemory`. The specific item for that branch is injected into this memory with a defined name.
-4.  **Concurrent Execution**: The specified `branch_pipe_code` is executed in all branches simultaneously. Each branch pipe operates only on its own item.
+4.  **Concurrent Execution**: The specified `branch_pipe_code` runs across the branches concurrently — in bounded chunks, by default at most `max_concurrency` branches at a time. Each branch pipe operates only on its own item.
 5.  **Aggregation**: After all branches have completed, `PipeBatch` collects the individual output from each one and aggregates them into a single new list. This list becomes the final output of the `PipeBatch` pipe.
+
+## Concurrency
+
+`PipeBatch` does not spawn every branch at once. Branches run in bounded concurrent chunks, capped by the `max_concurrency` setting under `[pipelex.pipeline_execution_config]` (default `8`). This keeps a large batch — one pipe over thousands of items — from overwhelming memory, the asyncio event loop, and provider rate limits.
+
+To restore unbounded fan-out (every branch started at once), set `max_concurrency = "unbounded"`.
+
+Results always preserve input order regardless of the concurrency bound. If a branch fails, the failure propagates and the first error by input index wins.
+
+For durable, rate-limited execution of very large batches, run the pipeline on the Temporal track.
 
 ## Configuration
 
@@ -8290,7 +8491,7 @@ How this works:
 2.  `PipeBatch` creates 10 parallel branches.
 3.  In branch #1, it takes the first article from `ArticleList`, puts it into the branch's isolated working memory, and gives it the name `ArticleText` (as specified by `input_item_name`).
 4.  The `summarize_one_article` pipe is then executed in branch #1. It looks for an input named `ArticleText`, finds the injected article, and produces a summary.
-5.  Steps 3 and 4 happen simultaneously for all 10 articles in their respective branches.
+5.  Steps 3 and 4 run concurrently across branches, up to `max_concurrency` at a time (8 by default), until all 10 articles are processed.
 6.  Once all `summarize_one_article` pipes are done, `PipeBatch` collects the 10 `ArticleSummary` outputs and bundles them into a single `SummaryList`. This list is the final result.
 
 ## Related Documentation
@@ -8620,108 +8821,6 @@ The Model Deck is your central configuration hub for all LLM-related settings. I
 1. **Cost Management**: Consider using different models based on task complexity and cost requirements
 
 
-## LLM Structured Generation
-
-# LLM Structured Generation Configuration
-
-The `StructureConfig` class controls how Pipelex handles structural processing of content, particularly in LLM-based pipes.
-
-## Configuration Options
-
-```python
-class StructureConfig(ConfigModel):
-    is_default_text_then_structure: bool
-```
-
-### Fields
-
-- `is_default_text_then_structure`: When true, uses a two-step LLM process where text is generated first, then structured into a JSON object
-
-## Example Configuration
-
-```toml
-[pipelex.structure_config]
-is_default_text_then_structure = false  # Set to true for better results: generates text before structuring
-```
-
-## Processing Flow
-
-The `is_default_text_then_structure` flag determines how LLM pipes generate structured content:
-
-### Two-Step Process (When `true`)
-
-1. **First LLM Call**: Generates preliminary text
-    - Uses the pipe's main prompt template
-    - Produces natural language text about the subject
-
-2. **Second LLM Call**: Converts text to structure
-    - Uses a specialized system prompt: "You are a data modeling expert specialized in extracting structure from text"
-    - Uses a template that instructs the LLM to extract structured data:
-   ```
-   Your job is to extract and structure information from a text.
-   Here is the text:
-   {{ preliminary_text|tag("text") }}
-
-   Now generate the JSON in the required format.
-   Do not create information that is not in the text.
-   ```
-    - Produces a JSON object matching the required concept structure
-
-### Single-Step Process (When `false`)
-
-- Single LLM call that directly generates the structured output
-- Uses the pipe's main prompt template
-- Produces structured JSON directly
-
-## Use Cases
-
-### When to Use Two-Step Process (`true`)
-
-- When you want more natural and fluid content generation
-- When the structure is complex and needs careful extraction
-- When you want to ensure all generated content is properly structured
-- When you need better control over the extraction process
-- When you want to debug or inspect the intermediate text
-
-### When to Use Single-Step Process (`false`)
-
-- When the structure is simple and straightforward
-- When you need faster processing (avoids second LLM call)
-- When the output format is well-defined and easy to generate
-- When you want to reduce API costs
-- When the prompt is already optimized for structured output
-
-## Technical Details
-
-The two-step process uses:
-
-1. The pipe's configured prompts for initial text generation
-2. A specialized structure extraction prompt that can be customized in the `pipelex.toml` config in the `[cogt.llm_config.generic_templates]` section:
-    - `structure_from_preliminary_text_system`: The system prompt for the second LLM call
-    - `structure_from_preliminary_text_user`: The user prompt for the second LLM call
-
-
-## Example Flow
-
-```mermaid
-graph TD
-    A[Input] --> B{is_default_text_then_structure?}
-    B -->|true| C[First LLM Call]
-    C --> D[Generate Text]
-    D --> E[Second LLM Call]
-    E --> F[Extract Structure]
-    F --> H[Final JSON Output]
-    B -->|false| G[Direct Structure Generation]
-    G --> H
-```
-
-## Related Documentation
-
-- [PipeLLM](./pipes/pipe-operators/PipeLLM.md) - Structured output behavior at the pipe level
-- [LLM Prompting Style Configuration](./adapt-to-llm-prompting-style-openai-anthropic-mistral.md) - Prompt formatting by target model
-- [LLM Integration](../features/llm-integration.md) - High-level LLM capability overview
-
-
 ## LLM Prompting Style
 
 # LLM Prompting Style Configuration
@@ -8784,7 +8883,8 @@ This allows for:
 
 ## Related Documentation
 
-- [LLM Structured Generation Configuration](./llm-structured-generation-config.md) - Control text-then-structure behavior
+- [PipeLLM › Structuring Method](./pipes/pipe-operators/PipeLLM.md#structuring-method-preliminary-text) - Two-step text-then-structure via `structuring_method = "preliminary_text"`
+- [PipeStructure](./pipes/pipe-operators/PipeStructure.md) - Standalone operator that turns text into a structured concept
 - [PipeLLM](./pipes/pipe-operators/PipeLLM.md) - Pipe-level prompting and output controls
 - [LLM Integration](../features/llm-integration.md) - High-level LLM capability overview
 
@@ -8914,6 +9014,9 @@ This command creates or resets a Pipelex config directory with:
     - `backends/` - Individual backend configuration files
     - `deck/` - AI model aliases and presets
 - **telemetry.toml** - Telemetry and observability settings
+
+!!! note "Offline cache priming"
+    When Pipelex Gateway is enabled, `pipelex init` also primes an on-disk copy of the gateway's remote config at `~/.pipelex/cache/remote_config.json`. This lets later setup, validation, and dry-runs work even when the remote config service is briefly unreachable. If you run `pipelex init` while offline, it prints a yellow warning and skips priming — re-run it online to enable offline dry-runs.
 
 ## Interactive Setup Flow
 
@@ -10212,7 +10315,7 @@ This helps you understand all possible output structures that the pipe could ret
 
 # Agent CLI (`pipelex-agent`)
 
-The `pipelex-agent` CLI is a machine-oriented companion to the main `pipelex` CLI. It is designed for programmatic consumption by AI agents, IDE extensions, and other automation tools. Output format varies by command — JSON, raw TOML, or markdown — with no Rich formatting or interactive prompts. Structured commands emit JSON errors to stderr; `fmt` and `lint` pass through native `plxt` output.
+The `pipelex-agent` CLI is a machine-oriented companion to the main `pipelex` CLI. It is designed for programmatic consumption by AI agents, IDE extensions, and other automation tools. Output format varies by command — markdown or JSON, raw TOML, or `plxt` passthrough — with no Rich formatting or interactive prompts. Structured commands emit errors to stderr; the error format is controlled by `--error-format`, which defaults to the value of `--format` (so `--format json` flips both, as before the split). `fmt` and `lint` pass through native `plxt` output.
 
 It is consumed by the `mthds-agent` CLI (from the `mthds` npm package) which itself is used by Claude Code skills, the VS Code extension, and can be called directly from the command line.
 
@@ -10230,7 +10333,7 @@ The agent CLI mirrors the main CLI's subcommand structure for `run`, `validate`,
 
 ### Run
 
-Execute a pipeline and return results as JSON.
+Execute a pipeline. Success output is markdown by default, or JSON with `--format json`. Errors follow `--error-format` (defaults to `--format`'s value).
 
 ```bash
 pipelex-agent run pipe <PIPE_CODE> [OPTIONS]
@@ -10246,12 +10349,14 @@ pipelex-agent run method <NAME> [OPTIONS]
 - `--graph` / `--no-graph` - Enable/disable execution graph (enabled by default)
 - `--library-dir`, `-L` - Additional library directory
 - `--with-memory` - Include full working memory in output
+- `--format` - Success output format: `markdown` (default) or `json`
+- `--error-format` - Error output format: `markdown` or `json` (defaults to `--format`'s value)
 
 For `bundle` and `method`, use `--pipe` to target a specific pipe.
 
 ### Validate
 
-Validate pipes, bundles, or methods and return status as JSON.
+Validate pipes, bundles, or methods. Success output is markdown by default, or JSON with `--format json`. Errors follow `--error-format` (defaults to `--format`'s value).
 
 ```bash
 pipelex-agent validate pipe <PIPE_CODE> [OPTIONS]
@@ -10263,12 +10368,14 @@ pipelex-agent validate method <NAME> [OPTIONS]
 **Common options:**
 
 - `--library-dir`, `-L` - Additional library directory
+- `--format` - Success output format: `markdown` (default) or `json`
+- `--error-format` - Error output format: `markdown` or `json` (defaults to `--format`'s value)
 
 For `bundle`, additional options are available:
 
 - `--pipe` - Require a specific pipe in the bundle
 - `--graph`, `-g` - Generate an execution graph visualization
-- `--format`, `-f` - Graph output format
+- `--graph-format`, `-f` - Graph output format (`mermaidflow`, `reactflow`, or `both`)
 - `--direction` - Graph layout direction
 
 ### Inputs
@@ -10297,16 +10404,16 @@ These commands do not have subcommands:
 | `lint` | Lint a `.mthds`/`.toml`/`.plx` file for errors (delegates to `plxt`) |
 | `concept` | Convert a JSON concept spec into raw TOML (stdout) |
 | `pipe` | Convert a JSON pipe spec into raw TOML (stdout) |
-| `models` | List available model presets, aliases, and waterfalls (`--format markdown\|json`, default: markdown) |
-| `doctor` | Check config, credentials, and model health (`--format markdown\|json`, default: markdown) |
+| `models` | List available model presets, aliases, and waterfalls (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
+| `doctor` | Check config, credentials, and model health (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
 
 ## Output Contract
 
 Commands use different stdout formats depending on their purpose:
 
-- **JSON**: `run`, `validate`, `inputs`, `init` — structured JSON via `agent_success()`
+- **Markdown or JSON**: `run`, `validate`, `init`, `models`, `check-model`, `doctor` — markdown by default, JSON with `--format json`. Error format follows `--error-format` (defaults to `--format`'s value, so `--format json` flips both).
+- **JSON**: `inputs` — structured JSON via `agent_success()`
 - **Raw TOML**: `concept`, `pipe` — TOML text printed directly to stdout
-- **Markdown or JSON**: `models`, `doctor` — markdown by default, JSON with `--format json`
 - **Passthrough**: `fmt`, `lint` — raw `plxt` output
 
 **JSON success** — written to stdout:
@@ -10320,6 +10427,20 @@ Commands use different stdout formats depending on their purpose:
 ```
 
 JSON commands return the result object directly. They are not wrapped in a `status` or `data` envelope.
+
+**Warnings** — non-fatal setup conditions are surfaced on a top-level `warnings` array of the success envelope, so consumers don't have to parse stderr. The field is absent when there is nothing to report. Each entry is an object with a `type` and a `message`:
+
+```json
+{
+  "success": true,
+  "target_dir": "/path/to/.pipelex",
+  "warnings": [
+    { "type": "RemoteConfigStale", "message": "Using a cached gateway config; run `pipelex init` while online to refresh." }
+  ]
+}
+```
+
+`RemoteConfigStale` is emitted when the gateway is enabled but the remote config service is unreachable and Pipelex falls back to its on-disk cache (offline mode).
 
 **Error** — written to stderr:
 
@@ -11257,12 +11378,30 @@ The Cogt configuration manages all cognitive tools in Pipelex, including LLM (La
 
 ```toml
 [cogt]
+# Tier 1 transport retry attempts
+transport_max_retries = 2
+
 # Main Cogt configuration sections
 [cogt.inference_manager_config]
 [cogt.llm_config]
 [cogt.img_gen_config]
 [cogt.extract_config]
 ```
+
+## Transport Retry
+
+`transport_max_retries` is a top-level `[cogt]` setting that controls how many times an inference SDK client retries a transient transport failure before giving up.
+
+```toml
+[cogt]
+transport_max_retries = 2
+```
+
+- `transport_max_retries` (int, `0`–`10`, default `2`): the number of retries attempted **on top of** the initial request when a transport-level failure occurs — a connection error, or an HTTP `408` / `409` / `429` / `5xx` response. A value of `2` therefore allows up to 3 attempts total. Retries honor a `Retry-After` response header when present.
+
+This is "Tier 1" of the retry model. It is wired uniformly into every inference SDK client factory — Anthropic, OpenAI / Azure OpenAI, the Pipelex Gateway clients, Mistral, and Google — as well as the raw-`httpx` Azure image-generation path, so the retry posture is a deliberate, uniform policy rather than a per-provider SDK default.
+
+It is distinct from `llm_config.schema_reask_max_attempts`, which is `instructor`'s schema re-ask count for structured-output validation failures — a different concern.
 
 ## Inference Manager Configuration
 
@@ -11283,10 +11422,7 @@ Configuration for all Language Model interactions:
 [cogt.llm_config]
 default_max_images = 100  # Maximum number of images in prompts
 is_structure_prompt_enabled = false
-
-# Job configuration
-[cogt.llm_config.llm_job_config]
-max_retries = 3  # Between 1 and 10
+schema_reask_max_attempts = 3  # instructor schema re-ask attempts, between 1 and 10
 ```
 
 ### LLM Job Parameters
@@ -11378,7 +11514,7 @@ All model types support the same routing, aliasing, and preset systems.
 ### LLM Configuration
 - Temperature must be between 0 and 1
 - Max tokens must be positive
-- Max retries must be between 1 and 10
+- Schema re-ask attempts must be between 1 and 10
 - Seeds must be non-negative
 
 ### ImageGen Configuration
@@ -11411,6 +11547,8 @@ All model types support the same routing, aliasing, and preset systems.
 
 ```toml
 [cogt]
+transport_max_retries = 2
+
 [cogt.inference_manager_config]
 is_auto_setup_preset_llm = true
 is_auto_setup_preset_img_gen = true
@@ -11419,9 +11557,7 @@ is_auto_setup_preset_extract = true
 [cogt.llm_config]
 default_max_images = 100
 is_structure_prompt_enabled = false
-
-[cogt.llm_config.llm_job_config]
-max_retries = 3
+schema_reask_max_attempts = 3
 
 [cogt.img_gen_config.img_gen_job_config]
 is_sync_mode = false
@@ -13522,9 +13658,11 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 ## What You'll Find Here
 
 - **Architecture Overview** - The two-layer design and how components fit together
+- **Build-time Elaboration** - How shorthand directives like `structuring_method = "preliminary_text"` are rewritten into concrete pipe trees before any pipe runs
 - **Execution Graph Tracing** - How pipeline executions are captured as graphs for visualization
 - **Image Handling in LLM Prompts** - How images flow from inputs to LLM calls
 - **Reasoning Controls** - How reasoning effort/budget flows to each provider's SDK
+- **Error Model** - How errors are classified, carried across every layer, and reported to humans, agents, and HTTP APIs
 - **StuffArtefact & Image Rendering** - How template access and image extraction work
 - **Test Profile Configuration** - How to configure which models are used in tests
 - **Dry Run Mock Generation** - How mock objects satisfy field validation constraints
@@ -13536,11 +13674,15 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 !!! info "Not Required for Using Pipelex"
     You don't need to read this section to use Pipelex effectively. The [Home](../index.md) section covers everything you need to build methods.
 
+!!! tip "Looking for Temporal deployment and operations?"
+    For running Pipelex on Temporal — cluster setup, workers, task-queue routing, and dashboard observability — see the user-facing [Distributed Execution with Temporal](../distributed-execution/index.md) guide. The pages below cover the runtime mechanics that make distributed execution work under the hood.
+
 ---
 
 ## Start Exploring
 
 - [:material-sitemap: Architecture Overview](./architecture-overview.md){ .md-button .md-button--primary }
+- [:material-source-branch: Build-time Elaboration](./build-time-elaboration.md){ .md-button }
 - [:material-graph: Execution Graph Tracing](./execution-graph-tracing.md){ .md-button }
 - [:material-image-multiple: Image Handling in LLM Prompts](./image-handling-in-llm-prompts.md){ .md-button }
 - [:material-brain: Reasoning Controls](./reasoning-controls.md){ .md-button }
@@ -13549,8 +13691,10 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - [:material-flask-outline: Dry Run Mock Generation](./dry-run-mock-generation.md){ .md-button }
 - [:material-console: Init CLI Flows](./init-cli-flows.md){ .md-button }
 - [:material-pipe: Pipe Routing & Execution](./pipe-routing-and-execution.md){ .md-button }
+- [:material-alert-circle-outline: Error Model](./error-model.md){ .md-button }
 - [:material-cloud-sync: Temporal Integration](./temporal-integration.md){ .md-button }
 - [:material-swap-horizontal: Distributed Content Generation](./distributed-content-generation.md){ .md-button }
+
 
 
 ## Architecture Overview
@@ -13712,6 +13856,111 @@ flowchart TB
 ## Next Steps
 
 - [:material-cog: Explore Configuration Internals](../contribute/configuration-defaults-and-overrides.md){ .md-button }
+
+
+## Build-time Elaboration
+
+# Build-time Elaboration
+
+Some MTHDS directives are **shorthands**: they describe what the user wants in one line, but the executable form needs several pipes wired together. Rather than handle them in the runtime, Pipelex rewrites them at load time, before any pipe runs. The runtime sees only normal pipes — `PipeLLM`, [`PipeStructure`](../building-methods/pipes/pipe-operators/PipeStructure.md), [`PipeSequence`](../building-methods/pipes/pipe-controllers/PipeSequence.md), and so on.
+
+Today, exactly one directive is elaborated: `structuring_method = "preliminary_text"` on a [`PipeLLM`](../building-methods/pipes/pipe-operators/PipeLLM.md). This page documents the mechanism so contributors and AI agents can reason about it.
+
+## Where it runs
+
+`BundleElaborator.elaborate(bundle)` runs inside `PipelexInterpreter.make_pipelex_bundle_blueprint()`, right after the bundle dict has been validated into a `PipelexBundleBlueprint`. Every code path that loads a bundle from a `.mthds` file goes through it.
+
+The elaborator has a fast-path short-circuit: if no pipe in the bundle carries `structuring_method = "preliminary_text"`, the input bundle is returned unchanged (identity-preserving). Loading a bundle without preliminary-text pipes pays no overhead.
+
+## What `preliminary_text` becomes
+
+Given a user-authored pipe like:
+
+```toml
+[pipe.review_restaurant]
+type = "PipeLLM"
+description = "Write a structured review of a restaurant from a transcript"
+inputs = { transcript = "Text" }
+output = "RestaurantReview"
+structuring_method = "preliminary_text"
+prompt = """
+Write a thorough review of this restaurant based on the transcript:
+
+@transcript
+"""
+```
+
+the elaborator replaces the single entry `review_restaurant` with three blueprints:
+
+- **`review_restaurant__draft_text`** — a `PipeLLMBlueprint` that inherits the original `inputs`, `system_prompt`, `prompt`, and `model`. Its output is **always literal `Text`**, regardless of the original output's multiplicity. `structuring_method` is reset to `None` so the elaborator never recurses.
+- **`review_restaurant__structure`** — a `PipeStructureBlueprint` with `inputs = { draft_text = "Text" }`, `output = original.output` (preserving multiplicity — `Foo`, `Foo[]`, `Foo[N]`), and `model = original.model_to_structure`. When `model_to_structure` is `None`, `PipeStructure` falls back to the deck's `for_object` LLM choice at runtime — same behavior as the legacy text-then-object path.
+- **`review_restaurant`** (replaced) — a `PipeSequenceBlueprint` wrapping the two synthetic steps, keeping the original `inputs`, `output`, and `description`. The original `pipe_code` is preserved so anything that calls or references the pipe (other pipes, `main_pipe`, the run API) keeps working unchanged.
+
+The two synthetic codes are recorded in `bundle.elaboration_metadata`, a side-table on `PipelexBundleBlueprint` that maps each synthetic code to its `parent_pipe_code` and a `step_role` (`DRAFT_TEXT` or `STRUCTURE`). The wrapping sequence is **not** registered — it is the user-facing pipe.
+
+## Why a side-table
+
+`elaboration_metadata` is declared with `Field(exclude=True)`, so it never serializes back to `.mthds`, TOML, or JSON. The runtime `PipeAbstract` has no `parent_pipe_code` field; the user-facing per-pipe blueprint surface is unpolluted by the elaboration concern.
+
+The side-table is the durable source of truth that downstream tools (graph viewer, CLI listings, distributed traces) can consult to render synthetic pipes specially. Today they don't — synthetic pipes appear as regular pipes in logs and traces — but the metadata is in place so that opt-in can land later without another round of plumbing.
+
+### Lifetime
+
+`elaboration_metadata` is **process-local**. It survives `model_copy` (used by the elaborator itself), but any `model_dump` → `model_validate` round-trip drops the side-table — that is what `exclude=True` buys us. The elaborator's own re-validate pass (`model_validate(elaborated.model_dump(by_alias=True))`) discards the rehydrated bundle and returns the original `model_copy`-built one with metadata intact, precisely because of this.
+
+Practical consequences:
+
+- Within a single process, after `BundleElaborator.elaborate(...)`, the metadata is available everywhere the bundle goes.
+- Across any serialization boundary — kajson dump, library cache, Temporal payload, MTHDS export — the metadata is gone. Downstream consumers that need it today have to re-elaborate.
+- The dependency loader handles one specific consequence: when a manifest restricts exports, synthetic helpers of exported parents are still loaded, even though they are never named in the manifest. This is implemented inline in `LibraryManager._load_single_dependency`.
+
+When a future consumer (graph viewer, persistent observability store) wants the metadata across boundaries, dropping `exclude=True` is the deliberate next step — captured as a follow-up in `TODOS.md`.
+
+## Multiplicity rule
+
+Step 1 always produces a single `Text`, even when the original output was `Foo[]` or `Foo[3]`. Step 2 is the one that fans out: `PipeStructure` inspects its declared `output` and either calls `make_object` (single) or `make_object_list` (list, with optional fixed `nb_items`). This matches the deleted `make_text_then_object_list` behavior verbatim — one preliminary text, structured into N objects.
+
+## Image inputs
+
+The original `inputs` dict (including any image variables) flows through to step 1. Step 2's input dict is hard-wired to `{ "draft_text": "Text" }`. The structuring template references only `{{ text }}`. Image variables therefore appear only on step 1, where they belong — the elaborator does not need explicit drop logic.
+
+## Pre-checks and validation
+
+Three layers guard against authoring mistakes around the output concept:
+
+1. **Construction-time (string)** — `PipeLLMBlueprint.validate_preliminary_text_output` (a `model_validator(mode="after")`) rejects a literal Text output (`"Text"`, `"native.Text"`, `"Text[]"`, `"Text[N]"`) combined with `structuring_method = "preliminary_text"`. This fires during `model_validate`, before the elaborator runs, so the user gets the error at parse time with a normal Pydantic validation failure.
+2. **Defense-in-depth (string)** — `BundleElaborator._elaborate_preliminary_text` re-runs the same string check. Only reachable if a caller bypasses validation via `model_construct`; the test suite exercises it, but nothing in the framework relies on the bypass.
+3. **Library-time (concept)** — `PipeStructure.validate_output_with_library` runs once the elaborated `PipeStructure` resolves its concept against the loaded library. This is the only layer that catches a *domain concept* that `refines = "Text"` — those slip past the string-level guards because they don't read as `Text` in the bundle source. A clean separation: string-level guards run at parse time; concept-level guards run at library load.
+
+The elaborator additionally:
+
+- Verifies that the synthetic codes (`<pipe_code>__draft_text`, `<pipe_code>__structure`) don't already exist in the bundle.
+- Verifies that the synthetic codes pass `is_pipe_code_valid` (snake_case + length).
+- After producing the new bundle, re-runs `PipelexBundleBlueprint.model_validate(elaborated.model_dump(...))` so bundle-level validators (concept refs, pipe refs, `main_pipe`) re-check the synthetic pipes. Any `ValidationError` is wrapped in `BundleElaboratorError` with context naming the originating pipe.
+- Asserts that no synthesized blueprint itself carries `structuring_method = "preliminary_text"` — a recursive-elaboration guard. Today's synthesis explicitly sets `None`; the guard protects against future elaboration kinds copying fields wholesale.
+
+## Cost and runtime semantics
+
+A `preliminary_text` pipe issues **two LLM calls per invocation** (one for the draft text, one for the structuring step). The reporting layer counts both — the integration tests assert exactly two `LLMTokensUsage` records per run.
+
+Runtime, including the Temporal data path, has no knowledge of `structuring_method`. Temporal sees only the elaborated form (`PipeSequence` + `PipeLLM` + `PipeStructure`); the existing `PipeOperator` machinery covers it.
+
+## When to add a new elaboration kind
+
+`BundleElaborator` is intentionally narrow today. Adding a second kind means:
+
+1. A new directive on a blueprint (e.g. another field on `PipeLLMBlueprint` or a new field on a different blueprint).
+2. A construction-time validator that rejects nonsensical combinations of the directive with other fields.
+3. A new private method on `BundleElaborator` (`_elaborate_<kind>`) that synthesizes the replacement pipes and registers metadata.
+4. Extending the `_is_<kind>_pipe` `TypeGuard` set + dispatch in `elaborate`.
+
+When the second kind lands, the dispatch logic should be promoted to a small registry keyed by directive — but not before. One concrete consumer is enough; two is a pattern.
+
+## Related
+
+- [`PipeLLM` › Structuring Method (preliminary_text)](../building-methods/pipes/pipe-operators/PipeLLM.md#structuring-method-preliminary-text) — the user-facing surface.
+- [`PipeStructure`](../building-methods/pipes/pipe-operators/PipeStructure.md) — the operator that backs step 2.
+- [`PipeSequence`](../building-methods/pipes/pipe-controllers/PipeSequence.md) — the controller that wraps the two synthetic steps.
 
 
 ## Dry Run Mock Generation
@@ -15081,7 +15330,7 @@ model = { model = "gpt-5.2", temperature = 0.1, reasoning_effort = "max" }
 
 ### ReasoningEffort
 
-The `ReasoningEffort` enum (`pipelex/cogt/llm/llm_job_components.py`) defines six levels:
+The `ReasoningEffort` enum (`pipelex/cogt/llm/llm_job_components.py`) defines the following levels:
 
 | Level | Value | Description |
 |-------|-------|-------------|
@@ -15090,6 +15339,7 @@ The `ReasoningEffort` enum (`pipelex/cogt/llm/llm_job_components.py`) defines si
 | `LOW` | `"low"` | Light reasoning |
 | `MEDIUM` | `"medium"` | Moderate reasoning |
 | `HIGH` | `"high"` | Heavy reasoning |
+| `XHIGH` | `"xhigh"` | Above `HIGH`, below `MAX`; maps to provider-specific xhigh value where supported (e.g. OpenAI) |
 | `MAX` | `"max"` | Maximum reasoning budget |
 
 ### ThinkingMode
@@ -15150,6 +15400,7 @@ minimal = "minimal"
 low = "low"
 medium = "medium"
 high = "high"
+xhigh = "xhigh"
 max = "xhigh"
 ```
 
@@ -15160,6 +15411,7 @@ max = "xhigh"
 | `LOW` | `"low"` |
 | `MEDIUM` | `"medium"` |
 | `HIGH` | `"high"` |
+| `XHIGH` | `"xhigh"` |
 | `MAX` | `"xhigh"` |
 
 !!! note
@@ -15180,6 +15432,7 @@ minimal = "low"
 low = "low"
 medium = "medium"
 high = "high"
+xhigh = "xhigh"
 max = "max"
 ```
 
@@ -15190,6 +15443,7 @@ max = "max"
 | `LOW` | `"low"` |
 | `MEDIUM` | `"medium"` |
 | `HIGH` | `"high"` |
+| `XHIGH` | `"xhigh"` |
 | `MAX` | `"max"` |
 
 Both modes first check `anthropic_config.effort_to_level_map` to gate reasoning. If the map returns `"disabled"` (e.g., for `NONE` effort), thinking is disabled entirely — no `thinking` parameter is sent to the SDK.
@@ -15216,6 +15470,7 @@ minimal = "low"
 low = "low"
 medium = "medium"
 high = "high"
+xhigh = "high"
 max = "high"
 ```
 
@@ -15238,6 +15493,7 @@ If the level map returns `"disabled"` (e.g., for `NONE` effort), thinking is dis
 | `LOW` | `1024` |
 | `MEDIUM` | `5000` |
 | `HIGH` | `16384` |
+| `XHIGH` | `32768` |
 | `MAX` | `65536` |
 
 **`reasoning_budget`** (explicit) passes through directly as `thinking_budget`. When `max_tokens` is known, the budget is capped to `min(budget, max_tokens - 1)`.
@@ -15261,6 +15517,7 @@ minimal = "reasoning"
 low = "reasoning"
 medium = "reasoning"
 high = "reasoning"
+xhigh = "reasoning"
 max = "reasoning"
 ```
 
@@ -15295,7 +15552,7 @@ Gateway and proxy backends (Azure OpenAI, Portkey, BlackBoxAI, Pipelex Gateway) 
 
 ## Effort-to-Level Configuration
 
-Each provider has an `effort_to_level_map` in its subconfig within `pipelex.toml` that maps `ReasoningEffort` values to provider-specific level strings. All six `ReasoningEffort` keys must be present in each map (enforced by a validator).
+Each provider has an `effort_to_level_map` in its subconfig within `pipelex.toml` that maps `ReasoningEffort` values to provider-specific level strings. Every `ReasoningEffort` key must be present in each map (enforced by a validator).
 
 The special value `"disabled"` causes the accessor to return `None`, signaling that reasoning should be skipped. OpenAI uses `"none"` as a valid API value instead (not `"disabled"`).
 
@@ -15312,6 +15569,7 @@ minimal = 512
 low = 1024
 medium = 5000
 high = 16384
+xhigh = 32768
 max = 65536
 
 [cogt.llm_config.effort_to_budget_maps.gemini]
@@ -15320,6 +15578,7 @@ minimal = 512
 low = 1024
 medium = 5000
 high = 16384
+xhigh = 32768
 max = 65536
 ```
 
@@ -16814,17 +17073,21 @@ Custom Temporal payload converter that uses Kajson for serializing/deserializing
 
 Entry point for the worker process. Calls `Pipelex.make(temporal_enabled=True)` to initialize the framework, then starts the Temporal worker with registered workflows and activities.
 
-### Content Generation Workflows
+### Content Generation Activities
 
-Concrete pipe operators (PipeLLM, PipeCompose, PipeExtract, PipeImgGen) use dedicated Temporal workflows and activities for their actual work:
+Concrete pipe operators (PipeLLM, PipeCompose, PipeExtract, PipeImgGen) dispatch dedicated Temporal activities for their actual work. Activities are invoked directly from inside `WfPipeRouter` via `ContentGeneratorInWorkflow` (`pipelex/temporal/tprl_content_generation/content_generator_in_workflow.py`), which calls `workflow.execute_activity(act_*, ...)` — there is no intermediate child workflow per content-generation call.
 
-| Workflow | Activity | Purpose |
-|----------|----------|---------|
-| `wf_make_llm_text` | `act_llm_gen_text` | LLM text generation |
-| `wf_make_object` | `act_llm_gen_object` | LLM structured output |
-| `wf_make_jinja2_text` | `act_jinja2_gen_text` | Jinja2 template rendering |
-| `wf_make_extract` | `act_extract_gen_extract_pages` | Document extraction |
-| `wf_make_image` | `act_img_gen_images` | Image generation |
+| Activity | Purpose |
+|----------|---------|
+| `act_llm_gen_text` | LLM text generation |
+| `act_llm_gen_object` | LLM structured output (single object) |
+| `act_llm_gen_object_list` | LLM structured output (list) |
+| `act_jinja2_gen_text` | Jinja2 template rendering |
+| `act_extract_gen_extract_pages` | Document extraction (OCR) |
+| `act_render_page_views` | PDF page rendering (page-views) |
+| `act_img_gen_images` | Image generation |
+
+All content-generation activities resolve dispatch via `worker_config.resolve_dispatch(...)`, so task-queue routing can be configured per activity (and, where applicable, per handle) through `[temporal.worker_config.activity_queues]`. If no routing is configured, activities fall back to the workflow's own task queue.
 
 ### Worker Environment
 
@@ -16861,7 +17124,7 @@ Each workflow creates its own `ClassRegistry` (pre-seeded from the global regist
 
 ### Known Limitation: StuffArtefact Serialization in Dry-Run
 
-PipeCondition and PipeCompose dispatch internal `WfMakeJinja2Text` sub-workflows that serialize working memory contents through the Temporal data converter. In dry-run mode, working memory contains `StuffArtefact` debug objects that are not JSON-serializable, causing these internal workflows to fail. PipeBatch also fails in dry-run (likely a related serialization issue in child PipeJob creation). PipeSequence and PipeParallel are unaffected — they dispatch child pipes through `SubPipe.run_pipe()` without internal templating workflows. See [Temporal Integration](./temporal-integration.md#known-limitation-stuffartefact-serialization-in-dry-run) for details and fix direction.
+PipeCondition and PipeCompose dispatch the `act_jinja2_gen_text` activity (via `ContentGeneratorInWorkflow.make_templated_text`) to render their expression / construct templates. The activity serializes working memory contents through the Temporal data converter. In dry-run mode, working memory contains `StuffArtefact` debug objects that are not JSON-serializable, causing these internal activities to fail. PipeBatch also fails in dry-run (likely a related serialization issue in child PipeJob creation). PipeSequence and PipeParallel are unaffected — they dispatch child pipes through `SubPipe.run_pipe()` without internal templating activities. See [Temporal Integration](./temporal-integration.md#known-limitation-stuffartefact-serialization-in-dry-run) for details and fix direction.
 
 ---
 
@@ -16938,9 +17201,434 @@ flowchart TB
 | Router selection | `pipelex/pipelex.py` (in `Pipelex.setup()`) |
 
 
+## Error Model
+
+# Error Model
+
+In Pipelex, an error is **data**, not a control-flow accident. Every failure is classified once — at the layer that knows the most about it — and that classification travels intact to every consumer: the human reading a Rich panel, the agent parsing JSON, the Temporal retry engine, and the HTTP adapter picking a status code.
+
+This page covers the contract that makes that possible: the `ErrorReport` schema, the classification enums, how inference workers classify SDK exceptions, how classification survives every wrapping layer, and how it crosses the Temporal boundary.
+
+---
+
+## Design Principle
+
+Three rules hold across the codebase, and everything else builds on them.
+
+**Single-rooted hierarchy.** Every custom exception inherits from `PipelexError` (`pipelex/base_exceptions.py`). There is one root, so one `to_error_report()` contract covers the whole tree.
+
+**Classify at the source, never lose it.** The layer that catches a third-party exception knows the most about it. It classifies there. Every layer above is a *wrapper* — it adds context (pipe code, stack) but inherits the classification rather than re-deriving or discarding it.
+
+**No broad catches in business logic.** `except Exception` is allowed only at CLI entry points and async task roots. Ruff rule `BLE001` enforces this — an unexpected exception crashes loudly instead of being silently swallowed.
+
+!!! info "Why classify, instead of just propagating the exception?"
+    A raw `openai.RateLimitError` tells a Python `except` clause what to catch, but it does not tell the Temporal retry engine whether to retry, the HTTP adapter which status to emit, or an agent whether the failure is the user's fault. Classification turns an exception into a decision input that every consumer can act on uniformly.
+
+---
+
+## The Layer Model
+
+An error rises through a series of layers. Each layer has exactly one job.
+
+| Layer | Role | What it does with errors |
+|-------|------|--------------------------|
+| **5 — CLI entry points** | `pipelex` / `pipelex-agent` commands | Catch, format for human (Rich) / agent (JSON·MD) / HTTP |
+| **4 — CLI factories** | `cli_factory.py`, `agent_cli_factory.py` | Catch setup errors, route to handlers |
+| **3 — Pipeline runner** | `PipelexRunner.execute_pipeline()` | Catch + wrap as `PipelineExecutionError` |
+| **2 — Pipe router / operators** | `PipeRouter`, pipe operators | Catch + wrap with pipe context (`pipe_code`, `pipe_stack`) |
+| **1 — Workers / SDK calls** | `pipelex/plugins/*/` | **Catch the SDK exception → classify → raise `CogtError`** |
+| **0 — Third-party SDKs** | OpenAI, Anthropic, Google, … | Raise raw, untyped provider exceptions |
+
+Classification happens once, at **Layer 1**. Layers 2–5 are wrappers: they attach context as they catch and re-raise, but the `error_category`, `error_domain`, `model`, and `provider` set at Layer 1 reach Layer 5 unchanged (see [Cause-Chain Enrichment](#cause-chain-enrichment)).
+
+---
+
+## ErrorReport — the Serialization Schema
+
+`ErrorReport` (`pipelex/base_exceptions.py`) is the single source of truth for error serialization. It is a frozen Pydantic dataclass with `extra="forbid"`.
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `error_type` | `str` | The exception class name |
+| `message` | `str` | Human-readable message |
+| `error_category` | `str \| None` | `InferenceErrorCategory` value (inference errors only) |
+| `error_domain` | `str \| None` | `ErrorDomain` value — `input` / `config` / `runtime` |
+| `retryable` | `bool \| None` | Whether a retry could succeed |
+| `user_action` | `UserAction \| None` | Typed advice — `kind` + free-form `detail` |
+| `model` | `str \| None` | Model handle, when the failure is attributable to one |
+| `provider` | `str \| None` | Backend name, when attributable |
+| `provider_metadata` | `ProviderErrorMetadata \| None` | SDK metadata — status code, request id, `retry_after` |
+
+`PipelexError.to_error_report()` is the entry point. `to_dict()` serializes, dropping `None` fields; `from_dict()` is its strict inverse.
+
+```python
+report = exc.to_error_report()
+report.to_dict()         # {"error_type": "LLMCompletionError", "message": "...", ...}
+ErrorReport.from_dict(d) # strict inverse — raises ValidationError on a malformed dict
+report.http_status       # 422 / 429 / 500 — for HTTP adapters
+```
+
+!!! warning "`ErrorReport` is `extra="forbid"`"
+    `from_dict()` rejects unknown keys. When recovering a report across a version boundary (e.g. a Temporal payload from a newer worker), trim to known fields *before* calling `from_dict()` — `recover_error_report()` does exactly this.
+
+---
+
+## Classification Enums
+
+Two `StrEnum`s drive every downstream decision.
+
+### InferenceErrorCategory
+
+Defined in `pipelex/cogt/exceptions.py`. Drives retry decisions — `is_retryable` is `True` only for `TRANSIENT`.
+
+| Category | Meaning | Retryable | Typical cause |
+|----------|---------|-----------|---------------|
+| `TRANSIENT` | A brief, self-correcting failure | ✅ | Rate limit, 5xx, connection blip |
+| `CONFIGURATION` | The setup is wrong | ❌ | Bad API key, missing backend |
+| `CONTENT` | The input or prompt is wrong | ❌ | Content-policy violation, bad prompt |
+| `CAPACITY` | Account quota / billing exhausted | ❌ | `insufficient_quota`, HTTP 402 |
+| `AMBIGUOUS` | Outcome unknown — may have committed | ❌ | Connection dropped mid-request |
+| `UNKNOWN` | Could not classify | ❌ | Unrecognized inner exception |
+
+```python
+class InferenceErrorCategory(StrEnum):
+    TRANSIENT = "transient"
+    # ... CONFIGURATION, CONTENT, CAPACITY, AMBIGUOUS ...
+    UNKNOWN = "unknown"
+
+    @property
+    def is_retryable(self) -> bool:
+        match self:
+            case InferenceErrorCategory.TRANSIENT:
+                return True
+            case _:  # all other categories
+                return False
+```
+
+!!! info "`AMBIGUOUS` vs `UNKNOWN`"
+    `AMBIGUOUS` means the *error type is known* but the operation may or may not have committed — a blind retry is unsafe for a non-idempotent call. `UNKNOWN` means classification itself failed. Both are non-retryable, for different reasons.
+
+### ErrorDomain
+
+Defined in `pipelex/base_exceptions.py`. Set as a class-level attribute on the exception, drives HTTP status.
+
+| Domain | Meaning | HTTP status | Who can fix it |
+|--------|---------|-------------|----------------|
+| `INPUT` | Caller sent something it can fix | **422** | The caller |
+| `CONFIG` | Environment / configuration change needed | **500** | The operator |
+| `RUNTIME` | A failure during execution | **500** | Depends on the cause |
+
+`error_domain_to_http_status()` is the pure mapping table. `ErrorReport.http_status` layers one rule on top: a provider 429 (`provider_metadata.status_code == 429`) takes precedence over the domain, so the API can emit a `Retry-After` header.
+
+```python
+class PipelexConfigError(PipelexError):
+    error_domain = ErrorDomain.CONFIG     # class-level — every instance carries it
+```
+
+---
+
+## Worker Classification
+
+Layer 0 → Layer 1. Every inference worker under `pipelex/plugins/*/` catches its SDK's typed exceptions and re-raises a categorized `CogtError`.
+
+### The Uniform Shape — Extract / Classify / Render
+
+Every inference worker's SDK-exception handler collapses to a three-step pipeline: **Extract** turns the SDK exception into a provider-blind `ProviderErrorMetadata`, **Classify** maps that metadata to a category + user-action, and **Render** picks the `CogtError` subclass to raise.
+
+```python
+except (APIError, APIConnectionError, APITimeoutError) as exc:
+    metadata = extract_openai_metadata(exc)
+    classification = classify_inference_error(metadata)
+    raise render_llm_error(
+        family=InferenceErrorFamily.LLM_COMPLETION,
+        metadata=metadata,
+        classification=classification,
+        model_desc=self.inference_model.desc,
+    ) from exc
+```
+
+The three steps live in three modules. Only the per-provider Extract functions stay plugin-local; Classify and Render are single shared functions.
+
+| Module | Step | What it owns |
+|--------|------|--------------|
+| `pipelex/cogt/inference/error_classification.py` | Extract | `ProviderErrorMetadata`, `SDKErrorEnvelope`, `UserAction`, `UserActionKind`, the 12 `extract_*_metadata` functions, plus pure discriminators (`is_quota_exhaustion`, `is_content_policy_violation`, `is_network_error`) exposed as `@property` on the metadata |
+| `pipelex/cogt/inference/error_classify.py` | Classify | `classify_inference_error()` — provider-blind mapping from `ProviderErrorMetadata` → `ClassificationResult(category, user_action_kind, is_model_not_found)` |
+| `pipelex/cogt/inference/error_render.py` | Render | `render_llm_error()` / `render_img_gen_error()` / `render_extract_error()` / `render_search_error()` — picks the `CogtError` subclass from `InferenceErrorFamily` plus `is_model_not_found` (e.g. `LLMModelNotFoundError` vs `LLMCompletionError`) |
+
+Provider-specific nuance is normalized away in Extract (e.g. Google's `code` becomes `status_code`; AWS Bedrock error codes are mapped to HTTP statuses), so Classify has no provider branching. HTTP status drives classification; status-less errors dispatch on the SDK exception type name. The `tests/unit/pipelex/cogt/inference/test_provider_classification_parity.py` meta-test walks every `ProviderName` against the extract-fn registry so adding a new provider without wiring it fails fast.
+
+### ProviderErrorMetadata and UserAction
+
+Every raised inference error carries structured SDK metadata and typed advice.
+
+```python
+class ProviderErrorMetadata(BaseModel):
+    provider: str
+    sdk_exception_type: str
+    status_code: int | None = None
+    request_id: str | None = None
+    retry_after_seconds: float | None = None
+    provider_error_code: str | None = None
+    body: Any | None = Field(default=None, exclude=True)   # may carry secrets
+```
+
+!!! warning "`body` is excluded from serialization"
+    The raw provider response `body` can carry account ids, billing details, or credential fragments. It is held in-process but `exclude`d from every serialized form — CLI JSON, agent output, Temporal details.
+
+`UserAction` pairs a discrete `UserActionKind` (`WAIT_AND_RETRY`, `CHECK_BILLING`, `CHECK_CREDENTIALS`, `CHANGE_INPUT`, `CHANGE_MODEL`, `CONTACT_SUPPORT`, `UNKNOWN`) with a free-form `detail` string — so the CLI can render consistent guidance while keeping provider-specific text.
+
+### The `instructor` Unwrap
+
+On structured-generation paths, `instructor` wraps the real SDK exception in an `InstructorRetryException`. `extract_underlying_sdk_exception()` recovers it, so it routes through the same per-provider categorization as the plain-text path. A genuinely unrecognized inner exception (e.g. a `pydantic.ValidationError` from a schema mismatch) lands in `UNKNOWN` rather than being mis-labelled as a `CONTENT`-policy violation.
+
+### Model and Provider Attribution
+
+Inference-failure leaf errors (`LLMCompletionError`, `ImgGenGenerationError`, …) are raised deep inside a plugin and do not know which model handle invoked them. Each worker family fills that in at its public-method chokepoint:
+
+```python
+def fill_model_and_provider(self, model_handle: str | None, backend_name: str | None) -> None:
+    """Fill model_handle / backend_name from the worker, only when still unset."""
+```
+
+---
+
+## Cause-Chain Enrichment
+
+A wrapper exception — `PipeRunError` → `PipeRouterError` → `PipelineExecutionError` — carries no `error_category` of its own. `to_error_report()` enriches the report from the `__cause__` chain, so the inference classification survives every wrapping layer.
+
+```python
+def _enrich_error_report_from_cause(self, report: ErrorReport) -> ErrorReport:
+    cause = self.__cause__
+    if not isinstance(cause, PipelexError):
+        return report
+    cause_report = cause.to_error_report()
+    return ErrorReport(
+        error_type=report.error_type,                                  # keep own identity
+        message=report.message,
+        error_category=report.error_category or cause_report.error_category,
+        error_domain=report.error_domain or cause_report.error_domain,
+        # ... retryable, user_action, model, provider, provider_metadata ...
+    )
+```
+
+A wrapper keeps its own `error_type` and `message` but inherits every classification field it does not set itself.
+
+!!! warning "Overrides must call the enrichment helper"
+    A `to_error_report()` override on a subclass **must** end with `self._enrich_error_report_from_cause(report)`. Otherwise that subclass becomes a black hole that drops the cause's classification. A cyclic-`__cause__` guard ensures a malformed chain can never turn error reporting into a `RecursionError`.
+
+---
+
+## The Temporal Error Bridge
+
+When a pipe runs on a Temporal worker, the error must survive serialization across the **activity → workflow → submitter** boundary. Temporal's default failure converter would wrap a raw `PipelexError` without packing the `ErrorReport` or deriving the retry decision. The bridge closes that gap.
+
+### Activity Side — `convert_pipelex_errors`
+
+A decorator applied beneath `@activity.defn` on every in-scope activity converts a `PipelexError` into a `TemporalError`.
+
+```python
+@activity.defn
+@convert_pipelex_errors
+async def act_llm_gen_text(llm_assignment: LLMAssignment) -> str:
+    return await llm_gen_text(llm_assignment=llm_assignment)
+```
+
+`TemporalError.from_message_exception()` does two things:
+
+- **Derives `non_retryable`** from `InferenceErrorCategory.is_retryable` for category-carrying errors. (The configured `non_retryable_error_types` class-name list is the fallback for category-less exceptions.)
+- **Packs the report** — `to_error_report().to_dict()` goes into `ApplicationError.details`, so workflow code keeps the full classification, not just a message string.
+
+### Submitter Side — `recover_error_report`
+
+Once the failure returns to the process that submitted the workflow, `recover_error_report()` walks the `__cause__` chain for the `ApplicationError`, pulls the details-packed dict, and rebuilds the `ErrorReport`.
+
+```python
+def recover_error_report(exc: BaseException) -> ErrorReport | None:
+    report_dict = _find_error_report_dict(exc)
+    if report_dict is None:
+        return None
+    known = {f.name for f in fields(ErrorReport)}
+    trimmed = {k: v for k, v in report_dict.items() if k in known}  # tolerate skew
+    try:
+        return ErrorReport.from_dict(trimmed)
+    except ValidationError:
+        return None
+```
+
+The recovered report is carried on `WorkflowExecutionError(error_report=...)`, whose `to_error_report()` override returns it. Since `WorkflowExecutionError` is a `PipelexError`, `PipelineExecutionError` inherits the classification natively.
+
+!!! info "Version skew is tolerated"
+    During a rolling deploy a worker and a submitter may run different Pipelex versions. Unknown keys are trimmed before validation, and a dict that still fails validation yields `None` — the error path degrades gracefully instead of crashing.
+
+**Net effect:** a pipe failing on a Temporal worker reaches the CLI and HTTP adapters with the *same* `error_category` / `retryable` / `model` / `provider` / `user_action` as the identical failure run locally.
+
+---
+
+## Interfaces
+
+### CLI
+
+The agent CLI (`pipelex-agent`) emits a structured error to **stderr**, markdown by default and JSON with `--error-format json`. When `--error-format` is omitted it **inherits the value of `--format`** (the success-output flag) — so `--format json` still flips both as it did before the split. Both exit with code 1.
+
+| Command | Error output |
+|---------|--------------|
+| `run`, `validate`, `init`, `models`, `check-model`, `doctor` | Markdown (default) or JSON via `--error-format` (or via `--format`, which `--error-format` inherits) |
+| `inputs`, `concept`, `pipe`, `accept-gateway-terms` | JSON only |
+| `fmt`, `lint` | Native `plxt` output (subprocess passthrough); falls back to JSON only when the `plxt` binary itself is missing |
+
+The human CLI (`pipelex`) renders a Rich error panel — red banner, structured fields, the `user_action` tip, doc/Discord links — through the shared `display_error_panel()` helper in `pipelex/cli/error_handlers.py`.
+
+### API
+
+`pipelex` is a library — there is no API server in the package. Downstream HTTP repos consume the `ErrorReport`:
+
+- `error_domain_to_http_status(error_domain)` — pure domain → status table.
+- `ErrorReport.http_status` — full property, layering the provider-429 passthrough on top.
+
+A downstream FastAPI exception handler calls `ErrorReport.http_status` and is a trivial adapter — it must not redefine the mapping.
+
+### Inputs and Outputs
+
+**Inputs.** `to_error_report()` takes a live `PipelexError`. `recover_error_report()` takes any `BaseException` and walks its `__cause__` chain. `ErrorReport.from_dict()` takes a `to_dict()` payload — strictly, raising `ValidationError` on drift.
+
+**Outputs.** `to_error_report()` returns an `ErrorReport`; `to_dict()` returns a `None`-free `dict`. Side effects: telemetry events emitted on pipeline failure at Layer 3; the agent CLI writes to stderr and raises `typer.Exit(1)`.
+
+---
+
+## Architecture
+
+```mermaid
+flowchart TB
+    SDK["Layer 0 — SDK exception<br/>(openai.RateLimitError)"]
+    W["Layer 1 — Worker classifies<br/>is_quota_exhaustion_*() → CogtError<br/>+ InferenceErrorCategory + ProviderErrorMetadata"]
+    WRAP["Layers 2-3 — Wrappers<br/>PipeRouterError → PipelineExecutionError<br/>(attach pipe context)"]
+    REPORT["ErrorReport<br/>via to_error_report() + cause-chain enrichment"]
+
+    SDK -->|"raise ... from exc"| W
+    W -->|"raise ... from exc"| WRAP
+    WRAP --> REPORT
+
+    REPORT --> RICH["Human CLI<br/>Rich panel"]
+    REPORT --> AGENT["Agent CLI<br/>JSON / Markdown"]
+    REPORT --> HTTP["HTTP adapters<br/>.http_status"]
+
+    W -.->|"@convert_pipelex_errors"| TEMP["Temporal bridge<br/>TemporalError → ApplicationError.details"]
+    TEMP -.->|"recover_error_report()"| REPORT
+
+    classDef src fill:#fff3e0,stroke:#e65100,color:#000
+    classDef cls fill:#e8eaf6,stroke:#3949ab,color:#000
+    classDef out fill:#e8f5e9,stroke:#2e7d32,color:#000
+    class SDK src
+    class W,WRAP,REPORT,TEMP cls
+    class RICH,AGENT,HTTP out
+```
+
+---
+
+## Implementation
+
+### Class Hierarchy
+
+`PipelexError` is the single root. `CogtError` is the inference branch — it overrides `to_error_report()` to add `error_category`, `retryable`, `user_action`, `provider_metadata`, and reads `model_handle` / `backend_name` from the instance.
+
+```
+Exception
+└── PipelexError                  base_exceptions.py — error_domain, user_action, to_error_report()
+    ├── PipelexConfigError         → error_domain = CONFIG
+    ├── PipelexSetupError          → error_domain = CONFIG
+    ├── CogtError                  cogt/exceptions.py — error_category, provider_metadata
+    │   ├── LLMCompletionError      ← per-instance category from the worker
+    │   ├── ImgGenGenerationError   ← per-instance category
+    │   ├── ModelNotFoundError      ← sibling family raised on provider HTTP 404
+    │   │   ├── LLMModelNotFoundError / ImgGenModelNotFoundError
+    │   │   └── ExtractModelNotFoundError / SearchModelNotFoundError
+    │   └── ... (see worker classification) ...
+    ├── PipelineExecutionError      pipeline/exceptions.py — error_domain = RUNTIME
+    └── ... (one exceptions.py per package) ...
+```
+
+### Factory-time vs Runtime
+
+| When | What carries metadata | How |
+|------|----------------------|-----|
+| **Class definition** | `error_domain`, `error_category` defaults, `user_action` defaults | Class-level attributes — one source of truth per exception type |
+| **Raise time** | Per-instance `error_category`, `user_action`, `provider_metadata` | Constructor args — set by the worker that classified the failure |
+| **Report time** | `model`, `provider`, cause-chain fields | `fill_model_and_provider()` at the worker chokepoint; `_enrich_error_report_from_cause()` on `to_error_report()` |
+
+The "outcome" exceptions (`LLMCompletionError`, `ImgGenGenerationError`, `ExtractJobFailureError`, `SearchJobFailureError`) intentionally carry **no** class-level `error_category` — their category is genuinely per-instance, decided by the worker.
+
+---
+
+## Reference
+
+### Quick-Ref
+
+```python
+# Produce a report from any PipelexError
+report = exc.to_error_report()          # enriched from the __cause__ chain
+payload = report.to_dict()              # None-free dict for serialization
+
+# Consume a report
+report.http_status                      # 422 / 429 / 500
+report.user_action_detail()             # free-form advice text, or None
+report.error_category                   # "transient" / "capacity" / ...
+
+# Round-trip across a boundary
+ErrorReport.from_dict(payload)           # strict inverse of to_dict()
+recover_error_report(temporal_failure)   # walk __cause__ for an ApplicationError
+
+# Retry decision
+InferenceErrorCategory.TRANSIENT.is_retryable   # True — only TRANSIENT
+```
+
+### File → Purpose
+
+| File | Purpose |
+|------|---------|
+| `pipelex/base_exceptions.py` | `PipelexError`, `ErrorReport`, `ErrorDomain`, `error_domain_to_http_status()` |
+| `pipelex/cogt/exceptions.py` | `CogtError`, `InferenceErrorCategory` |
+| `pipelex/cogt/inference/error_classification.py` | Extract — `ProviderErrorMetadata`, `SDKErrorEnvelope`, `UserAction`, `UserActionKind`, per-provider `extract_*_metadata` functions, pure discriminators |
+| `pipelex/cogt/inference/error_classify.py` | Classify — `classify_inference_error()`, `ClassificationResult` |
+| `pipelex/cogt/inference/error_render.py` | Render — `render_llm_error()` / `render_img_gen_error()` / `render_extract_error()` / `render_search_error()`, `InferenceErrorFamily` |
+| `pipelex/cogt/inference/provider_name.py` | `ProviderName` enum keying the extract-fn registry |
+| `pipelex/plugins/*/` | Per-provider inference workers — Layer 0 → 1 classification |
+| `pipelex/pipeline/exceptions.py` | `PipelineExecutionError`, `PipeExecutionError` |
+| `pipelex/temporal/tprl/temporal_error.py` | `TemporalError`, `from_message_exception`, `recover_error_report` |
+| `pipelex/temporal/tprl/activity_error_boundary.py` | `convert_pipelex_errors` decorator |
+| `pipelex/temporal/tprl/workflow_caller.py` | `WorkflowExecutor`, `WorkflowExecutionError` recovery |
+| `pipelex/cli/error_handlers.py` | Human CLI Rich panels — `display_error_panel()` |
+| `pipelex/cli/agent_cli/commands/agent_output.py` | Agent CLI JSON / markdown delivery |
+
+### Behavior Summary
+
+| Scenario | Behavior |
+|----------|----------|
+| Rate limit hit | `TRANSIENT` → retryable; transport retry honors `Retry-After` |
+| Quota / billing exhausted | `CAPACITY` → non-retryable; `UserAction(CHECK_BILLING)` |
+| Bad API key | `CONFIGURATION` → non-retryable; `error_domain = CONFIG` → HTTP 500 |
+| Model or deployment not found (provider HTTP 404) | Raises a dedicated `*ModelNotFoundError` sibling (`LLMModelNotFoundError`, `ImgGenModelNotFoundError`, `ExtractModelNotFoundError`, `SearchModelNotFoundError`); operator re-raises `PipeOperatorModelAvailabilityError` |
+| Content-policy violation | `CONTENT` → non-retryable; `UserAction(CHANGE_INPUT)` |
+| LLM returns schema-mismatched JSON | `instructor` re-asks; if exhausted → `UNKNOWN` |
+| Connection dropped mid-request | `AMBIGUOUS` → non-retryable (outcome unknown) |
+| Wrapper exception (no own category) | Inherits cause's classification via enrichment |
+| Failure on a Temporal worker | `ErrorReport` recovered from `ApplicationError.details` — same classification as local |
+| Worker/submitter version skew | Unknown keys trimmed; unrecoverable dict yields `None` |
+
+---
+
+## Next Steps
+
+- [Pipe Routing & Execution](./pipe-routing-and-execution.md) — the layer model errors rise through
+- [Temporal Integration](./temporal-integration.md) — the activity → workflow boundary the error bridge spans
+- [Cogt Configuration](../configuration/config-technical/cogt-config.md) — `transport_max_retries` and the Tier 1 retry policy
+- [Agent CLI](../tools/cli/agent-cli.md) — the JSON / markdown error contract
+
+
 ## Temporal Integration
 
 # Temporal Integration
+
+This page is for contributors working on Pipelex internals. If you're deploying or operating Pipelex on Temporal, see the user-facing [Distributed Execution with Temporal](../distributed-execution/index.md) guide instead.
 
 This page covers the Temporal-specific mechanisms that enable distributed pipe execution. For the general pipe routing architecture (shared between direct and distributed modes), see [Pipe Routing & Execution](./pipe-routing-and-execution.md).
 
@@ -17110,7 +17798,8 @@ PipeSequence (3 steps)
   → 1 parent WfPipeRouter
   → 3 child WfPipeRouters (one per step)
   Each child step (if PipeLLM):
-    → 1 child WfMakeLLMText + 1 ActLLMGenText activity
+    → 1 act_llm_gen_text activity (dispatched directly from WfPipeRouter
+       via ContentGeneratorInWorkflow.make_llm_text)
 
 PipeParallel (2 branches, then summary)
   → 1 parent WfPipeRouter
@@ -17135,29 +17824,29 @@ Each controller type creates a different child workflow pattern:
 | **PipeSequence** | Sequential: each step via `SubPipe.run_pipe()` → `PipeRouterChild` | N children (one per step), executed sequentially |
 | **PipeParallel** | Concurrent: all branches via `SubPipe.run_pipe()` + `asyncio.gather()` | N children (one per branch), executed concurrently |
 | **PipeBatch** | Fan-out: each list item via `SubPipe.run_pipe()` | N children (one per item), executed concurrently |
-| **PipeCondition** | Conditional: evaluates expression, dispatches selected outcome via `SubPipe.run_pipe()` | 1 child (the chosen outcome pipe), plus internal `WfMakeJinja2Text` for expression evaluation |
+| **PipeCondition** | Conditional: evaluates expression, dispatches selected outcome via `SubPipe.run_pipe()` | 1 child (the chosen outcome pipe), plus an internal `act_jinja2_gen_text` activity for expression evaluation |
 
-### Internal sub-workflows
+### Internal templating activities
 
-Some controllers dispatch internal sub-workflows in addition to pipe routing:
+Some controllers dispatch internal `act_jinja2_gen_text` activities in addition to pipe routing:
 
-- **PipeCondition**: `WfMakeJinja2Text` to evaluate the expression template against working memory
-- **PipeCompose**: `WfMakeJinja2Text` to resolve construct field references (e.g., `{ from = "title_text.text" }`)
+- **PipeCondition**: `act_jinja2_gen_text` to evaluate the expression template against working memory
+- **PipeCompose**: `act_jinja2_gen_text` to resolve construct field references (e.g., `{ from = "title_text.text" }`)
 
-These internal workflows carry working memory contents through the Temporal data converter, which creates a serialization dependency on working memory content types.
+Both call `ContentGeneratorInWorkflow.make_templated_text` from inside `WfPipeRouter`, which dispatches the activity directly via `workflow.execute_activity(act_jinja2_gen_text, ...)`. These activities carry working memory contents through the Temporal data converter, which creates a serialization dependency on working memory content types.
 
 ---
 
 ## Known Limitation: StuffArtefact Serialization in Dry-Run
 
-In dry-run mode, PipeLLM produces `StuffArtefact` debug objects as working memory content. When controllers dispatch internal sub-workflows that carry working memory contents through the Temporal data converter, Kajson fails with `TypeError: Type <class 'StuffArtefact'> is not JSON serializable`.
+In dry-run mode, PipeLLM produces `StuffArtefact` debug objects as working memory content. When controllers dispatch internal templating activities that carry working memory contents through the Temporal data converter, Kajson fails with `TypeError: Type <class 'StuffArtefact'> is not JSON serializable`.
 
 `StuffArtefact` is not a Pydantic model — it's a plain object used for dry-run tracing that was never designed for cross-process serialization.
 
 **Confirmed affected**:
 
-- **PipeCondition**: expression evaluation dispatches `WfMakeJinja2Text`, which serializes working memory to evaluate the Jinja2 expression. Fails with `StuffArtefact` TypeError.
-- **PipeCompose**: construct field resolution dispatches `WfMakeJinja2Text` similarly.
+- **PipeCondition**: expression evaluation dispatches `act_jinja2_gen_text`, which serializes working memory to evaluate the Jinja2 expression. Fails with `StuffArtefact` TypeError.
+- **PipeCompose**: construct field resolution dispatches `act_jinja2_gen_text` similarly.
 
 **Likely affected** (hangs in testing, root cause not fully diagnosed):
 
@@ -17165,11 +17854,11 @@ In dry-run mode, PipeLLM produces `StuffArtefact` debug objects as working memor
 
 **Not affected**:
 
-- **PipeSequence**: no internal sub-workflows — child pipes are dispatched via `SubPipe.run_pipe()` → `PipeRouterChild`, which creates clean child PipeJobs.
-- **PipeParallel**: same dispatch pattern as PipeSequence — branches go through `SubPipe.run_pipe()` without internal templating workflows.
+- **PipeSequence**: no internal templating activities — child pipes are dispatched via `SubPipe.run_pipe()` → `PipeRouterChild`, which creates clean child PipeJobs.
+- **PipeParallel**: same dispatch pattern as PipeSequence — branches go through `SubPipe.run_pipe()` without internal templating activities.
 - **All controllers in live mode**: `StuffArtefact` is only produced in dry-run. Live execution uses real content objects that serialize correctly.
 
-**Fix direction**: Either make `StuffArtefact` serializable (implement `__json__` or convert to Pydantic), or strip non-serializable objects from working memory before passing to internal sub-workflows.
+**Fix direction**: Either make `StuffArtefact` serializable (implement `__json__` or convert to Pydantic), or strip non-serializable objects from working memory before passing to internal templating activities.
 
 ---
 
@@ -17198,6 +17887,8 @@ In dry-run mode, PipeLLM produces `StuffArtefact` debug objects as working memor
 ## Distributed Content Generation
 
 # Distributed Content Generation
+
+This page is for contributors working on Pipelex internals. If you're deploying or operating Pipelex on Temporal, see the user-facing [Distributed Execution with Temporal](../distributed-execution/index.md) guide instead.
 
 This page covers the serialization mechanisms that enable content generation (LLM structured output, image generation, PDF extraction) to run across Temporal worker processes. For the broader Temporal architecture — LibraryCrate propagation, deferred hydration, per-workflow scoping — see [Temporal Integration](./temporal-integration.md).
 
