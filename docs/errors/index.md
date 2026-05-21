@@ -24,6 +24,9 @@ classification rules, and the cross-boundary Temporal bridge.
 
 ## CogtError
 
+- [`AnthropicModelListingError`](anthropic-model-listing-error.md) — Anthropic model listing
+- [`AnthropicSDKUnsupportedError`](anthropic-sdk-unsupported-error.md) — Anthropic sdk unsupported
+- [`AnthropicWorkerConfigurationError`](anthropic-worker-configuration-error.md) — Anthropic worker configuration
 - [`CogtError`](cogt-error.md) — AI inference failed
 - [`CostRegistryError`](cost-registry-error.md) — Cost registry
 - [`ExtractCapabilityError`](extract-capability-error.md) — Extract capability
@@ -32,6 +35,12 @@ classification rules, and the cross-boundary Temporal bridge.
 - [`ExtractJobFailureError`](extract-job-failure-error.md) — Extract job failure
 - [`ExtractModelNotFoundError`](extract-model-not-found-error.md) — Extract model not found
 - [`ExtractOutputError`](extract-output-error.md) — Extract output
+- [`GatewayCredentialsError`](gateway-credentials-error.md) — Gateway credentials
+- [`GatewayDeckError`](gateway-deck-error.md) — Gateway deck
+- [`GatewayError`](gateway-error.md) — Gateway
+- [`GatewayExtractResponseError`](gateway-extract-response-error.md) — Gateway extract response
+- [`GatewayFactoryError`](gateway-factory-error.md) — Gateway factory
+- [`GatewaySearchResponseError`](gateway-search-response-error.md) — Gateway search response
 - [`GatewayUnknownModelError`](gateway-unknown-model-error.md) — Gateway unknown model
 - [`GeneratedImageError`](generated-image-error.md) — Generated image
 - [`ImageContentError`](image-content-error.md) — Image content
@@ -57,6 +66,10 @@ classification rules, and the cross-boundary Temporal bridge.
 - [`LLMPromptSpecError`](llm-prompt-spec-error.md) — Llm prompt spec
 - [`LLMPromptTemplateInputsError`](llm-prompt-template-inputs-error.md) — Llm prompt template inputs
 - [`LLMSettingsValidationError`](llm-settings-validation-error.md) — Llm settings validation
+- [`MistralExtractResponseError`](mistral-extract-response-error.md) — Mistral extract response
+- [`MistralModelListingError`](mistral-model-listing-error.md) — Mistral model listing
+- [`MistralPluginError`](mistral-plugin-error.md) — Mistral plugin
+- [`MistralWorkerConfigurationError`](mistral-worker-configuration-error.md) — Mistral worker configuration
 - [`ModelChoiceNotFoundError`](model-choice-not-found-error.md) — Model choice not found
 - [`ModelDeckNotFoundError`](model-deck-not-found-error.md) — Model deck not found
 - [`ModelDeckPresetValidatonError`](model-deck-preset-validaton-error.md) — Model deck preset validaton
@@ -65,6 +78,9 @@ classification rules, and the cross-boundary Temporal bridge.
 - [`ModelManagerError`](model-manager-error.md) — Model manager
 - [`ModelNotFoundError`](model-not-found-error.md) — Model not found
 - [`ModelWaterfallError`](model-waterfall-error.md) — Model waterfall
+- [`PortkeyCredentialsError`](portkey-credentials-error.md) — Portkey credentials
+- [`PortkeyError`](portkey-error.md) — Portkey
+- [`PortkeyFactoryError`](portkey-factory-error.md) — Portkey factory
 - [`PromptDocumentFactoryError`](prompt-document-factory-error.md) — Prompt document factory
 - [`PromptImageFactoryError`](prompt-image-factory-error.md) — Prompt image factory
 - [`PromptImageFormatError`](prompt-image-format-error.md) — Prompt image format

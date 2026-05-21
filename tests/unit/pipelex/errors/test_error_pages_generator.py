@@ -10,8 +10,8 @@ from pipelex.errors.error_pages_generator import (
     GENERATED_MARKER,
     INDEX_STEM,
     ErrorPagesReport,
-    _has_authored_marker,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
     generate_error_pages,
+    has_authored_marker,
     page_slug,
 )
 from pipelex.tools.misc.string_utils import pascal_case_to_kebab
@@ -71,10 +71,10 @@ class TestErrorPagesGenerator:
     def test_authored_marker_detection_ignores_marker_inside_other_content(self) -> None:
         """The marker must appear as its own (stripped) line — substring matches don't count."""
         body_with_marker_in_prose = "<!-- gstack:generated -->\n<!-- Add the `<!-- gstack:authored -->` marker to claim this page -->\n"
-        assert _has_authored_marker(body_with_marker_in_prose) is False
+        assert has_authored_marker(body_with_marker_in_prose) is False
 
         body_with_standalone_marker = f"some content\n{AUTHORED_MARKER}\nmore content\n"
-        assert _has_authored_marker(body_with_standalone_marker) is True
+        assert has_authored_marker(body_with_standalone_marker) is True
 
     def test_report_total_sums_three_populations(self) -> None:
         """``total`` should equal the sum of ``written`` + ``unchanged`` + ``preserved``."""

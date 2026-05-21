@@ -41,11 +41,17 @@ _NON_STANDARD_ERROR_MODULES: tuple[str, ...] = (
 
 
 def _discover_standard_exception_modules() -> tuple[str, ...]:
-    """Return dotted module names for every ``exceptions.py`` / ``*_errors.py`` file under ``pipelex/``."""
+    """Return dotted module names for every conventionally-named error module under ``pipelex/``.
+
+    Covers three filename conventions in use today:
+    ``exceptions.py``, ``*_exceptions.py`` (plugin error modules), and ``*_errors.py``.
+    Missing one of them previously made the docs generator depend on Pipelex
+    bootstrap order to pick up plugin error classes — fragile coupling.
+    """
     pipelex_root = Path(pipelex.__file__).resolve().parent
     repo_root = pipelex_root.parent
     discovered: set[str] = set()
-    for pattern in ("exceptions.py", "*_errors.py"):
+    for pattern in ("exceptions.py", "*_exceptions.py", "*_errors.py"):
         for path in pipelex_root.rglob(pattern):
             rel = path.relative_to(repo_root).with_suffix("")
             discovered.add(".".join(rel.parts))

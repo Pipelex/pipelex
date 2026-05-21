@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 from rich.panel import Panel
@@ -11,9 +10,6 @@ from pipelex.errors.error_pages_generator import generate_error_pages
 from pipelex.hub import get_console
 from pipelex.pipelex import Pipelex
 
-# Default destination directory, aligned with the kebab tail of
-# :meth:`PipelexError.type_uri` so each ``<base_uri>/<slug>`` URL maps to a
-# real file at ``docs/errors/<slug>.md``.
 ERROR_PAGES_DIR = Path("docs/errors")
 
 
@@ -41,13 +37,6 @@ def generate_error_pages_cmd(output: Path | None = None, quiet: bool = False) ->
     Pipelex.make()
     try:
         report = generate_error_pages(output_dir=output_path)
-    except Exception:  # noqa: BLE001
-        # Dev CLI command root: report any generation failure as FAILED; exit non-zero.
-        if quiet:
-            console.print("[red]✗ Error pages generation: FAILED[/red]")
-        else:
-            console.print("[bold red]✗ Failed to generate error pages[/bold red]")
-        sys.exit(1)
     finally:
         Pipelex.teardown_if_needed()
 

@@ -148,6 +148,8 @@ All three call sites in `workflow_caller.py` (`:128`, `:240`, `:292`) drop their
 
 No structural change from the spec. The improvement is that `cls.title()` and `cls.type_uri()` from item A are total (always populated), so the generator never has to fall back to placeholder content. Every page has a real title and a stable URL anchor.
 
+**One material deviation, settled at landing time.** The original plan had `base_uri` defaulting to `https://pipelex.dev/errors` — a domain that does not actually serve these pages. Retargeted at landing to `https://docs.pipelex.com/latest/errors`, the live MkDocs + mike docs site. The `/latest/` alias is mike's canonical pointer at current stable, forced via `docs/overrides/main.html` — a `type` URI emitted by any deployed version always lands on up-to-date docs. `PipelexError.type_uri()` now appends a trailing slash (`<base>/<slug>/`) to match the canonical form MkDocs serves with `use_directory_urls: true` — clients dereferencing the URI hit the page directly without a 301. API consumers should treat `type_uri` as opaque and not strip or normalize the trailing slash.
+
 ---
 
 ### §F. Item 8 — `query_pipeline_state(...)` — **dropped**
@@ -188,8 +190,10 @@ These show up in multiple items above; collecting them here so the API agent can
 - [x] **Stage 1 — Foundations.** Items A + B.
 - [x] **Stage 2 — Rendering primitives + total recovery.** Items C + D-1.
 - [x] **Stage 3 — Async error pipe.** Item D-2 (the unblock for API Phase 4).
-- [ ] **Stage 4 — DX polish.** Item E.
-- [ ] **Stage 5 — Security tightening.** Item F (cross-repo).
+- [x] **Stage 4 — DX polish.** Item E.
+- [ ] **Stage 5 — Security tightening.** Item F (cross-repo, tracked at [`../security/webhook-signing.md`](../security/webhook-signing.md)).
+
+**Net to the API team:** the full error-handling refactor on the pipelex side is landed on `feature/API-readiness`. API Phases 0/1/4/5 are unblocked. The only outstanding pipelex-side item is the webhook-signing security track, which is independent of the rest of this plan and will land on its own schedule.
 
 ### What landed in Stage 1
 
@@ -234,3 +238,17 @@ Available now on `feature/API-readiness`:
 **One additive deviation.** The plan localized the threading to the Temporal path. The direct-mode `PipeRun` was also updated for parity (see above). Same observable contract for API consumers in both modes.
 
 **Pre-flight that the activity arg change relies on.** `tests/integration/pipelex/temporal/test_payload_codec_roundtrip.py::TestPayloadCodecRoundTrip::test_error_report_round_trips_through_activity` lands as a new test case that round-trips an `ErrorReport` (with populated `UserAction` + `ProviderErrorMetadata`) through a workflow → activity → return hop, verifying the BaseModel converter handles it directly. The plan's ordering (round-trip test before activity arg change) is preserved within the same commit set.
+
+### What landed in Stage 4
+
+Available now on `feature/API-readiness`:
+
+- **`pipelex.errors_config.base_uri` retargeted** (`pipelex/pipelex.toml`, `.pipelex/pipelex.toml`) — from `https://pipelex.dev/errors` to `https://docs.pipelex.com/latest/errors`. The `/latest/` alias is mike's canonical pointer at current stable; canonical URLs are forced to `/latest/` via `docs/overrides/main.html`. Override at your own deployment as needed; the `ErrorsConfig.base_uri` field is the single override point.
+- **`PipelexError.type_uri()` emits a trailing slash** (`pipelex/base_exceptions.py`) — form is `<base>/<kebab-class-name>/`. Matches the canonical URL MkDocs serves with `use_directory_urls: true` (verified against the built `<link rel="canonical">` of the deployed page). Clients dereferencing the URI now hit the docs page directly — no 301 round-trip. Treat `type_uri` as opaque on the API side; do NOT strip or normalize the trailing slash.
+- **`docs/errors/<kebab-class-name>.md`** — one generated page per non-test `PipelexError` subclass (232 pages at this writing). Each page carries the class identity table (`error_type`, `title`, `type_uri`, `error_domain`, defining module, parent-class link, class-level `user_action` when declared), a docstring fragment when present, and a back-link to the Error Model overview. Stamped with `<!-- gstack:generated -->`. Maintainers can claim a page for hand-editing by adding `<!-- gstack:authored -->` as a standalone line; the generator then preserves it across runs. A landing `docs/errors/index.md` lists every page grouped by top-level `PipelexError` branch.
+- **`pipelex-dev generate-error-pages`** (`pipelex/cli/dev_cli/commands/generate_error_pages_cmd.py`) — internal CLI command to regenerate the pages. Quiet status line via `--quiet`; custom output dir via `--output DIR` (defaults to `docs/errors/`). Bootstraps Pipelex internally so `type_uri()` resolves; tears down on exit.
+- **`pipelex/errors/error_module_registry.py`** — exposes `iter_pipelex_error_subclasses()` (force-loads every conventional error module and walks the hierarchy, skipping `tests.*`). Used by the docs generator and by the type-URI uniqueness test, so the two see the same class set. Discovery covers `exceptions.py`, `*_exceptions.py` (plugin error modules), and `*_errors.py` plus a small explicit list of non-standard locations.
+- **`mkdocs.yml` updates** — added a `not_in_nav` directive whitelisting `errors/*.md` (except `errors/index.md`) and `CLAUDE.md` so `make docs-check` (= `mkdocs build --strict`) finishes with zero INFO/WARNING/ERROR; added "Reference > Error Reference" pointing at `errors/index.md`.
+- **Pre-existing bug fix carried in this stage.** `pipelex/core/pipes/inputs/input_stuff_specs_factory.py` was shadowing `InputStuffSpecsFactoryError` with a local declaration that bypassed the canonical class in `pipelex/core/pipes/inputs/exceptions.py`. Two distinct class objects with the same name existed. Consolidated to one — the factory module now re-exports the canonical class via `__all__`; test imports keep working with no callsite changes.
+
+**One deviation from the plan**, both already documented in §E above: `base_uri` defaulted to the live docs host (not `pipelex.dev`), and `type_uri()` emits a trailing slash. Pure URL-shape changes; no other contract shifts. The trailing slash is the only thing the API team needs to be aware of when comparing strings against `type_uri` values.
