@@ -366,7 +366,7 @@ class ReportingManager(ReportingProtocol):
             log.warning(f"ReportingManager does not support reporting for inference job type: {type(inference_job).__name__}")
 
     @override
-    def generate_report(self, pipeline_run_id: str | None = None):
+    def generate_report(self, pipeline_run_id: str | None = None, print_to_console: bool = True):
         cost_report_file_path: Path | None = None
         if self._reporting_config.is_generate_cost_report_file_enabled:
             ensure_path(self._reporting_config.cost_report_dir_path)
@@ -388,6 +388,7 @@ class ReportingManager(ReportingProtocol):
                 tokens_usages=registry.get_current_tokens_usage(),
                 unit_scale=self._reporting_config.cost_report_unit_scale,
                 cost_report_file_path=cost_report_file_path,
+                print_to_console=print_to_console,
             )
 
     @override
