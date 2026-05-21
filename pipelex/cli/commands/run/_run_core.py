@@ -22,7 +22,7 @@ from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
-from pipelex.hub import get_console, get_telemetry_manager
+from pipelex.hub import get_console, get_report_delegate, get_telemetry_manager
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
@@ -51,6 +51,7 @@ async def _execute_run(
     dry_run: bool,
     mock_inputs: bool,
     library_dir: list[str] | None,
+    cost_report: bool | None,
     dynamic_output_concept_ref: str | None = None,
 ) -> None:
     """Core async execution logic for running a pipe.
@@ -212,6 +213,20 @@ async def _execute_run(
         save_as_json_to_path(object_to_save=working_memory_dict, path=working_memory_output_path)
         log.verbose(f"Working memory saved to: {working_memory_output_path}")
 
+    reporting_config = get_config().pipelex.reporting_config
+    # --no-cost-report (cost_report is False) skips the report entirely: no table, no CSV.
+    # Otherwise: console follows the flag (if given) or config; CSV follows config.
+    if cost_report is not False:
+        print_to_console = cost_report or reporting_config.is_log_costs_to_console
+        if print_to_console or reporting_config.is_generate_cost_report_file_enabled:
+            try:
+                get_report_delegate().generate_report(
+                    pipeline_run_id=response.pipeline_run_id,
+                    print_to_console=print_to_console,
+                )
+            except (OSError, PipelexError) as cost_report_error:
+                log.warning(f"Cost report generation failed (run succeeded): {cost_report_error}")
+
     # Print completion recap
     console = get_console()
     if dry_run:
@@ -245,6 +260,7 @@ def execute_run(
     dry_run: bool,
     mock_inputs: bool,
     library_dir: list[str] | None,
+    cost_report: bool | None = None,
     telemetry_command_label: str = COMMAND,
     temporal: bool | None = None,
     dynamic_output_concept_ref: str | None = None,
@@ -275,6 +291,7 @@ def execute_run(
                     dry_run=dry_run,
                     mock_inputs=mock_inputs,
                     library_dir=library_dir,
+                    cost_report=cost_report,
                     dynamic_output_concept_ref=dynamic_output_concept_ref,
                 )
             )
