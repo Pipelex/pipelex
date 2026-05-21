@@ -35,7 +35,7 @@ AUTHORED_MARKER = "<!-- gstack:authored -->"
 GENERATED_MARKER = "<!-- gstack:generated -->"
 # Stem of the landing page emitted alongside the per-class pages. Kept in nav;
 # the per-class pages are declared ``not_in_nav`` in ``mkdocs.yml`` so the
-# sidebar does not balloon with 200+ entries.
+# sidebar does not balloon with one entry per error class.
 INDEX_STEM = "index"
 
 

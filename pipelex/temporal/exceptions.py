@@ -12,9 +12,9 @@ class UnrecoverableWorkflowFailureError(TemporalFlowError):
 
     ``recover_error_report`` is total — every ``BaseException`` produces an
     ``ErrorReport``. When the failure has no embedded report (a non-Pipelex
-    worker exception, a Temporal infra error, or a worker/submitter version
-    skew that defeats ``from_dict``), we synthesize this exception and return
-    its ``to_error_report()``. That gives consumers a uniform shape with a
+    worker exception, a Temporal infra error, a heartbeat timeout), we
+    synthesize this exception and return its ``to_error_report()``. That
+    gives consumers a uniform shape with a
     stable identity (``error_type`` / ``title`` / ``type_uri``) and the
     ``RUNTIME`` classification, plus the most informative message we could
     recover from the failure chain.

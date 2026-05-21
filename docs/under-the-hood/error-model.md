@@ -69,7 +69,7 @@ report.http_status       # 422 / 429 / 500 — for HTTP adapters
 ```
 
 !!! warning "`ErrorReport` is `extra="forbid"`"
-    `from_dict()` rejects unknown keys. When recovering a report across a version boundary (e.g. a Temporal payload from a newer worker), trim to known fields *before* calling `from_dict()` — `recover_error_report()` does exactly this.
+    `from_dict()` rejects unknown keys. `recover_error_report()` calls it directly: a report dict that is found but fails validation is an internal contract bug — the activity bridge and the submitter share the schema within one deploy — and is allowed to raise rather than be silently swallowed.
 
 ---
 
