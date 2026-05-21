@@ -1,6 +1,9 @@
 import pytest
 from pytest_mock import MockerFixture
 
+from pipelex.base_exceptions import ErrorDomain, ErrorReport
+from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
+from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.pipe_run.delivery_assignment import (
     DeliveryAssignment,
     DeliveryStatus,
@@ -299,6 +302,79 @@ class TestDeliveryExecutor:
         json_text = files["working_memory.json"].data.decode("utf-8")
         assert "Page 1 contents" in json_text
         assert "https://example.com/img.png" in json_text
+
+    async def test_webhook_includes_error_report_on_failed_status(self, mocker: MockerFixture) -> None:
+        """A FAILED delivery with an ``ErrorReport`` includes a VERBOSE ``error`` dict the receiver can rehydrate."""
+        mock_client = mocker.AsyncMock()
+        mock_response = mocker.MagicMock()
+        mock_response.raise_for_status = mocker.Mock()
+        mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
+        mock_client.post = mocker.AsyncMock(return_value=mock_response)
+        mocker.patch("pipelex.pipe_run.delivery_executor.httpx.AsyncClient", return_value=mock_client)
+
+        error_report = ErrorReport(
+            error_type="LLMCompletionError",
+            message="provider returned 429",
+            title="AI inference failed",
+            type_uri="https://pipelex.dev/errors/llm-completion-error",
+            error_category="transient",
+            error_domain=ErrorDomain.RUNTIME,
+            retryable=True,
+            user_action=UserAction(kind=UserActionKind.WAIT_AND_RETRY, detail="Wait a moment and retry"),
+            model="gpt-4o-mini",
+            provider="openai",
+            provider_metadata=ProviderErrorMetadata(
+                provider=ProviderName.OPENAI,
+                sdk_exception_type="RateLimitError",
+                message="429 Too Many Requests",
+                status_code=429,
+                retry_after_seconds=2.5,
+            ),
+        )
+
+        executor = DeliveryExecutor()
+        assignment = DeliveryAssignment(webhooks=[WebhookTarget(url="https://example.com/callback")])
+
+        await executor.execute(
+            pipe_output=None,
+            user_id="test-user",
+            pipeline_run_id="plr-failed",
+            delivery_assignment=assignment,
+            status=DeliveryStatus.FAILED,
+            error_report=error_report,
+        )
+
+        payload = mock_client.post.call_args.kwargs["json"]
+        assert payload["status"] == DeliveryStatus.FAILED
+        assert "error" in payload, "FAILED webhook must include the structured error report"
+        rehydrated = ErrorReport.from_dict(payload["error"])
+        assert rehydrated == error_report, "VERBOSE payload must round-trip through from_dict"
+
+    async def test_webhook_omits_error_when_report_is_none(self, mocker: MockerFixture) -> None:
+        """A completed delivery (no report) must not introduce an ``error`` field in the payload."""
+        mock_client = mocker.AsyncMock()
+        mock_response = mocker.MagicMock()
+        mock_response.raise_for_status = mocker.Mock()
+        mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
+        mock_client.post = mocker.AsyncMock(return_value=mock_response)
+        mocker.patch("pipelex.pipe_run.delivery_executor.httpx.AsyncClient", return_value=mock_client)
+
+        executor = DeliveryExecutor()
+        assignment = DeliveryAssignment(webhooks=[WebhookTarget(url="https://example.com/callback")])
+
+        await executor.execute(
+            pipe_output=None,
+            user_id="test-user",
+            pipeline_run_id="plr-success",
+            delivery_assignment=assignment,
+            status=DeliveryStatus.COMPLETED,
+        )
+
+        payload = mock_client.post.call_args.kwargs["json"]
+        assert payload["status"] == DeliveryStatus.COMPLETED
+        assert "error" not in payload
 
     async def test_webhook_failure_raises(self, mocker: MockerFixture) -> None:
         import httpx  # noqa: PLC0415

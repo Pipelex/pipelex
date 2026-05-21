@@ -1,5 +1,3 @@
-from dataclasses import replace
-
 from typing_extensions import override
 
 from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexError, PipelexUnexpectedError
@@ -41,10 +39,11 @@ class PipelineExecutionError(PipelexError):
         # RUNTIME / UNKNOWN values are only a floor, applied when the cause
         # surfaced nothing — never overriding a categorized cause action.
         report = super().to_error_report()
-        return replace(
-            report,
-            error_domain=report.error_domain or ErrorDomain.RUNTIME,
-            user_action=report.user_action or UserAction(kind=UserActionKind.UNKNOWN, detail="Check pipe_stack to identify which pipe failed"),
+        return report.model_copy(
+            update={
+                "error_domain": report.error_domain or ErrorDomain.RUNTIME,
+                "user_action": report.user_action or UserAction(kind=UserActionKind.UNKNOWN, detail="Check pipe_stack to identify which pipe failed"),
+            }
         )
 
 

@@ -8,6 +8,7 @@ from kajson.exceptions import KajsonException
 from pydantic import ValidationError
 
 from pipelex import log
+from pipelex.base_exceptions import DisclosureMode, ErrorReport
 from pipelex.config import get_config
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
@@ -42,6 +43,7 @@ class DeliveryExecutor:
         pipeline_run_id: str,
         delivery_assignment: DeliveryAssignment,
         status: DeliveryStatus,
+        error_report: ErrorReport | None = None,
     ) -> None:
         """Execute a full delivery: generate result files, store them, then notify webhooks."""
         # Step 1: Persist the result files to storage (only on success with output)
@@ -51,7 +53,7 @@ class DeliveryExecutor:
 
         # Step 2: Notify webhooks with status + result_url (always, even on failure)
         for webhook in delivery_assignment.webhooks:
-            await self._notify_webhook(pipeline_run_id, status, result_url, webhook)
+            await self._notify_webhook(pipeline_run_id, status, result_url, webhook, error_report)
 
     # ---- Result file generation ----
 
@@ -241,14 +243,21 @@ class DeliveryExecutor:
         status: DeliveryStatus,
         result_url: str | None,
         webhook: WebhookTarget,
+        error_report: ErrorReport | None = None,
     ) -> None:
-        """POST status + result_url to a webhook URL."""
+        """POST status, optional result_url, and optional VERBOSE error report to a webhook URL.
+
+        VERBOSE on the wire is deliberate: the receiver decides what to re-expose
+        downstream (it can render STRICT via :meth:`ErrorReport.to_problem_document`).
+        """
         try:
             payload: dict[str, Any] = dict(webhook.payload)
             payload["pipeline_run_id"] = pipeline_run_id
             payload["status"] = status
             if result_url is not None:
                 payload["result_url"] = result_url
+            if error_report is not None:
+                payload["error"] = error_report.to_dict(disclosure_mode=DisclosureMode.VERBOSE)
 
             async with httpx.AsyncClient() as client:
                 response = await client.post(

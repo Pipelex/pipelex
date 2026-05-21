@@ -1,7 +1,7 @@
 import json
-from dataclasses import FrozenInstanceError
 
 import pytest
+from pydantic import ValidationError
 
 from pipelex.base_exceptions import ErrorReport, PipelexError
 from pipelex.cogt.exceptions import (
@@ -225,7 +225,7 @@ class TestErrorCategoryInfrastructure:
             title="AI inference failed",
             type_uri="https://pipelex.dev/errors/cogt-error",
         )
-        with pytest.raises(FrozenInstanceError):
+        with pytest.raises(ValidationError):
             report.message = "mutated"  # type: ignore[misc]
 
     def test_from_exc_chain_preserved(self) -> None:

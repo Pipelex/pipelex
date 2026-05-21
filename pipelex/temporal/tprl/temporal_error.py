@@ -1,5 +1,4 @@
 from collections.abc import Sequence
-from dataclasses import fields
 from typing import Any, cast
 
 from pydantic import ValidationError
@@ -12,6 +11,9 @@ from pipelex.config import get_config
 from pipelex.temporal.exceptions import UnrecoverableWorkflowFailureError
 from pipelex.temporal.log_temporal import activity_log, workflow_log
 from pipelex.types import Self
+
+# Frozen at module load so recover_error_report doesn't rebuild it per failure.
+_ERROR_REPORT_KNOWN_FIELDS: frozenset[str] = frozenset(ErrorReport.model_fields)
 
 
 def error_report_dict_from_details(details: Sequence[Any]) -> dict[str, Any] | None:
@@ -97,8 +99,7 @@ def recover_error_report(exc: BaseException) -> ErrorReport:
     """
     report_dict = _find_error_report_dict(exc)
     if report_dict is not None:
-        known_fields = {field.name for field in fields(ErrorReport)}
-        trimmed = {key: value for key, value in report_dict.items() if key in known_fields}
+        trimmed = {key: value for key, value in report_dict.items() if key in _ERROR_REPORT_KNOWN_FIELDS}
         try:
             return ErrorReport.from_dict(trimmed)
         except ValidationError:

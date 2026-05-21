@@ -6,11 +6,13 @@ from temporalio.exceptions import ActivityError, ChildWorkflowError
 from typing_extensions import override
 
 with workflow.unsafe.imports_passed_through():
+    from pipelex.base_exceptions import ErrorReport  # noqa: TC001  # must traverse the workflow sandbox
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryStatus
     from pipelex.temporal.exceptions import WorkflowExecutionError
     from pipelex.temporal.log_temporal import workflow_log
     from pipelex.temporal.tprl.observability import build_search_attributes, build_static_summary
+    from pipelex.temporal.tprl.temporal_error import recover_error_report
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
     from pipelex.temporal.tprl_pipe.act_assemble_graph import AssembleGraphArg, act_assemble_graph
     from pipelex.temporal.tprl_pipe.act_deliver import DeliveryActivityArg, act_deliver
@@ -40,6 +42,7 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
         status: DeliveryStatus = DeliveryStatus.COMPLETED
         pipe_output: PipeOutput | None = None
         execution_error: WorkflowExecutionError | None = None
+        error_report: ErrorReport | None = None
 
         # The wf_pipe_router child runs the same pipe as wf_pipe_run, so its
         # search attributes and static summary are identical — re-derive them
@@ -60,19 +63,10 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
             workflow_log.debug("WfPipeRouter completed successfully")
         except ChildWorkflowError as exc:
             status = DeliveryStatus.FAILED
-            # Wrap the raw ``ChildWorkflowError`` as ``WorkflowExecutionError`` so
-            # the rest of this function and the outer ``execute_workflow`` caller
-            # continue to see the same Pipelex error type as before — the
-            # in-workflow ``WorkflowExecutor.execute_child_workflow`` wrapper used
-            # to do this wrap before; the integration test
-            # ``test_wf_pipe_run_failure_path`` pins the workflow_failure_exception_types
-            # contract on ``WorkflowExecutionError``.
-            #
-            # Manual ``__cause__`` wire (not ``raise X from exc``): we hold the
-            # wrapped error for a deferred re-raise in the post-delivery block
-            # below so ``act_deliver`` still fires on the failure path. Raising
-            # here would short-circuit delivery.
-            execution_error = WorkflowExecutionError("WfPipeRouter failed")
+            # Hold the wrapped error for a deferred re-raise after delivery — raising here would short-circuit ``act_deliver``.
+            # ``ChildWorkflowError`` exposes the underlying failure via ``exc.cause``, not ``__cause__``.
+            error_report = recover_error_report(exc.cause if exc.cause is not None else exc)
+            execution_error = WorkflowExecutionError("WfPipeRouter failed", error_report=error_report)
             execution_error.__cause__ = exc
             workflow_log.error(f"WfPipeRouter failed: {exc}")
 
@@ -107,6 +101,7 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
                 pipeline_run_id=pipeline_run_id,
                 delivery_assignment=delivery_assignment,
                 status=status,
+                error_report=error_report,
             )
             # Include pipe_output only on success
             if pipe_output is not None:

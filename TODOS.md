@@ -217,7 +217,7 @@ The plan reflects these decisions; no further re-litigation in the items below.
 
 ## Stage 3 — Async error pipe *(unblocks `pipelex-api` Phase 4 — most important item)*
 
-### [ ] Item D-2 — Thread `ErrorReport` to the webhook
+### [x] Item D-2 — Thread `ErrorReport` to the webhook
 
 - **Prereq: convert `ErrorReport` from `@pydantic.dataclasses.dataclass` to `BaseModel`.**
 
@@ -322,7 +322,7 @@ Tracked here so the idea doesn't get lost. Each lands when a concrete consumer m
 | B | `request_id` on `JobMetadata` *(spec 3)* | 1 | [x] |
 | C | `to_dict(disclosure_mode=)` + `to_problem_document(...)` *(spec 4+6)* | 2 | [x] |
 | D-1 | Total `recover_error_report` | 2 | [x] |
-| D-2 | `ErrorReport` → `BaseModel`; thread to webhook; full `WfPipeRun` chain test *(spec 5)* | 3 | [ ] |
+| D-2 | `ErrorReport` → `BaseModel`; thread to webhook; full `WfPipeRun` chain test *(spec 5)* | 3 | [x] |
 | E | Per-class doc pages *(spec 7)* | 4 | [ ] |
 
 The original spec's item 9 (webhook signature) is tracked separately at [`wip/security/webhook-signing.md`](wip/security/webhook-signing.md).
@@ -445,14 +445,36 @@ Checkpoints are **hard stops**. Do not pick up the next stage in the same sessio
 - `make agent-check` + `make agent-test` clean.
 
 **Fill in at checkpoint time:**
-- Files touched: _TBD_
-- Confirmation that the workflow's "preserve `execution_error` for failure attribution" reordering still holds (current `wf_pipe_run.py:132` comment): _TBD_
+
+- **Files touched:**
+    - Production:
+        - `pipelex/base_exceptions.py` — `ErrorReport` is now a `BaseModel(model_config=ConfigDict(frozen=True, extra="forbid", arbitrary_types_allowed=True))`. `to_dict` uses `self.model_dump(exclude_none=True)` directly; `from_dict` uses `cls.model_validate(data)`. Dropped the cached `_ERROR_REPORT_ADAPTER` (no longer needed — `model_dump`/`model_validate` are first-class on BaseModel). Dropped the `pydantic.dataclasses` and `TypeAdapter`/`cast` imports.
+        - `pipelex/pipeline/exceptions.py` — `PipelineExecutionError.to_error_report()` uses `report.model_copy(update={...})` instead of `dataclasses.replace(report, ...)`. Removed the `from dataclasses import replace` import.
+        - `pipelex/temporal/tprl/temporal_error.py` — `recover_error_report` uses `set(ErrorReport.model_fields)` instead of `{field.name for field in fields(ErrorReport)}`. Removed the `from dataclasses import fields` import.
+        - `pipelex/pipe_run/delivery_executor.py` — `execute(...)` and `_notify_webhook(...)` accept `error_report: ErrorReport | None = None`. When non-None, the webhook payload includes `error = error_report.to_dict(DisclosureMode.VERBOSE)` so the receiver can losslessly rehydrate via `ErrorReport.from_dict`. Imports `DisclosureMode` and `ErrorReport`.
+        - `pipelex/pipe_run/pipe_run.py` — direct-mode `PipeRun.run` now captures `error_report = exc.to_error_report()` when the caught exception is a `PipelexError` and threads it into `self._delivery_executor.execute(error_report=...)`. Non-Pipelex exceptions surface no report (the in-process semantics consumers already expect).
+        - `pipelex/temporal/tprl_pipe/act_deliver.py` — `DeliveryActivityArg` gains `error_report: ErrorReport | None = None`. The `act_deliver` activity forwards it to `DeliveryExecutor.execute(error_report=...)`. The existing `BaseModelPayloadConverter._unwrap_optional_base_model` handles the `ErrorReport | None` field directly — no shim needed.
+        - `pipelex/temporal/tprl_pipe/wf_pipe_run.py` — on the `ChildWorkflowError` catch path, calls `recover_error_report(exc.cause if exc.cause is not None else exc)` (total since Item D-1), constructs `WorkflowExecutionError("WfPipeRouter failed", error_report=error_report)`, and threads the same `error_report` into `DeliveryActivityArg`. The `ErrorReport` import sits inside the `imports_passed_through()` block with a `noqa: TC001` because the workflow sandbox needs it at runtime for the local-variable annotation.
+    - Tests:
+        - New: `tests/integration/pipelex/temporal/test_payload_codec_roundtrip.py::TestPayloadCodecRoundTrip::test_error_report_round_trips_through_activity` — pre-flight that pins the `ErrorReport` BaseModel round-trip through a workflow→activity hop with populated nested `UserAction` / `ProviderErrorMetadata`. Lands before the activity arg change in the same commit; safety-net for the `BaseModelPayloadConverter` carrying the new arg.
+        - New: `tests/integration/pipelex/temporal/test_workflow_error_report_full_chain.py::TestWorkflowErrorReportFullChain::test_wf_pipe_run_failure_threads_error_report_to_webhook_and_submitter` — end-to-end `WfPipeRun` chain with `delivery_assignment` whose webhook is intercepted by an `httpx.AsyncClient` mock (via `mocker.AsyncMock(side_effect=...)`). Asserts both (a) the webhook payload's `error` dict carries the full classification (`error_type` / `error_category` / `retryable` / `model` / `provider` / `title` / `type_uri` / `user_action.kind`) and (b) the submitter-side `WorkflowExecutionError.to_error_report()` carries the same classification — i.e. the outer Temporal wrap did NOT drop the inner report.
+        - New: `tests/integration/pipelex/temporal/test_workflow_error_report_full_chain.py::TestWorkflowErrorReportFullChain::test_wf_pipe_run_failure_without_delivery_assignment_surfaces_classification` — verifies the submitter-side path still surfaces classification when no `delivery_assignment` is configured (skips `act_deliver` entirely).
+        - New: `tests/unit/pipelex/pipe_run/test_delivery_executor.py::TestDeliveryExecutor::test_webhook_includes_error_report_on_failed_status` + `test_webhook_omits_error_when_report_is_none` — receiver-rehydration pin (`ErrorReport.from_dict(payload["error"]) == original`) and the COMPLETED-without-report contract.
+        - Updated: `tests/unit/pipelex/cogt/test_exceptions.py::TestErrorCategoryInfrastructure::test_error_report_is_frozen` — now expects `pydantic.ValidationError` instead of `dataclasses.FrozenInstanceError`. Updated the test module's imports accordingly.
+- **Workflow's "preserve execution_error for failure attribution" reordering still holds.** `wf_pipe_run.py` re-raises in order: `if execution_error is not None: raise execution_error` first, `if delivery_error is not None: raise delivery_error` second. Test `tests/integration/pipelex/temporal/test_wf_pipe_run_failure_path.py::TestWfPipeRunFailurePath` continues to pin the failure-path invariant (router failure fires delivery with FAILED status before re-raising), and the new full-chain test pins the additional invariant that the structured report is recovered AND threaded through delivery before the re-raise.
+- **Surprises / deviations (recorded in `api-companion-revisions.md` §D-2):**
+    1. **The direct-mode `PipeRun` path also threads `error_report`** (not just the Temporal path the plan called out). The plan's D-2 acceptance criterion ("a Temporal-side pipe failure reaches the webhook with the same classification a sync caller would see locally") implies parity, so the local executor was updated to call `exc.to_error_report()` when the caught exception is a `PipelexError` and pass it to `DeliveryExecutor.execute`. Non-`PipelexError` exceptions still surface no report (consistent with the in-process semantics consumers already expect).
+    2. **`temporal_error.py` field-introspection swap.** `recover_error_report`'s known-fields set was built via `{field.name for field in fields(ErrorReport)}` (stdlib-dataclasses-only API). Under the BaseModel conversion this would `AttributeError` at runtime. Swapped to `set(ErrorReport.model_fields)`, which is the Pydantic v2 equivalent and is iterable as a `dict[str, FieldInfo]` keyed by field name.
+    3. **`title` auto-derive in the full-chain test.** The new `WfPipeRun` end-to-end test asserts `error_dict["title"] == "Llm completion"`, not `"AI inference failed"`. The `_declared_title` inheritance-bypass rule (locked in at Checkpoint 1) means `LLMCompletionError.title()` does NOT inherit `CogtError._declared_title`; it auto-derives from its own class name. Documented inline in the test alongside the assertion so a future reader sees why.
+    4. **Pre-existing baseline test failure persists.** `tests/e2e/agent_cli/test_offline_run_dry.py::TestOfflineDryRun::test_gateway_no_cache_no_network_fails_with_unavailable` still fails on `feature/API-readiness` for unrelated reasons (CLI subprocess returns empty `{}` instead of `{"error_type": "RemoteConfigUnavailableError"}`). Confirmed identical failure on `git stash` baseline — NOT introduced by Stage 3 and not in scope for this checkpoint. Tracked here for the Checkpoint 4 cold-start (or earlier, independent fix) per the Checkpoint 2 hand-off note.
 - **Notify the API team** that Stages 1–3 are landed and their Phases 0/1/4 are unblocked. Update [`api-companion-revisions.md`](wip/error-handling/api-companion-revisions.md) "current state" section.
 
 **Cold-start for Checkpoint 4:**
+
 - Stage 4 is docs polish. Re-read Item E.
 - Read `docs/under-the-hood/error-model.md` to understand the docs site layout.
 - Confirm docs build cleanly locally before starting.
+- The pre-existing `test_gateway_no_cache_no_network_fails_with_unavailable` failure on baseline carries over from Checkpoint 2 — fix or skip independently before the next `make agent-test` gate.
 
 ---
 

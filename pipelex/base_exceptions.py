@@ -1,7 +1,6 @@
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar
 
-from pydantic import TypeAdapter
-from pydantic.dataclasses import dataclass
+from pydantic import BaseModel, ConfigDict
 
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction
 from pipelex.errors.error_manager import ErrorManager
@@ -95,8 +94,7 @@ def error_domain_to_http_status(error_domain: ErrorDomain | str | None) -> int:
             return 500
 
 
-@dataclass(frozen=True, config={"extra": "forbid", "arbitrary_types_allowed": True})
-class ErrorReport:
+class ErrorReport(BaseModel):
     """Structured error report — single source of truth for all error serialization.
 
     Used by CLI JSON output, agent output, and Temporal error details.
@@ -105,7 +103,13 @@ class ErrorReport:
     (CLI, API, docs). Every ``PipelexError`` populates them automatically via
     :meth:`PipelexError.title` / :meth:`PipelexError.type_uri`; consumers never
     humanize or kebab-case a class name themselves.
+
+    Frozen: wrappers must rebuild via :meth:`model_copy` rather than mutate, so
+    a cause-enrichment pass cannot accidentally overwrite an outer wrapper's
+    identity in-place.
     """
+
+    model_config = ConfigDict(frozen=True, extra="forbid", arbitrary_types_allowed=True)
 
     error_type: str
     message: str
@@ -131,10 +135,7 @@ class ErrorReport:
         reports pass through unchanged in STRICT mode because their ``message``
         is caller-influenced and reflecting it back is part of the contract.
         """
-        payload = cast(
-            "dict[str, Any]",
-            _ERROR_REPORT_ADAPTER.dump_python(self, mode="python", exclude_none=True),
-        )
+        payload = self.model_dump(exclude_none=True)
         match disclosure_mode:
             case DisclosureMode.VERBOSE:
                 return payload
@@ -202,7 +203,7 @@ class ErrorReport:
         against that failure (version skew, corrupted payload) belongs at the
         recovery call site, not here.
         """
-        return _ERROR_REPORT_ADAPTER.validate_python(data)
+        return cls.model_validate(data)
 
     def user_action_detail(self) -> str | None:
         """Return the free-form advice text on ``user_action``, or ``None`` when absent."""
@@ -222,13 +223,6 @@ class ErrorReport:
         if self.provider_metadata is not None and self.provider_metadata.status_code == 429:
             return 429
         return error_domain_to_http_status(self.error_domain)
-
-
-# Cached at module scope because building a ``TypeAdapter`` per call rebuilds
-# the validator + serializer schema (pydantic explicitly flags per-call
-# construction as a hot-path pitfall). ``ErrorReport`` has no subclasses, so a
-# single instance covers every ``to_dict`` / ``from_dict`` call.
-_ERROR_REPORT_ADAPTER: TypeAdapter[ErrorReport] = TypeAdapter(ErrorReport)
 
 
 def _humanize_class_name(class_name: str) -> str:
