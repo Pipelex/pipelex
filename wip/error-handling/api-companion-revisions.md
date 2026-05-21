@@ -10,7 +10,7 @@ The execution plan that implemented these revisions is the now-archived [`archiv
 
 The original spec in [`changes-for-api-early-draft.md`](changes-for-api-early-draft.md) is **structurally sound** — every item identifies a real downstream pain and a real upstream primitive to fix it. But on close reading, several items push the very kind of consumer-side duplication, ad-hoc fallback logic, and optional-`None` plumbing that the spec itself argues against. A few items also introduce surface area earlier than it can be used, or hedge with "curate a subset, do the rest later" which leaves the codebase in an inconsistent state.
 
-The revisions below collapse 9 items to 6, eliminate four sources of consumer-side drift, remove one "caller hand-authors a fallback" duplication pattern, drop one item as YAGNI, and stay strictly inside the repo's *no speculative future-proofing* rule (`CLAUDE.md`).
+The revisions below collapse and re-scope the original items (see the mapping table next), eliminate the consumer-side drift sources it introduced, remove the "caller hand-authors a fallback" duplication pattern, drop the speculative item as YAGNI, and stay strictly inside the repo's *no speculative future-proofing* rule (`CLAUDE.md`).
 
 **For the API agent:** wherever the surface here disagrees with [`changes-for-api-early-draft.md`](changes-for-api-early-draft.md), **this doc is authoritative**. The spec is kept for context but is no longer the contract.
 
@@ -48,14 +48,19 @@ class PipelexError(Exception):
 
     @classmethod
     def title(cls) -> str:
-        return cls._declared_title or _humanize(cls.__name__)
+        # read only the class's OWN body — a curated title is never inherited
+        declared = cls.__dict__.get("_declared_title")
+        return declared if isinstance(declared, str) else _humanize(cls.__name__)
 
     @classmethod
     def type_uri(cls) -> str:
-        return cls._declared_type_uri or f"{_base_error_uri()}/{_kebab(cls.__name__)}"
+        declared = cls.__dict__.get("_declared_type_uri")
+        if isinstance(declared, str):
+            return declared
+        return f"{_base_error_uri()}/{_kebab(cls.__name__)}/"
 ```
 
-Subclasses override `_declared_title` / `_declared_type_uri` only when the auto-derive is bad copy or the URI needs to point elsewhere. **Every class works out of the box.** `ErrorReport` carries both as populated string fields — consumers never see `None`.
+Subclasses override `_declared_title` / `_declared_type_uri` only when the auto-derive is bad copy or the URI needs to point elsewhere — and the override is read from the class's own body, so a subclass never silently inherits an ancestor's curated value (see [What landed in Stage 1](#what-landed-in-stage-1)). **Every class works out of the box.** `ErrorReport` carries both as populated string fields — consumers never see `None`.
 
 **API consumer impact.** The API reads `report.title` and `report.type_uri` directly. No humanize helper, no kebab-case helper, no `_resolve_title_for_class_name(...)`. The `https://docs.pipelex.com/latest/errors` namespace is owned by pipelex via the `URLs.error_docs_base` constant (`pipelex/urls.py`).
 
@@ -102,6 +107,8 @@ class ErrorReport:
 - `CONFIG` / `RUNTIME` reports → `message` replaced with `"An internal error occurred."`; `provider`, `model`, `provider_metadata`, `user_action` dropped.
 - **Kept in all modes** (stable identifiers): `error_type`, `error_domain`, `error_category`, `retryable`, `title`, `type_uri`.
 
+> **Known gap (open).** The `INPUT`-domain passthrough is itself intended — an `INPUT` report's `message` is caller-facing, so reflecting it back is part of the contract (see [What landed in Stage 2](#what-landed-in-stage-2)). The gap is the *keying mechanism*: the passthrough keys on `error_domain`, which is *inherited* up the `__cause__` chain — so a domain-less wrapper raised `from` an `INPUT` cause can leak its own (non-caller-facing) `message` through STRICT, and `to_problem_document(STRICT)` can still echo provider metadata for `INPUT` reports. Tracked as a post-#931 follow-up — see [Current state](#current-state) and [`track-strict-disclosure-input-domain-gap.md`](track-strict-disclosure-input-domain-gap.md).
+
 Both methods land in Stage 2 (was 2+4 in the spec). `to_problem_document` is callable from the API's Phase 1 directly.
 
 **API consumer impact.** The Phase 1 builder is now ~10 lines (FastAPI Response wiring only). The envelope shape — `type`, `title`, `status`, `detail`, `instance`, extension members — comes from `report.to_problem_document(...)`. Strict mode is one kwarg. The "what does strict mode hide" rule lives in one place.
@@ -112,15 +119,17 @@ Both methods land in Stage 2 (was 2+4 in the spec). `to_problem_document` is cal
 
 This is the load-bearing item. Three sub-issues; the revisions address all of them.
 
+**Numbering note.** The `§D.x` subsections below are *sub-issues*, not revised items. §D.1 is **Item D-1** (totality, Stage 2); §D.2 and §D.3 together are **Item D-2** (`ErrorReport` threaded to the webhook as a typed field, Stage 3). There is no "Item D-3".
+
 #### §D.1 — "Caller hand-authors a fallback report" is duplication
 
 **What the spec proposes.** `recover_error_report(exc)` returns `Optional[ErrorReport]`. When it returns `None` (malformed details or version skew), the caller — the workflow boundary that catches the failure — hand-authors an `ErrorReport(error_type="WorkflowFailureUnrecoverable", error_domain="runtime", retryable=False, message="...")`.
 
 **Problem.** Every other caller that uses `recover_error_report` (the API's submitter-side recovery, the CLI on async result consumption, anyone else who lands later) duplicates this hand-author logic. The `error_type` string "WorkflowFailureUnrecoverable" doesn't correspond to a real `PipelexError` subclass, so it can't be navigated to a doc page (item 7), can't carry an auto-derived `type_uri`, and can't be matched on by pattern. The fallback is a stringly-typed escape hatch.
 
-**What we are building instead.** A new pipelex error class — `UnrecoverableWorkflowFailureError(PipelexError)` — and `recover_error_report` becomes **total**: signature `def recover_error_report(exc: BaseException) -> ErrorReport`. When no embedded report is found, it synthesizes the report via `UnrecoverableWorkflowFailureError(message_from_exc(exc)).to_error_report()`. One construction site, one error class, one doc page, navigable by pattern. A report dict that *is* found but fails `from_dict` validation is an internal contract bug — within one deploy the activity bridge and the submitter share the schema — and is allowed to raise; the Temporal integration ships fresh, so there is no prior on-wire schema to stay compatible with.
+**What we are building instead.** A new pipelex error class — `UnrecoverableWorkflowFailureError(TemporalFlowError)`, a `PipelexError` subclass — and `recover_error_report` becomes **total**: signature `def recover_error_report(exc: BaseException) -> ErrorReport`. When no embedded report is found, it synthesizes the report via `UnrecoverableWorkflowFailureError(message_from_exc(exc)).to_error_report()`. One construction site, one error class, one doc page, navigable by pattern. A report dict that *is* found but fails `from_dict` validation is an internal contract bug — within one deploy the activity bridge and the submitter share the schema — and is allowed to raise; the Temporal integration ships fresh, so there is no prior on-wire schema to stay compatible with.
 
-All three call sites in `workflow_caller.py` (`:128`, `:240`, `:292`) drop their `if error_report is not None` branches.
+All three call sites in `workflow_caller.py` (`execute_workflow` / `execute_child_workflow` / `start_child_workflow`) drop their `if error_report is not None` branches.
 
 **API consumer impact.** When the API recovers from a Temporal workflow failure on the submitter side, it gets a usable `ErrorReport` unconditionally. No `None` to handle, no fallback to author.
 
@@ -128,17 +137,15 @@ All three call sites in `workflow_caller.py` (`:128`, `:240`, `:292`) drop their
 
 **What the spec implies.** The `DeliveryActivityArg` would carry the error as a dict because "Temporal serialization."
 
-**Problem.** The other fields on `DeliveryActivityArg` (`pipe_output: PipeOutput | None`, `delivery_assignment: DeliveryAssignment`) don't carry `_dict` suffixes because the pipelex Temporal data converter handles them as Pydantic `BaseModel`s. Adding a `_dict` suffix telegraphs an implementation detail and is inconsistent with the rest of the file. The right answer is to make the data converter handle `ErrorReport` directly.
+**Problem.** The other fields on `DeliveryActivityArg` (`pipe_output: PipeOutput | None`, `delivery_assignment: DeliveryAssignment`) don't carry `_dict` suffixes because the pipelex Temporal data converter handles them as Pydantic `BaseModel`s. Adding a `_dict` suffix telegraphs an implementation detail and is inconsistent with the rest of the file. `ErrorReport` should cross the activity boundary as a typed field, like every other field on the arg.
 
-**Current state of the converter (verified):** `pipelex/temporal/temporal_data_converter.py` only handles `BaseModel` and `list[BaseModel]`. `ErrorReport` is a frozen Pydantic *dataclass* and will not round-trip as-is.
+**What we built.** `ErrorReport` was converted from a frozen Pydantic `@dataclass` to a `BaseModel` with `model_config = ConfigDict(frozen=True, extra="forbid", arbitrary_types_allowed=True)`. The Temporal data converter then handles it with **no converter surgery**: the already-shipped `BaseModelPayloadConverter._unwrap_optional_base_model` resolves the `ErrorReport | None` field directly. `DeliveryActivityArg.error_report: ErrorReport | None` is a plain typed field — no `_dict` suffix, no shim. A `tests/integration/pipelex/temporal/test_payload_codec_roundtrip.py` case covers the round-trip before `ErrorReport` is wired into the activity arg.
 
-**What we are building instead.** Per the user's stated preference: extend the data converter (and `kajson` if necessary) to handle Pydantic dataclasses generically. The converter and `kajson` were built precisely to handle pipelex's serialization needs; extending them here benefits any future Pydantic dataclass on a workflow arg. A `tests/integration/pipelex/temporal/test_payload_codec_roundtrip.py` case covers the round-trip before `ErrorReport` is wired into the activity arg.
-
-**Fallback path** (only if the extension turns out to be larger than expected): convert `ErrorReport` from `@dataclass(frozen=True)` to a `BaseModel` with `model_config = ConfigDict(frozen=True)`. Smaller diff but loses dataclass ergonomics. The plan is to take the converter-extension path; this is documented as the fallback only in case the converter work surfaces something unforeseen.
+**Why this, not extending the converter.** The alternative considered was teaching the data converter (and `kajson`) to round-trip Pydantic dataclasses generically. The `BaseModel` conversion turned out strictly cleaner: it reuses the converter's existing `BaseModel` path instead of adding a new one, it is a smaller diff, and `extra="forbid"` gives `from_dict` the strict-schema validation the §D.1 recovery path depends on. The dataclass-vs-`BaseModel` ergonomics difference is negligible for a frozen value type.
 
 #### §D.3 — Webhook payload field shape
 
-`payload["error"] = error_report.to_dict()` — verbose disclosure by default. The API chooses strict mode at *its own* surface (HTTP response), not at the pipelex delivery boundary. The webhook is internal infrastructure between pipelex and the API; redacting it before the API has decided what to do with it would be presumptuous.
+`payload["error"] = error_report.to_dict()` — verbose disclosure by default. The API chooses strict mode at *its own* surface (HTTP response), not at the pipelex delivery boundary; redacting the payload before the receiver has decided what to do with it would be presumptuous. The webhook target URL is caller-supplied, so a VERBOSE `error` dict reaches an endpoint pipelex does not control — but that endpoint belongs to the run's own caller, who already owns the run and its inputs. VERBOSE is therefore the receiver's data to redact, not pipelex's — accepted by design. Webhook signing (Item F / Stage 5) is orthogonal: it authenticates the webhook's origin so the receiver can trust it, but does not change what the payload discloses.
 
 **API consumer impact.** Receiving the webhook, the API sees a full `error` dict with the same shape as `ErrorReport.to_dict()`. It can call `ErrorReport.from_dict(payload["error"])` to rehydrate, or pass it through, or redact server-side based on `ERROR_DISCLOSURE`.
 
@@ -152,7 +159,9 @@ No structural change from the spec. The improvement is that `cls.title()` and `c
 
 ---
 
-### §F. Item 8 — `query_pipeline_state(...)` — **dropped**
+### Dropped — Item 8 — `query_pipeline_state(...)`
+
+This item is **dropped** from the plan. It is not assigned a revised-item letter — the `§A`–`§F` sections cover `Item A`–`Item F` (`Item D` itself splits into `D-1` / `D-2`; see the [mapping table](#mapping-original-items--revised-items)).
 
 **What the spec proposes.** A pipelex-level async function `query_pipeline_state(pipeline_run_id) -> PipelineState` that reads Temporal workflow history and returns a typed state for a future `GET /api/v1/pipeline/{run_id}` endpoint.
 
@@ -166,7 +175,7 @@ The risk of designing it now without a concrete consumer is that the typed state
 
 ---
 
-### §G. Item 9 — webhook signature
+### §F. Item 9 — webhook signature
 
 No structural change from the spec. One implementation note: the per-deployment signing secret lives in pipelex config (`get_config().pipeline_execution_config.webhook_signing_secret`) with an environment-variable fallback for ops convenience. The cross-repo PRs land in coordinated lockstep.
 
@@ -200,7 +209,7 @@ These show up in multiple items above; collecting them here so the API agent can
 
 ### What landed in Stage 1
 
-Available now on `feature/API-readiness-merge`:
+Available now:
 
 - **`PipelexError.title()` / `PipelexError.type_uri()`** (`pipelex/base_exceptions.py`) — classmethods returning a populated `str`. Auto-derive from the class name unless a subclass declares `_declared_title` / `_declared_type_uri` directly in its own body (inheritance is intentionally bypassed). Curated `_declared_title` overrides shipped for high-traffic base classes.
 - **`ErrorReport.title` and `ErrorReport.type_uri`** — both required `str`. Every `to_error_report()` call populates them. Round-trips through `to_dict` / `from_dict`. `from_dict` raises `ValidationError` on missing fields (the path that Stage 2 Item D-1's `recover_error_report` synthesizes into `UnrecoverableWorkflowFailureError`).
@@ -216,7 +225,7 @@ Available now on `feature/API-readiness-merge`:
 
 ### What landed in Stage 2
 
-Available now on `feature/API-readiness-merge`:
+Available now:
 
 - **`DisclosureMode` enum** (`pipelex/base_exceptions.py`) — `VERBOSE` / `STRICT`. The contract is pinned on the enum's own docstring: STRICT is a *classification-projection for server-side errors*, **not a path-leak shield**. `INPUT`-domain reports pass through unchanged in STRICT mode (their `message` is caller-influenced; reflecting it back is part of the contract). `CONFIG` / `RUNTIME` reports drop `user_action` / `model` / `provider` / `provider_metadata` and replace `message` with `"An internal error occurred."`, keeping the stable identifiers (`error_type` / `error_domain` / `error_category` / `retryable` / `title` / `type_uri`).
 - **`ErrorReport.to_dict(disclosure_mode=DisclosureMode.VERBOSE)`** — projects the report through the disclosure mode. `VERBOSE` round-trips through `from_dict` exactly; `STRICT` is lossy by design. Default is `VERBOSE` so existing internal-trust callers (webhook payloads, Temporal details) are unaffected.
@@ -229,22 +238,20 @@ Available now on `feature/API-readiness-merge`:
 
 ### What landed in Stage 3
 
-Available now on `feature/API-readiness-merge`:
+Available now:
 
 - **`ErrorReport` is a `BaseModel`** (`pipelex/base_exceptions.py`) — `model_config = ConfigDict(frozen=True, extra="forbid", arbitrary_types_allowed=True)`. `to_dict` uses `self.model_dump(exclude_none=True)`; `from_dict` uses `cls.model_validate(data)`. The frozen contract now raises `pydantic.ValidationError` (not `dataclasses.FrozenInstanceError`) on mutation attempts — caller-visible if anyone caught the specific dataclass error. Tests updated to match.
 - **`DeliveryExecutor.execute(error_report=...)`** (`pipelex/pipe_run/delivery_executor.py`) — accepts `ErrorReport | None`; when non-None, the webhook payload includes `error = report.to_dict(DisclosureMode.VERBOSE)`. Receivers (the API) rehydrate losslessly via `ErrorReport.from_dict(payload["error"])`. The webhook stays the only mechanism for surfacing the report — the storage path does NOT serialize it as a file. The disclosure choice (VERBOSE on the wire) is locked here; the API decides what to re-expose to its own clients (it can render strict via `to_problem_document(disclosure_mode=STRICT)`).
 - **`DeliveryActivityArg.error_report: ErrorReport | None`** (`pipelex/temporal/tprl_pipe/act_deliver.py`) — typed BaseModel field. No `_dict` shim. The existing `BaseModelPayloadConverter._unwrap_optional_base_model` (already shipped in Stage 1) handles the `ErrorReport | None` field directly with no converter surgery.
 - **`wf_pipe_run.py` recovers and threads the report.** On the `ChildWorkflowError` catch, calls `recover_error_report(exc.cause if exc.cause is not None else exc)` (total since Item D-1), uses it to construct `WorkflowExecutionError("WfPipeRouter failed", error_report=report)` AND threads it into `DeliveryActivityArg(error_report=report)`. The outer Temporal wrap therefore does NOT drop the inner classification — the submitter-side `WorkflowExecutionError.to_error_report()` carries the same `error_type` / `error_category` / `retryable` / `model` / `provider` / `user_action` / `title` / `type_uri` the worker saw. Pinned by the new end-to-end full-chain test.
 - **Direct-mode `PipeRun` (`pipelex/pipe_run/pipe_run.py`) threads the report too.** Captures `error_report = exc.to_error_report()` when the caught exception is a `PipelexError`, passes it to `DeliveryExecutor.execute`. The local / Temporal parity now holds at the delivery boundary — a sync-mode failure surfaces the same `error` dict on the webhook as a Temporal-mode failure. (This was an additive deviation from the plan's strict reading: the plan called out only the Temporal path, but the D-2 acceptance criterion implies parity, so the direct path was updated too. Non-`PipelexError` exceptions still surface no report, matching existing in-process semantics.)
-- **Field-introspection in `recover_error_report`.** `{field.name for field in fields(ErrorReport)}` (stdlib-dataclasses-only) swapped to `set(ErrorReport.model_fields)` (Pydantic v2 equivalent). Same field-name set, same semantics; broken under the BaseModel conversion without this swap.
-
 **One additive deviation.** The plan localized the threading to the Temporal path. The direct-mode `PipeRun` was also updated for parity (see above). Same observable contract for API consumers in both modes.
 
 **Pre-flight that the activity arg change relies on.** `tests/integration/pipelex/temporal/test_payload_codec_roundtrip.py::TestPayloadCodecRoundTrip::test_error_report_round_trips_through_activity` lands as a new test case that round-trips an `ErrorReport` (with populated `UserAction` + `ProviderErrorMetadata`) through a workflow → activity → return hop, verifying the BaseModel converter handles it directly. The plan's ordering (round-trip test before activity arg change) is preserved within the same commit set.
 
 ### What landed in Stage 4
 
-Available now on `feature/API-readiness-merge`:
+Available now:
 
 - **Error `type_uri` base is `https://docs.pipelex.com/latest/errors`** (`URLs.error_docs_base` in `pipelex/urls.py`) — the `/latest/` alias is mike's canonical pointer at current stable; canonical URLs are forced to `/latest/` via `docs/overrides/main.html`. A fork hosting its own error docs patches the constant.
 - **`PipelexError.type_uri()` emits a trailing slash** (`pipelex/base_exceptions.py`) — form is `<base>/<kebab-class-name>/`. Matches the canonical URL MkDocs serves with `use_directory_urls: true` (verified against the built `<link rel="canonical">` of the deployed page). Clients dereferencing the URI now hit the docs page directly — no 301 round-trip. Treat `type_uri` as opaque on the API side; do NOT strip or normalize the trailing slash.

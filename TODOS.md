@@ -73,7 +73,7 @@ Full analysis and options: [`wip/error-handling/track-strict-disclosure-input-do
 
 STRICT disclosure mode keys its redaction passthrough on `error_domain == ErrorDomain.INPUT`, but `error_domain` is inherited up the `__cause__` chain by `_enrich_error_report_from_cause`. Two consequences: a domain-less wrapper raised `from` an INPUT cause leaks its own internal `message` through STRICT; and `to_problem_document` echoes `provider` / `model` / `provider_metadata` for INPUT reports even in STRICT.
 
-- [ ] **Decision D1** — pick the Gap 1 fix: Option 1 (per-class `ClassVar` flagging classes that genuinely author caller-facing messages; gate STRICT passthrough on the flag) or Option 2 (stop inheriting `error_domain` onto a domain-less wrapper). Recommended: **Option 1** — it gates redaction on message provenance rather than an inherited classification, and avoids the `http_status` side effects Option 2 carries. Record the choice in the Decisions section.
+- [x] **Decision D1** — pick the Gap 1 fix: Option 1 (per-class `ClassVar` flagging classes that genuinely author caller-facing messages; gate STRICT passthrough on the flag) or Option 2 (stop inheriting `error_domain` onto a domain-less wrapper). Recommended: **Option 1** — it gates redaction on message provenance rather than an inherited classification, and avoids the `http_status` side effects Option 2 carries. Record the choice in the Decisions section. **→ Decided 2026-05-22: Option 1** (see [Decisions](#decisions)).
 - [ ] Implement the chosen Gap 1 fix in `pipelex/base_exceptions.py` (`to_dict` STRICT branch, and `_enrich_error_report_from_cause` / the report-construction path as the option requires).
 - [ ] Gap 2 — strip `provider` / `model` / `provider_metadata` from the INPUT passthrough branch of `to_dict(DisclosureMode.STRICT)`. An input-classification error has no business carrying provider metadata onto an external surface.
 - [ ] Align the `DisclosureMode` docstring in `pipelex/base_exceptions.py` with the implemented redaction set.
@@ -174,7 +174,7 @@ This is the last unshipped stage of the original error-handling plan. It is **cr
 
 ## Out of scope (recorded, not planned here)
 
-- Webhook VERBOSE disclosure to caller-supplied URLs — sending a full `ErrorReport` to an arbitrary unsigned endpoint is partly by design (plan §D.3: the receiver decides what to re-expose) and is mitigated once Phase 5 (signing) lands. No separate task; revisit only if the threat model changes.
+- Webhook VERBOSE disclosure to caller-supplied URLs — sending a full `ErrorReport` to the run caller's own endpoint is by design (plan §D.3: the endpoint belongs to the caller, who already owns the run data; the receiver decides what to re-expose). Webhook signing (Phase 5) is orthogonal — it authenticates origin, it does not reduce disclosure. No separate task; revisit only if the threat model changes.
 - Critical #1 from the `/review` pass (`recover_error_report` raising on a stale report dict) — resolved as not-a-bug: the Temporal integration has never shipped, so there is no prior on-wire schema. Docs are aligned in Phase 0. Nothing else to do.
 
 ---
@@ -183,7 +183,7 @@ This is the last unshipped stage of the original error-handling plan. It is **cr
 
 Record each decision here as it is taken, with date and rationale.
 
-- **D1** (Phase 1, Gap 1 fix) — _pending_.
+- **D1** (Phase 1, Gap 1 fix) — **Option 1**, decided 2026-05-22. Add a per-class `ClassVar` flagging error classes that genuinely author caller-facing messages, and gate the STRICT-disclosure passthrough on that flag instead of on the inherited `error_domain == INPUT`. Rationale: keys redaction on the *provenance of the message* rather than an inherited classification, and avoids the `http_status` side effects Option 2 (dropping `error_domain` inheritance for domain-less wrappers) would carry.
 - **D2** (Phase 2, request_id call-site strategy) — _pending_.
 
 ---
@@ -212,3 +212,5 @@ Append one dated entry per session / checkpoint. Each entry must leave the next 
   **Decisions:** none taken — D1 (Phase 1) and D2 (Phase 2) remain pending.
 
   **Next action:** start **Phase 1** — STRICT disclosure INPUT-domain leak. Take **Decision D1** first (recommended: Option 1 — per-class `ClassVar` flagging caller-facing-message authors).
+
+- **2026-05-22 — Decision D1 recorded.** Per the user, Decision D1 is **Option 1** (see the Decisions section for the full rationale); the Phase 1 D1 box is ticked to reflect it. Phase 1 **implementation is not started** — no implementation boxes ticked, no code touched. Next action: begin Phase 1 (STRICT disclosure INPUT-domain leak) at the first unticked box (implement the Gap 1 fix).
