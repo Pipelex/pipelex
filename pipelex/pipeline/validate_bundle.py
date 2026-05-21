@@ -45,6 +45,9 @@ class ValidateBundleError(PipelexError):
         kind=UserActionKind.CHANGE_INPUT,
         detail="Check the validation_errors array for specific issues",
     )
+    # Bundle-validation messages describe faults in the caller's own bundle —
+    # caller-facing copy, kept verbatim under STRICT disclosure.
+    _authors_caller_facing_message = True
 
     def __init__(
         self,

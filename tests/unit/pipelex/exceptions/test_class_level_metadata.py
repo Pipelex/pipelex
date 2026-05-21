@@ -93,3 +93,23 @@ class TestClassLevelMetadata:
         report = exc.to_error_report()
         assert exc.error_category is expected_category
         assert report.error_category == expected_category
+
+    @pytest.mark.parametrize(
+        ("_topic", "exc", "expected_caller_facing"),
+        [
+            ("interpreter", PipelexInterpreterError("boom"), True),
+            ("validate_bundle", ValidateBundleError("boom"), True),
+            ("config", PipelexConfigError("boom"), False),
+            ("pipe_execution", PipeExecutionError("boom"), False),
+            ("cogt", CogtError("boom"), False),
+        ],
+    )
+    def test_caller_facing_message(self, _topic: str, exc: PipelexError, expected_caller_facing: bool) -> None:
+        """Only classes whose message describes the caller's own input carry caller_facing_message in to_error_report().
+
+        ``PipelexInterpreterError`` / ``ValidateBundleError`` author caller-facing
+        copy (.mthds syntax, bundle validation); every other class defaults to
+        False so STRICT disclosure redacts its message.
+        """
+        report = exc.to_error_report()
+        assert report.caller_facing_message is expected_caller_facing

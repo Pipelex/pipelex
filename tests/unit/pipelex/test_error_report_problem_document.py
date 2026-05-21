@@ -114,14 +114,71 @@ class TestErrorReportProblemDocument:
         assert document["error_category"] == "capacity"
         assert document["retryable"] is False
 
-    def test_strict_mode_passthrough_for_input_domain(self) -> None:
-        """INPUT-domain reports reflect back ``detail`` unchanged in STRICT mode."""
+    def test_strict_mode_passes_through_detail_for_caller_facing_report(self) -> None:
+        """A caller-facing-message report reflects ``detail`` back unchanged in STRICT mode."""
         report = ErrorReport(
-            error_type="PipelexConfigError",
-            message="JSON payload at /Users/alice/secret.mthds is malformed",
-            title="Pipelex error",
-            type_uri="https://docs.pipelex.com/latest/errors/pipelex-config-error/",
+            error_type="PipelexInterpreterError",
+            message="pipe 'summarize' references unknown concept at line 14",
+            title="Pipelex interpreter error",
+            type_uri="https://docs.pipelex.com/latest/errors/pipelex-interpreter-error/",
+            error_domain=ErrorDomain.INPUT,
+            caller_facing_message=True,
+        )
+        document = report.to_problem_document(disclosure_mode=DisclosureMode.STRICT)
+        assert document["detail"] == "pipe 'summarize' references unknown concept at line 14"
+
+    def test_strict_mode_redacts_detail_for_input_domain_without_caller_facing_flag(self) -> None:
+        """An INPUT-classified report whose message is NOT caller-facing is still redacted in STRICT.
+
+        Regression pin: ``error_domain == INPUT`` alone (here inherited up a
+        ``__cause__`` chain by a domain-less wrapper) must not earn a ``detail``
+        passthrough — only ``caller_facing_message`` does.
+        """
+        report = ErrorReport(
+            error_type="PipelexUnexpectedError",
+            message="internal invariant violated at /srv/secret/handler.py",
+            title="Unexpected internal error",
+            type_uri="https://docs.pipelex.com/latest/errors/pipelex-unexpected-error/",
             error_domain=ErrorDomain.INPUT,
         )
         document = report.to_problem_document(disclosure_mode=DisclosureMode.STRICT)
-        assert document["detail"] == "JSON payload at /Users/alice/secret.mthds is malformed"
+        assert document["detail"] == INTERNAL_ERROR_PLACEHOLDER
+
+    def test_strict_mode_never_emits_provider_fields_regardless_of_error_domain(self) -> None:
+        """STRICT ``to_problem_document`` never echoes ``provider`` / ``model`` / ``provider_metadata``.
+
+        Gap 2: even a caller-facing INPUT report whose cause-enrichment pulled
+        provider metadata from an inference ``__cause__`` must not surface it on
+        the RFC 7807 envelope.
+        """
+        report = ErrorReport(
+            error_type="PipelexInterpreterError",
+            message="pipe 'summarize' references unknown concept at line 14",
+            title="Pipelex interpreter error",
+            type_uri="https://docs.pipelex.com/latest/errors/pipelex-interpreter-error/",
+            error_domain=ErrorDomain.INPUT,
+            caller_facing_message=True,
+            model="gpt-5",
+            provider="openai",
+            provider_metadata=ProviderErrorMetadata(provider=ProviderName.OPENAI, sdk_exception_type="RateLimitError"),
+        )
+        document = report.to_problem_document(disclosure_mode=DisclosureMode.STRICT)
+        assert document["detail"] == report.message
+        assert "model" not in document
+        assert "provider" not in document
+        assert "provider_metadata" not in document
+
+    def test_caller_facing_message_flag_never_rides_as_extension_member(self) -> None:
+        """``caller_facing_message`` is internal redaction plumbing — never an RFC 7807 extension member."""
+        report = ErrorReport(
+            error_type="PipelexInterpreterError",
+            message="pipe 'summarize' references unknown concept at line 14",
+            title="Pipelex interpreter error",
+            type_uri="https://docs.pipelex.com/latest/errors/pipelex-interpreter-error/",
+            error_domain=ErrorDomain.INPUT,
+            caller_facing_message=True,
+        )
+        verbose_document = report.to_problem_document(disclosure_mode=DisclosureMode.VERBOSE)
+        strict_document = report.to_problem_document(disclosure_mode=DisclosureMode.STRICT)
+        assert "caller_facing_message" not in verbose_document
+        assert "caller_facing_message" not in strict_document

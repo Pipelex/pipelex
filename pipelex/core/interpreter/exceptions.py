@@ -7,6 +7,9 @@ class PipelexInterpreterError(PipelexError):
     """Raised when PipelexInterpreter fails."""
 
     error_domain = ErrorDomain.INPUT
+    # The interpreter's messages describe faults in the caller's own .mthds
+    # source — caller-facing copy, kept verbatim under STRICT disclosure.
+    _authors_caller_facing_message = True
 
     def __init__(
         self,

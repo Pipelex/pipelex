@@ -8,18 +8,31 @@ from pipelex.types import StrEnum
 from pipelex.urls import URLs
 
 # Placeholder ``message`` substituted into a STRICT-mode serialization of a
-# CONFIG / RUNTIME report. INPUT-domain reports keep their original message.
+# report whose ``message`` is not caller-facing copy. A report flagged
+# ``caller_facing_message`` keeps its original ``message`` instead.
 INTERNAL_ERROR_PLACEHOLDER = "An internal error occurred."
 
-# Stable identifiers preserved verbatim in STRICT mode for CONFIG / RUNTIME
-# reports. ``message`` is intentionally absent — STRICT replaces it with
+# Stable identifiers preserved verbatim when STRICT mode redacts a report.
+# ``message`` is intentionally absent — STRICT replaces it with
 # ``INTERNAL_ERROR_PLACEHOLDER`` unconditionally, not by passthrough.
 _STRICT_KEPT_FIELDS: frozenset[str] = frozenset({"error_type", "title", "type_uri", "error_domain", "error_category", "retryable"})
+
+# Provider/model attribution fields. STRICT drops them unconditionally — from
+# the redacted branch (they are absent from ``_STRICT_KEPT_FIELDS``) and from
+# the caller-facing-message passthrough branch alike: provider metadata never
+# belongs on an external surface, whatever the report's ``error_domain``.
+_STRICT_PROVIDER_FIELDS: frozenset[str] = frozenset({"model", "provider", "provider_metadata"})
 
 # Fields already mapped into RFC 7807 standard slots (``detail`` / ``title`` /
 # ``type``) by ``to_problem_document`` — must NOT be echoed as extension
 # members on the returned envelope.
 _RFC7807_MAPPED_FIELDS: frozenset[str] = frozenset({"message", "title", "type_uri"})
+
+# Fields ``to_problem_document`` must not surface as RFC 7807 extension members:
+# the standard-slot mappings plus ``caller_facing_message``, which is internal
+# redaction plumbing carried on the serialized report, not consumer-facing
+# classification.
+_PROBLEM_DOCUMENT_OMITTED_FIELDS: frozenset[str] = _RFC7807_MAPPED_FIELDS | frozenset({"caller_facing_message"})
 
 
 class DisclosureMode(StrEnum):
@@ -30,20 +43,33 @@ class DisclosureMode(StrEnum):
       decides what to expose further downstream. ``from_dict(to_dict(report, VERBOSE))``
       reconstructs the original report exactly.
 
-    - ``STRICT``: stable identifiers only (``error_type``, ``error_domain``,
-      ``error_category``, ``retryable``, ``title``, ``type_uri``). For
-      ``CONFIG`` / ``RUNTIME`` reports, ``message`` is replaced with a generic
-      placeholder and ``provider`` / ``model`` / ``provider_metadata`` /
-      ``user_action`` are dropped. ``from_dict(to_dict(report, STRICT))`` for a
-      CONFIG / RUNTIME report does NOT reconstruct the original — STRICT is a
-      lossy projection.
+    - ``STRICT``: a lossy projection for untrusted external surfaces.
+      ``provider`` / ``model`` / ``provider_metadata`` are dropped
+      unconditionally — provider/model attribution never belongs on an external
+      surface. The ``message`` is then projected by *provenance*:
 
-      **``INPUT``-domain reports are returned unchanged in STRICT mode.** Their
-      ``message`` is caller-influenced and reflecting it back is part of the
-      contract. STRICT is a *classification-projection for server-side errors*,
-      **not a path-leak shield**. If an ``INPUT`` message could surface a
-      server-resolved path or secret, fix the upstream message — don't expand
-      STRICT mode's scope.
+      - A report flagged :attr:`ErrorReport.caller_facing_message` keeps its
+        ``message`` and ``user_action``. The flag is set by error classes whose
+        message is genuinely caller-facing copy — text describing the *caller's
+        own* input, e.g. ``PipelexInterpreterError`` (a ``.mthds`` syntax error)
+        or ``ValidateBundleError`` (a failed bundle validation).
+      - Every other report has its ``message`` replaced with a generic
+        placeholder and its ``user_action`` dropped, keeping only the stable
+        identifiers (``error_type``, ``error_domain``, ``error_category``,
+        ``retryable``, ``title``, ``type_uri``).
+
+      ``from_dict(to_dict(report, STRICT))`` does NOT reconstruct the original —
+      STRICT is lossy.
+
+      STRICT keys the ``message`` decision on the *provenance of the message*,
+      not on ``error_domain``: ``error_domain`` is inherited up the ``__cause__``
+      chain, so a domain-less wrapper raised ``from`` an ``INPUT`` cause is
+      classified ``INPUT`` while still carrying its own internal ``message`` —
+      which STRICT must redact. ``caller_facing_message`` is not inherited, so it
+      tracks the wrapper's own message correctly. STRICT is a
+      *classification-projection*, **not a path-leak shield**: if a genuinely
+      caller-facing ``message`` could surface a server-resolved path or secret,
+      fix the upstream message — don't expand STRICT mode's scope.
     """
 
     VERBOSE = "verbose"
@@ -122,26 +148,42 @@ class ErrorReport(BaseModel):
     model: str | None = None
     provider: str | None = None
     provider_metadata: ProviderErrorMetadata | None = None
+    # True when ``message`` was authored as caller-facing copy — set at report
+    # construction from ``PipelexError._authors_caller_facing_message``. STRICT
+    # disclosure keys its ``message`` passthrough on this flag (see
+    # :class:`DisclosureMode`). Defaults to False so an unflagged report — and
+    # any payload that predates the field — is redacted, never leaked.
+    caller_facing_message: bool = False
 
     def to_dict(self, disclosure_mode: DisclosureMode = DisclosureMode.VERBOSE) -> dict[str, Any]:
         """Return a dict with only non-None fields, projected through ``disclosure_mode``.
 
         ``VERBOSE`` is the strict inverse of :meth:`from_dict` — every populated
-        field round-trips. ``STRICT`` is a lossy projection: for ``CONFIG`` /
-        ``RUNTIME`` reports the disclosure-leaking fields (``user_action`` /
-        ``model`` / ``provider`` / ``provider_metadata``) are dropped and
-        ``message`` is replaced with a generic placeholder, keeping only the
-        stable identifiers (see :class:`DisclosureMode`). ``INPUT``-domain
-        reports pass through unchanged in STRICT mode because their ``message``
-        is caller-influenced and reflecting it back is part of the contract.
+        field round-trips. ``STRICT`` is a lossy projection (see
+        :class:`DisclosureMode`): ``provider`` / ``model`` / ``provider_metadata``
+        are always dropped, and unless the report is flagged
+        :attr:`caller_facing_message` its ``message`` is replaced with a generic
+        placeholder and ``user_action`` is dropped, leaving only the stable
+        identifiers.
         """
         payload = self.model_dump(exclude_none=True)
+        # ``caller_facing_message`` is redaction plumbing, not consumer-facing
+        # classification: emit it only when set, so the common (non-caller-facing)
+        # report serializes exactly as a report without the field would.
+        # ``from_dict`` defaults it back to False when absent, so the round-trip
+        # still holds.
+        if not self.caller_facing_message:
+            payload.pop("caller_facing_message", None)
         match disclosure_mode:
             case DisclosureMode.VERBOSE:
                 return payload
             case DisclosureMode.STRICT:
-                if self.error_domain == ErrorDomain.INPUT:
-                    return payload
+                if self.caller_facing_message:
+                    # The error class that authored this message designed it as
+                    # caller-facing copy — reflect it back. Provider/model
+                    # attribution is still stripped: it has no place on an
+                    # external surface, whatever the error_domain.
+                    return {key: value for key, value in payload.items() if key not in _STRICT_PROVIDER_FIELDS}
                 redacted: dict[str, Any] = {key: payload[key] for key in _STRICT_KEPT_FIELDS if key in payload}
                 redacted["message"] = INTERNAL_ERROR_PLACEHOLDER
                 return redacted
@@ -169,8 +211,9 @@ class ErrorReport(BaseModel):
         (``error_type`` / ``error_domain`` / ``error_category`` / ``retryable`` /
         ``user_action`` / ``model`` / ``provider`` / ``provider_metadata``).
         ``type_uri`` and ``title`` are mapped — not duplicated — so the returned
-        dict has exactly one ``title`` key. When the caller supplies a
-        ``request_id``, it rides as an extension member too.
+        dict has exactly one ``title`` key. The ``caller_facing_message`` flag is
+        internal redaction plumbing and is never echoed onto the envelope. When
+        the caller supplies a ``request_id``, it rides as an extension member too.
         """
         payload = self.to_dict(disclosure_mode=disclosure_mode)
         document: dict[str, Any] = {
@@ -184,7 +227,7 @@ class ErrorReport(BaseModel):
         if request_id is not None:
             document["request_id"] = request_id
         for key, value in payload.items():
-            if key in _RFC7807_MAPPED_FIELDS:
+            if key in _PROBLEM_DOCUMENT_OMITTED_FIELDS:
                 continue
             document[key] = value
         return document
@@ -254,6 +297,13 @@ class PipelexError(Exception):
     # ``URLs.error_docs_base`` constant. Same inheritance-bypass semantics
     # as ``_declared_title``.
     _declared_type_uri: ClassVar[str | None] = None
+    # When True, ``ErrorReport``s built from this class keep their ``message``
+    # verbatim under STRICT disclosure (see :class:`DisclosureMode`). Set it on
+    # classes whose ``message`` is genuinely caller-facing copy — text describing
+    # the *caller's own* input (a ``.mthds`` syntax error, a failed bundle
+    # validation). Unlike ``_declared_title`` / ``_declared_type_uri``, this flag
+    # inherits normally: a subclass of a caller-facing error stays caller-facing.
+    _authors_caller_facing_message: ClassVar[bool] = False
 
     @classmethod
     def title(cls) -> str:
@@ -319,17 +369,22 @@ class PipelexError(Exception):
             type_uri=type(self).type_uri(),
             error_domain=self.error_domain,
             user_action=self.user_action,
+            caller_facing_message=self._authors_caller_facing_message,
         )
         return self._enrich_error_report_from_cause(report)
 
     def _enrich_error_report_from_cause(self, report: ErrorReport) -> ErrorReport:
         """Fill the ``None`` classification fields of ``report`` from the ``__cause__`` chain.
 
-        A wrapper keeps its own ``error_type``, ``message``, ``title`` and
-        ``type_uri`` but inherits every classification field it does not set
-        itself — ``error_category``, ``error_domain``, ``retryable``, ``user_action``,
-        ``model``, ``provider``, ``provider_metadata`` — from the underlying
-        ``PipelexError`` that knows them. ``to_error_report()`` overrides call
+        A wrapper keeps its own ``error_type``, ``message``, ``title``,
+        ``type_uri`` and ``caller_facing_message`` but inherits every
+        classification field it does not set itself — ``error_category``,
+        ``error_domain``, ``retryable``, ``user_action``, ``model``, ``provider``,
+        ``provider_metadata`` — from the underlying ``PipelexError`` that knows
+        them. ``caller_facing_message`` is pointedly NOT inherited: it records
+        the provenance of ``report.message``, which is always the wrapper's own
+        message, so a domain-less wrapper raised ``from`` an ``INPUT`` cause does
+        not pick up caller-facing status. ``to_error_report()`` overrides call
         this so enrichment stays uniform.
         """
         cause = self.__cause__
@@ -351,6 +406,7 @@ class PipelexError(Exception):
             message=report.message,
             title=report.title,
             type_uri=report.type_uri,
+            caller_facing_message=report.caller_facing_message,
             error_category=report.error_category or cause_report.error_category,
             error_domain=report.error_domain or cause_report.error_domain,
             retryable=report.retryable if report.retryable is not None else cause_report.retryable,

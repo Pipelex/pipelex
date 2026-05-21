@@ -98,6 +98,7 @@ class CogtError(PipelexError):
             model=self.model_handle,
             provider=self.backend_name,
             provider_metadata=self.provider_metadata,
+            caller_facing_message=self._authors_caller_facing_message,
         )
         return self._enrich_error_report_from_cause(report)
 

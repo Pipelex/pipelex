@@ -1,5 +1,7 @@
 # STRICT disclosure — INPUT-domain passthrough gap
 
+> **Landed 2026-05-22** on `feature/API-readiness-2` (Phase 1 of `_for_api/TODOS.md`). Fixed via **Option 1**: a per-class `PipelexError._authors_caller_facing_message` `ClassVar` — default `False`, set `True` on `PipelexInterpreterError` and `ValidateBundleError` (the two INPUT-domain classes whose messages describe the caller's own input). It is carried onto a new `ErrorReport.caller_facing_message` field at report construction, is *not* inherited up the `__cause__` chain (so a domain-less wrapper over an INPUT cause does not pick it up), and gates the STRICT `message` passthrough — replacing the old `error_domain == INPUT` check. **Gap 2 closed too:** `provider` / `model` / `provider_metadata` are now stripped from the STRICT passthrough branch as well, so STRICT never emits provider metadata for any `error_domain`. The `DisclosureMode` docstring matches the implemented redaction set. The rest of this doc is the original analysis, kept for context.
+
 Follow-up surfaced during the /review pass on the Stage 2 disclosure-mode work (Item C). Not a blocker for the error-handling refactor — STRICT redaction is correct for `CONFIG` / `RUNTIME` reports, which is the path the API exercises today — but the `INPUT`-domain passthrough has two soft spots that should be tightened before the API starts rendering STRICT for caller-facing surfaces.
 
 ## What
@@ -42,8 +44,8 @@ In `_enrich_error_report_from_cause`, stop inheriting `error_domain` when the wr
 
 Strip `provider` / `model` / `provider_metadata` from the `INPUT` passthrough branch of `to_dict(STRICT)` — an input-classification error has no business carrying provider metadata onto an external surface — and align the `DisclosureMode` docstring with whatever the final behavior is.
 
-## Acceptance
+## Acceptance — all met (2026-05-22)
 
-- A domain-less wrapper (`PipelexUnexpectedError`) raised `from` an `INPUT`-domain cause does not leak the wrapper's `message` through `to_dict(STRICT)`.
-- `to_problem_document(disclosure_mode=STRICT)` never emits `provider` / `model` / `provider_metadata` regardless of `error_domain`.
-- The `DisclosureMode` STRICT docstring matches the implemented redaction set.
+- [x] A domain-less wrapper (`PipelexUnexpectedError`) raised `from` an `INPUT`-domain cause does not leak the wrapper's `message` through `to_dict(STRICT)`.
+- [x] `to_problem_document(disclosure_mode=STRICT)` never emits `provider` / `model` / `provider_metadata` regardless of `error_domain`.
+- [x] The `DisclosureMode` STRICT docstring matches the implemented redaction set.

@@ -74,21 +74,21 @@ Full analysis and options: [`wip/error-handling/track-strict-disclosure-input-do
 STRICT disclosure mode keys its redaction passthrough on `error_domain == ErrorDomain.INPUT`, but `error_domain` is inherited up the `__cause__` chain by `_enrich_error_report_from_cause`. Two consequences: a domain-less wrapper raised `from` an INPUT cause leaks its own internal `message` through STRICT; and `to_problem_document` echoes `provider` / `model` / `provider_metadata` for INPUT reports even in STRICT.
 
 - [x] **Decision D1** — pick the Gap 1 fix: Option 1 (per-class `ClassVar` flagging classes that genuinely author caller-facing messages; gate STRICT passthrough on the flag) or Option 2 (stop inheriting `error_domain` onto a domain-less wrapper). Recommended: **Option 1** — it gates redaction on message provenance rather than an inherited classification, and avoids the `http_status` side effects Option 2 carries. Record the choice in the Decisions section. **→ Decided 2026-05-22: Option 1** (see [Decisions](#decisions)).
-- [ ] Implement the chosen Gap 1 fix in `pipelex/base_exceptions.py` (`to_dict` STRICT branch, and `_enrich_error_report_from_cause` / the report-construction path as the option requires).
-- [ ] Gap 2 — strip `provider` / `model` / `provider_metadata` from the INPUT passthrough branch of `to_dict(DisclosureMode.STRICT)`. An input-classification error has no business carrying provider metadata onto an external surface.
-- [ ] Align the `DisclosureMode` docstring in `pipelex/base_exceptions.py` with the implemented redaction set.
-- [ ] Tests: a domain-less wrapper (`PipelexUnexpectedError`) raised `from` an INPUT-domain cause must not leak the wrapper's `message` through `to_dict(STRICT)`; `to_problem_document(disclosure_mode=STRICT)` must never emit `provider` / `model` / `provider_metadata` regardless of `error_domain`. Mirror the existing STRICT tests in `tests/unit/pipelex/test_error_report_disclosure_mode.py`.
-- [ ] `make agent-check` clean; STRICT-related tests green.
-- [ ] Update [`wip/error-handling/track-strict-disclosure-input-domain-gap.md`](wip/error-handling/track-strict-disclosure-input-domain-gap.md) — mark it landed, note the option taken.
+- [x] Implement the chosen Gap 1 fix in `pipelex/base_exceptions.py` (`to_dict` STRICT branch, and `_enrich_error_report_from_cause` / the report-construction path as the option requires).
+- [x] Gap 2 — strip `provider` / `model` / `provider_metadata` from the INPUT passthrough branch of `to_dict(DisclosureMode.STRICT)`. An input-classification error has no business carrying provider metadata onto an external surface.
+- [x] Align the `DisclosureMode` docstring in `pipelex/base_exceptions.py` with the implemented redaction set.
+- [x] Tests: a domain-less wrapper (`PipelexUnexpectedError`) raised `from` an INPUT-domain cause must not leak the wrapper's `message` through `to_dict(STRICT)`; `to_problem_document(disclosure_mode=STRICT)` must never emit `provider` / `model` / `provider_metadata` regardless of `error_domain`. Mirror the existing STRICT tests in `tests/unit/pipelex/test_error_report_disclosure_mode.py`.
+- [x] `make agent-check` clean; STRICT-related tests green.
+- [x] Update [`wip/error-handling/track-strict-disclosure-input-domain-gap.md`](wip/error-handling/track-strict-disclosure-input-domain-gap.md) — mark it landed, note the option taken.
 
 **Acceptance:** STRICT never reflects a non-caller-facing message or provider metadata to an external surface, for any `error_domain`. The `DisclosureMode` docstring matches the code.
 
 ### ⛔ CHECKPOINT 1 — STOP, verify, record
 
-- [ ] Run `make agent-check` and `make agent-test` — both must pass.
-- [ ] Commit Phase 1 as a single coherent commit.
-- [ ] Tick every Phase 1 box above.
-- [ ] Append a dated **Checkpoint 1** entry to the Session log with: Decision D1 outcome, files touched, the exact redaction behavior now in effect, anything deferred, and the next action (start Phase 2).
+- [x] Run `make agent-check` and `make agent-test` — both must pass.
+- [x] Commit Phase 1 as a single coherent commit.
+- [x] Tick every Phase 1 box above.
+- [x] Append a dated **Checkpoint 1** entry to the Session log with: Decision D1 outcome, files touched, the exact redaction behavior now in effect, anything deferred, and the next action (start Phase 2).
 
 ---
 
@@ -214,3 +214,28 @@ Append one dated entry per session / checkpoint. Each entry must leave the next 
   **Next action:** start **Phase 1** — STRICT disclosure INPUT-domain leak. Take **Decision D1** first (recommended: Option 1 — per-class `ClassVar` flagging caller-facing-message authors).
 
 - **2026-05-22 — Decision D1 recorded.** Per the user, Decision D1 is **Option 1** (see the Decisions section for the full rationale); the Phase 1 D1 box is ticked to reflect it. Phase 1 **implementation is not started** — no implementation boxes ticked, no code touched. Next action: begin Phase 1 (STRICT disclosure INPUT-domain leak) at the first unticked box (implement the Gap 1 fix).
+
+- **2026-05-22 — Checkpoint 1 (Phase 1 complete).** STRICT-disclosure INPUT-domain leak closed on `feature/API-readiness-2` as a single commit. `make agent-check` clean (pyright + mypy: 0 errors); `make agent-test` full suite green.
+
+  **Decision D1:** Option 1, implemented exactly as decided.
+
+  **What landed:**
+
+    - `pipelex/base_exceptions.py` — new `PipelexError._authors_caller_facing_message` `ClassVar` (default `False`) and new `ErrorReport.caller_facing_message: bool` field. `to_error_report()` sets the field from the class flag; `_enrich_error_report_from_cause` carries it **wrapper-wins** — never inherited from the `__cause__` chain, since it tracks the provenance of `report.message` (always the wrapper's own message). `to_dict(STRICT)` now gates the `message` passthrough on `caller_facing_message`, not on `error_domain == INPUT`.
+    - **Gap 2:** new `_STRICT_PROVIDER_FIELDS` constant — `provider` / `model` / `provider_metadata` are stripped from the STRICT caller-facing passthrough branch too (already absent from the redacted branch). STRICT now never emits provider metadata for any `error_domain`.
+    - `caller_facing_message` is serialized **only when `True`** (popped from `to_dict` output otherwise), so non-caller-facing reports — the common case — serialize identically to before; `from_dict` defaults it back to `False`, so the round-trip holds. `to_problem_document` never echoes it (new `_PROBLEM_DOCUMENT_OMITTED_FIELDS`) — it is internal redaction plumbing, not consumer classification.
+    - `pipelex/core/interpreter/exceptions.py` (`PipelexInterpreterError`) and `pipelex/pipeline/validate_bundle.py` (`ValidateBundleError`) — the two INPUT-domain classes — set `_authors_caller_facing_message = True`. `BundleElaboratorError` inherits it (normal inheritance, unlike `_declared_title`). All other classes keep the safe `False` default.
+    - `pipelex/cogt/exceptions.py` — `CogtError.to_error_report()` override threads `caller_facing_message` through too (resolves to `False`).
+    - Docstrings: `DisclosureMode`, `ErrorReport.to_dict` / `to_problem_document`, `PipelexError._enrich_error_report_from_cause`, and the module constant comments rewritten to describe provenance-gated redaction.
+
+  **Redaction behavior now in effect (STRICT):** `provider` / `model` / `provider_metadata` always dropped. If `caller_facing_message` — keep `message` + `user_action` + stable identifiers. Else — `message` → `INTERNAL_ERROR_PLACEHOLDER`, drop `user_action`, keep only the stable identifiers (`error_type` / `error_domain` / `error_category` / `retryable` / `title` / `type_uri`).
+
+  **Tests:** `tests/unit/pipelex/test_error_report_disclosure_mode.py` rewritten for the new contract — includes the regression pin (`PipelexUnexpectedError` raised `from` a `PipelexInterpreterError` → report classified `error_domain=INPUT` but `caller_facing_message=False` → message redacted) and the Gap 2 pin (caller-facing passthrough strips provider fields). `test_error_report_problem_document.py` — old `INPUT`-passthrough test replaced; added STRICT-never-emits-provider-fields and `caller_facing_message`-never-an-extension-member tests. `test_class_level_metadata.py` — added a `caller_facing_message` class-level parametrized test.
+
+  **Tracker:** `wip/error-handling/track-strict-disclosure-input-domain-gap.md` marked landed (banner + Acceptance checkboxes ticked).
+
+  **Deferred / not done:** Only `PipelexInterpreterError` and `ValidateBundleError` are flagged caller-facing — the exact two INPUT-domain classes the tracker named. Classes like `MthdsDecodeError` (TOML decode) author arguably-caller-facing messages but are not flagged: the safe default redacts them, which is a usability nit, not a leak, and STRICT is not rendered for those surfaces today. Widening the flag set is a future follow-up if it proves needed.
+
+  **Decisions:** D1 done. **D2 (Phase 2) still pending.**
+
+  **Next action:** start **Phase 2** — finish wiring `request_id` into Temporal logs. Take **Decision D2** first (recommended: bound-adapter approach, rebuilt per activity/workflow invocation).
