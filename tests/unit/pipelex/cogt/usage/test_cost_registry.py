@@ -430,3 +430,71 @@ class TestCostRegistry:
             output_cost=2.0,
         )
         assert total == 3.5
+
+    def test_generate_report_print_to_console_false_skips_console(self, job_metadata: JobMetadata, mocker: MockerFixture):
+        """When print_to_console=False, the console.print is not called."""
+        mock_console = mocker.MagicMock()
+        mocker.patch("pipelex.cogt.usage.cost_registry.get_console", return_value=mock_console)
+
+        llm_tokens_usage = LLMTokensUsage(
+            job_metadata=job_metadata,
+            inference_model_name="test-model",
+            inference_model_id="test-model-id",
+            nb_tokens_by_category={
+                TokenCategory.INPUT: 100,
+                TokenCategory.OUTPUT: 50,
+                TokenCategory.INPUT_CACHED: 20,
+            },
+            unit_costs={
+                CostCategory.INPUT: 1000,
+                CostCategory.INPUT_CACHED: 500,
+                CostCategory.OUTPUT: 2000,
+            },
+        )
+
+        CostRegistry.generate_report(
+            pipeline_run_id="test-pipeline",
+            tokens_usages=[llm_tokens_usage],
+            unit_scale=1.0,
+            cost_report_file_path=None,
+            print_to_console=False,
+        )
+
+        mock_console.print.assert_not_called()
+
+    def test_generate_report_print_to_console_false_still_writes_csv(self, job_metadata: JobMetadata, tmp_path: Path, mocker: MockerFixture):
+        """When print_to_console=False, CSV file is still written if a path is provided."""
+        mock_console = mocker.MagicMock()
+        mocker.patch("pipelex.cogt.usage.cost_registry.get_console", return_value=mock_console)
+
+        llm_tokens_usage = LLMTokensUsage(
+            job_metadata=job_metadata,
+            inference_model_name="test-model",
+            inference_model_id="test-model-id",
+            nb_tokens_by_category={
+                TokenCategory.INPUT: 100,
+                TokenCategory.OUTPUT: 50,
+                TokenCategory.INPUT_CACHED: 20,
+            },
+            unit_costs={
+                CostCategory.INPUT: 1000,
+                CostCategory.INPUT_CACHED: 500,
+                CostCategory.OUTPUT: 2000,
+            },
+        )
+
+        csv_file = tmp_path / "csv_only.csv"
+        CostRegistry.generate_report(
+            pipeline_run_id="test-pipeline",
+            tokens_usages=[llm_tokens_usage],
+            unit_scale=1.0,
+            cost_report_file_path=csv_file,
+            print_to_console=False,
+        )
+
+        mock_console.print.assert_not_called()
+        assert csv_file.exists()
+        with open(csv_file, encoding="utf-8") as file:
+            rows = list(csv.DictReader(file))
+        assert len(rows) == 1
+        assert rows[0][LLMTokenCostReportField.LLM_NAME] == "test-model"

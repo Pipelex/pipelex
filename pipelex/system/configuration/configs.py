@@ -97,7 +97,7 @@ class ReportingConfig(ConfigModel):
     cost_report_dir_path: str
     cost_report_base_name: str
     cost_report_extension: str
-    cost_report_unit_scale: float
+    cost_report_unit_scale: Annotated[float, Field(gt=0)]
 
 
 class TracingBackend(StrEnum):
