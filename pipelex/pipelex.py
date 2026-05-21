@@ -612,13 +612,13 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 pipelex_instance.models_manager.validate_model_deck()
         except BaseException:
             # Cleanup the singleton instance if setup fails to avoid "already initialized" errors.
-            # Clear ``ErrorManager`` too — ``Pipelex.__init__`` constructed it before
-            # ``setup()`` ran, so it lives in ``MetaSingleton.instances`` independently
-            # and would otherwise leak its (potentially stale) ``errors_config`` into the
-            # next bootstrap, where ``MetaSingleton.__call__`` would silently reuse it.
+            # ``ErrorManager`` is intentionally kept alive here so that callers catching the
+            # re-raised exception (e.g. ``make_pipelex_for_agent_cli``) can still format it
+            # via ``PipelexError.to_error_report()`` → ``type_uri()``. The next
+            # ``Pipelex.__init__`` runs ``ErrorManager.clear_instance()`` before reconstructing
+            # it, so stale config cannot leak across bootstraps.
             if cls in MetaSingleton.instances:
                 del MetaSingleton.instances[cls]
-            ErrorManager.clear_instance()
             raise
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} ready")
         return pipelex_instance
