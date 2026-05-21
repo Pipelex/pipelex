@@ -312,6 +312,16 @@ Tracked here so the idea doesn't get lost. Each lands when a concrete consumer m
 
 **Triggers for picking it up.** Any of: (a) the CLI gains a verbose error mode operators want for debugging; (b) the API exposes a `?verbose=true` query param or `Accept-Profile` header; (c) a log-shipper consumer requests Sentry-compatible chain output.
 
+### Webhook payload reserved-key collision
+
+**What.** `DeliveryExecutor._notify_webhook` (`pipelex/pipe_run/delivery_executor.py:240-260`) copies `WebhookTarget.payload` (arbitrary caller dict) and then unconditionally assigns four Pipelex-owned keys on top: `pipeline_run_id`, `status`, `result_url` (success), `error` (failure). A caller who sets one of these keys in their static payload silently has it overwritten — the webhook schema therefore varies with delivery status in a way the caller did not opt into.
+
+**Why deferred.** Item D-2 plan explicitly specified `payload["error"] = error_report.to_dict(VERBOSE)` and the test pins it. The asymmetry is consistent with `result_url`'s pre-existing behavior — `error` just made the four-key reserved set more visible. Surfaced during the Stage 3 /review pass; not a regression introduced by this refactor.
+
+**Recommended fix.** Add a `field_validator` to `WebhookTarget.payload` that rejects the four reserved keys at construction time, with a clear error message. Lands in its own PR after this refactor merges. Full options analysis and sequencing in [`wip/error-handling/track-webhook-payload-collision.md`](wip/error-handling/track-webhook-payload-collision.md).
+
+**Triggers for picking it up.** Any of: (a) a caller reports surprise that their static `error` key vanished on failed runs; (b) `pipelex-api` or the webapp wants to add a new payload field and needs a clear contract for what's already reserved; (c) the webhook-signing track lands and we want a clean payload shape under the signature.
+
 ---
 
 ## Tracking
