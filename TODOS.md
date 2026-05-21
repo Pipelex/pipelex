@@ -122,7 +122,7 @@ The plan reflects these decisions; no further re-litigation in the items below.
 
 ## Stage 2 — Rendering primitives + total recovery *(unblocks `pipelex-api` Phase 1)*
 
-### [ ] Item C — Parameterized `to_dict(disclosure_mode=)` + `to_problem_document(...)` *(merges spec items 4+6)*
+### [x] Item C — Parameterized `to_dict(disclosure_mode=)` + `to_problem_document(...)` *(merges spec items 4+6)*
 
 - **File:** `pipelex/base_exceptions.py`
 - **Surface:**
@@ -196,7 +196,7 @@ The plan reflects these decisions; no further re-litigation in the items below.
     - **Receiver-rehydration test:** simulate the API-side consumer. Take a populated `ErrorReport`, render `payload = {"status": "failed", "error": report.to_dict(VERBOSE)}`, then `ErrorReport.from_dict(payload["error"])` and assert it equals the original. Pins the contract pipelex-api will consume on the webhook.
 - **Acceptance:** the API consumes both methods directly. The redaction rule and the envelope shape live exactly once in pipelex; no consumer duplicates them.
 
-### [ ] Item D-1 — Make `recover_error_report` total
+### [x] Item D-1 — Make `recover_error_report` total
 
 - **Files:**
     - `pipelex/temporal/exceptions.py` — new subclass `UnrecoverableWorkflowFailureError(TemporalFlowError)` with `error_domain = ErrorDomain.RUNTIME` and `_declared_title = "Workflow failed without recoverable error details"`. Lives next to `TemporalFlowError`, `WorkflowExecutionError`, etc. (Reason: Temporal-flow-specific synthesis concept; locking it into the Temporal exceptions module keeps the base hierarchy clean.)
@@ -320,8 +320,8 @@ Tracked here so the idea doesn't get lost. Each lands when a concrete consumer m
 |---|---|---|---|
 | A | `PipelexError.title()` + `type_uri()` with auto-derive *(spec 1+2)* | 1 | [x] |
 | B | `request_id` on `JobMetadata` *(spec 3)* | 1 | [x] |
-| C | `to_dict(disclosure_mode=)` + `to_problem_document(...)` *(spec 4+6)* | 2 | [ ] |
-| D-1 | Total `recover_error_report` | 2 | [ ] |
+| C | `to_dict(disclosure_mode=)` + `to_problem_document(...)` *(spec 4+6)* | 2 | [x] |
+| D-1 | Total `recover_error_report` | 2 | [x] |
 | D-2 | `ErrorReport` → `BaseModel`; thread to webhook; full `WfPipeRun` chain test *(spec 5)* | 3 | [ ] |
 | E | Per-class doc pages *(spec 7)* | 4 | [ ] |
 
@@ -407,12 +407,28 @@ Checkpoints are **hard stops**. Do not pick up the next stage in the same sessio
 - `make agent-check` + `make agent-test` clean.
 
 **Fill in at checkpoint time:**
-- Files touched: _TBD_
+
+- **Files touched:**
+    - Production:
+        - `pipelex/base_exceptions.py` — added `DisclosureMode` enum (VERBOSE / STRICT) with the path-leak-shield-vs-classification-projection contract documented on its docstring; added `_INTERNAL_ERROR_PLACEHOLDER` / `_STRICT_KEPT_FIELDS` module-level constants so `to_dict` and the RFC 7807 extension projection stay in sync; added `disclosure_mode` parameter on `to_dict` (default VERBOSE) implementing the INPUT-passthrough + CONFIG/RUNTIME redaction rule; added `to_problem_document(*, instance=None, request_id=None, disclosure_mode=DisclosureMode.VERBOSE)` mapping `type_uri → type` / `title → title` / `http_status → status` / `message → detail` (no extension echoes, exactly one `title` key).
+        - `pipelex/temporal/exceptions.py` — added `UnrecoverableWorkflowFailureError(TemporalFlowError)` with `error_domain = ErrorDomain.RUNTIME` and `_declared_title = "Workflow failed without recoverable error details"`.
+        - `pipelex/temporal/tprl/temporal_error.py` — `recover_error_report` signature changed to `(BaseException) -> ErrorReport` (total — no more `| None`). When no embedded report is found or `from_dict` fails on version skew, synthesizes `UnrecoverableWorkflowFailureError(_message_from_exc(exc)).to_error_report()`. New private `_message_from_exc` helper walks the `__cause__` chain for the deepest non-empty message (preserving worker-side cause text), falling back to `repr(exc)` only when every node in the chain has an empty message.
+        - `pipelex/temporal/tprl/workflow_caller.py` — dropped the `if error_report is not None` branches at three call sites: `execute_workflow`'s `WorkflowFailureError` clause (was `:128`), and the `isinstance(exc.cause, ApplicationError)` branches of `execute_child_workflow` (`:240`) and `start_child_workflow` (`:292`). The `recover_error_report` return is always usable now. The defensive `WorkflowExecutionError(msg)` constructions on the `WorkflowAlreadyStartedError` / `RPCError` / non-`ApplicationError`-cause paths are intentionally retained — those branches do NOT call `recover_error_report`.
+    - Tests:
+        - New: `tests/unit/pipelex/test_error_report_disclosure_mode.py` (`TestErrorReportDisclosureMode` — INPUT-passthrough pin, CONFIG/RUNTIME redaction, retryable survival across modes, verbose round-trip, strict non-round-trip, receiver-rehydration). `tests/unit/pipelex/test_error_report_problem_document.py` (`TestErrorReportProblemDocument` — standard-slot population, no `title`/`type_uri` extension duplication, single-`title`-key contract, `request_id` / `instance` extension optionality, strict-mode redaction passthrough for INPUT).
+        - Updated: `tests/unit/pipelex/temporal/test_recover_error_report.py` — G3 / G4 / no-application-error cases renamed to `*_synthesizes_unrecoverable` and assert the synthesized report's `error_type` / `error_domain` / `retryable` / message contents instead of `is None`. `tests/unit/pipelex/temporal/test_workflow_caller_error_recovery.py` — `test_workflow_failure_without_report_stays_generic` renamed to `*_synthesizes_unrecoverable` with the round-3 P2 pin: assertion that the synthesized `error.message` contains the underlying exception text and is NOT the legacy `"Failed to execute workflow X"` framing. `tests/unit/pipelex/temporal/test_workflow_caller_child_error_recovery.py` — G3 / G4 child cases renamed and updated to assert the synthesized unrecoverable report; the non-`ApplicationError`-cause case stays unchanged.
+- **Surprises / deviations (record in `api-companion-revisions.md`):**
+    1. **`_message_from_exc` walks the full `__cause__` chain for the deepest non-empty message, NOT just `str(exc) or repr(exc)`.** The plan suggested literally "outer Temporal failure's message if non-empty, else `repr(exc)`", but `WorkflowFailureError` always carries the generic outer text `"Workflow execution failed"`, which would not satisfy the round-3 P2 pin (test asserts the synthesized message "contains the underlying exception text"). The implementation walks the chain keeping the deepest non-empty message — so `WorkflowFailureError(cause=RuntimeError("worker crashed hard"))` synthesizes a message containing `"worker crashed hard"`, not the generic outer framing. `repr(exc)` remains the final fallback when every node's `str` is empty.
+    2. **All three call sites in `workflow_caller.py` were simplified, not just the submitter-side one at `:128`.** The plan's "three call sites" list (`:128`, `:240`, `:292`) is now uniformly post-`if error_report is not None` removal. The child-workflow paths' G3 / G4 tests in `test_workflow_caller_child_error_recovery.py` were updated to match.
+    3. **Pre-existing unrelated test failure flagged for the next session:** `tests/e2e/agent_cli/test_offline_run_dry.py::TestOfflineDryRun::test_gateway_no_cache_no_network_fails_with_unavailable` fails identically on baseline (`git stash` rerun confirms). The CLI subprocess returns an empty `{}` JSON payload while the assertion expects `error_type == "RemoteConfigUnavailableError"`. NOT introduced by Stage 2 — should be fixed independently.
 
 **Cold-start for Checkpoint 3:**
+
 - Re-read Item D-2 + [`api-companion-revisions.md`](wip/error-handling/api-companion-revisions.md) §D. This is the load-bearing stage.
 - The `BaseModel` conversion is the gate — land the round-trip test before the activity arg change.
 - Confirm the new `WfPipeRun` end-to-end test is in scope, not deferred. The existing test bypasses `WfPipeRun`; the new test is the safety net for the outer Temporal wrap.
+- `recover_error_report` is already total (Item D-1) — Item D-2's `wf_pipe_run` change to `error_report = recover_error_report(exc.cause)` does NOT need a `None` guard.
+- The pre-existing `test_gateway_no_cache_no_network_fails_with_unavailable` failure on baseline is unrelated to the error-handling refactor — fix or skip independently before the next `make agent-test` gate.
 
 ---
 

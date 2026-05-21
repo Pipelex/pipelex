@@ -96,8 +96,14 @@ class TestWorkflowCallerChildErrorRecovery:
             pytest.param("start_child_workflow", id="start"),
         ],
     )
-    async def test_g3_malformed_report_details_falls_back_generic(self, mocker: MockerFixture, method_name: str) -> None:
-        """G3 — a child ``ApplicationError`` whose details fail validation falls back to a generic error, no crash."""
+    async def test_g3_malformed_report_details_synthesizes_unrecoverable(self, mocker: MockerFixture, method_name: str) -> None:
+        """G3 — a child ``ApplicationError`` whose details fail validation synthesizes the unrecoverable report.
+
+        After Item D-1, ``recover_error_report`` is total — there is no longer a
+        Pipelex-framed ``"Application error in child workflow X"`` fallback when
+        details validation fails. The ``WorkflowExecutionError`` carries an
+        ``UnrecoverableWorkflowFailureError`` report.
+        """
         malformed = {"error_type": "X", "message": "m", "retryable": ["not", "a", "bool"]}
         app_error = ApplicationError("worker failure", malformed, type="CogtError")
         mocker.patch.object(workflow, method_name, new=mocker.AsyncMock(side_effect=_child_workflow_error(app_error)))
@@ -107,8 +113,9 @@ class TestWorkflowCallerChildErrorRecovery:
             await getattr(executor, method_name)(workflow_class=_StubWorkflow, workflow_arg={}, workflow_id="ut-run")
 
         error = exc_info.value
-        assert error.error_report is None
-        assert error.message == "Application error in child workflow _StubWorkflow"
+        assert error.error_report is not None
+        assert error.error_report.error_type == "UnrecoverableWorkflowFailureError"
+        assert "worker failure" in error.message
 
     @pytest.mark.parametrize(
         "method_name",
@@ -117,8 +124,8 @@ class TestWorkflowCallerChildErrorRecovery:
             pytest.param("start_child_workflow", id="start"),
         ],
     )
-    async def test_g4_application_error_without_report_details_falls_back_generic(self, mocker: MockerFixture, method_name: str) -> None:
-        """G4 — a child ``ApplicationError`` carrying no report payload yields a generic error, ``error_report=None``."""
+    async def test_g4_application_error_without_report_details_synthesizes_unrecoverable(self, mocker: MockerFixture, method_name: str) -> None:
+        """G4 — a child ``ApplicationError`` carrying no report payload synthesizes the unrecoverable report."""
         app_error = ApplicationError("worker failure", type="RuntimeError")
         mocker.patch.object(workflow, method_name, new=mocker.AsyncMock(side_effect=_child_workflow_error(app_error)))
         executor = WorkflowExecutor[Any, Any](task_queue="test-queue")
@@ -127,8 +134,9 @@ class TestWorkflowCallerChildErrorRecovery:
             await getattr(executor, method_name)(workflow_class=_StubWorkflow, workflow_arg={}, workflow_id="ut-run")
 
         error = exc_info.value
-        assert error.error_report is None
-        assert error.message == "Application error in child workflow _StubWorkflow"
+        assert error.error_report is not None
+        assert error.error_report.error_type == "UnrecoverableWorkflowFailureError"
+        assert "worker failure" in error.message
 
     @pytest.mark.parametrize(
         ("method_name", "generic_message"),

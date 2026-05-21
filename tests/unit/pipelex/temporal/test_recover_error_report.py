@@ -51,23 +51,40 @@ class TestRecoverErrorReport:
         failure = _workflow_failure(_app_error(skewed))
         assert recover_error_report(failure) == _FULL_REPORT
 
-    def test_g3_malformed_details_recovers_nothing(self) -> None:
-        """G3 — a details dict that fails ``ErrorReport`` validation yields ``None`` (no crash)."""
+    def test_g3_malformed_details_synthesizes_unrecoverable(self) -> None:
+        """G3 — a details dict that fails ``ErrorReport`` validation falls through to the synthesized unrecoverable report.
+
+        ``recover_error_report`` is total: a malformed / schema-drifted payload
+        does not crash the error path, it produces a stable-identity
+        ``UnrecoverableWorkflowFailureError`` report carrying the most
+        informative message recoverable from the failure chain.
+        """
         # It has the error_type/message shape so it is picked up as a report,
         # but ``retryable`` is the wrong type → from_dict raises, caught internally.
         malformed = {"error_type": "X", "message": "m", "retryable": ["not", "a", "bool"]}
         failure = _workflow_failure(_app_error(malformed))
-        assert recover_error_report(failure) is None
+        report = recover_error_report(failure)
+        assert report.error_type == "UnrecoverableWorkflowFailureError"
+        assert report.error_domain == ErrorDomain.RUNTIME
+        assert report.retryable is None
+        # The synthesized message preserves the underlying ApplicationError text.
+        assert "rate limited on the worker" in report.message
 
-    def test_g4_application_error_without_report_details_recovers_nothing(self) -> None:
-        """G4 — an ``ApplicationError`` carrying no report payload yields ``None``."""
+    def test_g4_application_error_without_report_details_synthesizes_unrecoverable(self) -> None:
+        """G4 — an ``ApplicationError`` carrying no report payload synthesizes the unrecoverable report."""
         failure = _workflow_failure(_app_error())
-        assert recover_error_report(failure) is None
+        report = recover_error_report(failure)
+        assert report.error_type == "UnrecoverableWorkflowFailureError"
+        assert report.error_domain == ErrorDomain.RUNTIME
+        assert "rate limited on the worker" in report.message
 
-    def test_no_application_error_in_chain_recovers_nothing(self) -> None:
-        """A failure with no ``ApplicationError`` in its ``__cause__`` chain yields ``None``."""
+    def test_no_application_error_in_chain_synthesizes_unrecoverable(self) -> None:
+        """A failure with no ``ApplicationError`` in its ``__cause__`` chain synthesizes the unrecoverable report."""
         failure = _workflow_failure(RuntimeError("plain non-Temporal failure"))
-        assert recover_error_report(failure) is None
+        report = recover_error_report(failure)
+        assert report.error_type == "UnrecoverableWorkflowFailureError"
+        assert report.error_domain == ErrorDomain.RUNTIME
+        assert "plain non-Temporal failure" in report.message
 
     def test_recovers_report_past_report_less_wrapper_application_error(self) -> None:
         """A report-less wrapper ``ApplicationError`` (e.g. a ``WorkflowExecutionError`` raised

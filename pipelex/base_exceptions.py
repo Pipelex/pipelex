@@ -8,6 +8,43 @@ from pipelex.errors.error_manager import ErrorManager
 from pipelex.tools.misc.string_utils import pascal_case_to_kebab, pascal_case_to_sentence
 from pipelex.types import StrEnum
 
+# Placeholder ``message`` substituted into a STRICT-mode serialization of a
+# CONFIG / RUNTIME report. INPUT-domain reports keep their original message.
+_INTERNAL_ERROR_PLACEHOLDER = "An internal error occurred."
+
+# Stable identifiers preserved in STRICT mode for CONFIG / RUNTIME reports.
+# Listed once here so ``to_dict`` and the RFC 7807 extension projection stay in
+# sync — drop a field from this set and STRICT redaction drops it from both.
+_STRICT_KEPT_FIELDS: frozenset[str] = frozenset({"error_type", "message", "title", "type_uri", "error_domain", "error_category", "retryable"})
+
+
+class DisclosureMode(StrEnum):
+    """How much detail to include when serializing an ``ErrorReport`` for external surfaces.
+
+    - ``VERBOSE``: all classification fields plus the original ``message``. Use for
+      internal-trust boundaries (webhook payloads, internal RPCs) where the receiver
+      decides what to expose further downstream. ``from_dict(to_dict(report, VERBOSE))``
+      reconstructs the original report exactly.
+
+    - ``STRICT``: stable identifiers only (``error_type``, ``error_domain``,
+      ``error_category``, ``retryable``, ``title``, ``type_uri``). For
+      ``CONFIG`` / ``RUNTIME`` reports, ``message`` is replaced with a generic
+      placeholder and ``provider`` / ``model`` / ``provider_metadata`` /
+      ``user_action`` are dropped. ``from_dict(to_dict(report, STRICT))`` for a
+      CONFIG / RUNTIME report does NOT reconstruct the original — STRICT is a
+      lossy projection.
+
+      **``INPUT``-domain reports are returned unchanged in STRICT mode.** Their
+      ``message`` is caller-influenced and reflecting it back is part of the
+      contract. STRICT is a *classification-projection for server-side errors*,
+      **not a path-leak shield**. If an ``INPUT`` message could surface a
+      server-resolved path or secret, fix the upstream message — don't expand
+      STRICT mode's scope.
+    """
+
+    VERBOSE = "verbose"
+    STRICT = "strict"
+
 
 class ErrorDomain(StrEnum):
     """Classifies where an error originates, so consumers can route it.
@@ -77,12 +114,74 @@ class ErrorReport:
     provider: str | None = None
     provider_metadata: ProviderErrorMetadata | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        """Return a dict with only non-None fields."""
-        return cast(
+    def to_dict(self, disclosure_mode: DisclosureMode = DisclosureMode.VERBOSE) -> dict[str, Any]:
+        """Return a dict with only non-None fields, projected through ``disclosure_mode``.
+
+        ``VERBOSE`` is the strict inverse of :meth:`from_dict` — every populated
+        field round-trips. ``STRICT`` is a lossy projection: for ``CONFIG`` /
+        ``RUNTIME`` reports the disclosure-leaking fields (``user_action`` /
+        ``model`` / ``provider`` / ``provider_metadata``) are dropped and
+        ``message`` is replaced with a generic placeholder, keeping only the
+        stable identifiers (see :class:`DisclosureMode`). ``INPUT``-domain
+        reports pass through unchanged in STRICT mode because their ``message``
+        is caller-influenced and reflecting it back is part of the contract.
+        """
+        payload = cast(
             "dict[str, Any]",
             TypeAdapter(type(self)).dump_python(self, mode="python", exclude_none=True),
         )
+        match disclosure_mode:
+            case DisclosureMode.VERBOSE:
+                return payload
+            case DisclosureMode.STRICT:
+                if self.error_domain == ErrorDomain.INPUT:
+                    return payload
+                redacted = {key: value for key, value in payload.items() if key in _STRICT_KEPT_FIELDS}
+                redacted["message"] = _INTERNAL_ERROR_PLACEHOLDER
+                return redacted
+
+    def to_problem_document(
+        self,
+        *,
+        instance: str | None = None,
+        request_id: str | None = None,
+        disclosure_mode: DisclosureMode = DisclosureMode.VERBOSE,
+    ) -> dict[str, Any]:
+        """Render this report as an RFC 7807 ``application/problem+json`` envelope.
+
+        The runner stays HTTP-agnostic — this returns a plain ``dict`` that
+        downstream HTTP adapters serialize as JSON. The standard 7807 slots are
+        sourced from the report:
+
+        - ``type`` from :attr:`type_uri`
+        - ``title`` from :attr:`title`
+        - ``status`` from :attr:`http_status`
+        - ``detail`` from :attr:`message` (subject to ``disclosure_mode`` redaction)
+        - ``instance`` from the ``instance`` arg (URN provided by the caller)
+
+        Pipelex-native classification fields ride as extension members
+        (``error_type`` / ``error_domain`` / ``error_category`` / ``retryable`` /
+        ``user_action`` / ``model`` / ``provider`` / ``provider_metadata``).
+        ``type_uri`` and ``title`` are mapped — not duplicated — so the returned
+        dict has exactly one ``title`` key. When the caller supplies a
+        ``request_id``, it rides as an extension member too.
+        """
+        payload = self.to_dict(disclosure_mode=disclosure_mode)
+        document: dict[str, Any] = {
+            "type": self.type_uri,
+            "title": self.title,
+            "status": self.http_status,
+            "detail": payload["message"],
+        }
+        if instance is not None:
+            document["instance"] = instance
+        if request_id is not None:
+            document["request_id"] = request_id
+        for key, value in payload.items():
+            if key in {"message", "title", "type_uri"}:
+                continue
+            document[key] = value
+        return document
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ErrorReport":

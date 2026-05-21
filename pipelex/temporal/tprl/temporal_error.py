@@ -9,6 +9,7 @@ from temporalio.exceptions import ApplicationError
 from pipelex.base_exceptions import ErrorReport, PipelexError
 from pipelex.cogt.exceptions import find_inference_error_category_in_chain
 from pipelex.config import get_config
+from pipelex.temporal.exceptions import UnrecoverableWorkflowFailureError
 from pipelex.temporal.log_temporal import activity_log, workflow_log
 from pipelex.types import Self
 
@@ -54,29 +55,55 @@ def _find_error_report_dict(exc: BaseException) -> dict[str, Any] | None:
     return None
 
 
-def recover_error_report(exc: BaseException) -> ErrorReport | None:
-    """Recover the structured ``ErrorReport`` from a Temporal failure.
+def _message_from_exc(exc: BaseException) -> str:
+    """Return the most informative message available from a Temporal failure chain.
+
+    ``WorkflowFailureError`` carries the generic outer text ``"Workflow execution failed"``;
+    the underlying ``__cause__`` (a Temporal ``ApplicationError`` carrying the
+    worker exception, or a non-Temporal exception) holds the real detail. We walk
+    the ``__cause__`` chain and surface the deepest non-empty message, falling
+    back to ``repr(exc)`` when every message in the chain is unset.
+    """
+    deepest_message = ""
+    node: BaseException | None = exc
+    seen: set[int] = set()
+    while node is not None and id(node) not in seen:
+        seen.add(id(node))
+        text = str(node)
+        if text:
+            deepest_message = text
+        node = node.__cause__
+    return deepest_message or repr(exc)
+
+
+def recover_error_report(exc: BaseException) -> ErrorReport:
+    """Recover the structured ``ErrorReport`` from a Temporal failure — total.
 
     Walks the ``__cause__`` chain for an ``ApplicationError`` carrying a
     details-packed report (see :func:`error_report_dict_from_details`) and
-    rebuilds an :class:`ErrorReport` from it. Returns ``None`` when no such
-    payload is present, so the caller can fall back to a generic error.
+    rebuilds an :class:`ErrorReport` from it. When no such payload is present —
+    or ``from_dict`` fails on a malformed / schema-drifted payload — synthesizes
+    an :class:`UnrecoverableWorkflowFailureError` report so callers never get
+    ``None``. The synthesized report carries the most informative message we can
+    recover from the failure chain (see :func:`_message_from_exc`) and a stable
+    identity / classification (``error_type="UnrecoverableWorkflowFailureError"``,
+    ``error_domain=RUNTIME``).
 
     Tolerant of worker/submitter version skew (normal during a rolling deploy):
     unknown keys — a field a newer worker added — are dropped before validation,
-    and a dict that still fails ``ErrorReport.from_dict`` (a malformed or
-    otherwise schema-drifted payload) yields ``None`` rather than propagating a
-    ``ValidationError`` out of the error-recovery path.
+    and a dict that still fails ``ErrorReport.from_dict`` falls through to the
+    synthesized report rather than propagating a ``ValidationError`` out of the
+    error-recovery path.
     """
     report_dict = _find_error_report_dict(exc)
-    if report_dict is None:
-        return None
-    known_fields = {field.name for field in fields(ErrorReport)}
-    trimmed = {key: value for key, value in report_dict.items() if key in known_fields}
-    try:
-        return ErrorReport.from_dict(trimmed)
-    except ValidationError:
-        return None
+    if report_dict is not None:
+        known_fields = {field.name for field in fields(ErrorReport)}
+        trimmed = {key: value for key, value in report_dict.items() if key in known_fields}
+        try:
+            return ErrorReport.from_dict(trimmed)
+        except ValidationError:
+            pass
+    return UnrecoverableWorkflowFailureError(_message_from_exc(exc)).to_error_report()
 
 
 class TemporalError(ApplicationError):
