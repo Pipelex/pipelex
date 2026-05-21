@@ -23,7 +23,7 @@ def _runtime_report(message: str = "rate limited on the worker") -> ErrorReport:
         error_type="CogtError",
         message=message,
         title="AI inference failed",
-        type_uri="https://pipelex.dev/errors/cogt-error",
+        type_uri="https://docs.pipelex.com/latest/errors/cogt-error/",
         error_category="capacity",
         error_domain=ErrorDomain.RUNTIME,
         retryable=False,
@@ -44,7 +44,7 @@ def _config_report(message: str = "OPENAI_API_KEY is not set") -> ErrorReport:
         error_type="EnvVarNotFoundError",
         message=message,
         title="Environment variable not set",
-        type_uri="https://pipelex.dev/errors/env-var-not-found-error",
+        type_uri="https://docs.pipelex.com/latest/errors/env-var-not-found-error/",
         error_domain=ErrorDomain.CONFIG,
     )
 
@@ -54,7 +54,7 @@ def _input_report(message: str = "JSON payload at /Users/alice/secret.mthds is m
         error_type="PipelexConfigError",
         message=message,
         title="Pipelex error",
-        type_uri="https://pipelex.dev/errors/pipelex-config-error",
+        type_uri="https://docs.pipelex.com/latest/errors/pipelex-config-error/",
         error_domain=ErrorDomain.INPUT,
     )
 
@@ -137,7 +137,7 @@ class TestErrorReportDisclosureMode:
             error_type="CogtError",
             message="boom",
             title="AI inference failed",
-            type_uri="https://pipelex.dev/errors/cogt-error",
+            type_uri="https://docs.pipelex.com/latest/errors/cogt-error/",
             error_domain=ErrorDomain.RUNTIME,
             retryable=retryable,
         )

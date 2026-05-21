@@ -11,7 +11,7 @@ class TestPipelexErrorTitleAndTypeUri:
         """``to_error_report()`` populates ``title`` / ``type_uri`` from the class methods."""
         report = PipelexConfigError("bad config").to_error_report()
         assert report.title == "Pipelex config"
-        assert report.type_uri == "https://pipelex.dev/errors/pipelex-config-error"
+        assert report.type_uri == "https://docs.pipelex.com/latest/errors/pipelex-config-error/"
         assert report.error_domain == ErrorDomain.CONFIG
 
     def test_auto_derive_title(self) -> None:
@@ -21,7 +21,7 @@ class TestPipelexErrorTitleAndTypeUri:
             pass
 
         assert FooBarError.title() == "Foo bar"
-        assert FooBarError.type_uri() == "https://pipelex.dev/errors/foo-bar-error"
+        assert FooBarError.type_uri() == "https://docs.pipelex.com/latest/errors/foo-bar-error/"
 
     def test_declared_title_wins_over_auto_derive(self) -> None:
         """``_declared_title`` set on a subclass overrides the auto-derived title."""
@@ -31,7 +31,7 @@ class TestPipelexErrorTitleAndTypeUri:
 
         assert HasCuratedTitleError.title() == "Curated title"
         # type_uri still auto-derives unless _declared_type_uri is also set.
-        assert HasCuratedTitleError.type_uri() == "https://pipelex.dev/errors/has-curated-title-error"
+        assert HasCuratedTitleError.type_uri() == "https://docs.pipelex.com/latest/errors/has-curated-title-error/"
 
     def test_declared_type_uri_wins_over_auto_derive(self) -> None:
         """``_declared_type_uri`` set on a subclass overrides the auto-derived URI."""

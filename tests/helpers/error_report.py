@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction
 
 _DEFAULT_TITLE = "Test error"
-_DEFAULT_TYPE_URI = "https://test.pipelex.dev/errors/test-error"
+_DEFAULT_TYPE_URI = "https://test.pipelex.dev/errors/test-error/"
 
 
 def make_error_report(

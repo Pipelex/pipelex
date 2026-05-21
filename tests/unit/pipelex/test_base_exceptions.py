@@ -24,9 +24,9 @@ class TestErrorReportColdImport:
             "assert 'pipelex.cogt.exceptions' not in sys.modules, "
             "'cogt.exceptions already loaded — test no longer exercises the cold path'\n"
             "direct = ErrorReport(error_type='X', message='m', "
-            "title='X error', type_uri='https://pipelex.dev/errors/x')\n"
+            "title='X error', type_uri='https://docs.pipelex.com/latest/errors/x/')\n"
             "assert direct.to_dict() == {'error_type': 'X', 'message': 'm', "
-            "'title': 'X error', 'type_uri': 'https://pipelex.dev/errors/x'}\n"
+            "'title': 'X error', 'type_uri': 'https://docs.pipelex.com/latest/errors/x/'}\n"
         )
         result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=False)  # noqa: S603
         assert result.returncode == 0, f"cold-path ErrorReport construction failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"

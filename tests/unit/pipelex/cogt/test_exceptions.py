@@ -206,7 +206,7 @@ class TestErrorCategoryInfrastructure:
             "error_type": "CogtError",
             "message": "plain error",
             "title": "AI inference failed",
-            "type_uri": "https://pipelex.dev/errors/cogt-error",
+            "type_uri": "https://docs.pipelex.com/latest/errors/cogt-error/",
         }
 
     def test_to_error_report_to_dict_json_serializable(self) -> None:
@@ -223,7 +223,7 @@ class TestErrorCategoryInfrastructure:
             error_type="CogtError",
             message="test",
             title="AI inference failed",
-            type_uri="https://pipelex.dev/errors/cogt-error",
+            type_uri="https://docs.pipelex.com/latest/errors/cogt-error/",
         )
         with pytest.raises(ValidationError):
             report.message = "mutated"  # type: ignore[misc]

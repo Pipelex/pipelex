@@ -317,7 +317,7 @@ class TestDeliveryExecutor:
             error_type="LLMCompletionError",
             message="provider returned 429",
             title="AI inference failed",
-            type_uri="https://pipelex.dev/errors/llm-completion-error",
+            type_uri="https://docs.pipelex.com/latest/errors/llm-completion-error/",
             error_category="transient",
             error_domain=ErrorDomain.RUNTIME,
             retryable=True,

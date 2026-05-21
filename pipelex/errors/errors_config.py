@@ -7,9 +7,10 @@ class ErrorsConfig(ConfigModel):
     """Settings governing how Pipelex renders error reports.
 
     ``base_uri``: the URL prefix used to derive a per-class ``type`` URI for
-    every :class:`pipelex.base_exceptions.PipelexError` subclass. The default
-    points at the public ``pipelex.dev/errors`` documentation site; private
-    deployments may override it to point at their own error doc host.
+    every :class:`pipelex.base_exceptions.PipelexError` subclass. Defaults to
+    the public ``docs.pipelex.com/latest/errors`` MkDocs site (the
+    ``/latest/`` alias is mike's pointer at the current stable release);
+    private deployments may override it to point at their own error doc host.
     """
 
     model_config = ConfigDict(frozen=True)

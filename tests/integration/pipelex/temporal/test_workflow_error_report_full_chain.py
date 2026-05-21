@@ -183,7 +183,7 @@ class TestWorkflowErrorReportFullChain:
         assert error_dict["provider"] == ErrorReportParityTestData.FAILURE_PROVIDER
         # LLMCompletionError auto-derives its title (no _declared_title) — CogtError's curated title doesn't leak through.
         assert error_dict["title"] == "Llm completion"
-        assert error_dict["type_uri"] == "https://pipelex.dev/errors/llm-completion-error"
+        assert error_dict["type_uri"] == "https://docs.pipelex.com/latest/errors/llm-completion-error/"
         assert error_dict["user_action"]["kind"] == ErrorReportParityTestData.EXPECTED_USER_ACTION_KIND
 
         submitter_error = exc_info.value

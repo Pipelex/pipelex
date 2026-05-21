@@ -20,7 +20,7 @@ def _runtime_report() -> ErrorReport:
         error_type="CogtError",
         message="rate limited on the worker",
         title="AI inference failed",
-        type_uri="https://pipelex.dev/errors/cogt-error",
+        type_uri="https://docs.pipelex.com/latest/errors/cogt-error/",
         error_category="capacity",
         error_domain=ErrorDomain.RUNTIME,
         retryable=False,
@@ -94,7 +94,7 @@ class TestErrorReportProblemDocument:
             error_type="X",
             message="m",
             title="X",
-            type_uri="https://pipelex.dev/errors/x",
+            type_uri="https://docs.pipelex.com/latest/errors/x/",
             error_domain=error_domain,
         )
         document = report.to_problem_document()
@@ -120,7 +120,7 @@ class TestErrorReportProblemDocument:
             error_type="PipelexConfigError",
             message="JSON payload at /Users/alice/secret.mthds is malformed",
             title="Pipelex error",
-            type_uri="https://pipelex.dev/errors/pipelex-config-error",
+            type_uri="https://docs.pipelex.com/latest/errors/pipelex-config-error/",
             error_domain=ErrorDomain.INPUT,
         )
         document = report.to_problem_document(disclosure_mode=DisclosureMode.STRICT)

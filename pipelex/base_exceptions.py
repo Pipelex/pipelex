@@ -275,11 +275,15 @@ class PipelexError(Exception):
         """Return the per-class documentation URI for this error class.
 
         Used as the RFC 7807 ``type`` field on every ``ErrorReport``. Auto-derived
-        as ``<base_uri>/<kebab-class-name>`` unless a subclass sets
-        :attr:`_declared_type_uri` directly in its own body. The ``base_uri`` is
-        read from the :class:`pipelex.errors.error_manager.ErrorManager` singleton
-        (which holds the :class:`pipelex.errors.errors_config.ErrorsConfig` set
-        during Pipelex bootstrap); calling this before bootstrap completes raises
+        as ``<base_uri>/<kebab-class-name>/`` unless a subclass sets
+        :attr:`_declared_type_uri` directly in its own body. The trailing slash
+        matches the canonical form MkDocs (with the default
+        ``use_directory_urls: true``) and mike's ``/latest/`` alias serve at —
+        clients dereferencing the URI hit the docs page directly without a 301
+        round-trip. The ``base_uri`` is read from the
+        :class:`pipelex.errors.error_manager.ErrorManager` singleton (which
+        holds the :class:`pipelex.errors.errors_config.ErrorsConfig` set during
+        Pipelex bootstrap); calling this before bootstrap completes raises
         :class:`RuntimeError` (callers that may run that early should declare a
         literal ``_declared_type_uri``).
         """
@@ -287,7 +291,7 @@ class PipelexError(Exception):
         if isinstance(declared, str):
             return declared
         base = ErrorManager.get_required_instance().base_uri
-        return f"{base}/{pascal_case_to_kebab(cls.__name__)}"
+        return f"{base}/{pascal_case_to_kebab(cls.__name__)}/"
 
     def __init__(self, message: str):
         super().__init__(message)
