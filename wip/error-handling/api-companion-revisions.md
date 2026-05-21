@@ -1,18 +1,18 @@
 # API-companion revisions — what we are actually building vs. the original spec
 
-This doc captures the **deviations** the pipelex side is taking from the original spec in [`pipelex-changes.md`](pipelex-changes.md), and the **rationale** for each. Its primary audience is the `pipelex-api` agent: when you read [`pipelex-changes.md`](pipelex-changes.md) to plan how the API will consume the new pipelex primitives, read this first to know what surface to actually expect.
+This doc captures the **deviations** the pipelex side is taking from the original spec in [`changes-for-api-early-draft.md`](changes-for-api-early-draft.md), and the **rationale** for each. Its primary audience is the `pipelex-api` agent: when you read [`changes-for-api-early-draft.md`](changes-for-api-early-draft.md) to plan how the API will consume the new pipelex primitives, read this first to know what surface to actually expect.
 
-The execution plan that implements these revisions is [`../../TODOS.md`](../../TODOS.md).
+The execution plan that implemented these revisions is the now-archived [`archive-todos.md`](archive-todos.md).
 
 ---
 
 ## Why this exists
 
-The original spec in [`pipelex-changes.md`](pipelex-changes.md) is **structurally sound** — every item identifies a real downstream pain and a real upstream primitive to fix it. But on close reading, several items push the very kind of consumer-side duplication, ad-hoc fallback logic, and optional-`None` plumbing that the spec itself argues against. A few items also introduce surface area earlier than it can be used, or hedge with "curate a subset, do the rest later" which leaves the codebase in an inconsistent state.
+The original spec in [`changes-for-api-early-draft.md`](changes-for-api-early-draft.md) is **structurally sound** — every item identifies a real downstream pain and a real upstream primitive to fix it. But on close reading, several items push the very kind of consumer-side duplication, ad-hoc fallback logic, and optional-`None` plumbing that the spec itself argues against. A few items also introduce surface area earlier than it can be used, or hedge with "curate a subset, do the rest later" which leaves the codebase in an inconsistent state.
 
 The revisions below collapse 9 items to 6, eliminate four sources of consumer-side drift, remove one "caller hand-authors a fallback" duplication pattern, drop one item as YAGNI, and stay strictly inside the repo's *no speculative future-proofing* rule (`CLAUDE.md`).
 
-**For the API agent:** wherever the surface here disagrees with [`pipelex-changes.md`](pipelex-changes.md), **this doc is authoritative**. The spec is kept for context but is no longer the contract.
+**For the API agent:** wherever the surface here disagrees with [`changes-for-api-early-draft.md`](changes-for-api-early-draft.md), **this doc is authoritative**. The spec is kept for context but is no longer the contract.
 
 ---
 
@@ -57,7 +57,7 @@ class PipelexError(Exception):
 
 Subclasses override `_declared_title` / `_declared_type_uri` only when the auto-derive is bad copy or the URI needs to point elsewhere. **Every class works out of the box.** `ErrorReport` carries both as populated string fields — consumers never see `None`.
 
-**API consumer impact.** The API reads `report.title` and `report.type_uri` directly. No humanize helper, no kebab-case helper, no `_resolve_title_for_class_name(...)`. The `https://pipelex.dev/errors/` namespace is owned by pipelex via `get_config().errors.base_uri`.
+**API consumer impact.** The API reads `report.title` and `report.type_uri` directly. No humanize helper, no kebab-case helper, no `_resolve_title_for_class_name(...)`. The `https://docs.pipelex.com/latest/errors` namespace is owned by pipelex via the `URLs.error_docs_base` constant (`pipelex/urls.py`).
 
 ---
 
@@ -185,7 +185,7 @@ These show up in multiple items above; collecting them here so the API agent can
 
 ## Current state
 
-> **For the API agent:** check this section first to know what's actually available. It is updated at every checkpoint in [`../../TODOS.md`](../../TODOS.md).
+> **For the API agent:** check this section first to know what's actually available. The full per-stage execution ledger is archived at [`archive-todos.md`](archive-todos.md).
 
 - [x] **Stage 1 — Foundations.** Items A + B.
 - [x] **Stage 2 — Rendering primitives + total recovery.** Items C + D-1.
@@ -193,13 +193,13 @@ These show up in multiple items above; collecting them here so the API agent can
 - [x] **Stage 4 — DX polish.** Item E.
 - [ ] **Stage 5 — Security tightening.** Item F (cross-repo, tracked at [`../security/webhook-signing.md`](../security/webhook-signing.md)).
 
-**Net to the API team:** the full error-handling refactor on the pipelex side is landed on `feature/API-readiness`. API Phases 0/1/4/5 are unblocked. The only outstanding pipelex-side item is the webhook-signing security track, which is independent of the rest of this plan and will land on its own schedule.
+**Net to the API team:** the full error-handling refactor on the pipelex side is landed on `feature/API-readiness-merge`. API Phases 0/1/4/5 are unblocked. The only outstanding pipelex-side item is the webhook-signing security track, which is independent of the rest of this plan and will land on its own schedule.
 
 ### What landed in Stage 1
 
-Available now on `feature/API-readiness`:
+Available now on `feature/API-readiness-merge`:
 
-- **`PipelexError.title()` / `PipelexError.type_uri()`** (`pipelex/base_exceptions.py`) — classmethods returning a populated `str`. Auto-derive from the class name unless a subclass declares `_declared_title` / `_declared_type_uri` directly in its own body (inheritance is intentionally bypassed). 14 curated `_declared_title` overrides shipped for high-traffic base classes.
+- **`PipelexError.title()` / `PipelexError.type_uri()`** (`pipelex/base_exceptions.py`) — classmethods returning a populated `str`. Auto-derive from the class name unless a subclass declares `_declared_title` / `_declared_type_uri` directly in its own body (inheritance is intentionally bypassed). Curated `_declared_title` overrides shipped for high-traffic base classes.
 - **`ErrorReport.title` and `ErrorReport.type_uri`** — both required `str`. Every `to_error_report()` call populates them. Round-trips through `to_dict` / `from_dict`. `from_dict` raises `ValidationError` on missing fields (the path that Stage 2 Item D-1's `recover_error_report` synthesizes into `UnrecoverableWorkflowFailureError`).
 - **`URLs.error_docs_base`** (`pipelex/urls.py`) — the base URI for every error `type_uri`, a hardcoded constant (`"https://docs.pipelex.com/latest/errors"`). `type_uri()` is a pure function: it reads only this constant, so it is safe to call before Pipelex boot and inside Temporal workflow code. A fork that needs a different host patches the constant or declares a per-class `_declared_type_uri`.
 - **`pascal_case_to_kebab`** (`pipelex/tools/misc/string_utils.py`) — acronym-aware kebab conversion (`"APIError" -> "api-error"`, `"V2APIError" -> "v2-api-error"`, `"OAuth2" -> "o-auth2"`).
@@ -213,7 +213,7 @@ Available now on `feature/API-readiness`:
 
 ### What landed in Stage 2
 
-Available now on `feature/API-readiness`:
+Available now on `feature/API-readiness-merge`:
 
 - **`DisclosureMode` enum** (`pipelex/base_exceptions.py`) — `VERBOSE` / `STRICT`. The contract is pinned on the enum's own docstring: STRICT is a *classification-projection for server-side errors*, **not a path-leak shield**. `INPUT`-domain reports pass through unchanged in STRICT mode (their `message` is caller-influenced; reflecting it back is part of the contract). `CONFIG` / `RUNTIME` reports drop `user_action` / `model` / `provider` / `provider_metadata` and replace `message` with `"An internal error occurred."`, keeping the stable identifiers (`error_type` / `error_domain` / `error_category` / `retryable` / `title` / `type_uri`).
 - **`ErrorReport.to_dict(disclosure_mode=DisclosureMode.VERBOSE)`** — projects the report through the disclosure mode. `VERBOSE` round-trips through `from_dict` exactly; `STRICT` is lossy by design. Default is `VERBOSE` so existing internal-trust callers (webhook payloads, Temporal details) are unaffected.
@@ -226,7 +226,7 @@ Available now on `feature/API-readiness`:
 
 ### What landed in Stage 3
 
-Available now on `feature/API-readiness`:
+Available now on `feature/API-readiness-merge`:
 
 - **`ErrorReport` is a `BaseModel`** (`pipelex/base_exceptions.py`) — `model_config = ConfigDict(frozen=True, extra="forbid", arbitrary_types_allowed=True)`. `to_dict` uses `self.model_dump(exclude_none=True)`; `from_dict` uses `cls.model_validate(data)`. The frozen contract now raises `pydantic.ValidationError` (not `dataclasses.FrozenInstanceError`) on mutation attempts — caller-visible if anyone caught the specific dataclass error. Tests updated to match.
 - **`DeliveryExecutor.execute(error_report=...)`** (`pipelex/pipe_run/delivery_executor.py`) — accepts `ErrorReport | None`; when non-None, the webhook payload includes `error = report.to_dict(DisclosureMode.VERBOSE)`. Receivers (the API) rehydrate losslessly via `ErrorReport.from_dict(payload["error"])`. The webhook stays the only mechanism for surfacing the report — the storage path does NOT serialize it as a file. The disclosure choice (VERBOSE on the wire) is locked here; the API decides what to re-expose to its own clients (it can render strict via `to_problem_document(disclosure_mode=STRICT)`).
@@ -241,11 +241,11 @@ Available now on `feature/API-readiness`:
 
 ### What landed in Stage 4
 
-Available now on `feature/API-readiness`:
+Available now on `feature/API-readiness-merge`:
 
 - **Error `type_uri` base is `https://docs.pipelex.com/latest/errors`** (`URLs.error_docs_base` in `pipelex/urls.py`) — the `/latest/` alias is mike's canonical pointer at current stable; canonical URLs are forced to `/latest/` via `docs/overrides/main.html`. A fork hosting its own error docs patches the constant.
 - **`PipelexError.type_uri()` emits a trailing slash** (`pipelex/base_exceptions.py`) — form is `<base>/<kebab-class-name>/`. Matches the canonical URL MkDocs serves with `use_directory_urls: true` (verified against the built `<link rel="canonical">` of the deployed page). Clients dereferencing the URI now hit the docs page directly — no 301 round-trip. Treat `type_uri` as opaque on the API side; do NOT strip or normalize the trailing slash.
-- **`docs/errors/<kebab-class-name>.md`** — one generated page per non-test `PipelexError` subclass (232 pages at this writing). Each page carries the class identity table (`error_type`, `title`, `type_uri`, `error_domain`, defining module, parent-class link, class-level `user_action` when declared), a docstring fragment when present, and a back-link to the Error Model overview. Stamped with `<!-- gstack:generated -->`. Maintainers can claim a page for hand-editing by adding `<!-- gstack:authored -->` as a standalone line; the generator then preserves it across runs. A landing `docs/errors/index.md` lists every page grouped by top-level `PipelexError` branch.
+- **`docs/errors/<kebab-class-name>.md`** — one generated page per non-test `PipelexError` subclass. Each page carries the class identity table (`error_type`, `title`, `type_uri`, `error_domain`, defining module, parent-class link, class-level `user_action` when declared), a docstring fragment when present, and a back-link to the Error Model overview. Stamped with `<!-- gstack:generated -->`. Maintainers can claim a page for hand-editing by adding `<!-- gstack:authored -->` as a standalone line; the generator then preserves it across runs. A landing `docs/errors/index.md` lists every page grouped by top-level `PipelexError` branch.
 - **`pipelex-dev generate-error-pages`** (`pipelex/cli/dev_cli/commands/generate_error_pages_cmd.py`) — internal CLI command to regenerate the pages. Quiet status line via `--quiet`; custom output dir via `--output DIR` (defaults to `docs/errors/`). Bootstraps Pipelex internally so every `PipelexError` subclass is imported and discoverable; tears down on exit.
 - **`pipelex/errors/error_module_registry.py`** — exposes `iter_pipelex_error_subclasses()` (force-loads every conventional error module and walks the hierarchy, skipping `tests.*`). Used by the docs generator and by the type-URI uniqueness test, so the two see the same class set. Discovery covers `exceptions.py`, `*_exceptions.py` (plugin error modules), and `*_errors.py` plus a small explicit list of non-standard locations.
 - **`mkdocs.yml` updates** — added a `not_in_nav` directive whitelisting `errors/*.md` (except `errors/index.md`) and `CLAUDE.md` so `make docs-check` (= `mkdocs build --strict`) finishes with zero INFO/WARNING/ERROR; added "Reference > Error Reference" pointing at `errors/index.md`.
