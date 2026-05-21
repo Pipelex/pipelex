@@ -36,7 +36,6 @@ from pipelex.config import get_config
 from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.stuffs.stuff_template_set import STUFF_TEMPLATE_SET
 from pipelex.core.validation import report_validation_error
-from pipelex.errors.error_manager import ErrorManager
 from pipelex.graph.mermaidflow.template_set import MERMAID_TEMPLATE_SET
 from pipelex.graph.reactflow.template_set import REACTFLOW_TEMPLATE_SET
 from pipelex.hub import PipelexHub, set_pipelex_hub
@@ -119,12 +118,6 @@ class Pipelex(metaclass=MetaSingleton):
         self.pipelex_hub.set_console_print_target(target=log_config.console_print_target)
         log.configure(log_config=log_config)
         log.verbose("Logs are configured")
-
-        # ``MetaSingleton.__call__`` short-circuits on re-entry and silently
-        # discards the new ``errors_config`` arg — clear first so this bootstrap
-        # can't inherit stale config from a prior failed ``Pipelex.make()``.
-        ErrorManager.clear_instance()
-        ErrorManager(errors_config=get_config().pipelex.errors_config)
 
         # tools
         self.class_registry: ClassRegistryAbstract | None = None
@@ -503,11 +496,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # Clear the singleton instance from metaclass
         if self.__class__ in MetaSingleton.instances:
             del MetaSingleton.instances[self.__class__]
-        # Clear ``ErrorManager`` last: every other teardown step above may raise
-        # a ``PipelexError`` whose ``to_error_report() → type_uri()`` reads from
-        # the manager. Clearing earlier would convert a real teardown failure
-        # into a misleading "ErrorManager is not initialized" trace.
-        ErrorManager.clear_instance()
 
     def __enter__(self) -> Self:
         return self
@@ -612,11 +600,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 pipelex_instance.models_manager.validate_model_deck()
         except BaseException:
             # Cleanup the singleton instance if setup fails to avoid "already initialized" errors.
-            # ``ErrorManager`` is intentionally kept alive here so that callers catching the
-            # re-raised exception (e.g. ``make_pipelex_for_agent_cli``) can still format it
-            # via ``PipelexError.to_error_report()`` → ``type_uri()``. The next
-            # ``Pipelex.__init__`` runs ``ErrorManager.clear_instance()`` before reconstructing
-            # it, so stale config cannot leak across bootstraps.
             if cls in MetaSingleton.instances:
                 del MetaSingleton.instances[cls]
             raise

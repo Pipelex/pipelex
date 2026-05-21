@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **`PipelexError.type_uri()` is now a pure function; the `ErrorManager` / `ErrorsConfig` machinery is removed.** The RFC 7807 `type` URI is a stable identifier, so its base was never meant to be process config. `type_uri()` now derives `<base>/<kebab-class-name>/` from the hardcoded `URLs.error_docs_base` constant (`pipelex/urls.py`, `https://docs.pipelex.com/latest/errors`) instead of reading `ErrorManager.get_required_instance().base_uri`. The `ErrorManager` singleton, the `ErrorsConfig` model, and the `[errors_config]` config block are deleted — **breaking** for any deployment that overrode `errors_config.base_uri` (a fork now patches the constant or declares a per-class `_declared_type_uri`). This also closes a Temporal workflow non-determinism hazard: a synthesized `UnrecoverableWorkflowFailureError` recovered inside workflow code baked the mutable base URI into `DeliveryActivityArg` and thus into workflow history, so a replay after the config changed — or on a worker without `ErrorManager` initialized — could mismatch or fail before delivery. With `type_uri()` pure, `recover_error_report()` is pure and the workflow-side call is deterministic.
+
 ## [v0.29.1] - 2026-05-21
 
 ### Fixed

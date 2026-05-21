@@ -177,16 +177,6 @@ pipelex = "INFO"
 is_reporting_enabled = true
 
 ####################################################################################################
-# Errors Config
-####################################################################################################
-
-[pipelex.errors_config]
-# Base URL for per-class error documentation. Every PipelexError subclass derives its
-# RFC 7807 `type` URI by appending its kebab-cased class name (and a trailing slash)
-# to this prefix. Override for private deployments hosting their own error doc site.
-base_uri = "https://docs.pipelex.com/latest/errors"
-
-####################################################################################################
 # Reporting Config
 ####################################################################################################
 

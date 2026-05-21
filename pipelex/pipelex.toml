@@ -29,13 +29,6 @@ signed_urls_lifespan_seconds = 3600
 [pipelex.observer_config]
 observer_dir = "results/observer"
 
-[pipelex.errors_config]
-# Base URL for per-class error documentation. Every PipelexError subclass derives its
-# RFC 7807 `type` URI by appending its kebab-cased class name (and a trailing slash) to
-# this prefix. Points at `docs.pipelex.com/latest/...` so the URI tracks the live docs;
-# the `/latest/` alias is the mike-versioned pointer that always reflects current stable.
-base_uri = "https://docs.pipelex.com/latest/errors"
-
 [pipelex.scan_config]
 excluded_dirs = [
   ".venv",

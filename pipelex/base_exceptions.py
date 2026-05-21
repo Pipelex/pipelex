@@ -3,9 +3,9 @@ from typing import Any, ClassVar
 from pydantic import BaseModel, ConfigDict
 
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction
-from pipelex.errors.error_manager import ErrorManager
 from pipelex.tools.misc.string_utils import pascal_case_to_kebab, pascal_case_to_sentence
 from pipelex.types import StrEnum
+from pipelex.urls import URLs
 
 # Placeholder ``message`` substituted into a STRICT-mode serialization of a
 # CONFIG / RUNTIME report. INPUT-domain reports keep their original message.
@@ -275,23 +275,21 @@ class PipelexError(Exception):
         """Return the per-class documentation URI for this error class.
 
         Used as the RFC 7807 ``type`` field on every ``ErrorReport``. Auto-derived
-        as ``<base_uri>/<kebab-class-name>/`` unless a subclass sets
+        as ``<URLs.error_docs_base>/<kebab-class-name>/`` unless a subclass sets
         :attr:`_declared_type_uri` directly in its own body. The trailing slash
         matches the canonical form MkDocs (with the default
         ``use_directory_urls: true``) and mike's ``/latest/`` alias serve at —
         clients dereferencing the URI hit the docs page directly without a 301
-        round-trip. The ``base_uri`` is read from the
-        :class:`pipelex.errors.error_manager.ErrorManager` singleton (which
-        holds the :class:`pipelex.errors.errors_config.ErrorsConfig` set during
-        Pipelex bootstrap); calling this before bootstrap completes raises
-        :class:`RuntimeError` (callers that may run that early should declare a
-        literal ``_declared_type_uri``).
+        round-trip.
+
+        Pure function: the base URI is the :data:`pipelex.urls.URLs.error_docs_base`
+        constant, so this is safe to call before Pipelex bootstrap and inside
+        Temporal workflow code without any determinism hazard.
         """
         declared = cls.__dict__.get("_declared_type_uri")
         if isinstance(declared, str):
             return declared
-        base = ErrorManager.get_required_instance().base_uri
-        return f"{base}/{pascal_case_to_kebab(cls.__name__)}/"
+        return f"{URLs.error_docs_base}/{pascal_case_to_kebab(cls.__name__)}/"
 
     def __init__(self, message: str):
         super().__init__(message)
