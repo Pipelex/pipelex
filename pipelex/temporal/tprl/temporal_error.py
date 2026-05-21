@@ -1,7 +1,6 @@
 from collections.abc import Sequence
 from typing import Any, cast
 
-from pydantic import ValidationError
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
@@ -11,9 +10,6 @@ from pipelex.config import get_config
 from pipelex.temporal.exceptions import UnrecoverableWorkflowFailureError
 from pipelex.temporal.log_temporal import activity_log, workflow_log
 from pipelex.types import Self
-
-# Frozen at module load so recover_error_report doesn't rebuild it per failure.
-_ERROR_REPORT_KNOWN_FIELDS: frozenset[str] = frozenset(ErrorReport.model_fields)
 
 
 def error_report_dict_from_details(details: Sequence[Any]) -> dict[str, Any] | None:
@@ -79,31 +75,29 @@ def _message_from_exc(exc: BaseException) -> str:
 
 
 def recover_error_report(exc: BaseException) -> ErrorReport:
-    """Recover the structured ``ErrorReport`` from a Temporal failure — total.
+    """Recover the structured ``ErrorReport`` from a Temporal failure.
 
     Walks the ``__cause__`` chain for an ``ApplicationError`` carrying a
     details-packed report (see :func:`error_report_dict_from_details`) and
-    rebuilds an :class:`ErrorReport` from it. When no such payload is present —
-    or ``from_dict`` fails on a malformed / schema-drifted payload — synthesizes
-    an :class:`UnrecoverableWorkflowFailureError` report so callers never get
-    ``None``. The synthesized report carries the most informative message we can
-    recover from the failure chain (see :func:`_message_from_exc`) and a stable
-    identity / classification (``error_type="UnrecoverableWorkflowFailureError"``,
+    rebuilds an :class:`ErrorReport` from it. When no such payload is present
+    in the chain — a non-Pipelex exception, a worker crash, a heartbeat
+    timeout, or anything else that crossed the boundary without going through
+    the activity bridge — synthesizes an :class:`UnrecoverableWorkflowFailureError`
+    report so callers in the error-recovery path always have a structured
+    report to surface. The synthesized report carries the most informative
+    message recoverable from the failure chain (see :func:`_message_from_exc`)
+    and a stable identity / classification
+    (``error_type="UnrecoverableWorkflowFailureError"``,
     ``error_domain=RUNTIME``).
 
-    Tolerant of worker/submitter version skew (normal during a rolling deploy):
-    unknown keys — a field a newer worker added — are dropped before validation,
-    and a dict that still fails ``ErrorReport.from_dict`` falls through to the
-    synthesized report rather than propagating a ``ValidationError`` out of the
-    error-recovery path.
+    A report dict that is found but fails :meth:`ErrorReport.from_dict`
+    validation is an internal contract violation within one deploy — the
+    activity bridge and the submitter share the schema — and is allowed to
+    raise. That is a bug to fix, not a state to tolerate.
     """
     report_dict = _find_error_report_dict(exc)
     if report_dict is not None:
-        trimmed = {key: value for key, value in report_dict.items() if key in _ERROR_REPORT_KNOWN_FIELDS}
-        try:
-            return ErrorReport.from_dict(trimmed)
-        except ValidationError:
-            pass
+        return ErrorReport.from_dict(report_dict)
     return UnrecoverableWorkflowFailureError(_message_from_exc(exc)).to_error_report()
 
 

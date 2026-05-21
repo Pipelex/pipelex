@@ -198,10 +198,10 @@ class ErrorReport(BaseModel):
         ``to_error_report()`` world. The nested ``UserAction`` /
         ``ProviderErrorMetadata`` models round-trip through their dict form.
 
-        Strict: ``ErrorReport`` is ``extra="forbid"``, so a malformed or
-        schema-drifted dict raises :class:`pydantic.ValidationError`. Robustness
-        against that failure (version skew, corrupted payload) belongs at the
-        recovery call site, not here.
+        Strict: ``ErrorReport`` is ``extra="forbid"``, so a malformed dict
+        raises :class:`pydantic.ValidationError`. Within a single deploy the
+        writer (activity bridge) and reader (submitter) share the schema, so a
+        validation failure is an internal contract bug — let it propagate.
         """
         return cls.model_validate(data)
 

@@ -81,12 +81,10 @@ class TestWorkflowCallerErrorRecovery:
     async def test_workflow_failure_without_report_synthesizes_unrecoverable(self, mocker: MockerFixture) -> None:
         """A non-Pipelex workflow failure (no packed report) surfaces as a synthesized unrecoverable report.
 
-        After Item D-1, ``recover_error_report`` is total — there is no longer a
-        Pipelex-framed ``"Failed to execute workflow X"`` fallback. The
-        ``WorkflowExecutionError`` carries a stable-identity
-        ``UnrecoverableWorkflowFailureError`` report whose message preserves the
-        underlying exception text. The legacy framing is gone on purpose: the
-        new message is strictly more diagnostic.
+        ``recover_error_report`` is total — there is no Pipelex-framed
+        ``"Failed to execute workflow X"`` fallback. The ``WorkflowExecutionError``
+        carries a stable-identity ``UnrecoverableWorkflowFailureError`` report
+        whose message preserves the underlying exception text.
         """
         executor, client = _make_executor_with_stub_client(mocker)
         failure = WorkflowFailureError(cause=RuntimeError("worker crashed hard"))

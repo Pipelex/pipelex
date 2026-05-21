@@ -240,25 +240,19 @@ async def act_llm_gen_text(llm_assignment: LLMAssignment) -> str:
 
 ### Submitter Side — `recover_error_report`
 
-Once the failure returns to the process that submitted the workflow, `recover_error_report()` walks the `__cause__` chain for the `ApplicationError`, pulls the details-packed dict, and rebuilds the `ErrorReport`.
+Once the failure returns to the process that submitted the workflow, `recover_error_report()` walks the `__cause__` chain for the `ApplicationError`, pulls the details-packed dict, and rebuilds the `ErrorReport`. It is **total** — callers in the error-recovery path always get a structured report.
 
 ```python
-def recover_error_report(exc: BaseException) -> ErrorReport | None:
+def recover_error_report(exc: BaseException) -> ErrorReport:
     report_dict = _find_error_report_dict(exc)
-    if report_dict is None:
-        return None
-    known = {f.name for f in fields(ErrorReport)}
-    trimmed = {k: v for k, v in report_dict.items() if k in known}  # tolerate skew
-    try:
-        return ErrorReport.from_dict(trimmed)
-    except ValidationError:
-        return None
+    if report_dict is not None:
+        return ErrorReport.from_dict(report_dict)
+    return UnrecoverableWorkflowFailureError(_message_from_exc(exc)).to_error_report()
 ```
 
-The recovered report is carried on `WorkflowExecutionError(error_report=...)`, whose `to_error_report()` override returns it. Since `WorkflowExecutionError` is a `PipelexError`, `PipelineExecutionError` inherits the classification natively.
+When no report dict is found in the chain — a non-Pipelex exception, a worker crash, a heartbeat timeout — the function synthesizes an `UnrecoverableWorkflowFailureError` report so the recovery path always has structured classification to surface. A report dict that fails `ErrorReport.from_dict` validation is treated as an internal contract bug (writer and reader share the schema within one deploy) and is allowed to raise.
 
-!!! info "Version skew is tolerated"
-    During a rolling deploy a worker and a submitter may run different Pipelex versions. Unknown keys are trimmed before validation, and a dict that still fails validation yields `None` — the error path degrades gracefully instead of crashing.
+The recovered report is carried on `WorkflowExecutionError(error_report=...)`, whose `to_error_report()` override returns it. Since `WorkflowExecutionError` is a `PipelexError`, `PipelineExecutionError` inherits the classification natively.
 
 **Net effect:** a pipe failing on a Temporal worker reaches the CLI and HTTP adapters with the *same* `error_category` / `retryable` / `model` / `provider` / `user_action` as the identical failure run locally.
 
@@ -412,7 +406,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable   # True — only TRANSIENT
 | Connection dropped mid-request | `AMBIGUOUS` → non-retryable (outcome unknown) |
 | Wrapper exception (no own category) | Inherits cause's classification via enrichment |
 | Failure on a Temporal worker | `ErrorReport` recovered from `ApplicationError.details` — same classification as local |
-| Worker/submitter version skew | Unknown keys trimmed; unrecoverable dict yields `None` |
+| Worker exception with no `ErrorReport` | Synthesized `UnrecoverableWorkflowFailureError` report — `error_domain = RUNTIME` |
 
 ---
 

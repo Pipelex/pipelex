@@ -2,8 +2,7 @@
 
 When a Temporal workflow fails, the structured ``ErrorReport`` rides on the
 deserialized ``ApplicationError.details``. ``recover_error_report`` walks the
-``__cause__`` chain, finds that ``ApplicationError``, and rebuilds the report —
-tolerating worker/submitter version skew and never crashing the error path.
+``__cause__`` chain, finds that ``ApplicationError``, and rebuilds the report.
 """
 
 from typing import Any
@@ -44,31 +43,6 @@ class TestRecoverErrorReport:
         """The packed report is rebuilt with every classification field intact."""
         failure = _workflow_failure(_app_error(_FULL_REPORT.to_dict()))
         assert recover_error_report(failure) == _FULL_REPORT
-
-    def test_g2_unknown_key_dropped_for_version_skew(self) -> None:
-        """G2 — a report dict from a newer worker (extra field) is accepted; the unknown key is dropped."""
-        skewed = {**_FULL_REPORT.to_dict(), "future_field": "added by a newer Pipelex worker"}
-        failure = _workflow_failure(_app_error(skewed))
-        assert recover_error_report(failure) == _FULL_REPORT
-
-    def test_g3_malformed_details_synthesizes_unrecoverable(self) -> None:
-        """G3 — a details dict that fails ``ErrorReport`` validation falls through to the synthesized unrecoverable report.
-
-        ``recover_error_report`` is total: a malformed / schema-drifted payload
-        does not crash the error path, it produces a stable-identity
-        ``UnrecoverableWorkflowFailureError`` report carrying the most
-        informative message recoverable from the failure chain.
-        """
-        # It has the error_type/message shape so it is picked up as a report,
-        # but ``retryable`` is the wrong type → from_dict raises, caught internally.
-        malformed = {"error_type": "X", "message": "m", "retryable": ["not", "a", "bool"]}
-        failure = _workflow_failure(_app_error(malformed))
-        report = recover_error_report(failure)
-        assert report.error_type == "UnrecoverableWorkflowFailureError"
-        assert report.error_domain == ErrorDomain.RUNTIME
-        assert report.retryable is None
-        # The synthesized message preserves the underlying ApplicationError text.
-        assert "rate limited on the worker" in report.message
 
     def test_g4_application_error_without_report_details_synthesizes_unrecoverable(self) -> None:
         """G4 — an ``ApplicationError`` carrying no report payload synthesizes the unrecoverable report."""
