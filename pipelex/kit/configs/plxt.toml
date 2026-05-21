@@ -1,5 +1,5 @@
 # =============================================================================
-# Pipelex TOML Configuration
+# PLXT Configuration
 # =============================================================================
 # Configures MTHDS/TOML formatting and linting behaviour for this project.
 # Powered by the Pipelex extension (plxt / taplo engine).
