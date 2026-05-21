@@ -1,5 +1,6 @@
 # TODOS — Error Handling, Phase 2: Resilience, Agent Delivery, Broad-Except Hygiene
 
+> **ARCHIVED — COMPLETE.** This Phase 2 sweep landed in full; kept for its running notes and checkpoint history. The authoritative current-state description lives in the `track-*.md` docs linked from [README.md](README.md).
 > **Branch:** `feature/Error-handling-2`
 > **Current-state reference:** [wip/error-handling/README.md](README.md) and the `track-*.md` docs it links.
 > **Prior sweep (completed, archived):** [wip/error-handling/archive-worker-classification-sweep.md](archive-worker-classification-sweep.md).

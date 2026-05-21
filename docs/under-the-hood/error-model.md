@@ -45,12 +45,14 @@ Classification happens once, at **Layer 1**. Layers 2–5 are wrappers: they att
 
 ## ErrorReport — the Serialization Schema
 
-`ErrorReport` (`pipelex/base_exceptions.py`) is the single source of truth for error serialization. It is a frozen Pydantic dataclass with `extra="forbid"`.
+`ErrorReport` (`pipelex/base_exceptions.py`) is the single source of truth for error serialization. It is a frozen Pydantic model with `extra="forbid"`.
 
 | Field | Type | Meaning |
 |-------|------|---------|
 | `error_type` | `str` | The exception class name |
 | `message` | `str` | Human-readable message |
+| `title` | `str` | Stable human-readable summary — the RFC 7807 `title` |
+| `type_uri` | `str` | Per-class documentation URI — the RFC 7807 `type` |
 | `error_category` | `str \| None` | `InferenceErrorCategory` value (inference errors only) |
 | `error_domain` | `str \| None` | `ErrorDomain` value — `input` / `config` / `runtime` |
 | `retryable` | `bool \| None` | Whether a retry could succeed |

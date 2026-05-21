@@ -44,8 +44,10 @@ class WorkflowLog:
     All methods accept an optional ``request_id`` kwarg — when provided, it is
     forwarded to the Temporal workflow logger via ``extra={"request_id": ...}``
     so downstream log shippers can correlate the record back to the inbound
-    API request. Activities/workflows read the value off
-    ``arg.<path>.job_metadata.request_id`` and pass it explicitly.
+    API request. The kwarg is accepted but not yet threaded by any caller: no
+    workflow reads ``job_metadata.request_id`` and passes it in. Wiring that
+    end to end is tracked as Phase 2 of the API-readiness follow-ups in the
+    repo-root ``TODOS.md``.
     """
 
     def verbose(self, content: Union[str, Any], request_id: str | None = None) -> None:
@@ -83,8 +85,10 @@ class ActivityLog:
     All methods accept an optional ``request_id`` kwarg — when provided, it is
     forwarded to the Temporal activity logger via ``extra={"request_id": ...}``
     so downstream log shippers can correlate the record back to the inbound
-    API request. Activities/workflows read the value off
-    ``arg.<path>.job_metadata.request_id`` and pass it explicitly.
+    API request. The kwarg is accepted but not yet threaded by any caller: no
+    activity reads ``job_metadata.request_id`` and passes it in. Wiring that
+    end to end is tracked as Phase 2 of the API-readiness follow-ups in the
+    repo-root ``TODOS.md``.
     """
 
     def verbose(self, content: Union[str, Any], request_id: str | None = None) -> None:

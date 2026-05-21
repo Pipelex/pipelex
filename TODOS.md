@@ -32,38 +32,38 @@ No code-behavior changes in this phase — docs and docstrings only. Goal: every
 
 ### 0.1 — Reference docs and docstrings must match shipped code
 
-- [ ] `docs/under-the-hood/error-model.md` — verify the `extra="forbid"` warning no longer claims `recover_error_report()` trims unknown keys. Then read the whole file against the shipped `ErrorReport` / `recover_error_report` / disclosure-mode code and fix any other drift.
-- [ ] `pipelex/temporal/exceptions.py` — verify the `UnrecoverableWorkflowFailureError` docstring no longer claims it is synthesized on a `from_dict` version-skew failure. It is synthesized only when no report dict is found at all.
-- [ ] `pipelex/temporal/log_temporal.py` — the `WorkflowLog` / `ActivityLog` docstrings claim "activities/workflows read the value off `job_metadata.request_id` and pass it explicitly." No caller does that yet. Soften the docstrings to describe the parameter honestly (accepted; wiring tracked in Phase 2) so a review agent does not flag a false claim.
-- [ ] Sweep docstrings in the #931-touched modules for code-doc drift and fix what no longer matches: `base_exceptions.py` (`ErrorReport`, `DisclosureMode`, `to_dict`, `to_problem_document`, `title`, `type_uri`), `temporal_error.py` (`recover_error_report`, `_message_from_exc`, `_find_error_report_dict`), `delivery_executor.py`, `error_pages_generator.py`, `error_module_registry.py`.
+- [x] `docs/under-the-hood/error-model.md` — verify the `extra="forbid"` warning no longer claims `recover_error_report()` trims unknown keys. Then read the whole file against the shipped `ErrorReport` / `recover_error_report` / disclosure-mode code and fix any other drift.
+- [x] `pipelex/temporal/exceptions.py` — verify the `UnrecoverableWorkflowFailureError` docstring no longer claims it is synthesized on a `from_dict` version-skew failure. It is synthesized only when no report dict is found at all.
+- [x] `pipelex/temporal/log_temporal.py` — the `WorkflowLog` / `ActivityLog` docstrings claim "activities/workflows read the value off `job_metadata.request_id` and pass it explicitly." No caller does that yet. Soften the docstrings to describe the parameter honestly (accepted; wiring tracked in Phase 2) so a review agent does not flag a false claim.
+- [x] Sweep docstrings in the #931-touched modules for code-doc drift and fix what no longer matches: `base_exceptions.py` (`ErrorReport`, `DisclosureMode`, `to_dict`, `to_problem_document`, `title`, `type_uri`), `temporal_error.py` (`recover_error_report`, `_message_from_exc`, `_find_error_report_dict`), `delivery_executor.py`, `error_pages_generator.py`, `error_module_registry.py`.
 
 ### 0.2 — Plan doc `api-companion-revisions.md` coherence
 
-- [ ] Verify §D.1 and "What landed in Stage 2" describe `recover_error_report` correctly (no embedded report → synthesize; found-but-invalid dict → raise as an internal contract bug) and that the `_declared_title` value quoted matches the code.
-- [ ] Rewrite §B — it says "Activity logs carry it via a `ContextVar` (same pattern as `session_id`)." That is wrong. State the decided design: `request_id` is transported on `JobMetadata` and threaded explicitly into log calls; no `ContextVar`, because a ContextVar is process-local and does not survive the Temporal serialization boundary.
-- [ ] Reconcile the "Current state" Stage checklist with reality: Stages 1-4 landed, Stage 5 (webhook signing) pending. Add a pointer to this `TODOS.md` for the post-review follow-ups so a reader knows where the remaining work lives.
-- [ ] Make every "What landed in Stage X" section honest — in particular Stage 1's `request_id` claim must not imply the logging is wired end-to-end when it is not.
+- [x] Verify §D.1 and "What landed in Stage 2" describe `recover_error_report` correctly (no embedded report → synthesize; found-but-invalid dict → raise as an internal contract bug) and that the `_declared_title` value quoted matches the code.
+- [x] Rewrite §B — it says "Activity logs carry it via a `ContextVar` (same pattern as `session_id`)." That is wrong. State the decided design: `request_id` is transported on `JobMetadata` and threaded explicitly into log calls; no `ContextVar`, because a ContextVar is process-local and does not survive the Temporal serialization boundary.
+- [x] Reconcile the "Current state" Stage checklist with reality: Stages 1-4 landed, Stage 5 (webhook signing) pending. Add a pointer to this `TODOS.md` for the post-review follow-ups so a reader knows where the remaining work lives.
+- [x] Make every "What landed in Stage X" section honest — in particular Stage 1's `request_id` claim must not imply the logging is wired end-to-end when it is not.
 
 ### 0.3 — The `wip/error-handling/` hub
 
-- [ ] `wip/error-handling/README.md` — the "Status at a glance" table does not list the API-readiness / `api-companion-revisions.md` track at all, and "What's still open" mentions only the metadata-model long tail. Add the API-readiness track to the table, and rewrite "What's still open" to list the real open items — webhook signing (Stage 5), the STRICT disclosure gap, the webhook-payload collision, the `request_id` wiring, the metadata-model long tail — each linking its tracker doc and/or this `TODOS.md`.
-- [ ] Confirm the new trackers (`track-strict-disclosure-input-domain-gap.md`, `track-webhook-payload-collision.md`) are linked from the README and consistent with it.
-- [ ] Confirm every `archive-*.md` file reads unambiguously as an archive (point-in-time, superseded). Do NOT rewrite archive contents — only fix a header line if one genuinely reads as a current contract.
-- [ ] `changes-for-api-early-draft.md` — add a one-line "superseded — see `api-companion-revisions.md`" banner at the top if it does not already have one, so a review agent never treats the original draft spec as the contract.
+- [x] `wip/error-handling/README.md` — the "Status at a glance" table does not list the API-readiness / `api-companion-revisions.md` track at all, and "What's still open" mentions only the metadata-model long tail. Add the API-readiness track to the table, and rewrite "What's still open" to list the real open items — webhook signing (Stage 5), the STRICT disclosure gap, the webhook-payload collision, the `request_id` wiring, the metadata-model long tail — each linking its tracker doc and/or this `TODOS.md`.
+- [x] Confirm the new trackers (`track-strict-disclosure-input-domain-gap.md`, `track-webhook-payload-collision.md`) are linked from the README and consistent with it.
+- [x] Confirm every `archive-*.md` file reads unambiguously as an archive (point-in-time, superseded). Do NOT rewrite archive contents — only fix a header line if one genuinely reads as a current contract.
+- [x] `changes-for-api-early-draft.md` — add a one-line "superseded — see `api-companion-revisions.md`" banner at the top if it does not already have one, so a review agent never treats the original draft spec as the contract.
 
 ### 0.4 — Cross-doc coherence check
 
-- [ ] Final read: `TODOS.md` ↔ `api-companion-revisions.md` "Current state" ↔ `wip/error-handling/README.md` "What's still open" must agree on what is done and what is pending. Resolve any disagreement.
-- [ ] `make agent-check` clean (docstring edits can trip formatting/linting).
+- [x] Final read: `TODOS.md` ↔ `api-companion-revisions.md` "Current state" ↔ `wip/error-handling/README.md` "What's still open" must agree on what is done and what is pending. Resolve any disagreement.
+- [x] `make agent-check` clean (docstring edits can trip formatting/linting).
 
 **Acceptance:** a PR review agent reading the error-handling docs cold gets one coherent story — no doc contradicts the code, no two docs contradict each other, and pending work is clearly marked as pending.
 
 ### ⛔ CHECKPOINT 0 — Clean slate verified, STOP and record
 
-- [ ] Run `make agent-check` — must pass.
-- [ ] Commit Phase 0 as a single docs-only commit.
-- [ ] Tick every Phase 0 box above.
-- [ ] Append a dated **Checkpoint 0** entry to the Session log: confirm the doc set is coherent, list any doc deliberately left as-is and why, and the next action (start Phase 1).
+- [x] Run `make agent-check` — must pass.
+- [x] Commit Phase 0 as a single docs-only commit.
+- [x] Tick every Phase 0 box above.
+- [x] Append a dated **Checkpoint 0** entry to the Session log: confirm the doc set is coherent, list any doc deliberately left as-is and why, and the next action (start Phase 1).
 
 ---
 
@@ -192,4 +192,23 @@ Record each decision here as it is taken, with date and rationale.
 
 Append one dated entry per session / checkpoint. Each entry must leave the next session enough to cold-start: what landed, decisions taken, current code state, what is broken or deferred, and the exact next action.
 
-- _Not started. First session: branch from `dev` after PR #931 merges, then begin Phase 0._
+- **2026-05-22 — Checkpoint 0 (Phase 0 complete).** Documentation coherence pass landed as a single docs-only commit on `feature/API-readiness-2`. No code-behavior change — docstrings, comments, and markdown only. `make agent-check` clean (pyright + mypy: 0 errors).
+
+  **Drift found and fixed:**
+
+    - `docs/under-the-hood/error-model.md` — `ErrorReport` now described as a frozen Pydantic *model* (was "dataclass", stale since the Stage 3 `BaseModel` conversion); added the `title` / `type_uri` rows to the field table (they were missing). The `extra="forbid"` warning was already correct — it does not claim `recover_error_report()` trims unknown keys.
+    - `pipelex/temporal/log_temporal.py` — softened the `WorkflowLog` / `ActivityLog` docstrings: the `request_id` kwarg is accepted but not yet threaded by any caller (wiring is Phase 2).
+    - `pipelex/base_exceptions.py` — fixed a stale inline comment on `_declared_type_uri` ("bootstrap-registered errors base URI" → the `URLs.error_docs_base` constant; `type_uri()` is pure since the `ErrorManager` removal).
+    - `pipelex/temporal/tprl/temporal_error.py` — dropped two stale references to the removed in-process `PipeRouter` retry loop (`TemporalError` class docstring + `_is_non_retryable`).
+    - `api-companion-revisions.md` — rewrote §B Acceptance (`request_id` rides on `JobMetadata` and is threaded explicitly into log calls; **no `ContextVar`**, because a ContextVar is process-local and does not survive the Temporal serialization boundary); made the Stage 1 `request_id` claim honest (kwarg accepted, not wired end to end); rewrote "Net to the API team" to point at this `TODOS.md` for the post-review follow-ups.
+    - `wip/error-handling/README.md` — added the API-readiness track to the "Status at a glance" table; rewrote "What's still open" to list webhook signing, the STRICT-disclosure gap, the webhook-payload collision, the `request_id` wiring, and the metadata-model long tail, each linking its tracker.
+    - `wip/error-handling/archive-error-handling-2.md` — added an `ARCHIVED — COMPLETE` header line (the only archive whose title still read as a current plan).
+    - `wip/error-handling/changes-for-api-early-draft.md` — added a "superseded — see `api-companion-revisions.md`" banner.
+
+  **Verified correct, left as-is:** `pipelex/temporal/exceptions.py` `UnrecoverableWorkflowFailureError` docstring (already states it is synthesized only when no report dict is found); `base_exceptions.py` / `delivery_executor.py` / `error_pages_generator.py` / `error_module_registry.py` docstrings (swept — no drift). **Deliberate omission:** `error-model.md` does not yet document `DisclosureMode` / `to_problem_document` — not a contradiction (an under-the-hood doc need not be exhaustive), and Phase 1 changes STRICT behavior, so documenting it now would only be rewritten.
+
+  **Coherence:** `TODOS.md`, `api-companion-revisions.md` "Current state", and `README.md` "What's still open" now agree — Stages 1-4 landed via PR #931; pending = webhook signing (Stage 5) + the four `/review` follow-ups.
+
+  **Decisions:** none taken — D1 (Phase 1) and D2 (Phase 2) remain pending.
+
+  **Next action:** start **Phase 1** — STRICT disclosure INPUT-domain leak. Take **Decision D1** first (recommended: Option 1 — per-class `ClassVar` flagging caller-facing-message authors).

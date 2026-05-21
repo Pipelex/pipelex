@@ -65,7 +65,7 @@ Subclasses override `_declared_title` / `_declared_type_uri` only when the auto-
 
 **Decision taken in planning.** Field lives on `JobMetadata`, not `PipeJob`. `JobMetadata` already carries `pipeline_run_id`, `user_id`, `session_id` and threads through every activity / workflow / submitter hop via `PipeJob.job_metadata` → `PipeRunArg`. Adding it on `PipeJob` (as the spec's literal example shows) would require copying it across into `JobMetadata` anyway to make it visible to the logger context.
 
-**Acceptance.** The API populates `JobMetadata.request_id` from its inbound `X-Request-ID` middleware once at submitter dispatch. Activity logs carry it via a `ContextVar` (same pattern as `session_id`). The current `webhook.payload["request_id"]` piggyback becomes obsolete.
+**Acceptance.** The API populates `JobMetadata.request_id` from its inbound `X-Request-ID` middleware once at submitter dispatch. From there `request_id` rides on `JobMetadata` across every Temporal hop and is threaded **explicitly** into the worker-side log calls — **not** via a `ContextVar`. A `ContextVar` is process-local and does not survive the Temporal activity/workflow serialization boundary, so it cannot carry a correlation id from the submitter process to a worker running in another process. The explicit threading is the one piece still pending — tracked as Phase 2 of the post-review follow-ups in [`../../TODOS.md`](../../TODOS.md). The current `webhook.payload["request_id"]` piggyback becomes obsolete.
 
 ---
 
@@ -193,7 +193,10 @@ These show up in multiple items above; collecting them here so the API agent can
 - [x] **Stage 4 — DX polish.** Item E.
 - [ ] **Stage 5 — Security tightening.** Item F (cross-repo, tracked at [`../security/webhook-signing.md`](../security/webhook-signing.md)).
 
-**Net to the API team:** the full error-handling refactor on the pipelex side is landed on `feature/API-readiness-merge`. API Phases 0/1/4/5 are unblocked. The only outstanding pipelex-side item is the webhook-signing security track, which is independent of the rest of this plan and will land on its own schedule.
+**Net to the API team:** the error-handling refactor on the pipelex side is landed — Stages 1-4 shipped via PR #931. API Phases 0/1/4/5 are unblocked. Two things remain on the pipelex side:
+
+- **Webhook signing (Stage 5 / Item F)** — the cross-repo security track at [`../security/webhook-signing.md`](../security/webhook-signing.md), independent of the rest of this plan, landing on its own schedule.
+- **Post-review follow-ups** — a `/review` pass on PR #931 surfaced a small set of in-repo finalizations: a STRICT-disclosure INPUT-domain leak, finishing the `request_id` log wiring (§B), a webhook reserved-key collision, and test-coverage backfill. These are sequenced and tracked in [`../../TODOS.md`](../../TODOS.md).
 
 ### What landed in Stage 1
 
@@ -205,7 +208,7 @@ Available now on `feature/API-readiness-merge`:
 - **`pascal_case_to_kebab`** (`pipelex/tools/misc/string_utils.py`) — acronym-aware kebab conversion (`"APIError" -> "api-error"`, `"V2APIError" -> "v2-api-error"`, `"OAuth2" -> "o-auth2"`).
 - **`JobMetadata.request_id: str | None`** (`pipelex/pipeline/job_metadata.py`) — round-trips through `model_dump_json`, distinct from `ProviderErrorMetadata.request_id` (the provider-side request id) which keeps its name.
 - **`pipeline_run_setup(..., request_id="...")`** (`pipelex/pipeline/pipeline_run_setup.py`) — kwarg threaded into the constructed `JobMetadata`. The current `webhook.payload["request_id"]` piggyback on the API side is now obsolete; consumers should set `request_id` at dispatch time and read it back off `arg.<path>.job_metadata.request_id`.
-- **`WorkflowLog` / `ActivityLog` log methods** (`pipelex/temporal/log_temporal.py`) — every level (`verbose` / `debug` / `dev` / `info` / `warning` / `error` / `critical`) accepts optional `request_id: str | None`, forwarded to the Temporal logger via `extra={"request_id": ...}`.
+- **`WorkflowLog` / `ActivityLog` log methods** (`pipelex/temporal/log_temporal.py`) — every level (`verbose` / `debug` / `dev` / `info` / `warning` / `error` / `critical`) accepts optional `request_id: str | None`, forwarded to the Temporal logger via `extra={"request_id": ...}`. **The kwarg is accepted but not yet threaded by any caller** — no activity or workflow reads `job_metadata.request_id` and passes it into a log call, so end to end the `request_id` does not yet reach worker log records. Closing that gap is Phase 2 of the post-review follow-ups in [`../../TODOS.md`](../../TODOS.md).
 
 **Update — `type_uri()` is now a pure constant.** Stage 1 originally read the base URI through an `ErrorManager` singleton holding an `ErrorsConfig` — a workaround for the import cycle a lazy `get_config()` call inside the method would have created. That whole machinery (`ErrorManager`, `ErrorsConfig`, the `[errors_config]` config block) was later removed: the `type` URI is a stable identifier per RFC 7807, so making it configurable was over-engineering, and the mutable read leaked into Temporal workflow determinism (the base URI rode into workflow history via a synthesized `UnrecoverableWorkflowFailureError`). `type_uri()` now reads the `URLs.error_docs_base` constant directly — a pure function, no boot dependency, no static cycle. API consumers see no difference.
 

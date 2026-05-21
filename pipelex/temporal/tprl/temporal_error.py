@@ -109,10 +109,9 @@ class TemporalError(ApplicationError):
     - ``non_retryable``: when the exception's ``__cause__`` chain carries a
       ``CogtError`` with an ``InferenceErrorCategory`` the flag is derived from
       ``category.is_retryable`` — recovered even under the ``PipeRunError`` /
-      ``PipeRouterError`` / ``PipelineExecutionError`` wrappers, by the same
-      chain walk the in-process ``PipeRouter`` retry loop uses. For a chain
-      carrying no category the bridge falls back to the configured
-      ``non_retryable_error_types`` class-name list.
+      ``PipeRouterError`` / ``PipelineExecutionError`` wrappers, by walking the
+      ``__cause__`` chain. For a chain carrying no category the bridge falls
+      back to the configured ``non_retryable_error_types`` class-name list.
     - ``error_report``: the structured ``ErrorReport`` dict is packed into
       ``ApplicationError.details`` so workflow code keeps ``error_category``,
       ``user_action``, ``model`` and ``provider`` — not just the message string.
@@ -232,9 +231,8 @@ class TemporalError(ApplicationError):
         activity boundary, so the ``InferenceErrorCategory`` is recovered by walking the
         ``__cause__`` chain rather than inspecting only the outer exception. This keeps
         ``non_retryable`` consistent with the chain-enriched ``retryable`` field of the
-        ``ErrorReport`` packed alongside it, and with the in-process ``PipeRouter`` retry
-        loop. A chain carrying no category falls back to the configured
-        ``non_retryable_error_types`` class-name list.
+        ``ErrorReport`` packed alongside it. A chain carrying no category falls back to
+        the configured ``non_retryable_error_types`` class-name list.
         """
         error_category = find_inference_error_category_in_chain(exc)
         if error_category is not None:

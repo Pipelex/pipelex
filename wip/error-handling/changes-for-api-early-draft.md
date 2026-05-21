@@ -1,5 +1,7 @@
 # Pipelex changes — companion work for the API error-handling refactor
 
+> **Superseded — historical draft.** This is the original early-draft spec. The authoritative companion doc is [`api-companion-revisions.md`](api-companion-revisions.md), which records what actually shipped and the deviations taken. Kept for context only — do not treat it as the contract.
+
 Changes to the **pipelex** library to land in parallel with (and largely before) the `pipelex-api` error-handling refactor. The goal is to expose the right primitives upstream so the API consumes them cleanly instead of duplicating logic, working around missing fields, or stalling Phase 4.
 
 This is **not a follow-up list.** It is the pipelex-side workplan for the same integration. Done well, the API plan in [../../TODOS.md](../../TODOS.md) reads as straight consumer code with no compensating logic. Done poorly, the API plan accumulates small workarounds that the next consumer (CLI, agent CLI, future SDK) will have to either re-write or refactor away.

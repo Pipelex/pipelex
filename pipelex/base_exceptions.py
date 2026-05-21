@@ -251,7 +251,7 @@ class PipelexError(Exception):
     _declared_title: ClassVar[str | None] = "Pipelex error"
     # When declared *directly in a subclass body*, ``type_uri()`` returns this
     # verbatim instead of appending the kebab-cased class name to the
-    # bootstrap-registered errors base URI. Same inheritance-bypass semantics
+    # ``URLs.error_docs_base`` constant. Same inheritance-bypass semantics
     # as ``_declared_title``.
     _declared_type_uri: ClassVar[str | None] = None
 
