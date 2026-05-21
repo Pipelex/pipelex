@@ -10,12 +10,17 @@ from pipelex.types import StrEnum
 
 # Placeholder ``message`` substituted into a STRICT-mode serialization of a
 # CONFIG / RUNTIME report. INPUT-domain reports keep their original message.
-_INTERNAL_ERROR_PLACEHOLDER = "An internal error occurred."
+INTERNAL_ERROR_PLACEHOLDER = "An internal error occurred."
 
-# Stable identifiers preserved in STRICT mode for CONFIG / RUNTIME reports.
-# Listed once here so ``to_dict`` and the RFC 7807 extension projection stay in
-# sync — drop a field from this set and STRICT redaction drops it from both.
-_STRICT_KEPT_FIELDS: frozenset[str] = frozenset({"error_type", "message", "title", "type_uri", "error_domain", "error_category", "retryable"})
+# Stable identifiers preserved verbatim in STRICT mode for CONFIG / RUNTIME
+# reports. ``message`` is intentionally absent — STRICT replaces it with
+# ``INTERNAL_ERROR_PLACEHOLDER`` unconditionally, not by passthrough.
+_STRICT_KEPT_FIELDS: frozenset[str] = frozenset({"error_type", "title", "type_uri", "error_domain", "error_category", "retryable"})
+
+# Fields already mapped into RFC 7807 standard slots (``detail`` / ``title`` /
+# ``type``) by ``to_problem_document`` — must NOT be echoed as extension
+# members on the returned envelope.
+_RFC7807_MAPPED_FIELDS: frozenset[str] = frozenset({"message", "title", "type_uri"})
 
 
 class DisclosureMode(StrEnum):
@@ -128,7 +133,7 @@ class ErrorReport:
         """
         payload = cast(
             "dict[str, Any]",
-            TypeAdapter(type(self)).dump_python(self, mode="python", exclude_none=True),
+            _ERROR_REPORT_ADAPTER.dump_python(self, mode="python", exclude_none=True),
         )
         match disclosure_mode:
             case DisclosureMode.VERBOSE:
@@ -136,8 +141,8 @@ class ErrorReport:
             case DisclosureMode.STRICT:
                 if self.error_domain == ErrorDomain.INPUT:
                     return payload
-                redacted = {key: value for key, value in payload.items() if key in _STRICT_KEPT_FIELDS}
-                redacted["message"] = _INTERNAL_ERROR_PLACEHOLDER
+                redacted: dict[str, Any] = {key: payload[key] for key in _STRICT_KEPT_FIELDS if key in payload}
+                redacted["message"] = INTERNAL_ERROR_PLACEHOLDER
                 return redacted
 
     def to_problem_document(
@@ -178,7 +183,7 @@ class ErrorReport:
         if request_id is not None:
             document["request_id"] = request_id
         for key, value in payload.items():
-            if key in {"message", "title", "type_uri"}:
+            if key in _RFC7807_MAPPED_FIELDS:
                 continue
             document[key] = value
         return document
@@ -197,7 +202,7 @@ class ErrorReport:
         against that failure (version skew, corrupted payload) belongs at the
         recovery call site, not here.
         """
-        return cast("ErrorReport", TypeAdapter(cls).validate_python(data))
+        return _ERROR_REPORT_ADAPTER.validate_python(data)
 
     def user_action_detail(self) -> str | None:
         """Return the free-form advice text on ``user_action``, or ``None`` when absent."""
@@ -217,6 +222,13 @@ class ErrorReport:
         if self.provider_metadata is not None and self.provider_metadata.status_code == 429:
             return 429
         return error_domain_to_http_status(self.error_domain)
+
+
+# Cached at module scope because building a ``TypeAdapter`` per call rebuilds
+# the validator + serializer schema (pydantic explicitly flags per-call
+# construction as a hot-path pitfall). ``ErrorReport`` has no subclasses, so a
+# single instance covers every ``to_dict`` / ``from_dict`` call.
+_ERROR_REPORT_ADAPTER: TypeAdapter[ErrorReport] = TypeAdapter(ErrorReport)
 
 
 def _humanize_class_name(class_name: str) -> str:

@@ -10,7 +10,7 @@ is exactly one ``title`` key and ``type == type_uri``.
 
 import pytest
 
-from pipelex.base_exceptions import DisclosureMode, ErrorDomain, ErrorReport
+from pipelex.base_exceptions import INTERNAL_ERROR_PLACEHOLDER, DisclosureMode, ErrorDomain, ErrorReport
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.cogt.inference.provider_name import ProviderName
 
@@ -104,7 +104,7 @@ class TestErrorReportProblemDocument:
         """Strict ``to_problem_document`` redacts ``detail`` and drops disclosure-leaking extensions."""
         report = _runtime_report()
         document = report.to_problem_document(disclosure_mode=DisclosureMode.STRICT)
-        assert document["detail"] == "An internal error occurred."
+        assert document["detail"] == INTERNAL_ERROR_PLACEHOLDER
         assert "model" not in document
         assert "provider" not in document
         assert "provider_metadata" not in document

@@ -21,7 +21,7 @@ class UnrecoverableWorkflowFailureError(TemporalFlowError):
     """
 
     error_domain = ErrorDomain.RUNTIME
-    _declared_title = "Workflow failed without recoverable error details"
+    _declared_title = "Unrecoverable workflow failure"
 
 
 class WorkflowInputError(TemporalFlowError):

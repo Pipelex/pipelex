@@ -13,11 +13,9 @@ from typing import Any
 
 import pytest
 
-from pipelex.base_exceptions import DisclosureMode, ErrorDomain, ErrorReport
+from pipelex.base_exceptions import INTERNAL_ERROR_PLACEHOLDER, DisclosureMode, ErrorDomain, ErrorReport
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.cogt.inference.provider_name import ProviderName
-
-_INTERNAL_ERROR_PLACEHOLDER = "An internal error occurred."
 
 
 def _runtime_report(message: str = "rate limited on the worker") -> ErrorReport:
@@ -92,7 +90,7 @@ class TestErrorReportDisclosureMode:
     def test_strict_redaction_drops_sensitive_fields(self, report: ErrorReport) -> None:
         """STRICT for CONFIG / RUNTIME replaces ``message`` and drops the disclosure-leaking fields."""
         payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
-        assert payload["message"] == _INTERNAL_ERROR_PLACEHOLDER
+        assert payload["message"] == INTERNAL_ERROR_PLACEHOLDER
         assert "user_action" not in payload
         assert "model" not in payload
         assert "provider" not in payload
@@ -159,7 +157,7 @@ class TestErrorReportDisclosureMode:
         """``from_dict(to_dict(STRICT))`` for a RUNTIME report loses ``provider`` and rewrites ``message``."""
         report = _runtime_report()
         recovered = ErrorReport.from_dict(report.to_dict(disclosure_mode=DisclosureMode.STRICT))
-        assert recovered.message == _INTERNAL_ERROR_PLACEHOLDER
+        assert recovered.message == INTERNAL_ERROR_PLACEHOLDER
         assert recovered.provider is None
         assert recovered.user_action is None
 

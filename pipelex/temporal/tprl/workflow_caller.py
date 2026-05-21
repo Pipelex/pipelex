@@ -233,11 +233,7 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
         except ChildWorkflowError as exc:
             log.error(f"ChildWorkflowError in {workflow_class.__name__} caused by: {exc.cause}")
             if isinstance(exc.cause, ApplicationError):
-                # Mirror execute_workflow: the activity bridge packs the structured
-                # ErrorReport into the child's ApplicationError.details — recover it
-                # so the classification survives the child-workflow boundary.
-                # ``recover_error_report`` is total — a missing or malformed report
-                # synthesizes an ``UnrecoverableWorkflowFailureError`` report.
+                # Mirror ``execute_workflow``'s recovery path — see its rationale comment.
                 error_report = recover_error_report(exc.cause)
                 raise WorkflowExecutionError(error_report.message, error_report=error_report) from exc
             msg = f"Failed to execute child workflow {workflow_class.__name__}"
@@ -284,11 +280,7 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
         except ChildWorkflowError as exc:
             log.error(f"ChildWorkflowError in {workflow_class.__name__} caused by: {exc.cause}")
             if isinstance(exc.cause, ApplicationError):
-                # Mirror execute_workflow: the activity bridge packs the structured
-                # ErrorReport into the child's ApplicationError.details — recover it
-                # so the classification survives the child-workflow boundary.
-                # ``recover_error_report`` is total — a missing or malformed report
-                # synthesizes an ``UnrecoverableWorkflowFailureError`` report.
+                # Mirror ``execute_workflow``'s recovery path — see its rationale comment.
                 error_report = recover_error_report(exc.cause)
                 raise WorkflowExecutionError(error_report.message, error_report=error_report) from exc
             msg = f"Failed to start child workflow {workflow_class.__name__}"
