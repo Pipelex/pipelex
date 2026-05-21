@@ -6,7 +6,7 @@ from pipelex.types import StrEnum
 
 
 class ToolError(PipelexError):
-    pass
+    _declared_title = "Tool error"
 
 
 class NestedKeyConflictError(ToolError):
@@ -27,7 +27,7 @@ class MissingDependencyError(PipelexError):
 
 
 class CredentialsError(PipelexError):
-    pass
+    _declared_title = "Missing or invalid credentials"
 
 
 class TracebackMessageErrorMode(StrEnum):
@@ -52,7 +52,7 @@ class TracebackMessageError(PipelexError):
 
 
 class FatalError(TracebackMessageError):
-    pass
+    _declared_title = "Fatal error"
 
 
 class ConfigValidationError(FatalError):

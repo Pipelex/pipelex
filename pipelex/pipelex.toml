@@ -29,6 +29,11 @@ signed_urls_lifespan_seconds = 3600
 [pipelex.observer_config]
 observer_dir = "results/observer"
 
+[pipelex.errors_config]
+# Base URL for per-class error documentation. Every PipelexError subclass derives its
+# RFC 7807 `type` URI by appending kebab-cased class name to this prefix.
+base_uri = "https://pipelex.dev/errors"
+
 [pipelex.scan_config]
 excluded_dirs = [
   ".venv",

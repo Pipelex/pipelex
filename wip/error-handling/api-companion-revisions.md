@@ -185,10 +185,24 @@ These show up in multiple items above; collecting them here so the API agent can
 
 > **For the API agent:** check this section first to know what's actually available. It is updated at every checkpoint in [`../../TODOS.md`](../../TODOS.md).
 
-- [ ] **Stage 1 — Foundations.** Items A + B.
+- [x] **Stage 1 — Foundations.** Items A + B.
 - [ ] **Stage 2 — Rendering primitives + total recovery.** Items C + D-1.
 - [ ] **Stage 3 — Async error pipe.** Item D-2 (the unblock for API Phase 4).
 - [ ] **Stage 4 — DX polish.** Item E.
 - [ ] **Stage 5 — Security tightening.** Item F (cross-repo).
 
-Nothing landed yet on this branch (`feature/API-readiness`). When something lands, this list will tick green and a "What landed" subsection will appear below with file:line references the API agent can read against.
+### What landed in Stage 1
+
+Available now on `feature/API-readiness`:
+
+- **`PipelexError.title()` / `PipelexError.type_uri()`** (`pipelex/base_exceptions.py`) — classmethods returning a populated `str`. Auto-derive from the class name unless a subclass declares `_declared_title` / `_declared_type_uri` directly in its own body (inheritance is intentionally bypassed). 14 curated `_declared_title` overrides shipped for high-traffic base classes.
+- **`ErrorReport.title` and `ErrorReport.type_uri`** — both required `str`. Every `to_error_report()` call populates them. Round-trips through `to_dict` / `from_dict`. `from_dict` raises `ValidationError` on missing fields (the path that Stage 2 Item D-1's `recover_error_report` synthesizes into `UnrecoverableWorkflowFailureError`).
+- **`pipelex.errors_config.base_uri`** (`pipelex/errors/errors_config.py`, mounted under `Pipelex.errors_config` in `pipelex/system/configuration/configs.py`; default in `pipelex/pipelex.toml`) — required config field, default `"https://pipelex.dev/errors"`. The whole `ErrorsConfig` instance is held by the `ErrorManager` singleton (`pipelex/errors/error_manager.py`) constructed during Pipelex boot; `type_uri()` raises `RuntimeError` if called before boot (no fallback constant, per the locked-in decision).
+- **`pascal_case_to_kebab`** (`pipelex/tools/misc/string_utils.py`) — acronym-aware kebab conversion (`"APIError" -> "api-error"`, `"V2APIError" -> "v2-api-error"`, `"OAuth2" -> "o-auth2"`).
+- **`JobMetadata.request_id: str | None`** (`pipelex/pipeline/job_metadata.py`) — round-trips through `model_dump_json`, distinct from `ProviderErrorMetadata.request_id` (the provider-side request id) which keeps its name.
+- **`pipeline_run_setup(..., request_id="...")`** (`pipelex/pipeline/pipeline_run_setup.py`) — kwarg threaded into the constructed `JobMetadata`. The current `webhook.payload["request_id"]` piggyback on the API side is now obsolete; consumers should set `request_id` at dispatch time and read it back off `arg.<path>.job_metadata.request_id`.
+- **`WorkflowLog` / `ActivityLog` log methods** (`pipelex/temporal/log_temporal.py`) — every level (`verbose` / `debug` / `dev` / `info` / `warning` / `error` / `critical`) accepts optional `request_id: str | None`, forwarded to the Temporal logger via `extra={"request_id": ...}`.
+
+**One material deviation from the spec.** `type_uri()` reads the base URI from an `ErrorManager` singleton (`pipelex/errors/error_manager.py`) constructed by Pipelex boot — not from a lazy `from pipelex.config import get_config` call inside the method. The `ErrorManager` follows the `GraphTracerManager` pattern (`MetaSingleton`-based, not registered on `pipelex.hub`), keeping `pipelex.base_exceptions` at the bottom of the import graph (no static cycle). It is constructed with the entire `ErrorsConfig` (now living in its own module `pipelex/errors/errors_config.py`) and types that parameter via a local structural `Protocol` so the manager itself never imports `ConfigModel`. Same observable contract for callers (locked-in "no fallback constant" preserved; `RuntimeError` if called before boot). API consumers see no difference.
+
+**What `ErrorReport` looks like now.** Still a `@pydantic.dataclasses.dataclass(frozen=True, ...)` at the end of Stage 1; the conversion to `BaseModel` lands in Stage 3 Item D-2 as a prereq for crossing the Temporal activity boundary as a typed field. The Stage 2 work (`to_dict(disclosure_mode=...)` / `to_problem_document(...)`) lands on the dataclass form.

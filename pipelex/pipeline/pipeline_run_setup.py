@@ -62,6 +62,7 @@ async def pipeline_run_setup(
     search_domain_codes: list[str] | None = None,
     user_id: str | None = None,
     pipeline_run_id: str | None = None,
+    request_id: str | None = None,
 ) -> tuple[PipeJob, str, str]:
     """Set up a pipeline for execution.
 
@@ -120,6 +121,12 @@ async def pipeline_run_setup(
         Pre-generated pipeline run ID. If provided, this ID is used instead of
         generating a new one. Use this when the run record has already been created
         externally (e.g., by an API Gateway).
+    request_id:
+        Optional inbound ``X-Request-ID`` from the dispatcher (the value the
+        external HTTP caller can use to correlate every log line and every
+        ``ErrorReport`` back to its originating request). Threaded onto
+        :class:`pipelex.pipeline.job_metadata.JobMetadata.request_id` so it
+        crosses the Temporal serialization boundary intact.
 
     Returns:
     -------
@@ -307,6 +314,7 @@ async def pipeline_run_setup(
             pipeline_run_id=pipeline.pipeline_run_id,
             otel_context=otel_context,
             graph_context=graph_context,
+            request_id=request_id,
         )
 
         pipe_run_params = PipeRunParamsFactory.make_run_params(

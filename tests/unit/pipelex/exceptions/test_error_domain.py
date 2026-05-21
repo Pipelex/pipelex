@@ -1,5 +1,6 @@
-from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexError
+from pipelex.base_exceptions import ErrorDomain, PipelexError
 from pipelex.types import StrEnum
+from tests.helpers.error_report import make_error_report
 
 
 class _ConfigDomainError(PipelexError):
@@ -35,10 +36,10 @@ class TestErrorDomain:
 
     def test_to_dict_drops_error_domain_when_none(self) -> None:
         """ErrorReport.to_dict() omits error_domain when it is None."""
-        report_dict = ErrorReport(error_type="X", message="m").to_dict()
+        report_dict = make_error_report(error_type="X", message="m").to_dict()
         assert "error_domain" not in report_dict
 
     def test_to_dict_includes_error_domain_when_set(self) -> None:
         """ErrorReport.to_dict() includes error_domain when it is set."""
-        report_dict = ErrorReport(error_type="X", message="m", error_domain=ErrorDomain.CONFIG).to_dict()
+        report_dict = make_error_report(error_type="X", message="m", error_domain=ErrorDomain.CONFIG).to_dict()
         assert report_dict["error_domain"] == "config"

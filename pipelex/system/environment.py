@@ -19,7 +19,7 @@ PIPELEXPATH_ENV_KEY = "PIPELEXPATH"
 
 
 class EnvVarNotFoundError(ToolError):
-    pass
+    _declared_title = "Environment variable not set"
 
 
 def get_required_env(key: str) -> str:

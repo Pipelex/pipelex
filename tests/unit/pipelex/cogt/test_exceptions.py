@@ -202,7 +202,12 @@ class TestErrorCategoryInfrastructure:
         assert "user_action" not in report_dict
         assert "model" not in report_dict
         assert "provider" not in report_dict
-        assert report_dict == {"error_type": "CogtError", "message": "plain error"}
+        assert report_dict == {
+            "error_type": "CogtError",
+            "message": "plain error",
+            "title": "AI inference failed",
+            "type_uri": "https://pipelex.dev/errors/cogt-error",
+        }
 
     def test_to_error_report_to_dict_json_serializable(self) -> None:
         """to_dict() output can be serialized to JSON."""
@@ -214,7 +219,12 @@ class TestErrorCategoryInfrastructure:
 
     def test_error_report_is_frozen(self) -> None:
         """ErrorReport is immutable."""
-        report = ErrorReport(error_type="CogtError", message="test")
+        report = ErrorReport(
+            error_type="CogtError",
+            message="test",
+            title="AI inference failed",
+            type_uri="https://pipelex.dev/errors/cogt-error",
+        )
         with pytest.raises(FrozenInstanceError):
             report.message = "mutated"  # type: ignore[misc]
 

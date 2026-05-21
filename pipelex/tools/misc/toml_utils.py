@@ -15,6 +15,8 @@ from pipelex.tools.misc.json_utils import deep_update
 
 
 class TomlError(ToolError):
+    _declared_title = "TOML parse error"
+
     def __init__(self, message: str, doc: str, pos: int, lineno: int, colno: int):
         super().__init__(message)
         self.doc = doc

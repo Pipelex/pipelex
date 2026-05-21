@@ -34,7 +34,7 @@ The plan reflects these decisions; no further re-litigation in the items below.
 
 ## Stage 1 — Foundations *(unblocks `pipelex-api` Phase 0)*
 
-### [ ] Item A — `PipelexError.title()` + `type_uri()` with auto-derive defaults *(merges spec items 1+2)*
+### [x] Item A — `PipelexError.title()` + `type_uri()` with auto-derive defaults *(merges spec items 1+2)*
 
 - **Files:**
     - `pipelex/base_exceptions.py` — new classmethods + new `ErrorReport` fields.
@@ -101,7 +101,7 @@ The plan reflects these decisions; no further re-litigation in the items below.
     - **`from_dict` missing-required-fields:** `ErrorReport.from_dict({"error_type": "X", "message": "m"})` raises `pydantic.ValidationError` (no `title`/`type_uri`). This is the path that `recover_error_report` (Item D-1) converts into `UnrecoverableWorkflowFailureError` — pin it here as the unit-level contract.
 - **Acceptance:** consumers never humanize or kebab-case a class name themselves. The API consumes `report.title` / `report.type_uri` directly.
 
-### [ ] Item B — First-class `request_id` on `JobMetadata` *(spec item 3)*
+### [x] Item B — First-class `request_id` on `JobMetadata` *(spec item 3)*
 
 **Propagation, not a ContextVar layer.** Temporal serializes the activity arg, so the only way `request_id` reaches the worker is by riding on a field that's part of the workflow input. That field is `JobMetadata.request_id`. There is no cross-boundary ContextVar.
 
@@ -318,8 +318,8 @@ Tracked here so the idea doesn't get lost. Each lands when a concrete consumer m
 
 | ID | Item | Stage | Status |
 |---|---|---|---|
-| A | `PipelexError.title()` + `type_uri()` with auto-derive *(spec 1+2)* | 1 | [ ] |
-| B | `request_id` on `JobMetadata` *(spec 3)* | 1 | [ ] |
+| A | `PipelexError.title()` + `type_uri()` with auto-derive *(spec 1+2)* | 1 | [x] |
+| B | `request_id` on `JobMetadata` *(spec 3)* | 1 | [x] |
 | C | `to_dict(disclosure_mode=)` + `to_problem_document(...)` *(spec 4+6)* | 2 | [ ] |
 | D-1 | Total `recover_error_report` | 2 | [ ] |
 | D-2 | `ErrorReport` → `BaseModel`; thread to webhook; full `WfPipeRun` chain test *(spec 5)* | 3 | [ ] |
@@ -348,14 +348,52 @@ Checkpoints are **hard stops**. Do not pick up the next stage in the same sessio
 - All new tests exist and pass; `make agent-check` + `make agent-test` clean.
 
 **Fill in at checkpoint time:**
-- Curated `_declared_title` overrides landed: _TBD_
-- Files touched: _TBD_
-- Surprises / deviations (record in `api-companion-revisions.md`): _TBD_
+
+- **Curated `_declared_title` overrides landed:**
+    - `PipelexError._declared_title = "Pipelex error"` — set directly in the class body. Inheritance is bypassed in `title()` via `cls.__dict__.get(...)` (which only consults the requesting class's *own* attribute dict, never walking the MRO), so subclasses without an explicit `_declared_title` of their own auto-derive from their own class name rather than inheriting `"Pipelex error"`.
+    - `PipelexUnexpectedError._declared_title = "Unexpected internal error"`
+    - `SecurityError._declared_title = "Security policy violation"`
+    - `CogtError._declared_title = "AI inference failed"`
+    - `EnvVarNotFoundError._declared_title = "Environment variable not set"`
+    - `ToolError._declared_title = "Tool error"`
+    - `CredentialsError._declared_title = "Missing or invalid credentials"`
+    - `FatalError._declared_title = "Fatal error"`
+    - `TomlError._declared_title = "TOML parse error"`
+    - `StorageError._declared_title = "Storage error"`
+    - `StorageS3Error._declared_title = "S3 storage error"` (auto-derive was broken: `pascal_case_to_sentence("StorageS3")` drops the `S` and produced `"Storage 3"`)
+    - `StuffError._declared_title = "Stuff error"`
+    - `ConceptError._declared_title = "Concept error"`
+    - `LibraryError._declared_title = "Library error"`
+- **Files touched:**
+    - Production:
+        - `pipelex/base_exceptions.py` — added `_humanize_class_name`, `_declared_title` / `_declared_type_uri` ClassVars, `title()` / `type_uri()` classmethods, required `title` / `type_uri` fields on `ErrorReport`, propagation in `to_error_report()` / `_enrich_error_report_from_cause()`. `type_uri()` reads the base URI from the `ErrorManager` singleton (see deviation below).
+        - `pipelex/errors/error_manager.py` — new `ErrorManager` singleton (built on `ABCSingletonMeta` / `MetaSingleton`) holding the `ErrorsConfig`. Mirrors the `GraphTracerManager` precedent so `base_exceptions.py` can read it without importing `pipelex.hub`. Types its constructor against a local structural `Protocol` so this module retains zero transitive dependency on the config layer (avoids re-entering `pipelex.base_exceptions` via `pipelex.system.exceptions`).
+        - `pipelex/errors/errors_config.py` — new home for the `ErrorsConfig(ConfigModel)` model (moved out of `pipelex/system/configuration/configs.py` so it lives next to the manager that consumes it). `configs.py` now imports it and still mounts it under `Pipelex.errors_config`.
+        - `pipelex/pipelex.py` — constructs `self.error_manager = ErrorManager(errors_config=get_config().pipelex.errors_config)` right after config loads; `teardown()` calls `ErrorManager.clear_instance()`.
+        - `pipelex/system/configuration/configs.py` — added `ErrorsConfig(ConfigModel)` mounted under `Pipelex.errors_config`.
+        - `pipelex/pipelex.toml` — `[pipelex.errors_config]` section with `base_uri = "https://pipelex.dev/errors"`.
+        - `pipelex/tools/misc/string_utils.py` — added `pascal_case_to_kebab` (acronym-aware: splits on `[a-z0-9] -> [A-Z]` and `[A-Z] -> [A-Z][a-z]` transitions; does NOT reuse `pascal_case_to_sentence` which has token-loss bugs around digit boundaries).
+        - `pipelex/cogt/exceptions.py:87-99` — `CogtError.to_error_report()` populates `title` / `type_uri`.
+        - `pipelex/pipeline/job_metadata.py` — added `request_id: str | None = None` to `JobMetadata` (docstring distinguishes from `ProviderErrorMetadata.request_id`).
+        - `pipelex/pipeline/pipeline_run_setup.py` — `request_id` kwarg threaded into the constructed `JobMetadata`.
+        - `pipelex/temporal/log_temporal.py` — every `WorkflowLog` / `ActivityLog` method takes optional `request_id: str | None = None`, forwarded to the Temporal logger via `extra={"request_id": ...}`.
+        - Curated `_declared_title` overrides in: `pipelex/cogt/exceptions.py`, `pipelex/system/exceptions.py`, `pipelex/system/environment.py`, `pipelex/tools/misc/toml_utils.py`, `pipelex/tools/storage/exceptions.py`, `pipelex/core/stuffs/exceptions.py`, `pipelex/core/concepts/exceptions.py`, `pipelex/libraries/exceptions.py`.
+    - Tests:
+        - New: `tests/helpers/error_report.py` (helper for non-serialization tests), `tests/unit/pipelex/test_pipelex_error_title_and_type_uri.py`, `tests/unit/pipelex/test_pipelex_error_type_uri_uniqueness.py`, `tests/unit/pipelex/pipeline/test_job_metadata_request_id.py`, `tests/integration/pipelex/pipeline/test_pipeline_run_setup_request_id.py`.
+        - Updated: `tests/unit/pipelex/test_base_exceptions.py` (cold-import test — drops `to_error_report()` line and inlines literal `title` / `type_uri`), `tests/unit/pipelex/test_error_report_from_dict.py` (real values + missing-required-field cases for `title` / `type_uri`), `tests/unit/pipelex/test_error_http_status.py` + `tests/unit/pipelex/exceptions/test_error_domain.py` (helper-based), `tests/unit/pipelex/cogt/test_exceptions.py` (expected dict includes new fields), `tests/unit/pipelex/tools/misc/test_string_utils.py` (parametrized `pascal_case_to_kebab` table), `_FULL_REPORT` fixtures in the four temporal tests.
+- **Surprises / deviations (record in `api-companion-revisions.md`):**
+    1. **`type_uri()` reads from an `ErrorManager` singleton (`pipelex/errors/error_manager.py`) constructed by Pipelex bootstrap**, not from `get_config().pipelex.errors_config.base_uri` directly. Original plan called for the lazy `from pipelex.config import get_config` inside `type_uri()`, but pyright reported the static cycle on chain-entry-point files (`pipelex/__init__.py` etc.) that a file-level pragma on `base_exceptions.py` could not suppress. The `ErrorManager` mirrors the `GraphTracerManager` pattern (`MetaSingleton`-based, not registered on `pipelex.hub`), keeping `pipelex.base_exceptions` at the bottom of the import graph (no cycle at all). The manager holds the full `ErrorsConfig` instance — moved into its own module `pipelex/errors/errors_config.py` — typed structurally via a local `Protocol` in `error_manager.py` so the manager itself takes zero dependency on `ConfigModel` (which would re-introduce the cycle through `pipelex.system.exceptions`). Locked-in behavior preserved: no fallback constant; calling `type_uri()` before bootstrap raises a clear `RuntimeError`.
+    2. **`_declared_title` inheritance is intentionally bypassed in `title()`** via `cls.__dict__.get("_declared_title")` rather than direct attribute access. Without this, every bare subclass of `PipelexError` would inherit `"Pipelex error"` instead of auto-deriving from its own class name. The locked-in semantics ("class either declares its own title or auto-derives from its own name") is pinned by a dedicated test (`test_declared_title_does_not_leak_through_inheritance`).
+    3. **`pascal_case_to_kebab` is a fresh regex-based implementation, NOT `pascal_case_to_sentence(...).lower().replace(" ", "-")`.** The existing `pascal_case_to_sentence` loses single-letter tokens before digits (`StorageS3` -> `"Storage 3"`, `V2API` -> `"2 api"`) which would silently mangle docs URIs. `pascal_case_to_kebab` splits on the standard PascalCase boundaries and preserves every character.
+    4. **`StorageS3Error` got a curated `_declared_title = "S3 storage error"`** because the auto-derive (via the existing buggy `pascal_case_to_sentence`) would have produced `"Storage 3"`. Documented as a curated override rather than fixing the underlying `pascal_case_to_sentence` bug (out of scope).
+    5. **`tests/unit/pipelex/test_base_exceptions.py` was kept with just the cold-import subprocess test** (1 TestClass per module rule); the `TestPipelexErrorTitleAndTypeUri` and `TestPipelexErrorTypeUriUniqueness` classes live in their own new files.
 
 **Cold-start for Checkpoint 2:**
+
 - Re-read items C + D-1 here, and [`api-companion-revisions.md`](wip/error-handling/api-companion-revisions.md) §C + §D.
 - Skim `pipelex/temporal/tprl/temporal_error.py:recover_error_report` and its three call sites in `workflow_caller.py`.
 - Run `git log --oneline -20` and `make agent-test` to confirm starting clean.
+- Note: `ErrorReport` is still a `@dataclass` at the end of Stage 1; Stage 3's Item D-2 converts it to `BaseModel`. The Stage 2 work on `to_dict(disclosure_mode=...)` / `to_problem_document(...)` lands on the dataclass form.
 
 ---
 

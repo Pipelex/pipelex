@@ -7,6 +7,7 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cogt.config_cogt import Cogt
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.templating.templating_style import TemplatingStyle
+from pipelex.errors.errors_config import ErrorsConfig
 from pipelex.graph.graph_config import GraphConfig
 from pipelex.language.mthds_config import MthdsConfig
 from pipelex.system.configuration.config_model import ConfigModel
@@ -220,6 +221,7 @@ class Pipelex(ConfigModel):
     scan_config: ScanConfig
     builder_config: BuilderConfig
     kit_config: KitConfig
+    errors_config: ErrorsConfig
 
 
 class MigrationConfig(ConfigModel):

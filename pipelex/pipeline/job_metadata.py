@@ -50,6 +50,15 @@ class JobMetadata(BaseModel):
     # so cannot cause a non-determinism mismatch on child-workflow starts.
     session_id: str | None = None
 
+    # The API-inbound ``X-Request-ID`` (set by the dispatcher when an external
+    # HTTP request enters Pipelex). Rides on ``JobMetadata`` so it crosses the
+    # Temporal serialization boundary — every activity / workflow can correlate
+    # logs and the resulting ``ErrorReport`` back to the originating request.
+    # Distinct from :class:`pipelex.cogt.inference.error_classification.ProviderErrorMetadata.request_id`,
+    # which is the *provider*-side request id (OpenAI ``x-request-id`` etc.) —
+    # both can appear together when the API surfaces a provider failure.
+    request_id: str | None = None
+
     # Business ID for the current pipe execution (16-char hex string).
     # Always set during pipe runs for tracking purposes.
     pipe_run_id: str | None = None

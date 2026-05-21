@@ -27,82 +27,93 @@ def configure_temporal_logs():
     activity.logger.full_activity_info_on_extra = temporal_log_config.is_full_activity_info_on_extra
 
 
+def _build_extra(request_id: str | None) -> dict[str, str] | None:
+    """Pack ``request_id`` into the logger ``extra`` dict, omitting when absent.
+
+    The Temporal logger merges ``extra`` into each log record so downstream
+    formatters (and JSON-shipping consumers) can read ``record.request_id``.
+    """
+    if request_id is None:
+        return None
+    return {"request_id": request_id}
+
+
 class WorkflowLog:
-    """A class for logging messages in Temporal workflows with different severity levels."""
+    """A class for logging messages in Temporal workflows with different severity levels.
 
-    def verbose(self, content: Union[str, Any]):
+    All methods accept an optional ``request_id`` kwarg — when provided, it is
+    forwarded to the Temporal workflow logger via ``extra={"request_id": ...}``
+    so downstream log shippers can correlate the record back to the inbound
+    API request. Activities/workflows read the value off
+    ``arg.<path>.job_metadata.request_id`` and pass it explicitly.
+    """
+
+    def verbose(self, content: Union[str, Any], request_id: str | None = None) -> None:
         """Log a verbose-level message in a workflow."""
-        severity = LOGGING_LEVEL_VERBOSE
-        workflow.logger.log(level=severity, msg=content)
+        workflow.logger.log(level=LOGGING_LEVEL_VERBOSE, msg=content, extra=_build_extra(request_id))
 
-    def debug(self, content: Union[str, Any]):
+    def debug(self, content: Union[str, Any], request_id: str | None = None) -> None:
         """Log a debug-level message in a workflow."""
-        severity = logging.DEBUG
-        workflow.logger.log(level=severity, msg=content)
+        workflow.logger.log(level=logging.DEBUG, msg=content, extra=_build_extra(request_id))
 
-    def dev(self, content: Union[str, Any]):
+    def dev(self, content: Union[str, Any], request_id: str | None = None) -> None:
         """Log a development-level message in a workflow."""
-        severity = LOGGING_LEVEL_DEV
-        workflow.logger.log(level=severity, msg=content)
+        workflow.logger.log(level=LOGGING_LEVEL_DEV, msg=content, extra=_build_extra(request_id))
 
-    def info(self, content: Union[str, Any]):
+    def info(self, content: Union[str, Any], request_id: str | None = None) -> None:
         """Log an info-level message in a workflow."""
-        severity = logging.INFO
-        workflow.logger.log(level=severity, msg=content)
+        workflow.logger.log(level=logging.INFO, msg=content, extra=_build_extra(request_id))
 
-    def warning(self, content: Union[str, Any]):
+    def warning(self, content: Union[str, Any], request_id: str | None = None) -> None:
         """Log a warning-level message in a workflow."""
-        severity = logging.WARNING
-        workflow.logger.log(level=severity, msg=content)
+        workflow.logger.log(level=logging.WARNING, msg=content, extra=_build_extra(request_id))
 
-    def error(self, content: Union[str, Any]):
+    def error(self, content: Union[str, Any], request_id: str | None = None) -> None:
         """Log an error-level message in a workflow."""
-        severity = logging.ERROR
-        workflow.logger.log(level=severity, msg=content)
+        workflow.logger.log(level=logging.ERROR, msg=content, extra=_build_extra(request_id))
 
-    def critical(self, content: Union[str, Any]):
+    def critical(self, content: Union[str, Any], request_id: str | None = None) -> None:
         """Log a critical-level message in a workflow."""
-        severity = logging.CRITICAL
-        workflow.logger.log(level=severity, msg=content)
+        workflow.logger.log(level=logging.CRITICAL, msg=content, extra=_build_extra(request_id))
 
 
 class ActivityLog:
-    """A class for logging messages in Temporal activities with different severity levels."""
+    """A class for logging messages in Temporal activities with different severity levels.
 
-    def verbose(self, content: Union[str, Any]):
+    All methods accept an optional ``request_id`` kwarg — when provided, it is
+    forwarded to the Temporal activity logger via ``extra={"request_id": ...}``
+    so downstream log shippers can correlate the record back to the inbound
+    API request. Activities/workflows read the value off
+    ``arg.<path>.job_metadata.request_id`` and pass it explicitly.
+    """
+
+    def verbose(self, content: Union[str, Any], request_id: str | None = None) -> None:
         """Log a verbose-level message in an activity."""
-        severity = LOGGING_LEVEL_VERBOSE
-        activity.logger.log(level=severity, msg=content)
+        activity.logger.log(level=LOGGING_LEVEL_VERBOSE, msg=content, extra=_build_extra(request_id))
 
-    def debug(self, content: Union[str, Any]):
+    def debug(self, content: Union[str, Any], request_id: str | None = None) -> None:
         """Log a debug-level message in an activity."""
-        severity = logging.DEBUG
-        activity.logger.log(level=severity, msg=content)
+        activity.logger.log(level=logging.DEBUG, msg=content, extra=_build_extra(request_id))
 
-    def dev(self, content: Union[str, Any]):
+    def dev(self, content: Union[str, Any], request_id: str | None = None) -> None:
         """Log a development-level message in an activity."""
-        severity = LOGGING_LEVEL_DEV
-        activity.logger.log(level=severity, msg=content)
+        activity.logger.log(level=LOGGING_LEVEL_DEV, msg=content, extra=_build_extra(request_id))
 
-    def info(self, content: Union[str, Any]):
+    def info(self, content: Union[str, Any], request_id: str | None = None) -> None:
         """Log an info-level message in an activity."""
-        severity = logging.INFO
-        activity.logger.log(level=severity, msg=content)
+        activity.logger.log(level=logging.INFO, msg=content, extra=_build_extra(request_id))
 
-    def warning(self, content: Union[str, Any]):
+    def warning(self, content: Union[str, Any], request_id: str | None = None) -> None:
         """Log a warning-level message in an activity."""
-        severity = logging.WARNING
-        activity.logger.log(level=severity, msg=content)
+        activity.logger.log(level=logging.WARNING, msg=content, extra=_build_extra(request_id))
 
-    def error(self, content: Union[str, Any]):
+    def error(self, content: Union[str, Any], request_id: str | None = None) -> None:
         """Log an error-level message in an activity."""
-        severity = logging.ERROR
-        activity.logger.log(level=severity, msg=content)
+        activity.logger.log(level=logging.ERROR, msg=content, extra=_build_extra(request_id))
 
-    def critical(self, content: Union[str, Any]):
+    def critical(self, content: Union[str, Any], request_id: str | None = None) -> None:
         """Log a critical-level message in an activity."""
-        severity = logging.CRITICAL
-        activity.logger.log(level=severity, msg=content)
+        activity.logger.log(level=logging.CRITICAL, msg=content, extra=_build_extra(request_id))
 
 
 workflow_log = WorkflowLog()

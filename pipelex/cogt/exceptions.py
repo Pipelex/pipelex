@@ -48,6 +48,7 @@ class CogtError(PipelexError):
     provider_metadata: ProviderErrorMetadata | None = None
     model_handle: str | None = None
     backend_name: str | None = None
+    _declared_title = "AI inference failed"
 
     def __init__(
         self,
@@ -88,6 +89,8 @@ class CogtError(PipelexError):
         report = ErrorReport(
             error_type=type(self).__name__,
             message=self.message,
+            title=type(self).title(),
+            type_uri=type(self).type_uri(),
             error_category=self.error_category,
             error_domain=self.error_domain,
             retryable=self.error_category.is_retryable if self.error_category is not None else None,

@@ -1,9 +1,11 @@
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 from pydantic import TypeAdapter
 from pydantic.dataclasses import dataclass
 
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction
+from pipelex.errors.error_manager import ErrorManager
+from pipelex.tools.misc.string_utils import pascal_case_to_kebab, pascal_case_to_sentence
 from pipelex.types import StrEnum
 
 
@@ -56,10 +58,17 @@ class ErrorReport:
     """Structured error report — single source of truth for all error serialization.
 
     Used by CLI JSON output, agent output, and Temporal error details.
+
+    ``title`` and ``type_uri`` are the stable identity pair surfaced to consumers
+    (CLI, API, docs). Every ``PipelexError`` populates them automatically via
+    :meth:`PipelexError.title` / :meth:`PipelexError.type_uri`; consumers never
+    humanize or kebab-case a class name themselves.
     """
 
     error_type: str
     message: str
+    title: str
+    type_uri: str
     error_category: str | None = None
     error_domain: str | None = None
     retryable: bool | None = None
@@ -111,9 +120,69 @@ class ErrorReport:
         return error_domain_to_http_status(self.error_domain)
 
 
+def _humanize_class_name(class_name: str) -> str:
+    """Derive a human-readable title from a ``PipelexError`` subclass name.
+
+    Strips a trailing ``Error`` (if present) and runs the remainder through
+    :func:`pipelex.tools.misc.string_utils.pascal_case_to_sentence`. Single-token
+    leaves (``CogtError`` -> ``Cogt``) read awkwardly and warrant a curated
+    :attr:`PipelexError._declared_title` override.
+    """
+    stem = class_name.removesuffix("Error") if class_name.endswith("Error") and class_name != "Error" else class_name
+    return pascal_case_to_sentence(stem)
+
+
 class PipelexError(Exception):
     error_domain: ErrorDomain | None = None
     user_action: UserAction | None = None
+
+    # When declared *directly in a subclass body*, ``title()`` returns this
+    # verbatim instead of auto-deriving from the class name. Use to fix awkward
+    # auto-derives (e.g. ``CogtError`` -> ``Cogt``) or to publish a curated
+    # user-facing label. ``title()`` consults ``cls.__dict__`` so inheritance
+    # is bypassed — each class either declares its own title or auto-derives
+    # from its own name. That is why the curated ``"Pipelex error"`` value is
+    # set on ``PipelexError`` *itself* without leaking to bare subclasses.
+    _declared_title: ClassVar[str | None] = "Pipelex error"
+    # When declared *directly in a subclass body*, ``type_uri()`` returns this
+    # verbatim instead of appending the kebab-cased class name to the
+    # bootstrap-registered errors base URI. Same inheritance-bypass semantics
+    # as ``_declared_title``.
+    _declared_type_uri: ClassVar[str | None] = None
+
+    @classmethod
+    def title(cls) -> str:
+        """Return the human-readable title for this error class.
+
+        Used as the RFC 7807 ``title`` field on every ``ErrorReport``. Auto-derived
+        from the class name unless a subclass sets :attr:`_declared_title` directly
+        in its own body. Inheritance is bypassed so a parent's curated title does
+        not silently capture every subclass — each class either declares its own
+        title or auto-derives.
+        """
+        declared = cls.__dict__.get("_declared_title")
+        if isinstance(declared, str):
+            return declared
+        return _humanize_class_name(cls.__name__)
+
+    @classmethod
+    def type_uri(cls) -> str:
+        """Return the per-class documentation URI for this error class.
+
+        Used as the RFC 7807 ``type`` field on every ``ErrorReport``. Auto-derived
+        as ``<base_uri>/<kebab-class-name>`` unless a subclass sets
+        :attr:`_declared_type_uri` directly in its own body. The ``base_uri`` is
+        read from the :class:`pipelex.errors.error_manager.ErrorManager` singleton
+        (which holds the :class:`pipelex.errors.errors_config.ErrorsConfig` set
+        during Pipelex bootstrap); calling this before bootstrap completes raises
+        :class:`RuntimeError` (callers that may run that early should declare a
+        literal ``_declared_type_uri``).
+        """
+        declared = cls.__dict__.get("_declared_type_uri")
+        if isinstance(declared, str):
+            return declared
+        base = ErrorManager.get_required_instance().base_uri
+        return f"{base}/{pascal_case_to_kebab(cls.__name__)}"
 
     def __init__(self, message: str):
         super().__init__(message)
@@ -128,6 +197,10 @@ class PipelexError(Exception):
         fields from the underlying exception (typically a ``CogtError``) so they
         survive every wrapping layer up to the CLI / HTTP boundary.
 
+        ``title`` / ``type_uri`` are *wrapper-wins*: enrichment never overwrites
+        them with the cause's identity — the outermost wrapper's class is what
+        the consumer sees.
+
         Subclasses override to include additional fields (error_category, model,
         etc.); an override must end with ``self._enrich_error_report_from_cause(report)``
         so the cause-chain enrichment stays uniform across the hierarchy.
@@ -135,6 +208,8 @@ class PipelexError(Exception):
         report = ErrorReport(
             error_type=type(self).__name__,
             message=self.message,
+            title=type(self).title(),
+            type_uri=type(self).type_uri(),
             error_domain=self.error_domain,
             user_action=self.user_action,
         )
@@ -143,11 +218,12 @@ class PipelexError(Exception):
     def _enrich_error_report_from_cause(self, report: ErrorReport) -> ErrorReport:
         """Fill the ``None`` classification fields of ``report`` from the ``__cause__`` chain.
 
-        A wrapper keeps its own ``error_type`` and ``message`` but inherits every
-        classification field it does not set itself — ``error_category``,
-        ``error_domain``, ``retryable``, ``user_action``, ``model``, ``provider``,
-        ``provider_metadata`` — from the underlying ``PipelexError`` that knows them.
-        ``to_error_report()`` overrides call this so enrichment stays uniform.
+        A wrapper keeps its own ``error_type``, ``message``, ``title`` and
+        ``type_uri`` but inherits every classification field it does not set
+        itself — ``error_category``, ``error_domain``, ``retryable``, ``user_action``,
+        ``model``, ``provider``, ``provider_metadata`` — from the underlying
+        ``PipelexError`` that knows them. ``to_error_report()`` overrides call
+        this so enrichment stays uniform.
         """
         cause = self.__cause__
         if not isinstance(cause, PipelexError):
@@ -166,6 +242,8 @@ class PipelexError(Exception):
         return ErrorReport(
             error_type=report.error_type,
             message=report.message,
+            title=report.title,
+            type_uri=report.type_uri,
             error_category=report.error_category or cause_report.error_category,
             error_domain=report.error_domain or cause_report.error_domain,
             retryable=report.retryable if report.retryable is not None else cause_report.retryable,
@@ -177,7 +255,7 @@ class PipelexError(Exception):
 
 
 class PipelexUnexpectedError(PipelexError):
-    pass
+    _declared_title = "Unexpected internal error"
 
 
 class PipelexConfigError(PipelexError):
@@ -194,3 +272,5 @@ class SecurityError(PipelexError):
     Kept distinct from domain errors so security signals are not silently
     swallowed by domain-level `except` handlers (e.g. `except PipelexError`).
     """
+
+    _declared_title = "Security policy violation"

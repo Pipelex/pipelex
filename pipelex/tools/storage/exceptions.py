@@ -5,6 +5,8 @@ from pipelex.system.exceptions import ToolError
 class StorageError(ToolError):
     """Base exception for storage-related errors."""
 
+    _declared_title = "Storage error"
+
 
 class StorageConfigError(StorageError, PipelexConfigError):
     """Raised when a storage configuration is invalid."""
@@ -24,6 +26,8 @@ class StorageInvalidKeyError(StorageError):
 
 class StorageS3Error(StorageError):
     """Raised when an S3 storage operation fails."""
+
+    _declared_title = "S3 storage error"
 
 
 class StorageGcpError(StorageError):
