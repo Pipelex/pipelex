@@ -2,6 +2,7 @@ from typing import TypeGuard
 
 from pydantic import ValidationError
 
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.bundles.pipelex_bundle_blueprint import (
     ElaborationMetadata,
     PipeBlueprintUnion,
@@ -78,7 +79,7 @@ class BundleElaborator:
                     f"Synthesized pipe '{synthetic_code}' carries `structuring_method = preliminary_text`. "
                     "The elaborator should never produce nested directives — this is a bug."
                 )
-                raise BundleElaboratorError(msg)
+                raise PipelexUnexpectedError(msg)
 
         elaborated = bundle.model_copy(
             update={

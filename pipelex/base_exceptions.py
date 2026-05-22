@@ -23,6 +23,12 @@ _STRICT_KEPT_FIELDS: frozenset[str] = frozenset({"error_type", "title", "type_ur
 # belongs on an external surface, whatever the report's ``error_domain``.
 _STRICT_PROVIDER_FIELDS: frozenset[str] = frozenset({"model", "provider", "provider_metadata"})
 
+# Fields stripped from the STRICT caller-facing passthrough: provider/model
+# attribution plus ``caller_facing_message`` itself — the latter is internal
+# redaction plumbing that rides only the VERBOSE round-trip format, never the
+# lossy external projection.
+_STRICT_PASSTHROUGH_DROPPED_FIELDS: frozenset[str] = _STRICT_PROVIDER_FIELDS | frozenset({"caller_facing_message"})
+
 # Fields already mapped into RFC 7807 standard slots (``detail`` / ``title`` /
 # ``type``) by ``to_problem_document`` — must NOT be echoed as extension
 # members on the returned envelope.
@@ -181,9 +187,10 @@ class ErrorReport(BaseModel):
                 if self.caller_facing_message:
                     # The error class that authored this message designed it as
                     # caller-facing copy — reflect it back. Provider/model
-                    # attribution is still stripped: it has no place on an
-                    # external surface, whatever the error_domain.
-                    return {key: value for key, value in payload.items() if key not in _STRICT_PROVIDER_FIELDS}
+                    # attribution and the internal ``caller_facing_message`` flag
+                    # are still stripped: neither belongs on the lossy external
+                    # projection, whatever the error_domain.
+                    return {key: value for key, value in payload.items() if key not in _STRICT_PASSTHROUGH_DROPPED_FIELDS}
                 redacted: dict[str, Any] = {key: payload[key] for key in _STRICT_KEPT_FIELDS if key in payload}
                 redacted["message"] = INTERNAL_ERROR_PLACEHOLDER
                 return redacted

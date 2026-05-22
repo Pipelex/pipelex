@@ -144,12 +144,16 @@ class TestErrorReportDisclosureMode:
             assert payload["error_category"] == report.error_category
 
     def test_strict_passes_through_caller_facing_message(self) -> None:
-        """A report flagged ``caller_facing_message`` keeps its ``message`` and ``user_action`` in STRICT."""
+        """A report flagged ``caller_facing_message`` keeps its ``message`` and ``user_action`` in STRICT.
+
+        The ``caller_facing_message`` flag itself is internal redaction plumbing —
+        it rides only the VERBOSE round-trip format, never the STRICT projection.
+        """
         report = _caller_facing_report()
         payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
         assert payload["message"] == report.message
         assert "user_action" in payload
-        assert payload["caller_facing_message"] is True
+        assert "caller_facing_message" not in payload
 
     def test_strict_strips_provider_fields_even_from_caller_facing_passthrough(self) -> None:
         """Gap 2: provider/model attribution is stripped from the caller-facing passthrough branch.
