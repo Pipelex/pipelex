@@ -214,12 +214,18 @@ async def _execute_run(
         log.verbose(f"Working memory saved to: {working_memory_output_path}")
 
     reporting_config = get_config().pipelex.reporting_config
-    effective_cost_report = reporting_config.is_log_costs_to_console if cost_report is None else cost_report
-    if effective_cost_report or reporting_config.is_generate_cost_report_file_enabled:
-        try:
-            get_report_delegate().generate_report(pipeline_run_id=response.pipeline_run_id)
-        except OSError as cost_report_error:
-            log.warning(f"Cost report generation failed (run succeeded): {cost_report_error}")
+    # --no-cost-report (cost_report is False) skips the report entirely: no table, no CSV.
+    # Otherwise: console follows the flag (if given) or config; CSV follows config.
+    if cost_report is not False:
+        print_to_console = cost_report or reporting_config.is_log_costs_to_console
+        if print_to_console or reporting_config.is_generate_cost_report_file_enabled:
+            try:
+                get_report_delegate().generate_report(
+                    pipeline_run_id=response.pipeline_run_id,
+                    print_to_console=print_to_console,
+                )
+            except (OSError, PipelexError) as cost_report_error:
+                log.warning(f"Cost report generation failed (run succeeded): {cost_report_error}")
 
     # Print completion recap
     console = get_console()

@@ -81,7 +81,7 @@ def run_pipe_cmd(
         bool | None,
         typer.Option(
             "--cost-report/--no-cost-report",
-            help="Override config: enable or disable printing the aggregated inference cost table after the run",
+            help="Override config: --cost-report forces the cost table on; --no-cost-report skips reporting entirely (no table and no CSV file).",
         ),
     ] = None,
 ) -> None:
