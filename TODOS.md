@@ -149,7 +149,7 @@ Phases 0–4 are a coherent unit: the in-repo finalization of the error-handling
 - [x] Commit Phases 3–4.
 - [x] Tick every Phase 3 and Phase 4 box.
 - [x] Append a dated **Checkpoint 3** entry to the Session log: confirm all in-repo follow-ups are done, list anything still deferred, and state whether Phase 5 (webhook signing) is being picked up now or scheduled separately.
-- [ ] At this point the in-repo work is shippable. Decide with the user whether to open a PR for `feature/API-readiness-2` now and run Phase 5 on its own branch, or continue.
+- [x] At this point the in-repo work is shippable. Decide with the user whether to open a PR for `feature/API-readiness-2` now and run Phase 5 on its own branch, or continue. **→ Decided 2026-05-22: stop here** — no PR opened, Phase 5 not started; both deferred to a later session.
 
 ---
 
@@ -298,4 +298,4 @@ Append one dated entry per session / checkpoint. Each entry must leave the next 
 
   **Decisions:** D1 + D2 done (Phases 1-2). No new decision in Phases 3-4.
 
-  **Next action:** All in-repo follow-ups (Phases 0-4) are done — `feature/API-readiness-2` is shippable. **Decision pending with the user:** open a PR for `feature/API-readiness-2` now and run Phase 5 (webhook signing) on its own branch, or continue into Phase 5 on this branch. Phase 5 is cross-repo (pipelex + API in lockstep) per [`wip/security/webhook-signing.md`](wip/security/webhook-signing.md).
+  **Next action:** All in-repo follow-ups (Phases 0-4) are done — `feature/API-readiness-2` is shippable. **Decision (2026-05-22, with the user): stop here** — no PR opened and Phase 5 not started; both deferred to a later session. To resume, the open work is: (1) open a PR for `feature/API-readiness-2` — Phases 0-4 are a complete, reviewable unit; (2) **Phase 5** — webhook signing, the separate cross-repo track (pipelex + API in lockstep) per [`wip/security/webhook-signing.md`](wip/security/webhook-signing.md); (3) the two low-priority "Minor follow-ups" (`pascal_case_to_kebab` acronym collision, `error_module_registry` discovery fragility), batchable into any future checkpoint.
