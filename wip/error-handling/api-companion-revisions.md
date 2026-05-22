@@ -203,10 +203,11 @@ These show up in multiple items above; collecting them here so the API agent can
 - [x] **Stage 4 — DX polish.** Item E.
 - [ ] **Stage 5 — Security tightening.** Item F (cross-repo, tracked at [`../security/webhook-signing.md`](../security/webhook-signing.md)).
 
-**Net to the API team:** the error-handling refactor on the pipelex side is landed — Stages 1-4 shipped via PR #931. API Phases 0/1/4/5 are unblocked. Two things remain on the pipelex side:
+**Net to the API team:** the error-handling refactor on the pipelex side is landed — Stages 1-4 shipped via PR #931. API Phases 0/1/4/5 are unblocked. One thing remains on the pipelex side:
 
 - **Webhook signing (Stage 5 / Item F)** — the cross-repo security track at [`../security/webhook-signing.md`](../security/webhook-signing.md), independent of the rest of this plan, landing on its own schedule.
-- **Post-review follow-ups** — a `/review` pass on PR #931 surfaced a small set of in-repo finalizations, sequenced in [`../../TODOS.md`](../../TODOS.md): the STRICT-disclosure INPUT-domain leak (Phase 1) and the `request_id` log wiring (§B; Phase 2) landed 2026-05-22; a webhook reserved-key collision (Phase 3) and test-coverage backfill (Phase 4) remain.
+
+The post-review follow-ups — a `/review` pass on PR #931 surfaced a small set of in-repo finalizations, sequenced in [`../../TODOS.md`](../../TODOS.md) — all landed 2026-05-22: the STRICT-disclosure INPUT-domain leak (Phase 1), the `request_id` log wiring (§B; Phase 2), the webhook reserved-key collision (Phase 3), and the test-coverage backfill (Phase 4).
 
 ### What landed in Stage 1
 

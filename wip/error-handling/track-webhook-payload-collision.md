@@ -1,5 +1,7 @@
 # Webhook payload reserved-key collision
 
+> **Landed 2026-05-22** on `feature/API-readiness-2` (Phase 3 of `_for_api/TODOS.md`). Fixed via **Option 1**: a `field_validator` on `WebhookTarget.payload` (`pipelex/pipe_run/delivery_assignment.py`) that rejects the reserved-key set — `pipeline_run_id` / `status` / `result_url` / `error`, held in the new `_RESERVED_WEBHOOK_PAYLOAD_KEYS` frozenset — at construction time, with an error naming the offending key(s). A misconfigured webhook now fails the moment the `DeliveryAssignment` is built, not silently at delivery time. The rest of this doc is the original analysis, kept for context.
+
 Follow-up surfaced during the Stage 3 (Item D-2) /review pass. Not a blocker for the error-handling refactor — the behavior is consistent with how the webhook payload already handled `pipeline_run_id` / `status` / `result_url` — but the surface should be tightened before more callers depend on the schema.
 
 ## What

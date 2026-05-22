@@ -12,7 +12,7 @@
 
 - **`request_id` on `JobMetadata`.** An optional caller-supplied request id, threaded through every activity / workflow / submitter hop and into the Temporal log context. Set it at dispatch with `pipeline_run_setup(..., request_id="...")` and read it back off `job_metadata.request_id`.
 
-- **Failed runs now carry a structured error on the delivery webhook.** When a pipeline run fails, the webhook payload includes an `error` object — the full `ErrorReport` as a dict — so receivers can rehydrate it with `ErrorReport.from_dict(...)`, render an RFC 7807 response, or route on `error_domain` / `retryable`. Applies to both Temporal and direct execution modes.
+- **Failed runs now carry a structured error on the delivery webhook.** When a pipeline run fails, the webhook payload includes an `error` object — the full `ErrorReport` as a dict — so receivers can rehydrate it with `ErrorReport.from_dict(...)`, render an RFC 7807 response, or route on `error_domain` / `retryable`. Applies to both Temporal and direct execution modes. A `WebhookTarget.payload` that declares a Pipelex-owned key (`pipeline_run_id` / `status` / `result_url` / `error`) is now rejected at construction time, so a caller's static payload key can no longer silently shift meaning with delivery status.
 
 ### Changed
 

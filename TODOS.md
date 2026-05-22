@@ -120,10 +120,10 @@ Full analysis and options: [`wip/error-handling/track-webhook-payload-collision.
 
 `DeliveryExecutor._notify_webhook` copies the caller's `WebhookTarget.payload` and writes Pipelex-owned keys (`pipeline_run_id`, `status`, `result_url`, `error`) on top. A caller can put any of those keys in their static payload and have the meaning shift silently with delivery status.
 
-- [ ] Implement Option 1 from the tracker: a `field_validator` on `WebhookTarget.payload` in `pipelex/pipe_run/delivery_assignment.py` that rejects the reserved-key set at construction time, with a clear error naming the offending key(s).
-- [ ] Tests: constructing a `WebhookTarget` with a reserved key in `payload` raises a validation error; a clean payload passes.
-- [ ] `make agent-check` clean.
-- [ ] Update [`wip/error-handling/track-webhook-payload-collision.md`](wip/error-handling/track-webhook-payload-collision.md) — mark it landed.
+- [x] Implement Option 1 from the tracker: a `field_validator` on `WebhookTarget.payload` in `pipelex/pipe_run/delivery_assignment.py` that rejects the reserved-key set at construction time, with a clear error naming the offending key(s).
+- [x] Tests: constructing a `WebhookTarget` with a reserved key in `payload` raises a validation error; a clean payload passes.
+- [x] `make agent-check` clean.
+- [x] Update [`wip/error-handling/track-webhook-payload-collision.md`](wip/error-handling/track-webhook-payload-collision.md) — mark it landed.
 
 **Acceptance:** a caller cannot register a webhook whose static payload collides with a Pipelex-owned key; the failure is loud and at construction time.
 
@@ -133,11 +133,11 @@ Full analysis and options: [`wip/error-handling/track-webhook-payload-collision.
 
 The `/review` pass found gaps where the refactor removed or never added coverage. Some depend on Phase 2 — do this phase after Phase 2.
 
-- [ ] `recover_error_report` — `tests/integration/pipelex/temporal/test_recover_error_report.py` lost the cases that pinned the old "malformed → None" behavior. Add a case pinning the current contract: a report dict that is *found* but fails `ErrorReport` validation raises `pydantic.ValidationError` (treated as an internal contract bug, not synthesized).
-- [ ] `_message_from_exc` (`pipelex/temporal/tprl/temporal_error.py`) — add a test for the `id()`-based cycle guard (a self-referential `__cause__` chain must terminate) and a test for the `repr(exc)` fallback when every message in the chain is empty.
-- [ ] `DeliveryActivityArg` — add a focused unit round-trip test (`model_validate_json(model_dump_json())`) with a populated nested `error_report`, so a nested-model serialization regression is caught without a real Temporal worker.
-- [ ] Logging `request_id` path — covered by Phase 2's test; confirm it exists and is green here.
-- [ ] `make agent-check` and `make agent-test` clean.
+- [x] `recover_error_report` — `tests/integration/pipelex/temporal/test_recover_error_report.py` lost the cases that pinned the old "malformed → None" behavior. Add a case pinning the current contract: a report dict that is *found* but fails `ErrorReport` validation raises `pydantic.ValidationError` (treated as an internal contract bug, not synthesized).
+- [x] `_message_from_exc` (`pipelex/temporal/tprl/temporal_error.py`) — add a test for the `id()`-based cycle guard (a self-referential `__cause__` chain must terminate) and a test for the `repr(exc)` fallback when every message in the chain is empty.
+- [x] `DeliveryActivityArg` — add a focused unit round-trip test (`model_validate_json(model_dump_json())`) with a populated nested `error_report`, so a nested-model serialization regression is caught without a real Temporal worker.
+- [x] Logging `request_id` path — covered by Phase 2's test; confirm it exists and is green here.
+- [x] `make agent-check` and `make agent-test` clean.
 
 **Acceptance:** the behaviors the refactor introduced or changed are pinned by tests; no silent regression path remains for `recover_error_report`, `_message_from_exc`, or the activity-arg round-trip.
 
@@ -145,10 +145,10 @@ The `/review` pass found gaps where the refactor removed or never added coverage
 
 Phases 0–4 are a coherent unit: the in-repo finalization of the error-handling overhaul. Phase 5 is a separate cross-repo track.
 
-- [ ] Run `make agent-check` and `make agent-test` — both must pass.
-- [ ] Commit Phases 3–4.
-- [ ] Tick every Phase 3 and Phase 4 box.
-- [ ] Append a dated **Checkpoint 3** entry to the Session log: confirm all in-repo follow-ups are done, list anything still deferred, and state whether Phase 5 (webhook signing) is being picked up now or scheduled separately.
+- [x] Run `make agent-check` and `make agent-test` — both must pass.
+- [x] Commit Phases 3–4.
+- [x] Tick every Phase 3 and Phase 4 box.
+- [x] Append a dated **Checkpoint 3** entry to the Session log: confirm all in-repo follow-ups are done, list anything still deferred, and state whether Phase 5 (webhook signing) is being picked up now or scheduled separately.
 - [ ] At this point the in-repo work is shippable. Decide with the user whether to open a PR for `feature/API-readiness-2` now and run Phase 5 on its own branch, or continue.
 
 ---
@@ -276,3 +276,26 @@ Append one dated entry per session / checkpoint. Each entry must leave the next 
   **Next action:** start **Phase 3** — webhook payload reserved-key collision. Full analysis and options in [`wip/error-handling/track-webhook-payload-collision.md`](wip/error-handling/track-webhook-payload-collision.md); implement Option 1 (a `field_validator` on `WebhookTarget.payload` rejecting the reserved-key set at construction time).
 
 - **2026-05-22 — Phase 2 follow-up: `/code-review` pass.** An xhigh-effort `/code-review` of the Phase 2 commit (5-angle + sweep) found **no correctness bugs** — the `request_id` wiring, the `WorkflowLog` / `ActivityLog` refactor, and both tests verified clean across line-by-line, removed-behavior, cross-file, language-pitfall, and wrapper-correctness angles (all 7 method bodies confirmed to route to the right logger at the right level; the dropped per-method kwarg confirmed dead surface with no caller). Two low-severity test-hygiene tweaks applied: the integration test's `addHandler` / `setLevel` moved inside the `try` so the `finally` restore is structurally airtight; the unit test (`test_log_temporal_request_id.py`) parametrized over all seven severity methods — was `.info()` only — so 28 cases now pin every method's level + `extra`. `make agent-check` clean; both test files green. Next action unchanged: start **Phase 3**.
+
+- **2026-05-22 — Checkpoint 3 (Phases 3 & 4 complete).** The in-repo finalization of the error-handling overhaul is done on `feature/API-readiness-2`, landed as a single coherent commit. `make agent-check` clean (pyright + mypy: 0 errors); `make agent-test` full suite green.
+
+  **Phase 3 — webhook payload reserved-key collision:**
+
+    - `pipelex/pipe_run/delivery_assignment.py` — new `_RESERVED_WEBHOOK_PAYLOAD_KEYS` frozenset (`pipeline_run_id` / `status` / `result_url` / `error`) and a `field_validator` (`_reject_reserved_keys`, `mode="after"`) on `WebhookTarget.payload` that raises a `ValueError` naming the offending key(s) at construction time. A misconfigured webhook now fails when the `DeliveryAssignment` is built, not silently at delivery time. Option 1 from the tracker, implemented as planned.
+    - `tests/unit/pipelex/pipe_run/test_delivery_assignment.py` — added to `TestDeliveryAssignment`: a parametrized reject test (one case per reserved key), a multi-collision test (the error names every offending key), and a clean-payload pass test.
+    - Tracker `track-webhook-payload-collision.md` — marked landed (banner added).
+
+  **Phase 4 — test coverage backfill:**
+
+    - `recover_error_report` — `tests/unit/pipelex/temporal/test_recover_error_report.py` gained `test_found_but_invalid_report_dict_raises_validation_error`: a dict that `_find_error_report_dict` accepts (`error_type` + `message`) but that fails `ErrorReport` validation (missing required `title` / `type_uri`) raises `pydantic.ValidationError` — pins the current contract that a found-but-invalid report is an internal contract bug, not synthesized away. (The TODOS Phase 4 line names this file under `tests/integration/` — stale path; the file is and always was under `tests/unit/`. Harmless.)
+    - `_message_from_exc` — new `tests/unit/pipelex/temporal/test_message_from_exc.py` (`TestMessageFromExc`): the `id()`-based cycle guard (a self-referential `__cause__` chain terminates) and the `repr(exc)` fallback (every message in the chain empty). Imports the private function with the codebase's established `# noqa: PLC2701  # pyright: ignore[reportPrivateUsage]` pattern.
+    - `DeliveryActivityArg` — new `tests/unit/pipelex/temporal/test_delivery_activity_arg.py` (`TestDeliveryActivityArg`): a focused JSON round-trip (`model_validate_json(model_dump_json())`) with a populated nested `ErrorReport` (incl. a nested `UserAction`), catching a nested-model serialization regression without a live Temporal worker.
+    - Logging `request_id` path — confirmed `tests/unit/pipelex/temporal/test_log_temporal_request_id.py` (from Phase 2) exists and is green (28 parametrized cases).
+
+  **Doc coherence (beyond the strict checklist, for clean-slate consistency):** `wip/error-handling/README.md` "What's still open" + "Status at a glance" — Phases 3-4 removed from the open list, items renumbered (only webhook signing + the metadata-model long tail remain open); `api-companion-revisions.md` "Net to the API team" — the post-review follow-ups now all marked landed; `CHANGELOG.md` `[Unreleased]` — the delivery-webhook entry gained a sentence noting reserved keys are now rejected at construction (the webhook feature is unreleased, so this is a constraint on a new feature, not a breaking change to shipped software).
+
+  **Deferred / not done:** Nothing from Phases 0-4. The two "Minor follow-ups" (`pascal_case_to_kebab` acronym collision; `error_module_registry` discovery fragility) are still open — TODOS marks them low-priority and batchable into any checkpoint; left for a future pass. Phase 5 (webhook signing) is the separate cross-repo track, untouched.
+
+  **Decisions:** D1 + D2 done (Phases 1-2). No new decision in Phases 3-4.
+
+  **Next action:** All in-repo follow-ups (Phases 0-4) are done — `feature/API-readiness-2` is shippable. **Decision pending with the user:** open a PR for `feature/API-readiness-2` now and run Phase 5 (webhook signing) on its own branch, or continue into Phase 5 on this branch. Phase 5 is cross-repo (pipelex + API in lockstep) per [`wip/security/webhook-signing.md`](wip/security/webhook-signing.md).

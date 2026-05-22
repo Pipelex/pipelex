@@ -1,3 +1,6 @@
+import pytest
+from pydantic import ValidationError
+
 from pipelex.pipe_run.delivery_assignment import (
     DeliveryAssignment,
     DeliveryStatus,
@@ -64,3 +67,28 @@ class TestDeliveryAssignment:
     def test_delivery_status_values(self) -> None:
         assert DeliveryStatus.COMPLETED == "COMPLETED"
         assert DeliveryStatus.FAILED == "FAILED"
+
+    @pytest.mark.parametrize("reserved_key", ["pipeline_run_id", "status", "result_url", "error"])
+    def test_webhook_rejects_reserved_payload_key(self, reserved_key: str) -> None:
+        """Each Pipelex-owned key is rejected in a caller's static webhook payload."""
+        with pytest.raises(ValidationError, match=reserved_key):
+            WebhookTarget(url="https://example.com/callback", payload={reserved_key: "caller value"})
+
+    def test_webhook_rejects_multiple_reserved_payload_keys(self) -> None:
+        """The validation error names every offending key, not just the first."""
+        with pytest.raises(ValidationError) as exc_info:
+            WebhookTarget(
+                url="https://example.com/callback",
+                payload={"status": "x", "error": "y", "harmless": "z"},
+            )
+        message = str(exc_info.value)
+        assert "status" in message
+        assert "error" in message
+
+    def test_webhook_accepts_clean_payload(self) -> None:
+        """A payload free of reserved keys passes validation untouched."""
+        webhook = WebhookTarget(
+            url="https://example.com/callback",
+            payload={"customer_id": "abc", "tier": "pro"},
+        )
+        assert webhook.payload == {"customer_id": "abc", "tier": "pro"}
