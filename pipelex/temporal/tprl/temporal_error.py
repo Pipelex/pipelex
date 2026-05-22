@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 from typing import Any, cast
 
+from pydantic import ValidationError
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
@@ -92,12 +93,27 @@ def recover_error_report(exc: BaseException) -> ErrorReport:
 
     A report dict that is found but fails :meth:`ErrorReport.from_dict`
     validation is an internal contract violation within one deploy — the
-    activity bridge and the submitter share the schema — and is allowed to
-    raise. That is a bug to fix, not a state to tolerate.
+    activity bridge and the submitter share the schema. Raising there would
+    abort the caller before it can deliver the failure webhook, leaving the
+    receiver with no notification at all, so this synthesizes the same
+    :class:`UnrecoverableWorkflowFailureError` fallback — carrying the
+    recovered ``message`` and an ``[error report failed schema validation]``
+    marker. The failed run is still reported to the receiver and the contract
+    bug stays visible: a bug to fix, but not at the cost of a silent run.
     """
     report_dict = _find_error_report_dict(exc)
     if report_dict is not None:
-        return ErrorReport.from_dict(report_dict)
+        try:
+            return ErrorReport.from_dict(report_dict)
+        except ValidationError:
+            # The details payload looked like a report — it carried error_type
+            # and message — but failed the ErrorReport schema. Synthesize the
+            # fallback instead of raising, so the caller still delivers the
+            # failure webhook; the recovered message plus marker keep the
+            # contract bug visible on the wire.
+            recovered_message = report_dict.get("message") or _message_from_exc(exc)
+            fallback_message = f"{recovered_message} [error report failed schema validation]"
+            return UnrecoverableWorkflowFailureError(fallback_message).to_error_report()
     return UnrecoverableWorkflowFailureError(_message_from_exc(exc)).to_error_report()
 
 

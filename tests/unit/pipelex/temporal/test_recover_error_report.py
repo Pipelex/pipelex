@@ -7,8 +7,6 @@ deserialized ``ApplicationError.details``. ``recover_error_report`` walks the
 
 from typing import Any
 
-import pytest
-from pydantic import ValidationError
 from temporalio.client import WorkflowFailureError
 from temporalio.exceptions import ApplicationError
 
@@ -62,16 +60,22 @@ class TestRecoverErrorReport:
         assert report.error_domain == ErrorDomain.RUNTIME
         assert "plain non-Temporal failure" in report.message
 
-    def test_found_but_invalid_report_dict_raises_validation_error(self) -> None:
+    def test_found_but_invalid_report_dict_synthesizes_unrecoverable(self) -> None:
         """A report dict found in the chain but failing ``ErrorReport`` validation is an
-        internal contract bug — it raises ``ValidationError`` rather than being synthesized
-        away. ``error_type`` + ``message`` make it look like a report to
-        ``_find_error_report_dict``, but the required ``title`` / ``type_uri`` are absent.
+        internal contract bug. Rather than raise — which would abort the caller before it
+        can deliver the failure webhook, leaving the receiver with no notification at all —
+        it synthesizes the ``UnrecoverableWorkflowFailureError`` fallback, carrying the
+        recovered ``message`` and a marker flagging the validation failure. ``error_type``
+        + ``message`` make it look like a report to ``_find_error_report_dict``, but the
+        required ``title`` / ``type_uri`` are absent.
         """
         invalid_report_dict: dict[str, Any] = {"error_type": "CogtError", "message": "rate limited"}
         failure = _workflow_failure(_app_error(invalid_report_dict))
-        with pytest.raises(ValidationError):
-            recover_error_report(failure)
+        report = recover_error_report(failure)
+        assert report.error_type == "UnrecoverableWorkflowFailureError"
+        assert report.error_domain == ErrorDomain.RUNTIME
+        assert "rate limited" in report.message
+        assert "schema validation" in report.message
 
     def test_recovers_report_past_report_less_wrapper_application_error(self) -> None:
         """A report-less wrapper ``ApplicationError`` (e.g. a ``WorkflowExecutionError`` raised

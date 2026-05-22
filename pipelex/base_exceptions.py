@@ -251,7 +251,9 @@ class ErrorReport(BaseModel):
         Strict: ``ErrorReport`` is ``extra="forbid"``, so a malformed dict
         raises :class:`pydantic.ValidationError`. Within a single deploy the
         writer (activity bridge) and reader (submitter) share the schema, so a
-        validation failure is an internal contract bug — let it propagate.
+        validation failure is an internal contract bug. ``recover_error_report``
+        catches it to keep failure-webhook delivery intact; any other caller
+        should treat it as a bug to fix.
         """
         return cls.model_validate(data)
 
