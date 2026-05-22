@@ -25,7 +25,7 @@ class ConceptSpec(StructuredContent):
 Standard mock generators (like Polyfactory) produce random strings like `"uygNjiAuDMOtZEyibgHw"` which fail validation. The dry run system addresses this at two levels:
 
 1. **Field-level**: Generate values matching expected formats (snake_case, PascalCase, concept refs, etc.)
-2. **Model-level**: Bypass validators using `factory_use_construct=True`
+2. **Model-level**: Bypass validators using `factoVry_use_construct=True`
 
 ---
 

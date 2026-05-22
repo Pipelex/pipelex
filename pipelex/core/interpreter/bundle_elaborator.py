@@ -102,7 +102,7 @@ class BundleElaborator:
                 f"Bundle elaboration produced an invalid bundle (domain '{bundle.domain}'). "
                 f"Synthetic pipes: {sorted(elaboration_metadata.keys())}. {exc}"
             )
-            raise BundleElaboratorError(msg) from exc
+            raise PipelexUnexpectedError(msg) from exc
 
         return elaborated
 
