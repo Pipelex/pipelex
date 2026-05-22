@@ -66,7 +66,6 @@ class DryRunConfig(ConfigModel):
     nb_list_items: int
     nb_extract_pages: int
     image_urls: list[str]
-    allowed_to_fail_pipes: list[str] = Field(default_factory=list)
 
     @field_validator("image_urls", mode="before")
     @classmethod

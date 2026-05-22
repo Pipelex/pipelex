@@ -21,7 +21,6 @@ from pipelex.hub import (
     set_current_library,
     teardown_current_library,
 )
-from pipelex.pipe_run.dry_run import convert_to_working_memory_format
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -62,6 +61,7 @@ async def pipeline_run_setup(
     search_domain_codes: list[str] | None = None,
     user_id: str | None = None,
     pipeline_run_id: str | None = None,
+    keep_library_loaded: bool = False,
 ) -> tuple[PipeJob, str, str]:
     """Set up a pipeline for execution.
 
@@ -248,7 +248,7 @@ async def pipeline_run_setup(
         # If mock inputs is enabled, generate mock data for missing required inputs
         if execution_config.is_mock_inputs:
             needed_inputs_spec = pipe.needed_inputs()
-            needed_inputs_for_factory = convert_to_working_memory_format(needed_inputs_spec)
+            needed_inputs_for_factory = WorkingMemoryFactory.convert_input_specs_to_typed(needed_inputs_spec)
 
             # Filter out inputs that were already provided by the user
             if working_memory:
@@ -346,7 +346,8 @@ async def pipeline_run_setup(
         # Cleanup event log state from the report delegate
         if event_log is not None:
             get_report_delegate().clear_event_log(context_key=pipeline_run_id)
-        # Cleanup library
-        library_manager.teardown(library_id=library_id)
-        teardown_current_library()
+        # Cleanup library (unless the caller owns it)
+        if not keep_library_loaded:
+            library_manager.teardown(library_id=library_id)
+            teardown_current_library()
         raise

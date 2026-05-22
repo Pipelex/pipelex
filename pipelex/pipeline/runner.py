@@ -18,7 +18,11 @@ from pipelex.hub import (
     get_telemetry_manager,
     teardown_current_library,
 )
+from pipelex.observer.observer_protocol import ObserverNoOp
 from pipelex.pipe_run.exceptions import PipeRouterError
+from pipelex.pipe_run.pipe_router import PipeRouter
+from pipelex.pipe_run.pipe_run import PipeRun
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
 from pipelex.pipeline.pipeline_response import PipelexPipelineExecuteResponse
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
@@ -37,7 +41,6 @@ if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
     from pipelex.pipe_run.pipe_job import PipeJob
-    from pipelex.pipe_run.pipe_run_mode import PipeRunMode
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
     from pipelex.system.configuration.configs import PipelineExecutionConfig
 
@@ -60,6 +63,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         user_id: str | None = None,
         execution_config: PipelineExecutionConfig | None = None,
         pipe_run: PipeRunProtocol | None = None,
+        keep_library_loaded: bool = False,
     ):
         self.library_id = library_id
         self.library_dirs = library_dirs
@@ -69,7 +73,22 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         self.user_id = user_id
         self.execution_config = execution_config
         self._pipe_run = pipe_run
+        self.keep_library_loaded = keep_library_loaded
         self._running_tasks: dict[str, asyncio.Task[PipeOutput]] = {}
+
+    def _resolve_pipe_run(self) -> PipeRunProtocol:
+        """Resolve the PipeRun for this execution.
+
+        Per-request override (``self._pipe_run``) wins. Otherwise, DRY runs always execute
+        locally — even when the process-wide hub default is a Temporal-backed runner —
+        because dry-run is CPU-only and cheap; sending it through Temporal adds latency
+        and queue pressure for no benefit. LIVE runs use the hub default.
+        """
+        if self._pipe_run is not None:
+            return self._pipe_run
+        if self.pipe_run_mode is PipeRunMode.DRY:
+            return PipeRun(pipe_router=PipeRouter(observer=ObserverNoOp()))
+        return get_pipe_run()
 
     @override
     async def execute_pipeline(
@@ -148,8 +167,9 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
                 pipe_run_mode=self.pipe_run_mode,
                 search_domain_codes=self.search_domain_codes,
                 user_id=self.user_id,
+                keep_library_loaded=self.keep_library_loaded,
             )
-            effective_pipe_run = self._pipe_run or get_pipe_run()
+            effective_pipe_run = self._resolve_pipe_run()
             pipe_output = await effective_pipe_run.run(pipe_job, delivery_assignment=delivery_assignment)
         except PipeRouterError as exc:
             # PipeRouterError can only be raised by get_pipe_run().run(), so pipe_job is guaranteed to exist
@@ -205,8 +225,8 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
             if pipeline_run_id is not None:
                 get_report_delegate().clear_event_log(context_key=pipeline_run_id)
 
-            # Only teardown library if it was successfully created
-            if library_id_resolved is not None:
+            # Only teardown library if it was successfully created and the runner owns it
+            if library_id_resolved is not None and not self.keep_library_loaded:
                 get_library_manager().teardown(library_id=library_id_resolved)
                 teardown_current_library()
 

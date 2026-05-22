@@ -7,11 +7,16 @@ Used by both the regular CLI and the agent CLI.
 from pathlib import Path
 from typing import Any
 
+from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
+from pipelex.core.interpreter.exceptions import PipelexInterpreterError
+from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.graph.graph_config import GraphConfig
 from pipelex.graph.graph_factory import GraphOutputs, generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.graph.graphspec import GraphSpec
-from pipelex.pipe_run.dry_run_pipeline import dry_run_pipeline
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipeline.runner import PipelexRunner
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.types import StrEnum
 
@@ -104,22 +109,26 @@ async def _dry_run_bundle(
     bundle_path: Path,
     library_dirs: list[str] | None = None,
 ) -> tuple[GraphSpec, str]:
-    """Dry-run a bundle file to produce a GraphSpec.
+    """Dry-run a bundle file in DRY mode with graph generation enabled.
 
-    Reads the file, ensures its parent directory is in library_dirs,
-    then delegates to ``dry_run_pipeline``.
-
-    Args:
-        bundle_path: Path to the .mthds bundle file.
-        library_dirs: Optional library directories for pipe resolution.
+    Reads the file, ensures its parent directory is in library_dirs, identifies the bundle's
+    ``main_pipe``, and drives a :class:`PipelexRunner` with ``pipe_run_mode=DRY``,
+    ``generate_graph=True``, and ``mock_inputs=True``.
 
     Returns:
         Tuple of (GraphSpec, pipe_code).
     """
     mthds_content = bundle_path.read_text(encoding="utf-8")
 
-    # Ensure the bundle's parent directory is included in library_dirs
-    # so PipelexRunner can resolve sibling dependencies
+    # Resolve main_pipe upfront; runner needs an explicit pipe_code.
+    bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
+    if not bundle_blueprint.main_pipe:
+        msg = f"Bundle '{bundle_path}' does not declare a main_pipe, cannot generate graph"
+        raise PipelexInterpreterError(msg)
+    pipe_code = PipeFactory.make_pipe_ref_with_domain(domain_code=bundle_blueprint.domain, pipe_code=bundle_blueprint.main_pipe)
+
+    # Ensure the bundle's parent directory is included in library_dirs so the runner
+    # can resolve sibling dependencies.
     bundle_parent_dir = str(bundle_path.parent.resolve())
     effective_library_dirs: list[str]
     if library_dirs:
@@ -129,11 +138,27 @@ async def _dry_run_bundle(
     else:
         effective_library_dirs = [bundle_parent_dir]
 
-    return await dry_run_pipeline(
-        mthds_contents=[mthds_content],
+    execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
+        generate_graph=True,
+        mock_inputs=True,
+    )
+    runner = PipelexRunner(
         bundle_uris=[str(bundle_path)],
+        pipe_run_mode=PipeRunMode.DRY,
+        execution_config=execution_config,
         library_dirs=effective_library_dirs,
     )
+    response = await runner.execute_pipeline(
+        pipe_code=pipe_code,
+        mthds_contents=[mthds_content],
+    )
+    pipe_output = response.pipe_output
+
+    if not pipe_output.graph_spec:
+        msg = "Pipeline execution did not produce a graph spec"
+        raise PipelexError(msg)
+
+    return pipe_output.graph_spec, pipe_code
 
 
 async def generate_graph_for_bundle(

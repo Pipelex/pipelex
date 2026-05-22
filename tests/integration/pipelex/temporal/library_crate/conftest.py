@@ -8,7 +8,6 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.hub import get_library_manager
-from pipelex.pipe_run.dry_run import convert_to_working_memory_format
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from tests.integration.pipelex.fixtures.pipe_job_helpers import pipe_job_from_bundle, pipe_job_from_library
@@ -210,7 +209,7 @@ def cv_batch_screening_job(pipe_run_mode: PipeRunMode, is_class_registry_isolate
         get_library_manager().load_from_blueprints(library_id=library_id, blueprints=[blueprint])
 
     def _build_working_memory(pipe: PipeAbstract) -> WorkingMemory:
-        needed_inputs = convert_to_working_memory_format(needed_inputs_spec=pipe.needed_inputs())
+        needed_inputs = WorkingMemoryFactory.convert_input_specs_to_typed(needed_inputs_spec=pipe.needed_inputs())
         return WorkingMemoryFactory.make_mock_inputs(needed_inputs=needed_inputs)
 
     yield from pipe_job_from_library(

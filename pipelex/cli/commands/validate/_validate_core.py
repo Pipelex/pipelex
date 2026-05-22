@@ -26,9 +26,12 @@ from pipelex.hub import (
 )
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
-from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
+from pipelex.pipeline.validate_bundle import (
+    ValidateBundleError,
+    dry_run_loaded_pipes_or_raise,
+    validate_bundle,
+)
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.tools.misc.package_utils import get_package_version
@@ -66,7 +69,12 @@ def do_validate_all_libraries_and_dry_run(
 
             get_telemetry_manager().track_event(EventName.PIPE_DRY_RUN, properties={EventProperty.NB_PIPES: len(pipes)})
 
-            asyncio.run(dry_run_pipes(pipes=pipes, raise_on_failure=True))
+            asyncio.run(
+                dry_run_loaded_pipes_or_raise(
+                    pipe_refs=[pipe.pipe_ref for pipe in pipes],
+                    library_id=library_id,
+                )
+            )
             typer.echo("Setup sequence passed OK, config and pipelines are validated.")
     except PipeOperatorModelAvailabilityError as exc:
         handle_model_availability_error(exc, context=ErrorContext.VALIDATION)
@@ -109,9 +117,9 @@ async def _validate_pipe_or_bundle(
         pipe = get_required_pipe(pipe_code=pipe_code)
         typer.echo(f"Validating pipe '{pipe_code}'...")
         get_telemetry_manager().track_event(EventName.PIPE_DRY_RUN, properties={EventProperty.PIPE_TYPE: pipe.type})
-        await dry_run_pipe(
-            pipe,
-            raise_on_failure=True,
+        await dry_run_loaded_pipes_or_raise(
+            pipe_refs=[pipe.pipe_ref],
+            library_id=library_id,
         )
         typer.secho(f"Successfully validated pipe '{pipe_code}'", fg=typer.colors.GREEN)
     else:

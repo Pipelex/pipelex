@@ -13,9 +13,8 @@ from typing import ClassVar
 
 import pytest
 
-from pipelex.hub import get_required_pipe
-from pipelex.pipe_run.dry_run import dry_run_pipe
-from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.hub import get_current_library, get_required_pipe
+from pipelex.pipeline.validate_bundle import dry_run_loaded_pipes_or_raise, validate_bundle
 
 
 class TestData:
@@ -101,11 +100,13 @@ class TestPipeSequenceListOutputBug:
             # Get the main sequence pipe (without domain prefix since it's loaded into the library)
             main_sequence = get_required_pipe("main_sequence")
 
-            # Run dry run - this should NOT fail
-            # BUG: Currently fails with "Content of 'items' is of type 'Item', it should be 'ListContent'"
-            dry_run_output = await dry_run_pipe(main_sequence, raise_on_failure=True)
-
-            assert dry_run_output.status.name == "SUCCESS", f"Dry run failed: {dry_run_output.error_message}"
+            # Run dry run through the current library — must NOT fail
+            # BUG: previously failed with "Content of 'items' is of type 'Item', it should be 'ListContent'"
+            current_library_id = get_current_library()
+            await dry_run_loaded_pipes_or_raise(
+                pipe_refs=[main_sequence.pipe_ref],
+                library_id=current_library_id,
+            )
 
     async def test_standalone_pipe_llm_with_list_output(self):
         """Test that a standalone PipeLLM with output="Item[]" produces ListContent.
@@ -135,9 +136,10 @@ class TestPipeSequenceListOutputBug:
             )
 
             # Run dry run on the standalone pipe
-            dry_run_output = await dry_run_pipe(generate_items_pipe, raise_on_failure=True)
-
-            assert dry_run_output.status.name == "SUCCESS", f"Dry run of generate_items failed: {dry_run_output.error_message}"
+            await dry_run_loaded_pipes_or_raise(
+                pipe_refs=[generate_items_pipe.pipe_ref],
+                library_id=get_current_library(),
+            )
 
 
 class TestDataNested:
@@ -268,10 +270,11 @@ class TestNestedPipeSequenceListOutputBug:
             main_sequence = get_required_pipe("generate_expense_dataset")
 
             # Run dry run - this should NOT fail
-            # BUG: Currently may fail with "Content of 'expenses' is of type 'Expense', it should be 'ListContent'"
-            dry_run_output = await dry_run_pipe(main_sequence, raise_on_failure=True)
-
-            assert dry_run_output.status.name == "SUCCESS", f"Dry run failed: {dry_run_output.error_message}"
+            # BUG: previously failed with "Content of 'expenses' is of type 'Expense', it should be 'ListContent'"
+            await dry_run_loaded_pipes_or_raise(
+                pipe_refs=[main_sequence.pipe_ref],
+                library_id=get_current_library(),
+            )
 
     async def test_inner_sequence_directly(self):
         """Test the inner sequence directly to isolate the bug."""
@@ -292,6 +295,7 @@ class TestNestedPipeSequenceListOutputBug:
             inner_sequence = get_required_pipe("generate_employee_report")
 
             # Run dry run on the inner sequence
-            dry_run_output = await dry_run_pipe(inner_sequence, raise_on_failure=True)
-
-            assert dry_run_output.status.name == "SUCCESS", f"Dry run of inner sequence failed: {dry_run_output.error_message}"
+            await dry_run_loaded_pipes_or_raise(
+                pipe_refs=[inner_sequence.pipe_ref],
+                library_id=get_current_library(),
+            )
