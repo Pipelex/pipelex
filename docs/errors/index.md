@@ -421,7 +421,6 @@ classification rules, and the cross-boundary Temporal bridge.
 - [`Jinja2TemplateRenderError`](jinja2-template-render-error.md) — Jinja 2 template render
 - [`Jinja2TemplateSyntaxError`](jinja2-template-syntax-error.md) — Jinja 2 template syntax
 - [`JsonTypeError`](json-type-error.md) — Json type
-- [`MthdsDecodeError`](mthds-decode-error.md) — Mthds decode
 - [`NestedKeyConflictError`](nested-key-conflict-error.md) — Nested key conflict
 - [`SecretNotFoundError`](secret-not-found-error.md) — Secret not found
 - [`StorageConfigError`](storage-config-error.md) — Storage config

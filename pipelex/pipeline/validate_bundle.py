@@ -11,7 +11,7 @@ from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErro
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
-from pipelex.core.interpreter.exceptions import MthdsDecodeError, PipelexInterpreterError
+from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeFactoryError, PipeValidationError
 from pipelex.core.pipes.handle_pipe_errors import (
@@ -189,9 +189,6 @@ async def validate_bundle(
             message=msg,
             pipe_validation_errors=pipe_validation_errors,
         ) from validation_error
-    except MthdsDecodeError as decode_error:
-        msg = f"TOML syntax error at line {decode_error.lineno}, column {decode_error.colno}: {decode_error.message}"
-        raise ValidateBundleError(message=msg) from decode_error
     except PipeRunError as pipe_run_error:
         raise ValidateBundleError(
             message=pipe_run_error.message,
@@ -218,9 +215,6 @@ async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResu
 
         loaded_pipes = library_manager.load_libraries(library_id=library_id, library_dirs=[Path(directory)])
         dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
-    except MthdsDecodeError as decode_error:
-        msg = f"TOML syntax error at line {decode_error.lineno}, column {decode_error.colno}: {decode_error.message}"
-        raise ValidateBundleError(message=msg) from decode_error
     except PipelexInterpreterError as interpreter_error:
         raise ValidateBundleError(
             message=interpreter_error.message,
@@ -342,9 +336,6 @@ def load_concepts_only(
 
             return LoadConceptsOnlyResult(blueprints=loaded_blueprints, concepts=loaded_concepts)
 
-    except MthdsDecodeError as decode_error:
-        msg = f"TOML syntax error at line {decode_error.lineno}, column {decode_error.colno}: {decode_error.message}"
-        raise ValidateBundleError(message=msg) from decode_error
     except PipelexInterpreterError as interpreter_error:
         raise ValidateBundleError(
             message=interpreter_error.message,
@@ -388,9 +379,6 @@ def load_concepts_only_from_directory(directory: Path) -> LoadConceptsOnlyResult
             all_blueprints.append(blueprint)
 
         loaded_concepts = library_manager.load_concepts_only_from_blueprints(library_id=library_id, blueprints=all_blueprints)
-    except MthdsDecodeError as decode_error:
-        msg = f"TOML syntax error at line {decode_error.lineno}, column {decode_error.colno}: {decode_error.message}"
-        raise ValidateBundleError(message=msg) from decode_error
     except PipelexInterpreterError as interpreter_error:
         raise ValidateBundleError(
             message=interpreter_error.message,

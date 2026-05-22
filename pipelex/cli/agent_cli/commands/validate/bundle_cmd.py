@@ -20,7 +20,7 @@ from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_bundle_core,
     validate_pipe_in_bundle_core,
 )
-from pipelex.core.interpreter.exceptions import MthdsDecodeError, PipelexInterpreterError
+from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.graph.graph_rendering import GraphFormat, generate_graph_for_bundle, generate_view_for_bundle
@@ -158,7 +158,7 @@ def validate_bundle_cmd(
                     graph_extra["cause_type"] = type(exc.__cause__).__name__
                     graph_extra["cause_message"] = str(exc.__cause__)
                 agent_error(f"Graph generation failed: {exc.message}", "PipelineExecutionError", cause=exc, **graph_extra)
-            except (PipelexInterpreterError, MthdsDecodeError) as exc:
+            except PipelexInterpreterError as exc:
                 agent_error(f"Graph generation failed: {exc}", type(exc).__name__, cause=exc)
             except typer.Exit:
                 raise
@@ -186,7 +186,7 @@ def validate_bundle_cmd(
                     view_extra["cause_type"] = type(exc.__cause__).__name__
                     view_extra["cause_message"] = str(exc.__cause__)
                 agent_error(f"View generation failed: {exc.message}", "PipelineExecutionError", cause=exc, **view_extra)
-            except (PipelexInterpreterError, MthdsDecodeError) as exc:
+            except PipelexInterpreterError as exc:
                 agent_error(f"View generation failed: {exc}", type(exc).__name__, cause=exc)
             except typer.Exit:
                 raise

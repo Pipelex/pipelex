@@ -114,7 +114,6 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "JSONDecodeError": "Verify the JSON input is valid (check for trailing commas, unquoted keys, etc.)",
     # Interpreter errors
     "PipelexInterpreterError": "Check MTHDS file TOML syntax and ensure all referenced concepts and pipes are defined",
-    "MthdsDecodeError": "The MTHDS file has TOML syntax errors; validate TOML syntax before retrying",
     # Configuration/initialization errors
     "TelemetryConfigValidationError": "Run 'pipelex init telemetry' to create a valid telemetry configuration",
     "GatewayTermsNotAcceptedError": "Run 'pipelex init config' to accept gateway terms, or disable pipelex_gateway in backends.toml",
@@ -161,7 +160,6 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     "JSONDecodeError": "input",
     "JsonTypeError": "input",
     "ArgumentError": "input",
-    "MthdsDecodeError": "input",
     "ValidationError": "input",
     "ValueError": "input",
     "BundleError": "input",

@@ -5,7 +5,7 @@ from pydantic import BaseModel, ValidationError
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.interpreter.bundle_elaborator import BundleElaborator, BundleElaboratorError
-from pipelex.core.interpreter.exceptions import MthdsDecodeError, PipelexInterpreterError
+from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.validation_error_categorizer import PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD, categorize_blueprint_validation_error
 from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_content, load_toml_from_path
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
@@ -30,7 +30,8 @@ class PipelexInterpreter(BaseModel):
                 msg = "Either 'bundle_path' or 'mthds_content' must be provided for the PipelexInterpreter to make a PipelexBundleBlueprint"
                 raise PipelexInterpreterError(msg)
         except TomlError as exc:
-            raise MthdsDecodeError(message=exc.message, doc=exc.doc, pos=exc.pos, lineno=exc.lineno, colno=exc.colno) from exc
+            msg = f"TOML syntax error at line {exc.lineno}, column {exc.colno}: {exc.message}"
+            raise PipelexInterpreterError(msg) from exc
 
         if not blueprint_dict:
             msg = "Could not make 'PipelexBundleBlueprint': no blueprint found in the MTHDS file"
