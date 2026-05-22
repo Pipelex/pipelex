@@ -71,8 +71,12 @@ class TestDeliveryAssignment:
     @pytest.mark.parametrize("reserved_key", ["pipeline_run_id", "status", "result_url", "error"])
     def test_webhook_rejects_reserved_payload_key(self, reserved_key: str) -> None:
         """Each Pipelex-owned key is rejected in a caller's static webhook payload."""
-        with pytest.raises(ValidationError, match=reserved_key):
+        with pytest.raises(ValidationError) as exc_info:
             WebhookTarget(url="https://example.com/callback", payload={reserved_key: "caller value"})
+        # Pin the validator's own ``reserved keys: [...]`` phrase. A bare
+        # ``match=reserved_key`` would pass via pydantic's echoed
+        # ``input_value={'<key>': ...}`` even if the validator never named the key.
+        assert f"reserved keys: ['{reserved_key}']" in str(exc_info.value)
 
     def test_webhook_rejects_multiple_reserved_payload_keys(self) -> None:
         """The validation error names every offending key, not just the first."""
@@ -81,9 +85,10 @@ class TestDeliveryAssignment:
                 url="https://example.com/callback",
                 payload={"status": "x", "error": "y", "harmless": "z"},
             )
-        message = str(exc_info.value)
-        assert "status" in message
-        assert "error" in message
+        # The validator lists the colliding keys, sorted, in its own message —
+        # distinct from pydantic boilerplate and the echoed input, which contain
+        # the keys regardless of what the validator says.
+        assert "reserved keys: ['error', 'status']" in str(exc_info.value)
 
     def test_webhook_accepts_clean_payload(self) -> None:
         """A payload free of reserved keys passes validation untouched."""
