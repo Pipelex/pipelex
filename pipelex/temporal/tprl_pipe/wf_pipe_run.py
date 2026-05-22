@@ -10,7 +10,7 @@ with workflow.unsafe.imports_passed_through():
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryStatus
     from pipelex.temporal.exceptions import WorkflowExecutionError
-    from pipelex.temporal.log_temporal import workflow_log
+    from pipelex.temporal.log_temporal import WorkflowLog
     from pipelex.temporal.tprl.observability import build_search_attributes, build_static_summary
     from pipelex.temporal.tprl.temporal_error import recover_error_report
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
@@ -31,9 +31,12 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
     @override
     @workflow.run
     async def run(self, workflow_arg: PipeRunArg) -> PipeOutput:
+        pipe_job = workflow_arg.pipe_job
+        # Bound once per invocation: every record below carries this run's
+        # request_id (None when the run carries no inbound API request id).
+        workflow_log = WorkflowLog(request_id=pipe_job.job_metadata.request_id)
         workflow_log.debug("WfPipeRun start")
 
-        pipe_job = workflow_arg.pipe_job
         delivery_assignment = workflow_arg.delivery_assignment
         pipeline_run_id: str = pipe_job.job_metadata.pipeline_run_id
 

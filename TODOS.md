@@ -96,21 +96,21 @@ STRICT disclosure mode keys its redaction passthrough on `error_domain == ErrorD
 
 Plan Item B is half-landed. `JobMetadata.request_id`, the `pipeline_run_setup(request_id=...)` kwarg, and the `request_id` kwarg on every `WorkflowLog` / `ActivityLog` method plus `_build_extra` all shipped — but **no pipelex activity or workflow reads `job_metadata.request_id` and passes it to a log call.** The kwarg is dead surface today.
 
-- [ ] **Decision D2** — pick the call-site strategy. Either pass the `request_id` kwarg at each meaningful Temporal log call, or build a per-invocation bound logger/adapter from `job_metadata.request_id` at activity/workflow entry. Recommended: **the bound-adapter approach**, rebuilt every invocation, to avoid threading the kwarg through every call site. It must NOT be a ContextVar and must NOT be module/process state — it is rebuilt per activity/workflow invocation from that invocation's `JobMetadata`. Record the choice.
-- [ ] Wire it: at each activity and workflow entry point that has `job_metadata` in scope, read `job_metadata.request_id` and make that invocation's log records carry it via the `_build_extra` → `extra={"request_id": ...}` path.
-- [ ] Remove dead surface: if the bound-adapter approach wins, drop the now-unused per-method `request_id` kwargs, or fold them into the adapter — leave no unused parameter and no inaccurate docstring behind.
-- [ ] Test: a pipeline run dispatched with a `request_id` produces Temporal activity/workflow log records carrying that `request_id`. Add coverage of the `_build_extra` / logging request_id path — there is none today.
-- [ ] Update the docs to reflect Item B fully landed — `api-companion-revisions.md` "What landed" / "Current state", `wip/error-handling/README.md`, and the `log_temporal.py` docstrings (which can now state the wiring as fact).
-- [ ] `make agent-check` clean.
+- [x] **Decision D2** — pick the call-site strategy. Either pass the `request_id` kwarg at each meaningful Temporal log call, or build a per-invocation bound logger/adapter from `job_metadata.request_id` at activity/workflow entry. Recommended: **the bound-adapter approach**, rebuilt every invocation, to avoid threading the kwarg through every call site. It must NOT be a ContextVar and must NOT be module/process state — it is rebuilt per activity/workflow invocation from that invocation's `JobMetadata`. Record the choice. **→ Decided 2026-05-22: bound adapter** (see [Decisions](#decisions)).
+- [x] Wire it: at each activity and workflow entry point that has `job_metadata` in scope, read `job_metadata.request_id` and make that invocation's log records carry it via the `_build_extra` → `extra={"request_id": ...}` path.
+- [x] Remove dead surface: if the bound-adapter approach wins, drop the now-unused per-method `request_id` kwargs, or fold them into the adapter — leave no unused parameter and no inaccurate docstring behind.
+- [x] Test: a pipeline run dispatched with a `request_id` produces Temporal activity/workflow log records carrying that `request_id`. Add coverage of the `_build_extra` / logging request_id path — there is none today.
+- [x] Update the docs to reflect Item B fully landed — `api-companion-revisions.md` "What landed" / "Current state", `wip/error-handling/README.md`, and the `log_temporal.py` docstrings (which can now state the wiring as fact).
+- [x] `make agent-check` clean.
 
 **Acceptance:** a run dispatched with a `request_id` has that id on its Temporal log records; no dead `request_id` parameter or inaccurate docstring remains.
 
 ### ⛔ CHECKPOINT 2 — STOP, verify, record
 
-- [ ] Run `make agent-check` and `make agent-test` — both must pass.
-- [ ] Commit Phase 2 as a single coherent commit.
-- [ ] Tick every Phase 2 box above.
-- [ ] Append a dated **Checkpoint 2** entry to the Session log with: Decision D2 outcome, the wiring mechanism chosen, files touched, whether the per-method kwargs were kept or dropped, and the next action (start Phase 3).
+- [x] Run `make agent-check` and `make agent-test` — both must pass.
+- [x] Commit Phase 2 as a single coherent commit.
+- [x] Tick every Phase 2 box above.
+- [x] Append a dated **Checkpoint 2** entry to the Session log with: Decision D2 outcome, the wiring mechanism chosen, files touched, whether the per-method kwargs were kept or dropped, and the next action (start Phase 3).
 
 ---
 
@@ -184,7 +184,7 @@ This is the last unshipped stage of the original error-handling plan. It is **cr
 Record each decision here as it is taken, with date and rationale.
 
 - **D1** (Phase 1, Gap 1 fix) — **Option 1**, decided 2026-05-22. Add a per-class `ClassVar` flagging error classes that genuinely author caller-facing messages, and gate the STRICT-disclosure passthrough on that flag instead of on the inherited `error_domain == INPUT`. Rationale: keys redaction on the *provenance of the message* rather than an inherited classification, and avoids the `http_status` side effects Option 2 (dropping `error_domain` inheritance for domain-less wrappers) would carry.
-- **D2** (Phase 2, request_id call-site strategy) — _pending_.
+- **D2** (Phase 2, request_id call-site strategy) — **Bound adapter**, decided 2026-05-22. `WorkflowLog` / `ActivityLog` gain an instance-level `request_id` (held by a shared `_RequestIdLog` base), built once per workflow/activity invocation from `job_metadata.request_id`; the dead per-method `request_id` kwargs are dropped. Rationale: a new log call added inside a wired entry point picks up `request_id` automatically — no per-call threading, nothing to forget — and the per-method kwarg was unused dead surface.
 
 ---
 
@@ -247,3 +247,30 @@ Append one dated entry per session / checkpoint. Each entry must leave the next 
 - **2026-05-22 — Phase 1 follow-up: `/code-review` pass.** An xhigh-effort `/code-review` of the Phase 1 + `MthdsDecodeError` commits found no runtime bug but flagged doc-coherence regressions: the Phase 1 STRICT-behavior change had updated only `track-strict-disclosure-input-domain-gap.md` and this file, leaving `CHANGELOG.md`, `wip/error-handling/api-companion-revisions.md`, and `wip/error-handling/README.md` still describing the old `error_domain == INPUT` passthrough. Fixed all three to describe the provenance-gated (`caller_facing_message`) rule; `README.md` "What's still open" no longer lists the now-landed STRICT gap (items renumbered). Also restored an `error_category`-retention assertion that the STRICT-redaction test rewrite had dropped. **Two findings left as judgment calls, not acted on:** (4) `bundle_elaborator.py:81` raises an internal "...this is a bug" invariant assertion as `BundleElaboratorError`, which inherits `caller_facing_message=True`, so STRICT would reflect that internal message — it is a defense-in-depth guard the code comments call "unreachable today"; the clean fix is to raise `PipelexUnexpectedError` there. (5) `to_dict(STRICT)` of a caller-facing report emits the internal `caller_facing_message: true` flag onto the lossy projection (harmless boolean; `to_problem_document` already scrubs it via `_PROBLEM_DOCUMENT_OMITTED_FIELDS`). `make agent-check` clean. Next action unchanged: start **Phase 2**.
 
 - **2026-05-22 — Phase 1 follow-up: applied review findings 4 & 5.** The two `/code-review` findings previously left as judgment calls are now fixed. (4) `bundle_elaborator.py:81` — the internal "…this is a bug" nested-directive guard now raises `PipelexUnexpectedError` instead of `BundleElaboratorError`. It is a genuine internal-invariant violation, so it no longer rides the caller-facing `PipelexInterpreterError` path (`interpreter.py`'s `except BundleElaboratorError` no longer catches it — it surfaces as an unexpected error, 500, message redacted under STRICT, which is correct). The other `BundleElaboratorError` raises (caller-facing collision / invalid-bundle messages) are unchanged. (5) `to_dict(STRICT)` of a caller-facing report no longer emits the internal `caller_facing_message` flag — new `_STRICT_PASSTHROUGH_DROPPED_FIELDS` constant drops it alongside the provider fields; the flag rides only the VERBOSE round-trip format. The STRICT-passthrough test assertion was flipped to pin its absence. `make agent-check` clean; `make agent-test` green. Next action unchanged: start **Phase 2**.
+
+- **2026-05-22 — Checkpoint 2 (Phase 2 complete).** `request_id` log wiring finished on `feature/API-readiness-2` as a single commit. `make agent-check` clean (pyright + mypy: 0 errors); `make agent-test` full suite green.
+
+  **Decision D2:** bound adapter — implemented as decided (see the Decisions section).
+
+  **What landed:**
+
+    - `pipelex/temporal/log_temporal.py` — new `_RequestIdLog` base holds an instance-level `request_id`; `WorkflowLog` / `ActivityLog` subclass it. `_build_extra` is now an instance method reading the bound `request_id`. The per-method `request_id` kwarg — dead surface, no caller ever passed it — is **dropped** from every log method. The module-level `workflow_log` / `activity_log` singletons stay, unbound (`request_id is None`), for call sites with no `job_metadata` in scope.
+    - `pipelex/temporal/tprl_pipe/wf_pipe_run.py` and `wf_pipe_router.py` — the workflow entry points that log. Each `run()` builds a per-invocation `workflow_log = WorkflowLog(request_id=<job_metadata>.request_id)` as its first statement; every existing `workflow_log.*` call in the function picks it up unchanged (the local shadows nothing — the import is now the `WorkflowLog` class). `WfPipeRun` reads `pipe_job.job_metadata.request_id`; `WfPipeRouter` reads `workflow_arg.job_metadata.request_id`.
+    - Activities were checked: no Temporal activity logs via `activity_log` today (only `TemporalError._log_*` does, and it has no `job_metadata`), so there is no activity entry point to wire — `ActivityLog` keeps the symmetric bound capability for when one appears.
+
+  **Wiring mechanism:** per-invocation bound `WorkflowLog`, rebuilt every workflow `run()` from that invocation's `JobMetadata` — no `ContextVar`, no module/process state. A new log call added inside a wired entry point carries `request_id` automatically.
+
+  **Per-method kwargs:** dropped (not kept). `request_id` is held as instance state on the bound adapter; the kwargs were unused dead surface.
+
+  **Tests:**
+
+    - `tests/unit/pipelex/temporal/test_log_temporal_request_id.py` — pins the `_build_extra` path: a bound `WorkflowLog` / `ActivityLog` packs `extra={"request_id": ...}` into the log call, an unbound one passes `extra=None`.
+    - `tests/integration/pipelex/temporal/test_wf_pipe_run_request_id_logging.py` — end-to-end: dispatches `WfPipeRun` (failing-router stub, modeled on `test_wf_pipe_run_failure_path.py`) with a `request_id` on `job_metadata`, captures the `temporalio.workflow` logger, asserts records carry `record.request_id`. Verified to have teeth — temporarily unbinding the logger made it fail (`request_ids seen: ['None']`), then reverted.
+
+  **Docs:** `api-companion-revisions.md` §B Acceptance + the Stage 1 `WorkflowLog`/`ActivityLog` bullet + the "Net to the API team" post-review-follow-ups bullet rewritten to describe the landed wiring; `wip/error-handling/README.md` "What's still open" — the `request_id` log-wiring item removed, items renumbered; `log_temporal.py` docstrings state the wiring as fact.
+
+  **Deferred / not done:** `TemporalError._log_critical` / `_log_error` (`temporal_error.py`) still log via the unbound singletons — they are error-bridge helpers, not entry points, and have no `job_metadata` in scope; threading `request_id` there is out of scope for Item B. The `wf_test_*` workflows likewise stay unbound (test infra, no inbound request id).
+
+  **Decisions:** D1 + D2 done.
+
+  **Next action:** start **Phase 3** — webhook payload reserved-key collision. Full analysis and options in [`wip/error-handling/track-webhook-payload-collision.md`](wip/error-handling/track-webhook-payload-collision.md); implement Option 1 (a `field_validator` on `WebhookTarget.payload` rejecting the reserved-key set at construction time).
