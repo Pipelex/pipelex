@@ -6,9 +6,11 @@ from pipelex.cogt.content_generation.generated_content_factory import GeneratedC
 from pipelex.cogt.content_generation.img_gen_generate import img_gen_image_list_and_store, img_gen_single_image_and_store
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.hub import get_storage_provider
+from pipelex.temporal.tprl.activity_error_boundary import convert_pipelex_errors
 
 
 @activity.defn
+@convert_pipelex_errors
 async def act_img_gen_images(img_gen_assignment: ImgGenAssignment) -> list[ImageContent]:
     """Generate images and store them, returning lightweight ImageContent references.
 

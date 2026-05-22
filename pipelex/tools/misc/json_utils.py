@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Union, cast
 
 from kajson import kajson
+from kajson.exceptions import UnijsonEncoderError
 from pydantic import BaseModel
 
 from pipelex.system.exceptions import ToolError
@@ -24,7 +25,7 @@ class JsonTypeError(ToolError):
     pass
 
 
-CLEAN_JSON_FIELDS_TO_SKIP = ("__class__", "__module__")
+CLEAN_JSON_FIELDS_TO_SKIP = ("__class__", "__module__", "__pipelex_class__", "__pipelex_module__")
 
 
 def clean_json_content(content: Any) -> Any:
@@ -381,7 +382,7 @@ def purify_json(
     except TypeError:
         try:
             dict_string = kajson.dumps(data, indent=indent)  # pyright: ignore[reportUnknownMemberType]
-        except Exception:
+        except (TypeError, UnijsonEncoderError):
             if is_warning_enabled:
                 data = cast("dict[Any, Any] | list[Any]", data)
                 data = {"!": data}
@@ -441,7 +442,7 @@ def purify_json_list(
     except TypeError:
         try:
             list_string = kajson.dumps(data, indent=indent)  # pyright: ignore[reportUnknownMemberType]
-        except Exception:
+        except (TypeError, UnijsonEncoderError):
             list_string = json.dumps(data, indent=indent, default=str)
         pure_list = json.loads(list_string)
     return pure_list, list_string
@@ -494,7 +495,7 @@ def purify_json_dict(data: Any, indent: int | None = None, is_warning_enabled: b
     except TypeError:
         try:
             dict_string = kajson.dumps(data, indent=indent)  # pyright: ignore[reportUnknownMemberType]
-        except Exception:
+        except (TypeError, UnijsonEncoderError):
             if is_warning_enabled:
                 data = {"!": data}
             dict_string = json.dumps(data, indent=indent, default=str)

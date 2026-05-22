@@ -103,7 +103,8 @@ def inputs_method_cmd(
             availability_extra["pipe_stack"] = exc.pipe_stack
         agent_error(exc.message, "PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
 
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
         agent_error(str(exc), type(exc).__name__, cause=exc)
 
     finally:

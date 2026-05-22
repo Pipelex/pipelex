@@ -1,0 +1,798 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PR brief — Reintroduce <code>structuring_method = preliminary_text</code> + new <code>PipeStructure</code> operator</title>
+<style>
+  :root {
+    --bg: #0e1116;
+    --panel: #161b22;
+    --panel-2: #1c2330;
+    --ink: #e6edf3;
+    --ink-dim: #9aa6b2;
+    --accent: #79c0ff;
+    --accent-2: #d2a8ff;
+    --good: #7ee787;
+    --warn: #f5b352;
+    --bad: #ff7b72;
+    --line: #30363d;
+    --kbd: #21262d;
+  }
+  html { color-scheme: dark; }
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.55;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 28px 96px; }
+  header.title {
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+  }
+  header.title h1 {
+    margin: 0 0 6px;
+    font-size: 28px;
+    line-height: 1.25;
+  }
+  header.title p.lede {
+    margin: 0;
+    color: var(--ink-dim);
+    font-size: 15px;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--ink-dim);
+  }
+  .pill {
+    display: inline-block;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 2px 10px;
+    color: var(--ink);
+  }
+  .pill.added { color: var(--good); border-color: rgba(126,231,135,.4); }
+  .pill.changed { color: var(--accent); border-color: rgba(121,192,255,.4); }
+  .pill.removed { color: var(--bad); border-color: rgba(255,123,114,.4); }
+  h2 {
+    margin: 36px 0 12px;
+    font-size: 21px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 6px;
+  }
+  h3 {
+    margin: 24px 0 8px;
+    font-size: 17px;
+    color: var(--accent);
+  }
+  h4 {
+    margin: 18px 0 6px;
+    font-size: 15px;
+    color: var(--ink-dim);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  p { margin: 8px 0 12px; }
+  code, pre, kbd {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 13px;
+  }
+  code {
+    background: var(--kbd);
+    border: 1px solid var(--line);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow: auto;
+    margin: 10px 0 16px;
+    line-height: 1.45;
+  }
+  pre code { background: none; border: none; padding: 0; font-size: 12.5px; }
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 800px) {
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .card h3 { margin-top: 0; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 18px;
+    font-size: 14px;
+  }
+  th, td {
+    border-bottom: 1px solid var(--line);
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { color: var(--ink-dim); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  tr td:first-child { white-space: nowrap; color: var(--accent-2); font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  .diff {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .diff .filehead {
+    background: var(--panel);
+    padding: 8px 14px;
+    color: var(--ink-dim);
+    font-size: 12px;
+    border-bottom: 1px solid var(--line);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  .diff pre { margin: 0; border: 0; border-radius: 0; background: transparent; }
+  .add { color: var(--good); }
+  .del { color: var(--bad); }
+  .hunk { color: var(--ink-dim); }
+  .callout {
+    background: rgba(121,192,255,.08);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 10px 14px;
+    margin: 12px 0 16px;
+    font-size: 14px;
+  }
+  .callout.warn {
+    background: rgba(245,179,82,.08);
+    border-left-color: var(--warn);
+  }
+  .callout strong { color: var(--accent); }
+  .callout.warn strong { color: var(--warn); }
+  /* ASCII diagram */
+  .diagram {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow: auto;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    color: var(--ink);
+    white-space: pre;
+    line-height: 1.4;
+  }
+  .legend { font-size: 12px; color: var(--ink-dim); margin-top: 6px; }
+  ul.tight, ol.tight { margin: 6px 0 14px 22px; }
+  ul.tight li, ol.tight li { margin: 3px 0; }
+  .filelist {
+    columns: 2;
+    column-gap: 24px;
+    font-size: 13px;
+    margin: 8px 0 0;
+    padding-left: 18px;
+  }
+  .filelist li { break-inside: avoid; }
+  hr { border: 0; border-top: 1px solid var(--line); margin: 28px 0; }
+  .toc {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 18px;
+    font-size: 13px;
+  }
+  .toc ol { margin: 4px 0; padding-left: 20px; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="title">
+  <h1>Reintroduce <code>structuring_method = preliminary_text</code> via build-time elaboration + new <code>PipeStructure</code> operator</h1>
+  <p class="lede">
+    Brings back the "text-then-object" capability removed in <code>16b775b8</code>, but reshapes it as a build-time
+    rewrite into <code>PipeSequence[PipeLLM(text), PipeStructure]</code> instead of a runtime branch inside
+    <code>PipeLLM</code>. Adds a first-class <code>PipeStructure</code> operator that users can also call directly.
+  </p>
+  <div class="meta">
+    <span class="pill">Branch: <code>feature/Text-then-object</code></span>
+    <span class="pill">Base: <code>bb9bdb32</code> → HEAD <code>62fc10e4</code></span>
+    <span class="pill">55 files changed · +3208 / −97</span>
+    <span class="pill added">Added: PipeStructure</span>
+    <span class="pill changed">Changed: PipeLLM runtime simplified</span>
+    <span class="pill changed">Changed: BundleElaborator pass</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#tldr">TL;DR</a></li>
+    <li><a href="#why">Why this change</a></li>
+    <li><a href="#shape">Architectural shape</a></li>
+    <li><a href="#elaborator">The bundle elaborator</a></li>
+    <li><a href="#pipestructure">The <code>PipeStructure</code> operator</a></li>
+    <li><a href="#pipellm">What changed on <code>PipeLLM</code></a></li>
+    <li><a href="#metadata">The <code>elaboration_metadata</code> side-table</a></li>
+    <li><a href="#validation">Validation layers</a></li>
+    <li><a href="#tests">Test surface</a></li>
+    <li><a href="#followups">Follow-ups deliberately deferred</a></li>
+  </ol>
+</nav>
+
+<h2 id="tldr">TL;DR</h2>
+<ul class="tight">
+  <li><strong>Build-time, not runtime.</strong> <code>structuring_method = "preliminary_text"</code> is now a <em>directive</em>. <code>PipelexInterpreter</code> rewrites the bundle through <code>BundleElaborator</code> before any pipe runs. The runtime never sees the directive.</li>
+  <li><strong>One pipe in, three pipes out.</strong> A <code>PipeLLM</code> with the directive becomes a <code>PipeSequence</code> wrapping a synthetic <code>PipeLLM</code> (draft text) and a synthetic <code>PipeStructure</code> (structuring). The user-facing pipe code is preserved, so <code>main_pipe</code>, callers, and the run API are unaffected.</li>
+  <li><strong>New first-class operator.</strong> <code>PipeStructure</code> takes one Text-compatible input, runs one LLM call against the canned <code>structuring_prompt</code> template, and produces any structured concept with full multiplicity support (<code>Foo</code>, <code>Foo[]</code>, <code>Foo[N]</code>). Usable directly in MTHDS too — handy after PDF extraction, search results, or upstream prose.</li>
+  <li><strong>Runtime <code>PipeLLM</code> simplified.</strong> The field, validator, runtime branch, and execution-data line for <code>structuring_method</code> are gone. Less surface, fewer code paths, no <code>NotImplementedError</code> trap.</li>
+  <li><strong>Side-table over field pollution.</strong> Synthetic-pipe metadata lives in a process-local <code>PipelexBundleBlueprint.elaboration_metadata</code> dict (excluded from serialization), not as a new field on every blueprint or runtime pipe.</li>
+</ul>
+
+<h2 id="why">Why this change</h2>
+<p>
+  Before this PR, <code>structuring_method = "preliminary_text"</code> existed as a field on the runtime
+  <code>PipeLLM</code>, but it raised <code>NotImplementedError</code> at run time — left over after the original
+  text-then-object implementation was removed in <code>16b775b8</code>. The directive was effectively dead.
+</p>
+<p>
+  We have two kinds of users who want this:
+</p>
+<ul class="tight">
+  <li><strong>"Let the model think in prose first, then structure."</strong> Improves quality for tasks where reasoning is awkward in JSON. They want a one-line directive on <code>PipeLLM</code>.</li>
+  <li><strong>"I already have text from somewhere else (PDF extraction, search, user input) — just structure it."</strong> They don't want a <code>PipeLLM</code> at all; they want a dedicated structuring step.</li>
+</ul>
+<p>
+  Solving both with a runtime branch on <code>PipeLLM</code> bloats the operator and hides a sequence behind one
+  pipe. Instead, we introduce <code>PipeStructure</code> as the underlying primitive, then make
+  <code>structuring_method = "preliminary_text"</code> a build-time shorthand that expands into it. The runtime
+  layer (and Temporal) never sees the directive — it sees only ordinary <code>PipeSequence</code> +
+  <code>PipeLLM</code> + <code>PipeStructure</code>.
+</p>
+
+<h2 id="shape">Architectural shape</h2>
+
+<h3>Where elaboration sits in the load path</h3>
+<div class="diagram">
+.mthds file
+   │
+   ▼
+TOML parser ─► dict
+   │
+   ▼
+PipelexBundleBlueprint.model_validate(dict)         ◄── parse-time validators fire here
+   │                                                    (incl. new validate_preliminary_text_output)
+   ▼
+BundleElaborator.elaborate(bundle)                  ◄── NEW: rewrites preliminary_text
+   │                                                    (fast-path short-circuit if absent)
+   │   ┌─ scans for PipeLLM with structuring_method=preliminary_text
+   │   ├─ for each match: synthesize draft + structure + wrapping sequence
+   │   ├─ writes bundle.elaboration_metadata side-table
+   │   └─ re-validates the rewritten bundle (ref checks, main_pipe)
+   ▼
+elaborated PipelexBundleBlueprint
+   │
+   ▼
+LibraryManager → PipeFactory → runtime PipeAbstract objects
+                 (sees only PipeSequence, PipeLLM, PipeStructure — never the directive)
+</div>
+<p class="legend">
+  Every code path that loads a bundle from a <code>.mthds</code> file goes through the elaborator.
+  The fast-path returns the input bundle unchanged (identity-preserving) when no
+  <code>preliminary_text</code> directive is present, so the common case pays no overhead.
+</p>
+
+<h3>What <code>preliminary_text</code> rewrites into</h3>
+<div class="grid-2">
+<div class="card">
+<h4>Before — what the user writes</h4>
+<pre><code>[pipe.review_restaurant]
+type = "PipeLLM"
+description = "..."
+inputs = { transcript = "Text" }
+output = "RestaurantReview"
+structuring_method = "preliminary_text"
+prompt = """Write a thorough review …
+@transcript
+"""</code></pre>
+</div>
+<div class="card">
+<h4>After — what the runtime sees</h4>
+<pre><code># original code reused for the wrapping sequence
+[pipe.review_restaurant]
+type = "PipeSequence"
+inputs = { transcript = "Text" }
+output = "RestaurantReview"
+steps = [
+  { pipe = "review_restaurant__draft_text",
+    result = "draft_text" },
+  { pipe = "review_restaurant__structure",
+    result = "review_restaurant" },
+]
+
+[pipe.review_restaurant__draft_text]
+type = "PipeLLM"
+inputs = { transcript = "Text" }
+output = "Text"          # always single Text
+prompt = "...verbatim..."
+
+[pipe.review_restaurant__structure]
+type = "PipeStructure"
+inputs = { draft_text = "Text" }
+output = "RestaurantReview"   # multiplicity preserved
+model = original.model_to_structure</code></pre>
+</div>
+</div>
+<p>
+  The original pipe code is reused for the wrapping sequence, so anything that referenced
+  <code>review_restaurant</code> — other pipes, <code>main_pipe</code>, the run API — keeps working unchanged.
+</p>
+
+<h3>Multiplicity rule</h3>
+<p>
+  Step 1 always emits <strong>a single <code>Text</code></strong>, even when the original output is <code>Foo[]</code>
+  or <code>Foo[3]</code>. Step 2 (<code>PipeStructure</code>) is the one that fans out: one preliminary text →
+  N structured objects. This matches the deleted <code>make_text_then_object_list</code> behavior verbatim.
+</p>
+
+<h2 id="elaborator">The bundle elaborator</h2>
+
+<h3>New module: <code>pipelex/core/interpreter/bundle_elaborator.py</code></h3>
+<p>
+  A single class with one public classmethod <code>elaborate(bundle)</code>. The dispatch is intentionally narrow —
+  there is exactly one elaboration kind today. The structure is set up so adding a second kind is mechanical, but
+  no premature plugin registry.
+</p>
+
+<div class="diff">
+<div class="filehead">pipelex/core/interpreter/bundle_elaborator.py · key path</div>
+<pre><code><span class="add">@classmethod
+def elaborate(cls, bundle: PipelexBundleBlueprint) -> PipelexBundleBlueprint:
+    if not bundle.pipe or not any(_is_preliminary_text_pipe(bp) for bp in bundle.pipe.values()):
+        return bundle  # fast-path: identity-preserving short-circuit
+
+    existing_codes: set[str] = set(bundle.pipe.keys())
+    new_pipe_dict: dict[str, PipeBlueprintUnion] = {}
+    elaboration_metadata: dict[str, ElaborationMetadata] = {}
+
+    for pipe_code, pipe_blueprint in bundle.pipe.items():
+        if _is_preliminary_text_pipe(pipe_blueprint):
+            cls._elaborate_preliminary_text(
+                pipe_code=pipe_code,
+                pipe_blueprint=pipe_blueprint,
+                new_pipe_dict=new_pipe_dict,
+                elaboration_metadata=elaboration_metadata,
+                existing_codes=existing_codes,
+            )
+        else:
+            new_pipe_dict[pipe_code] = pipe_blueprint
+
+    # Defense in depth: synthesized pipes must never themselves carry the directive.
+    for synthetic_code, synthetic_blueprint in new_pipe_dict.items():
+        if synthetic_code in elaboration_metadata and _is_preliminary_text_pipe(synthetic_blueprint):
+            raise BundleElaboratorError(...)
+
+    elaborated = bundle.model_copy(update={
+        "pipe": new_pipe_dict,
+        "elaboration_metadata": elaboration_metadata,
+    })
+
+    # Re-run bundle-level validators against the synthetic pipes.
+    try:
+        PipelexBundleBlueprint.model_validate(elaborated.model_dump(by_alias=True))
+    except ValidationError as exc:
+        raise BundleElaboratorError(...) from exc
+
+    return elaborated</span></code></pre>
+</div>
+
+<p>
+  A module-level <code>TypeGuard</code> narrows the union type at the iteration site so the dispatch helper
+  receives a properly-typed <code>PipeLLMBlueprint</code>:
+</p>
+
+<div class="diff">
+<div class="filehead">pipelex/core/interpreter/bundle_elaborator.py · TypeGuard</div>
+<pre><code><span class="add">def _is_preliminary_text_pipe(pipe_blueprint: PipeBlueprintUnion) -> TypeGuard[PipeLLMBlueprint]:
+    if not isinstance(pipe_blueprint, PipeLLMBlueprint):
+        return False
+    method = pipe_blueprint.structuring_method
+    return method is not None and method.is_preliminary_text</span></code></pre>
+</div>
+
+<h3>Wiring into the interpreter</h3>
+<div class="diff">
+<div class="filehead">pipelex/core/interpreter/interpreter.py</div>
+<pre><code><span class="hunk">@@ make_pipelex_bundle_blueprint @@</span>
+ try:
+     pipelex_bundle_blueprint = PipelexBundleBlueprint.model_validate(blueprint_dict)
+     pipelex_bundle_blueprint.source = str(bundle_path) if bundle_path else None
+<span class="del">-    return pipelex_bundle_blueprint</span>
+ except ValidationError as exc:
+     ...
+<span class="add">+
++try:
++    return BundleElaborator.elaborate(bundle=pipelex_bundle_blueprint)
++except BundleElaboratorError as exc:
++    raise PipelexInterpreterError(message=str(exc)) from exc</span></code></pre>
+</div>
+
+<h2 id="pipestructure">The <code>PipeStructure</code> operator</h2>
+
+<p>
+  Mirrors the shape of <code>PipeLLM</code> for object generation but stripped of everything that doesn't apply:
+  no user-controlled prompt template, no image/document inputs, no system prompt, exactly one Text input.
+</p>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+<tbody>
+  <tr><td>type</td><td><code>"PipeStructure"</code></td><td>Discriminator</td></tr>
+  <tr><td>inputs</td><td>dict</td><td>Exactly one entry. Concept must be Text or refine Text. No multiplicity (use <code>PipeBatch</code>).</td></tr>
+  <tr><td>output</td><td>string</td><td>Any structured concept, with optional multiplicity (<code>Foo</code>, <code>Foo[]</code>, <code>Foo[N]</code>). Cannot be Text.</td></tr>
+  <tr><td>model</td><td><code>LLMModelChoice | None</code></td><td>Falls back to <code>llm_choice_overrides.for_object</code> → <code>llm_choice_defaults.for_object</code>.</td></tr>
+</tbody>
+</table>
+
+<h3>Runtime flow</h3>
+<div class="diagram">
+working_memory.get_stuff_as_str(text_input_name)
+        │
+        ▼
+render_template(structuring_prompt, {text})           ◄── new generic template in pipelex.toml
+        │
+        ▼
++ get_output_structure_prompt(target_concept)         ◄── shared with PipeLLM.object generation
+        │
+        ▼
+LLMSetting = self.llm_choice
+              ?? deck.llm_choice_overrides.for_object
+              ?? deck.llm_choice_defaults.for_object
+        │
+        ▼
+content_generator.make_object         (single)
+content_generator.make_object_list    (Foo[] / Foo[N])
+        │
+        ▼
+StuffFactory.make_stuff → working_memory.set_new_main_stuff
+</div>
+
+<h3>Critical code: <code>_live_run_operator_pipe</code></h3>
+<div class="diff">
+<div class="filehead">pipelex/pipe_operators/structure/pipe_structure.py</div>
+<pre><code><span class="add">text_str = working_memory.get_stuff_as_str(name=self.text_input_name)
+
+multiplicity_resolution = output_multiplicity_to_apply(
+    base_multiplicity=self.output_multiplicity,
+    override_multiplicity=pipe_run_params.output_multiplicity,
+)
+is_multiple_output = multiplicity_resolution.is_multiple_outputs_enabled
+fixed_nb_output = multiplicity_resolution.specific_output_count
+
+llm_choice_for_object = (
+    self.llm_choice
+    or model_deck.llm_choice_overrides.for_object
+    or model_deck.llm_choice_defaults.for_object
+)
+llm_setting_for_object = model_deck.get_llm_setting(llm_choice=llm_choice_for_object)
+
+structuring_template = llm_config.get_template(template_name="structuring_prompt")
+rendered_user_prompt = await render_template(
+    template=structuring_template,
+    category=TemplateCategory.LLM_PROMPT,
+    context={"text": text_str},
+)
+if llm_config.is_structure_prompt_enabled:
+    rendered_user_prompt += await get_output_structure_prompt(
+        concept_ref=self.output.concept.concept_ref
+    )
+
+llm_prompt = LLMPrompt(user_text=rendered_user_prompt)
+content_class = get_class_registry().get_required_subclass(
+    name=self.output.concept.structure_class_name, base_class=StuffContent,
+)
+
+if is_multiple_output:
+    generated_objects = await content_generator.make_object_list(
+        job_metadata=job_metadata, object_class=content_class,
+        llm_prompt_for_object_list=llm_prompt,
+        llm_setting_for_object_list=llm_setting_for_object,
+        nb_items=fixed_nb_output,
+    )
+    the_content = ListContent(items=generated_objects)
+else:
+    the_content = await content_generator.make_object(...)</span></code></pre>
+</div>
+
+<h3>The new generic template</h3>
+<div class="diff">
+<div class="filehead">pipelex/pipelex.toml · [cogt.llm_config.generic_templates]</div>
+<pre><code><span class="add">structuring_prompt = """
+Read the following text carefully and produce the requested structured output from it.
+
+---
+{{ text }}
+"""</span></code></pre>
+</div>
+<p>
+  The operator deliberately has <em>no</em> user-controlled prompt template — the only variable is <code>text</code>,
+  fed automatically from the declared input. Customization for <code>preliminary_text</code> is captured as a
+  follow-up; if a user really needs custom prompts they author the two pipes by hand.
+</p>
+
+<h2 id="pipellm">What changed on <code>PipeLLM</code></h2>
+
+<p>
+  The runtime <code>PipeLLM</code> no longer carries <code>structuring_method</code> at all. The field, validator,
+  the <code>NotImplementedError</code> trap, the <code>execution_data_dict</code> entry, and the factory's forwarding
+  of the field are all removed.
+</p>
+
+<div class="diff">
+<div class="filehead">pipelex/pipe_operators/llm/pipe_llm.py · removed</div>
+<pre><code><span class="del">-    structuring_method: StructuringMethod | None = None
+
+-    @model_validator(mode="after")
+-    def validate_output_concept_consistency(self) -> Self:
+-        if self.structuring_method is not None and self.output.concept.structure_class_name == NativeConceptCode.TEXT:
+-            msg = (
+-                f"Output concept '{self.output.concept.code}' is considered a Text concept, "
+-                f"so it cannot be structured. Maybe you forgot to add '{NativeConceptCode.TEXT}' to the class registry?"
+-            )
+-            raise ValueError(msg)
+-        return self
+
+# inside _live_run_operator_pipe:
+-        if self.structuring_method is not None:
+-            match self.structuring_method:
+-                case StructuringMethod.PRELIMINARY_TEXT:
+-                    msg = (
+-                        f"PipeLLM '{self.code}': structuring_method='preliminary_text' is not currently supported. "
+-                        "The text-then-object mechanism was removed; a new implementation is planned."
+-                    )
+-                    raise NotImplementedError(msg)
+-                case StructuringMethod.DIRECT:
+-                    pass
+
+# inside execution_data_dict:
+-        if self.structuring_method is not None:
+-            execution_data_dict["structuring_method"] = self.structuring_method</span></code></pre>
+</div>
+
+<h3>The blueprint keeps the field — and gains a parse-time validator</h3>
+<p>
+  <code>structuring_method</code> remains part of the language surface. <code>PipeLLMBlueprint</code> gets a
+  <code>model_validator(mode="after")</code> that mirrors the elaborator's pre-check, so the user gets the error
+  during <code>model_validate</code> (parse time) instead of at elaboration time. The elaborator's check stays
+  as defense-in-depth (only reachable via <code>model_construct</code>).
+</p>
+
+<div class="diff">
+<div class="filehead">pipelex/pipe_operators/llm/pipe_llm_blueprint.py · added</div>
+<pre><code><span class="add">class StructuringMethod(StrEnum):
+    DIRECT = "direct"
+    PRELIMINARY_TEXT = "preliminary_text"
+
+    @property
+    def is_preliminary_text(self) -> bool:        # avoid `==` against enum (project rule)
+        match self:
+            case StructuringMethod.PRELIMINARY_TEXT:
+                return True
+            case StructuringMethod.DIRECT:
+                return False
+
+
+class PipeLLMBlueprint(PipeBlueprint):
+    ...
+    structuring_method: StructuringMethod | None = None
+
+    @model_validator(mode="after")
+    def validate_preliminary_text_output(self) -> Self:
+        if self.structuring_method is None or not self.structuring_method.is_preliminary_text:
+            return self
+        output_parse_result = parse_concept_with_multiplicity(self.output)
+        if QualifiedRef.parse(output_parse_result.concept_ref_or_code).local_code == NativeConceptCode.TEXT:
+            raise ValueError(
+                f"PipeLLM with `structuring_method = preliminary_text` cannot have output `{self.output}`. "
+                "The output must be a structured concept, not Text."
+            )
+        return self</span></code></pre>
+</div>
+
+<div class="callout warn">
+  <strong>Heads-up for direct importers.</strong> <code>StructuringMethod</code> moved from
+  <code>pipelex.pipe_operators.llm.pipe_llm</code> to
+  <code>pipelex.pipe_operators.llm.pipe_llm_blueprint</code> (it now lives next to the only consumer).
+  CHANGELOG entry calls this out.
+</div>
+
+<h3><code>PipeLLMSpec</code> still exposes the directive</h3>
+<p>
+  AI agents authoring via specs can still opt in. <code>PipeLLMSpec</code> gains a plain
+  <code>structuring_method: StructuringMethod | None = None</code> field (intentionally <em>not</em>
+  <code>SkipJsonSchema</code>, so it shows up in the JSON schema we hand to agents) and forwards it in
+  <code>to_blueprint()</code>.
+</p>
+
+<h2 id="metadata">The <code>elaboration_metadata</code> side-table</h2>
+
+<p>
+  Synthetic-pipe metadata lives on the <em>bundle</em>, not on every pipe blueprint and not on the runtime
+  <code>PipeAbstract</code>. The user-facing per-pipe schema stays unpolluted.
+</p>
+
+<div class="diff">
+<div class="filehead">pipelex/core/bundles/pipelex_bundle_blueprint.py · added</div>
+<pre><code><span class="add">class StepRole(StrEnum):
+    DRAFT_TEXT = "draft_text"
+    STRUCTURE = "structure"
+
+
+class ElaborationMetadata(BaseModel):
+    parent_pipe_code: str
+    step_role: StepRole
+
+
+class PipelexBundleBlueprint(BaseModel):
+    ...
+    # Process-local. Survives model_copy. Dropped by any model_dump→model_validate
+    # round-trip (exclude=True keeps MTHDS / TOML / JSON exports clean).
+    elaboration_metadata: dict[str, ElaborationMetadata] | None = Field(default=None, exclude=True)
+
+    def get_elaboration_for(self, pipe_code: str) -> ElaborationMetadata | None:
+        if not self.elaboration_metadata:
+            return None
+        return self.elaboration_metadata.get(pipe_code)</span></code></pre>
+</div>
+
+<h3>Lifetime</h3>
+<ul class="tight">
+  <li>Within a single process, after <code>BundleElaborator.elaborate(...)</code>, the metadata is reachable via the bundle reference.</li>
+  <li>Across any serialization boundary — kajson, library cache, Temporal payload, MTHDS export — the metadata is gone.</li>
+  <li>The elaborator's own re-validate pass is by-design discarded: it round-trips <em>only</em> to surface ref-rot errors with bundle context, then returns the original <code>model_copy</code>-built bundle (with metadata intact).</li>
+</ul>
+
+<h3>One specific consumer wired today</h3>
+<p>
+  The dependency loader in <code>LibraryManager._load_single_dependency</code> walks the side-table to keep
+  synthetic helpers attached to exported parents. Without this, exporting <code>review_restaurant</code> from a
+  package would leave the wrapping <code>PipeSequence</code> referencing unresolved
+  <code>review_restaurant__draft_text</code> / <code>__structure</code> codes:
+</p>
+
+<div class="diff">
+<div class="filehead">pipelex/libraries/library_manager.py · added</div>
+<pre><code><span class="add">all_exported = resolved_dep.exported_pipe_codes | main_pipes
+synthetic_helpers: set[str] = set()
+for blueprint in dep_blueprints:
+    if not blueprint.elaboration_metadata:
+        continue
+    for synthetic_code, meta in blueprint.elaboration_metadata.items():
+        if meta.parent_pipe_code in all_exported:
+            synthetic_helpers.add(synthetic_code)
+all_exported |= synthetic_helpers</span></code></pre>
+</div>
+
+<h2 id="validation">Validation layers</h2>
+<p>
+  Three layers guard against the only authoring mistake the elaborator can hit — combining
+  <code>preliminary_text</code> with a Text output:
+</p>
+
+<table>
+<thead><tr><th>Layer</th><th>Where</th><th>What it catches</th></tr></thead>
+<tbody>
+  <tr>
+    <td>1. Construction</td>
+    <td><code>PipeLLMBlueprint.validate_preliminary_text_output</code></td>
+    <td>String-level: rejects <code>"Text"</code>, <code>"native.Text"</code>, <code>"Text[]"</code>, <code>"Text[N]"</code>. Fires during <code>model_validate</code>, before the elaborator runs.</td>
+  </tr>
+  <tr>
+    <td>2. Defense-in-depth</td>
+    <td><code>BundleElaborator._elaborate_preliminary_text</code></td>
+    <td>Same string-level check — only reachable if a caller bypassed validation via <code>model_construct</code>. Test suite exercises it.</td>
+  </tr>
+  <tr>
+    <td>3. Library-time</td>
+    <td><code>PipeStructure.validate_output_with_library</code></td>
+    <td>Concept-level: catches a domain concept that <code>refines = "Text"</code> — those slip past string-level guards because they don't read as <code>Text</code> in the source.</td>
+  </tr>
+</tbody>
+</table>
+
+<p>The elaborator additionally guards against:</p>
+<ul class="tight">
+  <li>Synthetic-code collisions with user-authored pipes in the same bundle.</li>
+  <li>Synthetic codes that don't pass <code>is_pipe_code_valid</code> (snake_case + length).</li>
+  <li>Recursive elaboration — a synthesized blueprint must never carry <code>structuring_method = preliminary_text</code> itself.</li>
+  <li>Reference rot in the rewritten bundle — re-runs <code>PipelexBundleBlueprint.model_validate</code> on the elaborated form, wraps any <code>ValidationError</code> in <code>BundleElaboratorError</code> with the originating-pipe context.</li>
+</ul>
+
+<h2 id="tests">Test surface</h2>
+
+<p>
+  Test counts: PipeStructure-focused subset is <strong>92 passed</strong>. Touched-source areas overall:
+  <strong>1506 passed, 1 xfailed</strong>. <code>make agent-check</code> and <code>make docs-check</code> clean.
+</p>
+
+<h3>New test modules</h3>
+<ul class="filelist">
+  <li><code>tests/unit/pipelex/core/bundles/test_elaboration_metadata.py</code></li>
+  <li><code>tests/unit/pipelex/core/interpreter/test_bundle_elaborator.py</code></li>
+  <li><code>tests/unit/pipelex/core/interpreter/test_interpreter_preliminary_text.py</code></li>
+  <li><code>tests/unit/pipelex/pipe_operators/pipe_structure/test_pipe_structure_blueprint.py</code></li>
+  <li><code>tests/unit/pipelex/pipe_operators/pipe_structure/test_pipe_structure_factory.py</code></li>
+  <li><code>tests/unit/pipelex/pipe_operators/pipe_structure/test_pipe_structure_validate_inputs.py</code></li>
+  <li><code>tests/unit/pipelex/pipe_operators/pipe_structure/test_pipe_structure_validate_outputs.py</code></li>
+  <li><code>tests/unit/pipelex/pipe_operators/pipe_structure/test_pipe_structure_kajson.py</code></li>
+  <li><code>tests/unit/pipelex/builder/pipe/pipe_operator/pipe_structure/test_pipe_structure_spec.py</code></li>
+  <li><code>tests/unit/pipelex/libraries/dependencies/test_dependency_preliminary_text_export.py</code></li>
+  <li><code>tests/integration/pipelex/pipes/operator/pipe_structure/test_pipe_structure.py</code></li>
+  <li><code>tests/integration/pipelex/pipes/operator/pipe_structure/test_pipe_structure_in_sequence.py</code></li>
+  <li><code>tests/integration/pipelex/pipes/operator/pipe_structure/test_pipe_structure_in_batch.py</code></li>
+  <li><code>tests/integration/pipelex/pipes/operator/pipe_structure/test_preliminary_text_e2e.py</code></li>
+  <li><code>tests/integration/pipelex/pipes/operator/pipe_structure/test_preliminary_text_inline_e2e.py</code></li>
+</ul>
+
+<h3>Integration coverage worth knowing about</h3>
+<ul class="tight">
+  <li><strong>End-to-end <code>preliminary_text</code> with real LLM calls</strong>, parametrized over all three multiplicity forms (<code>Foo</code>, <code>Foo[]</code>, <code>Foo[2]</code>), against both Python-class concepts (<code>RestaurantReview</code>, 8 fields) and inline-structure concepts (<code>HikingTripReport</code>, 12 fields with lists).</li>
+  <li><strong>Exactly two LLM calls per invocation</strong> asserted via the reporting registry — confirms one draft + one structure.</li>
+  <li><strong><code>PipeStructure</code> inside a hand-authored <code>PipeSequence</code></strong> (no elaboration sugar) — confirms the operator is usable on its own.</li>
+  <li><strong><code>PipeStructure</code> inside a <code>PipeBatch</code></strong> — three free-form review texts, per-item shape assertions.</li>
+  <li><strong>kajson round-trip</strong> for <code>PipeStructureBlueprint</code>, for a <code>PipeLLMBlueprint</code> carrying the directive, and for every blueprint in an elaborated bundle.</li>
+</ul>
+
+<div class="callout">
+  <strong>Authoring note.</strong> Writing <code>type = "PipeStructure"</code> directly in a <code>.mthds</code>
+  file currently fails <code>plxt</code> schema validation: the bundled schema in
+  <code>vscode-pipelex/crates/taplo-common/schemas/mthds_schema.json</code> predates this PR. The
+  <code>preliminary_text</code> path is unaffected (the synthesized <code>PipeStructure</code> lives in-memory
+  only). Cross-repo follow-up: ship a <code>pipelex-tools</code> release with the regenerated schema. Captured
+  in <code>TODOS.md</code>.
+</div>
+
+<h2 id="followups">Follow-ups deliberately deferred</h2>
+<p>Listed in <code>TODOS.md</code>; none of these block this PR.</p>
+<ol class="tight">
+  <li>Synthetic-pipe marker on graph node tags + CLI listing exclusion (uses the side-table).</li>
+  <li>Friendly synthetic-pipe rendering across logs, traces, and run-reporting.</li>
+  <li><code>mthds-ui</code> graph viewer integration.</li>
+  <li>Bundle-load benchmark in CI.</li>
+  <li><code>PipeStructure</code> image-input support.</li>
+  <li>Per-step prompt customization for <code>preliminary_text</code>.</li>
+  <li>Generic meta-pipe / build-time elaboration framework — when a <em>second</em> directive lands.</li>
+  <li><code>pipelex-dev elaborate-bundle &lt;path&gt;</code> debugging CLI.</li>
+  <li>Revisit <code>StructuringMethod.DIRECT</code> (functionally identical to <code>None</code> today; kept for symmetry).</li>
+  <li>Persist <code>elaboration_metadata</code> across serialization boundaries — drop <code>exclude=True</code> when a second cross-boundary consumer materializes (graph viewer over a serialized bundle, Temporal payload, persistent library cache). Today the only consumer is the in-process dependency loader.</li>
+</ol>
+
+<hr />
+
+<p style="color: var(--ink-dim); font-size: 12px; margin-top: 24px;">
+  Brief generated from the diff between <code>bb9bdb32</code> and HEAD on
+  <code>feature/Text-then-object</code>. See <code>TODOS.md</code> for the full phase-by-phase plan, decisions
+  taken, and audit notes; <code>docs/under-the-hood/build-time-elaboration.md</code> for the user-facing
+  mechanism doc; <code>docs/building-methods/pipes/pipe-operators/PipeStructure.md</code> for the operator
+  reference.
+</p>
+
+</div>
+</body>
+</html>

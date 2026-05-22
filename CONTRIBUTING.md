@@ -72,6 +72,18 @@ We are open to contributions in all areas of our core Pipelex library:
 - Fill in required credentials (OPENAI_API_KEY, AWS_ACCESS_KEY_ID, etc.)
 - Never commit `.env`
 
+## SWE Agent Rules
+
+`CLAUDE.md` and `AGENTS.md` are regenerated from `pipelex/kit/agent_rules/` via `make rules`. The committed `CLAUDE.md` is **lean**: it omits the Python and pytest standards, which Pipelex maintainers get from their multi-repo workspace's `.claude/rules/` directory. `AGENTS.md` keeps the full set inline.
+
+If you are contributing without that workspace and want a `CLAUDE.md` that includes the Python and pytest standards inline, run once:
+
+```bash
+make rules-claude-standalone
+```
+
+That overwrites `CLAUDE.md` with the full standalone version. Do not commit this regenerated file — the lean version is canonical in git.
+
 ## License
 
 * **CLA** – The first time you open a PR, the CLA-assistant bot will guide you through signing the Contributor License Agreement. The process signature uses the [CLA assistant lite](https://github.com/marketplace/actions/cla-assistant-lite).

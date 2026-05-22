@@ -33,6 +33,14 @@ class AgentRules(ConfigModel):
     demote: int = Field(default=1, description="Number of levels to demote headings when merging")
     cursor: CursorSpec = Field(description="Cursor rules export configuration")
     targets: dict[str, Target] = Field(description="Dictionary of single-file merge targets keyed by ID")
+    deprecated_rule_stems: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Stems (filename without extension) of agent_rules sources that used to ship but are no longer "
+            "present. The cleanup path uses this tombstone list to delete pre-existing generated artifacts "
+            "(e.g. `.cursor/rules/<stem>.mdc`) for users upgrading from an older version of the kit."
+        ),
+    )
 
 
 class KitIndex(ConfigModel):

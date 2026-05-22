@@ -9,7 +9,12 @@ from typing import Annotated, Any, cast
 import typer
 from tomlkit import table
 
-from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
+from pipelex.cli.agent_cli.commands.agent_output import (
+    CliOutputFormat,
+    agent_error,
+    agent_success_formatted,
+    set_agent_cli_error_format,
+)
 from pipelex.cli.commands.init.backends import get_selected_backend_keys, update_backends_in_toml
 from pipelex.cli.commands.init.command import attempt_prime_remote_config_cache
 from pipelex.cli.commands.init.config_files import init_config
@@ -59,6 +64,27 @@ def _parse_config_arg(config_arg: str | None) -> dict[str, Any]:
             agent_error(f"Failed to parse config file JSON: {exc}", "JSONDecodeError", cause=exc)
 
     return {}
+
+
+def _format_init_markdown(result: dict[str, Any]) -> str:
+    """Render an init result dict as agent-readable markdown."""
+    backends_enabled: list[str] = result.get("backends_enabled") or []
+    lines: list[str] = [
+        "# Pipelex initialized",
+        "",
+        f"**Target directory:** `{result['target_dir']}`",
+        "",
+        f"**Backends enabled:** {', '.join(backends_enabled) or 'none'}",
+        "",
+        f"**Routing profile:** `{result['routing_profile']}`",
+        "",
+        f"**Inference setup completed:** {result.get('inference_setup_completed', False)}",
+        "",
+        f"**Remote config cache primed:** {result.get('cache_primed', False)}",
+    ]
+    if result.get("cache_priming_error"):
+        lines.extend(["", f"> ⚠ Cache priming error: {result['cache_priming_error']}"])
+    return "\n".join(lines)
 
 
 def _resolve_target_dir(global_: bool) -> Path:
@@ -313,6 +339,14 @@ def agent_init_cmd(
             help="Force global ~/.pipelex/ directory.",
         ),
     ] = False,
+    output_format: Annotated[
+        CliOutputFormat,
+        typer.Option("--format", help="Success output format: markdown (default) or json (structured)"),
+    ] = CliOutputFormat.MARKDOWN,
+    error_format: Annotated[
+        CliOutputFormat | None,
+        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+    ] = None,
 ) -> None:
     """Initialize Pipelex configuration (non-interactive).
 
@@ -340,6 +374,8 @@ def agent_init_cmd(
     off; project init drops in a commented-out template that inherits the user's global
     telemetry settings via layered loading. Edit `telemetry.toml` to enable destinations.
     """
+    set_agent_cli_error_format(error_format or output_format)
+
     try:
         # Parse config
         parsed_config = _parse_config_arg(config)
@@ -388,9 +424,10 @@ def agent_init_cmd(
             result_payload["cache_priming_error"] = priming_result.error_message
 
         # Output result
-        agent_success(result_payload)
+        agent_success_formatted(result_payload, _format_init_markdown, output_format)
 
     except typer.Exit:
         raise
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
         agent_error(f"Initialization failed: {exc}", type(exc).__name__, cause=exc)

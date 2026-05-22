@@ -1,14 +1,19 @@
 """Exceptions for Pipelex managed services."""
 
+from pipelex.base_exceptions import ErrorDomain
 from pipelex.system.exceptions import PipelexError
 
 
 class PipelexServiceConfigValidationError(PipelexError):
     """Raised when pipelex_service.toml validation fails."""
 
+    error_domain = ErrorDomain.CONFIG
+
 
 class PipelexServiceError(PipelexError):
     """Base exception for Pipelex service errors."""
+
+    error_domain = ErrorDomain.CONFIG
 
 
 class RemoteConfigFetchError(PipelexServiceError):

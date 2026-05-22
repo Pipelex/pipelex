@@ -14,12 +14,12 @@ It also supports lists such as `List[BaseModel]` and `List[BaseModelSubclass]`.
 
 For examples, see the tests in `test_top_crafter.py`:
 
-1. `make ti TEST=test_make_object_direct`
+1. `make ti TEST=test_make_object`
    - This test uses `WfCraftObject`, which returns a `BaseModel`.
    - However, the actual class of the returned object is determined by `object_assignment.object_class`,
      allowing the calling method to cast it to the required generic type with `cast(BaseModelType, obj)`.
 
-2. `make ti TEST=test_make_object_list_direct`
+2. `make ti TEST=test_make_object_list`
    - This test uses `WfCraftObjectList`, which returns a `List[BaseModel]`.
    - Similarly, the items in the returned list use the class specified in `object_assignment.object_class`,
      allowing the calling method to cast the list to the required generic type with `cast(List[BaseModelType], obj_list)`.

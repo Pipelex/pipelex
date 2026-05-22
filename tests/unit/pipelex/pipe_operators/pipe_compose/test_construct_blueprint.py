@@ -203,16 +203,15 @@ class TestConstructBlueprintRequiredVariables:
     """Tests for get_required_variables method edge cases."""
 
     def test_get_required_variables_filters_internal_variables(self):
-        """Internal variables (_, preliminary_text, place_holder) should be filtered out."""
+        """Internal variables (_, place_holder) should be filtered out."""
         raw = {
-            "output": {"template": "{{ _internal }} {{ preliminary_text }} {{ place_holder }} {{ user_data }}"},
+            "output": {"template": "{{ _internal }} {{ place_holder }} {{ user_data }}"},
         }
         blueprint = ConstructBlueprint.make_from_raw(raw)
         required_vars = blueprint.get_required_variables()
 
         assert "user_data" in required_vars
         assert "_internal" not in required_vars
-        assert "preliminary_text" not in required_vars
         assert "place_holder" not in required_vars
 
     def test_get_required_variables_fixed_only_returns_empty(self):

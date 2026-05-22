@@ -11,7 +11,7 @@ class ReportingProtocol(Protocol):
 
     def report_inference_job(self, inference_job: InferenceJobAbstract): ...
 
-    def generate_report(self, pipeline_run_id: str | None = None): ...
+    def generate_report(self, pipeline_run_id: str | None = None, print_to_console: bool = True): ...
 
     def close_registry(self, pipeline_run_id: str): ...
 
@@ -40,7 +40,7 @@ class ReportingNoOp(ReportingProtocol):
         pass
 
     @override
-    def generate_report(self, pipeline_run_id: str | None = None):
+    def generate_report(self, pipeline_run_id: str | None = None, print_to_console: bool = True):
         pass
 
     @override

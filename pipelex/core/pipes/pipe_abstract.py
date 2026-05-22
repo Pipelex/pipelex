@@ -432,8 +432,36 @@ class PipeAbstract(ABC, BaseModel):
         output_name: str | None = None,
         library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
+        # Push the pipe's frame onto the stack, run it, and always pop it — even on failure —
+        # so a failed pipe never leaves a stale frame behind on the shared pipe_stack, where it
+        # could accumulate entries and trip PipeStackOverflowError. Required cleanup belongs in a
+        # `finally` block.
         pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
+        try:
+            return await self._run_pipe_traced(
+                job_metadata=job_metadata,
+                working_memory=working_memory,
+                pipe_run_params=pipe_run_params,
+                output_name=output_name,
+                library_crate=library_crate,
+            )
+        finally:
+            pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
 
+    @final
+    async def _run_pipe_traced(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: str | None = None,
+        library_crate: "LibraryCrate | None" = None,
+    ) -> PipeOutput:
+        """Run the pipe with graph tracing — the inner body of `run_pipe()`.
+
+        Split out so `run_pipe()` stays a thin push / `try`-`finally` / pop wrapper that
+        keeps the pipe's `pipe_stack` frame balanced on every exit path.
+        """
         # Handle graph tracing if enabled
         graph_node_id: str | None = None
         child_graph_context: GraphContext | None = None
@@ -512,6 +540,11 @@ class PipeAbstract(ABC, BaseModel):
                 job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
             )
         except Exception as exc:
+            # Broad catch is intentional: graph tracing must record EVERY failure mode,
+            # including unexpected ones — an untraced failure is an observability hole.
+            # This observes-and-re-raises (no swallow, no convert), so no bug is hidden.
+            # Can't be a `finally`: the success/error paths record different things and
+            # the error path needs the exception object.
             # Record graph tracing error
             if tracer_manager is not None and parent_graph_context is not None:
                 error_stack: str | None = None
@@ -557,7 +590,6 @@ class PipeAbstract(ABC, BaseModel):
                 output_concept_data=output_concept_data,
             )
 
-        pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
         return pipe_output
 
     @final
@@ -621,6 +653,8 @@ class PipeAbstract(ABC, BaseModel):
                 library_crate=library_crate,
             )
         except Exception as exc:
+            # Broad catch is intentional: the OTel span must be closed with ERROR status
+            # on any failure. Observes-and-re-raises — see note on the catch in _run_pipe_traced.
             self._end_pipe_span_error(span, error=exc, is_root_span=is_root_span)
             raise
 

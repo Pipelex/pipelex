@@ -34,7 +34,7 @@ from pipelex.cogt.search.search_setting import SearchModelChoice, SearchSetting
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.exceptions import ConfigValidationError
 from pipelex.system.runtime import ProblemReaction
-from pipelex.tools.misc.toml_utils import load_toml_from_path_if_exists
+from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_path_if_exists
 from pipelex.types import Self
 from pipelex.urls import URLs
 
@@ -704,8 +704,8 @@ class ModelDeck(ConfigModel):
             # Check if model_handle exists as a top-level key (section) in the TOML
             # Exclude special sections like 'defaults'
             return model_handle in backend_toml and model_handle != "defaults"
-        except Exception:
-            # Best-effort: if anything goes wrong, just return None
+        except (TomlError, OSError):
+            # Best-effort: an unreadable or malformed backend TOML is treated as "model not found"
             return None
 
     def _resolve_waterfall(

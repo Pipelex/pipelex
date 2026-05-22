@@ -1,11 +1,18 @@
 """Integration tests for cross-worker UsageReportEvent emission via two task queues.
 
-Validates the Phase 2 runner-side fallback: when `WfMakeLLMText` dispatches
+Validates the Phase 2 runner-side fallback: when `WfPipeRouter` dispatches
 `act_llm_gen_text` to a separate task queue (the production deployment topology
 where router and runner are physically separated), the runner-side worker —
 with no `_event_log_contexts` entry registered for the workflow — emits its
 `UsageReportEvent` into the same `traces_dir` partition via the per-process
 activity event log, stamped with a stable `act_*` `writer_id`.
+
+`ContentGeneratorInWorkflow.make_llm_text` calls
+`workflow.execute_activity(act_llm_gen_text, ..., task_queue=worker_config.resolve_queue(...))`
+directly from inside the workflow — there is no child workflow layer
+between the router and the activity. The split-worker topology is configured
+by overriding `worker_config.activity_queues[act_llm_gen_text].default` to
+point at the runner queue.
 """
 
 import uuid
@@ -20,6 +27,8 @@ from temporalio.client import Client as TemporalClient
 from pipelex.config import get_config
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.temporal.config_temporal import ActivityRouteConfig
+from pipelex.temporal.tprl_content_generation.act_llm_generate import act_llm_gen_text
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 from pipelex.tracing.activity_event_log import ActivityEventLogCache
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog
@@ -60,9 +69,10 @@ class TestSplitWorkerUsageEmission:
         DRY mode short-circuits the `act_llm_gen_text` activity dispatch
         (`ContentGeneratorDry` reports inline inside the workflow), so the
         cross-worker activity hop never fires. LIVE mode forces the workflow
-        to dispatch through `WfMakeLLMText` → `act_llm_gen_text`, which is
-        what the runner-side fallback pinned in this suite is supposed to
-        exercise. The fake `act_llm_gen_text` substitute installed by
+        to dispatch `act_llm_gen_text` directly via
+        `ContentGeneratorInWorkflow.make_llm_text`, which is what the
+        runner-side fallback pinned in this suite is supposed to exercise.
+        The fake `act_llm_gen_text` substitute installed by
         `make_split_workers` returns a stub string and synthesizes the
         usage report, so no real LLM call is made.
         """
@@ -74,19 +84,24 @@ class TestSplitWorkerUsageEmission:
         )
 
     @pytest.fixture
-    def configure_inference_task_queue(self, split_queues: tuple[str, str]) -> Generator[None, None, None]:
+    def route_llm_text_to_runner_queue(self, split_queues: tuple[str, str]) -> Generator[None, None, None]:
         """Route `act_llm_gen_text` to `q_runner` for the duration of the test.
 
-        Without this override, `WfMakeLLMText` would dispatch the activity to
-        whichever task queue the workflow is running on (the router queue),
-        defeating the split-worker topology this suite is supposed to exercise.
+        Without this override, `ContentGeneratorInWorkflow.make_llm_text` would
+        dispatch the activity to whichever task queue the workflow is running on
+        (the router queue), defeating the split-worker topology this suite is
+        supposed to exercise.
         """
         _q_router, q_runner = split_queues
         worker_config = get_config().temporal.worker_config
-        original = worker_config.inference_task_queue
-        worker_config.inference_task_queue = q_runner
+        activity_name = act_llm_gen_text.__name__
+        original_entry = worker_config.activity_queues.get(activity_name)
+        worker_config.activity_queues[activity_name] = ActivityRouteConfig(default=q_runner, by_handle={})
         yield
-        worker_config.inference_task_queue = original
+        if original_entry is None:
+            worker_config.activity_queues.pop(activity_name, None)
+        else:
+            worker_config.activity_queues[activity_name] = original_entry
 
     @pytest.fixture(autouse=True)
     def reset_activity_event_log(self) -> Generator[None, None, None]:
@@ -129,7 +144,7 @@ class TestSplitWorkerUsageEmission:
         temporal_client: TemporalClient,
         tracing_tmp_dir: Path,
         split_queues: tuple[str, str],
-        configure_inference_task_queue: None,  # noqa: ARG002
+        route_llm_text_to_runner_queue: None,  # noqa: ARG002
     ) -> None:
         """Router on q_router dispatches inference activity to q_runner.
 
@@ -164,7 +179,7 @@ class TestSplitWorkerUsageEmission:
         temporal_client: TemporalClient,
         tracing_tmp_dir: Path,
         split_queues: tuple[str, str],
-        configure_inference_task_queue: None,  # noqa: ARG002
+        route_llm_text_to_runner_queue: None,  # noqa: ARG002
     ) -> None:
         """Exactly-once invariant: `_emit_usage_event` takes either the fast
         path OR the fallback path, never both. Submit one workflow; assert

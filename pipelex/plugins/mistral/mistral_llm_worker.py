@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Any
 
+import httpx
 from mistralai import Mistral, MistralError
 from mistralai.models import MistralPromptMode, TextChunk, ThinkChunk
 from mistralai.types import UNSET
@@ -8,9 +9,14 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
 from pipelex.cogt.inference.error_classification import (
-    is_content_policy_violation,
-    is_quota_exhaustion_mistral,
+    UserAction,
+    UserActionKind,
+    extract_mistral_metadata,
+    extract_underlying_sdk_exception,
 )
+from pipelex.cogt.inference.error_classify import classify_inference_error
+from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
@@ -21,7 +27,6 @@ from pipelex.plugins.mistral.mistral_exceptions import MistralWorkerConfiguratio
 from pipelex.plugins.mistral.mistral_factory import MistralFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
-from pipelex.urls import URLs
 
 if TYPE_CHECKING:
     from mistralai.models import ChatCompletionResponse
@@ -59,54 +64,6 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
             self.instructor_for_objects = from_mistral(client=sdk_instance, mode=instructor_mode, use_async=True)
         else:
             self.instructor_for_objects = from_mistral(client=sdk_instance, use_async=True)
-
-    def _classify_mistral_error(self, exc: MistralError) -> LLMCompletionError:
-        """Classify a Mistral SDK error into a categorized LLMCompletionError."""
-        error_message = str(exc)
-        status_code = exc.status_code
-
-        if is_quota_exhaustion_mistral(error_message, status_code):
-            msg = f"Mistral quota exhausted for model '{self.inference_model.desc}': {exc}"
-            return LLMCompletionError(
-                msg,
-                error_category=InferenceErrorCategory.CAPACITY,
-                user_action=f"Your Mistral account has exceeded its quota — check billing at {URLs.mistral_billing}",
-            )
-
-        if status_code in {401, 403}:
-            msg = f"Mistral authentication error for model '{self.inference_model.desc}': {exc}"
-            return LLMCompletionError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
-
-        if status_code == 404:
-            msg = f"Mistral model '{self.inference_model.desc}' not found: {exc}"
-            return LLMCompletionError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
-
-        if status_code == 429:
-            msg = f"Mistral rate limit exceeded for model '{self.inference_model.desc}': {exc}"
-            return LLMCompletionError(
-                msg,
-                error_category=InferenceErrorCategory.TRANSIENT,
-                user_action="Rate limited by Mistral — the system will retry automatically",
-            )
-
-        if status_code == 400:
-            if is_content_policy_violation(error_message):
-                msg = f"Content rejected by safety filters for model '{self.inference_model.desc}': {exc}"
-                return LLMCompletionError(
-                    msg,
-                    error_category=InferenceErrorCategory.CONTENT,
-                    user_action="Content was rejected by safety filters — revise the prompt",
-                )
-            msg = f"Mistral bad request error for model '{self.inference_model.desc}': {exc}"
-            return LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT)
-
-        if status_code >= 500:
-            msg = f"Mistral server error for model '{self.inference_model.desc}': {exc}"
-            return LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT)
-
-        # Fallback
-        msg = f"Mistral API error for model '{self.inference_model.desc}': {exc}"
-        return LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT)
 
     def _resolve_prompt_mode(self, job_params: LLMJobParams) -> "OptionalNullable[MistralPromptMode]":
         """Resolve reasoning parameters to a Mistral prompt_mode value.
@@ -167,15 +124,39 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
                 max_tokens=job_params.max_tokens or self.default_max_tokens,
                 prompt_mode=prompt_mode,
             )
-        except MistralError as exc:
-            raise self._classify_mistral_error(exc) from exc
+        except (MistralError, httpx.TransportError) as sdk_exc:
+            metadata = extract_mistral_metadata(sdk_exc)
+            classification = classify_inference_error(metadata)
+            raise render_inference_error(
+                metadata=metadata,
+                classification=classification,
+                family=InferenceErrorFamily.LLM,
+                model_desc=self.inference_model.desc,
+                model_handle=self.inference_model.name,
+            ) from sdk_exc
 
         if not response:
             msg = "Mistral response is None"
-            raise LLMCompletionError(msg)
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                provider_metadata=None,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Mistral returned an empty response — the system will retry automatically",
+                ),
+            )
         if not response.choices:
             msg = "Mistral response.choices is None"
-            raise LLMCompletionError(msg)
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                provider_metadata=None,
+                user_action=UserAction(
+                    kind=UserActionKind.WAIT_AND_RETRY,
+                    detail="Mistral returned a response with no choices — the system will retry automatically",
+                ),
+            )
         mistral_response_content = response.choices[0].message.content
         result_text: str
         if isinstance(mistral_response_content, str):
@@ -194,11 +175,27 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
             result_text = "".join(text_parts)
         else:
             msg = f"Unexpected Mistral response content type: {type(mistral_response_content)}"
-            raise LLMCompletionError(msg)
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                provider_metadata=None,
+                user_action=UserAction(
+                    kind=UserActionKind.CONTACT_SUPPORT,
+                    detail="Mistral returned an unrecognized content type — report this to Pipelex support",
+                ),
+            )
 
         if not result_text:
             msg = "Mistral response text is empty"
-            raise LLMCompletionError(msg)
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                provider_metadata=None,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Mistral returned an empty text response — try rephrasing the prompt or using a different model",
+                ),
+            )
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := response.usage):
             llm_tokens_usage.nb_tokens_by_category = self.mistral_factory.make_nb_tokens_by_category(usage=usage)
@@ -215,7 +212,7 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
         self._validate_no_reasoning_for_structured_gen(job_params=job_params)
         messages = await self.mistral_factory.make_simple_messages_openai_typed(llm_job=llm_job)
         # Deferred import: avoid pulling heavy SDK at module-load time
-        from instructor.exceptions import InstructorRetryException  # noqa: PLC0415
+        from instructor.core import InstructorRetryException  # noqa: PLC0415
 
         try:
             result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
@@ -224,14 +221,45 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
                 model=self.inference_model.model_id,
                 temperature=job_params.temperature,
                 max_tokens=job_params.max_tokens or self.default_max_tokens,
+                # instructor's retry is confined to schema re-ask: this validation-only AsyncRetrying
+                # re-asks on a malformed/invalid output but lets a transport error propagate as the raw
+                # SDK exception — transport retry is the SDK client floor (Tier 1) alone. Without this
+                # the Mistral worker passed no max_retries at all, so structured Mistral got no re-ask.
+                max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.schema_reask_max_attempts),
             )
-        except MistralError as exc:
-            raise self._classify_mistral_error(exc) from exc
-        except LLMCompletionError:
-            raise
-        except InstructorRetryException as exc:
-            msg = f"Mistral structured generation failed after retries for model '{self.inference_model.desc}': {exc}"
-            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
+        except InstructorRetryException as instructor_exc:
+            # instructor wraps SDK exceptions during retries; recover the underlying
+            # one so transient/capacity/auth errors aren't all flattened to UNKNOWN.
+            underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
+            if underlying_exc is not None:
+                metadata = extract_mistral_metadata(underlying_exc)
+                classification = classify_inference_error(metadata)
+                raise render_inference_error(
+                    metadata=metadata,
+                    classification=classification,
+                    family=InferenceErrorFamily.LLM,
+                    model_desc=self.inference_model.desc,
+                    model_handle=self.inference_model.name,
+                ) from instructor_exc
+            msg = f"Mistral structured generation failed after retries for model '{self.inference_model.desc}': {instructor_exc}"
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.UNKNOWN,
+                user_action=UserAction(
+                    kind=UserActionKind.CONTACT_SUPPORT,
+                    detail="Structured generation failed for an unrecognized reason — retry, and report this if it persists",
+                ),
+            ) from instructor_exc
+        except (MistralError, httpx.TransportError) as sdk_exc:
+            metadata = extract_mistral_metadata(sdk_exc)
+            classification = classify_inference_error(metadata)
+            raise render_inference_error(
+                metadata=metadata,
+                classification=classification,
+                family=InferenceErrorFamily.LLM,
+                model_desc=self.inference_model.desc,
+                model_handle=self.inference_model.name,
+            ) from sdk_exc
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
             llm_tokens_usage.nb_tokens_by_category = self.mistral_factory.make_nb_tokens_by_category(usage=usage)

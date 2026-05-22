@@ -1,8 +1,10 @@
-import asyncio
+import functools
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from typing_extensions import override
 
+from pipelex import log
+from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -15,12 +17,29 @@ from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.tools.misc.async_utils import gather_bounded
 
 if TYPE_CHECKING:
-    from collections.abc import Coroutine
+    from collections.abc import Awaitable, Callable
 
+    from pipelex.core.stuffs.stuff import Stuff
     from pipelex.core.stuffs.stuff_content import StuffContent
     from pipelex.libraries.library_crate import LibraryCrate
+
+# When a single PipeBatch fans out over more than this many items, log a one-time advisory pointing at
+# the Temporal track — bounded fan-out is a basic backpressure effort, not durable, rate-limited execution.
+LARGE_BATCH_ADVISORY_THRESHOLD = 100
+
+
+def resolve_batch_max_concurrency(max_concurrency_setting: int | str) -> int | None:
+    """Translate the ``pipeline_execution_config.max_concurrency`` setting into a ``gather_bounded`` bound.
+
+    The config exposes the explicit literal ``"unbounded"``; ``gather_bounded`` takes ``None`` for no
+    bound. Any int value is passed through unchanged. Centralizing this guards against passing the
+    raw ``"unbounded"`` string into ``gather_bounded``, which would raise ``TypeError`` on its
+    ``max_concurrency < 1`` check.
+    """
+    return None if isinstance(max_concurrency_setting, str) else max_concurrency_setting
 
 
 class PipeBatch(PipeController):
@@ -117,8 +136,48 @@ class PipeBatch(PipeController):
         # TODO: Make commented code work when inputing images named "a.b.c"
         sub_pipe = get_required_pipe(pipe_code=self.branch_pipe_code)
         batch_output_stuff_code = StuffFactory.make_stuff_code()
-        tasks: list[Coroutine[Any, Any, PipeOutput]] = []
 
+        item_count = len(input_content.items)
+        max_concurrency_setting = get_config().pipelex.pipeline_execution_config.max_concurrency
+        max_concurrency = resolve_batch_max_concurrency(max_concurrency_setting)
+        if item_count > LARGE_BATCH_ADVISORY_THRESHOLD:
+            log.warning(
+                f"PipeBatch '{self.code}' is fanning out over {item_count} items. Bounded fan-out "
+                f"(max_concurrency={max_concurrency_setting}) is a basic backpressure effort, not durable execution — "
+                f"for a workload this size, consider running on Temporal for durable, rate-limited execution."
+            )
+
+        async def _run_branch(item_input_stuff: "Stuff", branch_output_item_code: str) -> PipeOutput:
+            branch_memory = working_memory.make_deep_copy()
+            branch_memory.set_new_main_stuff(stuff=item_input_stuff, name=input_item_stuff_name)
+
+            # We create a deep copy of the run params to avoid modifying the original run params,
+            # and we set the final stuff code to use the one provided for the branch pipe.
+            # Note: we set output_multiplicity to None to allow inner pipes to use their own
+            # multiplicity settings (e.g., a PipeLLM with output="Item[]" should still produce ListContent).
+            # PipeBatch aggregates the final outputs of each branch run into a list.
+            branch_pipe_run_params = pipe_run_params.model_copy(
+                deep=True,
+                update={
+                    "final_stuff_code": branch_output_item_code,
+                    "output_multiplicity": None,
+                },
+            )
+            branch_pipe_run_params.run_mode = pipe_run_params.run_mode
+            return await get_pipe_router().run(
+                pipe_job=PipeJobFactory.make_pipe_job(
+                    pipe=sub_pipe,
+                    job_metadata=job_metadata,
+                    working_memory=branch_memory,
+                    pipe_run_params=branch_pipe_run_params,
+                    output_name=None,
+                    library_crate=library_crate,
+                ),
+            )
+
+        # Build one factory per branch. Each factory defers its working-memory deep copy until it
+        # actually runs, so gather_bounded materializes at most `max_concurrency` of them at once.
+        branch_factories: list[Callable[[], Awaitable[PipeOutput]]] = []
         for branch_index, item in enumerate(input_content.items):
             branch_output_item_code = f"{batch_output_stuff_code}-branch-{branch_index}"
             branch_input_item_code = f"{input_stuff.stuff_code}-branch-{branch_index}"
@@ -143,35 +202,9 @@ class PipeBatch(PipeController):
                         batch_controller_node_id=batch_controller_node_id,
                     )
 
-            branch_memory = working_memory.make_deep_copy()
-            branch_memory.set_new_main_stuff(stuff=item_input_stuff, name=input_item_stuff_name)
+            branch_factories.append(functools.partial(_run_branch, item_input_stuff, branch_output_item_code))
 
-            # We create a deep copy of the run params to avoid modifying the original run params,
-            # and we set the final stuff code to use the one provided for the branch pipe.
-            # Note: we set output_multiplicity to None to allow inner pipes to use their own
-            # multiplicity settings (e.g., a PipeLLM with output="Item[]" should still produce ListContent).
-            # PipeBatch aggregates the final outputs of each branch run into a list.
-            branch_pipe_run_params = pipe_run_params.model_copy(
-                deep=True,
-                update={
-                    "final_stuff_code": branch_output_item_code,
-                    "output_multiplicity": None,
-                },
-            )
-            branch_pipe_run_params.run_mode = pipe_run_params.run_mode
-            task = get_pipe_router().run(
-                pipe_job=PipeJobFactory.make_pipe_job(
-                    pipe=sub_pipe,
-                    job_metadata=job_metadata,
-                    working_memory=branch_memory,
-                    pipe_run_params=branch_pipe_run_params,
-                    output_name=None,
-                    library_crate=library_crate,
-                ),
-            )
-            tasks.append(task)
-
-        pipe_outputs = await asyncio.gather(*tasks)
+        pipe_outputs = await gather_bounded(branch_factories, max_concurrency=max_concurrency)
 
         output_items: list[StuffContent] = []
         branch_output_stuff_codes: list[str] = []

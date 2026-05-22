@@ -4,10 +4,10 @@ from botocore.exceptions import ClientError
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
-from pipelex.cogt.inference.error_classification import (
-    is_quota_exhaustion_aws,
-)
+from pipelex.cogt.exceptions import CogtError, LLMCapabilityError, SdkTypeError
+from pipelex.cogt.inference.error_classification import extract_bedrock_metadata
+from pipelex.cogt.inference.error_classify import classify_inference_error
+from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
@@ -16,7 +16,6 @@ from pipelex.plugins.bedrock.bedrock_client_protocol import BedrockClientProtoco
 from pipelex.plugins.bedrock.bedrock_factory import BedrockFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
-from pipelex.urls import URLs
 
 
 class BedrockWorkerConfigurationError(CogtError):
@@ -76,47 +75,15 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
                 max_tokens=job_params.max_tokens or self.default_max_tokens,
             )
         except ClientError as exc:
-            error_code = exc.response.get("Error", {}).get("Code", "")
-            error_msg = exc.response.get("Error", {}).get("Message", str(exc))
-
-            if error_code == "ServiceQuotaExceededException":
-                msg = f"AWS service quota exceeded for model '{self.inference_model.desc}': {error_msg}"
-                raise LLMCompletionError(
-                    msg,
-                    error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=f"Your AWS account has exceeded its service quota — check billing at {URLs.aws_billing}",
-                ) from exc
-
-            if error_code == "ThrottlingException":
-                if is_quota_exhaustion_aws(error_msg):
-                    msg = f"AWS quota exhausted for model '{self.inference_model.desc}': {error_msg}"
-                    raise LLMCompletionError(
-                        msg,
-                        error_category=InferenceErrorCategory.CAPACITY,
-                        user_action=f"Your AWS account has exceeded its quota — check billing at {URLs.aws_billing}",
-                    ) from exc
-                msg = f"AWS rate limit exceeded for model '{self.inference_model.desc}': {error_msg}"
-                raise LLMCompletionError(
-                    msg,
-                    error_category=InferenceErrorCategory.TRANSIENT,
-                    user_action="Rate limited by AWS — the system will retry automatically",
-                ) from exc
-
-            if error_code == "AccessDeniedException":
-                msg = f"AWS access denied for model '{self.inference_model.desc}': {error_msg}"
-                raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from exc
-
-            if error_code == "ValidationException":
-                msg = f"AWS validation error for model '{self.inference_model.desc}': {error_msg}"
-                raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
-
-            if error_code in {"ModelNotReadyException", "ServiceUnavailableException"}:
-                msg = f"AWS service unavailable for model '{self.inference_model.desc}': {error_msg}"
-                raise LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
-
-            # Fallback for unknown AWS errors
-            msg = f"AWS error for model '{self.inference_model.desc}' ({error_code}): {error_msg}"
-            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
+            metadata = extract_bedrock_metadata(exc)
+            classification = classify_inference_error(metadata)
+            raise render_inference_error(
+                metadata=metadata,
+                classification=classification,
+                family=InferenceErrorFamily.LLM,
+                model_desc=self.inference_model.desc,
+                model_handle=self.inference_model.name,
+            ) from exc
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and nb_tokens_by_category:
             llm_tokens_usage.nb_tokens_by_category = nb_tokens_by_category

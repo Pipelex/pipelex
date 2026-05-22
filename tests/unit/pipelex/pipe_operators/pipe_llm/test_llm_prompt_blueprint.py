@@ -132,9 +132,9 @@ Use $user.name and $user.email and $user.address.city
         assert "public_var" in required_vars
         assert "_internal_var" not in required_vars
 
-    def test_required_variables_excludes_special_variables(self):
-        """Test that special variables preliminary_text and place_holder are excluded."""
-        prompt_template = "$data and $preliminary_text and $place_holder"
+    def test_required_variables_excludes_place_holder(self):
+        """Test that the special variable place_holder is excluded."""
+        prompt_template = "$data and $place_holder"
 
         blueprint = LLMPromptBlueprint(
             prompt_blueprint=TemplateBlueprint(
@@ -146,5 +146,4 @@ Use $user.name and $user.email and $user.address.city
         required_vars = blueprint.required_variables()
 
         assert "data" in required_vars
-        assert "preliminary_text" not in required_vars
         assert "place_holder" not in required_vars

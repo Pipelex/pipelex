@@ -35,6 +35,8 @@ def list_bedrock_models(
             msg,
         )
 
+    from botocore.exceptions import BotoCoreError, ClientError  # noqa: PLC0415 - optional dependency, lazy import
+
     from pipelex.plugins.bedrock.bedrock_llms import bedrock_list_available_models  # noqa: PLC0415
 
     plugin = Plugin(sdk=sdk, backend=backend_name)
@@ -69,7 +71,7 @@ def list_bedrock_models(
                 aws_region=aws_region,
             )
 
-    except Exception as exc:
+    except (AwsCredentialsError, BotoCoreError, ClientError) as exc:
         msg = f"Error listing Bedrock models: {exc}"
         raise PipelexCLIError(msg) from exc
 

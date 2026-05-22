@@ -6,13 +6,16 @@ from pytest import FixtureRequest, Parser
 from temporalio.client import Client as TemporalClient
 from temporalio.testing import WorkflowEnvironment
 
+from pipelex import log
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode, runtime_manager
+from pipelex.temporal.config_temporal import BUILTIN_SEARCH_ATTRIBUTES
 from pipelex.temporal.tasks import Tasks
 from pipelex.temporal.temporal_connect import connect_to_temporal_selected_server
 from pipelex.temporal.temporal_data_converter import data_converter
 from pipelex.temporal.temporal_hub import temporal_hub
 from pipelex.temporal.temporal_task_manager import TemporalTaskManager
+from pipelex.temporal.tprl.namespace_check import RegistrationFailure, ensure_required_search_attributes_registered
 from pipelex.test_extras.shared_pytest_plugins import ClassRegistryMode
 
 TEMPORAL_SERVER_NONE = "none"
@@ -65,17 +68,20 @@ def boot_temporal(reset_pipelex_config_fixture: None) -> Generator[None, None, N
     # This mirrors what a full Temporal-enabled Pipelex.make() would set up.
     from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory  # noqa: PLC0415
     from pipelex.hub import get_pipelex_hub, get_storage_provider  # noqa: PLC0415
-    from pipelex.temporal.tprl_content_generation.content_generator_child_factory import ContentGeneratorChildFactory  # noqa: PLC0415
+    from pipelex.temporal.tprl_content_generation.content_generator_in_workflow_factory import (  # noqa: PLC0415
+        ContentGeneratorInWorkflowFactory,
+    )
     from pipelex.temporal.tprl_pipe.temporal_pipe_router import make_temporal_pipe_router  # noqa: PLC0415
 
     pipelex_hub = get_pipelex_hub()
     pipelex_hub.set_pipe_router(make_temporal_pipe_router())
 
     generated_content_factory = GeneratedContentFactory(storage_provider=get_storage_provider())
-    content_generator_child = ContentGeneratorChildFactory.make_content_generator_child(
-        generated_content_factory=generated_content_factory,
+    pipelex_hub.set_content_generator(
+        ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow(
+            generated_content_factory=generated_content_factory,
+        )
     )
-    pipelex_hub.set_content_generator(content_generator_child)
 
     yield
     manager.teardown()
@@ -130,6 +136,32 @@ async def env(request: FixtureRequest) -> AsyncGenerator[WorkflowEnvironment, No
         if needs_teardown:
             Pipelex.teardown_if_needed()
         workflow_env = WorkflowEnvironment.from_client(temporal_client)
+    # Every Temporal namespace — in-process, time-skipping, or real-server profile —
+    # starts with no custom search attributes registered, so the cluster's
+    # StartWorkflowExecution RPC rejects every workflow that sets one. Register
+    # them here so all temporal tests can start workflows without per-test
+    # bootstrap. Idempotent: only adds attributes that are missing.
+    # ``RegistrationFailure`` is returned (not raised) when the API key lacks
+    # ``AddSearchAttributes`` permission (Temporal Cloud read-only key); surface
+    # it as a warning so the operator runs ``pipelex setup-temporal-namespace``
+    # with an admin key before rerunning the tests. For in-process and
+    # time-skipping servers the caller is always admin, so this branch is
+    # unreachable there — but handling it uniformly keeps the call site honest
+    # against the function's full return type.
+    registration_result = await ensure_required_search_attributes_registered(
+        temporal_client=workflow_env.client,
+        namespace=workflow_env.client.namespace,
+        configured_attributes=BUILTIN_SEARCH_ATTRIBUTES,
+    )
+    if isinstance(registration_result, RegistrationFailure):
+        msg = (
+            f"Could not auto-register Temporal search attributes on namespace "
+            f"'{registration_result.namespace}' (missing: {list(registration_result.missing)}). "
+            f"Workflow starts will fail at dispatch. Run `pipelex setup-temporal-namespace` "
+            f"with an admin API key, then rerun the tests. RPC error: "
+            f"{registration_result.rpc_error_message}"
+        )
+        log.warning(msg)
     yield workflow_env
     await workflow_env.shutdown()
 

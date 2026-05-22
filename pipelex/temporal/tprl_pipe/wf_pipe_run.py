@@ -8,7 +8,9 @@ from typing_extensions import override
 with workflow.unsafe.imports_passed_through():
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryStatus
+    from pipelex.temporal.exceptions import WorkflowExecutionError
     from pipelex.temporal.log_temporal import workflow_log
+    from pipelex.temporal.tprl.observability import build_search_attributes, build_static_summary
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
     from pipelex.temporal.tprl_pipe.act_assemble_graph import AssembleGraphArg, act_assemble_graph
     from pipelex.temporal.tprl_pipe.act_deliver import DeliveryActivityArg, act_deliver
@@ -37,18 +39,41 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
         workflow_log.debug(f"Starting child WfPipeRouter for pipe '{pipe_job.pipe.code}'")
         status: DeliveryStatus = DeliveryStatus.COMPLETED
         pipe_output: PipeOutput | None = None
-        execution_error: ChildWorkflowError | None = None
+        execution_error: WorkflowExecutionError | None = None
 
+        # The wf_pipe_router child runs the same pipe as wf_pipe_run, so its
+        # search attributes and static summary are identical — re-derive them
+        # from the same pipe_job. Dispatched via ``workflow.execute_child_workflow``
+        # directly so the recorded ``StartChildWorkflowExecution`` command is a
+        # pure function of the workflow input: no config-derived
+        # execution_timeout / retry_policy / task_queue smuggled in via the
+        # ``WorkflowExecutorFactory``, which would change across deploys and
+        # break determinism on replay after a config edit.
         try:
             pipe_output = await workflow.execute_child_workflow(
                 WfPipeRouter.run,
                 arg=pipe_job,
-                id=f"{workflow.info().workflow_id}-pipe-router",
+                id=f"{workflow.info().workflow_id}/pipe-router",
+                search_attributes=build_search_attributes(pipe_job),
+                static_summary=build_static_summary(pipe_job.pipe),
             )
             workflow_log.debug("WfPipeRouter completed successfully")
         except ChildWorkflowError as exc:
             status = DeliveryStatus.FAILED
-            execution_error = exc
+            # Wrap the raw ``ChildWorkflowError`` as ``WorkflowExecutionError`` so
+            # the rest of this function and the outer ``execute_workflow`` caller
+            # continue to see the same Pipelex error type as before — the
+            # in-workflow ``WorkflowExecutor.execute_child_workflow`` wrapper used
+            # to do this wrap before; the integration test
+            # ``test_wf_pipe_run_failure_path`` pins the workflow_failure_exception_types
+            # contract on ``WorkflowExecutionError``.
+            #
+            # Manual ``__cause__`` wire (not ``raise X from exc``): we hold the
+            # wrapped error for a deferred re-raise in the post-delivery block
+            # below so ``act_deliver`` still fires on the failure path. Raising
+            # here would short-circuit delivery.
+            execution_error = WorkflowExecutionError("WfPipeRouter failed")
+            execution_error.__cause__ = exc
             workflow_log.error(f"WfPipeRouter failed: {exc}")
 
         # Step 2: Assemble full graph from trace events (cross-worker)

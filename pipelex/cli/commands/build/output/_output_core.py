@@ -80,6 +80,7 @@ async def _generate_output_core(
     try:
         the_pipe = get_required_pipe(pipe_code=pipe_code)
     except Exception as exc:
+        # CLI command boundary: any failure resolving the pipe is reported to the user and exits via typer.Exit.
         typer.secho(f"Error: Could not find pipe '{pipe_code}': {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
 
@@ -89,6 +90,7 @@ async def _generate_output_core(
         typer.secho(str(exc), fg=typer.colors.YELLOW)
         raise typer.Exit(0) from exc
     except Exception as exc:
+        # CLI command boundary: any failure generating the output is reported to the user and exits via typer.Exit.
         typer.secho(f"Error generating output: {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
 
@@ -118,6 +120,7 @@ async def _generate_output_core(
         save_text_to_path(text=output_str, path=str(final_output_path))
         typer.secho(f"Generated output file: {final_output_path}", fg=typer.colors.GREEN)
     except Exception as exc:
+        # CLI command boundary: any failure writing the file is reported to the user and exits via typer.Exit.
         typer.secho(f"Error saving file: {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
 

@@ -23,6 +23,7 @@ from pipelex.builder.pipe.pipe_search_spec import PipeSearchSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
+from pipelex.builder.pipe.pipe_structure_spec import PipeStructureSpec
 
 # Aliases that agents may use instead of "pipe_code". First found is promoted when canonical key is absent; extras are dropped.
 _PIPE_CODE_ALIASES = ("pipe", "the_pipe_code", "code", "name", "pipe_name", "pipe_ref")
@@ -174,6 +175,12 @@ def add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: Table) -> None:
             pipe_table.add("system_prompt", pipe_spec.system_prompt)
         if pipe_spec.prompt:
             pipe_table.add("prompt", pipe_spec.prompt)
+        if pipe_spec.structuring_method is not None:
+            pipe_table.add("structuring_method", pipe_spec.structuring_method)
+
+    elif isinstance(pipe_spec, PipeStructureSpec):
+        if pipe_spec.model:
+            pipe_table.add("model", pipe_spec.model)
 
     elif isinstance(pipe_spec, PipeComposeSpec):
         if pipe_spec.construct_spec is not None:

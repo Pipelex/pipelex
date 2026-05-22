@@ -366,15 +366,10 @@ class ReportingManager(ReportingProtocol):
             log.warning(f"ReportingManager does not support reporting for inference job type: {type(inference_job).__name__}")
 
     @override
-    def generate_report(self, pipeline_run_id: str | None = None):
-        cost_report_file_path: Path | None = None
-        if self._reporting_config.is_generate_cost_report_file_enabled:
+    def generate_report(self, pipeline_run_id: str | None = None, print_to_console: bool = True):
+        is_csv_enabled = self._reporting_config.is_generate_cost_report_file_enabled
+        if is_csv_enabled:
             ensure_path(self._reporting_config.cost_report_dir_path)
-            cost_report_file_path = get_incremental_file_path(
-                base_path=self._reporting_config.cost_report_dir_path,
-                base_name=self._reporting_config.cost_report_base_name,
-                extension=self._reporting_config.cost_report_extension,
-            )
 
         registries_to_process: dict[str, UsageRegistry] = {}
         if pipeline_run_id:
@@ -383,11 +378,19 @@ class ReportingManager(ReportingProtocol):
             registries_to_process = self._usage_registries
 
         for run_id, registry in registries_to_process.items():
+            cost_report_file_path: Path | None = None
+            if is_csv_enabled:
+                cost_report_file_path = get_incremental_file_path(
+                    base_path=self._reporting_config.cost_report_dir_path,
+                    base_name=self._reporting_config.cost_report_base_name,
+                    extension=self._reporting_config.cost_report_extension,
+                )
             CostRegistry.generate_report(
                 pipeline_run_id=run_id,
                 tokens_usages=registry.get_current_tokens_usage(),
                 unit_scale=self._reporting_config.cost_report_unit_scale,
                 cost_report_file_path=cost_report_file_path,
+                print_to_console=print_to_console,
             )
 
     @override

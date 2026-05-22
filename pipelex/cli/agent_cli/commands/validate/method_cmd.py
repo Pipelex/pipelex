@@ -9,7 +9,14 @@ from typing import Annotated, Any
 import typer
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
-from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success, extract_validation_errors
+from pipelex.cli.agent_cli.commands.agent_output import (
+    CliOutputFormat,
+    agent_error,
+    agent_success_formatted,
+    extract_validation_errors,
+    set_agent_cli_error_format,
+)
+from pipelex.cli.agent_cli.commands.validate._output_helpers import format_validate_markdown
 from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_bundle_core,
     validate_pipe_in_bundle_core,
@@ -42,17 +49,28 @@ def validate_method_cmd(
             help="Accept PipeSignature placeholders in the dependency graph (lenient mode).",
         ),
     ] = False,
+    output_format: Annotated[
+        CliOutputFormat,
+        typer.Option("--format", help="Success output format: markdown (default) or json (structured)"),
+    ] = CliOutputFormat.MARKDOWN,
+    error_format: Annotated[
+        CliOutputFormat | None,
+        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+    ] = None,
 ) -> None:
-    """Validate an installed method and output JSON results.
+    """Validate an installed method and output the results.
 
     Resolves the method by name, finds its .mthds bundle, and validates it.
     If --pipe is provided, validates only that specific pipe within the bundle.
+    Default output is markdown; use --format json for structured JSON.
 
     Examples:
         pipelex-agent validate method my-method
         pipelex-agent validate method my-method --pipe custom_pipe
         pipelex-agent validate method my-method --allow-signatures
     """
+    set_agent_cli_error_format(error_format or output_format)
+
     pipe_code, method_library_dirs, method = resolve_method_target(
         method_name=name,
         pipe_override=pipe,
@@ -82,7 +100,7 @@ def validate_method_cmd(
             # Validate the entire bundle
             result = asyncio.run(validate_bundle_core(bundle_path=bundle_path, library_dirs=library_dirs_paths, allow_signatures=allow_signatures))
 
-        agent_success(result)
+        agent_success_formatted(result, format_validate_markdown, output_format)
 
     except FileNotFoundError as exc:
         agent_error(f"Bundle file not found: {bundle_path}", "FileNotFoundError", cause=exc)
@@ -115,7 +133,8 @@ def validate_method_cmd(
             availability_extra["pipe_stack"] = exc.pipe_stack
         agent_error(exc.message, "PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
 
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
         agent_error(str(exc), type(exc).__name__, cause=exc)
 
     finally:

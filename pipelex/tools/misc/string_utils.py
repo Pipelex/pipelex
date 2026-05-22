@@ -55,7 +55,8 @@ def can_inject_text(value: Any | None) -> bool:
         return False
     try:
         return has_text(f"{value}")
-    except Exception:
+    except Exception:  # noqa: BLE001
+        # f-string formatting invokes arbitrary __str__/__format__ on type-uncertain input; this helper is contractually safe for such input.
         return False
 
 

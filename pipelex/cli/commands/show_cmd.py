@@ -6,11 +6,14 @@ from typing import TYPE_CHECKING, Annotated, cast
 
 import typer
 from posthog import tag
+from pydantic import ValidationError
 from rich import box
+from rich.errors import MarkupError
+from rich.markup import escape
 from rich.table import Table
 
 from pipelex import pretty_print
-from pipelex.base_exceptions import PipelexConfigError
+from pipelex.base_exceptions import PipelexConfigError, PipelexError
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import ErrorContext
 from pipelex.cli.exceptions import PipelexCLIError
@@ -32,6 +35,7 @@ from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.tools.misc.package_utils import get_package_version
+from pipelex.tools.misc.toml_utils import TomlError
 
 if TYPE_CHECKING:
     from pipelex.cogt.models.model_manager import ModelManager
@@ -47,7 +51,7 @@ def do_show_config() -> None:
     try:
         final_config = config_manager.load_config()
         pretty_print(final_config, title="Pipelex configuration")
-    except Exception as exc:
+    except (OSError, TomlError) as exc:
         msg = f"Error loading configuration: {exc}"
         raise PipelexConfigError(msg) from exc
 
@@ -85,7 +89,7 @@ def do_show_backends(show_all: bool = False) -> None:
             backend_library = models_manager.inference_backend_library
 
         routing_profile = models_manager.routing_profile
-    except Exception as exc:
+    except (PipelexError, OSError, ValidationError) as exc:
         msg = f"Error accessing backend or routing configuration: {exc}"
         raise PipelexCLIError(msg) from exc
 
@@ -157,8 +161,10 @@ def do_show_backends(show_all: bool = False) -> None:
         else:
             console.print("[dim]No specific routing rules defined.[/dim]")
 
-    except Exception as exc:
-        console.print(f"[yellow]Warning: Could not load routing profile information: {exc}[/yellow]")
+    except MarkupError as exc:
+        # Escape the MarkupError text: its message quotes the offending `[`/`]`, which would
+        # otherwise be re-parsed as Rich markup and raise a second, uncaught MarkupError.
+        console.print(f"[yellow]Warning: Could not display routing profile information: {escape(str(exc))}[/yellow]")
 
     console.print("\n")
 

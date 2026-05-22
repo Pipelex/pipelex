@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from temporalio.client import Client as TemporalClient
     from temporalio.worker import Worker
 
-    from pipelex.temporal.config_temporal import WorkerScope
+    from pipelex.temporal.config_temporal import WorkerRuntimeProfile, WorkerScope
     from pipelex.temporal.temporal_tasks import TaskPack
     from pipelex.temporal.temporal_types import ActivityList, ActivityType, WorkflowList, WorkflowType
 
@@ -25,6 +25,7 @@ class TaskManager(Protocol):
         task_queue: str,
         is_not_sandboxed: bool = False,
         scope: WorkerScope | None = None,
+        runtime_profile: WorkerRuntimeProfile | None = None,
         substitute_activities: dict[ActivityType, ActivityType] | None = None,
         test_workflows: WorkflowList | None = None,
         test_activities: ActivityList | None = None,
@@ -36,6 +37,7 @@ class TaskManager(Protocol):
         is_unit_testing: bool,
         task_queue: str | None = None,
         scope_name: str | None = None,
+        profile_name: str | None = None,
     ): ...
 
     def task_packs(self) -> list[str]: ...

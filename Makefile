@@ -66,6 +66,7 @@ make plxt-format              - Format MTHDS/TOML/PLX files with plxt
 make plxt-lint                - Lint MTHDS/TOML/PLX files with plxt
 
 make rules                    - Install agent rules for contributing to Pipelex
+make rules-claude-standalone  - Install a standalone CLAUDE.md (full ruleset, for contributors without the Pipelex workspace)
 make up-kit-configs           - Update kit configs from .pipelex/
 make ukc                      - Shorthand -> up-kit-configs
 make check-config-sync        - Verify .pipelex and pipelex/kit/configs are in sync
@@ -86,7 +87,7 @@ make rtm                      - Shorthand -> regenerate-test-models
 make insert-skeleton          - Insert skeleton from $(SKELETON_DIR)
 
 make up                       - Shorthand -> generate-mthds-schema update-gateway-models up-kit-configs rules
-make cleanenv                 - Remove virtual env and lock files
+make cleanenv                 - Remove virtual env
 make cleanderived             - Remove extraneous compiled files, caches, logs, etc.
 make cleanall                 - Remove all -> cleanenv + cleanderived
 
@@ -175,7 +176,7 @@ export HELP
 .PHONY: \
 	all help env env-verbose check-uv check-uv-verbose lock install update build \
 	format lint ruff-format ruff-lint pyright mypy pylint plxt plxt-format plxt-lint \
-    rules up-kit-configs ukc check-config-sync ccs check-rules check-urls cu insert-skeleton \
+    rules rules-claude-standalone up-kit-configs ukc check-config-sync ccs check-rules check-urls cu insert-skeleton \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
 	test-llm tl test-img-gen tg test-extract te test-temporal ttm codex-tests gha-tests \
@@ -277,6 +278,10 @@ rules: env
 	$(call PRINT_TITLE,"Installing agent rules for contributing to Pipelex")
 	$(VENV_PIPELEX_DEV) kit rules --set all
 
+rules-claude-standalone: env
+	$(call PRINT_TITLE,"Installing standalone CLAUDE.md with the full ruleset for contributors without the Pipelex workspace")
+	$(VENV_PIPELEX_DEV) kit rules --set standalone --targets claude
+
 check-rules: env
 	$(call PRINT_TITLE,"Checking installed agent rules against templates")
 	$(VENV_PIPELEX_DEV) check-rules --quiet
@@ -289,20 +294,12 @@ cu: env
 	$(call PRINT_TITLE,"Checking URLs in pipelex/urls.py for broken links with detailed output")
 	$(VENV_PIPELEX_DEV) check-urls
 
-up-kit-configs:
+# Kit configs are mirrored from .pipelex/ by the pipelex-dev CLI, which derives its
+# exclude list from the single source of truth in pipelex/kit/paths.py — the same sets
+# `make check-config-sync` enforces, so a sync is always followed by a passing check.
+up-kit-configs: env
 	$(call PRINT_TITLE,"Updating kit configs from .pipelex/")
-	@rsync -av --delete \
-		--exclude='.DS_Store' \
-		--exclude='pipelex_service.toml' \
-		--exclude='pipelex_override.toml' \
-		--exclude='telemetry_override.toml' \
-		--exclude='storage' \
-		--exclude='temporal-payload-store' \
-		--exclude='traces' \
-		--exclude='x_custom_llm_deck.toml' \
-		--exclude='x_custom_extract_deck.toml' \
-		--exclude='mthds_schema.json' \
-		.pipelex/ pipelex/kit/configs/
+	$(VENV_PIPELEX_DEV) sync-kit-configs
 
 ukc: up-kit-configs
 	@echo "> done: ukc = up-kit-configs"
@@ -411,9 +408,8 @@ cleanderived:
 
 cleanenv:
 	$(call PRINT_TITLE,"Erasing virtual environment")
-	find . -name 'uv.lock' -delete && \
 	rm -rf "$(VIRTUAL_ENV)" && \
-	echo "Cleaned up virtual env and dependency lock files";
+	echo "Cleaned up virtual env";
 
 cleanconfig:
 	$(call PRINT_TITLE,"Erasing config files and directories")

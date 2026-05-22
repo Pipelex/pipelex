@@ -335,6 +335,9 @@ async def pipeline_run_setup(
 
         return pipe_job, pipeline_run_id, library_id
     except Exception:
+        # Error-path-only cleanup: on any failure during setup, tear down the graph tracer, event-log state
+        # and library that were partially created, then re-raise. Re-raises — never swallows. Cannot be a
+        # `finally`: on success these resources are returned alive for the pipeline run to use.
         # Cleanup graph tracer if it was opened
         if graph_context is not None:
             tracer_manager = GraphTracerManager.get_instance()

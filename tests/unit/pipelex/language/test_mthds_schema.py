@@ -89,28 +89,13 @@ class TestMthdsSchemaGeneration:
         assert "construct_blueprint" not in props, "Internal name 'construct_blueprint' should not appear in schema"
 
     def test_all_pipe_types_present(self, schema: dict[str, Any]) -> None:
-        """Verify every PipeType value is represented in the schema definitions."""
+        """Verify every PipeType has a corresponding blueprint definition in the schema."""
         definitions = schema.get("definitions", {})
 
-        expected_blueprint_names = {
-            "PipeFuncBlueprint",
-            "PipeImgGenBlueprint",
-            "PipeComposeBlueprint",
-            "PipeLLMBlueprint",
-            "PipeExtractBlueprint",
-            "PipeSearchBlueprint",
-            "PipeBatchBlueprint",
-            "PipeConditionBlueprint",
-            "PipeParallelBlueprint",
-            "PipeSequenceBlueprint",
-            "PipeSignatureBlueprint",
-        }
+        expected_blueprint_names = {f"{pipe_type}Blueprint" for pipe_type in PipeType.value_list()}
 
         for blueprint_name in expected_blueprint_names:
             assert blueprint_name in definitions, f"{blueprint_name} should be present in schema definitions"
-
-        # Sanity: blueprint definitions should cover every PipeType value, one blueprint per value.
-        assert len(PipeType.value_list()) == len(expected_blueprint_names), "Expected one blueprint per PipeType value"
 
     def test_construct_schema_matches_mthds_format(self, schema: dict[str, Any]) -> None:
         """Verify ConstructBlueprint uses additionalProperties, not 'fields' wrapper."""

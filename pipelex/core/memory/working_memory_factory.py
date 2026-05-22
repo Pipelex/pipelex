@@ -1,6 +1,7 @@
 import shortuuid
 from mthds.models.pipeline_inputs import PipelineInputs
-from pydantic import BaseModel
+from polyfactory.exceptions import FactoryException
+from pydantic import BaseModel, ValidationError
 
 from pipelex import log
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
@@ -186,7 +187,9 @@ class WorkingMemoryFactory(BaseModel):
             try:
                 mock_stuff = cls.make_mock_stuff(typed_named_stuff_spec)
                 working_memory.add_new_stuff(name=typed_named_stuff_spec.variable_name, stuff=mock_stuff)
-            except Exception as exc:
+            except (FactoryException, ValidationError) as exc:
+                # Mock build (polyfactory) or content validation (pydantic) failed for this dynamic
+                # class — fall back to text content. Unexpected errors propagate.
                 log.warning(
                     f"Failed to create mock for '{typed_named_stuff_spec.variable_name}' ({typed_named_stuff_spec.concept.code}): "
                     f"{exc}. Using fallback text content."

@@ -8,7 +8,14 @@ import typer
 
 from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
-from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success, extract_validation_errors
+from pipelex.cli.agent_cli.commands.agent_output import (
+    CliOutputFormat,
+    agent_error,
+    agent_success_formatted,
+    extract_validation_errors,
+    set_agent_cli_error_format,
+)
+from pipelex.cli.agent_cli.commands.validate._output_helpers import format_validate_markdown
 from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_bundle_core,
     validate_pipe_in_bundle_core,
@@ -41,7 +48,7 @@ def validate_bundle_cmd(
     ] = False,
     graph_format: Annotated[
         GraphFormat,
-        typer.Option("--format", "-f", help="Graph format to generate: mermaidflow, reactflow, or both"),
+        typer.Option("--graph-format", "-f", help="Graph format to generate: mermaidflow, reactflow, or both"),
     ] = GraphFormat.REACTFLOW,
     direction: Annotated[
         FlowchartDirection | None,
@@ -62,10 +69,19 @@ def validate_bundle_cmd(
             help="Accept PipeSignature placeholders in the dependency graph (lenient mode).",
         ),
     ] = False,
+    output_format: Annotated[
+        CliOutputFormat,
+        typer.Option("--format", help="Success output format: markdown (default) or json (structured)"),
+    ] = CliOutputFormat.MARKDOWN,
+    error_format: Annotated[
+        CliOutputFormat | None,
+        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+    ] = None,
 ) -> None:
-    """Validate a bundle file (.mthds) or pipeline directory and output JSON results.
+    """Validate a bundle file (.mthds) or pipeline directory and output the results.
 
-    Outputs JSON to stdout on success, JSON to stderr on error with exit code 1.
+    Default output is markdown; use --format json for structured JSON.
+    Results go to stdout on success, errors to stderr with exit code 1.
 
     Examples:
         pipelex-agent validate bundle my_bundle.mthds
@@ -75,6 +91,8 @@ def validate_bundle_cmd(
         pipelex-agent validate bundle pipeline_01/ --graph
         pipelex-agent validate bundle draft_pipeline.mthds --allow-signatures
     """
+    set_agent_cli_error_format(error_format or output_format)
+
     bundle_path: str | None = None
     target_path = Path(path)
 
@@ -158,7 +176,8 @@ def validate_bundle_cmd(
                 agent_error(f"Graph generation failed: {exc}", type(exc).__name__, cause=exc)
             except typer.Exit:
                 raise
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
+                # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
                 agent_error(f"Graph generation failed: {exc}", type(exc).__name__, cause=exc)
 
         # Generate view (GraphSpec JSON) if requested and validation succeeded
@@ -185,10 +204,11 @@ def validate_bundle_cmd(
                 agent_error(f"View generation failed: {exc}", type(exc).__name__, cause=exc)
             except typer.Exit:
                 raise
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
+                # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
                 agent_error(f"View generation failed: {exc}", type(exc).__name__, cause=exc)
 
-        agent_success(result)
+        agent_success_formatted(result, format_validate_markdown, output_format)
 
     except PipeNotFoundError as exc:
         agent_error(str(exc), "PipeNotFoundError", cause=exc)
@@ -227,7 +247,8 @@ def validate_bundle_cmd(
     except typer.Exit:
         raise
 
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
         agent_error(str(exc), type(exc).__name__, cause=exc)
 
     finally:

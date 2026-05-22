@@ -58,6 +58,9 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **gemini-3.1-pro**
   - inputs: text, images, pdf
   - outputs: text, structured
+- **gemini-3.5-flash**
+  - inputs: text, images, pdf
+  - outputs: text, structured
 - **gemini-flash-latest**
   - inputs: text, images, pdf
   - outputs: text, structured
@@ -223,6 +226,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-04-28T12:50:14Z
+> Last updated: 2026-05-20T11:45:37Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.

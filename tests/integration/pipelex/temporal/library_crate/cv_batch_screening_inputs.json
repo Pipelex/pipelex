@@ -1,0 +1,16 @@
+{
+  "cvs": {
+    "concept": "native.Document",
+    "content": [
+      {
+        "url": "../../../../data/documents/John-Doe-CV.pdf"
+      }
+    ]
+  },
+  "job_offer_pdf": {
+    "concept": "native.Document",
+    "content": {
+      "url": "../../../../data/documents/Job-Offer.pdf"
+    }
+  }
+}

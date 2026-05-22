@@ -34,7 +34,7 @@ class TestDataConverterForCrafting:
         assert restored
         assert llm_assignment == restored
 
-    def test_data_converter_for_make_object_direct(
+    def test_data_converter_for_make_object(
         self,
         payload_converter: BaseModelPayloadConverter,
     ):
