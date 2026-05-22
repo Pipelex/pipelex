@@ -140,6 +140,8 @@ class TestErrorReportDisclosureMode:
         assert payload["type_uri"] == report.type_uri
         if report.error_domain is not None:
             assert payload["error_domain"] == report.error_domain
+        if report.error_category is not None:
+            assert payload["error_category"] == report.error_category
 
     def test_strict_passes_through_caller_facing_message(self) -> None:
         """A report flagged ``caller_facing_message`` keeps its ``message`` and ``user_action`` in STRICT."""
