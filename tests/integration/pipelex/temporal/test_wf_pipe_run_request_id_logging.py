@@ -105,9 +105,9 @@ class TestWfPipeRunRequestIdLogging:
         temporal_workflow_logger = logging.getLogger("temporalio.workflow")
         handler = _RecordingHandler()
         original_level = temporal_workflow_logger.level
-        temporal_workflow_logger.addHandler(handler)
-        temporal_workflow_logger.setLevel(logging.DEBUG)
         try:
+            temporal_workflow_logger.addHandler(handler)
+            temporal_workflow_logger.setLevel(logging.DEBUG)
             async with Worker(
                 temporal_client,
                 task_queue=task_queue,
