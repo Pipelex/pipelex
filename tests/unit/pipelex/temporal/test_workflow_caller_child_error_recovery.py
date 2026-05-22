@@ -2,11 +2,12 @@
 
 When a child workflow fails, ``ChildWorkflowError`` exposes the deserialized
 failure via ``.cause``. ``execute_child_workflow`` / ``start_child_workflow``
-recover the structured ``ErrorReport`` packed by the activity bridge and carry
-it on the ``WorkflowExecutionError`` — mirroring the ``execute_workflow`` path —
-so the classification survives the child-workflow hop. A cause carrying no
-report payload, malformed details, or a non-``ApplicationError`` cause all fall
-back to a generic error.
+recover the structured ``ErrorReport`` via the total ``recover_error_report``
+and carry it on the ``WorkflowExecutionError`` — mirroring the
+``execute_workflow`` path — so the classification survives the child-workflow
+hop. A cause carrying a report payload recovers it verbatim; an
+``ApplicationError`` without a report, a non-``ApplicationError`` cause, or a
+missing cause all synthesize an ``UnrecoverableWorkflowFailureError`` report.
 """
 
 from typing import Any
@@ -111,14 +112,19 @@ class TestWorkflowCallerChildErrorRecovery:
         assert "worker failure" in error.message
 
     @pytest.mark.parametrize(
-        ("method_name", "generic_message"),
+        "method_name",
         [
-            pytest.param("execute_child_workflow", "Failed to execute child workflow _StubWorkflow", id="execute"),
-            pytest.param("start_child_workflow", "Failed to start child workflow _StubWorkflow", id="start"),
+            pytest.param("execute_child_workflow", id="execute"),
+            pytest.param("start_child_workflow", id="start"),
         ],
     )
-    async def test_non_application_error_cause_stays_generic(self, mocker: MockerFixture, method_name: str, generic_message: str) -> None:
-        """A child failure whose ``.cause`` is not an ``ApplicationError`` falls back to a generic error."""
+    async def test_non_application_error_cause_synthesizes_unrecoverable(self, mocker: MockerFixture, method_name: str) -> None:
+        """A child failure whose ``.cause`` is not an ``ApplicationError`` still synthesizes the unrecoverable report.
+
+        ``recover_error_report`` is total, so a plain worker exception is recovered just
+        like the ``ApplicationError``-without-report case — keeping the child path
+        consistent with ``execute_workflow`` and the production ``wf_pipe_run`` child path.
+        """
         cause = RuntimeError("worker crashed hard")
         mocker.patch.object(workflow, method_name, new=mocker.AsyncMock(side_effect=_child_workflow_error(cause)))
         executor = WorkflowExecutor[Any, Any](task_queue="test-queue")
@@ -127,5 +133,6 @@ class TestWorkflowCallerChildErrorRecovery:
             await getattr(executor, method_name)(workflow_class=_StubWorkflow, workflow_arg={}, workflow_id="ut-run")
 
         error = exc_info.value
-        assert error.error_report is None
-        assert error.message == generic_message
+        assert error.error_report is not None
+        assert error.error_report.error_type == "UnrecoverableWorkflowFailureError"
+        assert "worker crashed hard" in error.message

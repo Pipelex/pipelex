@@ -88,6 +88,37 @@ class TestPipeRun:
         assert call_kwargs["status"] == "FAILED"
         assert call_kwargs["pipe_output"] is None
 
+    async def test_run_failure_bare_exception_synthesizes_report(self, mocker: MockerFixture) -> None:
+        """A bare (non-Pipelex) exception still delivers a structured error report.
+
+        Direct mode must match Temporal mode, where ``recover_error_report`` is total:
+        the FAILED webhook always carries an ``error`` object so receivers can
+        rehydrate a failed run uniformly, whichever mode produced it.
+        """
+        mock_router = mocker.AsyncMock()
+        mock_router.run = mocker.AsyncMock(side_effect=RuntimeError("router blew up"))
+
+        mock_executor = mocker.patch(
+            "pipelex.pipe_run.pipe_run.DeliveryExecutor",
+        )
+        mock_executor_instance = mock_executor.return_value
+        mock_executor_instance.execute = mocker.AsyncMock()
+
+        mock_job = mocker.MagicMock()
+        mock_job.job_metadata.pipeline_run_id = "plr-bare"
+
+        pipe_run = PipeRun(pipe_router=mock_router)
+        assignment = DeliveryAssignment(storage=StorageTarget())
+
+        with pytest.raises(RuntimeError, match="router blew up"):
+            await pipe_run.run(pipe_job=mock_job, delivery_assignment=assignment)
+
+        mock_executor_instance.execute.assert_called_once()
+        error_report = mock_executor_instance.execute.call_args.kwargs["error_report"]
+        assert error_report is not None
+        assert error_report.error_type == "PipelexUnexpectedError"
+        assert "router blew up" in error_report.message
+
     async def test_run_failure_delivers_before_raising(self, mocker: MockerFixture) -> None:
         """Delivery runs BEFORE the error is re-raised."""
         call_order: list[str] = []

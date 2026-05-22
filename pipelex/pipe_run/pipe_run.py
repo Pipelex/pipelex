@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.base_exceptions import ErrorReport, PipelexError
+from pipelex.base_exceptions import ErrorReport, PipelexError, PipelexUnexpectedError
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus
 from pipelex.pipe_run.delivery_executor import DeliveryExecutor
@@ -44,9 +44,14 @@ class PipeRun(PipeRunProtocol):
             # Observe-and-reraise: records FAILED status so the finally delivery sees it, then re-raises the original error below.
             status = DeliveryStatus.FAILED
             execution_error = exc
-            # Only Pipelex errors carry structured classification; bare exceptions surface no report.
+            # Always build a report for the FAILED webhook: Pipelex errors carry their own
+            # classification; a bare exception is wrapped in PipelexUnexpectedError so the
+            # webhook still receives an `error` object — matching Temporal mode, where
+            # recover_error_report() is total.
             if isinstance(exc, PipelexError):
                 error_report = exc.to_error_report()
+            else:
+                error_report = PipelexUnexpectedError(str(exc) or repr(exc)).to_error_report()
             log.error(f"Pipe execution failed for pipeline_run_id={pipeline_run_id}: {exc}")
         finally:
             tracer_manager = GraphTracerManager.get_instance()

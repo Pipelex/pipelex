@@ -7,7 +7,7 @@ from temporalio import workflow
 from temporalio.client import Callback, WorkflowFailureError, WorkflowHandle
 from temporalio.client import Client as TemporalClient
 from temporalio.common import RetryPolicy, TypedSearchAttributes
-from temporalio.exceptions import ApplicationError, ChildWorkflowError, WorkflowAlreadyStartedError
+from temporalio.exceptions import ChildWorkflowError, WorkflowAlreadyStartedError
 from temporalio.service import RPCError
 from temporalio.workflow import ChildWorkflowHandle
 
@@ -232,12 +232,13 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
             )
         except ChildWorkflowError as exc:
             log.error(f"ChildWorkflowError in {workflow_class.__name__} caused by: {exc.cause}")
-            if isinstance(exc.cause, ApplicationError):
-                # Mirror ``execute_workflow``'s recovery path — see its rationale comment.
-                error_report = recover_error_report(exc.cause)
-                raise WorkflowExecutionError(error_report.message, error_report=error_report) from exc
-            msg = f"Failed to execute child workflow {workflow_class.__name__}"
-            raise WorkflowExecutionError(msg) from exc
+            # Mirror ``execute_workflow``'s recovery path — see its rationale comment.
+            # ``recover_error_report`` is total, so a non-``ApplicationError`` cause (a
+            # plain worker exception) still yields a synthesized report instead of a
+            # generic error. ``ChildWorkflowError`` exposes the underlying failure via
+            # ``exc.cause``; fall back to the error itself when it carries no cause.
+            error_report = recover_error_report(exc.cause if exc.cause is not None else exc)
+            raise WorkflowExecutionError(error_report.message, error_report=error_report) from exc
 
     async def start_child_workflow(
         self,
@@ -279,12 +280,13 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
             )
         except ChildWorkflowError as exc:
             log.error(f"ChildWorkflowError in {workflow_class.__name__} caused by: {exc.cause}")
-            if isinstance(exc.cause, ApplicationError):
-                # Mirror ``execute_workflow``'s recovery path — see its rationale comment.
-                error_report = recover_error_report(exc.cause)
-                raise WorkflowExecutionError(error_report.message, error_report=error_report) from exc
-            msg = f"Failed to start child workflow {workflow_class.__name__}"
-            raise WorkflowExecutionError(msg) from exc
+            # Mirror ``execute_workflow``'s recovery path — see its rationale comment.
+            # ``recover_error_report`` is total, so a non-``ApplicationError`` cause (a
+            # plain worker exception) still yields a synthesized report instead of a
+            # generic error. ``ChildWorkflowError`` exposes the underlying failure via
+            # ``exc.cause``; fall back to the error itself when it carries no cause.
+            error_report = recover_error_report(exc.cause if exc.cause is not None else exc)
+            raise WorkflowExecutionError(error_report.message, error_report=error_report) from exc
 
 
 class WorkflowExecutorFactory(Generic[WorkflowInput, WorkflowOutput]):
