@@ -241,7 +241,7 @@ class ErrorReport(BaseModel):
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ErrorReport":
-        """Rebuild an ``ErrorReport`` from a :meth:`to_dict` payload — the strict inverse of :meth:`to_dict`.
+        """Rebuild an ``ErrorReport`` from a :meth:`to_dict` payload — the strict inverse of :meth:`to_dict` in ``VERBOSE`` mode.
 
         Used to recover a report that crossed a serialization boundary (e.g. a
         Temporal ``ApplicationError.details`` payload) so it re-enters the
@@ -308,8 +308,10 @@ class PipelexError(Exception):
     # verbatim under STRICT disclosure (see :class:`DisclosureMode`). Set it on
     # classes whose ``message`` is genuinely caller-facing copy — text describing
     # the *caller's own* input (a ``.mthds`` syntax error, a failed bundle
-    # validation). Unlike ``_declared_title`` / ``_declared_type_uri``, this flag
-    # inherits normally: a subclass of a caller-facing error stays caller-facing.
+    # validation). It is consulted by plain attribute access, so it inherits
+    # normally — a subclass of a caller-facing error stays caller-facing.
+    # (Contrast ``_declared_title`` / ``_declared_type_uri``, which ``title()`` /
+    # ``type_uri()`` deliberately read via ``cls.__dict__`` to bypass inheritance.)
     _authors_caller_facing_message: ClassVar[bool] = False
 
     @classmethod
