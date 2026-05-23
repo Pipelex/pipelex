@@ -1,46 +1,76 @@
-"""Regression guard for the package-default console targets.
+"""Regression guard for the shipped console targets.
 
-The package-default ``pipelex/pipelex.toml`` is the only config layer that ships in the
-PyPI wheel. Its ``[pipelex.log_config]`` values define what every consumer sees before
-any user/project override. Logs and rich prints MUST default to stderr so the stdout
-channel stays clean for JSON-emitting CLI commands (e.g. ``pipelex-agent models
---format json``) that downstream tooling parses (``mthds-js`` calls
-``JSON.parse(stdout)``).
+Two TOML files ship in the PyPI wheel and define every consumer's defaults
+before any user/project override:
 
-PR #452 introduced the targetable console settings with the stated intent of defaulting
-to stderr but accidentally wired the defaults to stdout. This test pins the corrected
-default and fails fast if anyone flips the values back.
+- ``pipelex/pipelex.toml`` — the package-default that ``Pipelex.make()`` loads first.
+- ``pipelex/kit/configs/pipelex.toml`` — the template ``pipelex init`` copies to
+  ``~/.pipelex/``.
+
+The contract these defaults must satisfy:
+
+- ``console_log_target`` defaults to stderr — logs are diagnostics and must stay
+  off the data channel so JSON-emitting CLI commands (e.g.
+  ``pipelex-agent models --format json``) stay parseable by downstream tooling
+  (``mthds-js`` calls ``JSON.parse(stdout)``).
+- ``console_print_target`` defaults to stdout — the main ``pipelex`` CLI emits
+  human-facing tables (``show backends``, ``show models``, ``which``, ``doctor``)
+  via that channel and ``pipelex show backends > out.txt`` must keep working.
+
+PR #452 introduced the targetable console settings with the stated intent of
+stderr for logs; the print target then got over-corrected to stderr in commit
+ac858de8, which broke the redirect-to-file flow. This test pins both knobs in
+both shipped TOMLs and fails fast if either is flipped in either direction.
 """
 
 from pathlib import Path
 from typing import Any
 
+import pytest
 import tomli
 
 from pipelex.system.console_target import ConsoleTarget
-from pipelex.tools.log.log_config import LogConfig
 
-PIPELEX_PACKAGE_DEFAULT_TOML = Path(__file__).resolve().parents[4] / "pipelex" / "pipelex.toml"
+PIPELEX_REPO_ROOT = Path(__file__).resolve().parents[4]
+PACKAGE_DEFAULT_TOML = PIPELEX_REPO_ROOT / "pipelex" / "pipelex.toml"
+KIT_TEMPLATE_TOML = PIPELEX_REPO_ROOT / "pipelex" / "kit" / "configs" / "pipelex.toml"
 
 
-class TestPackageDefaultLogConfig:
-    def test_package_default_targets_are_stderr(self) -> None:
-        """Loading the package-default ``[pipelex.log_config]`` yields stderr targets.
+class TestShippedConsoleTargets:
+    @pytest.mark.parametrize(
+        ("label", "toml_path"),
+        [
+            ("package-default", PACKAGE_DEFAULT_TOML),
+            ("kit-template", KIT_TEMPLATE_TOML),
+        ],
+    )
+    def test_shipped_targets_are_log_stderr_and_print_stdout(
+        self,
+        label: str,
+        toml_path: Path,
+    ) -> None:
+        """Both shipped TOMLs route logs to stderr and prints to stdout.
 
-        Reads ``pipelex/pipelex.toml`` directly (bypassing the layered loader) so the
-        assertion is against the shipped defaults, not whatever the dev project or the
-        user's ``~/.pipelex/`` override.
+        Reads each file directly (bypassing the layered loader) so the assertion
+        is against the shipped values, not the merged config produced by the
+        dev project or the user's ``~/.pipelex/`` override. The kit template
+        intentionally carries only the user-facing subset of ``LogConfig``
+        fields, so we assert against the raw TOML values rather than
+        reconstructing the full model.
         """
-        assert PIPELEX_PACKAGE_DEFAULT_TOML.is_file(), f"Package-default toml not found at {PIPELEX_PACKAGE_DEFAULT_TOML}"
-        with PIPELEX_PACKAGE_DEFAULT_TOML.open("rb") as toml_file:
+        assert toml_path.is_file(), f"[{label}] toml not found at {toml_path}"
+        with toml_path.open("rb") as toml_file:
             raw_config: dict[str, Any] = tomli.load(toml_file)
 
         log_config_section = raw_config["pipelex"]["log_config"]
-        log_config = LogConfig.model_validate(log_config_section)
+        log_target_raw = log_config_section.get("console_log_target")
+        print_target_raw = log_config_section.get("console_print_target")
 
-        assert log_config.console_log_target == ConsoleTarget.STDERR, (
-            f"Package default console_log_target must be stderr to keep logs off the data channel; got {log_config.console_log_target!r}"
+        assert log_target_raw == ConsoleTarget.STDERR, (
+            f"[{label}] console_log_target must be stderr — logs are diagnostics and must stay off the data channel; got {log_target_raw!r}"
         )
-        assert log_config.console_print_target == ConsoleTarget.STDERR, (
-            f"Package default console_print_target must be stderr to keep prints off the data channel; got {log_config.console_print_target!r}"
+        assert print_target_raw == ConsoleTarget.STDOUT, (
+            f"[{label}] console_print_target must be stdout — the main pipelex CLI emits human-facing tables "
+            f"(show backends/models, which, doctor) via that channel and must remain redirectable to a file; "
+            f"got {print_target_raw!r}"
         )
