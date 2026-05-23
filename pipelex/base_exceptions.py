@@ -346,6 +346,12 @@ class PipelexError(Exception):
         Pure function: the base URI is the :data:`pipelex.urls.URLs.error_docs_base`
         constant, so this is safe to call before Pipelex bootstrap and inside
         Temporal workflow code without any determinism hazard.
+
+        Footgun: ``pascal_case_to_kebab`` is case-folding — acronym-casing
+        variants of an existing class name collide (``LLMError`` and ``LlmError``
+        both kebab to ``llm-error``). ``test_pipelex_error_type_uri_uniqueness``
+        catches this at CI time, and ``generate_error_pages`` raises loudly at
+        docs-generation time. Pick one casing per acronym in the codebase.
         """
         declared = cls.__dict__.get("_declared_type_uri")
         if isinstance(declared, str):

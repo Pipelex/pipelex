@@ -27,7 +27,7 @@ from typing import Any, NoReturn, cast
 import typer
 
 from pipelex.base_exceptions import PipelexError
-from pipelex.pipeline.validate_bundle import ValidateBundleError
+from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.tools.misc.json_utils import clean_json_dumps
 from pipelex.types import StrEnum
 

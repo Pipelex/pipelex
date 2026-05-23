@@ -1,5 +1,5 @@
 from pipelex.system.exceptions import ToolError
 
 
-class SecretNotFoundError(ToolError):
+class PyPdfium2RendererError(ToolError):
     pass

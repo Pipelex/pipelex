@@ -13,7 +13,7 @@ description: "Reference for the `TomlError` Pipelex error class."
 | `title` | TOML parse error |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/toml-error/` |
 | `error_domain` | _(inherited from parent)_ |
-| Defined in | `pipelex.tools.misc.toml_utils` |
+| Defined in | `pipelex.tools.misc.exceptions` |
 | Parent class | [`ToolError`](tool-error.md) |
 
 [Back to Error Model overview](../under-the-hood/error-model.md)

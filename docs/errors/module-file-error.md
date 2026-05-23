@@ -15,7 +15,7 @@ Exception raised for errors related to module file operations.
 | `title` | Module file |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/module-file-error/` |
 | `error_domain` | _(inherited from parent)_ |
-| Defined in | `pipelex.tools.typing.module_inspector` |
+| Defined in | `pipelex.tools.typing.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 
 [Back to Error Model overview](../under-the-hood/error-model.md)

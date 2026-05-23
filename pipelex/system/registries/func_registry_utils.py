@@ -8,10 +8,8 @@ from pipelex import log
 from pipelex.config import get_config
 from pipelex.system.registries.func_registry import func_registry, pipe_func
 from pipelex.tools.misc.file_utils import find_files_in_dir
-from pipelex.tools.typing.module_inspector import (
-    ModuleFileError,
-    import_module_from_file_if_has_decorated_functions,
-)
+from pipelex.tools.typing.exceptions import ModuleFileError
+from pipelex.tools.typing.module_inspector import import_module_from_file_if_has_decorated_functions
 
 
 class FuncRegistryUtils:

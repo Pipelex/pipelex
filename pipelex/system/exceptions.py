@@ -13,6 +13,10 @@ class NestedKeyConflictError(ToolError):
     """Raised when attempting to create nested keys under a non-dict value."""
 
 
+class EnvVarNotFoundError(ToolError):
+    _declared_title = "Environment variable not set"
+
+
 class MissingDependencyError(PipelexError):
     """Raised when a required dependency is not installed."""
 

@@ -25,7 +25,7 @@ from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.validate_bundle import ValidateBundleError
+from pipelex.pipeline.exceptions import ValidateBundleError
 
 
 def validate_pipe_cmd(

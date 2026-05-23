@@ -13,7 +13,7 @@ description: "Reference for the `FileTypeError` Pipelex error class."
 | `title` | File type |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/file-type-error/` |
 | `error_domain` | _(inherited from parent)_ |
-| Defined in | `pipelex.tools.misc.filetype_utils` |
+| Defined in | `pipelex.tools.misc.exceptions` |
 | Parent class | [`ToolError`](tool-error.md) |
 
 [Back to Error Model overview](../under-the-hood/error-model.md)

@@ -10,7 +10,7 @@ from pipelex.core.bundles.pipelex_bundle_blueprint import (
     StepRole,
 )
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.interpreter.exceptions import PipelexInterpreterError
+from pipelex.core.interpreter.exceptions import BundleElaboratorError
 from pipelex.core.pipes.validation import is_pipe_code_valid
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.core.qualified_ref import QualifiedRef
@@ -18,11 +18,6 @@ from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequen
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.structure.pipe_structure_blueprint import PipeStructureBlueprint
-
-
-class BundleElaboratorError(PipelexInterpreterError):
-    """Raised when bundle elaboration fails (e.g. synthetic-name collision, invalid output for preliminary_text)."""
-
 
 _SYNTHETIC_DRAFT_TEXT_SUFFIX = "__draft_text"
 _SYNTHETIC_STRUCTURE_SUFFIX = "__structure"

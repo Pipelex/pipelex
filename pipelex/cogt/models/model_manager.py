@@ -12,10 +12,11 @@ from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.model_routing.routing_models import BackendMatchingMethod
 from pipelex.cogt.model_routing.routing_profile import RoutingProfile
 from pipelex.cogt.model_routing.routing_profile_loader import load_active_routing_profile
+from pipelex.cogt.models.exceptions import ModelReferenceParseError
 from pipelex.cogt.models.model_deck import ModelDeck, ModelDeckBlueprint
 from pipelex.cogt.models.model_deck_loader import load_model_deck_blueprint
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
-from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind, ModelReferenceParseError
+from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind
 from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.config import get_config
 from pipelex.system.configuration.config_loader import config_manager

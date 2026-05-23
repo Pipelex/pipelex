@@ -13,7 +13,7 @@ description: "Reference for the `PipelineManagerAlreadyExistsError` Pipelex erro
 | `title` | Pipeline manager already exists |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/pipeline-manager-already-exists-error/` |
 | `error_domain` | _(inherited from parent)_ |
-| Defined in | `pipelex.pipeline.pipeline_manager` |
+| Defined in | `pipelex.pipeline.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 
 [Back to Error Model overview](../under-the-hood/error-model.md)

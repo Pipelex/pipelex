@@ -6,11 +6,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from pipelex.base_exceptions import PipelexError
-
-
-class ModuleFileError(PipelexError):
-    """Exception raised for errors related to module file operations."""
+from pipelex.tools.typing.exceptions import ModuleFileError
 
 
 def import_module_from_file(file_path: str) -> Any:

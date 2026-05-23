@@ -5,7 +5,7 @@ collision would mean two distinct error classes point at the same documentation
 page — catches future class-name reuses at CI time, not at docs-build time.
 """
 
-from pipelex.errors.error_module_registry import iter_pipelex_error_subclasses
+from pipelex.errors.error_pages_generator import iter_pipelex_error_subclasses
 
 
 class TestPipelexErrorTypeUriUniqueness:

@@ -11,3 +11,7 @@ class AnthropicSDKUnsupportedError(CogtError):
 
 class AnthropicWorkerConfigurationError(CogtError):
     pass
+
+
+class AnthropicFactoryError(CogtError):
+    pass

@@ -18,8 +18,9 @@ from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.configs import ConfigPaths
 from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableError, RemoteConfigValidationError
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
+from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.json_utils import deep_update
-from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_path
+from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 if TYPE_CHECKING:
     from rich.console import Console

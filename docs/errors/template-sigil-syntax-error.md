@@ -15,7 +15,7 @@ Raised when a template contains a Pipelex sigil shape that violates the strict l
 | `title` | Template sigil syntax |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/template-sigil-syntax-error/` |
 | `error_domain` | _(inherited from parent)_ |
-| Defined in | `pipelex.cogt.templating.template_errors` |
+| Defined in | `pipelex.cogt.templating.exceptions` |
 | Parent class | [`ToolError`](tool-error.md) |
 
 [Back to Error Model overview](../under-the-hood/error-model.md)

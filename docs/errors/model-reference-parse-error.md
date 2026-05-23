@@ -15,7 +15,7 @@ Error raised when a model reference string cannot be parsed.
 | `title` | Model reference parse |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/model-reference-parse-error/` |
 | `error_domain` | _(inherited from parent)_ |
-| Defined in | `pipelex.cogt.models.model_reference` |
+| Defined in | `pipelex.cogt.models.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 
 [Back to Error Model overview](../under-the-hood/error-model.md)

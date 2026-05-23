@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, SerializationInfo, SerializerFunctio
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.pipe_operators.compose.exceptions import ConstructFieldBlueprintTypeError, ConstructFieldBlueprintValueError
-from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
+from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.types import Self, StrEnum

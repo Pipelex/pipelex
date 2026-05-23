@@ -3,7 +3,8 @@ from pathlib import Path
 import aiofiles
 from typing_extensions import override
 
-from pipelex.tools.misc.filetype_utils import FileTypeError, detect_file_type_from_path
+from pipelex.tools.misc.exceptions import FileTypeError
+from pipelex.tools.misc.filetype_utils import detect_file_type_from_path
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidUriError
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract, StoredData
 

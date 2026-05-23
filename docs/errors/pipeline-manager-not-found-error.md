@@ -13,7 +13,7 @@ description: "Reference for the `PipelineManagerNotFoundError` Pipelex error cla
 | `title` | Pipeline manager not found |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/pipeline-manager-not-found-error/` |
 | `error_domain` | _(inherited from parent)_ |
-| Defined in | `pipelex.pipeline.pipeline_manager` |
+| Defined in | `pipelex.pipeline.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 
 [Back to Error Model overview](../under-the-hood/error-model.md)

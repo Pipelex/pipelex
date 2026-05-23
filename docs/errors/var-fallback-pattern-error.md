@@ -13,7 +13,7 @@ description: "Reference for the `VarFallbackPatternError` Pipelex error class."
 | `title` | Var fallback pattern |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/var-fallback-pattern-error/` |
 | `error_domain` | _(inherited from parent)_ |
-| Defined in | `pipelex.tools.secrets.secrets_utils` |
+| Defined in | `pipelex.tools.secrets.exceptions` |
 | Parent class | [`ToolError`](tool-error.md) |
 
 [Back to Error Model overview](../under-the-hood/error-model.md)

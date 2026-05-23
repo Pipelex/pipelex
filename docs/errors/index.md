@@ -24,9 +24,6 @@ classification rules, and the cross-boundary Temporal bridge.
 
 ## CogtError
 
-- [`AnthropicModelListingError`](anthropic-model-listing-error.md) — Anthropic model listing
-- [`AnthropicSDKUnsupportedError`](anthropic-sdk-unsupported-error.md) — Anthropic sdk unsupported
-- [`AnthropicWorkerConfigurationError`](anthropic-worker-configuration-error.md) — Anthropic worker configuration
 - [`CogtError`](cogt-error.md) — AI inference failed
 - [`CostRegistryError`](cost-registry-error.md) — Cost registry
 - [`ExtractCapabilityError`](extract-capability-error.md) — Extract capability
@@ -35,12 +32,6 @@ classification rules, and the cross-boundary Temporal bridge.
 - [`ExtractJobFailureError`](extract-job-failure-error.md) — Extract job failure
 - [`ExtractModelNotFoundError`](extract-model-not-found-error.md) — Extract model not found
 - [`ExtractOutputError`](extract-output-error.md) — Extract output
-- [`GatewayCredentialsError`](gateway-credentials-error.md) — Gateway credentials
-- [`GatewayDeckError`](gateway-deck-error.md) — Gateway deck
-- [`GatewayError`](gateway-error.md) — Gateway
-- [`GatewayExtractResponseError`](gateway-extract-response-error.md) — Gateway extract response
-- [`GatewayFactoryError`](gateway-factory-error.md) — Gateway factory
-- [`GatewaySearchResponseError`](gateway-search-response-error.md) — Gateway search response
 - [`GatewayUnknownModelError`](gateway-unknown-model-error.md) — Gateway unknown model
 - [`GeneratedImageError`](generated-image-error.md) — Generated image
 - [`ImageContentError`](image-content-error.md) — Image content
@@ -66,10 +57,6 @@ classification rules, and the cross-boundary Temporal bridge.
 - [`LLMPromptSpecError`](llm-prompt-spec-error.md) — Llm prompt spec
 - [`LLMPromptTemplateInputsError`](llm-prompt-template-inputs-error.md) — Llm prompt template inputs
 - [`LLMSettingsValidationError`](llm-settings-validation-error.md) — Llm settings validation
-- [`MistralExtractResponseError`](mistral-extract-response-error.md) — Mistral extract response
-- [`MistralModelListingError`](mistral-model-listing-error.md) — Mistral model listing
-- [`MistralPluginError`](mistral-plugin-error.md) — Mistral plugin
-- [`MistralWorkerConfigurationError`](mistral-worker-configuration-error.md) — Mistral worker configuration
 - [`ModelChoiceNotFoundError`](model-choice-not-found-error.md) — Model choice not found
 - [`ModelDeckNotFoundError`](model-deck-not-found-error.md) — Model deck not found
 - [`ModelDeckPresetValidatonError`](model-deck-preset-validaton-error.md) — Model deck preset validaton
@@ -78,9 +65,6 @@ classification rules, and the cross-boundary Temporal bridge.
 - [`ModelManagerError`](model-manager-error.md) — Model manager
 - [`ModelNotFoundError`](model-not-found-error.md) — Model not found
 - [`ModelWaterfallError`](model-waterfall-error.md) — Model waterfall
-- [`PortkeyCredentialsError`](portkey-credentials-error.md) — Portkey credentials
-- [`PortkeyError`](portkey-error.md) — Portkey
-- [`PortkeyFactoryError`](portkey-factory-error.md) — Portkey factory
 - [`PromptDocumentFactoryError`](prompt-document-factory-error.md) — Prompt document factory
 - [`PromptImageFactoryError`](prompt-image-factory-error.md) — Prompt image factory
 - [`PromptImageFormatError`](prompt-image-format-error.md) — Prompt image format
@@ -126,7 +110,6 @@ classification rules, and the cross-boundary Temporal bridge.
 
 - [`AwsCredentialsError`](aws-credentials-error.md) — Aws credentials
 - [`CredentialsError`](credentials-error.md) — Missing or invalid credentials
-- [`FalCredentialsError`](fal-credentials-error.md) — Fal credentials
 
 ## DeliveryError
 
@@ -149,11 +132,6 @@ classification rules, and the cross-boundary Temporal bridge.
 ## DryRunError
 
 - [`DryRunError`](dry-run-error.md) — Dry run
-
-## GraphSpecError
-
-- [`GraphSpecError`](graph-spec-error.md) — Graph spec
-- [`GraphSpecValidationError`](graph-spec-validation-error.md) — Graph spec validation
 
 ## InputStuffSpecsError
 
@@ -200,10 +178,6 @@ classification rules, and the cross-boundary Temporal bridge.
 ## NeitherUrlNorDataError
 
 - [`NeitherUrlNorDataError`](neither-url-nor-data-error.md) — Neither url nor data
-
-## PipeBatchFactoryError
-
-- [`PipeBatchFactoryError`](pipe-batch-factory-error.md) — Pipe batch factory
 
 ## PipeComposeError
 
@@ -290,14 +264,6 @@ classification rules, and the cross-boundary Temporal bridge.
 
 - [`PipeRunParamsError`](pipe-run-params-error.md) — Pipe run params
 
-## PipeSearchError
-
-- [`PipeSearchError`](pipe-search-error.md) — Pipe search
-
-## PipeSearchFactoryError
-
-- [`PipeSearchFactoryError`](pipe-search-factory-error.md) — Pipe search factory
-
 ## PipeSequenceFactoryError
 
 - [`PipeSequenceFactoryError`](pipe-sequence-factory-error.md) — Pipe sequence factory
@@ -305,10 +271,6 @@ classification rules, and the cross-boundary Temporal bridge.
 ## PipeStackOverflowError
 
 - [`PipeStackOverflowError`](pipe-stack-overflow-error.md) — Pipe stack overflow
-
-## PipelexBundleSpecBlueprintError
-
-- [`PipelexBundleSpecBlueprintError`](pipelex-bundle-spec-blueprint-error.md) — Pipelex bundle spec blueprint
 
 ## PipelexCLIError
 
@@ -396,6 +358,7 @@ classification rules, and the cross-boundary Temporal bridge.
 
 ## TemporalFlowError
 
+- [`BaseModelPayloadConverterError`](base-model-payload-converter-error.md) — Base model payload converter
 - [`ContentGenerationError`](content-generation-error.md) — Content generation
 - [`SearchAttributeRegistrationError`](search-attribute-registration-error.md) — Search attribute registration
 - [`TemporalConfigError`](temporal-config-error.md) — Temporal config

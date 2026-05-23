@@ -3,10 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from pipelex.tools.typing.module_inspector import (
-    ModuleFileError,
-    import_module_from_file,
-)
+from pipelex.tools.typing.exceptions import ModuleFileError
+from pipelex.tools.typing.module_inspector import import_module_from_file
 
 
 class TestImportModuleFromFile:

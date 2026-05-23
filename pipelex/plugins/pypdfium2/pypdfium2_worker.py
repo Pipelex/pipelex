@@ -4,7 +4,7 @@ from typing import Any
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.extract.extract_input import ExtractInputError
+from pipelex.cogt.extract.exceptions import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput, Page
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract

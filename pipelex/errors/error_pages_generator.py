@@ -21,11 +21,36 @@ from typing import TYPE_CHECKING
 
 from pipelex.base_exceptions import ErrorDomain, PipelexError
 from pipelex.cogt.inference.error_classification import UserAction
-from pipelex.errors.error_module_registry import iter_pipelex_error_subclasses
 from pipelex.tools.misc.string_utils import pascal_case_to_kebab
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Iterator
+
+
+def iter_pipelex_error_subclasses() -> Iterator[type[PipelexError]]:
+    """Yield :class:`PipelexError` and every loaded subclass, breadth-first.
+
+    Walks ``__subclasses__()`` transitively over the already-imported class
+    hierarchy. The convention check (see
+    ``tests/unit/pipelex/errors/test_error_class_location_convention.py``)
+    guarantees every production subclass lives in a properly-named module that
+    normal imports pull in, so no force-import phase is needed.
+
+    Skips classes whose ``__module__`` starts with ``tests.`` so synthetic
+    subclasses created by other tests in the same pytest session never leak
+    into the generated docs or the smoke-test assertions.
+    """
+    seen: set[type[PipelexError]] = set()
+    stack: list[type[PipelexError]] = [PipelexError]
+    while stack:
+        cls = stack.pop()
+        if cls in seen:
+            continue
+        seen.add(cls)
+        if not cls.__module__.startswith("tests."):
+            yield cls
+        stack.extend(cls.__subclasses__())
+
 
 # Marker a maintainer adds to a generated page to claim it for hand-editing.
 # When present, :func:`generate_error_pages` skips the page on regeneration.
@@ -123,13 +148,32 @@ def generate_error_pages(
     """Write one markdown page per :class:`PipelexError` subclass into ``output_dir``.
 
     ``classes`` defaults to every loaded production subclass via
-    :func:`pipelex.errors.error_module_registry.iter_pipelex_error_subclasses`.
-    Pages bearing :data:`AUTHORED_MARKER` are left untouched and reported under
-    ``preserved``; pages whose generated content matches what's already on disk
-    are reported as ``unchanged`` (no write, no mtime churn).
+    :func:`iter_pipelex_error_subclasses`. Pages bearing :data:`AUTHORED_MARKER`
+    are left untouched and reported under ``preserved``; pages whose generated
+    content matches what's already on disk are reported as ``unchanged`` (no
+    write, no mtime churn).
+
+    Raises a loud ``RuntimeError`` if two target classes resolve to the same
+    kebab slug (e.g. ``LLMError`` and ``LlmError`` both kebab to ``llm-error``),
+    so the collision is caught at generation time instead of silently — the
+    second page would overwrite the first.
     """
     output_dir.mkdir(parents=True, exist_ok=True)
     target_classes = list(classes) if classes is not None else list(iter_pipelex_error_subclasses())
+
+    slug_owners: dict[str, type[PipelexError]] = {}
+    for cls in target_classes:
+        slug = page_slug(cls)
+        previous = slug_owners.get(slug)
+        if previous is not None and previous is not cls:
+            msg = (
+                f"Kebab-slug collision on {slug!r}: {previous.__module__}.{previous.__name__} "
+                f"and {cls.__module__}.{cls.__name__} both resolve to the same docs page. "
+                "Rename one class — acronym-casing variants (e.g. LLMError / LlmError) kebab "
+                "to the same slug."
+            )
+            raise RuntimeError(msg)
+        slug_owners[slug] = cls
 
     report = ErrorPagesReport()
     for cls in target_classes:

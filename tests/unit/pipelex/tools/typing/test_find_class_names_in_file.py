@@ -2,10 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from pipelex.tools.typing.module_inspector import (
-    ModuleFileError,
-    find_class_names_in_file,
-)
+from pipelex.tools.typing.exceptions import ModuleFileError
+from pipelex.tools.typing.module_inspector import find_class_names_in_file
 
 
 class TestFindClassNamesInFile:

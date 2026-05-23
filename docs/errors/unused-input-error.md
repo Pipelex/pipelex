@@ -15,7 +15,7 @@ Raised when an input is declared but never referenced in the template.
 | `title` | Unused input |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/unused-input-error/` |
 | `error_domain` | _(inherited from parent)_ |
-| Defined in | `pipelex.pipe_operators.shared.template_image_analyzer` |
+| Defined in | `pipelex.pipe_operators.shared.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 
 [Back to Error Model overview](../under-the-hood/error-model.md)

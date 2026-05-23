@@ -33,6 +33,10 @@ class StorageDeliveryError(DeliveryError):
     pass
 
 
+class DryRunError(PipelexError):
+    """Raised when a dry run fails due to missing inputs or other validation issues."""
+
+
 class PipeRouterError(PipelexError):
     def __init__(
         self,

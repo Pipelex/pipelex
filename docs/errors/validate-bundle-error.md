@@ -15,7 +15,7 @@ Raised when bundle validation fails.
 | `title` | Validate bundle |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/validate-bundle-error/` |
 | `error_domain` | `input` |
-| Defined in | `pipelex.pipeline.validate_bundle` |
+| Defined in | `pipelex.pipeline.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 | `user_action` | `change_input` — Check the validation_errors array for specific issues |
 

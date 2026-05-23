@@ -1,7 +1,7 @@
 import re
 from re import Match
 
-from pipelex.cogt.templating.template_errors import TemplateSigilSyntaxError
+from pipelex.cogt.templating.exceptions import TemplateSigilSyntaxError
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.types import StrEnum
 

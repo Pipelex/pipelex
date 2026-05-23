@@ -30,8 +30,9 @@ from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexRunner
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
+from pipelex.tools.misc.exceptions import JsonTypeError
 from pipelex.tools.misc.file_utils import get_incremental_directory_path
-from pipelex.tools.misc.json_utils import JsonTypeError, load_json_dict_from_path, save_as_json_to_path
+from pipelex.tools.misc.json_utils import load_json_dict_from_path, save_as_json_to_path
 from pipelex.tools.misc.package_utils import get_package_version
 
 COMMAND = "run"

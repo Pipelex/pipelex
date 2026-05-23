@@ -9,7 +9,7 @@ from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelDeckPresetVal
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.hub import get_console
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
-from pipelex.pipeline.validate_bundle import ValidateBundleError
+from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.system.pipelex_service.exceptions import (
     GatewayApiKeyMissingError,
     GatewayDoNotTrackConflictError,

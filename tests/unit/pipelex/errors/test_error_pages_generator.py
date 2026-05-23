@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pipelex.errors.error_module_registry import iter_pipelex_error_subclasses
+import pytest
+
+from pipelex.base_exceptions import PipelexError
 from pipelex.errors.error_pages_generator import (
     AUTHORED_MARKER,
     GENERATED_MARKER,
@@ -12,6 +14,7 @@ from pipelex.errors.error_pages_generator import (
     ErrorPagesReport,
     generate_error_pages,
     has_authored_marker,
+    iter_pipelex_error_subclasses,
     page_slug,
 )
 from pipelex.tools.misc.string_utils import pascal_case_to_kebab
@@ -84,3 +87,15 @@ class TestErrorPagesGenerator:
             preserved=[Path("d.md"), Path("e.md"), Path("f.md")],
         )
         assert report.total == 6
+
+    def test_kebab_slug_collision_raises(self, tmp_path: Path) -> None:
+        """Two classes that kebab to the same slug fail generation loudly."""
+
+        class LLMError(PipelexError):
+            pass
+
+        class LlmError(PipelexError):
+            pass
+
+        with pytest.raises(RuntimeError, match="Kebab-slug collision on 'llm-error'"):
+            generate_error_pages(output_dir=tmp_path, classes=[LLMError, LlmError])

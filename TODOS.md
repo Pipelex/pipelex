@@ -165,10 +165,82 @@ This is the last unshipped stage of the original error-handling plan. It is **cr
 
 ---
 
+## Phase 6 — Error class location convention + static enforcement
+
+Discovery of `PipelexError` subclasses in `pipelex/errors/error_module_registry.py` relies on a filesystem pattern scan (`exceptions.py`, `*_exceptions.py`, `*_errors.py`) plus a hand-maintained allowlist `_NON_STANDARD_ERROR_MODULES`. A spot check found ~20 production error classes living in files matching neither convention — plugin worker/factory modules (`anthropic_factory.py`, `bedrock_llm_worker.py`, `openai_client_factory.py`, the google workers), single-error utility modules (`validate_bundle.py`, `module_inspector.py`, `index_loader.py`, `dry_run.py`, `model_reference.py`, `extract_input.py`, `pypdfium2_renderer.py`, `func_registry.py`, `concept_spec.py`, `stuff_spec_factory.py`), and mixed-concern modules (`pipeline_manager.py`, `template_image_analyzer.py`). They are silently absent from the generated `docs/errors/` pages and from `test_pipelex_error_type_uri_uniqueness`.
+
+The fix is structural, not a runtime patch. Pipelex errors are part of the documented public contract (each has a `type_uri`, a docs page, stable identity) — they belong in dedicated exception modules, like Django's `django.core.exceptions` or SQLAlchemy's `sqlalchemy.exc`. Enforce that via filename convention and a static check; refactor stragglers into properly-named modules; remove discovery from runtime entirely.
+
+- [x] **Decision D3** — pick the filename pattern. Recommended: **`exceptions.py` (default, one per package directory) + `*_exceptions.py` (for dirs that host multiple separate-concern error modules, e.g. plugin subpackages — the existing `portkey_exceptions.py` / `anthropic_exceptions.py` / `mistral_exceptions.py` / `gateway_exceptions.py` pattern)**. Drop `*_errors.py` — it is a redundant synonym (3 files today: `jinja2_errors.py`, `secrets_errors.py`, `template_errors.py`) and synonyms are exactly what produced the drift. Record the choice in the Decisions section. **→ Decided 2026-05-23: `exceptions.py` + `*_exceptions.py`** (see [Decisions](#decisions)).
+
+### 6.1 — Static check first (TDD)
+
+- [x] New test: AST-scan `pipelex/` for every `class X(...)` whose any transitive base resolves to `PipelexError`; assert each file matches the chosen pattern (plus the top-level `pipelex/base_exceptions.py`, which is special-cased as the root). Watch it fail, capture the misplaced list — that list is the authoritative refactor target.
+- [x] Backstop test: walk `PipelexError.__subclasses__()` transitively after normal imports, assert each subclass's `__module__` resolves to a properly-named file. Catches dynamic / decorator-registered cases the AST scan would miss, and is the regression net once `error_module_registry.py` is gone.
+
+### 6.2 — Refactor misplaced error classes
+
+Expected starting list (the static check is authoritative — extend or trim as needed):
+
+- `pipelex/pipeline/pipeline_manager.py` → append to existing `pipelex/pipeline/exceptions.py`.
+- `pipelex/pipeline/validate_bundle.py` → `pipelex/pipeline/validate_bundle_exceptions.py` (sibling pattern keeps the error next to its caller in import-graph terms).
+- `pipelex/pipe_operators/shared/template_image_analyzer.py` → `pipelex/pipe_operators/shared/exceptions.py`.
+- `pipelex/tools/misc/{context_provider_abstract,filetype_utils,json_utils,toml_utils}.py` → consolidate into `pipelex/tools/misc/exceptions.py`.
+- `pipelex/tools/secrets/secrets_utils.py` and `pipelex/tools/secrets/secrets_errors.py` (rename) → consolidate into `pipelex/tools/secrets/exceptions.py`.
+- `pipelex/tools/pdf/pypdfium2_renderer.py` → `pipelex/tools/pdf/exceptions.py`.
+- `pipelex/tools/typing/module_inspector.py` → `pipelex/tools/typing/exceptions.py`.
+- `pipelex/tools/jinja2/jinja2_errors.py` → rename to `pipelex/tools/jinja2/exceptions.py`.
+- `pipelex/cogt/templating/template_errors.py` → rename to `pipelex/cogt/templating/exceptions.py`.
+- `pipelex/core/pipes/stuff_spec/stuff_spec_factory.py` → append to existing `pipelex/core/pipes/stuff_spec/exceptions.py`.
+- `pipelex/plugins/google/google_{llm,img_gen}_worker.py` → `pipelex/plugins/google/google_exceptions.py` (or `exceptions.py` — D3 will decide whether to match the existing portkey/anthropic/mistral/gateway prefix style).
+- `pipelex/plugins/anthropic/anthropic_factory.py` → append to existing `anthropic_exceptions.py`.
+- `pipelex/plugins/bedrock/{bedrock_llm_worker,bedrock_factory}.py` → `pipelex/plugins/bedrock/bedrock_exceptions.py`.
+- `pipelex/plugins/openai/{openai_client_factory,vertexai_factory}.py` → `pipelex/plugins/openai/openai_exceptions.py`.
+- `pipelex/kit/index_loader.py` → append to existing `pipelex/kit/exceptions.py`.
+- `pipelex/system/environment.py` → append to existing `pipelex/system/exceptions.py`.
+- `pipelex/system/registries/func_registry.py` → `pipelex/system/registries/exceptions.py`.
+- `pipelex/pipe_run/dry_run.py` → append to existing `pipelex/pipe_run/exceptions.py`.
+- `pipelex/builder/concept/concept_spec.py` → `pipelex/builder/concept/exceptions.py`.
+- `pipelex/cogt/models/model_reference.py` → `pipelex/cogt/models/exceptions.py`.
+- `pipelex/cogt/extract/extract_input.py` → `pipelex/cogt/extract/exceptions.py`.
+
+For each move:
+
+- Update every import site (search by class name; do not rely on the static check to surface them).
+- Watch for circular imports — if appending to an existing `exceptions.py` would create a cycle, prefer a new `<topic>_exceptions.py` module that imports only `PipelexError` / its immediate base.
+- Don't leave shims or re-exports behind. Per project policy (no backward compatibility), update callers and move on.
+
+### 6.3 — Delete the registry, simplify discovery
+
+- [x] Delete `pipelex/errors/error_module_registry.py`. Replace `iter_pipelex_error_subclasses()` callers with a small inline transitive `__subclasses__()` walk in `error_pages_generator.py` (the only production consumer plus the URI-uniqueness test). Normal imports load everything now — no force-import phase needed, no allowlist to maintain.
+- [x] `pipelex-dev generate-error-pages` — regenerate `docs/errors/` and verify the page set is complete (new pages appear for previously-missed classes; no orphan pages).
+
+### 6.4 — Rule, docs, and the absorbed minor follow-up
+
+- [x] Add the rule to `pipelex/.claude/rules/python-standards.md` under a new "Error class location" section: every `PipelexError` subclass lives in a module whose filename matches `exceptions.py` or `*_exceptions.py` (final wording per D3); the static check from 6.1 enforces it.
+- [x] Reference it from `pipelex/CLAUDE.md` if appropriate. *(N/A — no `pipelex/CLAUDE.md` exists; the rule lives in `.claude/rules/python-standards.md` which is consulted by the top-level CLAUDE.md.)*
+- [x] Also resolve here, since it touches the same generator: the `pascal_case_to_kebab` acronym collision (`LLMError` / `LlmError` both kebab to `llm-error`). Add a defensive assert in `error_pages_generator.generate_error_pages` that fails loudly if two target classes resolve to the same slug, and a short note near `PipelexError` warning that acronym-casing variants of an existing error class name collide. (Today this is caught reactively by `test_pipelex_error_type_uri_uniqueness` only.)
+
+### 6.5 — Verify
+
+- [x] Static check passes against the full tree.
+- [x] Generated `docs/errors/` set is complete and `make agent-check` clean.
+- [x] `make agent-test` clean.
+
+**Acceptance:** every `PipelexError` subclass lives in a properly-named module; the static check fails the PR if a new error class lands outside the convention; `error_module_registry.py` is gone; discovery has no runtime side effects; the kebab-slug collision footgun is caught at generation time, not only by the uniqueness test.
+
+### ⛔ CHECKPOINT 6 — STOP, verify, record
+
+- [x] `make agent-check` and `make agent-test` clean.
+- [x] Commit as a single coherent refactor (or a small ordered series: test-first → moves → registry deletion → rule).
+- [x] Tick every Phase 6 box.
+- [x] Append a dated **Checkpoint 6** entry to the Session log: Decision D3 outcome, files moved, import sites updated, the kebab-collision defense added, anything left as-is and why, next action.
+
+---
+
 ## Minor follow-ups (low priority — batch into any checkpoint)
 
-- [ ] `pascal_case_to_kebab` acronym collision — `LLMError` and `LlmError` both kebab to `llm-error`, so two such classes would share a `type_uri` and overwrite each other's generated doc page. It is caught reactively by `test_pipelex_error_type_uri_uniqueness`. Add a defensive assert in `error_pages_generator.generate_error_pages` that fails loudly if two target classes resolve to the same slug, and a short note near `PipelexError` warning that acronym-casing variants of an existing error class name collide.
-- [ ] `error_module_registry` discovery fragility — `_NON_STANDARD_ERROR_MODULES` is a hardcoded list that goes stale silently; a new error class outside an `exceptions.py` / `*_errors.py` file and not added to the tuple is omitted from generated docs and from the uniqueness check. Add a test asserting every `PipelexError` subclass reachable after a full app import is also reachable via `iter_pipelex_error_subclasses()`, so the list cannot drift unnoticed. Optionally switch the filesystem scan to `pkgutil.walk_packages` for install-layout robustness.
+- (none open — `pascal_case_to_kebab` acronym collision and `error_module_registry` discovery fragility both folded into Phase 6.)
 
 ---
 
@@ -185,6 +257,7 @@ Record each decision here as it is taken, with date and rationale.
 
 - **D1** (Phase 1, Gap 1 fix) — **Option 1**, decided 2026-05-22. Add a per-class `ClassVar` flagging error classes that genuinely author caller-facing messages, and gate the STRICT-disclosure passthrough on that flag instead of on the inherited `error_domain == INPUT`. Rationale: keys redaction on the *provenance of the message* rather than an inherited classification, and avoids the `http_status` side effects Option 2 (dropping `error_domain` inheritance for domain-less wrappers) would carry.
 - **D2** (Phase 2, request_id call-site strategy) — **Bound adapter**, decided 2026-05-22. `WorkflowLog` / `ActivityLog` gain an instance-level `request_id` (held by a shared `_RequestIdLog` base), built once per workflow/activity invocation from `job_metadata.request_id`; the dead per-method `request_id` kwargs are dropped. Rationale: a new log call added inside a wired entry point picks up `request_id` automatically — no per-call threading, nothing to forget — and the per-method kwarg was unused dead surface.
+- **D3** (Phase 6, error class location filename pattern) — **`exceptions.py` + `*_exceptions.py`**, decided 2026-05-23. Every module declaring a `PipelexError` subclass must be named `exceptions.py` (default — one per package directory) or `<topic>_exceptions.py` (for directories that host multiple separate-concern error modules, matching the existing `pipelex/plugins/*/` pattern: `portkey_exceptions.py`, `anthropic_exceptions.py`, `mistral_exceptions.py`, `gateway_exceptions.py`). The `*_errors.py` synonym is dropped — it adds no information, and three files (`jinja2_errors.py`, `secrets_errors.py`, `template_errors.py`) get renamed. The root `pipelex/base_exceptions.py` is special-cased. Rationale: synonyms are exactly what produced the drift the registry exists to paper over; one canonical pattern + one topical variant covers the legitimate cases without inviting a third.
 
 ---
 
@@ -301,3 +374,37 @@ Append one dated entry per session / checkpoint. Each entry must leave the next 
   **Next action:** All in-repo follow-ups (Phases 0-4) are done — `feature/API-readiness-2` is shippable. **Decision (2026-05-22, with the user): stop here** — no PR opened and Phase 5 not started; both deferred to a later session. To resume, the open work is: (1) open a PR for `feature/API-readiness-2` — Phases 0-4 are a complete, reviewable unit; (2) **Phase 5** — webhook signing, the separate cross-repo track (pipelex + API in lockstep) per [`wip/security/webhook-signing.md`](wip/security/webhook-signing.md); (3) the two low-priority "Minor follow-ups" (`pascal_case_to_kebab` acronym collision, `error_module_registry` discovery fragility), batchable into any future checkpoint.
 
 - **2026-05-22 — Checkpoint 3 follow-up: `/code-review` pass.** An xhigh-effort `/code-review` of the Phases 3-4 commit (5 angles + sweep, three independent finders) found **no runtime bug** — the `WebhookTarget.payload` reserved-key validator verified correct across line-by-line, cross-file (the reserved set exactly matches the four keys `_notify_webhook` writes), language-pitfall, bypass-path, and doc-coherence angles. One real test-quality defect fixed: the reserved-key tests' message-quality assertions were vacuous — `str(ValidationError)` contains every payload key via pydantic's echoed `input_value={...}` (and "error" via boilerplate), so `match=reserved_key` and `assert "error" in message` passed regardless of the validator's own message. Both now pin the validator's distinctive `reserved keys: [...]` phrase, which the input echo and boilerplate cannot satisfy. The core "rejects reserved keys" contract (`pytest.raises(ValidationError)`) was already sound — only the message-naming check was hardened. `make agent-check` clean; reserved-key tests green. Committed as `bfa3cfba`. Next action unchanged: in-repo work (Phases 0-4) done; PR + Phase 5 deferred per the user.
+
+- **2026-05-23 — Checkpoint 6 (Phase 6 complete).** Error-class location convention enforced and `error_module_registry.py` deleted on `feature/API-readiness-2`. `make agent-check` clean (ruff + pyright + mypy: 0 issues); `make agent-test` full suite green.
+
+  **Decision D3:** `exceptions.py` (default — one per package directory) + `<topic>_exceptions.py` (for directories hosting multiple separate-concern error modules, matching the existing `pipelex/plugins/*/` convention). The `*_errors.py` synonym is dropped — it produced exactly the kind of drift the registry was papering over.
+
+  **TDD path:** `tests/unit/pipelex/errors/test_error_class_location_convention.py` written first — two complementary checks. (1) An AST scan of every `.py` under `pipelex/` that resolves the transitive `PipelexError` descendant set by class-name graph traversal and asserts each one lives in a properly-named module. (2) A runtime backstop that walks `PipelexError.__subclasses__()` transitively after normal imports — catches dynamic / decorator-registered cases the AST scan would miss, and is the regression net once the registry was gone. Both tests failed on first run with **43 misplaced classes** (AST scan — the authoritative target) / **28 currently loaded** (runtime backstop), agreeing on the same offenders.
+
+  **Refactor (Phase 6.2) — files moved or created:**
+
+    - Appended to existing `exceptions.py`: `PipelineManagerNotFoundError` / `PipelineManagerAlreadyExistsError` / `ValidateBundleError` → `pipelex/pipeline/exceptions.py`; `BundleElaboratorError` → `pipelex/core/interpreter/exceptions.py`; `StuffSpecFactoryError` → `pipelex/core/pipes/stuff_spec/exceptions.py`; `KitIndexLoadingError` → `pipelex/kit/exceptions.py`; `EnvVarNotFoundError` → `pipelex/system/exceptions.py`; `DryRunError` → `pipelex/pipe_run/exceptions.py`; `BaseModelPayloadConverterError` → `pipelex/temporal/exceptions.py`; `AnthropicFactoryError` → `pipelex/plugins/anthropic/anthropic_exceptions.py`.
+    - New `exceptions.py` modules: `pipelex/pipe_operators/shared/exceptions.py` (`WithImagesFilterError`, `UnusedInputError`); `pipelex/system/registries/exceptions.py` (`FuncRegistryError`); `pipelex/builder/concept/exceptions.py` (`ConceptSpecError`); `pipelex/cogt/models/exceptions.py` (`ModelReferenceParseError`); `pipelex/cogt/extract/exceptions.py` (`ExtractInputError`); `pipelex/cogt/img_gen/exceptions.py` (`FalCredentialsError`); `pipelex/tools/aws/exceptions.py` (`AwsCredentialsError`); `pipelex/tools/pdf/exceptions.py` (`PyPdfium2RendererError`); `pipelex/tools/typing/exceptions.py` (`ModuleFileError`); `pipelex/tools/misc/exceptions.py` (consolidates `TomlError` + `ContextProviderError` + `FileTypeError` + `ArgumentTypeError` + `JsonTypeError`); `pipelex/tools/secrets/exceptions.py` (consolidates `SecretNotFoundError` from the renamed `secrets_errors.py` + the three `secrets_utils.py` errors `VarNotFoundError` / `VarFallbackPatternError` / `UnknownVarPrefixError`).
+    - Renames (drop `*_errors.py`): `pipelex/tools/jinja2/jinja2_errors.py` → `pipelex/tools/jinja2/exceptions.py`; `pipelex/cogt/templating/template_errors.py` → `pipelex/cogt/templating/exceptions.py`. `pipelex/tools/secrets/secrets_errors.py` deleted (content folded into the new `exceptions.py`).
+    - New `<topic>_exceptions.py` modules (plugin-prefix pattern): `pipelex/plugins/bedrock/bedrock_exceptions.py` (`BedrockFactoryError` + `BedrockWorkerConfigurationError`); `pipelex/plugins/google/google_exceptions.py` (`GoogleLLMWorkerError` + `GoogleImgGenWorkerError`); `pipelex/plugins/openai/openai_exceptions.py` (`OpenAIClientFactoryError` + `VertexAIConfigError` + `VertexAICredentialsError`); `pipelex/plugins/azure_rest/azure_exceptions.py` (`AzureCredentialsError`).
+    - **Adjacent cleanup, in scope:** the broken back-compat shim `pipelex/pipe_operators/llm/template_image_analyzer.py` (re-export aggregator referencing the no-longer-present `WithImagesFilterError` / `UnusedInputError` after the move) was deleted, its three callers migrated to the canonical paths. The sibling `pipelex/pipe_operators/llm/image_reference.py` shim was left alone — it pre-dates this refactor and is not error-class-related.
+    - No back-compat shims or re-exports left behind anywhere. Every import site updated by class name across `pipelex/`, `tests/`, and `docs/` examples.
+
+  **Registry deletion (Phase 6.3):** `pipelex/errors/error_module_registry.py` deleted. The `iter_pipelex_error_subclasses` helper now lives directly in `error_pages_generator.py` as a simple transitive `__subclasses__()` walk — no filesystem scan, no `_NON_STANDARD_ERROR_MODULES` allowlist, no force-import phase. The two callers (`error_pages_generator.generate_error_pages` + the URI-uniqueness test in `tests/unit/pipelex/test_pipelex_error_type_uri_uniqueness.py`) import from the new location. Normal production imports now reach every error class — the convention test guarantees it.
+
+  **Docs regeneration:** `pipelex-dev generate-error-pages` ran cleanly — 209 total pages, 32 updated (their "Defined in" field changed to the new module), 177 unchanged, **1 new page** (`docs/errors/base-model-payload-converter-error.md` — `BaseModelPayloadConverterError` was previously silently missed by the registry's filename pattern scan). No orphan pages; the generator walks the current hierarchy.
+
+  **Rule + kebab-slug collision defense (Phase 6.4):**
+
+    - New "Error class location" section in `.claude/rules/python-standards.md` — states the convention, points at the convention test, calls out the `*_errors.py` ban and the topical-split escape hatch, and warns about acronym-casing kebab collisions.
+    - `error_pages_generator.generate_error_pages` now asserts kebab-slug uniqueness across `target_classes` before writing pages — raises a loud `RuntimeError` naming the two colliding classes if e.g. both `LLMError` and `LlmError` resolve to `llm-error`. Today this is caught reactively by `test_pipelex_error_type_uri_uniqueness`; now it fails at generation time too.
+    - Short note added near `PipelexError.type_uri()` describing the collision footgun and pointing at both defenses.
+    - New unit test `test_kebab_slug_collision_raises` in `test_error_pages_generator.py` pins the new guard with a synthetic `LLMError` / `LlmError` pair.
+
+  **Test count:** 9 in `tests/unit/pipelex/errors/` (2 convention, 7 generator), all green. Both convention tests verified to have teeth — they failed on first run with the misplaced list.
+
+  **Deferred / not done:** Nothing from Phase 6 itself. The `_for_api/CLAUDE.md` "Reference it from `pipelex/CLAUDE.md`" sub-bullet is N/A — no such file exists; the workspace consults `.claude/rules/python-standards.md` (which now carries the rule) from the top-level CLAUDE.md.
+
+  **Decisions:** D1 + D2 + D3 all done.
+
+  **Next action:** Stop at this checkpoint per the project policy. Confirm with the user before opening a PR — Phase 6 is a large, file-touching refactor (173 changed files: 1 deletion, 16 new `exceptions.py`/`*_exceptions.py` modules, 1 renamed module, ~150 source/test/doc edits) that should be reviewed as a single coherent commit (or a small ordered series: test-first → moves → registry deletion → rule).

@@ -23,3 +23,7 @@ class PipelexInterpreterError(PipelexError):
     ):
         self.validation_errors = validation_errors or []
         super().__init__(message)
+
+
+class BundleElaboratorError(PipelexInterpreterError):
+    """Raised when bundle elaboration fails (e.g. synthetic-name collision, invalid output for preliminary_text)."""

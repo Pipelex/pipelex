@@ -55,9 +55,10 @@ from pipelex.system.pipelex_service.pipelex_service_config import (
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig
 from pipelex.tools.misc.dict_utils import extract_vars_from_strings_recursive
+from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.placeholder import value_is_placeholder
-from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_path
+from pipelex.tools.misc.toml_utils import load_toml_from_path
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
 if TYPE_CHECKING:

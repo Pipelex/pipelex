@@ -13,7 +13,7 @@ description: "Reference for the `JsonTypeError` Pipelex error class."
 | `title` | Json type |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/json-type-error/` |
 | `error_domain` | _(inherited from parent)_ |
-| Defined in | `pipelex.tools.misc.json_utils` |
+| Defined in | `pipelex.tools.misc.exceptions` |
 | Parent class | [`ToolError`](tool-error.md) |
 
 [Back to Error Model overview](../under-the-hood/error-model.md)

@@ -31,7 +31,8 @@ from pipelex.hub import (
 )
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION
-from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
+from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty

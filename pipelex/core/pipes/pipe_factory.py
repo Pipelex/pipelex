@@ -9,8 +9,9 @@ from pipelex.core.pipes.exceptions import PipeFactoryError, PipeFactoryErrorType
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint, PipeType
+from pipelex.core.pipes.stuff_spec.exceptions import StuffSpecFactoryError
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
-from pipelex.core.pipes.stuff_spec.stuff_spec_factory import StuffSpecFactory, StuffSpecFactoryError
+from pipelex.core.pipes.stuff_spec.stuff_spec_factory import StuffSpecFactory
 from pipelex.hub import get_class_registry
 
 if TYPE_CHECKING:

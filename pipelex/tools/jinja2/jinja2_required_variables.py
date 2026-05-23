@@ -7,8 +7,8 @@ from jinja2.exceptions import (
 )
 
 from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError, Jinja2StuffError
 from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_loader
-from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError, Jinja2StuffError
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 

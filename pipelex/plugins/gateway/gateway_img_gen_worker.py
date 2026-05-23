@@ -23,7 +23,8 @@ from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCateg
 from pipelex.plugins.fal.fal_poller import FalPoller
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
 from pipelex.plugins.gateway.gateway_schemas import GatewayImgGenAzureFlux2Pro, GatewayImgGenAzureGptImage
-from pipelex.tools.misc.filetype_utils import FileTypeError, detect_file_type_from_bytes
+from pipelex.tools.misc.exceptions import FileTypeError
+from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 

@@ -18,8 +18,7 @@ from pipelex.cogt.exceptions import (
 )
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
-from pipelex.pipeline.validate_bundle import ValidateBundleError
+from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError, ValidateBundleError
 from pipelex.system.pipelex_service.exceptions import (
     GatewayTermsNotAcceptedError,
     PipelexServiceConfigValidationError,

@@ -27,8 +27,7 @@ from pipelex.graph.graph_rendering import GraphFormat, generate_graph_for_bundle
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.exceptions import PipelineExecutionError
-from pipelex.pipeline.validate_bundle import ValidateBundleError
+from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 
 

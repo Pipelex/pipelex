@@ -3,7 +3,6 @@ import time
 from pydantic import BaseModel, ValidationError
 
 from pipelex import log
-from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, TypedNamedStuffSpec
@@ -13,7 +12,7 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_class_registry
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_operators.compose.exceptions import PipeComposeError
-from pipelex.pipe_run.exceptions import PipeRunError
+from pipelex.pipe_run.exceptions import DryRunError, PipeRunError
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.exceptions import PipeStackOverflowError
@@ -22,10 +21,6 @@ from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.types import StrEnum
-
-
-class DryRunError(PipelexError):
-    """Raised when a dry run fails due to missing inputs or other validation issues."""
 
 
 class DryRunStatus(StrEnum):

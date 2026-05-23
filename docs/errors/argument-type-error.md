@@ -13,7 +13,7 @@ description: "Reference for the `ArgumentTypeError` Pipelex error class."
 | `title` | Argument type |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/argument-type-error/` |
 | `error_domain` | _(inherited from parent)_ |
-| Defined in | `pipelex.tools.misc.json_utils` |
+| Defined in | `pipelex.tools.misc.exceptions` |
 | Parent class | [`ToolError`](tool-error.md) |
 
 [Back to Error Model overview](../under-the-hood/error-model.md)

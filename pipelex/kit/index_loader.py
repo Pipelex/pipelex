@@ -1,14 +1,10 @@
 from pydantic import ValidationError
 
-from pipelex.base_exceptions import PipelexError
+from pipelex.kit.exceptions import KitIndexLoadingError
 from pipelex.kit.index_models import KitIndex
 from pipelex.kit.paths import get_kit_root
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
-
-
-class KitIndexLoadingError(PipelexError):
-    pass
 
 
 def load_index() -> KitIndex:

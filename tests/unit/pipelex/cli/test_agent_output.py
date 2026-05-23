@@ -29,7 +29,7 @@ from pipelex.cogt.inference.error_classification import UserAction, UserActionKi
 from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
-from pipelex.pipeline.validate_bundle import ValidateBundleError
+from pipelex.pipeline.exceptions import ValidateBundleError
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
