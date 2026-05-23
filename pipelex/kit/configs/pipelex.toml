@@ -161,7 +161,17 @@ default_directory_base_name = "pipeline"
 # Default logging level: "DEBUG", "INFO", "WARNING", "ERROR"
 default_log_level = "INFO"
 # Log output target: "stdout" or "stderr"
+# console_log_target controls the RichHandler used by the logging system (log.debug/info/...).
+# Logs are diagnostics → stderr.
 console_log_target = "stderr"
+# console_print_target controls the Console returned by get_console(), used for banners,
+# deck notices, and the main `pipelex` CLI's data tables (`show backends`, `show models`,
+# `which`, `doctor`). Tables are data the user pipes to a file → stdout.
+# Note: the agent CLI (`pipelex-agent`) emits its actual JSON/markdown results via bare
+# builtin `print(...)` to sys.stdout, bypassing Rich entirely — so this knob does NOT
+# affect the agent CLI data channel. The agent CLI factory additionally forces both
+# targets to stderr internally to keep its stdout strictly reserved for the success
+# envelope.
 console_print_target = "stdout"
 
 [pipelex.log_config.package_log_levels]

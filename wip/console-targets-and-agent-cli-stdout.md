@@ -1,6 +1,6 @@
 # Console targets — partial revert + agent CLI stdout hardening
 
-> **Status:** In progress on branch `fix/Log-target` (commit `ac858de8`). The current commit overshot the fix; this doc captures the partial revert that needs to land on top of it AND the deeper improvement for the agent CLI's stdout contract.
+> **Status:** Both parts landed on branch `fix/Log-target`. Part 1 (partial revert + dual-TOML test) shipped in commit `3d22ea9f`. Part 2 (agent-CLI factory-level hardening + adversarial E2E test) is included in this PR — `make_pipelex_for_agent_cli` now injects `config_overrides` that pin both console targets to stderr from the very first log/print during init, and the new test `test_models_json_stdout_resists_user_targets_override_to_stdout` pins the contract under adversarial user overrides.
 >
 > **Cold-start prerequisite:** read `pipelex/tools/log/log.py:91`, `pipelex/hub.py:137-148`, `pipelex/cli/agent_cli/commands/agent_cli_factory.py:118-122`, `pipelex/cli/agent_cli/commands/agent_output.py` (where `agent_success` writes to stdout), and `pipelex/tools/misc/pretty.py:214` (the bare `Console()` instantiation).
 
@@ -89,9 +89,11 @@ tables go through get_console() and must remain redirectable.
 
 Then run `make agent-check && make agent-test` and force-push the branch (history-rewrite is fine here since the PR isn't merged yet).
 
-## Part 2 — Agent CLI stdout hardening (the deeper fix)
+## Part 2 — Agent CLI stdout hardening (the deeper fix) — LANDED
 
 > Why this is its own piece of work: the partial revert above restores correctness for stock installs, but the agent CLI's stdout-as-JSON-channel contract is too important to leave at the mercy of the user's `~/.pipelex/pipelex.toml`. A user override of `console_print_target = "stderr"` shouldn't break the agent CLI's data channel either way, and a hypothetical override of `console_log_target = "stdout"` must NOT re-pollute the agent CLI's stdout. The defense should live in the factory, not depend on the config defaults staying lucky.
+
+> **Implementation note vs the original plan below.** The original plan proposed a single post-init `get_pipelex_hub().set_console_print_target(STDERR)` line. That covers post-init `get_console().print(...)` calls, but does NOT cover logs/prints that fire DURING `Pipelex.make()` (e.g. `telemetry_factory.py:77` DEBUG line, the deck-notice print). The shipped fix uses `config_overrides` passed to `Pipelex.make()` to pin both `console_log_target` and `console_print_target` to `stderr` from the very first log/print, which is strictly stronger. The post-init `set_console_print_target` and `log.redirect_to_stderr()` calls are kept as defense-in-depth.
 
 ### The contract we want
 
@@ -218,12 +220,12 @@ For Part 1 (partial revert) — must hold before re-pushing `fix/Log-target`:
 - [ ] CHANGELOG entry narrowed to scope (logs only).
 - [ ] `make agent-check && make agent-test` clean.
 
-For Part 2 (agent CLI hardening) — must hold before merging the follow-up PR:
+For Part 2 (agent CLI hardening) — LANDED in this PR:
 
-- [ ] `make_pipelex_for_agent_cli` calls `get_pipelex_hub().set_console_print_target(ConsoleTarget.STDERR)` alongside `log.redirect_to_stderr()`.
-- [ ] New E2E test pins the contract under adversarial user overrides (both targets set to stdout, package log level DEBUG, --log-level debug).
-- [ ] (Optional but recommended) E2E test parametrized across `models`, `check-model`, `doctor`, `validate bundle` — all JSON-emitting agent commands.
-- [ ] Docstring of `make_pipelex_for_agent_cli` updated to explicitly call out the stdout-channel contract.
+- [x] `make_pipelex_for_agent_cli` injects `config_overrides` pinning both targets to stderr, and additionally calls `get_pipelex_hub().set_console_print_target(STDERR)` post-init alongside `log.redirect_to_stderr()`.
+- [x] New E2E test `test_models_json_stdout_resists_user_targets_override_to_stdout` pins the contract under adversarial user overrides (both targets set to stdout, package log level DEBUG, `--log-level debug`).
+- [ ] (Optional but recommended) E2E test parametrized across `models`, `check-model`, `doctor`, `validate bundle` — all JSON-emitting agent commands. Deferred: the current test exercises the same `Pipelex.make()` setup path that every other agent command goes through, so adding more command variants gives marginal extra signal.
+- [x] Docstring of `make_pipelex_for_agent_cli` updated to explicitly call out the stdout-channel contract.
 
 ## How to start (cold)
 

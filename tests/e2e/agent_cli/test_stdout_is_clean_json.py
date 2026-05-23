@@ -68,6 +68,44 @@ def _set_pipelex_package_log_level_to_debug(pipelex_toml_path: Path) -> None:
     pipelex_toml_path.write_text("".join(lines), encoding="utf-8")
 
 
+def _set_console_targets(pipelex_toml_path: Path, *, log_target: str, print_target: str) -> None:
+    """Rewrite ``console_log_target`` and ``console_print_target`` directly under
+    ``[pipelex.log_config]`` to the given values.
+
+    Used by the adversarial defense-in-depth test to simulate a user who overrides both
+    targets to ``"stdout"`` in their ``~/.pipelex/pipelex.toml``. The agent CLI must keep
+    its stdout channel clean for JSON consumers regardless of this user config.
+
+    Asserts on no-match for either knob so a future kit refactor surfaces here instead of
+    silently neutering the test.
+    """
+    original_text = pipelex_toml_path.read_text(encoding="utf-8")
+    lines = original_text.splitlines(keepends=True)
+    in_target_section = False
+    log_target_rewritten = False
+    print_target_rewritten = False
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            in_target_section = stripped == "[pipelex.log_config]"
+            continue
+        if not in_target_section:
+            continue
+        if stripped.startswith("console_log_target"):
+            lines[index] = f'console_log_target = "{log_target}"\n'
+            log_target_rewritten = True
+        elif stripped.startswith("console_print_target"):
+            lines[index] = f'console_print_target = "{print_target}"\n'
+            print_target_rewritten = True
+    if not log_target_rewritten:
+        msg = f"Could not find 'console_log_target = ...' under [pipelex.log_config] in {pipelex_toml_path}"
+        raise AssertionError(msg)
+    if not print_target_rewritten:
+        msg = f"Could not find 'console_print_target = ...' under [pipelex.log_config] in {pipelex_toml_path}"
+        raise AssertionError(msg)
+    pipelex_toml_path.write_text("".join(lines), encoding="utf-8")
+
+
 @pytest.mark.gha_disabled  # Slow subprocess-based E2E; runs locally and on PR-gated workflows.
 class TestAgentCliStdoutIsCleanJson:
     def test_models_json_stdout_parses_as_single_json_document(
@@ -108,6 +146,62 @@ class TestAgentCliStdoutIsCleanJson:
         except json.JSONDecodeError as exc:
             msg = (
                 f"stdout must be a single parseable JSON document (no log/print pollution).\n"
+                f"stdout={result.stdout!r}\nstderr={result.stderr!r}\nparse error={exc!s}"
+            )
+            raise AssertionError(msg) from exc
+
+        assert isinstance(parsed, dict), f"Expected a JSON object envelope; got {type(parsed).__name__}: {parsed!r}"
+        payload = cast("dict[str, object]", parsed)
+        assert payload.get("success") is True, f"Expected ``success=True`` in envelope; got {payload!r}"
+
+    def test_models_json_stdout_resists_user_targets_override_to_stdout(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        """Adversarial defense-in-depth: even when the user's ``pipelex.toml`` sets BOTH
+        ``console_log_target = "stdout"`` and ``console_print_target = "stdout"`` AND
+        bumps ``package_log_levels.pipelex`` to DEBUG, the agent CLI's stdout channel
+        must remain a clean, parseable JSON envelope.
+
+        The agent CLI's stdout-as-JSON contract is too important to leave at the mercy of
+        the user's ``~/.pipelex/pipelex.toml``. ``make_pipelex_for_agent_cli`` injects
+        config_overrides that pin both targets to stderr from the very first log/print
+        call during ``Pipelex.make()`` — so this test exercises the override defense end
+        to end, not just the shipped TOML defaults.
+        """
+        pipelex_toml = hermetic_home / ".pipelex" / "pipelex.toml"
+        _set_pipelex_package_log_level_to_debug(pipelex_toml)
+        _set_console_targets(pipelex_toml, log_target="stdout", print_target="stdout")
+
+        result = subprocess.run(  # noqa: S603
+            [
+                str(PIPELEX_AGENT_BIN),
+                "--log-level",
+                "debug",
+                "models",
+                "--format",
+                "json",
+            ],
+            env=offline_subprocess_env,
+            cwd=str(hermetic_home),
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=120,
+        )
+
+        assert result.returncode == 0, (
+            f"pipelex-agent models --format json must succeed under adversarial user override.\nstdout={result.stdout!r}\nstderr={result.stderr!r}"
+        )
+
+        try:
+            parsed = json.loads(result.stdout)
+        except json.JSONDecodeError as exc:
+            msg = (
+                f"stdout must stay parseable JSON even when the user pipelex.toml routes "
+                f"both console_log_target and console_print_target to stdout — the agent CLI "
+                f"factory must override them back to stderr.\n"
                 f"stdout={result.stdout!r}\nstderr={result.stderr!r}\nparse error={exc!s}"
             )
             raise AssertionError(msg) from exc
