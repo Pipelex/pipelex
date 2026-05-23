@@ -78,6 +78,8 @@ make generate-mthds-schema    - Generate JSON Schema for .mthds files
 make gms                      - Shorthand -> generate-mthds-schema
 make check-mthds-schema       - Check MTHDS JSON Schema is up-to-date
 make cms                      - Shorthand -> check-mthds-schema
+make generate-error-pages     - Generate one docs page per PipelexError subclass under docs/errors/
+make gep                      - Shorthand -> generate-error-pages
 make update-gateway-models    - Update gateway models reference
 make ugm                      - Shorthand -> update-gateway-models
 make check-gateway-models     - Check gateway models reference is up-to-date
@@ -187,6 +189,7 @@ export HELP
 	li check-unused-imports fix-unused-imports check-TODOs check-uv \
 	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-specific-version docs-delete \
 	generate-mthds-schema generate-mthds-schema-quiet gms check-mthds-schema cms \
+	generate-error-pages generate-error-pages-quiet gep \
 	update-gateway-models update-gateway-models-quiet ugm check-gateway-models cgm up \
 	test-count check-test-badge \
 	serve-graph serve-graph-bg stop-graph-server view-graph sg vg \
@@ -327,6 +330,16 @@ check-mthds-schema: env
 
 cms: check-mthds-schema
 	@echo "> done: cms = check-mthds-schema"
+
+generate-error-pages: env
+	$(call PRINT_TITLE,"Generating per-class error documentation pages")
+	$(VENV_PIPELEX_DEV) generate-error-pages
+
+generate-error-pages-quiet: env
+	$(VENV_PIPELEX_DEV) generate-error-pages --quiet
+
+gep: generate-error-pages
+	@echo "> done: gep = generate-error-pages"
 
 update-gateway-models: env
 	$(call PRINT_TITLE,"Updating gateway models reference")
@@ -879,16 +892,16 @@ Sitemap: https://$(SITE_DOMAIN)/sitemap.xml
 endef
 export ROOT_ROBOTS_TXT
 
-docs: env
+docs: env generate-error-pages-quiet
 	$(call PRINT_TITLE,"Serving documentation with mkdocs")
 	$(VENV_MKDOCS) serve -a 127.0.0.1:8000 -f "$(CURDIR)/mkdocs.yml" --watch "$(CURDIR)/docs" -s
 
-docs-check: env
+docs-check: env generate-error-pages-quiet
 	$(call PRINT_TITLE,"Checking documentation build with mkdocs")
 	$(VENV_MKDOCS) build --strict
 
 docs-serve-versioned: export PATH := $(VIRTUAL_ENV)/bin:$(PATH)
-docs-serve-versioned: env
+docs-serve-versioned: env generate-error-pages-quiet
 	$(call PRINT_TITLE,"Serving versioned documentation with mike")
 	$(VENV_MIKE) serve
 
@@ -898,19 +911,19 @@ docs-list: env
 	$(VENV_MIKE) list
 
 docs-deploy: export PATH := $(VIRTUAL_ENV)/bin:$(PATH)
-docs-deploy: env
+docs-deploy: env generate-error-pages-quiet
 	$(call PRINT_TITLE,"Deploying documentation version $(if $(VERSION),$(VERSION),$(DOCS_VERSION))")
 	$(VENV_MIKE) deploy $(if $(VERSION),$(VERSION),$(DOCS_VERSION))
 
 docs-deploy-stable: export PATH := $(VIRTUAL_ENV)/bin:$(PATH)
-docs-deploy-stable: env
+docs-deploy-stable: env generate-error-pages-quiet
 	$(call PRINT_TITLE,"Deploying stable documentation $(DOCS_VERSION) with latest alias")
 	$(VENV_MIKE) deploy --push --update-aliases $(DOCS_VERSION) latest
 	$(VENV_MIKE) set-default --push latest
 	$(MAKE) docs-deploy-root
 
 docs-deploy-specific-version-pre-release: export PATH := $(VIRTUAL_ENV)/bin:$(PATH)
-docs-deploy-specific-version-pre-release: env
+docs-deploy-specific-version-pre-release: env generate-error-pages-quiet
 	$(call PRINT_TITLE,"Deploying documentation $(DOCS_VERSION) with pre-release alias")
 	$(VENV_MIKE) deploy --push --update-aliases $(DOCS_VERSION) pre-release
 	$(MAKE) docs-deploy-root
