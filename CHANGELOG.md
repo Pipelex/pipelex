@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **`console_log_target` and `console_print_target` package defaults are now `stderr` (were `stdout`).** Logs and rich prints now stay off the data channel by default, matching the intent of PR #452 ("default to stderr for outputs happening before initialization"). Downstream tooling that parses `pipelex` / `pipelex-agent` stdout as JSON (e.g. `mthds-js`'s `PipelexRunner`) is no longer at risk of stdout pollution from package-level logs — the bug was latent for stock installs because the agent-CLI JSON paths happen not to log at INFO+, but surfaced for anyone who raised `package_log_levels.pipelex` to DEBUG or added a setup-time log on the command path. The same flip is applied to the kit template (`pipelex/kit/configs/pipelex.toml`) that `pipelex init` copies to `~/.pipelex/`. This is a default-behavior change: anyone who was capturing stdout to collect logs should switch to capturing stderr, or set `console_log_target = "stdout"` explicitly in their `pipelex.toml`.
+
 ## [v0.29.1] - 2026-05-21
 
 ### Fixed

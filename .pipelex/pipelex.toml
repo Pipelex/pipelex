@@ -161,8 +161,8 @@ default_directory_base_name = "pipeline"
 # Default logging level: "DEBUG", "INFO", "WARNING", "ERROR"
 default_log_level = "INFO"
 # Log output target: "stdout" or "stderr"
-console_log_target = "stdout"
-console_print_target = "stdout"
+console_log_target = "stderr"
+console_print_target = "stderr"
 
 [pipelex.log_config.package_log_levels]
 # Log levels for specific packages (use "-" instead of "." in package names)

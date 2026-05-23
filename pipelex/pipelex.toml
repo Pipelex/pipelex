@@ -70,8 +70,8 @@ cost_report_unit_scale = 1.0
 
 [pipelex.log_config]
 default_log_level = "INFO"
-console_log_target = "stdout"
-console_print_target = "stdout"
+console_log_target = "stderr"
+console_print_target = "stderr"
 is_console_logging_enabled = true
 
 json_logs_indent = 4
