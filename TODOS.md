@@ -244,6 +244,66 @@ For each move:
 
 ---
 
+## Phase 7 — Error-class discovery contract (Fix #1 follow-up)
+
+Phase 6 deleted `pipelex/errors/error_module_registry.py` on the premise that *every error class lives in a properly-named module that normal imports pull in*. The premise turned out **false**. A `/code-review` pass on the Phase 6 commit `0fa4440b` found that `docs/errors/index.md` had already regressed by 23 entries because plugin worker/factory modules use deferred imports (rightly so — the SDKs are heavy / optional), so the colocated `*_exceptions.py` modules for `anthropic`, `bedrock`, `google`, `openai`, `azure_rest`, `mistral`, `gateway`, `portkey`, plus a handful of non-plugin classes (`FalCredentialsError`, `GraphSpecError`/`GraphSpecValidationError`, `PipeBatchFactoryError`, `PipeSearchError`/`PipeSearchFactoryError`, `PipelexBundleSpecBlueprintError`) are never reached by `Pipelex.make()` at docs-generation time. Their `__subclasses__()` registration never happens, so the new `iter_pipelex_error_subclasses()` silently misses them.
+
+A second commit (the Fix #2/#3/#4 commit landing right after this analysis) added the orphan-deletion path to `generate_error_pages` (so the 23 stale `.md` files are cleaned up rather than left as orphans on disk), a `removed` bucket in `ErrorPagesReport`, the `tomli` runtime-import fix in `pipelex/tools/misc/exceptions.py`, and an `xfail(strict=True)` completeness assertion at `tests/unit/pipelex/errors/test_error_class_location_convention.py::TestErrorClassLocationConvention::test_runtime_walk_discovers_every_ast_classified_subclass`. The xfail makes the gap visible in CI; the moment Phase 7 closes it, `strict=True` turns the unexpected pass into a CI failure that demands the marker be removed.
+
+### Goal
+
+Close the gap. Discovery must yield the same set the AST scan finds. The convention test's completeness assertion should pass without `xfail`.
+
+### Decision D4 — discovery strategy
+
+Three architectural options (all preserve the Phase 6 file-naming convention):
+
+- **Option A — Explicit registration manifest.** A single source file (e.g. `pipelex/errors/_all_exceptions.py`) imports every `*_exceptions.py` module explicitly. The convention test grows a two-sided check: every `*_exceptions.py` on disk has a matching import in the manifest; every manifest import points at an existing `*_exceptions.py`. **Pros:** explicit, no runtime filesystem scan, fails loudly when someone adds a module without registering it. **Cons:** one extra edit per new error module; the manifest grows.
+- **Option B — Eager `*_exceptions.py` import at `Pipelex.make()`.** Filesystem-walk for the convention patterns during bootstrap; force-import each one. Only error modules are loaded (verified safe: each plugin's `*_exceptions.py` imports only `CogtError`/`CredentialsError`/`PipelexError` — none pull in the plugin's SDK). **Pros:** zero maintenance; convention enforcement is structural. **Cons:** runtime filesystem touch (the smell the Phase 6 refactor wanted to delete); breaks in zip-wheel installs where `rglob` returns nothing.
+- **Option C — Build-time codegen.** A `pipelex-dev` command regenerates `pipelex/errors/_all_exceptions.py` from the filesystem; CI fails if the generated file is stale. **Pros:** explicit at rest, automatic at update; eliminates runtime filesystem touch. **Cons:** needs CI integration; adds a generator + a check; two commits to land any new error module.
+
+**Recommendation: Option A.** Explicit manifest. Trade one extra edit per module for visibility-in-source. The convention test makes forgetfulness an immediate CI failure on either side.
+
+Record the decision in the Decisions section when taken.
+
+### 7.1 — Implement the chosen option
+
+- [ ] **Decision D4** — pick A / B / C from above. Record date and rationale.
+- [ ] Implement.
+- [ ] Verify: `make agent-test` runs the completeness assertion *without* the `xfail` marker (or, equivalently, the test passes and pytest reports `XPASS` under `strict=True`, prompting the marker's removal).
+- [ ] Remove `@pytest.mark.xfail(...)` from `test_runtime_walk_discovers_every_ast_classified_subclass`.
+
+### 7.2 — Regenerate `docs/errors/`
+
+- [ ] `pipelex-dev generate-error-pages` — the 23 previously-dropped pages should reappear (recreated, not "removed"). Verify `ErrorPagesReport.written` lists them.
+- [ ] `docs/errors/index.md` is back to 230+ entries (the HEAD~1 baseline plus the new `BaseModelPayloadConverterError`).
+
+### 7.3 — Update the docs / rules
+
+- [ ] In `.claude/rules/python-standards.md`, document the chosen discovery strategy alongside the existing "Error class location" rule. The convention is about file naming; D4 is about how those files become discoverable.
+
+### Acceptance
+
+- The completeness assertion test passes without `xfail`.
+- `docs/errors/index.md` contains every AST-discovered class (no silent drops).
+- Generating docs from a clean clone (`pipelex-dev generate-error-pages` after `git clean`) produces the same set as the AST scan.
+
+### ⛔ CHECKPOINT 7 — STOP, verify, record
+
+- [ ] `make agent-check` and `make agent-test` clean (and the formerly-`xfail` test now passes without the marker).
+- [ ] Commit.
+- [ ] Tick every Phase 7 box.
+- [ ] Append a dated **Checkpoint 7** entry to the Session log: Decision D4 outcome, files touched, the AST/runtime set diff before and after, next action.
+
+### Cold-start context for a fresh session
+
+1. The smoking gun: `git show 0fa4440b -- docs/errors/index.md | head -50` shows the dropped entries. The current `docs/errors/index.md` is consistent with the deferred-import discovery state (208 entries); when Phase 7 closes, it should match the AST scan (231+ entries).
+2. The completeness assertion lives at `tests/unit/pipelex/errors/test_error_class_location_convention.py::test_runtime_walk_discovers_every_ast_classified_subclass`. Run it first thing: it should xfail today. After Phase 7, remove the `@pytest.mark.xfail(...)` decorator.
+3. The deleted `error_module_registry.py` (visible at `git show HEAD~N:pipelex/errors/error_module_registry.py` for the Phase 6 commit) had a body shaped roughly like the Option B implementation — useful as reference, but the recommended approach is Option A.
+4. Plugin `*_exceptions.py` files were verified safe to force-import in any environment (extras-only included) — they don't transitively import the plugin SDK. So Option B isn't blocked by extras availability.
+
+---
+
 ## Out of scope (recorded, not planned here)
 
 - Webhook VERBOSE disclosure to caller-supplied URLs — sending a full `ErrorReport` to the run caller's own endpoint is by design (plan §D.3: the endpoint belongs to the caller, who already owns the run data; the receiver decides what to re-expose). Webhook signing (Phase 5) is orthogonal — it authenticates origin, it does not reduce disclosure. No separate task; revisit only if the threat model changes.
@@ -258,6 +318,7 @@ Record each decision here as it is taken, with date and rationale.
 - **D1** (Phase 1, Gap 1 fix) — **Option 1**, decided 2026-05-22. Add a per-class `ClassVar` flagging error classes that genuinely author caller-facing messages, and gate the STRICT-disclosure passthrough on that flag instead of on the inherited `error_domain == INPUT`. Rationale: keys redaction on the *provenance of the message* rather than an inherited classification, and avoids the `http_status` side effects Option 2 (dropping `error_domain` inheritance for domain-less wrappers) would carry.
 - **D2** (Phase 2, request_id call-site strategy) — **Bound adapter**, decided 2026-05-22. `WorkflowLog` / `ActivityLog` gain an instance-level `request_id` (held by a shared `_RequestIdLog` base), built once per workflow/activity invocation from `job_metadata.request_id`; the dead per-method `request_id` kwargs are dropped. Rationale: a new log call added inside a wired entry point picks up `request_id` automatically — no per-call threading, nothing to forget — and the per-method kwarg was unused dead surface.
 - **D3** (Phase 6, error class location filename pattern) — **`exceptions.py` + `*_exceptions.py`**, decided 2026-05-23. Every module declaring a `PipelexError` subclass must be named `exceptions.py` (default — one per package directory) or `<topic>_exceptions.py` (for directories that host multiple separate-concern error modules, matching the existing `pipelex/plugins/*/` pattern: `portkey_exceptions.py`, `anthropic_exceptions.py`, `mistral_exceptions.py`, `gateway_exceptions.py`). The `*_errors.py` synonym is dropped — it adds no information, and three files (`jinja2_errors.py`, `secrets_errors.py`, `template_errors.py`) get renamed. The root `pipelex/base_exceptions.py` is special-cased. Rationale: synonyms are exactly what produced the drift the registry exists to paper over; one canonical pattern + one topical variant covers the legitimate cases without inviting a third.
+- **D4** (Phase 7, error class discovery strategy) — **pending**. Recommended: Option A (explicit registration manifest at `pipelex/errors/_all_exceptions.py` plus a two-sided convention test that verifies disk-vs-manifest parity). Record when taken.
 
 ---
 
@@ -408,3 +469,25 @@ Append one dated entry per session / checkpoint. Each entry must leave the next 
   **Decisions:** D1 + D2 + D3 all done.
 
   **Next action:** Stop at this checkpoint per the project policy. Confirm with the user before opening a PR — Phase 6 is a large, file-touching refactor (173 changed files: 1 deletion, 16 new `exceptions.py`/`*_exceptions.py` modules, 1 renamed module, ~150 source/test/doc edits) that should be reviewed as a single coherent commit (or a small ordered series: test-first → moves → registry deletion → rule).
+
+- **2026-05-23 — Phase 6 follow-up: `/code-review` pass at xhigh effort.** Five independent finder angles + Phase 2 verifiers + a sweep finder found a **shipped regression in the Phase 6 commit `0fa4440b`**: `docs/errors/index.md` dropped 23 entries (HEAD~1 = 230, HEAD = 208). The new `__subclasses__()`-based `iter_pipelex_error_subclasses` doesn't reach plugin/factory `*_exceptions.py` because plugin workers/factories use deferred imports (rightly — the SDKs are heavy/optional). Class names dropped: `AnthropicModelListingError`, `AnthropicSDKUnsupportedError`, `AnthropicWorkerConfigurationError`, the six gateway errors, the four mistral errors, the three portkey errors, `FalCredentialsError`, both graph errors, `PipeBatchFactoryError`, both pipe-search errors, `PipelexBundleSpecBlueprintError`. The OLD `error_module_registry._discover_standard_exception_modules()` filesystem-scan + force-import had been silently doing this work; Phase 6 deleted it on the premise that "natural imports reach every error module" — false premise.
+
+  **Findings landed in this session (Fix #2 + Fix #3 + Fix #4 + orphan cleanup):**
+
+    - **Fix #4 (`tomli` TYPE_CHECKING regression)**: `pipelex/tools/misc/exceptions.py` — moved `import tomli` out of `TYPE_CHECKING`. Pre-refactor `toml_utils.py` had it at module-top; the Phase 6 move demoted it. `typing.get_type_hints(TomlError.from_tomli_error)` now resolves cleanly; no current caller exercises that path, but the gap blocked any future autodoc / annotation-introspecting tool. Verified live: `python -c "import typing; from pipelex.tools.misc.exceptions import TomlError; typing.get_type_hints(TomlError.from_tomli_error)"` succeeds.
+    - **Fix #2 (orphan-page deletion)**: `pipelex/errors/error_pages_generator.py` — added a fourth `removed` bucket to `ErrorPagesReport` and a `_remove_orphans()` helper. Generated pages whose slug is no longer in `target_classes` are deleted; pages with `<!-- gstack:authored -->` are preserved verbatim; pages with neither marker (out-of-scope hand-files) are left untouched. The dev CLI command's success panel surfaces the new `Removed: N` count. Three new unit tests pin the behavior: orphan deletion, authored-marker preservation, unmarked-file isolation.
+    - **Fix #3 (completeness assertion)**: `tests/unit/pipelex/errors/test_error_class_location_convention.py` — refactored the AST scan into a reusable `_ast_discover_pipelex_error_subclasses()` helper, then added `test_runtime_walk_discovers_every_ast_classified_subclass`. It compares the AST-discovered class-name set to the runtime-loaded class-name set after normal imports, fails loudly with the missing names if they diverge. Marked `@pytest.mark.xfail(strict=True, ...)` pending Phase 7 / Decision D4. When the discovery contract is fixed, the test passes and `strict=True` turns the unexpected pass into a CI failure that prompts the marker's removal.
+    - **Orphan cleanup**: ran `pipelex-dev generate-error-pages` on the real `docs/errors/` — 23 stale per-class `.md` files (the ones dropped by the headline regression) deleted, `Written: 0 · Unchanged: 209 · Preserved: 0 · Removed: 23`. Disk now consistent with the production-imports discovery state, no orphan pages served by mkdocs.
+
+  **Fix #1 deferred to Phase 7 — see the new section above.** The architectural decision (Option A explicit manifest vs Option B eager filesystem-walk import vs Option C build-time codegen) is Decision D4, pending. The xfail completeness test will start passing as soon as Phase 7 lands; remove its marker then.
+
+  **What was NOT fixed (rejected as cosmetic or low-priority):**
+
+    - DFS vs BFS docstring wording mismatch in `iter_pipelex_error_subclasses` — sorted output unaffected; deferred.
+    - AST scan name-collision false positive risk — no current duplicate-short-name in the tree triggers it; would refactor when a real case arises.
+    - `path.relative_to(_PIPELEX_ROOT.parent)` `ValueError` for non-pipelex subclasses — no downstream caller today; not a blocker.
+    - Stale doc reference at `docs/under-the-hood/image-handling-in-llm-prompts.md:442` to the deleted shim — reader-facing only, batched into the next docs sweep.
+
+  **Decisions:** D1 + D2 + D3 done; D4 pending (Phase 7).
+
+  **Next action:** Phase 7 — close the discovery-contract gap per Decision D4. Cold-start context for a fresh session is in the Phase 7 section above. After Phase 7 lands and the `xfail` is removed, the in-repo error-handling work for `feature/API-readiness-2` is fully done (Phases 0-7).

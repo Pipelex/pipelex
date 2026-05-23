@@ -42,9 +42,12 @@ def generate_error_pages_cmd(output: Path | None = None, quiet: bool = False) ->
     written = len(report.written)
     unchanged = len(report.unchanged)
     preserved = len(report.preserved)
+    removed = len(report.removed)
 
     if quiet:
-        console.print(f"[green]✓ Error pages generation: PASSED[/green] ({written} written, {unchanged} unchanged, {preserved} preserved)")
+        console.print(
+            f"[green]✓ Error pages generation: PASSED[/green] ({written} written, {unchanged} unchanged, {preserved} preserved, {removed} removed)"
+        )
         return
 
     success_panel = Panel(
@@ -52,7 +55,7 @@ def generate_error_pages_cmd(output: Path | None = None, quiet: bool = False) ->
             f"[green]✓[/green] Error pages generated.\n\n"
             f"[dim]Output: {output_path}[/dim]\n"
             f"[dim]Total pages: {report.total}[/dim]\n"
-            f"[dim]Written: {written} · Unchanged: {unchanged} · Preserved (authored): {preserved}[/dim]"
+            f"[dim]Written: {written} · Unchanged: {unchanged} · Preserved (authored): {preserved} · Removed: {removed}[/dim]"
         ),
         title="[bold green]Error Pages Generation: PASSED[/bold green]",
         border_style="green",

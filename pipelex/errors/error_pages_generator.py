@@ -68,19 +68,23 @@ INDEX_STEM = "index"
 class ErrorPagesReport:
     """Outcome summary returned by :func:`generate_error_pages`.
 
-    Carries the three populations the CLI command reports back:
+    Carries the four populations the CLI command reports back:
     ``written`` (a page was newly created or refreshed),
     ``unchanged`` (a generated page already on disk was byte-identical),
-    ``preserved`` (the file carried :data:`AUTHORED_MARKER` and was left as-is).
+    ``preserved`` (the file carried :data:`AUTHORED_MARKER` and was left as-is),
+    ``removed`` (a previously-generated page no longer maps to a target class
+    and was deleted; pages bearing :data:`AUTHORED_MARKER` are never removed
+    and surface as ``preserved`` instead).
     """
 
     written: list[Path] = field(default_factory=list[Path])
     unchanged: list[Path] = field(default_factory=list[Path])
     preserved: list[Path] = field(default_factory=list[Path])
+    removed: list[Path] = field(default_factory=list[Path])
 
     @property
     def total(self) -> int:
-        return len(self.written) + len(self.unchanged) + len(self.preserved)
+        return len(self.written) + len(self.unchanged) + len(self.preserved) + len(self.removed)
 
 
 def page_slug(cls: type[PipelexError]) -> str:
@@ -151,7 +155,10 @@ def generate_error_pages(
     :func:`iter_pipelex_error_subclasses`. Pages bearing :data:`AUTHORED_MARKER`
     are left untouched and reported under ``preserved``; pages whose generated
     content matches what's already on disk are reported as ``unchanged`` (no
-    write, no mtime churn).
+    write, no mtime churn). Pre-existing generated pages whose slug no longer
+    appears in ``target_classes`` are deleted and reported under ``removed`` —
+    pages with :data:`AUTHORED_MARKER` are never removed, the index page is
+    never removed.
 
     Raises a loud ``RuntimeError`` if two target classes resolve to the same
     kebab slug (e.g. ``LLMError`` and ``LlmError`` both kebab to ``llm-error``),
@@ -176,6 +183,7 @@ def generate_error_pages(
         slug_owners[slug] = cls
 
     report = ErrorPagesReport()
+    expected_stems: set[str] = {page_slug(cls) for cls in target_classes} | {INDEX_STEM}
     for cls in target_classes:
         target = output_dir / f"{page_slug(cls)}.md"
         _commit_page(target, render_error_page(cls), report)
@@ -183,7 +191,31 @@ def generate_error_pages(
     index_target = output_dir / f"{INDEX_STEM}.md"
     _commit_page(index_target, render_index_page(target_classes), report)
 
+    _remove_orphans(output_dir=output_dir, expected_stems=expected_stems, report=report)
+
     return report
+
+
+def _remove_orphans(output_dir: Path, expected_stems: set[str], report: ErrorPagesReport) -> None:
+    """Delete generated ``.md`` files whose stem is not in ``expected_stems``.
+
+    Files carrying :data:`AUTHORED_MARKER` are preserved verbatim — those
+    pages have been hand-claimed and the maintainer is responsible for their
+    lifecycle. Files with no marker at all (neither generated nor authored)
+    are left alone too, since this function only takes responsibility for
+    pages this generator previously wrote.
+    """
+    for path in output_dir.glob("*.md"):
+        if path.stem in expected_stems:
+            continue
+        content = path.read_text(encoding="utf-8")
+        if has_authored_marker(content):
+            report.preserved.append(path)
+            continue
+        if GENERATED_MARKER not in content:
+            continue
+        path.unlink()
+        report.removed.append(path)
 
 
 def _commit_page(target: Path, new_content: str, report: ErrorPagesReport) -> None:

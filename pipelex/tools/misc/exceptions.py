@@ -1,11 +1,7 @@
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
+import tomli
 
 from pipelex.system.exceptions import ToolError
-
-if TYPE_CHECKING:
-    import tomli
+from pipelex.types import Self
 
 
 class ArgumentTypeError(ToolError):
@@ -37,5 +33,5 @@ class TomlError(ToolError):
         self.colno = colno
 
     @classmethod
-    def from_tomli_error(cls, exc: tomli.TOMLDecodeError) -> TomlError:
+    def from_tomli_error(cls, exc: tomli.TOMLDecodeError) -> Self:
         return cls(message=exc.msg, doc=exc.doc, pos=exc.pos, lineno=exc.lineno, colno=exc.colno)

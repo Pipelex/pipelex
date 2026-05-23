@@ -1,16 +1,23 @@
 """Static check: every ``PipelexError`` subclass must live in a properly-named module.
 
-Two complementary checks:
+Three complementary checks:
 
 - **AST scan** — parses every ``.py`` file under ``pipelex/`` and resolves the
   transitive ``PipelexError`` descendant set by class-name graph traversal.
   Catches new error classes that land outside the convention even if the
   module is never imported by production code.
-- **Runtime backstop** — after normal imports finish, walks
+- **Runtime location check** — after normal imports finish, walks
   ``PipelexError.__subclasses__()`` transitively and asserts each subclass's
   ``__module__`` resolves to a properly-named file. Catches dynamic /
-  decorator-registered cases the AST scan would miss, and is the regression
-  net once ``error_module_registry.py`` is gone.
+  decorator-registered cases the AST scan would miss.
+- **Discovery completeness** — asserts the AST-discovered set of production
+  subclass names equals the runtime-loaded set after the docs-generation
+  bootstrap path runs. This is the regression net for the
+  "natural-imports-reach-every-error-module" premise. If a properly-named
+  ``exceptions.py`` exists on disk but no production import path pulls it in
+  (e.g. plugin worker modules that defer their imports), the class is missing
+  from ``PipelexError.__subclasses__()`` and this assertion fails loudly —
+  which is exactly the silent-drift bug the refactor was meant to prevent.
 
 The accepted filename patterns are ``exceptions.py`` (default — one per
 package directory) and ``<topic>_exceptions.py`` (for directories that host
@@ -25,8 +32,11 @@ import inspect
 import sys
 from pathlib import Path
 
+import pytest
+
 import pipelex
 from pipelex.base_exceptions import PipelexError
+from pipelex.errors.error_pages_generator import iter_pipelex_error_subclasses
 
 _PIPELEX_ROOT: Path = Path(pipelex.__file__).resolve().parent
 _BASE_EXCEPTIONS_FILE: Path = _PIPELEX_ROOT / "base_exceptions.py"
@@ -56,39 +66,54 @@ def _base_short_name(node: ast.expr) -> str | None:
     return None
 
 
+def _ast_discover_pipelex_error_subclasses() -> dict[str, list[Path]]:
+    """AST-scan ``pipelex/`` and return ``{class_name: [paths_where_defined]}`` for every transitive ``PipelexError`` subclass.
+
+    Uses name-based BFS — a class is in the derived set if any of its bases'
+    short names is already in the set. False positives are possible if a
+    truly unrelated class shares a short name with a ``PipelexError``
+    descendant; today none exist in the tree.
+    """
+    class_to_files: dict[str, list[Path]] = {}
+    class_to_bases: dict[str, set[str]] = {}
+
+    for path in sorted(_PIPELEX_ROOT.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            class_to_files.setdefault(node.name, []).append(path)
+            bases = class_to_bases.setdefault(node.name, set())
+            for base in node.bases:
+                resolved = _base_short_name(base)
+                if resolved is not None:
+                    bases.add(resolved)
+
+    derived: set[str] = {"PipelexError"}
+    while True:
+        added = False
+        for class_name, bases in class_to_bases.items():
+            if class_name in derived:
+                continue
+            if bases & derived:
+                derived.add(class_name)
+                added = True
+        if not added:
+            break
+
+    # PipelexError itself is the root, not a "discovered subclass" — drop it.
+    derived.discard("PipelexError")
+    return {name: class_to_files[name] for name in derived}
+
+
 class TestErrorClassLocationConvention:
     def test_ast_scan_every_pipelex_error_subclass_lives_in_a_properly_named_module(self) -> None:
         """AST-scan ``pipelex/`` and assert every transitive ``PipelexError`` subclass lives in an accepted module."""
-        class_to_files: dict[str, list[Path]] = {}
-        class_to_bases: dict[str, set[str]] = {}
-
-        for path in sorted(_PIPELEX_ROOT.rglob("*.py")):
-            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-            for node in ast.walk(tree):
-                if not isinstance(node, ast.ClassDef):
-                    continue
-                class_to_files.setdefault(node.name, []).append(path)
-                bases = class_to_bases.setdefault(node.name, set())
-                for base in node.bases:
-                    resolved = _base_short_name(base)
-                    if resolved is not None:
-                        bases.add(resolved)
-
-        derived: set[str] = {"PipelexError"}
-        while True:
-            added = False
-            for class_name, bases in class_to_bases.items():
-                if class_name in derived:
-                    continue
-                if bases & derived:
-                    derived.add(class_name)
-                    added = True
-            if not added:
-                break
+        ast_discovered = _ast_discover_pipelex_error_subclasses()
 
         misplaced: list[tuple[str, Path]] = []
-        for class_name in sorted(derived):
-            for path in class_to_files.get(class_name, []):
+        for class_name in sorted(ast_discovered):
+            for path in ast_discovered[class_name]:
                 if not _is_properly_named(path):
                     misplaced.append((class_name, path))
 
@@ -136,4 +161,38 @@ class TestErrorClassLocationConvention:
             ]
             for class_name, location in misplaced:
                 lines.append(f"  - {class_name}  →  {location}")
+            raise AssertionError("\n".join(lines))
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason=(
+            "Discovery completeness is not yet enforced — the new `__subclasses__()`-based "
+            "`iter_pipelex_error_subclasses` doesn't reach plugin/factory `*_exceptions.py` "
+            "modules because their workers use deferred imports. Tracked as a follow-up in "
+            "TODOS.md (Phase 7 — error-class discovery contract). Once the manifest/eager-import "
+            "fix lands, remove this xfail marker."
+        ),
+    )
+    def test_runtime_walk_discovers_every_ast_classified_subclass(self) -> None:
+        """Discovery completeness: every AST-discovered subclass is reachable via ``__subclasses__()`` after normal imports.
+
+        Failing here means a properly-named ``exceptions.py`` exists on disk but
+        no production import path pulls it in — the symptom that ships as
+        silently-dropped docs pages and missed ``type_uri`` uniqueness checks.
+        Currently expected to fail; see the ``xfail`` reason for the follow-up
+        plan.
+        """
+        ast_names = set(_ast_discover_pipelex_error_subclasses().keys())
+        runtime_names = {cls.__name__ for cls in iter_pipelex_error_subclasses()} - {"PipelexError"}
+
+        missing = ast_names - runtime_names
+        if missing:
+            lines = [
+                "Discovery gap — AST-found subclasses that are not loaded at runtime:",
+                "",
+                *(f"  - {name}" for name in sorted(missing)),
+                "",
+                "These classes live in properly-named modules but no production code path imports them.",
+                "Docs generation and the type_uri uniqueness check therefore silently miss them.",
+            ]
             raise AssertionError("\n".join(lines))

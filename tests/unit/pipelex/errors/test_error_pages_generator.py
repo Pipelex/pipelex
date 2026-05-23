@@ -29,6 +29,7 @@ class TestErrorPagesGenerator:
         expected_stems = {pascal_case_to_kebab(cls.__name__) for cls in subclasses} | {INDEX_STEM}
 
         assert report.total == len(expected_stems)
+        assert report.removed == []
         emitted_paths = report.written + report.unchanged + report.preserved
         assert {path.stem for path in emitted_paths} == expected_stems
 
@@ -51,10 +52,12 @@ class TestErrorPagesGenerator:
         first = generate_error_pages(output_dir=tmp_path)
         assert first.unchanged == []
         assert first.preserved == []
+        assert first.removed == []
 
         second = generate_error_pages(output_dir=tmp_path)
         assert second.written == []
         assert second.preserved == []
+        assert second.removed == []
         assert len(second.unchanged) == first.total
 
     def test_authored_marker_preserves_hand_edited_page(self, tmp_path: Path) -> None:
@@ -79,14 +82,15 @@ class TestErrorPagesGenerator:
         body_with_standalone_marker = f"some content\n{AUTHORED_MARKER}\nmore content\n"
         assert has_authored_marker(body_with_standalone_marker) is True
 
-    def test_report_total_sums_three_populations(self) -> None:
-        """``total`` should equal the sum of ``written`` + ``unchanged`` + ``preserved``."""
+    def test_report_total_sums_four_populations(self) -> None:
+        """``total`` should equal the sum of ``written`` + ``unchanged`` + ``preserved`` + ``removed``."""
         report = ErrorPagesReport(
             written=[Path("a.md"), Path("b.md")],
             unchanged=[Path("c.md")],
             preserved=[Path("d.md"), Path("e.md"), Path("f.md")],
+            removed=[Path("g.md"), Path("h.md")],
         )
-        assert report.total == 6
+        assert report.total == 8
 
     def test_kebab_slug_collision_raises(self, tmp_path: Path) -> None:
         """Two classes that kebab to the same slug fail generation loudly."""
@@ -99,3 +103,43 @@ class TestErrorPagesGenerator:
 
         with pytest.raises(RuntimeError, match="Kebab-slug collision on 'llm-error'"):
             generate_error_pages(output_dir=tmp_path, classes=[LLMError, LlmError])
+
+    def test_orphan_generated_page_is_deleted(self, tmp_path: Path) -> None:
+        """A generated page whose slug is no longer in target_classes is deleted and reported under ``removed``."""
+
+        class FooError(PipelexError):
+            pass
+
+        first = generate_error_pages(output_dir=tmp_path, classes=[FooError])
+        foo_page = tmp_path / f"{page_slug(FooError)}.md"
+        assert foo_page in first.written
+        assert foo_page.exists()
+
+        # Re-run with an empty target set — FooError's page is now an orphan.
+        second = generate_error_pages(output_dir=tmp_path, classes=[])
+        assert foo_page in second.removed
+        assert not foo_page.exists()
+
+    def test_orphan_authored_page_is_preserved_not_deleted(self, tmp_path: Path) -> None:
+        """A hand-authored page (no longer mapped to a target class) is preserved, not removed."""
+        authored_page = tmp_path / "stale-but-authored.md"
+        authored_body = f"{AUTHORED_MARKER}\n\n# Custom notes\n"
+        authored_page.write_text(authored_body, encoding="utf-8")
+
+        report = generate_error_pages(output_dir=tmp_path, classes=[])
+
+        assert authored_page in report.preserved
+        assert authored_page not in report.removed
+        assert authored_page.read_text(encoding="utf-8") == authored_body
+
+    def test_orphan_unmarked_file_is_left_alone(self, tmp_path: Path) -> None:
+        """A file with neither marker is treated as out-of-scope and never touched."""
+        unmarked_page = tmp_path / "random-note.md"
+        unmarked_body = "# Random note\n\nNot ours to manage.\n"
+        unmarked_page.write_text(unmarked_body, encoding="utf-8")
+
+        report = generate_error_pages(output_dir=tmp_path, classes=[])
+
+        assert unmarked_page not in report.removed
+        assert unmarked_page not in report.preserved
+        assert unmarked_page.read_text(encoding="utf-8") == unmarked_body
