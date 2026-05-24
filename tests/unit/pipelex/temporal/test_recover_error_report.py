@@ -12,7 +12,10 @@ from temporalio.exceptions import ApplicationError
 
 from pipelex.base_exceptions import ErrorDomain, ErrorReport
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
-from pipelex.temporal.tprl.temporal_error import recover_error_report
+from pipelex.temporal.tprl.temporal_error import (
+    _ERROR_REPORT_VALIDATION_FAILED_MARKER,  # noqa: PLC2701 # pyright: ignore[reportPrivateUsage]
+    recover_error_report,
+)
 
 _FULL_REPORT = ErrorReport(
     error_type="CogtError",
@@ -82,7 +85,9 @@ class TestRecoverErrorReport:
         assert report.error_type == "UnrecoverableWorkflowFailureError"
         assert report.error_domain == ErrorDomain.RUNTIME
         assert "rate limited" in report.message
-        assert "schema validation" in report.message
+        # Pin the exact marker (imported constant), not a substring — the marker
+        # is a stable contract documented in docs/under-the-hood/error-model.md.
+        assert _ERROR_REPORT_VALIDATION_FAILED_MARKER in report.message
 
     def test_invalid_report_with_empty_message_falls_back_to_exc_chain(self) -> None:
         """An invalid report dict with an empty ``message`` field falls back to the

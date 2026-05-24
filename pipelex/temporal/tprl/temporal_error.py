@@ -14,6 +14,13 @@ from pipelex.types import Self
 
 _ERROR_REPORT_REQUIRED_KEYS: frozenset[str] = frozenset({"error_type", "message", "title", "type_uri"})
 
+# Suffixed onto the synthesized ``UnrecoverableWorkflowFailureError`` message when
+# the bridge-side schema-validation fallback in :func:`recover_error_report` fires.
+# Detectors (tests, ops dashboards, the documentation in
+# ``docs/under-the-hood/error-model.md``) reference this marker as a stable
+# contract — import the constant instead of duplicating the literal.
+_ERROR_REPORT_VALIDATION_FAILED_MARKER: str = "[error report failed schema validation]"
+
 
 def error_report_dict_from_details(details: Sequence[Any]) -> dict[str, Any] | None:
     """Recover the ``ErrorReport`` dict packed into ``ApplicationError.details``.
@@ -116,7 +123,7 @@ def recover_error_report(exc: BaseException) -> ErrorReport:
             # failure webhook; the recovered message plus marker keep the
             # contract bug visible on the wire.
             recovered_message = report_dict.get("message") or _message_from_exc(exc)
-            fallback_message = f"{recovered_message} [error report failed schema validation]"
+            fallback_message = f"{recovered_message} {_ERROR_REPORT_VALIDATION_FAILED_MARKER}"
             return UnrecoverableWorkflowFailureError(fallback_message).to_error_report()
     return UnrecoverableWorkflowFailureError(_message_from_exc(exc)).to_error_report()
 
