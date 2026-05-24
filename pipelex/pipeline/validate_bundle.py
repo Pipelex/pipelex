@@ -19,7 +19,7 @@ from pipelex.core.pipes.handle_pipe_errors import (
 )
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.validation import report_validation_error
-from pipelex.hub import get_library_manager, resolve_library_dirs, set_current_library
+from pipelex.hub import get_library_manager, resolve_library_dirs, set_current_library, teardown_current_library
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.pipe_run.dry_run import DryRunOutput, dry_run_pipes
 from pipelex.pipe_run.exceptions import DryRunError, PipeRunError
@@ -118,45 +118,53 @@ async def validate_bundle(
     loaded_pipes: list[PipeAbstract] | None = None
     loaded_blueprints: list[PipelexBundleBlueprint] | None = None
     await asyncio.sleep(0)  # Yield to event loop (keeps function async-compatible)
-    with _translate_to_validate_bundle_error():
-        if effective_dirs:
-            log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}) for validation")
-            library_manager.load_libraries(
-                library_id=library_id,
-                library_dirs=effective_dirs,
-            )
-        else:
-            log.verbose(f"No library directories to load ({source_label})")
-        if blueprints is not None:
-            loaded_blueprints = blueprints
-            loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints)
-            # TODO: wip - restore or refactor dry run
-            # dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
-            return ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result={})
-
-        elif mthds_contents is not None:
-            loaded_blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
-            loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
-            # TODO: wip - restore or refactor dry run
-            # dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
-            return ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result={})
-
-        else:
-            assert mthds_file_path is not None
-            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file_path)
-            loaded_blueprints = [blueprint]
-
-            if mthds_file_path.resolve() not in library.loaded_mthds_paths:
-                # File not yet loaded - load it from the blueprint
-                loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint])
+    success = False
+    try:
+        with _translate_to_validate_bundle_error():
+            if effective_dirs:
+                log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}) for validation")
+                library_manager.load_libraries(
+                    library_id=library_id,
+                    library_dirs=effective_dirs,
+                )
             else:
-                # File already loaded - get existing pipes from library by their codes
-                pipe_codes = list(blueprint.pipe.keys()) if blueprint.pipe else []
-                loaded_pipes = [library.pipe_library.get_required_pipe(pipe_code=code) for code in pipe_codes]
+                log.verbose(f"No library directories to load ({source_label})")
+            if blueprints is not None:
+                loaded_blueprints = blueprints
+                loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints)
+                # TODO: wip - restore or refactor dry run
+                # dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
+                result = ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result={})
 
-            # TODO: wip - restore or refactor dry run
-            # dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
-            return ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result={})
+            elif mthds_contents is not None:
+                loaded_blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
+                loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
+                # TODO: wip - restore or refactor dry run
+                # dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
+                result = ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result={})
+
+            else:
+                assert mthds_file_path is not None
+                blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file_path)
+                loaded_blueprints = [blueprint]
+
+                if mthds_file_path.resolve() not in library.loaded_mthds_paths:
+                    # File not yet loaded - load it from the blueprint
+                    loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint])
+                else:
+                    # File already loaded - get existing pipes from library by their codes
+                    pipe_codes = list(blueprint.pipe.keys()) if blueprint.pipe else []
+                    loaded_pipes = [library.pipe_library.get_required_pipe(pipe_code=code) for code in pipe_codes]
+
+                # TODO: wip - restore or refactor dry run
+                # dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
+                result = ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result={})
+        success = True
+        return result
+    finally:
+        if not success:
+            library_manager.teardown(library_id=library_id)
+            teardown_current_library()
 
 
 async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResult:
@@ -166,14 +174,22 @@ async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResu
     library_manager = get_library_manager()
     library_id, _ = library_manager.open_library()
     set_current_library(library_id=library_id)
-    with _translate_to_validate_bundle_error():
-        for mthds_file in mthds_files:
-            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file)
-            all_blueprints.append(blueprint)
+    success = False
+    try:
+        with _translate_to_validate_bundle_error():
+            for mthds_file in mthds_files:
+                blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file)
+                all_blueprints.append(blueprint)
 
-        loaded_pipes = library_manager.load_libraries(library_id=library_id, library_dirs=[Path(directory)])
-        dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
-        return ValidateBundleResult(blueprints=all_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
+            loaded_pipes = library_manager.load_libraries(library_id=library_id, library_dirs=[Path(directory)])
+            dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
+            result = ValidateBundleResult(blueprints=all_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
+        success = True
+        return result
+    finally:
+        if not success:
+            library_manager.teardown(library_id=library_id)
+            teardown_current_library()
 
 
 class LoadConceptsOnlyResult(BaseModel):
@@ -224,40 +240,48 @@ def load_concepts_only(
 
     loaded_concepts: list[Concept] | None = None
     loaded_blueprints: list[PipelexBundleBlueprint] | None = None
-    with _translate_to_validate_bundle_error():
-        if effective_dirs:
-            log.verbose(f"Loading concepts only from {len(effective_dirs)} library directory(ies) ({source_label})")
-            library_manager.load_libraries_concepts_only(
-                library_id=library_id,
-                library_dirs=effective_dirs,
-            )
-        else:
-            log.verbose(f"No library directories to load ({source_label})")
-
-        if blueprints is not None:
-            loaded_blueprints = blueprints
-            loaded_concepts = library_manager.load_concepts_only_from_blueprints(library_id=library_id, blueprints=blueprints)
-            return LoadConceptsOnlyResult(blueprints=loaded_blueprints, concepts=loaded_concepts)
-
-        elif mthds_contents is not None:
-            loaded_blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
-            loaded_concepts = library_manager.load_concepts_only_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
-            return LoadConceptsOnlyResult(blueprints=loaded_blueprints, concepts=loaded_concepts)
-
-        else:
-            assert mthds_file_path is not None
-            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file_path)
-            loaded_blueprints = [blueprint]
-
-            if mthds_file_path.resolve() not in library.loaded_mthds_paths:
-                # File not yet loaded - load it from the blueprint
-                loaded_concepts = library_manager.load_concepts_only_from_blueprints(library_id=library_id, blueprints=[blueprint])
+    success = False
+    try:
+        with _translate_to_validate_bundle_error():
+            if effective_dirs:
+                log.verbose(f"Loading concepts only from {len(effective_dirs)} library directory(ies) ({source_label})")
+                library_manager.load_libraries_concepts_only(
+                    library_id=library_id,
+                    library_dirs=effective_dirs,
+                )
             else:
-                # File already loaded - get existing concepts from library
-                # For concepts-only loading, we just return empty list since concepts are already in library
-                loaded_concepts = []
+                log.verbose(f"No library directories to load ({source_label})")
 
-            return LoadConceptsOnlyResult(blueprints=loaded_blueprints, concepts=loaded_concepts)
+            if blueprints is not None:
+                loaded_blueprints = blueprints
+                loaded_concepts = library_manager.load_concepts_only_from_blueprints(library_id=library_id, blueprints=blueprints)
+                result = LoadConceptsOnlyResult(blueprints=loaded_blueprints, concepts=loaded_concepts)
+
+            elif mthds_contents is not None:
+                loaded_blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
+                loaded_concepts = library_manager.load_concepts_only_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
+                result = LoadConceptsOnlyResult(blueprints=loaded_blueprints, concepts=loaded_concepts)
+
+            else:
+                assert mthds_file_path is not None
+                blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file_path)
+                loaded_blueprints = [blueprint]
+
+                if mthds_file_path.resolve() not in library.loaded_mthds_paths:
+                    # File not yet loaded - load it from the blueprint
+                    loaded_concepts = library_manager.load_concepts_only_from_blueprints(library_id=library_id, blueprints=[blueprint])
+                else:
+                    # File already loaded - get existing concepts from library
+                    # For concepts-only loading, we just return empty list since concepts are already in library
+                    loaded_concepts = []
+
+                result = LoadConceptsOnlyResult(blueprints=loaded_blueprints, concepts=loaded_concepts)
+        success = True
+        return result
+    finally:
+        if not success:
+            library_manager.teardown(library_id=library_id)
+            teardown_current_library()
 
 
 def load_concepts_only_from_directory(directory: Path) -> LoadConceptsOnlyResult:
@@ -282,10 +306,18 @@ def load_concepts_only_from_directory(directory: Path) -> LoadConceptsOnlyResult
     library_manager = get_library_manager()
     library_id, _ = library_manager.open_library()
     set_current_library(library_id=library_id)
-    with _translate_to_validate_bundle_error():
-        for mthds_file in mthds_files:
-            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file)
-            all_blueprints.append(blueprint)
+    success = False
+    try:
+        with _translate_to_validate_bundle_error():
+            for mthds_file in mthds_files:
+                blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file)
+                all_blueprints.append(blueprint)
 
-        loaded_concepts = library_manager.load_concepts_only_from_blueprints(library_id=library_id, blueprints=all_blueprints)
-        return LoadConceptsOnlyResult(blueprints=all_blueprints, concepts=loaded_concepts)
+            loaded_concepts = library_manager.load_concepts_only_from_blueprints(library_id=library_id, blueprints=all_blueprints)
+            result = LoadConceptsOnlyResult(blueprints=all_blueprints, concepts=loaded_concepts)
+        success = True
+        return result
+    finally:
+        if not success:
+            library_manager.teardown(library_id=library_id)
+            teardown_current_library()
