@@ -126,7 +126,13 @@ class TestErrorClassLocationConvention:
             raise AssertionError("\n".join(lines))
 
     def test_runtime_subclasses_walk_every_loaded_pipelex_error_subclass_lives_in_a_properly_named_module(self) -> None:
-        """Walk ``PipelexError.__subclasses__()`` transitively and assert every loaded subclass lives in an accepted module."""
+        """Walk ``PipelexError.__subclasses__()`` after the discovery helper fires and assert every loaded subclass lives in an accepted module."""
+        # Trigger the Phase 7 discovery helper so the runtime set matches the AST set.
+        # Without this, the test silently runs against only the naked-import
+        # subclasses, which all happen to be convention-compliant — green for the
+        # wrong reason.
+        list(iter_pipelex_error_subclasses())
+
         seen: set[type[PipelexError]] = set()
         stack: list[type[PipelexError]] = [PipelexError]
         misplaced: list[tuple[str, str]] = []
@@ -169,8 +175,10 @@ class TestErrorClassLocationConvention:
         shipped as silently-dropped docs pages and missed ``type_uri``
         uniqueness checks. The Phase 7 fix wires
         :func:`_force_load_all_error_modules` into ``iter_pipelex_error_subclasses``
-        so the AST set and the runtime set are equal by construction; this test
-        is the regression net.
+        so every AST-discovered class is reachable at runtime; this is a
+        one-sided subset check (runtime ⊇ AST) — runtime-only classes
+        (e.g. dynamically constructed via ``type()``) are intentionally
+        allowed and not caught here.
         """
         ast_names = set(_ast_discover_pipelex_error_subclasses().keys())
         runtime_names = {cls.__name__ for cls in iter_pipelex_error_subclasses()} - {"PipelexError"}
@@ -185,4 +193,46 @@ class TestErrorClassLocationConvention:
                 "These classes live in properly-named modules but no production code path imports them.",
                 "Docs generation and the type_uri uniqueness check therefore silently miss them.",
             ]
+            raise AssertionError("\n".join(lines))
+
+    def test_no_heavy_third_party_imports_in_error_modules(self) -> None:
+        """Every exceptions.py / *_exceptions.py imports only base error classes — no SDK pulls.
+
+        Phase 7's discovery helper force-loads every match. If a *_exceptions.py
+        were to import a plugin SDK (anthropic, boto3, openai, mistralai, google-genai,
+        portkey-ai, azure-identity, pypdfium2, fal-client, etc.), the SDK would be
+        pulled into every pytest collection and every dev CLI invocation — defeating
+        the deferred-import design that keeps optional plugin deps optional.
+        """
+        forbidden_top_level = {
+            "anthropic",
+            "boto3",
+            "botocore",
+            "openai",
+            "mistralai",
+            "google",
+            "portkey_ai",
+            "azure",
+            "pypdfium2",
+            "fal_client",
+        }
+        offenders: list[tuple[Path, str]] = []
+        for path in sorted(_PIPELEX_ROOT.rglob("*.py")):
+            if path.name != "exceptions.py" and not path.name.endswith("_exceptions.py"):
+                continue
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        root = alias.name.split(".", 1)[0]
+                        if root in forbidden_top_level:
+                            offenders.append((path, alias.name))
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    root = node.module.split(".", 1)[0]
+                    if root in forbidden_top_level:
+                        offenders.append((path, node.module))
+        if offenders:
+            lines = ["Error modules import third-party SDKs — would slow every CI run:", ""]
+            for path, name in offenders:
+                lines.append(f"  - {path.relative_to(_PIPELEX_ROOT.parent)}: {name}")
             raise AssertionError("\n".join(lines))

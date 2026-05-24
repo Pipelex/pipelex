@@ -212,7 +212,7 @@ For each move:
 
 ### 6.3 — Delete the registry, simplify discovery
 
-- [x] Delete `pipelex/errors/error_module_registry.py`. Replace `iter_pipelex_error_subclasses()` callers with a small inline transitive `__subclasses__()` walk in `error_pages_generator.py` (the only production consumer plus the URI-uniqueness test). Normal imports load everything now — no force-import phase needed, no allowlist to maintain.
+- [x] Delete `pipelex/errors/error_module_registry.py`. Replace `iter_pipelex_error_subclasses()` callers with a small inline transitive `__subclasses__()` walk in `error_pages_generator.py` (the only production consumer plus the URI-uniqueness test). Normal imports load everything now — no force-import phase needed, no allowlist to maintain. *(Refined by Phase 7: discovery is rehydrated by a dev/test-time `_force_load_all_error_modules` helper. Production bootstrap remains untouched.)*
 - [x] `pipelex-dev generate-error-pages` — regenerate `docs/errors/` and verify the page set is complete (new pages appear for previously-missed classes; no orphan pages).
 
 ### 6.4 — Rule, docs, and the absorbed minor follow-up
@@ -227,7 +227,7 @@ For each move:
 - [x] Generated `docs/errors/` set is complete and `make agent-check` clean.
 - [x] `make agent-test` clean.
 
-**Acceptance:** every `PipelexError` subclass lives in a properly-named module; the static check fails the PR if a new error class lands outside the convention; `error_module_registry.py` is gone; discovery has no runtime side effects; the kebab-slug collision footgun is caught at generation time, not only by the uniqueness test.
+**Acceptance:** every `PipelexError` subclass lives in a properly-named module; the static check fails the PR if a new error class lands outside the convention; `error_module_registry.py` is gone; discovery has no production-runtime side effects (the dev/test-time `_force_load_all_error_modules` helper added in Phase 7 walks the filesystem inside the docs generator and the URI uniqueness test only); the kebab-slug collision footgun is caught at generation time, not only by the uniqueness test.
 
 ### ⛔ CHECKPOINT 6 — STOP, verify, record
 
