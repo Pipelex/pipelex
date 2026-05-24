@@ -338,8 +338,8 @@ Options to consider:
 - **Option 3.** Leave as-is. STRICT consumers that need `Retry-After` must
   upgrade to VERBOSE on internal-trust boundaries.
 
-- [ ] Open this with the user. Decide. Record in the Decisions section below.
-- [ ] If Option 1 or 2: implement, add a STRICT-passthrough-of-retry-after
+- [x] Open this with the user. Decide. Record in the Decisions section below.
+- [x] If Option 1 or 2: implement, add a STRICT-passthrough-of-retry-after
       test, regenerate docs if the public surface changes.
 
 ---
@@ -381,6 +381,7 @@ Record each decision here as it is taken, with date and rationale.
 
 - **2026-05-24 — C.1: Remove unused `pipe_concept_instantiation_errors` infrastructure.** Per project policy "No backward compatibility", the never-populated-in-production field on `ValidateBundleError` + the `pipe_validation_error_data` aggregate (Backwards compatibility) property were both removed. The two callers (`pipelex/cli/agent_cli/commands/agent_output.py`, `pipelex/cli/error_handlers.py`) and the test fixture in `tests/unit/pipelex/cli/test_agent_output.py` were updated. Alternative considered: land the deferred catch site for Pydantic ValidationError in the factory instantiation path — rejected as bigger scope without a concrete need from production.
 - **2026-05-24 — C.3: Delete `BaseModelPayloadConverterError`.** Never imported or raised; `temporal_data_converter.py` lets kajson failures bubble raw. Wiring the class into the converter would require adding a speculative try/except, which the project rules explicitly forbid ("Do NOT add try/except speculatively"). Cleaner to delete and regenerate the docs.
+- **2026-05-24 — D.1: STRICT preserves curated `provider_metadata` subset (Option 1).** Project `provider_metadata` through a curated subset (just `status_code` + `retry_after_seconds`) on the STRICT envelope. Rationale: these two fields are actionable HTTP client hints (status mapping + `Retry-After` header), not provider attribution, so they don't violate the rule that "provider attribution never belongs on an external surface". Holds for both STRICT branches. Side effect: STRICT payloads no longer round-trip through `from_dict` (the partial `provider_metadata` fails pydantic validation on the required fields), but STRICT was already documented as a lossy projection and the existing `test_strict_does_not_round_trip` only asserted observable fields, not rehydration semantics — updated to read the dict directly. Options 2 (top-level field) and 3 (leave as-is) rejected.
 
 ---
 
@@ -421,3 +422,16 @@ state, what is broken or deferred, and the exact next action.
   - C.3 (`refactor(temporal): delete unused BaseModelPayloadConverterError`): dead class deleted; docs regenerated (one orphan page removed).
 - **Status**: `make agent-check` clean, `make agent-test` clean.
 - **Next action**: open Phase D.1 with the user — STRICT 429 stripping `provider_metadata.retry_after_seconds` is a design call between three options. Do not action without discussion (per the plan).
+
+### 2026-05-24 — Phase D.1 landed (final phase)
+
+- **Phase D.1** complete — single commit `fix(errors): preserve curated provider_metadata subset under STRICT disclosure`. User chose Option 1 (curated subset). Implementation:
+  - Removed `provider_metadata` from `_STRICT_PROVIDER_FIELDS` (the always-dropped set).
+  - Added `_STRICT_PROVIDER_METADATA_KEPT_FIELDS = {"status_code", "retry_after_seconds"}` and a `_redact_provider_metadata_for_strict` helper.
+  - Updated both STRICT branches in `ErrorReport.to_dict` (redacted and caller-facing) to project `provider_metadata` through the curated subset.
+  - Updated the `DisclosureMode.STRICT` and `to_dict` docstrings.
+  - Added two new tests: `test_strict_preserves_curated_provider_metadata`, `test_strict_omits_provider_metadata_when_only_curated_subset_is_empty`, `test_strict_provider_metadata_dict_carries_http_status_for_adapter`. Updated the existing `test_strict_redacts_non_caller_facing_reports`, `test_strict_strips_provider_fields_even_from_caller_facing_passthrough`, `test_strict_does_not_round_trip` (now asserts dict reads, not rehydration), `test_strict_mode_redacts_detail_and_drops_disclosure_fields` (now asserts the curated metadata rides as an extension member of the problem document).
+  - The new `_redact_provider_metadata_for_strict` helper omits `provider_metadata` entirely when both curated fields are unset (no empty-dict on the wire).
+- **Caveat captured**: STRICT payloads now break `ErrorReport.from_dict` because the curated `provider_metadata` lacks the required `provider` / `sdk_exception_type` fields. This is per-spec ("STRICT is lossy"), but is a behavior shift from the prior implementation where STRICT was still rehydratable. If a downstream consumer (`pipelex-relay`, `pipelex-api`, etc.) relies on rehydrating STRICT payloads, they need to migrate to reading the dict directly. Worth a heads-up in the PR description.
+- **Status**: `make agent-check` clean, `make agent-test` clean. All four phases (A/B/C/D) done.
+- **Next action**: this plan file is complete. Open a PR for the branch `feature/post-pr933-followups` once `feature/API-readiness-2` (PR #933) lands and the branch can rebase onto `dev`. Until then, the branch stacks on top of `feature/API-readiness-2`.
