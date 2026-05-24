@@ -8,34 +8,42 @@ from pipelex.tools.typing.pydantic_utils import analyze_pydantic_validation_erro
 def report_validation_error(category: str, validation_error: ValidationError) -> str:
     validation_error_analysis = analyze_pydantic_validation_error(validation_error)
 
-    migration_config = get_config().migration
+    # Guarded read: doctor calls this from inside its bootstrap, where setup_config raised
+    # mid-flight and the hub's _config is still None. Falling back to no migration hints
+    # keeps the friendly PipelexConfigError translation working in that path.
+    try:
+        migration_config = get_config().migration
+    except RuntimeError:
+        migration_config = None
 
     migration_reports: list[str] = []
 
     # Build field-to-renamings mapping for missing fields
     log.verbose(validation_error_analysis.missing_fields, title="Missing fields")
     missing_field_renamings: dict[tuple[tuple[str, str], ...], list[str]] = {}
-    for missing_field in validation_error_analysis.missing_fields:
-        text = missing_field.split(".")[-1]
-        if renamings := migration_config.text_in_renaming_values(category=category, text=text):
-            # Use tuple of renamings as key for grouping
-            renamings_key = tuple(renamings)
-            if renamings_key not in missing_field_renamings:
-                missing_field_renamings[renamings_key] = []
-            missing_field_renamings[renamings_key].append(missing_field)
+    if migration_config is not None:
+        for missing_field in validation_error_analysis.missing_fields:
+            text = missing_field.split(".")[-1]
+            if renamings := migration_config.text_in_renaming_values(category=category, text=text):
+                # Use tuple of renamings as key for grouping
+                renamings_key = tuple(renamings)
+                if renamings_key not in missing_field_renamings:
+                    missing_field_renamings[renamings_key] = []
+                missing_field_renamings[renamings_key].append(missing_field)
 
     # Build field-to-renamings mapping for extra fields
     log.verbose(validation_error_analysis.extra_fields, title="Extra fields")
     extra_field_renamings: dict[tuple[tuple[str, str], ...], list[str]] = {}
-    for extra_field in validation_error_analysis.extra_fields:
-        # Extract field path before the colon (extra fields include ": value")
-        field_path = extra_field.split(":")[0].strip()
-        text = field_path.split(".")[-1]
-        if renamings := migration_config.text_in_renaming_keys(category=category, text=text):
-            renamings_key = tuple(renamings)
-            if renamings_key not in extra_field_renamings:
-                extra_field_renamings[renamings_key] = []
-            extra_field_renamings[renamings_key].append(extra_field)
+    if migration_config is not None:
+        for extra_field in validation_error_analysis.extra_fields:
+            # Extract field path before the colon (extra fields include ": value")
+            field_path = extra_field.split(":")[0].strip()
+            text = field_path.split(".")[-1]
+            if renamings := migration_config.text_in_renaming_keys(category=category, text=text):
+                renamings_key = tuple(renamings)
+                if renamings_key not in extra_field_renamings:
+                    extra_field_renamings[renamings_key] = []
+                extra_field_renamings[renamings_key].append(extra_field)
 
     # Format grouped output for missing fields
     for renamings_tuple, fields in missing_field_renamings.items():

@@ -34,10 +34,14 @@ class TestDoctorLayeredResolution:
     """
 
     def test_do_doctor_cmd_delegates_layered_resolution_to_checks(self, mocker: MockerFixture) -> None:
-        """do_doctor_cmd should call check functions with no config_dir so they use layered resolution."""
+        """do_doctor_cmd should call check functions with no config_dir so they use layered resolution.
+
+        Also asserts the bootstrap is invoked exactly once (no overrides) — pinning the
+        contract that human doctor inherits the user's configured log targets.
+        """
         # Stub the runtime bootstrap so the test doesn't load real config or call log.configure
         # (once-per-process). The bootstrap call itself is exercised separately.
-        mocker.patch("pipelex.cli.commands.doctor_cmd.setup_doctor_runtime")
+        mock_setup = mocker.patch("pipelex.cli.commands.doctor_cmd.setup_doctor_runtime")
         mock_check_config = mocker.patch(
             "pipelex.cli.commands.doctor_cmd.check_config_files",
             return_value=(True, 0, "OK"),
@@ -68,6 +72,8 @@ class TestDoctorLayeredResolution:
             do_doctor_cmd(fix=False)
         assert exc_info.value.code == 0
 
+        # Bootstrap runs exactly once with no overrides (human doctor inherits user log targets)
+        mock_setup.assert_called_once_with()
         # All checks must be called without config_dir (layered resolution)
         mock_check_config.assert_called_once_with()
         mock_check_telemetry.assert_called_once_with()

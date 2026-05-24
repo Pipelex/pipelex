@@ -154,11 +154,14 @@ class TestAgentDoctorCmd:
         downstream consumer.
 
         This test asserts that agent_doctor_cmd now folds the stderr overrides into the
-        bootstrap call, so log/print targets are pinned before any check can fire.
+        bootstrap call, so log/print targets are pinned before any check can fire, and
+        that the defense-in-depth discipline helper is also invoked.
         """
-        # Re-mock setup_doctor_runtime so we can capture its call args
-        # (the autouse fixture also mocks it, but we need the fresh handle here).
+        # Re-mock setup_doctor_runtime and apply_agent_cli_output_discipline so we can
+        # capture their call args (the autouse fixture also mocks them, but we need the
+        # fresh handles here).
         mock_setup = mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.setup_doctor_runtime")
+        mock_discipline = mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.apply_agent_cli_output_discipline")
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_config_files",
             return_value=(True, 0, "OK"),
@@ -178,7 +181,8 @@ class TestAgentDoctorCmd:
 
         agent_doctor_cmd(output_format=CliOutputFormat.JSON)
 
-        mock_setup.assert_called_once_with(log_config_overrides=AGENT_CLI_STDERR_LOG_FIELDS)
+        mock_setup.assert_called_once_with(log_config_overrides=AGENT_CLI_STDERR_LOG_FIELDS, config_dir=None)
+        mock_discipline.assert_called_once()
         # Pin the contract of the field dict itself: both Rich-managed channels must be stderr.
         assert AGENT_CLI_STDERR_LOG_FIELDS["console_log_target"] is ConsoleTarget.STDERR
         assert AGENT_CLI_STDERR_LOG_FIELDS["console_print_target"] is ConsoleTarget.STDERR

@@ -54,6 +54,7 @@ from pipelex.system.pipelex_service.pipelex_service_config import (
 )
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig
+from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.misc.dict_utils import extract_vars_from_strings_recursive
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.placeholder import value_is_placeholder
@@ -61,6 +62,8 @@ from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_path
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from pipelex.system.pipelex_service.types import RemoteConfigSource
 
 
@@ -713,22 +716,35 @@ def check_deck_sync(config_dir: Path | None = None) -> tuple[bool, DeckSyncRepor
     return False, report, f"{len(actionable)} deck file(s) need action"
 
 
-def setup_doctor_runtime(log_config_overrides: dict[str, Any] | None = None) -> None:
+def setup_doctor_runtime(
+    log_config_overrides: Mapping[str, Any] | None = None,
+    config_dir: Path | None = None,
+) -> None:
     """Spin up a fresh PipelexHub and configure logging for doctor checks.
 
     Doctor intentionally bypasses ``Pipelex.make`` so it can diagnose a broken config
     without crashing during full init. This helper performs the minimum runtime setup
-    that ``check_models`` requires — a hub with a loaded config and a configured logger
-    — and lets the caller fold log-target overrides into the loaded ``log_config`` via
-    Pydantic ``model_copy(update=...)``.
+    that ``check_models`` requires — a hub with a loaded config, a hub-level console
+    print target, and a configured logger — mirroring ``Pipelex.__init__`` step for
+    step on that subset.
 
     The agent doctor passes ``AGENT_CLI_STDERR_LOG_FIELDS`` so the JSON envelope on
     stdout stays clean for downstream consumers. The human doctor passes nothing and
     inherits the user's configured log targets.
 
+    Overrides are merged via ``LogConfig.model_validate`` (full re-validation) so that
+    a wrong-typed override surfaces loudly instead of silently breaking downstream
+    match/case dispatch on ``ConsoleTarget`` etc.
+
+    ``log.configure`` is invoked through ``configure_if_unset`` so that if a library
+    embedding or interleaved test has already configured logging, this call no-ops
+    instead of raising the once-per-process ``RuntimeError``.
+
     Args:
-        log_config_overrides: Optional dict of ``LogConfig`` field names → values to
+        log_config_overrides: Optional mapping of ``LogConfig`` field names → values to
             merge into the loaded log_config before ``log.configure`` is called.
+        config_dir: Optional explicit config dir (e.g. for ``--global``). When provided,
+            project/global layering is bypassed and only this directory is read.
 
     Raises:
         PipelexConfigError: If config validation fails. Translation of
@@ -737,7 +753,7 @@ def setup_doctor_runtime(log_config_overrides: dict[str, Any] | None = None) -> 
     pipelex_hub = PipelexHub()
     set_pipelex_hub(pipelex_hub)
     try:
-        pipelex_hub.setup_config(config_cls=PipelexConfig)
+        pipelex_hub.setup_config(config_cls=PipelexConfig, config_dir=config_dir)
     except ValidationError as validation_error:
         validation_error_msg = report_validation_error(category="config", validation_error=validation_error)
         msg = f"Could not setup config because of: {validation_error_msg}"
@@ -745,8 +761,9 @@ def setup_doctor_runtime(log_config_overrides: dict[str, Any] | None = None) -> 
 
     log_config = get_config().pipelex.log_config
     if log_config_overrides is not None:
-        log_config = log_config.model_copy(update=log_config_overrides)
-    log.configure(log_config=log_config)
+        log_config = LogConfig.model_validate({**log_config.model_dump(), **log_config_overrides})
+    pipelex_hub.set_console_print_target(target=log_config.console_print_target)
+    log.configure_if_unset(log_config=log_config)
 
 
 def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, BackendFileReport]]:
@@ -864,14 +881,18 @@ def do_doctor_cmd(
     # Gather config location info
     config_location = gather_config_location()
 
+    # Filesystem-only checks run BEFORE bootstrap: setup_doctor_runtime calls
+    # load_config which materializes ~/.pipelex/ from kit templates as a side effect.
+    # Running it first would turn check_config_files into a silent installer on a
+    # fresh machine — it would always report healthy after the install.
+    config_healthy, config_missing_count, config_message = check_config_files()
+    telemetry_healthy, telemetry_message = check_telemetry_config()
+    backends_healthy, backend_credential_reports, backends_message = check_backend_credentials()
+
     # Bootstrap the minimum runtime check_models depends on (hub + log.configure).
     # No overrides for the human CLI: it inherits the user's configured log targets.
     setup_doctor_runtime()
 
-    # Run health checks (config_dir=None uses layered resolution: project → global)
-    config_healthy, config_missing_count, config_message = check_config_files()
-    telemetry_healthy, telemetry_message = check_telemetry_config()
-    backends_healthy, backend_credential_reports, backends_message = check_backend_credentials()
     models_healthy, models_message, backend_file_reports = check_models()
     deck_healthy, deck_report, deck_message = check_deck_sync()
 

@@ -1,7 +1,9 @@
 """Factory function for agent CLI commands -- JSON-only error output."""
 
 import warnings
+from collections.abc import Mapping
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
 import typer
@@ -54,24 +56,46 @@ from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
 # lands on stderr regardless of what the user's ``~/.pipelex/pipelex.toml`` says — so the
 # JSON data channel on stdout stays clean for downstream consumers like ``mthds-js``'s
 # ``PipelexRunner`` that do ``JSON.parse(stdout)``.
-AGENT_CLI_STDERR_LOG_FIELDS: dict[str, Any] = {
-    "console_log_target": ConsoleTarget.STDERR,
-    "console_print_target": ConsoleTarget.STDERR,
-}
+#
+# Wrapped in ``MappingProxyType`` so a stray ``AGENT_CLI_STDERR_LOG_FIELDS[...] = ...`` in
+# a future contributor's hot-fix raises immediately instead of silently mutating the
+# shared canonical instance (which both consumers below alias).
+AGENT_CLI_STDERR_LOG_FIELDS: Mapping[str, Any] = MappingProxyType(
+    {
+        "console_log_target": ConsoleTarget.STDERR,
+        "console_print_target": ConsoleTarget.STDERR,
+    }
+)
 
+# deep_update only recurses into ``dict`` instances; ``MappingProxyType`` would short-
+# circuit and overwrite the whole log_config branch. Build the override tree with a real
+# dict copy of the canonical leaf so the merge keeps merging.
 _AGENT_CLI_STDERR_CONSOLE_OVERRIDES: dict[str, Any] = {
-    "pipelex": {"log_config": AGENT_CLI_STDERR_LOG_FIELDS},
+    "pipelex": {"log_config": dict(AGENT_CLI_STDERR_LOG_FIELDS)},
 }
 
 
-def apply_agent_cli_output_discipline() -> None:
-    """Pin pretty-print + hub console target to stderr.
+def apply_agent_cli_output_discipline(log_level: LogLevel = LogLevel.WARNING) -> None:
+    """Pin pipelex log level, pretty-print silence, and hub console target to stderr.
 
-    Defense-in-depth, redundant with the log_config overrides applied at init time but
-    kept so any future code path that bypasses the init override still finds the hub
-    pinned. Called from ``make_pipelex_for_agent_cli`` (full-init path) and from
-    ``agent_doctor_cmd`` (doctor-only path that does not go through ``Pipelex.make``).
+    Called from two paths:
+      - ``make_pipelex_for_agent_cli`` (full-init): defense-in-depth. ``Pipelex.__init__``
+        already pinned the hub console via ``set_console_print_target`` from the loaded
+        log_config (whose ``console_print_target`` was overridden to STDERR by
+        ``_AGENT_CLI_STDERR_CONSOLE_OVERRIDES``).
+      - ``agent_doctor_cmd`` (doctor-only): also defense-in-depth, since
+        ``setup_doctor_runtime`` now mirrors ``Pipelex.__init__`` and applies
+        ``set_console_print_target`` itself from the overridden log_config.
+
+    Folding ``log.set_level_for_package("pipelex", log_level)`` in here keeps every
+    agent CLI command sharing one source of truth for "be quiet on stderr."
+
+    Args:
+        log_level: Floor for the ``pipelex`` package logger. Defaults to WARNING so the
+            agent CLI surface stays terse; the factory passes its own ``log_level``
+            through unchanged.
     """
+    log.set_level_for_package("pipelex", log_level)
     PrettyPrinter.mode = PrettyPrintMode.SILENT
     get_pipelex_hub().set_console_print_target(target=ConsoleTarget.STDERR)
 
@@ -187,7 +211,6 @@ def make_pipelex_for_agent_cli(
 
     # Suppress Rich pretty-printing and INFO/DEV/DEBUG log noise so that agent
     # commands only emit structured JSON.  Warnings and errors still reach stderr.
-    log.set_level_for_package("pipelex", log_level)
     log.redirect_to_stderr()
-    apply_agent_cli_output_discipline()
+    apply_agent_cli_output_discipline(log_level=log_level)
     return pipelex_instance

@@ -120,13 +120,6 @@ def agent_doctor_cmd(
     """
     set_agent_cli_error_format(error_format or output_format)
     try:
-        # Pin the Rich-managed channels to stderr before any doctor check can log,
-        # so the JSON envelope this command writes to stdout stays parseable even
-        # when the user's pipelex.toml sets console_log_target = "stdout" and a
-        # verbose log level. See AGENT_CLI_STDERR_LOG_FIELDS docs.
-        setup_doctor_runtime(log_config_overrides=AGENT_CLI_STDERR_LOG_FIELDS)
-        apply_agent_cli_output_discipline()
-
         # When --global, force checking ~/.pipelex/ only; otherwise use layered resolution
         config_dir = config_manager.global_config_dir if global_ else None
 
@@ -141,9 +134,21 @@ def agent_doctor_cmd(
         else:
             config_location = gather_config_location()
 
+        # Filesystem-only checks run BEFORE bootstrap: setup_doctor_runtime calls
+        # load_config which materializes ~/.pipelex/ from kit templates as a side effect.
+        # Running it first would turn check_config_files into a silent installer on a
+        # fresh machine — it would always report healthy after the install.
         config_healthy, config_missing_count, config_message = check_config_files(config_dir=config_dir)
         telemetry_healthy, telemetry_message = check_telemetry_config(config_dir=config_dir)
         backends_healthy, backend_credential_reports, backends_message = check_backend_credentials(config_dir=config_dir)
+
+        # Bootstrap the runtime check_models needs. Pinned to stderr so the JSON envelope
+        # this command writes to stdout stays parseable even when the user's pipelex.toml
+        # sets console_log_target = "stdout" and a raised pipelex log level. The discipline
+        # call below adds defense-in-depth (silent pretty-printer + pipelex log floor).
+        setup_doctor_runtime(log_config_overrides=AGENT_CLI_STDERR_LOG_FIELDS, config_dir=config_dir)
+        apply_agent_cli_output_discipline()
+
         models_healthy, models_message, backend_file_reports = check_models(config_dir=config_dir)
     except Exception as exc:  # noqa: BLE001
         # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
