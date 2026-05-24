@@ -461,8 +461,65 @@ documented:
 
 ## Decisions
 
-Record each decision here as it is taken, with date and rationale. (Empty —
-ready for the new session.)
+Record each decision here as it is taken, with date and rationale.
+
+### 2026-05-24 — Phase A: A-fix-1 (move-into-try)
+
+Applied **A-fix-1** as recommended in the plan. Moved every statement between
+`library_manager.open_library()` and the existing `try:` INTO the try block
+in all four bundle-loading entry points. The `success = False` flag stays
+just before the `try`. No new abstraction.
+
+### 2026-05-24 — Phase B.1: skipped (B.1-c, accept the gap)
+
+REJECTED the plan's B.1-a recommendation. Reasoning:
+
+- Verified by grep that `PipeFactoryError` / `PipeValidationError` are raised
+  only from `pipelex/core/pipes/pipe_factory.py` and `pipe_abstract.py`.
+  Concept-loading paths (`load_concepts_only_from_blueprints`) don't reach
+  those modules — the dead-code claim in the docstring is correct.
+- Renaming the framing to "Concept factory error" / "Concept validation
+  failed" would be semantically dubious (concepts don't have factories) AND
+  would HIDE the actual error type for the speculative future case where
+  those arms ever do fire from a concepts-only path. The current framing is
+  diagnostically accurate when those arms fire.
+- The plan's worry — "if a future change ever surfaces a PipeValidationError
+  from concept loading" — is speculative; if/when that happens, the right
+  fix is at the source, not at the framing layer.
+
+### 2026-05-24 — Phase B.2: applied (assert_never on Literal)
+
+Added `case _ as unreachable: assert_never(unreachable)` to the
+`match category:` block. The Literal at the call site is the right place
+for runtime backup — even though pyright catches it statically, the failure
+mode without `assert_never` is a silent `UnboundLocalError` on `msg`, which
+would silently break the helper's translation contract. Loud beats silent.
+
+### 2026-05-24 — Phase C.1 / C.2: skipped
+
+REJECTED the plan's recommendation to add `assert_never` on the
+`DisclosureMode` (`to_dict`) and `ErrorDomain | None` (`error_domain_to_http_status`)
+matches. Reasoning:
+
+- `python-standards.md` explicitly forbids `case _:` on exhaustive enum
+  matches.
+- `pyright` config has `reportMatchNotExhaustive = "error"` — a new enum
+  variant without updating the match fails the typecheck at the match site.
+  This is the linter feedback the rule relies on.
+- No precedent for `assert_never` in `pipelex/`.
+- `DisclosureMode("audit")` raises `ValueError` at enum construction —
+  before the match. A dynamically-constructed enum can't be "wrong" without
+  raising on construction.
+- `# type: ignore` is an explicit developer opt-out; the codebase trusts
+  static checking for these.
+
+### 2026-05-24 — Phase C.3: folded into Phase A commit
+
+Folded the library_id-value assertion into the existing lifecycle tests
+during the A.3 commit, as recommended. Each lifecycle test now spies on
+`library_manager.open_library` as well as `library_manager.teardown` and
+asserts `teardown.call_args.kwargs["library_id"] == open_library.spy_return[0]`,
+so a regression that tore down a stale closure-captured id would fail.
 
 ## Session log
 
@@ -470,4 +527,29 @@ Append one dated entry per session / checkpoint. Each entry must leave the
 next session enough to cold-start: what landed, decisions taken, current
 code state, what is broken or deferred, and the exact next action.
 
-(Empty — ready for the new session.)
+### 2026-05-24 — Phase A + B.2 landed, B.1 + C.1 + C.2 declined
+
+**Landed commits** (on top of the 22-commit baseline `ab07bd2c`):
+
+- `4b7683cb` `fix(validate): close pre-try leak window in bundle entry points`
+  — Phase A + folded C.3. Moves all pre-`try` work into the `try` block in
+  all four entry points. Extends lifecycle tests with `library_id` value
+  assertion (C.3) + adds new tests for `BaseException` (simulated
+  `CancelledError`) and `TypeError` raised in the pre-try window.
+  Teeth-checked.
+- `01f911cd` `fix(validate): assert_never on unknown category in shared helper`
+  — Phase B.2. Adds `assert_never` to the `match category:` block, swaps
+  silent `UnboundLocalError` for loud `AssertionError`. Teeth-checked.
+
+**Declined** (recorded in Decisions above):
+
+- B.1 (B.1-a recommendation): skipped — framing would mislead in the
+  speculative case it was supposed to fix.
+- C.1, C.2: skipped — go against the codebase rule forbidding `case _:` on
+  exhaustive enum matches; pyright already enforces exhaustiveness.
+
+**Current state**: working tree clean except this plan file. `make agent-check`
+green; pipeline unit + integration tests green.
+
+**Next action**: none — all 7 plan findings triaged and either landed or
+declined with rationale recorded. Ready for review.
