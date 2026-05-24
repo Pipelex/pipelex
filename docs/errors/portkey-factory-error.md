@@ -3,7 +3,7 @@ title: "Portkey factory"
 description: "Reference for the `PortkeyFactoryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Portkey factory
 

@@ -3,7 +3,7 @@ title: "Mistral plugin"
 description: "Reference for the `MistralPluginError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Mistral plugin
 

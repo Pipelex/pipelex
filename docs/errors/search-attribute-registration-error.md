@@ -3,7 +3,7 @@ title: "Search attribute registration"
 description: "Reference for the `SearchAttributeRegistrationError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Search attribute registration
 

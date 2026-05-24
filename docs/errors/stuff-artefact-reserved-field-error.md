@@ -3,7 +3,7 @@ title: "Stuff artefact reserved field"
 description: "Reference for the `StuffArtefactReservedFieldError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Stuff artefact reserved field
 

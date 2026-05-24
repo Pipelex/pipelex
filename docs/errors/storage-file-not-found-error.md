@@ -3,7 +3,7 @@ title: "Storage file not found"
 description: "Reference for the `StorageFileNotFoundError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Storage file not found
 

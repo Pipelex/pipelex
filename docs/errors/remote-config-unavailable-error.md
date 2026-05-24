@@ -3,7 +3,7 @@ title: "Remote config unavailable"
 description: "Reference for the `RemoteConfigUnavailableError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Remote config unavailable
 

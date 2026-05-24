@@ -3,7 +3,7 @@ title: "Llm handle not found"
 description: "Reference for the `LLMHandleNotFoundError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Llm handle not found
 

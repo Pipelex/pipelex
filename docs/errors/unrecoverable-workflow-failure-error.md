@@ -3,7 +3,7 @@ title: "Unrecoverable workflow failure"
 description: "Reference for the `UnrecoverableWorkflowFailureError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Unrecoverable workflow failure
 

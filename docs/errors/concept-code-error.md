@@ -3,7 +3,7 @@ title: "Concept code"
 description: "Reference for the `ConceptCodeError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Concept code
 

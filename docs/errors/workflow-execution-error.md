@@ -3,7 +3,7 @@ title: "Workflow execution"
 description: "Reference for the `WorkflowExecutionError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Workflow execution
 

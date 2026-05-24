@@ -3,7 +3,7 @@ title: "Concept library concept not found"
 description: "Reference for the `ConceptLibraryConceptNotFoundError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Concept library concept not found
 

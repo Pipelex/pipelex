@@ -3,7 +3,7 @@ title: "Missing or invalid credentials"
 description: "Reference for the `CredentialsError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Missing or invalid credentials
 

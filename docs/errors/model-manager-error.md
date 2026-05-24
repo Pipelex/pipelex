@@ -3,7 +3,7 @@ title: "Model manager"
 description: "Reference for the `ModelManagerError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Model manager
 

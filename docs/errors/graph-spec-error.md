@@ -3,7 +3,7 @@ title: "Graph spec"
 description: "Reference for the `GraphSpecError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Graph spec
 

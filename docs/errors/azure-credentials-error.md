@@ -3,7 +3,7 @@ title: "Azure credentials"
 description: "Reference for the `AzureCredentialsError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Azure credentials
 

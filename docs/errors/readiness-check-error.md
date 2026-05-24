@@ -3,7 +3,7 @@ title: "Readiness check"
 description: "Reference for the `ReadinessCheckError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Readiness check
 

@@ -3,7 +3,7 @@ title: "Nested key conflict"
 description: "Reference for the `NestedKeyConflictError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Nested key conflict
 

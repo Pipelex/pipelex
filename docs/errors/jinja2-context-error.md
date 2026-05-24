@@ -3,7 +3,7 @@ title: "Jinja 2 context"
 description: "Reference for the `Jinja2ContextError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Jinja 2 context
 

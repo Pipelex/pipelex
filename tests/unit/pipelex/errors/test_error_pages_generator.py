@@ -81,7 +81,7 @@ class TestErrorPagesGenerator:
 
     def test_authored_marker_detection_ignores_marker_inside_other_content(self) -> None:
         """The marker must appear as its own (stripped) line — substring matches don't count."""
-        body_with_marker_in_prose = "<!-- gstack:generated -->\n<!-- Add the `<!-- gstack:authored -->` marker to claim this page -->\n"
+        body_with_marker_in_prose = "<!-- pipelex:generated -->\n<!-- Add the `<!-- pipelex:authored -->` marker to claim this page -->\n"
         assert has_authored_marker(body_with_marker_in_prose) is False
 
         body_with_standalone_marker = f"some content\n{AUTHORED_MARKER}\nmore content\n"

@@ -3,7 +3,7 @@ title: "Anthropic factory"
 description: "Reference for the `AnthropicFactoryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Anthropic factory
 

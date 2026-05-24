@@ -3,7 +3,7 @@ title: "Routing profile blueprint value"
 description: "Reference for the `RoutingProfileBlueprintValueError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Routing profile blueprint value
 

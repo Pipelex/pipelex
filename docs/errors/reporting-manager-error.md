@@ -3,7 +3,7 @@ title: "Reporting manager"
 description: "Reference for the `ReportingManagerError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Reporting manager
 

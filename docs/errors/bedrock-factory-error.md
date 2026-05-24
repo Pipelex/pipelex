@@ -3,7 +3,7 @@ title: "Bedrock factory"
 description: "Reference for the `BedrockFactoryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Bedrock factory
 

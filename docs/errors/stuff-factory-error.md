@@ -3,7 +3,7 @@ title: "Stuff factory"
 description: "Reference for the `StuffFactoryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Stuff factory
 

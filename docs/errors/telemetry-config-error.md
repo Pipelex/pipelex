@@ -3,7 +3,7 @@ title: "Telemetry config"
 description: "Reference for the `TelemetryConfigError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Telemetry config
 

@@ -3,7 +3,7 @@ title: "Pipe batch factory"
 description: "Reference for the `PipeBatchFactoryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipe batch factory
 

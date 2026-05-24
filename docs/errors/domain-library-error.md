@@ -3,7 +3,7 @@ title: "Domain library"
 description: "Reference for the `DomainLibraryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Domain library
 

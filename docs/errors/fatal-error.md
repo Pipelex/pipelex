@@ -3,7 +3,7 @@ title: "Fatal error"
 description: "Reference for the `FatalError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Fatal error
 

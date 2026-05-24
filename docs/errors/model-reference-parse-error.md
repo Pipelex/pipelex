@@ -3,7 +3,7 @@ title: "Model reference parse"
 description: "Reference for the `ModelReferenceParseError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Model reference parse
 

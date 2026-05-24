@@ -3,7 +3,7 @@ title: "Missing dependency"
 description: "Reference for the `MissingDependencyError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Missing dependency
 

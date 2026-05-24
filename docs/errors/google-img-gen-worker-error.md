@@ -3,7 +3,7 @@ title: "Google img gen worker"
 description: "Reference for the `GoogleImgGenWorkerError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Google img gen worker
 

@@ -21,7 +21,7 @@ def generate_error_pages_cmd(output: Path | None = None, quiet: bool = False) ->
     underlying discovery rglobs every ``exceptions.py`` / ``*_exceptions.py``
     via :func:`iter_pipelex_error_subclasses` — no manual import or class-list
     update is needed when a new error class lands. Pages already carrying
-    ``<!-- gstack:authored -->`` are preserved so hand-edited reference content
+    ``<!-- pipelex:authored -->`` are preserved so hand-edited reference content
     is never clobbered.
 
     Args:

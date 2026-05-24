@@ -3,7 +3,7 @@ title: "Batch params"
 description: "Reference for the `BatchParamsError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Batch params
 

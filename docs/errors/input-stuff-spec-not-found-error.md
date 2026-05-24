@@ -3,7 +3,7 @@ title: "Input stuff spec not found"
 description: "Reference for the `InputStuffSpecNotFoundError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Input stuff spec not found
 

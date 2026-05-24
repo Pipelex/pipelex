@@ -3,7 +3,7 @@ title: "Pipe execution"
 description: "Reference for the `PipeExecutionError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipe execution
 

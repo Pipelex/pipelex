@@ -3,7 +3,7 @@ title: "Gateway config merge"
 description: "Reference for the `GatewayConfigMergeError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Gateway config merge
 

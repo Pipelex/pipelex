@@ -6,10 +6,10 @@ aligns with :meth:`PipelexError.type_uri`'s final segment. The docs site can
 then host those pages at ``<base_uri>/<kebab-class-name>`` and a clickable
 RFC 7807 ``type`` URI lands the user on a populated reference page.
 
-Pages a maintainer has hand-edited are protected by an ``<!-- gstack:authored -->``
+Pages a maintainer has hand-edited are protected by an ``<!-- pipelex:authored -->``
 HTML comment anywhere in the file: when the generator detects it on an
 existing page, the page is left untouched. Generated pages carry a different
-marker (``<!-- gstack:generated -->``) so a quick ``grep`` distinguishes the
+marker (``<!-- pipelex:generated -->``) so a quick ``grep`` distinguishes the
 two populations.
 """
 
@@ -151,10 +151,10 @@ def iter_pipelex_error_subclasses() -> Iterator[type[PipelexError]]:
 
 # Marker a maintainer adds to a generated page to claim it for hand-editing.
 # When present, :func:`generate_error_pages` skips the page on regeneration.
-AUTHORED_MARKER = "<!-- gstack:authored -->"
+AUTHORED_MARKER = "<!-- pipelex:authored -->"
 # Marker stamped on every generated page so the two populations are
-# distinguishable at a glance (``grep -L gstack:authored docs/errors``).
-GENERATED_MARKER = "<!-- gstack:generated -->"
+# distinguishable at a glance (``grep -L pipelex:authored docs/errors``).
+GENERATED_MARKER = "<!-- pipelex:generated -->"
 # Stem of the landing page emitted alongside the per-class pages. Kept in nav;
 # the per-class pages are declared ``not_in_nav`` in ``mkdocs.yml`` so the
 # sidebar does not balloon with one entry per error class.

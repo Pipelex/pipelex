@@ -3,7 +3,7 @@ title: "Generated image"
 description: "Reference for the `GeneratedImageError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Generated image
 

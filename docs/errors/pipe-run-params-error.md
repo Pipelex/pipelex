@@ -3,7 +3,7 @@ title: "Pipe run params"
 description: "Reference for the `PipeRunParamsError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipe run params
 

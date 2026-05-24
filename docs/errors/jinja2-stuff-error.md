@@ -3,7 +3,7 @@ title: "Jinja 2 stuff"
 description: "Reference for the `Jinja2StuffError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Jinja 2 stuff
 

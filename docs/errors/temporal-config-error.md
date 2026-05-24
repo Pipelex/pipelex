@@ -3,7 +3,7 @@ title: "Temporal config"
 description: "Reference for the `TemporalConfigError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Temporal config
 

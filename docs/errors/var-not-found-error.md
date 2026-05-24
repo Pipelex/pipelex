@@ -3,7 +3,7 @@ title: "Var not found"
 description: "Reference for the `VarNotFoundError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Var not found
 

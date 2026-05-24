@@ -3,7 +3,7 @@ title: "Storage config"
 description: "Reference for the `StorageConfigError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Storage config
 

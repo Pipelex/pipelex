@@ -3,7 +3,7 @@ title: "Storage error"
 description: "Reference for the `StorageError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Storage error
 

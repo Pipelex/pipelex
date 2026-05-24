@@ -3,7 +3,7 @@ title: "Gateway do not track conflict"
 description: "Reference for the `GatewayDoNotTrackConflictError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Gateway do not track conflict
 

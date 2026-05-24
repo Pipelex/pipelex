@@ -3,7 +3,7 @@ title: "Llm completion"
 description: "Reference for the `LLMCompletionError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Llm completion
 

@@ -3,7 +3,7 @@ title: "Extract handle not found"
 description: "Reference for the `ExtractHandleNotFoundError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Extract handle not found
 

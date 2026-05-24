@@ -3,7 +3,7 @@ title: "Pipe input"
 description: "Reference for the `PipeInputError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipe input
 

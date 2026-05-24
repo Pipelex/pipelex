@@ -3,7 +3,7 @@ title: "Tool error"
 description: "Reference for the `ToolError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Tool error
 

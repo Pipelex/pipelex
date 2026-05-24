@@ -3,7 +3,7 @@ title: "Pipe loading"
 description: "Reference for the `PipeLoadingError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipe loading
 

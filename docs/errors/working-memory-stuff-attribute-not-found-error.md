@@ -3,7 +3,7 @@ title: "Working memory stuff attribute not found"
 description: "Reference for the `WorkingMemoryStuffAttributeNotFoundError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Working memory stuff attribute not found
 

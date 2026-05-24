@@ -3,7 +3,7 @@ title: "Pipe controller"
 description: "Reference for the `PipeControllerError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipe controller
 

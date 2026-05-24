@@ -3,7 +3,7 @@ title: "Jinja 2 template syntax"
 description: "Reference for the `Jinja2TemplateSyntaxError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Jinja 2 template syntax
 

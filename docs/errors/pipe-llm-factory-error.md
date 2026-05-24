@@ -3,7 +3,7 @@ title: "Pipe llm factory"
 description: "Reference for the `PipeLLMFactoryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipe llm factory
 

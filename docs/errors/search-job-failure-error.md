@@ -3,7 +3,7 @@ title: "Search job failure"
 description: "Reference for the `SearchJobFailureError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Search job failure
 

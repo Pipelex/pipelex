@@ -3,7 +3,7 @@ title: "Concept structure generator"
 description: "Reference for the `ConceptStructureGeneratorError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Concept structure generator
 

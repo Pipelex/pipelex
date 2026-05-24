@@ -3,7 +3,7 @@ title: "Temporal server"
 description: "Reference for the `TemporalServerError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Temporal server
 

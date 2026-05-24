@@ -3,7 +3,7 @@ title: "Unexpected internal error"
 description: "Reference for the `PipelexUnexpectedError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Unexpected internal error
 

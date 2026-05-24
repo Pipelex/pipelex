@@ -3,7 +3,7 @@ title: "Routing profile library not found"
 description: "Reference for the `RoutingProfileLibraryNotFoundError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Routing profile library not found
 

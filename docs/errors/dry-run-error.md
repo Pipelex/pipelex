@@ -3,7 +3,7 @@ title: "Dry run"
 description: "Reference for the `DryRunError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Dry run
 

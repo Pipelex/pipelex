@@ -3,7 +3,7 @@ title: "Llm prompt spec"
 description: "Reference for the `LLMPromptSpecError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Llm prompt spec
 

@@ -3,7 +3,7 @@ title: "Pipe condition factory"
 description: "Reference for the `PipeConditionFactoryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipe condition factory
 

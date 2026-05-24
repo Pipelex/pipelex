@@ -3,7 +3,7 @@ title: "Prompt document factory"
 description: "Reference for the `PromptDocumentFactoryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Prompt document factory
 

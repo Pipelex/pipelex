@@ -3,7 +3,7 @@ title: "Webhook delivery"
 description: "Reference for the `WebhookDeliveryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Webhook delivery
 

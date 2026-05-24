@@ -3,7 +3,7 @@ title: "Concept refine"
 description: "Reference for the `ConceptRefineError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Concept refine
 

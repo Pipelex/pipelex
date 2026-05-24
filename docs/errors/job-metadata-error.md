@@ -3,7 +3,7 @@ title: "Job metadata"
 description: "Reference for the `JobMetadataError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Job metadata
 

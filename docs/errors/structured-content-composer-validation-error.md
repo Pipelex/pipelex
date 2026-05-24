@@ -3,7 +3,7 @@ title: "Structured content composer validation"
 description: "Reference for the `StructuredContentComposerValidationError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Structured content composer validation
 

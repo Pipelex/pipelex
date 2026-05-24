@@ -3,7 +3,7 @@ title: "Fal credentials"
 description: "Reference for the `FalCredentialsError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Fal credentials
 

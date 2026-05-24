@@ -3,7 +3,7 @@ title: "Validate bundle"
 description: "Reference for the `ValidateBundleError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Validate bundle
 

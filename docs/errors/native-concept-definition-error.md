@@ -3,7 +3,7 @@ title: "Native concept definition"
 description: "Reference for the `NativeConceptDefinitionError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Native concept definition
 

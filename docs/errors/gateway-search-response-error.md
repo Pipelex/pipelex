@@ -3,7 +3,7 @@ title: "Gateway search response"
 description: "Reference for the `GatewaySearchResponseError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Gateway search response
 

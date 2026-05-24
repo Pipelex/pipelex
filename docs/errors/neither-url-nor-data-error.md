@@ -3,7 +3,7 @@ title: "Neither url nor data"
 description: "Reference for the `NeitherUrlNorDataError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Neither url nor data
 

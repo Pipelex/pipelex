@@ -3,7 +3,7 @@ title: "Extract model not found"
 description: "Reference for the `ExtractModelNotFoundError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Extract model not found
 

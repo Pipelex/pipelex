@@ -3,7 +3,7 @@ title: "Environment variable not set"
 description: "Reference for the `EnvVarNotFoundError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Environment variable not set
 

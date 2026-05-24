@@ -3,7 +3,7 @@ title: "Template sigil syntax"
 description: "Reference for the `TemplateSigilSyntaxError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Template sigil syntax
 

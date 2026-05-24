@@ -3,7 +3,7 @@ title: "Pipe parallel factory"
 description: "Reference for the `PipeParallelFactoryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipe parallel factory
 

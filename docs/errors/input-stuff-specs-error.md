@@ -3,7 +3,7 @@ title: "Input stuff specs"
 description: "Reference for the `InputStuffSpecsError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Input stuff specs
 

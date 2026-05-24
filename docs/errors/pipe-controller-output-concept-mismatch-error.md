@@ -3,7 +3,7 @@ title: "Pipe controller output concept mismatch"
 description: "Reference for the `PipeControllerOutputConceptMismatchError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipe controller output concept mismatch
 

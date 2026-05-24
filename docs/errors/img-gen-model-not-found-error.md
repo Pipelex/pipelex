@@ -3,7 +3,7 @@ title: "Img gen model not found"
 description: "Reference for the `ImgGenModelNotFoundError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Img gen model not found
 

@@ -3,7 +3,7 @@ title: "S3 storage error"
 description: "Reference for the `StorageS3Error` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # S3 storage error
 

@@ -3,7 +3,7 @@ title: "Sdk type"
 description: "Reference for the `SdkTypeError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Sdk type
 

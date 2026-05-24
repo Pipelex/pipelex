@@ -3,7 +3,7 @@ title: "Img gen prompt"
 description: "Reference for the `ImgGenPromptError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Img gen prompt
 

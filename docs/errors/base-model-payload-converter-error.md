@@ -3,7 +3,7 @@ title: "Base model payload converter"
 description: "Reference for the `BaseModelPayloadConverterError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Base model payload converter
 

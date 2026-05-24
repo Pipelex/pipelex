@@ -3,7 +3,7 @@ title: "Pipe not found"
 description: "Reference for the `PipeNotFoundError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipe not found
 

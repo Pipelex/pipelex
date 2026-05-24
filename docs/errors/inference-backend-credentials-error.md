@@ -3,7 +3,7 @@ title: "Inference backend credentials"
 description: "Reference for the `InferenceBackendCredentialsError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Inference backend credentials
 

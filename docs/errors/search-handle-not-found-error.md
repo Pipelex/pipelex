@@ -3,7 +3,7 @@ title: "Search handle not found"
 description: "Reference for the `SearchHandleNotFoundError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Search handle not found
 

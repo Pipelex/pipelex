@@ -3,7 +3,7 @@ title: "Pipe img gen run"
 description: "Reference for the `PipeImgGenRunError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipe img gen run
 

@@ -3,7 +3,7 @@ title: "Delivery"
 description: "Reference for the `DeliveryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Delivery
 

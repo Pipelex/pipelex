@@ -3,7 +3,7 @@ title: "Anthropic sdk unsupported"
 description: "Reference for the `AnthropicSDKUnsupportedError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Anthropic sdk unsupported
 

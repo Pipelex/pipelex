@@ -3,7 +3,7 @@ title: "Gateway api key missing"
 description: "Reference for the `GatewayApiKeyMissingError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Gateway api key missing
 

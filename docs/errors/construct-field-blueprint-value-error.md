@@ -3,7 +3,7 @@ title: "Construct field blueprint value"
 description: "Reference for the `ConstructFieldBlueprintValueError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Construct field blueprint value
 

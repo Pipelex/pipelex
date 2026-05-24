@@ -3,7 +3,7 @@ title: "Storage invalid key"
 description: "Reference for the `StorageInvalidKeyError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Storage invalid key
 

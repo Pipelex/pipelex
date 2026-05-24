@@ -3,7 +3,7 @@ title: "Inference setup required"
 description: "Reference for the `InferenceSetupRequiredError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Inference setup required
 

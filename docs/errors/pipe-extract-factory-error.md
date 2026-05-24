@@ -3,7 +3,7 @@ title: "Pipe extract factory"
 description: "Reference for the `PipeExtractFactoryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipe extract factory
 

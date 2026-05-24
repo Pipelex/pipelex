@@ -3,7 +3,7 @@ title: "Content generation"
 description: "Reference for the `ContentGenerationError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Content generation
 

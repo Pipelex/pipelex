@@ -3,7 +3,7 @@ title: "Model deck validaton"
 description: "Reference for the `ModelDeckValidatonError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Model deck validaton
 

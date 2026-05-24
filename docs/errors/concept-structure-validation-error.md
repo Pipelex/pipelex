@@ -3,7 +3,7 @@ title: "Concept structure validation"
 description: "Reference for the `ConceptStructureValidationError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Concept structure validation
 

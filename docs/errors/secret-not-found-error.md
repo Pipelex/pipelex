@@ -3,7 +3,7 @@ title: "Secret not found"
 description: "Reference for the `SecretNotFoundError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Secret not found
 

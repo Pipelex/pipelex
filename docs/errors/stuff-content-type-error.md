@@ -3,7 +3,7 @@ title: "Stuff content type"
 description: "Reference for the `StuffContentTypeError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Stuff content type
 

@@ -3,7 +3,7 @@ title: "Concept loading"
 description: "Reference for the `ConceptLoadingError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Concept loading
 

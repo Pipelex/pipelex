@@ -3,7 +3,7 @@ title: "Gateway extract response"
 description: "Reference for the `GatewayExtractResponseError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Gateway extract response
 

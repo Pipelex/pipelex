@@ -3,7 +3,7 @@ title: "Argument type"
 description: "Reference for the `ArgumentTypeError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Argument type
 

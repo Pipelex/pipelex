@@ -3,7 +3,7 @@ title: "Kit index loading"
 description: "Reference for the `KitIndexLoadingError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Kit index loading
 

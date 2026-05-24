@@ -3,7 +3,7 @@ title: "Context provider"
 description: "Reference for the `ContextProviderError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Context provider
 

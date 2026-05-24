@@ -3,7 +3,7 @@ title: "Pipe compose"
 description: "Reference for the `PipeComposeError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipe compose
 

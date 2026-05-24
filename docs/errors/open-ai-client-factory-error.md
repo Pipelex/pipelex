@@ -3,7 +3,7 @@ title: "Open ai client factory"
 description: "Reference for the `OpenAIClientFactoryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Open ai client factory
 

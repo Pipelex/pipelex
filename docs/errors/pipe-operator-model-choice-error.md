@@ -3,7 +3,7 @@ title: "Pipe operator model choice"
 description: "Reference for the `PipeOperatorModelChoiceError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipe operator model choice
 

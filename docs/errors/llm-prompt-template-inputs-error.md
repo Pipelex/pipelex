@@ -3,7 +3,7 @@ title: "Llm prompt template inputs"
 description: "Reference for the `LLMPromptTemplateInputsError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Llm prompt template inputs
 

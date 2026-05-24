@@ -3,7 +3,7 @@ title: "Concept string"
 description: "Reference for the `ConceptStringError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Concept string
 

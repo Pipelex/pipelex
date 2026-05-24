@@ -3,7 +3,7 @@ title: "Stuff spec"
 description: "Reference for the `StuffSpecError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Stuff spec
 

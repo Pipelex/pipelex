@@ -3,7 +3,7 @@ title: "Gateway credentials"
 description: "Reference for the `GatewayCredentialsError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Gateway credentials
 

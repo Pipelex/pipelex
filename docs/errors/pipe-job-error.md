@@ -3,7 +3,7 @@ title: "Pipe job"
 description: "Reference for the `PipeJobError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipe job
 
