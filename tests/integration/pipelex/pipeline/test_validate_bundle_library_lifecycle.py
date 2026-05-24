@@ -12,8 +12,17 @@ The IDE/server use case is the amplifier: a process that calls ``validate_bundle
 once per user save accumulates leaked libraries proportional to how often the
 caller validates failing bundles — which is "every save while syntax-erroring"
 for the IDE/agent build flow.
+
+Also pins the preflight-leak surface: every statement that runs between
+``open_library()`` and the body must live inside the ``try`` block so any
+exception (including ``asyncio.CancelledError`` at an ``await`` yield, or a
+``TypeError`` from ``resolve_library_dirs``) still triggers teardown. The
+``library_id`` passed to ``teardown`` is asserted equal to the one returned by
+``open_library`` so a regression that tore down a stale closure-captured id
+would still fail the test.
 """
 
+import asyncio
 import tempfile
 from collections.abc import Callable
 from pathlib import Path
@@ -65,6 +74,7 @@ class TestValidateBundleLibraryLifecycle:
     ) -> None:
         load_empty_library()
         library_manager = get_library_manager()
+        open_library_spy = mocker.spy(library_manager, "open_library")
         teardown_spy = mocker.spy(library_manager, "teardown")
         mocker.patch.object(validate_bundle_module, "ValidateBundleResult", _BrokenResult)
 
@@ -75,7 +85,8 @@ class TestValidateBundleLibraryLifecycle:
         # The fixture's own teardown runs after the test, so we capture the delta here.
         assert teardown_spy.call_count == teardown_calls_before + 1
         latest_call = teardown_spy.call_args_list[-1]
-        assert "library_id" in latest_call.kwargs
+        opened_library_id, _ = open_library_spy.spy_return
+        assert latest_call.kwargs["library_id"] == opened_library_id
 
     async def test_validate_bundles_from_directory_tears_down_library_on_translated_error(
         self,
@@ -84,6 +95,7 @@ class TestValidateBundleLibraryLifecycle:
     ) -> None:
         load_empty_library()
         library_manager = get_library_manager()
+        open_library_spy = mocker.spy(library_manager, "open_library")
         teardown_spy = mocker.spy(library_manager, "teardown")
         mocker.patch.object(validate_bundle_module, "ValidateBundleResult", _BrokenResult)
 
@@ -94,7 +106,8 @@ class TestValidateBundleLibraryLifecycle:
                 await validate_bundles_from_directory(directory=Path(tmp_dir))
         assert teardown_spy.call_count == teardown_calls_before + 1
         latest_call = teardown_spy.call_args_list[-1]
-        assert "library_id" in latest_call.kwargs
+        opened_library_id, _ = open_library_spy.spy_return
+        assert latest_call.kwargs["library_id"] == opened_library_id
 
     async def test_load_concepts_only_tears_down_library_on_translated_error(
         self,
@@ -103,6 +116,7 @@ class TestValidateBundleLibraryLifecycle:
     ) -> None:
         load_empty_library()
         library_manager = get_library_manager()
+        open_library_spy = mocker.spy(library_manager, "open_library")
         teardown_spy = mocker.spy(library_manager, "teardown")
         mocker.patch.object(validate_bundle_module, "LoadConceptsOnlyResult", _BrokenResult)
 
@@ -111,7 +125,8 @@ class TestValidateBundleLibraryLifecycle:
             load_concepts_only(mthds_contents=[_VALID_MTHDS])
         assert teardown_spy.call_count == teardown_calls_before + 1
         latest_call = teardown_spy.call_args_list[-1]
-        assert "library_id" in latest_call.kwargs
+        opened_library_id, _ = open_library_spy.spy_return
+        assert latest_call.kwargs["library_id"] == opened_library_id
 
     async def test_load_concepts_only_from_directory_tears_down_library_on_translated_error(
         self,
@@ -120,6 +135,7 @@ class TestValidateBundleLibraryLifecycle:
     ) -> None:
         load_empty_library()
         library_manager = get_library_manager()
+        open_library_spy = mocker.spy(library_manager, "open_library")
         teardown_spy = mocker.spy(library_manager, "teardown")
         mocker.patch.object(validate_bundle_module, "LoadConceptsOnlyResult", _BrokenResult)
 
@@ -130,4 +146,105 @@ class TestValidateBundleLibraryLifecycle:
                 load_concepts_only_from_directory(directory=Path(tmp_dir))
         assert teardown_spy.call_count == teardown_calls_before + 1
         latest_call = teardown_spy.call_args_list[-1]
-        assert "library_id" in latest_call.kwargs
+        opened_library_id, _ = open_library_spy.spy_return
+        assert latest_call.kwargs["library_id"] == opened_library_id
+
+    async def test_validate_bundle_tears_down_on_base_exception_in_pre_try_window(
+        self,
+        load_empty_library: Callable[[], str],
+        mocker: MockerFixture,
+    ) -> None:
+        """Pin: a ``BaseException`` (e.g. ``CancelledError``) raised in the pre-try window still triggers teardown.
+
+        The IDE/server use case is the trigger — a caller that cancels in-flight
+        validation on every keystroke would otherwise leak one library per
+        cancellation, because ``asyncio.CancelledError`` is a ``BaseException``
+        and only ``finally`` (not ``except Exception``) catches it. Every
+        statement between ``open_library()`` and the helper ``with`` block —
+        including the ``await asyncio.sleep(0)`` yield — must live inside the
+        ``try`` block so the ``finally`` runs.
+
+        Simulated here by patching ``resolve_library_dirs`` (which runs in that
+        window) to raise ``CancelledError``. The shape — a ``BaseException`` in
+        the pre-try window — is the property under test, not the specific call
+        site.
+        """
+        load_empty_library()
+        library_manager = get_library_manager()
+        open_library_spy = mocker.spy(library_manager, "open_library")
+        teardown_spy = mocker.spy(library_manager, "teardown")
+        mocker.patch.object(
+            validate_bundle_module,
+            "resolve_library_dirs",
+            side_effect=asyncio.CancelledError("simulated cancellation in pre-try window"),
+        )
+
+        teardown_calls_before = teardown_spy.call_count
+        with pytest.raises(asyncio.CancelledError):
+            await validate_bundle(mthds_contents=[_VALID_MTHDS])
+
+        assert teardown_spy.call_count == teardown_calls_before + 1
+        latest_call = teardown_spy.call_args_list[-1]
+        opened_library_id, _ = open_library_spy.spy_return
+        assert latest_call.kwargs["library_id"] == opened_library_id
+
+    async def test_validate_bundle_tears_down_on_resolve_library_dirs_failure(
+        self,
+        load_empty_library: Callable[[], str],
+        mocker: MockerFixture,
+    ) -> None:
+        """Pin: a ``TypeError`` from ``resolve_library_dirs`` still triggers teardown.
+
+        ``resolve_library_dirs`` runs between ``open_library`` and the helper
+        ``with`` block. A malformed ``library_dirs`` element (e.g. ``None`` in
+        the sequence) raises ``TypeError`` at ``Path(None)``. The pre-try-leak
+        fix moves it inside the ``try`` block so the ``finally`` runs.
+        """
+        load_empty_library()
+        library_manager = get_library_manager()
+        open_library_spy = mocker.spy(library_manager, "open_library")
+        teardown_spy = mocker.spy(library_manager, "teardown")
+        mocker.patch.object(
+            validate_bundle_module,
+            "resolve_library_dirs",
+            side_effect=TypeError("simulated invalid library_dirs element"),
+        )
+
+        teardown_calls_before = teardown_spy.call_count
+        with pytest.raises(TypeError):
+            await validate_bundle(mthds_contents=[_VALID_MTHDS])
+
+        assert teardown_spy.call_count == teardown_calls_before + 1
+        latest_call = teardown_spy.call_args_list[-1]
+        opened_library_id, _ = open_library_spy.spy_return
+        assert latest_call.kwargs["library_id"] == opened_library_id
+
+    async def test_load_concepts_only_tears_down_on_resolve_library_dirs_failure(
+        self,
+        load_empty_library: Callable[[], str],
+        mocker: MockerFixture,
+    ) -> None:
+        """Pin: same pre-try-leak guarantee for the concepts-only entry point.
+
+        The concepts-only path also calls ``resolve_library_dirs`` between
+        ``open_library`` and the helper ``with`` block. The fix applies
+        symmetrically to both entry points that consume ``library_dirs``.
+        """
+        load_empty_library()
+        library_manager = get_library_manager()
+        open_library_spy = mocker.spy(library_manager, "open_library")
+        teardown_spy = mocker.spy(library_manager, "teardown")
+        mocker.patch.object(
+            validate_bundle_module,
+            "resolve_library_dirs",
+            side_effect=TypeError("simulated invalid library_dirs element"),
+        )
+
+        teardown_calls_before = teardown_spy.call_count
+        with pytest.raises(TypeError):
+            load_concepts_only(mthds_contents=[_VALID_MTHDS])
+
+        assert teardown_spy.call_count == teardown_calls_before + 1
+        latest_call = teardown_spy.call_args_list[-1]
+        opened_library_id, _ = open_library_spy.spy_return
+        assert latest_call.kwargs["library_id"] == opened_library_id

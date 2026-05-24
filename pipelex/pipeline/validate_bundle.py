@@ -125,16 +125,16 @@ async def validate_bundle(
 
     library_manager = get_library_manager()
     library_id, library = library_manager.open_library()
-    set_current_library(library_id=library_id)
-
-    # Load libraries from resolved directories before loading the bundle
-    effective_dirs, source_label = resolve_library_dirs(library_dirs)
-
-    loaded_pipes: list[PipeAbstract] | None = None
-    loaded_blueprints: list[PipelexBundleBlueprint] | None = None
-    await asyncio.sleep(0)  # Yield to event loop (keeps function async-compatible)
     success = False
     try:
+        set_current_library(library_id=library_id)
+
+        # Load libraries from resolved directories before loading the bundle
+        effective_dirs, source_label = resolve_library_dirs(library_dirs)
+
+        loaded_pipes: list[PipeAbstract] | None = None
+        loaded_blueprints: list[PipelexBundleBlueprint] | None = None
+        await asyncio.sleep(0)  # Yield to event loop (keeps function async-compatible)
         with _translate_to_validate_bundle_error(category="pipe"):
             if effective_dirs:
                 log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}) for validation")
@@ -188,9 +188,9 @@ async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResu
 
     library_manager = get_library_manager()
     library_id, _ = library_manager.open_library()
-    set_current_library(library_id=library_id)
     success = False
     try:
+        set_current_library(library_id=library_id)
         with _translate_to_validate_bundle_error(category="pipe"):
             for mthds_file in mthds_files:
                 blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file)
@@ -248,15 +248,15 @@ def load_concepts_only(
 
     library_manager = get_library_manager()
     library_id, library = library_manager.open_library()
-    set_current_library(library_id=library_id)
-
-    # Load libraries from resolved directories before loading the bundle
-    effective_dirs, source_label = resolve_library_dirs(library_dirs)
-
-    loaded_concepts: list[Concept] | None = None
-    loaded_blueprints: list[PipelexBundleBlueprint] | None = None
     success = False
     try:
+        set_current_library(library_id=library_id)
+
+        # Load libraries from resolved directories before loading the bundle
+        effective_dirs, source_label = resolve_library_dirs(library_dirs)
+
+        loaded_concepts: list[Concept] | None = None
+        loaded_blueprints: list[PipelexBundleBlueprint] | None = None
         with _translate_to_validate_bundle_error(category="concept"):
             if effective_dirs:
                 log.verbose(f"Loading concepts only from {len(effective_dirs)} library directory(ies) ({source_label})")
@@ -320,9 +320,9 @@ def load_concepts_only_from_directory(directory: Path) -> LoadConceptsOnlyResult
 
     library_manager = get_library_manager()
     library_id, _ = library_manager.open_library()
-    set_current_library(library_id=library_id)
     success = False
     try:
+        set_current_library(library_id=library_id)
         with _translate_to_validate_bundle_error(category="concept"):
             for mthds_file in mthds_files:
                 blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file)
