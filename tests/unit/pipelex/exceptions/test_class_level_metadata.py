@@ -112,3 +112,29 @@ class TestClassLevelMetadata:
         """
         report = exc.to_error_report()
         assert report.caller_facing_message is expected_caller_facing
+
+    def test_caller_facing_message_inherits_for_interpreter_subclass(self) -> None:
+        """A subclass of ``PipelexInterpreterError`` stays caller-facing.
+
+        Pins the deliberate inheritance contract on ``_authors_caller_facing_message``
+        (plain attribute access — see ``base_exceptions.py``): a future refactor
+        swapping the flag to ``cls.__dict__`` lookup (the path used by
+        ``_declared_title`` / ``_declared_type_uri``) would silently downgrade
+        STRICT disclosure for every subclass and let internal messages leak under
+        STRICT — or, more likely, silently redact authored caller-facing copy.
+        """
+
+        class _SubInterpreterError(PipelexInterpreterError):
+            pass
+
+        report = _SubInterpreterError("boom").to_error_report()
+        assert report.caller_facing_message is True
+
+    def test_caller_facing_message_inherits_for_validate_bundle_subclass(self) -> None:
+        """A subclass of ``ValidateBundleError`` stays caller-facing — same contract as the interpreter case."""
+
+        class _SubValidateBundleError(ValidateBundleError):
+            pass
+
+        report = _SubValidateBundleError("boom").to_error_report()
+        assert report.caller_facing_message is True

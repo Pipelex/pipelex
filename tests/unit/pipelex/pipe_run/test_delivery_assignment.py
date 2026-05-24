@@ -97,3 +97,21 @@ class TestDeliveryAssignment:
             payload={"customer_id": "abc", "tier": "pro"},
         )
         assert webhook.payload == {"customer_id": "abc", "tier": "pro"}
+
+    def test_reserved_key_check_runs_only_at_construction(self) -> None:
+        """Mutating ``webhook.payload`` after construction does not re-trigger the reserved-key validator.
+
+        The model has no ``validate_assignment=True``, so post-construction
+        mutation bypasses ``_reject_reserved_keys``. ``_notify_webhook``'s
+        ``dict(webhook.payload)`` shallow-copies before override, so the wire
+        payload is safe today, but the contract is implicit. This pins the
+        construction-only behavior so a future ``validate_assignment=True``
+        toggle gets caught as a behavior change.
+        """
+        webhook = WebhookTarget(
+            url="https://example.com/callback",
+            payload={"customer_id": "abc"},
+        )
+        # Should not raise — validator runs only at construction.
+        webhook.payload["status"] = "post-construction-mutation"
+        assert webhook.payload["status"] == "post-construction-mutation"

@@ -84,6 +84,29 @@ class TestRecoverErrorReport:
         assert "rate limited" in report.message
         assert "schema validation" in report.message
 
+    def test_invalid_report_with_empty_message_falls_back_to_exc_chain(self) -> None:
+        """An invalid report dict with an empty ``message`` field falls back to the
+        exception chain for the recovered message preamble — the ``or`` at
+        ``temporal_error.py:118`` falls through when the report dict's ``message``
+        is empty or whitespace. A regression swapping ``or`` to ``??`` / ``is None``
+        would silently emit ``[error report failed schema validation]`` with no
+        preamble at all, hiding the underlying failure text from the wire payload.
+        """
+        invalid_report_dict: dict[str, Any] = {
+            "error_type": "CogtError",
+            "message": "",  # empty: ``or`` must fall through to _message_from_exc(exc)
+            "title": "AI inference failed",
+            "type_uri": "https://docs.pipelex.com/latest/errors/cogt-error/",
+            "future_field_we_do_not_know_about": "unexpected",
+        }
+        failure = _workflow_failure(_app_error(invalid_report_dict))
+        report = recover_error_report(failure)
+        assert report.error_type == "UnrecoverableWorkflowFailureError"
+        # The fallback message must include both the ApplicationError text
+        # (recovered via the exception-chain walk) and the schema-validation marker.
+        assert "rate limited on the worker" in report.message
+        assert "schema validation" in report.message
+
     def test_recovers_report_past_report_less_wrapper_application_error(self) -> None:
         """A report-less wrapper ``ApplicationError`` (e.g. a ``WorkflowExecutionError`` raised
         when a workflow wraps a failed child workflow) does not hide the report-carrying
