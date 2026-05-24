@@ -261,9 +261,9 @@ Two TODO comments live on `ValidateBundleError`:
 The first never landed. The second contradicts project policy ("No backward
 compatibility").
 
-- [ ] Decide with the user: land the deferred catch site for
+- [x] Decide with the user: land the deferred catch site for
       `pipe_concept_instantiation_errors`, or remove the unused structure.
-- [ ] For the `pipe_validation_error_data` property: drop it and update callers
+- [x] For the `pipe_validation_error_data` property: drop it and update callers
       (preferred per policy), or remove the "Backwards compatibility" framing
       and the TODO if the property is genuinely useful as an aggregate getter.
 
@@ -276,11 +276,11 @@ compatibility").
 `ValidateBundleError(...)` with the same fields. ~70 lines of pure duplication.
 A new handler must be added in two places.
 
-- [ ] Extract the handler cascade into a helper
+- [x] Extract the handler cascade into a helper
       `_translate_validation_error_to_validate_bundle_error(exc)` (or wrap the
       try-body in a context manager) so both call sites share one source of
       truth.
-- [ ] Confirm both `validate_bundle` and `validate_bundles_from_directory`
+- [x] Confirm both `validate_bundle` and `validate_bundles_from_directory`
       callers still get identical `ValidateBundleError` instances after the
       refactor.
 
@@ -293,7 +293,7 @@ opportunity to either delete it or wire it into actual error sites in
 `pipelex/temporal/temporal_data_converter.py` where unexpected conversion
 failures currently surface as generic exceptions.
 
-- [ ] Decide: delete the class (one less generated docs page) OR wire it into
+- [x] Decide: delete the class (one less generated docs page) OR wire it into
       `temporal_data_converter.py` where it would add meaningful classification.
 
 ### Acceptance
@@ -303,8 +303,8 @@ Each item resolved either by landing the change or by recording a deliberate
 
 ### ⛔ CHECKPOINT C — STOP, verify, record
 
-- [ ] `make agent-check` and `make agent-test` clean.
-- [ ] Append a dated entry to the Session log below: which items landed, which
+- [x] `make agent-check` and `make agent-test` clean.
+- [x] Append a dated entry to the Session log below: which items landed, which
       were deliberately left, and why.
 
 ---
@@ -377,8 +377,10 @@ Items the reviewer noted but explicitly did not flag as actionable:
 
 ## Decisions
 
-Record each decision here as it is taken, with date and rationale. (Empty —
-ready for the new session.)
+Record each decision here as it is taken, with date and rationale.
+
+- **2026-05-24 — C.1: Remove unused `pipe_concept_instantiation_errors` infrastructure.** Per project policy "No backward compatibility", the never-populated-in-production field on `ValidateBundleError` + the `pipe_validation_error_data` aggregate (Backwards compatibility) property were both removed. The two callers (`pipelex/cli/agent_cli/commands/agent_output.py`, `pipelex/cli/error_handlers.py`) and the test fixture in `tests/unit/pipelex/cli/test_agent_output.py` were updated. Alternative considered: land the deferred catch site for Pydantic ValidationError in the factory instantiation path — rejected as bigger scope without a concrete need from production.
+- **2026-05-24 — C.3: Delete `BaseModelPayloadConverterError`.** Never imported or raised; `temporal_data_converter.py` lets kajson failures bubble raw. Wiring the class into the converter would require adding a speculative try/except, which the project rules explicitly forbid ("Do NOT add try/except speculatively"). Cleaner to delete and regenerate the docs.
 
 ---
 
@@ -410,3 +412,12 @@ state, what is broken or deferred, and the exact next action.
   - B.4 (`fix(errors): make OpenAI/VertexAI titles match the suffix convention`): three `_declared_title` values updated; `docs/errors/` regenerated (4 files diff: 3 pages + index).
 - **Status**: `make agent-check` clean, `make agent-test` clean.
 - **Next action**: open Phase C.1 — the stale TODOs in `pipeline/exceptions.py` need a decision (land the deferred catch site OR remove the unused structure per "No backward compatibility" policy).
+
+### 2026-05-24 — Checkpoint C landed
+
+- **Phase C** complete — three commits:
+  - C.1 (`refactor(errors): drop unused pipe_concept_instantiation_errors infrastructure`): user chose "Remove unused structure" (see Decisions). Dropped the field from `ValidateBundleError`, the iteration loop from `agent_output.py`, the `pipe_validation_error_data` property; inlined `pipe_validation_errors` at the call site in `error_handlers.py`; updated the test fixture.
+  - C.2 (`refactor(validate): extract bundle-loading handler cascade to a helper`): both `validate_bundle` and `validate_bundles_from_directory` now wrap their try-body in `with _translate_to_validate_bundle_error():` — single source of truth for the six-handler cascade.
+  - C.3 (`refactor(temporal): delete unused BaseModelPayloadConverterError`): dead class deleted; docs regenerated (one orphan page removed).
+- **Status**: `make agent-check` clean, `make agent-test` clean.
+- **Next action**: open Phase D.1 with the user — STRICT 429 stripping `provider_metadata.retry_after_seconds` is a design call between three options. Do not action without discussion (per the plan).
