@@ -418,19 +418,20 @@ class PipelexError(Exception):
             seen.add(id(node))
             node = node.__cause__
         cause_report = cause.to_error_report()
-        return ErrorReport(
-            error_type=report.error_type,
-            message=report.message,
-            title=report.title,
-            type_uri=report.type_uri,
-            caller_facing_message=report.caller_facing_message,
-            error_category=report.error_category or cause_report.error_category,
-            error_domain=report.error_domain or cause_report.error_domain,
-            retryable=report.retryable if report.retryable is not None else cause_report.retryable,
-            user_action=report.user_action or cause_report.user_action,
-            model=report.model or cause_report.model,
-            provider=report.provider or cause_report.provider,
-            provider_metadata=report.provider_metadata or cause_report.provider_metadata,
+        # Only the cause-merged classification fields are updated; the wrapper-wins
+        # fields (error_type, message, title, type_uri, caller_facing_message)
+        # stay untouched, so a future wrapper-wins field added to ErrorReport
+        # does not need to be re-listed here.
+        return report.model_copy(
+            update={
+                "error_category": report.error_category or cause_report.error_category,
+                "error_domain": report.error_domain or cause_report.error_domain,
+                "retryable": report.retryable if report.retryable is not None else cause_report.retryable,
+                "user_action": report.user_action or cause_report.user_action,
+                "model": report.model or cause_report.model,
+                "provider": report.provider or cause_report.provider,
+                "provider_metadata": report.provider_metadata or cause_report.provider_metadata,
+            }
         )
 
 
