@@ -268,19 +268,19 @@ Record the decision in the Decisions section when taken.
 
 ### 7.1 — Implement the chosen option
 
-- [ ] **Decision D4** — pick A / B / C from above. Record date and rationale.
-- [ ] Implement.
-- [ ] Verify: `make agent-test` runs the completeness assertion *without* the `xfail` marker (or, equivalently, the test passes and pytest reports `XPASS` under `strict=True`, prompting the marker's removal).
-- [ ] Remove `@pytest.mark.xfail(...)` from `test_runtime_walk_discovers_every_ast_classified_subclass`.
+- [x] **Decision D4** — pick A / B / C from above. Record date and rationale. **→ Decided 2026-05-23: Option B' (scoped rglob + force-import in dev/test consumers; no production bootstrap touch)** (see [Decisions](#decisions)).
+- [x] Implement.
+- [x] Verify: `make agent-test` runs the completeness assertion *without* the `xfail` marker (or, equivalently, the test passes and pytest reports `XPASS` under `strict=True`, prompting the marker's removal).
+- [x] Remove `@pytest.mark.xfail(...)` from `test_runtime_walk_discovers_every_ast_classified_subclass`.
 
 ### 7.2 — Regenerate `docs/errors/`
 
-- [ ] `pipelex-dev generate-error-pages` — the 23 previously-dropped pages should reappear (recreated, not "removed"). Verify `ErrorPagesReport.written` lists them.
-- [ ] `docs/errors/index.md` is back to 230+ entries (the HEAD~1 baseline plus the new `BaseModelPayloadConverterError`).
+- [x] `pipelex-dev generate-error-pages` — the previously-dropped pages reappear (recreated, not "removed"). Verify `ErrorPagesReport.written` lists them.
+- [x] `docs/errors/index.md` carries every AST-discovered class.
 
 ### 7.3 — Update the docs / rules
 
-- [ ] In `.claude/rules/python-standards.md`, document the chosen discovery strategy alongside the existing "Error class location" rule. The convention is about file naming; D4 is about how those files become discoverable.
+- [x] In `.claude/rules/python-standards.md`, document the chosen discovery strategy alongside the existing "Error class location" rule. The convention is about file naming; D4 is about how those files become discoverable.
 
 ### Acceptance
 
@@ -290,10 +290,10 @@ Record the decision in the Decisions section when taken.
 
 ### ⛔ CHECKPOINT 7 — STOP, verify, record
 
-- [ ] `make agent-check` and `make agent-test` clean (and the formerly-`xfail` test now passes without the marker).
-- [ ] Commit.
-- [ ] Tick every Phase 7 box.
-- [ ] Append a dated **Checkpoint 7** entry to the Session log: Decision D4 outcome, files touched, the AST/runtime set diff before and after, next action.
+- [x] `make agent-check` and `make agent-test` clean (and the formerly-`xfail` test now passes without the marker).
+- [x] Commit.
+- [x] Tick every Phase 7 box.
+- [x] Append a dated **Checkpoint 7** entry to the Session log: Decision D4 outcome, files touched, the AST/runtime set diff before and after, next action.
 
 ### Cold-start context for a fresh session
 
@@ -318,7 +318,7 @@ Record each decision here as it is taken, with date and rationale.
 - **D1** (Phase 1, Gap 1 fix) — **Option 1**, decided 2026-05-22. Add a per-class `ClassVar` flagging error classes that genuinely author caller-facing messages, and gate the STRICT-disclosure passthrough on that flag instead of on the inherited `error_domain == INPUT`. Rationale: keys redaction on the *provenance of the message* rather than an inherited classification, and avoids the `http_status` side effects Option 2 (dropping `error_domain` inheritance for domain-less wrappers) would carry.
 - **D2** (Phase 2, request_id call-site strategy) — **Bound adapter**, decided 2026-05-22. `WorkflowLog` / `ActivityLog` gain an instance-level `request_id` (held by a shared `_RequestIdLog` base), built once per workflow/activity invocation from `job_metadata.request_id`; the dead per-method `request_id` kwargs are dropped. Rationale: a new log call added inside a wired entry point picks up `request_id` automatically — no per-call threading, nothing to forget — and the per-method kwarg was unused dead surface.
 - **D3** (Phase 6, error class location filename pattern) — **`exceptions.py` + `*_exceptions.py`**, decided 2026-05-23. Every module declaring a `PipelexError` subclass must be named `exceptions.py` (default — one per package directory) or `<topic>_exceptions.py` (for directories that host multiple separate-concern error modules, matching the existing `pipelex/plugins/*/` pattern: `portkey_exceptions.py`, `anthropic_exceptions.py`, `mistral_exceptions.py`, `gateway_exceptions.py`). The `*_errors.py` synonym is dropped — it adds no information, and three files (`jinja2_errors.py`, `secrets_errors.py`, `template_errors.py`) get renamed. The root `pipelex/base_exceptions.py` is special-cased. Rationale: synonyms are exactly what produced the drift the registry exists to paper over; one canonical pattern + one topical variant covers the legitimate cases without inviting a third.
-- **D4** (Phase 7, error class discovery strategy) — **pending**. Recommended: Option A (explicit registration manifest at `pipelex/errors/_all_exceptions.py` plus a two-sided convention test that verifies disk-vs-manifest parity). Record when taken.
+- **D4** (Phase 7, error class discovery strategy) — **Option B' (scoped rglob + force-import in dev/test consumers only)**, decided 2026-05-23. `pipelex/errors/error_pages_generator.py` gains a `functools.cache`-d `_force_load_all_error_modules()` helper that rglob-scans the package for `exceptions.py` / `*_exceptions.py` and `importlib.import_module`s each; `iter_pipelex_error_subclasses` calls it as its first statement. Production bootstrap (`Pipelex.make()`) does NOT touch it — discovery has zero runtime side effect outside the docs generator and the type-URI uniqueness test. Rationale: this option carries the convention contract through to discovery without re-introducing a hand-maintained list (Phase 6's original drift target). Option A (explicit manifest) was rejected because the manifest is a second copy of information already on disk under the convention — it would have to be maintained for the life of the codebase and the two-sided test would be the only thing keeping it in sync. Option B' achieves the same end with zero maintenance: empirically verified that every `*_exceptions.py` imports only base error classes (zero SDK pulls), and Phase 6's filename convention guarantees the rglob is complete. The Phase 6 deletion of `error_module_registry.py` was right to remove the production runtime touch but overshot — Phase 7 restores the discovery helper, scoped to the two dev/test-time consumers that legitimately need it.
 
 ---
 
@@ -491,3 +491,33 @@ Append one dated entry per session / checkpoint. Each entry must leave the next 
   **Decisions:** D1 + D2 + D3 done; D4 pending (Phase 7).
 
   **Next action:** Phase 7 — close the discovery-contract gap per Decision D4. Cold-start context for a fresh session is in the Phase 7 section above. After Phase 7 lands and the `xfail` is removed, the in-repo error-handling work for `feature/API-readiness-2` is fully done (Phases 0-7).
+
+- **2026-05-23 — Checkpoint 7 (Phase 7 complete).** Error-class discovery contract closed on `feature/API-readiness-2`. `make agent-check` clean (ruff + pyright + mypy: 0 issues); targeted tests (`tests/unit/pipelex/errors/` + `tests/unit/pipelex/test_pipelex_error_type_uri_uniqueness.py`) all green; production bootstrap (`Pipelex.make()`) verified unchanged — same 203 subclasses loaded, helper not triggered.
+
+  **Decision D4:** Option B' — scoped rglob + force-import in dev/test consumers only. Rejected Option A (explicit manifest) because it re-introduces a hand-maintained list (the very drift target Phase 6 was attacking, just in disguise); rejected Option B (eager filesystem walk at `Pipelex.make()`) because production bootstrap shouldn't filesystem-touch; rejected Option C (build-time codegen) as unnecessary ceremony. Empirical verification underwrites B': every one of the 63 `exceptions.py` / `*_exceptions.py` files imports only base error classes (`PipelexError` / `CogtError` / `CredentialsError` / `ClickException`) — zero SDK pulls. Phase 6's filename convention guarantees the rglob is complete; no allowlist needed.
+
+  **What landed:**
+
+    - `pipelex/errors/error_pages_generator.py` — new `_force_load_all_error_modules()` helper (~17 lines incl. docstring), decorated with `@functools.cache` so the first call walks `pipelex/` for `exceptions.py` + `*_exceptions.py` and `importlib.import_module`s each, subsequent calls are no-ops. `iter_pipelex_error_subclasses()` calls it as its first statement. New `import functools` + `import importlib` + `import pipelex` (for `pipelex.__file__` resolution) added at the top.
+    - `tests/unit/pipelex/errors/test_error_class_location_convention.py` — `@pytest.mark.xfail(strict=True, ...)` removed from `test_runtime_walk_discovers_every_ast_classified_subclass`; the test now passes positively. Docstring updated to describe the test as a regression net rather than a future-failure marker. Unused `import pytest` removed.
+    - `.claude/rules/python-standards.md` (workspace level) — "Error class location" section gained a "Discovery contract" paragraph documenting the scoped force-import strategy and stating explicitly that adding a new error class is a one-step operation (no manifest to update).
+    - `docs/errors/` regenerated via `.venv/bin/pipelex-dev generate-error-pages` — `Written: 35 · Unchanged: 208 · Preserved: 0 · Removed: 0`. 34 new per-class pages (anthropic family, azure_rest, bedrock family, gateway family × 6, google × 2, graph × 2, mistral × 4, openai × 3 incl. VertexAI, portkey × 3, pipe-batch, pipe-search × 2, plus `ConceptSpecError`, `FalCredentialsError`, `PipeBatchFactoryError`, `PipelexBundleSpecBlueprintError`, `PyPdfium2RendererError`) + `docs/errors/index.md` regenerated to list them.
+
+  **Discovery set: before vs. after.**
+
+    - AST scan: 241 PipelexError subclasses on disk (unchanged).
+    - Runtime walk after naked `import pipelex`: 19 subclasses (unchanged).
+    - Runtime walk after `Pipelex.make()`: 203 subclasses (unchanged — production path untouched).
+    - Runtime walk after `iter_pipelex_error_subclasses()`: **241 → 241** (formerly 203, now equals AST set by construction). The 38-class gap is closed.
+    - The 4-page gap between the AST set diff and the 34 new files is `KitError` / `KitIndexLoadingError` / `PipelexCLIError` / `ReadinessCheckError` — these were already loaded by the dev CLI command's own bootstrap path before the helper ran, so their pages were already present.
+
+  **CHANGELOG:** `[Unreleased]` — one-line entry under the existing error-handling block noting `docs/errors/` is back to full coverage (34 previously-missing per-class pages restored).
+
+  **Deferred / not done (record-only):**
+
+    - AST-level "no SDK imports in `*_exceptions.py`" check on the convention test. Empirical verification suffices; revisit if the precondition is ever violated.
+    - Folding `iter_pipelex_error_subclasses` into a dedicated `pipelex/errors/discovery.py` module. Marginal organizational gain; not worth the diff.
+
+  **Decisions:** D1 + D2 + D3 + D4 all done. The in-repo error-handling work for `feature/API-readiness-2` is now fully complete (Phases 0-7).
+
+  **Next action:** Open the PR for `feature/API-readiness-2` against `dev`. Phase 5 (webhook signing) is the remaining cross-repo track — independent, lands on its own schedule per [`wip/security/webhook-signing.md`](wip/security/webhook-signing.md). Handoff drafts for the API team are at [`wip/api-readiness-2-handoff-drafts.md`](wip/api-readiness-2-handoff-drafts.md) — both human (Slack) and agent-prompt forms ready.

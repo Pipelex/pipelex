@@ -15,10 +15,13 @@ two populations.
 
 from __future__ import annotations
 
+import functools
+import importlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import pipelex
 from pipelex.base_exceptions import ErrorDomain, PipelexError
 from pipelex.cogt.inference.error_classification import UserAction
 from pipelex.tools.misc.string_utils import pascal_case_to_kebab
@@ -27,19 +30,53 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
 
 
+@functools.cache
+def _force_load_all_error_modules() -> None:
+    """Force-import every ``exceptions.py`` / ``*_exceptions.py`` module under ``pipelex/``.
+
+    Cached via :func:`functools.cache` so the first call walks the package and
+    ``importlib.import_module``-s every properly-named error module while
+    subsequent calls are no-ops. Two preconditions keep this safe and complete,
+    both enforced by
+    ``tests/unit/pipelex/errors/test_error_class_location_convention.py``:
+
+    1. Every :class:`PipelexError` subclass lives in a module named
+       ``exceptions.py`` or ``<topic>_exceptions.py`` (the Phase 6 file-naming
+       convention). A name-filtered ``rglob`` therefore captures the complete
+       error-class set — no allowlist needed.
+    2. Every properly-named error module imports only base error classes
+       (``PipelexError`` / ``CogtError`` / ``CredentialsError`` /
+       ``ClickException``). Verified empirically across every such module: zero
+       SDK pulls. Force-loading adds no third-party weight.
+
+    Called by :func:`iter_pipelex_error_subclasses` so the docs generator and
+    the type-URI uniqueness test see every subclass — including those whose
+    home module is otherwise reached only by a deferred plugin / factory
+    import path. Production code (notably ``Pipelex.make()``) does NOT touch
+    this — discovery has no runtime side effect outside the dev/test-time
+    consumers.
+    """
+    pipelex_root = Path(pipelex.__file__).resolve().parent
+    for path in sorted(pipelex_root.rglob("*.py")):
+        name = path.name
+        if name == "exceptions.py" or name.endswith("_exceptions.py"):
+            rel = path.relative_to(pipelex_root.parent).with_suffix("")
+            importlib.import_module(".".join(rel.parts))
+
+
 def iter_pipelex_error_subclasses() -> Iterator[type[PipelexError]]:
     """Yield :class:`PipelexError` and every loaded subclass, breadth-first.
 
-    Walks ``__subclasses__()`` transitively over the already-imported class
-    hierarchy. The convention check (see
-    ``tests/unit/pipelex/errors/test_error_class_location_convention.py``)
-    guarantees every production subclass lives in a properly-named module that
-    normal imports pull in, so no force-import phase is needed.
+    Calls :func:`_force_load_all_error_modules` first so deferred-import
+    plugin / factory error modules are reachable via ``__subclasses__()``. The
+    call is idempotent — first invocation walks the filesystem, subsequent
+    invocations are no-ops.
 
     Skips classes whose ``__module__`` starts with ``tests.`` so synthetic
     subclasses created by other tests in the same pytest session never leak
     into the generated docs or the smoke-test assertions.
     """
+    _force_load_all_error_modules()
     seen: set[type[PipelexError]] = set()
     stack: list[type[PipelexError]] = [PipelexError]
     while stack:

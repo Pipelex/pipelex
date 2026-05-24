@@ -32,8 +32,6 @@ import inspect
 import sys
 from pathlib import Path
 
-import pytest
-
 import pipelex
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.error_pages_generator import iter_pipelex_error_subclasses
@@ -163,24 +161,16 @@ class TestErrorClassLocationConvention:
                 lines.append(f"  - {class_name}  →  {location}")
             raise AssertionError("\n".join(lines))
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Discovery completeness is not yet enforced — the new `__subclasses__()`-based "
-            "`iter_pipelex_error_subclasses` doesn't reach plugin/factory `*_exceptions.py` "
-            "modules because their workers use deferred imports. Tracked as a follow-up in "
-            "TODOS.md (Phase 7 — error-class discovery contract). Once the manifest/eager-import "
-            "fix lands, remove this xfail marker."
-        ),
-    )
     def test_runtime_walk_discovers_every_ast_classified_subclass(self) -> None:
-        """Discovery completeness: every AST-discovered subclass is reachable via ``__subclasses__()`` after normal imports.
+        """Discovery completeness: AST-discovered subclasses are reachable via ``__subclasses__()`` after the discovery helper runs.
 
         Failing here means a properly-named ``exceptions.py`` exists on disk but
-        no production import path pulls it in — the symptom that ships as
-        silently-dropped docs pages and missed ``type_uri`` uniqueness checks.
-        Currently expected to fail; see the ``xfail`` reason for the follow-up
-        plan.
+        the discovery helper did not import it — the symptom that previously
+        shipped as silently-dropped docs pages and missed ``type_uri``
+        uniqueness checks. The Phase 7 fix wires
+        :func:`_force_load_all_error_modules` into ``iter_pipelex_error_subclasses``
+        so the AST set and the runtime set are equal by construction; this test
+        is the regression net.
         """
         ast_names = set(_ast_discover_pipelex_error_subclasses().keys())
         runtime_names = {cls.__name__ for cls in iter_pipelex_error_subclasses()} - {"PipelexError"}
