@@ -26,7 +26,7 @@ classification rules, and the cross-boundary Temporal bridge.
 
 - [`AnthropicFactoryError`](anthropic-factory-error.md) — Anthropic factory
 - [`AnthropicModelListingError`](anthropic-model-listing-error.md) — Anthropic model listing
-- [`AnthropicSDKUnsupportedError`](anthropic-sdk-unsupported-error.md) — Anthropic sdk unsupported
+- [`AnthropicSDKUnsupportedError`](anthropic-sdk-unsupported-error.md) — Anthropic SDK unsupported
 - [`AnthropicWorkerConfigurationError`](anthropic-worker-configuration-error.md) — Anthropic worker configuration
 - [`BedrockFactoryError`](bedrock-factory-error.md) — Bedrock factory
 - [`BedrockWorkerConfigurationError`](bedrock-worker-configuration-error.md) — Bedrock worker configuration
@@ -59,16 +59,16 @@ classification rules, and the cross-boundary Temporal bridge.
 - [`InferenceBackendLibraryNotFoundError`](inference-backend-library-not-found-error.md) — Inference backend library not found
 - [`InferenceBackendLibraryValidationError`](inference-backend-library-validation-error.md) — Inference backend library validation
 - [`InferenceModelSpecError`](inference-model-spec-error.md) — Inference model spec
-- [`LLMAssignmentError`](llm-assignment-error.md) — Llm assignment
-- [`LLMCapabilityError`](llm-capability-error.md) — Llm capability
-- [`LLMCompletionError`](llm-completion-error.md) — Llm completion
-- [`LLMConfigError`](llm-config-error.md) — Llm config
-- [`LLMHandleNotFoundError`](llm-handle-not-found-error.md) — Llm handle not found
-- [`LLMModelNotFoundError`](llm-model-not-found-error.md) — Llm model not found
-- [`LLMPromptParameterError`](llm-prompt-parameter-error.md) — Llm prompt parameter
-- [`LLMPromptSpecError`](llm-prompt-spec-error.md) — Llm prompt spec
-- [`LLMPromptTemplateInputsError`](llm-prompt-template-inputs-error.md) — Llm prompt template inputs
-- [`LLMSettingsValidationError`](llm-settings-validation-error.md) — Llm settings validation
+- [`LLMAssignmentError`](llm-assignment-error.md) — LLM assignment
+- [`LLMCapabilityError`](llm-capability-error.md) — LLM capability
+- [`LLMCompletionError`](llm-completion-error.md) — LLM completion
+- [`LLMConfigError`](llm-config-error.md) — LLM config
+- [`LLMHandleNotFoundError`](llm-handle-not-found-error.md) — LLM handle not found
+- [`LLMModelNotFoundError`](llm-model-not-found-error.md) — LLM model not found
+- [`LLMPromptParameterError`](llm-prompt-parameter-error.md) — LLM prompt parameter
+- [`LLMPromptSpecError`](llm-prompt-spec-error.md) — LLM prompt spec
+- [`LLMPromptTemplateInputsError`](llm-prompt-template-inputs-error.md) — LLM prompt template inputs
+- [`LLMSettingsValidationError`](llm-settings-validation-error.md) — LLM settings validation
 - [`MistralExtractResponseError`](mistral-extract-response-error.md) — Mistral extract response
 - [`MistralModelListingError`](mistral-model-listing-error.md) — Mistral model listing
 - [`MistralPluginError`](mistral-plugin-error.md) — Mistral plugin
@@ -81,7 +81,7 @@ classification rules, and the cross-boundary Temporal bridge.
 - [`ModelManagerError`](model-manager-error.md) — Model manager
 - [`ModelNotFoundError`](model-not-found-error.md) — Model not found
 - [`ModelWaterfallError`](model-waterfall-error.md) — Model waterfall
-- [`OpenAIClientFactoryError`](open-ai-client-factory-error.md) — Open ai client factory
+- [`OpenAIClientFactoryError`](open-ai-client-factory-error.md) — OpenAI client factory
 - [`PortkeyCredentialsError`](portkey-credentials-error.md) — Portkey credentials
 - [`PortkeyError`](portkey-error.md) — Portkey
 - [`PortkeyFactoryError`](portkey-factory-error.md) — Portkey factory
@@ -97,7 +97,7 @@ classification rules, and the cross-boundary Temporal bridge.
 - [`SearchHandleNotFoundError`](search-handle-not-found-error.md) — Search handle not found
 - [`SearchJobFailureError`](search-job-failure-error.md) — Search job failure
 - [`SearchModelNotFoundError`](search-model-not-found-error.md) — Search model not found
-- [`VertexAIConfigError`](vertex-ai-config-error.md) — Vertex ai config
+- [`VertexAIConfigError`](vertex-ai-config-error.md) — VertexAI config
 
 ## ConceptError
 
@@ -137,7 +137,7 @@ classification rules, and the cross-boundary Temporal bridge.
 - [`AzureCredentialsError`](azure-credentials-error.md) — Azure credentials
 - [`CredentialsError`](credentials-error.md) — Missing or invalid credentials
 - [`FalCredentialsError`](fal-credentials-error.md) — Fal credentials
-- [`VertexAICredentialsError`](vertex-ai-credentials-error.md) — Vertex ai credentials
+- [`VertexAICredentialsError`](vertex-ai-credentials-error.md) — VertexAI credentials
 
 ## DeliveryError
 
@@ -167,7 +167,7 @@ classification rules, and the cross-boundary Temporal bridge.
 
 ## GoogleLLMWorkerError
 
-- [`GoogleLLMWorkerError`](google-llm-worker-error.md) — Google llm worker
+- [`GoogleLLMWorkerError`](google-llm-worker-error.md) — Google LLM worker
 
 ## GraphSpecError
 
@@ -277,7 +277,7 @@ classification rules, and the cross-boundary Temporal bridge.
 
 ## PipeLLMFactoryError
 
-- [`PipeLLMFactoryError`](pipe-llm-factory-error.md) — Pipe llm factory
+- [`PipeLLMFactoryError`](pipe-llm-factory-error.md) — Pipe LLM factory
 
 ## PipeLibraryError
 
@@ -331,7 +331,7 @@ classification rules, and the cross-boundary Temporal bridge.
 
 ## PipelexCLIError
 
-- [`PipelexCLIError`](pipelex-cli-error.md) — Pipelex cli
+- [`PipelexCLIError`](pipelex-cli-error.md) — Pipelex CLI
 - [`ReadinessCheckError`](readiness-check-error.md) — Readiness check
 
 ## PipelexConfigError

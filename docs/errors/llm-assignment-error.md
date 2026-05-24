@@ -1,16 +1,16 @@
 ---
-title: "Llm assignment"
+title: "LLM assignment"
 description: "Reference for the `LLMAssignmentError` Pipelex error class."
 ---
 
 <!-- pipelex:generated -->
 
-# Llm assignment
+# LLM assignment
 
 | Field | Value |
 |---|---|
 | `error_type` | `LLMAssignmentError` |
-| `title` | Llm assignment |
+| `title` | LLM assignment |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/llm-assignment-error/` |
 | `error_domain` | _(inherited from parent)_ |
 | Defined in | `pipelex.cogt.exceptions` |

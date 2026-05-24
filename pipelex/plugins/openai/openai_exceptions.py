@@ -3,12 +3,12 @@ from pipelex.system.exceptions import CredentialsError
 
 
 class OpenAIClientFactoryError(CogtError):
-    pass
+    _declared_title = "OpenAI client factory"
 
 
 class VertexAIConfigError(CogtError):
-    pass
+    _declared_title = "VertexAI config"
 
 
 class VertexAICredentialsError(CredentialsError):
-    pass
+    _declared_title = "VertexAI credentials"

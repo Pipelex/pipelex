@@ -1,16 +1,16 @@
 ---
-title: "Llm completion"
+title: "LLM completion"
 description: "Reference for the `LLMCompletionError` Pipelex error class."
 ---
 
 <!-- pipelex:generated -->
 
-# Llm completion
+# LLM completion
 
 | Field | Value |
 |---|---|
 | `error_type` | `LLMCompletionError` |
-| `title` | Llm completion |
+| `title` | LLM completion |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/llm-completion-error/` |
 | `error_domain` | _(inherited from parent)_ |
 | Defined in | `pipelex.cogt.exceptions` |

@@ -1,16 +1,16 @@
 ---
-title: "Vertex ai credentials"
+title: "VertexAI credentials"
 description: "Reference for the `VertexAICredentialsError` Pipelex error class."
 ---
 
 <!-- pipelex:generated -->
 
-# Vertex ai credentials
+# VertexAI credentials
 
 | Field | Value |
 |---|---|
 | `error_type` | `VertexAICredentialsError` |
-| `title` | Vertex ai credentials |
+| `title` | VertexAI credentials |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/vertex-ai-credentials-error/` |
 | `error_domain` | _(inherited from parent)_ |
 | Defined in | `pipelex.plugins.openai.openai_exceptions` |

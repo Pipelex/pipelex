@@ -1,18 +1,18 @@
 ---
-title: "Pipelex cli"
+title: "Pipelex CLI"
 description: "Reference for the `PipelexCLIError` Pipelex error class."
 ---
 
 <!-- pipelex:generated -->
 
-# Pipelex cli
+# Pipelex CLI
 
 Raised when there's an error in CLI usage or operation.
 
 | Field | Value |
 |---|---|
 | `error_type` | `PipelexCLIError` |
-| `title` | Pipelex cli |
+| `title` | Pipelex CLI |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/pipelex-cli-error/` |
 | `error_domain` | _(inherited from parent)_ |
 | Defined in | `pipelex.cli.exceptions` |

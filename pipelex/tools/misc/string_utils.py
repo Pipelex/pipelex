@@ -191,7 +191,9 @@ def pascal_case_to_sentence(name: str) -> str:
             processed_words: list[str] = [word if word.isupper() else word.lower() for word in words]
             result_parts.append(" ".join(processed_words))
 
-    return " ".join(result_parts).capitalize()
+    # Capitalize only the leading character so preserved uppercase acronyms (e.g. "JSON") survive.
+    joined = " ".join(result_parts)
+    return joined[:1].upper() + joined[1:] if joined else joined
 
 
 def snake_to_pascal_case(snake_str: str) -> str:

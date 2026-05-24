@@ -98,10 +98,11 @@ def test_pascal_case_to_snake_case(pascal: str, expected: str) -> None:
     ("text", "expected"),
     [
         ("HelloWorld", "Hello world"),
-        ("BOB LowKey", "Bob low key"),
-        ("ParseJSONData", "Parse json data"),
-        ("ACDPService", "Acdp service"),
-        ("JSON2XMLConverter", "Json 2 xml converter"),
+        ("BOB LowKey", "BOB low key"),
+        ("ParseJSONData", "Parse JSON data"),
+        ("ACDPService", "ACDP service"),
+        ("JSON2XMLConverter", "JSON 2 XML converter"),
+        ("OpenAIClientFactory", "Open AI client factory"),
     ],
 )
 def test_pascal_case_to_sentence(text: str, expected: str) -> None:

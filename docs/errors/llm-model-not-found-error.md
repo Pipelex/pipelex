@@ -1,16 +1,16 @@
 ---
-title: "Llm model not found"
+title: "LLM model not found"
 description: "Reference for the `LLMModelNotFoundError` Pipelex error class."
 ---
 
 <!-- pipelex:generated -->
 
-# Llm model not found
+# LLM model not found
 
 | Field | Value |
 |---|---|
 | `error_type` | `LLMModelNotFoundError` |
-| `title` | Llm model not found |
+| `title` | LLM model not found |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/llm-model-not-found-error/` |
 | `error_domain` | _(inherited from parent)_ |
 | Defined in | `pipelex.cogt.exceptions` |
