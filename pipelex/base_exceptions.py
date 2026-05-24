@@ -479,6 +479,11 @@ class PipelexError(Exception):
         # fields (error_type, message, title, type_uri, caller_facing_message)
         # stay untouched, so a future wrapper-wins field added to ErrorReport
         # does not need to be re-listed here.
+        # Footgun: ``provider_metadata`` uses whole-object OR, and a Pydantic
+        # model instance is always truthy — a wrapper that attached
+        # attribution-only metadata (no ``status_code`` / ``retry_after_seconds``)
+        # discards the cause's actionable hints. Pinned by
+        # ``tests/unit/pipelex/cogt/test_cogt_provider_metadata_wrapper_wins.py``.
         return report.model_copy(
             update={
                 "error_category": report.error_category or cause_report.error_category,

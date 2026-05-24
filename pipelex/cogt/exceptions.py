@@ -91,6 +91,11 @@ class CogtError(PipelexError):
         # fields on top with the same wrapper-wins-when-set semantics: a value
         # explicitly set on this CogtError overrides whatever the cause surfaced,
         # otherwise the cause-derived value carried by ``base_report`` stays.
+        # Footgun: ``provider_metadata`` uses whole-object OR, and a Pydantic
+        # model instance is always truthy — a wrapper that attached
+        # attribution-only metadata (no ``status_code`` / ``retry_after_seconds``)
+        # discards the cause's actionable hints. Pinned by
+        # ``tests/unit/pipelex/cogt/test_cogt_provider_metadata_wrapper_wins.py``.
         base_report = super().to_error_report()
         own_retryable = self.error_category.is_retryable if self.error_category is not None else None
         return base_report.model_copy(
