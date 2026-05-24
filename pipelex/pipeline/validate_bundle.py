@@ -2,9 +2,10 @@ import asyncio
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Literal, Sequence, assert_never
+from typing import Literal, Sequence
 
 from pydantic import BaseModel, ValidationError
+from typing_extensions import assert_never
 
 from pipelex import log
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
