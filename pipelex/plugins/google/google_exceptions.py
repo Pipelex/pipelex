@@ -1,9 +1,9 @@
-from pipelex.base_exceptions import PipelexError
+from pipelex.cogt.exceptions import CogtError
 
 
-class GoogleLLMWorkerError(PipelexError):
+class GoogleLLMWorkerError(CogtError):
     """Base exception for Google LLM Worker errors."""
 
 
-class GoogleImgGenWorkerError(PipelexError):
+class GoogleImgGenWorkerError(CogtError):
     """Base exception for Google Image Generation Worker errors."""

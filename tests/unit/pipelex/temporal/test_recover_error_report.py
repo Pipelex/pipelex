@@ -65,11 +65,18 @@ class TestRecoverErrorReport:
         internal contract bug. Rather than raise — which would abort the caller before it
         can deliver the failure webhook, leaving the receiver with no notification at all —
         it synthesizes the ``UnrecoverableWorkflowFailureError`` fallback, carrying the
-        recovered ``message`` and a marker flagging the validation failure. ``error_type``
-        + ``message`` make it look like a report to ``_find_error_report_dict``, but the
-        required ``title`` / ``type_uri`` are absent.
+        recovered ``message`` and a marker flagging the validation failure. The payload
+        carries every required key (``error_type``, ``message``, ``title``, ``type_uri``)
+        so ``_find_error_report_dict`` picks it up, but its extra key violates
+        ``ErrorReport``'s ``extra="forbid"`` and fails ``from_dict`` validation.
         """
-        invalid_report_dict: dict[str, Any] = {"error_type": "CogtError", "message": "rate limited"}
+        invalid_report_dict: dict[str, Any] = {
+            "error_type": "CogtError",
+            "message": "rate limited",
+            "title": "AI inference failed",
+            "type_uri": "https://docs.pipelex.com/latest/errors/cogt-error/",
+            "future_field_we_do_not_know_about": "unexpected",
+        }
         failure = _workflow_failure(_app_error(invalid_report_dict))
         report = recover_error_report(failure)
         assert report.error_type == "UnrecoverableWorkflowFailureError"

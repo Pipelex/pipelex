@@ -46,6 +46,8 @@ classification rules, and the cross-boundary Temporal bridge.
 - [`GatewaySearchResponseError`](gateway-search-response-error.md) — Gateway search response
 - [`GatewayUnknownModelError`](gateway-unknown-model-error.md) — Gateway unknown model
 - [`GeneratedImageError`](generated-image-error.md) — Generated image
+- [`GoogleImgGenWorkerError`](google-img-gen-worker-error.md) — Google img gen worker
+- [`GoogleLLMWorkerError`](google-llm-worker-error.md) — Google LLM worker
 - [`ImageContentError`](image-content-error.md) — Image content
 - [`ImgGenGeneratedTypeError`](img-gen-generated-type-error.md) — Img gen generated type
 - [`ImgGenGenerationError`](img-gen-generation-error.md) — Img gen generation
@@ -160,14 +162,6 @@ classification rules, and the cross-boundary Temporal bridge.
 ## DryRunError
 
 - [`DryRunError`](dry-run-error.md) — Dry run
-
-## GoogleImgGenWorkerError
-
-- [`GoogleImgGenWorkerError`](google-img-gen-worker-error.md) — Google img gen worker
-
-## GoogleLLMWorkerError
-
-- [`GoogleLLMWorkerError`](google-llm-worker-error.md) — Google LLM worker
 
 ## GraphSpecError
 

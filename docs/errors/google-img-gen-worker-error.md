@@ -16,6 +16,6 @@ Base exception for Google Image Generation Worker errors.
 | `type_uri` | `https://docs.pipelex.com/latest/errors/google-img-gen-worker-error/` |
 | `error_domain` | _(inherited from parent)_ |
 | Defined in | `pipelex.plugins.google.google_exceptions` |
-| Parent class | [`PipelexError`](pipelex-error.md) |
+| Parent class | [`CogtError`](cogt-error.md) |
 
 [Back to Error Model overview](../under-the-hood/error-model.md)

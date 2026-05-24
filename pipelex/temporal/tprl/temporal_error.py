@@ -12,17 +12,21 @@ from pipelex.temporal.exceptions import UnrecoverableWorkflowFailureError
 from pipelex.temporal.log_temporal import activity_log, workflow_log
 from pipelex.types import Self
 
+_ERROR_REPORT_REQUIRED_KEYS: frozenset[str] = frozenset({"error_type", "message", "title", "type_uri"})
+
 
 def error_report_dict_from_details(details: Sequence[Any]) -> dict[str, Any] | None:
     """Recover the ``ErrorReport`` dict packed into ``ApplicationError.details``.
 
     The bridge packs ``exc.to_error_report().to_dict()`` as the first details
     entry. After Temporal serialization the dict comes back as a plain mapping;
-    we identify it by its ``error_type`` / ``message`` shape so an unrelated
-    details payload is not mistaken for an error report.
+    we identify it by the presence of every ``ErrorReport``-mandatory key
+    (``error_type`` / ``message`` / ``title`` / ``type_uri``) so an unrelated
+    details payload that happens to carry only two of them is not picked up
+    and routed into the schema-validation fallback.
     """
     for entry in details:
-        if isinstance(entry, dict) and "error_type" in entry and "message" in entry:
+        if isinstance(entry, dict) and all(key in entry for key in _ERROR_REPORT_REQUIRED_KEYS):
             return cast("dict[str, Any]", entry)
     return None
 
