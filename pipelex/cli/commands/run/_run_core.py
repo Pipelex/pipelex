@@ -15,6 +15,7 @@ from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_availability_error,
     handle_model_choice_error,
+    print_traceback_if_requested,
 )
 from pipelex.config import get_config
 from pipelex.core.interpreter.exceptions import MthdsDecodeError, PipelexInterpreterError
@@ -307,6 +308,7 @@ def execute_run(
 
     except PipelexError as exc:
         console = get_console()
+        print_traceback_if_requested(console)
         console.print("\n[bold red]Failed to execute pipeline[/bold red]\n")
         console.print(f"  {exc.message}\n")
         raise typer.Exit(1) from exc
