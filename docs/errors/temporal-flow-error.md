@@ -3,7 +3,7 @@ title: "Temporal flow"
 description: "Reference for the `TemporalFlowError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Temporal flow
 

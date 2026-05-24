@@ -3,7 +3,7 @@ title: "Inference model spec"
 description: "Reference for the `InferenceModelSpecError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Inference model spec
 

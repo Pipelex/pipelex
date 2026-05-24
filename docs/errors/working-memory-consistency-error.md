@@ -3,7 +3,7 @@ title: "Working memory consistency"
 description: "Reference for the `WorkingMemoryConsistencyError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Working memory consistency
 

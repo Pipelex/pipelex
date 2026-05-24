@@ -3,7 +3,7 @@ title: "Graph spec validation"
 description: "Reference for the `GraphSpecValidationError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Graph spec validation
 

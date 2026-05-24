@@ -3,7 +3,7 @@ title: "Inference backend library not found"
 description: "Reference for the `InferenceBackendLibraryNotFoundError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Inference backend library not found
 

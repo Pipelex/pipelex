@@ -3,7 +3,7 @@ title: "Aws credentials"
 description: "Reference for the `AwsCredentialsError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Aws credentials
 

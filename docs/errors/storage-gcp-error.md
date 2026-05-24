@@ -3,7 +3,7 @@ title: "Storage gcp"
 description: "Reference for the `StorageGcpError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Storage gcp
 

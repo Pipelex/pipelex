@@ -3,7 +3,7 @@ title: "Routing profile disabled backend"
 description: "Reference for the `RoutingProfileDisabledBackendError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Routing profile disabled backend
 

@@ -3,7 +3,7 @@ title: "Working memory factory"
 description: "Reference for the `WorkingMemoryFactoryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Working memory factory
 

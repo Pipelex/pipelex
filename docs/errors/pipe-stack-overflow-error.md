@@ -3,7 +3,7 @@ title: "Pipe stack overflow"
 description: "Reference for the `PipeStackOverflowError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipe stack overflow
 

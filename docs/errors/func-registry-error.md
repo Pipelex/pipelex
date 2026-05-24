@@ -3,7 +3,7 @@ title: "Func registry"
 description: "Reference for the `FuncRegistryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Func registry
 

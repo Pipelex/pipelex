@@ -3,7 +3,7 @@ title: "Pipe search factory"
 description: "Reference for the `PipeSearchFactoryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipe search factory
 

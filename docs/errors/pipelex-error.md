@@ -3,7 +3,7 @@ title: "Pipelex error"
 description: "Reference for the `PipelexError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipelex error
 

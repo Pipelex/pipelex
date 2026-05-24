@@ -3,7 +3,7 @@ title: "Pipe compose factory"
 description: "Reference for the `PipeComposeFactoryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipe compose factory
 

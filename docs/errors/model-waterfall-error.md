@@ -3,7 +3,7 @@ title: "Model waterfall"
 description: "Reference for the `ModelWaterfallError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Model waterfall
 

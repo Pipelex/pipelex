@@ -3,7 +3,7 @@ title: "Var fallback pattern"
 description: "Reference for the `VarFallbackPatternError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Var fallback pattern
 

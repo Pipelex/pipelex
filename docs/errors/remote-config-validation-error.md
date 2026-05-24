@@ -3,7 +3,7 @@ title: "Remote config validation"
 description: "Reference for the `RemoteConfigValidationError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Remote config validation
 

@@ -3,7 +3,7 @@ title: "Img gen handle not found"
 description: "Reference for the `ImgGenHandleNotFoundError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Img gen handle not found
 

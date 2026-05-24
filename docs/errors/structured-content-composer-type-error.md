@@ -3,7 +3,7 @@ title: "Structured content composer type"
 description: "Reference for the `StructuredContentComposerTypeError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Structured content composer type
 

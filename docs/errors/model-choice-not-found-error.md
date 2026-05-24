@@ -3,7 +3,7 @@ title: "Model choice not found"
 description: "Reference for the `ModelChoiceNotFoundError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Model choice not found
 

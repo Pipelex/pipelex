@@ -3,7 +3,7 @@ title: "Model deck preset validaton"
 description: "Reference for the `ModelDeckPresetValidatonError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Model deck preset validaton
 

@@ -3,7 +3,7 @@ title: "Library loading"
 description: "Reference for the `LibraryLoadingError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Library loading
 

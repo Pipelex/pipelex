@@ -3,7 +3,7 @@ title: "Anthropic model listing"
 description: "Reference for the `AnthropicModelListingError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Anthropic model listing
 

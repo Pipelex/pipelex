@@ -3,7 +3,7 @@ title: "Structure class"
 description: "Reference for the `StructureClassError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Structure class
 

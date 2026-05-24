@@ -3,7 +3,7 @@ title: "Llm capability"
 description: "Reference for the `LLMCapabilityError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Llm capability
 

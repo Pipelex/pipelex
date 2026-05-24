@@ -3,7 +3,7 @@ title: "Worker profile config"
 description: "Reference for the `WorkerProfileConfigError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Worker profile config
 

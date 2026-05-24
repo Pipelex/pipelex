@@ -3,7 +3,7 @@ title: "Pipe sequence factory"
 description: "Reference for the `PipeSequenceFactoryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipe sequence factory
 

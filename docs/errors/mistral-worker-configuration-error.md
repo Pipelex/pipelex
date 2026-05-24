@@ -3,7 +3,7 @@ title: "Mistral worker configuration"
 description: "Reference for the `MistralWorkerConfigurationError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Mistral worker configuration
 

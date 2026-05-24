@@ -3,7 +3,7 @@ title: "Pipeline manager not found"
 description: "Reference for the `PipelineManagerNotFoundError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipeline manager not found
 

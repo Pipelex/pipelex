@@ -3,7 +3,7 @@ title: "Unknown var prefix"
 description: "Reference for the `UnknownVarPrefixError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Unknown var prefix
 

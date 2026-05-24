@@ -3,7 +3,7 @@ title: "Mistral model listing"
 description: "Reference for the `MistralModelListingError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Mistral model listing
 

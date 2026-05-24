@@ -3,7 +3,7 @@ title: "Model deck not found"
 description: "Reference for the `ModelDeckNotFoundError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Model deck not found
 

@@ -3,7 +3,7 @@ title: "Gateway unknown model"
 description: "Reference for the `GatewayUnknownModelError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Gateway unknown model
 

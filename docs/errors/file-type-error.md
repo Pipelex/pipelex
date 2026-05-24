@@ -3,7 +3,7 @@ title: "File type"
 description: "Reference for the `FileTypeError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # File type
 

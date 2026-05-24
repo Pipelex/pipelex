@@ -3,7 +3,7 @@ title: "Config validation"
 description: "Reference for the `ConfigValidationError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Config validation
 

@@ -3,7 +3,7 @@ title: "Worker task queue unknown"
 description: "Reference for the `WorkerTaskQueueUnknownError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Worker task queue unknown
 

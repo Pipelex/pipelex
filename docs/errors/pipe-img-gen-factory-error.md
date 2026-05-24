@@ -3,7 +3,7 @@ title: "Pipe img gen factory"
 description: "Reference for the `PipeImgGenFactoryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipe img gen factory
 

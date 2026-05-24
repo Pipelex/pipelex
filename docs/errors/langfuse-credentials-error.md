@@ -3,7 +3,7 @@ title: "Langfuse credentials"
 description: "Reference for the `LangfuseCredentialsError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Langfuse credentials
 

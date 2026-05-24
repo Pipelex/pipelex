@@ -34,7 +34,10 @@ from pathlib import Path
 
 import pipelex
 from pipelex.base_exceptions import PipelexError
-from pipelex.errors.error_pages_generator import iter_pipelex_error_subclasses
+from pipelex.errors.error_pages_generator import (
+    _FIXTURE_DIR_NAMES,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+    iter_pipelex_error_subclasses,
+)
 
 _PIPELEX_ROOT: Path = Path(pipelex.__file__).resolve().parent
 _BASE_EXCEPTIONS_FILE: Path = _PIPELEX_ROOT / "base_exceptions.py"
@@ -64,18 +67,27 @@ def _base_short_name(node: ast.expr) -> str | None:
     return None
 
 
-def _ast_discover_pipelex_error_subclasses() -> dict[str, list[Path]]:
-    """AST-scan ``pipelex/`` and return ``{class_name: [paths_where_defined]}`` for every transitive ``PipelexError`` subclass.
+def _ast_discover_pipelex_error_subclasses(root: Path = _PIPELEX_ROOT) -> dict[str, list[Path]]:
+    """AST-scan ``root`` and return ``{class_name: [paths_where_defined]}`` for every transitive ``PipelexError`` subclass.
 
     Uses name-based BFS — a class is in the derived set if any of its bases'
     short names is already in the set. False positives are possible if a
     truly unrelated class shares a short name with a ``PipelexError``
     descendant; today none exist in the tree.
+
+    Shipped fixture packages (``test_extras/`` / ``test_helpers/``) are skipped
+    to stay symmetric with ``_is_production_subclass`` at runtime — otherwise
+    a ``PipelexError`` subclass added inside a fixture package would surface
+    here but not in the runtime set, triggering a false ``discovery gap`` in
+    ``test_runtime_walk_discovers_every_ast_classified_subclass``.
     """
     class_to_files: dict[str, list[Path]] = {}
     class_to_bases: dict[str, set[str]] = {}
 
-    for path in sorted(_PIPELEX_ROOT.rglob("*.py")):
+    for path in sorted(root.rglob("*.py")):
+        rel_parts = path.relative_to(root).parts
+        if not _FIXTURE_DIR_NAMES.isdisjoint(rel_parts):
+            continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
             if not isinstance(node, ast.ClassDef):
@@ -126,7 +138,13 @@ class TestErrorClassLocationConvention:
             raise AssertionError("\n".join(lines))
 
     def test_runtime_subclasses_walk_every_loaded_pipelex_error_subclass_lives_in_a_properly_named_module(self) -> None:
-        """Walk ``PipelexError.__subclasses__()`` transitively and assert every loaded subclass lives in an accepted module."""
+        """Walk ``PipelexError.__subclasses__()`` after the discovery helper fires and assert every loaded subclass lives in an accepted module."""
+        # Trigger the Phase 7 discovery helper so the runtime set matches the AST set.
+        # Without this, the test silently runs against only the naked-import
+        # subclasses, which all happen to be convention-compliant — green for the
+        # wrong reason.
+        list(iter_pipelex_error_subclasses())
+
         seen: set[type[PipelexError]] = set()
         stack: list[type[PipelexError]] = [PipelexError]
         misplaced: list[tuple[str, str]] = []
@@ -169,8 +187,10 @@ class TestErrorClassLocationConvention:
         shipped as silently-dropped docs pages and missed ``type_uri``
         uniqueness checks. The Phase 7 fix wires
         :func:`_force_load_all_error_modules` into ``iter_pipelex_error_subclasses``
-        so the AST set and the runtime set are equal by construction; this test
-        is the regression net.
+        so every AST-discovered class is reachable at runtime; this is a
+        one-sided subset check (runtime ⊇ AST) — runtime-only classes
+        (e.g. dynamically constructed via ``type()``) are intentionally
+        allowed and not caught here.
         """
         ast_names = set(_ast_discover_pipelex_error_subclasses().keys())
         runtime_names = {cls.__name__ for cls in iter_pipelex_error_subclasses()} - {"PipelexError"}
@@ -185,4 +205,73 @@ class TestErrorClassLocationConvention:
                 "These classes live in properly-named modules but no production code path imports them.",
                 "Docs generation and the type_uri uniqueness check therefore silently miss them.",
             ]
+            raise AssertionError("\n".join(lines))
+
+    def test_ast_scan_skips_shipped_fixture_packages(self, tmp_path: Path) -> None:
+        """AST scan must filter ``test_extras``/``test_helpers`` like the runtime walk does.
+
+        Regression for codex review: ``_is_production_subclass`` drops classes defined under
+        shipped fixture packages at runtime. If the AST scan does NOT apply the same filter,
+        a fixture-resident ``PipelexError`` subclass surfaces in ``ast_names`` but not in
+        ``runtime_names``, and ``test_runtime_walk_discovers_every_ast_classified_subclass``
+        fails with a false ``discovery gap``.
+        """
+        production_dir = tmp_path / "core"
+        production_dir.mkdir()
+        (production_dir / "exceptions.py").write_text(
+            "class FakeProductionError(PipelexError):\n    pass\n",
+            encoding="utf-8",
+        )
+        fixture_dir = tmp_path / "test_extras"
+        fixture_dir.mkdir()
+        (fixture_dir / "fixture_exceptions.py").write_text(
+            "class FakeFixtureOnlyError(PipelexError):\n    pass\n",
+            encoding="utf-8",
+        )
+
+        discovered = _ast_discover_pipelex_error_subclasses(root=tmp_path)
+
+        assert "FakeProductionError" in discovered, "AST scan should pick up properly-named modules outside fixture dirs"
+        assert "FakeFixtureOnlyError" not in discovered, "AST scan must skip shipped fixture packages to stay symmetric with the runtime filter"
+
+    def test_no_heavy_third_party_imports_in_error_modules(self) -> None:
+        """Every exceptions.py / *_exceptions.py imports only base error classes — no SDK pulls.
+
+        Phase 7's discovery helper force-loads every match. If a *_exceptions.py
+        were to import a plugin SDK (anthropic, boto3, openai, mistralai, google-genai,
+        portkey-ai, azure-identity, pypdfium2, fal-client, etc.), the SDK would be
+        pulled into every pytest collection and every dev CLI invocation — defeating
+        the deferred-import design that keeps optional plugin deps optional.
+        """
+        forbidden_top_level = {
+            "anthropic",
+            "boto3",
+            "botocore",
+            "openai",
+            "mistralai",
+            "google",
+            "portkey_ai",
+            "azure",
+            "pypdfium2",
+            "fal_client",
+        }
+        offenders: list[tuple[Path, str]] = []
+        for path in sorted(_PIPELEX_ROOT.rglob("*.py")):
+            if path.name != "exceptions.py" and not path.name.endswith("_exceptions.py"):
+                continue
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        root = alias.name.split(".", 1)[0]
+                        if root in forbidden_top_level:
+                            offenders.append((path, alias.name))
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    root = node.module.split(".", 1)[0]
+                    if root in forbidden_top_level:
+                        offenders.append((path, node.module))
+        if offenders:
+            lines = ["Error modules import third-party SDKs — would slow every CI run:", ""]
+            for path, name in offenders:
+                lines.append(f"  - {path.relative_to(_PIPELEX_ROOT.parent)}: {name}")
             raise AssertionError("\n".join(lines))

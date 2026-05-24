@@ -3,7 +3,7 @@ title: "Unsafe schema"
 description: "Reference for the `UnsafeSchemaError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Unsafe schema
 

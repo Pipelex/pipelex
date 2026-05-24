@@ -3,7 +3,7 @@ title: "Json type"
 description: "Reference for the `JsonTypeError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Json type
 

@@ -3,7 +3,7 @@ title: "Domain code"
 description: "Reference for the `DomainCodeError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Domain code
 

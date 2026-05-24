@@ -3,7 +3,7 @@ title: "Library error"
 description: "Reference for the `LibraryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Library error
 

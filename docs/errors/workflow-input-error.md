@@ -3,7 +3,7 @@ title: "Workflow input"
 description: "Reference for the `WorkflowInputError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Workflow input
 

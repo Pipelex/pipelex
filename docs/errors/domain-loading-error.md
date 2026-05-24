@@ -3,7 +3,7 @@ title: "Domain loading"
 description: "Reference for the `DomainLoadingError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Domain loading
 

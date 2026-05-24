@@ -3,7 +3,7 @@ title: "Search model not found"
 description: "Reference for the `SearchModelNotFoundError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Search model not found
 

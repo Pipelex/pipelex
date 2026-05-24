@@ -3,7 +3,7 @@ title: "Extract input"
 description: "Reference for the `ExtractInputError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Extract input
 

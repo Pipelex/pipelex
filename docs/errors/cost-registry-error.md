@@ -3,7 +3,7 @@ title: "Cost registry"
 description: "Reference for the `CostRegistryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Cost registry
 

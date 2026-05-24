@@ -3,7 +3,7 @@ title: "Anthropic worker configuration"
 description: "Reference for the `AnthropicWorkerConfigurationError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Anthropic worker configuration
 

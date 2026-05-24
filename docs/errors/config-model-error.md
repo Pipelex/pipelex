@@ -3,7 +3,7 @@ title: "Config model"
 description: "Reference for the `ConfigModelError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Config model
 

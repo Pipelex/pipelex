@@ -3,7 +3,7 @@ title: "Gateway deck"
 description: "Reference for the `GatewayDeckError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Gateway deck
 

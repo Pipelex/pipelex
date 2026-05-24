@@ -3,7 +3,7 @@ title: "Storage invalid uri"
 description: "Reference for the `StorageInvalidUriError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Storage invalid uri
 

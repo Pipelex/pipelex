@@ -3,7 +3,7 @@ title: "Llm model not found"
 description: "Reference for the `LLMModelNotFoundError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Llm model not found
 

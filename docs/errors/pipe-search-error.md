@@ -3,7 +3,7 @@ title: "Pipe search"
 description: "Reference for the `PipeSearchError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipe search
 

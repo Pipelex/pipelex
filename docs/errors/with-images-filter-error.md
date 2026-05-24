@@ -3,7 +3,7 @@ title: "With images filter"
 description: "Reference for the `WithImagesFilterError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # With images filter
 

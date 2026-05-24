@@ -3,7 +3,7 @@ title: "Py pdfium 2 renderer"
 description: "Reference for the `PyPdfium2RendererError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Py pdfium 2 renderer
 

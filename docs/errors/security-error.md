@@ -3,7 +3,7 @@ title: "Security policy violation"
 description: "Reference for the `SecurityError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Security policy violation
 

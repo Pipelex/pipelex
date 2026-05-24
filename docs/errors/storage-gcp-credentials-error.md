@@ -3,7 +3,7 @@ title: "Storage gcp credentials"
 description: "Reference for the `StorageGcpCredentialsError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Storage gcp credentials
 

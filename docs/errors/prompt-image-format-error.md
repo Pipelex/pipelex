@@ -3,7 +3,7 @@ title: "Prompt image format"
 description: "Reference for the `PromptImageFormatError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Prompt image format
 

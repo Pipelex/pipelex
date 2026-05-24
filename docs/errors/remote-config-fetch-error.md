@@ -3,7 +3,7 @@ title: "Remote config fetch"
 description: "Reference for the `RemoteConfigFetchError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Remote config fetch
 

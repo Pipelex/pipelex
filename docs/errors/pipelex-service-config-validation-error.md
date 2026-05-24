@@ -3,7 +3,7 @@ title: "Pipelex service config validation"
 description: "Reference for the `PipelexServiceConfigValidationError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipelex service config validation
 

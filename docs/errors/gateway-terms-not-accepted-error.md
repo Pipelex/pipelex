@@ -3,7 +3,7 @@ title: "Gateway terms not accepted"
 description: "Reference for the `GatewayTermsNotAcceptedError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Gateway terms not accepted
 

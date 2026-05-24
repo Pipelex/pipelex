@@ -3,7 +3,7 @@ title: "Working memory"
 description: "Reference for the `WorkingMemoryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Working memory
 

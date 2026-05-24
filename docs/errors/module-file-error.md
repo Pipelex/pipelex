@@ -3,7 +3,7 @@ title: "Module file"
 description: "Reference for the `ModuleFileError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Module file
 

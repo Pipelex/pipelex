@@ -3,7 +3,7 @@ title: "Img gen settings validation"
 description: "Reference for the `ImgGenSettingsValidationError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Img gen settings validation
 

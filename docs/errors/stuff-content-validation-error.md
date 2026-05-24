@@ -3,7 +3,7 @@ title: "Stuff content validation"
 description: "Reference for the `StuffContentValidationError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Stuff content validation
 

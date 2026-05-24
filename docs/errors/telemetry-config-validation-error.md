@@ -3,7 +3,7 @@ title: "Telemetry config validation"
 description: "Reference for the `TelemetryConfigValidationError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Telemetry config validation
 

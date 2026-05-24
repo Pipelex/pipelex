@@ -3,7 +3,7 @@ title: "Domain factory"
 description: "Reference for the `DomainFactoryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Domain factory
 

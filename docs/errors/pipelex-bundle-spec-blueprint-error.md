@@ -3,7 +3,7 @@ title: "Pipelex bundle spec blueprint"
 description: "Reference for the `PipelexBundleSpecBlueprintError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipelex bundle spec blueprint
 

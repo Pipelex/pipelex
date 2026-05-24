@@ -3,7 +3,7 @@ title: "Kit"
 description: "Reference for the `KitError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Kit
 

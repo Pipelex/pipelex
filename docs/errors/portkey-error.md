@@ -3,7 +3,7 @@ title: "Portkey"
 description: "Reference for the `PortkeyError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Portkey
 

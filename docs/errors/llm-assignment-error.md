@@ -3,7 +3,7 @@ title: "Llm assignment"
 description: "Reference for the `LLMAssignmentError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Llm assignment
 

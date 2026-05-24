@@ -3,7 +3,7 @@ title: "Jinja 2 detect variables"
 description: "Reference for the `Jinja2DetectVariablesError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Jinja 2 detect variables
 

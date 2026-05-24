@@ -3,7 +3,7 @@ title: "Storage delivery"
 description: "Reference for the `StorageDeliveryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Storage delivery
 

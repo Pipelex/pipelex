@@ -3,7 +3,7 @@ title: "Pipe operator model availability"
 description: "Reference for the `PipeOperatorModelAvailabilityError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipe operator model availability
 

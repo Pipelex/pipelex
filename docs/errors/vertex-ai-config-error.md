@@ -3,7 +3,7 @@ title: "Vertex ai config"
 description: "Reference for the `VertexAIConfigError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Vertex ai config
 

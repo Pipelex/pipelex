@@ -3,7 +3,7 @@ title: "Pipe router"
 description: "Reference for the `PipeRouterError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipe router
 

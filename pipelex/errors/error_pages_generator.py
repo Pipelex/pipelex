@@ -6,10 +6,10 @@ aligns with :meth:`PipelexError.type_uri`'s final segment. The docs site can
 then host those pages at ``<base_uri>/<kebab-class-name>`` and a clickable
 RFC 7807 ``type`` URI lands the user on a populated reference page.
 
-Pages a maintainer has hand-edited are protected by an ``<!-- gstack:authored -->``
+Pages a maintainer has hand-edited are protected by an ``<!-- pipelex:authored -->``
 HTML comment anywhere in the file: when the generator detects it on an
 existing page, the page is left untouched. Generated pages carry a different
-marker (``<!-- gstack:generated -->``) so a quick ``grep`` distinguishes the
+marker (``<!-- pipelex:generated -->``) so a quick ``grep`` distinguishes the
 two populations.
 """
 
@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import functools
 import importlib
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -28,6 +29,10 @@ from pipelex.tools.misc.string_utils import pascal_case_to_kebab
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
+
+
+_PIPELEX_ROOT = Path(pipelex.__file__).resolve().parent
+_FIXTURE_DIR_NAMES = frozenset({"test_extras", "test_helpers"})
 
 
 @functools.cache
@@ -46,8 +51,8 @@ def _force_load_all_error_modules() -> None:
        error-class set — no allowlist needed.
     2. Every properly-named error module imports only base error classes
        (``PipelexError`` / ``CogtError`` / ``CredentialsError`` /
-       ``ClickException``). Verified empirically across every such module: zero
-       SDK pulls. Force-loading adds no third-party weight.
+       ``ClickException``) — no third-party SDK pulls. Force-loading adds no
+       optional-plugin weight to pytest collection or dev CLI invocations.
 
     Called by :func:`iter_pipelex_error_subclasses` so the docs generator and
     the type-URI uniqueness test see every subclass — including those whose
@@ -55,13 +60,66 @@ def _force_load_all_error_modules() -> None:
     import path. Production code (notably ``Pipelex.make()``) does NOT touch
     this — discovery has no runtime side effect outside the dev/test-time
     consumers.
+
+    Per-module import failures are accumulated and raised once at the end so a
+    single broken ``*_exceptions.py`` surfaces with its dotted module name
+    rather than aborting the walk under an opaque exception whose traceback
+    frames all live inside this helper. ``functools.cache`` only memoizes the
+    success path (no caching on exception), so a fix-then-retry cycle inside
+    a long-lived dev session works without ``cache_clear()``.
+
+    The catch is intentionally broad: ``importlib.import_module`` runs the
+    target module's top-level code, so a typo or bad reference inside a new
+    ``*_exceptions.py`` can surface as ``NameError``, ``SyntaxError``,
+    ``AttributeError``, … — all of which must be aggregated like ``ImportError``
+    so the dev sees the full list of broken modules at once.
+
+    To clear the cache (e.g. inside a long-lived dev session after adding a
+    new ``*_exceptions.py``), call ``_force_load_all_error_modules.cache_clear()``.
     """
-    pipelex_root = Path(pipelex.__file__).resolve().parent
-    for path in sorted(pipelex_root.rglob("*.py")):
+    failures: list[tuple[str, BaseException]] = []
+    for path in sorted(_PIPELEX_ROOT.rglob("*.py")):
         name = path.name
-        if name == "exceptions.py" or name.endswith("_exceptions.py"):
-            rel = path.relative_to(pipelex_root.parent).with_suffix("")
-            importlib.import_module(".".join(rel.parts))
+        if name != "exceptions.py" and not name.endswith("_exceptions.py"):
+            continue
+        rel = path.relative_to(_PIPELEX_ROOT.parent).with_suffix("")
+        dotted = ".".join(rel.parts)
+        try:
+            importlib.import_module(dotted)
+        except Exception as exc:  # noqa: BLE001
+            # importlib runs the target module's top-level code — an open-ended exception surface
+            # (NameError, SyntaxError, …) that must be aggregated like ImportError so the dev
+            # sees the full list of broken modules at once instead of aborting on the first one.
+            failures.append((dotted, exc))
+    if failures:
+        lines = ["One or more error modules failed to import during discovery:"]
+        lines.extend(f"  - {name}: {exc}" for name, exc in failures)
+        msg = "\n".join(lines)
+        raise RuntimeError(msg)
+
+
+def _is_production_subclass(cls: type[PipelexError]) -> bool:
+    """True when ``cls`` should appear in the production discovery set.
+
+    Excludes synthetic subclasses created inside test modules (``tests.*``) and
+    classes defined inside shipped fixture packages (``pipelex/.../test_extras/``,
+    ``pipelex/.../test_helpers/``) — those are test infrastructure that happens
+    to be packaged alongside production code so it can be reused across
+    downstream test suites.
+    """
+    if cls.__module__.startswith("tests."):
+        return False
+    module = sys.modules.get(cls.__module__)
+    if module is None:
+        return True
+    module_file = getattr(module, "__file__", None)
+    if module_file is None:
+        return True
+    try:
+        rel = Path(module_file).resolve().relative_to(_PIPELEX_ROOT)
+    except ValueError:
+        return True
+    return _FIXTURE_DIR_NAMES.isdisjoint(rel.parts)
 
 
 def iter_pipelex_error_subclasses() -> Iterator[type[PipelexError]]:
@@ -72,9 +130,11 @@ def iter_pipelex_error_subclasses() -> Iterator[type[PipelexError]]:
     call is idempotent — first invocation walks the filesystem, subsequent
     invocations are no-ops.
 
-    Skips classes whose ``__module__`` starts with ``tests.`` so synthetic
-    subclasses created by other tests in the same pytest session never leak
-    into the generated docs or the smoke-test assertions.
+    Skips classes that fail :func:`_is_production_subclass` so synthetic
+    subclasses created by other tests in the same pytest session and classes
+    defined under shipped fixture packages (``pipelex/.../test_extras/`` /
+    ``test_helpers/``) never leak into the generated docs or the smoke-test
+    assertions.
     """
     _force_load_all_error_modules()
     seen: set[type[PipelexError]] = set()
@@ -84,17 +144,17 @@ def iter_pipelex_error_subclasses() -> Iterator[type[PipelexError]]:
         if cls in seen:
             continue
         seen.add(cls)
-        if not cls.__module__.startswith("tests."):
+        if _is_production_subclass(cls):
             yield cls
         stack.extend(cls.__subclasses__())
 
 
 # Marker a maintainer adds to a generated page to claim it for hand-editing.
 # When present, :func:`generate_error_pages` skips the page on regeneration.
-AUTHORED_MARKER = "<!-- gstack:authored -->"
+AUTHORED_MARKER = "<!-- pipelex:authored -->"
 # Marker stamped on every generated page so the two populations are
-# distinguishable at a glance (``grep -L gstack:authored docs/errors``).
-GENERATED_MARKER = "<!-- gstack:generated -->"
+# distinguishable at a glance (``grep -L pipelex:authored docs/errors``).
+GENERATED_MARKER = "<!-- pipelex:generated -->"
 # Stem of the landing page emitted alongside the per-class pages. Kept in nav;
 # the per-class pages are declared ``not_in_nav`` in ``mkdocs.yml`` so the
 # sidebar does not balloon with one entry per error class.

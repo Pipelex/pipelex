@@ -3,7 +3,7 @@ title: "Mistral extract response"
 description: "Reference for the `MistralExtractResponseError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Mistral extract response
 

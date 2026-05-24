@@ -3,7 +3,7 @@ title: "TOML parse error"
 description: "Reference for the `TomlError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # TOML parse error
 

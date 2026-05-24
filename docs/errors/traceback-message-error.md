@@ -3,7 +3,7 @@ title: "Traceback message"
 description: "Reference for the `TracebackMessageError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Traceback message
 

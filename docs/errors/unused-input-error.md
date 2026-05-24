@@ -3,7 +3,7 @@ title: "Unused input"
 description: "Reference for the `UnusedInputError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Unused input
 

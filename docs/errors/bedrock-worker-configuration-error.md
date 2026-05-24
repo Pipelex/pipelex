@@ -3,7 +3,7 @@ title: "Bedrock worker configuration"
 description: "Reference for the `BedrockWorkerConfigurationError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Bedrock worker configuration
 

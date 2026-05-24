@@ -212,7 +212,7 @@ For each move:
 
 ### 6.3 — Delete the registry, simplify discovery
 
-- [x] Delete `pipelex/errors/error_module_registry.py`. Replace `iter_pipelex_error_subclasses()` callers with a small inline transitive `__subclasses__()` walk in `error_pages_generator.py` (the only production consumer plus the URI-uniqueness test). Normal imports load everything now — no force-import phase needed, no allowlist to maintain.
+- [x] Delete `pipelex/errors/error_module_registry.py`. Replace `iter_pipelex_error_subclasses()` callers with a small inline transitive `__subclasses__()` walk in `error_pages_generator.py` (the only production consumer plus the URI-uniqueness test). Normal imports load everything now — no force-import phase needed, no allowlist to maintain. *(Refined by Phase 7: discovery is rehydrated by a dev/test-time `_force_load_all_error_modules` helper. Production bootstrap remains untouched.)*
 - [x] `pipelex-dev generate-error-pages` — regenerate `docs/errors/` and verify the page set is complete (new pages appear for previously-missed classes; no orphan pages).
 
 ### 6.4 — Rule, docs, and the absorbed minor follow-up
@@ -227,7 +227,7 @@ For each move:
 - [x] Generated `docs/errors/` set is complete and `make agent-check` clean.
 - [x] `make agent-test` clean.
 
-**Acceptance:** every `PipelexError` subclass lives in a properly-named module; the static check fails the PR if a new error class lands outside the convention; `error_module_registry.py` is gone; discovery has no runtime side effects; the kebab-slug collision footgun is caught at generation time, not only by the uniqueness test.
+**Acceptance:** every `PipelexError` subclass lives in a properly-named module; the static check fails the PR if a new error class lands outside the convention; `error_module_registry.py` is gone; discovery has no production-runtime side effects (the dev/test-time `_force_load_all_error_modules` helper added in Phase 7 walks the filesystem inside the docs generator and the URI uniqueness test only); the kebab-slug collision footgun is caught at generation time, not only by the uniqueness test.
 
 ### ⛔ CHECKPOINT 6 — STOP, verify, record
 
@@ -475,7 +475,7 @@ Append one dated entry per session / checkpoint. Each entry must leave the next 
   **Findings landed in this session (Fix #2 + Fix #3 + Fix #4 + orphan cleanup):**
 
     - **Fix #4 (`tomli` TYPE_CHECKING regression)**: `pipelex/tools/misc/exceptions.py` — moved `import tomli` out of `TYPE_CHECKING`. Pre-refactor `toml_utils.py` had it at module-top; the Phase 6 move demoted it. `typing.get_type_hints(TomlError.from_tomli_error)` now resolves cleanly; no current caller exercises that path, but the gap blocked any future autodoc / annotation-introspecting tool. Verified live: `python -c "import typing; from pipelex.tools.misc.exceptions import TomlError; typing.get_type_hints(TomlError.from_tomli_error)"` succeeds.
-    - **Fix #2 (orphan-page deletion)**: `pipelex/errors/error_pages_generator.py` — added a fourth `removed` bucket to `ErrorPagesReport` and a `_remove_orphans()` helper. Generated pages whose slug is no longer in `target_classes` are deleted; pages with `<!-- gstack:authored -->` are preserved verbatim; pages with neither marker (out-of-scope hand-files) are left untouched. The dev CLI command's success panel surfaces the new `Removed: N` count. Three new unit tests pin the behavior: orphan deletion, authored-marker preservation, unmarked-file isolation.
+    - **Fix #2 (orphan-page deletion)**: `pipelex/errors/error_pages_generator.py` — added a fourth `removed` bucket to `ErrorPagesReport` and a `_remove_orphans()` helper. Generated pages whose slug is no longer in `target_classes` are deleted; pages with `<!-- pipelex:authored -->` are preserved verbatim; pages with neither marker (out-of-scope hand-files) are left untouched. The dev CLI command's success panel surfaces the new `Removed: N` count. Three new unit tests pin the behavior: orphan deletion, authored-marker preservation, unmarked-file isolation.
     - **Fix #3 (completeness assertion)**: `tests/unit/pipelex/errors/test_error_class_location_convention.py` — refactored the AST scan into a reusable `_ast_discover_pipelex_error_subclasses()` helper, then added `test_runtime_walk_discovers_every_ast_classified_subclass`. It compares the AST-discovered class-name set to the runtime-loaded class-name set after normal imports, fails loudly with the missing names if they diverge. Marked `@pytest.mark.xfail(strict=True, ...)` pending Phase 7 / Decision D4. When the discovery contract is fixed, the test passes and `strict=True` turns the unexpected pass into a CI failure that prompts the marker's removal.
     - **Orphan cleanup**: ran `pipelex-dev generate-error-pages` on the real `docs/errors/` — 23 stale per-class `.md` files (the ones dropped by the headline regression) deleted, `Written: 0 · Unchanged: 209 · Preserved: 0 · Removed: 23`. Disk now consistent with the production-imports discovery state, no orphan pages served by mkdocs.
 

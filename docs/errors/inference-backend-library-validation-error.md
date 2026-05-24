@@ -3,7 +3,7 @@ title: "Inference backend library validation"
 description: "Reference for the `InferenceBackendLibraryValidationError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Inference backend library validation
 

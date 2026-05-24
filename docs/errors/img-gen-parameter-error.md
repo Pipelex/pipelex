@@ -3,7 +3,7 @@ title: "Img gen parameter"
 description: "Reference for the `ImgGenParameterError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Img gen parameter
 

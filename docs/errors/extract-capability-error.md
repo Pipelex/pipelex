@@ -3,7 +3,7 @@ title: "Extract capability"
 description: "Reference for the `ExtractCapabilityError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Extract capability
 

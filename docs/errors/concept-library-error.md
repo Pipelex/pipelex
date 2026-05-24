@@ -3,7 +3,7 @@ title: "Concept library"
 description: "Reference for the `ConceptLibraryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Concept library
 

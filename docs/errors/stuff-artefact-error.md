@@ -3,7 +3,7 @@ title: "Stuff artefact"
 description: "Reference for the `StuffArtefactError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Stuff artefact
 

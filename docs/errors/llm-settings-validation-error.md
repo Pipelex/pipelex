@@ -3,7 +3,7 @@ title: "Llm settings validation"
 description: "Reference for the `LLMSettingsValidationError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Llm settings validation
 

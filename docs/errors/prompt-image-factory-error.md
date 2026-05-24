@@ -3,7 +3,7 @@ title: "Prompt image factory"
 description: "Reference for the `PromptImageFactoryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Prompt image factory
 

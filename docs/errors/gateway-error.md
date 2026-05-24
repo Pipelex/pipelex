@@ -3,7 +3,7 @@ title: "Gateway"
 description: "Reference for the `GatewayError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Gateway
 

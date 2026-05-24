@@ -3,7 +3,7 @@ title: "Bundle elaborator"
 description: "Reference for the `BundleElaboratorError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Bundle elaborator
 

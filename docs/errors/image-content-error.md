@@ -3,7 +3,7 @@ title: "Image content"
 description: "Reference for the `ImageContentError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Image content
 

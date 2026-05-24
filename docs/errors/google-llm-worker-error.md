@@ -3,7 +3,7 @@ title: "Google llm worker"
 description: "Reference for the `GoogleLLMWorkerError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Google llm worker
 

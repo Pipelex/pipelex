@@ -3,7 +3,7 @@ title: "Vertex ai credentials"
 description: "Reference for the `VertexAICredentialsError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Vertex ai credentials
 

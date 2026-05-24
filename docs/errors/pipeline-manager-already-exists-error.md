@@ -3,7 +3,7 @@ title: "Pipeline manager already exists"
 description: "Reference for the `PipelineManagerAlreadyExistsError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Pipeline manager already exists
 

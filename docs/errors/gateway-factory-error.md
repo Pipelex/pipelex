@@ -3,7 +3,7 @@ title: "Gateway factory"
 description: "Reference for the `GatewayFactoryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Gateway factory
 

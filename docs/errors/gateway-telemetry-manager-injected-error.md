@@ -3,7 +3,7 @@ title: "Gateway telemetry manager injected"
 description: "Reference for the `GatewayTelemetryManagerInjectedError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Gateway telemetry manager injected
 

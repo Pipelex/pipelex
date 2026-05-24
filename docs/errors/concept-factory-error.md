@@ -3,7 +3,7 @@ title: "Concept factory"
 description: "Reference for the `ConceptFactoryError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Concept factory
 

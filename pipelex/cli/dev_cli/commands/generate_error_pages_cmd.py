@@ -16,10 +16,13 @@ ERROR_PAGES_DIR = Path("docs/errors")
 def generate_error_pages_cmd(output: Path | None = None, quiet: bool = False) -> None:
     """Generate per-class error documentation pages.
 
-    Bootstraps Pipelex so every ``PipelexError`` subclass is imported and thus
-    discoverable, walks them all, and writes one markdown page per class. Pages
-    already carrying ``<!-- gstack:authored -->`` are preserved so hand-edited
-    reference content is never clobbered.
+    Bootstraps Pipelex (kept for parity with other dev CLI commands and to surface
+    config / setup errors loudly), then calls :func:`generate_error_pages`. The
+    underlying discovery rglobs every ``exceptions.py`` / ``*_exceptions.py``
+    via :func:`iter_pipelex_error_subclasses` — no manual import or class-list
+    update is needed when a new error class lands. Pages already carrying
+    ``<!-- pipelex:authored -->`` are preserved so hand-edited reference content
+    is never clobbered.
 
     Args:
         output: Custom output directory. Defaults to ``docs/errors/``.

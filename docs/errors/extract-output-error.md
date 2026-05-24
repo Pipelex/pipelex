@@ -3,7 +3,7 @@ title: "Extract output"
 description: "Reference for the `ExtractOutputError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Extract output
 

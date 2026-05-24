@@ -3,7 +3,7 @@ title: "Llm config"
 description: "Reference for the `LLMConfigError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Llm config
 

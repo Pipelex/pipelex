@@ -3,7 +3,7 @@ title: "AI inference failed"
 description: "Reference for the `CogtError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # AI inference failed
 

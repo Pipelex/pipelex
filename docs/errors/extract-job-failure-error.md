@@ -3,7 +3,7 @@ title: "Extract job failure"
 description: "Reference for the `ExtractJobFailureError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Extract job failure
 

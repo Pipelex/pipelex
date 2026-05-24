@@ -3,7 +3,7 @@ title: "Worker scope config"
 description: "Reference for the `WorkerScopeConfigError` Pipelex error class."
 ---
 
-<!-- gstack:generated -->
+<!-- pipelex:generated -->
 
 # Worker scope config
 
