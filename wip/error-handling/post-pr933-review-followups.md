@@ -163,15 +163,15 @@ logger they target (`workflow.logger` vs `activity.logger`) and a docstring
 substring ("in a workflow" vs "in an activity"). Every new severity level must
 be added in two places.
 
-- [ ] Move the seven severity methods (`verbose` / `debug` / `dev` / `info` /
+- [x] Move the seven severity methods (`verbose` / `debug` / `dev` / `info` /
       `warning` / `error` / `critical`) onto the `_RequestIdLog` base. Add an
       abstract `_logger` property (or ClassVar) that each subclass overrides
       to point at `workflow.logger` or `activity.logger`. Each method becomes
       a one-liner: `self._logger.log(level=..., msg=content, extra=self._build_extra())`.
-- [ ] Verify both `WorkflowLog` and `ActivityLog` still satisfy the protocols
+- [x] Verify both `WorkflowLog` and `ActivityLog` still satisfy the protocols
       expected by their existing call sites — the public method set is
       unchanged.
-- [ ] `tests/unit/pipelex/temporal/test_log_temporal_request_id.py` parametrizes
+- [x] `tests/unit/pipelex/temporal/test_log_temporal_request_id.py` parametrizes
       over all seven severity methods — it should keep passing without
       modification.
 
@@ -183,7 +183,7 @@ docstring and in `docs/under-the-hood/error-model.md`. Anything that wants to
 detect the schema-validation fallback on the wire (a test, an ops dashboard,
 the documentation) must duplicate the literal string.
 
-- [ ] Add `_ERROR_REPORT_VALIDATION_FAILED_MARKER = "[error report failed schema validation]"`
+- [x] Add `_ERROR_REPORT_VALIDATION_FAILED_MARKER = "[error report failed schema validation]"`
       at module scope in `pipelex/temporal/tprl/temporal_error.py`. Use it in
       the f-string. Update `tests/unit/pipelex/temporal/test_recover_error_report.py`
       (the `test_found_but_invalid_report_dict_synthesizes_unrecoverable` case)
@@ -198,15 +198,15 @@ constructor with 12 kwargs — 5 copied verbatim from `report`, 7 merged via
 docstring; a new wrapper-wins field on `ErrorReport` would require editing this
 list too.
 
-- [ ] Refactor to `return report.model_copy(update={...})` with just the
+- [x] Refactor to `return report.model_copy(update={...})` with just the
       cause-merged classification fields. Matches the pattern already in use
       at `pipelex/pipeline/exceptions.py:43-49` (`PipelineExecutionError.to_error_report`).
-- [ ] Same refactor opportunity in `pipelex/cogt/exceptions.py:87-103`
+- [x] Same refactor opportunity in `pipelex/cogt/exceptions.py:87-103`
       (`CogtError.to_error_report` override duplicates 11 of the same
       constructor kwargs to add four CogtError-only fields). Switch to
       `super().to_error_report()` (which runs cause-chain enrichment) followed
       by `.model_copy(update={...})` with just the CogtError-specific fields.
-- [ ] No observable behavior change. Existing tests must keep passing.
+- [x] No observable behavior change. Existing tests must keep passing.
 
 ### B.4 — OpenAI/VertexAI title-suffix consistency
 
@@ -215,7 +215,7 @@ values that drop the trailing "error" / "failed" word that every other curated
 title uses (`"AI inference failed"`, `"Library error"`, `"TOML parse error"`,
 etc.). The RFC 7807 `title` field is consumer-facing.
 
-- [ ] Pick the dominant convention (keep the trailing "error" / "failed") and
+- [x] Pick the dominant convention (keep the trailing "error" / "failed") and
       apply it to OpenAI + VertexAI:
       - `OpenAIClientFactoryError._declared_title = "OpenAI client factory error"`
         (was `"OpenAI client factory"`).
@@ -223,9 +223,9 @@ etc.). The RFC 7807 `title` field is consumer-facing.
         (was `"VertexAI config"`).
       - `VertexAICredentialsError._declared_title = "VertexAI credentials error"`
         (was `"VertexAI credentials"`).
-- [ ] Regenerate `docs/errors/` via `.venv/bin/pipelex-dev generate-error-pages`
+- [x] Regenerate `docs/errors/` via `.venv/bin/pipelex-dev generate-error-pages`
       — the three affected pages should land with updated title frontmatter.
-- [ ] If `tests/unit/pipelex/test_pipelex_error_title_and_type_uri.py` asserts
+- [x] If `tests/unit/pipelex/test_pipelex_error_title_and_type_uri.py` asserts
       specific title strings for these classes, update them.
 
 ### Acceptance
@@ -236,9 +236,9 @@ files.
 
 ### ⛔ CHECKPOINT B — STOP, verify, record
 
-- [ ] `make agent-check` and `make agent-test` clean.
-- [ ] Each refactor as its own commit.
-- [ ] Append a dated entry to the Session log below.
+- [x] `make agent-check` and `make agent-test` clean.
+- [x] Each refactor as its own commit.
+- [x] Append a dated entry to the Session log below.
 
 ---
 
@@ -400,3 +400,13 @@ state, what is broken or deferred, and the exact next action.
   - A.6: `test_reserved_key_check_runs_only_at_construction` in `test_delivery_assignment.py`. Pins observed behavior; `validate_assignment=True` alone doesn't trip it (mutation vs assignment), but a stricter regression (immutable payload, custom `__setitem__` validation) would.
 - **Status**: `make agent-check` clean, `make agent-test` clean.
 - **Next action**: commit Phase A as a single test-only commit, then start Phase B.1.
+
+### 2026-05-24 — Checkpoint B landed
+
+- **Phase B** complete — four refactors, each as its own commit, no observable behavior change:
+  - B.1 (`refactor(temporal): hoist severity methods onto _RequestIdLog base`): collapsed the 14 duplicated severity methods on `WorkflowLog` / `ActivityLog` onto `_RequestIdLog` with a `_logger` ClassVar per subclass. Existing parametrized test suite covers both subclasses unchanged.
+  - B.2 (`refactor(temporal): hoist error-report validation marker to module constant`): added `_ERROR_REPORT_VALIDATION_FAILED_MARKER` constant in `temporal_error.py`; updated `test_recover_error_report.py` to import the constant.
+  - B.3 (`refactor(errors): switch _enrich_error_report_from_cause to model_copy`): both the base implementation and `CogtError.to_error_report` override now use `super().to_error_report()` + `model_copy(update={...})` with just the cause-merged fields. Wrapper-wins fields stay untouched by construction. Verified against unit + integration error-handling tests.
+  - B.4 (`fix(errors): make OpenAI/VertexAI titles match the suffix convention`): three `_declared_title` values updated; `docs/errors/` regenerated (4 files diff: 3 pages + index).
+- **Status**: `make agent-check` clean, `make agent-test` clean.
+- **Next action**: open Phase C.1 — the stale TODOs in `pipeline/exceptions.py` need a decision (land the deferred catch site OR remove the unused structure per "No backward compatibility" policy).
