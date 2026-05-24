@@ -731,8 +731,51 @@ deviation, raise it with the user.
 
 ## Decisions
 
-Record each decision here as it is taken, with date and rationale. (Empty —
-ready for the new session.)
+Record each decision here as it is taken, with date and rationale.
+
+- **2026-05-24, A.1**: Plan A confirmed — moved returns inside the `with` block on
+  the two outliers. Result-construction errors now translate to
+  `ValidateBundleError` uniformly across all 4 entry points.
+- **2026-05-24, A.2**: Teardown API already exists (`library_manager.teardown(library_id)`
+  + `teardown_current_library()`); no new context manager needed. In-scope here.
+  Pattern: `try/finally` with `success` flag (project policy forbids generic
+  `except Exception`), only tear down on failure path — matches the
+  "error-path-only cleanup" precedent at `pipeline_run_setup.py:345-360`.
+- **2026-05-24, B.1**: Option B.1-a — refactored `to_dict` STRICT branches to share
+  `_STRICT_KEPT_FIELDS` as single allowlist. Caller-facing overlays
+  `message` + `user_action` on the shared base. Dropped unused
+  `_STRICT_PROVIDER_FIELDS` / `_STRICT_PASSTHROUGH_DROPPED_FIELDS` constants.
+  Parity test added.
+- **2026-05-24, B.2**: Option B.2-a — added `category: Literal["pipe", "concept"]`
+  parameter to `_translate_to_validate_bundle_error`. The two `validate_bundle*`
+  call sites pass `"pipe"`, the two `load_concepts_only*` pass `"concept"`. Only
+  the `except ValidationError` arm's framing changes per category; the
+  structured payload (`pipe_validation_errors`) is unchanged because
+  `categorize_pipe_validation_error` already detects PIPE/CONCEPT model-scope
+  per error.
+- **2026-05-24, C.1**: Option C.1-b — pinned wrapper-wins semantics with a test
+  at `tests/unit/pipelex/cogt/test_cogt_provider_metadata_wrapper_wins.py`.
+  Added comments at both OR-suppression call sites
+  (`pipelex/cogt/exceptions.py` and `pipelex/base_exceptions.py`) pointing at
+  the test.
+- **2026-05-24, C.2**: Trivial fix — added `str.strip()` guard at both sites
+  (`recover_error_report` line 125 + `_message_from_exc`). Extended existing
+  parametrize to cover whitespace cases.
+- **2026-05-24, C.3**: Added one-line test asserting
+  `not issubclass(PipeValidationError, pydantic.ValidationError)`. Added
+  comment in the helper above `except PipeValidationError` clause pointing at
+  the test.
+- **2026-05-24, C.4**: C.4-a (no action). The inheritance hazard for external
+  `ValidateBundleError` subclasses is documented in the `DisclosureMode.STRICT`
+  docstring ("STRICT is a classification-projection, not a path-leak shield");
+  in-repo subclass count is 0 (only an ephemeral test class).
+- **2026-05-24, C.5**: C.5-a (no action). Same rationale as F6: temporalio's
+  in-place mutation behavior makes the captured-at-class-definition reference
+  safe today.
+- **2026-05-24, D.1-D.6**: All resolutions still hold — verified
+  `CHANGELOG.md` STRICT line, `model_copy` no `validate=True` kwarg, STRICT
+  docstring covers 5xx leak + from_dict failure, helper docstring names all 4
+  call sites, `_logger: ClassVar[Any]` unchanged.
 
 ## Session log
 
@@ -740,4 +783,53 @@ Append one dated entry per session / checkpoint. Each entry must leave the
 next session enough to cold-start: what landed, decisions taken, current
 code state, what is broken or deferred, and the exact next action.
 
-(Empty — ready for the new session.)
+- **2026-05-24**: Worked through all 15 findings in one session.
+
+  **Phase A** — both committed (`1fccafd2`, `366a8aad`).
+  - A.1 moved returns inside the `with` block on `validate_bundles_from_directory`
+    and `load_concepts_only_from_directory` (the two outliers). Added
+    `tests/integration/pipelex/pipeline/test_validate_bundle_return_placement.py`
+    with one test per entry point — teeth-checked one by reverting (failed
+    as expected, then restored).
+  - A.2 wrapped each entry point in `try/finally` with a `success` flag that
+    teardowns `library_manager` + `teardown_current_library()` only on the
+    failure path. Added imports for `teardown_current_library`. Added
+    `tests/integration/pipelex/pipeline/test_validate_bundle_library_lifecycle.py`
+    spying on `library_manager.teardown` for each entry point — teeth-checked
+    by reverting one entry point.
+
+  **Phase B** — both committed (`52325498`, `0554303b`).
+  - B.1-a unified the two STRICT branches in `ErrorReport.to_dict` to share
+    `_STRICT_KEPT_FIELDS` as a single allowlist; caller-facing branch overlays
+    `message` + `user_action`. Dropped `_STRICT_PROVIDER_FIELDS` and
+    `_STRICT_PASSTHROUGH_DROPPED_FIELDS`. Updated the constant's docstring.
+    Added `test_strict_branch_kept_field_parity`.
+  - B.2-a added `category: Literal["pipe", "concept"]` to the helper signature.
+    The four call sites now pass their category explicitly. Only the
+    `except ValidationError` arm's message framing changes (Could not load
+    blueprints vs Could not load concepts). Structured payload unchanged.
+    Added `test_validate_bundle_category_framing.py`.
+
+  **Phase C** — three committed (`d8ad53ff`, `7cfb6a20`, `b4d454fc`), two
+  skipped per recommendation.
+  - C.1-b added a test pinning wrapper-wins `provider_metadata` semantics
+    (`tests/unit/pipelex/cogt/test_cogt_provider_metadata_wrapper_wins.py`) and
+    a one-paragraph comment at both OR-suppression call sites
+    (`pipelex/cogt/exceptions.py` and `pipelex/base_exceptions.py`).
+  - C.2 added `str.strip()` guards at both
+    `_message_from_exc` and `recover_error_report` line 125. Extended the
+    existing parametrize to cover empty/space/tab/newline/mixed-whitespace.
+    Teeth-checked.
+  - C.3 added `test_pipe_validation_error_is_not_a_pydantic_validation_error_subclass`
+    plus a one-line comment in the helper above the `except PipeValidationError`
+    clause.
+  - C.4 skipped per recommendation (C.4-a — no action; documented in
+    `DisclosureMode.STRICT` docstring).
+  - C.5 skipped per recommendation (C.5-a — no action; same rationale as F6).
+
+  **Phase D** — all six F1-F6 resolutions verified intact. No code changes.
+
+  **State at end of session**: baseline green (`make agent-check` clean,
+  `make agent-test` passes). Branch is `feature/post-pr933-followups`, 8 new
+  commits on top of `e73cb5a9`. PR #933 not yet landed at time of writing —
+  do NOT rebase onto `dev` until it does.
