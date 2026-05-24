@@ -68,6 +68,11 @@ def _translate_to_validate_bundle_error(category: Literal["pipe", "concept"]) ->
             message=f"Pipe factory error: {factory_error}",
             pipe_factory_errors=[factory_error_data],
         ) from factory_error
+    # Cascade order: ``except PipeValidationError`` must precede
+    # ``except ValidationError``. Their sibling-under-``ValueError``
+    # relationship (``PipeValidationError(ValueError)``, not a subclass of
+    # ``pydantic.ValidationError``) is pinned by
+    # ``tests/unit/pipelex/pipeline/test_validate_bundle_helper.py``.
     except PipeValidationError as pipe_error:
         pipe_error_data = categorize_pipe_validation_with_libraries_error(pipe_error=pipe_error)
         raise ValidateBundleError(
