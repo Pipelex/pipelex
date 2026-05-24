@@ -466,21 +466,4 @@ def extract_validation_errors(exc: ValidateBundleError) -> list[dict[str, Any]]:
             entry["variable_names"] = pipe_error.variable_names
         validation_errors.append(entry)
 
-    for instantiation_error in exc.pipe_concept_instantiation_errors:
-        entry = {
-            "category": "instantiation",
-            "error_type": str(instantiation_error.error_type),
-            "pipe_code": instantiation_error.pipe_code,
-            "message": instantiation_error.message,
-        }
-        if instantiation_error.domain_code:
-            entry["domain_code"] = instantiation_error.domain_code
-        if instantiation_error.concept_code:
-            entry["concept_code"] = instantiation_error.concept_code
-        if instantiation_error.field_path:
-            entry["field_path"] = instantiation_error.field_path
-        if instantiation_error.variable_names:
-            entry["variable_names"] = instantiation_error.variable_names
-        validation_errors.append(entry)
-
     return validation_errors
