@@ -383,6 +383,51 @@ class TestErrorReportDisclosureMode:
         report = _runtime_report()
         assert report.to_dict() == report.to_dict(disclosure_mode=DisclosureMode.VERBOSE)
 
+    def test_strict_branch_kept_field_parity(self) -> None:
+        """STRICT projection: both branches emit the same key set modulo the deliberately divergent keys.
+
+        Pins the single-allowlist contract introduced when the two STRICT
+        branches were unified: caller-facing and redacted branches share
+        ``_STRICT_KEPT_FIELDS`` as the base, and the caller-facing branch
+        adds ``message`` and ``user_action`` on top while the redacted branch
+        only emits a placeholder ``message``. Both branches reattach the
+        same curated ``provider_metadata`` slice. The remaining key set must
+        match — without this pin, a new ``ErrorReport`` field added in the
+        future could silently appear on one branch and silently disappear
+        from the other.
+        """
+        # A report with every populatable field set, so both branches see the
+        # same payload going in. We then flip ``caller_facing_message`` to
+        # exercise each branch — using ``model_copy`` so pyright sees the
+        # concrete field types instead of the union we'd get from ``**kwargs``.
+        caller_facing_report = ErrorReport(
+            error_type="PipelexInterpreterError",
+            message="pipe references unknown concept",
+            title="Pipelex interpreter error",
+            type_uri="https://docs.pipelex.com/latest/errors/pipelex-interpreter-error/",
+            error_category="capacity",
+            error_domain=ErrorDomain.INPUT,
+            retryable=False,
+            user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail="fix the concept name"),
+            model="gpt-5",
+            provider="openai",
+            provider_metadata=ProviderErrorMetadata(
+                provider=ProviderName.OPENAI,
+                sdk_exception_type="RateLimitError",
+                status_code=429,
+                retry_after_seconds=12.0,
+            ),
+            caller_facing_message=True,
+        )
+        redacted_report = caller_facing_report.model_copy(update={"caller_facing_message": False})
+
+        caller_facing_payload = caller_facing_report.to_dict(disclosure_mode=DisclosureMode.STRICT)
+        redacted_payload = redacted_report.to_dict(disclosure_mode=DisclosureMode.STRICT)
+
+        # ``message`` is on both (different values), ``user_action`` only on caller-facing —
+        # those are the legitimate divergences. After removing them, the key sets must match.
+        assert set(caller_facing_payload) - {"message", "user_action"} == set(redacted_payload) - {"message"}
+
     def test_receiver_rehydrates_verbose_payload_for_webhook(self) -> None:
         """An API-side receiver rebuilds the report from a VERBOSE webhook payload.
 

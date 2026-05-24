@@ -12,20 +12,23 @@ from pipelex.urls import URLs
 # ``caller_facing_message`` keeps its original ``message`` instead.
 INTERNAL_ERROR_PLACEHOLDER = "An internal error occurred."
 
-# Stable identifiers preserved verbatim when STRICT mode redacts a report.
-# ``message`` is intentionally absent — STRICT replaces it with
-# ``INTERNAL_ERROR_PLACEHOLDER`` unconditionally, not by passthrough.
-# ``provider_metadata`` is also absent here — it is reattached separately under
-# STRICT as a curated subset (see ``_STRICT_PROVIDER_METADATA_KEPT_FIELDS``).
+# Stable identifiers preserved verbatim on every STRICT envelope, regardless of
+# the report's ``caller_facing_message`` flag. ``message`` and ``user_action``
+# are intentionally absent and handled separately by the two STRICT branches:
+# the caller-facing branch keeps both, the redacted branch replaces ``message``
+# with ``INTERNAL_ERROR_PLACEHOLDER`` and drops ``user_action``.
+# ``provider_metadata`` is also absent here — it is reattached on both branches
+# as a curated subset (see ``_STRICT_PROVIDER_METADATA_KEPT_FIELDS``).
+# Provider/model attribution (``provider``, ``model``) is unconditionally
+# excluded: it never belongs on an external surface, whatever the report's
+# ``error_domain``. The internal ``caller_facing_message`` flag is likewise
+# excluded — it is redaction plumbing that rides only the VERBOSE round-trip
+# format, never the lossy external projection.
+#
+# Single source of truth for both STRICT branches. Adding a new top-level
+# ``ErrorReport`` field is one decision: include it here to surface it on both
+# branches, or leave it out to keep both branches consistently silent.
 _STRICT_KEPT_FIELDS: frozenset[str] = frozenset({"error_type", "title", "type_uri", "error_domain", "error_category", "retryable"})
-
-# Provider/model attribution fields. STRICT drops them unconditionally — from
-# the redacted branch (they are absent from ``_STRICT_KEPT_FIELDS``) and from
-# the caller-facing-message passthrough branch alike: provider/model identity
-# never belongs on an external surface, whatever the report's ``error_domain``.
-# ``provider_metadata`` is handled separately because some of its inner fields
-# carry actionable client hints (see ``_STRICT_PROVIDER_METADATA_KEPT_FIELDS``).
-_STRICT_PROVIDER_FIELDS: frozenset[str] = frozenset({"model", "provider"})
 
 # The curated subset of ``ProviderErrorMetadata`` that survives STRICT
 # projection. ``status_code`` and ``retry_after_seconds`` are actionable client
@@ -35,13 +38,6 @@ _STRICT_PROVIDER_FIELDS: frozenset[str] = frozenset({"model", "provider"})
 # or internal correlation IDs / free-form text (``request_id``, ``message``) that
 # the external surface has no business seeing.
 _STRICT_PROVIDER_METADATA_KEPT_FIELDS: frozenset[str] = frozenset({"status_code", "retry_after_seconds"})
-
-# Fields stripped from the STRICT caller-facing passthrough: provider/model
-# attribution plus ``caller_facing_message`` itself — the latter is internal
-# redaction plumbing that rides only the VERBOSE round-trip format, never the
-# lossy external projection. ``provider_metadata`` is not in this set because it
-# undergoes a separate curated-subset projection.
-_STRICT_PASSTHROUGH_DROPPED_FIELDS: frozenset[str] = _STRICT_PROVIDER_FIELDS | frozenset({"caller_facing_message"})
 
 
 def _redact_provider_metadata_for_strict(metadata_payload: dict[str, Any]) -> dict[str, Any] | None:
@@ -233,25 +229,19 @@ class ErrorReport(BaseModel):
             case DisclosureMode.VERBOSE:
                 return payload
             case DisclosureMode.STRICT:
+                # Both STRICT branches start from the same allowlist — single
+                # source of truth, so adding a new top-level ``ErrorReport``
+                # field is one decision (include / exclude), not two.
+                projected: dict[str, Any] = {key: payload[key] for key in _STRICT_KEPT_FIELDS if key in payload}
                 if self.caller_facing_message:
                     # The error class that authored this message designed it as
-                    # caller-facing copy — reflect it back. Provider/model
-                    # attribution and the internal ``caller_facing_message`` flag
-                    # are still stripped: neither belongs on the lossy external
-                    # projection, whatever the error_domain. ``provider_metadata``
-                    # is projected through the curated subset so actionable HTTP
-                    # client hints (``status_code`` / ``retry_after_seconds``)
-                    # survive while provider identity does not.
-                    projected: dict[str, Any] = {key: value for key, value in payload.items() if key not in _STRICT_PASSTHROUGH_DROPPED_FIELDS}
-                    if "provider_metadata" in projected:
-                        curated_metadata = _redact_provider_metadata_for_strict(projected["provider_metadata"])
-                        if curated_metadata is None:
-                            projected.pop("provider_metadata")
-                        else:
-                            projected["provider_metadata"] = curated_metadata
-                    return projected
-                redacted: dict[str, Any] = {key: payload[key] for key in _STRICT_KEPT_FIELDS if key in payload}
-                redacted["message"] = INTERNAL_ERROR_PLACEHOLDER
+                    # caller-facing copy — reflect it (and ``user_action``) back
+                    # on top of the shared allowlist.
+                    projected["message"] = payload["message"]
+                    if "user_action" in payload:
+                        projected["user_action"] = payload["user_action"]
+                else:
+                    projected["message"] = INTERNAL_ERROR_PLACEHOLDER
                 # Reattach a curated ``provider_metadata`` slice — even on the
                 # fully-redacted branch, ``status_code`` and ``retry_after_seconds``
                 # are actionable client hints (HTTP status mapping, ``Retry-After``
@@ -259,8 +249,8 @@ class ErrorReport(BaseModel):
                 if "provider_metadata" in payload:
                     curated_metadata = _redact_provider_metadata_for_strict(payload["provider_metadata"])
                     if curated_metadata is not None:
-                        redacted["provider_metadata"] = curated_metadata
-                return redacted
+                        projected["provider_metadata"] = curated_metadata
+                return projected
 
     def to_problem_document(
         self,
