@@ -2,7 +2,7 @@ import asyncio
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Sequence
+from typing import Literal, Sequence
 
 from pydantic import BaseModel, ValidationError
 
@@ -33,21 +33,27 @@ class ValidateBundleResult(BaseModel):
 
 
 @contextmanager
-def _translate_to_validate_bundle_error() -> Iterator[None]:
+def _translate_to_validate_bundle_error(category: Literal["pipe", "concept"]) -> Iterator[None]:
     """Translate the bundle-loading exception surface into a single ``ValidateBundleError``.
 
     Single source of truth for the bundle-loading error cascade, used by all
     four entry points: ``validate_bundle`` / ``validate_bundles_from_directory``
-    (full pipe + dry-run path) and ``load_concepts_only`` /
-    ``load_concepts_only_from_directory`` (concepts-only path). A
-    ``PipelexInterpreterError`` becomes a ``ValidateBundleError`` carrying the
-    blueprint validation errors, a ``PipeFactoryError`` carries the categorized
-    factory error, etc. Sharing one source of truth means a new handler only
-    needs to be added once. The four pipe-loading / dry-run handlers
-    (``PipeFactoryError``, ``PipeValidationError``, ``PipeRunError``,
-    ``DryRunError``) are dead code in the concepts-only paths (those
-    functions never instantiate pipes or run dry runs), but they are harmless
-    there — they simply never fire.
+    (full pipe + dry-run path, ``category="pipe"``) and ``load_concepts_only`` /
+    ``load_concepts_only_from_directory`` (concepts-only path,
+    ``category="concept"``). A ``PipelexInterpreterError`` becomes a
+    ``ValidateBundleError`` carrying the blueprint validation errors, a
+    ``PipeFactoryError`` carries the categorized factory error, etc. Sharing one
+    source of truth means a new handler only needs to be added once. The four
+    pipe-loading / dry-run handlers (``PipeFactoryError``, ``PipeValidationError``,
+    ``PipeRunError``, ``DryRunError``) are dead code in the concepts-only paths
+    (those functions never instantiate pipes or run dry runs), but they are
+    harmless there — they simply never fire.
+
+    ``category`` controls the user-facing framing for the one branch that fires
+    from both paths: the ``except ValidationError`` arm catches pydantic
+    validation errors raised during model construction. A concepts-only path
+    that fails ``Concept`` validation must not be framed as a pipe-validation
+    error — pass ``category="concept"`` to surface concept-aware copy.
     """
     try:
         yield
@@ -71,7 +77,11 @@ def _translate_to_validate_bundle_error() -> Iterator[None]:
     except ValidationError as validation_error:
         pipe_validation_errors = categorize_pipe_validation_error(validation_error=validation_error)
         validation_error_msg = report_validation_error(category="mthds", validation_error=validation_error)
-        msg = f"Could not load blueprints because of: {validation_error_msg}"
+        match category:
+            case "pipe":
+                msg = f"Could not load blueprints because of: {validation_error_msg}"
+            case "concept":
+                msg = f"Could not load concepts because of: {validation_error_msg}"
         raise ValidateBundleError(
             message=msg,
             pipe_validation_errors=pipe_validation_errors,
@@ -120,7 +130,7 @@ async def validate_bundle(
     await asyncio.sleep(0)  # Yield to event loop (keeps function async-compatible)
     success = False
     try:
-        with _translate_to_validate_bundle_error():
+        with _translate_to_validate_bundle_error(category="pipe"):
             if effective_dirs:
                 log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}) for validation")
                 library_manager.load_libraries(
@@ -176,7 +186,7 @@ async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResu
     set_current_library(library_id=library_id)
     success = False
     try:
-        with _translate_to_validate_bundle_error():
+        with _translate_to_validate_bundle_error(category="pipe"):
             for mthds_file in mthds_files:
                 blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file)
                 all_blueprints.append(blueprint)
@@ -242,7 +252,7 @@ def load_concepts_only(
     loaded_blueprints: list[PipelexBundleBlueprint] | None = None
     success = False
     try:
-        with _translate_to_validate_bundle_error():
+        with _translate_to_validate_bundle_error(category="concept"):
             if effective_dirs:
                 log.verbose(f"Loading concepts only from {len(effective_dirs)} library directory(ies) ({source_label})")
                 library_manager.load_libraries_concepts_only(
@@ -308,7 +318,7 @@ def load_concepts_only_from_directory(directory: Path) -> LoadConceptsOnlyResult
     set_current_library(library_id=library_id)
     success = False
     try:
-        with _translate_to_validate_bundle_error():
+        with _translate_to_validate_bundle_error(category="concept"):
             for mthds_file in mthds_files:
                 blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file)
                 all_blueprints.append(blueprint)
