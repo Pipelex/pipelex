@@ -36,11 +36,18 @@ class ValidateBundleResult(BaseModel):
 def _translate_to_validate_bundle_error() -> Iterator[None]:
     """Translate the bundle-loading exception surface into a single ``ValidateBundleError``.
 
-    Both ``validate_bundle`` and ``validate_bundles_from_directory`` perform the
-    same six-handler cascade: a ``PipelexInterpreterError`` becomes a
-    ``ValidateBundleError`` carrying the blueprint validation errors, a
-    ``PipeFactoryError`` carries the categorized factory error, etc. Sharing
-    one source of truth means a new handler only needs to be added once.
+    Single source of truth for the bundle-loading error cascade, used by all
+    four entry points: ``validate_bundle`` / ``validate_bundles_from_directory``
+    (full pipe + dry-run path) and ``load_concepts_only`` /
+    ``load_concepts_only_from_directory`` (concepts-only path). A
+    ``PipelexInterpreterError`` becomes a ``ValidateBundleError`` carrying the
+    blueprint validation errors, a ``PipeFactoryError`` carries the categorized
+    factory error, etc. Sharing one source of truth means a new handler only
+    needs to be added once. The four pipe-loading / dry-run handlers
+    (``PipeFactoryError``, ``PipeValidationError``, ``PipeRunError``,
+    ``DryRunError``) are dead code in the concepts-only paths (those
+    functions never instantiate pipes or run dry runs), but they are harmless
+    there — they simply never fire.
     """
     try:
         yield
@@ -217,7 +224,7 @@ def load_concepts_only(
 
     loaded_concepts: list[Concept] | None = None
     loaded_blueprints: list[PipelexBundleBlueprint] | None = None
-    try:
+    with _translate_to_validate_bundle_error():
         if effective_dirs:
             log.verbose(f"Loading concepts only from {len(effective_dirs)} library directory(ies) ({source_label})")
             library_manager.load_libraries_concepts_only(
@@ -252,20 +259,6 @@ def load_concepts_only(
 
             return LoadConceptsOnlyResult(blueprints=loaded_blueprints, concepts=loaded_concepts)
 
-    except PipelexInterpreterError as interpreter_error:
-        raise ValidateBundleError(
-            message=interpreter_error.message,
-            pipelex_bundle_blueprint_validation_errors=interpreter_error.validation_errors,
-        ) from interpreter_error
-    except ValidationError as validation_error:
-        pipe_validation_errors = categorize_pipe_validation_error(validation_error=validation_error)
-        validation_error_msg = report_validation_error(category="mthds", validation_error=validation_error)
-        msg = f"Could not load blueprints because of: {validation_error_msg}"
-        raise ValidateBundleError(
-            message=msg,
-            pipe_validation_errors=pipe_validation_errors,
-        ) from validation_error
-
 
 def load_concepts_only_from_directory(directory: Path) -> LoadConceptsOnlyResult:
     """Load MTHDS files from a directory, processing only domains and concepts, skipping pipes.
@@ -289,23 +282,10 @@ def load_concepts_only_from_directory(directory: Path) -> LoadConceptsOnlyResult
     library_manager = get_library_manager()
     library_id, _ = library_manager.open_library()
     set_current_library(library_id=library_id)
-    try:
+    with _translate_to_validate_bundle_error():
         for mthds_file in mthds_files:
             blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file)
             all_blueprints.append(blueprint)
 
         loaded_concepts = library_manager.load_concepts_only_from_blueprints(library_id=library_id, blueprints=all_blueprints)
-    except PipelexInterpreterError as interpreter_error:
-        raise ValidateBundleError(
-            message=interpreter_error.message,
-            pipelex_bundle_blueprint_validation_errors=interpreter_error.validation_errors,
-        ) from interpreter_error
-    except ValidationError as validation_error:
-        pipe_validation_errors = categorize_pipe_validation_error(validation_error=validation_error)
-        validation_error_msg = report_validation_error(category="mthds", validation_error=validation_error)
-        msg = f"Could not load blueprints because of: {validation_error_msg}"
-        raise ValidateBundleError(
-            message=msg,
-            pipe_validation_errors=pipe_validation_errors,
-        ) from validation_error
     return LoadConceptsOnlyResult(blueprints=all_blueprints, concepts=loaded_concepts)

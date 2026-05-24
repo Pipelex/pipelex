@@ -94,7 +94,15 @@ class DisclosureMode(StrEnum):
         ``retryable``, ``title``, ``type_uri``).
 
       ``from_dict(to_dict(report, STRICT))`` does NOT reconstruct the original —
-      STRICT is lossy.
+      STRICT is lossy. Beyond the redacted message and dropped fields, a STRICT
+      payload that carries ``provider_metadata`` cannot be rehydrated at all:
+      the curated dict lacks the ``provider`` / ``sdk_exception_type`` fields
+      required by :class:`pipelex.cogt.inference.error_classification.ProviderErrorMetadata`,
+      so :meth:`ErrorReport.from_dict` raises :class:`pydantic.ValidationError`.
+      Consumers of a STRICT payload must read the dict directly (e.g. via
+      :meth:`ErrorReport.to_problem_document`) rather than rebuilding an
+      ``ErrorReport`` through ``from_dict``. Use VERBOSE on any surface that
+      needs round-trip semantics (webhook payloads, internal RPCs).
 
       STRICT keys the ``message`` decision on the *provenance of the message*,
       not on ``error_domain``: ``error_domain`` is inherited up the ``__cause__``
@@ -105,6 +113,17 @@ class DisclosureMode(StrEnum):
       *classification-projection*, **not a path-leak shield**: if a genuinely
       caller-facing ``message`` could surface a server-resolved path or secret,
       fix the upstream message — don't expand STRICT mode's scope.
+
+      The curated ``provider_metadata`` subset, in contrast, IS inherited up the
+      ``__cause__`` chain via :meth:`PipelexError._enrich_error_report_from_cause`
+      and is preserved on both STRICT branches. A wrapper error (e.g.
+      ``PipelexUnexpectedError``) raised ``from`` a categorized ``CogtError``
+      therefore surfaces the cause's ``status_code`` / ``retry_after_seconds`` on
+      the STRICT envelope, even though the wrapper itself advertises no provider
+      relationship. This is deliberate, by the same reasoning as the previous
+      paragraph: the curated fields are HTTP client hints (status mapping,
+      ``Retry-After`` header), not provider attribution, and STRICT does not
+      hide internal failure topology.
     """
 
     VERBOSE = "verbose"

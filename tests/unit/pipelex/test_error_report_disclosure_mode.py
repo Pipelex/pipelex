@@ -21,6 +21,7 @@ be redacted. ``caller_facing_message`` is not inherited, so STRICT redacts it.
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from pipelex.base_exceptions import (
     INTERNAL_ERROR_PLACEHOLDER,
@@ -357,6 +358,25 @@ class TestErrorReportDisclosureMode:
         # The curated ``provider_metadata`` slice rides for the HTTP adapter to
         # emit Retry-After / the right status — see
         # ``test_strict_provider_metadata_dict_carries_http_status_for_adapter``.
+
+    def test_strict_payload_with_provider_metadata_fails_from_dict_rehydration(self) -> None:
+        """A STRICT payload that carries ``provider_metadata`` is not rehydratable via :meth:`from_dict`.
+
+        Pins the sharp failure mode external consumers should expect: the
+        curated subset (``status_code`` / ``retry_after_seconds``) lacks the
+        ``provider`` and ``sdk_exception_type`` fields required by
+        :class:`ProviderErrorMetadata`, so :meth:`ErrorReport.from_dict` raises
+        :class:`pydantic.ValidationError`. Consumers must read the STRICT dict
+        directly (e.g. via :meth:`ErrorReport.to_problem_document`) rather than
+        rebuilding through ``from_dict``; any code path that relied on the
+        pre-curated-subset behavior — where STRICT dropped ``provider_metadata``
+        entirely and was therefore still rehydratable — must migrate.
+        """
+        report = _runtime_report()
+        strict_payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
+        assert "provider_metadata" in strict_payload
+        with pytest.raises(ValidationError):
+            ErrorReport.from_dict(strict_payload)
 
     def test_to_dict_defaults_to_verbose(self) -> None:
         """No argument == VERBOSE — the safe default for in-process / round-trip callers."""
