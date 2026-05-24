@@ -173,7 +173,7 @@ async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResu
 
         loaded_pipes = library_manager.load_libraries(library_id=library_id, library_dirs=[Path(directory)])
         dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
-    return ValidateBundleResult(blueprints=all_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
+        return ValidateBundleResult(blueprints=all_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
 
 
 class LoadConceptsOnlyResult(BaseModel):
@@ -288,4 +288,4 @@ def load_concepts_only_from_directory(directory: Path) -> LoadConceptsOnlyResult
             all_blueprints.append(blueprint)
 
         loaded_concepts = library_manager.load_concepts_only_from_blueprints(library_id=library_id, blueprints=all_blueprints)
-    return LoadConceptsOnlyResult(blueprints=all_blueprints, concepts=loaded_concepts)
+        return LoadConceptsOnlyResult(blueprints=all_blueprints, concepts=loaded_concepts)
