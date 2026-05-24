@@ -1,4 +1,6 @@
 import asyncio
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Sequence
 
@@ -28,6 +30,55 @@ class ValidateBundleResult(BaseModel):
     blueprints: list[PipelexBundleBlueprint]
     pipes: list[PipeAbstract]
     dry_run_result: dict[str, DryRunOutput]
+
+
+@contextmanager
+def _translate_to_validate_bundle_error() -> Iterator[None]:
+    """Translate the bundle-loading exception surface into a single ``ValidateBundleError``.
+
+    Both ``validate_bundle`` and ``validate_bundles_from_directory`` perform the
+    same six-handler cascade: a ``PipelexInterpreterError`` becomes a
+    ``ValidateBundleError`` carrying the blueprint validation errors, a
+    ``PipeFactoryError`` carries the categorized factory error, etc. Sharing
+    one source of truth means a new handler only needs to be added once.
+    """
+    try:
+        yield
+    except PipelexInterpreterError as interpreter_error:
+        raise ValidateBundleError(
+            message=interpreter_error.message,
+            pipelex_bundle_blueprint_validation_errors=interpreter_error.validation_errors,
+        ) from interpreter_error
+    except PipeFactoryError as factory_error:
+        factory_error_data = categorize_pipe_factory_error(factory_error=factory_error)
+        raise ValidateBundleError(
+            message=f"Pipe factory error: {factory_error}",
+            pipe_factory_errors=[factory_error_data],
+        ) from factory_error
+    except PipeValidationError as pipe_error:
+        pipe_error_data = categorize_pipe_validation_with_libraries_error(pipe_error=pipe_error)
+        raise ValidateBundleError(
+            message=f"Pipe validation failed: {pipe_error}",
+            pipe_validation_errors=[pipe_error_data],
+        ) from pipe_error
+    except ValidationError as validation_error:
+        pipe_validation_errors = categorize_pipe_validation_error(validation_error=validation_error)
+        validation_error_msg = report_validation_error(category="mthds", validation_error=validation_error)
+        msg = f"Could not load blueprints because of: {validation_error_msg}"
+        raise ValidateBundleError(
+            message=msg,
+            pipe_validation_errors=pipe_validation_errors,
+        ) from validation_error
+    except PipeRunError as pipe_run_error:
+        raise ValidateBundleError(
+            message=pipe_run_error.message,
+            dry_run_error_message=pipe_run_error.message,
+        ) from pipe_run_error
+    except DryRunError as dry_run_error:
+        raise ValidateBundleError(
+            message=dry_run_error.message,
+            dry_run_error_message=dry_run_error.message,
+        ) from dry_run_error
 
 
 async def validate_bundle(
@@ -60,7 +111,7 @@ async def validate_bundle(
     loaded_pipes: list[PipeAbstract] | None = None
     loaded_blueprints: list[PipelexBundleBlueprint] | None = None
     await asyncio.sleep(0)  # Yield to event loop (keeps function async-compatible)
-    try:
+    with _translate_to_validate_bundle_error():
         if effective_dirs:
             log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}) for validation")
             library_manager.load_libraries(
@@ -100,42 +151,6 @@ async def validate_bundle(
             # dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
             return ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result={})
 
-    except PipelexInterpreterError as interpreter_error:
-        raise ValidateBundleError(
-            message=interpreter_error.message,
-            pipelex_bundle_blueprint_validation_errors=interpreter_error.validation_errors,
-        ) from interpreter_error
-    except PipeFactoryError as factory_error:
-        factory_error_data = categorize_pipe_factory_error(factory_error=factory_error)
-        raise ValidateBundleError(
-            message=f"Pipe factory error: {factory_error}",
-            pipe_factory_errors=[factory_error_data],
-        ) from factory_error
-    except PipeValidationError as pipe_error:
-        pipe_error_data = categorize_pipe_validation_with_libraries_error(pipe_error=pipe_error)
-        raise ValidateBundleError(
-            message=f"Pipe validation failed: {pipe_error}",
-            pipe_validation_errors=[pipe_error_data],
-        ) from pipe_error
-    except ValidationError as validation_error:
-        pipe_validation_errors = categorize_pipe_validation_error(validation_error=validation_error)
-        validation_error_msg = report_validation_error(category="mthds", validation_error=validation_error)
-        msg = f"Could not load blueprints because of: {validation_error_msg}"
-        raise ValidateBundleError(
-            message=msg,
-            pipe_validation_errors=pipe_validation_errors,
-        ) from validation_error
-    except PipeRunError as pipe_run_error:
-        raise ValidateBundleError(
-            message=pipe_run_error.message,
-            dry_run_error_message=pipe_run_error.message,
-        ) from pipe_run_error
-    except DryRunError as dry_run_error:
-        raise ValidateBundleError(
-            message=dry_run_error.message,
-            dry_run_error_message=dry_run_error.message,
-        ) from dry_run_error
-
 
 async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResult:
     mthds_files = get_pipelex_mthds_files_from_dirs(dirs={directory})
@@ -144,48 +159,13 @@ async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResu
     library_manager = get_library_manager()
     library_id, _ = library_manager.open_library()
     set_current_library(library_id=library_id)
-    try:
+    with _translate_to_validate_bundle_error():
         for mthds_file in mthds_files:
             blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file)
             all_blueprints.append(blueprint)
 
         loaded_pipes = library_manager.load_libraries(library_id=library_id, library_dirs=[Path(directory)])
         dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
-    except PipelexInterpreterError as interpreter_error:
-        raise ValidateBundleError(
-            message=interpreter_error.message,
-            pipelex_bundle_blueprint_validation_errors=interpreter_error.validation_errors,
-        ) from interpreter_error
-    except PipeFactoryError as factory_error:
-        factory_error_data = categorize_pipe_factory_error(factory_error=factory_error)
-        raise ValidateBundleError(
-            message=f"Pipe factory error: {factory_error}",
-            pipe_factory_errors=[factory_error_data],
-        ) from factory_error
-    except PipeValidationError as pipe_error:
-        pipe_error_data = categorize_pipe_validation_with_libraries_error(pipe_error=pipe_error)
-        raise ValidateBundleError(
-            message=f"Pipe validation failed: {pipe_error}",
-            pipe_validation_errors=[pipe_error_data],
-        ) from pipe_error
-    except ValidationError as validation_error:
-        pipe_validation_errors = categorize_pipe_validation_error(validation_error=validation_error)
-        validation_error_msg = report_validation_error(category="mthds", validation_error=validation_error)
-        msg = f"Could not load blueprints because of: {validation_error_msg}"
-        raise ValidateBundleError(
-            message=msg,
-            pipe_validation_errors=pipe_validation_errors,
-        ) from validation_error
-    except PipeRunError as pipe_run_error:
-        raise ValidateBundleError(
-            message=pipe_run_error.message,
-            dry_run_error_message=pipe_run_error.message,
-        ) from pipe_run_error
-    except DryRunError as dry_run_error:
-        raise ValidateBundleError(
-            message=dry_run_error.message,
-            dry_run_error_message=dry_run_error.message,
-        ) from dry_run_error
     return ValidateBundleResult(blueprints=all_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
 
 
