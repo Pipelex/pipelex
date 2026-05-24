@@ -83,7 +83,7 @@ classification rules, and the cross-boundary Temporal bridge.
 - [`ModelManagerError`](model-manager-error.md) — Model manager
 - [`ModelNotFoundError`](model-not-found-error.md) — Model not found
 - [`ModelWaterfallError`](model-waterfall-error.md) — Model waterfall
-- [`OpenAIClientFactoryError`](open-ai-client-factory-error.md) — OpenAI client factory
+- [`OpenAIClientFactoryError`](open-ai-client-factory-error.md) — OpenAI client factory error
 - [`PortkeyCredentialsError`](portkey-credentials-error.md) — Portkey credentials
 - [`PortkeyError`](portkey-error.md) — Portkey
 - [`PortkeyFactoryError`](portkey-factory-error.md) — Portkey factory
@@ -99,7 +99,7 @@ classification rules, and the cross-boundary Temporal bridge.
 - [`SearchHandleNotFoundError`](search-handle-not-found-error.md) — Search handle not found
 - [`SearchJobFailureError`](search-job-failure-error.md) — Search job failure
 - [`SearchModelNotFoundError`](search-model-not-found-error.md) — Search model not found
-- [`VertexAIConfigError`](vertex-ai-config-error.md) — VertexAI config
+- [`VertexAIConfigError`](vertex-ai-config-error.md) — VertexAI configuration error
 
 ## ConceptError
 
@@ -139,7 +139,7 @@ classification rules, and the cross-boundary Temporal bridge.
 - [`AzureCredentialsError`](azure-credentials-error.md) — Azure credentials
 - [`CredentialsError`](credentials-error.md) — Missing or invalid credentials
 - [`FalCredentialsError`](fal-credentials-error.md) — Fal credentials
-- [`VertexAICredentialsError`](vertex-ai-credentials-error.md) — VertexAI credentials
+- [`VertexAICredentialsError`](vertex-ai-credentials-error.md) — VertexAI credentials error
 
 ## DeliveryError
 
