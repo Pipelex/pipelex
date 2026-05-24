@@ -70,10 +70,6 @@ class Log:
         self.poor_handler = None
         self.log_dispatch.reset()
 
-    def is_configured(self) -> bool:
-        """Whether ``configure`` has already been called this process."""
-        return self._log_config_instance is not None
-
     def configure_if_unset(self, log_config: LogConfig) -> bool:
         """Configure logging unless already configured.
 

@@ -4,6 +4,7 @@ from typing import Annotated, Any
 
 import typer
 
+from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cli.agent_cli.commands.agent_cli_factory import AGENT_CLI_STDERR_LOG_FIELDS, apply_agent_cli_output_discipline
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success, set_agent_cli_error_format
 from pipelex.cli.commands.doctor_cmd import (
@@ -16,6 +17,7 @@ from pipelex.cli.commands.doctor_cmd import (
     setup_doctor_runtime,
 )
 from pipelex.system.configuration.config_loader import config_manager
+from pipelex.tools.log.log_levels import LogLevel
 
 
 def _status_icon(healthy: bool) -> str:
@@ -134,22 +136,36 @@ def agent_doctor_cmd(
         else:
             config_location = gather_config_location()
 
-        # Filesystem-only checks run BEFORE bootstrap: setup_doctor_runtime calls
-        # load_config which materializes ~/.pipelex/ from kit templates as a side effect.
-        # Running it first would turn check_config_files into a silent installer on a
-        # fresh machine — it would always report healthy after the install.
+        # Filesystem-only checks run BEFORE bootstrap: when no --global override is in
+        # play, setup_doctor_runtime's load_config materializes ~/.pipelex/ from kit
+        # templates as a side effect. Running it first would turn check_config_files into
+        # a silent installer on a fresh machine. (The --global path skips materialization
+        # — see load_config.)
         config_healthy, config_missing_count, config_message = check_config_files(config_dir=config_dir)
         telemetry_healthy, telemetry_message = check_telemetry_config(config_dir=config_dir)
         backends_healthy, backend_credential_reports, backends_message = check_backend_credentials(config_dir=config_dir)
 
-        # Bootstrap the runtime check_models needs. Pinned to stderr so the JSON envelope
-        # this command writes to stdout stays parseable even when the user's pipelex.toml
-        # sets console_log_target = "stdout" and a raised pipelex log level. The discipline
-        # call below adds defense-in-depth (silent pretty-printer + pipelex log floor).
-        setup_doctor_runtime(log_config_overrides=AGENT_CLI_STDERR_LOG_FIELDS, config_dir=config_dir)
-        apply_agent_cli_output_discipline()
-
-        models_healthy, models_message, backend_file_reports = check_models(config_dir=config_dir)
+        # check_models requires the hub + log.configure produced by setup_doctor_runtime.
+        # When the config is broken, we skip the bootstrap entirely — setup_doctor_runtime
+        # would raise PipelexConfigError and we'd lose the partial check tuples gathered
+        # above (the JSON envelope would degrade to a single error payload). The bootstrap
+        # pins stderr so the JSON envelope this command writes to stdout stays parseable
+        # even when the user's pipelex.toml sets console_log_target = "stdout".
+        if config_healthy:
+            log_was_configured_by_us = setup_doctor_runtime(log_config_overrides=AGENT_CLI_STDERR_LOG_FIELDS, config_dir=config_dir)
+            # When an embedder already configured logging, configure_if_unset no-oped;
+            # respect their package log level by passing None instead of forcing WARNING.
+            apply_agent_cli_output_discipline(log_level=LogLevel.WARNING if log_was_configured_by_us else None)
+            models_healthy, models_message, backend_file_reports = check_models(config_dir=config_dir)
+        else:
+            models_healthy = False
+            models_message = "skipped — fix configuration errors first"
+            backend_file_reports = {}
+    except PipelexConfigError as exc:
+        # Defense-in-depth: a config can pass check_config_files's shape check and still fail
+        # full validation inside setup_doctor_runtime (e.g. a layered override file). Surface
+        # the translated message instead of mislabelling it as an unexpected failure.
+        agent_error(exc.message, "PipelexConfigError", cause=exc)
     except Exception as exc:  # noqa: BLE001
         # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
         agent_error(f"Health check failed unexpectedly: {exc}", type(exc).__name__, cause=exc)

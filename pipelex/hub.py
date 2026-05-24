@@ -226,6 +226,15 @@ class PipelexHub:
             raise RuntimeError(msg)
         return self._config
 
+    def get_optional_config(self) -> ConfigRoot | None:
+        """Get the current configuration if it has been set, otherwise None.
+
+        Non-raising counterpart to ``get_required_config``. Used by callers that must
+        run before/around bootstrap (e.g. ``report_validation_error`` invoked from the
+        doctor's setup helper when ``setup_config`` itself failed).
+        """
+        return self._config
+
     def get_console(self) -> Console:
         if self._console:
             return self._console

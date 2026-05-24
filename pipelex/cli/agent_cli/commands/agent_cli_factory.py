@@ -67,15 +67,16 @@ AGENT_CLI_STDERR_LOG_FIELDS: Mapping[str, Any] = MappingProxyType(
     }
 )
 
-# deep_update only recurses into ``dict`` instances; ``MappingProxyType`` would short-
-# circuit and overwrite the whole log_config branch. Build the override tree with a real
-# dict copy of the canonical leaf so the merge keeps merging.
+# Direct alias: deep_update recurses into any ``Mapping`` and converts frozen leaves to
+# plain dicts at merge time, so referencing the canonical ``MappingProxyType`` here is
+# safe AND keeps mutation attempts on either reference loud (TypeError on the frozen
+# proxy) instead of silently diverging.
 _AGENT_CLI_STDERR_CONSOLE_OVERRIDES: dict[str, Any] = {
-    "pipelex": {"log_config": dict(AGENT_CLI_STDERR_LOG_FIELDS)},
+    "pipelex": {"log_config": AGENT_CLI_STDERR_LOG_FIELDS},
 }
 
 
-def apply_agent_cli_output_discipline(log_level: LogLevel = LogLevel.WARNING) -> None:
+def apply_agent_cli_output_discipline(log_level: LogLevel | None = LogLevel.WARNING) -> None:
     """Pin pipelex log level, pretty-print silence, and hub console target to stderr.
 
     Called from two paths:
@@ -87,15 +88,20 @@ def apply_agent_cli_output_discipline(log_level: LogLevel = LogLevel.WARNING) ->
         ``setup_doctor_runtime`` now mirrors ``Pipelex.__init__`` and applies
         ``set_console_print_target`` itself from the overridden log_config.
 
-    Folding ``log.set_level_for_package("pipelex", log_level)`` in here keeps every
-    agent CLI command sharing one source of truth for "be quiet on stderr."
+    Folding ``log.set_level_for_package("pipelex", log_level)`` and ``redirect_to_stderr``
+    in here keeps every agent CLI entry point sharing one source of truth for "be quiet
+    on stderr."
 
     Args:
         log_level: Floor for the ``pipelex`` package logger. Defaults to WARNING so the
             agent CLI surface stays terse; the factory passes its own ``log_level``
-            through unchanged.
+            through unchanged. Pass ``None`` to leave the package logger untouched —
+            useful when an embedder configured logging before we did and we want to
+            respect their level choice.
     """
-    log.set_level_for_package("pipelex", log_level)
+    if log_level is not None:
+        log.set_level_for_package("pipelex", log_level)
+    log.redirect_to_stderr()
     PrettyPrinter.mode = PrettyPrintMode.SILENT
     get_pipelex_hub().set_console_print_target(target=ConsoleTarget.STDERR)
 
@@ -211,6 +217,5 @@ def make_pipelex_for_agent_cli(
 
     # Suppress Rich pretty-printing and INFO/DEV/DEBUG log noise so that agent
     # commands only emit structured JSON.  Warnings and errors still reach stderr.
-    log.redirect_to_stderr()
     apply_agent_cli_output_discipline(log_level=log_level)
     return pipelex_instance

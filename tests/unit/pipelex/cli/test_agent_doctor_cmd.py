@@ -143,6 +143,50 @@ class TestAgentDoctorCmd:
         assert parsed["error"] is True
         assert "unexpected kaboom" in parsed["message"]
 
+    def test_broken_config_skips_bootstrap_and_preserves_partial_report(
+        self,
+        mocker: MockerFixture,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Regression: when check_config_files reports unhealthy, the doctor must NOT
+        run setup_doctor_runtime / check_models — calling them on a broken config
+        either raises PipelexConfigError (discarding the partial check tuples) or
+        falls through to "Health check failed unexpectedly" instead of the friendly
+        translation. The fix short-circuits to a "skipped — fix configuration errors
+        first" model section so the full triage report still reaches stdout.
+        """
+        mock_setup = mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.setup_doctor_runtime")
+        mock_check_models = mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.check_models")
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_config_files",
+            return_value=(False, 0, "Configuration validation failed: bogus_field is not a valid field"),
+        )
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
+            return_value=(True, "OK"),
+        )
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_backend_credentials",
+            return_value=(True, {}, "OK"),
+        )
+
+        agent_doctor_cmd(output_format=CliOutputFormat.JSON)
+
+        mock_setup.assert_not_called()
+        mock_check_models.assert_not_called()
+
+        parsed = json.loads(capsys.readouterr().out)
+        assert parsed["all_healthy"] is False
+        # Per-check breakdown still present — the user gets full triage, not just one error line.
+        assert parsed["checks"]["config_files"]["healthy"] is False
+        assert "bogus_field" in parsed["checks"]["config_files"]["message"]
+        assert parsed["checks"]["telemetry"]["healthy"] is True
+        assert parsed["checks"]["backend_credentials"]["healthy"] is True
+        assert parsed["checks"]["models"]["healthy"] is False
+        assert "skipped" in parsed["checks"]["models"]["message"].lower()
+        # Config-error recommended action is still emitted.
+        assert any("pipelex.toml" in action or "pipelex init config" in action for action in parsed["recommended_actions"])
+
     def test_bootstrap_pins_console_targets_to_stderr(self, mocker: MockerFixture) -> None:
         """Regression: agent_doctor_cmd must pass AGENT_CLI_STDERR_LOG_FIELDS to setup_doctor_runtime.
 
