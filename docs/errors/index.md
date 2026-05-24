@@ -409,7 +409,6 @@ classification rules, and the cross-boundary Temporal bridge.
 
 ## TemporalFlowError
 
-- [`BaseModelPayloadConverterError`](base-model-payload-converter-error.md) — Base model payload converter
 - [`ContentGenerationError`](content-generation-error.md) — Content generation
 - [`SearchAttributeRegistrationError`](search-attribute-registration-error.md) — Search attribute registration
 - [`TemporalConfigError`](temporal-config-error.md) — Temporal config

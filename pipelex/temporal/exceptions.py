@@ -91,7 +91,3 @@ class SearchAttributeRegistrationError(TemporalConfigError):
     ``temporal operator search-attribute create`` command so operators on
     either side of the fence can fix the gap.
     """
-
-
-class BaseModelPayloadConverterError(TemporalFlowError):
-    pass
