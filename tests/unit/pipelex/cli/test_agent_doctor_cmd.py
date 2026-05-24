@@ -183,9 +183,56 @@ class TestAgentDoctorCmd:
         assert parsed["checks"]["telemetry"]["healthy"] is True
         assert parsed["checks"]["backend_credentials"]["healthy"] is True
         assert parsed["checks"]["models"]["healthy"] is False
+        assert parsed["checks"]["models"]["skipped"] is True
         assert "skipped" in parsed["checks"]["models"]["message"].lower()
         # Config-error recommended action is still emitted.
         assert any("pipelex.toml" in action or "pipelex init config" in action for action in parsed["recommended_actions"])
+
+    def test_pipelex_config_error_from_bootstrap_preserves_partial_report(
+        self,
+        mocker: MockerFixture,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Regression: a config that passes check_config_files's shape check but fails full
+        validation inside setup_doctor_runtime must still produce the full triage envelope.
+
+        Before the fix, the PipelexConfigError arm called agent_error() (NoReturn), which
+        discarded the telemetry/backends tuples gathered before the bootstrap and degraded
+        the JSON output to a single error payload. The current contract: treat this the
+        same as the broken-config short-circuit — mark models as skipped, surface the
+        translated message under checks.models, keep every other check in the envelope.
+        """
+        from pipelex.base_exceptions import PipelexConfigError  # noqa: PLC0415
+
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.setup_doctor_runtime",
+            side_effect=PipelexConfigError("translated validation message"),
+        )
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_config_files",
+            return_value=(True, 0, "All config files present"),
+        )
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
+            return_value=(True, "Telemetry configured"),
+        )
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_backend_credentials",
+            return_value=(True, {}, "All backends healthy"),
+        )
+
+        agent_doctor_cmd(output_format=CliOutputFormat.JSON)
+
+        parsed = json.loads(capsys.readouterr().out)
+        assert parsed["all_healthy"] is False
+        # All non-models sections survive intact.
+        assert parsed["checks"]["config_files"]["healthy"] is True
+        assert parsed["checks"]["telemetry"]["healthy"] is True
+        assert parsed["checks"]["backend_credentials"]["healthy"] is True
+        # Models marked as skipped with the translated message inline.
+        assert parsed["checks"]["models"]["healthy"] is False
+        assert parsed["checks"]["models"]["skipped"] is True
+        assert "translated validation message" in parsed["checks"]["models"]["message"]
 
     def test_bootstrap_pins_console_targets_to_stderr(self, mocker: MockerFixture) -> None:
         """Regression: agent_doctor_cmd must pass AGENT_CLI_STDERR_LOG_FIELDS to setup_doctor_runtime.

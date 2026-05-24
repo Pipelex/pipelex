@@ -10,7 +10,7 @@ import typer
 
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, record_setup_warning
 from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelDeckPresetValidatonError
-from pipelex.hub import get_pipelex_hub
+from pipelex.hub import PipelexHub
 from pipelex.pipelex import Pipelex
 from pipelex.system.console_target import ConsoleTarget
 from pipelex.system.pipelex_service.exceptions import (
@@ -76,7 +76,7 @@ _AGENT_CLI_STDERR_CONSOLE_OVERRIDES: dict[str, Any] = {
 }
 
 
-def apply_agent_cli_output_discipline(log_level: LogLevel | None = LogLevel.WARNING) -> None:
+def apply_agent_cli_output_discipline(log_level: LogLevel = LogLevel.WARNING) -> None:
     """Pin pipelex log level, pretty-print silence, and hub console target to stderr.
 
     Called from two paths:
@@ -88,22 +88,16 @@ def apply_agent_cli_output_discipline(log_level: LogLevel | None = LogLevel.WARN
         ``setup_doctor_runtime`` now mirrors ``Pipelex.__init__`` and applies
         ``set_console_print_target`` itself from the overridden log_config.
 
-    Folding ``log.set_level_for_package("pipelex", log_level)`` and ``redirect_to_stderr``
-    in here keeps every agent CLI entry point sharing one source of truth for "be quiet
-    on stderr."
-
-    Args:
-        log_level: Floor for the ``pipelex`` package logger. Defaults to WARNING so the
-            agent CLI surface stays terse; the factory passes its own ``log_level``
-            through unchanged. Pass ``None`` to leave the package logger untouched —
-            useful when an embedder configured logging before we did and we want to
-            respect their level choice.
+    Safe to call from the broken-config doctor path where ``setup_doctor_runtime`` was
+    skipped: ``log.redirect_to_stderr`` no-ops when no rich_handler is registered, and
+    the hub print-target call is gated on a hub being installed.
     """
-    if log_level is not None:
-        log.set_level_for_package("pipelex", log_level)
+    log.set_level_for_package("pipelex", log_level)
     log.redirect_to_stderr()
     PrettyPrinter.mode = PrettyPrintMode.SILENT
-    get_pipelex_hub().set_console_print_target(target=ConsoleTarget.STDERR)
+    hub = PipelexHub.get_optional_instance()
+    if hub is not None:
+        hub.set_console_print_target(target=ConsoleTarget.STDERR)
 
 
 def make_pipelex_for_agent_cli(

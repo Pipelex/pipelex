@@ -8,6 +8,7 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cli.agent_cli.commands.agent_cli_factory import AGENT_CLI_STDERR_LOG_FIELDS, apply_agent_cli_output_discipline
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success, set_agent_cli_error_format
 from pipelex.cli.commands.doctor_cmd import (
+    BackendFileReport,
     ConfigLocationInfo,
     check_backend_credentials,
     check_config_files,
@@ -17,7 +18,6 @@ from pipelex.cli.commands.doctor_cmd import (
     setup_doctor_runtime,
 )
 from pipelex.system.configuration.config_loader import config_manager
-from pipelex.tools.log.log_levels import LogLevel
 
 
 def _status_icon(healthy: bool) -> str:
@@ -71,7 +71,11 @@ def _format_doctor_markdown(result: dict[str, Any]) -> str:
 
     # Models
     models_check = checks["models"]
-    lines.append(f"\n## Models \u2014 {_status_icon(models_check['healthy'])}\n")
+    models_skipped_flag = models_check.get("skipped", False)
+    # Skipped state renders with the warn icon so consumers don't confuse "deferred until
+    # config is fixed" with a genuine models failure.
+    models_icon = "\u26a0\ufe0f" if models_skipped_flag else _status_icon(models_check["healthy"])
+    lines.append(f"\n## Models \u2014 {models_icon}\n")
     lines.append(models_check["message"])
     for file_entry in models_check.get("backend_files", []):
         name = file_entry["backend_name"]
@@ -146,29 +150,41 @@ def agent_doctor_cmd(
         backends_healthy, backend_credential_reports, backends_message = check_backend_credentials(config_dir=config_dir)
 
         # check_models requires the hub + log.configure produced by setup_doctor_runtime.
-        # When the config is broken, we skip the bootstrap entirely — setup_doctor_runtime
-        # would raise PipelexConfigError and we'd lose the partial check tuples gathered
-        # above (the JSON envelope would degrade to a single error payload). The bootstrap
-        # pins stderr so the JSON envelope this command writes to stdout stays parseable
-        # even when the user's pipelex.toml sets console_log_target = "stdout".
+        # When the config is broken (either shape-check fails up front or full validation
+        # raises PipelexConfigError inside the bootstrap), we skip running check_models and
+        # mark models as skipped — keeping the partial check tuples gathered above so the
+        # JSON envelope still reports telemetry/backends instead of degrading to a single
+        # error payload.
+        models_skipped: bool = False
+        models_healthy: bool
+        models_message: str
+        backend_file_reports: dict[str, BackendFileReport]
         if config_healthy:
-            log_was_configured_by_us = setup_doctor_runtime(log_config_overrides=AGENT_CLI_STDERR_LOG_FIELDS, config_dir=config_dir)
-            # When an embedder already configured logging, configure_if_unset no-oped;
-            # respect their package log level by passing None instead of forcing WARNING.
-            apply_agent_cli_output_discipline(log_level=LogLevel.WARNING if log_was_configured_by_us else None)
-            models_healthy, models_message, backend_file_reports = check_models(config_dir=config_dir)
+            try:
+                setup_doctor_runtime(log_config_overrides=AGENT_CLI_STDERR_LOG_FIELDS, config_dir=config_dir)
+                models_healthy, models_message, backend_file_reports = check_models(config_dir=config_dir)
+            except PipelexConfigError as exc:
+                # A config can pass check_config_files's shape check and still fail full validation
+                # inside setup_doctor_runtime (e.g. a layered override file). Surface the translated
+                # message via the same partial-report shape as the broken-config branch.
+                models_skipped = True
+                models_healthy = False
+                models_message = f"skipped — {exc.message}"
+                backend_file_reports = {}
         else:
+            models_skipped = True
             models_healthy = False
             models_message = "skipped — fix configuration errors first"
             backend_file_reports = {}
-    except PipelexConfigError as exc:
-        # Defense-in-depth: a config can pass check_config_files's shape check and still fail
-        # full validation inside setup_doctor_runtime (e.g. a layered override file). Surface
-        # the translated message instead of mislabelling it as an unexpected failure.
-        agent_error(exc.message, "PipelexConfigError", cause=exc)
     except Exception as exc:  # noqa: BLE001
-        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any genuinely
+        # unexpected failure into the structured error payload. PipelexConfigError is
+        # handled by the inner arm above and never reaches here.
         agent_error(f"Health check failed unexpectedly: {exc}", type(exc).__name__, cause=exc)
+
+    # Pin stdout discipline regardless of bootstrap path (broken-config branch never
+    # installed a hub or configured log — the helper guards both internally).
+    apply_agent_cli_output_discipline()
 
     all_healthy = config_healthy and telemetry_healthy and backends_healthy and models_healthy
 
@@ -245,6 +261,7 @@ def agent_doctor_cmd(
             },
             "models": {
                 "healthy": models_healthy,
+                "skipped": models_skipped,
                 "message": models_message,
                 "backend_files": backend_files_list,
             },

@@ -35,12 +35,15 @@ def _make_validation_error() -> ValidationError:
 
 
 class TestReportValidationError:
-    def test_returns_message_without_bootstrap(self, mocker: MockerFixture) -> None:
-        """No hub, no log.configure — must still produce the friendly translation.
+    def test_returns_message_when_hub_singleton_is_none(self, mocker: MockerFixture) -> None:
+        """report_validation_error must still produce the friendly translation when no hub
+        is installed on the process singleton.
 
         Reproduces the agent doctor's pre-fix crash path: with the new ordering,
         check_config_files calls report_validation_error before setup_doctor_runtime,
-        so neither the hub nor the log are configured at this point.
+        so no hub has been installed yet. (Note: tests/conftest.py's autouse Pipelex.make
+        fixture configures ``log`` for this process — this test pins hub-state isolation,
+        not log-state isolation.)
         """
         # Ensure the hub singleton is None for this test — mirrors a fresh process
         # where Pipelex.make hasn't run yet.

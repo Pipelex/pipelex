@@ -43,7 +43,6 @@ from pipelex.hub import PipelexHub, get_console, set_pipelex_hub
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.configs import PipelexConfig
-from pipelex.system.console_target import ConsoleTarget
 from pipelex.system.environment import get_optional_env
 from pipelex.system.exceptions import ConfigValidationError
 from pipelex.system.pipelex_service.exceptions import (
@@ -452,6 +451,7 @@ def display_health_report(
     deck_report: DeckSyncReport,
     config_location: ConfigLocationInfo,
     fix_mode: bool = False,
+    models_skipped: bool = False,
 ) -> None:
     """Display a comprehensive health report.
 
@@ -472,6 +472,9 @@ def display_health_report(
         deck_report: Per-file sync status report (used to render the per-file detail when not healthy)
         config_location: Resolved configuration location information
         fix_mode: Whether we're in interactive fix mode (--fix flag)
+        models_skipped: True when check_models was bypassed because config is broken — render
+            the Models row as a yellow advisory and suppress its standalone Solutions entry,
+            since the Config Files row already steers the user.
     """
     all_healthy = config_healthy and telemetry_healthy and backends_healthy and models_healthy and deck_healthy
 
@@ -552,6 +555,10 @@ def display_health_report(
     console.print("[bold]Models[/bold]")
     if models_healthy:
         console.print(f"  [green]✓[/green] {models_message}")
+    elif models_skipped:
+        # Skipped reads as advisory, not failure — the Config Files row is the real issue.
+        console.print(f"  [yellow]⚠[/yellow]  {models_message}")
+        console.print("    [dim]Models check deferred until config errors are fixed.[/dim]")
     else:
         console.print(f"  [red]✗[/red] {models_message}")
 
@@ -732,7 +739,7 @@ def check_deck_sync(config_dir: Path | None = None) -> tuple[bool, DeckSyncRepor
 def setup_doctor_runtime(
     log_config_overrides: Mapping[str, Any] | None = None,
     config_dir: Path | None = None,
-) -> bool:
+) -> None:
     """Spin up a fresh PipelexHub and configure logging for doctor checks.
 
     Doctor intentionally bypasses ``Pipelex.make`` so it can diagnose a broken config
@@ -751,21 +758,13 @@ def setup_doctor_runtime(
 
     ``log.configure`` is invoked through ``configure_if_unset`` so that if a library
     embedding or interleaved test has already configured logging, this call no-ops
-    instead of raising the once-per-process ``RuntimeError``. When that no-op path
-    is taken, we still surgically redirect rich_handler.console to stderr so the
-    override on ``console_log_target`` is honored even though we did not call configure.
+    instead of raising the once-per-process ``RuntimeError``.
 
     Args:
         log_config_overrides: Optional mapping of ``LogConfig`` field names → values to
             merge into the loaded log_config before ``log.configure`` is called.
         config_dir: Optional explicit config dir (e.g. for ``--global``). When provided,
             project/global layering is bypassed and only this directory is read.
-
-    Returns:
-        True if ``log.configure`` was applied here, False if logging was already
-        configured by a prior caller (library embedder, interleaved test). The agent
-        doctor uses this signal to decide whether to override the ``pipelex`` package
-        log level — if an embedder configured logging, we respect their level choice.
 
     Raises:
         PipelexConfigError: If config validation fails. Translation of
@@ -784,14 +783,7 @@ def setup_doctor_runtime(
     if log_config_overrides is not None:
         log_config = LogConfig.model_validate({**log_config.model_dump(), **log_config_overrides})
     pipelex_hub.set_console_print_target(target=log_config.console_print_target)
-    applied = log.configure_if_unset(log_config=log_config)
-    if not applied and log_config.console_log_target is ConsoleTarget.STDERR:
-        # configure_if_unset no-oped because log was already configured. The hub print
-        # target above still got pinned; here we surgically swap the rich_handler's
-        # console so the console_log_target=STDERR override on log_config still takes
-        # effect for any future log call.
-        log.redirect_to_stderr()
-    return applied
+    log.configure_if_unset(log_config=log_config)
 
 
 def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, BackendFileReport]]:
@@ -846,6 +838,13 @@ def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, B
         except (RemoteConfigUnavailableError, RemoteConfigValidationError) as exc:
             return False, f"Failed to fetch Pipelex Gateway remote configuration: {exc}", backend_file_reports
 
+    # When --global (config_dir set), pin every path so layered config_manager.X
+    # resolution doesn't silently fall back to the project-local files.
+    backends_library_override = str(config_dir / "inference" / "backends.toml") if config_dir is not None else None
+    backends_dir_override = str(config_dir / "inference" / "backends") if config_dir is not None else None
+    routing_profile_override = str(config_dir / "inference" / "routing_profiles.toml") if config_dir is not None else None
+    deck_dir_override = str(config_dir / "inference" / "deck") if config_dir is not None else None
+
     models_manager = ModelManager()
     secrets_provider = EnvSecretsProvider()
     try:
@@ -853,6 +852,10 @@ def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, B
             secrets_provider=secrets_provider,
             gateway_config=gateway_config,
             gateway_config_source=gateway_config_source,
+            backends_library_path=backends_library_override,
+            backends_dir_path=backends_dir_override,
+            routing_profile_library_path=routing_profile_override,
+            deck_dir_path=deck_dir_override,
         )
         models_manager.validate_model_deck()
     except InferenceBackendLibraryError as exc:
@@ -931,10 +934,12 @@ def do_doctor_cmd(
     if config_healthy:
         setup_doctor_runtime()
         models_healthy, models_message, backend_file_reports = check_models()
+        models_skipped = False
     else:
         models_healthy = False
         models_message = "skipped — fix configuration errors first"
         backend_file_reports = {}
+        models_skipped = True
 
     deck_healthy, deck_report, deck_message = check_deck_sync()
 
@@ -950,6 +955,7 @@ def do_doctor_cmd(
         backend_credential_reports=backend_credential_reports,
         models_healthy=models_healthy,
         models_message=models_message,
+        models_skipped=models_skipped,
         backend_file_reports=backend_file_reports,
         deck_healthy=deck_healthy,
         deck_message=deck_message,
