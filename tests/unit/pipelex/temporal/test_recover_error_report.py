@@ -7,6 +7,7 @@ deserialized ``ApplicationError.details``. ``recover_error_report`` walks the
 
 from typing import Any
 
+import pytest
 from temporalio.client import WorkflowFailureError
 from temporalio.exceptions import ApplicationError
 
@@ -89,17 +90,29 @@ class TestRecoverErrorReport:
         # is a stable contract documented in docs/under-the-hood/error-model.md.
         assert _ERROR_REPORT_VALIDATION_FAILED_MARKER in report.message
 
-    def test_invalid_report_with_empty_message_falls_back_to_exc_chain(self) -> None:
-        """An invalid report dict with an empty ``message`` field falls back to the
-        exception chain for the recovered message preamble — the ``or`` at
-        ``temporal_error.py:118`` falls through when the report dict's ``message``
-        is empty or whitespace. A regression swapping ``or`` to ``??`` / ``is None``
-        would silently emit ``[error report failed schema validation]`` with no
-        preamble at all, hiding the underlying failure text from the wire payload.
+    @pytest.mark.parametrize(
+        "empty_like_message",
+        [
+            pytest.param("", id="empty"),
+            pytest.param(" ", id="single-space"),
+            pytest.param("   ", id="multiple-spaces"),
+            pytest.param("\n", id="newline"),
+            pytest.param("\t", id="tab"),
+            pytest.param(" \n\t  ", id="mixed-whitespace"),
+        ],
+    )
+    def test_invalid_report_with_empty_or_whitespace_message_falls_back_to_exc_chain(self, empty_like_message: str) -> None:
+        """An invalid report dict with an empty or whitespace-only ``message`` falls back to the exception chain.
+
+        Without ``str.strip()``, a whitespace-only ``message`` (a space, a
+        newline, a tab) is truthy in Python, so the fallback never fires and the
+        synthesized preamble renders as a visually broken `` [error report
+        failed schema validation]``. The strip guard treats every
+        whitespace-only value the same as the empty string.
         """
         invalid_report_dict: dict[str, Any] = {
             "error_type": "CogtError",
-            "message": "",  # empty: ``or`` must fall through to _message_from_exc(exc)
+            "message": empty_like_message,
             "title": "AI inference failed",
             "type_uri": "https://docs.pipelex.com/latest/errors/cogt-error/",
             "future_field_we_do_not_know_about": "unexpected",

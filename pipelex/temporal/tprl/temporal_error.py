@@ -73,6 +73,10 @@ def _message_from_exc(exc: BaseException) -> str:
     worker exception, or a non-Temporal exception) holds the real detail. We walk
     the ``__cause__`` chain and surface the deepest non-empty message, falling
     back to ``repr(exc)`` when every message in the chain is unset.
+
+    A whitespace-only ``str(node)`` is treated the same as empty — without the
+    ``strip()`` guard, a node whose message is purely spaces or newlines would
+    win and the synthesized preamble would be visually broken.
     """
     deepest_message = ""
     node: BaseException | None = exc
@@ -80,7 +84,7 @@ def _message_from_exc(exc: BaseException) -> str:
     while node is not None and id(node) not in seen:
         seen.add(id(node))
         text = str(node)
-        if text:
+        if text.strip():
             deepest_message = text
         node = node.__cause__
     return deepest_message or repr(exc)
@@ -122,7 +126,15 @@ def recover_error_report(exc: BaseException) -> ErrorReport:
             # fallback instead of raising, so the caller still delivers the
             # failure webhook; the recovered message plus marker keep the
             # contract bug visible on the wire.
-            recovered_message = report_dict.get("message") or _message_from_exc(exc)
+            # A whitespace-only ``report_dict["message"]`` is treated the same
+            # as missing — without the ``strip()`` guard, the fallback would not
+            # fire and the synthesized preamble would render as a visually
+            # broken `` [error report failed schema validation]``.
+            raw_message = report_dict.get("message")
+            if isinstance(raw_message, str) and raw_message.strip():
+                recovered_message = raw_message
+            else:
+                recovered_message = _message_from_exc(exc)
             fallback_message = f"{recovered_message} {_ERROR_REPORT_VALIDATION_FAILED_MARKER}"
             return UnrecoverableWorkflowFailureError(fallback_message).to_error_report()
     return UnrecoverableWorkflowFailureError(_message_from_exc(exc)).to_error_report()
