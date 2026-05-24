@@ -35,6 +35,9 @@ class TestDoctorLayeredResolution:
 
     def test_do_doctor_cmd_delegates_layered_resolution_to_checks(self, mocker: MockerFixture) -> None:
         """do_doctor_cmd should call check functions with no config_dir so they use layered resolution."""
+        # Stub the runtime bootstrap so the test doesn't load real config or call log.configure
+        # (once-per-process). The bootstrap call itself is exercised separately.
+        mocker.patch("pipelex.cli.commands.doctor_cmd.setup_doctor_runtime")
         mock_check_config = mocker.patch(
             "pipelex.cli.commands.doctor_cmd.check_config_files",
             return_value=(True, 0, "OK"),

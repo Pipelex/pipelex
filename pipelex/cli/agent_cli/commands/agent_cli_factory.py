@@ -26,7 +26,13 @@ from pipelex.tools.log.log import log
 from pipelex.tools.log.log_levels import LogLevel
 from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
 
-# Highest-priority overrides applied to every ``pipelex-agent`` invocation.
+# Canonical leaf dict for "for any agent-CLI invocation, both Rich-managed channels land
+# on stderr." Composed by two distinct call sites:
+#   - ``_AGENT_CLI_STDERR_CONSOLE_OVERRIDES`` below wraps it in the full-config-tree shape
+#     required by ``Pipelex.make(config_overrides=...)`` for the full-init path.
+#   - ``pipelex.cli.agent_cli.commands.doctor_cmd`` passes it flat to
+#     ``setup_doctor_runtime(log_config_overrides=...)`` for the doctor-only path that
+#     does not go through ``Pipelex.make``.
 #
 # These two knobs only control Rich-managed diagnostic channels — NOT the agent CLI's
 # data channel:
@@ -48,14 +54,26 @@ from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
 # lands on stderr regardless of what the user's ``~/.pipelex/pipelex.toml`` says — so the
 # JSON data channel on stdout stays clean for downstream consumers like ``mthds-js``'s
 # ``PipelexRunner`` that do ``JSON.parse(stdout)``.
-_AGENT_CLI_STDERR_CONSOLE_OVERRIDES: dict[str, Any] = {
-    "pipelex": {
-        "log_config": {
-            "console_log_target": ConsoleTarget.STDERR,
-            "console_print_target": ConsoleTarget.STDERR,
-        },
-    },
+AGENT_CLI_STDERR_LOG_FIELDS: dict[str, Any] = {
+    "console_log_target": ConsoleTarget.STDERR,
+    "console_print_target": ConsoleTarget.STDERR,
 }
+
+_AGENT_CLI_STDERR_CONSOLE_OVERRIDES: dict[str, Any] = {
+    "pipelex": {"log_config": AGENT_CLI_STDERR_LOG_FIELDS},
+}
+
+
+def apply_agent_cli_output_discipline() -> None:
+    """Pin pretty-print + hub console target to stderr.
+
+    Defense-in-depth, redundant with the log_config overrides applied at init time but
+    kept so any future code path that bypasses the init override still finds the hub
+    pinned. Called from ``make_pipelex_for_agent_cli`` (full-init path) and from
+    ``agent_doctor_cmd`` (doctor-only path that does not go through ``Pipelex.make``).
+    """
+    PrettyPrinter.mode = PrettyPrintMode.SILENT
+    get_pipelex_hub().set_console_print_target(target=ConsoleTarget.STDERR)
 
 
 def make_pipelex_for_agent_cli(
@@ -169,10 +187,7 @@ def make_pipelex_for_agent_cli(
 
     # Suppress Rich pretty-printing and INFO/DEV/DEBUG log noise so that agent
     # commands only emit structured JSON.  Warnings and errors still reach stderr.
-    PrettyPrinter.mode = PrettyPrintMode.SILENT
     log.set_level_for_package("pipelex", log_level)
     log.redirect_to_stderr()
-    # Defense-in-depth: redundant with the config_overrides above, but cheap and explicit
-    # — any future bypass of the override still finds the hub console pinned to stderr.
-    get_pipelex_hub().set_console_print_target(target=ConsoleTarget.STDERR)
+    apply_agent_cli_output_discipline()
     return pipelex_instance

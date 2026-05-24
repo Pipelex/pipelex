@@ -4,6 +4,7 @@ from typing import Annotated, Any
 
 import typer
 
+from pipelex.cli.agent_cli.commands.agent_cli_factory import AGENT_CLI_STDERR_LOG_FIELDS, apply_agent_cli_output_discipline
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success, set_agent_cli_error_format
 from pipelex.cli.commands.doctor_cmd import (
     ConfigLocationInfo,
@@ -12,6 +13,7 @@ from pipelex.cli.commands.doctor_cmd import (
     check_models,
     check_telemetry_config,
     gather_config_location,
+    setup_doctor_runtime,
 )
 from pipelex.system.configuration.config_loader import config_manager
 
@@ -118,6 +120,13 @@ def agent_doctor_cmd(
     """
     set_agent_cli_error_format(error_format or output_format)
     try:
+        # Pin the Rich-managed channels to stderr before any doctor check can log,
+        # so the JSON envelope this command writes to stdout stays parseable even
+        # when the user's pipelex.toml sets console_log_target = "stdout" and a
+        # verbose log level. See AGENT_CLI_STDERR_LOG_FIELDS docs.
+        setup_doctor_runtime(log_config_overrides=AGENT_CLI_STDERR_LOG_FIELDS)
+        apply_agent_cli_output_discipline()
+
         # When --global, force checking ~/.pipelex/ only; otherwise use layered resolution
         config_dir = config_manager.global_config_dir if global_ else None
 

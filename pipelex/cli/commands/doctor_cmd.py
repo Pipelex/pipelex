@@ -713,8 +713,47 @@ def check_deck_sync(config_dir: Path | None = None) -> tuple[bool, DeckSyncRepor
     return False, report, f"{len(actionable)} deck file(s) need action"
 
 
+def setup_doctor_runtime(log_config_overrides: dict[str, Any] | None = None) -> None:
+    """Spin up a fresh PipelexHub and configure logging for doctor checks.
+
+    Doctor intentionally bypasses ``Pipelex.make`` so it can diagnose a broken config
+    without crashing during full init. This helper performs the minimum runtime setup
+    that ``check_models`` requires — a hub with a loaded config and a configured logger
+    — and lets the caller fold log-target overrides into the loaded ``log_config`` via
+    Pydantic ``model_copy(update=...)``.
+
+    The agent doctor passes ``AGENT_CLI_STDERR_LOG_FIELDS`` so the JSON envelope on
+    stdout stays clean for downstream consumers. The human doctor passes nothing and
+    inherits the user's configured log targets.
+
+    Args:
+        log_config_overrides: Optional dict of ``LogConfig`` field names → values to
+            merge into the loaded log_config before ``log.configure`` is called.
+
+    Raises:
+        PipelexConfigError: If config validation fails. Translation of
+            ``pydantic.ValidationError`` to keep doctor's error surface stable.
+    """
+    pipelex_hub = PipelexHub()
+    set_pipelex_hub(pipelex_hub)
+    try:
+        pipelex_hub.setup_config(config_cls=PipelexConfig)
+    except ValidationError as validation_error:
+        validation_error_msg = report_validation_error(category="config", validation_error=validation_error)
+        msg = f"Could not setup config because of: {validation_error_msg}"
+        raise PipelexConfigError(msg) from validation_error
+
+    log_config = get_config().pipelex.log_config
+    if log_config_overrides is not None:
+        log_config = log_config.model_copy(update=log_config_overrides)
+    log.configure(log_config=log_config)
+
+
 def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, BackendFileReport]]:
     """Check if models are valid, including backend file validation.
+
+    Assumes ``setup_doctor_runtime`` has already run — the function reads from the
+    active hub and relies on ``log`` being configured.
 
     Args:
         config_dir: Explicit config directory override (e.g. for --global).
@@ -734,19 +773,6 @@ def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, B
             first_error = next((report.error_message for report in backend_file_reports.values() if report.error_message), "Unknown error")
             msg = f"Backend configuration error: {first_error}"
             return False, msg, backend_file_reports
-
-    # If backend files are OK, try to load and validate models
-    pipelex_hub = PipelexHub()
-    set_pipelex_hub(pipelex_hub)
-
-    try:
-        pipelex_hub.setup_config(config_cls=PipelexConfig)
-    except ValidationError as validation_error:
-        validation_error_msg = report_validation_error(category="config", validation_error=validation_error)
-        msg = f"Could not setup config because of: {validation_error_msg}"
-        raise PipelexConfigError(msg) from validation_error
-
-    log.configure(log_config=get_config().pipelex.log_config)
 
     # Fetch gateway model specs if Gateway is enabled
     gateway_config: GatewayConfig | None = None
@@ -837,6 +863,10 @@ def do_doctor_cmd(
     """
     # Gather config location info
     config_location = gather_config_location()
+
+    # Bootstrap the minimum runtime check_models depends on (hub + log.configure).
+    # No overrides for the human CLI: it inherits the user's configured log targets.
+    setup_doctor_runtime()
 
     # Run health checks (config_dir=None uses layered resolution: project → global)
     config_healthy, config_missing_count, config_message = check_config_files()

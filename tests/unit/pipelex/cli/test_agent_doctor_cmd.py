@@ -11,13 +11,28 @@ import typer
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
+from pipelex.cli.agent_cli.commands.agent_cli_factory import AGENT_CLI_STDERR_LOG_FIELDS
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.doctor_cmd import agent_doctor_cmd
 from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport
+from pipelex.system.console_target import ConsoleTarget
 
 
 class TestAgentDoctorCmd:
     """Tests for agent_doctor_cmd JSON output."""
+
+    @pytest.fixture(autouse=True)
+    def _mock_doctor_bootstrap(self, mocker: MockerFixture) -> None:
+        """Stub the runtime bootstrap so unit tests don't load real config or reconfigure logging.
+
+        ``setup_doctor_runtime`` instantiates a PipelexHub, loads config from disk, and
+        calls ``log.configure`` (once-per-process). ``apply_agent_cli_output_discipline``
+        mutates global PrettyPrinter mode and the hub's console target. Both are out of
+        scope for these tests — they cover the command's output shape, not the runtime
+        bootstrap mechanics.
+        """
+        mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.setup_doctor_runtime")
+        mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.apply_agent_cli_output_discipline")
 
     def test_healthy_output_json(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """Healthy checks should produce JSON with all_healthy=true and no recommended_actions."""
@@ -127,3 +142,43 @@ class TestAgentDoctorCmd:
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["error"] is True
         assert "unexpected kaboom" in parsed["message"]
+
+    def test_bootstrap_pins_console_targets_to_stderr(self, mocker: MockerFixture) -> None:
+        """Regression: agent_doctor_cmd must pass AGENT_CLI_STDERR_LOG_FIELDS to setup_doctor_runtime.
+
+        The original bug: agent_doctor_cmd bypassed the agent CLI stdout-hardening that
+        every other agent CLI command receives via make_pipelex_for_agent_cli. Doctor's
+        check_models internally called log.configure with the user's raw log_config, so a
+        user with console_log_target = "stdout" and a raised pipelex log level got log
+        lines on stdout before the JSON envelope — breaking json.loads(stdout) for any
+        downstream consumer.
+
+        This test asserts that agent_doctor_cmd now folds the stderr overrides into the
+        bootstrap call, so log/print targets are pinned before any check can fire.
+        """
+        # Re-mock setup_doctor_runtime so we can capture its call args
+        # (the autouse fixture also mocks it, but we need the fresh handle here).
+        mock_setup = mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.setup_doctor_runtime")
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_config_files",
+            return_value=(True, 0, "OK"),
+        )
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
+            return_value=(True, "OK"),
+        )
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_backend_credentials",
+            return_value=(True, {}, "OK"),
+        )
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_models",
+            return_value=(True, "OK", {}),
+        )
+
+        agent_doctor_cmd(output_format=CliOutputFormat.JSON)
+
+        mock_setup.assert_called_once_with(log_config_overrides=AGENT_CLI_STDERR_LOG_FIELDS)
+        # Pin the contract of the field dict itself: both Rich-managed channels must be stderr.
+        assert AGENT_CLI_STDERR_LOG_FIELDS["console_log_target"] is ConsoleTarget.STDERR
+        assert AGENT_CLI_STDERR_LOG_FIELDS["console_print_target"] is ConsoleTarget.STDERR
