@@ -2,7 +2,7 @@ import asyncio
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Literal, Sequence
+from typing import Literal, Sequence, assert_never
 
 from pydantic import BaseModel, ValidationError
 
@@ -87,6 +87,12 @@ def _translate_to_validate_bundle_error(category: Literal["pipe", "concept"]) ->
                 msg = f"Could not load blueprints because of: {validation_error_msg}"
             case "concept":
                 msg = f"Could not load concepts because of: {validation_error_msg}"
+            case _ as unreachable:
+                # ``category`` is ``Literal["pipe", "concept"]`` — pyright catches a
+                # bad call site statically, but the runtime can still receive an
+                # unexpected value via ``# type: ignore`` or dynamic dispatch. Loud
+                # ``AssertionError`` beats silent ``UnboundLocalError`` on ``msg``.
+                assert_never(unreachable)
         raise ValidateBundleError(
             message=msg,
             pipe_validation_errors=pipe_validation_errors,
