@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -12,12 +13,16 @@ from pipelex.errors.error_pages_generator import (
     GENERATED_MARKER,
     INDEX_STEM,
     ErrorPagesReport,
+    _force_load_all_error_modules,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
     generate_error_pages,
     has_authored_marker,
     iter_pipelex_error_subclasses,
     page_slug,
 )
 from pipelex.tools.misc.string_utils import pascal_case_to_kebab
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 
 class TestErrorPagesGenerator:
@@ -143,3 +148,23 @@ class TestErrorPagesGenerator:
         assert unmarked_page not in report.removed
         assert unmarked_page not in report.preserved
         assert unmarked_page.read_text(encoding="utf-8") == unmarked_body
+
+    def test_force_load_aggregates_non_import_error_failures(self, mocker: MockerFixture) -> None:
+        """A `NameError` (or any non-ImportError) raised during module init is aggregated, not propagated raw.
+
+        Regression for greptile review: if a `*_exceptions.py` has a typo at module scope, its
+        import raises `NameError` — not `ImportError`. The walk must still finish for every other
+        module and surface the broken module's dotted name in the final `RuntimeError`.
+        """
+        _force_load_all_error_modules.cache_clear()
+        try:
+            mocker.patch(
+                "pipelex.errors.error_pages_generator.importlib.import_module",
+                side_effect=NameError("boom"),
+            )
+            with pytest.raises(RuntimeError, match="boom") as exc_info:
+                _force_load_all_error_modules()
+            message = str(exc_info.value)
+            assert "pipelex.base_exceptions" in message, "RuntimeError should list at least one walked dotted module"
+        finally:
+            _force_load_all_error_modules.cache_clear()

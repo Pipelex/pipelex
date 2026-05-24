@@ -63,10 +63,16 @@ def _force_load_all_error_modules() -> None:
 
     Per-module import failures are accumulated and raised once at the end so a
     single broken ``*_exceptions.py`` surfaces with its dotted module name
-    rather than aborting the walk under an opaque ``ImportError`` whose
-    traceback frames all live inside this helper. ``functools.cache`` only
-    memoizes the success path (no caching on exception), so a fix-then-retry
-    cycle inside a long-lived dev session works without ``cache_clear()``.
+    rather than aborting the walk under an opaque exception whose traceback
+    frames all live inside this helper. ``functools.cache`` only memoizes the
+    success path (no caching on exception), so a fix-then-retry cycle inside
+    a long-lived dev session works without ``cache_clear()``.
+
+    The catch is intentionally broad: ``importlib.import_module`` runs the
+    target module's top-level code, so a typo or bad reference inside a new
+    ``*_exceptions.py`` can surface as ``NameError``, ``SyntaxError``,
+    ``AttributeError``, … — all of which must be aggregated like ``ImportError``
+    so the dev sees the full list of broken modules at once.
 
     To clear the cache (e.g. inside a long-lived dev session after adding a
     new ``*_exceptions.py``), call ``_force_load_all_error_modules.cache_clear()``.
@@ -80,7 +86,10 @@ def _force_load_all_error_modules() -> None:
         dotted = ".".join(rel.parts)
         try:
             importlib.import_module(dotted)
-        except ImportError as exc:
+        except Exception as exc:  # noqa: BLE001
+            # importlib runs the target module's top-level code — an open-ended exception surface
+            # (NameError, SyntaxError, …) that must be aggregated like ImportError so the dev
+            # sees the full list of broken modules at once instead of aborting on the first one.
             failures.append((dotted, exc))
     if failures:
         lines = ["One or more error modules failed to import during discovery:"]

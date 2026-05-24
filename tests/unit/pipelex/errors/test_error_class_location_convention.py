@@ -34,7 +34,10 @@ from pathlib import Path
 
 import pipelex
 from pipelex.base_exceptions import PipelexError
-from pipelex.errors.error_pages_generator import iter_pipelex_error_subclasses
+from pipelex.errors.error_pages_generator import (
+    _FIXTURE_DIR_NAMES,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+    iter_pipelex_error_subclasses,
+)
 
 _PIPELEX_ROOT: Path = Path(pipelex.__file__).resolve().parent
 _BASE_EXCEPTIONS_FILE: Path = _PIPELEX_ROOT / "base_exceptions.py"
@@ -64,18 +67,27 @@ def _base_short_name(node: ast.expr) -> str | None:
     return None
 
 
-def _ast_discover_pipelex_error_subclasses() -> dict[str, list[Path]]:
-    """AST-scan ``pipelex/`` and return ``{class_name: [paths_where_defined]}`` for every transitive ``PipelexError`` subclass.
+def _ast_discover_pipelex_error_subclasses(root: Path = _PIPELEX_ROOT) -> dict[str, list[Path]]:
+    """AST-scan ``root`` and return ``{class_name: [paths_where_defined]}`` for every transitive ``PipelexError`` subclass.
 
     Uses name-based BFS — a class is in the derived set if any of its bases'
     short names is already in the set. False positives are possible if a
     truly unrelated class shares a short name with a ``PipelexError``
     descendant; today none exist in the tree.
+
+    Shipped fixture packages (``test_extras/`` / ``test_helpers/``) are skipped
+    to stay symmetric with ``_is_production_subclass`` at runtime — otherwise
+    a ``PipelexError`` subclass added inside a fixture package would surface
+    here but not in the runtime set, triggering a false ``discovery gap`` in
+    ``test_runtime_walk_discovers_every_ast_classified_subclass``.
     """
     class_to_files: dict[str, list[Path]] = {}
     class_to_bases: dict[str, set[str]] = {}
 
-    for path in sorted(_PIPELEX_ROOT.rglob("*.py")):
+    for path in sorted(root.rglob("*.py")):
+        rel_parts = path.relative_to(root).parts
+        if not _FIXTURE_DIR_NAMES.isdisjoint(rel_parts):
+            continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
             if not isinstance(node, ast.ClassDef):
@@ -194,6 +206,33 @@ class TestErrorClassLocationConvention:
                 "Docs generation and the type_uri uniqueness check therefore silently miss them.",
             ]
             raise AssertionError("\n".join(lines))
+
+    def test_ast_scan_skips_shipped_fixture_packages(self, tmp_path: Path) -> None:
+        """AST scan must filter ``test_extras``/``test_helpers`` like the runtime walk does.
+
+        Regression for codex review: ``_is_production_subclass`` drops classes defined under
+        shipped fixture packages at runtime. If the AST scan does NOT apply the same filter,
+        a fixture-resident ``PipelexError`` subclass surfaces in ``ast_names`` but not in
+        ``runtime_names``, and ``test_runtime_walk_discovers_every_ast_classified_subclass``
+        fails with a false ``discovery gap``.
+        """
+        production_dir = tmp_path / "core"
+        production_dir.mkdir()
+        (production_dir / "exceptions.py").write_text(
+            "class FakeProductionError(PipelexError):\n    pass\n",
+            encoding="utf-8",
+        )
+        fixture_dir = tmp_path / "test_extras"
+        fixture_dir.mkdir()
+        (fixture_dir / "fixture_exceptions.py").write_text(
+            "class FakeFixtureOnlyError(PipelexError):\n    pass\n",
+            encoding="utf-8",
+        )
+
+        discovered = _ast_discover_pipelex_error_subclasses(root=tmp_path)
+
+        assert "FakeProductionError" in discovered, "AST scan should pick up properly-named modules outside fixture dirs"
+        assert "FakeFixtureOnlyError" not in discovered, "AST scan must skip shipped fixture packages to stay symmetric with the runtime filter"
 
     def test_no_heavy_third_party_imports_in_error_modules(self) -> None:
         """Every exceptions.py / *_exceptions.py imports only base error classes — no SDK pulls.
