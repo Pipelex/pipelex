@@ -15,19 +15,46 @@ INTERNAL_ERROR_PLACEHOLDER = "An internal error occurred."
 # Stable identifiers preserved verbatim when STRICT mode redacts a report.
 # ``message`` is intentionally absent — STRICT replaces it with
 # ``INTERNAL_ERROR_PLACEHOLDER`` unconditionally, not by passthrough.
+# ``provider_metadata`` is also absent here — it is reattached separately under
+# STRICT as a curated subset (see ``_STRICT_PROVIDER_METADATA_KEPT_FIELDS``).
 _STRICT_KEPT_FIELDS: frozenset[str] = frozenset({"error_type", "title", "type_uri", "error_domain", "error_category", "retryable"})
 
 # Provider/model attribution fields. STRICT drops them unconditionally — from
 # the redacted branch (they are absent from ``_STRICT_KEPT_FIELDS``) and from
-# the caller-facing-message passthrough branch alike: provider metadata never
-# belongs on an external surface, whatever the report's ``error_domain``.
-_STRICT_PROVIDER_FIELDS: frozenset[str] = frozenset({"model", "provider", "provider_metadata"})
+# the caller-facing-message passthrough branch alike: provider/model identity
+# never belongs on an external surface, whatever the report's ``error_domain``.
+# ``provider_metadata`` is handled separately because some of its inner fields
+# carry actionable client hints (see ``_STRICT_PROVIDER_METADATA_KEPT_FIELDS``).
+_STRICT_PROVIDER_FIELDS: frozenset[str] = frozenset({"model", "provider"})
+
+# The curated subset of ``ProviderErrorMetadata`` that survives STRICT
+# projection. ``status_code`` and ``retry_after_seconds`` are actionable client
+# hints (HTTP status mapping, ``Retry-After`` header) — they are not provider
+# attribution. Every other ``ProviderErrorMetadata`` field carries either
+# provider identity (``provider``, ``provider_error_code``, ``sdk_exception_type``)
+# or internal correlation IDs / free-form text (``request_id``, ``message``) that
+# the external surface has no business seeing.
+_STRICT_PROVIDER_METADATA_KEPT_FIELDS: frozenset[str] = frozenset({"status_code", "retry_after_seconds"})
 
 # Fields stripped from the STRICT caller-facing passthrough: provider/model
 # attribution plus ``caller_facing_message`` itself — the latter is internal
 # redaction plumbing that rides only the VERBOSE round-trip format, never the
-# lossy external projection.
+# lossy external projection. ``provider_metadata`` is not in this set because it
+# undergoes a separate curated-subset projection.
 _STRICT_PASSTHROUGH_DROPPED_FIELDS: frozenset[str] = _STRICT_PROVIDER_FIELDS | frozenset({"caller_facing_message"})
+
+
+def _redact_provider_metadata_for_strict(metadata_payload: dict[str, Any]) -> dict[str, Any] | None:
+    """Project a ``ProviderErrorMetadata`` payload through STRICT's curated subset.
+
+    Keeps only the fields in :data:`_STRICT_PROVIDER_METADATA_KEPT_FIELDS`
+    (``status_code`` / ``retry_after_seconds``). Returns ``None`` when no curated
+    field is present, so the caller can omit the key entirely rather than emit
+    an empty dict on the wire.
+    """
+    curated = {key: value for key, value in metadata_payload.items() if key in _STRICT_PROVIDER_METADATA_KEPT_FIELDS}
+    return curated or None
+
 
 # Fields already mapped into RFC 7807 standard slots (``detail`` / ``title`` /
 # ``type``) by ``to_problem_document`` — must NOT be echoed as extension
@@ -50,9 +77,11 @@ class DisclosureMode(StrEnum):
       reconstructs the original report exactly.
 
     - ``STRICT``: a lossy projection for untrusted external surfaces.
-      ``provider`` / ``model`` / ``provider_metadata`` are dropped
-      unconditionally — provider/model attribution never belongs on an external
-      surface. The ``message`` is then projected by *provenance*:
+      ``provider`` / ``model`` are dropped unconditionally — provider/model
+      attribution never belongs on an external surface. ``provider_metadata`` is
+      projected through a curated subset: only ``status_code`` and
+      ``retry_after_seconds`` survive (actionable HTTP client hints, not provider
+      attribution). The ``message`` is then projected by *provenance*:
 
       - A report flagged :attr:`ErrorReport.caller_facing_message` keeps its
         ``message`` and ``user_action``. The flag is set by error classes whose
@@ -166,11 +195,12 @@ class ErrorReport(BaseModel):
 
         ``VERBOSE`` is the strict inverse of :meth:`from_dict` — every populated
         field round-trips. ``STRICT`` is a lossy projection (see
-        :class:`DisclosureMode`): ``provider`` / ``model`` / ``provider_metadata``
-        are always dropped, and unless the report is flagged
-        :attr:`caller_facing_message` its ``message`` is replaced with a generic
-        placeholder and ``user_action`` is dropped, leaving only the stable
-        identifiers.
+        :class:`DisclosureMode`): ``provider`` / ``model`` are always dropped,
+        ``provider_metadata`` is projected through the curated subset (just
+        ``status_code`` and ``retry_after_seconds``), and unless the report is
+        flagged :attr:`caller_facing_message` its ``message`` is replaced with a
+        generic placeholder and ``user_action`` is dropped, leaving only the
+        stable identifiers plus the curated ``provider_metadata`` slice.
         """
         payload = self.model_dump(exclude_none=True)
         # ``caller_facing_message`` is redaction plumbing, not consumer-facing
@@ -189,10 +219,28 @@ class ErrorReport(BaseModel):
                     # caller-facing copy — reflect it back. Provider/model
                     # attribution and the internal ``caller_facing_message`` flag
                     # are still stripped: neither belongs on the lossy external
-                    # projection, whatever the error_domain.
-                    return {key: value for key, value in payload.items() if key not in _STRICT_PASSTHROUGH_DROPPED_FIELDS}
+                    # projection, whatever the error_domain. ``provider_metadata``
+                    # is projected through the curated subset so actionable HTTP
+                    # client hints (``status_code`` / ``retry_after_seconds``)
+                    # survive while provider identity does not.
+                    projected: dict[str, Any] = {key: value for key, value in payload.items() if key not in _STRICT_PASSTHROUGH_DROPPED_FIELDS}
+                    if "provider_metadata" in projected:
+                        curated_metadata = _redact_provider_metadata_for_strict(projected["provider_metadata"])
+                        if curated_metadata is None:
+                            projected.pop("provider_metadata")
+                        else:
+                            projected["provider_metadata"] = curated_metadata
+                    return projected
                 redacted: dict[str, Any] = {key: payload[key] for key in _STRICT_KEPT_FIELDS if key in payload}
                 redacted["message"] = INTERNAL_ERROR_PLACEHOLDER
+                # Reattach a curated ``provider_metadata`` slice — even on the
+                # fully-redacted branch, ``status_code`` and ``retry_after_seconds``
+                # are actionable client hints (HTTP status mapping, ``Retry-After``
+                # header) that the HTTP adapter needs to emit a useful response.
+                if "provider_metadata" in payload:
+                    curated_metadata = _redact_provider_metadata_for_strict(payload["provider_metadata"])
+                    if curated_metadata is not None:
+                        redacted["provider_metadata"] = curated_metadata
                 return redacted
 
     def to_problem_document(

@@ -2,13 +2,15 @@
 
 ``DisclosureMode.VERBOSE`` is the exact inverse of ``from_dict`` (round-trip preserved).
 ``DisclosureMode.STRICT`` is a lossy projection for untrusted external surfaces:
-``provider`` / ``model`` / ``provider_metadata`` are always dropped, and the
-``message`` is kept only when the report is flagged ``caller_facing_message`` —
-the flag set by error classes (``PipelexInterpreterError`` / ``ValidateBundleError``)
-whose message describes the caller's own input. Every other report has its
-``message`` replaced with a generic placeholder and ``user_action`` dropped,
-keeping the stable identifiers (``error_type`` / ``error_domain`` /
-``error_category`` / ``retryable`` / ``title`` / ``type_uri``).
+``provider`` / ``model`` are always dropped, ``provider_metadata`` is projected
+through the curated subset (just ``status_code`` and ``retry_after_seconds`` —
+actionable HTTP client hints), and the ``message`` is kept only when the report
+is flagged ``caller_facing_message`` — the flag set by error classes
+(``PipelexInterpreterError`` / ``ValidateBundleError``) whose message describes
+the caller's own input. Every other report has its ``message`` replaced with a
+generic placeholder and ``user_action`` dropped, keeping the stable identifiers
+(``error_type`` / ``error_domain`` / ``error_category`` / ``retryable`` /
+``title`` / ``type_uri``) plus the curated ``provider_metadata`` slice.
 
 The flag is keyed on message *provenance*, not ``error_domain``: ``error_domain``
 is inherited up the ``__cause__`` chain, so a domain-less wrapper raised ``from``
@@ -127,13 +129,16 @@ class TestErrorReportDisclosureMode:
         The ``input-domain-wrapper`` case is the regression pin: ``error_domain``
         alone (here INPUT, inherited up a ``__cause__`` chain) does NOT earn a
         message passthrough — only the ``caller_facing_message`` flag does.
+
+        ``provider_metadata`` is the one classification field allowed through
+        STRICT as a curated subset: ``status_code`` and ``retry_after_seconds``
+        (HTTP client hints) survive — see ``test_strict_preserves_curated_provider_metadata``.
         """
         payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
         assert payload["message"] == INTERNAL_ERROR_PLACEHOLDER
         assert "user_action" not in payload
         assert "model" not in payload
         assert "provider" not in payload
-        assert "provider_metadata" not in payload
         # Stable identifiers survive.
         assert payload["error_type"] == report.error_type
         assert payload["title"] == report.title
@@ -161,7 +166,9 @@ class TestErrorReportDisclosureMode:
         An INPUT-classification error can pick up ``provider`` / ``model`` /
         ``provider_metadata`` from an inference-layer ``__cause__`` during
         enrichment. STRICT must never reflect that onto an external surface,
-        even when the ``message`` itself is allowed through.
+        even when the ``message`` itself is allowed through. A
+        ``provider_metadata`` with no curated fields (no ``status_code`` /
+        ``retry_after_seconds``) is omitted entirely.
         """
         report = _caller_facing_report().model_copy(
             update={
@@ -175,6 +182,68 @@ class TestErrorReportDisclosureMode:
         assert "model" not in payload
         assert "provider" not in payload
         assert "provider_metadata" not in payload
+
+    def test_strict_preserves_curated_provider_metadata(self) -> None:
+        """STRICT preserves ``status_code`` and ``retry_after_seconds`` — actionable HTTP client hints.
+
+        Provider 429s carry a ``Retry-After`` hint the HTTP adapter needs to emit
+        a useful response header. Provider identity / SDK type / free-form
+        message / request_id are still stripped — only the curated subset rides.
+
+        Holds for BOTH the redacted (non-caller-facing) and caller-facing
+        passthrough branches.
+        """
+        non_caller_facing_report = _runtime_report()
+        payload = non_caller_facing_report.to_dict(disclosure_mode=DisclosureMode.STRICT)
+        assert "provider_metadata" in payload
+        assert payload["provider_metadata"] == {"status_code": 429, "retry_after_seconds": 12.0}
+        # The other ProviderErrorMetadata fields (provider, sdk_exception_type) must not leak.
+        assert "provider" not in payload["provider_metadata"]
+        assert "sdk_exception_type" not in payload["provider_metadata"]
+
+        caller_facing_report = _caller_facing_report().model_copy(
+            update={
+                "provider_metadata": ProviderErrorMetadata(
+                    provider=ProviderName.OPENAI,
+                    sdk_exception_type="RateLimitError",
+                    status_code=429,
+                    retry_after_seconds=12.0,
+                ),
+            }
+        )
+        caller_facing_payload = caller_facing_report.to_dict(disclosure_mode=DisclosureMode.STRICT)
+        assert caller_facing_payload["provider_metadata"] == {"status_code": 429, "retry_after_seconds": 12.0}
+
+    def test_strict_omits_provider_metadata_when_only_curated_subset_is_empty(self) -> None:
+        """A ``provider_metadata`` with no curated fields is omitted entirely rather than emitted as an empty dict."""
+        report = _runtime_report().model_copy(
+            update={
+                "provider_metadata": ProviderErrorMetadata(
+                    provider=ProviderName.OPENAI,
+                    sdk_exception_type="RateLimitError",
+                    status_code=None,
+                    retry_after_seconds=None,
+                ),
+            }
+        )
+        payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
+        assert "provider_metadata" not in payload
+
+    def test_strict_provider_metadata_dict_carries_http_status_for_adapter(self) -> None:
+        """A STRICT-projected dict carries ``status_code=429`` and ``retry_after_seconds`` for the HTTP adapter.
+
+        STRICT is not meant to round-trip through :meth:`ErrorReport.from_dict`
+        (see ``test_strict_does_not_round_trip``) — consumers read the dict
+        directly. This pins the contract the HTTP adapter relies on: it can
+        read ``payload["provider_metadata"]["status_code"]`` to emit the right
+        status and ``payload["provider_metadata"]["retry_after_seconds"]`` to
+        emit a useful ``Retry-After`` header, without rehydrating.
+        """
+        report = _runtime_report()
+        strict_payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
+        provider_metadata = strict_payload["provider_metadata"]
+        assert provider_metadata["status_code"] == 429
+        assert provider_metadata["retry_after_seconds"] == 12.0
 
     def test_strict_redacts_domain_less_wrapper_raised_from_input_cause(self) -> None:
         """A domain-less wrapper raised ``from`` an INPUT cause must not leak its own message in STRICT.
@@ -271,12 +340,23 @@ class TestErrorReportDisclosureMode:
         assert recovered.caller_facing_message == report.caller_facing_message
 
     def test_strict_does_not_round_trip(self) -> None:
-        """``from_dict(to_dict(STRICT))`` for a RUNTIME report loses ``provider`` and rewrites ``message``."""
+        """STRICT is not the inverse of :meth:`ErrorReport.from_dict` — consumers must read the dict directly.
+
+        STRICT carries a redacted ``message``, drops provider/model identity,
+        drops ``user_action``, and projects ``provider_metadata`` through a
+        curated subset. Read the dict's fields directly (``payload[<key>]``);
+        ``from_dict`` is meant only as the VERBOSE round-trip inverse.
+        """
         report = _runtime_report()
-        recovered = ErrorReport.from_dict(report.to_dict(disclosure_mode=DisclosureMode.STRICT))
-        assert recovered.message == INTERNAL_ERROR_PLACEHOLDER
-        assert recovered.provider is None
-        assert recovered.user_action is None
+        strict_payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
+        # Direct dict reads — the HTTP adapter / API surface doesn't rehydrate.
+        assert strict_payload["message"] == INTERNAL_ERROR_PLACEHOLDER
+        assert "provider" not in strict_payload
+        assert "model" not in strict_payload
+        assert "user_action" not in strict_payload
+        # The curated ``provider_metadata`` slice rides for the HTTP adapter to
+        # emit Retry-After / the right status — see
+        # ``test_strict_provider_metadata_dict_carries_http_status_for_adapter``.
 
     def test_to_dict_defaults_to_verbose(self) -> None:
         """No argument == VERBOSE — the safe default for in-process / round-trip callers."""
