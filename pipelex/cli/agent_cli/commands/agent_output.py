@@ -279,7 +279,10 @@ def _assemble_error_payload(message: str, error_type: str, cause: BaseException 
 
 
 # Payload keys that the markdown renderer treats specially (heading / body /
-# tip / code block) rather than listing under the "Details" section.
+# tip) or omits entirely rather than listing under the "Details" section.
+# ``error_source`` is dropped from markdown — it's internal stack frames that
+# don't help an LLM fix a `.mthds` file. The field stays in the JSON envelope
+# for programmatic consumers.
 _MARKDOWN_RESERVED_KEYS: frozenset[str] = frozenset({"error", "error_type", "message", "hint", "error_source"})
 
 
@@ -301,10 +304,6 @@ def _render_error_markdown(payload: dict[str, Any]) -> str:
             else:
                 lines += [f"- **{key}:**", "", "```json", clean_json_dumps(value, indent=2), "```", ""]
 
-    error_source = payload.get("error_source")
-    if error_source:
-        lines += ["", "## Error source", "", "```", *(str(frame) for frame in error_source), "```"]
-
     return "\n".join(lines)
 
 
@@ -319,8 +318,10 @@ def agent_error_markdown(message: str, error_type: str, cause: BaseException | N
     """Print a markdown-rendered error to stderr and exit with code 1.
 
     The markdown sibling of :func:`agent_error`'s JSON path: an error-type
-    heading, the message body, the hint as a tip callout, structured fields
-    under a Details section, and ``error_source`` as a code block.
+    heading, the message body, the hint as a tip callout, and structured fields
+    under a Details section. ``error_source`` (internal stack frames) is
+    deliberately omitted from markdown — the field remains in the JSON envelope
+    for programmatic consumers.
 
     Args:
         message: Human-readable error message.
