@@ -162,6 +162,13 @@ def agent_doctor_cmd(
         if config_healthy:
             try:
                 setup_doctor_runtime(log_config_overrides=AGENT_CLI_STDERR_LOG_FIELDS, config_dir=config_dir)
+                # Pin discipline BEFORE check_models. setup_doctor_runtime uses
+                # log.configure_if_unset(), which no-ops when a prior process already configured
+                # logging (embedded reuse, interleaved tests) — in that case AGENT_CLI_STDERR_LOG_FIELDS
+                # never reaches the handler, and any log line check_models emits could land on stdout.
+                # apply_agent_cli_output_discipline mutates the existing handler unconditionally via
+                # log.redirect_to_stderr, closing that window before any check fires.
+                apply_agent_cli_output_discipline()
                 models_healthy, models_message, backend_file_reports = check_models(config_dir=config_dir)
             except PipelexConfigError as exc:
                 # A config can pass check_config_files's shape check and still fail full validation

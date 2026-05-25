@@ -273,7 +273,57 @@ class TestAgentDoctorCmd:
         agent_doctor_cmd(output_format=CliOutputFormat.JSON)
 
         mock_setup.assert_called_once_with(log_config_overrides=AGENT_CLI_STDERR_LOG_FIELDS, config_dir=None)
-        mock_discipline.assert_called_once()
+        mock_discipline.assert_called()
         # Pin the contract of the field dict itself: both Rich-managed channels must be stderr.
         assert AGENT_CLI_STDERR_LOG_FIELDS["console_log_target"] is ConsoleTarget.STDERR
         assert AGENT_CLI_STDERR_LOG_FIELDS["console_print_target"] is ConsoleTarget.STDERR
+
+    def test_discipline_runs_before_check_models(self, mocker: MockerFixture) -> None:
+        """Regression: ``apply_agent_cli_output_discipline`` MUST run before ``check_models``.
+
+        ``setup_doctor_runtime`` calls ``log.configure_if_unset()``, which no-ops when a
+        prior process already configured logging (embedded reuse, interleaved test). In
+        that case ``AGENT_CLI_STDERR_LOG_FIELDS`` never reaches the handler, and any log
+        line ``check_models`` emits can land on stdout — corrupting the JSON envelope.
+
+        Pinning discipline (which mutates the existing handler unconditionally via
+        ``log.redirect_to_stderr``) immediately after the bootstrap closes that window
+        before any check fires.
+        """
+        call_order: list[str] = []
+
+        def record_discipline(*_args: object, **_kwargs: object) -> None:
+            call_order.append("discipline")
+
+        def record_check_models(*_args: object, **_kwargs: object) -> tuple[bool, str, dict[str, object]]:
+            call_order.append("check_models")
+            return True, "OK", {}
+
+        mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.setup_doctor_runtime")
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.apply_agent_cli_output_discipline",
+            side_effect=record_discipline,
+        )
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_config_files",
+            return_value=(True, 0, "OK"),
+        )
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
+            return_value=(True, "OK"),
+        )
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_backend_credentials",
+            return_value=(True, {}, "OK"),
+        )
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_models",
+            side_effect=record_check_models,
+        )
+
+        agent_doctor_cmd(output_format=CliOutputFormat.JSON)
+
+        # discipline must appear before check_models in the call sequence
+        assert "discipline" in call_order
+        assert "check_models" in call_order
+        assert call_order.index("discipline") < call_order.index("check_models")

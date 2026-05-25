@@ -930,11 +930,23 @@ def do_doctor_cmd(
     # check_models requires the hub + log.configure produced by setup_doctor_runtime.
     # When the config is broken, skipping setup keeps the friendly translation alive
     # (setup_doctor_runtime would raise PipelexConfigError on an invalid config and
-    # discard the partial check tuples gathered so far).
+    # discard the partial check tuples gathered so far). The PipelexConfigError arm
+    # handles the layered-override case: a config that passes check_config_files's
+    # shape check on disk can still fail full Pydantic validation inside the bootstrap.
+    models_skipped: bool
+    models_healthy: bool
+    models_message: str
+    backend_file_reports: dict[str, BackendFileReport]
     if config_healthy:
-        setup_doctor_runtime()
-        models_healthy, models_message, backend_file_reports = check_models()
-        models_skipped = False
+        try:
+            setup_doctor_runtime()
+            models_healthy, models_message, backend_file_reports = check_models()
+            models_skipped = False
+        except PipelexConfigError as exc:
+            models_healthy = False
+            models_message = f"skipped — {exc.message}"
+            backend_file_reports = {}
+            models_skipped = True
     else:
         models_healthy = False
         models_message = "skipped — fix configuration errors first"
