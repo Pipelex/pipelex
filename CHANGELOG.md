@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **`console_log_target` package default is now `stderr` (was `stdout`).** Logs now stay off the data channel by default, matching the intent of PR #452 ("default to stderr for outputs happening before initialization"). Downstream tooling that parses `pipelex` / `pipelex-agent` stdout as JSON (e.g. `mthds-js`'s `PipelexRunner`) is no longer at risk of stdout pollution from package-level logs — the bug was latent for stock installs because the agent-CLI JSON paths happen not to log at INFO+, but surfaced for anyone who raised `package_log_levels.pipelex` to DEBUG or added a setup-time log on the command path. The same flip is applied to the kit template (`pipelex/kit/configs/pipelex.toml`) that `pipelex init` copies to `~/.pipelex/`. **Note:** `console_print_target` is intentionally left at `stdout` — the main `pipelex` CLI emits human-facing tables (`show backends`, `show models`, `which`, `doctor`) via that channel, and downstream piping (`pipelex show backends > out.txt`) must keep working.
+
+- **`pipelex-agent` now pins both console targets to `stderr` regardless of user config.** `make_pipelex_for_agent_cli` injects `config_overrides` into `Pipelex.make()` that force `console_log_target = "stderr"` and `console_print_target = "stderr"` from the very first log/print fired during init, so a user override of either knob in `~/.pipelex/pipelex.toml` can no longer leak diagnostics onto the agent CLI's JSON data channel. Defense-in-depth post-init calls to `log.redirect_to_stderr()` and `get_pipelex_hub().set_console_print_target(STDERR)` remain. A new adversarial E2E test (`tests/e2e/agent_cli/test_stdout_is_clean_json.py::test_models_json_stdout_resists_user_targets_override_to_stdout`) pins the contract by overriding both targets to `stdout` and `package_log_levels.pipelex` to `DEBUG` and asserting `json.loads(stdout)` still parses.
+
 ## [v0.29.1] - 2026-05-21
 
 ### Fixed
