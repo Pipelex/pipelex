@@ -44,6 +44,7 @@ from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.environment import get_optional_env
+from pipelex.system.exceptions import ConfigValidationError
 from pipelex.system.pipelex_service.exceptions import (
     RemoteConfigUnavailableError,
     RemoteConfigValidationError,
@@ -54,6 +55,7 @@ from pipelex.system.pipelex_service.pipelex_service_config import (
 )
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig
+from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.misc.dict_utils import extract_vars_from_strings_recursive
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.placeholder import value_is_placeholder
@@ -61,6 +63,8 @@ from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_path
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from pipelex.system.pipelex_service.types import RemoteConfigSource
 
 
@@ -120,20 +124,31 @@ def check_config_files(config_dir: Path | None = None) -> tuple[bool, int, str]:
     except (PipelexCLIError, OSError) as exc:
         return False, 0, f"Error checking config files: {exc}"
 
-    # Check if main config can be loaded using the hub's setup.
-    # Note: load_config() uses config_manager's own resolution chain (package → global → project)
-    # which may differ from config_dir when --global is used. This is acceptable for a diagnostic
-    # check — the existence check guards the path, while load_config() validates the merged config.
+    # Validate the merged config against the same scope the diagnostic is reporting on.
+    # Threading config_dir through:
+    #   - matches what setup_doctor_runtime will load (no silent shape disagreement),
+    #   - and skips ensure_global_config_exists when --global is set, so this probe
+    #     stays a check and never silently materializes ~/.pipelex/ on a fresh machine.
     pipelex_config_path = config_manager.resolve_config_file("pipelex.toml", config_dir=config_dir)
     if path_exists(pipelex_config_path):
         try:
             # Suppress stderr and stdout to prevent tracebacks from being printed
             with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
-                config = config_manager.load_config()
+                config = config_manager.load_config(config_dir=config_dir)
                 PipelexConfig.model_validate(config)
         except ValidationError as validation_error:
             validation_error_msg = report_validation_error(category="config", validation_error=validation_error)
             msg = f"Configuration validation failed:\n{validation_error_msg}"
+            return False, 0, msg
+        except ConfigValidationError as exc:
+            # ConfigRoot.__init__ wraps pydantic.ValidationError into ConfigValidationError;
+            # recover the original via __cause__ so we still emit the migration-aware report.
+            underlying = exc.__cause__
+            if isinstance(underlying, ValidationError):
+                validation_error_msg = report_validation_error(category="config", validation_error=underlying)
+                msg = f"Configuration validation failed:\n{validation_error_msg}"
+            else:
+                msg = f"Configuration validation failed: {exc.message}"
             return False, 0, msg
         except (TomlError, OSError) as exc:
             return False, 0, f"Error loading pipelex.toml: {exc}"
@@ -436,6 +451,7 @@ def display_health_report(
     deck_report: DeckSyncReport,
     config_location: ConfigLocationInfo,
     fix_mode: bool = False,
+    models_skipped: bool = False,
 ) -> None:
     """Display a comprehensive health report.
 
@@ -456,6 +472,9 @@ def display_health_report(
         deck_report: Per-file sync status report (used to render the per-file detail when not healthy)
         config_location: Resolved configuration location information
         fix_mode: Whether we're in interactive fix mode (--fix flag)
+        models_skipped: True when check_models was bypassed because config is broken — render
+            the Models row as a yellow advisory and suppress its standalone Solutions entry,
+            since the Config Files row already steers the user.
     """
     all_healthy = config_healthy and telemetry_healthy and backends_healthy and models_healthy and deck_healthy
 
@@ -536,6 +555,10 @@ def display_health_report(
     console.print("[bold]Models[/bold]")
     if models_healthy:
         console.print(f"  [green]✓[/green] {models_message}")
+    elif models_skipped:
+        # Skipped reads as advisory, not failure — the Config Files row is the real issue.
+        console.print(f"  [yellow]⚠[/yellow]  {models_message}")
+        console.print("    [dim]Models check deferred until config errors are fixed.[/dim]")
     else:
         console.print(f"  [red]✗[/red] {models_message}")
 
@@ -713,8 +736,61 @@ def check_deck_sync(config_dir: Path | None = None) -> tuple[bool, DeckSyncRepor
     return False, report, f"{len(actionable)} deck file(s) need action"
 
 
+def setup_doctor_runtime(
+    log_config_overrides: Mapping[str, Any] | None = None,
+    config_dir: Path | None = None,
+) -> None:
+    """Spin up a fresh PipelexHub and configure logging for doctor checks.
+
+    Doctor intentionally bypasses ``Pipelex.make`` so it can diagnose a broken config
+    without crashing during full init. This helper performs the minimum runtime setup
+    that ``check_models`` requires — a hub with a loaded config, a hub-level console
+    print target, and a configured logger — mirroring ``Pipelex.__init__`` step for
+    step on that subset.
+
+    The agent doctor passes ``AGENT_CLI_STDERR_LOG_FIELDS`` so the JSON envelope on
+    stdout stays clean for downstream consumers. The human doctor passes nothing and
+    inherits the user's configured log targets.
+
+    Overrides are merged via ``LogConfig.model_validate`` (full re-validation) so that
+    a wrong-typed override surfaces loudly instead of silently breaking downstream
+    match/case dispatch on ``ConsoleTarget`` etc.
+
+    ``log.configure`` is invoked through ``configure_if_unset`` so that if a library
+    embedding or interleaved test has already configured logging, this call no-ops
+    instead of raising the once-per-process ``RuntimeError``.
+
+    Args:
+        log_config_overrides: Optional mapping of ``LogConfig`` field names → values to
+            merge into the loaded log_config before ``log.configure`` is called.
+        config_dir: Optional explicit config dir (e.g. for ``--global``). When provided,
+            project/global layering is bypassed and only this directory is read.
+
+    Raises:
+        PipelexConfigError: If config validation fails. Translation of
+            ``pydantic.ValidationError`` to keep doctor's error surface stable.
+    """
+    pipelex_hub = PipelexHub()
+    set_pipelex_hub(pipelex_hub)
+    try:
+        pipelex_hub.setup_config(config_cls=PipelexConfig, config_dir=config_dir)
+    except ValidationError as validation_error:
+        validation_error_msg = report_validation_error(category="config", validation_error=validation_error)
+        msg = f"Could not setup config because of: {validation_error_msg}"
+        raise PipelexConfigError(msg) from validation_error
+
+    log_config = get_config().pipelex.log_config
+    if log_config_overrides is not None:
+        log_config = LogConfig.model_validate({**log_config.model_dump(), **log_config_overrides})
+    pipelex_hub.set_console_print_target(target=log_config.console_print_target)
+    log.configure_if_unset(log_config=log_config)
+
+
 def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, BackendFileReport]]:
     """Check if models are valid, including backend file validation.
+
+    Assumes ``setup_doctor_runtime`` has already run — the function reads from the
+    active hub and relies on ``log`` being configured.
 
     Args:
         config_dir: Explicit config directory override (e.g. for --global).
@@ -735,24 +811,18 @@ def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, B
             msg = f"Backend configuration error: {first_error}"
             return False, msg, backend_file_reports
 
-    # If backend files are OK, try to load and validate models
-    pipelex_hub = PipelexHub()
-    set_pipelex_hub(pipelex_hub)
-
-    try:
-        pipelex_hub.setup_config(config_cls=PipelexConfig)
-    except ValidationError as validation_error:
-        validation_error_msg = report_validation_error(category="config", validation_error=validation_error)
-        msg = f"Could not setup config because of: {validation_error_msg}"
-        raise PipelexConfigError(msg) from validation_error
-
-    log.configure(log_config=get_config().pipelex.log_config)
-
-    # Fetch gateway model specs if Gateway is enabled
+    # Fetch gateway model specs if Gateway is enabled.
+    # Probe the same backends.toml / pipelex_service.toml the doctor is reporting on
+    # (project-vs-global) instead of always defaulting to the global path — otherwise
+    # --global on a machine with a project-local backends.toml would mis-report gateway
+    # state because the layered `config_manager.backends_file_path` would still resolve
+    # to the project file.
+    backends_file_path = config_dir / "inference" / "backends.toml" if config_dir is not None else None
+    service_config_dir = config_dir if config_dir is not None else config_manager.global_config_dir
     gateway_config: GatewayConfig | None = None
     gateway_config_source: RemoteConfigSource | None = None
-    if is_pipelex_gateway_enabled():
-        pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
+    if is_pipelex_gateway_enabled(backends_file_path=backends_file_path):
+        pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=service_config_dir)
         if pipelex_service_config is None:
             return False, "Pipelex Gateway is enabled but service configuration is missing", backend_file_reports
         if not pipelex_service_config.agreement.terms_accepted:
@@ -768,6 +838,13 @@ def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, B
         except (RemoteConfigUnavailableError, RemoteConfigValidationError) as exc:
             return False, f"Failed to fetch Pipelex Gateway remote configuration: {exc}", backend_file_reports
 
+    # When --global (config_dir set), pin every path so layered config_manager.X
+    # resolution doesn't silently fall back to the project-local files.
+    backends_library_override = str(config_dir / "inference" / "backends.toml") if config_dir is not None else None
+    backends_dir_override = str(config_dir / "inference" / "backends") if config_dir is not None else None
+    routing_profile_override = str(config_dir / "inference" / "routing_profiles.toml") if config_dir is not None else None
+    deck_dir_override = str(config_dir / "inference" / "deck") if config_dir is not None else None
+
     models_manager = ModelManager()
     secrets_provider = EnvSecretsProvider()
     try:
@@ -775,6 +852,10 @@ def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, B
             secrets_provider=secrets_provider,
             gateway_config=gateway_config,
             gateway_config_source=gateway_config_source,
+            backends_library_path=backends_library_override,
+            backends_dir_path=backends_dir_override,
+            routing_profile_library_path=routing_profile_override,
+            deck_dir_path=deck_dir_override,
         )
         models_manager.validate_model_deck()
     except InferenceBackendLibraryError as exc:
@@ -838,11 +919,40 @@ def do_doctor_cmd(
     # Gather config location info
     config_location = gather_config_location()
 
-    # Run health checks (config_dir=None uses layered resolution: project → global)
+    # Filesystem-only checks run BEFORE bootstrap: when no --global override is in play,
+    # setup_doctor_runtime's load_config materializes ~/.pipelex/ from kit templates as a
+    # side effect. Running it first would turn check_config_files into a silent installer
+    # on a fresh machine. (The --global path skips materialization — see load_config.)
     config_healthy, config_missing_count, config_message = check_config_files()
     telemetry_healthy, telemetry_message = check_telemetry_config()
     backends_healthy, backend_credential_reports, backends_message = check_backend_credentials()
-    models_healthy, models_message, backend_file_reports = check_models()
+
+    # check_models requires the hub + log.configure produced by setup_doctor_runtime.
+    # When the config is broken, skipping setup keeps the friendly translation alive
+    # (setup_doctor_runtime would raise PipelexConfigError on an invalid config and
+    # discard the partial check tuples gathered so far). The PipelexConfigError arm
+    # handles the layered-override case: a config that passes check_config_files's
+    # shape check on disk can still fail full Pydantic validation inside the bootstrap.
+    models_skipped: bool
+    models_healthy: bool
+    models_message: str
+    backend_file_reports: dict[str, BackendFileReport]
+    if config_healthy:
+        try:
+            setup_doctor_runtime()
+            models_healthy, models_message, backend_file_reports = check_models()
+            models_skipped = False
+        except PipelexConfigError as exc:
+            models_healthy = False
+            models_message = f"skipped — {exc.message}"
+            backend_file_reports = {}
+            models_skipped = True
+    else:
+        models_healthy = False
+        models_message = "skipped — fix configuration errors first"
+        backend_file_reports = {}
+        models_skipped = True
+
     deck_healthy, deck_report, deck_message = check_deck_sync()
 
     # Display report
@@ -857,6 +967,7 @@ def do_doctor_cmd(
         backend_credential_reports=backend_credential_reports,
         models_healthy=models_healthy,
         models_message=models_message,
+        models_skipped=models_skipped,
         backend_file_reports=backend_file_reports,
         deck_healthy=deck_healthy,
         deck_message=deck_message,
