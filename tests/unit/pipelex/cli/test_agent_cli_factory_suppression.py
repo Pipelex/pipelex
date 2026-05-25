@@ -13,21 +13,36 @@ if TYPE_CHECKING:
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
 
+# Loggers armed by the test below at non-default levels. Their ``.level`` attribute is
+# snapshot in the autouse fixture and restored after each test so the per-logger state
+# does not leak into the rest of the suite (other tests may rely on the default NOTSET).
+_ARMED_LOGGER_NAMES: tuple[str, ...] = (
+    "pipelex",
+    "anthropic",
+    "httpx",
+    "some.unknown.transitive.dep",
+)
+
 
 class TestAgentCliFactorySuppression:
     """After successful init, the factory should silence pretty-print and Python logging."""
 
     @pytest.fixture(autouse=True)
     def _restore_globals(self):
-        """Save and restore PrettyPrinter.mode and the process-global logging disable
-        threshold around each test so the agent CLI cutoff does not leak into the rest
-        of the suite.
+        """Save and restore PrettyPrinter.mode, the process-global logging disable
+        threshold, AND the per-logger ``.level`` for every logger this test class arms.
+        Without restoring the per-logger levels, the ``setLevel`` calls in the test body
+        leak into shared module-level loggers (``pipelex``, ``anthropic``, ``httpx``, ...)
+        and affect any other test that assumes default NOTSET.
         """
         original_mode = PrettyPrinter.mode
         original_disable = logging.root.manager.disable
+        original_levels = {name: logging.getLogger(name).level for name in _ARMED_LOGGER_NAMES}
         yield
         PrettyPrinter.mode = original_mode
         logging.disable(original_disable)
+        for name, level in original_levels.items():
+            logging.getLogger(name).setLevel(level)
 
     def test_sets_silent_pretty_print_mode(self, mocker: MockerFixture) -> None:
         """PrettyPrinter.mode should be SILENT after make_pipelex_for_agent_cli succeeds."""

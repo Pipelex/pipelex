@@ -191,9 +191,10 @@ class TestAgentCliStdoutIsCleanJson:
         Before the fix the agent CLI's ``package_log_levels`` override only pinned
         ``pipelex = OFF`` and let third-party loggers keep their configured level,
         leaking INFO/DEBUG records onto stderr via the root's RichHandler. The fix is
-        ``logging.disable(LOGGING_LEVEL_OFF)`` at the start of every agent CLI entry
-        point — a process-global cutoff that blocks every record for every logger,
-        regardless of which package emits.
+        ``logging.disable(sys.maxsize)`` at the start of every agent CLI entry point
+        — a process-global cutoff that blocks every record for every logger at every
+        level (including custom levels above CRITICAL), regardless of which package
+        emits.
         """
         pipelex_toml = hermetic_home / ".pipelex" / "pipelex.toml"
         for package_name in ("anthropic", "httpx", "botocore", "openai"):

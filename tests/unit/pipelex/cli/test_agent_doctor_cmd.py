@@ -29,7 +29,7 @@ class TestAgentDoctorCmd:
         ``setup_doctor_runtime`` instantiates a PipelexHub, loads config from disk, and
         calls ``log.configure`` (once-per-process). ``apply_agent_cli_output_discipline``
         mutates global PrettyPrinter mode and the hub's console target.
-        ``silence_logging_for_agent_cli`` arms ``logging.disable`` at LOGGING_LEVEL_OFF
+        ``silence_logging_for_agent_cli`` arms ``logging.disable`` at ``sys.maxsize``
         — process-global and would leak into other tests in the suite. All three are
         out of scope for these tests — they cover the command's output shape, not the
         runtime bootstrap mechanics.

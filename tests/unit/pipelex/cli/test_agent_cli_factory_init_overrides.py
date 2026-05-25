@@ -6,9 +6,10 @@ Regression guard: a user TOML with ``[pipelex.log_config.package_log_levels] pip
 ``log.warning``) onto stderr — corrupting the JSON error envelope that downstream agent
 consumers parse. The bulletproof cutoff is ``silence_logging_for_agent_cli`` which is
 called at the very start of every agent CLI entry point and uses
-``logging.disable(LOGGING_LEVEL_OFF)`` — a process-global threshold that blocks any
-record for any logger, regardless of which package emits or what level it's configured
-at. The ``config_overrides`` carry defense-in-depth pins on top.
+``logging.disable(sys.maxsize)`` — a process-global threshold that blocks any record
+for any logger at any level (including custom levels above CRITICAL), regardless of
+which package emits or what level it's configured at. The ``config_overrides`` carry
+defense-in-depth pins on top.
 
 The agent CLI has NO ``--log-level`` flag. Suppression is unconditional by design — the
 CLI is machine-consumed and stderr is reserved for the structured error envelope.
@@ -17,6 +18,7 @@ CLI is machine-consumed and stderr is reserved for the structured error envelope
 from __future__ import annotations
 
 import logging
+import sys
 from typing import TYPE_CHECKING
 
 import pytest
@@ -29,7 +31,7 @@ from pipelex.cli.agent_cli.commands.agent_cli_factory import (
     make_pipelex_for_agent_cli,
 )
 from pipelex.system.console_target import ConsoleTarget
-from pipelex.tools.log.log_levels import LOGGING_LEVEL_OFF, LogLevel
+from pipelex.tools.log.log_levels import LogLevel
 
 
 class TestAgentCliFactoryInitOverrides:
@@ -63,9 +65,9 @@ class TestAgentCliFactoryInitOverrides:
            table / pretty-print fires.
         2. ``silence_logging_for_agent_cli`` (called before ``Pipelex.make`` so the
            cutoff is active during init) must have armed ``logging.disable`` at
-           ``LOGGING_LEVEL_OFF`` — the bulletproof handler-side cutoff that blocks
-           every record for every logger, including third-party libraries we don't
-           enumerate.
+           ``sys.maxsize`` — the bulletproof handler-side cutoff that blocks every
+           record for every logger at every level (including custom levels above
+           CRITICAL), including third-party libraries we don't enumerate.
         """
         mock_pipelex = mocker.MagicMock()
         mock_make = mocker.patch(
@@ -82,8 +84,8 @@ class TestAgentCliFactoryInitOverrides:
         assert log_config_overrides["console_log_target"] is ConsoleTarget.STDERR
         assert log_config_overrides["console_print_target"] is ConsoleTarget.STDERR
 
-        assert logging.root.manager.disable == LOGGING_LEVEL_OFF, (
+        assert logging.root.manager.disable == sys.maxsize, (
             "make_pipelex_for_agent_cli must call silence_logging_for_agent_cli (which arms "
-            "logging.disable at LOGGING_LEVEL_OFF) BEFORE Pipelex.make — otherwise any "
+            "logging.disable at sys.maxsize) BEFORE Pipelex.make — otherwise any "
             "third-party logger configured at INFO/WARNING leaks records during init."
         )

@@ -18,6 +18,7 @@ would ship green. This module covers the real side effects.
 from __future__ import annotations
 
 import logging
+import sys
 from typing import TYPE_CHECKING
 
 import pytest
@@ -30,28 +31,42 @@ from pipelex.cli.agent_cli.commands.agent_cli_factory import (
     silence_logging_for_agent_cli,
 )
 from pipelex.system.console_target import ConsoleTarget
-from pipelex.tools.log.log_levels import LOGGING_LEVEL_OFF
 from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
+
+# Loggers armed by the test below at non-OFF levels. Their ``.level`` attribute is
+# snapshot in the autouse fixture and restored after each test so the per-logger state
+# does not leak into the rest of the suite (other tests may rely on the default NOTSET).
+_ARMED_LOGGER_NAMES: tuple[str, ...] = (
+    "anthropic",
+    "httpx",
+    "some.transitive.dep.we.never.heard.of",
+)
 
 
 class TestAgentCliOutputDiscipline:
     @pytest.fixture(autouse=True)
     def _restore_globals(self):
-        """Restore PrettyPrinter.mode and process-global ``logging.disable`` after each
-        test so the agent CLI cutoff does not leak into other tests in the suite.
+        """Restore PrettyPrinter.mode, the process-global ``logging.disable`` threshold,
+        AND the per-logger ``.level`` for every logger this test class arms — otherwise
+        the levels set on shared module-level loggers (``anthropic``, ``httpx``, ...) leak
+        into other tests that assume default NOTSET.
         """
         original_mode = PrettyPrinter.mode
         original_disable = logging.root.manager.disable
+        original_levels = {name: logging.getLogger(name).level for name in _ARMED_LOGGER_NAMES}
         yield
         PrettyPrinter.mode = original_mode
         logging.disable(original_disable)
+        for name, level in original_levels.items():
+            logging.getLogger(name).setLevel(level)
 
     def test_silence_logging_disables_every_third_party_logger_regardless_of_configured_level(self) -> None:
         """Regression: ``silence_logging_for_agent_cli`` must call ``logging.disable`` at
-        ``LOGGING_LEVEL_OFF`` so that every logger — pipelex, anthropic, httpx, botocore,
+        ``sys.maxsize`` so that every logger — pipelex, anthropic, httpx, botocore,
         openai, anything a transitive dep ever creates — has ``isEnabledFor`` short-circuit
-        to False before its own level check fires. This is the only defense that scales
-        without an enumeration of package names.
+        to False before its own level check fires, at every level (including custom levels
+        above CRITICAL). This is the only defense that scales without an enumeration of
+        package names.
         """
         # Arm a couple of loggers at INFO/WARNING as if a downstream library had configured
         # them. The global disable must override their own level checks.
@@ -65,7 +80,7 @@ class TestAgentCliOutputDiscipline:
 
         silence_logging_for_agent_cli()
 
-        assert logging.root.manager.disable == LOGGING_LEVEL_OFF
+        assert logging.root.manager.disable == sys.maxsize
         assert not anthropic_logger.isEnabledFor(logging.INFO)
         assert not anthropic_logger.isEnabledFor(logging.CRITICAL)
         assert not httpx_logger.isEnabledFor(logging.WARNING)

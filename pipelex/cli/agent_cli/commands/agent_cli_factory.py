@@ -1,6 +1,7 @@
 """Factory function for agent CLI commands -- JSON-only error output."""
 
 import logging
+import sys
 import warnings
 from collections.abc import Mapping
 from pathlib import Path
@@ -26,7 +27,7 @@ from pipelex.system.pipelex_service.exceptions import (
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 from pipelex.tools.log.log import log
-from pipelex.tools.log.log_levels import LOGGING_LEVEL_OFF, LogLevel
+from pipelex.tools.log.log_levels import LogLevel
 from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
 
 # Canonical leaf dict for "for any agent-CLI invocation, both Rich-managed channels land
@@ -41,7 +42,7 @@ from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
 # The four knobs in this dict shape Pipelex's own log infrastructure but they CANNOT
 # enumerate every third-party logger a transitive dependency might create. The
 # bulletproof cutoff lives in ``silence_logging_for_agent_cli`` below, which calls
-# ``logging.disable(LOGGING_LEVEL_OFF)`` — a process-global threshold checked inside
+# ``logging.disable(sys.maxsize)`` — a process-global threshold checked inside
 # ``Logger.isEnabledFor`` BEFORE any per-logger level. With that in effect, no record
 # is created for any logger, regardless of which package emits, how it's configured, or
 # what handlers it attaches. We call it as the very first line of
@@ -95,13 +96,13 @@ AGENT_CLI_STDERR_LOG_FIELDS: Mapping[str, Any] = MappingProxyType(
 def silence_logging_for_agent_cli() -> None:
     """Process-global cutoff of Python's logging system for agent CLI invocations.
 
-    Calls ``logging.disable(LOGGING_LEVEL_OFF)``, which sets
-    ``logging.Logger.manager.disable = LOGGING_LEVEL_OFF``. Every ``Logger.isEnabledFor``
+    Calls ``logging.disable(sys.maxsize)``, which sets
+    ``logging.Logger.manager.disable = sys.maxsize``. Every ``Logger.isEnabledFor``
     call checks ``self.manager.disable >= level`` before the per-logger level check, so
-    no record gets created for any logger at any standard level (DEBUG through CRITICAL)
-    — regardless of which package emits, what level the logger is configured at, or
-    what handlers it has attached. This includes third-party packages we never
-    enumerate and any logger created AFTER this call.
+    no record gets created for any logger — blocks every record at every level
+    (including custom levels above CRITICAL), regardless of which package emits, what
+    level the logger is configured at, or what handlers it has attached. This includes
+    third-party packages we never enumerate and any logger created AFTER this call.
 
     Idempotent. The primary call site is ``app_callback`` in
     ``pipelex.cli.agent_cli._agent_cli`` — Typer routes every ``pipelex-agent``
@@ -117,7 +118,7 @@ def silence_logging_for_agent_cli() -> None:
     the hub's ``set_console_print_target``. Does NOT affect bare ``print(...)`` calls
     — those are reserved for the structured success/error envelopes by design.
     """
-    logging.disable(LOGGING_LEVEL_OFF)
+    logging.disable(sys.maxsize)
 
 
 # Full ``config_overrides`` tree for ``Pipelex.make()``. ``deep_update`` recurses into

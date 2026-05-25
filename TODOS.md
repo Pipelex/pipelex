@@ -66,20 +66,20 @@ The structural change is invasive enough that a regression here would mask every
 
 Three small fixes, tightly related. Land together.
 
-- [ ] **Step 2.1 (fixes #9)** — In `pipelex/cli/agent_cli/commands/agent_cli_factory.py`, change `silence_logging_for_agent_cli` to call `logging.disable(sys.maxsize)` instead of `logging.disable(LOGGING_LEVEL_OFF)`. Add `import sys` if missing. Keep `LOGGING_LEVEL_OFF` import only if still used elsewhere in the file. Update the docstring's "blocks DEBUG through CRITICAL" line to "blocks every record at every level (including custom levels above CRITICAL)".
-- [ ] **Step 2.2 (fixes #9 tests)** — Update assertions in `tests/unit/pipelex/cli/test_agent_cli_factory_init_overrides.py:85` and `tests/unit/pipelex/cli/test_agent_cli_output_discipline.py` that compare `logging.root.manager.disable` to `LOGGING_LEVEL_OFF`. Change to compare to `sys.maxsize`. Update imports.
-- [ ] **Step 2.3 (fixes #3)** — In `tests/unit/pipelex/cli/test_agent_cli_factory.py:31-39`, extend the autouse `_restore_globals` fixture to save/restore `logging.root.manager.disable` alongside `PrettyPrinter.mode` and `root_logger.level`. Follow the pattern from `test_agent_cli_factory_init_overrides.py`.
-- [ ] **Step 2.4 (fixes #11)** — In `tests/unit/pipelex/cli/test_agent_cli_factory_suppression.py:22-30` AND `tests/unit/pipelex/cli/test_agent_cli_output_discipline.py:32-40`, extend the autouse fixture to snapshot and restore the `.level` attribute of every logger the tests arm. Targets to cover:
-  - In `test_agent_cli_factory_suppression.py`: `pipelex`, `anthropic`, `httpx`, `some.unknown.transitive.dep`.
-  - In `test_agent_cli_output_discipline.py`: `anthropic`, `httpx`, `some.transitive.dep.we.never.heard.of`, AND the loggers derived from `_THIRD_PARTY_PACKAGES` via `package_name.replace("-", ".")`.
+- [x] **Step 2.1 (fixes #9)** — In `pipelex/cli/agent_cli/commands/agent_cli_factory.py`, change `silence_logging_for_agent_cli` to call `logging.disable(sys.maxsize)` instead of `logging.disable(LOGGING_LEVEL_OFF)`. Add `import sys` if missing. Keep `LOGGING_LEVEL_OFF` import only if still used elsewhere in the file. Update the docstring's "blocks DEBUG through CRITICAL" line to "blocks every record at every level (including custom levels above CRITICAL)". **Done:** added `import sys`, removed `LOGGING_LEVEL_OFF` import (no other uses in file), updated docstring + the comment block at lines 32-49 that also referenced the old constant.
+- [x] **Step 2.2 (fixes #9 tests)** — Update assertions in `tests/unit/pipelex/cli/test_agent_cli_factory_init_overrides.py:85` and `tests/unit/pipelex/cli/test_agent_cli_output_discipline.py` that compare `logging.root.manager.disable` to `LOGGING_LEVEL_OFF`. Change to compare to `sys.maxsize`. Update imports. **Done:** swapped both assertions and import statements; updated module/test docstrings.
+- [x] **Step 2.3 (fixes #3)** — In `tests/unit/pipelex/cli/test_agent_cli_factory.py:31-39`, extend the autouse `_restore_globals` fixture to save/restore `logging.root.manager.disable` alongside `PrettyPrinter.mode` and `root_logger.level`. Follow the pattern from `test_agent_cli_factory_init_overrides.py`. **Done.**
+- [x] **Step 2.4 (fixes #11)** — In `tests/unit/pipelex/cli/test_agent_cli_factory_suppression.py:22-30` AND `tests/unit/pipelex/cli/test_agent_cli_output_discipline.py:32-40`, extend the autouse fixture to snapshot and restore the `.level` attribute of every logger the tests arm. Targets to cover:
+  - In `test_agent_cli_factory_suppression.py`: `pipelex`, `anthropic`, `httpx`, `some.unknown.transitive.dep`. **Done** (via module-level `_ARMED_LOGGER_NAMES` tuple consumed by the fixture).
+  - In `test_agent_cli_output_discipline.py`: `anthropic`, `httpx`, `some.transitive.dep.we.never.heard.of`. **Done** (same pattern). Note: the TODOS step also mentioned `_THIRD_PARTY_PACKAGES` — that symbol does not exist anywhere in `pipelex/` or `tests/` (grep confirms), so it was a stale reference from the abandoned enumeration approach. The actual loggers armed by the test body are the three listed; nothing more to restore.
 
 ### ✅ CHECKPOINT 2 — verify before continuing
 
 Production-code changes are done. Test-only work remains.
 
-- [ ] Run `make agent-check`. Must be clean.
-- [ ] Run targeted: `.venv/bin/pytest -n auto -m "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api" -o log_level=WARNING --tb=short -q tests/unit/pipelex/cli/ tests/unit/pipelex/tools/test_log_config.py tests/e2e/agent_cli/`. Must pass.
-- [ ] Run `make tb` (boot test) — sanity check on config loading.
+- [x] Run `make agent-check`. Must be clean. **Result:** 0 pyright errors, mypy success on 1893 files.
+- [x] Run targeted: `.venv/bin/pytest -n auto -m "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api" -o log_level=WARNING --tb=short -q tests/unit/pipelex/cli/ tests/unit/pipelex/tools/test_log_config.py tests/e2e/agent_cli/`. Must pass. **Result:** 366 passed in 43.36s.
+- [x] Run `make tb` (boot test) — sanity check on config loading. **Result:** 2 passed, 6708 deselected in 5.67s.
 
 **Cold-start handoff at this checkpoint:** next agent reads this TODOS.md, runs `git diff HEAD --stat` to see what's staged. Phase 3 is test-only and can land in a fresh session safely. If anything in Phase 2 broke, the most likely culprits are: (a) the `sys.maxsize` swap left a dangling `LOGGING_LEVEL_OFF` import; (b) the fixture extension overlooked one of the logger names. Re-grep the test files for `setLevel(` calls and verify each target is in the restore loop.
 
