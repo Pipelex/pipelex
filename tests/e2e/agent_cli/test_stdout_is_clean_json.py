@@ -35,37 +35,61 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
+from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 from tests.e2e.agent_cli.conftest import PIPELEX_AGENT_BIN
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
-def _set_pipelex_package_log_level_to_debug(pipelex_toml_path: Path) -> None:
-    """Rewrite the ``pipelex = "INFO"`` line inside ``[pipelex.log_config.package_log_levels]``
-    to ``"DEBUG"`` so any setup-time ``log.debug`` in the ``pipelex.*`` namespace fires.
+def _set_package_log_level(pipelex_toml_path: Path, *, package_name: str, level: str) -> None:
+    """Set ``<package_name> = "<level>"`` inside ``[pipelex.log_config.package_log_levels]``.
 
-    Targets the specific kit-template structure (``pipelex = "INFO"`` lives directly under
-    that section). Asserts on no-match so a future kit refactor surfaces here instead of
-    silently neutering the test.
+    Uses the project's ``tomlkit``-based helpers (the same pair ``init_cmd`` relies
+    on) to parse-edit-dump the file. This handles every edge case the previous
+    line-based rewriter had to special-case (duplicate section headers, whitespace
+    variants in key lines, missing trailing newlines) — tomlkit's parser is the
+    source of truth for what the agent CLI ultimately reads back via Pipelex's
+    config loader.
     """
-    original_text = pipelex_toml_path.read_text(encoding="utf-8")
-    lines = original_text.splitlines(keepends=True)
-    in_target_section = False
-    rewrote = False
-    for index, line in enumerate(lines):
-        stripped = line.strip()
-        if stripped.startswith("[") and stripped.endswith("]"):
-            in_target_section = stripped == "[pipelex.log_config.package_log_levels]"
-            continue
-        if in_target_section and stripped.startswith("pipelex"):
-            lines[index] = 'pipelex = "DEBUG"\n'
-            rewrote = True
-            break
-    if not rewrote:
-        msg = f"Could not find 'pipelex = ...' under [pipelex.log_config.package_log_levels] in {pipelex_toml_path}"
+    doc = load_toml_with_tomlkit(pipelex_toml_path)
+    doc["pipelex"]["log_config"]["package_log_levels"][package_name] = level  # type: ignore[index]
+    save_toml_to_path(doc, pipelex_toml_path)
+
+
+def _set_pipelex_package_log_level_to_debug(pipelex_toml_path: Path) -> None:
+    """Compatibility shim for the original two callers — bumps pipelex to DEBUG."""
+    _set_package_log_level(pipelex_toml_path, package_name="pipelex", level="DEBUG")
+
+
+def _assert_stderr_is_clean_or_structured_envelope(stderr: str) -> None:
+    """Assert that ``stderr`` is either empty or a parseable structured error envelope.
+
+    The agent CLI's contract is: stderr is reserved for the structured error envelope
+    (a JSON object with an ``error`` field). The strictest catch on a third-party
+    logger leak is: any free-floating log line on stderr would NOT be valid JSON, so
+    ``json.loads`` fails. This relaxation lets the test tolerate the edge case where
+    the envelope itself legitimately appears on stderr (which would never happen on a
+    successful run, but it absorbs unrelated environmental noise that still parses
+    cleanly), while still failing loudly on the log-leak shape we actually guard
+    against.
+    """
+    if stderr == "":
+        return
+    try:
+        parsed = json.loads(stderr)
+    except json.JSONDecodeError as exc:
+        msg = (
+            f"stderr must be either empty or a parseable JSON error envelope — any other "
+            f"content (log line, warning, print) means something leaked through the agent "
+            f"CLI's stdout/stderr discipline.\nstderr={stderr!r}\nparse error={exc!s}"
+        )
+        raise AssertionError(msg) from exc
+    if not (isinstance(parsed, dict) and "error" in parsed):
+        msg = (
+            f"stderr parsed as JSON but is not the structured error envelope shape (expected a dict containing an ``error`` key).\nstderr={stderr!r}"
+        )
         raise AssertionError(msg)
-    pipelex_toml_path.write_text("".join(lines), encoding="utf-8")
 
 
 def _set_console_targets(pipelex_toml_path: Path, *, log_target: str, print_target: str) -> None:
@@ -117,16 +141,15 @@ class TestAgentCliStdoutIsCleanJson:
 
         Bumps ``package_log_levels.pipelex`` to DEBUG (the exact knob a downstream user
         would flip when debugging) so the latent ``console_log_target`` bug surfaces as
-        DEBUG lines on stdout. Then ``json.loads`` on the entire stdout (with no slicing,
-        no last-object walker) must succeed and return a dict envelope.
+        DEBUG lines on stdout. The agent CLI's ``config_overrides`` MUST win over the
+        user-TOML override (pinning pipelex to OFF), so ``json.loads`` on the entire
+        stdout must succeed and return a dict envelope.
         """
         _set_pipelex_package_log_level_to_debug(hermetic_home / ".pipelex" / "pipelex.toml")
 
         result = subprocess.run(  # noqa: S603
             [
                 str(PIPELEX_AGENT_BIN),
-                "--log-level",
-                "debug",
                 "models",
                 "--format",
                 "json",
@@ -154,6 +177,55 @@ class TestAgentCliStdoutIsCleanJson:
         payload = cast("dict[str, object]", parsed)
         assert payload.get("success") is True, f"Expected ``success=True`` in envelope; got {payload!r}"
 
+    def test_models_json_stdout_and_stderr_stay_clean_under_third_party_logger_enabled(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        """Regression for the third-party-logger leak: even when the user bumps a
+        third-party logger (anthropic, httpx) to DEBUG in their ``pipelex.toml``, the
+        agent CLI's stdout AND stderr channels must stay clean — stdout parseable as a
+        single JSON envelope, stderr free of any log line that would corrupt the
+        structured error envelope.
+
+        Before the fix the agent CLI's ``package_log_levels`` override only pinned
+        ``pipelex = OFF`` and let third-party loggers keep their configured level,
+        leaking INFO/DEBUG records onto stderr via the root's RichHandler. The fix is
+        ``logging.disable(sys.maxsize)`` at the start of every agent CLI entry point
+        — a process-global cutoff that blocks every record for every logger at every
+        level (including custom levels above CRITICAL), regardless of which package
+        emits.
+        """
+        pipelex_toml = hermetic_home / ".pipelex" / "pipelex.toml"
+        for package_name in ("anthropic", "httpx", "botocore", "openai"):
+            _set_package_log_level(pipelex_toml, package_name=package_name, level="DEBUG")
+
+        result = subprocess.run(  # noqa: S603
+            [
+                str(PIPELEX_AGENT_BIN),
+                "models",
+                "--format",
+                "json",
+            ],
+            env=offline_subprocess_env,
+            cwd=str(hermetic_home),
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=120,
+        )
+
+        assert result.returncode == 0, (
+            f"pipelex-agent models --format json must succeed with third-party loggers at DEBUG.\nstdout={result.stdout!r}\nstderr={result.stderr!r}"
+        )
+        # stdout must parse as JSON in one shot — no log line preceding/following the envelope.
+        parsed = json.loads(result.stdout)
+        assert isinstance(parsed, dict)
+        # stderr must be either empty (the expected case for a successful run) or a
+        # parseable structured error envelope — anything else (log line, warning, print)
+        # proves a third-party logger leaked through the root RichHandler.
+        _assert_stderr_is_clean_or_structured_envelope(result.stderr)
+
     def test_models_json_stdout_resists_user_targets_override_to_stdout(
         self,
         hermetic_home: Path,
@@ -177,8 +249,6 @@ class TestAgentCliStdoutIsCleanJson:
         result = subprocess.run(  # noqa: S603
             [
                 str(PIPELEX_AGENT_BIN),
-                "--log-level",
-                "debug",
                 "models",
                 "--format",
                 "json",

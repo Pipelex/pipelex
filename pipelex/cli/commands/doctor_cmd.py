@@ -58,6 +58,7 @@ from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.misc.dict_utils import extract_vars_from_strings_recursive
 from pipelex.tools.misc.file_utils import path_exists
+from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.placeholder import value_is_placeholder
 from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_path
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
@@ -752,8 +753,10 @@ def setup_doctor_runtime(
     stdout stays clean for downstream consumers. The human doctor passes nothing and
     inherits the user's configured log targets.
 
-    Overrides are merged via ``LogConfig.model_validate`` (full re-validation) so that
-    a wrong-typed override surfaces loudly instead of silently breaking downstream
+    Overrides are merged via ``deep_update`` so nested dicts (notably
+    ``package_log_levels``) merge into the loaded config instead of replacing it
+    wholesale, then passed through ``LogConfig.model_validate`` (full re-validation) so
+    that a wrong-typed override surfaces loudly instead of silently breaking downstream
     match/case dispatch on ``ConsoleTarget`` etc.
 
     ``log.configure`` is invoked through ``configure_if_unset`` so that if a library
@@ -781,7 +784,9 @@ def setup_doctor_runtime(
 
     log_config = get_config().pipelex.log_config
     if log_config_overrides is not None:
-        log_config = LogConfig.model_validate({**log_config.model_dump(), **log_config_overrides})
+        merged = log_config.model_dump()
+        deep_update(merged, log_config_overrides)
+        log_config = LogConfig.model_validate(merged)
     pipelex_hub.set_console_print_target(target=log_config.console_print_target)
     log.configure_if_unset(log_config=log_config)
 

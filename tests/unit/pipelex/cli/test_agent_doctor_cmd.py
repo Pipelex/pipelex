@@ -23,16 +23,20 @@ class TestAgentDoctorCmd:
 
     @pytest.fixture(autouse=True)
     def _mock_doctor_bootstrap(self, mocker: MockerFixture) -> None:
-        """Stub the runtime bootstrap so unit tests don't load real config or reconfigure logging.
+        """Stub the runtime bootstrap so unit tests don't load real config or mutate
+        global logging / PrettyPrinter state.
 
         ``setup_doctor_runtime`` instantiates a PipelexHub, loads config from disk, and
         calls ``log.configure`` (once-per-process). ``apply_agent_cli_output_discipline``
-        mutates global PrettyPrinter mode and the hub's console target. Both are out of
-        scope for these tests — they cover the command's output shape, not the runtime
-        bootstrap mechanics.
+        mutates global PrettyPrinter mode and the hub's console target.
+        ``silence_logging_for_agent_cli`` arms ``logging.disable`` at ``sys.maxsize``
+        — process-global and would leak into other tests in the suite. All three are
+        out of scope for these tests — they cover the command's output shape, not the
+        runtime bootstrap mechanics.
         """
         mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.setup_doctor_runtime")
         mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.apply_agent_cli_output_discipline")
+        mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.silence_logging_for_agent_cli")
 
     def test_healthy_output_json(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """Healthy checks should produce JSON with all_healthy=true and no recommended_actions."""
