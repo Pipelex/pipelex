@@ -448,7 +448,14 @@ is_enabled = false
 # Master toggle. When false, workflow starts don't attach any custom search
 # attributes, the worker-boot check is skipped, and the dashboard view falls
 # back to WorkflowType / WorkflowId / StartTime only.
-enabled = true
+#
+# Default off: custom search attributes must be pre-registered on the target
+# Temporal namespace, and `temporal server start-dev` does not auto-register
+# them — so a default-on baseline makes every local dev loop fail on the
+# first workflow start. Deployments that have registered the attributes
+# (Temporal Cloud namespaces, self-hosted clusters with the migration run)
+# opt in by setting `enabled = true` in their env override.
+enabled = false
 # Subset of the five built-in attributes to populate. Names not in this list
 # are skipped at workflow-start time AND not required at worker boot. Pipelex
 # only knows how to populate these five; arbitrary custom names are out of

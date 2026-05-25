@@ -224,7 +224,7 @@ is_enabled = false
 # the operator owns the namespace policy and can't grant search-attribute
 # admin to the worker.
 [temporal.search_attributes]
-enabled = true
+enabled = false
 attributes = ["PipeCode", "PipelineRunId", "SessionId", "UserId", "DomainCode"]
 
 [temporal.payload_codec_config]
