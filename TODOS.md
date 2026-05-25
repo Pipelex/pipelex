@@ -43,20 +43,20 @@ A `/code-review` pass found 15 findings. After triage with the user, 6 actionabl
 
 Single architectural shift: every agent CLI command must traverse `app_callback` in `pipelex/cli/agent_cli/_agent_cli.py`. Wiring the silence call there guarantees every current AND future command is covered, even ones (like `init_cmd`, `accept_gateway_terms_cmd`) that bypass `make_pipelex_for_agent_cli`.
 
-- [ ] **Step 1.1** — Read `pipelex/cli/agent_cli/_agent_cli.py` to locate `app_callback` (around line 81 per the review). Confirm it's the typer choke point every command runs through, and that `set_agent_cli_error_format(CliOutputFormat.JSON)` already lives there.
-- [ ] **Step 1.2** — Add `silence_logging_for_agent_cli()` call at the top of `app_callback`, BEFORE `set_agent_cli_error_format`. Import the symbol from `pipelex.cli.agent_cli.commands.agent_cli_factory`.
-- [ ] **Step 1.3** — Decide: keep the existing per-call invocations in `make_pipelex_for_agent_cli:166` and `agent_doctor_cmd:134` OR remove them.
+- [x] **Step 1.1** — Read `pipelex/cli/agent_cli/_agent_cli.py` to locate `app_callback` (around line 81 per the review). Confirm it's the typer choke point every command runs through, and that `set_agent_cli_error_format(CliOutputFormat.JSON)` already lives there.
+- [x] **Step 1.2** — Add `silence_logging_for_agent_cli()` call at the top of `app_callback`, BEFORE `set_agent_cli_error_format`. Import the symbol from `pipelex.cli.agent_cli.commands.agent_cli_factory`.
+- [x] **Step 1.3** — Decide: keep the existing per-call invocations in `make_pipelex_for_agent_cli:166` and `agent_doctor_cmd:134` OR remove them.
   - **Decision recorded:** KEEP both. `silence_logging_for_agent_cli` is idempotent (calling `logging.disable` twice with the same value is a no-op). Keeping preserves defense for direct library callers of `make_pipelex_for_agent_cli` and avoids breaking the unit tests that mock `Pipelex.make` and call the factory directly (they assert `logging.root.manager.disable == LOGGING_LEVEL_OFF` after the call).
-- [ ] **Step 1.4** — Update docstrings: `silence_logging_for_agent_cli`'s docstring says "Must be called at the very start of every agent CLI entry point (`make_pipelex_for_agent_cli`, `agent_doctor_cmd`)" — rewrite to reflect that `app_callback` is now the primary armor and the per-call invocations are belt-and-braces.
+- [x] **Step 1.4** — Update docstrings: `silence_logging_for_agent_cli`'s docstring says "Must be called at the very start of every agent CLI entry point (`make_pipelex_for_agent_cli`, `agent_doctor_cmd`)" — rewrite to reflect that `app_callback` is now the primary armor and the per-call invocations are belt-and-braces.
 
 ### ✅ CHECKPOINT 1 — verify before continuing
 
 The structural change is invasive enough that a regression here would mask everything else. STOP here and:
 
-- [ ] Run `make agent-check` — must be clean.
-- [ ] Run the unit suite for cli/: `.venv/bin/pytest -n auto -m "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api" -o log_level=WARNING --tb=short -q tests/unit/pipelex/cli/`. Must pass.
-- [ ] Run the e2e: `.venv/bin/pytest --tb=short -q tests/e2e/agent_cli/test_stdout_is_clean_json.py`. Must pass — both the original three tests AND the new third-party-leak test.
-- [ ] Manually verify with a fresh shell that `pipelex-agent init --format json` produces a clean stderr in offline mode (no httpx INFO leaks).
+- [x] Run `make agent-check` — must be clean. **Result:** 0 pyright errors, mypy success on 1893 files.
+- [x] Run the unit suite for cli/: `.venv/bin/pytest -n auto -m "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api" -o log_level=WARNING --tb=short -q tests/unit/pipelex/cli/`. Must pass. **Result:** 349 passed in 10.29s.
+- [x] Run the e2e: `.venv/bin/pytest --tb=short -q tests/e2e/agent_cli/test_stdout_is_clean_json.py`. Must pass — both the original three tests AND the new third-party-leak test. **Result:** 3 passed in 3.02s (incl. `test_models_json_stdout_and_stderr_stay_clean_under_third_party_logger_enabled`).
+- [x] Manually verify with a fresh shell that `pipelex-agent init --format json` produces a clean stderr in offline mode (no httpx INFO leaks). **Result:** stderr is exactly the structured `ArgumentError` envelope (no project root in `/tmp`); no log lines. Confirms `app_callback` runs and silences logging even on the `init`/`accept-gateway-terms` paths that bypass `make_pipelex_for_agent_cli` (verified by grep — neither cmd module calls `silence_logging_for_agent_cli` nor the factory).
 
 **Cold-start handoff at this checkpoint:** if the session ends here, the next agent should re-read this TODOS.md (especially the "Context" section above), then `git diff HEAD` to see what's staged. If Step 1.2 landed but the verify failed, the regression is most likely in `_agent_cli.py` — check that `app_callback` runs unconditionally for every command, not gated on some Typer flag. If verify passed, Phase 2 is independent and can start fresh.
 

@@ -9,6 +9,7 @@ from typer.core import TyperGroup
 from typing_extensions import override
 
 from pipelex.cli.agent_cli.commands.accept_gateway_terms_cmd import agent_accept_gateway_terms_cmd
+from pipelex.cli.agent_cli.commands.agent_cli_factory import silence_logging_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, set_agent_cli_error_format
 from pipelex.cli.agent_cli.commands.check_model_cmd import agent_check_model_cmd
 from pipelex.cli.agent_cli.commands.concept_cmd import concept_cmd
@@ -99,10 +100,20 @@ def app_callback(
 
     Note: there is no ``--log-level`` flag. ``pipelex-agent`` is machine-consumed:
     stdout is reserved for the success envelope and stderr for the error envelope.
-    Free-floating logs would corrupt those channels, so pipelex's logs are silenced
-    unconditionally by the factory. For verbose debugging, use the human ``pipelex``
-    CLI instead.
+    Free-floating logs would corrupt those channels, so Python's logging system is
+    cut off process-wide via ``silence_logging_for_agent_cli`` as the very first
+    action in this callback — covering every subcommand invocation (including ones
+    like ``init`` and ``accept-gateway-terms`` that bypass
+    ``make_pipelex_for_agent_cli``). The ``--version`` eager option short-circuits
+    before this body runs, but its callback only does ``typer.echo`` + ``Exit`` and
+    touches no log path. For verbose debugging, use the human ``pipelex`` CLI instead.
     """
+    # Process-global logging cutoff, armed BEFORE any command body runs and BEFORE any
+    # error-format / runner-validation code below can route through ``log.*``. This is the
+    # primary armor for the stdout/stderr discipline; the per-call invocations inside
+    # ``make_pipelex_for_agent_cli`` and ``agent_doctor_cmd`` are kept as defense-in-depth
+    # for direct library callers that bypass this Typer entry point.
+    silence_logging_for_agent_cli()
     # Reset the error-format ContextVar at the single choke point every command passes through, so
     # a markdown command cannot leak markdown into a later JSON-only command in the same process.
     # --format / --error-format commands override this afterwards; JSON-only commands keep the JSON default.

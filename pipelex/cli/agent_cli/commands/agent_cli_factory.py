@@ -103,10 +103,14 @@ def silence_logging_for_agent_cli() -> None:
     what handlers it has attached. This includes third-party packages we never
     enumerate and any logger created AFTER this call.
 
-    Idempotent. Must be called at the very start of every agent CLI entry point
-    (``make_pipelex_for_agent_cli``, ``agent_doctor_cmd``) so the cutoff is active
-    before any setup code can reach a ``log.*`` call — closing the window between
-    ``log.configure`` and ``apply_agent_cli_output_discipline``.
+    Idempotent. The primary call site is ``app_callback`` in
+    ``pipelex.cli.agent_cli._agent_cli`` — Typer routes every ``pipelex-agent``
+    subcommand through that callback, so the cutoff is armed before any command body
+    runs (including commands like ``init`` and ``accept-gateway-terms`` that bypass
+    ``make_pipelex_for_agent_cli``). The additional invocations at the top of
+    ``make_pipelex_for_agent_cli`` and ``agent_doctor_cmd`` are belt-and-braces
+    defense for direct library callers that bypass the Typer entry point (and for
+    the unit tests that drive those factories directly).
 
     Does NOT affect Rich ``Console`` output (banners, tables, pretty_print) — that's
     handled by ``console_print_target = STDERR`` + ``PrettyPrinter.mode = SILENT`` +
