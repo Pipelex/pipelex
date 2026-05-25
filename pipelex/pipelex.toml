@@ -501,17 +501,15 @@ non_retryable_error_types = [
 # Per-queue submitter options. Operators populate this when a backend pool
 # needs its own timeout or retry tuning. See pipelex/kit/configs/pipelex.toml
 # for examples.
+#
+# The baseline ships no entries here. Each deployment is expected to add its
+# own ``[temporal.queue_options.<queue>]`` block keyed by whatever name it
+# chose for ``default_task_queue`` (and any extra queues referenced by
+# ``activity_queues``). Shipping an opinionated entry for the baseline's
+# ``temporal_task_queue`` name would create an orphan overlay the moment a
+# downstream override renames the queue — and config merging cannot delete
+# baseline keys, so that orphan would be unrecoverable from the override.
 [temporal.queue_options]
-
-# Default cluster-wide rate cap on the worker's home queue. Mirrors the pre-v2
-# hardcoded ``max_task_queue_activities_per_second=1000`` on ``Worker(...)`` so
-# existing deployments on ``temporal_task_queue`` keep the same Temporal-server-
-# enforced cap. Deployments using non-default queue names should add their own
-# ``[temporal.queue_options.<queue>]`` entries. The empty-routing hybrid
-# fallback applies these overlays to activities dispatched without an explicit
-# task_queue too.
-[temporal.queue_options.temporal_task_queue]
-max_task_queue_activities_per_second = 1000
 
 # Named worker-runtime profiles. A worker process selects one via --profile.
 # Defaults are lifted verbatim from the pre-v2 hardcoded Worker(...) construction
