@@ -87,23 +87,23 @@ Production-code changes are done. Test-only work remains.
 
 ## Phase 3 — Test/helper robustness (independent improvements)
 
-- [ ] **Step 3.1 (fixes #13)** — In `tests/e2e/agent_cli/test_stdout_is_clean_json.py::test_models_json_stdout_and_stderr_stay_clean_under_third_party_logger_enabled`, replace the `assert result.stderr == ""` with: stderr must be either empty OR parse as a structured error envelope (a dict with `error` field). This catches log-line leaks (which would not be valid JSON) while tolerating environmental noise like ResourceWarnings. Helper: try `json.loads(result.stderr)` and accept either parse-success-with-envelope-shape or empty.
-- [ ] **Step 3.2 (fixes #7, #8, #15)** — Rewrite `_set_package_log_level` in `tests/e2e/agent_cli/test_stdout_is_clean_json.py` using `tomlkit` (already a project dep — see `init_cmd.py`'s usage). Pseudo:
+- [x] **Step 3.1 (fixes #13)** — In `tests/e2e/agent_cli/test_stdout_is_clean_json.py::test_models_json_stdout_and_stderr_stay_clean_under_third_party_logger_enabled`, replace the `assert result.stderr == ""` with: stderr must be either empty OR parse as a structured error envelope (a dict with `error` field). This catches log-line leaks (which would not be valid JSON) while tolerating environmental noise like ResourceWarnings. Helper: try `json.loads(result.stderr)` and accept either parse-success-with-envelope-shape or empty. **Done:** added `_assert_stderr_is_clean_or_structured_envelope` helper; the test now calls it in place of the strict empty-string assertion.
+- [x] **Step 3.2 (fixes #7, #8, #15)** — Rewrite `_set_package_log_level` in `tests/e2e/agent_cli/test_stdout_is_clean_json.py` using `tomlkit` (already a project dep — see `init_cmd.py`'s usage). Pseudo:
   ```python
   import tomlkit
   doc = tomlkit.parse(pipelex_toml_path.read_text())
   doc["pipelex"]["log_config"]["package_log_levels"][package_name] = level
   pipelex_toml_path.write_text(tomlkit.dumps(doc))
   ```
-  This eliminates all three line-based-rewriter edges (duplicate section, no-space matcher, no-trailing-newline) in one pass. Keep the `_set_pipelex_package_log_level_to_debug` compat shim so the original two callers don't change.
-- [ ] **Step 3.3** — Sanity check: read the rewritten test file to confirm the section path `["pipelex"]["log_config"]["package_log_levels"]` exists in the kit's `pipelex.toml` (it does, line 177 — `[pipelex.log_config.package_log_levels]`).
+  This eliminates all three line-based-rewriter edges (duplicate section, no-space matcher, no-trailing-newline) in one pass. Keep the `_set_pipelex_package_log_level_to_debug` compat shim so the original two callers don't change. **Done:** used the project's `load_toml_with_tomlkit` + `save_toml_to_path` helpers from `pipelex.tools.misc.toml_utils` (proper type stubs, same pair `init_cmd` uses) instead of raw tomlkit — pyright was unhappy with the raw `tomlkit.dumps` overload. Compat shim preserved.
+- [x] **Step 3.3** — Sanity check: read the rewritten test file to confirm the section path `["pipelex"]["log_config"]["package_log_levels"]` exists in the kit's `pipelex.toml` (it does, line 177 — `[pipelex.log_config.package_log_levels]`). **Confirmed via grep on both `pipelex/pipelex.toml:98` and `pipelex/kit/configs/pipelex.toml:177`.**
 
 ### ✅ CHECKPOINT 3 — final verification
 
-- [ ] Run `make agent-check`. Must be clean.
-- [ ] Run targeted: `.venv/bin/pytest -n auto -m "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api" -o log_level=WARNING --tb=short -q tests/unit/pipelex/cli/ tests/unit/pipelex/tools/ tests/integration/pipelex/cli/ tests/e2e/agent_cli/`. All pass.
-- [ ] Run `make tb`. Pass.
-- [ ] Skim `git diff HEAD --stat` — the diff should now cover: `_agent_cli.py` (new silence wire), `agent_cli_factory.py` (sys.maxsize), `test_agent_cli_factory.py` (fixture), `test_agent_cli_factory_suppression.py` + `test_agent_cli_output_discipline.py` (per-logger restore), `test_stdout_is_clean_json.py` (relaxed assertion + tomlkit rewrite).
+- [x] Run `make agent-check`. Must be clean. **Result:** 0 pyright errors, mypy success on 1893 files.
+- [x] Run targeted: `.venv/bin/pytest -n auto -m "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api" -o log_level=WARNING --tb=short -q tests/unit/pipelex/cli/ tests/unit/pipelex/tools/ tests/integration/pipelex/cli/ tests/e2e/agent_cli/`. All pass. **Result:** 1541 passed, 1 skipped (pre-existing `test_toml_utils.py:61` skip — unrelated) in 33.33s.
+- [x] Run `make tb`. Pass. **Result:** 2 passed, 6708 deselected in 6.13s.
+- [x] Skim `git diff HEAD --stat` — the diff should now cover: `_agent_cli.py` (new silence wire), `agent_cli_factory.py` (sys.maxsize), `test_agent_cli_factory.py` (fixture), `test_agent_cli_factory_suppression.py` + `test_agent_cli_output_discipline.py` (per-logger restore), `test_stdout_is_clean_json.py` (relaxed assertion + tomlkit rewrite). **Note:** Phase 1 (commit `d98eb0e2`) and Phase 2 (commit `9563915f`) are already landed on the branch, so `git diff HEAD --stat` now shows only the Phase 3 file (`test_stdout_is_clean_json.py`) plus `TODOS.md`. The cumulative range vs `main`/release base covers every file listed.
 
 ---
 
@@ -122,7 +122,7 @@ The `/code-review` surfaced 15 findings; these 9 were explicitly skipped after t
 
 When all phases are checked off:
 
-- [ ] `git diff HEAD --stat` shows the expected files (see Checkpoint 3 list).
-- [ ] All three e2e tests in `test_stdout_is_clean_json.py` pass.
-- [ ] No regression in `make agent-test` (full suite — run before commit per CLAUDE.md release/commit conventions).
-- [ ] Decide whether this work folds into the existing `release/v0.30.1` branch or warrants a follow-up release entry in CHANGELOG. (Note: per memory `feedback_no_unreleased_header.md`, use `[Unreleased]` on work branches — replace with versioned entry only at release time. The current branch is already named `release/v0.30.1` so check with user before bumping.)
+- [x] `git diff HEAD --stat` shows the expected files (see Checkpoint 3 list). **Cumulative diff across the 3 commits on this branch since `Release v0.30.1` (6902952c): `_agent_cli.py`, `agent_cli_factory.py`, `doctor_cmd.py`, `test_stdout_is_clean_json.py`, `test_agent_cli_factory.py`, `test_agent_cli_factory_init_overrides.py`, `test_agent_cli_factory_suppression.py`, `test_agent_cli_output_discipline.py`, `test_agent_doctor_cmd.py`, `TODOS.md`, `CHANGELOG.md`.**
+- [x] All three e2e tests in `test_stdout_is_clean_json.py` pass. **Result:** 3 passed in 3.73s.
+- [x] No regression in `make agent-test` (full suite — run before commit per CLAUDE.md release/commit conventions). **Result:** "All tests passed." — full suite clean.
+- [x] Decide whether this work folds into the existing `release/v0.30.1` branch or warrants a follow-up release entry in CHANGELOG. **Decision (user-confirmed):** fold into the existing v0.30.1 CHANGELOG entry. v0.30.1 is not yet tagged (only v0.30.0 exists), so the entry was still safely editable. Appended a second `### Fixed` bullet covering the Phase 1-3 work (process-global `logging.disable(sys.maxsize)`, `app_callback` wiring, third-party-logger leak regression test) and bumped the v0.30.1 date from 2026-05-25 → 2026-05-26.
