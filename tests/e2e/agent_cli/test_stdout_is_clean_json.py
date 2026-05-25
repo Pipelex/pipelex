@@ -41,31 +41,55 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def _set_pipelex_package_log_level_to_debug(pipelex_toml_path: Path) -> None:
-    """Rewrite the ``pipelex = "INFO"`` line inside ``[pipelex.log_config.package_log_levels]``
-    to ``"DEBUG"`` so any setup-time ``log.debug`` in the ``pipelex.*`` namespace fires.
+def _set_package_log_level(pipelex_toml_path: Path, *, package_name: str, level: str) -> None:
+    """Set ``<package_name> = "<level>"`` inside ``[pipelex.log_config.package_log_levels]``.
 
-    Targets the specific kit-template structure (``pipelex = "INFO"`` lives directly under
-    that section). Asserts on no-match so a future kit refactor surfaces here instead of
+    If the package key already exists in the section, rewrites its value. Otherwise
+    appends a new line at the end of the section. Either way the user's TOML ends up
+    explicitly carrying the level, which is what we need to exercise the
+    "user-configured third-party logger" leak scenario.
+
+    Asserts on missing-section so a future kit refactor surfaces here instead of
     silently neutering the test.
     """
     original_text = pipelex_toml_path.read_text(encoding="utf-8")
     lines = original_text.splitlines(keepends=True)
+    target_section_start: int | None = None
+    target_section_end: int | None = None
     in_target_section = False
-    rewrote = False
     for index, line in enumerate(lines):
         stripped = line.strip()
         if stripped.startswith("[") and stripped.endswith("]"):
-            in_target_section = stripped == "[pipelex.log_config.package_log_levels]"
-            continue
-        if in_target_section and stripped.startswith("pipelex"):
-            lines[index] = 'pipelex = "DEBUG"\n'
-            rewrote = True
-            break
-    if not rewrote:
-        msg = f"Could not find 'pipelex = ...' under [pipelex.log_config.package_log_levels] in {pipelex_toml_path}"
+            if in_target_section:
+                target_section_end = index
+                in_target_section = False
+            if stripped == "[pipelex.log_config.package_log_levels]":
+                in_target_section = True
+                target_section_start = index
+    if in_target_section:
+        target_section_end = len(lines)
+    if target_section_start is None or target_section_end is None:
+        msg = f"Could not find [pipelex.log_config.package_log_levels] in {pipelex_toml_path}"
         raise AssertionError(msg)
+
+    new_line = f'{package_name} = "{level}"\n'
+    for index in range(target_section_start + 1, target_section_end):
+        if lines[index].strip().startswith(f"{package_name} "):
+            lines[index] = new_line
+            break
+    else:
+        # Insert before the first trailing blank line so the section's contents stay grouped.
+        insert_index = target_section_end
+        while insert_index > target_section_start + 1 and lines[insert_index - 1].strip() == "":
+            insert_index -= 1
+        lines.insert(insert_index, new_line)
+
     pipelex_toml_path.write_text("".join(lines), encoding="utf-8")
+
+
+def _set_pipelex_package_log_level_to_debug(pipelex_toml_path: Path) -> None:
+    """Compatibility shim for the original two callers — bumps pipelex to DEBUG."""
+    _set_package_log_level(pipelex_toml_path, package_name="pipelex", level="DEBUG")
 
 
 def _set_console_targets(pipelex_toml_path: Path, *, log_target: str, print_target: str) -> None:
@@ -152,6 +176,58 @@ class TestAgentCliStdoutIsCleanJson:
         assert isinstance(parsed, dict), f"Expected a JSON object envelope; got {type(parsed).__name__}: {parsed!r}"
         payload = cast("dict[str, object]", parsed)
         assert payload.get("success") is True, f"Expected ``success=True`` in envelope; got {payload!r}"
+
+    def test_models_json_stdout_and_stderr_stay_clean_under_third_party_logger_enabled(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        """Regression for the third-party-logger leak: even when the user bumps a
+        third-party logger (anthropic, httpx) to DEBUG in their ``pipelex.toml``, the
+        agent CLI's stdout AND stderr channels must stay clean — stdout parseable as a
+        single JSON envelope, stderr free of any log line that would corrupt the
+        structured error envelope.
+
+        Before the fix the agent CLI's ``package_log_levels`` override only pinned
+        ``pipelex = OFF`` and let third-party loggers keep their configured level,
+        leaking INFO/DEBUG records onto stderr via the root's RichHandler. The fix is
+        ``logging.disable(LOGGING_LEVEL_OFF)`` at the start of every agent CLI entry
+        point — a process-global cutoff that blocks every record for every logger,
+        regardless of which package emits.
+        """
+        pipelex_toml = hermetic_home / ".pipelex" / "pipelex.toml"
+        for package_name in ("anthropic", "httpx", "botocore", "openai"):
+            _set_package_log_level(pipelex_toml, package_name=package_name, level="DEBUG")
+
+        result = subprocess.run(  # noqa: S603
+            [
+                str(PIPELEX_AGENT_BIN),
+                "models",
+                "--format",
+                "json",
+            ],
+            env=offline_subprocess_env,
+            cwd=str(hermetic_home),
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=120,
+        )
+
+        assert result.returncode == 0, (
+            f"pipelex-agent models --format json must succeed with third-party loggers at DEBUG.\nstdout={result.stdout!r}\nstderr={result.stderr!r}"
+        )
+        # stdout must parse as JSON in one shot — no log line preceding/following the envelope.
+        parsed = json.loads(result.stdout)
+        assert isinstance(parsed, dict)
+        # stderr must stay empty — any line here proves a third-party logger leaked through
+        # the root RichHandler. Empty-stderr is the strictest possible assertion on the
+        # "no log corrupts the error envelope" contract.
+        assert result.stderr == "", (
+            f"stderr must stay clean even when third-party loggers are bumped to DEBUG — "
+            f"otherwise their records leak through the root's RichHandler and corrupt the "
+            f"JSON error envelope.\nstderr={result.stderr!r}"
+        )
 
     def test_models_json_stdout_resists_user_targets_override_to_stdout(
         self,

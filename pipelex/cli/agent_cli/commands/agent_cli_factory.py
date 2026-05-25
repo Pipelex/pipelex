@@ -1,5 +1,6 @@
 """Factory function for agent CLI commands -- JSON-only error output."""
 
+import logging
 import warnings
 from collections.abc import Mapping
 from pathlib import Path
@@ -25,11 +26,11 @@ from pipelex.system.pipelex_service.exceptions import (
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 from pipelex.tools.log.log import log
-from pipelex.tools.log.log_levels import LogLevel
+from pipelex.tools.log.log_levels import LOGGING_LEVEL_OFF, LogLevel
 from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
 
 # Canonical leaf dict for "for any agent-CLI invocation, both Rich-managed channels land
-# on stderr AND all pipelex logs are silenced from the very first ``log.configure`` call."
+# on stderr AND Python's logging system is globally muted from the very first init call."
 # Consumed by:
 #   - ``AGENT_CLI_CONFIG_OVERRIDES`` below wraps it in the full-config-tree shape required
 #     by ``Pipelex.make(config_overrides=...)`` for the full-init path.
@@ -37,20 +38,34 @@ from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
 #     ``setup_doctor_runtime(log_config_overrides=...)`` for the doctor-only path that
 #     does not go through ``Pipelex.make``.
 #
-# Four knobs:
+# The four knobs in this dict shape Pipelex's own log infrastructure but they CANNOT
+# enumerate every third-party logger a transitive dependency might create. The
+# bulletproof cutoff lives in ``silence_logging_for_agent_cli`` below, which calls
+# ``logging.disable(LOGGING_LEVEL_OFF)`` — a process-global threshold checked inside
+# ``Logger.isEnabledFor`` BEFORE any per-logger level. With that in effect, no record
+# is created for any logger, regardless of which package emits, how it's configured, or
+# what handlers it attaches. We call it as the very first line of
+# ``make_pipelex_for_agent_cli`` and ``agent_doctor_cmd`` so the cutoff is active before
+# any setup code can reach a ``log.*`` call.
+#
+# The dict below stays useful as defense-in-depth + Rich-channel pinning:
 #   - ``console_log_target``  -> the ``RichHandler`` for Python's logging system
-#                                (``log.debug/info/warning/error``).
+#                                (``log.debug/info/warning/error``). Pinned to stderr so
+#                                if ``logging.disable`` is ever cleared in this process,
+#                                logs still land on the diagnostic channel rather than
+#                                corrupting the stdout success envelope.
 #   - ``console_print_target`` -> the ``Console`` returned by ``get_console()`` and used
 #                                for banners, deck notices, and the main ``pipelex`` CLI's
-#                                ``show backends`` / ``show models`` tables.
-#   - ``default_log_level``   -> root-logger level. Pinned at OFF so any third-party
-#                                package that inherits root (no explicit override) is
-#                                fully silenced.
-#   - ``package_log_levels``  -> per-package overrides. ``pipelex`` is pinned at OFF here;
-#                                deep-merged into the user's config, so third-party
-#                                package levels (anthropic, asyncio, ...) are preserved.
+#                                ``show backends`` / ``show models`` tables. Rich Console
+#                                is INDEPENDENT of Python logging — ``logging.disable``
+#                                does not touch it — so this pin is the only thing
+#                                keeping Rich tables off stdout.
+#   - ``default_log_level``   -> root-logger level. Pinned at OFF as a backup in case
+#                                ``logging.disable`` is cleared.
+#   - ``package_log_levels``  -> historic ``pipelex = OFF`` pin. Redundant under
+#                                ``logging.disable`` but kept as defense.
 #
-# Why silence all pipelex logs? The agent CLI is machine-consumed. Its contract is:
+# Why silence everything? The agent CLI is machine-consumed. Its contract is:
 # stdout = structured success envelope (JSON or markdown), stderr = structured error
 # envelope. ANY log line on stderr — DEBUG, INFO, WARNING, anything — corrupts the
 # error-envelope channel for downstream parsers (e.g. mthds-js's ``PipelexRunner``
@@ -60,9 +75,9 @@ from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
 #
 # The agent CLI's actual results are written by ``agent_success`` /
 # ``agent_success_formatted`` via the bare builtin ``print(...)`` to ``sys.stdout``;
-# error envelopes via ``print(..., file=sys.stderr)``. Both bypass Rich entirely, so
-# the OFF-level pin has no effect on the structured envelopes — only on free-floating
-# ``log.*`` calls scattered through the codebase.
+# error envelopes via ``print(..., file=sys.stderr)``. Both bypass Rich and Python's
+# ``logging`` entirely, so neither ``logging.disable`` nor the pins below affect the
+# structured envelopes themselves.
 #
 # Wrapped in ``MappingProxyType`` so a stray ``AGENT_CLI_STDERR_LOG_FIELDS[...] = ...`` in
 # a future contributor's hot-fix raises immediately instead of silently mutating the
@@ -75,6 +90,31 @@ AGENT_CLI_STDERR_LOG_FIELDS: Mapping[str, Any] = MappingProxyType(
         "package_log_levels": MappingProxyType({"pipelex": LogLevel.OFF}),
     }
 )
+
+
+def silence_logging_for_agent_cli() -> None:
+    """Process-global cutoff of Python's logging system for agent CLI invocations.
+
+    Calls ``logging.disable(LOGGING_LEVEL_OFF)``, which sets
+    ``logging.Logger.manager.disable = LOGGING_LEVEL_OFF``. Every ``Logger.isEnabledFor``
+    call checks ``self.manager.disable >= level`` before the per-logger level check, so
+    no record gets created for any logger at any standard level (DEBUG through CRITICAL)
+    — regardless of which package emits, what level the logger is configured at, or
+    what handlers it has attached. This includes third-party packages we never
+    enumerate and any logger created AFTER this call.
+
+    Idempotent. Must be called at the very start of every agent CLI entry point
+    (``make_pipelex_for_agent_cli``, ``agent_doctor_cmd``) so the cutoff is active
+    before any setup code can reach a ``log.*`` call — closing the window between
+    ``log.configure`` and ``apply_agent_cli_output_discipline``.
+
+    Does NOT affect Rich ``Console`` output (banners, tables, pretty_print) — that's
+    handled by ``console_print_target = STDERR`` + ``PrettyPrinter.mode = SILENT`` +
+    the hub's ``set_console_print_target``. Does NOT affect bare ``print(...)`` calls
+    — those are reserved for the structured success/error envelopes by design.
+    """
+    logging.disable(LOGGING_LEVEL_OFF)
+
 
 # Full ``config_overrides`` tree for ``Pipelex.make()``. ``deep_update`` recurses into
 # ``package_log_levels``, so the ``pipelex = OFF`` entry merges into the user's config
@@ -91,22 +131,23 @@ AGENT_CLI_CONFIG_OVERRIDES: Mapping[str, Any] = MappingProxyType(
 
 
 def apply_agent_cli_output_discipline() -> None:
-    """Pin pipelex log level to OFF, silence pretty-print, and hub console target to stderr.
+    """Reaffirm the agent CLI output contract on the Rich/hub channels post-init.
 
-    Called from two paths:
-      - ``make_pipelex_for_agent_cli`` (full-init): defense-in-depth. ``Pipelex.__init__``
-        already pinned the hub console via ``set_console_print_target`` from the loaded
-        log_config (whose ``console_print_target`` was overridden to STDERR by
-        ``AGENT_CLI_CONFIG_OVERRIDES``, which also pinned the pipelex log level to OFF).
-      - ``agent_doctor_cmd`` (doctor-only): also defense-in-depth, since
-        ``setup_doctor_runtime`` now mirrors ``Pipelex.__init__`` and applies
-        ``set_console_print_target`` itself from the overridden log_config.
+    The bulletproof logging cutoff is ``silence_logging_for_agent_cli`` (called at the
+    start of every agent CLI entry point); this helper handles the channels that are
+    INDEPENDENT of Python's logging system:
+
+      1. ``log.redirect_to_stderr`` keeps the RichHandler's console on stderr — defense
+         in case ``logging.disable`` is ever cleared.
+      2. ``PrettyPrinter.mode = SILENT`` neutralizes ``pretty_print(...)`` entirely
+         (Rich-based, not logging-based).
+      3. Hub-level ``set_console_print_target(STDERR)`` for the Rich ``Console`` used by
+         banners / tables (also Rich-based, not logging-based).
 
     Safe to call from the broken-config doctor path where ``setup_doctor_runtime`` was
     skipped: ``log.redirect_to_stderr`` no-ops when no rich_handler is registered, and
     the hub print-target call is gated on a hub being installed.
     """
-    log.set_level_for_package("pipelex", LogLevel.OFF)
     log.redirect_to_stderr()
     PrettyPrinter.mode = PrettyPrintMode.SILENT
     hub = PipelexHub.get_optional_instance()
@@ -160,6 +201,9 @@ def make_pipelex_for_agent_cli(
         typer.Exit: If initialization fails (after printing JSON error to stderr),
             or if inference setup is required (after printing markdown to stdout).
     """
+    # Process-global logging cutoff, BEFORE Pipelex.make can trigger any third-party
+    # log line (anthropic/httpx/botocore credential probes, telemetry setup, etc.).
+    silence_logging_for_agent_cli()
     try:
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always", RemoteConfigStaleWarning)

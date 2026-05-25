@@ -5,7 +5,11 @@ from typing import Annotated, Any
 import typer
 
 from pipelex.base_exceptions import PipelexConfigError
-from pipelex.cli.agent_cli.commands.agent_cli_factory import AGENT_CLI_STDERR_LOG_FIELDS, apply_agent_cli_output_discipline
+from pipelex.cli.agent_cli.commands.agent_cli_factory import (
+    AGENT_CLI_STDERR_LOG_FIELDS,
+    apply_agent_cli_output_discipline,
+    silence_logging_for_agent_cli,
+)
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success, set_agent_cli_error_format
 from pipelex.cli.commands.doctor_cmd import (
     BackendFileReport,
@@ -125,6 +129,9 @@ def agent_doctor_cmd(
     Use --global/-g to force checking the global ~/.pipelex/ directory.
     """
     set_agent_cli_error_format(error_format or output_format)
+    # Process-global logging cutoff, BEFORE setup_doctor_runtime / check_* can trigger
+    # any third-party log line.
+    silence_logging_for_agent_cli()
     try:
         # When --global, force checking ~/.pipelex/ only; otherwise use layered resolution
         config_dir = config_manager.global_config_dir if global_ else None
