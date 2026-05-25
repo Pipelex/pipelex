@@ -97,7 +97,6 @@ def _setup_mocks(mocker: MockerFixture) -> None:
 
 
 def _run_check(
-    agent_ctx: Any,
     mocker: MockerFixture,
     capsys: pytest.CaptureFixture[str],
     name: str,
@@ -106,7 +105,7 @@ def _run_check(
 ) -> dict[str, Any]:
     """Run check-model and return parsed JSON output."""
     _setup_mocks(mocker)
-    agent_check_model_cmd(ctx=agent_ctx, name=name, model_type=model_type, output_format=output_format)
+    agent_check_model_cmd(name=name, model_type=model_type, output_format=output_format)
     parsed: dict[str, Any] = json.loads(capsys.readouterr().out)
     return parsed
 
@@ -114,57 +113,57 @@ def _run_check(
 class TestCheckModelCmd:
     """Tests for agent_check_model_cmd validation and fuzzy matching."""
 
-    def test_valid_preset(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_valid_preset(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """A known preset name with $ sigil should be valid."""
-        result = _run_check(agent_ctx, mocker, capsys, "$writing-creative")
+        result = _run_check(mocker, capsys, "$writing-creative")
         assert result["valid"] is True
         assert result["kind"] == "preset"
 
-    def test_valid_alias(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_valid_alias(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """A known alias name with @ sigil should be valid."""
-        result = _run_check(agent_ctx, mocker, capsys, "@best-claude")
+        result = _run_check(mocker, capsys, "@best-claude")
         assert result["valid"] is True
         assert result["kind"] == "alias"
 
-    def test_valid_handle(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_valid_handle(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """A known bare model handle should be valid."""
-        result = _run_check(agent_ctx, mocker, capsys, "claude-4.5-sonnet")
+        result = _run_check(mocker, capsys, "claude-4.5-sonnet")
         assert result["valid"] is True
         assert result["kind"] == "handle"
 
-    def test_invalid_preset_with_fuzzy_suggestions(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_invalid_preset_with_fuzzy_suggestions(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """A typo in a preset name should return fuzzy suggestions with $ prefix."""
-        result = _run_check(agent_ctx, mocker, capsys, "$writting-creative")
+        result = _run_check(mocker, capsys, "$writting-creative")
         assert result["valid"] is False
         assert any("$writing-creative" in suggestion for suggestion in result["suggestions"])
 
-    def test_wrong_sigil_detected(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_wrong_sigil_detected(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """Using $ for a name that exists as an alias should produce a wrong-sigil hint."""
-        result = _run_check(agent_ctx, mocker, capsys, "$best-claude")
+        result = _run_check(mocker, capsys, "$best-claude")
         assert result["valid"] is False
         assert any("@best-claude" in hint for hint in result["wrong_sigil_hints"])
 
-    def test_invalid_handle_cross_collection_suggestions(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_invalid_handle_cross_collection_suggestions(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """A bare name matching a preset should suggest the prefixed version."""
-        result = _run_check(agent_ctx, mocker, capsys, "writing-creative")
+        result = _run_check(mocker, capsys, "writing-creative")
         assert result["valid"] is False
         assert any("$writing-creative" in hint for hint in result["wrong_sigil_hints"])
 
-    def test_invalid_handle_fuzzy_suggestions(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_invalid_handle_fuzzy_suggestions(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """A typo in a handle should return fuzzy suggestions without sigil prefix."""
-        result = _run_check(agent_ctx, mocker, capsys, "claude-4.5-sonet")
+        result = _run_check(mocker, capsys, "claude-4.5-sonet")
         assert result["valid"] is False
         assert "claude-4.5-sonnet" in result["suggestions"]
 
-    def test_completely_unknown_name(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_completely_unknown_name(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """A completely unknown name should return no suggestions."""
-        result = _run_check(agent_ctx, mocker, capsys, "$zzz-nonexistent-xyz")
+        result = _run_check(mocker, capsys, "$zzz-nonexistent-xyz")
         assert result["valid"] is False
         assert len(result["suggestions"]) == 0
 
-    def test_json_output_structure(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_json_output_structure(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """JSON output should contain all expected keys on failure."""
-        result = _run_check(agent_ctx, mocker, capsys, "$nonexistent")
+        result = _run_check(mocker, capsys, "$nonexistent")
         assert result["success"] is True
         assert result["valid"] is False
         assert "suggestions" in result
@@ -172,23 +171,23 @@ class TestCheckModelCmd:
         assert "cross_collection_suggestions" in result
         assert result["model_type"] == "llm"
 
-    def test_markdown_valid_output(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_markdown_valid_output(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """Markdown output for a valid reference should be a single confirmation line."""
         _setup_mocks(mocker)
-        agent_check_model_cmd(ctx=agent_ctx, name="$writing-creative", model_type=ModelCategory.LLM, output_format=CliOutputFormat.MARKDOWN)
+        agent_check_model_cmd(name="$writing-creative", model_type=ModelCategory.LLM, output_format=CliOutputFormat.MARKDOWN)
         output = capsys.readouterr().out.strip()
         assert output == "$writing-creative is a valid llm preset."
 
-    def test_markdown_invalid_output_has_suggestions(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_markdown_invalid_output_has_suggestions(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """Markdown output for an invalid reference should include 'Did you mean' suggestions."""
         _setup_mocks(mocker)
-        agent_check_model_cmd(ctx=agent_ctx, name="$writting-creative", model_type=ModelCategory.LLM, output_format=CliOutputFormat.MARKDOWN)
+        agent_check_model_cmd(name="$writting-creative", model_type=ModelCategory.LLM, output_format=CliOutputFormat.MARKDOWN)
         output = capsys.readouterr().out
         assert "is not a valid" in output
         assert "Did you mean:" in output
 
-    def test_valid_waterfall(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_valid_waterfall(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """A known waterfall name with ~ sigil should be valid."""
-        result = _run_check(agent_ctx, mocker, capsys, "~robust-llm")
+        result = _run_check(mocker, capsys, "~robust-llm")
         assert result["valid"] is True
         assert result["kind"] == "waterfall"

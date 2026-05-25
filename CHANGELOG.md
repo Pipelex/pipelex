@@ -1,5 +1,19 @@
 # Changelog
 
+## [v0.30.1] - 2026-05-25
+
+### Fixed
+
+- **`pipelex-agent` now silences all pipelex logs on stderr regardless of user TOML.** The agent CLI is machine-consumed: stdout is reserved for the structured success envelope (JSON / markdown) and stderr for the structured error envelope. Free-floating `log.*` calls — even a single `log.debug` from `telemetry_factory.py` or a `log.warning` from `validation_error_categorizer.py` — would corrupt the stderr channel for downstream parsers (`mthds-js`'s `PipelexRunner` doing `JSON.parse(stderr)` on the validate hook). `make_pipelex_for_agent_cli` now injects `config_overrides` into `Pipelex.make()` that pin `default_log_level = OFF` and `package_log_levels.pipelex = OFF` from the very first `log.configure` call — so a user setting `[pipelex.log_config.package_log_levels] pipelex = "DEBUG"` in `~/.pipelex/pipelex.toml` can no longer leak DEBUG/INFO/WARNING lines onto the agent CLI's stderr channel. The DEBUG log line in `telemetry_factory.py:77` itself is unchanged — it's still useful diagnostic info for the human `pipelex` CLI.
+
+### Changed
+
+- **`pipelex-agent` no longer accepts `--log-level`.** Log suppression is unconditional by design — there is no verbosity setting on the agent CLI. The `log_level` parameter is removed from `make_pipelex_for_agent_cli()` and `apply_agent_cli_output_discipline()`, and the corresponding `ctx.obj["log_level"]` plumbing is gone from every caller. For verbose debugging, use the human `pipelex` CLI, which honors the user's TOML log config.
+
+- **`pipelex/cli/commands/doctor_cmd.py::setup_doctor_runtime` now `deep_update`s `log_config_overrides` into the loaded config** (was a flat-merge that silently replaced nested dicts like `package_log_levels`). With the flat merge, pinning `package_log_levels.pipelex = OFF` for the agent doctor path would have wiped out all the third-party package levels (`anthropic`, `asyncio`, `botocore`, ...) shipped in the default config. The deep merge preserves them.
+
+- **Removed `ctx: typer.Context` from 8 agent CLI commands that no longer used it.** `validate/{pipe,bundle,method}_cmd.py`, `inputs/{pipe,bundle,method}_cmd.py`, `models_cmd.py`, `check_model_cmd.py` had `ctx.obj["log_level"]` as their only ctx usage; with `--log-level` gone, the parameter became dead weight. The `run/` commands keep `ctx` because they still read `ctx.obj["runner"]`. Test callers (and the now-unused `agent_ctx` conftest fixture) updated to match.
+
 ## [v0.30.0] - 2026-05-25
 
 ### Fixed

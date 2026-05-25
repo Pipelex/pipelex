@@ -117,16 +117,15 @@ class TestAgentCliStdoutIsCleanJson:
 
         Bumps ``package_log_levels.pipelex`` to DEBUG (the exact knob a downstream user
         would flip when debugging) so the latent ``console_log_target`` bug surfaces as
-        DEBUG lines on stdout. Then ``json.loads`` on the entire stdout (with no slicing,
-        no last-object walker) must succeed and return a dict envelope.
+        DEBUG lines on stdout. The agent CLI's ``config_overrides`` MUST win over the
+        user-TOML override (pinning pipelex to OFF), so ``json.loads`` on the entire
+        stdout must succeed and return a dict envelope.
         """
         _set_pipelex_package_log_level_to_debug(hermetic_home / ".pipelex" / "pipelex.toml")
 
         result = subprocess.run(  # noqa: S603
             [
                 str(PIPELEX_AGENT_BIN),
-                "--log-level",
-                "debug",
                 "models",
                 "--format",
                 "json",
@@ -177,8 +176,6 @@ class TestAgentCliStdoutIsCleanJson:
         result = subprocess.run(  # noqa: S603
             [
                 str(PIPELEX_AGENT_BIN),
-                "--log-level",
-                "debug",
                 "models",
                 "--format",
                 "json",

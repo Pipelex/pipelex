@@ -44,12 +44,12 @@ class TestApplyAgentCliOutputDiscipline:
             return_value=mock_hub,
         )
 
-        apply_agent_cli_output_discipline(log_level=LogLevel.WARNING)
+        apply_agent_cli_output_discipline()
 
         mock_redirect.assert_called_once()
         mock_hub.set_console_print_target.assert_called_once_with(target=ConsoleTarget.STDERR)
         assert PrettyPrinter.mode is PrettyPrintMode.SILENT
-        assert logging.getLogger("pipelex").level == LogLevel.WARNING.int_logging_level
+        assert logging.getLogger("pipelex").level == LogLevel.OFF.int_logging_level
 
     def test_no_hub_path_skips_hub_call_safely(self, mocker: MockerFixture) -> None:
         """When no hub is installed (broken-config doctor path), the helper must still pin
@@ -61,8 +61,8 @@ class TestApplyAgentCliOutputDiscipline:
             return_value=None,
         )
 
-        apply_agent_cli_output_discipline(log_level=LogLevel.WARNING)
+        apply_agent_cli_output_discipline()
 
         mock_redirect.assert_called_once()
         assert PrettyPrinter.mode is PrettyPrintMode.SILENT
-        assert logging.getLogger("pipelex").level == LogLevel.WARNING.int_logging_level
+        assert logging.getLogger("pipelex").level == LogLevel.OFF.int_logging_level

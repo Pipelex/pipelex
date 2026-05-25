@@ -37,24 +37,15 @@ class TestAgentCliFactorySuppression:
 
         assert PrettyPrinter.mode is PrettyPrintMode.SILENT
 
-    def test_sets_warning_log_level(self, mocker: MockerFixture) -> None:
-        """Log level should be WARNING by default after make_pipelex_for_agent_cli succeeds."""
+    def test_silences_pipelex_logger(self, mocker: MockerFixture) -> None:
+        """The pipelex package logger must be pinned at OFF (LOGGING_LEVEL_OFF=999) — the
+        agent CLI's contract is "no free-floating logs on stderr." There is no log_level
+        parameter; suppression is unconditional.
+        """
         mock_pipelex = mocker.MagicMock()
         mocker.patch("pipelex.cli.agent_cli.commands.agent_cli_factory.Pipelex.make", return_value=mock_pipelex)
 
         make_pipelex_for_agent_cli()
 
         pipelex_logger = logging.getLogger("pipelex")
-        assert pipelex_logger.level == logging.WARNING
-        assert pipelex_logger.level == LogLevel.WARNING.int_logging_level
-
-    def test_sets_custom_log_level(self, mocker: MockerFixture) -> None:
-        """Log level should match the provided log_level parameter."""
-        mock_pipelex = mocker.MagicMock()
-        mocker.patch("pipelex.cli.agent_cli.commands.agent_cli_factory.Pipelex.make", return_value=mock_pipelex)
-
-        make_pipelex_for_agent_cli(log_level=LogLevel.DEBUG)
-
-        pipelex_logger = logging.getLogger("pipelex")
-        assert pipelex_logger.level == logging.DEBUG
-        assert pipelex_logger.level == LogLevel.DEBUG.int_logging_level
+        assert pipelex_logger.level == LogLevel.OFF.int_logging_level
