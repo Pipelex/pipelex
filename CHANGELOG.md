@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.30.2] - 2026-05-26
+
+### Changed
+
+- **`pipelex-agent` markdown error envelope no longer includes the `## Error source` stack-frame section.** Markdown is the agent / human-facing channel; internal frames like `LibraryError @ pipelex/libraries/library.py:140` are noise for an LLM trying to fix a `.mthds` file and forced every consumer (e.g. the `mthds-plugins` validate hook) to strip them. The `error_source` field remains in the JSON envelope (`--error-format json`) untouched for programmatic consumers — same shape, same cause-chain ordering — so any tooling that parses JSON keeps the full diagnostic surface. The `## Details` section (which carries `error_domain` and other structured fields) is unchanged. No change to error categorization, `error_domain` values, message wording, or stdout/stderr routing.
+
 ## [v0.30.1] - 2026-05-26
 
 ### Fixed

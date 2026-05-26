@@ -18,7 +18,7 @@ Markdown structure per command:
 - `run`: `# Pipeline run complete`, a `## Result` section (the rendered `main_stuff` markdown with `--with-memory`, otherwise the concept JSON in a fenced block), and output / graph file paths.
 - `validate`: `# Validation passed`, the bundle path when relevant, and a list of validated pipes with their status.
 - `init`: `# Pipelex initialized` with target directory, enabled backends, and routing profile.
-- error path: `# Error: <error_type>`, the message, the hint as a `> 💡` callout, a `## Details` section, and `## Error source` as a code block.
+- error path: `# Error: <error_type>`, the message, the hint as a `> 💡` callout, and a `## Details` section. `error_source` (internal stack frames) is omitted from markdown — it remains in the JSON envelope (`--error-format json`) for programmatic consumers.
 
 ## Companion: Agent Skills
 
