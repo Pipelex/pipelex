@@ -40,8 +40,13 @@ class TestAgentErrorFormat:
         with pytest.raises(json.JSONDecodeError):
             json.loads(captured.err)
 
-    def test_agent_error_markdown_renders_hint_details_and_source(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """agent_error_markdown renders the heading, hint callout, details, and source block."""
+    def test_agent_error_markdown_renders_hint_and_details_but_omits_source(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """agent_error_markdown renders the heading, hint callout, and details — but not the source block.
+
+        ``error_source`` (internal stack frames) is deliberately omitted from markdown — it's
+        noise for an LLM trying to fix a `.mthds` file. The field still appears in the JSON
+        envelope for programmatic consumers; that's covered by the integration test.
+        """
         cause = ValueError("bad value")
         with pytest.raises(typer.Exit):
             agent_error_markdown(
@@ -55,4 +60,5 @@ class TestAgentErrorFormat:
         assert "model issue" in err
         assert "💡" in err  # hint callout for a known error type
         assert "**pipe_code:** my_pipe" in err
-        assert "## Error source" in err
+        assert "## Error source" not in err
+        assert "error_source" not in err

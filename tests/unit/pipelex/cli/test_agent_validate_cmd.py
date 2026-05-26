@@ -26,7 +26,6 @@ class TestValidateBundleCmd:
 
     def test_graph_generation_failure_emits_single_json_error(
         self,
-        agent_ctx: Any,
         mocker: MockerFixture,
         capsys: pytest.CaptureFixture[str],
         tmp_path: Path,
@@ -71,7 +70,6 @@ class TestValidateBundleCmd:
 
         with pytest.raises(typer.Exit) as exc_info:
             validate_bundle_cmd(
-                ctx=agent_ctx,
                 path=str(mthds_file),
                 graph=True,
                 output_format=CliOutputFormat.JSON,
