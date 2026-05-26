@@ -8,6 +8,7 @@ scenario described in issue #437.
 from __future__ import annotations
 
 import asyncio
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock, patch
 
 import click
@@ -15,14 +16,17 @@ import pytest
 import typer
 from rich.traceback import Traceback
 
-from pipelex.cli.commands.run._run_core import _execute_run  # noqa: PLC2701
+if TYPE_CHECKING:
+    from collections.abc import Coroutine
+
+from pipelex.cli.commands.run._run_core import _execute_run  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.exceptions import PipelineExecutionError
 
 OUTPUT_DIR = "temp/test_outputs"
 
 
-def _run_async(coro):  # noqa: ANN001
+def _run_async(coro: Coroutine[Any, Any, Any]) -> Any:
     """Run a coroutine synchronously for testing."""
     loop = asyncio.new_event_loop()
     try:
