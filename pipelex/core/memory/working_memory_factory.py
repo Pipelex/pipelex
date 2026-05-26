@@ -7,12 +7,13 @@ from pipelex import log
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.core.memory.exceptions import WorkingMemoryFactoryError
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
-from pipelex.core.pipes.inputs.input_stuff_specs import TypedNamedStuffSpec
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, TypedNamedStuffSpec
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.hub import get_class_registry
 
 # Field names that require snake_case format for pipelex bundle specs
 # Note: main_pipe is NOT included here because BundleHeaderSpec.main_pipe has
@@ -128,6 +129,55 @@ class WorkingMemoryFactory(BaseModel):
             return PipeBatchSpec
 
         return structure_class
+
+    @classmethod
+    def convert_input_specs_to_typed(cls, needed_inputs_spec: InputStuffSpecs) -> list[TypedNamedStuffSpec]:
+        """Resolve each named stuff spec's concept structure to a concrete class.
+
+        Looks up the concept's ``structure_class_name`` in the class registry and pairs it with
+        the stuff spec. Falls back to :class:`TextContent` when the class is missing,
+        non-:class:`StuffContent`, or fails pydantic validation — keeps mock-input generation
+        robust against partially loaded libraries (e.g. dynamic concepts).
+        """
+        typed_specs: list[TypedNamedStuffSpec] = []
+        class_registry = get_class_registry()
+
+        for named_stuff_spec in needed_inputs_spec.named_stuff_specs:
+            try:
+                concept = named_stuff_spec.concept
+                structure_class_name = concept.structure_class_name
+                structure_class = class_registry.get_class(name=structure_class_name)
+
+                if structure_class and issubclass(structure_class, StuffContent):
+                    typed_specs.append(
+                        TypedNamedStuffSpec.make_from_named(
+                            named=named_stuff_spec,
+                            structure_class=structure_class,
+                        ),
+                    )
+                else:
+                    log.verbose(
+                        f"Could not get structure class '{structure_class_name}' for "
+                        f"concept '{named_stuff_spec.concept.code}', falling back to TextContent",
+                    )
+                    typed_specs.append(
+                        TypedNamedStuffSpec.make_from_named(
+                            named=named_stuff_spec,
+                            structure_class=TextContent,
+                        ),
+                    )
+            except ValidationError as exc:
+                log.warning(
+                    f"Error getting structure class for concept '{named_stuff_spec.concept.code}': {exc}, falling back to TextContent",
+                )
+                typed_specs.append(
+                    TypedNamedStuffSpec.make_from_named(
+                        named=named_stuff_spec,
+                        structure_class=TextContent,
+                    ),
+                )
+
+        return typed_specs
 
     @classmethod
     def make_mock_inputs(cls, needed_inputs: list[TypedNamedStuffSpec]) -> "WorkingMemory":
