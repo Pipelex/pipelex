@@ -77,9 +77,11 @@ async def _execute_run(
                     raise typer.Exit(1)
                 pipe_code = main_pipe_code
         except FileNotFoundError as exc:
+            print_traceback_if_requested(get_console())
             typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
         except (PipelexInterpreterError, MthdsDecodeError) as exc:
+            print_traceback_if_requested(get_console())
             typer.secho(f"Failed to parse bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
     elif not pipe_code:
@@ -93,6 +95,7 @@ async def _execute_run(
             try:
                 pipeline_inputs = json.loads(inputs)
             except json.JSONDecodeError as json_decode_exc:
+                print_traceback_if_requested(get_console())
                 typer.secho(f"Failed to parse inline JSON inputs: {json_decode_exc}", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from json_decode_exc
         else:
@@ -103,9 +106,11 @@ async def _execute_run(
                 pipeline_inputs = resolve_inputs_paths(pipeline_inputs, base_dir)
                 typer.echo(f"Loaded inputs from: {inputs}")
             except FileNotFoundError as file_not_found_exc:
+                print_traceback_if_requested(get_console())
                 typer.secho(f"Failed to load input file '{inputs}': file not found", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from file_not_found_exc
             except JsonTypeError as json_type_error_exc:
+                print_traceback_if_requested(get_console())
                 typer.secho(f"Failed to parse input file '{inputs}': must be a valid JSON dictionary", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from json_type_error_exc
 
@@ -134,9 +139,11 @@ async def _execute_run(
         )
         pipe_output = response.pipe_output
     except PipelineExecutionError as exc:
+        print_traceback_if_requested(get_console())
         typer.secho(f"Failed to execute pipeline '{exc.pipe_code}': {exc}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1) from exc
     except PipelexError as exc:
+        print_traceback_if_requested(get_console())
         typer.secho(f"Failed to execute pipeline '{pipe_code or bundle_path}': {exc}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1) from exc
 
