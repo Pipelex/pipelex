@@ -278,8 +278,9 @@ non_retryable_error_types = [
 # Per-queue submitter options. Layer on top of worker_config defaults at
 # dispatch time. Add `[temporal.queue_options.<queue>]` entries to match each
 # backend pool's latency/retry profile (timeouts, retry policy, cluster-wide
-# rate caps). See pipelex/kit/configs/pipelex.toml for examples. Ships empty
-# to match the package default — see the rationale in pipelex/pipelex.toml.
+# rate caps). Ships empty to match the package default — see the rationale in
+# pipelex/pipelex.toml. Each deployment configures the overlay for whatever
+# name it picked for `default_task_queue`.
 [temporal.queue_options]
 
 # Named worker-runtime profiles. A worker process selects one via `--profile`.
