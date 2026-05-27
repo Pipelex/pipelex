@@ -95,7 +95,10 @@ def _force_load_all_error_modules() -> None:
         lines = ["One or more error modules failed to import during discovery:"]
         lines.extend(f"  - {name}: {exc}" for name, exc in failures)
         msg = "\n".join(lines)
-        raise RuntimeError(msg)
+        # Chain from the first failure so the dev sees a full traceback (file:line
+        # of the broken module) in addition to the aggregated list of names —
+        # str(exc) alone elides where the failure happened.
+        raise RuntimeError(msg) from failures[0][1]
 
 
 def _is_production_subclass(cls: type[PipelexError]) -> bool:
@@ -408,7 +411,7 @@ def _resolve_class_level_domain(cls: type[PipelexError]) -> str:
     """Return the formatted ``error_domain`` value, or an inherited marker."""
     declared = cls.__dict__.get("error_domain")
     if isinstance(declared, ErrorDomain):
-        return f"`{declared.value}`"
+        return f"`{declared}`"
     if cls is PipelexError:
         return "_(unset)_"
     return "_(inherited from parent)_"
@@ -419,7 +422,7 @@ def _resolve_class_level_user_action(cls: type[PipelexError]) -> str | None:
     declared = cls.__dict__.get("user_action")
     if not isinstance(declared, UserAction):
         return None
-    kind_repr = f"`{declared.kind.value}`"
+    kind_repr = f"`{declared.kind}`"
     if declared.detail:
         return f"{kind_repr} — {declared.detail}"
     return kind_repr

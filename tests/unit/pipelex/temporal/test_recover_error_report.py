@@ -7,12 +7,16 @@ deserialized ``ApplicationError.details``. ``recover_error_report`` walks the
 
 from typing import Any
 
+import pytest
 from temporalio.client import WorkflowFailureError
 from temporalio.exceptions import ApplicationError
 
 from pipelex.base_exceptions import ErrorDomain, ErrorReport
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
-from pipelex.temporal.tprl.temporal_error import recover_error_report
+from pipelex.temporal.tprl.temporal_error import (
+    _ERROR_REPORT_VALIDATION_FAILED_MARKER,  # noqa: PLC2701 # pyright: ignore[reportPrivateUsage]
+    recover_error_report,
+)
 
 _FULL_REPORT = ErrorReport(
     error_type="CogtError",
@@ -65,16 +69,60 @@ class TestRecoverErrorReport:
         internal contract bug. Rather than raise — which would abort the caller before it
         can deliver the failure webhook, leaving the receiver with no notification at all —
         it synthesizes the ``UnrecoverableWorkflowFailureError`` fallback, carrying the
-        recovered ``message`` and a marker flagging the validation failure. ``error_type``
-        + ``message`` make it look like a report to ``_find_error_report_dict``, but the
-        required ``title`` / ``type_uri`` are absent.
+        recovered ``message`` and a marker flagging the validation failure. The payload
+        carries every required key (``error_type``, ``message``, ``title``, ``type_uri``)
+        so ``_find_error_report_dict`` picks it up, but its extra key violates
+        ``ErrorReport``'s ``extra="forbid"`` and fails ``from_dict`` validation.
         """
-        invalid_report_dict: dict[str, Any] = {"error_type": "CogtError", "message": "rate limited"}
+        invalid_report_dict: dict[str, Any] = {
+            "error_type": "CogtError",
+            "message": "rate limited",
+            "title": "AI inference failed",
+            "type_uri": "https://docs.pipelex.com/latest/errors/cogt-error/",
+            "future_field_we_do_not_know_about": "unexpected",
+        }
         failure = _workflow_failure(_app_error(invalid_report_dict))
         report = recover_error_report(failure)
         assert report.error_type == "UnrecoverableWorkflowFailureError"
         assert report.error_domain == ErrorDomain.RUNTIME
         assert "rate limited" in report.message
+        # Pin the exact marker (imported constant), not a substring — the marker
+        # is a stable contract documented in docs/under-the-hood/error-model.md.
+        assert _ERROR_REPORT_VALIDATION_FAILED_MARKER in report.message
+
+    @pytest.mark.parametrize(
+        "empty_like_message",
+        [
+            pytest.param("", id="empty"),
+            pytest.param(" ", id="single-space"),
+            pytest.param("   ", id="multiple-spaces"),
+            pytest.param("\n", id="newline"),
+            pytest.param("\t", id="tab"),
+            pytest.param(" \n\t  ", id="mixed-whitespace"),
+        ],
+    )
+    def test_invalid_report_with_empty_or_whitespace_message_falls_back_to_exc_chain(self, empty_like_message: str) -> None:
+        """An invalid report dict with an empty or whitespace-only ``message`` falls back to the exception chain.
+
+        Without ``str.strip()``, a whitespace-only ``message`` (a space, a
+        newline, a tab) is truthy in Python, so the fallback never fires and the
+        synthesized preamble renders as a visually broken `` [error report
+        failed schema validation]``. The strip guard treats every
+        whitespace-only value the same as the empty string.
+        """
+        invalid_report_dict: dict[str, Any] = {
+            "error_type": "CogtError",
+            "message": empty_like_message,
+            "title": "AI inference failed",
+            "type_uri": "https://docs.pipelex.com/latest/errors/cogt-error/",
+            "future_field_we_do_not_know_about": "unexpected",
+        }
+        failure = _workflow_failure(_app_error(invalid_report_dict))
+        report = recover_error_report(failure)
+        assert report.error_type == "UnrecoverableWorkflowFailureError"
+        # The fallback message must include both the ApplicationError text
+        # (recovered via the exception-chain walk) and the schema-validation marker.
+        assert "rate limited on the worker" in report.message
         assert "schema validation" in report.message
 
     def test_recovers_report_past_report_less_wrapper_application_error(self) -> None:

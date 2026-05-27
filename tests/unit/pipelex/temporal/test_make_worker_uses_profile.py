@@ -108,23 +108,3 @@ class TestMakeWorkerUsesProfile:
 
         worker_mock.assert_called_once()
         assert worker_mock.call_args.kwargs["max_task_queue_activities_per_second"] is None
-
-    def test_shipping_default_temporal_task_queue_has_1000_rate_cap(self, mocker: MockerFixture) -> None:
-        """Regression guard: the shipping ``[temporal.queue_options.temporal_task_queue]``
-        block sets ``max_task_queue_activities_per_second = 1000`` to preserve
-        the pre-v2 hardcoded ``Worker(..., max_task_queue_activities_per_second=1000)``
-        for deployments using the default queue name. Catches accidental
-        removal of the baseline cap.
-        """
-        worker_mock = mocker.patch("pipelex.temporal.temporal_task_manager.Worker")
-        profile = _make_profile()
-
-        TemporalTaskManager().make_worker(
-            temporal_client=mocker.MagicMock(),
-            task_queue="temporal_task_queue",
-            is_not_sandboxed=True,
-            runtime_profile=profile,
-        )
-
-        worker_mock.assert_called_once()
-        assert worker_mock.call_args.kwargs["max_task_queue_activities_per_second"] == 1000

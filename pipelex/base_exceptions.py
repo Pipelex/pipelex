@@ -12,22 +12,45 @@ from pipelex.urls import URLs
 # ``caller_facing_message`` keeps its original ``message`` instead.
 INTERNAL_ERROR_PLACEHOLDER = "An internal error occurred."
 
-# Stable identifiers preserved verbatim when STRICT mode redacts a report.
-# ``message`` is intentionally absent — STRICT replaces it with
-# ``INTERNAL_ERROR_PLACEHOLDER`` unconditionally, not by passthrough.
+# Stable identifiers preserved verbatim on every STRICT envelope, regardless of
+# the report's ``caller_facing_message`` flag. ``message`` and ``user_action``
+# are intentionally absent and handled separately by the two STRICT branches:
+# the caller-facing branch keeps both, the redacted branch replaces ``message``
+# with ``INTERNAL_ERROR_PLACEHOLDER`` and drops ``user_action``.
+# ``provider_metadata`` is also absent here — it is reattached on both branches
+# as a curated subset (see ``_STRICT_PROVIDER_METADATA_KEPT_FIELDS``).
+# Provider/model attribution (``provider``, ``model``) is unconditionally
+# excluded: it never belongs on an external surface, whatever the report's
+# ``error_domain``. The internal ``caller_facing_message`` flag is likewise
+# excluded — it is redaction plumbing that rides only the VERBOSE round-trip
+# format, never the lossy external projection.
+#
+# Single source of truth for both STRICT branches. Adding a new top-level
+# ``ErrorReport`` field is one decision: include it here to surface it on both
+# branches, or leave it out to keep both branches consistently silent.
 _STRICT_KEPT_FIELDS: frozenset[str] = frozenset({"error_type", "title", "type_uri", "error_domain", "error_category", "retryable"})
 
-# Provider/model attribution fields. STRICT drops them unconditionally — from
-# the redacted branch (they are absent from ``_STRICT_KEPT_FIELDS``) and from
-# the caller-facing-message passthrough branch alike: provider metadata never
-# belongs on an external surface, whatever the report's ``error_domain``.
-_STRICT_PROVIDER_FIELDS: frozenset[str] = frozenset({"model", "provider", "provider_metadata"})
+# The curated subset of ``ProviderErrorMetadata`` that survives STRICT
+# projection. ``status_code`` and ``retry_after_seconds`` are actionable client
+# hints (HTTP status mapping, ``Retry-After`` header) — they are not provider
+# attribution. Every other ``ProviderErrorMetadata`` field carries either
+# provider identity (``provider``, ``provider_error_code``, ``sdk_exception_type``)
+# or internal correlation IDs / free-form text (``request_id``, ``message``) that
+# the external surface has no business seeing.
+_STRICT_PROVIDER_METADATA_KEPT_FIELDS: frozenset[str] = frozenset({"status_code", "retry_after_seconds"})
 
-# Fields stripped from the STRICT caller-facing passthrough: provider/model
-# attribution plus ``caller_facing_message`` itself — the latter is internal
-# redaction plumbing that rides only the VERBOSE round-trip format, never the
-# lossy external projection.
-_STRICT_PASSTHROUGH_DROPPED_FIELDS: frozenset[str] = _STRICT_PROVIDER_FIELDS | frozenset({"caller_facing_message"})
+
+def _redact_provider_metadata_for_strict(metadata_payload: dict[str, Any]) -> dict[str, Any] | None:
+    """Project a ``ProviderErrorMetadata`` payload through STRICT's curated subset.
+
+    Keeps only the fields in :data:`_STRICT_PROVIDER_METADATA_KEPT_FIELDS`
+    (``status_code`` / ``retry_after_seconds``). Returns ``None`` when no curated
+    field is present, so the caller can omit the key entirely rather than emit
+    an empty dict on the wire.
+    """
+    curated = {key: value for key, value in metadata_payload.items() if key in _STRICT_PROVIDER_METADATA_KEPT_FIELDS}
+    return curated or None
+
 
 # Fields already mapped into RFC 7807 standard slots (``detail`` / ``title`` /
 # ``type``) by ``to_problem_document`` — must NOT be echoed as extension
@@ -50,9 +73,11 @@ class DisclosureMode(StrEnum):
       reconstructs the original report exactly.
 
     - ``STRICT``: a lossy projection for untrusted external surfaces.
-      ``provider`` / ``model`` / ``provider_metadata`` are dropped
-      unconditionally — provider/model attribution never belongs on an external
-      surface. The ``message`` is then projected by *provenance*:
+      ``provider`` / ``model`` are dropped unconditionally — provider/model
+      attribution never belongs on an external surface. ``provider_metadata`` is
+      projected through a curated subset: only ``status_code`` and
+      ``retry_after_seconds`` survive (actionable HTTP client hints, not provider
+      attribution). The ``message`` is then projected by *provenance*:
 
       - A report flagged :attr:`ErrorReport.caller_facing_message` keeps its
         ``message`` and ``user_action``. The flag is set by error classes whose
@@ -65,7 +90,15 @@ class DisclosureMode(StrEnum):
         ``retryable``, ``title``, ``type_uri``).
 
       ``from_dict(to_dict(report, STRICT))`` does NOT reconstruct the original —
-      STRICT is lossy.
+      STRICT is lossy. Beyond the redacted message and dropped fields, a STRICT
+      payload that carries ``provider_metadata`` cannot be rehydrated at all:
+      the curated dict lacks the ``provider`` / ``sdk_exception_type`` fields
+      required by :class:`pipelex.cogt.inference.error_classification.ProviderErrorMetadata`,
+      so :meth:`ErrorReport.from_dict` raises :class:`pydantic.ValidationError`.
+      Consumers of a STRICT payload must read the dict directly (e.g. via
+      :meth:`ErrorReport.to_problem_document`) rather than rebuilding an
+      ``ErrorReport`` through ``from_dict``. Use VERBOSE on any surface that
+      needs round-trip semantics (webhook payloads, internal RPCs).
 
       STRICT keys the ``message`` decision on the *provenance of the message*,
       not on ``error_domain``: ``error_domain`` is inherited up the ``__cause__``
@@ -76,6 +109,17 @@ class DisclosureMode(StrEnum):
       *classification-projection*, **not a path-leak shield**: if a genuinely
       caller-facing ``message`` could surface a server-resolved path or secret,
       fix the upstream message — don't expand STRICT mode's scope.
+
+      The curated ``provider_metadata`` subset, in contrast, IS inherited up the
+      ``__cause__`` chain via :meth:`PipelexError._enrich_error_report_from_cause`
+      and is preserved on both STRICT branches. A wrapper error (e.g.
+      ``PipelexUnexpectedError``) raised ``from`` a categorized ``CogtError``
+      therefore surfaces the cause's ``status_code`` / ``retry_after_seconds`` on
+      the STRICT envelope, even though the wrapper itself advertises no provider
+      relationship. This is deliberate, by the same reasoning as the previous
+      paragraph: the curated fields are HTTP client hints (status mapping,
+      ``Retry-After`` header), not provider attribution, and STRICT does not
+      hide internal failure topology.
     """
 
     VERBOSE = "verbose"
@@ -166,11 +210,12 @@ class ErrorReport(BaseModel):
 
         ``VERBOSE`` is the strict inverse of :meth:`from_dict` — every populated
         field round-trips. ``STRICT`` is a lossy projection (see
-        :class:`DisclosureMode`): ``provider`` / ``model`` / ``provider_metadata``
-        are always dropped, and unless the report is flagged
-        :attr:`caller_facing_message` its ``message`` is replaced with a generic
-        placeholder and ``user_action`` is dropped, leaving only the stable
-        identifiers.
+        :class:`DisclosureMode`): ``provider`` / ``model`` are always dropped,
+        ``provider_metadata`` is projected through the curated subset (just
+        ``status_code`` and ``retry_after_seconds``), and unless the report is
+        flagged :attr:`caller_facing_message` its ``message`` is replaced with a
+        generic placeholder and ``user_action`` is dropped, leaving only the
+        stable identifiers plus the curated ``provider_metadata`` slice.
         """
         payload = self.model_dump(exclude_none=True)
         # ``caller_facing_message`` is redaction plumbing, not consumer-facing
@@ -184,16 +229,28 @@ class ErrorReport(BaseModel):
             case DisclosureMode.VERBOSE:
                 return payload
             case DisclosureMode.STRICT:
+                # Both STRICT branches start from the same allowlist — single
+                # source of truth, so adding a new top-level ``ErrorReport``
+                # field is one decision (include / exclude), not two.
+                projected: dict[str, Any] = {key: payload[key] for key in _STRICT_KEPT_FIELDS if key in payload}
                 if self.caller_facing_message:
                     # The error class that authored this message designed it as
-                    # caller-facing copy — reflect it back. Provider/model
-                    # attribution and the internal ``caller_facing_message`` flag
-                    # are still stripped: neither belongs on the lossy external
-                    # projection, whatever the error_domain.
-                    return {key: value for key, value in payload.items() if key not in _STRICT_PASSTHROUGH_DROPPED_FIELDS}
-                redacted: dict[str, Any] = {key: payload[key] for key in _STRICT_KEPT_FIELDS if key in payload}
-                redacted["message"] = INTERNAL_ERROR_PLACEHOLDER
-                return redacted
+                    # caller-facing copy — reflect it (and ``user_action``) back
+                    # on top of the shared allowlist.
+                    projected["message"] = payload["message"]
+                    if "user_action" in payload:
+                        projected["user_action"] = payload["user_action"]
+                else:
+                    projected["message"] = INTERNAL_ERROR_PLACEHOLDER
+                # Reattach a curated ``provider_metadata`` slice — even on the
+                # fully-redacted branch, ``status_code`` and ``retry_after_seconds``
+                # are actionable client hints (HTTP status mapping, ``Retry-After``
+                # header) that the HTTP adapter needs to emit a useful response.
+                if "provider_metadata" in payload:
+                    curated_metadata = _redact_provider_metadata_for_strict(payload["provider_metadata"])
+                    if curated_metadata is not None:
+                        projected["provider_metadata"] = curated_metadata
+                return projected
 
     def to_problem_document(
         self,
@@ -418,19 +475,25 @@ class PipelexError(Exception):
             seen.add(id(node))
             node = node.__cause__
         cause_report = cause.to_error_report()
-        return ErrorReport(
-            error_type=report.error_type,
-            message=report.message,
-            title=report.title,
-            type_uri=report.type_uri,
-            caller_facing_message=report.caller_facing_message,
-            error_category=report.error_category or cause_report.error_category,
-            error_domain=report.error_domain or cause_report.error_domain,
-            retryable=report.retryable if report.retryable is not None else cause_report.retryable,
-            user_action=report.user_action or cause_report.user_action,
-            model=report.model or cause_report.model,
-            provider=report.provider or cause_report.provider,
-            provider_metadata=report.provider_metadata or cause_report.provider_metadata,
+        # Only the cause-merged classification fields are updated; the wrapper-wins
+        # fields (error_type, message, title, type_uri, caller_facing_message)
+        # stay untouched, so a future wrapper-wins field added to ErrorReport
+        # does not need to be re-listed here.
+        # Footgun: ``provider_metadata`` uses whole-object OR, and a Pydantic
+        # model instance is always truthy — a wrapper that attached
+        # attribution-only metadata (no ``status_code`` / ``retry_after_seconds``)
+        # discards the cause's actionable hints. Pinned by
+        # ``tests/unit/pipelex/cogt/test_cogt_provider_metadata_wrapper_wins.py``.
+        return report.model_copy(
+            update={
+                "error_category": report.error_category or cause_report.error_category,
+                "error_domain": report.error_domain or cause_report.error_domain,
+                "retryable": report.retryable if report.retryable is not None else cause_report.retryable,
+                "user_action": report.user_action or cause_report.user_action,
+                "model": report.model or cause_report.model,
+                "provider": report.provider or cause_report.provider,
+                "provider_metadata": report.provider_metadata or cause_report.provider_metadata,
+            }
         )
 
 

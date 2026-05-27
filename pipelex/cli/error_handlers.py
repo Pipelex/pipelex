@@ -234,9 +234,9 @@ def _display_validation_error_details(console: Console, exc: ValidateBundleError
             console.print()
 
     # Display pipe validation errors
-    if exc.pipe_validation_error_data:
+    if exc.pipe_validation_errors:
         console.print("[bold cyan]Pipe Validation Errors:[/bold cyan]\n")
-        for pipe_index, pipe_error in enumerate(exc.pipe_validation_error_data, 1):
+        for pipe_index, pipe_error in enumerate(exc.pipe_validation_errors, 1):
             console.print(f"[bold yellow]{pipe_index}. {pipe_error.error_type.replace('_', ' ').title()}[/bold yellow]")
 
             # Display key identification info

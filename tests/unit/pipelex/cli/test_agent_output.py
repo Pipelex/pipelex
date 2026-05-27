@@ -136,24 +136,15 @@ class TestAgentOutput:
                     variable_names=["y"],
                 ),
             ],
-            pipe_concept_instantiation_errors=[
-                PipesAndConceptValidationErrorData(
-                    error_type=PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR,
-                    pipe_code="pipe_d",
-                    message="pydantic validation failed",
-                    field_path="pipe_d.output",
-                ),
-            ],
         )
 
         result = extract_validation_errors(exc)
-        assert len(result) == 4
+        assert len(result) == 3
 
         categories = [entry["category"] for entry in result]
         assert "blueprint_validation" in categories
         assert "pipe_factory" in categories
         assert "pipe_validation" in categories
-        assert "instantiation" in categories
 
         # Check factory error has extra fields
         factory_entry = next(entry for entry in result if entry["category"] == "pipe_factory")

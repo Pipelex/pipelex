@@ -46,6 +46,8 @@ classification rules, and the cross-boundary Temporal bridge.
 - [`GatewaySearchResponseError`](gateway-search-response-error.md) — Gateway search response
 - [`GatewayUnknownModelError`](gateway-unknown-model-error.md) — Gateway unknown model
 - [`GeneratedImageError`](generated-image-error.md) — Generated image
+- [`GoogleImgGenWorkerError`](google-img-gen-worker-error.md) — Google img gen worker
+- [`GoogleLLMWorkerError`](google-llm-worker-error.md) — Google LLM worker
 - [`ImageContentError`](image-content-error.md) — Image content
 - [`ImgGenGeneratedTypeError`](img-gen-generated-type-error.md) — Img gen generated type
 - [`ImgGenGenerationError`](img-gen-generation-error.md) — Img gen generation
@@ -81,7 +83,7 @@ classification rules, and the cross-boundary Temporal bridge.
 - [`ModelManagerError`](model-manager-error.md) — Model manager
 - [`ModelNotFoundError`](model-not-found-error.md) — Model not found
 - [`ModelWaterfallError`](model-waterfall-error.md) — Model waterfall
-- [`OpenAIClientFactoryError`](open-ai-client-factory-error.md) — OpenAI client factory
+- [`OpenAIClientFactoryError`](open-ai-client-factory-error.md) — OpenAI client factory error
 - [`PortkeyCredentialsError`](portkey-credentials-error.md) — Portkey credentials
 - [`PortkeyError`](portkey-error.md) — Portkey
 - [`PortkeyFactoryError`](portkey-factory-error.md) — Portkey factory
@@ -97,7 +99,7 @@ classification rules, and the cross-boundary Temporal bridge.
 - [`SearchHandleNotFoundError`](search-handle-not-found-error.md) — Search handle not found
 - [`SearchJobFailureError`](search-job-failure-error.md) — Search job failure
 - [`SearchModelNotFoundError`](search-model-not-found-error.md) — Search model not found
-- [`VertexAIConfigError`](vertex-ai-config-error.md) — VertexAI config
+- [`VertexAIConfigError`](vertex-ai-config-error.md) — VertexAI configuration error
 
 ## ConceptError
 
@@ -137,7 +139,7 @@ classification rules, and the cross-boundary Temporal bridge.
 - [`AzureCredentialsError`](azure-credentials-error.md) — Azure credentials
 - [`CredentialsError`](credentials-error.md) — Missing or invalid credentials
 - [`FalCredentialsError`](fal-credentials-error.md) — Fal credentials
-- [`VertexAICredentialsError`](vertex-ai-credentials-error.md) — VertexAI credentials
+- [`VertexAICredentialsError`](vertex-ai-credentials-error.md) — VertexAI credentials error
 
 ## DeliveryError
 
@@ -160,14 +162,6 @@ classification rules, and the cross-boundary Temporal bridge.
 ## DryRunError
 
 - [`DryRunError`](dry-run-error.md) — Dry run
-
-## GoogleImgGenWorkerError
-
-- [`GoogleImgGenWorkerError`](google-img-gen-worker-error.md) — Google img gen worker
-
-## GoogleLLMWorkerError
-
-- [`GoogleLLMWorkerError`](google-llm-worker-error.md) — Google LLM worker
 
 ## GraphSpecError
 
@@ -415,7 +409,6 @@ classification rules, and the cross-boundary Temporal bridge.
 
 ## TemporalFlowError
 
-- [`BaseModelPayloadConverterError`](base-model-payload-converter-error.md) — Base model payload converter
 - [`ContentGenerationError`](content-generation-error.md) — Content generation
 - [`SearchAttributeRegistrationError`](search-attribute-registration-error.md) — Search attribute registration
 - [`TemporalConfigError`](temporal-config-error.md) — Temporal config

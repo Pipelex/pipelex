@@ -101,18 +101,25 @@ class TestErrorReportProblemDocument:
         assert document["status"] == expected_status
 
     def test_strict_mode_redacts_detail_and_drops_disclosure_fields(self) -> None:
-        """Strict ``to_problem_document`` redacts ``detail`` and drops disclosure-leaking extensions."""
+        """Strict ``to_problem_document`` redacts ``detail`` and drops disclosure-leaking extensions.
+
+        ``provider`` / ``model`` identity is stripped. ``provider_metadata`` is
+        projected through the curated subset — ``status_code`` and
+        ``retry_after_seconds`` ride as an extension member so HTTP adapters can
+        derive ``Retry-After`` headers from the problem document.
+        """
         report = _runtime_report()
         document = report.to_problem_document(disclosure_mode=DisclosureMode.STRICT)
         assert document["detail"] == INTERNAL_ERROR_PLACEHOLDER
         assert "model" not in document
         assert "provider" not in document
-        assert "provider_metadata" not in document
         assert "user_action" not in document
         # Stable identifiers are kept.
         assert document["error_type"] == "CogtError"
         assert document["error_category"] == "capacity"
         assert document["retryable"] is False
+        # Curated provider_metadata slice rides as an extension member.
+        assert document["provider_metadata"] == {"status_code": 429, "retry_after_seconds": 12.0}
 
     def test_strict_mode_passes_through_detail_for_caller_facing_report(self) -> None:
         """A caller-facing-message report reflects ``detail`` back unchanged in STRICT mode."""

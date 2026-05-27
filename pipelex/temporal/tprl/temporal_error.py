@@ -12,17 +12,28 @@ from pipelex.temporal.exceptions import UnrecoverableWorkflowFailureError
 from pipelex.temporal.log_temporal import activity_log, workflow_log
 from pipelex.types import Self
 
+_ERROR_REPORT_REQUIRED_KEYS: frozenset[str] = frozenset({"error_type", "message", "title", "type_uri"})
+
+# Suffixed onto the synthesized ``UnrecoverableWorkflowFailureError`` message when
+# the bridge-side schema-validation fallback in :func:`recover_error_report` fires.
+# Detectors (tests, ops dashboards, the documentation in
+# ``docs/under-the-hood/error-model.md``) reference this marker as a stable
+# contract — import the constant instead of duplicating the literal.
+_ERROR_REPORT_VALIDATION_FAILED_MARKER: str = "[error report failed schema validation]"
+
 
 def error_report_dict_from_details(details: Sequence[Any]) -> dict[str, Any] | None:
     """Recover the ``ErrorReport`` dict packed into ``ApplicationError.details``.
 
     The bridge packs ``exc.to_error_report().to_dict()`` as the first details
     entry. After Temporal serialization the dict comes back as a plain mapping;
-    we identify it by its ``error_type`` / ``message`` shape so an unrelated
-    details payload is not mistaken for an error report.
+    we identify it by the presence of every ``ErrorReport``-mandatory key
+    (``error_type`` / ``message`` / ``title`` / ``type_uri``) so an unrelated
+    details payload that happens to carry only two of them is not picked up
+    and routed into the schema-validation fallback.
     """
     for entry in details:
-        if isinstance(entry, dict) and "error_type" in entry and "message" in entry:
+        if isinstance(entry, dict) and all(key in entry for key in _ERROR_REPORT_REQUIRED_KEYS):
             return cast("dict[str, Any]", entry)
     return None
 
@@ -62,6 +73,10 @@ def _message_from_exc(exc: BaseException) -> str:
     worker exception, or a non-Temporal exception) holds the real detail. We walk
     the ``__cause__`` chain and surface the deepest non-empty message, falling
     back to ``repr(exc)`` when every message in the chain is unset.
+
+    A whitespace-only ``str(node)`` is treated the same as empty — without the
+    ``strip()`` guard, a node whose message is purely spaces or newlines would
+    win and the synthesized preamble would be visually broken.
     """
     deepest_message = ""
     node: BaseException | None = exc
@@ -69,7 +84,7 @@ def _message_from_exc(exc: BaseException) -> str:
     while node is not None and id(node) not in seen:
         seen.add(id(node))
         text = str(node)
-        if text:
+        if text.strip():
             deepest_message = text
         node = node.__cause__
     return deepest_message or repr(exc)
@@ -111,8 +126,16 @@ def recover_error_report(exc: BaseException) -> ErrorReport:
             # fallback instead of raising, so the caller still delivers the
             # failure webhook; the recovered message plus marker keep the
             # contract bug visible on the wire.
-            recovered_message = report_dict.get("message") or _message_from_exc(exc)
-            fallback_message = f"{recovered_message} [error report failed schema validation]"
+            # A whitespace-only ``report_dict["message"]`` is treated the same
+            # as missing — without the ``strip()`` guard, the fallback would not
+            # fire and the synthesized preamble would render as a visually
+            # broken `` [error report failed schema validation]``.
+            raw_message = report_dict.get("message")
+            if isinstance(raw_message, str) and raw_message.strip():
+                recovered_message = raw_message
+            else:
+                recovered_message = _message_from_exc(exc)
+            fallback_message = f"{recovered_message} {_ERROR_REPORT_VALIDATION_FAILED_MARKER}"
             return UnrecoverableWorkflowFailureError(fallback_message).to_error_report()
     return UnrecoverableWorkflowFailureError(_message_from_exc(exc)).to_error_report()
 

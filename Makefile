@@ -106,6 +106,8 @@ make gha-tests		          - Run tests for github actions (exit on first failure)
 make test                     - Run unit tests (no inference)
 make test-xdist               - Run unit tests with xdist (no inference)
 make agent-test               - Run unit tests, silent on success, output on failure (for AI agents)
+make agent-test-debug         - Debug variant: cleanup + outer timeout + live log; use when agent-test hangs or fails opaquely
+make atd                      - Shorthand -> agent-test-debug
 make t                        - Shorthand -> test-xdist
 make test-quiet               - Run unit tests without prints (no inference)
 make tq                       - Shorthand -> test-quiet
@@ -183,7 +185,7 @@ export HELP
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
 	test-llm tl test-img-gen tg test-extract te test-temporal ttm codex-tests gha-tests \
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
-	validate v check c cc agent-check agent-test \
+	validate v check c cc agent-check agent-test agent-test-debug atd \
 	test-durations td test-durations-serial tds test-time tt test-time-serial tts \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright merge-check-plxt-format merge-check-plxt-lint \
 	li check-unused-imports fix-unused-imports check-TODOs check-uv \
@@ -708,6 +710,66 @@ agent-test: env
 	rm -f "$$tmpfile"; \
 	if [ $$exit_code -eq 0 ]; then echo "• All tests passed."; fi; \
 	exit $$exit_code
+
+# Debug variant of agent-test for when the suite hangs or fails opaquely.
+# Use this instead of agent-test when:
+#   - a prior `make agent-test` hung (or got killed) without a verdict
+#   - failures are integration-temporal with worker crashes / "node down" noise
+#   - you need to see what's actually happening during the run
+# Differences vs agent-test:
+#   - pkill stale `pytest` + `temporal-sdk-python` processes first (zombies from
+#     prior hung runs compound contention and cause more hangs)
+#   - outer wall-clock `timeout` so fixture-teardown hangs and xdist
+#     worker-replace loops can't run forever (`pytest --timeout` is per-test only)
+#   - direct file redirect — `tail -f $(DEBUG_LOG)` in another shell for live progress
+#   - `-v` (not `-q`) so each test name lands in the log as it runs
+# Tunable: DEBUG_TIMEOUT (outer wall-clock seconds, default 480), DEBUG_LOG (log path).
+# Full playbook: docs/agents/debugging-hanging-pytest-runs.md
+DEBUG_TIMEOUT ?= 480
+DEBUG_LOG ?= /tmp/pytest-agent-test-debug.log
+TIMEOUT_CMD := $(shell command -v timeout 2>/dev/null || command -v gtimeout 2>/dev/null)
+agent-test-debug: env
+	@if [ -z "$(TIMEOUT_CMD)" ]; then \
+		echo "✘ Neither 'timeout' nor 'gtimeout' is installed."; \
+		echo "  On macOS: brew install coreutils"; \
+		echo "  The outer wall-clock cap is the whole point of this target — install before using."; \
+		exit 1; \
+	fi
+	@echo "• Cleaning stale pytest + temporal-sdk-python processes..."
+	@pkill -9 -f "pytest" 2>/dev/null || true
+	@pkill -9 -f "temporal-sdk-python" 2>/dev/null || true
+	@sleep 1
+	@echo "• Running with outer timeout=$(DEBUG_TIMEOUT)s, log: $(DEBUG_LOG)"
+	@echo "  Live progress: tail -f $(DEBUG_LOG)"
+	@$(TIMEOUT_CMD) $(DEBUG_TIMEOUT) $(VENV_PYTEST) -n auto --timeout=120 --timeout-method=thread \
+		-m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --tb=short -v \
+		> $(DEBUG_LOG) 2>&1; \
+	exit_code=$$?; \
+	if [ $$exit_code -eq 124 ]; then \
+		echo ""; \
+		echo "TIMEOUT: outer cap hit at $(DEBUG_TIMEOUT)s — fixture teardown or xdist worker-replace loop suspected."; \
+		echo "  Tail of log:"; \
+		tail -30 $(DEBUG_LOG) | sed 's/^/    /'; \
+		echo "  Full log: $(DEBUG_LOG)"; \
+		echo "  Playbook: docs/agents/debugging-hanging-pytest-runs.md"; \
+	elif [ $$exit_code -ne 0 ]; then \
+		echo ""; \
+		echo "FAIL: tests failed (exit $$exit_code). Unique failed tests:"; \
+		grep -oE "FAILED tests/[^ ]+" $(DEBUG_LOG) | sort -u | sed 's/^/    /'; \
+		echo ""; \
+		echo "  Full log: $(DEBUG_LOG)"; \
+		echo "  Tip: grep failures by error class name, not formatted message —"; \
+		echo "       grep -B 2 -A 10 'YourErrorClass' $(DEBUG_LOG)"; \
+		echo "  If failures are integration-temporal with worker crashes, re-run that"; \
+		echo "  slice serially: .venv/bin/pytest --timeout=60 -q tests/integration/.../"; \
+		echo "  Playbook: docs/agents/debugging-hanging-pytest-runs.md"; \
+	else \
+		echo "PASS: all tests green. Log: $(DEBUG_LOG)"; \
+	fi; \
+	exit $$exit_code
+
+atd: agent-test-debug
+	@echo "> done: atd = agent-test-debug"
 
 ##########################################################################################
 ### TEST DIAGNOSTICS

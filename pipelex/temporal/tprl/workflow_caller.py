@@ -13,6 +13,7 @@ from temporalio.workflow import ChildWorkflowHandle
 
 from pipelex import log
 from pipelex.config import get_config
+from pipelex.pipe_run.exceptions import AsyncExecutionNotEnabledError
 from pipelex.temporal.exceptions import WorkflowExecutionError
 from pipelex.temporal.temporal_manager import TemporalWorkerEnvironment, get_temporal_client, get_temporal_manager
 from pipelex.temporal.tprl.temporal_error import recover_error_report
@@ -72,8 +73,7 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
     async def temporal_client(self) -> TemporalClient:
         """Get the temporal client, raising an error if not set."""
         if not get_config().temporal.is_enabled:
-            msg = "Temporal is not enabled. Set temporal.is_enabled = true in pipelex.toml or use --temporal CLI flag."
-            raise WorkflowExecutionError(msg)
+            raise AsyncExecutionNotEnabledError.with_default_message()
         if self._temporal_client is None:
             if self.should_auto_connect_temporal:
                 log.debug(f"{self.class_name} auto-connecting to Temporal server")

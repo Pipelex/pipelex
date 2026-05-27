@@ -376,6 +376,38 @@ class TestDeliveryExecutor:
         assert payload["status"] == DeliveryStatus.COMPLETED
         assert "error" not in payload
 
+    async def test_webhook_omits_error_when_failed_status_with_none_report(self, mocker: MockerFixture) -> None:
+        """A FAILED delivery with ``error_report=None`` must not introduce an ``error`` field in the payload.
+
+        The COMPLETED case is pinned by ``test_webhook_omits_error_when_report_is_none``,
+        but the FAILED case is not — a future regression defaulting ``error`` to ``{}``
+        on FAILED would slip through. ``_notify_webhook`` only writes
+        ``payload["error"]`` when ``error_report is not None``, regardless of status.
+        """
+        mock_client = mocker.AsyncMock()
+        mock_response = mocker.MagicMock()
+        mock_response.raise_for_status = mocker.Mock()
+        mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
+        mock_client.post = mocker.AsyncMock(return_value=mock_response)
+        mocker.patch("pipelex.pipe_run.delivery_executor.httpx.AsyncClient", return_value=mock_client)
+
+        executor = DeliveryExecutor()
+        assignment = DeliveryAssignment(webhooks=[WebhookTarget(url="https://example.com/callback")])
+
+        await executor.execute(
+            pipe_output=None,
+            user_id="test-user",
+            pipeline_run_id="plr-failed-no-report",
+            delivery_assignment=assignment,
+            status=DeliveryStatus.FAILED,
+            error_report=None,
+        )
+
+        payload = mock_client.post.call_args.kwargs["json"]
+        assert payload["status"] == DeliveryStatus.FAILED
+        assert "error" not in payload
+
     async def test_webhook_failure_raises(self, mocker: MockerFixture) -> None:
         import httpx  # noqa: PLC0415
 

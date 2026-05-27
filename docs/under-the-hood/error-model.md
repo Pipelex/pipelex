@@ -71,7 +71,7 @@ report.http_status       # 422 / 429 / 500 — for HTTP adapters
 ```
 
 !!! warning "`ErrorReport` is `extra="forbid"`"
-    `from_dict()` rejects unknown keys. `recover_error_report()` calls it directly: a report dict that is found but fails validation is an internal contract bug — the activity bridge and the submitter share the schema within one deploy — and is allowed to raise rather than be silently swallowed.
+    `from_dict()` rejects unknown keys. `recover_error_report()` calls it directly: a report dict that is found but fails validation is an internal contract bug — the activity bridge and the submitter share the schema within one deploy. `recover_error_report()` catches the `ValidationError` and synthesizes an `UnrecoverableWorkflowFailureError` fallback (carrying the recovered message plus an `[error report failed schema validation]` marker) so failure-webhook delivery stays intact; the workflow still fails afterwards, keeping the contract bug visible. Any other caller of `from_dict()` should treat the validation failure as a bug to fix.
 
 ---
 
@@ -252,7 +252,7 @@ def recover_error_report(exc: BaseException) -> ErrorReport:
     return UnrecoverableWorkflowFailureError(_message_from_exc(exc)).to_error_report()
 ```
 
-When no report dict is found in the chain — a non-Pipelex exception, a worker crash, a heartbeat timeout — the function synthesizes an `UnrecoverableWorkflowFailureError` report so the recovery path always has structured classification to surface. A report dict that fails `ErrorReport.from_dict` validation is treated as an internal contract bug (writer and reader share the schema within one deploy) and is allowed to raise.
+When no report dict is found in the chain — a non-Pipelex exception, a worker crash, a heartbeat timeout — the function synthesizes an `UnrecoverableWorkflowFailureError` report so the recovery path always has structured classification to surface. A report dict that fails `ErrorReport.from_dict` validation is treated as an internal contract bug (writer and reader share the schema within one deploy) and is also synthesized into the same `UnrecoverableWorkflowFailureError` fallback — carrying the recovered message plus an `[error report failed schema validation]` marker — so the failure webhook still fires; the workflow still fails afterwards, keeping the contract bug visible.
 
 The recovered report is carried on `WorkflowExecutionError(error_report=...)`, whose `to_error_report()` override returns it. Since `WorkflowExecutionError` is a `PipelexError`, `PipelineExecutionError` inherits the classification natively.
 

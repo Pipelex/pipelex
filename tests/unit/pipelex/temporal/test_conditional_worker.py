@@ -17,6 +17,18 @@ from pipelex.temporal.tprl.workflow_caller import WorkflowExecutor
 class TestConditionalWorker:
     """Verify that with_conditional_worker restores task_queue after execution."""
 
+    @pytest.fixture(autouse=True)
+    def _enable_temporal(self, mocker: MockerFixture) -> None:
+        """The deployment-level async-enabled guard inside
+        ``with_conditional_worker`` short-circuits the wrapper when
+        ``temporal.is_enabled`` is False — disabled-path coverage lives in
+        ``test_async_execution_not_enabled.py``. These tests exercise the
+        worker-bootstrap branches, so the config must read enabled.
+        """
+        config_root = mocker.MagicMock()
+        config_root.temporal.is_enabled = True
+        mocker.patch("pipelex.temporal.tprl.conditional_worker.get_config", return_value=config_root)
+
     async def test_task_queue_not_mutated_after_multiple_calls(self, mocker: MockerFixture) -> None:
         """Calling a decorated method multiple times must not grow the task_queue name."""
         original_queue = "my-task-queue"

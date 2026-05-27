@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Union
+from typing import Any, ClassVar, Union
 
 from temporalio import activity, workflow
 
@@ -28,16 +28,25 @@ def configure_temporal_logs():
 
 
 class _RequestIdLog:
-    """Base for the Temporal log helpers — carries the per-invocation ``request_id``.
+    """Base for the Temporal log helpers — carries the per-invocation ``request_id``
+    and the seven severity methods that route through the bound logger.
 
     A :class:`WorkflowLog` / :class:`ActivityLog` is built once per workflow or
     activity invocation, bound to that invocation's ``job_metadata.request_id``
-    (``None`` when the run carries no inbound API request id). Every log call it
-    makes attaches ``request_id`` to the Temporal log record via
+    (``None`` when the run carries no inbound API request id). Every severity
+    method packs that ``request_id`` into the Temporal log record via
     ``extra={"request_id": ...}``, so downstream log shippers can correlate the
     record back to the originating API request — the call site never threads the
     id itself.
+
+    Subclasses point ``_logger`` at the right Temporal logger
+    (``workflow.logger`` or ``activity.logger``).
     """
+
+    # Set on each subclass to the right Temporal logger. The two loggers are
+    # ``LoggerAdapter`` instances initialized at module import time; a ClassVar
+    # reference holds the same instance the call sites and tests target.
+    _logger: ClassVar[Any]
 
     def __init__(self, request_id: str | None = None) -> None:
         self._request_id = request_id
@@ -52,6 +61,27 @@ class _RequestIdLog:
             return None
         return {"request_id": self._request_id}
 
+    def verbose(self, content: Union[str, Any]) -> None:
+        self._logger.log(level=LOGGING_LEVEL_VERBOSE, msg=content, extra=self._build_extra())
+
+    def debug(self, content: Union[str, Any]) -> None:
+        self._logger.log(level=logging.DEBUG, msg=content, extra=self._build_extra())
+
+    def dev(self, content: Union[str, Any]) -> None:
+        self._logger.log(level=LOGGING_LEVEL_DEV, msg=content, extra=self._build_extra())
+
+    def info(self, content: Union[str, Any]) -> None:
+        self._logger.log(level=logging.INFO, msg=content, extra=self._build_extra())
+
+    def warning(self, content: Union[str, Any]) -> None:
+        self._logger.log(level=logging.WARNING, msg=content, extra=self._build_extra())
+
+    def error(self, content: Union[str, Any]) -> None:
+        self._logger.log(level=logging.ERROR, msg=content, extra=self._build_extra())
+
+    def critical(self, content: Union[str, Any]) -> None:
+        self._logger.log(level=logging.CRITICAL, msg=content, extra=self._build_extra())
+
 
 class WorkflowLog(_RequestIdLog):
     """Logs messages in Temporal workflows at different severity levels.
@@ -63,33 +93,7 @@ class WorkflowLog(_RequestIdLog):
     used by call sites that have no ``job_metadata`` in scope.
     """
 
-    def verbose(self, content: Union[str, Any]) -> None:
-        """Log a verbose-level message in a workflow."""
-        workflow.logger.log(level=LOGGING_LEVEL_VERBOSE, msg=content, extra=self._build_extra())
-
-    def debug(self, content: Union[str, Any]) -> None:
-        """Log a debug-level message in a workflow."""
-        workflow.logger.log(level=logging.DEBUG, msg=content, extra=self._build_extra())
-
-    def dev(self, content: Union[str, Any]) -> None:
-        """Log a development-level message in a workflow."""
-        workflow.logger.log(level=LOGGING_LEVEL_DEV, msg=content, extra=self._build_extra())
-
-    def info(self, content: Union[str, Any]) -> None:
-        """Log an info-level message in a workflow."""
-        workflow.logger.log(level=logging.INFO, msg=content, extra=self._build_extra())
-
-    def warning(self, content: Union[str, Any]) -> None:
-        """Log a warning-level message in a workflow."""
-        workflow.logger.log(level=logging.WARNING, msg=content, extra=self._build_extra())
-
-    def error(self, content: Union[str, Any]) -> None:
-        """Log an error-level message in a workflow."""
-        workflow.logger.log(level=logging.ERROR, msg=content, extra=self._build_extra())
-
-    def critical(self, content: Union[str, Any]) -> None:
-        """Log a critical-level message in a workflow."""
-        workflow.logger.log(level=logging.CRITICAL, msg=content, extra=self._build_extra())
+    _logger: ClassVar[Any] = workflow.logger
 
 
 class ActivityLog(_RequestIdLog):
@@ -102,33 +106,7 @@ class ActivityLog(_RequestIdLog):
     used by call sites that have no ``job_metadata`` in scope.
     """
 
-    def verbose(self, content: Union[str, Any]) -> None:
-        """Log a verbose-level message in an activity."""
-        activity.logger.log(level=LOGGING_LEVEL_VERBOSE, msg=content, extra=self._build_extra())
-
-    def debug(self, content: Union[str, Any]) -> None:
-        """Log a debug-level message in an activity."""
-        activity.logger.log(level=logging.DEBUG, msg=content, extra=self._build_extra())
-
-    def dev(self, content: Union[str, Any]) -> None:
-        """Log a development-level message in an activity."""
-        activity.logger.log(level=LOGGING_LEVEL_DEV, msg=content, extra=self._build_extra())
-
-    def info(self, content: Union[str, Any]) -> None:
-        """Log an info-level message in an activity."""
-        activity.logger.log(level=logging.INFO, msg=content, extra=self._build_extra())
-
-    def warning(self, content: Union[str, Any]) -> None:
-        """Log a warning-level message in an activity."""
-        activity.logger.log(level=logging.WARNING, msg=content, extra=self._build_extra())
-
-    def error(self, content: Union[str, Any]) -> None:
-        """Log an error-level message in an activity."""
-        activity.logger.log(level=logging.ERROR, msg=content, extra=self._build_extra())
-
-    def critical(self, content: Union[str, Any]) -> None:
-        """Log a critical-level message in an activity."""
-        activity.logger.log(level=logging.CRITICAL, msg=content, extra=self._build_extra())
+    _logger: ClassVar[Any] = activity.logger
 
 
 # Unbound singletons for call sites with no ``job_metadata`` in scope (e.g. the

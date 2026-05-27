@@ -86,21 +86,27 @@ class CogtError(PipelexError):
 
     @override
     def to_error_report(self) -> ErrorReport:
-        report = ErrorReport(
-            error_type=type(self).__name__,
-            message=self.message,
-            title=type(self).title(),
-            type_uri=type(self).type_uri(),
-            error_category=self.error_category,
-            error_domain=self.error_domain,
-            retryable=self.error_category.is_retryable if self.error_category is not None else None,
-            user_action=self.user_action,
-            model=self.model_handle,
-            provider=self.backend_name,
-            provider_metadata=self.provider_metadata,
-            caller_facing_message=self._authors_caller_facing_message,
+        # Start from the base report (which already runs cause-chain enrichment
+        # over the shared classification fields) and layer the CogtError-specific
+        # fields on top with the same wrapper-wins-when-set semantics: a value
+        # explicitly set on this CogtError overrides whatever the cause surfaced,
+        # otherwise the cause-derived value carried by ``base_report`` stays.
+        # Footgun: ``provider_metadata`` uses whole-object OR, and a Pydantic
+        # model instance is always truthy — a wrapper that attached
+        # attribution-only metadata (no ``status_code`` / ``retry_after_seconds``)
+        # discards the cause's actionable hints. Pinned by
+        # ``tests/unit/pipelex/cogt/test_cogt_provider_metadata_wrapper_wins.py``.
+        base_report = super().to_error_report()
+        own_retryable = self.error_category.is_retryable if self.error_category is not None else None
+        return base_report.model_copy(
+            update={
+                "error_category": self.error_category or base_report.error_category,
+                "retryable": own_retryable if own_retryable is not None else base_report.retryable,
+                "model": self.model_handle or base_report.model,
+                "provider": self.backend_name or base_report.provider,
+                "provider_metadata": self.provider_metadata or base_report.provider_metadata,
+            }
         )
-        return self._enrich_error_report_from_cause(report)
 
 
 def find_inference_error_category_in_chain(exc: BaseException) -> InferenceErrorCategory | None:

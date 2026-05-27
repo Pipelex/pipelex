@@ -42,6 +42,17 @@ def _make_pipe_job_stub(mocker: MockerFixture) -> Any:
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestTemporalPipeRouterChildObservability:
+    @pytest.fixture(autouse=True)
+    def _enable_temporal(self, mocker: MockerFixture) -> None:
+        """The async-enabled guard inside ``with_conditional_worker`` runs
+        before ``_run_pipe_job``'s body — patch the decorator's ``get_config``
+        site so the guard reads enabled (disabled-path coverage lives in
+        ``test_async_execution_not_enabled.py``).
+        """
+        config_root = mocker.MagicMock()
+        config_root.temporal.is_enabled = True
+        mocker.patch("pipelex.temporal.tprl.conditional_worker.get_config", return_value=config_root)
+
     async def test_child_workflow_dispatch_passes_static_details(self, mocker: MockerFixture) -> None:
         """Child workflow dispatch must pass ``static_details`` to
         ``workflow.execute_child_workflow``, matching the top-level path.
