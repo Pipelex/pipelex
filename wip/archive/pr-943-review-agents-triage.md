@@ -36,18 +36,11 @@ The bug is at four sites in `pipelex/pipeline/validate_bundle.py`: `validate_bun
 
 **Fix.**
 
-- New context manager `scoped_current_library(library_id: str)` in `pipelex/hub.py`. Captures the prior `_library_id` ContextVar value, sets the new one, restores the prior on exit (success or exception).
-- All 4 entry points in `validate_bundle.py` refactored from the `set_current_library(...) / teardown_current_library()` pattern to `with scoped_current_library(library_id=library_id):`. The TODO comment is gone.
+- New public helper `get_current_library_id_or_none()` in `pipelex/hub.py` (reads the `_library_id` ContextVar without raising on unset). A `scoped_current_library(library_id: str)` context manager is also added in `hub.py` but is **not yet used** — it is kept for the upcoming `submitter_hydration.py` migration (separate follow-up commit). The TODO comment in `validate_bundle.py` is gone.
+- All 4 entry points in `validate_bundle.py` capture `prev_library_id = get_current_library_id_or_none()` before `set_current_library(library_id=library_id)`, then in the failure-only `finally` branch restore the prior value (`set_current_library(library_id=prev_library_id)` or, when no outer was set, `teardown_current_library()`). The success-path behavior is unchanged on purpose: the caller's library is left as current after the function returns, which `_runner_core.py`, `_inputs_core.py`, `_output_core.py`, the agent_cli `validate_pipe_in_bundle_core`, `validate_ops.py:184`, and `inputs_ops.py` all rely on for their immediate `get_required_pipe(pipe_code=...)` call.
 - 4 new regression tests in `tests/integration/pipelex/pipeline/test_validate_bundle_library_lifecycle.py` (new `TestValidateBundleRestoresOuterLibraryOnFailure` class) — one per entry point. Each sets an outer current library, forces a translated failure (via the existing `_BrokenResult` patch pattern), and asserts `get_current_library() == outer_library_id` post-call. All four failed before the fix (`RuntimeError: No current library set`), pass after.
 
-**Collateral.** The fix made it observable that several existing tests relied on the leaky pre-fix behavior — they called `get_current_library()` after `validate_bundle` / `load_concepts_only` to access the just-loaded library. That is exactly the implicit dependency the fix surfaces. To express the dependency cleanly:
-
-- `ValidateBundleResult` and `LoadConceptsOnlyResult` now expose `library_id: str` (the id of the library the function opened and populated).
-- 6 affected tests updated:
-  - 3 in `test_load_concepts_only.py` now look the library up explicitly via `library_manager.get_library(library_id=result.library_id)`.
-  - 4 in `test_pipe_sequence_list_output_bug.py` wrap the post-call dry-run work in `with scoped_current_library(library_id=result.library_id):` (the dry-run path also reads current library internally).
-
-The production consumer of `load_concepts_only` (`pipelex/cli/commands/build/structures_cmd.py`) was audited and confirmed not to rely on the post-call current library — only `result.blueprints` is used. No production behavior change.
+**Collateral.** None — `ValidateBundleResult` / `LoadConceptsOnlyResult` are unchanged, and no existing test relied on the leaky pre-fix behavior in a way that needed updating. The success-path keeps the caller's library current, so call sites that read `get_current_library()` after a successful call continue to work as before.
 
 ### #3 — Greptile: "Delivery logs lose request"
 
@@ -68,15 +61,13 @@ The production consumer of `load_concepts_only` (`pipelex/cli/commands/build/str
 ## Files changed
 
 ```
-pipelex/hub.py                                                  (+1 import, +18 lines: scoped_current_library context manager)
-pipelex/pipeline/validate_bundle.py                             (4 sites refactored, TODO comment removed, +1 field on each result class)
+pipelex/hub.py                                                  (+1 public helper get_current_library_id_or_none; +scoped_current_library context manager — added but unused, kept for the upcoming submitter_hydration.py migration)
+pipelex/pipeline/validate_bundle.py                             (4 sites: capture prev_library_id, restore-or-teardown on failure only; TODO comment removed)
 pipelex/pipe_run/delivery_executor.py                           (request_id threaded through 3 method signatures + 2 log strings)
 pipelex/temporal/tprl_pipe/act_deliver.py                       (+1 field, +1 kwarg passthrough)
 pipelex/temporal/tprl_pipe/wf_pipe_run.py                       (+1 kwarg populated from job_metadata)
 
 tests/integration/pipelex/pipeline/test_validate_bundle_library_lifecycle.py   (+1 test class, 4 new tests)
-tests/integration/pipelex/pipeline/test_load_concepts_only.py                  (3 tests updated to use result.library_id)
-tests/integration/pipelex/pipes/controller/pipe_sequence/test_pipe_sequence_list_output_bug.py  (4 tests wrap dry-run in scoped_current_library)
 tests/unit/pipelex/pipe_run/test_delivery_executor.py                          (+3 new tests for request_id in delivery logs)
 tests/unit/pipelex/temporal/test_delivery_activity_arg.py                      (existing roundtrip extended + 1 new defaults test)
 ```
@@ -91,7 +82,7 @@ tests/unit/pipelex/temporal/test_delivery_activity_arg.py                      (
 
 - **PR-thread replies + resolves** — held at user's request, not yet posted. When ready:
   - Thread `PRRT_kwDOOwmMFc6FG301` (codex, temporal_error.py) → reply with policy rationale ("no backward-compat for Temporal; pre-shipping wire shape can change freely"), then resolve.
-  - Thread `PRRT_kwDOOwmMFc6FHB_5` (greptile, validate_bundle.py) → reply summarizing the `scoped_current_library` helper + 4-site refactor + 4 regression tests + the explicit-`library_id`-on-result correctness improvement, then resolve.
+  - Thread `PRRT_kwDOOwmMFc6FHB_5` (greptile, validate_bundle.py) → reply summarizing the prev-library capture-and-restore pattern at all 4 entry points + 4 regression tests, then resolve. (The `scoped_current_library` helper added to `hub.py` is intentionally unused for now — it is staged for the submitter_hydration.py migration in a separate follow-up commit.)
   - Thread `PRRT_kwDOOwmMFc6FHCBU` (greptile, act_deliver.py) → reply summarizing the `request_id` plumbing from `JobMetadata` through to the delivery completion logs + 3 regression tests, then resolve.
 
 - **Commit shape** — fix #2 and fix #3 are independent and could land as two commits, or one bundled. The collateral (`library_id` on result types + 6 test updates) belongs with fix #2. Awaiting user direction.
@@ -100,6 +91,7 @@ tests/unit/pipelex/temporal/test_delivery_activity_arg.py                      (
 
 ## Notes for the next session
 
-- The `scoped_current_library` helper is now a public symbol on `pipelex.hub`. If new validation/loading entry points appear that touch `_library_id`, they should use this helper rather than the bare `set_current_library` / `teardown_current_library` pair.
-- The `library_id` field on `ValidateBundleResult` / `LoadConceptsOnlyResult` is the canonical way for a caller to reach the loaded library after the call. Don't reintroduce `get_current_library()`-after-call patterns in tests or new code — that's the leaky behavior the fix removes.
+- `get_current_library_id_or_none()` is now a public helper on `pipelex.hub` — use it anywhere a caller needs to snapshot `_library_id` without raising on unset.
+- `scoped_current_library(library_id: str)` is also public on `pipelex.hub` but **currently unused**. It restores the prior `_library_id` on context exit (success or exception); intended for the upcoming `submitter_hydration.py` migration. Note that it does NOT fit the `validate_bundle.py` shape, which intentionally keeps the new library current on the success path — that is why the entry points there use a manual capture-and-restore in the failure-only branch.
+- The success-path "caller's library is left as current" behavior of `validate_bundle` / `load_concepts_only` is the canonical contract — `_runner_core.py`, `_inputs_core.py`, `_output_core.py`, `validate_pipe_in_bundle_core`, `validate_ops.py:184`, and `inputs_ops.py` all rely on it for the immediate `get_required_pipe(...)` call after a successful validation.
 - The `request_id` correlation now flows: inbound API → `JobMetadata.request_id` → `WfPipeRun.run()` builds a bound `WorkflowLog` (existing) → `DeliveryActivityArg.request_id` (new) → `DeliveryExecutor.execute(request_id=...)` (new) → `, request_id={...}` suffix on the storage/webhook completion lines.

@@ -192,14 +192,17 @@ async def validate_bundle(
         return result
     finally:
         if not success:
-            library_manager.teardown(library_id=library_id)
-            # Restore the caller's outer current-library so a failure here does not
-            # clobber an outer scope. ``set_current_library`` cannot accept ``None``,
-            # so route the "no outer was set" case through ``teardown_current_library``.
+            # Restore the caller's outer current-library FIRST so the safety
+            # guarantee holds even when ``library_manager.teardown`` raises
+            # (e.g. ``LibraryError`` on a double-teardown race) — otherwise the
+            # outer scope is left holding the just-torn-down ``library_id``.
+            # ``set_current_library`` cannot accept ``None``, so route the
+            # "no outer was set" case through ``teardown_current_library``.
             if prev_library_id is not None:
                 set_current_library(library_id=prev_library_id)
             else:
                 teardown_current_library()
+            library_manager.teardown(library_id=library_id)
 
 
 async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResult:
@@ -224,11 +227,13 @@ async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResu
         return result
     finally:
         if not success:
-            library_manager.teardown(library_id=library_id)
+            # See ``validate_bundle``: restore the outer current-library before
+            # ``library_manager.teardown`` so the guarantee survives a teardown raise.
             if prev_library_id is not None:
                 set_current_library(library_id=prev_library_id)
             else:
                 teardown_current_library()
+            library_manager.teardown(library_id=library_id)
 
 
 class LoadConceptsOnlyResult(BaseModel):
@@ -320,11 +325,13 @@ def load_concepts_only(
         return result
     finally:
         if not success:
-            library_manager.teardown(library_id=library_id)
+            # See ``validate_bundle``: restore the outer current-library before
+            # ``library_manager.teardown`` so the guarantee survives a teardown raise.
             if prev_library_id is not None:
                 set_current_library(library_id=prev_library_id)
             else:
                 teardown_current_library()
+            library_manager.teardown(library_id=library_id)
 
 
 def load_concepts_only_from_directory(directory: Path) -> LoadConceptsOnlyResult:
@@ -363,8 +370,10 @@ def load_concepts_only_from_directory(directory: Path) -> LoadConceptsOnlyResult
         return result
     finally:
         if not success:
-            library_manager.teardown(library_id=library_id)
+            # See ``validate_bundle``: restore the outer current-library before
+            # ``library_manager.teardown`` so the guarantee survives a teardown raise.
             if prev_library_id is not None:
                 set_current_library(library_id=prev_library_id)
             else:
                 teardown_current_library()
+            library_manager.teardown(library_id=library_id)

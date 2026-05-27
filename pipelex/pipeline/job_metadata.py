@@ -57,7 +57,10 @@ class JobMetadata(BaseModel):
     # Distinct from :class:`pipelex.cogt.inference.error_classification.ProviderErrorMetadata.request_id`,
     # which is the *provider*-side request id (OpenAI ``x-request-id`` etc.) —
     # both can appear together when the API surfaces a provider failure.
-    request_id: str | None = None
+    # Constrained at the wire-format boundary (printable ASCII only, max 128
+    # chars) so an unsanitized upstream value cannot inject newlines or control
+    # characters into the log lines or ``ErrorReport`` envelopes that quote it.
+    request_id: str | None = Field(default=None, max_length=128, pattern=r"^[\x20-\x7E]+$")
 
     # Business ID for the current pipe execution (16-char hex string).
     # Always set during pipe runs for tracking purposes.

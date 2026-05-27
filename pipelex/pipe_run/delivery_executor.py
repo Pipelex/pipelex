@@ -235,7 +235,7 @@ class DeliveryExecutor:
             # TODO: include the full S3 URI (s3://bucket/key/) so result_url is
             # self-contained and doesn't depend on knowing the bucket externally.
             result_url: str = f"{base_key}/"
-            request_id_suffix = f", request_id={request_id}" if request_id is not None else ""
+            request_id_suffix = f", request_id={request_id}" if request_id else ""
             log.info(f"Storage delivery completed: pipeline_run_id={pipeline_run_id}, files={len(result_files)}{request_id_suffix}")
             return result_url
         except Exception as exc:
@@ -276,7 +276,7 @@ class DeliveryExecutor:
                     timeout=30.0,
                 )
                 response.raise_for_status()
-            request_id_suffix = f", request_id={request_id}" if request_id is not None else ""
+            request_id_suffix = f", request_id={request_id}" if request_id else ""
             log.info(f"Webhook delivery completed: pipeline_run_id={pipeline_run_id}, url={webhook.url}{request_id_suffix}")
         except httpx.HTTPStatusError as exc:
             msg = f"Webhook delivery failed for pipeline_run_id={pipeline_run_id}: HTTP {exc.response.status_code}"
