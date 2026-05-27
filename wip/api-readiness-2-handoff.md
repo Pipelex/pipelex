@@ -2,6 +2,8 @@
 
 **Status.** In-repo work on this branch is at a natural pause point. The branch is shippable as a coherent unit; no PR is open yet. Two threads still need API-team coordination (one cross-repo, one in-repo follow-up). This doc is a *launchpad* for the next session — it tells you what to read and what to decide, not what to write.
 
+> The execution ledger originally lived at the repo root as `TODOS.md`; it was archived 2026-05-28 to `wip/error-handling/archive-todos-api-readiness-2.md`. Paths below refer to the archived location.
+
 **Audience.** A fresh Claude Code session pointed at this file by Louis.
 
 ---
@@ -12,7 +14,7 @@ Do **not** draft anything from this file alone. Read the authoritative sources f
 
 Cold-start reading order:
 
-1. `TODOS.md` end-to-end — Phases, Decisions, full Session log. The Session log is the ground truth for what shipped.
+1. `wip/error-handling/archive-todos-api-readiness-2.md` end-to-end — Phases, Decisions, full Session log. The Session log is the ground truth for what shipped.
 2. `wip/error-handling/README.md` and the tracker docs it links.
 3. `wip/security/webhook-signing.md`.
 4. `git log main..HEAD --oneline` and `git diff main...HEAD --stat` to see the actual shape of the branch.
@@ -24,13 +26,13 @@ Only after that should you produce the deliverables (below).
 
 ## What sits on this branch
 
-Don't restate it. Re-derive from `TODOS.md` + the Session log entries for the completed Checkpoints. The shape is:
+Don't restate it. Re-derive from `wip/error-handling/archive-todos-api-readiness-2.md` + the Session log entries for the completed Checkpoints. The shape is:
 
 - A coherent error-handling and webhook-contract overhaul (multiple Phases, all in-repo).
 - One large structural refactor of where error classes live in the source tree.
 - A documented follow-up that the recent `/code-review` pass uncovered, partially fixed, and partially deferred.
 
-What's **not** on this branch: webhook signing (the cross-repo track) and the discovery-contract follow-up. Both are flagged in `TODOS.md`.
+What's **not** on this branch: webhook signing (the cross-repo track) and the discovery-contract follow-up. Both are flagged in `wip/error-handling/archive-todos-api-readiness-2.md`.
 
 ---
 
@@ -76,4 +78,4 @@ Both forms should *point at* source-of-truth docs, not restate them. The API tea
 - Don't enumerate every changed file, moved class, or renamed module. Point at the relevant Checkpoint entry.
 - Don't draft the handoff message *inside this file*. That's a deliverable, not a tracker.
 - Don't treat the deferred Phases as in progress. They aren't.
-- Don't expand this file as new work lands. If the picture changes, update `TODOS.md` (the source of truth) and revisit this brief.
+- Don't expand this file as new work lands. If the picture changes, update `wip/error-handling/archive-todos-api-readiness-2.md` (the source of truth) and revisit this brief.

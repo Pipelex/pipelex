@@ -1,5 +1,7 @@
 # API handoff — message drafts for `feature/API-readiness-2`
 
+> The drafts below were written when the execution ledger lived at the repo root as `_for_api/TODOS.md`. That file was archived 2026-05-28 to `_for_api/wip/error-handling/archive-todos-api-readiness-2.md` — translate any `TODOS.md` path reference below to the archived location if reusing these drafts.
+
 Two forms below — pick the one matching the channel. Both point at source docs rather than restating them.
 
 ---
