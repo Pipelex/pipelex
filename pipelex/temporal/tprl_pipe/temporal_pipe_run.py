@@ -8,7 +8,6 @@ from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
-from pipelex.pipe_run.exceptions import AsyncExecutionNotEnabledError
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.temporal.temporal_manager import TemporalWorkerEnvironment
@@ -23,31 +22,6 @@ from pipelex.temporal.tprl.workflow_caller import WorkflowClass, WorkflowExecuto
 from pipelex.temporal.tprl_pipe.pipe_run_arg import PipeRunArg
 from pipelex.temporal.tprl_pipe.submitter_hydration import rehydrate_pipe_output_with_crate
 from pipelex.temporal.tprl_pipe.wf_pipe_run import WfPipeRun
-
-_ASYNC_EXECUTION_NOT_ENABLED_MESSAGE = (
-    "Asynchronous pipeline execution is not enabled on this deployment. "
-    "Synchronous execution remains available; to enable async execution, the "
-    "server operator must configure an async execution backend in the "
-    "deployment's pipelex configuration."
-)
-
-
-def _check_async_execution_enabled() -> None:
-    """Fail fast when an async dispatch path is reached on a deployment that
-    has not enabled an async execution backend.
-
-    Belongs at the entry of every async dispatch site that depends on the
-    ``TemporalManager`` singleton (``stamp_submitter_session_id`` reads
-    ``get_temporal_manager().session_id`` on its first line). Without this
-    guard, the disabled path produces an opaque ``RuntimeError`` from the
-    singleton accessor instead of a classifiable ``PipelexError`` — and
-    downstream HTTP / CLI layers degrade it to a generic 500.
-
-    The message is backend-neutral on purpose (see the
-    :class:`AsyncExecutionNotEnabledError` docstring).
-    """
-    if not get_config().temporal.is_enabled:
-        raise AsyncExecutionNotEnabledError(_ASYNC_EXECUTION_NOT_ENABLED_MESSAGE)
 
 
 class TemporalPipeRun(WorkflowExecutor[PipeRunArg, PipeOutput], PipeRunProtocol):
@@ -77,11 +51,14 @@ class TemporalPipeRun(WorkflowExecutor[PipeRunArg, PipeOutput], PipeRunProtocol)
         pipe_job: PipeJob,
         delivery_assignment: DeliveryAssignment | None = None,
     ) -> PipeOutput:
-        """Execute a pipe run via Temporal (blocking — waits for completion)."""
-        # Fail fast with a classifiable error before touching the
-        # ``TemporalManager`` singleton (which is only initialized when the
-        # async backend is enabled). See ``_check_async_execution_enabled``.
-        _check_async_execution_enabled()
+        """Execute a pipe run via Temporal (blocking — waits for completion).
+
+        The deployment-level async-enabled guard fires inside
+        ``with_conditional_worker`` (above), before the worker setup on the
+        ``INTERNAL`` path and before this body on ``EXTERNAL`` — so
+        ``stamp_submitter_session_id`` (which reads the ``TemporalManager``
+        singleton) is unreachable on a disabled deployment.
+        """
         # Stamp submitter session_id before the workflow input is built so the
         # value flows through to every child workflow via the workflow arg.
         pipe_job = stamp_submitter_session_id(pipe_job)
@@ -119,12 +96,10 @@ class TemporalPipeRun(WorkflowExecutor[PipeRunArg, PipeOutput], PipeRunProtocol)
         """Start a pipe run without waiting for completion.
 
         Returns the workflow_id and a WorkflowHandle that can be awaited later.
+        The deployment-level async-enabled guard fires inside
+        ``with_conditional_worker``; see :meth:`run` for the rationale.
         """
         log.debug(f"TemporalPipeRun start using task_queue: {self.task_queue}")
-        # Fail fast with a classifiable error before touching the
-        # ``TemporalManager`` singleton (which is only initialized when the
-        # async backend is enabled). See ``_check_async_execution_enabled``.
-        _check_async_execution_enabled()
         # Stamp submitter session_id before building the workflow input so it
         # flows through every child workflow via the workflow arg.
         pipe_job = stamp_submitter_session_id(pipe_job)

@@ -73,13 +73,7 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
     async def temporal_client(self) -> TemporalClient:
         """Get the temporal client, raising an error if not set."""
         if not get_config().temporal.is_enabled:
-            msg = (
-                "Asynchronous pipeline execution is not enabled on this deployment. "
-                "Synchronous execution remains available; to enable async execution, "
-                "the server operator must configure an async execution backend in "
-                "the deployment's pipelex configuration."
-            )
-            raise AsyncExecutionNotEnabledError(msg)
+            raise AsyncExecutionNotEnabledError.with_default_message()
         if self._temporal_client is None:
             if self.should_auto_connect_temporal:
                 log.debug(f"{self.class_name} auto-connecting to Temporal server")

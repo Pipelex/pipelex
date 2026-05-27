@@ -22,6 +22,21 @@ class AsyncExecutionNotEnabledError(PipelexError):
     error_domain = ErrorDomain.CONFIG
     _declared_title = "Async execution not enabled"
 
+    DEFAULT_MESSAGE = (
+        "Asynchronous pipeline execution is not enabled on this deployment. "
+        "Synchronous execution remains available; to enable async execution, the "
+        "server operator must configure an async execution backend in the "
+        "deployment's pipelex configuration."
+    )
+
+    @classmethod
+    def with_default_message(cls) -> "AsyncExecutionNotEnabledError":
+        """Construct with the canonical backend-neutral message used by the
+        facade-level dispatch guard (``with_conditional_worker``) and the
+        lower-level ``WorkflowExecutor.temporal_client()`` boundary.
+        """
+        return cls(cls.DEFAULT_MESSAGE)
+
 
 class PipeRunParamsError(PipelexError):
     pass

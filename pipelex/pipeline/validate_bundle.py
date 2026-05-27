@@ -134,6 +134,20 @@ async def validate_bundle(
     library_id, library = library_manager.open_library()
     success = False
     try:
+        # TODO(post-merge revisit): the failure cleanup at the end of this
+        # `try` calls `teardown_current_library()` unconditionally, which
+        # clears the `_library_id` ContextVar entirely. If validation is ever
+        # entered from a context that already has an outer library set as
+        # current, that outer scope is clobbered — the next
+        # `get_current_library()` raises `RuntimeError: No current library set`.
+        # The scoped restore pattern in
+        # `submitter_hydration.rehydrate_pipe_output_with_crate` (capture prev
+        # id, restore on cleanup) is the right shape. Same bug at the three
+        # other `set_current_library` sites in this file. Not fixed here
+        # because this file is being modified on another branch; confirm
+        # whether the bug still exists after merge and apply a scoped
+        # `@contextmanager scoped_current_library(...)` helper to all four
+        # sites.
         set_current_library(library_id=library_id)
 
         # Load libraries from resolved directories before loading the bundle
