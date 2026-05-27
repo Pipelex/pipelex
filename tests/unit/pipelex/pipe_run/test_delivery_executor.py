@@ -472,6 +472,64 @@ class TestDeliveryExecutor:
         assert "request_id=req-xyz-789" in webhook_messages[0]
         assert "pipeline_run_id=plr-webhook-req" in webhook_messages[0]
 
+    async def test_failed_webhook_log_includes_request_id_when_set(self, mocker: MockerFixture) -> None:
+        """``request_id`` and ``error_report`` are independent dimensions of ``DeliveryExecutor.execute``.
+
+        The COMPLETED variant is pinned by ``test_webhook_completion_log_includes_request_id_when_set``;
+        this pins that the FAILED + populated-error_report path still surfaces ``request_id`` on the
+        delivery log line — so a future refactor that split the FAILED and COMPLETED webhook code
+        paths cannot drop the correlation id from the failure surface.
+        """
+        from pipelex import log as pipelex_log  # noqa: PLC0415
+
+        info_spy = mocker.spy(pipelex_log, "info")
+
+        mock_client = mocker.AsyncMock()
+        mock_response = mocker.MagicMock()
+        mock_response.raise_for_status = mocker.Mock()
+        mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
+        mock_client.post = mocker.AsyncMock(return_value=mock_response)
+        mocker.patch("pipelex.pipe_run.delivery_executor.httpx.AsyncClient", return_value=mock_client)
+
+        error_report = ErrorReport(
+            error_type="LLMCompletionError",
+            message="provider returned 429",
+            title="AI inference failed",
+            type_uri="https://docs.pipelex.com/latest/errors/llm-completion-error/",
+            error_category="transient",
+            error_domain=ErrorDomain.RUNTIME,
+            retryable=True,
+            user_action=UserAction(kind=UserActionKind.WAIT_AND_RETRY, detail="Wait a moment and retry"),
+            model="gpt-4o-mini",
+            provider="openai",
+            provider_metadata=ProviderErrorMetadata(
+                provider=ProviderName.OPENAI,
+                sdk_exception_type="RateLimitError",
+                message="429 Too Many Requests",
+                status_code=429,
+                retry_after_seconds=2.5,
+            ),
+        )
+
+        executor = DeliveryExecutor()
+        assignment = DeliveryAssignment(webhooks=[WebhookTarget(url="https://example.com/callback")])
+
+        await executor.execute(
+            pipe_output=None,
+            user_id="test-user",
+            pipeline_run_id="plr-webhook-failed-req",
+            delivery_assignment=assignment,
+            status=DeliveryStatus.FAILED,
+            error_report=error_report,
+            request_id="req-fail-1",
+        )
+
+        webhook_messages = [str(c.args[0]) for c in info_spy.call_args_list if "Webhook delivery completed" in str(c.args[0])]
+        assert webhook_messages, "Webhook delivery completion must emit one info log even on FAILED status"
+        assert "request_id=req-fail-1" in webhook_messages[0]
+        assert "pipeline_run_id=plr-webhook-failed-req" in webhook_messages[0]
+
     async def test_completion_logs_omit_request_id_when_unset(self, mocker: MockerFixture) -> None:
         """When ``request_id`` is None (run dispatched without an inbound id), the log lines do NOT print a stray ``request_id=None``."""
         from pipelex import log as pipelex_log  # noqa: PLC0415
