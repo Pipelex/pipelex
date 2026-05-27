@@ -85,6 +85,7 @@ class PipeRun(PipeRunProtocol):
                         delivery_assignment=delivery_assignment,
                         status=status,
                         error_report=error_report,
+                        request_id=pipe_job.job_metadata.request_id,
                     )
                 except DeliveryError as delivery_error:
                     if execution_error is None:
