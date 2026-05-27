@@ -20,7 +20,6 @@ from pipelex.pipeline.exceptions import ValidateBundleError
 
 
 def inputs_method_cmd(
-    ctx: typer.Context,
     name: Annotated[
         str,
         typer.Argument(help="Name of the installed method"),
@@ -56,7 +55,7 @@ def inputs_method_cmd(
     if library_dir:
         library_dirs_paths.extend(Path(lib_dir) for lib_dir in library_dir)
 
-    make_pipelex_for_agent_cli(library_dirs=library_dirs_paths, log_level=ctx.obj["log_level"], needs_inference=False, needs_model_specs=True)
+    make_pipelex_for_agent_cli(library_dirs=library_dirs_paths, needs_inference=False, needs_model_specs=True)
 
     try:
         result = asyncio.run(inputs_core(pipe_code=pipe_code, bundle_path=bundle_path, library_dirs=library_dirs_paths))

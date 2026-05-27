@@ -224,17 +224,23 @@ def load_json_list_from_path(path: str) -> list[Any]:
     raise JsonTypeError(msg)
 
 
-def deep_update(target_dict: dict[str, Any], updates: dict[str, Any]):
-    """Recursively updates a dictionary with values from another dictionary.
+def deep_update(target_dict: dict[str, Any], updates: Mapping[str, Any]):
+    """Recursively updates a dictionary with values from another mapping.
 
-    This function performs a deep merge of two dictionaries, handling nested
-    dictionaries. For dictionaries, it recursively updates values. For all other
-    types (including lists), values from updates override the target values.
+    This function performs a deep merge, handling nested mappings (``dict`` or any
+    ``Mapping`` — ``MappingProxyType``, etc.). For mappings, it recursively updates
+    values. For all other types (including lists), values from ``updates`` override
+    the target values.
+
+    The merged ``target_dict`` always holds plain ``dict`` instances at recursion
+    points, even when an input branch was a frozen ``Mapping``. Downstream code that
+    iterates results expecting a real ``dict`` (Pydantic ``model_validate`` on a
+    sub-tree, deep-merge with another layer) stays compatible.
 
     Args:
         target_dict (Dict[str, Any]): The dictionary to update. This dictionary
             will be modified in place.
-        updates (Dict[str, Any]): The dictionary containing updates to apply.
+        updates: The mapping containing updates to apply.
 
     Example:
         >>> base = {"a": 1, "b": {"x": 2, "y": 3}, "c": [1, 2]}
@@ -245,8 +251,10 @@ def deep_update(target_dict: dict[str, Any], updates: dict[str, Any]):
 
     """
     for key, value in updates.items():
-        if isinstance(value, dict) and key in target_dict and isinstance(target_dict[key], dict):
+        if isinstance(value, Mapping) and key in target_dict and isinstance(target_dict[key], dict):
             deep_update(target_dict[key], value)  # pyright: ignore[reportUnknownArgumentType]
+        elif isinstance(value, Mapping) and not isinstance(value, dict):
+            target_dict[key] = dict(value)  # pyright: ignore[reportUnknownArgumentType]
         else:
             target_dict[key] = value
 

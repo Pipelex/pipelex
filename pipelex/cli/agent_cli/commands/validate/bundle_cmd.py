@@ -32,7 +32,6 @@ from pipelex.tools.misc.chart_utils import FlowchartDirection
 
 
 def validate_bundle_cmd(
-    ctx: typer.Context,
     path: Annotated[
         str,
         typer.Argument(help="Path to a .mthds bundle file or a pipeline directory"),
@@ -126,7 +125,7 @@ def validate_bundle_cmd(
     # Convert library_dirs to list[str] for graph helper
     library_dir_strings = [str(lib_dir) for lib_dir in library_dirs] if library_dirs else None
 
-    make_pipelex_for_agent_cli(library_dirs=library_dirs, log_level=ctx.obj["log_level"], needs_inference=False, needs_model_specs=True)
+    make_pipelex_for_agent_cli(library_dirs=library_dirs, needs_inference=False, needs_model_specs=True)
 
     try:
         if pipe:

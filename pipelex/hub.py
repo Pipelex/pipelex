@@ -111,7 +111,7 @@ class PipelexHub:
 
     # tools
 
-    def setup_config(self, config_cls: type[ConfigRoot], config_overrides: dict[str, Any] | None = None):
+    def setup_config(self, config_cls: type[ConfigRoot], config_overrides: dict[str, Any] | None = None, config_dir: Path | None = None):
         """Set the global configuration instance.
 
         Args:
@@ -119,8 +119,12 @@ class PipelexHub:
             config_overrides: Optional dict deep-merged on top of all TOML layers
                 as the highest-priority override. Useful for tests that need
                 specific config without editing TOML files.
+            config_dir: Optional explicit config dir. When provided, project/global
+                layering is bypassed and only this directory is read. Used by the
+                doctor ``--global`` path so the hub reflects exactly the directory
+                being reported on.
         """
-        config_dict = config_manager.load_config(extra_overrides=config_overrides)
+        config_dict = config_manager.load_config(extra_overrides=config_overrides, config_dir=config_dir)
         self.set_config(config=config_cls.model_validate(config_dict))
 
     def set_config(self, config: ConfigRoot):
@@ -220,6 +224,15 @@ class PipelexHub:
         if self._config is None:
             msg = "Config instance is not set. You must initialize Pipelex first."
             raise RuntimeError(msg)
+        return self._config
+
+    def get_optional_config(self) -> ConfigRoot | None:
+        """Get the current configuration if it has been set, otherwise None.
+
+        Non-raising counterpart to ``get_required_config``. Used by callers that must
+        run before/around bootstrap (e.g. ``report_validation_error`` invoked from the
+        doctor's setup helper when ``setup_config`` itself failed).
+        """
         return self._config
 
     def get_console(self) -> Console:

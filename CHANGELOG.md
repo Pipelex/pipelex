@@ -24,6 +24,38 @@
 
 - **`InputStuffSpecsFactoryError` was shadowed by a duplicate class definition.** `pipelex/core/pipes/inputs/input_stuff_specs_factory.py` declared a local class with the same name as the canonical one in the package's `exceptions.py`, leaving two distinct class objects in play so an `except` on one would miss the other. Consolidated to the single canonical class.
 
+## [v0.30.2] - 2026-05-26
+
+### Changed
+
+- **`pipelex-agent` markdown error envelope no longer includes the `## Error source` stack-frame section.** Markdown is the agent / human-facing channel; internal frames like `LibraryError @ pipelex/libraries/library.py:140` are noise for an LLM trying to fix a `.mthds` file and forced every consumer (e.g. the `mthds-plugins` validate hook) to strip them. The `error_source` field remains in the JSON envelope (`--error-format json`) untouched for programmatic consumers — same shape, same cause-chain ordering — so any tooling that parses JSON keeps the full diagnostic surface. The `## Details` section (which carries `error_domain` and other structured fields) is unchanged. No change to error categorization, `error_domain` values, message wording, or stdout/stderr routing.
+
+## [v0.30.1] - 2026-05-26
+
+### Fixed
+
+- **`pipelex-agent` now silences every Python logger on stderr regardless of user TOML.** The agent CLI is machine-consumed: stdout is reserved for the structured success envelope (JSON / markdown) and stderr for the structured error envelope. Free-floating `log.*` calls — a `log.debug` from `telemetry_factory.py`, a `log.warning` from `validation_error_categorizer.py`, or an INFO/WARNING line from any third-party dep (`anthropic`, `httpx`, `botocore`, `openai`, anything a transitive dep configures) — would corrupt the stderr channel for downstream parsers (`mthds-js`'s `PipelexRunner` doing `JSON.parse(stderr)` on the validate hook). Two layers, defense-in-depth:
+  - **Layer 1 — pin pipelex's own logs off via config.** `make_pipelex_for_agent_cli` injects `config_overrides` into `Pipelex.make()` that pin `default_log_level = OFF` and `package_log_levels.pipelex = OFF` from the very first `log.configure` call. A user setting `[pipelex.log_config.package_log_levels] pipelex = "DEBUG"` in `~/.pipelex/pipelex.toml` can no longer leak its own DEBUG/INFO/WARNING lines.
+  - **Layer 2 — process-global cutoff that covers every logger.** New `silence_logging_for_agent_cli()` calls `logging.disable(sys.maxsize)` — a process-global threshold checked inside `Logger.isEnabledFor` BEFORE any per-logger level. No record gets created for any logger at any level (including custom levels above `CRITICAL`), regardless of which package emits or what level the user configured. Wired into the Typer `app_callback` so every subcommand — including `init` and `accept-gateway-terms`, which bypass `make_pipelex_for_agent_cli` — silences logging before any command body runs; idempotent per-call invocations remain inside `make_pipelex_for_agent_cli` and `agent_doctor_cmd` as belt-and-braces for direct library callers.
+
+  A new e2e regression test pins the contract by setting `anthropic`, `httpx`, `botocore`, `openai` to `DEBUG` in the user TOML and asserting both stdout and stderr stay clean.
+
+### Changed
+
+- **`pipelex-agent` no longer accepts `--log-level`.** Log suppression is unconditional by design — there is no verbosity setting on the agent CLI. The `log_level` parameter is removed from `make_pipelex_for_agent_cli()` and `apply_agent_cli_output_discipline()`, and the corresponding `ctx.obj["log_level"]` plumbing is gone from every caller. For verbose debugging, use the human `pipelex` CLI, which honors the user's TOML log config.
+
+- **`pipelex/cli/commands/doctor_cmd.py::setup_doctor_runtime` now `deep_update`s `log_config_overrides` into the loaded config** (was a flat-merge that silently replaced nested dicts like `package_log_levels`). With the flat merge, pinning `package_log_levels.pipelex = OFF` for the agent doctor path would have wiped out all the third-party package levels (`anthropic`, `asyncio`, `botocore`, ...) shipped in the default config. The deep merge preserves them.
+
+- **Removed `ctx: typer.Context` from 8 agent CLI commands that no longer used it.** `validate/{pipe,bundle,method}_cmd.py`, `inputs/{pipe,bundle,method}_cmd.py`, `models_cmd.py`, `check_model_cmd.py` had `ctx.obj["log_level"]` as their only ctx usage; with `--log-level` gone, the parameter became dead weight. The `run/` commands keep `ctx` because they still read `ctx.obj["runner"]`. Test callers (and the now-unused `agent_ctx` conftest fixture) updated to match.
+
+## [v0.30.0] - 2026-05-25
+
+### Fixed
+
+- **`console_log_target` package default is now `stderr` (was `stdout`).** Logs now stay off the data channel by default, matching the intent of PR #452 ("default to stderr for outputs happening before initialization"). Downstream tooling that parses `pipelex` / `pipelex-agent` stdout as JSON (e.g. `mthds-js`'s `PipelexRunner`) is no longer at risk of stdout pollution from package-level logs — the bug was latent for stock installs because the agent-CLI JSON paths happen not to log at INFO+, but surfaced for anyone who raised `package_log_levels.pipelex` to DEBUG or added a setup-time log on the command path. The same flip is applied to the kit template (`pipelex/kit/configs/pipelex.toml`) that `pipelex init` copies to `~/.pipelex/`. **Note:** `console_print_target` is intentionally left at `stdout` — the main `pipelex` CLI emits human-facing tables (`show backends`, `show models`, `which`, `doctor`) via that channel, and downstream piping (`pipelex show backends > out.txt`) must keep working.
+
+- **`pipelex-agent` now pins both console targets to `stderr` regardless of user config.** `make_pipelex_for_agent_cli` injects `config_overrides` into `Pipelex.make()` that force `console_log_target = "stderr"` and `console_print_target = "stderr"` from the very first log/print fired during init, so a user override of either knob in `~/.pipelex/pipelex.toml` can no longer leak diagnostics onto the agent CLI's JSON data channel. Defense-in-depth post-init calls to `log.redirect_to_stderr()` and `get_pipelex_hub().set_console_print_target(STDERR)` remain. A new adversarial E2E test (`tests/e2e/agent_cli/test_stdout_is_clean_json.py::test_models_json_stdout_resists_user_targets_override_to_stdout`) pins the contract by overriding both targets to `stdout` and `package_log_levels.pipelex` to `DEBUG` and asserting `json.loads(stdout)` still parses.
+
 ## [v0.29.1] - 2026-05-21
 
 ### Fixed
