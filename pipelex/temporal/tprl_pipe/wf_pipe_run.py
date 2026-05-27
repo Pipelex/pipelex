@@ -105,6 +105,7 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
                 delivery_assignment=delivery_assignment,
                 status=status,
                 error_report=error_report,
+                request_id=pipe_job.job_metadata.request_id,
             )
             # Include pipe_output only on success
             if pipe_output is not None:

@@ -34,6 +34,7 @@ class TestDeliveryActivityArg:
             delivery_assignment=DeliveryAssignment(webhooks=[WebhookTarget(url="https://example.com/callback")]),
             status=DeliveryStatus.FAILED,
             error_report=error_report,
+            request_id="req-abc",
         )
 
         restored = DeliveryActivityArg.model_validate_json(arg.model_dump_json())
@@ -42,3 +43,17 @@ class TestDeliveryActivityArg:
         assert restored.error_report == error_report
         assert restored.error_report is not None
         assert restored.error_report.user_action == error_report.user_action
+        assert restored.request_id == "req-abc"
+
+    def test_request_id_defaults_to_none(self) -> None:
+        """A run dispatched without an inbound API request id (e.g. cron, internal job) carries ``request_id=None``."""
+        arg = DeliveryActivityArg(
+            user_id="user-123",
+            pipeline_run_id="plr-no-req",
+            delivery_assignment=DeliveryAssignment(),
+            status=DeliveryStatus.COMPLETED,
+        )
+
+        assert arg.request_id is None
+        restored = DeliveryActivityArg.model_validate_json(arg.model_dump_json())
+        assert restored.request_id is None

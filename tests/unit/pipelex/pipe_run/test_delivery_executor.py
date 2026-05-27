@@ -408,6 +408,99 @@ class TestDeliveryExecutor:
         assert payload["status"] == DeliveryStatus.FAILED
         assert "error" not in payload
 
+    async def test_storage_completion_log_includes_request_id_when_set(self, mocker: MockerFixture) -> None:
+        """The ``Storage delivery completed`` log line carries the originating ``request_id`` for cross-phase correlation."""
+        from pipelex import log as pipelex_log  # noqa: PLC0415
+
+        info_spy = mocker.spy(pipelex_log, "info")
+
+        mock_storage = mocker.AsyncMock()
+        mock_storage.store = mocker.AsyncMock(return_value="pipelex-storage://test-key")
+        mocker.patch("pipelex.pipe_run.delivery_executor.get_storage_provider", return_value=mock_storage)
+
+        mock_output = mocker.MagicMock()
+        mock_output.working_memory_raw = None
+        mock_output.working_memory.smart_dump.return_value = {"root": {}, "aliases": {}}
+        mock_output.working_memory.get_optional_main_stuff.return_value = None
+        mock_output.graph_spec = None
+
+        executor = DeliveryExecutor()
+        assignment = DeliveryAssignment(storage=StorageTarget())
+
+        await executor.execute(
+            pipe_output=mock_output,
+            user_id="test-user",
+            pipeline_run_id="plr-storage-req",
+            delivery_assignment=assignment,
+            status=DeliveryStatus.COMPLETED,
+            request_id="req-abc-123",
+        )
+
+        storage_messages = [str(c.args[0]) for c in info_spy.call_args_list if "Storage delivery completed" in str(c.args[0])]
+        assert storage_messages, "Storage delivery completion must emit one info log"
+        assert "request_id=req-abc-123" in storage_messages[0]
+        assert "pipeline_run_id=plr-storage-req" in storage_messages[0]
+
+    async def test_webhook_completion_log_includes_request_id_when_set(self, mocker: MockerFixture) -> None:
+        """The ``Webhook delivery completed`` log line carries the originating ``request_id`` for cross-phase correlation."""
+        from pipelex import log as pipelex_log  # noqa: PLC0415
+
+        info_spy = mocker.spy(pipelex_log, "info")
+
+        mock_client = mocker.AsyncMock()
+        mock_response = mocker.MagicMock()
+        mock_response.raise_for_status = mocker.Mock()
+        mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
+        mock_client.post = mocker.AsyncMock(return_value=mock_response)
+        mocker.patch("pipelex.pipe_run.delivery_executor.httpx.AsyncClient", return_value=mock_client)
+
+        executor = DeliveryExecutor()
+        assignment = DeliveryAssignment(webhooks=[WebhookTarget(url="https://example.com/callback")])
+
+        await executor.execute(
+            pipe_output=None,
+            user_id="test-user",
+            pipeline_run_id="plr-webhook-req",
+            delivery_assignment=assignment,
+            status=DeliveryStatus.COMPLETED,
+            request_id="req-xyz-789",
+        )
+
+        webhook_messages = [str(c.args[0]) for c in info_spy.call_args_list if "Webhook delivery completed" in str(c.args[0])]
+        assert webhook_messages, "Webhook delivery completion must emit one info log"
+        assert "request_id=req-xyz-789" in webhook_messages[0]
+        assert "pipeline_run_id=plr-webhook-req" in webhook_messages[0]
+
+    async def test_completion_logs_omit_request_id_when_unset(self, mocker: MockerFixture) -> None:
+        """When ``request_id`` is None (run dispatched without an inbound id), the log lines do NOT print a stray ``request_id=None``."""
+        from pipelex import log as pipelex_log  # noqa: PLC0415
+
+        info_spy = mocker.spy(pipelex_log, "info")
+
+        mock_client = mocker.AsyncMock()
+        mock_response = mocker.MagicMock()
+        mock_response.raise_for_status = mocker.Mock()
+        mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
+        mock_client.post = mocker.AsyncMock(return_value=mock_response)
+        mocker.patch("pipelex.pipe_run.delivery_executor.httpx.AsyncClient", return_value=mock_client)
+
+        executor = DeliveryExecutor()
+        assignment = DeliveryAssignment(webhooks=[WebhookTarget(url="https://example.com/callback")])
+
+        await executor.execute(
+            pipe_output=None,
+            user_id="test-user",
+            pipeline_run_id="plr-no-req",
+            delivery_assignment=assignment,
+            status=DeliveryStatus.COMPLETED,
+        )
+
+        webhook_messages = [str(c.args[0]) for c in info_spy.call_args_list if "Webhook delivery completed" in str(c.args[0])]
+        assert webhook_messages, "Webhook delivery completion must emit one info log"
+        assert "request_id" not in webhook_messages[0], "an unset request_id must not produce a stray field"
+
     async def test_webhook_failure_raises(self, mocker: MockerFixture) -> None:
         import httpx  # noqa: PLC0415
 
