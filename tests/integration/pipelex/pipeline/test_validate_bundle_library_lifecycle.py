@@ -31,7 +31,7 @@ import pytest
 from pydantic import BaseModel
 from pytest_mock import MockerFixture
 
-from pipelex.hub import get_library_manager
+from pipelex.hub import get_current_library, get_library_manager, set_current_library, teardown_current_library
 from pipelex.pipeline import validate_bundle as validate_bundle_module
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import (
@@ -248,3 +248,84 @@ class TestValidateBundleLibraryLifecycle:
         latest_call = teardown_spy.call_args_list[-1]
         opened_library_id, _ = open_library_spy.spy_return
         assert latest_call.kwargs["library_id"] == opened_library_id
+
+
+@pytest.mark.asyncio(loop_scope="class")
+class TestValidateBundleRestoresOuterLibraryOnFailure:
+    """Pin: a failed validation must restore the caller's outer current-library, not clear it.
+
+    The IDE/server use case: a process sets a current library (e.g. for an
+    in-flight pipeline run or an open project), then calls a validation entry
+    point for a user edit. If that validation fails, the ``finally`` block
+    must restore the outer ``_library_id`` ContextVar to what the caller had
+    set — clearing it strands every subsequent ``get_current_library()`` in
+    the same async context with ``RuntimeError: No current library set``.
+
+    Covers all four entry points that touch ``_library_id``:
+    ``validate_bundle``, ``validate_bundles_from_directory``,
+    ``load_concepts_only``, ``load_concepts_only_from_directory``.
+    """
+
+    async def test_validate_bundle_restores_previous_current_library(
+        self,
+        load_empty_library: Callable[[], str],
+        mocker: MockerFixture,
+    ) -> None:
+        outer_library_id = load_empty_library()
+        set_current_library(library_id=outer_library_id)
+        try:
+            mocker.patch.object(validate_bundle_module, "ValidateBundleResult", _BrokenResult)
+            with pytest.raises(ValidateBundleError):
+                await validate_bundle(mthds_contents=[_VALID_MTHDS])
+            assert get_current_library() == outer_library_id
+        finally:
+            teardown_current_library()
+
+    async def test_validate_bundles_from_directory_restores_previous_current_library(
+        self,
+        load_empty_library: Callable[[], str],
+        mocker: MockerFixture,
+    ) -> None:
+        outer_library_id = load_empty_library()
+        set_current_library(library_id=outer_library_id)
+        try:
+            mocker.patch.object(validate_bundle_module, "ValidateBundleResult", _BrokenResult)
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                (Path(tmp_dir) / "test.mthds").write_text(_VALID_MTHDS, encoding="utf-8")
+                with pytest.raises(ValidateBundleError):
+                    await validate_bundles_from_directory(directory=Path(tmp_dir))
+            assert get_current_library() == outer_library_id
+        finally:
+            teardown_current_library()
+
+    async def test_load_concepts_only_restores_previous_current_library(
+        self,
+        load_empty_library: Callable[[], str],
+        mocker: MockerFixture,
+    ) -> None:
+        outer_library_id = load_empty_library()
+        set_current_library(library_id=outer_library_id)
+        try:
+            mocker.patch.object(validate_bundle_module, "LoadConceptsOnlyResult", _BrokenResult)
+            with pytest.raises(ValidateBundleError):
+                load_concepts_only(mthds_contents=[_VALID_MTHDS])
+            assert get_current_library() == outer_library_id
+        finally:
+            teardown_current_library()
+
+    async def test_load_concepts_only_from_directory_restores_previous_current_library(
+        self,
+        load_empty_library: Callable[[], str],
+        mocker: MockerFixture,
+    ) -> None:
+        outer_library_id = load_empty_library()
+        set_current_library(library_id=outer_library_id)
+        try:
+            mocker.patch.object(validate_bundle_module, "LoadConceptsOnlyResult", _BrokenResult)
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                (Path(tmp_dir) / "test.mthds").write_text(_VALID_MTHDS, encoding="utf-8")
+                with pytest.raises(ValidateBundleError):
+                    load_concepts_only_from_directory(directory=Path(tmp_dir))
+            assert get_current_library() == outer_library_id
+        finally:
+            teardown_current_library()

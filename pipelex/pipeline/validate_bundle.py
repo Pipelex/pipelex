@@ -20,7 +20,13 @@ from pipelex.core.pipes.handle_pipe_errors import (
 )
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.validation import report_validation_error
-from pipelex.hub import get_library_manager, resolve_library_dirs, set_current_library, teardown_current_library
+from pipelex.hub import (
+    get_current_library_id_or_none,
+    get_library_manager,
+    resolve_library_dirs,
+    set_current_library,
+    teardown_current_library,
+)
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.pipe_run.dry_run import DryRunOutput, dry_run_pipes
 from pipelex.pipe_run.exceptions import DryRunError, PipeRunError
@@ -133,21 +139,8 @@ async def validate_bundle(
     library_manager = get_library_manager()
     library_id, library = library_manager.open_library()
     success = False
+    prev_library_id = get_current_library_id_or_none()
     try:
-        # TODO(post-merge revisit): the failure cleanup at the end of this
-        # `try` calls `teardown_current_library()` unconditionally, which
-        # clears the `_library_id` ContextVar entirely. If validation is ever
-        # entered from a context that already has an outer library set as
-        # current, that outer scope is clobbered — the next
-        # `get_current_library()` raises `RuntimeError: No current library set`.
-        # The scoped restore pattern in
-        # `submitter_hydration.rehydrate_pipe_output_with_crate` (capture prev
-        # id, restore on cleanup) is the right shape. Same bug at the three
-        # other `set_current_library` sites in this file. Not fixed here
-        # because this file is being modified on another branch; confirm
-        # whether the bug still exists after merge and apply a scoped
-        # `@contextmanager scoped_current_library(...)` helper to all four
-        # sites.
         set_current_library(library_id=library_id)
 
         # Load libraries from resolved directories before loading the bundle
@@ -200,7 +193,13 @@ async def validate_bundle(
     finally:
         if not success:
             library_manager.teardown(library_id=library_id)
-            teardown_current_library()
+            # Restore the caller's outer current-library so a failure here does not
+            # clobber an outer scope. ``set_current_library`` cannot accept ``None``,
+            # so route the "no outer was set" case through ``teardown_current_library``.
+            if prev_library_id is not None:
+                set_current_library(library_id=prev_library_id)
+            else:
+                teardown_current_library()
 
 
 async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResult:
@@ -210,6 +209,7 @@ async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResu
     library_manager = get_library_manager()
     library_id, _ = library_manager.open_library()
     success = False
+    prev_library_id = get_current_library_id_or_none()
     try:
         set_current_library(library_id=library_id)
         with _translate_to_validate_bundle_error(category="pipe"):
@@ -225,7 +225,10 @@ async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResu
     finally:
         if not success:
             library_manager.teardown(library_id=library_id)
-            teardown_current_library()
+            if prev_library_id is not None:
+                set_current_library(library_id=prev_library_id)
+            else:
+                teardown_current_library()
 
 
 class LoadConceptsOnlyResult(BaseModel):
@@ -270,6 +273,7 @@ def load_concepts_only(
     library_manager = get_library_manager()
     library_id, library = library_manager.open_library()
     success = False
+    prev_library_id = get_current_library_id_or_none()
     try:
         set_current_library(library_id=library_id)
 
@@ -317,7 +321,10 @@ def load_concepts_only(
     finally:
         if not success:
             library_manager.teardown(library_id=library_id)
-            teardown_current_library()
+            if prev_library_id is not None:
+                set_current_library(library_id=prev_library_id)
+            else:
+                teardown_current_library()
 
 
 def load_concepts_only_from_directory(directory: Path) -> LoadConceptsOnlyResult:
@@ -342,6 +349,7 @@ def load_concepts_only_from_directory(directory: Path) -> LoadConceptsOnlyResult
     library_manager = get_library_manager()
     library_id, _ = library_manager.open_library()
     success = False
+    prev_library_id = get_current_library_id_or_none()
     try:
         set_current_library(library_id=library_id)
         with _translate_to_validate_bundle_error(category="concept"):
@@ -356,4 +364,7 @@ def load_concepts_only_from_directory(directory: Path) -> LoadConceptsOnlyResult
     finally:
         if not success:
             library_manager.teardown(library_id=library_id)
-            teardown_current_library()
+            if prev_library_id is not None:
+                set_current_library(library_id=prev_library_id)
+            else:
+                teardown_current_library()
