@@ -63,6 +63,7 @@ Key properties of the destination state:
 - The two boundaries that bind today's `request_id` continue to bind it — but at the *context* level, not by threading kwargs through 4-deep call stacks. The API request handler binds; `PipeRun.run` binds for non-API direct-mode invocations (whatever metadata it has); the Temporal activity entry re-binds from `DeliveryActivityArg.*` (the wire-format fields stay; only the propagation mechanism inside the activity changes).
 - The manual `request_id` kwargs on `DeliveryExecutor.execute` / `_store_results` / `_notify_webhook` are **deleted**. So is the `request_id_suffix` interpolation. The success log lines auto-pick up `request_id` from the filter; the failure log lines do too; the exception messages can stop carrying it (and stop pretending to).
 - Non-API invocations (CLI, direct library use, tests) simply don't bind `request_id`; the filter sees None; the field is absent from the record. No conditional suffix code anywhere.
+- **Event-name emission on delivery paths.** The success and failure log lines in `delivery_executor.py` carry an `event` field — `event=webhook_delivery` / `event=webhook_failure` on the webhook path, `event=storage_delivery` / `event=storage_failure` on the storage path. (Folded in from `feature/API-readiness-4`'s deferred item #7 — see that branch's `TODOS.md` item #7 for the original context. The API-side `TODOS.md` pointer for this needs re-targeting from API-readiness-4 onto this branch when work starts.)
 
 ## Reality of the current code (what we found during the trigger discussion)
 

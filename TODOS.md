@@ -72,13 +72,15 @@ While here: sweep `pipelex/builder/operations/*.py` for the same pattern (raw-it
 
 ---
 
-### 4. `LocalStorageProvider` should wrap raw `OSError` as a `StorageError`
+### 4. `LocalStorageProvider` should wrap raw `OSError` as a `StorageLocalError`
 
 **Status:** Not started.
 **Authoritative spec:** `../pipelex-api/wip/pipelex-changes.md` item #12.
 **Where:** `pipelex/tools/storage/local_storage_provider.py` — `_store` and `_load_with_metadata`.
 
-Today, `ENOSPC` / `EACCES` / `EROFS` / `EIO` / `FileExistsError` / TOCTOU window after `file_path.exists()` all escape as raw `OSError`. Add a narrow `try/except OSError as exc: raise StorageError(msg) from exc` around the filesystem calls — mirroring the wrapping already done by `S3StorageProvider` / `GcpStorageProvider`. Empirical reproductions are in the spec doc; consider adding a `StorageLocalError(StorageError)` to parallel `StorageS3Error` / `StorageGcpError`, but reusing `StorageError` is acceptable.
+Today, `ENOSPC` / `EACCES` / `EROFS` / `EIO` / `FileExistsError` / TOCTOU window after `file_path.exists()` all escape as raw `OSError`. Add a narrow `try/except OSError as exc: raise StorageLocalError(msg) from exc` around the filesystem calls — mirroring the wrapping already done by `S3StorageProvider` / `GcpStorageProvider`. Empirical reproductions are in the spec doc.
+
+**Decision:** Add a new `StorageLocalError(StorageError)` to `pipelex/tools/storage/exceptions.py`, paralleling `StorageS3Error` / `StorageGcpError` (with a `_declared_title = "Local storage error"`). Keeps per-backend differentiation consistent across the storage abstraction.
 
 Pair-test with item #5 (S3) — both deliver on the same storage-abstraction contract; same review can cover both.
 
@@ -93,6 +95,8 @@ Pair-test with item #5 (S3) — both deliver on the same storage-abstraction con
 The provider catches only three `BotoCoreError` subclasses (`NoCredentialsError`, `EndpointConnectionError`) plus `ClientError` (which is a *sibling*, not a subclass, of `BotoCoreError`). Every other `BotoCoreError` subclass — `ReadTimeoutError`, `ConnectTimeoutError`, `ConnectionClosedError`, `PartialCredentialsError`, `CredentialRetrievalError`, `ProxyConnectionError`, … — escapes unwrapped. `ReadTimeoutError` is the most likely real-world leak (transient AWS networking).
 
 Fix: broaden each `except` block from `(NoCredentialsError, EndpointConnectionError)` to `BotoCoreError`, keeping the `ClientError` branch as a separate sibling `except`. The two service-specific branches at the top (`NoSuchKey`, `NoSuchBucket`) stay. `public_url`'s `try/except ClientError → return public URL` fallback should likely widen the same way.
+
+**Decision:** Keep wrapping as the existing `StorageS3Error(StorageError)` — no new sub-error class needed for the broadened catch. (Symmetric to item #4's `StorageLocalError` addition.)
 
 Lower-priority side issue noted in the spec doc: `_get_session()` runs outside every method's try block. Mention in the PR but don't gate on it.
 
@@ -113,34 +117,23 @@ The literal-host check on the API side stays as a cheap first line of defense.
 
 **Test fixture:** synthesize a webhook URL whose DNS resolves to a private IP (use a `socket.getaddrinfo`-style monkeypatch or a test resolver). Confirm the delivery aborts with a typed error (likely a new `WebhookDeliverySsrfBlocked` or similar) rather than completing the request.
 
-Cross-link: the same rule lives in `api/schemas/models.py::_is_disallowed_host` on the API side. Consider whether the rule itself (the set of disallowed CIDRs) should live upstream in pipelex so both sides share it — likely yes; if so, add a small `pipelex.tools.network.is_disallowed_host(...)` helper and have the API import it. That keeps the rule in one place going forward.
+**Decision — rule placement.** Create a new `pipelex/tools/network/` package (greenfield — no `network` module exists today under `pipelex/tools/`) and put the rule in `pipelex.tools.network.is_disallowed_host(...)`. The API-side `_is_disallowed_host` in `pipelex-api/api/schemas/models.py` gets re-pointed at this helper, so the CIDR set lives in one place. Follow the error-location convention: `pipelex/tools/network/exceptions.py` for `WebhookDeliverySsrfBlocked` (or whatever the typed error ends up named) — do not co-locate the error with the helper.
 
 ---
 
-### 7. Structured `event=webhook_delivery` / `event=webhook_failure` logging — **sequencing decision required before starting**
+### 7. Structured `event=webhook_delivery` / `event=webhook_failure` logging — **DEFERRED to structured-logging refactor**
 
-**Status:** Not started. **Sequencing question open.**
-**Where:** `pipelex/pipe_run/delivery_executor.py:239` (storage delivery success), `:280` (webhook delivery success), plus the failure paths (`:243`, `:282`, `:285`).
+**Status:** Closed-by-deferral on this branch (2026-05-28). Re-scoped onto the `refactor/structured-logging` branch.
+**Where (for the deferral):** `wip/structured-logging/kickoff.md` "What good looks like" — event-name emission now in scope.
 
-Today these log lines interpolate `request_id` and `pipeline_run_id` as f-string suffixes:
+The lines this item would have touched (`pipelex/pipe_run/delivery_executor.py` around 239 / 243 / 280 / 282 / 285) are exactly the lines the structured-logging refactor lists as deletion targets (`request_id_suffix` pattern, kwarg threading from commits `ceb018b5` / `07f9cce9`). Doing a narrow event-name pass on this branch would touch those lines twice.
 
-```python
-request_id_suffix = f", request_id={request_id}" if request_id else ""
-log.info(f"Storage delivery completed: pipeline_run_id={pipeline_run_id}, files={len(result_files)}{request_id_suffix}")
-```
+**Follow-up actions when the structured-logging branch starts:**
 
-The API-side T6 cross-path test (`tests/unit/test_webhook_recovery.py`) is already in place; what's missing is the upstream **event-name emission** so consumers can grep / filter by `event=webhook_delivery` and `event=webhook_failure` rather than parsing the message body.
+- Emit `event=webhook_delivery` / `event=webhook_failure` (and `event=storage_delivery` / `event=storage_failure` for symmetry) as structured fields once the new `log.info(msg, **fields)` surface lands. Document this in the kickoff doc's destination shape.
+- Re-target the API-side TODO in `../pipelex-api/TODOS.md` "Deferred / next-track work" → "Upstream-pipelex follow-ups" from this branch onto the structured-logging branch.
 
-**Sequencing question.** `wip/structured-logging/kickoff.md` plans a full refactor of the `log` API to structured fields + contextvars, which would **delete** the current `request_id_suffix` pattern entirely and replace it with bind-once context propagation. The lines this item touches are exactly the lines that refactor will rewrite.
-
-Two viable paths — pick one before starting:
-
-- **(a) Narrow now, refactor later.** Add `event=webhook_delivery` / `event=webhook_failure` as a literal substring in the current f-string log lines. Mechanical, ~10 lines. Discharges the API-side dependency immediately. The lines get rewritten by the bigger refactor later — acceptable churn, the event name carries through.
-- **(b) Defer to the structured-logging refactor.** Mark this item closed-by-deferral on this branch; document that `event=webhook_delivery` / `event=webhook_failure` are part of the structured-logging refactor's scope (add to its kickoff doc's destination shape). The API-side TODO that points here gets re-targeted at the structured-logging branch.
-
-**Recommended: (b) defer.** The structured refactor is the right altitude for this; doing (a) now means touching these lines twice and the API-side test doesn't actually pin event names (it pins error-rendering consistency across the sync RFC 7807 path and the webhook `error` field, which is upstream of the log format). Confirm with Louis before starting either path.
-
-If (a) is picked, also emit `event=storage_delivery` / `event=storage_failure` on the storage delivery paths (same file, lines 239 and 243) for symmetry.
+The API-side T6 test (`pipelex-api/tests/unit/test_webhook_recovery.py`) pins error-rendering consistency, not event names, so the API is not blocked on event-name emission.
 
 ---
 
@@ -178,11 +171,11 @@ The eventual end-state — flipping the API back to a PyPI floor (`pipelex>=<nex
 
 ---
 
-## Open questions for the cold-start session
+## Decisions taken (2026-05-28)
 
-1. **Item #7 sequencing** (above). Defer to the structured-logging refactor, or do the narrow event-name pass now?
-2. **Item #6 SSRF rule placement.** Move the disallowed-host rule into a shared `pipelex.tools.network.is_disallowed_host(...)` helper consumed by both pipelex (delivery time) and pipelex-api (request time)? Probably yes; confirm.
-3. **Items #4 / #5 — error class shape.** New `StorageLocalError(StorageError)` to parallel `StorageS3Error` / `StorageGcpError`, or reuse `StorageError` directly? Probably new class for symmetry; confirm.
-4. **`dev` merge.** Is `dev` ahead of `feature/API-readiness-2` (the base of this branch) in any way that matters? If so, merge `dev` in first as a separate commit before any of the items above. Check with `git log feature/API-readiness-2..origin/dev --oneline`.
+The open questions from the original cold-start session have been resolved. Recording here so they don't get re-litigated:
 
-Resolve these before writing code on the corresponding items.
+1. **Item #7 sequencing — DEFERRED to structured-logging refactor.** See item #7 above. The lines it would have touched are explicit deletion targets in `wip/structured-logging/kickoff.md`. Doing the narrow event-name pass now means touching them twice.
+2. **Item #6 SSRF rule placement — SHARED HELPER.** Create `pipelex/tools/network/` (greenfield) with `is_disallowed_host(...)`. The pipelex-api side re-points its `_is_disallowed_host` at this helper. Single source of truth for the disallowed CIDR set. See item #6 above for the error-location convention note.
+3. **Items #4 / #5 error class shape — NEW `StorageLocalError(StorageError)`.** Mirrors the established per-backend pattern (`StorageS3Error` / `StorageGcpError` with `_declared_title`). Item #5 keeps wrapping as the existing `StorageS3Error`.
+4. **`dev` merge — NOT NEEDED.** `git log feature/API-readiness-2..origin/dev --oneline` returns 0 commits. `dev` is not ahead.
