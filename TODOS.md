@@ -34,7 +34,7 @@ Sequencing inside this branch is flexible — every item is independent except w
 
 ### 1. `ErrorDomain.is_input` (and siblings) — `@property` helpers on the enum
 
-- [ ] **Status:** Not started.
+- [x] **Status:** Done (2026-05-28). Two pieces landed in `pipelex/base_exceptions.py`: (a) `ErrorDomain.is_input` as an exhaustive-`match` `@property` (the enum-level single source of truth), and (b) a module-level `error_domain_is_input(error_domain: ErrorDomain | str | None) -> bool` that coerces the serialized form and delegates to the property — paralleling the existing `error_domain_to_http_status(...)`. The function is the one the API actually consumes: both API call sites hold `error_domain` as `str | None` (`ErrorReport.error_domain` is typed `str | None`; the problem-document dict value is a plain str), so the bare `report.error_domain.is_input` the spec sketched would not type-check. Covered by `tests/unit/pipelex/exceptions/test_error_domain.py::TestErrorDomain` (`test_is_input` + `test_error_domain_is_input`). Only `is_input` landed — `is_config` / `is_runtime` deferred until a need surfaces. The API consumes this via the editable local dependency on this worktree (no PyPI pin bump needed); the API-side switch off `== ErrorDomain.INPUT` at `api/exception_handlers.py:204,253` is being made now.
 **Authoritative spec:** `../pipelex-api/wip/pipelex-changes.md` item #14.
 **Where:** `pipelex/base_exceptions.py` — the `ErrorDomain` `StrEnum`.
 
