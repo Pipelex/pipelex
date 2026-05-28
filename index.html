@@ -1,18 +1,72 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Redirecting</title>
-  <noscript>
-    <meta http-equiv="refresh" content="1; url=latest/" />
-  </noscript>
-  <script>
-    window.location.replace(
-      "latest/" + window.location.search + window.location.hash
-    );
-  </script>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="0;url=/latest/">
+<link rel="canonical" href="https://docs.pipelex.com/latest/">
+<title>Pipelex — Build & Run AI Methods</title>
+<meta name="description" content="Pipelex is an open-source library and CLI for building and running executable AI methods. Methods are reusable, typed AI procedures declared in MTHDS and executed across 60+ models.">
+<meta property="og:title" content="Pipelex — Build & Run AI Methods">
+<meta property="og:description" content="Pipelex is an open-source library and CLI for building and running executable AI methods. Methods are reusable, typed AI procedures declared in MTHDS and executed across 60+ models.">
+<meta property="og:url" content="https://docs.pipelex.com/latest/">
+<meta property="og:type" content="website">
+<style>
+    body {
+        margin: 0;
+        padding: 2rem;
+        background: #1a1a1a;
+        color: #d4d4d4;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        line-height: 1.6;
+        max-width: 720px;
+        margin: 0 auto;
+    }
+    a { color: #45BF9F; }
+    h1 { color: #e5e5e5; }
+    ul { padding-left: 1.2rem; }
+    .redirect-notice { color: #888; font-size: 0.85rem; margin-top: 2rem; }
+</style>
 </head>
 <body>
-  Redirecting to <a href="latest/">latest/</a>...
+<h1>Pipelex: Build & Run AI Methods</h1>
+<p>A method is a reusable, typed AI procedure declared in a .mthds file and executed by Pipelex. Each step is explicit, each output is structured, and every run is repeatable.</p>
+<h2>What a Method Looks Like</h2>
+<pre><code>[pipe.summarize_article]
+type    = "PipeLLM"
+inputs  = { article = "Text", audience = "Text" }
+output  = "Text"
+prompt  = "Summarize $article in three bullet points for $audience."
+</code></pre>
+<p>From here, Pipelex handles model routing across 60+ models, structured output parsing, and pipeline orchestration.</p>
+<h2>Why Methods?</h2>
+<ul>
+<li><strong>Declarative</strong> — Express business logic in human-readable .mthds files that work across models.</li>
+<li><strong>Typed</strong> — Concepts are semantic types: AI understands what you mean, and every input and output connects with purpose.</li>
+<li><strong>Repeatable</strong> — Deterministic orchestration that leaves exactly the room you want for AI to express its intelligence.</li>
+<li><strong>Composable</strong> — Chain pipes into sequences, nest methods inside methods, and share them with the community.</li>
+</ul>
+<h2>Capabilities</h2>
+<ul>
+<li><a href="/latest/features/concepts/">Typed Concepts</a> — Semantic types that give meaning to every input and output.</li>
+<li><a href="/latest/features/pipe-operators/">Pipe Operators</a> — LLM calls, document extraction, image generation, web search, composition, and custom functions.</li>
+<li><a href="/latest/features/pipeline-orchestration/">Pipeline Orchestration</a> — Sequence, parallel, batch, and conditional controllers.</li>
+<li><a href="/latest/features/llm-integration/">60+ AI Models</a> — OpenAI, Anthropic, Mistral, Google, Deepseek, Hugging Face, and more.</li>
+<li><a href="/latest/features/validation-dry-run/">Validation and Dry Run</a> — Catch errors without spending tokens.</li>
+<li><a href="/latest/features/cli/">CLI and Tooling</a> — Init, build, validate, run, and graph visualization.</li>
+</ul>
+<h2>Get Started</h2>
+<ul>
+<li><a href="/latest/get-started/build-with-claude-code/">Build with Claude Code</a> — Describe what you want in natural language.</li>
+<li><a href="/latest/get-started/mthds-language-tutorial/">MTHDS Language Tutorial</a> — Learn concepts, pipes, sequences, and structured outputs.</li>
+<li><a href="/latest/cookbook/">Cookbook Examples</a> — From Hello World to document extraction and image generation.</li>
+</ul>
+<h2>The MTHDS Ecosystem</h2>
+<ul>
+<li><a href="https://mthds.ai">mthds.ai</a> — The MTHDS language specification</li>
+<li><a href="https://mthds.sh">mthds.sh</a> — The Methods Hub for discovering and sharing methods</li>
+<li><a href="https://github.com/Pipelex/pipelex">GitHub</a> — Pipelex source code</li>
+</ul>
+<p>For AI agents: see <a href="/llms.txt">/llms.txt</a> for a machine-readable index of this documentation.</p>
+<p class="redirect-notice">Redirecting to <a href="/latest/">Pipelex Documentation</a>&#8230;</p>
 </body>
 </html>
