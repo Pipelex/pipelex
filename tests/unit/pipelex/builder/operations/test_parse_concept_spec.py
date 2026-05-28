@@ -107,11 +107,20 @@ class TestParseConceptSpec:
 
     # -- malformed structure shape (typed, not bare AttributeError/TypeError) --
 
-    def test_non_dict_structure_raises_concept_spec_error(self) -> None:
-        """A non-mapping ``structure`` is a caller-input fault, not a bare AttributeError."""
-        spec: dict[str, Any] = {"concept_code": "Bad", "description": "d", "structure": "not_a_dict"}
+    # A present-but-falsy non-mapping (``[]`` / ``""`` / ``0`` / ``False``) must hit the
+    # typed guard too, not slip past a truthiness check into a bare Pydantic ValidationError.
+    @pytest.mark.parametrize("bad_structure", ["not_a_dict", [], "", 0, False])
+    def test_non_dict_structure_raises_concept_spec_error(self, bad_structure: Any) -> None:
+        """A non-mapping ``structure`` is a caller-input fault, not a bare AttributeError/ValidationError."""
+        spec: dict[str, Any] = {"concept_code": "Bad", "description": "d", "structure": bad_structure}
         with pytest.raises(ConceptSpecError, match="'structure' must be a mapping"):
             parse_concept_spec(spec)
+
+    def test_none_structure_is_treated_as_absent(self) -> None:
+        """``structure: None`` means "no structure" (the field defaults to None), not a malformed mapping."""
+        spec: dict[str, Any] = {"concept_code": "NoStruct", "description": "d", "refines": "Text", "structure": None}
+        result = parse_concept_spec(spec)
+        assert result.structure is None
 
     @pytest.mark.parametrize("bad_field_value", [42, [1, 2], 3.14, True])
     def test_non_str_non_dict_field_raises_concept_spec_error(self, bad_field_value: Any) -> None:
@@ -125,6 +134,19 @@ class TestParseConceptSpec:
         spec: dict[str, Any] = {"concept_code": "Bad", "description": "d", "structure": "not_a_dict"}
         with pytest.raises(ConceptSpecError) as exc_info:
             parse_concept_spec(spec)
+        assert error_domain_is_input(exc_info.value.error_domain)
+
+    # -- malformed top-level shape (typed, not bare TypeError/ValueError) --
+
+    @pytest.mark.parametrize("bad_spec", ["a string", ["a", "b"], 123, 3.14, None])
+    def test_non_mapping_top_level_raises_concept_spec_error(self, bad_spec: Any) -> None:
+        """A non-mapping top-level spec leaks a bare TypeError/ValueError from dict() without the guard."""
+        with pytest.raises(ConceptSpecError, match="must be a mapping"):
+            parse_concept_spec(bad_spec)
+
+    def test_non_mapping_top_level_classifies_as_input_domain(self) -> None:
+        with pytest.raises(ConceptSpecError) as exc_info:
+            parse_concept_spec("not a mapping")
         assert error_domain_is_input(exc_info.value.error_domain)
 
     # -- full parsing scenarios -------------------------------------------

@@ -34,37 +34,54 @@ if TYPE_CHECKING:
     from httpcore import SOCKET_OPTION
 
 
-async def resolve_to_allowed_ip(host: str, port: int) -> str:
-    """Resolve ``host`` and return one IP that passes the disallowed-host rule.
+async def resolve_to_allowed_ips(
+    host: str,
+    port: int,
+    timeout: float | None = None,  # noqa: ASYNC109 — propagates httpcore's connect timeout to bound DNS resolution
+) -> list[str]:
+    """Resolve ``host`` and return every IP that passes the disallowed-host rule.
 
     Raises :class:`SsrfBlockedError` when ``host`` is a literal disallowed host or
     resolves to *any* disallowed (private/loopback/metadata) address — a mixed
     public/private resolution is itself a rebinding signal, so the whole
-    connection is refused rather than cherry-picking an allowed record. A plain
-    DNS-resolution failure is mapped to :class:`httpcore.ConnectError` so httpx
-    surfaces it as the usual :class:`httpx.ConnectError` rather than a security
-    error.
+    connection is refused rather than cherry-picking the allowed records. Every IP
+    in the returned list is vetted, so the caller may dial any of them (and fall
+    back across them) with no rebind window.
+
+    A plain DNS-resolution failure is mapped to :class:`httpcore.ConnectError`,
+    and a resolution that exceeds ``timeout`` to :class:`httpcore.ConnectTimeout`,
+    so httpx surfaces them as the usual connect errors rather than security
+    errors. Bounding resolution by ``timeout`` keeps the httpx connect timeout
+    covering DNS too — stock httpcore resolves inside the same deadline, but here
+    resolution happens in a separate step.
     """
     if is_disallowed_host(host):
         msg = f"Refusing to connect to {host!r}: destination is a disallowed (private/loopback/metadata) address."
         raise SsrfBlockedError(msg)
     loop = asyncio.get_running_loop()
+    getaddrinfo_coro = loop.getaddrinfo(host, port, type=socket.SOCK_STREAM)
     try:
-        addr_infos = await loop.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+        if timeout is None:
+            addr_infos = await getaddrinfo_coro
+        else:
+            addr_infos = await asyncio.wait_for(getaddrinfo_coro, timeout=timeout)
     except socket.gaierror as exc:
         msg = f"Could not resolve host {host!r}."
         raise httpcore.ConnectError(msg) from exc
+    except asyncio.TimeoutError as exc:  # noqa: UP041 — asyncio.TimeoutError is distinct from builtin TimeoutError pre-3.11; project targets 3.10+
+        msg = f"Timed out resolving host {host!r}."
+        raise httpcore.ConnectTimeout(msg) from exc
     resolved_ips = [str(addr_info[4][0]) for addr_info in addr_infos]
     # Fail closed: if resolution yielded no address to vet, refuse rather than
     # fall through. getaddrinfo raises on failure today, but the guard's contract
-    # is "return a vetted IP or raise" — never return an unvetted destination.
+    # is "return vetted IPs or raise" — never return an unvetted destination.
     if not resolved_ips:
         msg = f"Refusing to connect to {host!r}: name resolved to no addresses."
         raise SsrfBlockedError(msg)
     if any(is_disallowed_ip(resolved_ip) for resolved_ip in resolved_ips):
         msg = f"Refusing to connect to {host!r}: it resolved to a disallowed (private/loopback/metadata) address."
         raise SsrfBlockedError(msg)
-    return resolved_ips[0]
+    return resolved_ips
 
 
 class SsrfGuardedBackend(httpcore.AsyncNetworkBackend):
@@ -87,16 +104,34 @@ class SsrfGuardedBackend(httpcore.AsyncNetworkBackend):
         local_address: str | None = None,
         socket_options: Iterable[SOCKET_OPTION] | None = None,
     ) -> httpcore.AsyncNetworkStream:
-        vetted_ip = await resolve_to_allowed_ip(host, port)
-        # Dial the literal vetted IP — getaddrinfo on an IP literal does no DNS, so
-        # no rebind can slip in between the check above and this connect.
-        return await self._inner.connect_tcp(
-            host=vetted_ip,
-            port=port,
-            timeout=timeout,
-            local_address=local_address,
-            socket_options=socket_options,
-        )
+        # ``timeout`` bounds the WHOLE connect (DNS + every fallback dial), matching
+        # stock httpcore semantics — not each attempt separately, which would let a
+        # multi-IP host balloon to (N+1)x the configured timeout. Track a single
+        # monotonic deadline and hand each step only the time left in the budget.
+        loop = asyncio.get_running_loop()
+        deadline = None if timeout is None else loop.time() + timeout
+        vetted_ips = await resolve_to_allowed_ips(host, port, timeout=timeout)
+        # Every IP is pre-vetted, so dialing any literal is rebind-safe (getaddrinfo
+        # on an IP literal does no DNS). Try them in order and fall back on connect
+        # failure, restoring the multi-address resilience (dual-stack / multiple A
+        # records) that pinning to a single IP would lose.
+        last_exc: httpcore.ConnectError | httpcore.ConnectTimeout | None = None
+        for vetted_ip in vetted_ips:
+            remaining = None if deadline is None else max(0.0, deadline - loop.time())
+            try:
+                return await self._inner.connect_tcp(
+                    host=vetted_ip,
+                    port=port,
+                    timeout=remaining,
+                    local_address=local_address,
+                    socket_options=socket_options,
+                )
+            except (httpcore.ConnectError, httpcore.ConnectTimeout) as exc:
+                last_exc = exc
+        # vetted_ips is never empty (resolve_to_allowed_ips raises otherwise), so the
+        # loop ran at least once and a connect error was recorded for every candidate.
+        assert last_exc is not None
+        raise last_exc
 
     @override
     async def connect_unix_socket(

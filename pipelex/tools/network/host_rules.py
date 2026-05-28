@@ -50,9 +50,17 @@ def is_disallowed_host(host: str) -> bool:
     (:mod:`pipelex.tools.network.ssrf_guard`) re-resolves and re-checks. This
     function is the request-time first line of defense and the literal-host arm
     of the delivery-time guard.
+
+    The host is normalized first: hostnames are case-insensitive and an absolute
+    (trailing-dot) FQDN is equivalent to its dotless form, so ``LOCALHOST`` and
+    ``metadata.google.internal.`` must classify the same as their canonical
+    forms — otherwise these common variants would slip past the blocklist.
     """
     if not host:
         return True
-    if host in _DISALLOWED_HOSTNAMES:
+    normalized_host = host.rstrip(".").lower()
+    if not normalized_host:
         return True
-    return is_disallowed_ip(host)
+    if normalized_host in _DISALLOWED_HOSTNAMES:
+        return True
+    return is_disallowed_ip(normalized_host)

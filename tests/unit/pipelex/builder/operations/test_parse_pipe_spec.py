@@ -266,6 +266,19 @@ class TestParsePipeSpec:
             parse_pipe_spec("PipeSequence", spec)
         assert error_domain_is_input(exc_info.value.error_domain)
 
+    # -- malformed top-level shape (typed, not bare TypeError/ValueError) --
+
+    @pytest.mark.parametrize("bad_spec", ["a string", ["a", "b"], 123, 3.14, None])
+    def test_non_mapping_top_level_raises_pipe_spec_error(self, bad_spec: Any) -> None:
+        """A non-mapping top-level spec leaks a bare TypeError/ValueError from dict() without the guard."""
+        with pytest.raises(PipeSpecError, match="must be a mapping"):
+            parse_pipe_spec("PipeLLM", bad_spec)
+
+    def test_non_mapping_top_level_classifies_as_input_domain(self) -> None:
+        with pytest.raises(PipeSpecError) as exc_info:
+            parse_pipe_spec("PipeLLM", "not a mapping")
+        assert error_domain_is_input(exc_info.value.error_domain)
+
     # -- PipeCondition expression alias -----------------------------------
 
     _BASE_CONDITION: ClassVar[dict[str, Any]] = {

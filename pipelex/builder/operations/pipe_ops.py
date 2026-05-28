@@ -86,20 +86,21 @@ def _normalize_prompt_aliases(data: dict[str, Any]) -> None:
                 data.pop(alias)
 
 
-def parse_pipe_spec(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
+def parse_pipe_spec(pipe_type: str, spec_data: Any) -> PipeSpec:
     """Parse and validate a PipeSpec from JSON-like data.
 
     Args:
         pipe_type: The type of pipe (e.g., "PipeLLM", "PipeSequence").
-        spec_data: Raw data for the pipe spec.
+        spec_data: Raw data for the pipe spec (untrusted JSON-like input).
 
     Returns:
         Validated PipeSpec instance of the correct type.
 
     Raises:
         ValueError: If the pipe type is invalid.
-        PipeSpecError: If ``steps`` / ``branches`` is not a list, or an entry
-            within them is not a mapping. Carries the INPUT error domain.
+        PipeSpecError: If the top-level value is not a mapping, ``steps`` /
+            ``branches`` is not a list, or an entry within them is not a mapping.
+            Carries the INPUT error domain.
         ValidationError: If Pydantic validation of the assembled spec fails.
     """
     if pipe_type not in pipe_type_to_spec_class:
@@ -108,6 +109,14 @@ def parse_pipe_spec(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
         raise ValueError(msg)
 
     spec_class = pipe_type_to_spec_class[pipe_type]
+
+    # Validate the top-level shape before iterating so a non-mapping caller input
+    # (scalar / list / None) surfaces as a typed, INPUT-domain PipeSpecError
+    # instead of a bare TypeError / ValueError from ``dict(...)`` below.
+    if not isinstance(spec_data, dict):
+        msg = f"Pipe spec must be a mapping, got {type(spec_data).__name__}"
+        raise PipeSpecError(msg)
+    spec_data = cast("dict[str, Any]", spec_data)
 
     # Work on a copy to avoid mutating the caller's dict
     spec_data = dict(spec_data)

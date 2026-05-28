@@ -37,11 +37,19 @@ class TestHostRules:
             ("localhost", True),
             ("metadata", True),  # GCP metadata alias
             ("metadata.google.internal", True),  # GCP metadata server
+            ("LOCALHOST", True),  # case-insensitive: uppercase must still match
+            ("LocalHost", True),  # case-insensitive: mixed case must still match
+            ("METADATA", True),  # case-insensitive alias
+            ("metadata.google.internal.", True),  # absolute FQDN (trailing dot) is equivalent
+            ("localhost.", True),  # absolute FQDN form of loopback alias
+            (".", True),  # dots-only normalizes to empty → disallowed
             ("127.0.0.1", True),  # literal loopback
+            ("127.0.0.1.", True),  # trailing-dot literal IP normalizes and is still caught
             ("169.254.169.254", True),  # literal metadata IP
             ("10.0.0.5", True),  # literal private IP
             ("100.64.0.1", True),  # literal carrier-grade NAT IP
             ("example.com", False),  # ordinary public hostname
+            ("example.com.", False),  # absolute FQDN of a public host stays allowed
             ("api.openai.com", False),
             ("8.8.8.8", False),  # literal public IP
         ],

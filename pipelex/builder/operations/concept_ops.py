@@ -10,24 +10,33 @@ from pipelex.builder.concept.concept_spec import ConceptSpec, ConceptStructureSp
 from pipelex.builder.concept.exceptions import ConceptSpecError
 
 
-def parse_concept_spec(spec_data: dict[str, Any]) -> ConceptSpec:
+def parse_concept_spec(spec_data: Any) -> ConceptSpec:
     """Parse and validate a ConceptSpec from JSON-like data.
 
     Accepts common aliases for "concept_code" and converts structure fields.
 
     Args:
-        spec_data: Raw data for the concept spec.
+        spec_data: Raw data for the concept spec (untrusted JSON-like input).
 
     Returns:
         Validated ConceptSpec instance.
 
     Raises:
-        ConceptSpecError: If ``structure`` is not a mapping, a structure field
-            value is neither a description string nor a field-spec mapping, or a
-            ConceptSpec-level rule fails (e.g. ``refines`` and ``structure`` both
-            set). Carries the INPUT error domain.
+        ConceptSpecError: If the top-level value is not a mapping, ``structure``
+            is not a mapping, a structure field value is neither a description
+            string nor a field-spec mapping, or a ConceptSpec-level rule fails
+            (e.g. ``refines`` and ``structure`` both set). Carries the INPUT
+            error domain.
         ValidationError: If Pydantic validation of the assembled spec fails.
     """
+    # Validate the top-level shape before iterating so a non-mapping caller input
+    # (scalar / list / None) surfaces as a typed, INPUT-domain ConceptSpecError
+    # instead of a bare TypeError / ValueError from ``dict(...)`` below.
+    if not isinstance(spec_data, dict):
+        msg = f"Concept spec must be a mapping, got {type(spec_data).__name__}"
+        raise ConceptSpecError(msg)
+    spec_data = cast("dict[str, Any]", spec_data)
+
     # Work on a copy to avoid mutating the caller's dict
     spec_data = dict(spec_data)
 
@@ -43,7 +52,11 @@ def parse_concept_spec(spec_data: dict[str, Any]) -> ConceptSpec:
     # Validate the raw shape before iterating so a malformed ``structure`` surfaces
     # as a typed, INPUT-domain ConceptSpecError instead of a bare AttributeError /
     # TypeError (which the caller cannot tell apart from a real programming bug).
-    if spec_data.get("structure"):
+    # ``is not None`` (not truthiness) so a present-but-falsy non-mapping — ``[]`` /
+    # ``""`` / ``0`` / ``False`` — still hits the typed guard below instead of
+    # silently skipping to a bare Pydantic ValidationError; ``None`` / absent both
+    # mean "no structure" (the field defaults to ``None``).
+    if spec_data.get("structure") is not None:
         structure_value = spec_data["structure"]
         if not isinstance(structure_value, dict):
             msg = f"Concept spec 'structure' must be a mapping of field names to field specs, got {type(structure_value).__name__}"
