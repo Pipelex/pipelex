@@ -14,7 +14,7 @@ Read in this order to understand why this branch exists at all:
 4. `../pipelex-api/TODOS.md` "Deferred / next-track work" → "Upstream-pipelex follow-ups" — names the same items at the API end, in the consumer's voice. Useful sanity check.
 5. `wip/console-targets-and-agent-cli-stdout.md` and `wip/structured-logging/kickoff.md` — relevant background for the **webhook-delivery logging** item below; see the sequencing note in that section before starting.
 
-Once read, `git log feature/API-readiness-2..HEAD --oneline` shows that this branch currently carries only a recap doc + one new test (`test_failed_webhook_log_includes_request_id_when_set`). Everything below is what to add.
+The `test_failed_webhook_log_includes_request_id_when_set` regression test already landed on the base (`feature/API-readiness-2`, commit `74b68bd7`) and is present in the working tree — do **not** re-add it. `git log feature/API-readiness-2..HEAD --oneline` shows this branch adds only planning docs on top of that base. Everything below is what to implement.
 
 ---
 
@@ -34,7 +34,7 @@ Sequencing inside this branch is flexible — every item is independent except w
 
 ### 1. `ErrorDomain.is_input` (and siblings) — `@property` helpers on the enum
 
-**Status:** Not started.
+- [ ] **Status:** Not started.
 **Authoritative spec:** `../pipelex-api/wip/pipelex-changes.md` item #14.
 **Where:** `pipelex/base_exceptions.py` — the `ErrorDomain` `StrEnum`.
 
@@ -46,7 +46,7 @@ Add `@property` helpers (`is_input`, and `is_config` / `is_runtime` as needs sur
 
 ### 2. `EnvVarNotFoundError` should carry `error_domain = ErrorDomain.CONFIG`
 
-**Status:** Not started.
+- [ ] **Status:** Not started.
 **Authoritative spec:** `../pipelex-api/wip/pipelex-changes.md` item #10.
 **Where:** `pipelex/system/exceptions.py` (note: moved here from `pipelex/system/environment.py` during the Phase 6 import-path moves the API already adapted to — the spec doc still names the old path).
 
@@ -58,7 +58,7 @@ This is the upstream half of the "original bug" the entire endeavour started fro
 
 ### 3. `parse_concept_spec` should validate `structure` shape before iterating
 
-**Status:** Not started.
+- [ ] **Status:** Not started.
 **Authoritative spec:** `../pipelex-api/wip/pipelex-changes.md` item #11.
 **Where:** `pipelex/builder/operations/concept_ops.py` — the `parse_concept_spec(...)` function.
 
@@ -68,13 +68,13 @@ Fix is upstream shape validation — either raise a typed `PipelexInputError`-eq
 
 The API today cannot safely catch these at the route — `AttributeError` / `TypeError` are also the types a real programming bug would raise, so a route-level catch would mask genuine bugs. Once this lands, the API's `/build/concept` route gets a narrow, typed catch.
 
-While here: sweep `pipelex/builder/operations/*.py` for the same pattern (raw-iterate-then-validate). If `parse_pipe_spec`'s already-documented `ValueError`-on-bad-`pipe_type` is the only other instance, leave it — that one is narrow enough.
+While here: sweep `pipelex/builder/operations/*.py` for the same pattern (raw-iterate-then-validate). `parse_pipe_spec` has it too — it iterates `spec_data["steps"]` / `spec_data["branches"]` and calls `dict(step)` on each entry before `model_validate`, so a non-list `steps` / `branches` or non-mapping entries leak bare `TypeError` / `ValueError` ahead of validation. Route those through the same narrow shape-validation path before iterating. (The bad-`pipe_type` `ValueError` is a separate, already-documented case — that one is narrow enough to leave.)
 
 ---
 
 ### 4. `LocalStorageProvider` should wrap raw `OSError` as a `StorageLocalError`
 
-**Status:** Not started.
+- [ ] **Status:** Not started.
 **Authoritative spec:** `../pipelex-api/wip/pipelex-changes.md` item #12.
 **Where:** `pipelex/tools/storage/local_storage_provider.py` — `_store` and `_load_with_metadata`.
 
@@ -88,7 +88,7 @@ Pair-test with item #5 (S3) — both deliver on the same storage-abstraction con
 
 ### 5. `S3StorageProvider` should catch the full `BotoCoreError` hierarchy
 
-**Status:** Not started.
+- [ ] **Status:** Not started.
 **Authoritative spec:** `../pipelex-api/wip/pipelex-changes.md` item #13.
 **Where:** `pipelex/tools/storage/s3_storage_provider.py` — `_load_with_metadata`, `_store`, and `public_url`.
 
@@ -104,13 +104,13 @@ Lower-priority side issue noted in the spec doc: `_get_session()` runs outside e
 
 ### 6. Webhook-delivery SSRF DNS recheck
 
-**Status:** Not started. Flagged in `../pipelex-api/TODOS.md` "Deferred / next-track work" → "Upstream-pipelex follow-ups".
+- [ ] **Status:** Not started. Flagged in `../pipelex-api/TODOS.md` "Deferred / next-track work" → "Upstream-pipelex follow-ups".
 **Where:** `pipelex/pipe_run/delivery_executor.py` — wherever the webhook HTTP client (`httpx`) actually fires.
 
 The API's `api/schemas/models.py::_is_disallowed_host` only blocks literal private / loopback / metadata IPs **at request time**. A callback URL like `https://attacker.example/cb` passes API-side validation while its DNS record can resolve to `169.254.169.254` / `127.0.0.0/8` / `10.0.0.0/8` when the worker later fires the webhook. The fix belongs at delivery time:
 
-- Either a custom resolver on the `httpx.AsyncClient` (set via `httpx.AsyncHTTPTransport(...)` + a resolver hook) that re-checks the resolved IP against the same private-host rule and aborts on a private destination.
-- Or an `httpx` event hook that fires after connection but before payload send.
+- A custom `httpx` transport / `httpcore` network backend whose connect step resolves the host, checks every resolved IP against the same private-host rule, and refuses to open the socket to a private / metadata destination. Note: on the pinned `httpx` 0.28.1, `AsyncHTTPTransport` exposes **no** resolver hook, and event hooks are `request` / `response` only — neither fires after DNS but before payload send — so a plain event hook cannot close the DNS-rebinding gap.
+- Or an explicit resolve-and-connect flow: resolve the hostname (`socket.getaddrinfo`), validate each candidate IP against the rule, then connect to a vetted IP while preserving the original `Host` header / SNI — so a rebind between validation and send is impossible.
 - Plus optionally an egress allowlist / proxy at the deploy layer (out of scope here — flag in the PR description so the deploy team sees it).
 
 The literal-host check on the API side stays as a cheap first line of defense.
@@ -123,7 +123,7 @@ The literal-host check on the API side stays as a cheap first line of defense.
 
 ### 7. Structured `event=webhook_delivery` / `event=webhook_failure` logging — **DEFERRED to structured-logging refactor**
 
-**Status:** Closed-by-deferral on this branch (2026-05-28). Re-scoped onto the `refactor/structured-logging` branch.
+- [x] **Status:** Closed-by-deferral on this branch (2026-05-28). Re-scoped onto the `refactor/structured-logging` branch.
 **Where (for the deferral):** `wip/structured-logging/kickoff.md` "What good looks like" — event-name emission now in scope.
 
 The lines this item would have touched (`pipelex/pipe_run/delivery_executor.py` around 239 / 243 / 280 / 282 / 285) are exactly the lines the structured-logging refactor lists as deletion targets (`request_id_suffix` pattern, kwarg threading from commits `ceb018b5` / `07f9cce9`). Doing a narrow event-name pass on this branch would touch those lines twice.

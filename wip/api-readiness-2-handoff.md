@@ -32,7 +32,7 @@ Don't restate it. Re-derive from `wip/error-handling/archive-todos-api-readiness
 - One large structural refactor of where error classes live in the source tree.
 - A documented follow-up that the recent `/code-review` pass uncovered, partially fixed, and partially deferred.
 
-What's **not** on this branch: webhook signing (the cross-repo track) and the discovery-contract follow-up. Both are flagged in `wip/error-handling/archive-todos-api-readiness-2.md`.
+What's **not** on this branch: webhook signing (the cross-repo track). It is flagged in `wip/error-handling/archive-todos-api-readiness-2.md`.
 
 ---
 
