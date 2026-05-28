@@ -2,6 +2,7 @@
 
 # pyright: reportUnknownMemberType=false
 
+from collections.abc import Mapping
 from typing import Any, cast
 
 import tomlkit
@@ -31,14 +32,15 @@ def parse_concept_spec(spec_data: Any) -> ConceptSpec:
     """
     # Validate the top-level shape before iterating so a non-mapping caller input
     # (scalar / list / None) surfaces as a typed, INPUT-domain ConceptSpecError
-    # instead of a bare TypeError / ValueError from ``dict(...)`` below.
-    if not isinstance(spec_data, dict):
+    # instead of a bare TypeError / ValueError from ``dict(...)`` below. Accept any
+    # ``Mapping`` (not just ``dict``): the message promises "a mapping", so a
+    # non-``dict`` mapping (e.g. ``MappingProxyType``) must be parsed, not rejected.
+    if not isinstance(spec_data, Mapping):
         msg = f"Concept spec must be a mapping, got {type(spec_data).__name__}"
         raise ConceptSpecError(msg)
-    spec_data = cast("dict[str, Any]", spec_data)
 
-    # Work on a copy to avoid mutating the caller's dict
-    spec_data = dict(spec_data)
+    # Normalize to a plain dict; ``dict(...)`` also copies so we never mutate the caller's mapping.
+    spec_data = dict(cast("Mapping[str, Any]", spec_data))
 
     # Accept common aliases for "concept_code"
     for alias in ("the_concept_code", "code", "name", "concept_name", "concept_ref"):
@@ -58,10 +60,10 @@ def parse_concept_spec(spec_data: Any) -> ConceptSpec:
     # mean "no structure" (the field defaults to ``None``).
     if spec_data.get("structure") is not None:
         structure_value = spec_data["structure"]
-        if not isinstance(structure_value, dict):
+        if not isinstance(structure_value, Mapping):
             msg = f"Concept spec 'structure' must be a mapping of field names to field specs, got {type(structure_value).__name__}"
             raise ConceptSpecError(msg)
-        structure_data = cast("dict[str, Any]", structure_value)
+        structure_data = cast("Mapping[str, Any]", structure_value)
         converted_structure: dict[str, Any] = {}
         for field_name, field_data in structure_data.items():
             if isinstance(field_data, str):
@@ -71,9 +73,9 @@ def parse_concept_spec(spec_data: Any) -> ConceptSpec:
                     "description": field_data,
                     "type": "text",
                 }
-            elif isinstance(field_data, dict):
+            elif isinstance(field_data, Mapping):
                 # Full field spec — copy to avoid mutating nested caller data
-                field_spec_data = dict(cast("dict[str, Any]", field_data))
+                field_spec_data = dict(cast("Mapping[str, Any]", field_data))
                 field_spec_data["the_field_name"] = field_name
                 # Default to "text" when agent omits the type field
                 if "type" not in field_spec_data:

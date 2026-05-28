@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from types import MappingProxyType
 from typing import Any, ClassVar
 
 import pytest
@@ -148,6 +149,20 @@ class TestParseConceptSpec:
         with pytest.raises(ConceptSpecError) as exc_info:
             parse_concept_spec("not a mapping")
         assert error_domain_is_input(exc_info.value.error_domain)
+
+    def test_non_dict_mapping_top_level_is_accepted(self) -> None:
+        """A non-``dict`` mapping (here a read-only ``MappingProxyType``) is a mapping and must parse, not be rejected."""
+        spec = MappingProxyType(
+            {
+                "concept_code": "Person",
+                "description": "A person record",
+                "structure": MappingProxyType({"name": "The person's name"}),
+            }
+        )
+        result = parse_concept_spec(spec)
+        assert result.concept_code == "Person"
+        assert result.structure is not None
+        assert "name" in result.structure
 
     # -- full parsing scenarios -------------------------------------------
 
