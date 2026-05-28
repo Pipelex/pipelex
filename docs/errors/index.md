@@ -390,6 +390,7 @@ classification rules, and the cross-boundary Temporal bridge.
 ## SecurityError
 
 - [`SecurityError`](security-error.md) — Security policy violation
+- [`SsrfBlockedError`](ssrf-blocked-error.md) — Outbound request blocked (SSRF guard)
 - [`UnsafeSchemaError`](unsafe-schema-error.md) — Unsafe schema
 
 ## StuffError

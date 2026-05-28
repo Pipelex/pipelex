@@ -20,6 +20,7 @@ from pipelex.hub import get_class_registry, get_storage_provider
 from pipelex.pipe_run.exceptions import PipeJobError, StorageDeliveryError, WebhookDeliveryError
 from pipelex.temporal.tprl_pipe.hydration import hydrate_content
 from pipelex.tools.misc.json_utils import clean_json_dumps
+from pipelex.tools.network.ssrf_guard import SsrfGuardedTransport
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_output import PipeOutput
@@ -258,6 +259,14 @@ class DeliveryExecutor:
 
         VERBOSE on the wire is deliberate: the receiver decides what to re-expose
         downstream (it can render STRICT via :meth:`ErrorReport.to_problem_document`).
+
+        The HTTP client uses :class:`SsrfGuardedTransport`, which re-resolves the
+        callback host at connect time and refuses private/loopback/metadata
+        destinations — closing the DNS-rebinding gap a request-time literal-IP
+        check leaves open. A blocked destination raises
+        :class:`pipelex.tools.network.exceptions.SsrfBlockedError`, which (being a
+        security signal) is deliberately *not* caught and re-wrapped as a
+        ``WebhookDeliveryError`` here — it propagates so the delivery aborts loudly.
         """
         try:
             payload: dict[str, Any] = dict(webhook.payload)
@@ -268,7 +277,7 @@ class DeliveryExecutor:
             if error_report is not None:
                 payload["error"] = error_report.to_dict(disclosure_mode=DisclosureMode.VERBOSE)
 
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(transport=SsrfGuardedTransport()) as client:
                 response = await client.post(
                     webhook.url,
                     json=payload,
