@@ -1,0 +1,11 @@
+domain      = "offline_gateway_img_gen"
+description = "Pipeline referencing a gateway image-generation model that exists in the cached gateway specs"
+main_pipe   = "gateway_img_gen_pipe"
+
+[pipe]
+[pipe.gateway_img_gen_pipe]
+type        = "PipeImgGen"
+description = "Single image-generation step using a gateway-listed image model handle"
+output      = "Image"
+model       = "nano-banana"
+prompt      = "A single red circle on a white background."
