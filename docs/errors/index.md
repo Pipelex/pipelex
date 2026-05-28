@@ -18,6 +18,10 @@ structural shape of the hierarchy stays visible.
 See [Error Model](../under-the-hood/error-model.md) for the underlying contract,
 classification rules, and the cross-boundary Temporal bridge.
 
+## AsyncExecutionNotEnabledError
+
+- [`AsyncExecutionNotEnabledError`](async-execution-not-enabled-error.md) — Async execution not enabled
+
 ## BatchParamsError
 
 - [`BatchParamsError`](batch-params-error.md) — Batch params
@@ -314,6 +318,10 @@ classification rules, and the cross-boundary Temporal bridge.
 ## PipeSequenceFactoryError
 
 - [`PipeSequenceFactoryError`](pipe-sequence-factory-error.md) — Pipe sequence factory
+
+## PipeSpecError
+
+- [`PipeSpecError`](pipe-spec-error.md) — Pipe spec
 
 ## PipeStackOverflowError
 

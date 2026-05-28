@@ -7,7 +7,9 @@ from typing import Any, ClassVar
 import pytest
 from pydantic import ValidationError
 
+from pipelex.base_exceptions import error_domain_is_input
 from pipelex.builder.concept.concept_spec import ConceptStructureSpecFieldType
+from pipelex.builder.concept.exceptions import ConceptSpecError
 from pipelex.builder.operations.concept_ops import parse_concept_spec
 
 
@@ -102,6 +104,28 @@ class TestParseConceptSpec:
         assert result.structure is not None
         assert result.structure["name"].type == ConceptStructureSpecFieldType.TEXT
         assert result.structure["age"].type == ConceptStructureSpecFieldType.INTEGER
+
+    # -- malformed structure shape (typed, not bare AttributeError/TypeError) --
+
+    def test_non_dict_structure_raises_concept_spec_error(self) -> None:
+        """A non-mapping ``structure`` is a caller-input fault, not a bare AttributeError."""
+        spec: dict[str, Any] = {"concept_code": "Bad", "description": "d", "structure": "not_a_dict"}
+        with pytest.raises(ConceptSpecError, match="'structure' must be a mapping"):
+            parse_concept_spec(spec)
+
+    @pytest.mark.parametrize("bad_field_value", [42, [1, 2], 3.14, True])
+    def test_non_str_non_dict_field_raises_concept_spec_error(self, bad_field_value: Any) -> None:
+        """A structure field that is neither a description string nor a field-spec mapping is a typed input error."""
+        spec: dict[str, Any] = {"concept_code": "Bad", "description": "d", "structure": {"my_field": bad_field_value}}
+        with pytest.raises(ConceptSpecError, match="must be a description string or a field-spec mapping"):
+            parse_concept_spec(spec)
+
+    def test_malformed_structure_classifies_as_input_domain(self) -> None:
+        """The raised error carries the INPUT domain so HTTP consumers render it as a 422."""
+        spec: dict[str, Any] = {"concept_code": "Bad", "description": "d", "structure": "not_a_dict"}
+        with pytest.raises(ConceptSpecError) as exc_info:
+            parse_concept_spec(spec)
+        assert error_domain_is_input(exc_info.value.error_domain)
 
     # -- full parsing scenarios -------------------------------------------
 

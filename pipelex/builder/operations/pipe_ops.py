@@ -5,12 +5,13 @@
 # pyright: reportUnknownVariableType=false
 # pyright: reportAttributeAccessIssue=false
 
-from typing import Any
+from typing import Any, cast
 
 import tomlkit
 from pydantic import ValidationError
 from tomlkit.items import Table
 
+from pipelex.builder.pipe.exceptions import PipeSpecError
 from pipelex.builder.pipe.pipe_batch_spec import PipeBatchSpec
 from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.builder.pipe.pipe_condition_spec import PipeConditionSpec
@@ -41,6 +42,28 @@ def _normalize_sub_pipe_dict(data: dict[str, Any]) -> None:
     # Agents sometimes add "inputs" to individual steps — silently drop.
     # Step-level inputs are not supported; inputs set by the pipe definition.
     data.pop("inputs", None)
+
+
+def _normalize_sub_pipe_list(raw_value: Any, field_name: str) -> list[dict[str, Any]]:
+    """Validate and normalize a raw ``steps`` / ``branches`` value into a list of step dicts.
+
+    Each entry is copied (to avoid mutating the caller's nested dicts) and passed
+    through :func:`_normalize_sub_pipe_dict`. A non-list ``raw_value`` or a
+    non-mapping entry is a caller-input fault, raised as a typed ``PipeSpecError``
+    before validation rather than leaking a bare ``TypeError`` / ``ValueError``.
+    """
+    if not isinstance(raw_value, list):
+        msg = f"Pipe spec '{field_name}' must be a list of step mappings, got {type(raw_value).__name__}"
+        raise PipeSpecError(msg)
+    normalized: list[dict[str, Any]] = []
+    for entry in cast("list[Any]", raw_value):
+        if not isinstance(entry, dict):
+            msg = f"Each entry in pipe spec '{field_name}' must be a mapping, got {type(entry).__name__}"
+            raise PipeSpecError(msg)
+        entry_copy = dict(cast("dict[str, Any]", entry))
+        _normalize_sub_pipe_dict(entry_copy)
+        normalized.append(entry_copy)
+    return normalized
 
 
 def _normalize_pipe_code_aliases(data: dict[str, Any]) -> None:
@@ -75,7 +98,9 @@ def parse_pipe_spec(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
 
     Raises:
         ValueError: If the pipe type is invalid.
-        ValidationError: If validation fails.
+        PipeSpecError: If ``steps`` / ``branches`` is not a list, or an entry
+            within them is not a mapping. Carries the INPUT error domain.
+        ValidationError: If Pydantic validation of the assembled spec fails.
     """
     if pipe_type not in pipe_type_to_spec_class:
         valid_types = list(pipe_type_to_spec_class.keys())
@@ -98,21 +123,14 @@ def parse_pipe_spec(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
 
     # Handle steps/branches conversion — normalize aliases and drop unknown fields.
     # Deep-copy nested dicts to avoid mutating caller's nested structures.
+    # Validate the raw shape before iterating so a malformed ``steps`` / ``branches``
+    # surfaces as a typed, INPUT-domain PipeSpecError instead of a bare TypeError /
+    # ValueError (which the caller cannot tell apart from a real programming bug).
     if "steps" in spec_data:
-        converted_steps = []
-        for step in spec_data["steps"]:
-            step = dict(step)
-            _normalize_sub_pipe_dict(step)
-            converted_steps.append(step)
-        spec_data["steps"] = converted_steps
+        spec_data["steps"] = _normalize_sub_pipe_list(spec_data["steps"], field_name="steps")
 
     if "branches" in spec_data:
-        converted_branches = []
-        for branch in spec_data["branches"]:
-            branch = dict(branch)
-            _normalize_sub_pipe_dict(branch)
-            converted_branches.append(branch)
-        spec_data["branches"] = converted_branches
+        spec_data["branches"] = _normalize_sub_pipe_list(spec_data["branches"], field_name="branches")
 
     # Handle expression -> jinja2_expression_template for PipeCondition
     if pipe_type == "PipeCondition" and "expression" in spec_data:
