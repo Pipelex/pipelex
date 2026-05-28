@@ -1,3 +1,5 @@
+import socket
+
 import pytest
 from pytest_mock import MockerFixture
 
@@ -12,6 +14,7 @@ from pipelex.pipe_run.delivery_assignment import (
 )
 from pipelex.pipe_run.delivery_executor import DeliveryExecutor
 from pipelex.pipe_run.exceptions import StorageDeliveryError, WebhookDeliveryError
+from pipelex.tools.network.exceptions import SsrfBlockedError
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -558,6 +561,32 @@ class TestDeliveryExecutor:
         webhook_messages = [str(c.args[0]) for c in info_spy.call_args_list if "Webhook delivery completed" in str(c.args[0])]
         assert webhook_messages, "Webhook delivery completion must emit one info log"
         assert "request_id" not in webhook_messages[0], "an unset request_id must not produce a stray field"
+
+    async def test_webhook_aborts_on_dns_rebind_to_private_ip(self, mocker: MockerFixture) -> None:
+        """A callback host that passes literal-IP validation but resolves to a private
+        address at delivery time must abort with ``SsrfBlockedError`` — the DNS-rebinding
+        guard. The error is a security signal and propagates (it is NOT re-wrapped as a
+        ``WebhookDeliveryError``), so the delivery aborts loudly rather than POSTing to an
+        internal service. This drives the real ``SsrfGuardedTransport`` (httpx.AsyncClient
+        is deliberately NOT mocked here) and aborts before any socket opens.
+        """
+
+        def fake_getaddrinfo(*_args: object, **_kwargs: object) -> list[tuple[int, int, int, str, tuple[str, int]]]:
+            return [(int(socket.AF_INET), int(socket.SOCK_STREAM), 6, "", ("169.254.169.254", 80))]
+
+        mocker.patch("socket.getaddrinfo", side_effect=fake_getaddrinfo)
+
+        executor = DeliveryExecutor()
+        assignment = DeliveryAssignment(webhooks=[WebhookTarget(url="http://attacker.example/cb")])
+
+        with pytest.raises(SsrfBlockedError):
+            await executor.execute(
+                pipe_output=None,
+                user_id="test-user",
+                pipeline_run_id="plr-ssrf",
+                delivery_assignment=assignment,
+                status=DeliveryStatus.COMPLETED,
+            )
 
     async def test_webhook_failure_raises(self, mocker: MockerFixture) -> None:
         import httpx  # noqa: PLC0415

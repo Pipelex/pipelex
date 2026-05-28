@@ -24,6 +24,12 @@ class StorageInvalidKeyError(StorageError):
     """Raised when a storage key is invalid (e.g., contains scheme prefix)."""
 
 
+class StorageLocalError(StorageError):
+    """Raised when a local filesystem storage operation fails."""
+
+    _declared_title = "Local storage error"
+
+
 class StorageS3Error(StorageError):
     """Raised when an S3 storage operation fails."""
 

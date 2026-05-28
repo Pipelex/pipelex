@@ -1,7 +1,7 @@
 import logging
 from typing import ClassVar
 
-from pipelex.base_exceptions import PipelexError
+from pipelex.base_exceptions import ErrorDomain, PipelexError
 from pipelex.types import StrEnum
 
 
@@ -14,6 +14,9 @@ class NestedKeyConflictError(ToolError):
 
 
 class EnvVarNotFoundError(ToolError):
+    # A missing required env var is fixed by an operator setting it, not by the
+    # caller correcting input — the textbook CONFIG-domain failure.
+    error_domain = ErrorDomain.CONFIG
     _declared_title = "Environment variable not set"
 
 

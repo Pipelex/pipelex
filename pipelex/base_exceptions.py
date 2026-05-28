@@ -138,6 +138,19 @@ class ErrorDomain(StrEnum):
     CONFIG = "config"
     RUNTIME = "runtime"
 
+    @property
+    def is_input(self) -> bool:
+        """True for the caller-fixable input domain — read state through the enum rather than ``== ErrorDomain.INPUT``.
+
+        Exhaustive ``match`` so a future domain forces this helper to be revisited
+        rather than silently classifying as non-input.
+        """
+        match self:
+            case ErrorDomain.INPUT:
+                return True
+            case ErrorDomain.CONFIG | ErrorDomain.RUNTIME:
+                return False
+
 
 def error_domain_to_http_status(error_domain: ErrorDomain | str | None) -> int:
     """Map an error domain to an HTTP status code.
@@ -168,6 +181,30 @@ def error_domain_to_http_status(error_domain: ErrorDomain | str | None) -> int:
             return 500
         case None:
             return 500
+
+
+def error_domain_is_input(error_domain: ErrorDomain | str | None) -> bool:
+    """True when ``error_domain`` is the caller-fixable ``INPUT`` domain.
+
+    The serialized-form counterpart to :attr:`ErrorDomain.is_input`, mirroring
+    :func:`error_domain_to_http_status`: it accepts the raw ``str`` / ``None``
+    shape that :attr:`ErrorReport.error_domain` carries (and the value pulled out
+    of a serialized problem-document dict), so HTTP consumers can branch on
+    "is this the caller's mistake?" without re-implementing the coercion. Holds
+    a single source of truth — it delegates the per-value decision to
+    :attr:`ErrorDomain.is_input`.
+
+    ``None`` or an unrecognized string (e.g. a report serialized by a newer
+    Pipelex) is treated as non-input — the conservative default those consumers
+    want, matching :func:`error_domain_to_http_status` which maps the same cases
+    to a server-side 500.
+    """
+    if error_domain is None:
+        return False
+    try:
+        return ErrorDomain(error_domain).is_input
+    except ValueError:
+        return False
 
 
 class ErrorReport(BaseModel):

@@ -18,6 +18,10 @@ structural shape of the hierarchy stays visible.
 See [Error Model](../under-the-hood/error-model.md) for the underlying contract,
 classification rules, and the cross-boundary Temporal bridge.
 
+## AsyncExecutionNotEnabledError
+
+- [`AsyncExecutionNotEnabledError`](async-execution-not-enabled-error.md) — Async execution not enabled
+
 ## BatchParamsError
 
 - [`BatchParamsError`](batch-params-error.md) — Batch params
@@ -315,6 +319,10 @@ classification rules, and the cross-boundary Temporal bridge.
 
 - [`PipeSequenceFactoryError`](pipe-sequence-factory-error.md) — Pipe sequence factory
 
+## PipeSpecError
+
+- [`PipeSpecError`](pipe-spec-error.md) — Pipe spec
+
 ## PipeStackOverflowError
 
 - [`PipeStackOverflowError`](pipe-stack-overflow-error.md) — Pipe stack overflow
@@ -382,6 +390,7 @@ classification rules, and the cross-boundary Temporal bridge.
 ## SecurityError
 
 - [`SecurityError`](security-error.md) — Security policy violation
+- [`SsrfBlockedError`](ssrf-blocked-error.md) — Outbound request blocked (SSRF guard)
 - [`UnsafeSchemaError`](unsafe-schema-error.md) — Unsafe schema
 
 ## StuffError
@@ -444,6 +453,7 @@ classification rules, and the cross-boundary Temporal bridge.
 - [`StorageGcpError`](storage-gcp-error.md) — Storage gcp
 - [`StorageInvalidKeyError`](storage-invalid-key-error.md) — Storage invalid key
 - [`StorageInvalidUriError`](storage-invalid-uri-error.md) — Storage invalid uri
+- [`StorageLocalError`](storage-local-error.md) — Local storage error
 - [`StorageS3Error`](storage-s3-error.md) — S3 storage error
 - [`TemplateSigilSyntaxError`](template-sigil-syntax-error.md) — Template sigil syntax
 - [`TomlError`](toml-error.md) — TOML parse error
