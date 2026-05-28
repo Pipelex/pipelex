@@ -8,7 +8,6 @@ from google.genai.client import Client as GoogleGenAiClient
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError
 from pipelex.cogt.inference.error_classification import (
     UserAction,
@@ -27,16 +26,13 @@ from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
+from pipelex.plugins.google.google_exceptions import GoogleLLMWorkerError
 from pipelex.plugins.google.google_factory import GoogleFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
-
-
-class GoogleLLMWorkerError(PipelexError):
-    """Base exception for Google LLM Worker errors."""
 
 
 class GoogleLLMWorker(LLMWorkerInternalAbstract):

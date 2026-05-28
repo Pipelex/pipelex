@@ -21,11 +21,21 @@ class TestErrorReportFromDict:
     @pytest.mark.parametrize(
         "report",
         [
-            pytest.param(ErrorReport(error_type="X", message="m"), id="minimal"),
+            pytest.param(
+                ErrorReport(
+                    error_type="X",
+                    message="m",
+                    title="X error",
+                    type_uri="https://docs.pipelex.com/latest/errors/x/",
+                ),
+                id="minimal",
+            ),
             pytest.param(
                 ErrorReport(
                     error_type="CogtError",
                     message="rate limited",
+                    title="AI inference failed",
+                    type_uri="https://docs.pipelex.com/latest/errors/cogt-error/",
                     error_category="capacity",
                     error_domain=ErrorDomain.RUNTIME,
                     retryable=False,
@@ -39,6 +49,8 @@ class TestErrorReportFromDict:
                 ErrorReport(
                     error_type="LLMCompletionError",
                     message="429 Too Many Requests",
+                    title="LLM completion",
+                    type_uri="https://docs.pipelex.com/latest/errors/llm-completion-error/",
                     error_category="capacity",
                     retryable=True,
                     provider_metadata=ProviderErrorMetadata(
@@ -62,10 +74,42 @@ class TestErrorReportFromDict:
     @pytest.mark.parametrize(
         "bad_data",
         [
-            pytest.param({"message": "missing error_type"}, id="missing-required-error-type"),
-            pytest.param({"error_type": "X"}, id="missing-required-message"),
-            pytest.param({"error_type": "X", "message": "m", "surprise": "extra"}, id="extra-forbidden-key"),
-            pytest.param({"error_type": "X", "message": "m", "retryable": ["not", "a", "bool"]}, id="wrong-field-type"),
+            pytest.param(
+                {"message": "missing error_type", "title": "t", "type_uri": "u"},
+                id="missing-required-error-type",
+            ),
+            pytest.param(
+                {"error_type": "X", "title": "t", "type_uri": "u"},
+                id="missing-required-message",
+            ),
+            pytest.param(
+                {"error_type": "X", "message": "m", "type_uri": "u"},
+                id="missing-required-title",
+            ),
+            pytest.param(
+                {"error_type": "X", "message": "m", "title": "t"},
+                id="missing-required-type-uri",
+            ),
+            pytest.param(
+                {
+                    "error_type": "X",
+                    "message": "m",
+                    "title": "t",
+                    "type_uri": "u",
+                    "surprise": "extra",
+                },
+                id="extra-forbidden-key",
+            ),
+            pytest.param(
+                {
+                    "error_type": "X",
+                    "message": "m",
+                    "title": "t",
+                    "type_uri": "u",
+                    "retryable": ["not", "a", "bool"],
+                },
+                id="wrong-field-type",
+            ),
         ],
     )
     def test_g1_from_dict_raises_on_malformed_dict(self, bad_data: dict[str, Any]) -> None:

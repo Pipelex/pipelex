@@ -16,8 +16,8 @@ from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.llm.template_document_analyzer import TemplateDocumentAnalyzer
-from pipelex.pipe_operators.llm.template_image_analyzer import TemplateImageAnalyzer
-from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
+from pipelex.pipe_operators.shared.template_image_analyzer import TemplateImageAnalyzer
+from pipelex.tools.jinja2.exceptions import Jinja2TemplateSyntaxError
 
 
 class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):

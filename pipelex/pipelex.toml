@@ -458,7 +458,14 @@ is_enabled = false
 # Master toggle. When false, workflow starts don't attach any custom search
 # attributes, the worker-boot check is skipped, and the dashboard view falls
 # back to WorkflowType / WorkflowId / StartTime only.
-enabled = true
+#
+# Default off: custom search attributes must be pre-registered on the target
+# Temporal namespace, and `temporal server start-dev` does not auto-register
+# them — so a default-on baseline makes every local dev loop fail on the
+# first workflow start. Deployments that have registered the attributes
+# (Temporal Cloud namespaces, self-hosted clusters with the migration run)
+# opt in by setting `enabled = true` in their env override.
+enabled = false
 # Subset of the five built-in attributes to populate. Names not in this list
 # are skipped at workflow-start time AND not required at worker boot. Pipelex
 # only knows how to populate these five; arbitrary custom names are out of
@@ -511,17 +518,15 @@ non_retryable_error_types = [
 # Per-queue submitter options. Operators populate this when a backend pool
 # needs its own timeout or retry tuning. See pipelex/kit/configs/pipelex.toml
 # for examples.
+#
+# The baseline ships no entries here. Each deployment is expected to add its
+# own ``[temporal.queue_options.<queue>]`` block keyed by whatever name it
+# chose for ``default_task_queue`` (and any extra queues referenced by
+# ``activity_queues``). Shipping an opinionated entry for the baseline's
+# ``temporal_task_queue`` name would create an orphan overlay the moment a
+# downstream override renames the queue — and config merging cannot delete
+# baseline keys, so that orphan would be unrecoverable from the override.
 [temporal.queue_options]
-
-# Default cluster-wide rate cap on the worker's home queue. Mirrors the pre-v2
-# hardcoded ``max_task_queue_activities_per_second=1000`` on ``Worker(...)`` so
-# existing deployments on ``temporal_task_queue`` keep the same Temporal-server-
-# enforced cap. Deployments using non-default queue names should add their own
-# ``[temporal.queue_options.<queue>]`` entries. The empty-routing hybrid
-# fallback applies these overlays to activities dispatched without an explicit
-# task_queue too.
-[temporal.queue_options.temporal_task_queue]
-max_task_queue_activities_per_second = 1000
 
 # Named worker-runtime profiles. A worker process selects one via --profile.
 # Defaults are lifted verbatim from the pre-v2 hardcoded Worker(...) construction

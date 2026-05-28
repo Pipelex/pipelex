@@ -4,7 +4,6 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.system.environment import (
-    EnvVarNotFoundError,
     all_env_vars_are_set,
     any_env_var_is_placeholder,
     get_optional_env,
@@ -12,6 +11,7 @@ from pipelex.system.environment import (
     is_env_var_set,
     set_env,
 )
+from pipelex.system.exceptions import EnvVarNotFoundError
 from pipelex.tools.misc.placeholder import PLACEHOLDER_PREFIX, make_placeholder_value
 
 

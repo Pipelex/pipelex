@@ -4,9 +4,9 @@ from typing import Any
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.tools.secrets.secrets_errors import SecretNotFoundError
+from pipelex.tools.secrets.exceptions import SecretNotFoundError, UnknownVarPrefixError, VarFallbackPatternError, VarNotFoundError
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
-from pipelex.tools.secrets.secrets_utils import UnknownVarPrefixError, VarFallbackPatternError, VarNotFoundError, substitute_vars
+from pipelex.tools.secrets.secrets_utils import substitute_vars
 
 
 @pytest.fixture

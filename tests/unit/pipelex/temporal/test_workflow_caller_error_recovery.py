@@ -25,6 +25,8 @@ from pipelex.temporal.tprl.workflow_caller import WorkflowClass, WorkflowExecuto
 _FULL_REPORT = ErrorReport(
     error_type="CogtError",
     message="rate limited on the worker",
+    title="AI inference failed",
+    type_uri="https://docs.pipelex.com/latest/errors/cogt-error/",
     error_category="capacity",
     error_domain=ErrorDomain.RUNTIME,
     retryable=False,
@@ -76,8 +78,14 @@ class TestWorkflowCallerErrorRecovery:
         assert report.user_action is not None
         assert report.user_action.kind == UserActionKind.CHECK_BILLING
 
-    async def test_workflow_failure_without_report_stays_generic(self, mocker: MockerFixture) -> None:
-        """A non-Pipelex workflow failure (no packed report) falls back to a generic error."""
+    async def test_workflow_failure_without_report_synthesizes_unrecoverable(self, mocker: MockerFixture) -> None:
+        """A non-Pipelex workflow failure (no packed report) surfaces as a synthesized unrecoverable report.
+
+        ``recover_error_report`` is total — there is no Pipelex-framed
+        ``"Failed to execute workflow X"`` fallback. The ``WorkflowExecutionError``
+        carries a stable-identity ``UnrecoverableWorkflowFailureError`` report
+        whose message preserves the underlying exception text.
+        """
         executor, client = _make_executor_with_stub_client(mocker)
         failure = WorkflowFailureError(cause=RuntimeError("worker crashed hard"))
         client.execute_workflow = mocker.AsyncMock(side_effect=failure)
@@ -86,8 +94,13 @@ class TestWorkflowCallerErrorRecovery:
             await executor.execute_workflow(workflow_class=_StubWorkflow, workflow_arg={}, workflow_id="ut-run")
 
         error = exc_info.value
-        assert error.error_report is None
-        assert error.message == "Failed to execute workflow _StubWorkflow"
+        assert error.error_report is not None
+        assert error.error_report.error_type == "UnrecoverableWorkflowFailureError"
+        assert error.error_report.error_domain == ErrorDomain.RUNTIME
+        # Synthesized message preserves the underlying exception text, NOT the
+        # legacy "Failed to execute workflow _StubWorkflow" framing.
+        assert "worker crashed hard" in error.message
+        assert error.message != "Failed to execute workflow _StubWorkflow"
 
     @pytest.mark.parametrize(
         "side_effect",

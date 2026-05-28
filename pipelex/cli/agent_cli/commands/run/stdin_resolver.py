@@ -9,7 +9,8 @@ from typing import Any, cast
 
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
 from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
-from pipelex.tools.misc.json_utils import JsonTypeError, load_json_dict_from_path
+from pipelex.tools.misc.exceptions import JsonTypeError
+from pipelex.tools.misc.json_utils import load_json_dict_from_path
 
 WORKING_MEMORY_KEY = "working_memory"
 MAIN_STUFF_KEY = "main_stuff"

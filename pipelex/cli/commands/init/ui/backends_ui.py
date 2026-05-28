@@ -7,9 +7,10 @@ from rich.prompt import Prompt
 from rich.table import Table
 from rich.text import Text
 
+from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.string_utils import snake_to_capitalize_first_letter
-from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_path
+from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 
 def get_backend_options_from_toml(template_path: str, existing_path: str | None = None) -> list[tuple[str, str]]:

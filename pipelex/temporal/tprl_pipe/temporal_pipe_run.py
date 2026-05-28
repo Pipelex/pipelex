@@ -51,7 +51,14 @@ class TemporalPipeRun(WorkflowExecutor[PipeRunArg, PipeOutput], PipeRunProtocol)
         pipe_job: PipeJob,
         delivery_assignment: DeliveryAssignment | None = None,
     ) -> PipeOutput:
-        """Execute a pipe run via Temporal (blocking — waits for completion)."""
+        """Execute a pipe run via Temporal (blocking — waits for completion).
+
+        The deployment-level async-enabled guard fires inside
+        ``with_conditional_worker`` (above), before the worker setup on the
+        ``INTERNAL`` path and before this body on ``EXTERNAL`` — so
+        ``stamp_submitter_session_id`` (which reads the ``TemporalManager``
+        singleton) is unreachable on a disabled deployment.
+        """
         # Stamp submitter session_id before the workflow input is built so the
         # value flows through to every child workflow via the workflow arg.
         pipe_job = stamp_submitter_session_id(pipe_job)
@@ -89,6 +96,8 @@ class TemporalPipeRun(WorkflowExecutor[PipeRunArg, PipeOutput], PipeRunProtocol)
         """Start a pipe run without waiting for completion.
 
         Returns the workflow_id and a WorkflowHandle that can be awaited later.
+        The deployment-level async-enabled guard fires inside
+        ``with_conditional_worker``; see :meth:`run` for the rationale.
         """
         log.debug(f"TemporalPipeRun start using task_queue: {self.task_queue}")
         # Stamp submitter session_id before building the workflow input so it

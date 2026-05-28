@@ -13,12 +13,39 @@ class DeliveryStatus(StrEnum):
     FAILED = "FAILED"
 
 
+# Keys that Pipelex assigns per delivery onto the outgoing webhook body
+# (see ``DeliveryExecutor._notify_webhook``). A caller's static ``payload``
+# must not declare any of them — otherwise the value would shift silently
+# with delivery status. Enforced at construction by ``_reject_reserved_keys``.
+_RESERVED_WEBHOOK_PAYLOAD_KEYS: frozenset[str] = frozenset({"pipeline_run_id", "status", "result_url", "error"})
+
+
 class WebhookTarget(BaseModel):
     """A webhook endpoint to notify on delivery."""
 
     url: str
     headers: dict[str, str] = Field(default_factory=dict)
     payload: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("payload", mode="after")
+    @classmethod
+    def _reject_reserved_keys(cls, value: dict[str, Any]) -> dict[str, Any]:
+        """Reject caller payload keys that Pipelex assigns per delivery.
+
+        ``DeliveryExecutor._notify_webhook`` writes ``pipeline_run_id`` /
+        ``status`` / ``result_url`` / ``error`` onto the outgoing body. A static
+        payload that declares any of them would have its meaning shift with
+        delivery status — fail loudly at construction instead of silently at
+        delivery time.
+        """
+        collisions = set(value) & _RESERVED_WEBHOOK_PAYLOAD_KEYS
+        if collisions:
+            msg = (
+                f"WebhookTarget.payload contains reserved keys: {sorted(collisions)}. "
+                "Pipelex owns these keys (assigned per delivery); choose different names."
+            )
+            raise ValueError(msg)
+        return value
 
 
 class StorageTarget(BaseModel):

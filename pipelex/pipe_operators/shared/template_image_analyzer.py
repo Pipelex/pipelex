@@ -5,7 +5,6 @@ to determine which variables reference images (directly or nested) and how they
 should be extracted at runtime.
 """
 
-from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.core.concepts.concept import Concept
@@ -13,18 +12,11 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.hub import get_native_concept, get_required_concept
+from pipelex.pipe_operators.shared.exceptions import UnusedInputError, WithImagesFilterError
 from pipelex.pipe_operators.shared.image_reference import ImageReference, ImageReferenceKind
 from pipelex.tools.jinja2.jinja2_models import Jinja2FilterName
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_variable_references
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
-
-
-class WithImagesFilterError(PipelexError):
-    """Raised when | with_images is used on a type without nested images."""
-
-
-class UnusedInputError(PipelexError):
-    """Raised when an input is declared but never referenced in the template."""
 
 
 class TemplateImageAnalyzer:

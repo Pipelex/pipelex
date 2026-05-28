@@ -2,29 +2,45 @@
 
 # pyright: reportUnknownMemberType=false
 
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, cast
 
 import tomlkit
 
 from pipelex.builder.concept.concept_spec import ConceptSpec, ConceptStructureSpec
+from pipelex.builder.concept.exceptions import ConceptSpecError
 
 
-def parse_concept_spec(spec_data: dict[str, Any]) -> ConceptSpec:
+def parse_concept_spec(spec_data: Any) -> ConceptSpec:
     """Parse and validate a ConceptSpec from JSON-like data.
 
     Accepts common aliases for "concept_code" and converts structure fields.
 
     Args:
-        spec_data: Raw data for the concept spec.
+        spec_data: Raw data for the concept spec (untrusted JSON-like input).
 
     Returns:
         Validated ConceptSpec instance.
 
     Raises:
-        ValidationError: If validation fails.
+        ConceptSpecError: If the top-level value is not a mapping, ``structure``
+            is not a mapping, a structure field value is neither a description
+            string nor a field-spec mapping, or a ConceptSpec-level rule fails
+            (e.g. ``refines`` and ``structure`` both set). Carries the INPUT
+            error domain.
+        ValidationError: If Pydantic validation of the assembled spec fails.
     """
-    # Work on a copy to avoid mutating the caller's dict
-    spec_data = dict(spec_data)
+    # Validate the top-level shape before iterating so a non-mapping caller input
+    # (scalar / list / None) surfaces as a typed, INPUT-domain ConceptSpecError
+    # instead of a bare TypeError / ValueError from ``dict(...)`` below. Accept any
+    # ``Mapping`` (not just ``dict``): the message promises "a mapping", so a
+    # non-``dict`` mapping (e.g. ``MappingProxyType``) must be parsed, not rejected.
+    if not isinstance(spec_data, Mapping):
+        msg = f"Concept spec must be a mapping, got {type(spec_data).__name__}"
+        raise ConceptSpecError(msg)
+
+    # Normalize to a plain dict; ``dict(...)`` also copies so we never mutate the caller's mapping.
+    spec_data = dict(cast("Mapping[str, Any]", spec_data))
 
     # Accept common aliases for "concept_code"
     for alias in ("the_concept_code", "code", "name", "concept_name", "concept_ref"):
@@ -34,9 +50,20 @@ def parse_concept_spec(spec_data: dict[str, Any]) -> ConceptSpec:
             else:
                 spec_data.pop(alias)
 
-    # Convert structure if present - need to add field names
-    if spec_data.get("structure"):
-        structure_data = spec_data["structure"]
+    # Convert structure if present - need to add field names.
+    # Validate the raw shape before iterating so a malformed ``structure`` surfaces
+    # as a typed, INPUT-domain ConceptSpecError instead of a bare AttributeError /
+    # TypeError (which the caller cannot tell apart from a real programming bug).
+    # ``is not None`` (not truthiness) so a present-but-falsy non-mapping — ``[]`` /
+    # ``""`` / ``0`` / ``False`` — still hits the typed guard below instead of
+    # silently skipping to a bare Pydantic ValidationError; ``None`` / absent both
+    # mean "no structure" (the field defaults to ``None``).
+    if spec_data.get("structure") is not None:
+        structure_value = spec_data["structure"]
+        if not isinstance(structure_value, Mapping):
+            msg = f"Concept spec 'structure' must be a mapping of field names to field specs, got {type(structure_value).__name__}"
+            raise ConceptSpecError(msg)
+        structure_data = cast("Mapping[str, Any]", structure_value)
         converted_structure: dict[str, Any] = {}
         for field_name, field_data in structure_data.items():
             if isinstance(field_data, str):
@@ -46,14 +73,20 @@ def parse_concept_spec(spec_data: dict[str, Any]) -> ConceptSpec:
                     "description": field_data,
                     "type": "text",
                 }
-            else:
+            elif isinstance(field_data, Mapping):
                 # Full field spec — copy to avoid mutating nested caller data
-                field_data = dict(field_data)
-                field_data["the_field_name"] = field_name
+                field_spec_data = dict(cast("Mapping[str, Any]", field_data))
+                field_spec_data["the_field_name"] = field_name
                 # Default to "text" when agent omits the type field
-                if "type" not in field_data:
-                    field_data["type"] = "text"
-                converted_structure[field_name] = field_data
+                if "type" not in field_spec_data:
+                    field_spec_data["type"] = "text"
+                converted_structure[field_name] = field_spec_data
+            else:
+                msg = (
+                    f"Concept spec structure field '{field_name}' must be a description string or a field-spec mapping, "
+                    f"got {type(field_data).__name__}"
+                )
+                raise ConceptSpecError(msg)
         spec_data["structure"] = converted_structure
 
     return ConceptSpec.model_validate(spec_data)

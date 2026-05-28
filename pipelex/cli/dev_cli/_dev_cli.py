@@ -15,6 +15,7 @@ from pipelex.cli.dev_cli.commands.check_gateway_models_cmd import check_gateway_
 from pipelex.cli.dev_cli.commands.check_mthds_schema_cmd import check_mthds_schema_cmd
 from pipelex.cli.dev_cli.commands.check_rules_sync_cmd import check_rules_sync_cmd
 from pipelex.cli.dev_cli.commands.check_urls_cmd import DEFAULT_TIMEOUT, check_urls_cmd
+from pipelex.cli.dev_cli.commands.generate_error_pages_cmd import generate_error_pages_cmd
 from pipelex.cli.dev_cli.commands.generate_mthds_schema_cmd import generate_mthds_schema_cmd
 from pipelex.cli.dev_cli.commands.kit_cmd import kit_app
 from pipelex.cli.dev_cli.commands.preprocess_test_models_cmd import preprocess_test_models_cmd
@@ -38,6 +39,7 @@ class PipelexDevCLI(TyperGroup):
             "check-mthds-schema",
             "check-rules",
             "check-urls",
+            "generate-error-pages",
             "generate-mthds-schema",
             "kit",
             "preprocess-test-models",
@@ -145,6 +147,28 @@ def check_urls_command(
     """Check all URLs in pipelex/urls.py for broken links."""
     try:
         check_urls_cmd(quiet=quiet, timeout=timeout)
+    except (typer.Exit, typer.Abort):
+        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
+        raise
+    except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
+        console = get_console()
+        console.print()
+        console.print("[bold red]Unexpected error occurred[/bold red]")
+        console.print()
+        console.print(Traceback())
+        sys.exit(1)
+
+
+@app.command(name="generate-error-pages", help="Generate one docs page per PipelexError subclass under docs/errors/")
+def generate_error_pages_command(
+    output: Annotated[str | None, typer.Option("--output", "-o", help="Custom output directory for the error pages")] = None,
+    quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only a single status line")] = False,
+) -> None:
+    """Generate per-class error documentation pages under ``docs/errors/``."""
+    try:
+        output_path = Path(output) if output else None
+        generate_error_pages_cmd(output=output_path, quiet=quiet)
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise

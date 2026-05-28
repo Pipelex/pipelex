@@ -19,7 +19,8 @@ from pipelex.core.pipes.inputs.input_renderer import NoInputsRequiredError, rend
 from pipelex.hub import get_library_manager, get_required_pipe, get_telemetry_manager, resolve_library_dirs, set_current_library
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION
-from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
+from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.file_utils import (

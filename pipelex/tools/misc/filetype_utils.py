@@ -8,7 +8,7 @@ import filetype
 from pydantic import BaseModel
 
 from pipelex import log
-from pipelex.system.exceptions import ToolError
+from pipelex.tools.misc.exceptions import FileTypeError
 
 # Constant for unknown/undetectable file types
 UNKNOWN_FILE_TYPE = "unknown"
@@ -28,10 +28,6 @@ _MIME_DB.add_type("application/json", ".json", strict=True)
 _MIME_DB.add_type("application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".docx", strict=True)
 _MIME_DB.add_type("application/vnd.openxmlformats-officedocument.presentationml.presentation", ".pptx", strict=True)
 _MIME_DB.add_type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx", strict=True)
-
-
-class FileTypeError(ToolError):
-    pass
 
 
 class FileType(BaseModel):

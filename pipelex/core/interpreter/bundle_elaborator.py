@@ -2,6 +2,7 @@ from typing import TypeGuard
 
 from pydantic import ValidationError
 
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.bundles.pipelex_bundle_blueprint import (
     ElaborationMetadata,
     PipeBlueprintUnion,
@@ -9,7 +10,7 @@ from pipelex.core.bundles.pipelex_bundle_blueprint import (
     StepRole,
 )
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.interpreter.exceptions import PipelexInterpreterError
+from pipelex.core.interpreter.exceptions import BundleElaboratorError
 from pipelex.core.pipes.validation import is_pipe_code_valid
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.core.qualified_ref import QualifiedRef
@@ -17,11 +18,6 @@ from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequen
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.structure.pipe_structure_blueprint import PipeStructureBlueprint
-
-
-class BundleElaboratorError(PipelexInterpreterError):
-    """Raised when bundle elaboration fails (e.g. synthetic-name collision, invalid output for preliminary_text)."""
-
 
 _SYNTHETIC_DRAFT_TEXT_SUFFIX = "__draft_text"
 _SYNTHETIC_STRUCTURE_SUFFIX = "__structure"
@@ -78,7 +74,7 @@ class BundleElaborator:
                     f"Synthesized pipe '{synthetic_code}' carries `structuring_method = preliminary_text`. "
                     "The elaborator should never produce nested directives — this is a bug."
                 )
-                raise BundleElaboratorError(msg)
+                raise PipelexUnexpectedError(msg)
 
         elaborated = bundle.model_copy(
             update={
@@ -101,7 +97,7 @@ class BundleElaborator:
                 f"Bundle elaboration produced an invalid bundle (domain '{bundle.domain}'). "
                 f"Synthetic pipes: {sorted(elaboration_metadata.keys())}. {exc}"
             )
-            raise BundleElaboratorError(msg) from exc
+            raise PipelexUnexpectedError(msg) from exc
 
         return elaborated
 

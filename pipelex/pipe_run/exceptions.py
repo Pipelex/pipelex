@@ -1,5 +1,41 @@
-from pipelex.base_exceptions import PipelexError
+from pipelex.base_exceptions import ErrorDomain, PipelexError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+
+
+class AsyncExecutionNotEnabledError(PipelexError):
+    """Raised when a route that depends on asynchronous execution is hit on a
+    deployment that does not have an async execution backend enabled.
+
+    Backend-neutral on purpose: the same condition can be produced today by a
+    Temporal-backed runner finding ``[temporal] is_enabled = false`` and will be
+    produced by other async backends (e.g. Mistral Workflows) as support lands.
+    The class name, title, and detail therefore talk about *async execution* as
+    a capability of the deployment, not about any specific backend brand.
+
+    ``error_domain = CONFIG`` because the caller's request is well-formed; what
+    is missing is server-side configuration. The pipelex-api layer maps this
+    class to HTTP 501 (Not Implemented), which is more precise than the
+    ``CONFIG`` -> 500 default and tells clients the failure is permanent under
+    the current deployment rather than a transient runtime fault.
+    """
+
+    error_domain = ErrorDomain.CONFIG
+    _declared_title = "Async execution not enabled"
+
+    DEFAULT_MESSAGE = (
+        "Asynchronous pipeline execution is not enabled on this deployment. "
+        "Synchronous execution remains available; to enable async execution, the "
+        "server operator must configure an async execution backend in the "
+        "deployment's pipelex configuration."
+    )
+
+    @classmethod
+    def with_default_message(cls) -> "AsyncExecutionNotEnabledError":
+        """Construct with the canonical backend-neutral message used by the
+        facade-level dispatch guard (``with_conditional_worker``) and the
+        lower-level ``WorkflowExecutor.temporal_client()`` boundary.
+        """
+        return cls(cls.DEFAULT_MESSAGE)
 
 
 class PipeRunParamsError(PipelexError):
@@ -31,6 +67,10 @@ class WebhookDeliveryError(DeliveryError):
 
 class StorageDeliveryError(DeliveryError):
     pass
+
+
+class DryRunError(PipelexError):
+    """Raised when a dry run fails due to missing inputs or other validation issues."""
 
 
 class PipeRouterError(PipelexError):

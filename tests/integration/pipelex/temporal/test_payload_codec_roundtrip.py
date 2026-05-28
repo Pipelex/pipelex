@@ -16,6 +16,9 @@ from temporalio import activity, workflow
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
+from pipelex.base_exceptions import ErrorDomain, ErrorReport
+from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
+from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.temporal.codec.storage_payload_codec import StoragePayloadCodec
@@ -76,6 +79,25 @@ class WfEchoLargePayload:
         return await workflow.execute_activity(
             act_echo_large_payload,
             payload,
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+
+
+@activity.defn(name="act_echo_error_report")
+async def act_echo_error_report(report: ErrorReport) -> ErrorReport:  # noqa: RUF029
+    """Activity that returns its ErrorReport input unchanged — exercises the BaseModel round-trip."""
+    return report
+
+
+@workflow.defn(name="wf_echo_error_report")
+class WfEchoErrorReport:
+    """Workflow that forwards an ErrorReport through an activity and returns it."""
+
+    @workflow.run
+    async def run(self, report: ErrorReport) -> ErrorReport:
+        return await workflow.execute_activity(
+            act_echo_error_report,
+            report,
             start_to_close_timeout=timedelta(seconds=30),
         )
 
@@ -149,3 +171,53 @@ class TestPayloadCodecRoundTrip:
         stored_files = list(storage_root.rglob("*"))
         stored_files = [file_path for file_path in stored_files if file_path.is_file()]
         assert len(stored_files) > 0, "Codec should have offloaded payloads to storage"
+
+    async def test_error_report_round_trips_through_activity(self) -> None:
+        """``ErrorReport`` round-trips through a workflow→activity hop, including nested ``UserAction`` / ``ProviderErrorMetadata``."""
+        original = ErrorReport(
+            error_type="LLMCompletionError",
+            message="provider returned 429",
+            title="AI inference failed",
+            type_uri="https://docs.pipelex.com/latest/errors/llm-completion-error/",
+            error_category="transient",
+            error_domain=ErrorDomain.RUNTIME,
+            retryable=True,
+            user_action=UserAction(kind=UserActionKind.WAIT_AND_RETRY, detail="Wait a moment and retry"),
+            model="gpt-4o-mini",
+            provider="openai",
+            provider_metadata=ProviderErrorMetadata(
+                provider=ProviderName.OPENAI,
+                sdk_exception_type="RateLimitError",
+                message="429 Too Many Requests",
+                status_code=429,
+                request_id="req_round_trip_001",
+                retry_after_seconds=2.5,
+            ),
+        )
+
+        task_queue = str(uuid.uuid4())
+        converter = make_data_converter()
+
+        async with await WorkflowEnvironment.start_local(data_converter=converter) as env:  # pyright: ignore[reportUnknownMemberType]
+            temporal_client: TemporalClient = env.client
+            async with Worker(
+                temporal_client,
+                task_queue=task_queue,
+                workflows=[WfEchoErrorReport],
+                activities=[act_echo_error_report],
+                workflow_runner=UnsandboxedWorkflowRunner(),
+            ):
+                result: ErrorReport = await temporal_client.execute_workflow(  # pyright: ignore[reportUnknownMemberType]
+                    WfEchoErrorReport.run,
+                    original,
+                    id=f"wf-error-report-roundtrip-{uuid.uuid4().hex[:8]}",
+                    task_queue=task_queue,
+                )
+
+        assert isinstance(result, ErrorReport)
+        assert result == original
+        assert result.user_action is not None
+        assert result.user_action.kind == UserActionKind.WAIT_AND_RETRY
+        assert result.provider_metadata is not None
+        assert result.provider_metadata.status_code == 429
+        assert result.provider_metadata.retry_after_seconds == 2.5

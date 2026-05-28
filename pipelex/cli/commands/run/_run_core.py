@@ -17,7 +17,7 @@ from pipelex.cli.error_handlers import (
     handle_model_choice_error,
 )
 from pipelex.config import get_config
-from pipelex.core.interpreter.exceptions import MthdsDecodeError, PipelexInterpreterError
+from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
@@ -30,8 +30,9 @@ from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexRunner
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
+from pipelex.tools.misc.exceptions import JsonTypeError
 from pipelex.tools.misc.file_utils import get_incremental_directory_path
-from pipelex.tools.misc.json_utils import JsonTypeError, load_json_dict_from_path, save_as_json_to_path
+from pipelex.tools.misc.json_utils import load_json_dict_from_path, save_as_json_to_path
 from pipelex.tools.misc.package_utils import get_package_version
 
 COMMAND = "run"
@@ -78,7 +79,7 @@ async def _execute_run(
         except FileNotFoundError as exc:
             typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
-        except (PipelexInterpreterError, MthdsDecodeError) as exc:
+        except PipelexInterpreterError as exc:
             typer.secho(f"Failed to parse bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
     elif not pipe_code:

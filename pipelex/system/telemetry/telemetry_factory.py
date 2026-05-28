@@ -14,7 +14,7 @@ from pipelex.system.telemetry.telemetry_manager_abstract import (
     TelemetryManagerAbstract,
     TelemetryManagerNoOp,
 )
-from pipelex.tools.secrets.secrets_errors import SecretNotFoundError
+from pipelex.tools.secrets.exceptions import SecretNotFoundError
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
 

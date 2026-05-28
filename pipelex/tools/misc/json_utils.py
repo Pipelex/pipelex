@@ -10,19 +10,11 @@ from kajson import kajson
 from kajson.exceptions import UnijsonEncoderError
 from pydantic import BaseModel
 
-from pipelex.system.exceptions import ToolError
+from pipelex.tools.misc.exceptions import ArgumentTypeError, JsonTypeError
 from pipelex.tools.misc.file_utils import save_text_to_path
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 
 JsonContent = Union[dict[str, Any], list[Any]]
-
-
-class ArgumentTypeError(ToolError):
-    pass
-
-
-class JsonTypeError(ToolError):
-    pass
 
 
 CLEAN_JSON_FIELDS_TO_SKIP = ("__class__", "__module__", "__pipelex_class__", "__pipelex_module__")

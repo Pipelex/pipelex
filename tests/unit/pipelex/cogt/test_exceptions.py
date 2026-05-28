@@ -1,7 +1,7 @@
 import json
-from dataclasses import FrozenInstanceError
 
 import pytest
+from pydantic import ValidationError
 
 from pipelex.base_exceptions import ErrorReport, PipelexError
 from pipelex.cogt.exceptions import (
@@ -202,7 +202,12 @@ class TestErrorCategoryInfrastructure:
         assert "user_action" not in report_dict
         assert "model" not in report_dict
         assert "provider" not in report_dict
-        assert report_dict == {"error_type": "CogtError", "message": "plain error"}
+        assert report_dict == {
+            "error_type": "CogtError",
+            "message": "plain error",
+            "title": "AI inference failed",
+            "type_uri": "https://docs.pipelex.com/latest/errors/cogt-error/",
+        }
 
     def test_to_error_report_to_dict_json_serializable(self) -> None:
         """to_dict() output can be serialized to JSON."""
@@ -214,8 +219,13 @@ class TestErrorCategoryInfrastructure:
 
     def test_error_report_is_frozen(self) -> None:
         """ErrorReport is immutable."""
-        report = ErrorReport(error_type="CogtError", message="test")
-        with pytest.raises(FrozenInstanceError):
+        report = ErrorReport(
+            error_type="CogtError",
+            message="test",
+            title="AI inference failed",
+            type_uri="https://docs.pipelex.com/latest/errors/cogt-error/",
+        )
+        with pytest.raises(ValidationError):
             report.message = "mutated"  # type: ignore[misc]
 
     def test_from_exc_chain_preserved(self) -> None:

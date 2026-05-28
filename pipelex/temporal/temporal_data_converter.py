@@ -44,11 +44,6 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
 from pipelex.hub import get_class_registry
-from pipelex.temporal.exceptions import TemporalFlowError
-
-
-class BaseModelPayloadConverterError(TemporalFlowError):
-    pass
 
 
 class BaseModelPayloadConverter(JSONPlainPayloadConverter):

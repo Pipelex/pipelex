@@ -1,128 +1,181 @@
-# Agent CLI logging-discipline hardening — TODOS
+# Implementation Plan — `feature/API-readiness-4`
 
-## Context (read this first on a cold start)
-
-**Branch:** `release/v0.30.1`
-**Working dir:** `/Users/lchoquel/repos/Pipelex/pipelex`
-
-### What this work is about
-
-A reviewer flagged a real bug at `pipelex/cli/agent_cli/commands/agent_cli_factory.py:75` (pre-fix line number): the agent CLI's `package_log_levels` override only pinned `pipelex = OFF`, but `deep_update` deep-merges it into the user config. Third-party loggers (anthropic, httpx, botocore, openai, ...) configured at INFO/WARNING in `pipelex/pipelex.toml` kept emitting through the root's `RichHandler` (now pointing at stderr) — corrupting the JSON error envelope that downstream parsers (e.g. `mthds-js`'s `PipelexRunner`) expect.
-
-### What's been done in the current session
-
-First pass tried to enumerate every third-party logger (brittle list). User pushed back: "Listing feels like an uphill battle — do we control enough of the logging config to just cut off all logs to stdout and stderr regardless of what package sends them?"
-
-Second pass landed the correct fix: `logging.disable(LOGGING_LEVEL_OFF)` as a process-global cutoff called at the start of `make_pipelex_for_agent_cli` and `agent_doctor_cmd`. Records get filtered in `Logger.isEnabledFor` BEFORE any per-logger level check — no list to maintain.
-
-Files modified in this session (staged, not committed):
-
-- `pipelex/cli/agent_cli/commands/agent_cli_factory.py` — added `silence_logging_for_agent_cli()`; simplified `apply_agent_cli_output_discipline()`; simplified `AGENT_CLI_STDERR_LOG_FIELDS` back to `{pipelex: OFF}`
-- `pipelex/cli/agent_cli/commands/doctor_cmd.py` — wired `silence_logging_for_agent_cli` at top of `agent_doctor_cmd`
-- `tests/e2e/agent_cli/test_stdout_is_clean_json.py` — added the third-party-logger leak regression test; refactored `_set_package_log_level` helper
-- `tests/unit/pipelex/cli/test_agent_cli_factory_init_overrides.py` — updated for the new design
-- `tests/unit/pipelex/cli/test_agent_cli_factory_suppression.py` — replaced per-logger level assertion with `isEnabledFor` checks
-- `tests/unit/pipelex/cli/test_agent_cli_output_discipline.py` — renamed test class, added `silence_logging_for_agent_cli` regression
-- `tests/unit/pipelex/cli/test_agent_doctor_cmd.py` — stubbed `silence_logging_for_agent_cli` in the bootstrap fixture
-
-State: `make agent-check` clean. Targeted unit/integration/e2e tests pass (1541 pass / 1 skip).
-
-### Why we have more TODOs
-
-A `/code-review` pass found 15 findings. After triage with the user, 6 actionable items remain (rest are skipped or made moot by the structural fix). Decisions are baked into the steps below.
-
-### Key references
-
-- The source-of-truth docstring for the cutoff is `pipelex/cli/agent_cli/commands/agent_cli_factory.py:95` (`silence_logging_for_agent_cli`).
-- The comment block at `pipelex/cli/agent_cli/commands/agent_cli_factory.py:32-83` explains why the listing approach was abandoned and how the four knobs in `AGENT_CLI_STDERR_LOG_FIELDS` relate to the global cutoff.
-- The e2e regression test for the original third-party leak: `tests/e2e/agent_cli/test_stdout_is_clean_json.py::test_models_json_stdout_and_stderr_stay_clean_under_third_party_logger_enabled`.
+Pipelex-side cleanup branch picking up the upstream tail of the API error-handling endeavour. The API consumer (`pipelex-api`, branch `feature/Adapt-to-pipelex-update-3`) has shipped through Phases 0-5 plus Phase A0 / A1 and is at a "finalize" moment; what remains for the API to fully discharge that endeavour is a handful of upstream-pipelex items. **This branch is those items.**
 
 ---
 
-## Phase 1 — Structural fix (the biggest change)
+## Cold-start reading order
 
-Single architectural shift: every agent CLI command must traverse `app_callback` in `pipelex/cli/agent_cli/_agent_cli.py`. Wiring the silence call there guarantees every current AND future command is covered, even ones (like `init_cmd`, `accept_gateway_terms_cmd`) that bypass `make_pipelex_for_agent_cli`.
+Read in this order to understand why this branch exists at all:
 
-- [x] **Step 1.1** — Read `pipelex/cli/agent_cli/_agent_cli.py` to locate `app_callback` (around line 81 per the review). Confirm it's the typer choke point every command runs through, and that `set_agent_cli_error_format(CliOutputFormat.JSON)` already lives there.
-- [x] **Step 1.2** — Add `silence_logging_for_agent_cli()` call at the top of `app_callback`, BEFORE `set_agent_cli_error_format`. Import the symbol from `pipelex.cli.agent_cli.commands.agent_cli_factory`.
-- [x] **Step 1.3** — Decide: keep the existing per-call invocations in `make_pipelex_for_agent_cli:166` and `agent_doctor_cmd:134` OR remove them.
-  - **Decision recorded:** KEEP both. `silence_logging_for_agent_cli` is idempotent (calling `logging.disable` twice with the same value is a no-op). Keeping preserves defense for direct library callers of `make_pipelex_for_agent_cli` and avoids breaking the unit tests that mock `Pipelex.make` and call the factory directly (they assert `logging.root.manager.disable == LOGGING_LEVEL_OFF` after the call).
-- [x] **Step 1.4** — Update docstrings: `silence_logging_for_agent_cli`'s docstring says "Must be called at the very start of every agent CLI entry point (`make_pipelex_for_agent_cli`, `agent_doctor_cmd`)" — rewrite to reflect that `app_callback` is now the primary armor and the per-call invocations are belt-and-braces.
+1. `wip/error-handling/README.md` — current state of error handling across pipelex; the high-level map.
+2. `wip/error-handling/archive-todos-api-readiness-2.md` — the prior ledger (formerly the repo-root `TODOS.md`, archived 2026-05-28). This branch is the successor.
+3. `../pipelex-api/wip/pipelex-changes.md` Stage 7 (items #10-#15) — the **authoritative per-item context** for five of the items on this branch. Each item there has a *What / Why / Where / How* writeup with empirical reproductions against the pinned pipelex. Do not re-derive that context here; consume it from there.
+4. `../pipelex-api/TODOS.md` "Deferred / next-track work" → "Upstream-pipelex follow-ups" — names the same items at the API end, in the consumer's voice. Useful sanity check.
+5. `wip/console-targets-and-agent-cli-stdout.md` and `wip/structured-logging/kickoff.md` — relevant background for the **webhook-delivery logging** item below; see the sequencing note in that section before starting.
 
-### ✅ CHECKPOINT 1 — verify before continuing
-
-The structural change is invasive enough that a regression here would mask everything else. STOP here and:
-
-- [x] Run `make agent-check` — must be clean. **Result:** 0 pyright errors, mypy success on 1893 files.
-- [x] Run the unit suite for cli/: `.venv/bin/pytest -n auto -m "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api" -o log_level=WARNING --tb=short -q tests/unit/pipelex/cli/`. Must pass. **Result:** 349 passed in 10.29s.
-- [x] Run the e2e: `.venv/bin/pytest --tb=short -q tests/e2e/agent_cli/test_stdout_is_clean_json.py`. Must pass — both the original three tests AND the new third-party-leak test. **Result:** 3 passed in 3.02s (incl. `test_models_json_stdout_and_stderr_stay_clean_under_third_party_logger_enabled`).
-- [x] Manually verify with a fresh shell that `pipelex-agent init --format json` produces a clean stderr in offline mode (no httpx INFO leaks). **Result:** stderr is exactly the structured `ArgumentError` envelope (no project root in `/tmp`); no log lines. Confirms `app_callback` runs and silences logging even on the `init`/`accept-gateway-terms` paths that bypass `make_pipelex_for_agent_cli` (verified by grep — neither cmd module calls `silence_logging_for_agent_cli` nor the factory).
-
-**Cold-start handoff at this checkpoint:** if the session ends here, the next agent should re-read this TODOS.md (especially the "Context" section above), then `git diff HEAD` to see what's staged. If Step 1.2 landed but the verify failed, the regression is most likely in `_agent_cli.py` — check that `app_callback` runs unconditionally for every command, not gated on some Typer flag. If verify passed, Phase 2 is independent and can start fresh.
+The `test_failed_webhook_log_includes_request_id_when_set` regression test already landed on the base (`feature/API-readiness-2`, commit `74b68bd7`) and is present in the working tree — do **not** re-add it. `git log feature/API-readiness-2..HEAD --oneline` shows this branch adds only planning docs on top of that base. Everything below is what to implement.
 
 ---
 
-## Phase 2 — Production-code hardening + test-fixture leak fix
+## What this branch is NOT
 
-Three small fixes, tightly related. Land together.
-
-- [x] **Step 2.1 (fixes #9)** — In `pipelex/cli/agent_cli/commands/agent_cli_factory.py`, change `silence_logging_for_agent_cli` to call `logging.disable(sys.maxsize)` instead of `logging.disable(LOGGING_LEVEL_OFF)`. Add `import sys` if missing. Keep `LOGGING_LEVEL_OFF` import only if still used elsewhere in the file. Update the docstring's "blocks DEBUG through CRITICAL" line to "blocks every record at every level (including custom levels above CRITICAL)". **Done:** added `import sys`, removed `LOGGING_LEVEL_OFF` import (no other uses in file), updated docstring + the comment block at lines 32-49 that also referenced the old constant.
-- [x] **Step 2.2 (fixes #9 tests)** — Update assertions in `tests/unit/pipelex/cli/test_agent_cli_factory_init_overrides.py:85` and `tests/unit/pipelex/cli/test_agent_cli_output_discipline.py` that compare `logging.root.manager.disable` to `LOGGING_LEVEL_OFF`. Change to compare to `sys.maxsize`. Update imports. **Done:** swapped both assertions and import statements; updated module/test docstrings.
-- [x] **Step 2.3 (fixes #3)** — In `tests/unit/pipelex/cli/test_agent_cli_factory.py:31-39`, extend the autouse `_restore_globals` fixture to save/restore `logging.root.manager.disable` alongside `PrettyPrinter.mode` and `root_logger.level`. Follow the pattern from `test_agent_cli_factory_init_overrides.py`. **Done.**
-- [x] **Step 2.4 (fixes #11)** — In `tests/unit/pipelex/cli/test_agent_cli_factory_suppression.py:22-30` AND `tests/unit/pipelex/cli/test_agent_cli_output_discipline.py:32-40`, extend the autouse fixture to snapshot and restore the `.level` attribute of every logger the tests arm. Targets to cover:
-  - In `test_agent_cli_factory_suppression.py`: `pipelex`, `anthropic`, `httpx`, `some.unknown.transitive.dep`. **Done** (via module-level `_ARMED_LOGGER_NAMES` tuple consumed by the fixture).
-  - In `test_agent_cli_output_discipline.py`: `anthropic`, `httpx`, `some.transitive.dep.we.never.heard.of`. **Done** (same pattern). Note: the TODOS step also mentioned `_THIRD_PARTY_PACKAGES` — that symbol does not exist anywhere in `pipelex/` or `tests/` (grep confirms), so it was a stale reference from the abandoned enumeration approach. The actual loggers armed by the test body are the three listed; nothing more to restore.
-
-### ✅ CHECKPOINT 2 — verify before continuing
-
-Production-code changes are done. Test-only work remains.
-
-- [x] Run `make agent-check`. Must be clean. **Result:** 0 pyright errors, mypy success on 1893 files.
-- [x] Run targeted: `.venv/bin/pytest -n auto -m "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api" -o log_level=WARNING --tb=short -q tests/unit/pipelex/cli/ tests/unit/pipelex/tools/test_log_config.py tests/e2e/agent_cli/`. Must pass. **Result:** 366 passed in 43.36s.
-- [x] Run `make tb` (boot test) — sanity check on config loading. **Result:** 2 passed, 6708 deselected in 5.67s.
-
-**Cold-start handoff at this checkpoint:** next agent reads this TODOS.md, runs `git diff HEAD --stat` to see what's staged. Phase 3 is test-only and can land in a fresh session safely. If anything in Phase 2 broke, the most likely culprits are: (a) the `sys.maxsize` swap left a dangling `LOGGING_LEVEL_OFF` import; (b) the fixture extension overlooked one of the logger names. Re-grep the test files for `setLevel(` calls and verify each target is in the restore loop.
+- Not the structured-logging refactor. That has its own kick-off doc and its own future branch (`refactor/structured-logging` or similar — see `wip/structured-logging/kickoff.md`).
+- Not webhook signing. That's the cross-repo lockstep track owned by `wip/security/webhook-signing.md`.
+- Not a `dev` merge train. If `dev` has moved, treat that as a separate prep step, not part of this plan.
 
 ---
 
-## Phase 3 — Test/helper robustness (independent improvements)
+## Items
 
-- [x] **Step 3.1 (fixes #13)** — In `tests/e2e/agent_cli/test_stdout_is_clean_json.py::test_models_json_stdout_and_stderr_stay_clean_under_third_party_logger_enabled`, replace the `assert result.stderr == ""` with: stderr must be either empty OR parse as a structured error envelope (a dict with `error` field). This catches log-line leaks (which would not be valid JSON) while tolerating environmental noise like ResourceWarnings. Helper: try `json.loads(result.stderr)` and accept either parse-success-with-envelope-shape or empty. **Done:** added `_assert_stderr_is_clean_or_structured_envelope` helper; the test now calls it in place of the strict empty-string assertion.
-- [x] **Step 3.2 (fixes #7, #8, #15)** — Rewrite `_set_package_log_level` in `tests/e2e/agent_cli/test_stdout_is_clean_json.py` using `tomlkit` (already a project dep — see `init_cmd.py`'s usage). Pseudo:
-  ```python
-  import tomlkit
-  doc = tomlkit.parse(pipelex_toml_path.read_text())
-  doc["pipelex"]["log_config"]["package_log_levels"][package_name] = level
-  pipelex_toml_path.write_text(tomlkit.dumps(doc))
-  ```
-  This eliminates all three line-based-rewriter edges (duplicate section, no-space matcher, no-trailing-newline) in one pass. Keep the `_set_pipelex_package_log_level_to_debug` compat shim so the original two callers don't change. **Done:** used the project's `load_toml_with_tomlkit` + `save_toml_to_path` helpers from `pipelex.tools.misc.toml_utils` (proper type stubs, same pair `init_cmd` uses) instead of raw tomlkit — pyright was unhappy with the raw `tomlkit.dumps` overload. Compat shim preserved.
-- [x] **Step 3.3** — Sanity check: read the rewritten test file to confirm the section path `["pipelex"]["log_config"]["package_log_levels"]` exists in the kit's `pipelex.toml` (it does, line 177 — `[pipelex.log_config.package_log_levels]`). **Confirmed via grep on both `pipelex/pipelex.toml:98` and `pipelex/kit/configs/pipelex.toml:177`.**
+Six concrete items, all flagged in `pipelex-changes.md` Stage 7 or surfaced by the API-side `TODOS.md`. None blocks any API release on its own; together they discharge the upstream tail of the error-handling endeavour and let the API drop a small number of follow-up catches and workarounds.
 
-### ✅ CHECKPOINT 3 — final verification
+Sequencing inside this branch is flexible — every item is independent except where called out. Suggested order is "smallest first to build momentum, then the two bigger ones."
 
-- [x] Run `make agent-check`. Must be clean. **Result:** 0 pyright errors, mypy success on 1893 files.
-- [x] Run targeted: `.venv/bin/pytest -n auto -m "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api" -o log_level=WARNING --tb=short -q tests/unit/pipelex/cli/ tests/unit/pipelex/tools/ tests/integration/pipelex/cli/ tests/e2e/agent_cli/`. All pass. **Result:** 1541 passed, 1 skipped (pre-existing `test_toml_utils.py:61` skip — unrelated) in 33.33s.
-- [x] Run `make tb`. Pass. **Result:** 2 passed, 6708 deselected in 6.13s.
-- [x] Skim `git diff HEAD --stat` — the diff should now cover: `_agent_cli.py` (new silence wire), `agent_cli_factory.py` (sys.maxsize), `test_agent_cli_factory.py` (fixture), `test_agent_cli_factory_suppression.py` + `test_agent_cli_output_discipline.py` (per-logger restore), `test_stdout_is_clean_json.py` (relaxed assertion + tomlkit rewrite). **Note:** Phase 1 (commit `d98eb0e2`) and Phase 2 (commit `9563915f`) are already landed on the branch, so `git diff HEAD --stat` now shows only the Phase 3 file (`test_stdout_is_clean_json.py`) plus `TODOS.md`. The cumulative range vs `main`/release base covers every file listed.
+### 1. `ErrorDomain.is_input` (and siblings) — `@property` helpers on the enum
+
+- [x] **Status:** Done (2026-05-28). Two pieces landed in `pipelex/base_exceptions.py`: (a) `ErrorDomain.is_input` as an exhaustive-`match` `@property` (the enum-level single source of truth), and (b) a module-level `error_domain_is_input(error_domain: ErrorDomain | str | None) -> bool` that coerces the serialized form and delegates to the property — paralleling the existing `error_domain_to_http_status(...)`. The function is the one the API actually consumes: both API call sites hold `error_domain` as `str | None` (`ErrorReport.error_domain` is typed `str | None`; the problem-document dict value is a plain str), so the bare `report.error_domain.is_input` the spec sketched would not type-check. Covered by `tests/unit/pipelex/exceptions/test_error_domain.py::TestErrorDomain` (`test_is_input` + `test_error_domain_is_input`). Only `is_input` landed — `is_config` / `is_runtime` deferred until a need surfaces. The API consumes this via the editable local dependency on this worktree (no PyPI pin bump needed); the API-side switch off `== ErrorDomain.INPUT` at `api/exception_handlers.py:204,253` is being made now.
+**Authoritative spec:** `../pipelex-api/wip/pipelex-changes.md` item #14.
+**Where:** `pipelex/base_exceptions.py` — the `ErrorDomain` `StrEnum`.
+
+Add `@property` helpers (`is_input`, and `is_config` / `is_runtime` as needs surface) so callers read state via `report.error_domain.is_input` instead of `report.error_domain == ErrorDomain.INPUT`. This is the canonical project remediation for single-state enum checks (see `python-standards.md`) — call sites stay one-liners, the enumeration lives in one place.
+
+**Sequence first:** every other item benefits from being able to use the helper at call sites it touches. Trivial change; ~20 lines + a test. The API-side `archive-todos-api-readiness-2.md` Phase 3 review Q9 left two call sites in `api/exception_handlers.py` deliberately on `== ErrorDomain.INPUT` waiting for this; one follow-up commit there will switch them once this lands.
 
 ---
 
-## Skipped findings (recorded so a future session doesn't re-litigate)
+### 2. `EnvVarNotFoundError` should carry `error_domain = ErrorDomain.CONFIG`
 
-The `/code-review` surfaced 15 findings; these 9 were explicitly skipped after triage:
+- [x] **Status:** Done (2026-05-28). Added `error_domain = ErrorDomain.CONFIG` as a class attribute on `EnvVarNotFoundError` in `pipelex/system/exceptions.py`, so its rendered `ErrorReport` / RFC 7807 problem document classifies as a config-domain failure (an operator sets the missing env var, not the caller). HTTP status is unchanged — both `None` and `CONFIG` map to 500. Covered by `tests/unit/pipelex/exceptions/test_class_level_metadata.py::TestClassLevelMetadata::test_error_domain` (new `env_var_not_found` parametrize case). The API consumes this via the editable local dependency on this worktree.
+**Authoritative spec:** `../pipelex-api/wip/pipelex-changes.md` item #10.
+**Where:** `pipelex/system/exceptions.py` (note: moved here from `pipelex/system/environment.py` during the Phase 6 import-path moves the API already adapted to — the spec doc still names the old path).
 
-- **#4 + #5 (warnings module / print_to_stderr leaks)** — Skipped. `logging.disable` doesn't cover these channels (`warnings.warn` → `sys.stderr.write` directly; `print_to_stderr` in `remote_config_fetcher.py:82/219/259`). Doctor path has no `catch_warnings` wrapper, so `GatewayOverrideWarning` (UserWarning subclass) could leak there. Decision: no real-world report; defer until someone hits it. Phase 3 Step 3.1's relaxed e2e assertion absorbs the noise.
-- **#6 (process-global `logging.disable` leaks for in-process callers)** — Skipped. Documented one-shot CLI; embedded/in-process use isn't supported. Could add a docstring note but no functional change.
-- **#10 (apply_agent_cli_output_discipline lost the `pipelex = OFF` backstop)** — Skipped. With `silence_logging_for_agent_cli` in `app_callback` (Phase 1), every path that calls `apply_agent_cli_output_discipline` also has silence armed. Restoring the backstop would be cargo-cult.
-- **#14 (silence ordering in `agent_doctor_cmd`)** — Made moot by Phase 1. `app_callback` runs before any command body, so silence is armed before `set_agent_cli_error_format` runs in `agent_doctor_cmd`.
+Today `EnvVarNotFoundError` is domain-less (it's a `ToolError`; neither parent sets `error_domain`). A missing required env var is the textbook `CONFIG`-domain failure — an operator, not the caller, fixes it. Add `error_domain = ErrorDomain.CONFIG` as a ClassVar so the rendered `ErrorReport` / RFC 7807 problem document classifies correctly. HTTP status is unaffected (both `None` and `CONFIG` map to 500).
+
+This is the upstream half of the "original bug" the entire endeavour started from — a deployment that forgot to set `COMPLETION_CALLBACK_SECRET`. The API already classifies its own config faults as `CONFIG`; this brings pipelex-authored ones into alignment.
 
 ---
 
-## End-to-end completion criteria
+### 3. `parse_concept_spec` should validate `structure` shape before iterating
 
-When all phases are checked off:
+- [x] **Status:** Done (2026-05-28). Two parsing functions now shape-validate raw caller input before iterating, raising typed `INPUT`-domain errors instead of leaking bare `AttributeError`/`TypeError`/`ValueError`. (a) `parse_concept_spec` (`concept_ops.py`) rejects a non-mapping `structure` and any field value that is neither a description string nor a field-spec mapping, raising `ConceptSpecError`. (b) `parse_pipe_spec` (`pipe_ops.py`) rejects a non-list `steps`/`branches` or a non-mapping entry within them, raising the new `PipeSpecError`; the raw-iterate logic moved into a shared `_normalize_sub_pipe_list(...)` helper. Both error classes now carry `error_domain = ErrorDomain.INPUT` + `_authors_caller_facing_message = True` — `ConceptSpecError` (`builder/concept/exceptions.py`) gained the domain (it was previously domain-less); `PipeSpecError` is new (`builder/pipe/exceptions.py`). Docstrings on both functions now list every exception actually raised. Covered by new cases in `tests/unit/pipelex/builder/operations/test_parse_concept_spec.py` and `test_parse_pipe_spec.py` (typed-error + INPUT-domain assertions). Verified end-to-end through both consumers: `pipelex-agent concept`/`pipe` now emit `{"error_type": "ConceptSpecError"|"PipeSpecError", "error_domain": "input"}` instead of a bug-looking bare type. Error doc pages regenerated (`pipelex-dev generate-error-pages`) — added `pipe-spec-error.md`, refreshed `concept-spec-error.md`; the run also picked up two pre-existing stale pages unrelated to this item (`env-var-not-found-error.md` from item #2, and a missing `async-execution-not-enabled-error.md`). The API consumes this via the editable local dependency on this worktree; the API-side narrow `/build/concept` + `/build/pipe` route catches are API-side follow-ups, not this branch.
+**Authoritative spec:** `../pipelex-api/wip/pipelex-changes.md` item #11.
+**Where:** `pipelex/builder/operations/concept_ops.py` — the `parse_concept_spec(...)` function.
 
-- [x] `git diff HEAD --stat` shows the expected files (see Checkpoint 3 list). **Cumulative diff across the 3 commits on this branch since `Release v0.30.1` (6902952c): `_agent_cli.py`, `agent_cli_factory.py`, `doctor_cmd.py`, `test_stdout_is_clean_json.py`, `test_agent_cli_factory.py`, `test_agent_cli_factory_init_overrides.py`, `test_agent_cli_factory_suppression.py`, `test_agent_cli_output_discipline.py`, `test_agent_doctor_cmd.py`, `TODOS.md`, `CHANGELOG.md`.**
-- [x] All three e2e tests in `test_stdout_is_clean_json.py` pass. **Result:** 3 passed in 3.73s.
-- [x] No regression in `make agent-test` (full suite — run before commit per CLAUDE.md release/commit conventions). **Result:** "All tests passed." — full suite clean.
-- [x] Decide whether this work folds into the existing `release/v0.30.1` branch or warrants a follow-up release entry in CHANGELOG. **Decision (user-confirmed):** fold into the existing v0.30.1 CHANGELOG entry. v0.30.1 is not yet tagged (only v0.30.0 exists), so the entry was still safely editable. Appended a second `### Fixed` bullet covering the Phase 1-3 work (process-global `logging.disable(sys.maxsize)`, `app_callback` wiring, third-party-logger leak regression test) and bumped the v0.30.1 date from 2026-05-25 → 2026-05-26.
+The function iterates `spec_data["structure"]` before calling `ConceptSpec.model_validate(...)`. Non-dict `structure`, or fields that are neither string nor dict, leak bare `AttributeError` / `TypeError` (undocumented; the docstring only declares `ValidationError`). Empirical reproductions live in the spec doc.
+
+Fix is upstream shape validation — either raise a typed `PipelexInputError`-equivalent, or a `pydantic.ValidationError` via a thin `model_validate(...)` over the raw input shape before the iteration. Update the docstring to list every exception actually raised.
+
+The API today cannot safely catch these at the route — `AttributeError` / `TypeError` are also the types a real programming bug would raise, so a route-level catch would mask genuine bugs. Once this lands, the API's `/build/concept` route gets a narrow, typed catch.
+
+While here: sweep `pipelex/builder/operations/*.py` for the same pattern (raw-iterate-then-validate). `parse_pipe_spec` has it too — it iterates `spec_data["steps"]` / `spec_data["branches"]` and calls `dict(step)` on each entry before `model_validate`, so a non-list `steps` / `branches` or non-mapping entries leak bare `TypeError` / `ValueError` ahead of validation. Route those through the same narrow shape-validation path before iterating. (The bad-`pipe_type` `ValueError` is a separate, already-documented case — that one is narrow enough to leave.)
+
+---
+
+### 4. `LocalStorageProvider` should wrap raw `OSError` as a `StorageLocalError`
+
+- [x] **Status:** Done (2026-05-28). Added `StorageLocalError(StorageError)` (with `_declared_title = "Local storage error"`) to `pipelex/tools/storage/exceptions.py`, paralleling `StorageS3Error` / `StorageGcpError`. Both filesystem methods in `local_storage_provider.py` now wrap raw `OSError`: `_store` wraps the `mkdir` + `aiofiles.open(...).write(...)` block (`ENOSPC` / `EACCES` / `EROFS` / `FileExistsError` / `EIO` → `StorageLocalError`); `_load_with_metadata` wraps the `aiofiles.open(...).read()` call, with an explicit `except FileNotFoundError` branch first that routes the TOCTOU window (file removed between the `exists()` check and the open) to `StorageFileNotFoundError`, so "file not found" stays the same typed error regardless of timing, and a generic `except OSError` → `StorageLocalError` for the rest (`PermissionError` / `IsADirectoryError` / `EIO`). `public_url` does no filesystem I/O, so it's untouched. Docstrings updated to list `StorageLocalError`. Covered by three new cases in `tests/unit/pipelex/tools/storage/test_local_storage_provider.py` (store→`FileExistsError` via blocker file, load→`IsADirectoryError` via dir-at-key, load→TOCTOU `FileNotFoundError` via `aiofiles.open` monkeypatch) — each asserts the typed wrapper and `__cause__` is an `OSError`. Error doc page generated (`pipelex-dev generate-error-pages`) — added `storage-local-error.md`, refreshed `index.md`; no incidental stale pages this run. The API consumes this via the editable local dependency on this worktree; the API-side narrow storage-route catches are API-side follow-ups, not this branch.
+**Authoritative spec:** `../pipelex-api/wip/pipelex-changes.md` item #12.
+**Where:** `pipelex/tools/storage/local_storage_provider.py` — `_store` and `_load_with_metadata`.
+
+Today, `ENOSPC` / `EACCES` / `EROFS` / `EIO` / `FileExistsError` / TOCTOU window after `file_path.exists()` all escape as raw `OSError`. Add a narrow `try/except OSError as exc: raise StorageLocalError(msg) from exc` around the filesystem calls — mirroring the wrapping already done by `S3StorageProvider` / `GcpStorageProvider`. Empirical reproductions are in the spec doc.
+
+**Decision:** Add a new `StorageLocalError(StorageError)` to `pipelex/tools/storage/exceptions.py`, paralleling `StorageS3Error` / `StorageGcpError` (with a `_declared_title = "Local storage error"`). Keeps per-backend differentiation consistent across the storage abstraction.
+
+Pair-test with item #5 (S3) — both deliver on the same storage-abstraction contract; same review can cover both.
+
+---
+
+### 5. `S3StorageProvider` should catch the full `BotoCoreError` hierarchy
+
+- [x] **Status:** Done (2026-05-28). All three methods in `s3_storage_provider.py` now wrap the entire `BotoCoreError` hierarchy instead of only `NoCredentialsError` / `EndpointConnectionError`. In `_load_with_metadata` and `_store` the final `except (NoCredentialsError, EndpointConnectionError)` branch was broadened to `except BotoCoreError as exc: raise StorageS3Error(f"S3 backend error for key '{key}': {type(exc).__name__}") from exc`, sitting after the `ClientError` *sibling* branch (kept separate — `ClientError` is not a `BotoCoreError` subclass, verified empirically) and after the two service-specific `client.exceptions.NoSuchKey` / `NoSuchBucket` branches (unchanged). This closes the real-world leak: `ReadTimeoutError` / `ConnectTimeoutError` / `ConnectionClosedError` / `PartialCredentialsError` / `CredentialRetrievalError` / `ProxyConnectionError` (all `BotoCoreError` subclasses) previously escaped unwrapped; the most likely one, `ReadTimeoutError` on a slow/transient transfer, now surfaces as a typed `StorageS3Error`. `public_url`'s presign fallback widened from `except ClientError` → `except (BotoCoreError, ClientError)`, preserving the existing "if signing fails, serve the unsigned public URL" semantics for transport failures too. Per the decision, **no new sub-error class** — wrapping stays on the existing `StorageS3Error`, so no doc page work (generator confirms 0 drift: `Written: 0 · Unchanged: 245`). Covered by three new cases in `tests/unit/pipelex/tools/storage/test_s3_storage_provider.py` (`test_load_read_timeout_error_raises_s3_error`, `test_store_read_timeout_error_raises_s3_error`, `test_public_url_falls_back_to_public_url_on_botocore_error`); the three pre-existing `NoCredentialsError` / `EndpointConnectionError` tests were updated to assert the new message (`type(exc).__name__` in the text) and that `__cause__` is a `BotoCoreError`. The lower-priority `_get_session()`-outside-the-try side issue (a `BotoCoreError` from boto's own session-startup path could still escape) is left as-is — flag in the PR, don't gate on it. The API consumes this via the editable local dependency on this worktree; the API-side narrow storage-route catches are API-side follow-ups, not this branch.
+**Authoritative spec:** `../pipelex-api/wip/pipelex-changes.md` item #13.
+**Where:** `pipelex/tools/storage/s3_storage_provider.py` — `_load_with_metadata`, `_store`, and `public_url`.
+
+The provider catches only three `BotoCoreError` subclasses (`NoCredentialsError`, `EndpointConnectionError`) plus `ClientError` (which is a *sibling*, not a subclass, of `BotoCoreError`). Every other `BotoCoreError` subclass — `ReadTimeoutError`, `ConnectTimeoutError`, `ConnectionClosedError`, `PartialCredentialsError`, `CredentialRetrievalError`, `ProxyConnectionError`, … — escapes unwrapped. `ReadTimeoutError` is the most likely real-world leak (transient AWS networking).
+
+Fix: broaden each `except` block from `(NoCredentialsError, EndpointConnectionError)` to `BotoCoreError`, keeping the `ClientError` branch as a separate sibling `except`. The two service-specific branches at the top (`NoSuchKey`, `NoSuchBucket`) stay. `public_url`'s `try/except ClientError → return public URL` fallback should likely widen the same way.
+
+**Decision:** Keep wrapping as the existing `StorageS3Error(StorageError)` — no new sub-error class needed for the broadened catch. (Symmetric to item #4's `StorageLocalError` addition.)
+
+Lower-priority side issue noted in the spec doc: `_get_session()` runs outside every method's try block. Mention in the PR but don't gate on it.
+
+---
+
+### 6. Webhook-delivery SSRF DNS recheck
+
+- [x] **Status:** Done (2026-05-28). Greenfield `pipelex/tools/network/` package now closes the DNS-rebinding gap at webhook-delivery time. Three modules: (a) `host_rules.py` — `is_disallowed_ip(host)` (**deny-by-default**: `not addr.is_global`, so private/loopback/link-local — incl. `169.254.169.254` — /CGNAT `100.64/10`/shared/documentation/benchmarking/unspecified are all refused in one predicate, plus explicit `is_multicast`/`is_reserved` because `ipaddress` marks the `224.0.0.0/4` and `64:ff9b::/96` NAT64 ranges as `is_global`) + `is_disallowed_host(host)` (empty / known internal hostname `localhost`·`metadata`·`metadata.google.internal` / literal disallowed IP) — this is the single source of truth, and it is **stricter than the API's current enumerate-the-bad-ranges `_is_disallowed_host`** (the deny-by-default form closes a CGNAT leak the API check has; the API inherits the tightening when it re-points at this helper); (b) `exceptions.py` — `SsrfBlockedError(SecurityError)` with `error_domain = ErrorDomain.INPUT` (destination is caller-supplied — fixable by providing a public URL) and `_authors_caller_facing_message = True` (message names only the caller's own hostname, never the resolved private IP, so STRICT disclosure cannot confirm internal topology); (c) `ssrf_guard.py` — `SsrfGuardedTransport(httpx.AsyncHTTPTransport)` whose `resolve_to_allowed_ip(host, port)` short-circuits literal-disallowed hosts, resolves via `loop.getaddrinfo` (→ `socket.getaddrinfo`, monkeypatch-able), refuses if **any** resolved IP is disallowed (a mixed public/private resolution is itself a rebinding signal), maps a genuine `socket.gaierror` → `httpcore.ConnectError` (so a real DNS failure keeps its normal `httpx.ConnectError` → `WebhookDeliveryError` path), and connects to the **first vetted IP** (a literal → `getaddrinfo` does no DNS, so no rebind can slip between the check and the socket). **Seam choice:** on pinned `httpx` 0.28.1 / `httpcore` 1.0.9 there is no public `network_backend` kwarg and no resolver/DNS hook (event hooks are request/response only), so the guard wraps the connection pool's `_network_backend` in place via a custom `httpcore.AsyncNetworkBackend` (`SsrfGuardedBackend`). This intercepts only the TCP connect — TLS SNI / cert verification and the `Host` header keep using the origin **hostname** automatically, because `httpcore._async.connection.AsyncHTTPConnection._connect` derives `server_hostname` from the origin, not from what `connect_tcp` dials. One private-attr touch (`self._pool._network_backend`) carries the repo's established `# noqa: SLF001  # pyright: ignore[reportPrivateUsage]`. `delivery_executor._notify_webhook` now builds `httpx.AsyncClient(transport=SsrfGuardedTransport())`; `SsrfBlockedError` — a `SecurityError` — is deliberately **not** re-wrapped as `WebhookDeliveryError`, so it propagates and the delivery aborts loudly (security signals must not be swallowed by the domain-level `except httpx.RequestError`). Covered by `tests/unit/pipelex/tools/network/test_host_rules.py` (`TestHostRules` — literal-IP + hostname classification), `test_ssrf_guard.py` (`TestSsrfGuard` — public/private/literal/mixed/`gaierror` resolution + a real `httpx.AsyncClient` driven through the guarded transport aborting before any socket), and an end-to-end `test_webhook_aborts_on_dns_rebind_to_private_ip` in `tests/unit/pipelex/pipe_run/test_delivery_executor.py` (`execute()` aborts with `SsrfBlockedError` via a `socket.getaddrinfo` monkeypatch returning `169.254.169.254` — no live network). Error doc page generated (`pipelex-dev generate-error-pages`): `docs/errors/ssrf-blocked-error.md` + a one-line index refresh under `SecurityError`. `make agent-check` clean (pyright 0, mypy 0, ruff/plxt clean); targeted unit + integration-pipes suites green. **Naming deviation:** named `SsrfBlockedError` (generic — the transport guards any caller-supplied outbound URL, not only webhooks) rather than the spec's tentative `WebhookDeliverySsrfBlocked`, per the "(or whatever the typed error ends up named)" latitude; it still lives in `pipelex/tools/network/exceptions.py` per the error-location convention (not co-located with the helper). **API-side migration note:** the API doc says `from pipelex.tools.network import is_disallowed_host`, but `__init__.py` is kept empty per the no-re-export-in-`__init__` rule — the real import path is `from pipelex.tools.network.host_rules import is_disallowed_host`. **Tradeoffs to flag in the PR:** (1) the guard connects to the first vetted IP, forgoing httpx/anyio happy-eyeballs multi-IP fallback for webhooks (acceptable — pinning to a vetted IP is the whole point); (2) an egress allowlist / proxy at the deploy layer stays out of scope. The API-side narrow catch + re-point of `_is_disallowed_host` is an API-side follow-up, not this branch.
+**Where:** `pipelex/pipe_run/delivery_executor.py` — wherever the webhook HTTP client (`httpx`) actually fires.
+
+The API's `api/schemas/models.py::_is_disallowed_host` only blocks literal private / loopback / metadata IPs **at request time**. A callback URL like `https://attacker.example/cb` passes API-side validation while its DNS record can resolve to `169.254.169.254` / `127.0.0.0/8` / `10.0.0.0/8` when the worker later fires the webhook. The fix belongs at delivery time:
+
+- A custom `httpx` transport / `httpcore` network backend whose connect step resolves the host, checks every resolved IP against the same private-host rule, and refuses to open the socket to a private / metadata destination. Note: on the pinned `httpx` 0.28.1, `AsyncHTTPTransport` exposes **no** resolver hook, and event hooks are `request` / `response` only — neither fires after DNS but before payload send — so a plain event hook cannot close the DNS-rebinding gap.
+- Or an explicit resolve-and-connect flow: resolve the hostname (`socket.getaddrinfo`), validate each candidate IP against the rule, then connect to a vetted IP while preserving the original `Host` header / SNI — so a rebind between validation and send is impossible.
+- Plus optionally an egress allowlist / proxy at the deploy layer (out of scope here — flag in the PR description so the deploy team sees it).
+
+The literal-host check on the API side stays as a cheap first line of defense.
+
+**Test fixture:** synthesize a webhook URL whose DNS resolves to a private IP (use a `socket.getaddrinfo`-style monkeypatch or a test resolver). Confirm the delivery aborts with a typed error (likely a new `WebhookDeliverySsrfBlocked` or similar) rather than completing the request.
+
+**Decision — rule placement.** Create a new `pipelex/tools/network/` package (greenfield — no `network` module exists today under `pipelex/tools/`) and put the rule in `pipelex.tools.network.is_disallowed_host(...)`. The API-side `_is_disallowed_host` in `pipelex-api/api/schemas/models.py` gets re-pointed at this helper, so the CIDR set lives in one place. Follow the error-location convention: `pipelex/tools/network/exceptions.py` for `WebhookDeliverySsrfBlocked` (or whatever the typed error ends up named) — do not co-locate the error with the helper.
+
+---
+
+### 7. Structured `event=webhook_delivery` / `event=webhook_failure` logging — **DEFERRED to structured-logging refactor**
+
+- [x] **Status:** Closed-by-deferral on this branch (2026-05-28). Re-scoped onto the `refactor/structured-logging` branch.
+**Where (for the deferral):** `wip/structured-logging/kickoff.md` "What good looks like" — event-name emission now in scope.
+
+The lines this item would have touched (`pipelex/pipe_run/delivery_executor.py` around 239 / 243 / 280 / 282 / 285) are exactly the lines the structured-logging refactor lists as deletion targets (`request_id_suffix` pattern, kwarg threading from commits `ceb018b5` / `07f9cce9`). Doing a narrow event-name pass on this branch would touch those lines twice.
+
+**Follow-up actions when the structured-logging branch starts:**
+
+- Emit `event=webhook_delivery` / `event=webhook_failure` (and `event=storage_delivery` / `event=storage_failure` for symmetry) as structured fields once the new `log.info(msg, **fields)` surface lands. Document this in the kickoff doc's destination shape.
+- Re-target the API-side TODO in `../pipelex-api/TODOS.md` "Deferred / next-track work" → "Upstream-pipelex follow-ups" from this branch onto the structured-logging branch.
+
+The API-side T6 test (`pipelex-api/tests/unit/test_webhook_recovery.py`) pins error-rendering consistency, not event names, so the API is not blocked on event-name emission.
+
+---
+
+## Out of scope (for this branch — recorded so they don't drift back in)
+
+- **Structured-logging refactor.** Its own branch and PR. See `wip/structured-logging/kickoff.md`.
+- **Webhook signing.** Cross-repo, lockstep. See `wip/security/webhook-signing.md`.
+- **Item #15 — kajson crafted-marker exceptions.** Target repo is `kajson`, **not** `pipelex`. Belongs on a separate kajson PR. Spec lives at `../pipelex-api/wip/pipelex-changes.md` item #15; the API has a workaround in place (`_decode_body`'s widened catch tuple). Re-target there if Louis wants this on the same release train.
+- **Console targets / agent CLI stdout discipline.** Independent track — `wip/console-targets-and-agent-cli-stdout.md`. Already landed in part on `fix/Log-target`.
+- **Kajson untrusted-deserialization design pass.** Separate track at `../pipelex-api/wip/security/kajson-untrusted-deserialization.md` (workspace-level concern, needs `pipelex-app` + `pipelex-api-deploy` in the room).
+- **API-side `pipe_code` / `pipeline_run_id` log enrichment.** Done in `pipelex-api`, not here.
+- **API-side `RecursionError` in `_decode_body`.** Done in `pipelex-api`, not here.
+- **API-side JSON log sink.** Done in `pipelex-api`, not here.
+
+---
+
+## Verification (when items land)
+
+- `make c` + `make t` clean on every commit.
+- For items #1-#5: add unit tests that pin the new behavior; the API-side test suite (`pipelex-api` with this branch pinned via the `[tool.uv.sources]` git rev) should also still pass — bump the pin and run `make c && make tp` over there as part of the PR.
+- For item #6 (SSRF): integration-style test using a mock resolver. No live network.
+- For item #7: depends on the sequencing decision.
+
+---
+
+## Pin coordination with `pipelex-api`
+
+`pipelex-api/pyproject.toml` has a temporary `[tool.uv.sources]` git-rev pin pointing at this repo. When this branch reaches a shippable point:
+
+1. Bump that `rev` to this branch's HEAD; run `make c && make tp` in `pipelex-api`.
+2. Update the API-side `TODOS.md` "Deferred / next-track work" → "Upstream-pipelex follow-ups" — strike through the items that landed; keep the rest.
+3. Update `../pipelex-api/wip/pipelex-changes.md` Stage 7 tracking table — flip the items' status.
+
+The eventual end-state — flipping the API back to a PyPI floor (`pipelex>=<next-release>`) — is Louis-gated cross-repo release coordination; not part of this branch.
+
+---
+
+## Decisions taken (2026-05-28)
+
+The open questions from the original cold-start session have been resolved. Recording here so they don't get re-litigated:
+
+1. **Item #7 sequencing — DEFERRED to structured-logging refactor.** See item #7 above. The lines it would have touched are explicit deletion targets in `wip/structured-logging/kickoff.md`. Doing the narrow event-name pass now means touching them twice.
+2. **Item #6 SSRF rule placement — SHARED HELPER.** Create `pipelex/tools/network/` (greenfield) with `is_disallowed_host(...)`. The pipelex-api side re-points its `_is_disallowed_host` at this helper. Single source of truth for the disallowed CIDR set. See item #6 above for the error-location convention note.
+3. **Items #4 / #5 error class shape — NEW `StorageLocalError(StorageError)`.** Mirrors the established per-backend pattern (`StorageS3Error` / `StorageGcpError` with `_declared_title`). Item #5 keeps wrapping as the existing `StorageS3Error`.
+4. **`dev` merge — NOT NEEDED.** `git log feature/API-readiness-2..origin/dev --oneline` returns 0 commits. `dev` is not ahead.

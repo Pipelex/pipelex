@@ -3,14 +3,11 @@ from pydantic import Field
 from pipelex import log
 from pipelex.hub import get_secret
 from pipelex.system.configuration.config_model import ConfigModel
-from pipelex.system.environment import EnvVarNotFoundError, get_required_env
-from pipelex.system.exceptions import CredentialsError
-from pipelex.tools.secrets.secrets_errors import SecretNotFoundError
+from pipelex.system.environment import get_required_env
+from pipelex.system.exceptions import EnvVarNotFoundError
+from pipelex.tools.aws.exceptions import AwsCredentialsError
+from pipelex.tools.secrets.exceptions import SecretNotFoundError
 from pipelex.types import StrEnum
-
-
-class AwsCredentialsError(CredentialsError):
-    pass
 
 
 class AwsKeyMethod(StrEnum):
