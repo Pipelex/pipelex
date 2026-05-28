@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.30.3] - 2026-05-28
+
+### Added
+
+- **`claude-4.8-opus` model** added to the `anthropic` and `bedrock` backends. Adaptive thinking mode, supports text / images / pdf in and structured outputs, `max_prompt_images = 100`, `max_tokens = 128000`, costs `{ input = 5.0, output = 25.0 }` per million tokens. Carries the `temperature_unsupported` constraint like `claude-4.7-opus`. Also available via the Pipelex Gateway.
+
 ## [v0.30.2] - 2026-05-26
 
 ### Changed
