@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
+from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.exceptions import ModelReferenceParseError
 from pipelex.cogt.models.model_deck_loader import load_model_deck_blueprint
@@ -28,6 +29,7 @@ from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.pipelex_service.remote_config_cache import CACHE_SCHEMA_VERSION
+from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 if TYPE_CHECKING:
     from pipelex.cogt.models.model_deck import (
@@ -84,6 +86,25 @@ def load_kit_model_deck_blueprint() -> ModelDeckBlueprint:
     return load_model_deck_blueprint(model_deck_paths=ModelManager.get_model_deck_paths(deck_dir_path=str(deck_dir)))
 
 
+def software_only_internal_handles() -> set[str]:
+    """Handles served by the local ``internal`` backend — the ones the Pipelex Gateway never provides.
+
+    ``PipelexBackend.INTERNAL`` is the software-only backend ("runs internally, without AI" — e.g. the
+    pypdfium2 / docling text extractors). Those handles have no gateway equivalent, so they must be
+    excluded from the derived gateway specs: otherwise the primed cache would claim the gateway serves a
+    software-only extractor, and a deck alias like ``@default-no-inference`` / ``@default-text-from-pdf``
+    could resolve through the fake ``gateway_extract`` worker instead of the real internal backend.
+
+    Read straight from the shipped backend spec file (no booted Pipelex needed) and keyed off the enum
+    value, so adding a new software-only extractor to the internal backend auto-excludes it here too.
+    Provider-backed models (claude, gpt, linkup, nano-banana, ...) are intentionally NOT excluded: the
+    gateway genuinely proxies those, so they belong in the faithful gateway cache.
+    """
+    internal_spec_path = Path(str(get_kit_configs_dir())) / "inference" / "backends" / f"{PipelexBackend.INTERNAL}.toml"
+    raw_specs = load_toml_from_path(path=str(internal_spec_path))
+    return {name for name, spec in raw_specs.items() if name != "defaults" and isinstance(spec, dict)}
+
+
 def gateway_backend_model_specs_for_kit_deck() -> dict[str, Any]:
     """Build a gateway ``backend_model_specs`` payload covering every concrete model handle the kit deck names.
 
@@ -93,8 +114,15 @@ def gateway_backend_model_specs_for_kit_deck() -> dict[str, Any]:
     waterfalls, and presets (across all model types) gets a minimal spec declaring the
     gateway sdk for its type — all ``ModelManager._enforce_gateway_model_membership`` needs
     is name membership. Deck/gateway consistency itself is covered by ``TestModelDeckReferences``.
+
+    Handles served by the software-only ``internal`` backend (see ``software_only_internal_handles``)
+    are excluded: the gateway never provides them, so claiming it does would make the fake cache
+    unfaithful and let a software-only extractor alias resolve through the gateway worker. Those
+    handles are still reachable in the offline subprocess via the local internal backend, so the
+    membership check passes for them without a gateway spec.
     """
     blueprint = load_kit_model_deck_blueprint()
+    excluded_handles = software_only_internal_handles()
 
     handle_model_types: dict[str, ModelType] = {}
     for model_type, section in (
@@ -110,6 +138,8 @@ def gateway_backend_model_specs_for_kit_deck() -> dict[str, Any]:
                 continue
             match ref.kind:
                 case ModelReferenceKind.HANDLE:
+                    if ref.name in excluded_handles:
+                        continue
                     handle_model_types.setdefault(ref.name, model_type)
                 case ModelReferenceKind.ALIAS | ModelReferenceKind.WATERFALL | ModelReferenceKind.PRESET:
                     continue
@@ -287,6 +317,7 @@ __all__ = [
     "gateway_backend_model_specs_for_kit_deck",
     "load_kit_model_deck_blueprint",
     "set_gateway_enabled",
+    "software_only_internal_handles",
     "write_active_routing_profile",
     "write_remote_config_cache",
 ]

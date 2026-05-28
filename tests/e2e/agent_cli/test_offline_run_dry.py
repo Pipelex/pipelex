@@ -204,6 +204,28 @@ class TestOfflineDryRun:
             f"Derived gateway specs must cover the kit deck's default-premium target '{premium_target}'; got handles: {sorted(specs)}"
         )
 
+    def test_primed_cache_excludes_software_only_internal_handles(self) -> None:
+        """Regression: the gateway cache must not claim software-only internal extractors as gateway models.
+
+        ``@default-no-inference`` / ``@default-text-from-pdf`` resolve to an extractor served by the
+        local ``internal`` backend (``PipelexBackend.INTERNAL`` — "runs internally, without AI"), which
+        the Pipelex Gateway never provides. If the derived gateway specs claimed it, an offline dry-run
+        could resolve the alias to the fake ``gateway_extract`` worker instead of exercising the real
+        internal backend. The companion assertion guards the other direction: a genuinely gateway-served
+        extract model (the ``default-extract-document`` target) must stay covered, so the exclusion does
+        not over-reach onto provider-backed models the gateway does proxy.
+        """
+        blueprint = load_kit_model_deck_blueprint()
+        software_only_target = blueprint.extract.aliases["default-no-inference"]
+        gateway_extract_target = blueprint.extract.aliases["default-extract-document"]
+        specs = gateway_backend_model_specs_for_kit_deck()
+        assert software_only_target not in specs, (
+            f"Derived gateway specs must exclude software-only internal handle '{software_only_target}'; got handles: {sorted(specs)}"
+        )
+        assert gateway_extract_target in specs, (
+            f"Gateway-served extract target '{gateway_extract_target}' must remain covered; got handles: {sorted(specs)}"
+        )
+
     def test_gateway_known_with_cache_succeeds_offline(self, hermetic_home: Path, offline_subprocess_env: dict[str, str]) -> None:
         """Gateway enabled + no network + primed cache → dry-run exits 0 with stale-cache warning."""
         pipelex_dir = hermetic_home / ".pipelex"
