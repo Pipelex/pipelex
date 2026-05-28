@@ -19,6 +19,7 @@ from pipelex.cogt.exceptions import (
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError, ValidateBundleError
+from pipelex.system.exceptions import EnvVarNotFoundError
 from pipelex.system.pipelex_service.exceptions import (
     GatewayTermsNotAcceptedError,
     PipelexServiceConfigValidationError,
@@ -51,6 +52,7 @@ class TestClassLevelMetadata:
             ("service_config_validation", PipelexServiceConfigValidationError("boom"), ErrorDomain.CONFIG),
             ("remote_config_fetch", RemoteConfigFetchError("boom"), ErrorDomain.CONFIG),
             ("gateway_terms", GatewayTermsNotAcceptedError(), ErrorDomain.CONFIG),
+            ("env_var_not_found", EnvVarNotFoundError("boom"), ErrorDomain.CONFIG),
         ],
     )
     def test_error_domain(self, _topic: str, exc: PipelexError, expected_domain: ErrorDomain) -> None:

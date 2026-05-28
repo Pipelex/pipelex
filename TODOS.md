@@ -46,7 +46,7 @@ Add `@property` helpers (`is_input`, and `is_config` / `is_runtime` as needs sur
 
 ### 2. `EnvVarNotFoundError` should carry `error_domain = ErrorDomain.CONFIG`
 
-- [ ] **Status:** Not started.
+- [x] **Status:** Done (2026-05-28). Added `error_domain = ErrorDomain.CONFIG` as a class attribute on `EnvVarNotFoundError` in `pipelex/system/exceptions.py`, so its rendered `ErrorReport` / RFC 7807 problem document classifies as a config-domain failure (an operator sets the missing env var, not the caller). HTTP status is unchanged — both `None` and `CONFIG` map to 500. Covered by `tests/unit/pipelex/exceptions/test_class_level_metadata.py::TestClassLevelMetadata::test_error_domain` (new `env_var_not_found` parametrize case). The API consumes this via the editable local dependency on this worktree.
 **Authoritative spec:** `../pipelex-api/wip/pipelex-changes.md` item #10.
 **Where:** `pipelex/system/exceptions.py` (note: moved here from `pipelex/system/environment.py` during the Phase 6 import-path moves the API already adapted to — the spec doc still names the old path).
 
