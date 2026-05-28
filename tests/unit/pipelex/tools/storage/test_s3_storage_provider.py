@@ -2,7 +2,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from botocore.exceptions import ClientError, EndpointConnectionError, NoCredentialsError
+from botocore.exceptions import BotoCoreError, ClientError, EndpointConnectionError, NoCredentialsError, ReadTimeoutError
 from pytest_mock import MockerFixture
 
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidKeyError, StorageS3Error
@@ -328,41 +328,90 @@ class TestS3StorageProvider:
         s3_provider_no_signed_urls: S3StorageProvider,
         mock_aioboto3: dict[str, Any],
     ) -> None:
-        """Test that NoCredentialsError raises StorageS3Error."""
+        """Test that NoCredentialsError (a BotoCoreError subclass) raises StorageS3Error."""
         mock_aioboto3["client"].get_object = AsyncMock(side_effect=NoCredentialsError())
         uri = f"{PIPELEX_STORAGE_SCHEME}test.bin"
 
         with pytest.raises(StorageS3Error) as exc_info:
             await s3_provider_no_signed_urls.load(uri=uri)
 
-        assert "connectivity/credentials error" in str(exc_info.value)
+        assert "NoCredentialsError" in str(exc_info.value)
+        assert isinstance(exc_info.value.__cause__, BotoCoreError)
 
     async def test_store_no_credentials_error_raises_s3_error(
         self,
         s3_provider_no_signed_urls: S3StorageProvider,
         mock_aioboto3: dict[str, Any],
     ) -> None:
-        """Test that NoCredentialsError during store raises StorageS3Error."""
+        """Test that NoCredentialsError (a BotoCoreError subclass) during store raises StorageS3Error."""
         mock_aioboto3["client"].put_object = AsyncMock(side_effect=NoCredentialsError())
 
         with pytest.raises(StorageS3Error) as exc_info:
             await s3_provider_no_signed_urls.store(data=b"test", key="test.bin")
 
-        assert "connectivity/credentials error" in str(exc_info.value)
+        assert "NoCredentialsError" in str(exc_info.value)
+        assert isinstance(exc_info.value.__cause__, BotoCoreError)
 
     async def test_load_endpoint_connection_error_raises_s3_error(
         self,
         s3_provider_no_signed_urls: S3StorageProvider,
         mock_aioboto3: dict[str, Any],
     ) -> None:
-        """Test that EndpointConnectionError raises StorageS3Error."""
+        """Test that EndpointConnectionError (a BotoCoreError subclass) raises StorageS3Error."""
         mock_aioboto3["client"].get_object = AsyncMock(side_effect=EndpointConnectionError(endpoint_url="https://s3.amazonaws.com"))
         uri = f"{PIPELEX_STORAGE_SCHEME}test.bin"
 
         with pytest.raises(StorageS3Error) as exc_info:
             await s3_provider_no_signed_urls.load(uri=uri)
 
-        assert "connectivity/credentials error" in str(exc_info.value)
+        assert "EndpointConnectionError" in str(exc_info.value)
+        assert isinstance(exc_info.value.__cause__, BotoCoreError)
+
+    async def test_load_read_timeout_error_raises_s3_error(
+        self,
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aioboto3: dict[str, Any],
+    ) -> None:
+        """Test that ReadTimeoutError — the canonical transient-network BotoCoreError that used to escape — raises StorageS3Error."""
+        mock_aioboto3["client"].get_object = AsyncMock(side_effect=ReadTimeoutError(endpoint_url="https://s3.amazonaws.com"))
+        uri = f"{PIPELEX_STORAGE_SCHEME}slow/file.bin"
+
+        with pytest.raises(StorageS3Error) as exc_info:
+            await s3_provider_no_signed_urls.load(uri=uri)
+
+        assert "slow/file.bin" in str(exc_info.value)
+        assert "ReadTimeoutError" in str(exc_info.value)
+        assert isinstance(exc_info.value.__cause__, BotoCoreError)
+
+    async def test_store_read_timeout_error_raises_s3_error(
+        self,
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aioboto3: dict[str, Any],
+    ) -> None:
+        """Test that ReadTimeoutError during store (slow upload, transient blip) raises StorageS3Error."""
+        mock_aioboto3["client"].put_object = AsyncMock(side_effect=ReadTimeoutError(endpoint_url="https://s3.amazonaws.com"))
+
+        with pytest.raises(StorageS3Error) as exc_info:
+            await s3_provider_no_signed_urls.store(data=b"test", key="slow/upload.bin")
+
+        assert "slow/upload.bin" in str(exc_info.value)
+        assert "ReadTimeoutError" in str(exc_info.value)
+        assert isinstance(exc_info.value.__cause__, BotoCoreError)
+
+    async def test_public_url_falls_back_to_public_url_on_botocore_error(
+        self,
+        s3_provider_with_signed_urls: S3StorageProvider,
+        mock_aioboto3: dict[str, Any],
+    ) -> None:
+        """Test that public_url() falls back to public URL on a transport BotoCoreError, not just ClientError."""
+        key = "fallback/timeout.bin"
+        uri = f"{PIPELEX_STORAGE_SCHEME}{key}"
+        mock_aioboto3["client"].generate_presigned_url = MagicMock(side_effect=ReadTimeoutError(endpoint_url="https://s3.amazonaws.com"))
+
+        display = await s3_provider_with_signed_urls.public_url(uri=uri)
+
+        expected_public_url = f"https://{S3_TEST_BUCKET}.s3.{S3_TEST_REGION}.amazonaws.com/{key}"
+        assert display == expected_public_url
 
     async def test_public_url_falls_back_to_public_url_on_client_error(
         self,
