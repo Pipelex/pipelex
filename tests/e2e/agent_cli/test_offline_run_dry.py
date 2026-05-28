@@ -142,6 +142,7 @@ def _comprehensive_cached_backend_model_specs() -> dict[str, object]:
         "claude-4.6-opus",
         "claude-4.6-sonnet",
         "claude-4.7-opus",
+        "claude-4.8-opus",
         "gemini-flash-latest",
         "gemini-flash-lite-latest",
         "gemini-pro-latest",
