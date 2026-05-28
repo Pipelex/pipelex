@@ -17,12 +17,26 @@ import json
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
+from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.cogt.models.exceptions import ModelReferenceParseError
+from pipelex.cogt.models.model_deck_loader import load_model_deck_blueprint
+from pipelex.cogt.models.model_manager import ModelManager
+from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.pipelex_service.remote_config_cache import CACHE_SCHEMA_VERSION
+
+if TYPE_CHECKING:
+    from pipelex.cogt.models.model_deck import (
+        ExtractDeckBlueprint,
+        ImgGenDeckBlueprint,
+        LLMDeckBlueprint,
+        ModelDeckBlueprint,
+        SearchDeckBlueprint,
+    )
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PIPELEX_AGENT_BIN = REPO_ROOT / ".venv" / "bin" / "pipelex-agent"
@@ -30,6 +44,75 @@ OFFLINE_BUNDLES_DIR = REPO_ROOT / "tests" / "e2e" / "data" / "offline_mode"
 
 # Reserved/unroutable address — httpx will raise ConnectError immediately without hanging.
 UNREACHABLE_REMOTE_CONFIG_URL = "http://127.0.0.1:1/pipelex_remote_config.json"
+
+# Minimal-but-valid gateway spec bodies per model type (valid against InferenceModelSpecBlueprint).
+# The gateway proxies to these sdks, so a gateway-sourced handle declares the matching gateway_* sdk.
+_GATEWAY_SPEC_TEMPLATE_BY_TYPE: dict[ModelType, dict[str, Any]] = {
+    ModelType.LLM: {"sdk": "gateway_completions", "model_type": "llm", "inputs": ["text"], "outputs": ["text", "structured"]},
+    ModelType.IMG_GEN: {"sdk": "gateway_image", "model_type": "img_gen"},
+    ModelType.TEXT_EXTRACTOR: {"sdk": "gateway_extract", "model_type": "text_extractor"},
+    ModelType.SEARCH: {"sdk": "gateway_search", "model_type": "search"},
+}
+
+
+def _deck_section_handle_references(
+    section: LLMDeckBlueprint | ExtractDeckBlueprint | ImgGenDeckBlueprint | SearchDeckBlueprint,
+) -> list[str]:
+    """Every raw model reference a deck section names via aliases, waterfalls, or presets.
+
+    Choice defaults are intentionally NOT read here: in the kit deck they are always
+    ``@alias`` / ``$preset`` references, so the terminal handles they resolve to are
+    already named as alias targets / preset models and get collected anyway. Skipping
+    them keeps this free of the ``disabled`` sentinel and the typed choice-default union.
+    """
+    raw_references: list[str] = list(section.aliases.values())
+    for waterfall_entries in section.waterfalls.values():
+        raw_references.extend(waterfall_entries)
+    for preset in section.presets.values():
+        raw_references.append(preset.model)
+    return raw_references
+
+
+def load_kit_model_deck_blueprint() -> ModelDeckBlueprint:
+    """Load the shipped kit deck blueprint — the same deck files the offline subprocess loads."""
+    deck_dir = Path(str(get_kit_configs_dir())) / "inference" / "deck"
+    return load_model_deck_blueprint(model_deck_paths=ModelManager.get_model_deck_paths(deck_dir_path=str(deck_dir)))
+
+
+def gateway_backend_model_specs_for_kit_deck() -> dict[str, Any]:
+    """Build a gateway ``backend_model_specs`` payload covering every concrete model handle the kit deck names.
+
+    Derived from the shipped kit deck rather than a hand-maintained list, so the primed
+    offline cache auto-tracks deck changes — e.g. promoting a premium alias to a new model
+    no longer silently breaks these tests. Every bare handle named in the deck's aliases,
+    waterfalls, and presets (across all model types) gets a minimal spec declaring the
+    gateway sdk for its type — all ``ModelManager._enforce_gateway_model_membership`` needs
+    is name membership. Deck/gateway consistency itself is covered by ``TestModelDeckReferences``.
+    """
+    blueprint = load_kit_model_deck_blueprint()
+
+    handle_model_types: dict[str, ModelType] = {}
+    for model_type, section in (
+        (ModelType.LLM, blueprint.llm),
+        (ModelType.TEXT_EXTRACTOR, blueprint.extract),
+        (ModelType.IMG_GEN, blueprint.img_gen),
+        (ModelType.SEARCH, blueprint.search),
+    ):
+        for raw_reference in _deck_section_handle_references(section):
+            try:
+                ref = ModelReference.parse(raw_reference)
+            except ModelReferenceParseError:
+                continue
+            match ref.kind:
+                case ModelReferenceKind.HANDLE:
+                    handle_model_types.setdefault(ref.name, model_type)
+                case ModelReferenceKind.ALIAS | ModelReferenceKind.WATERFALL | ModelReferenceKind.PRESET:
+                    continue
+
+    specs: dict[str, Any] = {"defaults": {"sdk": "gateway_completions"}}
+    for handle, model_type in handle_model_types.items():
+        specs[handle] = dict(_GATEWAY_SPEC_TEMPLATE_BY_TYPE[model_type])
+    return specs
 
 
 def _copy_kit_configs_into(pipelex_dir: Path) -> None:
@@ -196,6 +279,8 @@ __all__ = [
     "OFFLINE_BUNDLES_DIR",
     "PIPELEX_AGENT_BIN",
     "UNREACHABLE_REMOTE_CONFIG_URL",
+    "gateway_backend_model_specs_for_kit_deck",
+    "load_kit_model_deck_blueprint",
     "set_gateway_enabled",
     "write_active_routing_profile",
     "write_remote_config_cache",
