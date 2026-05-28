@@ -221,6 +221,32 @@ class TestOfflineDryRun:
             f"Cached-source setup must surface a RemoteConfigStale warning on the envelope; got: {payload!r}"
         )
 
+    def test_gateway_img_gen_with_cache_succeeds_offline(self, hermetic_home: Path, offline_subprocess_env: dict[str, str]) -> None:
+        """Gateway enabled + no network + primed cache → an image-gen pipe dry-runs offline.
+
+        Companion to ``test_gateway_known_with_cache_succeeds_offline``, but the bundle's pipe is a
+        ``PipeImgGen`` referencing a gateway image handle (``nano-banana``). It proves the derived
+        cache covers img_gen handles too — not just LLMs — so the gateway-membership check passes for
+        an image model and the offline dry-run completes.
+
+        Scope note: dry-run mocks image generation via ``ContentGeneratorDry``, so this does NOT build
+        the img-gen worker and therefore does not exercise the spec's ``sdk`` -> worker-factory mapping;
+        it covers membership + handle resolution for image models. The sdk-vs-factory contract is a
+        runtime (non-dry) concern.
+        """
+        pipelex_dir = hermetic_home / ".pipelex"
+        set_gateway_enabled(pipelex_dir / "inference" / "backends.toml", enabled=True)
+        write_remote_config_cache(pipelex_dir, _cached_remote_config_payload())
+
+        staged_bundle = _stage_bundle(OFFLINE_BUNDLES_DIR / "gateway_img_gen_model", hermetic_home)
+        result = _run_agent_bundle(staged_bundle, offline_subprocess_env, cwd=hermetic_home)
+
+        assert result.returncode == 0, (
+            f"Gateway img-gen dry-run with primed cache must succeed offline.\nstdout={result.stdout!r}\nstderr={result.stderr!r}"
+        )
+        payload = _parse_agent_json(result.stdout)
+        assert "error" not in payload, payload
+
     def test_gateway_unknown_with_cache_fails_with_clear_error(self, hermetic_home: Path, offline_subprocess_env: dict[str, str]) -> None:
         """Bundle pipe references a model absent from the cached gateway specs → clear error.
 

@@ -46,14 +46,15 @@ OFFLINE_BUNDLES_DIR = REPO_ROOT / "tests" / "e2e" / "data" / "offline_mode"
 UNREACHABLE_REMOTE_CONFIG_URL = "http://127.0.0.1:1/pipelex_remote_config.json"
 
 # Minimal-but-valid gateway spec bodies per model type (valid against InferenceModelSpecBlueprint).
-# Each ``sdk`` MUST be one the matching worker factory's gateway branch accepts — the spec survives the
-# name-only membership check regardless, but worker creation matches on the sdk string and a value with
-# no case raises NotImplementedError. Image generation through the gateway goes via the completions
-# endpoint, so img_gen uses "gateway_completions" too (see img_gen_worker_factory's gateway case), NOT a
-# "gateway_image" sdk — that string exists in no factory.
+# Each ``sdk`` names the dedicated gateway worker for its type — gateway_completions (LLM),
+# gateway_img_gen (image), gateway_extract, gateway_search — i.e. a value the matching worker factory's
+# gateway branch accepts (an unrecognized sdk like "gateway_image" hits ``case _: raise NotImplementedError``).
+# The sdk is consumed only at worker creation, which the offline dry-run tests never reach
+# (ContentGeneratorDry mocks generation), so the membership check is indifferent to it — but it must still
+# be real so the fake cache stays faithful and any non-dry consumer of this helper can build a worker.
 _GATEWAY_SPEC_TEMPLATE_BY_TYPE: dict[ModelType, dict[str, Any]] = {
     ModelType.LLM: {"sdk": "gateway_completions", "model_type": "llm", "inputs": ["text"], "outputs": ["text", "structured"]},
-    ModelType.IMG_GEN: {"sdk": "gateway_completions", "model_type": "img_gen"},
+    ModelType.IMG_GEN: {"sdk": "gateway_img_gen", "model_type": "img_gen"},
     ModelType.TEXT_EXTRACTOR: {"sdk": "gateway_extract", "model_type": "text_extractor"},
     ModelType.SEARCH: {"sdk": "gateway_search", "model_type": "search"},
 }
