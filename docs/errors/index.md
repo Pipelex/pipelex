@@ -452,6 +452,7 @@ classification rules, and the cross-boundary Temporal bridge.
 - [`StorageGcpError`](storage-gcp-error.md) — Storage gcp
 - [`StorageInvalidKeyError`](storage-invalid-key-error.md) — Storage invalid key
 - [`StorageInvalidUriError`](storage-invalid-uri-error.md) — Storage invalid uri
+- [`StorageLocalError`](storage-local-error.md) — Local storage error
 - [`StorageS3Error`](storage-s3-error.md) — S3 storage error
 - [`TemplateSigilSyntaxError`](template-sigil-syntax-error.md) — Template sigil syntax
 - [`TomlError`](toml-error.md) — TOML parse error
