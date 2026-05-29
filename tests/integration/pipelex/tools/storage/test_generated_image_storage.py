@@ -7,6 +7,7 @@ compatibility with AI-generated image handling.
 """
 
 import base64
+from pathlib import Path
 
 import pytest
 from pytest_mock import MockerFixture
@@ -47,7 +48,7 @@ class TestGeneratedImageStorage:
         mocker.patch("pipelex.cogt.image.prompt_image_utils.get_storage_provider", return_value=storage_provider)
 
         # Load a real test image as bytes
-        image_bytes = load_binary(path=ImageTestCases.IMAGE_FILE_PATH_LOGO_TINY)
+        image_bytes = load_binary(path=Path(ImageTestCases.IMAGE_FILE_PATH_LOGO_TINY))
 
         # Create GeneratedImageRawDetails with raw bytes
         raw_details = GeneratedImageRawDetails(

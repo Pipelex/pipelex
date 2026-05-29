@@ -6,6 +6,7 @@ PreparedFile instances that can be consumed by LLM provider APIs.
 
 import asyncio
 import base64
+from pathlib import Path
 
 from pipelex.cogt.document.prompt_document import (
     PromptDocument,
@@ -67,7 +68,7 @@ async def prepare_prompt_document(
                         )
 
                 case ResolvedLocalPath():
-                    raw_bytes = await load_binary_async(prompt_document.resolved.path)
+                    raw_bytes = await load_binary_async(Path(prompt_document.resolved.path))
                     prepared = PreparedFileBase64(
                         base64_data=base64.b64encode(raw_bytes).decode("ascii"),
                         file_type=detect_file_type_from_bytes(raw_bytes),
@@ -144,7 +145,7 @@ async def prepare_prompt_document_as_base64(prompt_document: PromptDocument) -> 
                     )
 
                 case ResolvedLocalPath():
-                    raw_bytes = await load_binary_async(prompt_document.resolved.path)
+                    raw_bytes = await load_binary_async(Path(prompt_document.resolved.path))
                     return PreparedFileBase64(
                         base64_data=base64.b64encode(raw_bytes).decode("ascii"),
                         file_type=detect_file_type_from_bytes(raw_bytes),

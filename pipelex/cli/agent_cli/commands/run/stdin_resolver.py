@@ -168,7 +168,7 @@ def _parse_inputs_arg(inputs_arg: str) -> dict[str, Any] | None:
             agent_error(f"Failed to parse inline JSON inputs: {exc}", "JSONDecodeError", cause=exc)
     else:
         try:
-            loaded = load_json_dict_from_path(inputs_arg)
+            loaded = load_json_dict_from_path(Path(inputs_arg))
             # Resolve relative url paths against the inputs file's parent directory
             base_dir = Path(inputs_arg).parent.resolve()
             return resolve_inputs_paths(loaded, base_dir)
