@@ -58,7 +58,7 @@ Priority files: `tprl_pipe/wf_pipe_router.py` (multiple `except Exception`), `tp
 
 ## Out-of-scope-but-tracked from temporal-primitives
 
-**Owner doc:** [`../temporal-primitives/02-id-and-naming-plan.md`](../temporal-primitives/02-id-and-naming-plan.md) §"Out of scope".
+**Owner doc:** `02-id-and-naming-plan.md` §"Out of scope" (moved to workspace `docs/history/temporal-primitives/`).
 
 These are explicitly out of scope for the shipped temporal-primitives work but stay on the watchlist:
 
@@ -90,7 +90,7 @@ Out of scope until: an operator hits an actual timeout/retry mismatch on graph a
 
 ## Real-cluster validation gaps
 
-**Source:** [`../temporal-primitives/02-id-and-naming-plan.md`](../temporal-primitives/02-id-and-naming-plan.md) §"Known follow-ups (deferred)" under Phase 6.
+**Source:** `02-id-and-naming-plan.md` §"Known follow-ups (deferred)" under Phase 6 (moved to workspace `docs/history/temporal-primitives/`).
 
 - Hard-fail path against a real Temporal cluster — unit suite covers the contract via mocked clients; run `/temporal-e2e-validate` once a real-cluster credential is available.
 - `[temporal.search_attributes].enabled = false` end-to-end path on a real cluster — covered by unit tests + propagation-by-construction; deferred for explicit e2e verification.

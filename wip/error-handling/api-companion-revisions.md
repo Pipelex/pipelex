@@ -207,7 +207,7 @@ These show up in multiple items above; collecting them here so the API agent can
 
 - **Webhook signing (Stage 5 / Item F)** — the cross-repo security track at [`../security/webhook-signing.md`](../security/webhook-signing.md), independent of the rest of this plan, landing on its own schedule.
 
-The post-review follow-ups — a `/review` pass surfaced a small set of in-repo finalizations, sequenced in the archived [`archive-todos-api-readiness-2.md`](archive-todos-api-readiness-2.md) — all landed 2026-05-22 on `feature/API-readiness-2`: the STRICT-disclosure INPUT-domain leak (Phase 1), the `request_id` log wiring (§B; Phase 2), the webhook reserved-key collision (Phase 3), and the test-coverage backfill (Phase 4).
+The post-review follow-ups — a `/review` pass surfaced a small set of in-repo finalizations, sequenced in the archived `archive-todos-api-readiness-2.md` (moved to workspace `docs/history/error-handling/`) — all landed 2026-05-22 on `feature/API-readiness-2`: the STRICT-disclosure INPUT-domain leak (Phase 1), the `request_id` log wiring (§B; Phase 2), the webhook reserved-key collision (Phase 3), and the test-coverage backfill (Phase 4).
 
 ### What landed in Stage 1
 

@@ -13,7 +13,7 @@
 >
 > **Original metadata:** Pre-planning analysis — decision gates marked with ❓
 > **Date**: 2026-03-29
-> **Related**: [00-master-plan.md](00-master-plan.md), [phase2-crate-propagation-rationale.md](phase2-crate-propagation-rationale.md)
+> **Related**: [00-master-plan.md](00-master-plan.md), `phase2-crate-propagation-rationale.md` (moved to workspace `docs/history/temporal-library-crate/`)
 > **Scope**: GraphTracer (execution graph capture) + ReportingManager (AI usage/cost tracking) in Temporal distributed execution
 
 ---

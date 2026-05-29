@@ -34,7 +34,7 @@ Coverage is landed at every level: per-worker classification, the classification
 
 ## Open gaps
 
-None load-bearing. Two optional refinements are recorded in [review-notes/](review-notes/): the Temporal integration tests verify the converted payload rather than Temporal's retry-engine behavior, and a couple of search/extract worker tests omit non-status `APIError` subtypes. Both are deliberate scope choices.
+None load-bearing. Two optional refinements (review notes preserved in workspace `docs/history/error-handling/`; both tracked in the deferred backlog) are deliberate scope choices: the Temporal integration tests verify the converted payload rather than Temporal's retry-engine behavior, and a couple of search/extract worker tests omit non-status `APIError` subtypes.
 
 ## Related tracks
 

@@ -2,7 +2,7 @@
 
 > **Status**: Reviewed, ready to implement (updated after feature/LibraryCrate merge — 5477e16a, then crate design review — Option A chosen)
 > **Date**: 2026-03-25
-> **Related**: [00-master-plan.md](00-master-plan.md), [phase2-crate-propagation-rationale.md](phase2-crate-propagation-rationale.md), [future-crate-first-architecture.md](../crate-architecture/future-crate-first-architecture.md)
+> **Related**: [00-master-plan.md](00-master-plan.md), `phase2-crate-propagation-rationale.md` (moved to workspace `docs/history/temporal-library-crate/`), [future-crate-first-architecture.md](../crate-architecture/future-crate-first-architecture.md)
 > **Review**: Eng review passed (0 critical gaps). Codex outside voice: 7 findings, all addressed. Crate design review: Option A (blueprint accumulation) chosen over Option B (crate merge).
 
 ---
@@ -19,7 +19,7 @@ Phase 0 (pipe_ref fix) and Phase 1 (LibraryCrate in direct mode) are complete. T
 
 ## Key Architecture Decisions
 
-1. **Crate on PipeJob** — `library_crate: LibraryCrate | None = None` field on `PipeJob`. Threaded through the signature chain as an optional parameter. (Rationale: [phase2-crate-propagation-rationale.md](phase2-crate-propagation-rationale.md))
+1. **Crate on PipeJob** — `library_crate: LibraryCrate | None = None` field on `PipeJob`. Threaded through the signature chain as an optional parameter. (Rationale: `phase2-crate-propagation-rationale.md`, moved to workspace `docs/history/temporal-library-crate/`)
 
 2. **Self-contained crate** — The crate carries ALL blueprints (PIPELEXPATH + mthds_content + extra library_dirs). Workers don't assume anything is pre-loaded.
 

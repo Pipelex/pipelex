@@ -3,7 +3,7 @@
 > **Status**: Archived (2026-05-04). All phases complete and merged.
 > **Date**: 2026-03-23 (originally drafted)
 > **Successor**: [01-master-plan.md](01-master-plan.md) (Phase 4.5 Step 6 + Phase 6 — next phases)
-> **Related**: [early-library-as-execution-context.md](early-library-as-execution-context.md), [phase0-pipe-namespace-fix.md](phase0-pipe-namespace-fix.md), [phase4-explicit-class-registry.md](phase4-explicit-class-registry.md), [phase5-payload-codec-DONE.md](phase5-payload-codec-DONE.md), [phase2-crate-propagation-rationale.md](phase2-crate-propagation-rationale.md)
+> **Related**: [early-library-as-execution-context.md](early-library-as-execution-context.md), [phase0-pipe-namespace-fix.md](phase0-pipe-namespace-fix.md), `phase4-explicit-class-registry.md` + `phase2-crate-propagation-rationale.md` (both moved to workspace `docs/history/temporal-primitives/` and `docs/history/temporal-library-crate/`), [phase5-payload-codec-DONE.md](phase5-payload-codec-DONE.md)
 
 ---
 
@@ -144,7 +144,7 @@ Flat structure. Domain is implicit in the keys — `scoring.WeightedScore`, `sco
 
 **What it does NOT solve yet**: Layer 1 (dynamic class deserialization) for concepts introduced by `mthds_content` that aren't in PIPELEXPATH. That's Phase 3.
 
-See [phase2-crate-propagation-rationale.md](phase2-crate-propagation-rationale.md) for the design rationale and rejected alternatives.
+See `phase2-crate-propagation-rationale.md` (moved to workspace `docs/history/temporal-library-crate/`) for the design rationale and rejected alternatives.
 
 ### Design
 
@@ -255,7 +255,7 @@ class PipeJob(BaseModel):
 
 **Goal**: Move ClassRegistry scoping out of Kajson (a serialization library) and into Pipelex's Library lifecycle. Fix two bugs that only manifest with separate Temporal worker processes: decoder bypass (dynamic classes with `__module__="builtins"`) and teardown clobber (non-stack-safe `finally` block).
 
-See [phase4-explicit-class-registry.md](phase4-explicit-class-registry.md) for the full design.
+See `phase4-explicit-class-registry.md` (moved to workspace `docs/history/temporal-primitives/`) for the full design.
 
 ### Design
 
