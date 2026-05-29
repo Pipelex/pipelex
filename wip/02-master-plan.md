@@ -105,10 +105,10 @@ Items surfaced during the P0 eng review and the post-merge SWE-agent review of P
 Even if P0 ships, the events still need to be turned into a cost report. Today the read-back path exists for the **graph** (`assemble_graph_on_output` / `act_assemble_graph` → `GraphSpecAssembler`) but not for **usage**. The pieces all exist on the manager side:
 
 - `UsageAggregator.aggregate(events) → list[AnyTokensUsage]` (`pipelex/tracing/usage_aggregator.py`).
-- `ReportingManager.inject_tokens_usages(pipeline_run_id, tokens_usages)` (`reporting_manager.py:191`) — docstring: *"Used after assembling usage data from distributed trace events, so that generate_report() can produce a complete cost report across all workers."*
-- `ReportingManager.generate_report(pipeline_run_id)` (`reporting_manager.py:247`).
+- `ReportingManager.inject_tokens_usages(pipeline_run_id, tokens_usages)` (`reporting_manager.py:227`) — docstring: *"Used after assembling usage data from distributed trace events, so that generate_report() can produce a complete cost report across all workers."*
+- `ReportingManager.generate_report(pipeline_run_id)` (`reporting_manager.py:369`).
 
-Nothing in the runtime calls these. `generate_report()` has zero runtime callers; only integration tests invoke it. Captured events sit in the backend and never become a cost report.
+`generate_report()` itself now has a runtime caller — the CLI run path invokes it at `_run_core.py:224`. But that path only reports from the **local, in-process** usage registries; it never reads back the distributed trace events. `UsageAggregator.aggregate()` and `inject_tokens_usages()` still have zero runtime callers, so `UsageReportEvent`s emitted by runner/worker processes sit in the backend and never get assembled into the cost report. The missing piece is the cross-worker read-back, not `generate_report` itself.
 
 This is a small piece of plumbing once P0's design is settled — the same place that calls the graph assembler can call the usage aggregator and inject the result into the report delegate before `generate_report` runs.
 
@@ -117,7 +117,7 @@ This is a small piece of plumbing once P0's design is settled — the same place
 - [ ] Runtime path: read events for `pipeline_run_id` → `UsageAggregator.aggregate()` → `ReportingManager.inject_tokens_usages()` → `generate_report()`.
 - [ ] Wired in both direct mode (in `pipelex/pipeline/runner.py`) and Temporal mode (alongside or inside the existing graph-assembly hook).
 - [ ] Cross-worker case verified: parent workflow on Worker A, child workflow on Worker B, activity on Worker C — single end-of-run cost report contains usage from all three.
-- [ ] Replace / remove the `_get_registry` TODO at `reporting_manager.py:111-117` since the proper distributed path now exists.
+- [ ] Revisit the local-only registry fallback (`_get_registry_strict` at `reporting_manager.py:119`, `_try_add_to_registry` at `:141`) once the distributed read-back lands. (The old `_get_registry` TODO that previously sat here is already gone — the accessor was renamed to `_get_registry_strict` — but the local-only behaviour it flagged remains until the cross-worker path is wired.)
 
 ---
 

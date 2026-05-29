@@ -116,22 +116,34 @@ Notes:
 
 ## Structured error reporting
 
-`ErrorReport` (`pipelex/base_exceptions.py`) is a frozen pydantic dataclass with `extra="forbid"`:
+`ErrorReport` (`pipelex/base_exceptions.py`) is a frozen `BaseModel` (`ConfigDict(frozen=True, extra="forbid", arbitrary_types_allowed=True)`) — the single source of truth for all error serialization (CLI JSON output, agent output, Temporal error details). Frozen so a cause-enrichment pass rebuilds via `model_copy` rather than mutating an outer wrapper's identity in place.
 
 ```
 ErrorReport
-  error_type:        str
-  message:           str
-  error_category:    str | None
-  error_domain:      str | None
-  retryable:         bool | None
-  user_action:       UserAction | None
-  model:             str | None
-  provider:          str | None
-  provider_metadata: ProviderErrorMetadata | None
+  error_type:            str
+  message:               str
+  title:                 str
+  type_uri:              str
+  error_category:        str | None
+  error_domain:          str | None
+  retryable:             bool | None
+  user_action:           UserAction | None
+  model:                 str | None
+  provider:              str | None
+  provider_metadata:     ProviderErrorMetadata | None
+  caller_facing_message: bool
 ```
 
-`to_dict()` drops `None` fields. `PipelexError.to_error_report()` returns `error_type`, `message`, and the class-level `error_domain`. `CogtError.to_error_report()` overrides to add `error_category`, `retryable` (derived from category), `user_action`, `provider_metadata`, and reads `model_handle` / `backend_name` when present on the instance. `to_error_report()` enriches from the `__cause__` chain, so a wrapper exception surfaces the inference metadata of the underlying `CogtError`.
+`title` / `type_uri` are the stable identity pair surfaced to consumers — every `PipelexError` populates them automatically via `PipelexError.title()` / `PipelexError.type_uri()` (auto-derived from the class name unless a subclass declares `_declared_title` / `_declared_type_uri`), so consumers never humanize or kebab-case a class name themselves.
+
+Serialization goes through `to_dict(disclosure_mode=DisclosureMode.VERBOSE)`, not a plain dump. `DisclosureMode` has two values:
+
+- `VERBOSE` — every populated (non-`None`) field; the strict inverse of `from_dict`, so it round-trips. Use on internal-trust boundaries (webhook payloads, internal RPCs) that need round-trip fidelity.
+- `STRICT` — a lossy projection for untrusted external surfaces: `provider` / `model` are always dropped, `provider_metadata` is reduced to a curated subset (`status_code`, `retry_after_seconds`), and unless the report sets `caller_facing_message` its `message` is replaced with a generic placeholder and `user_action` dropped — leaving only the stable identifiers. `caller_facing_message` flags reports whose `message` is genuinely caller-facing copy (e.g. a `.mthds` syntax error from `PipelexInterpreterError`), so STRICT keeps it. STRICT keys on message *provenance*, not on `error_domain` (which is inherited up the `__cause__` chain).
+
+`PipelexError.to_error_report()` returns `error_type`, `message`, `title`, `type_uri`, the class-level `error_domain`, `user_action`, and `caller_facing_message`. `CogtError.to_error_report()` overrides to add `error_category`, `retryable` (derived from category), `provider_metadata`, and reads `model_handle` / `backend_name` when present on the instance. `to_error_report()` enriches from the `__cause__` chain, so a wrapper exception surfaces the inference metadata of the underlying `CogtError` — but `title` / `type_uri` are *wrapper-wins* (enrichment never overwrites the outermost wrapper's identity).
+
+`error_category` carries an `InferenceErrorCategory` value (`pipelex/cogt/exceptions.py`). Only `TRANSIENT` is retryable; `CONFIGURATION` / `CONTENT` / `CAPACITY` / `AMBIGUOUS` / `UNKNOWN` are not. The `AMBIGUOUS` / `UNKNOWN` split is deliberate: `AMBIGUOUS` means the error type is known but the outcome is not (e.g. a connection dropped mid-request, so a non-idempotent operation may or may not have committed) — a blind retry is unsafe, so it is non-retryable by design; `UNKNOWN` means classification failed outright. Keeping them separate lets a non-idempotent worker (e.g. `azure_img_gen_worker.py`) pick `AMBIGUOUS` rather than the looser `UNKNOWN`.
 
 See [track-metadata-model.md](track-metadata-model.md) for the remaining gap: `error_domain` is now a class-level attribute and inference errors fully self-describe, but a long tail of non-inference `PipelexError` subclasses still depend on the lookup dicts in `pipelex/cli/agent_cli/commands/agent_output.py` for their `hint` / `error_domain`.
 
