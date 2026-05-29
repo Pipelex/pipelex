@@ -1,181 +1,144 @@
-# Implementation Plan — `feature/API-readiness-4`
+# WIP-Docs Tidy — Follow-Up Plan
 
-Pipelex-side cleanup branch picking up the upstream tail of the API error-handling endeavour. The API consumer (`pipelex-api`, branch `feature/Adapt-to-pipelex-update-3`) has shipped through Phases 0-5 plus Phase A0 / A1 and is at a "finalize" moment; what remains for the API to fully discharge that endeavour is a handful of upstream-pipelex items. **This branch is those items.**
+> Plan for finishing the `_docs/wip/` cleanup and acting on what it surfaced. Multi-phase, with hard-stop **checkpoints** where the agent MUST pause, verify, and update the [Progress log](#progress-log) so a fresh session can resume from this file alone.
 
----
+## Cold-start context — read this first
 
-## Cold-start reading order
+You are continuing a documentation-tidy effort. If you are starting cold, this section plus the three review artifacts below is everything you need.
 
-Read in this order to understand why this branch exists at all:
+**Where you are.** This file lives in a git worktree of the **pipelex** repo at `/Users/lchoquel/repos/Pipelex/_docs/`, on branch `docs/Tidy`. The worktree carries the full pipelex source (`pipelex/`, `tests/`, `CHANGELOG.md`) at that branch's revision — use it to verify any doc claim against real code.
 
-1. `wip/error-handling/README.md` — current state of error handling across pipelex; the high-level map.
-2. `wip/error-handling/archive-todos-api-readiness-2.md` — the prior ledger (formerly the repo-root `TODOS.md`, archived 2026-05-28). This branch is the successor.
-3. `../pipelex-api/wip/pipelex-changes.md` Stage 7 (items #10-#15) — the **authoritative per-item context** for five of the items on this branch. Each item there has a *What / Why / Where / How* writeup with empirical reproductions against the pinned pipelex. Do not re-derive that context here; consume it from there.
-4. `../pipelex-api/TODOS.md` "Deferred / next-track work" → "Upstream-pipelex follow-ups" — names the same items at the API end, in the consumer's voice. Useful sanity check.
-5. `wip/console-targets-and-agent-cli-stdout.md` and `wip/structured-logging/kickoff.md` — relevant background for the **webhook-delivery logging** item below; see the sequencing note in that section before starting.
+**Two repos, do not confuse them.**
 
-The `test_failed_webhook_log_includes_request_id_when_set` regression test already landed on the base (`feature/API-readiness-2`, commit `74b68bd7`) and is present in the working tree — do **not** re-add it. `git log feature/API-readiness-2..HEAD --oneline` shows this branch adds only planning docs on top of that base. Everything below is what to implement.
+- `/Users/lchoquel/repos/Pipelex/_docs/` — the **pipelex repo** worktree (branch `docs/Tidy`). All the `wip/` docs live here. Moves within it are reversible (git-tracked, isolated branch).
+- `/Users/lchoquel/repos/Pipelex/` — the **workspace repo** (branch `main`). Its `docs/history/` is the destination for the "move-to-history" bucket. This is a *different repo*; `git mv` cannot cross into it — use `cp` + `git rm`, and commit in each repo separately.
 
----
+**Authoritative artifacts (at the worktree root, already committed on `docs/Tidy`).**
 
-## What this branch is NOT
+- `TIDY-MANIFEST.md` — per-file dispositions, red-flags, supersession map, an Execution-status section recording what already ran, and copy-paste `git mv` / `cp` / `git rm` command blocks under "Execution notes". **The move-to-history file list and its exact command block are in §"move-to-history" + "Execution notes" step 4. The keep-active in-place corrections are in §"keep-active" + "Execution notes" step 6.** Reference these instead of re-deriving.
+- `DEFERRED-BACKLOG.md` — deferred items / follow-ups / bugs consolidated by theme. Every bug-kind row is tagged with a verified verdict (`[REAL]`, `[REAL — deferred]`, `[partial → low]`, `[RESOLVED]`, `[unverified]`) and a corrected severity.
+- `BUG-VERIFICATION.md` — the evidence (file:line) behind each bug verdict. Authoritative when it disagrees with an older note in `TIDY-MANIFEST.md`.
 
-- Not the structured-logging refactor. That has its own kick-off doc and its own future branch (`refactor/structured-logging` or similar — see `wip/structured-logging/kickoff.md`).
-- Not webhook signing. That's the cross-repo lockstep track owned by `wip/security/webhook-signing.md`.
-- Not a `dev` merge train. If `dev` has moved, treat that as a separate prep step, not part of this plan.
+**What is already done (committed on `docs/Tidy`).**
 
----
+- `d2fcd0a0` — the reorganization: loose top-level docs grouped into `crate-architecture/` and `graph-model/`; finished docs moved into `archive/` subfolders (incl. a new `wip/error-handling/archive/`); the mislabeled live-bug doc renamed `archive-delivery-error-path-request-id.md` → `track-delivery-error-path-request-id.md`; derived `.html` renders and dead/duplicate archive docs deleted; all cross-references repointed and verified with a link-resolution sweep.
+- `0d1ab679` — the three review docs above, with the backlog corrected to the verified verdicts.
 
-## Items
+**What is NOT done = this plan.** Nothing here has been started. Phases 1–3 are docs-only work on `docs/Tidy`. Phase 4 is *runtime code* and must not start without the branch decision at Checkpoint C.
 
-Six concrete items, all flagged in `pipelex-changes.md` Stage 7 or surfaced by the API-side `TODOS.md`. None blocks any API release on its own; together they discharge the upstream tail of the error-handling endeavour and let the API drop a small number of follow-up catches and workarounds.
+**Convention reminders.** `track-*.md` = current-state reference (active); `archive/` and `archive-*.md` = finished/history; `0X-master-plan.md` numbered (higher = newer; `02-master-plan.md` is live). MkDocs markdown: blank line before every list/table; never hard-wrap (one paragraph = one line); never hardcode counts of items in prose.
 
-Sequencing inside this branch is flexible — every item is independent except where called out. Suggested order is "smallest first to build momentum, then the two bigger ones."
+## Checkpoint protocol
 
-### 1. `ErrorDomain.is_input` (and siblings) — `@property` helpers on the enum
+At every checkpoint marked **STOP** below, you MUST, before doing anything else:
 
-- [x] **Status:** Done (2026-05-28). Two pieces landed in `pipelex/base_exceptions.py`: (a) `ErrorDomain.is_input` as an exhaustive-`match` `@property` (the enum-level single source of truth), and (b) a module-level `error_domain_is_input(error_domain: ErrorDomain | str | None) -> bool` that coerces the serialized form and delegates to the property — paralleling the existing `error_domain_to_http_status(...)`. The function is the one the API actually consumes: both API call sites hold `error_domain` as `str | None` (`ErrorReport.error_domain` is typed `str | None`; the problem-document dict value is a plain str), so the bare `report.error_domain.is_input` the spec sketched would not type-check. Covered by `tests/unit/pipelex/exceptions/test_error_domain.py::TestErrorDomain` (`test_is_input` + `test_error_domain_is_input`). Only `is_input` landed — `is_config` / `is_runtime` deferred until a need surfaces. The API consumes this via the editable local dependency on this worktree (no PyPI pin bump needed); the API-side switch off `== ErrorDomain.INPUT` at `api/exception_handlers.py:204,253` is being made now.
-**Authoritative spec:** `../pipelex-api/wip/pipelex-changes.md` item #14.
-**Where:** `pipelex/base_exceptions.py` — the `ErrorDomain` `StrEnum`.
-
-Add `@property` helpers (`is_input`, and `is_config` / `is_runtime` as needs surface) so callers read state via `report.error_domain.is_input` instead of `report.error_domain == ErrorDomain.INPUT`. This is the canonical project remediation for single-state enum checks (see `python-standards.md`) — call sites stay one-liners, the enumeration lives in one place.
-
-**Sequence first:** every other item benefits from being able to use the helper at call sites it touches. Trivial change; ~20 lines + a test. The API-side `archive-todos-api-readiness-2.md` Phase 3 review Q9 left two call sites in `api/exception_handlers.py` deliberately on `== ErrorDomain.INPUT` waiting for this; one follow-up commit there will switch them once this lands.
+1. **Verify.** Run `git status --short` in *both* repos as applicable; for docs phases run the link sweep (see [Verification commands](#verification-commands)); for code phases run `make agent-check` and the targeted tests.
+2. **Record.** Append a dated entry to the [Progress log](#progress-log): what completed, commit SHAs (both repos), decisions taken, anything surprising, and the exact next action. Tick the checkboxes you finished.
+3. **Stop and hand off.** Do not continue past a STOP checkpoint in the same session unless the user explicitly says to. The point is a clean cold-start boundary.
 
 ---
 
-### 2. `EnvVarNotFoundError` should carry `error_domain = ErrorDomain.CONFIG`
+## Phase 1 — Cross-repo move-to-history
 
-- [x] **Status:** Done (2026-05-28). Added `error_domain = ErrorDomain.CONFIG` as a class attribute on `EnvVarNotFoundError` in `pipelex/system/exceptions.py`, so its rendered `ErrorReport` / RFC 7807 problem document classifies as a config-domain failure (an operator sets the missing env var, not the caller). HTTP status is unchanged — both `None` and `CONFIG` map to 500. Covered by `tests/unit/pipelex/exceptions/test_class_level_metadata.py::TestClassLevelMetadata::test_error_domain` (new `env_var_not_found` parametrize case). The API consumes this via the editable local dependency on this worktree.
-**Authoritative spec:** `../pipelex-api/wip/pipelex-changes.md` item #10.
-**Where:** `pipelex/system/exceptions.py` (note: moved here from `pipelex/system/environment.py` during the Phase 6 import-path moves the API already adapted to — the spec doc still names the old path).
+Relocate the finished internal-planning docs that should leave the public pipelex repo but be kept as institutional memory. Authoritative file list + ready-to-run command block: `TIDY-MANIFEST.md` → §"move-to-history" and "Execution notes" step 4.
 
-Today `EnvVarNotFoundError` is domain-less (it's a `ToolError`; neither parent sets `error_domain`). A missing required env var is the textbook `CONFIG`-domain failure — an operator, not the caller, fixes it. Add `error_domain = ErrorDomain.CONFIG` as a ClassVar so the rendered `ErrorReport` / RFC 7807 problem document classifies correctly. HTTP status is unaffected (both `None` and `CONFIG` map to 500).
+- [ ] Re-read `TIDY-MANIFEST.md` §"move-to-history" — confirm the source list is still accurate against the current `wip/` tree (the reorg moved/renamed some of these; re-derive any path that 404s).
+- [ ] Create the `docs/history/` topic folders in the **workspace repo** (`/Users/lchoquel/repos/Pipelex/docs/history/...`).
+- [ ] `cp` each move-to-history doc into its `docs/history/<topic>/` destination (workspace repo).
+- [ ] Before removing sources: confirm every deferred item in these docs is already captured in `DEFERRED-BACKLOG.md` (it should be — the backlog was built from them). Spot-check, don't assume.
+- [ ] `git rm` the source docs from the `wip/` worktree.
+- [ ] Fix cross-references broken by the removal: grep the surviving `wip/` tree for links to the moved files and repoint or de-link. Held docs that link to each other (e.g. `post-pr933-xhigh-followups.md` ↔ its now-moved siblings) need attention. Run the link sweep to confirm clean.
+- [ ] Decide how history docs reference back into the pipelex repo (cross-repo links are inherently broken once relocated) — either strip those links or note them as historical. Record the decision in the log.
+- [ ] Commit the worktree (`docs/Tidy`): `git rm`s + link fixes.
+- [ ] Commit the workspace repo (`main`): the new `docs/history/` content. **This commit is on `main` of the workspace repo — higher blast radius. Do NOT push without the user's say-so.**
 
-This is the upstream half of the "original bug" the entire endeavour started from — a deployment that forgot to set `COMPLETION_CALLBACK_SECRET`. The API already classifies its own config faults as `CONFIG`; this brings pipelex-authored ones into alignment.
+### ☑ CHECKPOINT A — **STOP** (after Phase 1)
 
----
-
-### 3. `parse_concept_spec` should validate `structure` shape before iterating
-
-- [x] **Status:** Done (2026-05-28). Two parsing functions now shape-validate raw caller input before iterating, raising typed `INPUT`-domain errors instead of leaking bare `AttributeError`/`TypeError`/`ValueError`. (a) `parse_concept_spec` (`concept_ops.py`) rejects a non-mapping `structure` and any field value that is neither a description string nor a field-spec mapping, raising `ConceptSpecError`. (b) `parse_pipe_spec` (`pipe_ops.py`) rejects a non-list `steps`/`branches` or a non-mapping entry within them, raising the new `PipeSpecError`; the raw-iterate logic moved into a shared `_normalize_sub_pipe_list(...)` helper. Both error classes now carry `error_domain = ErrorDomain.INPUT` + `_authors_caller_facing_message = True` — `ConceptSpecError` (`builder/concept/exceptions.py`) gained the domain (it was previously domain-less); `PipeSpecError` is new (`builder/pipe/exceptions.py`). Docstrings on both functions now list every exception actually raised. Covered by new cases in `tests/unit/pipelex/builder/operations/test_parse_concept_spec.py` and `test_parse_pipe_spec.py` (typed-error + INPUT-domain assertions). Verified end-to-end through both consumers: `pipelex-agent concept`/`pipe` now emit `{"error_type": "ConceptSpecError"|"PipeSpecError", "error_domain": "input"}` instead of a bug-looking bare type. Error doc pages regenerated (`pipelex-dev generate-error-pages`) — added `pipe-spec-error.md`, refreshed `concept-spec-error.md`; the run also picked up two pre-existing stale pages unrelated to this item (`env-var-not-found-error.md` from item #2, and a missing `async-execution-not-enabled-error.md`). The API consumes this via the editable local dependency on this worktree; the API-side narrow `/build/concept` + `/build/pipe` route catches are API-side follow-ups, not this branch.
-**Authoritative spec:** `../pipelex-api/wip/pipelex-changes.md` item #11.
-**Where:** `pipelex/builder/operations/concept_ops.py` — the `parse_concept_spec(...)` function.
-
-The function iterates `spec_data["structure"]` before calling `ConceptSpec.model_validate(...)`. Non-dict `structure`, or fields that are neither string nor dict, leak bare `AttributeError` / `TypeError` (undocumented; the docstring only declares `ValidationError`). Empirical reproductions live in the spec doc.
-
-Fix is upstream shape validation — either raise a typed `PipelexInputError`-equivalent, or a `pydantic.ValidationError` via a thin `model_validate(...)` over the raw input shape before the iteration. Update the docstring to list every exception actually raised.
-
-The API today cannot safely catch these at the route — `AttributeError` / `TypeError` are also the types a real programming bug would raise, so a route-level catch would mask genuine bugs. Once this lands, the API's `/build/concept` route gets a narrow, typed catch.
-
-While here: sweep `pipelex/builder/operations/*.py` for the same pattern (raw-iterate-then-validate). `parse_pipe_spec` has it too — it iterates `spec_data["steps"]` / `spec_data["branches"]` and calls `dict(step)` on each entry before `model_validate`, so a non-list `steps` / `branches` or non-mapping entries leak bare `TypeError` / `ValueError` ahead of validation. Route those through the same narrow shape-validation path before iterating. (The bad-`pipe_type` `ValueError` is a separate, already-documented case — that one is narrow enough to leave.)
+This phase touched two repos and produced two commits — a mandatory stop. Before stopping: verify both repos are clean, the link sweep passes in `wip/`, and the workspace-repo commit contains only the intended history files. Record both commit SHAs and the cross-repo-link decision in the [Progress log](#progress-log). Confirm with the user whether to push either repo.
 
 ---
 
-### 4. `LocalStorageProvider` should wrap raw `OSError` as a `StorageLocalError`
+## Phase 2 — Editorial in-place corrections (keep-active docs)
 
-- [x] **Status:** Done (2026-05-28). Added `StorageLocalError(StorageError)` (with `_declared_title = "Local storage error"`) to `pipelex/tools/storage/exceptions.py`, paralleling `StorageS3Error` / `StorageGcpError`. Both filesystem methods in `local_storage_provider.py` now wrap raw `OSError`: `_store` wraps the `mkdir` + `aiofiles.open(...).write(...)` block (`ENOSPC` / `EACCES` / `EROFS` / `FileExistsError` / `EIO` → `StorageLocalError`); `_load_with_metadata` wraps the `aiofiles.open(...).read()` call, with an explicit `except FileNotFoundError` branch first that routes the TOCTOU window (file removed between the `exists()` check and the open) to `StorageFileNotFoundError`, so "file not found" stays the same typed error regardless of timing, and a generic `except OSError` → `StorageLocalError` for the rest (`PermissionError` / `IsADirectoryError` / `EIO`). `public_url` does no filesystem I/O, so it's untouched. Docstrings updated to list `StorageLocalError`. Covered by three new cases in `tests/unit/pipelex/tools/storage/test_local_storage_provider.py` (store→`FileExistsError` via blocker file, load→`IsADirectoryError` via dir-at-key, load→TOCTOU `FileNotFoundError` via `aiofiles.open` monkeypatch) — each asserts the typed wrapper and `__cause__` is an `OSError`. Error doc page generated (`pipelex-dev generate-error-pages`) — added `storage-local-error.md`, refreshed `index.md`; no incidental stale pages this run. The API consumes this via the editable local dependency on this worktree; the API-side narrow storage-route catches are API-side follow-ups, not this branch.
-**Authoritative spec:** `../pipelex-api/wip/pipelex-changes.md` item #12.
-**Where:** `pipelex/tools/storage/local_storage_provider.py` — `_store` and `_load_with_metadata`.
+Fix the stale claims in docs that stay active. List: `TIDY-MANIFEST.md` → §"keep-active" notes and "Execution notes" step 6. **Each correction is a doc edit that must be validated against current code — do not apply a manifest note blindly; the manifest predates the bug verification and some of its notes are nuanced or already-addressed.**
 
-Today, `ENOSPC` / `EACCES` / `EROFS` / `EIO` / `FileExistsError` / TOCTOU window after `file_path.exists()` all escape as raw `OSError`. Add a narrow `try/except OSError as exc: raise StorageLocalError(msg) from exc` around the filesystem calls — mirroring the wrapping already done by `S3StorageProvider` / `GcpStorageProvider`. Empirical reproductions are in the spec doc.
-
-**Decision:** Add a new `StorageLocalError(StorageError)` to `pipelex/tools/storage/exceptions.py`, paralleling `StorageS3Error` / `StorageGcpError` (with a `_declared_title = "Local storage error"`). Keeps per-backend differentiation consistent across the storage abstraction.
-
-Pair-test with item #5 (S3) — both deliver on the same storage-abstraction contract; same review can cover both.
-
----
-
-### 5. `S3StorageProvider` should catch the full `BotoCoreError` hierarchy
-
-- [x] **Status:** Done (2026-05-28). All three methods in `s3_storage_provider.py` now wrap the entire `BotoCoreError` hierarchy instead of only `NoCredentialsError` / `EndpointConnectionError`. In `_load_with_metadata` and `_store` the final `except (NoCredentialsError, EndpointConnectionError)` branch was broadened to `except BotoCoreError as exc: raise StorageS3Error(f"S3 backend error for key '{key}': {type(exc).__name__}") from exc`, sitting after the `ClientError` *sibling* branch (kept separate — `ClientError` is not a `BotoCoreError` subclass, verified empirically) and after the two service-specific `client.exceptions.NoSuchKey` / `NoSuchBucket` branches (unchanged). This closes the real-world leak: `ReadTimeoutError` / `ConnectTimeoutError` / `ConnectionClosedError` / `PartialCredentialsError` / `CredentialRetrievalError` / `ProxyConnectionError` (all `BotoCoreError` subclasses) previously escaped unwrapped; the most likely one, `ReadTimeoutError` on a slow/transient transfer, now surfaces as a typed `StorageS3Error`. `public_url`'s presign fallback widened from `except ClientError` → `except (BotoCoreError, ClientError)`, preserving the existing "if signing fails, serve the unsigned public URL" semantics for transport failures too. Per the decision, **no new sub-error class** — wrapping stays on the existing `StorageS3Error`, so no doc page work (generator confirms 0 drift: `Written: 0 · Unchanged: 245`). Covered by three new cases in `tests/unit/pipelex/tools/storage/test_s3_storage_provider.py` (`test_load_read_timeout_error_raises_s3_error`, `test_store_read_timeout_error_raises_s3_error`, `test_public_url_falls_back_to_public_url_on_botocore_error`); the three pre-existing `NoCredentialsError` / `EndpointConnectionError` tests were updated to assert the new message (`type(exc).__name__` in the text) and that `__cause__` is a `BotoCoreError`. The lower-priority `_get_session()`-outside-the-try side issue (a `BotoCoreError` from boto's own session-startup path could still escape) is left as-is — flag in the PR, don't gate on it. The API consumes this via the editable local dependency on this worktree; the API-side narrow storage-route catches are API-side follow-ups, not this branch.
-**Authoritative spec:** `../pipelex-api/wip/pipelex-changes.md` item #13.
-**Where:** `pipelex/tools/storage/s3_storage_provider.py` — `_load_with_metadata`, `_store`, and `public_url`.
-
-The provider catches only three `BotoCoreError` subclasses (`NoCredentialsError`, `EndpointConnectionError`) plus `ClientError` (which is a *sibling*, not a subclass, of `BotoCoreError`). Every other `BotoCoreError` subclass — `ReadTimeoutError`, `ConnectTimeoutError`, `ConnectionClosedError`, `PartialCredentialsError`, `CredentialRetrievalError`, `ProxyConnectionError`, … — escapes unwrapped. `ReadTimeoutError` is the most likely real-world leak (transient AWS networking).
-
-Fix: broaden each `except` block from `(NoCredentialsError, EndpointConnectionError)` to `BotoCoreError`, keeping the `ClientError` branch as a separate sibling `except`. The two service-specific branches at the top (`NoSuchKey`, `NoSuchBucket`) stay. `public_url`'s `try/except ClientError → return public URL` fallback should likely widen the same way.
-
-**Decision:** Keep wrapping as the existing `StorageS3Error(StorageError)` — no new sub-error class needed for the broadened catch. (Symmetric to item #4's `StorageLocalError` addition.)
-
-Lower-priority side issue noted in the spec doc: `_get_session()` runs outside every method's try block. Mention in the PR but don't gate on it.
+- [ ] `02-master-plan.md` P1: reconcile the "generate_report() has zero runtime callers" note. Per `BUG-VERIFICATION.md`, `generate_report` now *does* have a caller (`_run_core.py:224`), but the cross-worker **aggregation** path (`inject_tokens_usages` / `UsageAggregator`) is still unwired. Correct the wording to match that reality; do not overstate it as "fully wired."
+- [ ] `error-handling/architecture.md`: refresh the `ErrorReport` schema section (missing `title`, `type_uri`, `caller_facing_message`, `DisclosureMode`; "frozen pydantic dataclass" → frozen `BaseModel`; add the `AMBIGUOUS`/`UNKNOWN` enum nuance). Verify field names against `pipelex/base_exceptions.py` before writing.
+- [ ] `error-handling/track-cli-delivery.md`: stale ContextVar names (`_agent_cli_output_format` → `_agent_cli_error_format`), `display_error_panel` `error_message: str | None`. Verify against `agent_output.py` / `error_handlers.py`.
+- [ ] `error-handling/track-metadata-model.md`, `track-temporal-integration.md`, `track-worker-classification.md`: apply the minor type/name/wrapper fixes noted in the manifest, each checked against code (e.g. `azure_img_gen_worker.py` still has a `_raise_categorized_*` wrapper — reconcile doc vs code).
+- [ ] `concurrency/README.md`: drop the now-shipped "retry jitter quick win" from suggested next steps (verified shipped — see backlog "Recently shipped" note).
+- [ ] Run the link sweep after edits (no links should have moved, but confirm).
+- [ ] Commit the worktree (`docs/Tidy`).
 
 ---
 
-### 6. Webhook-delivery SSRF DNS recheck
+## Phase 3 — Confirm the two `[unverified]` backlog items
 
-- [x] **Status:** Done (2026-05-28). Greenfield `pipelex/tools/network/` package now closes the DNS-rebinding gap at webhook-delivery time. Three modules: (a) `host_rules.py` — `is_disallowed_ip(host)` (**deny-by-default**: `not addr.is_global`, so private/loopback/link-local — incl. `169.254.169.254` — /CGNAT `100.64/10`/shared/documentation/benchmarking/unspecified are all refused in one predicate, plus explicit `is_multicast`/`is_reserved` because `ipaddress` marks the `224.0.0.0/4` and `64:ff9b::/96` NAT64 ranges as `is_global`) + `is_disallowed_host(host)` (empty / known internal hostname `localhost`·`metadata`·`metadata.google.internal` / literal disallowed IP) — this is the single source of truth, and it is **stricter than the API's current enumerate-the-bad-ranges `_is_disallowed_host`** (the deny-by-default form closes a CGNAT leak the API check has; the API inherits the tightening when it re-points at this helper); (b) `exceptions.py` — `SsrfBlockedError(SecurityError)` with `error_domain = ErrorDomain.INPUT` (destination is caller-supplied — fixable by providing a public URL) and `_authors_caller_facing_message = True` (message names only the caller's own hostname, never the resolved private IP, so STRICT disclosure cannot confirm internal topology); (c) `ssrf_guard.py` — `SsrfGuardedTransport(httpx.AsyncHTTPTransport)` whose `resolve_to_allowed_ip(host, port)` short-circuits literal-disallowed hosts, resolves via `loop.getaddrinfo` (→ `socket.getaddrinfo`, monkeypatch-able), refuses if **any** resolved IP is disallowed (a mixed public/private resolution is itself a rebinding signal), maps a genuine `socket.gaierror` → `httpcore.ConnectError` (so a real DNS failure keeps its normal `httpx.ConnectError` → `WebhookDeliveryError` path), and connects to the **first vetted IP** (a literal → `getaddrinfo` does no DNS, so no rebind can slip between the check and the socket). **Seam choice:** on pinned `httpx` 0.28.1 / `httpcore` 1.0.9 there is no public `network_backend` kwarg and no resolver/DNS hook (event hooks are request/response only), so the guard wraps the connection pool's `_network_backend` in place via a custom `httpcore.AsyncNetworkBackend` (`SsrfGuardedBackend`). This intercepts only the TCP connect — TLS SNI / cert verification and the `Host` header keep using the origin **hostname** automatically, because `httpcore._async.connection.AsyncHTTPConnection._connect` derives `server_hostname` from the origin, not from what `connect_tcp` dials. One private-attr touch (`self._pool._network_backend`) carries the repo's established `# noqa: SLF001  # pyright: ignore[reportPrivateUsage]`. `delivery_executor._notify_webhook` now builds `httpx.AsyncClient(transport=SsrfGuardedTransport())`; `SsrfBlockedError` — a `SecurityError` — is deliberately **not** re-wrapped as `WebhookDeliveryError`, so it propagates and the delivery aborts loudly (security signals must not be swallowed by the domain-level `except httpx.RequestError`). Covered by `tests/unit/pipelex/tools/network/test_host_rules.py` (`TestHostRules` — literal-IP + hostname classification), `test_ssrf_guard.py` (`TestSsrfGuard` — public/private/literal/mixed/`gaierror` resolution + a real `httpx.AsyncClient` driven through the guarded transport aborting before any socket), and an end-to-end `test_webhook_aborts_on_dns_rebind_to_private_ip` in `tests/unit/pipelex/pipe_run/test_delivery_executor.py` (`execute()` aborts with `SsrfBlockedError` via a `socket.getaddrinfo` monkeypatch returning `169.254.169.254` — no live network). Error doc page generated (`pipelex-dev generate-error-pages`): `docs/errors/ssrf-blocked-error.md` + a one-line index refresh under `SecurityError`. `make agent-check` clean (pyright 0, mypy 0, ruff/plxt clean); targeted unit + integration-pipes suites green. **Naming deviation:** named `SsrfBlockedError` (generic — the transport guards any caller-supplied outbound URL, not only webhooks) rather than the spec's tentative `WebhookDeliverySsrfBlocked`, per the "(or whatever the typed error ends up named)" latitude; it still lives in `pipelex/tools/network/exceptions.py` per the error-location convention (not co-located with the helper). **API-side migration note:** the API doc says `from pipelex.tools.network import is_disallowed_host`, but `__init__.py` is kept empty per the no-re-export-in-`__init__` rule — the real import path is `from pipelex.tools.network.host_rules import is_disallowed_host`. **Tradeoffs to flag in the PR:** (1) the guard connects to the first vetted IP, forgoing httpx/anyio happy-eyeballs multi-IP fallback for webhooks (acceptable — pinning to a vetted IP is the whole point); (2) an egress allowlist / proxy at the deploy layer stays out of scope. The API-side narrow catch + re-point of `_is_disallowed_host` is an API-side follow-up, not this branch.
-**Where:** `pipelex/pipe_run/delivery_executor.py` — wherever the webhook HTTP client (`httpx`) actually fires.
+These two bug entries could not be settled statically; resolve them and update `DEFERRED-BACKLOG.md` + `BUG-VERIFICATION.md` with the outcome.
 
-The API's `api/schemas/models.py::_is_disallowed_host` only blocks literal private / loopback / metadata IPs **at request time**. A callback URL like `https://attacker.example/cb` passes API-side validation while its DNS record can resolve to `169.254.169.254` / `127.0.0.0/8` / `10.0.0.0/8` when the worker later fires the webhook. The fix belongs at delivery time:
+- [ ] **Offline baseline test** (`tests/e2e/agent_cli/test_offline_run_dry.py::...no_cache_no_network...`): run it locally — `.venv/bin/pytest tests/e2e/agent_cli/test_offline_run_dry.py -k no_cache_no_network`. It is `gha_disabled` (subprocess E2E). If green, mark the backlog row `[RESOLVED]` and drop it; if red, re-open with the real failure.
+- [ ] **plxt PipeStructure schema** (cross-repo): the pipelex side is correct/test-guarded; the bundled schema lives in the sibling repo `vscode-pipelex/crates/taplo-common/schemas/mthds_schema.json`. Check whether it contains `PipeStructureBlueprint` (regenerate via the pipelex generator and diff); re-file against `vscode-pipelex` if stale. This requires leaving this worktree — flag to the user rather than wandering repos unprompted.
+- [ ] Update the two rows in `DEFERRED-BACKLOG.md` and the corresponding sections in `BUG-VERIFICATION.md`; commit the worktree.
 
-- A custom `httpx` transport / `httpcore` network backend whose connect step resolves the host, checks every resolved IP against the same private-host rule, and refuses to open the socket to a private / metadata destination. Note: on the pinned `httpx` 0.28.1, `AsyncHTTPTransport` exposes **no** resolver hook, and event hooks are `request` / `response` only — neither fires after DNS but before payload send — so a plain event hook cannot close the DNS-rebinding gap.
-- Or an explicit resolve-and-connect flow: resolve the hostname (`socket.getaddrinfo`), validate each candidate IP against the rule, then connect to a vetted IP while preserving the original `Host` header / SNI — so a rebind between validation and send is impossible.
-- Plus optionally an egress allowlist / proxy at the deploy layer (out of scope here — flag in the PR description so the deploy team sees it).
+### ☑ CHECKPOINT B — **STOP** (docs tidy complete)
 
-The literal-host check on the API side stays as a cheap first line of defense.
-
-**Test fixture:** synthesize a webhook URL whose DNS resolves to a private IP (use a `socket.getaddrinfo`-style monkeypatch or a test resolver). Confirm the delivery aborts with a typed error (likely a new `WebhookDeliverySsrfBlocked` or similar) rather than completing the request.
-
-**Decision — rule placement.** Create a new `pipelex/tools/network/` package (greenfield — no `network` module exists today under `pipelex/tools/`) and put the rule in `pipelex.tools.network.is_disallowed_host(...)`. The API-side `_is_disallowed_host` in `pipelex-api/api/schemas/models.py` gets re-pointed at this helper, so the CIDR set lives in one place. Follow the error-location convention: `pipelex/tools/network/exceptions.py` for `WebhookDeliverySsrfBlocked` (or whatever the typed error ends up named) — do not co-locate the error with the helper.
+After Phase 3, the documentation tidy is fully complete on `docs/Tidy`. Mandatory stop: this is the clean "docs done" milestone and the natural place to open a PR or merge. Before stopping: link sweep clean, `git status` clean, all three review docs reflect final state. Record the milestone, all commit SHAs, and whether a PR was opened in the [Progress log](#progress-log). **Get the user's decision on merging `docs/Tidy` and on whether to proceed to Phase 4 at all.**
 
 ---
 
-### 7. Structured `event=webhook_delivery` / `event=webhook_failure` logging — **DEFERRED to structured-logging refactor**
+## Phase 4 — Code fixes (runtime; separate branch; requires the test gate)
 
-- [x] **Status:** Closed-by-deferral on this branch (2026-05-28). Re-scoped onto the `refactor/structured-logging` branch.
-**Where (for the deferral):** `wip/structured-logging/kickoff.md` "What good looks like" — event-name emission now in scope.
+These are *not* docs — they change `pipelex/` and need `make agent-check` + tests. They are a different risk profile and almost certainly do **not** belong on the docs-only `docs/Tidy` branch.
 
-The lines this item would have touched (`pipelex/pipe_run/delivery_executor.py` around 239 / 243 / 280 / 282 / 285) are exactly the lines the structured-logging refactor lists as deletion targets (`request_id_suffix` pattern, kwarg threading from commits `ceb018b5` / `07f9cce9`). Doing a narrow event-name pass on this branch would touch those lines twice.
+### ☑ CHECKPOINT C — **STOP BEFORE STARTING** (branch decision)
 
-**Follow-up actions when the structured-logging branch starts:**
+Do not write any code under this phase until you have confirmed with the user: (a) that they want these fixes now, and (b) which branch — mixing runtime fixes into `docs/Tidy` is wrong; expect a fresh branch off `main` of the pipelex repo (not the worktree). Record the branch decision before proceeding. After each fix: `make agent-check` then the targeted tests for the touched area (see `tests/CLAUDE.md` source→test mapping); full `make agent-test` before any push.
 
-- Emit `event=webhook_delivery` / `event=webhook_failure` (and `event=storage_delivery` / `event=storage_failure` for symmetry) as structured fields once the new `log.info(msg, **fields)` surface lands. Document this in the kickoff doc's destination shape.
-- Re-target the API-side TODO in `../pipelex-api/TODOS.md` "Deferred / next-track work" → "Upstream-pipelex follow-ups" from this branch onto the structured-logging branch.
-
-The API-side T6 test (`pipelex-api/tests/unit/test_webhook_recovery.py`) pins error-rendering consistency, not event names, so the API is not blocked on event-name emission.
+- [ ] **4a — `request_id` on delivery failure messages** (verified `[REAL]`, low, S). In `pipelex/pipe_run/delivery_executor.py`: append the already-in-scope `request_id_suffix` to the `StorageDeliveryError` failure message (~`:244`) and to both `WebhookDeliveryError` branches (~`:291`, `:294`), mirroring the success paths. Add unit assertions that the messages contain `request_id=`. Evidence in `BUG-VERIFICATION.md`.
+- [ ] **4b — cross-worker cost report assembly** (verified `[REAL]`, medium, M). The single genuine functional gap: wire `UsageAggregator.aggregate(events)` → `ReportingManager.inject_tokens_usages(...)` → `generate_report` into the post-run readback, parallel to the existing graph readback, for both direct mode (`pipe_run/pipe_run.py:71` / `graph_assembly.py`) and Temporal (`act_assemble_graph` / post-workflow). Add a cross-worker test. This is its own scoped piece of work — consider a dedicated plan.
 
 ---
 
-## Out of scope (for this branch — recorded so they don't drift back in)
+## Deferred / out of scope here (tracked in `DEFERRED-BACKLOG.md`)
 
-- **Structured-logging refactor.** Its own branch and PR. See `wip/structured-logging/kickoff.md`.
-- **Webhook signing.** Cross-repo, lockstep. See `wip/security/webhook-signing.md`.
-- **Item #15 — kajson crafted-marker exceptions.** Target repo is `kajson`, **not** `pipelex`. Belongs on a separate kajson PR. Spec lives at `../pipelex-api/wip/pipelex-changes.md` item #15; the API has a workaround in place (`_decode_body`'s widened catch tuple). Re-target there if Louis wants this on the same release train.
-- **Console targets / agent CLI stdout discipline.** Independent track — `wip/console-targets-and-agent-cli-stdout.md`. Already landed in part on `fix/Log-target`.
-- **Kajson untrusted-deserialization design pass.** Separate track at `../pipelex-api/wip/security/kajson-untrusted-deserialization.md` (workspace-level concern, needs `pipelex-app` + `pipelex-api-deploy` in the room).
-- **API-side `pipe_code` / `pipeline_run_id` log enrichment.** Done in `pipelex-api`, not here.
-- **API-side `RecursionError` in `_decode_body`.** Done in `pipelex-api`, not here.
-- **API-side JSON log sink.** Done in `pipelex-api`, not here.
+These are real but intentionally not in the active plan above; pick up individually if/when prioritized:
+
+- `[REAL]` GraphSpec causal ordering for parent/child topologies (medium, observability-only).
+- `[REAL]` kajson class-registry race under pytest-xdist (low, test-hygiene; needs runtime repro).
+- `[REAL — deferred]` `get_config()` replay-determinism — the cheap parts (a `docs/distributed-execution` note on the config-edit-while-in-flight constraint, plus a Replayer regression test) are file-able; the full fix is Worker Versioning (large).
+- Pre-existing broken links in historical archive docs (the absolute-style `wip/...`-from-inside-`wip/` pattern, and wrong relative paths in `archive/00-master-plan.md` / `archive/01-master-plan.md`) — optional sweep; not introduced by this cleanup.
 
 ---
 
-## Verification (when items land)
+## Verification commands
 
-- `make c` + `make t` clean on every commit.
-- For items #1-#5: add unit tests that pin the new behavior; the API-side test suite (`pipelex-api` with this branch pinned via the `[tool.uv.sources]` git rev) should also still pass — bump the pin and run `make c && make tp` over there as part of the PR.
-- For item #6 (SSRF): integration-style test using a mock resolver. No live network.
-- For item #7: depends on the sequencing decision.
+- **Link sweep** (run from the worktree root after any docs move/edit) — resolves every relative `.md`/`.html` link in `wip/` and reports danglers:
+
+  ```sh
+  cd /Users/lchoquel/repos/Pipelex/_docs && python3 - <<'PY'
+  import os, re
+  root='wip'; link=re.compile(r'\[[^\]]*\]\(([^)]+)\)'); bad=[]
+  for dp,_,fs in os.walk(root):
+    for f in fs:
+      if not f.endswith('.md'): continue
+      p=os.path.join(dp,f)
+      for m in link.finditer(open(p,encoding='utf-8').read()):
+        t=m.group(1).strip()
+        if t.startswith(('http','#','mailto:','file:')): continue
+        t=t.split('#')[0].split(' ')[0]
+        if not re.search(r'\.(md|html)$',t): continue
+        if not os.path.exists(os.path.normpath(os.path.join(dp,t))): bad.append((p,t))
+  [print(p,'->',t) for p,t in sorted(bad)]; print('dangling:',len(bad))
+  PY
+  ```
+
+- **State check:** `git -C /Users/lchoquel/repos/Pipelex/_docs status --short` and `git -C /Users/lchoquel/repos/Pipelex status --short`.
+- **Code gate (Phase 4 only):** `make agent-check`, then targeted tests per `tests/CLAUDE.md`, then `make agent-test` before any push.
 
 ---
 
-## Pin coordination with `pipelex-api`
+## Progress log
 
-`pipelex-api/pyproject.toml` has a temporary `[tool.uv.sources]` git-rev pin pointing at this repo. When this branch reaches a shippable point:
+Append a dated entry at every checkpoint. Newest last.
 
-1. Bump that `rev` to this branch's HEAD; run `make c && make tp` in `pipelex-api`.
-2. Update the API-side `TODOS.md` "Deferred / next-track work" → "Upstream-pipelex follow-ups" — strike through the items that landed; keep the rest.
-3. Update `../pipelex-api/wip/pipelex-changes.md` Stage 7 tracking table — flip the items' status.
-
-The eventual end-state — flipping the API back to a PyPI floor (`pipelex>=<next-release>`) — is Louis-gated cross-repo release coordination; not part of this branch.
-
----
-
-## Decisions taken (2026-05-28)
-
-The open questions from the original cold-start session have been resolved. Recording here so they don't get re-litigated:
-
-1. **Item #7 sequencing — DEFERRED to structured-logging refactor.** See item #7 above. The lines it would have touched are explicit deletion targets in `wip/structured-logging/kickoff.md`. Doing the narrow event-name pass now means touching them twice.
-2. **Item #6 SSRF rule placement — SHARED HELPER.** Create `pipelex/tools/network/` (greenfield) with `is_disallowed_host(...)`. The pipelex-api side re-points its `_is_disallowed_host` at this helper. Single source of truth for the disallowed CIDR set. See item #6 above for the error-location convention note.
-3. **Items #4 / #5 error class shape — NEW `StorageLocalError(StorageError)`.** Mirrors the established per-backend pattern (`StorageS3Error` / `StorageGcpError` with `_declared_title`). Item #5 keeps wrapping as the existing `StorageS3Error`.
-4. **`dev` merge — NOT NEEDED.** `git log feature/API-readiness-2..origin/dev --oneline` returns 0 commits. `dev` is not ahead.
+- **2026-05-29 — Plan created.** Reorg (`d2fcd0a0`) and review docs (`0d1ab679`) already committed on `docs/Tidy`; backlog verified against code. Nothing in this plan started. Next action: Phase 1 (cross-repo move-to-history). Open questions: (1) push policy for the workspace-repo `main` commit in Phase 1; (2) whether to merge/PR `docs/Tidy` at Checkpoint B; (3) branch for Phase 4 code fixes.
