@@ -16,6 +16,8 @@
 
 ### Changed
 
+- **Filesystem path helpers in `pipelex.tools.misc.file_utils` and `pipelex.tools.misc.json_utils` now take and return `pathlib.Path` instead of `str`.** Helpers such as `save_text_to_path`, `load_text_from_path`, `load_binary` / `load_binary_async`, `load_json_from_path` / `load_json_dict_from_path` / `load_json_list_from_path`, `save_as_json_to_path`, `copy_file`, `remove_file` / `remove_folder`, `ensure_directory_exists` / `ensure_directory_for_file_path`, and `get_incremental_directory_path` / `get_incremental_file_path` now operate on `Path`. Path handling is `Path`-based throughout `pipelex/`, converting to/from `str` only at boundaries (CLI arguments, environment variables, JSON/TOML serialization). Callers passing bare strings must now wrap them with `Path(...)`.
+
 - **`ErrorReport` is now a frozen Pydantic `BaseModel`** (previously a frozen Pydantic dataclass). It is still immutable and still round-trips through `to_dict()` / `from_dict()`, but an attempted mutation now raises `pydantic.ValidationError` instead of `dataclasses.FrozenInstanceError`.
 
 - **`recover_error_report()` is now a total function.** It returns an `ErrorReport` rather than `ErrorReport | None`: when a Temporal failure carries no embedded report — or its payload fails to rehydrate — it synthesizes one from the new `UnrecoverableWorkflowFailureError`, surfacing the deepest worker-side cause message. Callers no longer branch on `None`.

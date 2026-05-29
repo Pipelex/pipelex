@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any
 
 from pipelex.plugins.openai.openai_exceptions import VertexAIConfigError, VertexAICredentialsError
@@ -63,7 +64,7 @@ class VertexAIFactory(ConfigModel):
             raise MissingDependencyError(lib_name, lib_extra_name, msg) from exc
 
         try:
-            credentials_dict: dict[str, Any] = load_json_dict_from_path(path=gcp_credentials_file_path)
+            credentials_dict: dict[str, Any] = load_json_dict_from_path(path=Path(gcp_credentials_file_path))
         except FileNotFoundError as exc:
             msg = f"Could not get VertexAI credentials from GCP credentials file: File not found: {gcp_credentials_file_path}"
             raise VertexAICredentialsError(msg) from exc

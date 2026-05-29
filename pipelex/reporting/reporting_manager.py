@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 from pydantic import Field, RootModel
 from typing_extensions import override
@@ -32,9 +32,6 @@ try:
     from botocore.exceptions import ClientError as _BotoClientError  # type: ignore[import-untyped]
 except ImportError:
     _BotoClientError = None  # type: ignore[assignment, misc]
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 @dataclass
@@ -369,7 +366,7 @@ class ReportingManager(ReportingProtocol):
     def generate_report(self, pipeline_run_id: str | None = None, print_to_console: bool = True):
         is_csv_enabled = self._reporting_config.is_generate_cost_report_file_enabled
         if is_csv_enabled:
-            ensure_path(self._reporting_config.cost_report_dir_path)
+            ensure_path(Path(self._reporting_config.cost_report_dir_path))
 
         registries_to_process: dict[str, UsageRegistry] = {}
         if pipeline_run_id:
@@ -381,7 +378,7 @@ class ReportingManager(ReportingProtocol):
             cost_report_file_path: Path | None = None
             if is_csv_enabled:
                 cost_report_file_path = get_incremental_file_path(
-                    base_path=self._reporting_config.cost_report_dir_path,
+                    base_path=Path(self._reporting_config.cost_report_dir_path),
                     base_name=self._reporting_config.cost_report_base_name,
                     extension=self._reporting_config.cost_report_extension,
                 )

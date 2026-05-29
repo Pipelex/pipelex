@@ -127,7 +127,7 @@ def json_str(some_object: Any, title: str | None = None, is_spaced: bool = False
 
 def save_as_json_to_path(
     object_to_save: Any,
-    path: str,
+    path: Path,
     indent: int | None = 4,
     is_warning_enabled: bool = True,
     create_directory: bool = False,
@@ -139,7 +139,7 @@ def save_as_json_to_path(
 
     Args:
         object_to_save (Any): The Python object to be saved as JSON. Can be any JSON-serializable object.
-        path (str): The file path where the JSON file will be saved.
+        path (Path): The file path where the JSON file will be saved.
         indent (int | None, optional): Number of spaces for JSON formatting indentation. Defaults to 4.
         is_warning_enabled (bool, optional): Whether to show warnings during JSON purification. Defaults to True.
         create_directory (bool, optional): Whether to create the directory if it doesn't exist. Defaults to False.
@@ -152,14 +152,14 @@ def save_as_json_to_path(
     save_text_to_path(json_string, path, create_directory=create_directory)
 
 
-def load_json_from_path(path: str) -> JsonContent:
+def load_json_from_path(path: Path) -> JsonContent:
     """Loads and parses a JSON file from the specified path.
 
     This function reads a JSON file and returns its contents as a Python object.
     The file is read using UTF-8 encoding.
 
     Args:
-        path (str): The file path to the JSON file to be loaded.
+        path (Path): The file path to the JSON file to be loaded.
 
     Returns:
         JsonContent: The parsed JSON content as a Python object (can be a dict, list, string, number, bool, or None).
@@ -169,19 +169,18 @@ def load_json_from_path(path: str) -> JsonContent:
         json.JSONDecodeError: If the file contains invalid JSON.
 
     """
-    with open(path, encoding="utf-8") as file:
-        json_content: JsonContent = json.load(file)
-        return json_content
+    json_content: JsonContent = json.loads(path.read_text(encoding="utf-8"))
+    return json_content
 
 
-def load_json_dict_from_path(path: str) -> dict[str, Any]:
+def load_json_dict_from_path(path: Path) -> dict[str, Any]:
     """Loads a JSON file and ensures it contains a dictionary.
 
     This function reads a JSON file and verifies that its content is a dictionary.
     It uses load_json_from_path internally and adds type checking.
 
     Args:
-        path (str): The file path to the JSON file to be loaded.
+        path (Path): The file path to the JSON file to be loaded.
 
     Returns:
         Dict[str, Any]: The parsed JSON content as a Python dictionary.
@@ -199,14 +198,14 @@ def load_json_dict_from_path(path: str) -> dict[str, Any]:
     return json_content
 
 
-def load_json_list_from_path(path: str) -> list[Any]:
+def load_json_list_from_path(path: Path) -> list[Any]:
     """Loads a JSON file and ensures it contains a list.
 
     This function reads a JSON file and verifies that its content is a list.
     It uses load_json_from_path internally and adds type checking.
 
     Args:
-        path (str): The file path to the JSON file to be loaded.
+        path (Path): The file path to the JSON file to be loaded.
 
     Returns:
         List[Any]: The parsed JSON content as a Python list.

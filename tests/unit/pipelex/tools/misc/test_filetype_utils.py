@@ -36,21 +36,7 @@ class TestFileTypeError:
 
 
 class TestDetectFileTypeFromPath:
-    def test_detect_file_type_from_path_success_string(self, mocker: MockerFixture):
-        # Mock the filetype.guess function
-        mock_kind = mocker.MagicMock()
-        mock_kind.extension = "jpg"
-        mock_kind.mime = "image/jpeg"
-        mock_filetype_guess = mocker.patch("filetype.guess", return_value=mock_kind)
-
-        result = detect_file_type_from_path("/path/to/image.jpg")
-
-        assert isinstance(result, FileType)
-        assert result.extension == "jpg"
-        assert result.mime == "image/jpeg"
-        mock_filetype_guess.assert_called_once_with("/path/to/image.jpg")
-
-    def test_detect_file_type_from_path_success_pathlib(self, mocker: MockerFixture):
+    def test_detect_file_type_from_path_success(self, mocker: MockerFixture):
         # Mock the filetype.guess function
         mock_kind = mocker.MagicMock()
         mock_kind.extension = "png"
@@ -66,15 +52,6 @@ class TestDetectFileTypeFromPath:
         mock_filetype_guess.assert_called_once_with(path)
 
     def test_detect_file_type_from_path_failure(self, mocker: MockerFixture):
-        # Mock filetype.guess to return None (unrecognized file type)
-        mock_filetype_guess = mocker.patch("filetype.guess", return_value=None)
-
-        with pytest.raises(FileTypeError, match=r"Could not identify file type of '/unknown/file\.xyz'"):
-            detect_file_type_from_path("/unknown/file.xyz")
-
-        mock_filetype_guess.assert_called_once_with("/unknown/file.xyz")
-
-    def test_detect_file_type_from_path_failure_pathlib(self, mocker: MockerFixture):
         # Mock filetype.guess to return None (unrecognized file type)
         mock_filetype_guess = mocker.patch("filetype.guess", return_value=None)
 

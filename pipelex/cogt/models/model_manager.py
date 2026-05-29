@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelManagerError
@@ -44,7 +46,7 @@ class ModelManager(ModelManagerAbstract):
         model_deck_paths = [
             str(path)
             for path in find_files_in_dir(
-                dir_path=deck_dir_path,
+                dir_path=Path(deck_dir_path),
                 pattern="*.toml",
                 is_recursive=True,
             )

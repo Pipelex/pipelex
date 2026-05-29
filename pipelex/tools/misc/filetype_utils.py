@@ -35,7 +35,7 @@ class FileType(BaseModel):
     mime: str
 
 
-def detect_file_type_from_path(path: str | Path) -> FileType:
+def detect_file_type_from_path(path: Path) -> FileType:
     """Detect the file type of a file at a given path.
 
     Args:
