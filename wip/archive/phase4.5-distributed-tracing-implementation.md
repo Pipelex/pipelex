@@ -3,7 +3,7 @@ phase 4.5 of wip/00-master-plan.md
 # Distributed Tracing & Reporting — Local Version
 
 > Implementation plan for the NDJSON-file-based event log that enables graph tracing and cost reporting across Temporal workers.
-> Design rationale and cloud architecture (DynamoDB) in [wip/distributed-tracing-and-reporting.md](wip/distributed-tracing-and-reporting.md).
+> Design rationale and cloud architecture (DynamoDB) in [wip/distributed-tracing-and-reporting.md](distributed-tracing-and-reporting.md).
 
 ---
 

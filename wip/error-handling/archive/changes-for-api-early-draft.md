@@ -1,10 +1,10 @@
 # Pipelex changes — companion work for the API error-handling refactor
 
-> **Superseded — historical draft.** This is the original early-draft spec. The authoritative companion doc is [`api-companion-revisions.md`](api-companion-revisions.md), which records what actually shipped and the deviations taken. Kept for context only — do not treat it as the contract.
+> **Superseded — historical draft.** This is the original early-draft spec. The authoritative companion doc is [`api-companion-revisions.md`](../api-companion-revisions.md), which records what actually shipped and the deviations taken. Kept for context only — do not treat it as the contract.
 
 Changes to the **pipelex** library to land in parallel with (and largely before) the `pipelex-api` error-handling refactor. The goal is to expose the right primitives upstream so the API consumes them cleanly instead of duplicating logic, working around missing fields, or stalling Phase 4.
 
-This is **not a follow-up list.** It is the pipelex-side workplan for the same integration. Done well, the API plan in [../../TODOS.md](../../TODOS.md) reads as straight consumer code with no compensating logic. Done poorly, the API plan accumulates small workarounds that the next consumer (CLI, agent CLI, future SDK) will have to either re-write or refactor away.
+This is **not a follow-up list.** It is the pipelex-side workplan for the same integration. Done well, the API plan in [../../../TODOS.md](../../../TODOS.md) reads as straight consumer code with no compensating logic. Done poorly, the API plan accumulates small workarounds that the next consumer (CLI, agent CLI, future SDK) will have to either re-write or refactor away.
 
 Each item names a concrete API surface in pipelex, the downstream pain it removes, and a landing stage. File-path references with `pipelex/` are pipelex; with `api/` are this repo.
 
@@ -137,7 +137,7 @@ class ErrorReport:
         ...
 ```
 
-**Why.** The architecture doc states **"Don't redefine the mapping"** ([architecture.md](architecture.md) cross-cutting principles). Strict-mode redaction IS the kind of presentational logic that should live where the error model lives — for the same reason `http_status` is on `ErrorReport` and `error_domain_to_http_status` is in pipelex.
+**Why.** The architecture doc states **"Don't redefine the mapping"** ([architecture.md](../architecture.md) cross-cutting principles). Strict-mode redaction IS the kind of presentational logic that should live where the error model lives — for the same reason `http_status` is on `ErrorReport` and `error_domain_to_http_status` is in pipelex.
 
 Today only the API has a need for this (hosted multi-tenant deployments set `ERROR_DISCLOSURE=strict`). But the moment a second consumer wants the same — the human CLI gains a `--share-error` mode that sanitizes before clipboard, the agent CLI emits errors to a chat surface that may leak, a hosted SDK redacts before forwarding to a user-facing app — the logic gets duplicated, and the two copies will drift.
 

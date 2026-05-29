@@ -2,10 +2,10 @@
 
 > **Archived 2026-05-15.** This is the completed worker-classification sweep — every phase landed. It is kept for the running notes and checkpoint history, which have reference value. The current plan is in `_tprl/TODOS.md`.
 
-> **Source of truth:** [track-worker-classification.md](track-worker-classification.md).
+> **Source of truth:** [track-worker-classification.md](../track-worker-classification.md).
 > **Implementation reference:** `pipelex/plugins/anthropic/anthropic_llm_worker.py`.
 > **Test reference:** `tests/unit/pipelex/plugins/anthropic/test_anthropic_worker_object_error_handling.py`.
-> **Out-of-scope follow-up:** [track-extract-classify-render.md](track-extract-classify-render.md) — the natural next step once this sweep lands. Do **not** pull forward.
+> **Out-of-scope follow-up:** [track-extract-classify-render.md](../track-extract-classify-render.md) — the natural next step once this sweep lands. Do **not** pull forward.
 
 ---
 

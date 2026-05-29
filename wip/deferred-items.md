@@ -7,7 +7,7 @@
 
 ## Architectural Direction (Future)
 
-Long-term goals documented for vision alignment. Not planned for implementation now. See [future-crate-first-architecture.md](future-crate-first-architecture.md) for the full design rationale.
+Long-term goals documented for vision alignment. Not planned for implementation now. See [future-crate-first-architecture.md](crate-architecture/future-crate-first-architecture.md) for the full design rationale.
 
 ### Crate-First Architecture
 
@@ -37,14 +37,14 @@ Cache loaded crates in shared storage (Redis, S3) so multiple workers don't redu
 
 ## Distributed Tracing — Deferred Items
 
-Items related to the event log and graph tracing system (Phase 4.5). Also documented in [distributed-tracing-and-reporting.md](distributed-tracing-and-reporting.md).
+Items related to the event log and graph tracing system (Phase 4.5). Also documented in [distributed-tracing-and-reporting.md](archive/distributed-tracing-and-reporting.md).
 
 ### Event Log Backends
 
 | Item | Status | Context |
 |---|---|---|
 | DynamoDB backend | **Shipped** (2026, `feature/dynamodb-tracer`) | `pipelex/tracing/dynamodb_event_log.py` (+ `TEMPORAL_DYNAMODB` variant). Schema-compatible with `pipelex-api-infra`'s `TraceEventDynamoDBAdapter`. Selected via `[pipelex.tracing] backend = "dynamodb"`. |
-| SQLite backend | **Not planned** — NDJSON + DynamoDB cover the matrix | Listed in the original analysis (`distributed-tracing-and-reporting.md`); not built. Re-evaluate only if a use case appears that NDJSON can't serve and DynamoDB is overkill. |
+| SQLite backend | **Not planned** — NDJSON + DynamoDB cover the matrix | Listed in the original analysis (`archive/distributed-tracing-and-reporting.md`); not built. Re-evaluate only if a use case appears that NDJSON can't serve and DynamoDB is overkill. |
 
 ### Event Log Protocol Extensions
 

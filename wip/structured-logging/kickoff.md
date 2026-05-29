@@ -10,7 +10,7 @@ Pipelex's `log` API is string-shaped today (`log.info("a message string with stu
 
 ## What triggered this
 
-`wip/error-handling/archive-delivery-error-path-request-id.md` opened the question of whether to thread `request_id` into the failure-path messages of `DeliveryExecutor` (mirroring the success-path threading from commits `ceb018b5` and `07f9cce9`). The proximate decision was "do it the manual way OR do the structural fix." We chose to defer the structural fix to a dedicated branch — this one.
+`wip/error-handling/track-delivery-error-path-request-id.md` opened the question of whether to thread `request_id` into the failure-path messages of `DeliveryExecutor` (mirroring the success-path threading from commits `ceb018b5` and `07f9cce9`). The proximate decision was "do it the manual way OR do the structural fix." We chose to defer the structural fix to a dedicated branch — this one.
 
 Two preceding commits did manual per-line threading on the success path:
 
@@ -124,7 +124,7 @@ The session should answer these before writing the plan:
 
 ## References
 
-- `wip/error-handling/archive-delivery-error-path-request-id.md` — the trigger doc; closing rationale references this refactor as the deferred altitude fix.
+- `wip/error-handling/track-delivery-error-path-request-id.md` — the trigger doc; closing rationale references this refactor as the deferred altitude fix.
 - Commit `ceb018b5` — `feat(delivery): thread request_id through DeliveryExecutor for cross-phase log correlation`. To be partially reverted.
 - Commit `07f9cce9` — `fix(delivery): forward request_id from PipeRun direct-mode dispatcher to DeliveryExecutor`. To be partially reverted.
 - `pipelex/tools/log/log.py` — current string-shaped Log API. The surface to extend.

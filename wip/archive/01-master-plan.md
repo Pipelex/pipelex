@@ -21,7 +21,7 @@ This file tracks the **distributed execution** work that follows the LibraryCrat
 |---|---|
 | **Phase 4.5 Step 6 — Cross-process tracing** | Shipped via `feature/dynamodb-tracer`, but with a different design than the originally proposed `TracingActivityInboundInterceptor`. See "Phase 4.5 Step 6 — as built" below. |
 
-Open architectural notes and known limitations live in [deferred-items.md](deferred-items.md). Long-term direction in [future-crate-first-architecture.md](future-crate-first-architecture.md). Tracing background (pre-implementation analysis — decisions superseded) in [distributed-tracing-and-reporting.md](distributed-tracing-and-reporting.md).
+Open architectural notes and known limitations live in [deferred-items.md](deferred-items.md). Long-term direction in [future-crate-first-architecture.md](../crate-architecture/future-crate-first-architecture.md). Tracing background (pre-implementation analysis — decisions superseded) in [distributed-tracing-and-reporting.md](distributed-tracing-and-reporting.md).
 
 ---
 
@@ -51,7 +51,7 @@ Pre-implementation analysis (proposed SQLite/Redis backends, decision gates, etc
 
 **Goal**: Include cross-package dependency content in the LibraryCrate so that Temporal workers can execute pipelines that reference concepts and pipes from other packages — without those packages being installed on the worker. Then extend to remote dependencies fetched from GitHub.
 
-See [future-crate-first-architecture.md](future-crate-first-architecture.md) for the full crate-first architectural vision and design rationale.
+See [future-crate-first-architecture.md](../crate-architecture/future-crate-first-architecture.md) for the full crate-first architectural vision and design rationale.
 
 ### Why
 

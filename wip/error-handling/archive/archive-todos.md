@@ -2,7 +2,7 @@
 
 > **ARCHIVED — superseded.** This was the execution ledger for the error-handling refactor; every stage is landed. It is kept for history and moved here from the repo root. Note that "Item A" describes a deviation where `type_uri()` read its base URI through an `ErrorManager` singleton holding an `ErrorsConfig`; that machinery was later removed entirely — `type_uri()` is now a pure function reading the `URLs.error_docs_base` constant (`pipelex/urls.py`). The relative links below were written relative to the repo root, not this `wip/error-handling/` location.
 
-This worktree (`feature/API-readiness`) carries the **pipelex-side** companion work for the `pipelex-api` error-handling design. The original per-item spec is in [`wip/error-handling/changes-for-api-early-draft.md`](wip/error-handling/changes-for-api-early-draft.md); the deviations we are taking from that spec — and *why* — are documented in [`wip/error-handling/api-companion-revisions.md`](wip/error-handling/api-companion-revisions.md). The cross-repo consumer (the API) lives in the side-by-side worktree [`../pipelex-api/wip/error-handling/`](../../pipelex-api/wip/error-handling/).
+This worktree (`feature/API-readiness`) carries the **pipelex-side** companion work for the `pipelex-api` error-handling design. The original per-item spec is in [`wip/error-handling/changes-for-api-early-draft.md`](changes-for-api-early-draft.md); the deviations we are taking from that spec — and *why* — are documented in [`wip/error-handling/api-companion-revisions.md`](wip/error-handling/api-companion-revisions.md). The cross-repo consumer (the API) lives in the side-by-side worktree [`../pipelex-api/wip/error-handling/`](../../pipelex-api/wip/error-handling/).
 
 This file is the **execution plan** — what to land, in what order, with hard-stop checkpoints. It consolidates the error-handling items from the original spec. The original spec's webhook-signing item (item 9) is split out as a separate security track — see [`wip/security/webhook-signing.md`](wip/security/webhook-signing.md). It is security work, not error-handling work; the cross-repo coordination it needs is independent of this plan's PR series. See [`api-companion-revisions.md`](wip/error-handling/api-companion-revisions.md) for the full rationale on the error-handling consolidation.
 
@@ -536,7 +536,7 @@ Checkpoints are **hard stops**. Do not pick up the next stage in the same sessio
 
 1. This `TODOS.md` — find the first unchecked item and its checkpoint context. **Read the "Decisions locked in" section at the top first** — the items below assume them.
 2. [`wip/error-handling/api-companion-revisions.md`](wip/error-handling/api-companion-revisions.md) — what we are actually building vs. what the original spec proposed, with rationale per item. **The pipelex-api agent reads this to know what to expect.**
-3. [`wip/error-handling/changes-for-api-early-draft.md`](wip/error-handling/changes-for-api-early-draft.md) — the original spec, kept for context but superseded by the revisions doc.
+3. [`wip/error-handling/changes-for-api-early-draft.md`](changes-for-api-early-draft.md) — the original spec, kept for context but superseded by the revisions doc.
 4. [`wip/error-handling/README.md`](wip/error-handling/README.md) — the broader error-handling landscape.
 5. The most recent checkpoint's "Fill in at checkpoint time" block — running notes from the previous session.
 6. `git log --oneline -20` to see the most recent landings.

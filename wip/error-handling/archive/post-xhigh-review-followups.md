@@ -16,7 +16,7 @@ it.
     original 4-phase (A/B/C/D) plan that drove the first 12 commits.
   - [`./post-pr933-followups-code-review.md`](./post-pr933-followups-code-review.md) —
     the F1-F6 plan that drove 4 commits.
-  - [`./post-pr933-xhigh-followups.md`](./post-pr933-xhigh-followups.md) — the
+  - [`./post-pr933-xhigh-followups.md`](../post-pr933-xhigh-followups.md) — the
     15-finding xhigh plan that drove the 8 commits this xhigh pass reviewed.
 - **State at cold start** (check on entry):
   - `git log --oneline feature/API-readiness-2..HEAD` should show 22 commits.

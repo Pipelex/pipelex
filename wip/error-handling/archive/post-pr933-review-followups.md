@@ -7,7 +7,7 @@ flagged per the "see something, say something" rule, or refinements that didn't
 warrant action in the same commit series. Sequenced here so a fresh session can
 land them coherently.
 
-The original plan was [`../../TODOS.md`](../../TODOS.md). This file is its
+The original plan was [`../../../TODOS.md`](../../../TODOS.md). This file is its
 post-merge tail.
 
 ## Branch setup

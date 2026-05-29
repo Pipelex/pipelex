@@ -1,6 +1,6 @@
 # Archive — Recover the structured error report across the Temporal submitter & child-workflow boundaries
 
-> **ARCHIVED 2026-05-17 — COMPLETE.** Both plans below landed in full (#912 submitter boundary, #911-adjacent child-workflow boundary) and were moved here from the repo-root `TODOS.md`. Kept for their full trace, root-cause analysis, TDD record, and eng-review history. The authoritative current-state summary lives in [track-temporal-integration.md](track-temporal-integration.md) ("Submitter-side report recovery (landed)" and "Child-workflow boundary recovery (landed)"); where this archive's pre-implementation sketches differ from the repo, the committed code is authoritative.
+> **ARCHIVED 2026-05-17 — COMPLETE.** Both plans below landed in full (#912 submitter boundary, #911-adjacent child-workflow boundary) and were moved here from the repo-root `TODOS.md`. Kept for their full trace, root-cause analysis, TDD record, and eng-review history. The authoritative current-state summary lives in [track-temporal-integration.md](../track-temporal-integration.md) ("Submitter-side report recovery (landed)" and "Child-workflow boundary recovery (landed)"); where this archive's pre-implementation sketches differ from the repo, the committed code is authoritative.
 
 ## [done] Recover the structured error report across the Temporal submitter boundary
 

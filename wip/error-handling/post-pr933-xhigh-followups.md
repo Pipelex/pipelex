@@ -7,7 +7,7 @@ decision needed from the user, then the fix/test work where applicable.
 
 The first 9 findings are NEW concerns not raised in the prior review. The last
 6 are re-surfaced versions of the already-decided findings from
-[`./post-pr933-followups-code-review.md`](./post-pr933-followups-code-review.md) —
+[`./post-pr933-followups-code-review.md`](archive/post-pr933-followups-code-review.md) —
 included here for recall completeness and quick re-verification, not for
 re-deciding.
 
@@ -17,9 +17,9 @@ re-deciding.
   (PR #933 still open against `dev` at time of writing). Do NOT rebase onto
   `dev` until PR #933 lands.
 - **Prior plans on this branch**:
-  - [`./post-pr933-review-followups.md`](./post-pr933-review-followups.md) — the
+  - [`./post-pr933-review-followups.md`](archive/post-pr933-review-followups.md) — the
     original 4-phase (A/B/C/D) plan that drove the first 12 commits.
-  - [`./post-pr933-followups-code-review.md`](./post-pr933-followups-code-review.md) —
+  - [`./post-pr933-followups-code-review.md`](archive/post-pr933-followups-code-review.md) —
     a pre-PR `/code-review` pass that flagged 6 findings (F1-F6); all 6 were
     resolved in a follow-up session (4 commits' worth of changes: CHANGELOG
     fix, `DisclosureMode.STRICT` docstring extension, new pinning test,
@@ -311,7 +311,7 @@ arm in `_translate_to_validate_bundle_error`).
 `pipe_validation_errors=[...]` and a message framed as "Could not load
 blueprints because of: ..." with pipe-specific categorization. Pre-F5
 (working diff in
-[`./post-pr933-followups-code-review.md`](./post-pr933-followups-code-review.md)),
+[`./post-pr933-followups-code-review.md`](archive/post-pr933-followups-code-review.md)),
 `load_concepts_only*` had their own inline `except ValidationError` arm that
 called the SAME categorizer — so the mislabeling is pre-existing for the
 concepts-only path. F5 widened the surface (4 entry points now share it) and
@@ -638,7 +638,7 @@ Recommend C.5-a unless temporalio's mutation behavior changes.
 ## Phase D — Already-documented decisions (re-verify only)
 
 The xhigh review re-surfaced the six already-decided findings from
-[`./post-pr933-followups-code-review.md`](./post-pr933-followups-code-review.md)
+[`./post-pr933-followups-code-review.md`](archive/post-pr933-followups-code-review.md)
 (F1-F6) for recall completeness. The decisions taken in that session still
 stand. This phase is just a sanity check that the documentation, tests, and
 code state actually match those decisions — in case the resolution commits

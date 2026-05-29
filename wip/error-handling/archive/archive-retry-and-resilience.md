@@ -1,6 +1,6 @@
 # TODOS — Retry & Resilience: remove the PipeRouter loop, make Tier 1 (transport retry) explicit
 
-> **ARCHIVED — both workstreams landed.** Workstream 1 (remove the `PipeRouter` transient-retry loop) and Workstream 2 (make Tier 1 transport retry explicit and uniform, confine `instructor` to schema re-ask) are both in the code. This file is kept for its running notes and checkpoint history. The current-state description lives in [track-retry-and-resilience.md](track-retry-and-resilience.md).
+> **ARCHIVED — both workstreams landed.** Workstream 1 (remove the `PipeRouter` transient-retry loop) and Workstream 2 (make Tier 1 transport retry explicit and uniform, confine `instructor` to schema re-ask) are both in the code. This file is kept for its running notes and checkpoint history. The current-state description lives in [track-retry-and-resilience.md](../track-retry-and-resilience.md).
 
 > **Type:** Implementation plan — two independent workstreams. Workstream 1 is a removal; Workstream 2 is config + factory wiring + a worker audit.
 > **Source / intent:** [wip/error-handling/track-retry-and-resilience.md](wip/error-handling/track-retry-and-resilience.md) — the target-architecture doc. Where this plan and that doc differ, the doc is authoritative for *intent*; this plan is authoritative for *steps*.

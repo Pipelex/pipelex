@@ -62,5 +62,5 @@ These are real and belong to the hosted product, but they are platform/product c
 
 - [track-temporal-integration.md](track-temporal-integration.md) — Tier 2: how `InferenceErrorCategory` drives Temporal's retry decision.
 - [track-metadata-model.md](track-metadata-model.md) — `ProviderErrorMetadata` carries `retry_after_seconds` for the error report; the SDK does its own `Retry-After` handling for retries.
-- [archive-retry-and-resilience.md](archive-retry-and-resilience.md) — the implementation plan and checkpoint history for the two workstreams that landed this track.
+- [archive-retry-and-resilience.md](archive/archive-retry-and-resilience.md) — the implementation plan and checkpoint history for the two workstreams that landed this track.
 - [../temporal-next/00-enterprise-readiness-analysis.md](../temporal-next/00-enterprise-readiness-analysis.md) — the multi-tenant / hosted concerns scoped out above.

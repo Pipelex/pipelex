@@ -2,7 +2,7 @@
 
 > **Status**: Design
 > **Date**: 2026-04-01
-> **Related**: [phase5-payload-codec-strategy.md](phase5-payload-codec-strategy.md), Temporal img pipeline bug (fix/Temporal-Img branch)
+> **Related**: [phase5-payload-codec-DONE.md](phase5-payload-codec-DONE.md), Temporal img pipeline bug (fix/Temporal-Img branch)
 > **Trigger**: `NotImplementedError` when running `test_image_out_in.mthds` through Temporal — aiohttp's connector cleanup calls `loop.is_closed()` on Temporal's sandboxed event loop
 
 ---
@@ -45,7 +45,7 @@ The naive fix — create an activity that wraps the storage call — has two pro
 
 2. **Double history pollution**: The large image data would enter workflow history twice — once as the generation activity output, once as the storage activity input.
 
-The Temporal-recommended "Large Data Handling" pattern (see `phase5-payload-codec-strategy.md` section "Large Data Handling" from the Temporal developer skill): activities should read AND write large data internally, passing only small references through the workflow.
+The Temporal-recommended "Large Data Handling" pattern (see `phase5-payload-codec-DONE.md` section "Large Data Handling" from the Temporal developer skill): activities should read AND write large data internally, passing only small references through the workflow.
 
 ---
 
@@ -183,7 +183,7 @@ The protocol defines `make_image_content` and `make_page_contents` as public met
 
 ## 8. Relationship to PayloadCodec (Phase 5)
 
-The PayloadCodec (`phase5-payload-codec-strategy.md`) is the general solution for large payload offloading — it transparently offloads any payload exceeding a size threshold to external storage at the wire boundary.
+The PayloadCodec (`phase5-payload-codec-DONE.md`) is the general solution for large payload offloading — it transparently offloads any payload exceeding a size threshold to external storage at the wire boundary.
 
 This design is complementary, not competing:
 

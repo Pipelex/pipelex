@@ -2,7 +2,7 @@
 
 > **Status**: Vision / future direction
 > **Date**: 2026-03-25
-> **Related**: [archive/00-master-plan.md](archive/00-master-plan.md), [archive/phase2-implementation-plan.md](archive/phase2-implementation-plan.md)
+> **Related**: [../archive/00-master-plan.md](../archive/00-master-plan.md), [../archive/phase2-implementation-plan.md](../archive/phase2-implementation-plan.md)
 
 ---
 

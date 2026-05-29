@@ -3,7 +3,7 @@
 > **Status**: Not started
 > **Goal**: Dependencies can be fetched from remote addresses (e.g., `github.com/org/repo/package`). The crate becomes fully self-contained for cloud-native execution where workers are stateless.
 > **Predecessor**: [phase6a-local-cross-package-deps.md](phase6a-local-cross-package-deps.md) — needs the blueprint collector extracted in 6a.
-> **Related**: [02-master-plan.md](02-master-plan.md), [future-crate-first-architecture.md](future-crate-first-architecture.md).
+> **Related**: [02-master-plan.md](02-master-plan.md), [future-crate-first-architecture.md](crate-architecture/future-crate-first-architecture.md).
 
 ---
 

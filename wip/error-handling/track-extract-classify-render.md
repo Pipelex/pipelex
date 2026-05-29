@@ -10,7 +10,7 @@ Today every inference worker performs three logically separate steps inline insi
 
 This track proposes decomposing the pipeline so that only the **Extract** step is per-provider. **Classify** and **Render** become provider-agnostic and share a single implementation across all 18+ workers.
 
-This track is **proposed but not started.** It is the natural next step after the worker-classification sweep, which has landed ([archive-worker-classification-sweep.md](archive-worker-classification-sweep.md)): now that every worker uniformly attaches `ProviderErrorMetadata` and a structured `UserAction`, the duplication across workers is the dominant complexity, and decomposition is the obvious cleanup.
+This track is **proposed but not started.** It is the natural next step after the worker-classification sweep, which has landed ([archive-worker-classification-sweep.md](archive/archive-worker-classification-sweep.md)): now that every worker uniformly attaches `ProviderErrorMetadata` and a structured `UserAction`, the duplication across workers is the dominant complexity, and decomposition is the obvious cleanup.
 
 ## Current state
 

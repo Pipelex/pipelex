@@ -14,7 +14,7 @@
 
 ## ▶ Start here — cold-start context
 
-The error-handling Phase-2 plan landed in full (archived at [wip/error-handling/archive-error-handling-2.md](wip/error-handling/archive-error-handling-2.md)). Phase 8 surfaced a **pre-existing resilience bug** that was deliberately scoped out of Phase 8 — this TODO is that follow-up.
+The error-handling Phase-2 plan landed in full (archived at [wip/error-handling/archive-error-handling-2.md](archive/archive-error-handling-2.md)). Phase 8 surfaced a **pre-existing resilience bug** that was deliberately scoped out of Phase 8 — this TODO is that follow-up.
 
 **The bug.** Phase 5 added an application-level transient-retry loop to `PipeRouter`. `PipeRouterProtocol.run()` (`pipelex/pipe_run/pipe_router_protocol.py`, around line 66) retries on `except CogtError` when `error_category.is_retryable` is true (i.e. `InferenceErrorCategory.TRANSIENT`). But the LLM pipe operators **catch the worker's `LLMCompletionError` (a `CogtError`) and re-raise it as a plain `PipeRunError` before it ever reaches the router.** The router's `except PipeRunError` branch (around line 82) does *not* retry — it wraps into `PipeRouterError` and gives up. So:
 

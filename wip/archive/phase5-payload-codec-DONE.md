@@ -2,7 +2,7 @@
 
 **Goal**: Remove the 2MB payload size limit for production workloads with large libraries or WorkingMemory containing images/documents.
 
-**Reference**: `wip/00-master-plan.md` lines 311-355, `wip/phase5-payload-codec-strategy.md`
+**Reference**: `wip/archive/00-master-plan.md` lines 311-355
 
 ---
 

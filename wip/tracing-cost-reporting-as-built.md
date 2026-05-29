@@ -2,7 +2,7 @@
 
 > **Status**: Shipped via `feature/dynamodb-tracer` (supersedes the original Phase 4.5 Step 6 design from `archive/00-master-plan.md`).
 > **Last updated**: 2026-05-04
-> **Related**: [02-master-plan.md](02-master-plan.md), [distributed-tracing-and-reporting.md](distributed-tracing-and-reporting.md) (pre-implementation analysis — design choices superseded), [archive/phase4.5-distributed-tracing-implementation.md](archive/phase4.5-distributed-tracing-implementation.md).
+> **Related**: [02-master-plan.md](02-master-plan.md), [distributed-tracing-and-reporting.md](archive/distributed-tracing-and-reporting.md) (pre-implementation analysis — design choices superseded), [archive/phase4.5-distributed-tracing-implementation.md](archive/phase4.5-distributed-tracing-implementation.md).
 
 This file documents what actually shipped, plus the known gaps that 02-master-plan addresses.
 
