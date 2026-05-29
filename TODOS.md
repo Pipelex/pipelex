@@ -71,8 +71,10 @@ These types cross the Temporal wire directly or transitively. After Phase 0, eac
 
 ## Pre-flight — freeze the boundary (do before any edit)
 
-- [ ] Re-confirm the wire layer is clean: `grep -rn "@dataclass\|NamedTuple" pipelex/temporal/` returns nothing.
-- [ ] Resolve every "confirm path" entry in the safety boundary above (`GraphContext`, `LibraryCrate`, `PipeAbstract`, `PageContent`, page-view payload, `TraceEvent`) and pin the paths.
+- [x] Re-confirm the wire layer is clean: `grep -rn "@dataclass\|NamedTuple" pipelex/temporal/` returns nothing.
+  - Result: only two matches, both off-wire and slated for later phases — `config_temporal.py:366` (`DispatchOptions`, Phase 5) and `tprl/namespace_check.py:50` (`RegistrationFailure`, Phase 4). No *wire* type is a dataclass/NamedTuple.
+- [x] Resolve every "confirm path" entry in the safety boundary above (`GraphContext`, `LibraryCrate`, `PipeAbstract`, `PageContent`, page-view payload, `TraceEvent`) and pin the paths.
+  - Result (all `BaseModel`): `GraphContext`=`pipelex/graph/graph_context.py:12`; `LibraryCrate`=`pipelex/libraries/library_crate.py:11`; `PipeAbstract`=`pipelex/core/pipes/pipe_abstract.py:46`; `PageContent`=`pipelex/core/stuffs/page_content.py:13` (StructuredContent); page-view payload = `PageContent.page_view: ImageContent | None` (line 15) → already-listed `ImageContent`; `TraceEvent`=`pipelex/tracing/trace_events.py:34`.
 
 ---
 
@@ -84,30 +86,40 @@ Goal: stop the converter from being the sole arbiter of domain-model shape. Toda
 
 kajson v0.5.0 has no dataclass support and no dataclass tests. A pydantic dataclass currently only survives via the untested generic catch-all: encode via `__dict__` (`json_encoder.py` ~160), decode via `the_class(**the_dict)` (`json_decoder.py` ~293). The decode path is fragile — if validation raises there, the next line swallows it (`except Exception: pass`) and falls through to the unsafe `obj.__dict__ = the_dict` path, then to returning a raw dict. Silent corruption instead of a loud error.
 
-- [ ] **0.1** Add an explicit pydantic-dataclass branch in `_apply_decoder_strategies` (after the `Enum` / `BaseModel` branches, before the generic constructor), using `pydantic.dataclasses.is_pydantic_dataclass`. Reconstruct via the dataclass' pydantic validator (validates), and on `ValidationError` raise `KajsonDecoderError` loudly with dict context — mirroring the existing `BaseModel` branch (~line 265). No silent fall-through.
-- [ ] **0.2** Add kajson round-trip tests in `../kajson/tests`: pydantic dataclass with (a) nested `BaseModel` field, (b) `Optional` field, (c) `list` of pydantic dataclasses, (d) `timedelta` field, (e) a subclass (type preservation); plus a negative test that a bad payload raises `KajsonDecoderError` (not silent corruption). Lock encode-via-`__dict__` with an explicit assertion rather than relying on the catch-all.
-- [ ] **0.3** Bump kajson version in `../kajson/pyproject.toml` + add a CHANGELOG entry (genuine new capability, benefits all kajson users).
+- [x] **0.1** Add an explicit pydantic-dataclass branch in `_apply_decoder_strategies` (after the `Enum` / `BaseModel` branches, before the generic constructor), using `pydantic.dataclasses.is_pydantic_dataclass`. Reconstruct via the dataclass' pydantic validator (validates), and on `ValidationError` raise `KajsonDecoderError` loudly with dict context — mirroring the existing `BaseModel` branch (~line 265). No silent fall-through.
+  - Result: added `is_pydantic_dataclass` import + the branch in `../kajson/kajson/json_decoder.py` (`return the_class(**the_dict)`, `except ValidationError → raise KajsonDecoderError(...) from exc`). Confirmed the prior behavior was silent corruption (bad dataclass payload returned a raw `dict`); now raises loudly.
+- [x] **0.2** Add kajson round-trip tests in `../kajson/tests`: pydantic dataclass with (a) nested `BaseModel` field, (b) `Optional` field, (c) `list` of pydantic dataclasses, (d) `timedelta` field, (e) a subclass (type preservation); plus a negative test that a bad payload raises `KajsonDecoderError` (not silent corruption). Lock encode-via-`__dict__` with an explicit assertion rather than relying on the catch-all.
+  - Result: `../kajson/tests/unit/test_pydantic_dataclass.py` (7 tests, all cases above + encode-via-`__dict__` metadata assertion + negative test). The negative test was the TDD red (DID NOT RAISE before 0.1, green after). Full kajson suite green (257 passed, 1 skipped); kajson `make agent-check` clean.
+  - Follow-up from code review: the timedelta round-trip initially needed a band-aid (an earlier suite test, `test_json_encoder`, clears the process-global codec registry without restoring). Fixed the **root cause** instead — `test_json_encoder.py` / `test_json_decoder.py` autouse fixtures now snapshot the registry and restore it on teardown — and removed the band-aid. The new dataclass tests are order-independent without re-registering anything.
+- [x] **0.3** Bump kajson version in `../kajson/pyproject.toml` + add a CHANGELOG entry (genuine new capability, benefits all kajson users).
+  - Result: `0.5.0` → `0.6.0` + dated CHANGELOG entry. kajson is on its own `feature/Support-more-types` branch (versioned-only CHANGELOG convention — no `[Unreleased]`). Editable install means the pipelex venv serves the live source; installed metadata stays `0.5.0`, so the pipelex `kajson==0.5.0` pin is still satisfied. **Do NOT run `uv lock`/`uv sync` in this worktree until the pin is bumped** — the `==0.5.0` exact pin would conflict with the editable `0.6.0`. Pin bump stays bundled with the PyPI publish at the release gate (below).
 
 ### Layer 2 — the converter (`pipelex/temporal/temporal_data_converter.py`)
 
 Widen two predicates; leave the `BaseModel` path byte-identical.
 
-- [ ] **0.4** `to_payload` (~line 56): factor `_is_kajson_wire_value(value) -> bool` = `isinstance(value, BaseModel) or is_pydantic_dataclass(type(value))`; route both single-value and first-element-of-list cases through kajson when it holds. `BaseModel` check first (hot-path short-circuit). The `__kajson_class_source__` lookup stays (it's `None` for dataclasses — harmless).
-- [ ] **0.5** `from_payload` (~line 138): factor `_is_kajson_type(tp) -> bool` = `BaseModel` subclass **or** `is_pydantic_dataclass(tp)`; reuse it in all three hint checks (scalar, `Optional`, `list`). `_restore_class_source` only fires when `class_source_code is not None` (BaseModel-only), so dataclasses correctly skip it.
+- [x] **0.4** `to_payload` (~line 56): factor `_is_kajson_wire_value(value) -> bool` = `isinstance(value, BaseModel) or is_pydantic_dataclass(type(value))`; route both single-value and first-element-of-list cases through kajson when it holds. `BaseModel` check first (hot-path short-circuit). The `__kajson_class_source__` lookup stays (it's `None` for dataclasses — harmless).
+  - Result: added `_is_kajson_wire_value(value: object)` + extracted `_kajson_to_payload(value, source_type_holder)` (shared by the scalar and list branches) + `_first_kajson_list_element` (list probe). BaseModel path is byte-identical (locked by the 0.6 regression guard). **Type-checking deviation:** the original relied on inline `isinstance` narrowing; the predicate is non-narrowing, so to keep pyright-strict `reportUnknownArgumentType` happy I typed the value predicate param as `object` (so `type(value)` is `type[object]`, not `type[Unknown]`) and kept `value` explicitly `Any` at call sites.
+- [x] **0.5** `from_payload` (~line 138): factor `_is_kajson_type(tp) -> bool` = `BaseModel` subclass **or** `is_pydantic_dataclass(tp)`; reuse it in all three hint checks (scalar, `Optional`, `list`). `_restore_class_source` only fires when `class_source_code is not None` (BaseModel-only), so dataclasses correctly skip it.
+  - Result: added `_is_kajson_type(type_hint)`, generalized `_unwrap_optional_base_model` → `_unwrap_optional_kajson_type`, and reused `_is_kajson_type` in all three checks (scalar, Optional, list). `is_pydantic_dataclass` is runtime-safe on non-class hints (returns `False`), so the inner `Optional`/`list` args need no guard. One `cast("Any", type_hint)` collapses the post-`isinstance` `Any | type[Unknown]` for the typed probe.
 
 Perf note: adds one cheap `is_pydantic_dataclass()` check per conversion, behind the `BaseModel` short-circuit. Negligible; no benchmark needed (changes no existing payload).
 
 ### Test perimeter (three layers — most safety-critical seam)
 
-- [ ] **0.6** Converter unit round-trip: call `to_payload` / `from_payload` directly for a pydantic dataclass and for `Optional[...]` / `list[...]` hints; assert value + concrete type survive. **Regression guard:** assert a `BaseModel` payload is byte-identical to before (the untouched path).
-- [ ] **0.7** Temporal integration round-trip: a `@workflow.defn` / `@activity.defn` taking and returning a pydantic dataclass, exercised through the in-process test server (`tests/integration/pipelex/temporal/`).
+- [x] **0.6** Converter unit round-trip: call `to_payload` / `from_payload` directly for a pydantic dataclass and for `Optional[...]` / `list[...]` hints; assert value + concrete type survive. **Regression guard:** assert a `BaseModel` payload is byte-identical to before (the untouched path).
+  - Result: `tests/integration/pipelex/temporal/data_converter/test_data_conv_dataclass.py` — scalar / `X | None` / `list[X]` dataclass round-trips (concrete type + nested BaseModel preserved) + a byte-identical guard for a plain BaseModel (metadata == `{encoding}`, data == `kajson.dumps(model)`). 8 tests in the dir pass.
+- [x] **0.7** Temporal integration round-trip: a `@workflow.defn` / `@activity.defn` taking and returning a pydantic dataclass, exercised through the in-process test server (`tests/integration/pipelex/temporal/`).
+  - Result: `tests/integration/pipelex/temporal/test_wf_dataclass_roundtrip.py` — `WfEchoDataclassPayload` forwards a `@pydantic_dataclass` (with nested BaseModel + `timedelta` fields) through an activity via `WorkflowEnvironment.start_local` + `Worker`; asserts type preserved end-to-end. Green. Broader temporal integration suite (non-inference) re-run clean: 136 passed, 4 pre-existing xdist-race xpass, no regressions.
 
 ### Cross-repo wiring
 
 This worktree's `uv.lock` pins kajson as `{ editable = "../kajson" }` (confirmed) — changes in `../kajson` are picked up live, no publish needed for dev/test. `pipelex/pyproject.toml` still declares `kajson==0.5.0`; that specifier only bites at pipelex release time.
 
-- [ ] **0.8** After 0.4/0.5 land, update the "Safety boundary" heading wording in this file from "must be BaseModel" framing to the now-true "BaseModel or pydantic dataclass" (already drafted above — just confirm it matches what shipped).
-- [ ] **0.9** Verify the editable kajson install survives any `uv sync` run during this phase (re-check `uv.lock` line for `editable = "../kajson"`).
+- [x] **0.8** After 0.4/0.5 land, update the "Safety boundary" heading wording in this file from "must be BaseModel" framing to the now-true "BaseModel or pydantic dataclass" (already drafted above — just confirm it matches what shipped).
+  - Result: confirmed — the heading and body wording ("each MUST be a `BaseModel` **or** a pydantic dataclass — the two forms `BaseModelPayloadConverter` routes through kajson") matches what shipped (`_is_kajson_wire_value` / `_is_kajson_type` route both forms through kajson). No edit needed.
+- [x] **0.9** Verify the editable kajson install survives any `uv sync` run during this phase (re-check `uv.lock` line for `editable = "../kajson"`).
+  - Result: `uv.lock` still pins `source = { editable = "../kajson" }` (line 1972); no `uv lock`/`uv sync` was run. Verified the pipelex worktree's `.venv` serves the live kajson source (imports the new decode branch; bad payload raises `KajsonDecoderError`) with installed metadata still `0.5.0`. **Caveat:** a `uv lock` regeneration WOULD now conflict (editable `0.6.0` vs `kajson==0.5.0` pin) — defer until the release-gate pin bump.
 
 **Verify Phase 0:** kajson dataclass tests green · converter unit round-trip green (incl. BaseModel-unchanged regression guard) · `.venv/bin/pytest tests/integration/pipelex/temporal/` green · `make agent-check` + `make tb` clean.
 
@@ -269,6 +281,19 @@ Append one entry per session, especially at every hard stop. Template:
 - Code state: <clean & committed? mid-edit? which files dirty?>
 - NEXT ACTION: <the single exact thing the next session should do first>
 ```
+
+### 2026-05-29 — Phase 0 complete (converter + kajson generalized) — 🛑 HARD STOP 1 reached
+- Landed: Pre-flight (both boxes) + **0.1–0.9** all flipped with per-item results above. Two-repo change:
+  - **kajson** (`../kajson`, branch `feature/Support-more-types`): `json_decoder.py` gained an explicit `is_pydantic_dataclass` decode branch (validates via the dataclass, raises `KajsonDecoderError` loudly instead of silently returning a raw dict); new `tests/unit/test_pydantic_dataclass.py`; version `0.5.0`→`0.6.0` + CHANGELOG entry.
+  - **pipelex** (`_data` worktree): `pipelex/temporal/temporal_data_converter.py` widened — `_is_kajson_wire_value` (to_payload, BaseModel-short-circuit first) and `_is_kajson_type` (from_payload scalar/Optional/list) now also accept pydantic dataclasses; BaseModel path byte-identical. New tests: `data_converter/test_data_conv_dataclass.py` (direct converter + byte-identical regression guard) and `test_wf_dataclass_roundtrip.py` (in-process-server round-trip).
+- Decisions / deviations:
+  - **kajson test isolation (fixed at root after code review):** `test_json_encoder` / `test_json_decoder` autouse fixtures used to `clear_*coders()` on teardown without restoring, wiping kajson's import-time default codecs process-wide. Now they snapshot the registry and restore it on teardown. An initial band-aid (re-registering `timedelta` in the new dataclass test) was removed.
+  - **pyright-strict refactor:** replacing the original inline `isinstance` narrowing with non-narrowing bool predicates surfaced `reportUnknownArgumentType` errors (`type(Any)` → `type[Unknown]`). Resolved cleanly: value predicate param typed `object`, list-head probe extracted to an `object`-typed helper, call sites keep `value` explicitly `Any`, and one `cast("Any", type_hint)` collapses the post-`isinstance` union. No `# pyright: ignore` added in the converter.
+  - **Version/pin tension (IMPORTANT for next session):** kajson is bumped to `0.6.0` but pipelex still pins `kajson==0.5.0` (editable source serves live code; installed metadata stays `0.5.0`, so the pin holds and the `.venv` works). Running `uv lock`/`uv sync` here would now FAIL (editable `0.6.0` vs `==0.5.0`). The pin bump + PyPI publish remain the deferred release gate.
+- Verification (all green): kajson suite 257 passed / 1 skipped + kajson `make agent-check` clean · pipelex `make agent-check` (pyright 0/0, mypy 1929 files) · `make tb` 2 passed · converter+integration round-trips 11 passed · full temporal integration (non-inference) 136 passed, 4 pre-existing xdist-race xpass, no regressions, no stray temporal processes.
+- Open questions: none blocking Phase 1. The only live item is the deferred kajson PyPI publish + `kajson==` pin bump (release gate, not dev-blocking).
+- Code state: **uncommitted** (per instruction — not committing without explicit ask). Dirty: kajson = `CHANGELOG.md`, `kajson/json_decoder.py`, `pyproject.toml`, new `tests/unit/test_pydantic_dataclass.py`, plus the code-review root-cause fix in `tests/unit/test_json_encoder.py` + `tests/unit/test_json_decoder.py`; pipelex `_data` = `pipelex/temporal/temporal_data_converter.py`, new `tests/integration/pipelex/temporal/data_converter/test_data_conv_dataclass.py`, new `tests/integration/pipelex/temporal/test_wf_dataclass_roundtrip.py`, and this `TODOS.md`. Tree otherwise clean; `uv.lock` untouched.
+- NEXT ACTION: HARD STOP 1 — END THE SESSION. A fresh session starts Phase 1 (perf baseline harness at `tests/perf/test_dataclass_forms_bench.py`, task 1.1), which does not depend on Phase 0 internals. Before any `uv` re-lock, remember the version/pin tension above.
 
 ### 2026-05-29 — Ledger created (planning only, no code changes)
 - Landed: nothing implemented yet. This ledger was created from the former `wip/data-class-best-practices-plan.md` (removed). The previous root ledger (`feature/API-readiness-4`, all complete) was archived to `wip/error-handling/archive-todos-api-readiness-4.md`.
