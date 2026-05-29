@@ -1,181 +1,278 @@
-# Implementation Plan — `feature/API-readiness-4`
+# Data-Class Best-Practices Refactor — Working Ledger (`refactor/Dataclasses`)
 
-Pipelex-side cleanup branch picking up the upstream tail of the API error-handling endeavour. The API consumer (`pipelex-api`, branch `feature/Adapt-to-pipelex-update-3`) has shipped through Phases 0-5 plus Phase A0 / A1 and is at a "finalize" moment; what remains for the API to fully discharge that endeavour is a handful of upstream-pipelex items. **This branch is those items.**
+Give every data holder the right shape: `BaseModel` (or, after Phase 0, a pydantic dataclass) for anything on the Temporal wire; `NamedTuple` for small fixed immutable off-wire records replacing bare tuples; frozen `BaseModel` for immutable validated off-wire value objects; plain mutable `BaseModel` where the object is genuinely mutated in place. Eradicate every stdlib `@dataclass` (HARD RULE 1).
+
+Phase 0 is the foundation: generalize the Temporal converter (and kajson, in `../kajson`) so pydantic dataclasses are wire-legal, relaxing the "must be BaseModel on the wire" constraint. It is purely additive — no current wire type is a pydantic dataclass, so no existing payload changes. Everything after Phase 0 is off-wire and chosen per-site.
+
+This ledger supersedes the completed `feature/API-readiness-4` ledger (archived to `wip/error-handling/archive-todos-api-readiness-4.md` on 2026-05-29). The original free-form plan that seeded this ledger was at `wip/data-class-best-practices-plan.md` (now removed; this file replaces it).
 
 ---
 
 ## Cold-start reading order
 
-Read in this order to understand why this branch exists at all:
+A fresh session should read, in order:
 
-1. `wip/error-handling/README.md` — current state of error handling across pipelex; the high-level map.
-2. `wip/error-handling/archive-todos-api-readiness-2.md` — the prior ledger (formerly the repo-root `TODOS.md`, archived 2026-05-28). This branch is the successor.
-3. `../pipelex-api/wip/pipelex-changes.md` Stage 7 (items #10-#15) — the **authoritative per-item context** for five of the items on this branch. Each item there has a *What / Why / Where / How* writeup with empirical reproductions against the pinned pipelex. Do not re-derive that context here; consume it from there.
-4. `../pipelex-api/TODOS.md` "Deferred / next-track work" → "Upstream-pipelex follow-ups" — names the same items at the API end, in the consumer's voice. Useful sanity check.
-5. `wip/console-targets-and-agent-cli-stdout.md` and `wip/structured-logging/kickoff.md` — relevant background for the **webhook-delivery logging** item below; see the sequencing note in that section before starting.
-
-The `test_failed_webhook_log_includes_request_id_when_set` regression test already landed on the base (`feature/API-readiness-2`, commit `74b68bd7`) and is present in the working tree — do **not** re-add it. `git log feature/API-readiness-2..HEAD --oneline` shows this branch adds only planning docs on top of that base. Everything below is what to implement.
+1. **This file, top to bottom.** It is the single source of truth for what to do and what's done.
+2. **The "Session log" at the bottom** — the most recent entry is the handoff note from the last session: what landed, decisions taken, open questions, and the exact next action.
+3. **`pipelex/temporal/temporal_data_converter.py`** — the converter being generalized in Phase 0. Read `BaseModelPayloadConverter.to_payload` / `from_payload`.
+4. **`../kajson/kajson/json_decoder.py`** (`_apply_decoder_strategies`, ~line 196) and **`json_encoder.py`** (`default`, ~line 107) — the kajson dispatch Phase 0 extends.
+5. The per-item detail sections below carry the *why* for each conversion; trust them but re-confirm any path/line reference against the current tree before editing (the off-wire audit was originally taken against a sibling `refactor/Paths` worktree).
 
 ---
 
-## What this branch is NOT
+## How to use this ledger
 
-- Not the structured-logging refactor. That has its own kick-off doc and its own future branch (`refactor/structured-logging` or similar — see `wip/structured-logging/kickoff.md`).
-- Not webhook signing. That's the cross-repo lockstep track owned by `wip/security/webhook-signing.md`.
-- Not a `dev` merge train. If `dev` has moved, treat that as a separate prep step, not part of this plan.
-
----
-
-## Items
-
-Six concrete items, all flagged in `pipelex-changes.md` Stage 7 or surfaced by the API-side `TODOS.md`. None blocks any API release on its own; together they discharge the upstream tail of the error-handling endeavour and let the API drop a small number of follow-up catches and workarounds.
-
-Sequencing inside this branch is flexible — every item is independent except where called out. Suggested order is "smallest first to build momentum, then the two bigger ones."
-
-### 1. `ErrorDomain.is_input` (and siblings) — `@property` helpers on the enum
-
-- [x] **Status:** Done (2026-05-28). Two pieces landed in `pipelex/base_exceptions.py`: (a) `ErrorDomain.is_input` as an exhaustive-`match` `@property` (the enum-level single source of truth), and (b) a module-level `error_domain_is_input(error_domain: ErrorDomain | str | None) -> bool` that coerces the serialized form and delegates to the property — paralleling the existing `error_domain_to_http_status(...)`. The function is the one the API actually consumes: both API call sites hold `error_domain` as `str | None` (`ErrorReport.error_domain` is typed `str | None`; the problem-document dict value is a plain str), so the bare `report.error_domain.is_input` the spec sketched would not type-check. Covered by `tests/unit/pipelex/exceptions/test_error_domain.py::TestErrorDomain` (`test_is_input` + `test_error_domain_is_input`). Only `is_input` landed — `is_config` / `is_runtime` deferred until a need surfaces. The API consumes this via the editable local dependency on this worktree (no PyPI pin bump needed); the API-side switch off `== ErrorDomain.INPUT` at `api/exception_handlers.py:204,253` is being made now.
-**Authoritative spec:** `../pipelex-api/wip/pipelex-changes.md` item #14.
-**Where:** `pipelex/base_exceptions.py` — the `ErrorDomain` `StrEnum`.
-
-Add `@property` helpers (`is_input`, and `is_config` / `is_runtime` as needs surface) so callers read state via `report.error_domain.is_input` instead of `report.error_domain == ErrorDomain.INPUT`. This is the canonical project remediation for single-state enum checks (see `python-standards.md`) — call sites stay one-liners, the enumeration lives in one place.
-
-**Sequence first:** every other item benefits from being able to use the helper at call sites it touches. Trivial change; ~20 lines + a test. The API-side `archive-todos-api-readiness-2.md` Phase 3 review Q9 left two call sites in `api/exception_handlers.py` deliberately on `== ErrorDomain.INPUT` waiting for this; one follow-up commit there will switch them once this lands.
+- **Checkboxes** track progress. Flip `[ ]` → `[x]` the moment a task lands (with its verification green), and append a one-line result (what changed + where) right under it. Do not batch.
+- **Checkpoints are HARD STOPS.** When you reach a `🛑 HARD STOP` marker you MUST end the session after completing the context-save protocol below — do not roll into the next phase in the same session. They sit at natural handoff points where a coherent unit has landed and context has grown enough to warrant a fresh start.
+- **Context-save protocol** (run at every hard stop, before ending the session):
+  1. Flip all completed checkboxes and write their one-line results.
+  2. Append a new **Session log** entry (template at the bottom): date, what landed, decisions taken, open questions, current code state (clean? mid-edit?), and the single exact next action for the next session.
+  3. Record any deviation from this plan inline in the relevant item, with the reason.
+  4. Confirm the tree is in a clean, committed (or clearly-described) state — the next session must be able to cold-start with zero memory of this one.
+- **Verification commands** (run as noted per phase; never skip on a hard stop):
+  - `make agent-check` — after every code change.
+  - `make tb` — after any change touching boot/config/import paths.
+  - `.venv/bin/pytest tests/integration/pipelex/temporal/` — after any change in `pipelex/temporal/` or the converter/kajson.
+  - `make agent-test` — full suite, at the final gate.
 
 ---
 
-### 2. `EnvVarNotFoundError` should carry `error_domain = ErrorDomain.CONFIG`
+## Safety boundary — wire types must be BaseModel or pydantic dataclass
 
-- [x] **Status:** Done (2026-05-28). Added `error_domain = ErrorDomain.CONFIG` as a class attribute on `EnvVarNotFoundError` in `pipelex/system/exceptions.py`, so its rendered `ErrorReport` / RFC 7807 problem document classifies as a config-domain failure (an operator sets the missing env var, not the caller). HTTP status is unchanged — both `None` and `CONFIG` map to 500. Covered by `tests/unit/pipelex/exceptions/test_class_level_metadata.py::TestClassLevelMetadata::test_error_domain` (new `env_var_not_found` parametrize case). The API consumes this via the editable local dependency on this worktree.
-**Authoritative spec:** `../pipelex-api/wip/pipelex-changes.md` item #10.
-**Where:** `pipelex/system/exceptions.py` (note: moved here from `pipelex/system/environment.py` during the Phase 6 import-path moves the API already adapted to — the spec doc still names the old path).
+These types cross the Temporal wire directly or transitively. After Phase 0, each MUST be a `BaseModel` **or** a pydantic dataclass — the two forms `BaseModelPayloadConverter` routes through kajson with type preservation. A `NamedTuple`, stdlib dataclass, or arbitrary class here falls through to Temporal's stock JSON path and silently corrupts distributed execution or hard-fails deserialization.
 
-Today `EnvVarNotFoundError` is domain-less (it's a `ToolError`; neither parent sets `error_domain`). A missing required env var is the textbook `CONFIG`-domain failure — an operator, not the caller, fixes it. Add `error_domain = ErrorDomain.CONFIG` as a ClassVar so the rendered `ErrorReport` / RFC 7807 problem document classifies correctly. HTTP status is unaffected (both `None` and `CONFIG` map to 500).
+**Every type on this list currently is, and should remain, a `BaseModel`.** They rely on machinery pydantic dataclasses don't provide as cleanly — discriminated unions, model validators, `model_dump`, the dynamic-class `__kajson_class_source__` mechanism. Phase 0 widens what is *legal* on the wire; it does NOT motivate converting anything already here. Do not convert these to pydantic dataclasses just because Phase 0 makes it possible.
 
-This is the upstream half of the "original bug" the entire endeavour started from — a deployment that forgot to set `COMPLETION_CALLBACK_SECRET`. The API already classifies its own config faults as `CONFIG`; this brings pipelex-authored ones into alignment.
-
----
-
-### 3. `parse_concept_spec` should validate `structure` shape before iterating
-
-- [x] **Status:** Done (2026-05-28). Two parsing functions now shape-validate raw caller input before iterating, raising typed `INPUT`-domain errors instead of leaking bare `AttributeError`/`TypeError`/`ValueError`. (a) `parse_concept_spec` (`concept_ops.py`) rejects a non-mapping `structure` and any field value that is neither a description string nor a field-spec mapping, raising `ConceptSpecError`. (b) `parse_pipe_spec` (`pipe_ops.py`) rejects a non-list `steps`/`branches` or a non-mapping entry within them, raising the new `PipeSpecError`; the raw-iterate logic moved into a shared `_normalize_sub_pipe_list(...)` helper. Both error classes now carry `error_domain = ErrorDomain.INPUT` + `_authors_caller_facing_message = True` — `ConceptSpecError` (`builder/concept/exceptions.py`) gained the domain (it was previously domain-less); `PipeSpecError` is new (`builder/pipe/exceptions.py`). Docstrings on both functions now list every exception actually raised. Covered by new cases in `tests/unit/pipelex/builder/operations/test_parse_concept_spec.py` and `test_parse_pipe_spec.py` (typed-error + INPUT-domain assertions). Verified end-to-end through both consumers: `pipelex-agent concept`/`pipe` now emit `{"error_type": "ConceptSpecError"|"PipeSpecError", "error_domain": "input"}` instead of a bug-looking bare type. Error doc pages regenerated (`pipelex-dev generate-error-pages`) — added `pipe-spec-error.md`, refreshed `concept-spec-error.md`; the run also picked up two pre-existing stale pages unrelated to this item (`env-var-not-found-error.md` from item #2, and a missing `async-execution-not-enabled-error.md`). The API consumes this via the editable local dependency on this worktree; the API-side narrow `/build/concept` + `/build/pipe` route catches are API-side follow-ups, not this branch.
-**Authoritative spec:** `../pipelex-api/wip/pipelex-changes.md` item #11.
-**Where:** `pipelex/builder/operations/concept_ops.py` — the `parse_concept_spec(...)` function.
-
-The function iterates `spec_data["structure"]` before calling `ConceptSpec.model_validate(...)`. Non-dict `structure`, or fields that are neither string nor dict, leak bare `AttributeError` / `TypeError` (undocumented; the docstring only declares `ValidationError`). Empirical reproductions live in the spec doc.
-
-Fix is upstream shape validation — either raise a typed `PipelexInputError`-equivalent, or a `pydantic.ValidationError` via a thin `model_validate(...)` over the raw input shape before the iteration. Update the docstring to list every exception actually raised.
-
-The API today cannot safely catch these at the route — `AttributeError` / `TypeError` are also the types a real programming bug would raise, so a route-level catch would mask genuine bugs. Once this lands, the API's `/build/concept` route gets a narrow, typed catch.
-
-While here: sweep `pipelex/builder/operations/*.py` for the same pattern (raw-iterate-then-validate). `parse_pipe_spec` has it too — it iterates `spec_data["steps"]` / `spec_data["branches"]` and calls `dict(step)` on each entry before `model_validate`, so a non-list `steps` / `branches` or non-mapping entries leak bare `TypeError` / `ValueError` ahead of validation. Route those through the same narrow shape-validation path before iterating. (The bad-`pipe_type` `ValueError` is a separate, already-documented case — that one is narrow enough to leave.)
-
----
-
-### 4. `LocalStorageProvider` should wrap raw `OSError` as a `StorageLocalError`
-
-- [x] **Status:** Done (2026-05-28). Added `StorageLocalError(StorageError)` (with `_declared_title = "Local storage error"`) to `pipelex/tools/storage/exceptions.py`, paralleling `StorageS3Error` / `StorageGcpError`. Both filesystem methods in `local_storage_provider.py` now wrap raw `OSError`: `_store` wraps the `mkdir` + `aiofiles.open(...).write(...)` block (`ENOSPC` / `EACCES` / `EROFS` / `FileExistsError` / `EIO` → `StorageLocalError`); `_load_with_metadata` wraps the `aiofiles.open(...).read()` call, with an explicit `except FileNotFoundError` branch first that routes the TOCTOU window (file removed between the `exists()` check and the open) to `StorageFileNotFoundError`, so "file not found" stays the same typed error regardless of timing, and a generic `except OSError` → `StorageLocalError` for the rest (`PermissionError` / `IsADirectoryError` / `EIO`). `public_url` does no filesystem I/O, so it's untouched. Docstrings updated to list `StorageLocalError`. Covered by three new cases in `tests/unit/pipelex/tools/storage/test_local_storage_provider.py` (store→`FileExistsError` via blocker file, load→`IsADirectoryError` via dir-at-key, load→TOCTOU `FileNotFoundError` via `aiofiles.open` monkeypatch) — each asserts the typed wrapper and `__cause__` is an `OSError`. Error doc page generated (`pipelex-dev generate-error-pages`) — added `storage-local-error.md`, refreshed `index.md`; no incidental stale pages this run. The API consumes this via the editable local dependency on this worktree; the API-side narrow storage-route catches are API-side follow-ups, not this branch.
-**Authoritative spec:** `../pipelex-api/wip/pipelex-changes.md` item #12.
-**Where:** `pipelex/tools/storage/local_storage_provider.py` — `_store` and `_load_with_metadata`.
-
-Today, `ENOSPC` / `EACCES` / `EROFS` / `EIO` / `FileExistsError` / TOCTOU window after `file_path.exists()` all escape as raw `OSError`. Add a narrow `try/except OSError as exc: raise StorageLocalError(msg) from exc` around the filesystem calls — mirroring the wrapping already done by `S3StorageProvider` / `GcpStorageProvider`. Empirical reproductions are in the spec doc.
-
-**Decision:** Add a new `StorageLocalError(StorageError)` to `pipelex/tools/storage/exceptions.py`, paralleling `StorageS3Error` / `StorageGcpError` (with a `_declared_title = "Local storage error"`). Keeps per-backend differentiation consistent across the storage abstraction.
-
-Pair-test with item #5 (S3) — both deliver on the same storage-abstraction contract; same review can cover both.
+- `PipeRunArg` (`pipelex/temporal/tprl_pipe/pipe_run_arg.py`) — direct argument of `WfPipeRun.run`. Already `BaseModel`.
+- `PipeJob` (`pipelex/pipe_run/pipe_job.py`) — argument of `WfPipeRouter.run`; field of `PipeRunArg`.
+- `PipeOutput` (`pipelex/core/pipes/pipe_output.py`) — return of both router workflows; field of `DeliveryActivityArg`.
+- `DeliveryAssignment` (`pipelex/pipe_run/delivery_assignment.py`) — field of `PipeRunArg` and `DeliveryActivityArg`.
+- `DeliveryActivityArg` (`pipelex/temporal/tprl_pipe/act_deliver.py`) — argument of `act_deliver`.
+- `DeliveryStatus` (StrEnum, `pipelex/pipe_run/delivery_assignment.py`) — enclosed in `DeliveryActivityArg`; the StrEnum is fine, keep the enclosing type a `BaseModel`.
+- `ErrorReport` (`pipelex/base_exceptions.py`) — field of `DeliveryActivityArg`.
+- `AssembleGraphArg` (`pipelex/temporal/tprl_pipe/act_assemble_graph.py`) — argument of `act_assemble_graph`.
+- `GraphSpec` (`pipelex/graph/graphspec.py`) — return of `act_assemble_graph`; field of `PipeOutput`.
+- `PipelineRef` (`pipelex/graph/graphspec.py`) — embedded in the returned `GraphSpec`.
+- `FlushTraceEventsArg` (`pipelex/temporal/tprl_pipe/act_flush_trace_events.py`) — argument of `act_flush_trace_events`.
+- `JobMetadata` (`pipelex/pipeline/job_metadata.py`) — field of `PipeJob`.
+- `GraphContext` (confirm path: `grep -rn "class GraphContext" pipelex/`) — field of `JobMetadata`, transitively on `PipeJob`.
+- `WorkingMemory` (`pipelex/core/memory/working_memory.py`) — field of `PipeJob` and `PipeOutput`.
+- `PipeRunParams` (`pipelex/core/pipes/pipe_run_params.py`) — field of `PipeJob`.
+- `PipeAbstract` + all concrete pipe subclasses (`pipelex/core/pipes/pipe_abstract.py`; confirm) — the `pipe` field of `PipeJob`.
+- `LibraryCrate` (confirm path: `grep -rn "class LibraryCrate" pipelex/`) — field of `PipeJob`.
+- `Stuff` (`pipelex/core/stuffs/stuff.py`) — contained in `WorkingMemory`.
+- `StuffContent` + the entire discriminated-union hierarchy (`pipelex/core/stuffs/stuff_content.py`): `TextContent`, `ImageContent`, `PdfContent`, `ListContent`, `StructuredContent`, `HtmlContent`, `NumberContent`, etc.
+- `ImageContent` — return element of content-gen activities (`list[ImageContent]`).
+- `PageContent` (confirm exact file) — return element of a content-gen activity (`list[PageContent]`).
+- Page-view content payload(s) — returned by the render-page-views activity, embedded in `PageContent.page_view`. Confirm exact class name(s) by reading the activity return annotation and the `PageContent.page_view` field BEFORE touching anything nearby; highest-risk list-element serialization spot.
+- `TraceEvent` + subtypes (`pipelex/tracing/...`) — element type of `FlushTraceEventsArg.events`. Confirm via the `events` annotation and `BufferingEventLog.drain` return type.
 
 ---
 
-### 5. `S3StorageProvider` should catch the full `BotoCoreError` hierarchy
+## Pre-flight — freeze the boundary (do before any edit)
 
-- [x] **Status:** Done (2026-05-28). All three methods in `s3_storage_provider.py` now wrap the entire `BotoCoreError` hierarchy instead of only `NoCredentialsError` / `EndpointConnectionError`. In `_load_with_metadata` and `_store` the final `except (NoCredentialsError, EndpointConnectionError)` branch was broadened to `except BotoCoreError as exc: raise StorageS3Error(f"S3 backend error for key '{key}': {type(exc).__name__}") from exc`, sitting after the `ClientError` *sibling* branch (kept separate — `ClientError` is not a `BotoCoreError` subclass, verified empirically) and after the two service-specific `client.exceptions.NoSuchKey` / `NoSuchBucket` branches (unchanged). This closes the real-world leak: `ReadTimeoutError` / `ConnectTimeoutError` / `ConnectionClosedError` / `PartialCredentialsError` / `CredentialRetrievalError` / `ProxyConnectionError` (all `BotoCoreError` subclasses) previously escaped unwrapped; the most likely one, `ReadTimeoutError` on a slow/transient transfer, now surfaces as a typed `StorageS3Error`. `public_url`'s presign fallback widened from `except ClientError` → `except (BotoCoreError, ClientError)`, preserving the existing "if signing fails, serve the unsigned public URL" semantics for transport failures too. Per the decision, **no new sub-error class** — wrapping stays on the existing `StorageS3Error`, so no doc page work (generator confirms 0 drift: `Written: 0 · Unchanged: 245`). Covered by three new cases in `tests/unit/pipelex/tools/storage/test_s3_storage_provider.py` (`test_load_read_timeout_error_raises_s3_error`, `test_store_read_timeout_error_raises_s3_error`, `test_public_url_falls_back_to_public_url_on_botocore_error`); the three pre-existing `NoCredentialsError` / `EndpointConnectionError` tests were updated to assert the new message (`type(exc).__name__` in the text) and that `__cause__` is a `BotoCoreError`. The lower-priority `_get_session()`-outside-the-try side issue (a `BotoCoreError` from boto's own session-startup path could still escape) is left as-is — flag in the PR, don't gate on it. The API consumes this via the editable local dependency on this worktree; the API-side narrow storage-route catches are API-side follow-ups, not this branch.
-**Authoritative spec:** `../pipelex-api/wip/pipelex-changes.md` item #13.
-**Where:** `pipelex/tools/storage/s3_storage_provider.py` — `_load_with_metadata`, `_store`, and `public_url`.
-
-The provider catches only three `BotoCoreError` subclasses (`NoCredentialsError`, `EndpointConnectionError`) plus `ClientError` (which is a *sibling*, not a subclass, of `BotoCoreError`). Every other `BotoCoreError` subclass — `ReadTimeoutError`, `ConnectTimeoutError`, `ConnectionClosedError`, `PartialCredentialsError`, `CredentialRetrievalError`, `ProxyConnectionError`, … — escapes unwrapped. `ReadTimeoutError` is the most likely real-world leak (transient AWS networking).
-
-Fix: broaden each `except` block from `(NoCredentialsError, EndpointConnectionError)` to `BotoCoreError`, keeping the `ClientError` branch as a separate sibling `except`. The two service-specific branches at the top (`NoSuchKey`, `NoSuchBucket`) stay. `public_url`'s `try/except ClientError → return public URL` fallback should likely widen the same way.
-
-**Decision:** Keep wrapping as the existing `StorageS3Error(StorageError)` — no new sub-error class needed for the broadened catch. (Symmetric to item #4's `StorageLocalError` addition.)
-
-Lower-priority side issue noted in the spec doc: `_get_session()` runs outside every method's try block. Mention in the PR but don't gate on it.
+- [ ] Re-confirm the wire layer is clean: `grep -rn "@dataclass\|NamedTuple" pipelex/temporal/` returns nothing.
+- [ ] Resolve every "confirm path" entry in the safety boundary above (`GraphContext`, `LibraryCrate`, `PipeAbstract`, `PageContent`, page-view payload, `TraceEvent`) and pin the paths.
 
 ---
 
-### 6. Webhook-delivery SSRF DNS recheck
+## Phase 0 — Generalize the converter (+ kajson) to accept pydantic dataclasses
 
-- [x] **Status:** Done (2026-05-28). Greenfield `pipelex/tools/network/` package now closes the DNS-rebinding gap at webhook-delivery time. Three modules: (a) `host_rules.py` — `is_disallowed_ip(host)` (**deny-by-default**: `not addr.is_global`, so private/loopback/link-local — incl. `169.254.169.254` — /CGNAT `100.64/10`/shared/documentation/benchmarking/unspecified are all refused in one predicate, plus explicit `is_multicast`/`is_reserved` because `ipaddress` marks the `224.0.0.0/4` and `64:ff9b::/96` NAT64 ranges as `is_global`) + `is_disallowed_host(host)` (empty / known internal hostname `localhost`·`metadata`·`metadata.google.internal` / literal disallowed IP) — this is the single source of truth, and it is **stricter than the API's current enumerate-the-bad-ranges `_is_disallowed_host`** (the deny-by-default form closes a CGNAT leak the API check has; the API inherits the tightening when it re-points at this helper); (b) `exceptions.py` — `SsrfBlockedError(SecurityError)` with `error_domain = ErrorDomain.INPUT` (destination is caller-supplied — fixable by providing a public URL) and `_authors_caller_facing_message = True` (message names only the caller's own hostname, never the resolved private IP, so STRICT disclosure cannot confirm internal topology); (c) `ssrf_guard.py` — `SsrfGuardedTransport(httpx.AsyncHTTPTransport)` whose `resolve_to_allowed_ip(host, port)` short-circuits literal-disallowed hosts, resolves via `loop.getaddrinfo` (→ `socket.getaddrinfo`, monkeypatch-able), refuses if **any** resolved IP is disallowed (a mixed public/private resolution is itself a rebinding signal), maps a genuine `socket.gaierror` → `httpcore.ConnectError` (so a real DNS failure keeps its normal `httpx.ConnectError` → `WebhookDeliveryError` path), and connects to the **first vetted IP** (a literal → `getaddrinfo` does no DNS, so no rebind can slip between the check and the socket). **Seam choice:** on pinned `httpx` 0.28.1 / `httpcore` 1.0.9 there is no public `network_backend` kwarg and no resolver/DNS hook (event hooks are request/response only), so the guard wraps the connection pool's `_network_backend` in place via a custom `httpcore.AsyncNetworkBackend` (`SsrfGuardedBackend`). This intercepts only the TCP connect — TLS SNI / cert verification and the `Host` header keep using the origin **hostname** automatically, because `httpcore._async.connection.AsyncHTTPConnection._connect` derives `server_hostname` from the origin, not from what `connect_tcp` dials. One private-attr touch (`self._pool._network_backend`) carries the repo's established `# noqa: SLF001  # pyright: ignore[reportPrivateUsage]`. `delivery_executor._notify_webhook` now builds `httpx.AsyncClient(transport=SsrfGuardedTransport())`; `SsrfBlockedError` — a `SecurityError` — is deliberately **not** re-wrapped as `WebhookDeliveryError`, so it propagates and the delivery aborts loudly (security signals must not be swallowed by the domain-level `except httpx.RequestError`). Covered by `tests/unit/pipelex/tools/network/test_host_rules.py` (`TestHostRules` — literal-IP + hostname classification), `test_ssrf_guard.py` (`TestSsrfGuard` — public/private/literal/mixed/`gaierror` resolution + a real `httpx.AsyncClient` driven through the guarded transport aborting before any socket), and an end-to-end `test_webhook_aborts_on_dns_rebind_to_private_ip` in `tests/unit/pipelex/pipe_run/test_delivery_executor.py` (`execute()` aborts with `SsrfBlockedError` via a `socket.getaddrinfo` monkeypatch returning `169.254.169.254` — no live network). Error doc page generated (`pipelex-dev generate-error-pages`): `docs/errors/ssrf-blocked-error.md` + a one-line index refresh under `SecurityError`. `make agent-check` clean (pyright 0, mypy 0, ruff/plxt clean); targeted unit + integration-pipes suites green. **Naming deviation:** named `SsrfBlockedError` (generic — the transport guards any caller-supplied outbound URL, not only webhooks) rather than the spec's tentative `WebhookDeliverySsrfBlocked`, per the "(or whatever the typed error ends up named)" latitude; it still lives in `pipelex/tools/network/exceptions.py` per the error-location convention (not co-located with the helper). **API-side migration note:** the API doc says `from pipelex.tools.network import is_disallowed_host`, but `__init__.py` is kept empty per the no-re-export-in-`__init__` rule — the real import path is `from pipelex.tools.network.host_rules import is_disallowed_host`. **Tradeoffs to flag in the PR:** (1) the guard connects to the first vetted IP, forgoing httpx/anyio happy-eyeballs multi-IP fallback for webhooks (acceptable — pinning to a vetted IP is the whole point); (2) an egress allowlist / proxy at the deploy layer stays out of scope. The API-side narrow catch + re-point of `_is_disallowed_host` is an API-side follow-up, not this branch.
-**Where:** `pipelex/pipe_run/delivery_executor.py` — wherever the webhook HTTP client (`httpx`) actually fires.
+Goal: stop the converter from being the sole arbiter of domain-model shape. Today `BaseModelPayloadConverter` routes only `BaseModel` / `Optional[BaseModel]` / `list[BaseModel]` through kajson; everything else falls through to Temporal's stock JSON. Phase 0 widens that to pydantic dataclasses (and `Optional` / `list` of them). Scope is pydantic dataclasses ONLY — `NamedTuple` stays out (kajson flattens it to a bare JSON array, losing field names + type), stdlib dataclasses stay out (HARD RULE 1 eradicates them), arbitrary classes stay out (unsafe `__dict__`-replace path).
 
-The API's `api/schemas/models.py::_is_disallowed_host` only blocks literal private / loopback / metadata IPs **at request time**. A callback URL like `https://attacker.example/cb` passes API-side validation while its DNS record can resolve to `169.254.169.254` / `127.0.0.0/8` / `10.0.0.0/8` when the worker later fires the webhook. The fix belongs at delivery time:
+### Layer 1 — kajson (`../kajson`, editable via this worktree's `uv.lock`)
 
-- A custom `httpx` transport / `httpcore` network backend whose connect step resolves the host, checks every resolved IP against the same private-host rule, and refuses to open the socket to a private / metadata destination. Note: on the pinned `httpx` 0.28.1, `AsyncHTTPTransport` exposes **no** resolver hook, and event hooks are `request` / `response` only — neither fires after DNS but before payload send — so a plain event hook cannot close the DNS-rebinding gap.
-- Or an explicit resolve-and-connect flow: resolve the hostname (`socket.getaddrinfo`), validate each candidate IP against the rule, then connect to a vetted IP while preserving the original `Host` header / SNI — so a rebind between validation and send is impossible.
-- Plus optionally an egress allowlist / proxy at the deploy layer (out of scope here — flag in the PR description so the deploy team sees it).
+kajson v0.5.0 has no dataclass support and no dataclass tests. A pydantic dataclass currently only survives via the untested generic catch-all: encode via `__dict__` (`json_encoder.py` ~160), decode via `the_class(**the_dict)` (`json_decoder.py` ~293). The decode path is fragile — if validation raises there, the next line swallows it (`except Exception: pass`) and falls through to the unsafe `obj.__dict__ = the_dict` path, then to returning a raw dict. Silent corruption instead of a loud error.
 
-The literal-host check on the API side stays as a cheap first line of defense.
+- [ ] **0.1** Add an explicit pydantic-dataclass branch in `_apply_decoder_strategies` (after the `Enum` / `BaseModel` branches, before the generic constructor), using `pydantic.dataclasses.is_pydantic_dataclass`. Reconstruct via the dataclass' pydantic validator (validates), and on `ValidationError` raise `KajsonDecoderError` loudly with dict context — mirroring the existing `BaseModel` branch (~line 265). No silent fall-through.
+- [ ] **0.2** Add kajson round-trip tests in `../kajson/tests`: pydantic dataclass with (a) nested `BaseModel` field, (b) `Optional` field, (c) `list` of pydantic dataclasses, (d) `timedelta` field, (e) a subclass (type preservation); plus a negative test that a bad payload raises `KajsonDecoderError` (not silent corruption). Lock encode-via-`__dict__` with an explicit assertion rather than relying on the catch-all.
+- [ ] **0.3** Bump kajson version in `../kajson/pyproject.toml` + add a CHANGELOG entry (genuine new capability, benefits all kajson users).
 
-**Test fixture:** synthesize a webhook URL whose DNS resolves to a private IP (use a `socket.getaddrinfo`-style monkeypatch or a test resolver). Confirm the delivery aborts with a typed error (likely a new `WebhookDeliverySsrfBlocked` or similar) rather than completing the request.
+### Layer 2 — the converter (`pipelex/temporal/temporal_data_converter.py`)
 
-**Decision — rule placement.** Create a new `pipelex/tools/network/` package (greenfield — no `network` module exists today under `pipelex/tools/`) and put the rule in `pipelex.tools.network.is_disallowed_host(...)`. The API-side `_is_disallowed_host` in `pipelex-api/api/schemas/models.py` gets re-pointed at this helper, so the CIDR set lives in one place. Follow the error-location convention: `pipelex/tools/network/exceptions.py` for `WebhookDeliverySsrfBlocked` (or whatever the typed error ends up named) — do not co-locate the error with the helper.
+Widen two predicates; leave the `BaseModel` path byte-identical.
 
----
+- [ ] **0.4** `to_payload` (~line 56): factor `_is_kajson_wire_value(value) -> bool` = `isinstance(value, BaseModel) or is_pydantic_dataclass(type(value))`; route both single-value and first-element-of-list cases through kajson when it holds. `BaseModel` check first (hot-path short-circuit). The `__kajson_class_source__` lookup stays (it's `None` for dataclasses — harmless).
+- [ ] **0.5** `from_payload` (~line 138): factor `_is_kajson_type(tp) -> bool` = `BaseModel` subclass **or** `is_pydantic_dataclass(tp)`; reuse it in all three hint checks (scalar, `Optional`, `list`). `_restore_class_source` only fires when `class_source_code is not None` (BaseModel-only), so dataclasses correctly skip it.
 
-### 7. Structured `event=webhook_delivery` / `event=webhook_failure` logging — **DEFERRED to structured-logging refactor**
+Perf note: adds one cheap `is_pydantic_dataclass()` check per conversion, behind the `BaseModel` short-circuit. Negligible; no benchmark needed (changes no existing payload).
 
-- [x] **Status:** Closed-by-deferral on this branch (2026-05-28). Re-scoped onto the `refactor/structured-logging` branch.
-**Where (for the deferral):** `wip/structured-logging/kickoff.md` "What good looks like" — event-name emission now in scope.
+### Test perimeter (three layers — most safety-critical seam)
 
-The lines this item would have touched (`pipelex/pipe_run/delivery_executor.py` around 239 / 243 / 280 / 282 / 285) are exactly the lines the structured-logging refactor lists as deletion targets (`request_id_suffix` pattern, kwarg threading from commits `ceb018b5` / `07f9cce9`). Doing a narrow event-name pass on this branch would touch those lines twice.
+- [ ] **0.6** Converter unit round-trip: call `to_payload` / `from_payload` directly for a pydantic dataclass and for `Optional[...]` / `list[...]` hints; assert value + concrete type survive. **Regression guard:** assert a `BaseModel` payload is byte-identical to before (the untouched path).
+- [ ] **0.7** Temporal integration round-trip: a `@workflow.defn` / `@activity.defn` taking and returning a pydantic dataclass, exercised through the in-process test server (`tests/integration/pipelex/temporal/`).
 
-**Follow-up actions when the structured-logging branch starts:**
+### Cross-repo wiring
 
-- Emit `event=webhook_delivery` / `event=webhook_failure` (and `event=storage_delivery` / `event=storage_failure` for symmetry) as structured fields once the new `log.info(msg, **fields)` surface lands. Document this in the kickoff doc's destination shape.
-- Re-target the API-side TODO in `../pipelex-api/TODOS.md` "Deferred / next-track work" → "Upstream-pipelex follow-ups" from this branch onto the structured-logging branch.
+This worktree's `uv.lock` pins kajson as `{ editable = "../kajson" }` (confirmed) — changes in `../kajson` are picked up live, no publish needed for dev/test. `pipelex/pyproject.toml` still declares `kajson==0.5.0`; that specifier only bites at pipelex release time.
 
-The API-side T6 test (`pipelex-api/tests/unit/test_webhook_recovery.py`) pins error-rendering consistency, not event names, so the API is not blocked on event-name emission.
+- [ ] **0.8** After 0.4/0.5 land, update the "Safety boundary" heading wording in this file from "must be BaseModel" framing to the now-true "BaseModel or pydantic dataclass" (already drafted above — just confirm it matches what shipped).
+- [ ] **0.9** Verify the editable kajson install survives any `uv sync` run during this phase (re-check `uv.lock` line for `editable = "../kajson"`).
 
----
+**Verify Phase 0:** kajson dataclass tests green · converter unit round-trip green (incl. BaseModel-unchanged regression guard) · `.venv/bin/pytest tests/integration/pipelex/temporal/` green · `make agent-check` + `make tb` clean.
 
-## Out of scope (for this branch — recorded so they don't drift back in)
-
-- **Structured-logging refactor.** Its own branch and PR. See `wip/structured-logging/kickoff.md`.
-- **Webhook signing.** Cross-repo, lockstep. See `wip/security/webhook-signing.md`.
-- **Item #15 — kajson crafted-marker exceptions.** Target repo is `kajson`, **not** `pipelex`. Belongs on a separate kajson PR. Spec lives at `../pipelex-api/wip/pipelex-changes.md` item #15; the API has a workaround in place (`_decode_body`'s widened catch tuple). Re-target there if Louis wants this on the same release train.
-- **Console targets / agent CLI stdout discipline.** Independent track — `wip/console-targets-and-agent-cli-stdout.md`. Already landed in part on `fix/Log-target`.
-- **Kajson untrusted-deserialization design pass.** Separate track at `../pipelex-api/wip/security/kajson-untrusted-deserialization.md` (workspace-level concern, needs `pipelex-app` + `pipelex-api-deploy` in the room).
-- **API-side `pipe_code` / `pipeline_run_id` log enrichment.** Done in `pipelex-api`, not here.
-- **API-side `RecursionError` in `_decode_body`.** Done in `pipelex-api`, not here.
-- **API-side JSON log sink.** Done in `pipelex-api`, not here.
+> 🛑 **HARD STOP 1 — Converter generalized.** Foundation in place across two repos; wire rule is now "BaseModel or pydantic dataclass." Run the context-save protocol and END THE SESSION. The off-wire refactor (Phases 1–5) builds on top without depending on Phase 0's internals, so a fresh session can pick up cleanly. **Release-gate to record (not dev-blocking):** publish the new kajson to PyPI + bump the `kajson==` pin in `pipelex/pyproject.toml` before pipelex ships a release depending on the new feature.
 
 ---
 
-## Verification (when items land)
+## Phase 1 — Capture perf baseline (no production code changes)
 
-- `make c` + `make t` clean on every commit.
-- For items #1-#5: add unit tests that pin the new behavior; the API-side test suite (`pipelex-api` with this branch pinned via the `[tool.uv.sources]` git rev) should also still pass — bump the pin and run `make c && make tp` over there as part of the PR.
-- For item #6 (SSRF): integration-style test using a mock resolver. No live network.
-- For item #7: depends on the sequencing decision.
+- [ ] **1.1** Write the microbench harness at `tests/perf/test_dataclass_forms_bench.py` (sketch in "Perf harness reference" below). Prefer `pytest-benchmark` if it's already a dev dep (check `pyproject.toml`); else a committed `timeit` bench so the baseline is reproducible dependency-free.
+- [ ] **1.2** Run on pre-change HEAD, save `tests/perf/baselines/dataclass_refactor_pre.json`.
 
----
-
-## Pin coordination with `pipelex-api`
-
-`pipelex-api/pyproject.toml` has a temporary `[tool.uv.sources]` git-rev pin pointing at this repo. When this branch reaches a shippable point:
-
-1. Bump that `rev` to this branch's HEAD; run `make c && make tp` in `pipelex-api`.
-2. Update the API-side `TODOS.md` "Deferred / next-track work" → "Upstream-pipelex follow-ups" — strike through the items that landed; keep the rest.
-3. Update `../pipelex-api/wip/pipelex-changes.md` Stage 7 tracking table — flip the items' status.
-
-The eventual end-state — flipping the API back to a PyPI floor (`pipelex>=<next-release>`) — is Louis-gated cross-repo release coordination; not part of this branch.
+What to measure: construction cost (N instances), validation cost (`model_validate` vs plain NamedTuple construction), serialize round-trip (`model_dump_json` / `model_validate_json` to mirror the converter), memory (`getsizeof` + `__dict__` vs `__slots__`, large-list growth). Perf-relevant sites: `DispatchOptions` (per-dispatch hot path — the one conversion that could regress), `PipeRunArg` (wire anchor, no form change), `_ThinkingParams` (control, no form change). The NamedTuple conversions (Phase 2) and Phase 0 are perf-neutral.
 
 ---
 
-## Decisions taken (2026-05-28)
+## Phase 2 — NamedTuple upgrades (off-wire bare-tuple returns, lowest risk)
 
-The open questions from the original cold-start session have been resolved. Recording here so they don't get re-litigated:
+Verified-to-exist bare-tuple returns where named fields prevent positional swaps. All off the wire, already-typed, no validation needed → NamedTuple (not pydantic dataclass). Replace `from typing import Tuple` annotations; keep `NamedTuple` defs module-local next to the function (or shared where two siblings return the same shape).
 
-1. **Item #7 sequencing — DEFERRED to structured-logging refactor.** See item #7 above. The lines it would have touched are explicit deletion targets in `wip/structured-logging/kickoff.md`. Doing the narrow event-name pass now means touching them twice.
-2. **Item #6 SSRF rule placement — SHARED HELPER.** Create `pipelex/tools/network/` (greenfield) with `is_disallowed_host(...)`. The pipelex-api side re-points its `_is_disallowed_host` at this helper. Single source of truth for the disallowed CIDR set. See item #6 above for the error-location convention note.
-3. **Items #4 / #5 error class shape — NEW `StorageLocalError(StorageError)`.** Mirrors the established per-backend pattern (`StorageS3Error` / `StorageGcpError` with `_declared_title`). Item #5 keeps wrapping as the existing `StorageS3Error`.
-4. **`dev` merge — NOT NEEDED.** `git log feature/API-readiness-2..origin/dev --oneline` returns 0 commits. `dev` is not ahead.
+- [ ] **2.1** `_handle_basic_blueprint` (~line 336) + `_handle_refines` (~line 377) in `pipelex/core/concepts/concept_factory.py` — both return `(structure_class_name, refine_string)` with `refine_string: str | None`. Define ONE shared NamedTuple (e.g. `StructureNameAndRefine`) and reuse for both.
+- [ ] **2.2** `split_cross_package_ref` (~line 197) in `pipelex/core/qualified_ref.py` — `(alias, remainder)`. Define e.g. `CrossPackageRef(alias, remainder)`. All call sites (`qualified_ref.py`, `core/domains/validation.py`, `core/concepts/concept_factory.py`, `core/concepts/validation.py`, `libraries/library.py`, `libraries/library_manager.py`, `libraries/pipe/pipe_library.py`, `libraries/concept/concept_library.py`) destructure into two locals — none relies on plain-tuple `len`/concat or passes the tuple onto a wire path. Safe.
+- [ ] **2.3** `_get_is_prod_and_runtime_mode` in `pipelex/system/runtime_manager.py` — `(is_prod, runtime_mode)`. Single caller (`setup()`) unpacks positionally; NamedTuple supports positional unpacking, no breakage.
+- [ ] **2.4** `_find_project_root` in `pipelex/config_manager.py` — `(project_root_dir, found_root_marker)`, `Tuple[Optional[Path], bool]`. NOTE: currently dead code (defined, never called) → zero call-site risk.
+
+**Verify:** `make agent-check`; `make tb` (runtime_manager / config_manager touch boot paths). Temporal suite not required (nothing near the wire).
+
+---
+
+## Phase 3 — Off-wire stdlib dataclass removals (no wire, no hot-path concern)
+
+HARD RULE 1: every stdlib `@dataclass` must go. These four are off-wire and not perf-critical.
+
+- [ ] **3.1** `_EventLogContext` — `pipelex/reporting/reporting_manager.py` → **NamedTuple**. Fields `event_log: EventLogProtocol`, `workflow_id`, `pipeline_run_id`. Private manager state in `ReportingManager._event_log_contexts`, set wholesale + popped, never field-mutated, never serialized. `event_log` is a bare `@runtime_checkable` Protocol instance stored as-is. NamedTuple avoids needing `arbitrary_types_allowed`.
+- [ ] **3.2** `ErrorPagesReport` — `pipelex/errors/error_pages_generator.py` → **frozen `BaseModel`**. Four `list[Path]` fields via `Field(default_factory=list)` + a computed `total` `@property`. Single full-kwargs construction, no in-place `.append` on instances → frozen holds. `Path` serializes natively in pydantic v2; the computed-property + default_factory pattern argues for BaseModel over NamedTuple.
+- [ ] **3.3** `CustomClassInfo` — `pipelex/builder/runner_code.py` → **frozen `BaseModel`**. Scalar fields (`class_name`, `domain_code`, `concept_code`) + two computed `@property` (`module_name`, `import_statement`). Builder/codegen artifact, never mutated, never a Temporal arg/return. `builder/CLAUDE.md` says the builder layer is uniformly pydantic; the properties make NamedTuple awkward.
+- [ ] **3.4** `VariableReference` — `pipelex/tools/jinja2/jinja2_required_variables.py` → **mutable (non-frozen) `BaseModel`** with `filters: list[str] = Field(default_factory=list)`. CRITICAL: it is MUTATED IN PLACE — `_collect_variable_references` does `references[full_path].filters.append(filter_name)` on re-seen variables. In-place mutation rules out NamedTuple and any frozen form. Do NOT freeze it. (low-medium risk: preserve the append-after-construction contract.)
+
+**Verify:** `make agent-check` after each; `make tb` after the group.
+
+---
+
+## Phase 4 — Temporal-adjacent stdlib removal (low risk)
+
+- [ ] **4.1** `RegistrationFailure` — `pipelex/temporal/tprl/namespace_check.py` (~line 50) → **NamedTuple**. Fields `namespace: str`, `missing: tuple[str, ...]`, `rpc_error_message: str`. Off-wire admin plumbing — produced by `ensure_required_search_attributes_registered` at worker boot/setup, consumed only by `pipelex/cli/commands/setup_temporal_namespace_cmd.py` to format a runbook; never an `@activity.defn` return nor a wire field. **Implementer note:** a NamedTuple is also a `tuple`, so all consumers must keep discriminating the `RegistrationFailure | tuple[str, ...]` return via `isinstance(x, RegistrationFailure)` (CLI already does, ~line 148), never `isinstance(x, tuple)`.
+
+**Verify:** `make agent-check`; `make tb`; `.venv/bin/pytest tests/integration/pipelex/temporal/`.
+
+> 🛑 **HARD STOP 2 — All mechanical off-wire work done.** NamedTuple upgrades + four off-wire stdlib removals + the temporal-adjacent one have landed; the only remaining conversion is the reviewed `DispatchOptions`, which needs a without-temporal-extra import check that's cleanest in a fresh session. Run the context-save protocol and END THE SESSION.
+
+---
+
+## Phase 5 — The reviewed item: `DispatchOptions` (needs human-review gate)
+
+`DispatchOptions` — `pipelex/temporal/config_temporal.py` (~line 366) → **frozen `BaseModel`** with `model_config = ConfigDict(arbitrary_types_allowed=True)`. Off-wire (built only inside `WorkerConfig.resolve_dispatch`, immediately consumed by splatting `to_execute_kwargs()` into `workflow.execute_activity(...)`; never a workflow/activity arg/return, never a wire field). Holds a live `temporalio` `RetryPolicy` (non-JSON, `TYPE_CHECKING` forward ref) + the `to_execute_kwargs()` behavior method → `arbitrary_types_allowed` required, `frozen` matches the build-once-read-only lifecycle. NamedTuple/pydantic dataclass are wrong (the method + arbitrary SDK field; and a pydantic dataclass hits the SAME class-def-time annotation-resolution risk as BaseModel — Phase 0 does not change this).
+
+**Load-bearing invariant (the gate):** the module must import without `temporalio` installed. `temporalio` is imported only under `TYPE_CHECKING` and lazily inside `make_retry_policy`; `retry_policy: "RetryPolicy"` is a forward ref. A pydantic model builds a validator at class-def time and may try to resolve that annotation, risking pulling `temporalio` into the plain import path.
+
+- [ ] **5.1** GATE: verify the `temporalio`-not-installed import path — run `make tb` on an environment WITHOUT the temporal extra and confirm import + config-load succeed. Keep `RetryPolicy` under `TYPE_CHECKING` (or typed `Any`).
+- [ ] **5.2** Convert `DispatchOptions` to frozen `BaseModel(arbitrary_types_allowed=True)`, preserving `to_execute_kwargs()`. If the import-clean path proves infeasible, FALL BACK to a NamedTuple with `timedelta | None` fields + the `to_execute_kwargs` method (still off-wire-legal) — record the decision in the Session log.
+
+**Verify:** `make agent-check`; `make tb`; `.venv/bin/pytest tests/integration/pipelex/temporal/`.
+
+---
+
+## Phase 6 — Perf diff + final gate
+
+- [ ] **6.1** Re-run the harness, save `tests/perf/baselines/dataclass_refactor_post.json`.
+- [ ] **6.2** Diff pre vs post. Acceptance: NamedTuple/dataclass paths must not regress; `DispatchOptions` as frozen `BaseModel` may show a small per-dispatch validation cost — confirm it's negligible vs the (network-bound) activity round-trip it configures. If non-trivial in the loop → switch `DispatchOptions` to the NamedTuple fallback (5.2) and re-verify.
+- [ ] **6.3** Final gate: `grep -rln "from dataclasses import" pipelex/` returns nothing · full `make agent-check` · full `.venv/bin/pytest tests/integration/pipelex/temporal/` · `make agent-test`.
+- [ ] **6.4** Record the release-time follow-up (still pending): publish new kajson to PyPI + bump the `kajson==` pin in `pipelex/pyproject.toml`.
+
+> 🛑 **HARD STOP 3 — Done.** Converter + kajson generalized (wire rule now BaseModel-or-pydantic-dataclass), all stdlib dataclasses removed, NamedTuple upgrades landed, perf diff acceptable, temporal suite green, denylist types never converted away from BaseModel. Run the context-save protocol; final Session log entry records the perf diff, Phase 0 test results, the `DispatchOptions` import-invariant outcome, and the pending release-gate.
+
+---
+
+## Leave-as-is (do NOT convert) — confirmed correct already
+
+- `_ThinkingParams` — `pipelex/plugins/anthropic/anthropic_llm_worker.py` — the codebase's one legitimate pydantic dataclass; off-wire, built+consumed within a single `_gen_text` call. Right tool already.
+- `ResultFile` (`pipelex/pipe_run/delivery_executor.py`), `SupportCheck` (`pipelex/cogt/img_gen/img_gen_param_support.py`), `StoredData` (`pipelex/tools/storage/storage_provider_abstract.py`), `PipeJobComponents` (`pipelex/pipe_run/pipe_job_factory.py`) — existing off-wire NamedTuples, all correct. (`PipeJobComponents` is a local unpack container for building `PipeJob`; anything embedded INTO `PipeJob` must still be wire-legal.)
+- `iter_model_fields` (`pipelex/tools/misc/model_utils.py`, `pipelex/tools/typing/field_helpers.py`) and `items` (`pipelex/tools/misc/func_registry.py`) — keep as plain `Iterator[Tuple[...]]` (`dict.items()` convention). Best follow-up (separate refactor) is consolidating the two duplicate `iter_model_fields`, not changing their data form.
+- `generate_from_structure_blueprint` (`pipelex/core/concepts/structure_generation/generator.py` ~line 78) — `(class_code, generated_class)`; one element is a live `type`. Firmly off-wire (a `type` can't round-trip the converter). NamedTuple would be harmless polish but optional — leave unless doing a broader codegen cleanup.
+
+## Rejected — stale candidates that do NOT exist (do not re-propose)
+
+Verified absent by full-tree grep + directory listing. Listed so a future session doesn't re-derive them: `pipelex/cli/run_helpers.py` (`execute_method_and_output`, `_resolve_inputs_and_memory`); `pipelex/cli/ui_helpers.py` (`prompt_for_methods_and_output`); `pipelex/cli/blueprint_writer.py` (the four `_write_*_stub_file`); the entire `pipelex/pipe_operators/ocr/` path; `pipe_func._resolve_content_generator_and_func_name`; `pipe_img_gen_factory._resolve_blueprint_and_factory`; `pipe_llm_blueprint._split_prompt_template`; `pipe_llm_factory._resolve_prompt_template_and_target`; `toml_utils.load_toml_from_path_and_get_content`; `template_provider_abstract._provide_template_text_and_source`; `file_utils._split_filepath_into_components(_with_extension)`; `hub.get_pipelex_hub_and_pipe_router`; `sub_pipe._resolve_condition_expression`; `library_manager.get_library_paths`; `concept_native.NativeConceptClassNamePair`; `concept_factory._parse_concept_string`; `stuff_factory.make_from_str` (returns a single `Stuff`, misdescribed); the removed `pipelex/cocktail/` directory (`_detect_action_type_and_agent`, `_parse_command_line`). The nearest real shape to the gone `blueprint_writer` is `structures_cmd._generate_structures_for_inline` returning `list[tuple[str, str]]` — a weak list-element case, separately scoped; do not fold the non-existent functions into it.
+
+---
+
+## Perf harness reference
+
+Place at `tests/perf/test_dataclass_forms_bench.py`:
+
+```python
+import sys
+import timeit
+from datetime import timedelta
+from typing import NamedTuple, Optional
+
+from pydantic import BaseModel, ConfigDict
+
+
+class DispatchOptionsBM(BaseModel):
+    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
+    task_queue: str
+    start_to_close_timeout: Optional[timedelta] = None
+    schedule_to_close_timeout: Optional[timedelta] = None
+    retry_policy: Optional[object] = None  # stand-in for temporalio RetryPolicy
+
+
+class DispatchOptionsNT(NamedTuple):
+    task_queue: str
+    start_to_close_timeout: Optional[timedelta] = None
+    schedule_to_close_timeout: Optional[timedelta] = None
+    retry_policy: Optional[object] = None
+
+
+N = 200_000
+
+
+def _bench(label, fn):
+    secs = timeit.timeit(fn, number=N)
+    print(f"{label:40s} {secs / N * 1e9:8.1f} ns/op  ({secs:.3f}s / {N})")
+
+
+def main():
+    tq = "default"
+    to = timedelta(seconds=30)
+    _bench("construct BaseModel", lambda: DispatchOptionsBM(task_queue=tq, start_to_close_timeout=to))
+    _bench("construct NamedTuple", lambda: DispatchOptionsNT(task_queue=tq, start_to_close_timeout=to))
+    bm = DispatchOptionsBM(task_queue=tq, start_to_close_timeout=to)
+    payload = bm.model_dump()
+    _bench("BaseModel model_dump", lambda: bm.model_dump())
+    _bench("BaseModel model_validate", lambda: DispatchOptionsBM.model_validate(payload))
+    _bench("BaseModel json round-trip", lambda: DispatchOptionsBM.model_validate_json(bm.model_dump_json()))
+    print("\n--- memory (single instance) ---")
+    print("BaseModel getsizeof:", sys.getsizeof(bm), "has __dict__:", hasattr(bm, "__dict__"))
+    nt = DispatchOptionsNT(task_queue=tq, start_to_close_timeout=to)
+    print("NamedTuple getsizeof:", sys.getsizeof(nt), "has __dict__:", hasattr(nt, "__dict__"))
+
+
+if __name__ == "__main__":
+    main()
+```
+
+For the wire anchor, add a second bench constructing a realistic `PipeRunArg` (or a stripped stand-in matching its field count) and timing `model_dump_json()` / `model_validate_json()` — the reference for asserting no wire type accidentally got heavier.
+
+---
+
+## Session log (newest first)
+
+Append one entry per session, especially at every hard stop. Template:
+
+```
+### YYYY-MM-DD — <phase / what this session covered>
+- Landed: <checkboxes flipped + one-line results>
+- Decisions: <any choice taken, with reason>
+- Open questions: <anything unresolved for the next session>
+- Code state: <clean & committed? mid-edit? which files dirty?>
+- NEXT ACTION: <the single exact thing the next session should do first>
+```
+
+### 2026-05-29 — Ledger created (planning only, no code changes)
+- Landed: nothing implemented yet. This ledger was created from the former `wip/data-class-best-practices-plan.md` (removed). The previous root ledger (`feature/API-readiness-4`, all complete) was archived to `wip/error-handling/archive-todos-api-readiness-4.md`.
+- Decisions: (1) per-site type strategy for the six stdlib dataclasses — NOT a uniform pydantic-dataclass conversion. (2) Generalize the converter + kajson FIRST as Phase 0, scoped to pydantic dataclasses only. (3) kajson is consumed editable from `../kajson` in this worktree, so no PyPI publish needed for dev; publish + pin bump is a release-time gate.
+- Open questions: none blocking. The `DispatchOptions` import-without-temporalio invariant (Phase 5) is the one real unknown — gated by 5.1.
+- Code state: clean working tree except this ledger + the archived file move. No production code touched.
+- NEXT ACTION: start Phase 0 — Pre-flight boundary freeze, then task 0.1 (kajson `is_pydantic_dataclass` decode branch in `../kajson/kajson/json_decoder.py`), TDD: write the kajson round-trip tests (0.2) first.
