@@ -267,7 +267,7 @@ class LibraryManager(LibraryManagerAbstract):
             # Only import files that contain @pipe_func decorated functions (uses AST pre-check)
             FuncRegistryUtils.register_funcs_in_folder(
                 folder_path=library_dir,
-                force_include_dirs=[str(Path(builder_pkg.__file__).parent)],
+                force_include_dirs=[Path(builder_pkg.__file__).parent],
             )
 
         # Auto-discover and register all StructuredContent classes from sys.modules
