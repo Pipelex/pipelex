@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import contextlib
 import io
-import os
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -58,7 +57,6 @@ from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.misc.dict_utils import extract_vars_from_strings_recursive
 from pipelex.tools.misc.exceptions import TomlError
-from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.placeholder import value_is_placeholder
 from pipelex.tools.misc.toml_utils import load_toml_from_path
@@ -122,7 +120,7 @@ def check_config_files(config_dir: Path | None = None) -> tuple[bool, int, str]:
 
     # Check for missing files
     try:
-        missing_count = init_config(reset=False, dry_run=True, target_dir=str(effective_config_dir))
+        missing_count = init_config(reset=False, dry_run=True, target_dir=effective_config_dir)
     except (PipelexCLIError, OSError) as exc:
         return False, 0, f"Error checking config files: {exc}"
 
@@ -132,7 +130,7 @@ def check_config_files(config_dir: Path | None = None) -> tuple[bool, int, str]:
     #   - and skips ensure_global_config_exists when --global is set, so this probe
     #     stays a check and never silently materializes ~/.pipelex/ on a fresh machine.
     pipelex_config_path = config_manager.resolve_config_file("pipelex.toml", config_dir=config_dir)
-    if path_exists(pipelex_config_path):
+    if pipelex_config_path.exists():
         try:
             # Suppress stderr and stdout to prevent tracebacks from being printed
             with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
@@ -200,9 +198,9 @@ def check_backend_credentials(config_dir: Path | None = None) -> tuple[bool, dic
     Returns:
         Tuple of (is_healthy, backend_reports_dict, summary_message)
     """
-    backends_toml_path = config_manager.resolve_config_file(os.path.join("inference", "backends.toml"), config_dir=config_dir)
+    backends_toml_path = config_manager.resolve_config_file(str(Path("inference") / "backends.toml"), config_dir=config_dir)
 
-    if not path_exists(backends_toml_path):
+    if not backends_toml_path.exists():
         return False, {}, "Backend configuration file not found"
 
     try:
@@ -314,7 +312,7 @@ def replace_backend_file(backend_name: str, dry_run: bool = False, config_dir: P
 
         # Determine target path
         resolved_config_dir = config_dir or config_manager.pipelex_config_dir
-        target_dir = Path(resolved_config_dir) / "inference" / "backends"
+        target_dir = resolved_config_dir / "inference" / "backends"
         target_file = target_dir / f"{backend_name}.toml"
 
         if dry_run:
@@ -342,14 +340,14 @@ def check_backend_files(config_dir: Path | None = None) -> tuple[bool, dict[str,
     Returns:
         Tuple of (is_healthy, backend_file_reports_dict, summary_message)
     """
-    backends_dir_path = config_manager.resolve_config_file(os.path.join("inference", "backends"), config_dir=config_dir)
+    backends_dir_path = config_manager.resolve_config_file(str(Path("inference") / "backends"), config_dir=config_dir)
 
-    if not path_exists(backends_dir_path):
+    if not backends_dir_path.exists():
         return True, {}, "No backend files to check"
 
     # Get list of enabled backends from backends.toml
-    backends_toml_path = config_manager.resolve_config_file(os.path.join("inference", "backends.toml"), config_dir=config_dir)
-    if not path_exists(backends_toml_path):
+    backends_toml_path = config_manager.resolve_config_file(str(Path("inference") / "backends.toml"), config_dir=config_dir)
+    if not backends_toml_path.exists():
         return True, {}, "No backends.toml to check"
 
     try:
@@ -377,9 +375,10 @@ def check_backend_files(config_dir: Path | None = None) -> tuple[bool, dict[str,
             continue
 
         # Check if backend file exists
-        backend_file_path = str(backends_dir_path / f"{backend_name}.toml")
+        backend_file = backends_dir_path / f"{backend_name}.toml"
+        backend_file_path = str(backend_file)
 
-        if not path_exists(backend_file_path):
+        if not backend_file.exists():
             # No separate file - this is OK, configuration might be inline
             continue
 

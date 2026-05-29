@@ -2,6 +2,7 @@ import importlib
 import inspect
 import pkgutil
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from pipelex import log
@@ -73,7 +74,7 @@ class FuncRegistryUtils:
     @classmethod
     def register_funcs_in_folder(
         cls,
-        folder_path: str,
+        folder_path: Path,
         force_include_dirs: list[str] | None = None,
         is_recursive: bool = True,
     ) -> None:
@@ -105,12 +106,12 @@ class FuncRegistryUtils:
         )
 
         for python_file in python_files:
-            cls._register_funcs_in_file(file_path=str(python_file))
+            cls._register_funcs_in_file(file_path=python_file)
 
     @classmethod
     def _register_funcs_in_file(
         cls,
-        file_path: str,
+        file_path: Path,
     ) -> None:
         """Processes a Python file to find and register eligible @pipe_func decorated functions.
 
@@ -155,7 +156,7 @@ class FuncRegistryUtils:
                     func_registry.register_ineligible_function(
                         func=func,
                         reason=eligibility_error,
-                        source_file=file_path,
+                        source_file=str(file_path),
                     )
                     log.warning(f"Function '{func_name}' in '{file_path}' has @pipe_func() decorator but is not eligible: {eligibility_error}")
         except ModuleFileError:

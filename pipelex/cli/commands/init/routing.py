@@ -20,7 +20,6 @@ from pipelex.cogt.model_routing.routing_profile import PipelexRoutingProfile
 from pipelex.hub import get_console
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
-from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 
 
@@ -33,11 +32,11 @@ def customize_routing_profile(selected_backend_keys: list[str], target_config_di
     """
     console = get_console()
     effective_config_dir = target_config_dir or config_manager.pipelex_config_dir
-    routing_profiles_toml_path = str(effective_config_dir / "inference" / "routing_profiles.toml")
-    template_routing_path = str(get_kit_configs_dir() / "inference" / "routing_profiles.toml")
-    backends_toml_path = str(effective_config_dir / "inference" / "backends.toml")
+    routing_profiles_toml_path = effective_config_dir / "inference" / "routing_profiles.toml"
+    template_routing_path = Path(str(get_kit_configs_dir() / "inference" / "routing_profiles.toml"))
+    backends_toml_path = effective_config_dir / "inference" / "backends.toml"
 
-    if not path_exists(routing_profiles_toml_path):
+    if not routing_profiles_toml_path.exists():
         console.print("[yellow]⚠ Warning: routing_profiles.toml not found, skipping routing customization[/yellow]")
         return
 
@@ -49,7 +48,7 @@ def customize_routing_profile(selected_backend_keys: list[str], target_config_di
         toml_doc = load_toml_with_tomlkit(routing_profiles_toml_path)
 
         # Get backend options for display names
-        template_backends_path = str(get_kit_configs_dir() / "inference" / "backends.toml")
+        template_backends_path = Path(str(get_kit_configs_dir() / "inference" / "backends.toml"))
         backend_options = get_backend_options_from_toml(template_backends_path, backends_toml_path)
 
         # Case 1: pipelex_gateway is enabled - use all_pipelex_gateway

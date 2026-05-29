@@ -6,6 +6,7 @@ pipelex-storage:// URIs for more efficient pipeline processing.
 """
 
 import base64
+from pathlib import Path
 from typing import Any, cast
 
 import shortuuid
@@ -218,7 +219,7 @@ async def _normalize_url_content(
 
         # Read local file, detect type, upload to storage
         try:
-            raw_bytes = await load_binary_async(resolved_uri.path)
+            raw_bytes = await load_binary_async(Path(resolved_uri.path))
         except FileNotFoundError as exc:
             msg = f"Input file not found: '{resolved_uri.path}'"
             raise PipelexError(msg) from exc

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
@@ -39,7 +41,7 @@ class TestPromptImageFactoryDataUrl:
         far exceeding URL_MAX_LENGTH (2048).
         Before the fix, this would fail with 'URI is too long'.
         """
-        data_url = await make_base64_url_from_path(image_path)
+        data_url = await make_base64_url_from_path(Path(image_path))
 
         result = PromptImageFactory.make_prompt_image(uri=data_url)
 

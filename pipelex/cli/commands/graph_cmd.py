@@ -48,7 +48,7 @@ def _do_graph_render(
     get_telemetry_manager().track_event(EventName.GRAPH_RENDER)
     # Load the graph
     typer.echo(f"Loading graph from: {input_file}", err=True)
-    json_str = load_text_from_path(str(input_file))
+    json_str = load_text_from_path(input_file)
     graph_spec = GraphSpec.model_validate_json(json_str)
     typer.secho(f"✅ Loaded graph with {len(graph_spec.nodes)} nodes", fg=typer.colors.GREEN, err=True)
 

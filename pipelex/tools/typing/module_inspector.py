@@ -1,7 +1,6 @@
 import ast
 import importlib.util
 import inspect
-import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -9,7 +8,7 @@ from typing import Any
 from pipelex.tools.typing.exceptions import ModuleFileError
 
 
-def import_module_from_file(file_path: str) -> Any:
+def import_module_from_file(file_path: Path) -> Any:
     """Imports a module from a file path.
 
     Args:
@@ -23,13 +22,12 @@ def import_module_from_file(file_path: str) -> Any:
 
     """
     # Validate that the file is a Python file
-    if not file_path.endswith(".py"):
+    if file_path.suffix != ".py":
         msg = f"File {file_path} is not a Python file (must end with .py)"
         raise ModuleFileError(msg)
 
     # Validate that the path exists and is a file, not a directory
-    path = Path(file_path)
-    if path.exists() and not path.is_file():
+    if file_path.exists() and not file_path.is_file():
         msg = f"Path {file_path} exists but is not a file (it may be a directory)"
         raise ModuleFileError(msg)
 
@@ -41,7 +39,7 @@ def import_module_from_file(file_path: str) -> Any:
         return sys.modules[module_name]
 
     # Use importlib.util to load the module from file path
-    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    spec = importlib.util.spec_from_file_location(module_name, str(file_path))
     if spec is None or spec.loader is None:
         msg = f"Could not load module from {file_path}"
         raise ModuleFileError(msg)
@@ -57,7 +55,7 @@ def import_module_from_file(file_path: str) -> Any:
     return module
 
 
-def convert_file_path_to_module_path(file_path: str) -> str:
+def convert_file_path_to_module_path(file_path: Path) -> str:
     """Convert a file path to a valid module identifier.
 
     The module name doesn't need to match the actual package structure since
@@ -71,7 +69,7 @@ def convert_file_path_to_module_path(file_path: str) -> str:
         A unique, valid Python module name derived from the absolute file path
     """
     # Convert to absolute path for uniqueness and consistency
-    abs_path = os.path.abspath(file_path)
+    abs_path = str(file_path.resolve())
 
     # Remove .py extension
     module_path = abs_path.removesuffix(".py")
@@ -99,7 +97,7 @@ def convert_file_path_to_module_path(file_path: str) -> str:
     return result
 
 
-def find_class_names_in_file(file_path: str, base_class_names: list[str] | None = None) -> list[str]:
+def find_class_names_in_file(file_path: Path, base_class_names: list[str] | None = None) -> list[str]:
     """Find class names in a Python file without executing it using AST parsing.
 
     This is useful when you want to discover classes without running module-level code.
@@ -118,20 +116,19 @@ def find_class_names_in_file(file_path: str, base_class_names: list[str] | None 
 
     """
     # Validate that the file is a Python file
-    if not file_path.endswith(".py"):
+    if file_path.suffix != ".py":
         msg = f"File {file_path} is not a Python file (must end with .py)"
         raise ModuleFileError(msg)
 
     # Validate that the path exists and is a file
-    path = Path(file_path)
-    if not path.exists() or not path.is_file():
+    if not file_path.exists() or not file_path.is_file():
         msg = f"Path {file_path} does not exist or is not a file"
         raise ModuleFileError(msg)
 
     try:
         # Read and parse the file
-        source = Path(file_path).read_text(encoding="utf-8")
-        tree = ast.parse(source, filename=file_path)
+        source = file_path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(file_path))
     except (OSError, SyntaxError, ValueError) as exc:
         msg = f"Failed to parse {file_path}: {exc}"
         raise ModuleFileError(msg) from exc
@@ -162,7 +159,7 @@ def find_class_names_in_file(file_path: str, base_class_names: list[str] | None 
 
 
 def find_decorated_function_names_in_file(
-    file_path: str,
+    file_path: Path,
     decorator_names: list[str],
 ) -> list[str]:
     """Find function names decorated with specific decorators without executing the file.
@@ -181,20 +178,19 @@ def find_decorated_function_names_in_file(
 
     """
     # Validate that the file is a Python file
-    if not file_path.endswith(".py"):
+    if file_path.suffix != ".py":
         msg = f"File {file_path} is not a Python file (must end with .py)"
         raise ModuleFileError(msg)
 
     # Validate that the path exists and is a file
-    path = Path(file_path)
-    if not path.exists() or not path.is_file():
+    if not file_path.exists() or not file_path.is_file():
         msg = f"Path {file_path} does not exist or is not a file"
         raise ModuleFileError(msg)
 
     try:
         # Read and parse the file
-        source = Path(file_path).read_text(encoding="utf-8")
-        tree = ast.parse(source, filename=file_path)
+        source = file_path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(file_path))
     except (OSError, SyntaxError, ValueError) as exc:
         msg = f"Failed to parse {file_path}: {exc}"
         raise ModuleFileError(msg) from exc
@@ -227,7 +223,7 @@ def find_decorated_function_names_in_file(
 
 
 def import_module_from_file_if_has_decorated_functions(
-    file_path: str,
+    file_path: Path,
     decorator_names: list[str],
 ) -> Any | None:
     """Import a module only if it contains functions with specific decorators.
@@ -259,7 +255,7 @@ def import_module_from_file_if_has_decorated_functions(
 
 
 def import_module_from_file_if_has_classes(
-    file_path: str,
+    file_path: Path,
     base_class_names: list[str] | None = None,
 ) -> Any | None:
     """Import a module only if it contains classes (optionally filtered by base class).

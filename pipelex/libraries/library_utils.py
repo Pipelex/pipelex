@@ -73,7 +73,7 @@ def get_pipelex_mthds_files_from_dirs(dirs: set[Path]) -> list[Path]:
 
         # Find all .mthds files in the directory, excluding problematic directories
         mthds_files = find_files_in_dir(
-            dir_path=str(dir_path),
+            dir_path=dir_path,
             pattern=f"*{MTHDS_EXTENSION}",
             excluded_dirs=list(get_config().pipelex.scan_config.excluded_dirs),
             force_include_dirs=[str(Path(builder_pkg.__file__).parent)],

@@ -218,8 +218,8 @@ class TestGraphSpecRoundtrip:
         )
 
         file_path = tmp_path / "test_graph.json"
-        save_text_to_path(graph.to_json(), str(file_path))
-        json_str = load_text_from_path(str(file_path))
+        save_text_to_path(graph.to_json(), file_path)
+        json_str = load_text_from_path(file_path)
         restored = GraphSpec.model_validate_json(json_str)
 
         assert restored.graph_id == graph.graph_id
