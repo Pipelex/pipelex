@@ -198,7 +198,7 @@ def check_backend_credentials(config_dir: Path | None = None) -> tuple[bool, dic
     Returns:
         Tuple of (is_healthy, backend_reports_dict, summary_message)
     """
-    backends_toml_path = config_manager.resolve_config_file(str(Path("inference") / "backends.toml"), config_dir=config_dir)
+    backends_toml_path = config_manager.resolve_config_file("inference/backends.toml", config_dir=config_dir)
 
     if not backends_toml_path.exists():
         return False, {}, "Backend configuration file not found"
@@ -340,13 +340,13 @@ def check_backend_files(config_dir: Path | None = None) -> tuple[bool, dict[str,
     Returns:
         Tuple of (is_healthy, backend_file_reports_dict, summary_message)
     """
-    backends_dir_path = config_manager.resolve_config_file(str(Path("inference") / "backends"), config_dir=config_dir)
+    backends_dir_path = config_manager.resolve_config_file("inference/backends", config_dir=config_dir)
 
     if not backends_dir_path.exists():
         return True, {}, "No backend files to check"
 
     # Get list of enabled backends from backends.toml
-    backends_toml_path = config_manager.resolve_config_file(str(Path("inference") / "backends.toml"), config_dir=config_dir)
+    backends_toml_path = config_manager.resolve_config_file("inference/backends.toml", config_dir=config_dir)
     if not backends_toml_path.exists():
         return True, {}, "No backends.toml to check"
 
