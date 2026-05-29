@@ -1,6 +1,15 @@
 # Data-Class Best-Practices Refactor — Working Ledger (`refactor/Dataclasses`)
 
-Give every data holder the right shape: `BaseModel` (or, after Phase 0, a pydantic dataclass) for anything on the Temporal wire; `NamedTuple` for small fixed immutable off-wire records replacing bare tuples; frozen `BaseModel` for immutable validated off-wire value objects; plain mutable `BaseModel` where the object is genuinely mutated in place. Eradicate every stdlib `@dataclass` (HARD RULE 1).
+Give every data holder the right shape. Eradicate every stdlib `@dataclass` (HARD RULE 1) — but replace it with whichever form fits the site, NOT uniformly with `BaseModel`.
+
+**On the Temporal wire:** `BaseModel` or (after Phase 0) a pydantic dataclass — the two forms `BaseModelPayloadConverter` routes through kajson with type preservation.
+
+**Off the wire, choose per-site** (this is the premise — pydantic dataclass is a first-class option here, often the lowest-churn one):
+
+- **`NamedTuple`** — a small fixed immutable record replacing a bare tuple. Also the only safe form when a field is a bare `@runtime_checkable` Protocol / arbitrary non-pydantic type, because it skips validation (no `arbitrary_types_allowed` dance). Avoid when the type is returned in a union alongside a real `tuple` (a NamedTuple *is* a tuple → ambiguous `isinstance`).
+- **pydantic dataclass** (`from pydantic.dataclasses import dataclass`) — a validated record that wants to keep dataclass idioms (`field(default_factory=...)`, computed `@property`, `frozen=`) with **minimal churn** (often just swap the decorator import). Wire-legal since Phase 0. **Use it ONLY for internal records that are constructed + field-read and never serialized.** A pydantic dataclass has no `.model_dump()` / `.model_validate()` methods — and "does this ever need serializing/dumping?" is the *deciding* question, not an afterthought: **if it ever needs dumping, make it a `BaseModel` from the start — do NOT reach for `TypeAdapter`.** Needing `TypeAdapter` means the wrong shape was picked; keep `TypeAdapter` out of the codebase entirely.
+- **frozen `BaseModel`** — an immutable validated value object that needs the full model API (`model_dump`, validators, discriminated unions) OR sits in a layer that is uniformly `BaseModel` (e.g. `pipelex/builder/`), OR must stay type-distinct from a sibling `tuple` in a union return.
+- **plain mutable `BaseModel`** — genuinely mutated in place AND wants the model API / layer-consistency; otherwise a non-frozen pydantic dataclass is the lighter choice for in-place-mutated records.
 
 Phase 0 is the foundation: generalize the Temporal converter (and kajson, in `../kajson`) so pydantic dataclasses are wire-legal, relaxing the "must be BaseModel on the wire" constraint. It is purely additive — no current wire type is a pydantic dataclass, so no existing payload changes. Everything after Phase 0 is off-wire and chosen per-site.
 
@@ -127,12 +136,19 @@ This worktree's `uv.lock` pins kajson as `{ editable = "../kajson" }` (confirmed
 
 ---
 
-## Phase 1 — Capture perf baseline (no production code changes)
+## Phase 1 — ~~Capture perf baseline~~ → DROPPED after review (no production code changes either way)
 
-- [ ] **1.1** Write the microbench harness at `tests/perf/test_dataclass_forms_bench.py` (sketch in "Perf harness reference" below). Prefer `pytest-benchmark` if it's already a dev dep (check `pyproject.toml`); else a committed `timeit` bench so the baseline is reproducible dependency-free.
-- [ ] **1.2** Run on pre-change HEAD, save `tests/perf/baselines/dataclass_refactor_pre.json`.
+**The whole perf-measurement effort (this phase + Phase 6's perf diff) was BUILT, then DROPPED on review (user decision, 2026-05-29).** The harness (`tests/perf/test_dataclass_forms_bench.py` + `tests/perf/baselines/dataclass_refactor_pre.json`) was deleted.
 
-What to measure: construction cost (N instances), validation cost (`model_validate` vs plain NamedTuple construction), serialize round-trip (`model_dump_json` / `model_validate_json` to mirror the converter), memory (`getsizeof` + `__dict__` vs `__slots__`, large-list growth). Perf-relevant sites: `DispatchOptions` (per-dispatch hot path — the one conversion that could regress), `PipeRunArg` (wire anchor, no form change), `_ThinkingParams` (control, no form change). The NamedTuple conversions (Phase 2) and Phase 0 are perf-neutral.
+Why it measured nothing useful:
+
+- It benchmarked **synthetic stand-ins**, not the real classes. The `DispatchOptions*` stand-ins matched the real field shape, but the "wire anchor" was a fake type that timed pydantic's native `model_dump_json`/`model_validate_json` — **NOT** the real Temporal wire path (`BaseModelPayloadConverter` → kajson with type-preservation metadata). So the one number meant to guard "no wire type got heavier" never touched the actual wire code.
+- The costs are **negligible in context**: the only conversion that could plausibly regress is `DispatchOptions` (one build per activity dispatch, ~360ns form-delta) — dwarfed by the 10²–10³ ms network round-trip of the activity it configures.
+- **None of the Phase 2/3/4 conversions sit on a hot path** (build-time, per-usage-event, dev-CLI, template-prep, worker-boot), so their construction speed never shows up in real behavior.
+
+Consequence for the `DispatchOptions` form decision (Phase 5): it now rests on **reasoning** (per-dispatch cost is negligible vs the network round-trip), not measurement — no perf data is needed to accept frozen `BaseModel`.
+
+- [x] **1.1 / 1.2** — built the harness + captured the pre-change baseline, then **removed both** per the review above.
 
 ---
 
@@ -140,33 +156,43 @@ What to measure: construction cost (N instances), validation cost (`model_valida
 
 Verified-to-exist bare-tuple returns where named fields prevent positional swaps. All off the wire, already-typed, no validation needed → NamedTuple (not pydantic dataclass). Replace `from typing import Tuple` annotations; keep `NamedTuple` defs module-local next to the function (or shared where two siblings return the same shape).
 
-- [ ] **2.1** `_handle_basic_blueprint` (~line 336) + `_handle_refines` (~line 377) in `pipelex/core/concepts/concept_factory.py` — both return `(structure_class_name, refine_string)` with `refine_string: str | None`. Define ONE shared NamedTuple (e.g. `StructureNameAndRefine`) and reuse for both.
-- [ ] **2.2** `split_cross_package_ref` (~line 197) in `pipelex/core/qualified_ref.py` — `(alias, remainder)`. Define e.g. `CrossPackageRef(alias, remainder)`. All call sites (`qualified_ref.py`, `core/domains/validation.py`, `core/concepts/concept_factory.py`, `core/concepts/validation.py`, `libraries/library.py`, `libraries/library_manager.py`, `libraries/pipe/pipe_library.py`, `libraries/concept/concept_library.py`) destructure into two locals — none relies on plain-tuple `len`/concat or passes the tuple onto a wire path. Safe.
-- [ ] **2.3** `_get_is_prod_and_runtime_mode` in `pipelex/system/runtime_manager.py` — `(is_prod, runtime_mode)`. Single caller (`setup()`) unpacks positionally; NamedTuple supports positional unpacking, no breakage.
-- [ ] **2.4** `_find_project_root` in `pipelex/config_manager.py` — `(project_root_dir, found_root_marker)`, `Tuple[Optional[Path], bool]`. NOTE: currently dead code (defined, never called) → zero call-site risk.
+- [x] **2.1** `_handle_basic_blueprint` (~line 336) + `_handle_refines` (~line 377) in `pipelex/core/concepts/concept_factory.py` — both return `(structure_class_name, refine_string)` with `refine_string: str | None`. Define ONE shared NamedTuple (e.g. `StructureNameAndRefine`) and reuse for both.
+  - Result: added module-level `class StructureNameAndRefine(NamedTuple)` with `structure_class_name: str`, `refine_string: str | None`. Both methods now return it (6 return sites wrapped: 4 in `_handle_basic_blueprint`, 2 in `_handle_refines`). `_handle_refines`'s refine widened from `str` → `str | None` (its sole caller passes straight to `Concept.refines: str | None`, so type-safe). All 3 call sites use positional unpacking — unchanged. Confirmed `Concept.refines` is `str | None`.
+- [x] **2.2** `split_cross_package_ref` (~line 197) in `pipelex/core/qualified_ref.py` — `(alias, remainder)`. Define e.g. `CrossPackageRef(alias, remainder)`. All call sites (`qualified_ref.py`, `core/domains/validation.py`, `core/concepts/concept_factory.py`, `core/concepts/validation.py`, `libraries/library.py`, `libraries/library_manager.py`, `libraries/pipe/pipe_library.py`, `libraries/concept/concept_library.py`) destructure into two locals — none relies on plain-tuple `len`/concat or passes the tuple onto a wire path. Safe.
+  - Result: added module-level `class CrossPackageRef(NamedTuple)` with `alias: str`, `remainder: str`; `split_cross_package_ref` now returns `CrossPackageRef(alias=..., remainder=...)`. Re-grepped ALL 12 current call sites (the plan's list was close but I verified against the live tree) — every one uses positional 2-tuple unpacking (`alias, remainder = ...` or `_, remainder = ...`), so none changed. Core+pipes suite green (1323 passed).
+- [x] **2.3** ~~`_get_is_prod_and_runtime_mode` in `pipelex/system/runtime_manager.py`~~ — **DOES NOT EXIST in current tree (skipped).** There is no `runtime_manager.py`; runtime mode lives in `pipelex/system/runtime.py` and is now fully **property-based** on a `RuntimeManager(BaseModel)` (`is_unit_testing`, `is_ci_testing`, `environment`, `run_mode` props) — no `(is_prod, runtime_mode)` tuple helper anywhere (grep-confirmed). The stale audit predates that refactor. Nothing to convert.
+- [x] **2.4** ~~`_find_project_root` in `pipelex/config_manager.py`~~ — **DOES NOT EXIST in current tree (skipped).** `config_manager.py` is now `pipelex/system/configuration/config_loader.py` (`config_manager = ConfigLoader()`); its `find_project_root(start_dir) -> Path | None` returns just `Path | None` — the `found_root_marker` bool was dropped in the refactor, so there is no `(Path, bool)` tuple to convert (grep-confirmed no such tuple anywhere).
 
 **Verify:** `make agent-check`; `make tb` (runtime_manager / config_manager touch boot paths). Temporal suite not required (nothing near the wire).
+  - Result: `make agent-check` clean (pyright 0/0, mypy 1932 files); `make tb` 2 passed; targeted `tests/unit|integration/pipelex/core/` + `tests/integration/pipelex/pipes/` → 1323 passed, 1 xfailed (pre-existing known-bug marker).
 
 ---
 
 ## Phase 3 — Off-wire stdlib dataclass removals (no wire, no hot-path concern)
 
-HARD RULE 1: every stdlib `@dataclass` must go. These four are off-wire and not perf-critical.
+HARD RULE 1: every stdlib `@dataclass` must go. These four are off-wire and not perf-critical. Form chosen per-site per the form-selection guide at the top of this file — **including pydantic dataclass**, which for records already written in dataclass style (`field(default_factory=...)` + computed `@property`) is the lowest-churn replacement (just swap the decorator import).
 
-- [ ] **3.1** `_EventLogContext` — `pipelex/reporting/reporting_manager.py` → **NamedTuple**. Fields `event_log: EventLogProtocol`, `workflow_id`, `pipeline_run_id`. Private manager state in `ReportingManager._event_log_contexts`, set wholesale + popped, never field-mutated, never serialized. `event_log` is a bare `@runtime_checkable` Protocol instance stored as-is. NamedTuple avoids needing `arbitrary_types_allowed`.
-- [ ] **3.2** `ErrorPagesReport` — `pipelex/errors/error_pages_generator.py` → **frozen `BaseModel`**. Four `list[Path]` fields via `Field(default_factory=list)` + a computed `total` `@property`. Single full-kwargs construction, no in-place `.append` on instances → frozen holds. `Path` serializes natively in pydantic v2; the computed-property + default_factory pattern argues for BaseModel over NamedTuple.
-- [ ] **3.3** `CustomClassInfo` — `pipelex/builder/runner_code.py` → **frozen `BaseModel`**. Scalar fields (`class_name`, `domain_code`, `concept_code`) + two computed `@property` (`module_name`, `import_statement`). Builder/codegen artifact, never mutated, never a Temporal arg/return. `builder/CLAUDE.md` says the builder layer is uniformly pydantic; the properties make NamedTuple awkward.
-- [ ] **3.4** `VariableReference` — `pipelex/tools/jinja2/jinja2_required_variables.py` → **mutable (non-frozen) `BaseModel`** with `filters: list[str] = Field(default_factory=list)`. CRITICAL: it is MUTATED IN PLACE — `_collect_variable_references` does `references[full_path].filters.append(filter_name)` on re-seen variables. In-place mutation rules out NamedTuple and any frozen form. Do NOT freeze it. (low-medium risk: preserve the append-after-construction contract.)
+- [x] **3.1** `_EventLogContext` — `pipelex/reporting/reporting_manager.py` → **NamedTuple**. Fields `event_log: EventLogProtocol`, `workflow_id`, `pipeline_run_id`. Private manager state in `ReportingManager._event_log_contexts`, set wholesale + popped, never field-mutated, never serialized. `event_log` is a bare `@runtime_checkable` Protocol instance stored as-is. NamedTuple avoids needing `arbitrary_types_allowed`.
+  - Result: `@dataclass\nclass _EventLogContext` → `class _EventLogContext(NamedTuple)`; removed the now-unused `from dataclasses import dataclass`. Confirmed all uses are kwargs-construction (line ~90), dict store/pop, and attribute reads (`context.event_log.next_sequence()`, `.pipeline_run_id`, `.workflow_id`, `.event_log.emit(...)`) — no field mutation. Reporting unit suite green.
+- [x] **3.2** `ErrorPagesReport` — `pipelex/errors/error_pages_generator.py` → **frozen `BaseModel`**. Four `list[Path]` fields via `Field(default_factory=list)` + a computed `total` `@property`. ~~Single full-kwargs construction, no in-place `.append` on instances → frozen holds.~~ `Path` serializes natively in pydantic v2; the computed-property + default_factory pattern argues for BaseModel over NamedTuple.
+  - Result (FINAL, after 2nd review pass): **frozen pydantic dataclass** (`@pydantic.dataclasses.dataclass(frozen=True)`, `field(default_factory=list[Path])` ×4 + the `total` `@property`). This is the near-zero-diff replacement of the original `@dataclass(frozen=True)` — just swapped `from dataclasses import dataclass` → `from pydantic.dataclasses import dataclass` (kept `from dataclasses import field`). It's a dev-tool report with no model-API need, so a pydantic dataclass fits better than `BaseModel` (which I'd used in the first pass — reverted). **DEVIATION from plan rationale (still applies):** the plan claimed "single full-kwargs construction, no in-place `.append`" — STALE: it's built empty (`ErrorPagesReport()`) then **appended in place** (`_commit_page`/`_remove_orphans`). `frozen=True` (stdlib dataclass, pydantic dataclass, AND BaseModel) blocks attribute *reassignment*, NOT list mutation — `.append` works under all. Errors suite + type_uri-uniqueness test green (318 passed in the errors+jinja2+templating run).
+- [x] **3.3** `CustomClassInfo` — `pipelex/builder/runner_code.py` → **frozen `BaseModel`**. Scalar fields (`class_name`, `domain_code`, `concept_code`) + two computed `@property` (`module_name`, `import_statement`). Builder/codegen artifact, never mutated, never a Temporal arg/return. `builder/CLAUDE.md` says the builder layer is uniformly pydantic; the properties make NamedTuple awkward.
+  - Result: `@dataclass` → `class CustomClassInfo(BaseModel)` with `model_config = ConfigDict(frozen=True)`; both properties kept; removed `from dataclasses import dataclass`. Confirmed all uses are kwargs-construction (line ~116) + attribute reads + use as `dict[str, CustomClassInfo]` values — no field mutation, no instance hashing relied upon (frozen makes it hashable anyway, a superset). Builder suite green.
+- [x] **3.4** `VariableReference` — `pipelex/tools/jinja2/jinja2_required_variables.py` → **mutable (non-frozen) `BaseModel`** with `filters: list[str] = Field(default_factory=list)`. CRITICAL: it is MUTATED IN PLACE — `_collect_variable_references` does `references[full_path].filters.append(filter_name)` on re-seen variables. In-place mutation rules out NamedTuple and any frozen form. Do NOT freeze it. (low-medium risk: preserve the append-after-construction contract.)
+  - Result (FINAL, after 2nd review pass): **non-frozen pydantic dataclass** (`@pydantic.dataclasses.dataclass`, `path: str` + `filters: list[str] = field(default_factory=list[str])`). Near-zero-diff replacement of the original `@dataclass` — swapped `from dataclasses import dataclass` → `from pydantic.dataclasses import dataclass` (kept `field`), and used `list[str]` as the factory so no `# pyright: ignore` is needed (the original had one). Chosen over `BaseModel` (first pass — reverted): it's mutated in place and has no model-API need, so a pydantic dataclass is the lighter, more idiomatic fit. Confirmed the in-place `.filters.append(...)` works (pydantic dataclasses don't validate on attribute access/mutation, only on init). jinja2 var-ref unit tests + templating pipeline green.
 
 **Verify:** `make agent-check` after each; `make tb` after the group.
+  - Result: `make agent-check` clean (pyright 0/0, mypy 1932 files); `make tb` 2 passed; targeted `builder` + `tools` + `errors` + `reporting` suites → 1676 passed, 1 pre-existing skip.
 
 ---
 
 ## Phase 4 — Temporal-adjacent stdlib removal (low risk)
 
-- [ ] **4.1** `RegistrationFailure` — `pipelex/temporal/tprl/namespace_check.py` (~line 50) → **NamedTuple**. Fields `namespace: str`, `missing: tuple[str, ...]`, `rpc_error_message: str`. Off-wire admin plumbing — produced by `ensure_required_search_attributes_registered` at worker boot/setup, consumed only by `pipelex/cli/commands/setup_temporal_namespace_cmd.py` to format a runbook; never an `@activity.defn` return nor a wire field. **Implementer note:** a NamedTuple is also a `tuple`, so all consumers must keep discriminating the `RegistrationFailure | tuple[str, ...]` return via `isinstance(x, RegistrationFailure)` (CLI already does, ~line 148), never `isinstance(x, tuple)`.
+- [x] **4.1** `RegistrationFailure` — `pipelex/temporal/tprl/namespace_check.py` (~line 50) → **NamedTuple**. Fields `namespace: str`, `missing: tuple[str, ...]`, `rpc_error_message: str`. Off-wire admin plumbing — produced by `ensure_required_search_attributes_registered` at worker boot/setup, consumed only by `pipelex/cli/commands/setup_temporal_namespace_cmd.py` to format a runbook; never an `@activity.defn` return nor a wire field. **Implementer note:** a NamedTuple is also a `tuple`, so all consumers must keep discriminating the `RegistrationFailure | tuple[str, ...]` return via `isinstance(x, RegistrationFailure)` (CLI already does, ~line 148), never `isinstance(x, tuple)`.
+  - Result: `@dataclass(frozen=True)` → **frozen `BaseModel`** (`model_config = ConfigDict(frozen=True)`). **DEVIATION from the plan's NamedTuple target — deliberately chose BaseModel over NamedTuple here** (decided on review, 2026-05-29): the return type is a union `RegistrationFailure | tuple[str, ...]`, and a NamedTuple IS a tuple, so a NamedTuple form makes BOTH arms tuples and leans entirely on every caller using `isinstance(x, RegistrationFailure)`. A `BaseModel` is **not** a tuple, so it stays cleanly type-distinct from the `tuple[str, ...]` success arm — strictly safer for this union. Its fields (`str`, `tuple[str, ...]`, `str`) are all pydantic-native, so NO `arbitrary_types_allowed` is needed. (A frozen *pydantic dataclass* would also have worked and been an even smaller diff — noted as the minimal-churn alternative.) Verified all consumers: 3 discrimination sites use `isinstance(..., RegistrationFailure)` (`setup_temporal_namespace_cmd.py:148`, `test_ensure_search_attributes_registered.py:117/140`, `integration/.../conftest.py:156`); none uses `isinstance(x, tuple)`; field access is `.namespace`/`.missing`/`.rpc_error_message`; construction is kwargs. Temporal unit+integration + setup-namespace CLI tests green (452 passed, 4 pre-existing xpass).
 
 **Verify:** `make agent-check`; `make tb`; `.venv/bin/pytest tests/integration/pipelex/temporal/`.
+  - Result: `make agent-check` clean; `make tb` 2 passed; `tests/unit/pipelex/temporal/` + `tests/integration/pipelex/temporal/` → 445 passed, 4 xpassed (the documented pre-existing xdist class-registration race flakes — passes in isolation; no regressions). No stray temporal processes after the run.
 
 > 🛑 **HARD STOP 2 — All mechanical off-wire work done.** NamedTuple upgrades + four off-wire stdlib removals + the temporal-adjacent one have landed; the only remaining conversion is the reviewed `DispatchOptions`, which needs a without-temporal-extra import check that's cleanest in a fresh session. Run the context-save protocol and END THE SESSION.
 
@@ -185,20 +211,20 @@ HARD RULE 1: every stdlib `@dataclass` must go. These four are off-wire and not 
 
 ---
 
-## Phase 6 — Perf diff + final gate
+## Phase 6 — Final gate
 
-- [ ] **6.1** Re-run the harness, save `tests/perf/baselines/dataclass_refactor_post.json`.
-- [ ] **6.2** Diff pre vs post. Acceptance: NamedTuple/dataclass paths must not regress; `DispatchOptions` as frozen `BaseModel` may show a small per-dispatch validation cost — confirm it's negligible vs the (network-bound) activity round-trip it configures. If non-trivial in the loop → switch `DispatchOptions` to the NamedTuple fallback (5.2) and re-verify.
-- [ ] **6.3** Final gate: `grep -rln "from dataclasses import" pipelex/` returns nothing · full `make agent-check` · full `.venv/bin/pytest tests/integration/pipelex/temporal/` · `make agent-test`.
-- [ ] **6.4** Record the release-time follow-up (still pending): publish new kajson to PyPI + bump the `kajson==` pin in `pipelex/pyproject.toml`.
+(Perf-diff steps removed — the harness was dropped in Phase 1; the `DispatchOptions` form decision rests on reasoning, not measurement.)
 
-> 🛑 **HARD STOP 3 — Done.** Converter + kajson generalized (wire rule now BaseModel-or-pydantic-dataclass), all stdlib dataclasses removed, NamedTuple upgrades landed, perf diff acceptable, temporal suite green, denylist types never converted away from BaseModel. Run the context-save protocol; final Session log entry records the perf diff, Phase 0 test results, the `DispatchOptions` import-invariant outcome, and the pending release-gate.
+- [ ] **6.1** Final gate: **no stdlib `@dataclass` decorator** — `grep -rn "from dataclasses import" pipelex/ | grep -w dataclass` returns nothing (currently flags only `config_temporal.py`, cleared by Phase 5). **NOTE:** plain `from dataclasses import field` is ALLOWED and expected — the pydantic dataclasses (`error_pages_generator.py`, `jinja2_required_variables.py`) use `dataclasses.field(default_factory=...)` for their defaults; that helper is not a stdlib `@dataclass`, so do NOT grep for the bare `"from dataclasses import"` string (it false-positives on `field`). Then: full `make agent-check` · full `.venv/bin/pytest tests/integration/pipelex/temporal/` · `make agent-test`.
+- [ ] **6.2** Record the release-time follow-up (still pending): publish new kajson to PyPI + bump the `kajson==` pin in `pipelex/pyproject.toml`.
+
+> 🛑 **HARD STOP 3 — Done.** Converter + kajson generalized (wire rule now BaseModel-or-pydantic-dataclass), all stdlib dataclasses removed, NamedTuple upgrades landed, temporal suite green, denylist types never converted away from BaseModel. Run the context-save protocol; final Session log entry records the Phase 0 test results, the `DispatchOptions` import-invariant outcome, and the pending release-gate.
 
 ---
 
 ## Leave-as-is (do NOT convert) — confirmed correct already
 
-- `_ThinkingParams` — `pipelex/plugins/anthropic/anthropic_llm_worker.py` — the codebase's one legitimate pydantic dataclass; off-wire, built+consumed within a single `_gen_text` call. Right tool already.
+- `_ThinkingParams` — `pipelex/plugins/anthropic/anthropic_llm_worker.py` — a legitimate pydantic dataclass; off-wire, built+consumed within a single `_gen_text` call. Right tool already. (No longer the *only* pydantic dataclass — `ErrorPagesReport` (3.2) and `VariableReference` (3.4) joined it after the 2nd review pass.)
 - `ResultFile` (`pipelex/pipe_run/delivery_executor.py`), `SupportCheck` (`pipelex/cogt/img_gen/img_gen_param_support.py`), `StoredData` (`pipelex/tools/storage/storage_provider_abstract.py`), `PipeJobComponents` (`pipelex/pipe_run/pipe_job_factory.py`) — existing off-wire NamedTuples, all correct. (`PipeJobComponents` is a local unpack container for building `PipeJob`; anything embedded INTO `PipeJob` must still be wire-legal.)
 - `iter_model_fields` (`pipelex/tools/misc/model_utils.py`, `pipelex/tools/typing/field_helpers.py`) and `items` (`pipelex/tools/misc/func_registry.py`) — keep as plain `Iterator[Tuple[...]]` (`dict.items()` convention). Best follow-up (separate refactor) is consolidating the two duplicate `iter_model_fields`, not changing their data form.
 - `generate_from_structure_blueprint` (`pipelex/core/concepts/structure_generation/generator.py` ~line 78) — `(class_code, generated_class)`; one element is a live `type`. Firmly off-wire (a `type` can't round-trip the converter). NamedTuple would be harmless polish but optional — leave unless doing a broader codegen cleanup.
@@ -206,66 +232,6 @@ HARD RULE 1: every stdlib `@dataclass` must go. These four are off-wire and not 
 ## Rejected — stale candidates that do NOT exist (do not re-propose)
 
 Verified absent by full-tree grep + directory listing. Listed so a future session doesn't re-derive them: `pipelex/cli/run_helpers.py` (`execute_method_and_output`, `_resolve_inputs_and_memory`); `pipelex/cli/ui_helpers.py` (`prompt_for_methods_and_output`); `pipelex/cli/blueprint_writer.py` (the four `_write_*_stub_file`); the entire `pipelex/pipe_operators/ocr/` path; `pipe_func._resolve_content_generator_and_func_name`; `pipe_img_gen_factory._resolve_blueprint_and_factory`; `pipe_llm_blueprint._split_prompt_template`; `pipe_llm_factory._resolve_prompt_template_and_target`; `toml_utils.load_toml_from_path_and_get_content`; `template_provider_abstract._provide_template_text_and_source`; `file_utils._split_filepath_into_components(_with_extension)`; `hub.get_pipelex_hub_and_pipe_router`; `sub_pipe._resolve_condition_expression`; `library_manager.get_library_paths`; `concept_native.NativeConceptClassNamePair`; `concept_factory._parse_concept_string`; `stuff_factory.make_from_str` (returns a single `Stuff`, misdescribed); the removed `pipelex/cocktail/` directory (`_detect_action_type_and_agent`, `_parse_command_line`). The nearest real shape to the gone `blueprint_writer` is `structures_cmd._generate_structures_for_inline` returning `list[tuple[str, str]]` — a weak list-element case, separately scoped; do not fold the non-existent functions into it.
-
----
-
-## Perf harness reference
-
-Place at `tests/perf/test_dataclass_forms_bench.py`:
-
-```python
-import sys
-import timeit
-from datetime import timedelta
-from typing import NamedTuple, Optional
-
-from pydantic import BaseModel, ConfigDict
-
-
-class DispatchOptionsBM(BaseModel):
-    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
-    task_queue: str
-    start_to_close_timeout: Optional[timedelta] = None
-    schedule_to_close_timeout: Optional[timedelta] = None
-    retry_policy: Optional[object] = None  # stand-in for temporalio RetryPolicy
-
-
-class DispatchOptionsNT(NamedTuple):
-    task_queue: str
-    start_to_close_timeout: Optional[timedelta] = None
-    schedule_to_close_timeout: Optional[timedelta] = None
-    retry_policy: Optional[object] = None
-
-
-N = 200_000
-
-
-def _bench(label, fn):
-    secs = timeit.timeit(fn, number=N)
-    print(f"{label:40s} {secs / N * 1e9:8.1f} ns/op  ({secs:.3f}s / {N})")
-
-
-def main():
-    tq = "default"
-    to = timedelta(seconds=30)
-    _bench("construct BaseModel", lambda: DispatchOptionsBM(task_queue=tq, start_to_close_timeout=to))
-    _bench("construct NamedTuple", lambda: DispatchOptionsNT(task_queue=tq, start_to_close_timeout=to))
-    bm = DispatchOptionsBM(task_queue=tq, start_to_close_timeout=to)
-    payload = bm.model_dump()
-    _bench("BaseModel model_dump", lambda: bm.model_dump())
-    _bench("BaseModel model_validate", lambda: DispatchOptionsBM.model_validate(payload))
-    _bench("BaseModel json round-trip", lambda: DispatchOptionsBM.model_validate_json(bm.model_dump_json()))
-    print("\n--- memory (single instance) ---")
-    print("BaseModel getsizeof:", sys.getsizeof(bm), "has __dict__:", hasattr(bm, "__dict__"))
-    nt = DispatchOptionsNT(task_queue=tq, start_to_close_timeout=to)
-    print("NamedTuple getsizeof:", sys.getsizeof(nt), "has __dict__:", hasattr(nt, "__dict__"))
-
-
-if __name__ == "__main__":
-    main()
-```
-
-For the wire anchor, add a second bench constructing a realistic `PipeRunArg` (or a stripped stand-in matching its field count) and timing `model_dump_json()` / `model_validate_json()` — the reference for asserting no wire type accidentally got heavier.
 
 ---
 
@@ -281,6 +247,24 @@ Append one entry per session, especially at every hard stop. Template:
 - Code state: <clean & committed? mid-edit? which files dirty?>
 - NEXT ACTION: <the single exact thing the next session should do first>
 ```
+
+### 2026-05-29 — Phases 1–4 complete (NamedTuple upgrades + off-wire stdlib removals; perf harness built then dropped) — 🛑 HARD STOP 2 reached
+- **POST-REVIEW ADJUSTMENTS (same session, after the user reviewed the work):** (1) **Perf harness DROPPED** — `tests/perf/` deleted entirely. It measured nothing realistic (synthetic stand-ins; the wire-anchor never used the real kajson converter path; costs negligible vs network-bound activities; nothing on a hot path). Phase 1 & Phase 6's perf-diff are struck; the `DispatchOptions` form decision now rests on reasoning. (2) **4.1 `RegistrationFailure` switched NamedTuple → frozen `BaseModel`** — a NamedTuple IS a tuple, which collides with the `tuple[str, ...]` success arm of its union return; a BaseModel stays type-distinct. (3) **2nd review pass — premise update + 3.2/3.4 → pydantic dataclass.** The user clarified the premise: the goal is the *right per-site shape*, and a **pydantic dataclass** (wire-legal since Phase 0) is a first-class off-wire option, often the lowest-churn one. Rewrote the top-of-file form-selection guide accordingly, then converted **3.2 `ErrorPagesReport` → frozen pydantic dataclass** and **3.4 `VariableReference` → non-frozen pydantic dataclass** (both near-zero-diff: keep `field(default_factory=...)` + properties, just swap the decorator import). Kept 3.1 NamedTuple (Protocol field), 3.3 BaseModel (uniform builder layer), 4.1 BaseModel (type-distinct from tuple). agent-check clean (pyright 0/0, mypy 1929); errors+jinja2+templating 318 passed; temporal + setup-namespace 452 passed/4 pre-existing xpass.
+- Landed: **2.1, 2.2, 3.1, 3.2, 3.3, 3.4, 4.1** flipped with per-item results above. **1.1/1.2 built-then-dropped** (see above). **2.3 and 2.4 skipped — target code no longer exists in the current tree** (see deviations). Files touched (final state):
+  - **Phase 2 (NamedTuple):** `pipelex/core/concepts/concept_factory.py` (+`StructureNameAndRefine`), `pipelex/core/qualified_ref.py` (+`CrossPackageRef`).
+  - **Phase 3 (off-wire stdlib removals):** `pipelex/reporting/reporting_manager.py` (`_EventLogContext`→NamedTuple), `pipelex/errors/error_pages_generator.py` (`ErrorPagesReport`→frozen BaseModel), `pipelex/builder/runner_code.py` (`CustomClassInfo`→frozen BaseModel), `pipelex/tools/jinja2/jinja2_required_variables.py` (`VariableReference`→mutable BaseModel).
+  - **Phase 4 (temporal-adjacent):** `pipelex/temporal/tprl/namespace_check.py` (`RegistrationFailure`→**frozen BaseModel**, post-review).
+  - **Final per-site forms:** 3.1 `_EventLogContext`→NamedTuple · 3.2 `ErrorPagesReport`→**frozen pydantic dataclass** · 3.3 `CustomClassInfo`→frozen BaseModel · 3.4 `VariableReference`→**pydantic dataclass** · 4.1 `RegistrationFailure`→frozen BaseModel · 2.1/2.2→NamedTuple.
+- Decisions / deviations:
+  - **2.3 / 2.4 do not exist (the audit was stale — taken against the sibling `refactor/Paths` worktree).** `runtime_manager.py` is gone; runtime mode is now property-based in `pipelex/system/runtime.py`. `config_manager.py` is now `pipelex/system/configuration/config_loader.py` and its `find_project_root() -> Path | None` already dropped the `found_root_marker` bool. Both grep-confirmed absent — nothing to convert, so both checkboxes are marked done-by-absence (struck through inline).
+  - **3.2 `ErrorPagesReport` — plan rationale was stale; final form is frozen pydantic dataclass.** Plan said "single full-kwargs construction, no in-place `.append`"; actually it's built empty and `.append`-ed in place. `frozen=True` blocks attribute *reassignment*, not list mutation, under stdlib-dataclass / pydantic-dataclass / BaseModel alike — so all three are behavior-equivalent for the append pattern. Final choice (2nd review pass): frozen **pydantic dataclass** — lowest churn (kept `field(default_factory=list[Path])`) and no model-API need.
+  - **4.1 `RegistrationFailure` implementer-note verified, not assumed:** re-grepped all consumers; every discrimination is `isinstance(x, RegistrationFailure)`, none is `isinstance(x, tuple)`; success path returns plain tuples (never NamedTuple-subclass instances) so discrimination stays exact.
+  - **Only ONE stdlib dataclass remains in `pipelex/`:** `pipelex/temporal/config_temporal.py` (`DispatchOptions`, Phase 5) — grep-confirmed. HARD RULE 1 is one conversion away from satisfied.
+  - **Inline LSP noise (informational):** throughout, the editor's inline pyright kept emitting `temporalio.*` "could not be resolved" / "type unknown" diagnostics on temporal files I touched (and the Phase 0 files). That inline checker lacks the temporal extra; the authoritative `make agent-check` pyright resolves `temporalio` and reports **0 errors**. One round of jinja2 diagnostics was also stale (referenced pre-edit line numbers) — verified the file by re-reading; conversion was correct. Trust `make agent-check`, not the inline stream.
+- Verification (all green): `make agent-check` clean (ruff+plxt, pyright 0/0, mypy 1932 files) · `make tb` 2 passed · core+pipes 1323 passed/1 xfailed (pre-existing) · temporal unit+integration 445 passed/4 xpassed (pre-existing xdist flakes, no stray procs) · builder+tools+errors+reporting 1676 passed/1 pre-existing skip.
+- Open questions / carry-forward: (1) **deferred release gate still pending** — publish new kajson `0.6.0` to PyPI + bump `kajson==` pin in `pipelex/pyproject.toml`; do NOT run `uv lock`/`uv sync` in this worktree until then (editable `0.6.0` vs `==0.5.0` pin would conflict). (2) Phase 5 gate 5.1 wants `make tb` on an env WITHOUT the temporal extra — but THIS worktree HAS temporalio installed, so the next session must arrange a no-temporal-extra import check (separate venv, or a targeted import-isolation test) rather than assuming the local env exercises that path.
+- Code state: **uncommitted and fully UNSTAGED** (user unstaged the index; not committing without an explicit ask — the protocol's "or clearly-described" clause is satisfied by this entry). Dirty/modified files (final, after 2nd review pass): `TODOS.md` (this update), `pipelex/core/concepts/concept_factory.py`, `pipelex/core/qualified_ref.py`, `pipelex/reporting/reporting_manager.py`, `pipelex/errors/error_pages_generator.py`, `pipelex/builder/runner_code.py`, `pipelex/tools/jinja2/jinja2_required_variables.py`, `pipelex/temporal/tprl/namespace_check.py`. **No new files** (the `tests/perf/` harness was created then deleted in the same session). `uv.lock` untouched. Tree otherwise clean.
+- NEXT ACTION: HARD STOP 2 — END THE SESSION. A fresh session starts **Phase 5** — convert `DispatchOptions` in `pipelex/temporal/config_temporal.py` to frozen `BaseModel(arbitrary_types_allowed=True)`. **Do gate 5.1 FIRST:** confirm the module still imports without the `temporalio` extra (RetryPolicy stays under `TYPE_CHECKING`/typed `Any`); this worktree has temporalio installed, so arrange a no-extra import check. If the import-clean path proves infeasible, fall back to the NamedTuple form (5.2) and record it.
 
 ### 2026-05-29 — Phase 0 complete (converter + kajson generalized) — 🛑 HARD STOP 1 reached
 - Landed: Pre-flight (both boxes) + **0.1–0.9** all flipped with per-item results above. Two-repo change:

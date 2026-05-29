@@ -1,7 +1,6 @@
 from collections.abc import Sequence
-from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 from pydantic import Field, RootModel
 from typing_extensions import override
@@ -37,8 +36,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-@dataclass
-class _EventLogContext:
+class _EventLogContext(NamedTuple):
     """Per-workflow/run event log state. Private to ReportingManager."""
 
     event_log: EventLogProtocol
