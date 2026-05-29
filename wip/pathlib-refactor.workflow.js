@@ -238,7 +238,7 @@ phase('Verify')
 const VERIFY_CMDS =
   'Run, from the repo root, IN THIS ORDER and capture output:\n' +
   '  1. `make agent-check`  (ruff fix-unused-imports + format + lint, then pyright, then mypy)\n' +
-  '  2. `.venv/bin/pytest -q -p no:randomly -m "not (inference or pipelex_api or imgg or gha_disabled or needs_output or llm or ocr)" -k "test_boot or test_toml_utils or test_paths or inputs_path_resolver or convert_file_path_to_module_path" --tb=short`  (targeted: boot/config load + path-related unit tests)\n' +
+  '  2. `.venv/bin/pytest -q -p no:randomly -m "not (inference or pipelex_api or img_gen or gha_disabled or needs_output or llm or ocr)" -k "test_boot or test_toml_utils or test_paths or inputs_path_resolver or convert_file_path_to_module_path" --tb=short`  (targeted: boot/config load + path-related unit tests)\n' +
   'Report passed=true ONLY if make agent-check exits 0 AND the targeted pytest exits 0. ' +
   'Parse failures into the structured list (tool, file, message). Include the last ~60 lines of combined output in raw_tail.'
 
