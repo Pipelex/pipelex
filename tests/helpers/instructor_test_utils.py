@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING, Any
 from instructor.core import FailedAttempt, InstructorRetryException
 from pydantic import BaseModel
 
+from pipelex.cogt.llm.llm_prompt import LLMPrompt
+
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
@@ -54,11 +56,17 @@ def make_llm_job(mocker: MockerFixture) -> Any:
     """Return a MagicMock ``LLMJob`` skeleton suitable for ``_gen_object`` tests.
 
     The returned mock has ``applied_job_params=None`` and a ``job_params`` mock
-    populated with the fields ``_gen_object`` actually reads. Callers may
-    override individual fields as needed.
+    populated with the fields ``_gen_object`` actually reads. ``llm_prompt`` is a
+    real :class:`LLMPrompt` (not a MagicMock) so its ``system_text`` / ``user_text``
+    don't leak auto-attributes into provider config/message construction. Callers
+    may override individual fields as needed.
     """
     job = mocker.MagicMock()
     job.applied_job_params = None
+    job.llm_prompt = LLMPrompt(
+        system_text="You are a helpful test assistant.",
+        user_text="Generate a structured object.",
+    )
     job.job_params.temperature = 0.5
     job.job_params.max_tokens = None
     job.job_params.reasoning_effort = None
