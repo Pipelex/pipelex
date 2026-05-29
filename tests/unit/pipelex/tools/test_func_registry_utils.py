@@ -163,7 +163,7 @@ class CodebaseFileContent(StructuredContent):
             func_registry.teardown()
 
             # Test the registration
-            FuncRegistryUtils.register_funcs_in_folder(folder_path=temp_dir, is_recursive=False)
+            FuncRegistryUtils.register_funcs_in_folder(folder_path=Path(temp_dir), is_recursive=False)
 
             # Check that expected functions were registered
             for func_name in expected_registered:
@@ -213,7 +213,7 @@ async def nested_function(working_memory: WorkingMemory) -> TextContent:
             func_registry.teardown()
 
             # Test recursive search
-            FuncRegistryUtils.register_funcs_in_folder(folder_path=temp_dir, is_recursive=True)
+            FuncRegistryUtils.register_funcs_in_folder(folder_path=Path(temp_dir), is_recursive=True)
 
             # Both functions should be registered
             assert func_registry.has_function("root_function"), "root_function should be registered"
@@ -221,7 +221,7 @@ async def nested_function(working_memory: WorkingMemory) -> TextContent:
 
             # Clear and test non-recursive search
             func_registry.teardown()
-            FuncRegistryUtils.register_funcs_in_folder(folder_path=temp_dir, is_recursive=False)
+            FuncRegistryUtils.register_funcs_in_folder(folder_path=Path(temp_dir), is_recursive=False)
 
             # Only root function should be registered
             assert func_registry.has_function("root_function"), "root_function should be registered"

@@ -20,7 +20,7 @@ class ClassB:
 def some_function():
     pass
 """)
-        class_names = find_class_names_in_file(str(test_file_path))
+        class_names = find_class_names_in_file(test_file_path)
         assert len(class_names) == 2
         assert "ClassA" in class_names
         assert "ClassB" in class_names
@@ -45,7 +45,7 @@ class UnrelatedClass:
     pass
 """)
         class_names = find_class_names_in_file(
-            str(test_file_path),
+            test_file_path,
             base_class_names=["StructuredContent"],
         )
         assert len(class_names) == 1
@@ -66,7 +66,7 @@ class UnrelatedClass:
     pass
 """)
         class_names = find_class_names_in_file(
-            str(test_file_path),
+            test_file_path,
             base_class_names=["StructuredContent"],
         )
         assert len(class_names) == 1
@@ -81,7 +81,7 @@ def some_function():
 
 variable = 42
 """)
-        class_names = find_class_names_in_file(str(test_file_path))
+        class_names = find_class_names_in_file(test_file_path)
         assert len(class_names) == 0
 
     def test_find_class_names_non_python_file_raises_error(self, tmp_path: Path):
@@ -89,12 +89,12 @@ variable = 42
         test_file_path = tmp_path / "test.txt"
         test_file_path.write_text("Not Python")
         with pytest.raises(ModuleFileError) as excinfo:
-            find_class_names_in_file(str(test_file_path))
+            find_class_names_in_file(test_file_path)
         assert "is not a Python file" in str(excinfo.value)
 
     def test_find_class_names_nonexistent_file_raises_error(self, tmp_path: Path):
         """Test that nonexistent file raises error."""
         nonexistent_file_path = tmp_path / "nonexistent.py"
         with pytest.raises(ModuleFileError) as excinfo:
-            find_class_names_in_file(str(nonexistent_file_path))
+            find_class_names_in_file(nonexistent_file_path)
         assert "does not exist" in str(excinfo.value)

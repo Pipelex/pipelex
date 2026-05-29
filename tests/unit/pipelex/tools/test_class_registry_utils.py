@@ -32,10 +32,10 @@ class TestClassRegistryUtilsUnit:
             return_value=mock_registry,
         )
 
-        ClassRegistryUtils.register_classes_in_file(file_path="/fake/path.py", base_class=None, is_include_imported=False)
+        ClassRegistryUtils.register_classes_in_file(file_path=Path("/fake/path.py"), base_class=None, is_include_imported=False)
 
         # Verify the mocked functions were called correctly
-        mock_import.assert_called_once_with("/fake/path.py")
+        mock_import.assert_called_once_with(Path("/fake/path.py"))
         mock_find.assert_called_once_with(module=mock_module, base_class=None, include_imported=False)
 
         # Verify classes were registered with the global registry
@@ -57,7 +57,7 @@ class TestClassRegistryUtilsUnit:
         mock_register_file = mocker.patch.object(ClassRegistryUtils, "register_classes_in_file")
 
         ClassRegistryUtils.register_classes_in_folder(
-            folder_path="/fake/folder",
+            folder_path=Path("/fake/folder"),
             base_class=BaseModel,
             is_recursive=True,
             is_include_imported=False,
@@ -65,7 +65,7 @@ class TestClassRegistryUtilsUnit:
 
         # Verify find_files_in_dir was called correctly
         mock_find_files.assert_called_once_with(
-            dir_path="/fake/folder",
+            dir_path=Path("/fake/folder"),
             pattern="*.py",
             is_recursive=True,
             excluded_dirs=["__pycache__", ".git"],
@@ -73,5 +73,5 @@ class TestClassRegistryUtilsUnit:
 
         # Verify register_classes_in_file was called for each file
         assert mock_register_file.call_count == 2
-        mock_register_file.assert_any_call(file_path="/fake/file1.py", base_class=BaseModel, is_include_imported=False)
-        mock_register_file.assert_any_call(file_path="/fake/file2.py", base_class=BaseModel, is_include_imported=False)
+        mock_register_file.assert_any_call(file_path=Path("/fake/file1.py"), base_class=BaseModel, is_include_imported=False)
+        mock_register_file.assert_any_call(file_path=Path("/fake/file2.py"), base_class=BaseModel, is_include_imported=False)

@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
@@ -38,7 +37,7 @@ def setup_combine_concepts(load_test_library: Callable[[list[Path]], None]):
     """Register structured content classes and create concepts for combine_stuffs tests."""
     load_test_library([Path(__file__).parent])
     ClassRegistryUtils.register_classes_in_file(
-        file_path=os.path.join(os.path.dirname(__file__), "test_stuff_factory_combine_stuffs.py"),
+        file_path=Path(__file__).parent / "test_stuff_factory_combine_stuffs.py",
         base_class=StructuredContent,
         is_include_imported=False,
     )

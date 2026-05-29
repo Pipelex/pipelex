@@ -117,8 +117,8 @@ async def _generate_output_core(
                 final_output_path = Path("results/output_schema.json")
 
     try:
-        ensure_directory_for_file_path(file_path=str(final_output_path))
-        save_text_to_path(text=output_str, path=str(final_output_path))
+        ensure_directory_for_file_path(file_path=final_output_path)
+        save_text_to_path(text=output_str, path=final_output_path)
         typer.secho(f"Generated output file: {final_output_path}", fg=typer.colors.GREEN)
     except Exception as exc:
         # CLI command boundary: any failure writing the file is reported to the user and exits via typer.Exit.

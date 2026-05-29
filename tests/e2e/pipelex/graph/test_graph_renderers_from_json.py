@@ -28,8 +28,8 @@ def _get_next_output_folder() -> Path:
 
     Creates folders like: temp/test_outputs/graph_renderers/run_01, run_02, etc.
     """
-    base_dir = str(Path(TEST_OUTPUTS_DIR) / "graph_renderers")
-    return Path(get_incremental_directory_path(base_dir, "run"))
+    base_dir = Path(TEST_OUTPUTS_DIR) / "graph_renderers"
+    return get_incremental_directory_path(base_dir, "run")
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -66,7 +66,7 @@ class TestGraphRenderersFromJson:
         json_path = Path(graph_json_path)
         assert json_path.exists(), f"Graph JSON file not found: {json_path}"
 
-        json_str = load_text_from_path(str(json_path))
+        json_str = load_text_from_path(json_path)
         graph_spec = GraphSpec.model_validate_json(json_str)
         assert graph_spec is not None
         assert len(graph_spec.nodes) > 0
