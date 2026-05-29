@@ -55,7 +55,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-kajson = { path = "../kajson", editable = true }
+kajson = { git = "https://github.com/Pipelex/kajson.git", rev = "39233003636b40ad20c73785a7a42a57d90a9b71" }
 
 [project.urls]
 Homepage = "https://pipelex.com"
