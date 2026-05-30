@@ -58,8 +58,8 @@ The known retry-related over-counting case (R2) is documented and pinned by `tes
 The pieces all exist:
 
 - `UsageAggregator.aggregate(events) → list[AnyTokensUsage]` (`pipelex/tracing/usage_aggregator.py`).
-- `ReportingManager.inject_tokens_usages(pipeline_run_id, tokens_usages)` whose docstring literally says: *"Used after assembling usage data from distributed trace events, so that generate_report() can produce a complete cost report across all workers."* (`reporting_manager.py:191`).
-- `ReportingManager.generate_report(pipeline_run_id)` (`reporting_manager.py:247`).
+- `ReportingManager.inject_tokens_usages(pipeline_run_id, tokens_usages)` whose docstring literally says: *"Used after assembling usage data from distributed trace events, so that generate_report() can produce a complete cost report across all workers."* (`reporting_manager.py:223`).
+- `ReportingManager.generate_report(pipeline_run_id)` (`reporting_manager.py:365`).
 
 But **nothing in the runtime calls them**. The graph assembly path (`graph_assembly.py`, `act_assemble_graph.py`) reads events back, but only feeds them into `GraphSpecAssembler` — never into `UsageAggregator`. `generate_report()` has zero runtime callers; only integration tests invoke it.
 
