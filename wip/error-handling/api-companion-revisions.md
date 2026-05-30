@@ -1,8 +1,8 @@
 # API-companion revisions — what we are actually building vs. the original spec
 
-This doc captures the **deviations** the pipelex side is taking from the original spec in `changes-for-api-early-draft.md` (moved to workspace `docs/history/error-handling/`), and the **rationale** for each. Its primary audience is the `pipelex-api` agent: when you read `changes-for-api-early-draft.md` to plan how the API will consume the new pipelex primitives, read this first to know what surface to actually expect.
+This doc captures the **deviations** the pipelex side is taking from the original spec in `changes-for-api-early-draft.md`, and the **rationale** for each. Its primary audience is the `pipelex-api` agent: when you read `changes-for-api-early-draft.md` to plan how the API will consume the new pipelex primitives, read this first to know what surface to actually expect.
 
-The execution plan that implemented these revisions is the now-archived `archive-todos.md` (moved to workspace `docs/history/error-handling/`).
+The execution plan that implemented these revisions is now retired.
 
 ---
 
@@ -70,7 +70,7 @@ Subclasses override `_declared_title` / `_declared_type_uri` only when the auto-
 
 **Decision taken in planning.** Field lives on `JobMetadata`, not `PipeJob`. `JobMetadata` already carries `pipeline_run_id`, `user_id`, `session_id` and threads through every activity / workflow / submitter hop via `PipeJob.job_metadata` → `PipeRunArg`. Adding it on `PipeJob` (as the spec's literal example shows) would require copying it across into `JobMetadata` anyway to make it visible to the logger context.
 
-**Acceptance.** The API populates `JobMetadata.request_id` from its inbound `X-Request-ID` middleware once at submitter dispatch. From there `request_id` rides on `JobMetadata` across every Temporal hop and is threaded **explicitly** into the worker-side log calls — **not** via a `ContextVar`. A `ContextVar` is process-local and does not survive the Temporal activity/workflow serialization boundary, so it cannot carry a correlation id from the submitter process to a worker running in another process. The worker-side wiring landed in TODOS Phase 2 (2026-05-22): `WfPipeRun` / `WfPipeRouter` build a per-invocation `WorkflowLog` bound to `job_metadata.request_id` at entry, so every workflow log record they emit carries `request_id` in its `extra` dict. The current `webhook.payload["request_id"]` piggyback becomes obsolete.
+**Acceptance.** The API populates `JobMetadata.request_id` from its inbound `X-Request-ID` middleware once at submitter dispatch. From there `request_id` rides on `JobMetadata` across every Temporal hop and is threaded **explicitly** into the worker-side log calls — **not** via a `ContextVar`. A `ContextVar` is process-local and does not survive the Temporal activity/workflow serialization boundary, so it cannot carry a correlation id from the submitter process to a worker running in another process. The worker-side wiring is landed: `WfPipeRun` / `WfPipeRouter` build a per-invocation `WorkflowLog` bound to `job_metadata.request_id` at entry, so every workflow log record they emit carries `request_id` in its `extra` dict. The current `webhook.payload["request_id"]` piggyback becomes obsolete.
 
 ---
 
@@ -108,7 +108,7 @@ class ErrorReport:
 - Every other report → `message` replaced with `"An internal error occurred."`, `user_action` dropped.
 - **Kept in all modes** (stable identifiers): `error_type`, `error_domain`, `error_category`, `retryable`, `title`, `type_uri`.
 
-> **Gap closed (2026-05-22, TODOS Phase 1).** STRICT originally keyed its `message` passthrough on `error_domain == INPUT`, which is *inherited* up the `__cause__` chain — so a domain-less wrapper raised `from` an `INPUT` cause could leak its own (non-caller-facing) `message`, and `to_problem_document(STRICT)` could echo provider metadata for `INPUT` reports. The passthrough now keys on a per-class `caller_facing_message` flag (message *provenance*, not inherited classification) and provider metadata is stripped unconditionally. See `track-strict-disclosure-input-domain-gap.md` (moved to workspace `docs/history/error-handling/`).
+> **Gap closed (2026-05-22, TODOS Phase 1).** STRICT originally keyed its `message` passthrough on `error_domain == INPUT`, which is *inherited* up the `__cause__` chain — so a domain-less wrapper raised `from` an `INPUT` cause could leak its own (non-caller-facing) `message`, and `to_problem_document(STRICT)` could echo provider metadata for `INPUT` reports. The passthrough now keys on a per-class `caller_facing_message` flag (message *provenance*, not inherited classification) and provider metadata is stripped unconditionally.
 
 Both methods land in Stage 2 (was 2+4 in the spec). `to_problem_document` is callable from the API's Phase 1 directly.
 
@@ -195,7 +195,7 @@ These show up in multiple items above; collecting them here so the API agent can
 
 ## Current state
 
-> **For the API agent:** check this section first to know what's actually available. The full per-stage execution ledger is archived at `archive-todos.md` (moved to workspace `docs/history/error-handling/`).
+> **For the API agent:** check this section first to know what's actually available.
 
 - [x] **Stage 1 — Foundations.** Items A + B.
 - [x] **Stage 2 — Rendering primitives + total recovery.** Items C + D-1.
@@ -203,11 +203,11 @@ These show up in multiple items above; collecting them here so the API agent can
 - [x] **Stage 4 — DX polish.** Item E.
 - [ ] **Stage 5 — Security tightening.** Item F (cross-repo, tracked at [`../security/webhook-signing.md`](../security/webhook-signing.md)).
 
-**Net to the API team:** the error-handling refactor on the pipelex side is landed — Stages 1-4 ship in PR #933 (PR #931 was the prior staging branch and was closed unmerged; the work was replayed and finalized on `feature/API-readiness-2`). API Phases 0/1/4/5 are unblocked. One thing remains on the pipelex side:
+**Net to the API team:** the error-handling refactor on the pipelex side is landed. API Phases 0/1/4/5 are unblocked. One thing remains on the pipelex side:
 
 - **Webhook signing (Stage 5 / Item F)** — the cross-repo security track at [`../security/webhook-signing.md`](../security/webhook-signing.md), independent of the rest of this plan, landing on its own schedule.
 
-The post-review follow-ups — a `/review` pass surfaced a small set of in-repo finalizations, sequenced in the archived `archive-todos-api-readiness-2.md` (moved to workspace `docs/history/error-handling/`) — all landed 2026-05-22 on `feature/API-readiness-2`: the STRICT-disclosure INPUT-domain leak (Phase 1), the `request_id` log wiring (§B; Phase 2), the webhook reserved-key collision (Phase 3), and the test-coverage backfill (Phase 4).
+The post-review follow-ups have all landed: the STRICT-disclosure INPUT-domain leak, the `request_id` log wiring (§B), the webhook reserved-key collision, and the test-coverage backfill.
 
 ### What landed in Stage 1
 
@@ -219,7 +219,7 @@ Available now:
 - **`pascal_case_to_kebab`** (`pipelex/tools/misc/string_utils.py`) — acronym-aware kebab conversion (`"APIError" -> "api-error"`, `"V2APIError" -> "v2-api-error"`, `"OAuth2" -> "o-auth2"`).
 - **`JobMetadata.request_id: str | None`** (`pipelex/pipeline/job_metadata.py`) — round-trips through `model_dump_json`, distinct from `ProviderErrorMetadata.request_id` (the provider-side request id) which keeps its name.
 - **`pipeline_run_setup(..., request_id="...")`** (`pipelex/pipeline/pipeline_run_setup.py`) — kwarg threaded into the constructed `JobMetadata`. The current `webhook.payload["request_id"]` piggyback on the API side is now obsolete; consumers should set `request_id` at dispatch time and read it back off `arg.<path>.job_metadata.request_id`.
-- **`WorkflowLog` / `ActivityLog`** (`pipelex/temporal/log_temporal.py`) — every level (`verbose` / `debug` / `dev` / `info` / `warning` / `error` / `critical`) attaches the helper's bound `request_id` to the Temporal log record via `extra={"request_id": ...}`. Stage 1 shipped a per-method `request_id` kwarg here; TODOS Phase 2 (2026-05-22) replaced it with a per-invocation bound helper — `WfPipeRun` / `WfPipeRouter` build a `WorkflowLog` from `job_metadata.request_id` at entry, so worker log records now carry the `request_id` end to end.
+- **`WorkflowLog` / `ActivityLog`** (`pipelex/temporal/log_temporal.py`) — every level (`verbose` / `debug` / `dev` / `info` / `warning` / `error` / `critical`) attaches the helper's bound `request_id` to the Temporal log record via `extra={"request_id": ...}`. A per-invocation bound helper — `WfPipeRun` / `WfPipeRouter` build a `WorkflowLog` from `job_metadata.request_id` at entry — means worker log records carry the `request_id` end to end.
 
 **Update — `type_uri()` is now a pure constant.** Stage 1 originally read the base URI through an `ErrorManager` singleton holding an `ErrorsConfig` — a workaround for the import cycle a lazy `get_config()` call inside the method would have created. That whole machinery (`ErrorManager`, `ErrorsConfig`, the `[errors_config]` config block) was later removed: the `type` URI is a stable identifier per RFC 7807, so making it configurable was over-engineering, and the mutable read leaked into Temporal workflow determinism (the base URI rode into workflow history via a synthesized `UnrecoverableWorkflowFailureError`). `type_uri()` now reads the `URLs.error_docs_base` constant directly — a pure function, no boot dependency, no static cycle. API consumers see no difference.
 
@@ -229,7 +229,7 @@ Available now:
 
 Available now:
 
-- **`DisclosureMode` enum** (`pipelex/base_exceptions.py`) — `VERBOSE` / `STRICT`. The contract is pinned on the enum's own docstring: STRICT is a *classification-projection*, **not a path-leak shield**. STRICT always drops `provider` / `model` / `provider_metadata`, then redacts `message` by *provenance*: a report flagged `caller_facing_message` (set by error classes that author caller-facing copy — `PipelexInterpreterError` / `ValidateBundleError`) keeps its `message` and `user_action`; every other report drops `user_action` and replaces `message` with `"An internal error occurred."`, keeping the stable identifiers (`error_type` / `error_domain` / `error_category` / `retryable` / `title` / `type_uri`). The passthrough keys on the per-class flag, not `error_domain` — refined post-#931 from the original Stage 2 `error_domain == INPUT` keying (TODOS Phase 1; see the gap note above).
+- **`DisclosureMode` enum** (`pipelex/base_exceptions.py`) — `VERBOSE` / `STRICT`. The contract is pinned on the enum's own docstring: STRICT is a *classification-projection*, **not a path-leak shield**. STRICT always drops `provider` / `model` / `provider_metadata`, then redacts `message` by *provenance*: a report flagged `caller_facing_message` (set by error classes that author caller-facing copy — `PipelexInterpreterError` / `ValidateBundleError`) keeps its `message` and `user_action`; every other report drops `user_action` and replaces `message` with `"An internal error occurred."`, keeping the stable identifiers (`error_type` / `error_domain` / `error_category` / `retryable` / `title` / `type_uri`). The passthrough keys on the per-class flag, not `error_domain` (see the gap note above).
 - **`ErrorReport.to_dict(disclosure_mode=DisclosureMode.VERBOSE)`** — projects the report through the disclosure mode. `VERBOSE` round-trips through `from_dict` exactly; `STRICT` is lossy by design. Default is `VERBOSE` so existing internal-trust callers (webhook payloads, Temporal details) are unaffected.
 - **`ErrorReport.to_problem_document(*, instance=None, request_id=None, disclosure_mode=VERBOSE)`** — returns a plain dict in RFC 7807 shape. `type` ← `type_uri`, `title` ← `title`, `status` ← `http_status`, `detail` ← `message` (subject to disclosure-mode redaction). The pipelex-native classification fields ride as extension members; `type_uri` and `title` are mapped — NOT echoed — so the returned dict contains exactly one `title` key. `request_id` and `instance` ride as extensions only when the caller supplies them. The runtime stays HTTP-agnostic — no FastAPI/Starlette import.
 - **`recover_error_report(exc: BaseException) -> ErrorReport`** (`pipelex/temporal/tprl/temporal_error.py`) — total. When the failure carries no embedded report, the function synthesizes `UnrecoverableWorkflowFailureError(_message_from_exc(exc)).to_error_report()`. A report dict that *is* found but fails `from_dict` validation is an internal contract bug — the activity bridge and the submitter share the schema within one deploy — and is also synthesized into the same `UnrecoverableWorkflowFailureError` fallback, with the recovered message plus an `[error report failed schema validation]` marker, so failure-webhook delivery stays intact (the workflow still fails afterwards, keeping the contract bug visible). `UnrecoverableWorkflowFailureError` lives in `pipelex/temporal/exceptions.py` next to `WorkflowExecutionError` etc., with `error_domain=RUNTIME` and `_declared_title="Unrecoverable workflow failure"`. Callers in `workflow_caller.py` (the three former `if error_report is not None` branches at `execute_workflow` / `execute_child_workflow` / `start_child_workflow`) now treat the return as always-usable.

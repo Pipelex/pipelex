@@ -1,6 +1,6 @@
 # Temporal — Deferred Items Index
 
-Single index of work explicitly deferred out of shipped Temporal phases and the in-flight `feature/Temporal-merge-3` (PR #891) merge. Each entry links back to the doc that owns the full context — this file is just the directory so nothing falls off the radar.
+Single index of work explicitly deferred out of shipped Temporal phases and the in-flight Temporal merge work. Each entry links back to the doc that owns the full context — this file is just the directory so nothing falls off the radar.
 
 For non-temporal deferrals, see [`../deferred-items.md`](../deferred-items.md).
 
@@ -8,7 +8,7 @@ For non-temporal deferrals, see [`../deferred-items.md`](../deferred-items.md).
 
 ## Replay-determinism: remaining `get_config()` reads inside workflow code
 
-**Source:** PR #891 review (chatgpt-codex-connector, 2026-05; cubic-dev-ai independently flagged the same root cause at `wf_pipe_run.py:57`, 2026-05).
+**Source:** review finding — root cause at `wf_pipe_run.py:57`.
 **Owner doc:** Phase 0 of [`00-enterprise-readiness-analysis.md`](00-enterprise-readiness-analysis.md) — bullet "Eliminate remaining config reads inside workflow code".
 **Precedent:** the same class of issue was already solved at the submitter boundary for `WorkflowExecutorFactory` (bypassed inside workflows — see `tprl/workflow_caller.py:179+`) and for `TemporalManager.session_id` (`stamp_submitter_session_id` in `tprl/observability.py`).
 
@@ -19,7 +19,7 @@ Two call paths still re-derive options from `get_config()` at workflow runtime, 
 
 ### Why the "submitter snapshot on workflow input" pattern is the wrong fix
 
-An initial attempt during the PR #891 follow-up implemented a `TemporalDispatchSnapshot` pydantic model that froze `worker_config`, `queue_options`, `is_dispatch_resolution_traced`, and the search-attribute toggle + name list on `JobMetadata`, stamped at the top-level dispatch boundary alongside `stamp_submitter_session_id`. **That approach was reverted** after a Temporal-developer skill consultation. Reasons:
+An initial attempt implemented a `TemporalDispatchSnapshot` pydantic model that froze `worker_config`, `queue_options`, `is_dispatch_resolution_traced`, and the search-attribute toggle + name list on `JobMetadata`, stamped at the top-level dispatch boundary alongside `stamp_submitter_session_id`. **That approach was reverted** after a Temporal-developer skill consultation. Reasons:
 
 - **Architectural inversion.** The `worker_config` slice (routing, queue tunings, retry policies) is operator-owned deployment concern. Putting it on workflow input mixes operations data with business state — the opposite of why central config exists.
 - **Payload bloat.** Temporal limits are 2 MB per payload, 4 MB per gRPC message, <10 MB per workflow history. A serious deployment with dozens of `activity_queues`, per-handle routing, queue overlays, and retry policies makes the snapshot non-trivially sized, and it now rides on (a) every workflow start, (b) every child workflow start, (c) every activity input via `JobMetadata`. For fan-out-heavy or long-running pipelines this can balloon history.
@@ -40,10 +40,10 @@ Ordered from least to most invasive — pick the combination that fits the opera
 
 ## `WorkflowExecutionError` → `ApplicationError` cleanup
 
-**Source:** Phase 5 / 6 follow-up; only deferred item from temporal-primitives Phases 1–6.
+**Source:** the only deferred item from the temporal-primitives work.
 **Owner doc:** [`../temporal-primitives/03-temporal-error-handling-revamp.md`](../temporal-primitives/03-temporal-error-handling-revamp.md).
 
-`WorkflowExecutionError` doesn't subclass `temporalio.exceptions.FailureError`, so the workaround in commit `117bbe01` registers it in the Worker's `workflow_failure_exception_types` list. Proposal: make `WorkflowExecutionError` subclass `ApplicationError`, drop the registration, simplify the exception model end-to-end.
+`WorkflowExecutionError` doesn't subclass `temporalio.exceptions.FailureError`, so the workaround registers it in the Worker's `workflow_failure_exception_types` list. Proposal: make `WorkflowExecutionError` subclass `ApplicationError`, drop the registration, simplify the exception model end-to-end.
 
 ---
 
@@ -52,13 +52,13 @@ Ordered from least to most invasive — pick the combination that fits the opera
 **Source:** [`00-enterprise-readiness-analysis.md`](00-enterprise-readiness-analysis.md) gap #3 + Phase 0 first bullet.
 **Owner doc:** Phase 0 of `00-enterprise-readiness-analysis.md`.
 
-Priority files: `tprl_pipe/wf_pipe_router.py` (multiple `except Exception`), `tprl_pipe/act_assemble_graph.py` (one labeled `# TODO: wip — do not catch all exceptions`). Already partially addressed in commit `117bbe01` for `tprl/workflow_caller.py`; the workflow-side and activity-side catches remain.
+Priority files: `tprl_pipe/wf_pipe_router.py` (multiple `except Exception`), `tprl_pipe/act_assemble_graph.py` (one labeled `# TODO: wip — do not catch all exceptions`). Already partially addressed for `tprl/workflow_caller.py`; the workflow-side and activity-side catches remain.
 
 ---
 
 ## Out-of-scope-but-tracked from temporal-primitives
 
-**Owner doc:** `02-id-and-naming-plan.md` §"Out of scope" (moved to workspace `docs/history/temporal-primitives/`).
+**Owner doc:** [`../temporal-primitives/01-id-and-naming-design.md`](../temporal-primitives/01-id-and-naming-design.md).
 
 These are explicitly out of scope for the shipped temporal-primitives work but stay on the watchlist:
 
@@ -67,14 +67,14 @@ These are explicitly out of scope for the shipped temporal-primitives work but s
 - Per-pipe Workflow Type registration.
 - Search-attribute schema versioning / migration tooling.
 - `display_label` parameter at the `PipeRun` entry point.
-- **Unifying the two child-spawn paths.** Was attempted (Phase 5 follow-up), reverted (`ac8e2335`) for replay-determinism reasons — a clean unification needs the submitter-snapshot pattern above to land first.
+- **Unifying the two child-spawn paths.** Was attempted, then reverted for replay-determinism reasons — a clean unification needs the submitter-snapshot pattern above to land first.
 - `WorkflowIDReusePolicy` choice — stays at SDK default `ALLOW_DUPLICATE`; revisit whether `REJECT_DUPLICATE` catches double-execution bugs now that workflow IDs are deterministic from `pipeline_run_id`.
 
 ---
 
 ## Config-driven infrastructure activity tuning
 
-**Source:** PR #891 `/review` (informational finding #8).
+**Source:** review finding.
 **Owner doc:** this file.
 
 `pipelex/temporal/tprl_pipe/wf_pipe_run.py` dispatches two infrastructure activities — `act_assemble_graph` and `act_deliver` — with hardcoded options: `start_to_close_timeout=timedelta(seconds=30)` / `RetryPolicy(maximum_attempts=3)` for graph assembly, `start_to_close_timeout=timedelta(seconds=60)` / `RetryPolicy(maximum_attempts=3)` for delivery. Content-generation activities were threaded through `worker_config.resolve_dispatch(...)` in the v2 routing work, but these two infra paths were deliberately left hardcoded: they're not part of the content-generation surface, and forwarding the dispatch resolver here re-introduces the same config-read-on-workflow-runtime concern that motivated bypassing `WorkflowExecutor.execute_child_workflow` from inside workflows.
@@ -90,7 +90,7 @@ Out of scope until: an operator hits an actual timeout/retry mismatch on graph a
 
 ## Real-cluster validation gaps
 
-**Source:** `02-id-and-naming-plan.md` §"Known follow-ups (deferred)" under Phase 6 (moved to workspace `docs/history/temporal-primitives/`).
+**Source:** deferred follow-up from the temporal id-and-naming work.
 
 - Hard-fail path against a real Temporal cluster — unit suite covers the contract via mocked clients; run `/temporal-e2e-validate` once a real-cluster credential is available.
 - `[temporal.search_attributes].enabled = false` end-to-end path on a real cluster — covered by unit tests + propagation-by-construction; deferred for explicit e2e verification.

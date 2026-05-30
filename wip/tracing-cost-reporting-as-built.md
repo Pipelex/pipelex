@@ -1,8 +1,8 @@
 # Tracing & Cost Reporting — As Built
 
-> **Status**: Shipped via `feature/dynamodb-tracer` (supersedes the original Phase 4.5 Step 6 design from `00-master-plan.md`, moved to workspace `docs/history/distributed-execution/`).
+> **Status**: Shipped — the current tracing & cost-reporting implementation (supersedes an earlier distributed-tracing design, now retired).
 > **Last updated**: 2026-05-04
-> **Related**: [02-master-plan.md](02-master-plan.md); `distributed-tracing-and-reporting.md` (pre-implementation analysis — design choices superseded) and `phase4.5-distributed-tracing-implementation.md`, both moved to workspace `docs/history/distributed-execution/`.
+> **Related**: [02-master-plan.md](02-master-plan.md).
 
 This file documents what actually shipped, plus the known gaps that 02-master-plan addresses.
 
@@ -38,7 +38,7 @@ The original Step 6 plan called for a `TracingActivityInboundInterceptor` to set
 
 **Severity (was)**: Blocked the whole point of distributed activity workers.
 
-**Status**: Resolved on `fix/Tracing-across-workers` (P0 in [02-master-plan.md](02-master-plan.md)). The full implementation history (six phases, eng-review notes, decisions, test inventory, atomic-commit list) is preserved in the branch's git log.
+**Status**: Resolved (P0 in [02-master-plan.md](02-master-plan.md)).
 
 The fix has two independent parts that ship together:
 
@@ -77,6 +77,6 @@ Net effect: even when usage events ARE captured (i.e., the same-worker case in t
 
 ## How this connects to 02-master-plan
 
-- T1 was the **top priority** in [02-master-plan.md](02-master-plan.md) — now resolved on `fix/Tracing-across-workers`.
+- T1 was the **top priority** in [02-master-plan.md](02-master-plan.md) — now resolved.
 - T2 is the **next priority** — events now land in the same partition from every worker; the small remaining step is wiring `read events → UsageAggregator → inject_tokens_usages → generate_report`.
 - T3 is the architectural shape; the T1 fix mitigates the immediate impact, the deeper refactor will land alongside T2 / further follow-ups.

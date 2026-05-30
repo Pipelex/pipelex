@@ -6,7 +6,7 @@ Pipelex exposes workflow execution failures as `pipelex.temporal.exceptions.Work
 
 But Temporal's Python SDK has a strict rule: only exceptions that subclass `temporalio.exceptions.FailureError` are treated as **workflow execution failures** (terminal, propagated to client as `WorkflowFailureError`). Anything else is treated as a **workflow task failure** (programmer bug — workflow task is retried indefinitely, the workflow never completes).
 
-`WorkflowExecutionError` doesn't subclass `FailureError`. So any workflow that catches it and re-raises it (the pattern in `wf_pipe_run.py` after the Phase 5 follow-up) would hang forever — except we worked around it by registering `WorkflowExecutionError` in the Worker's `workflow_failure_exception_types` list (commit `117bbe01`).
+`WorkflowExecutionError` doesn't subclass `FailureError`. So any workflow that catches it and re-raises it (the pattern in `wf_pipe_run.py`) would hang forever — except we worked around it by registering `WorkflowExecutionError` in the Worker's `workflow_failure_exception_types` list.
 
 ## What this revamp would do
 
@@ -56,7 +56,7 @@ Likely **not** changed:
 
 ## Related work
 
-- Phase 5 follow-up commit `117bbe01` — "Pre-Phase-6 cleanup: tighten exception handling + WfPipeRun failure-path test" — added the `workflow_failure_exception_types` workaround.
+- The `workflow_failure_exception_types` registration is the current workaround this revamp would remove.
 - `pipelex/temporal/tprl/workflow_caller.py` — the four `WorkflowExecutor` entry points and their named-exception catches.
 - `pipelex/temporal/exceptions.py` — the current `TemporalFlowError` hierarchy.
 - `tests/integration/pipelex/temporal/test_wf_pipe_run_failure_path.py` — the test that surfaced this issue.

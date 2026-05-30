@@ -2,7 +2,7 @@
 
 > **Status**: Not started
 > **Goal**: Dependency blueprints are included in the crate. Workers can execute pipelines with cross-package deps without having the dependency packages installed on PIPELEXPATH.
-> **Predecessor**: Phase 2 (crate propagation, shipped — see `00-master-plan.md`, workspace `docs/history/distributed-execution/`).
+> **Predecessor**: Phase 2 (crate propagation, shipped).
 > **Related**: [02-master-plan.md](02-master-plan.md), [future-crate-first-architecture.md](crate-architecture/future-crate-first-architecture.md).
 
 ---

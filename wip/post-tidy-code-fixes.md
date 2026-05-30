@@ -26,4 +26,4 @@ Consolidated in [`../DEFERRED-BACKLOG.md`](../DEFERRED-BACKLOG.md) and the per-t
 - `[REAL]` GraphSpec causal ordering for parent/child topologies (medium, observability-only).
 - `[REAL]` kajson class-registry race under pytest-xdist (low, test-hygiene; needs runtime repro).
 - `[REAL — deferred]` `get_config()` replay-determinism — the cheap parts (a `docs/distributed-execution` note on the config-edit-while-in-flight constraint, plus a Replayer regression test) are file-able; the full fix is Worker Versioning (large).
-- Pre-existing broken links in the relocated historical archive docs (the absolute-style `wip/...`-from-inside-`wip/` pattern, and wrong relative paths in the master-plan archives). These left `wip/` with the move to workspace `docs/history/`; optional sweep there, not introduced by this cleanup.
+- Pre-existing broken links in the relocated historical archive docs (the absolute-style `wip/...`-from-inside-`wip/` pattern, and wrong relative paths in the master-plan archives). These left `wip/` when the finished archive docs were retired; optional sweep, not introduced by this cleanup.

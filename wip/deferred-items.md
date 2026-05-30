@@ -37,14 +37,14 @@ Cache loaded crates in shared storage (Redis, S3) so multiple workers don't redu
 
 ## Distributed Tracing — Deferred Items
 
-Items related to the event log and graph tracing system (Phase 4.5). Also documented in `distributed-tracing-and-reporting.md` (moved to workspace `docs/history/distributed-execution/`).
+Items related to the event log and graph tracing system.
 
 ### Event Log Backends
 
 | Item | Status | Context |
 |---|---|---|
-| DynamoDB backend | **Shipped** (2026, `feature/dynamodb-tracer`) | `pipelex/tracing/dynamodb_event_log.py` (+ `TEMPORAL_DYNAMODB` variant). Schema-compatible with `pipelex-api-infra`'s `TraceEventDynamoDBAdapter`. Selected via `[pipelex.tracing] backend = "dynamodb"`. |
-| SQLite backend | **Not planned** — NDJSON + DynamoDB cover the matrix | Listed in the original analysis (`distributed-tracing-and-reporting.md`, workspace `docs/history/distributed-execution/`); not built. Re-evaluate only if a use case appears that NDJSON can't serve and DynamoDB is overkill. |
+| DynamoDB backend | **Shipped** | `pipelex/tracing/dynamodb_event_log.py` (+ `TEMPORAL_DYNAMODB` variant). Schema-compatible with `pipelex-api-infra`'s `TraceEventDynamoDBAdapter`. Selected via `[pipelex.tracing] backend = "dynamodb"`. |
+| SQLite backend | **Not planned** — NDJSON + DynamoDB cover the matrix | Not built. Re-evaluate only if a use case appears that NDJSON can't serve and DynamoDB is overkill. |
 
 ### Event Log Protocol Extensions
 
@@ -66,7 +66,7 @@ Items related to the event log and graph tracing system (Phase 4.5). Also docume
 
 | Item | Status | Context |
 |---|---|---|
-| Causal event ordering in assembler | **Known limitation** — works for current topologies | `read_events()` sorts by `(workflow_id, sequence)` which groups by lexicographic workflow ID, not execution order. In parent/child workflow topologies, this can cause `_stuff_producer_map` overwrites in the wrong order during `GraphSpecAssembler.pass_one()`, producing incorrect DATA edge sources. Consider sorting by timestamp or processing events in a topology-aware order. Flagged by codex on PR #796. |
+| Causal event ordering in assembler | **Known limitation** — works for current topologies | `read_events()` sorts by `(workflow_id, sequence)` which groups by lexicographic workflow ID, not execution order. In parent/child workflow topologies, this can cause `_stuff_producer_map` overwrites in the wrong order during `GraphSpecAssembler.pass_one()`, producing incorrect DATA edge sources. Consider sorting by timestamp or processing events in a topology-aware order. |
 | PipeCondition SELECTED_OUTCOME wiring | **Deferred** — no production use yet | PipeCondition has no tracer calls in production code currently. If SELECTED_OUTCOME edges are needed, that's a separate change. |
 
 ---

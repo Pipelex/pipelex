@@ -2,7 +2,6 @@
 
 > **Status**: Vision / future direction
 > **Date**: 2026-03-25
-> **Related**: `00-master-plan.md`, `phase2-implementation-plan.md` (both moved to workspace `docs/history/distributed-execution/`)
 
 ---
 

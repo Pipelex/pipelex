@@ -1,15 +1,15 @@
 # track: request_id correlation on delivery error paths
 
-**Status:** open. Surfaced by `/code-review xhigh` on commit `07f9cce9`. Decision: TBD.
+**Status:** open. Decision: TBD.
 
-**TL;DR:** Commits `ceb018b5` (Temporal) and `07f9cce9` (direct-mode) thread `request_id` through `DeliveryExecutor` and into the **success-path** completion log lines. The **failure-path** log/error messages in the same executor still don't carry the field — same correlation gap the feature was meant to close, just on the unhappy path. Three lines in `delivery_executor.py`, plus one debug log in `pipe_run.py`.
+**TL;DR:** Earlier work threaded `request_id` through `DeliveryExecutor` and into the **success-path** completion log lines (Temporal + direct-mode dispatchers). The **failure-path** log/error messages in the same executor still don't carry the field — same correlation gap the feature was meant to close, just on the unhappy path. Three lines in `delivery_executor.py`, plus one debug log in `pipe_run.py`.
 
 ## Context
 
-Greptile's "Delivery logs lose request" PR comment was scoped to "the storage/webhook completion logs don't carry the inbound `X-Request-ID`." We addressed it twice:
+A review's "Delivery logs lose request" comment was scoped to "the storage/webhook completion logs don't carry the inbound `X-Request-ID`." We addressed it twice:
 
-- `ceb018b5` — `DeliveryActivityArg.request_id` plumbed through to `DeliveryExecutor.execute` and into the **two success log lines** in `_store_results` and `_notify_webhook`.
-- `07f9cce9` — direct-mode `PipeRun.run` forwards `pipe_job.job_metadata.request_id` to `DeliveryExecutor.execute` so non-Temporal dispatchers don't lose correlation.
+- Temporal path — `DeliveryActivityArg.request_id` plumbed through to `DeliveryExecutor.execute` and into the **two success log lines** in `_store_results` and `_notify_webhook`.
+- Direct mode — `PipeRun.run` forwards `pipe_job.job_metadata.request_id` to `DeliveryExecutor.execute` so non-Temporal dispatchers don't lose correlation.
 
 Both commits stopped at the success-path log lines. The failure-path messages — which is exactly where operators most want the correlation — still emit `pipeline_run_id=...` without `request_id`.
 
@@ -31,7 +31,7 @@ All four lines have `request_id` (or could have it) in local scope — `_store_r
 - **Completeness of the stated feature.** The point of threading `request_id` was operator correlation across the delivery phase. Operators most need that correlation when something fails — failed webhooks are exactly when they grep logs for the inbound request id. Leaving the failure messages uncorrelated defeats half the value.
 - **Consistency.** Success-path log lines carry the field; failure-path messages don't. Any operator who reads logs will notice the asymmetry and learn the wrong heuristic ("request_id is on success lines only — guess I have to correlate by pipeline_run_id when things break").
 - **Cheap.** The exception-path messages already have `pipeline_run_id` interpolated; adding the same conditional suffix that the success path uses is mechanical. No new arguments to thread (the kwarg is already in scope at all three executor sites). Test changes are small.
-- **The feature isn't done until this is done.** The PR review thread for greptile's #3 finding is still open — closing it with "we did half" invites a re-flag.
+- **The feature isn't done until this is done.** The review's #3 finding is still open — closing it with "we did half" invites a re-flag.
 
 ## Case for leaving it
 
@@ -54,7 +54,7 @@ Rationale:
 
 ## If we do it
 
-Single commit on `feature/API-readiness-2`, scoped to `pipelex/pipe_run/delivery_executor.py`:
+Single commit scoped to `pipelex/pipe_run/delivery_executor.py`:
 
 - `_store_results` line 243 — append the existing `request_id_suffix` variable to the error message. (Already constructed at line 238 in the same function.)
 - `_notify_webhook` lines 282 and 285 — both error-message constructions. Lift `request_id_suffix` (currently defined at line 279 after the success branch) to the top of the function so both the success and both failure messages can reuse it.
@@ -65,7 +65,7 @@ Sketch commit message:
 ```
 fix(delivery): include request_id in DeliveryExecutor failure messages
 
-Closes the asymmetric correlation gap left by ceb018b5 / 07f9cce9:
+Closes the asymmetric correlation gap left by the success-path threading:
 success-path completion logs carry request_id, but the matching
 exception messages on storage/webhook failure paths still did not.
 Operators correlating failed deliveries to inbound X-Request-ID had
@@ -80,18 +80,16 @@ refactor to a request-bound contextvar.
 ## Decision criteria
 
 Push toward **close now** if:
-- The PR thread on greptile's "Delivery logs lose request" comment is still open and we don't want to leave it for a re-flag.
+- The review thread on the "Delivery logs lose request" comment is still open and we don't want to leave it for a re-flag.
 - Operators have already raised an issue about asymmetric correlation in delivery failures.
 - Cost of the fix stays as small as sketched (single-file, single-commit, one regression test).
 
 Push toward **defer** if:
-- We're racing the merge of `feature/API-readiness-2` and any further change widens the audit surface.
+- We're racing a merge and any further change widens the audit surface.
 - We want to land the altitude refactor (contextvar / structured-log adapter) first and not pay the per-line cost twice.
-- The greptile thread is already closed and a separate PR for the failure-path is acceptable.
+- The review thread is already closed and a separate PR for the failure-path is acceptable.
 
 ## References
 
-- Commit `ceb018b5` — `feat(delivery): thread request_id through DeliveryExecutor for cross-phase log correlation` (success-path lines).
-- Commit `07f9cce9` — `fix(delivery): forward request_id from PipeRun direct-mode dispatcher to DeliveryExecutor`.
-- `/code-review xhigh` outputs from both review passes — error-path findings #1-#3.
-- PR #943, greptile comment thread `PRRT_kwDOOwmMFc6FHCBU`.
+- The success-path threading in `DeliveryExecutor` (Temporal + direct-mode) — the prior work this builds on.
+- The code-review error-path findings that surfaced this gap.

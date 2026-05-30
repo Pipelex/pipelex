@@ -1,6 +1,6 @@
 # Track — Extract / Classify / Render Decomposition
 
-> **Status: landed on `refactor/ECR`.** Every inference worker's `except` block now collapses to `extract → classify → raise render(...) from exc`. **Classify** lives in `pipelex/cogt/inference/error_classify.py`, **Render** in `error_render.py`; the per-provider `extract_*_metadata` functions stay in `pipelex/cogt/inference/error_classification.py`. The per-provider `*_error_classification.py` files, `AnthropicCredentialsError`, and the dead `GatewayFactory` Portkey-classify helpers are deleted. Per-provider quota probes are now module-private (`_is_quota_exhaustion_*`), reachable only through `ProviderErrorMetadata.is_quota_exhaustion`. A new parity meta-test (`tests/unit/pipelex/cogt/inference/test_provider_classification_parity.py`) walks every `ProviderName` against the extract-fn registry, so adding a new provider without wiring it fails fast.
+> **Status: landed.** Every inference worker's `except` block now collapses to `extract → classify → raise render(...) from exc`. **Classify** lives in `pipelex/cogt/inference/error_classify.py`, **Render** in `error_render.py`; the per-provider `extract_*_metadata` functions stay in `pipelex/cogt/inference/error_classification.py`. The per-provider `*_error_classification.py` files, `AnthropicCredentialsError`, and the dead `GatewayFactory` Portkey-classify helpers are deleted. Per-provider quota probes are now module-private (`_is_quota_exhaustion_*`), reachable only through `ProviderErrorMetadata.is_quota_exhaustion`. A new parity meta-test (`tests/unit/pipelex/cogt/inference/test_provider_classification_parity.py`) walks every `ProviderName` against the extract-fn registry, so adding a new provider without wiring it fails fast.
 >
 > The rest of this doc describes the **pre-refactor problem and the design** that the refactor implements. It is kept as the historical motivation; the code is now in its post-refactor state.
 
@@ -10,7 +10,7 @@ Today every inference worker performs three logically separate steps inline insi
 
 This track proposes decomposing the pipeline so that only the **Extract** step is per-provider. **Classify** and **Render** become provider-agnostic and share a single implementation across all 18+ workers.
 
-This track is **proposed but not started.** It is the natural next step after the worker-classification sweep, which has landed (`archive-worker-classification-sweep.md`, moved to workspace `docs/history/error-handling/`): now that every worker uniformly attaches `ProviderErrorMetadata` and a structured `UserAction`, the duplication across workers is the dominant complexity, and decomposition is the obvious cleanup.
+This track is **proposed but not started.** It is the natural next step after the worker-classification sweep, which has landed: now that every worker uniformly attaches `ProviderErrorMetadata` and a structured `UserAction`, the duplication across workers is the dominant complexity, and decomposition is the obvious cleanup.
 
 ## Current state
 

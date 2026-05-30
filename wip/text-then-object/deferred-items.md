@@ -1,6 +1,6 @@
 # Text-then-object — Deferred Items
 
-Follow-ups deferred out of the text-then-object work that landed in PR #891 (`feature/Temporal-merge-3`). Mirrored here so they survive `TODOS.md` being cleared at release time.
+Follow-ups deferred out of the text-then-object work. Mirrored here so they survive `TODOS.md` being cleared at release time.
 
 **Source:** `TODOS.md` §"What remains as follow-up TODOs" from the PR recap.
 **Owner doc:** this file once `TODOS.md` is cleared on next release.

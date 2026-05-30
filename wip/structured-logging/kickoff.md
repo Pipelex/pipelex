@@ -1,6 +1,6 @@
 # Structured logging refactor — kickoff briefing
 
-**Status:** kicked off, not started. Sequenced AFTER `feature/API-readiness-2` and the surrounding error-handling stack merge. Will get its own branch and its own PR.
+**Status:** kicked off, not started. Sequenced AFTER the error-handling stack merges. Will get its own branch and its own PR.
 
 **Purpose of this doc:** cold-start briefing for the session that picks this up. Captures *why* the refactor exists, *what good looks like*, *what the current code constrains us to*, and the first open questions to resolve. **Not a plan** — the plan is the first artifact of that session.
 
@@ -10,12 +10,12 @@ Pipelex's `log` API is string-shaped today (`log.info("a message string with stu
 
 ## What triggered this
 
-`wip/error-handling/track-delivery-error-path-request-id.md` opened the question of whether to thread `request_id` into the failure-path messages of `DeliveryExecutor` (mirroring the success-path threading from commits `ceb018b5` and `07f9cce9`). The proximate decision was "do it the manual way OR do the structural fix." We chose to defer the structural fix to a dedicated branch — this one.
+`wip/error-handling/track-delivery-error-path-request-id.md` opened the question of whether to thread `request_id` into the failure-path messages of `DeliveryExecutor` (mirroring the success-path threading already in place). The proximate decision was "do it the manual way OR do the structural fix." We chose to defer the structural fix to a dedicated branch — this one.
 
-Two preceding commits did manual per-line threading on the success path:
+Earlier work did manual per-line threading on the success path:
 
-- `ceb018b5` — thread `request_id` through `DeliveryExecutor.execute` and into success log lines.
-- `07f9cce9` — forward `request_id` from `PipeRun.run` direct-mode dispatcher to `DeliveryExecutor`.
+- `DeliveryExecutor.execute` threads `request_id` into the success log lines.
+- `PipeRun.run` forwards `request_id` from the direct-mode dispatcher to `DeliveryExecutor`.
 
 Both commits also introduced the ad-hoc `request_id_suffix = f", request_id={request_id}" if request_id is not None else ""` pattern. That pattern is exactly what this refactor exists to delete.
 
@@ -63,7 +63,7 @@ Key properties of the destination state:
 - The two boundaries that bind today's `request_id` continue to bind it — but at the *context* level, not by threading kwargs through 4-deep call stacks. The API request handler binds; `PipeRun.run` binds for non-API direct-mode invocations (whatever metadata it has); the Temporal activity entry re-binds from `DeliveryActivityArg.*` (the wire-format fields stay; only the propagation mechanism inside the activity changes).
 - The manual `request_id` kwargs on `DeliveryExecutor.execute` / `_store_results` / `_notify_webhook` are **deleted**. So is the `request_id_suffix` interpolation. The success log lines auto-pick up `request_id` from the filter; the failure log lines do too; the exception messages can stop carrying it (and stop pretending to).
 - Non-API invocations (CLI, direct library use, tests) simply don't bind `request_id`; the filter sees None; the field is absent from the record. No conditional suffix code anywhere.
-- **Event-name emission on delivery paths.** The success and failure log lines in `delivery_executor.py` carry an `event` field — `event=webhook_delivery` / `event=webhook_failure` on the webhook path, `event=storage_delivery` / `event=storage_failure` on the storage path. **Why this is folded into this refactor rather than done standalone:** the lines it touches (`delivery_executor.py` around 239 / 243 / 280 / 282 / 285) are exactly the `request_id_suffix` interpolation / kwarg-threading sites listed as deletion targets in "Reality of the current code" below (introduced by commits `ceb018b5` / `07f9cce9`). A narrow event-name pass on its own branch would touch those lines, and this refactor would touch them again — so it was deferred out of `feature/API-readiness-4` (its `TODOS.md` item #7, closed-by-deferral 2026-05-28) into this branch's scope. **Follow-ups when this branch starts:** (a) emit the four `event=...` fields above once the structured-field surface lands; (b) re-target the API-side pointer in `../pipelex-api/TODOS.md` "Deferred / next-track work" → "Upstream-pipelex follow-ups" from `feature/API-readiness-4` onto this branch. Note: the API-side T6 test (`pipelex-api/tests/unit/test_webhook_recovery.py`) pins error-rendering consistency, not event names — the API is **not** blocked on event-name emission, so this is genuinely follow-up work, not a release gate.
+- **Event-name emission on delivery paths.** The success and failure log lines in `delivery_executor.py` carry an `event` field — `event=webhook_delivery` / `event=webhook_failure` on the webhook path, `event=storage_delivery` / `event=storage_failure` on the storage path. **Why this is folded into this refactor rather than done standalone:** the lines it touches (`delivery_executor.py` around 239 / 243 / 280 / 282 / 285) are exactly the `request_id_suffix` interpolation / kwarg-threading sites listed as deletion targets in "Reality of the current code" below. A narrow event-name pass on its own branch would touch those lines, and this refactor would touch them again — so it was deferred from the API-readiness work into this branch's scope. **Follow-ups when this branch starts:** (a) emit the four `event=...` fields above once the structured-field surface lands; (b) re-target the API-side pointer in `../pipelex-api/TODOS.md` "Deferred / next-track work" → "Upstream-pipelex follow-ups" onto this branch. Note: the API-side T6 test (`pipelex-api/tests/unit/test_webhook_recovery.py`) pins error-rendering consistency, not event names — the API is **not** blocked on event-name emission, so this is genuinely follow-up work, not a release gate.
 
 ## Reality of the current code (what we found during the trigger discussion)
 
@@ -81,7 +81,7 @@ No `extra=` kwarg, no `**fields`, no structured pathway. Dispatch flows through 
 Specific sites currently doing manual interpolation / threading of `request_id` and `pipeline_run_id` (these become the regression-test fixtures for the refactor, and the places we delete code):
 
 - `pipelex/pipe_run/delivery_executor.py`
-  - `execute(... request_id: str | None = None)` — kwarg added by `ceb018b5`. To delete.
+  - `execute(... request_id: str | None = None)` — the threaded kwarg. To delete.
   - `_store_results(... request_id: str | None = None)` — same. To delete.
   - `_notify_webhook(... request_id: str | None = None)` — same. To delete.
   - Success log lines (lines around 239 and 280) interpolate `request_id_suffix`. To revert to plain narrative.
@@ -117,7 +117,7 @@ The session should answer these before writing the plan:
 
 ## Sequencing
 
-- **Do not start until `feature/API-readiness-2` merges.** That branch is the trigger context; this refactor touches the same files.
+- **Do not start until the API-readiness work merges.** That is the trigger context; this refactor touches the same files.
 - **Do not start until the error-handling stack settles.** Several `wip/error-handling/track-*.md` items are still open; they shouldn't be racing this refactor through the same files.
 - **Branch:** `refactor/structured-logging` (or similar — confirm at branch-creation time).
 - **Scope discipline:** the refactor is the API extension + the contextvar machinery + the migration of the request-scoped fields we know about (`request_id`, `pipeline_run_id`, `user_id`). It is NOT "rewrite every log line in the codebase." Other call sites migrate opportunistically as they're touched.
@@ -125,8 +125,8 @@ The session should answer these before writing the plan:
 ## References
 
 - `wip/error-handling/track-delivery-error-path-request-id.md` — the trigger doc; closing rationale references this refactor as the deferred altitude fix.
-- Commit `ceb018b5` — `feat(delivery): thread request_id through DeliveryExecutor for cross-phase log correlation`. To be partially reverted.
-- Commit `07f9cce9` — `fix(delivery): forward request_id from PipeRun direct-mode dispatcher to DeliveryExecutor`. To be partially reverted.
+- The success-path threading in `DeliveryExecutor` — to be partially reverted.
+- The direct-mode forwarding from `PipeRun.run` to `DeliveryExecutor` — to be partially reverted.
 - `pipelex/tools/log/log.py` — current string-shaped Log API. The surface to extend.
 - `pipelex/tools/log/log_dispatch.py` — dispatch layer. First file to investigate (open question 1).
 - `pipelex/tools/log/log_formatter.py` — formatter layer. Second file to investigate (open questions 1 and 2).

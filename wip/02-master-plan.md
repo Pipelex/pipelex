@@ -2,7 +2,7 @@
 
 > **Status**: Live plan — drives the next round of distributed-execution work.
 > **Date**: 2026-05-04
-> **Predecessors**: `00-master-plan.md` (Phases 0–5, shipped) · `01-master-plan.md` (interim plan, now split into per-topic files) — both moved to workspace `docs/history/distributed-execution/`.
+> **Predecessors**: the Phase 0–5 master plan (shipped) and the interim plan that was split into per-topic files — both now retired.
 
 The big direction now is to actually run **activities on standalone Worker pools** — separate processes from the workflow Worker pool — so we can scale workflow orchestration and inference activity execution independently. Today's tracing / cost-reporting design was built for the single-bundle-per-Worker case and breaks the moment activities move off-process. That has to be fixed before anything else.
 
@@ -12,22 +12,22 @@ The big direction now is to actually run **activities on standalone Worker pools
 
 | # | Item | Status | Owner file |
 |---|---|---|---|
-| **P0** | **Tracing & cost reporting across separate-process workers** | Done — shipped on `fix/Tracing-across-workers`; see [tracing-cost-reporting-as-built.md](tracing-cost-reporting-as-built.md) (T1 marked fixed) | this file (problem statement) |
+| **P0** | **Tracing & cost reporting across separate-process workers** | Done — see [tracing-cost-reporting-as-built.md](tracing-cost-reporting-as-built.md) (T1 marked fixed) | this file (problem statement) |
 | **P0.1** | **Dry-run through activity dispatch (testing affordance)** | Not started — surfaced during P0 Phase 6 validation | this file (problem statement) |
-| **P0.2** | **Deferred follow-ons from P0** | Not started — surfaced during P0 eng review + PR #860 SWE-agent review | this file (problem statement) |
+| **P0.2** | **Deferred follow-ons from P0** | Not started — surfaced during P0 eng review | this file (problem statement) |
 | **P1** | **Cross-worker cost report assembly wiring** | Not started — depends on P0 design | this file (problem statement) |
 | **P2** | Phase 6a — Local cross-package dependencies in crate | Not started | [phase6a-local-cross-package-deps.md](phase6a-local-cross-package-deps.md) |
 | **P3** | Phase 6b — Remote dependencies from GitHub | Not started — needs P2 | [phase6b-remote-deps-from-github.md](phase6b-remote-deps-from-github.md) |
 
 What's already shipped on this front: see [tracing-cost-reporting-as-built.md](tracing-cost-reporting-as-built.md). It also enumerates the open issues (T1, T2, T3) that motivate P0 and P1.
 
-Sibling tracks (separate branches, not in this plan): worker error-handling Phases 4–7 (`error-handling-phase-{4,5,6,7}-*.md`), instructor-unwrap port (`instructor-unwrap-other-workers.md`).
+Sibling tracks (separate branches, not in this plan): the error-handling work — see [`error-handling/README.md`](error-handling/README.md).
 
 ---
 
 ## P0 — Tracing & cost reporting across separate-process workers — DONE
 
-Shipped on `fix/Tracing-across-workers`. The full implementation history (six phases, eng-review notes, decisions, test inventory, atomic-commit list) is preserved in the branch's git log and summarized in [tracing-cost-reporting-as-built.md](tracing-cost-reporting-as-built.md). The architectural notes below are kept for context. Follow-ons that were explicitly deferred during implementation are tracked under §P0.2.
+Shipped. The current state is summarized in [tracing-cost-reporting-as-built.md](tracing-cost-reporting-as-built.md). The architectural notes below are kept for context. Follow-ons that were explicitly deferred during implementation are tracked under §P0.2.
 
 ### Why this is top priority
 
@@ -43,7 +43,7 @@ The whole point of the distributed-execution work is to allow **activities on st
 
 ### Design discussion (deferred)
 
-We're not designing the fix yet — that comes when we pick up P0. The two natural starting points are (a) the original Phase 4.5 Step 6 `TracingActivityInboundInterceptor` design (now in `00-master-plan.md` and `01-master-plan.md`, workspace `docs/history/distributed-execution/`), and (b) plumbing tracing config + workflow id through `JobMetadata` so each activity can construct its own event log directly. Either way the activity needs request-scoped tracing data, not process-scoped state.
+We're not designing the fix yet — that comes when we pick up P0. The two natural starting points are (a) the original Phase 4.5 Step 6 `TracingActivityInboundInterceptor` design (from the now-retired master plan), and (b) plumbing tracing config + workflow id through `JobMetadata` so each activity can construct its own event log directly. Either way the activity needs request-scoped tracing data, not process-scoped state.
 
 ### Acceptance criteria — all met
 
@@ -83,7 +83,7 @@ Same affordance unlocks dry-run e2e for any future cross-process work (P1 cost r
 
 ## P0.2 — Deferred follow-ons from P0
 
-Items surfaced during the P0 eng review and the post-merge SWE-agent review of PR #860. Each is independently scoped and not blocking for P0.1 / P1 / P2 / P3. Pick up individually as priorities and signals dictate.
+Items surfaced during the P0 eng review and the post-merge review. Each is independently scoped and not blocking for P0.1 / P1 / P2 / P3. Pick up individually as priorities and signals dictate.
 
 ### From eng review (logged at the time of P0 implementation)
 
@@ -91,10 +91,10 @@ Items surfaced during the P0 eng review and the post-merge SWE-agent review of P
 - [ ] **DynamoDB `BatchWriteItem` for runner emission** — current path does one `PutItem` per usage event. At high-concurrency runners that's one boto3 call per emit; `BatchWriteItem` batches up to 25. Defer until actual throughput shows it matters. (Eng review R3.)
 - [ ] **NDJSON shared-filesystem invariant enforcement** — the NDJSON backend assumes `traces_dir` is visible to all writer processes (router pool + runner pool + `act_flush_trace_events`). For multi-host deployments this needs NFS/EFS or equivalent. Follow-up: a startup check that warns if `traces_dir` looks like a local-only path on a multi-worker deployment. (Eng review TODO-2.)
 
-### From PR #860 SWE-agent review (post-merge triage of `fix/Tracing-across-workers`)
+### Post-merge review follow-ons
 
-- [ ] **Per-thread `writer_id` for activity event log** — the surgical lock fix from PR #860 closes the duplicate-sequence race on `next_sequence()`, but a per-thread writer_id would eliminate the contention entirely and align the design with how Temporal's worker pool already partitions activities. Each thread would emit into its own writer namespace; dedup naturally drops to per-thread, no lock needed in the hot path.
-- [ ] **Project-wide migration of `JobMetadata.started_at` to timezone-aware datetimes** — the PR #860 patch builds the synthetic `now` with the same `tzinfo` as the incoming `started_at`, which removes the immediate `TypeError` crash but doesn't fix the underlying inconsistency: `JobMetadata.started_at` default factory is naive (`datetime.now`) while several callers (e.g. `pipe_abstract.py:428`) construct aware datetimes (`datetime.now(timezone.utc)`). A clean migration would standardize on `datetime.now(timezone.utc)` everywhere, document the tz contract on `JobMetadata`, and let `duration` subtract without defensive tzinfo matching at every site.
+- [ ] **Per-thread `writer_id` for activity event log** — the surgical lock fix closes the duplicate-sequence race on `next_sequence()`, but a per-thread writer_id would eliminate the contention entirely and align the design with how Temporal's worker pool already partitions activities. Each thread would emit into its own writer namespace; dedup naturally drops to per-thread, no lock needed in the hot path.
+- [ ] **Project-wide migration of `JobMetadata.started_at` to timezone-aware datetimes** — the landed patch builds the synthetic `now` with the same `tzinfo` as the incoming `started_at`, which removes the immediate `TypeError` crash but doesn't fix the underlying inconsistency: `JobMetadata.started_at` default factory is naive (`datetime.now`) while several callers (e.g. `pipe_abstract.py:428`) construct aware datetimes (`datetime.now(timezone.utc)`). A clean migration would standardize on `datetime.now(timezone.utc)` everywhere, document the tz contract on `JobMetadata`, and let `duration` subtract without defensive tzinfo matching at every site.
 
 ---
 
