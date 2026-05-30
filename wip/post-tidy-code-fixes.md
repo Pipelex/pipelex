@@ -21,7 +21,7 @@ The single genuine functional gap from the tracing work: wire `UsageAggregator.a
 
 ## Deferred / out of scope — pick up individually if prioritized
 
-Consolidated in [`../DEFERRED-BACKLOG.md`](../DEFERRED-BACKLOG.md) and the per-topic deferred indexes ([`deferred-items.md`](deferred-items.md), [`temporal-next/01-deferred-items.md`](temporal-next/01-deferred-items.md), [`text-then-object/deferred-items.md`](text-then-object/deferred-items.md)):
+Consolidated in [`../DEFERRED-BACKLOG.md`](../DEFERRED-BACKLOG.md) and the per-topic deferred indexes ([`deferred-items.md`](deferred-items.md), [`text-then-object/deferred-items.md`](text-then-object/deferred-items.md)):
 
 - `[REAL]` GraphSpec causal ordering for parent/child topologies (medium, observability-only).
 - `[REAL]` kajson class-registry race under pytest-xdist (low, test-hygiene; needs runtime repro).
