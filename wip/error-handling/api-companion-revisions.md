@@ -1,18 +1,18 @@
 # API-companion revisions — what we are actually building vs. the original spec
 
-This doc captures the **deviations** the pipelex side is taking from the original spec in [`changes-for-api-early-draft.md`](archive/changes-for-api-early-draft.md), and the **rationale** for each. Its primary audience is the `pipelex-api` agent: when you read [`changes-for-api-early-draft.md`](archive/changes-for-api-early-draft.md) to plan how the API will consume the new pipelex primitives, read this first to know what surface to actually expect.
+This doc captures the **deviations** the pipelex side is taking from the original spec in `changes-for-api-early-draft.md` (moved to workspace `docs/history/error-handling/`), and the **rationale** for each. Its primary audience is the `pipelex-api` agent: when you read `changes-for-api-early-draft.md` to plan how the API will consume the new pipelex primitives, read this first to know what surface to actually expect.
 
-The execution plan that implemented these revisions is the now-archived [`archive-todos.md`](archive/archive-todos.md).
+The execution plan that implemented these revisions is the now-archived `archive-todos.md` (moved to workspace `docs/history/error-handling/`).
 
 ---
 
 ## Why this exists
 
-The original spec in [`changes-for-api-early-draft.md`](archive/changes-for-api-early-draft.md) is **structurally sound** — every item identifies a real downstream pain and a real upstream primitive to fix it. But on close reading, several items push the very kind of consumer-side duplication, ad-hoc fallback logic, and optional-`None` plumbing that the spec itself argues against. A few items also introduce surface area earlier than it can be used, or hedge with "curate a subset, do the rest later" which leaves the codebase in an inconsistent state.
+The original spec in `changes-for-api-early-draft.md` is **structurally sound** — every item identifies a real downstream pain and a real upstream primitive to fix it. But on close reading, several items push the very kind of consumer-side duplication, ad-hoc fallback logic, and optional-`None` plumbing that the spec itself argues against. A few items also introduce surface area earlier than it can be used, or hedge with "curate a subset, do the rest later" which leaves the codebase in an inconsistent state.
 
 The revisions below collapse and re-scope the original items (see the mapping table next), eliminate the consumer-side drift sources it introduced, remove the "caller hand-authors a fallback" duplication pattern, drop the speculative item as YAGNI, and stay strictly inside the repo's *no speculative future-proofing* rule (`CLAUDE.md`).
 
-**For the API agent:** wherever the surface here disagrees with [`changes-for-api-early-draft.md`](archive/changes-for-api-early-draft.md), **this doc is authoritative**. The spec is kept for context but is no longer the contract.
+**For the API agent:** wherever the surface here disagrees with `changes-for-api-early-draft.md`, **this doc is authoritative**. The spec is kept for context but is no longer the contract.
 
 ---
 
@@ -108,7 +108,7 @@ class ErrorReport:
 - Every other report → `message` replaced with `"An internal error occurred."`, `user_action` dropped.
 - **Kept in all modes** (stable identifiers): `error_type`, `error_domain`, `error_category`, `retryable`, `title`, `type_uri`.
 
-> **Gap closed (2026-05-22, TODOS Phase 1).** STRICT originally keyed its `message` passthrough on `error_domain == INPUT`, which is *inherited* up the `__cause__` chain — so a domain-less wrapper raised `from` an `INPUT` cause could leak its own (non-caller-facing) `message`, and `to_problem_document(STRICT)` could echo provider metadata for `INPUT` reports. The passthrough now keys on a per-class `caller_facing_message` flag (message *provenance*, not inherited classification) and provider metadata is stripped unconditionally. See [`track-strict-disclosure-input-domain-gap.md`](archive/track-strict-disclosure-input-domain-gap.md).
+> **Gap closed (2026-05-22, TODOS Phase 1).** STRICT originally keyed its `message` passthrough on `error_domain == INPUT`, which is *inherited* up the `__cause__` chain — so a domain-less wrapper raised `from` an `INPUT` cause could leak its own (non-caller-facing) `message`, and `to_problem_document(STRICT)` could echo provider metadata for `INPUT` reports. The passthrough now keys on a per-class `caller_facing_message` flag (message *provenance*, not inherited classification) and provider metadata is stripped unconditionally. See `track-strict-disclosure-input-domain-gap.md` (moved to workspace `docs/history/error-handling/`).
 
 Both methods land in Stage 2 (was 2+4 in the spec). `to_problem_document` is callable from the API's Phase 1 directly.
 
@@ -195,7 +195,7 @@ These show up in multiple items above; collecting them here so the API agent can
 
 ## Current state
 
-> **For the API agent:** check this section first to know what's actually available. The full per-stage execution ledger is archived at [`archive-todos.md`](archive/archive-todos.md).
+> **For the API agent:** check this section first to know what's actually available. The full per-stage execution ledger is archived at `archive-todos.md` (moved to workspace `docs/history/error-handling/`).
 
 - [x] **Stage 1 — Foundations.** Items A + B.
 - [x] **Stage 2 — Rendering primitives + total recovery.** Items C + D-1.

@@ -1,8 +1,8 @@
 # Tracing & Cost Reporting — As Built
 
-> **Status**: Shipped via `feature/dynamodb-tracer` (supersedes the original Phase 4.5 Step 6 design from `archive/00-master-plan.md`).
+> **Status**: Shipped via `feature/dynamodb-tracer` (supersedes the original Phase 4.5 Step 6 design from `00-master-plan.md`, moved to workspace `docs/history/distributed-execution/`).
 > **Last updated**: 2026-05-04
-> **Related**: [02-master-plan.md](02-master-plan.md), [distributed-tracing-and-reporting.md](archive/distributed-tracing-and-reporting.md) (pre-implementation analysis — design choices superseded), [archive/phase4.5-distributed-tracing-implementation.md](archive/phase4.5-distributed-tracing-implementation.md).
+> **Related**: [02-master-plan.md](02-master-plan.md); `distributed-tracing-and-reporting.md` (pre-implementation analysis — design choices superseded) and `phase4.5-distributed-tracing-implementation.md`, both moved to workspace `docs/history/distributed-execution/`.
 
 This file documents what actually shipped, plus the known gaps that 02-master-plan addresses.
 

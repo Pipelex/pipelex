@@ -2,7 +2,7 @@
 
 > **Status**: Live plan — drives the next round of distributed-execution work.
 > **Date**: 2026-05-04
-> **Predecessors**: [archive/00-master-plan.md](archive/00-master-plan.md) (Phases 0–5, shipped) · [archive/01-master-plan.md](archive/01-master-plan.md) (interim plan, now split into per-topic files).
+> **Predecessors**: `00-master-plan.md` (Phases 0–5, shipped) · `01-master-plan.md` (interim plan, now split into per-topic files) — both moved to workspace `docs/history/distributed-execution/`.
 
 The big direction now is to actually run **activities on standalone Worker pools** — separate processes from the workflow Worker pool — so we can scale workflow orchestration and inference activity execution independently. Today's tracing / cost-reporting design was built for the single-bundle-per-Worker case and breaks the moment activities move off-process. That has to be fixed before anything else.
 
@@ -43,7 +43,7 @@ The whole point of the distributed-execution work is to allow **activities on st
 
 ### Design discussion (deferred)
 
-We're not designing the fix yet — that comes when we pick up P0. The two natural starting points are (a) the original Phase 4.5 Step 6 `TracingActivityInboundInterceptor` design (now in `archive/00-master-plan.md` and `archive/01-master-plan.md`), and (b) plumbing tracing config + workflow id through `JobMetadata` so each activity can construct its own event log directly. Either way the activity needs request-scoped tracing data, not process-scoped state.
+We're not designing the fix yet — that comes when we pick up P0. The two natural starting points are (a) the original Phase 4.5 Step 6 `TracingActivityInboundInterceptor` design (now in `00-master-plan.md` and `01-master-plan.md`, workspace `docs/history/distributed-execution/`), and (b) plumbing tracing config + workflow id through `JobMetadata` so each activity can construct its own event log directly. Either way the activity needs request-scoped tracing data, not process-scoped state.
 
 ### Acceptance criteria — all met
 
