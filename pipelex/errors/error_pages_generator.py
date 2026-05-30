@@ -18,9 +18,11 @@ from __future__ import annotations
 import functools
 import importlib
 import sys
-from dataclasses import dataclass, field
+from dataclasses import field
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from pydantic.dataclasses import dataclass
 
 import pipelex
 from pipelex.base_exceptions import ErrorDomain, PipelexError
@@ -175,6 +177,9 @@ class ErrorPagesReport:
     ``removed`` (a previously-generated page no longer maps to a target class
     and was deleted; pages bearing :data:`AUTHORED_MARKER` are never removed
     and surface as ``preserved`` instead).
+
+    ``frozen`` only blocks rebinding the fields — the lists are still populated
+    in place via ``.append`` by ``_commit_page`` / ``_remove_orphans``.
     """
 
     written: list[Path] = field(default_factory=list[Path])
