@@ -1,7 +1,7 @@
 from collections.abc import Sequence
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import NamedTuple
 
 from pydantic import Field, RootModel
 from typing_extensions import override
@@ -34,8 +34,7 @@ except ImportError:
     _BotoClientError = None  # type: ignore[assignment, misc]
 
 
-@dataclass
-class _EventLogContext:
+class _EventLogContext(NamedTuple):
     """Per-workflow/run event log state. Private to ReportingManager."""
 
     event_log: EventLogProtocol
