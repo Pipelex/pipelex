@@ -71,7 +71,7 @@ This is the mechanism behind weakness 2: a global *number* applied per-batch is 
 
 ## Shipped — retry jitter
 
-`transport_retry.py` now uses full-jitter `wait_random_exponential` (`transport_retry.py:44`); it was previously jitter-free `wait_exponential`, so under a 429 storm every retry re-fired in lockstep. With full jitter each wait is drawn from `uniform(0, exponential_bound)`, breaking the lockstep.
+`transport_retry.py` now uses full-jitter `wait_random_exponential` (`transport_retry.py:46`); it was previously jitter-free `wait_exponential`, so under a 429 storm every retry re-fired in lockstep. With full jitter each wait is drawn from `uniform(0, exponential_bound)`, breaking the lockstep.
 
 **Direct vs Temporal:** `transport_retry` runs inside the activity in both modes — jitter is fine there (non-determinism allowed in activities). Pre-existing nuance, unaffected by this change: under Temporal there are already two retry layers — `tenacity` inside the activity and Temporal's activity `RetryPolicy` outside it. Whether the activity should fail faster and let `RetryPolicy` own retries is a separate, existing design question.
 
