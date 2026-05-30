@@ -61,7 +61,7 @@ The pieces all exist:
 - `ReportingManager.inject_tokens_usages(pipeline_run_id, tokens_usages)` whose docstring literally says: *"Used after assembling usage data from distributed trace events, so that generate_report() can produce a complete cost report across all workers."* (`reporting_manager.py:223`).
 - `ReportingManager.generate_report(pipeline_run_id)` (`reporting_manager.py:365`).
 
-But **nothing in the runtime calls them**. The graph assembly path (`graph_assembly.py`, `act_assemble_graph.py`) reads events back, but only feeds them into `GraphSpecAssembler` — never into `UsageAggregator`. `generate_report()` has zero runtime callers; only integration tests invoke it.
+But **the cross-worker assembly chain is not wired up**. The graph assembly path (`graph_assembly.py`, `act_assemble_graph.py`) reads events back, but only feeds them into `GraphSpecAssembler` — never into `UsageAggregator`. `generate_report()` does have a runtime caller (the CLI run path, `_run_core.py:224`), but it reports only the local, in-process usage registries; `UsageAggregator.aggregate()` and `inject_tokens_usages()` still have zero runtime callers, so the events emitted by runner/worker processes never get assembled into the cost report.
 
 Net effect: even when usage events ARE captured (i.e., the same-worker case in the table above), the captured events sit in NDJSON / DynamoDB and never become a cross-worker cost report.
 
