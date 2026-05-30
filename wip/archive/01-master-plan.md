@@ -21,7 +21,7 @@ This file tracks the **distributed execution** work that follows the LibraryCrat
 |---|---|
 | **Phase 4.5 Step 6 — Cross-process tracing** | Shipped via `feature/dynamodb-tracer`, but with a different design than the originally proposed `TracingActivityInboundInterceptor`. See "Phase 4.5 Step 6 — as built" below. |
 
-Open architectural notes and known limitations live in [deferred-items.md](deferred-items.md). Long-term direction in [future-crate-first-architecture.md](../crate-architecture/future-crate-first-architecture.md). Tracing background (pre-implementation analysis — decisions superseded) in [distributed-tracing-and-reporting.md](distributed-tracing-and-reporting.md).
+Open architectural notes and known limitations live in [deferred-items.md](../deferred-items.md). Long-term direction in [future-crate-first-architecture.md](../crate-architecture/future-crate-first-architecture.md). Tracing background (pre-implementation analysis — decisions superseded) in [distributed-tracing-and-reporting.md](distributed-tracing-and-reporting.md).
 
 ---
 

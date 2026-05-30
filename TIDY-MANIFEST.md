@@ -1,20 +1,20 @@
 # Tidy Manifest — `_docs/wip/` cleanup
 
-This is a review artifact, not an executed change. It consolidates the per-file triage produced by upstream agents into one actionable plan for tidying the `_docs/wip/` working-docs tree. It lives on branch `docs/Tidy`. **Nothing has been moved, renamed, or deleted yet** — every disposition below is a proposal awaiting your review. Once approved, the steps in "Execution notes" make the changes mechanical. Two destinations do not exist yet and will be created on execution: the workspace history store at `/Users/lchoquel/repos/Pipelex/docs/history/` (a separate repo, sibling to this worktree) and the `wip/error-handling/archive/` subfolder.
+This is the manifest for the `_docs/wip/` cleanup carried out on branch `docs/Tidy`. It consolidates the per-file triage produced by upstream agents into one actionable plan, and now also serves as the record of what was executed. **The reorganization and the move-to-history step have both been executed and committed on this branch** — see [Execution status](#execution-status) below for the per-step state. The triage tables and the [Execution notes](#execution-notes) runbook are kept as the audit trail of what was decided and what was run; do not re-execute them blindly.
 
 ## Execution status
 
-**Executed** on branch `docs/Tidy` (staged, not yet committed): the in-worktree reorganization — files grouped into the new `crate-architecture/`, `graph-model/`, and `wip/error-handling/archive/` folders; finished docs moved into `archive/`; the misnamed live-bug doc renamed (`archive-delivery-error-path-request-id.md` → `track-delivery-error-path-request-id.md`); the derived `.html` renders and dead/duplicate archive docs deleted; and all cross-references repointed (verified with a full link-resolution sweep).
+**Executed and committed** on branch `docs/Tidy` (commit `d2fcd0a0`): the in-worktree reorganization — files grouped into the new `crate-architecture/`, `graph-model/`, and `wip/error-handling/archive/` folders; finished docs moved into `archive/`; the misnamed live-bug doc renamed (`archive-delivery-error-path-request-id.md` → `track-delivery-error-path-request-id.md`); the derived `.html` renders and dead/duplicate archive docs deleted; and all cross-references repointed (verified with a full link-resolution sweep).
 
-**Held** for a separate, confirmed step: the **move-to-history** bucket. Every doc in that bucket is still in place under `wip/`; nothing has been copied to the workspace `docs/history/` repo yet.
+**Executed and committed** on branch `docs/Tidy` (commit `f860a76c`): the **move-to-history** bucket — finished planning docs copied into the workspace history store at `/Users/lchoquel/repos/Pipelex/docs/history/` (a separate sibling repo), and `git rm`'d from this worktree.
 
 **Deviation from the per-file triage:** `error-handling/track-extract-classify-render.md` was triaged for archival but is kept **active** — the curated `error-handling/README.md` and two other docs treat it as the authoritative current-state doc, so archiving it would have contradicted the folder's structure.
 
 **Convention:** finished error-handling docs were archived into a `wip/error-handling/archive/` subfolder (not an `archive-` filename prefix).
 
-**Not done (editorial, deferred):** the in-place content corrections to keep-active docs (the stale `generate_report()` claim in `02-master-plan.md` P1, the `ErrorReport` schema section in `architecture.md`, and the minor type/name fixes in a few `track-*` docs). Each needs a code check; best done as a focused follow-up. See [keep-active](#keep-active) and [Execution notes](#execution-notes).
+**Executed and committed** on branch `docs/Tidy` (commit `3b011694`): the in-place content corrections to keep-active docs — the stale `generate_report()` claim in `02-master-plan.md` P1 (refocused to the missing cross-worker read-back, since `generate_report` is now called from `_run_core.py:224`), the `ErrorReport` schema section in `architecture.md` (added `title`, `type_uri`, `caller_facing_message`, the VERBOSE/STRICT `DisclosureMode` projection, and the AMBIGUOUS/UNKNOWN `InferenceErrorCategory` nuance), the retry-jitter quick-win in `concurrency/README.md` (already shipped via `wait_random_exponential`), and per-doc type/field/wrapper drift in `track-cli-delivery.md` / `track-metadata-model.md` / `track-temporal-integration.md` / `track-worker-classification.md`. `track-testing.md` was re-verified post-tidy and showed no actual drift (all file paths and key symbols resolve in code). See [keep-active](#keep-active) for the per-doc audit trail and [Execution notes](#execution-notes) for the runbook record.
 
-**Pre-existing broken links** (not introduced by this cleanup) remain in a few archived/historical docs — chiefly an absolute-style `wip/...`-from-inside-`wip/` link pattern and a couple of wrong relative paths in `archive/00-master-plan.md` and `archive/01-master-plan.md`. Left untouched; flag for a separate sweep if wanted.
+**Pre-existing broken links** (not introduced by this cleanup) remain in a few archived/historical docs — chiefly an absolute-style `wip/...`-from-inside-`wip/` link pattern and a couple of wrong relative paths in `archive/00-master-plan.md` and `archive/01-master-plan.md`. A few bot-flagged instances were fixed in PR review follow-up (the `deferred-items.md` link in `wip/archive/01-master-plan.md` line 24, and the `api-companion-revisions.md` link in `wip/error-handling/archive/archive-todos.md` line 5); the rest are left untouched. Flag for a separate sweep if wanted.
 
 ## Summary
 
@@ -45,28 +45,28 @@ Live plans, current-state track docs, deferred-item indexes, and finished docs a
 
 | Path | Current location | Proposed target | Why |
 | --- | --- | --- | --- |
-| `wip/02-master-plan.md` | `wip/` | stays | The live master plan. P0 done; P0.1/P0.2/P1/P2/P3 open. Correct the stale "generate_report() has zero runtime callers" claim in P1. |
+| `wip/02-master-plan.md` | `wip/` | stays | The live master plan. P0 done; P0.1/P0.2/P1/P2/P3 open. The stale "generate_report() has zero runtime callers" claim in P1 was corrected in `3b011694` — refocused to the missing cross-worker read-back. |
 | `wip/deferred-items.md` | `wip/` | stays | Canonical non-temporal deferral index, cross-referenced by temporal-next and crate docs. |
 | `wip/phase6a-local-cross-package-deps.md` | `wip/` | stays | P2 in the master plan; not-started forward plan. |
 | `wip/phase6b-remote-deps-from-github.md` | `wip/` | stays | P3 in the master plan; not-started forward plan. |
 | `wip/security/webhook-signing.md` | `wip/security/` | stays | Open security gap; all tracked items unimplemented. |
 | `wip/structured-logging/kickoff.md` | `wip/structured-logging/` | stays | Cold-start brief for the upcoming structured-logging refactor; matches current code. |
 | `wip/tracing-cost-reporting-as-built.md` | `wip/` | stays | As-built tracing reference; T2/T3 still open. Supersedes the distributed-tracing analysis. |
-| `wip/concurrency/README.md` | `wip/concurrency/` | stays | Topic index. Update: remove the now-shipped "retry jitter quick win" as a suggested next step. |
+| `wip/concurrency/README.md` | `wip/concurrency/` | stays | Topic index. The shipped "retry jitter quick win" was moved out of suggested next steps in `3b011694` (the SDK clients already use `wait_random_exponential`). |
 | `wip/concurrency/batch-partial-failure.md` | `wip/concurrency/` | stays | Active design for unimplemented feature. |
 | `wip/concurrency/fan-out-scheduling.md` | `wip/concurrency/` | stays | Active design; `gather_bounded` still uses old chunking. |
 | `wip/concurrency/rate-limiting.md` | `wip/concurrency/` | stays | Active design; direct-mode inference gate not built. |
 | `wip/error-handling/README.md` | `wip/error-handling/` | stays | Authoritative nav index for the error-handling folder. |
 | `wip/error-handling/api-companion-revisions.md` | `wip/error-handling/` | stays | API-layer design contract; Stage 5 (webhook signing) open. |
-| `wip/error-handling/architecture.md` | `wip/error-handling/` | stays | Structural reference for the track docs. Update: `ErrorReport` schema section is stale (missing `title`, `type_uri`, `caller_facing_message`, `DisclosureMode`). |
+| `wip/error-handling/architecture.md` | `wip/error-handling/` | stays | Structural reference for the track docs. The `ErrorReport` schema section was refreshed in `3b011694` — added `title`, `type_uri`, `caller_facing_message`, the VERBOSE/STRICT `DisclosureMode` projection, and the AMBIGUOUS/UNKNOWN `InferenceErrorCategory` nuance. |
 | `wip/error-handling/archive-delivery-error-path-request-id.md` | `wip/error-handling/` | rename to `wip/error-handling/track-delivery-error-path-request-id.md` | Misleadingly named "archive-"; describes an OPEN bug still present at `delivery_executor.py:244/291/294`. Drop the prefix. |
 | `wip/error-handling/archive-llm-retry-loop-bypass.md` | `wip/error-handling/` | stays | Already correctly named/placed as a superseded archive entry; README references it. |
-| `wip/error-handling/track-cli-delivery.md` | `wip/error-handling/` | stays | Current-state track doc. Correct in place: stale ContextVar naming + `error_message` type signature. |
-| `wip/error-handling/track-metadata-model.md` | `wip/error-handling/` | stays | Current-state track doc with real open gaps. Correct stale type/field/enum details in place. |
+| `wip/error-handling/track-cli-delivery.md` | `wip/error-handling/` | stays | Current-state track doc. The ContextVar naming and `display_error_panel`'s `str \| None` body signature were corrected in `3b011694`; the two-option `--format` / `--error-format` model was documented. |
+| `wip/error-handling/track-metadata-model.md` | `wip/error-handling/` | stays | Current-state track doc with real open gaps. Stale type/field/enum details were corrected in `3b011694` alongside the `architecture.md` schema refresh. |
 | `wip/error-handling/track-retry-and-resilience.md` | `wip/error-handling/` | stays | Authoritative retry/resilience reference; consistent. |
-| `wip/error-handling/track-temporal-integration.md` | `wip/error-handling/` | stays | Authoritative Temporal error-bridge reference; minor `recover_error_report` wording fix. |
-| `wip/error-handling/track-testing.md` | `wip/error-handling/` | stays | Test-coverage reference; cosmetic path/name drift only. |
-| `wip/error-handling/track-worker-classification.md` | `wip/error-handling/` | stays | Per-worker classification reference; minor `azure_img_gen_worker` wrapper fix. |
+| `wip/error-handling/track-temporal-integration.md` | `wip/error-handling/` | stays | Authoritative Temporal error-bridge reference. The `recover_error_report` wording was tightened in `3b011694` — it is total (never returns None), `from_dict` is `extra="forbid"`, and a malformed payload synthesizes an `UnrecoverableWorkflowFailureError` fallback. |
+| `wip/error-handling/track-testing.md` | `wip/error-handling/` | stays | Test-coverage reference. Re-verified post-tidy (commit timeline through 2026-05-29); no actual drift — every cited test path resolves and the key symbols (`AGENT_ERROR_HINTS` / `AGENT_ERROR_DOMAINS` / `RETRYABLE_ERROR_TYPES` / `ErrorReportParityTestData` / `native_text_sequence`) match code. |
+| `wip/error-handling/track-worker-classification.md` | `wip/error-handling/` | stays | Per-worker classification reference. The Azure img-gen worker overclaim was softened in `3b011694` — the worker still has an inline `_raise_categorized_azure_status_error` rather than going through the shared helpers. |
 | `wip/temporal-next/00-enterprise-readiness-analysis.md` | `wip/temporal-next/` | stays | Owner doc for the enterprise-readiness roadmap; Phase 0 hygiene still open. |
 | `wip/temporal-next/01-deferred-items.md` | `wip/temporal-next/` | stays | Active temporal deferred-items index; items verifiably open. |
 | `wip/temporal-primitives/01-id-and-naming-design.md` | `wip/temporal-primitives/` | stays | Self-declared authoritative design reference; consistent with code. |
@@ -130,7 +130,7 @@ Finished/superseded docs in the active `wip/` or `wip/error-handling/` tree that
 | `wip/error-handling/post-pr933-followups-code-review.md` | `wip/error-handling/` | `wip/error-handling/archive/post-pr933-followups-code-review.md` | All findings resolved; finished code-review artifact. |
 | `wip/error-handling/post-pr933-review-followups.md` | `wip/error-handling/` | `wip/error-handling/archive-post-pr933-review-followups.md` (prefix-rename per triage) | All phases complete; decisions recorded. Note: triage target uses an `archive-` prefix rather than the `archive/` subfolder — reconcile with the others below. |
 | `wip/error-handling/post-xhigh-review-followups.md` | `wip/error-handling/` | `wip/error-handling/archive-post-xhigh-review-followups.md` (prefix-rename per triage) | Fully completed tracker; both commits in git history. Same prefix-vs-subfolder note as above. |
-| `wip/error-handling/track-extract-classify-render.md` | `wip/error-handling/` | `wip/error-handling/archive/archive-extract-classify-render-track.md` | ECR refactor shipped; content is pre-refactor narrative, duplicates the archive companion. Superseded by `archive-extract-classify-render.md`. |
+| `wip/error-handling/track-extract-classify-render.md` | `wip/error-handling/` | **Deviated — kept active** at `wip/error-handling/track-extract-classify-render.md` | Triaged for archival, but `error-handling/README.md` and two other docs treat it as the authoritative current-state doc; archiving it would have contradicted the folder's structure. See line-11 deviation note. |
 | `wip/error-handling/track-strict-disclosure-input-domain-gap.md` | `wip/error-handling/` | `wip/error-handling/archive/track-strict-disclosure-input-domain-gap.md` | Landed 2026-05-22; both gaps closed in code. |
 | `wip/text-then-object/text-then-object-plan.md` | `wip/text-then-object/` | `wip/archive/text-then-object-plan.md` | All phases complete; deferred items already in sibling `deferred-items.md`. Topic folder stays for the active deferred index. |
 
@@ -204,7 +204,7 @@ Derived `.html` PR-story renders whose `.md` source is preserved, plus finished/
 - `distributed-tracing-and-reporting.md` (+ `archive/phase4.5-distributed-tracing-implementation.md`) → `tracing-cost-reporting-as-built.md`.
 - `error-handling/changes-for-api-early-draft.md` → `error-handling/api-companion-revisions.md`.
 - `error-handling/archive-llm-retry-loop-bypass.md` → `error-handling/archive-retry-and-resilience.md` → `error-handling/track-retry-and-resilience.md`.
-- `error-handling/archive-extract-classify-render.md` ↔ `track-extract-classify-render.md` (the archive doc is now the source-of-truth; the track doc is being archived as a duplicate narrative).
+- `error-handling/archive-extract-classify-render.md` (moved to workspace history) ↔ `track-extract-classify-render.md` (kept active — see line-11 deviation; original triage proposed archival but `README.md` treats this as the authoritative current-state doc).
 - `error-handling/post-pr933-followups-code-review.md` → `error-handling/post-pr933-review-followups.md`.
 - `archive/phase5-payload-codec-strategy.md` → `archive/phase5-payload-codec-DONE.md`.
 - `archive/scoped-registry-teardown.md` / `archive/kajson-decoder-class-registry.md` → resolved by the per-workflow `ClassRegistry` pattern in `wf_pipe_router.py`.
@@ -226,7 +226,7 @@ Derived `.html` PR-story renders whose `.md` source is preserved, plus finished/
 
 ## Execution notes
 
-Run everything from the worktree root `/Users/lchoquel/repos/Pipelex/_docs/` unless noted. Stay on branch `docs/Tidy`. None of the steps below have been executed.
+Run everything from the worktree root `/Users/lchoquel/repos/Pipelex/_docs/` unless noted. Stay on branch `docs/Tidy`. **These steps have all been executed and committed on this branch** (see [Execution status](#execution-status) — commits `d2fcd0a0` and `f860a76c`). They are preserved here as the runbook record of what was done, with the line-262 deviation marked. Do not re-run blindly.
 
 **Before any move — harvest deferred items.** Several docs slated for delete/move/history carry open deferred items (e.g. `collapse-content-generation-workflow-layer.html` §12, `refactor-drop-text-then-object.html` kajson race, `phase5-payload-codec-strategy.md` monitor item, `changes-for-api-early-draft.md` Stages 5/6, `archive-todos.md` cause-chain serialization, the queue-routing/queue-options/id-and-naming/console-targets deferred lists). Confirm each is already captured in a surviving index (`wip/deferred-items.md`, `wip/temporal-next/01-deferred-items.md`, `wip/text-then-object/deferred-items.md`, `wip/security/webhook-signing.md`, `wip/error-handling/track-metadata-model.md`) before deleting or moving its source. Add any that are missing.
 
@@ -259,7 +259,7 @@ git mv wip/error-handling/changes-for-api-early-draft.md wip/error-handling/arch
 git mv wip/error-handling/post-pr933-followups-code-review.md wip/error-handling/archive/post-pr933-followups-code-review.md
 git mv wip/error-handling/post-pr933-review-followups.md wip/error-handling/archive/post-pr933-review-followups.md
 git mv wip/error-handling/post-xhigh-review-followups.md wip/error-handling/archive/post-xhigh-review-followups.md
-git mv wip/error-handling/track-extract-classify-render.md wip/error-handling/archive/archive-extract-classify-render-track.md
+# Deviation: track-extract-classify-render.md kept active (do not move). See line-11 deviation note.
 git mv wip/error-handling/track-strict-disclosure-input-domain-gap.md wip/error-handling/archive/track-strict-disclosure-input-domain-gap.md
 git mv wip/text-then-object/text-then-object-plan.md wip/archive/text-then-object-plan.md
 ```
@@ -350,12 +350,14 @@ git rm wip/offline-mode-pr-story.html \
        wip/text-then-object/PR-text-then-object.html
 ```
 
-**6. keep-active in-place corrections** (manual edits, no move). These are the small fixes flagged in the keep-active table — apply with the Edit tool, not a script:
+**6. keep-active in-place corrections** (manual edits, no move). **Executed and committed in `3b011694`** ("docs(wip): correct stale claims in keep-active error-handling docs"). The four files flagged in the keep-active table were each corrected, with the change verified against current code:
 
-- `wip/02-master-plan.md` — correct the stale "generate_report() has zero runtime callers" claim in P1.
-- `wip/concurrency/README.md` — drop the now-shipped "retry jitter quick win" from suggested next steps.
-- `wip/error-handling/architecture.md` — refresh the `ErrorReport` schema section (add `title`, `type_uri`, `caller_facing_message`, `DisclosureMode`).
-- `wip/error-handling/track-cli-delivery.md`, `track-metadata-model.md`, `track-temporal-integration.md`, `track-worker-classification.md` — apply the minor type/name/wrapper corrections noted per-doc.
+- `wip/02-master-plan.md` — the stale "generate_report() has zero runtime callers" claim in P1 was refocused to the missing cross-worker read-back, since `generate_report` is now called from `_run_core.py:224`.
+- `wip/concurrency/README.md` — the shipped "retry jitter quick win" was dropped from suggested next steps (SDK clients use `wait_random_exponential`).
+- `wip/error-handling/architecture.md` — the `ErrorReport` schema section was refreshed (added `title`, `type_uri`, `caller_facing_message`, the VERBOSE/STRICT `DisclosureMode` projection, and the AMBIGUOUS/UNKNOWN `InferenceErrorCategory` nuance).
+- `wip/error-handling/track-cli-delivery.md`, `track-metadata-model.md`, `track-temporal-integration.md`, `track-worker-classification.md` — minor type/name/wrapper corrections applied per the audit notes in the keep-active table.
+
+`track-testing.md` was re-verified post-tidy and required no edits — every cited test path resolves and the key symbols match the code.
 
 **promote-to-official** — no editorial rewrites required this round (no docs were triaged for promotion).
 
