@@ -1,10 +1,20 @@
-# Master Plan v3 — Distributed Workers
+# Distributed Execution — Plan & Track Map
 
 > **Status**: Live plan — drives the next round of distributed-execution work.
-> **Date**: 2026-05-04
-> **Predecessors**: the Phase 0–5 master plan (shipped) and the interim plan that was split into per-topic files — both now retired.
 
 The big direction now is to actually run **activities on standalone Worker pools** — separate processes from the workflow Worker pool — so we can scale workflow orchestration and inference activity execution independently. Today's tracing / cost-reporting design was built for the single-bundle-per-Worker case and breaks the moment activities move off-process. That has to be fixed before anything else.
+
+This folder is the **distributed-execution track**: running MTHDS methods as Temporal workflows across separate worker processes. This README is the priority-ordered plan; the other docs in the folder are the per-topic designs and references it points to.
+
+## Docs in this track
+
+- [tracing-cost-reporting.md](tracing-cost-reporting.md) — as-built reference for tracing & cost reporting across workers, plus its deferred items (P0/P1 context).
+- [local-cross-package-deps.md](local-cross-package-deps.md) — Phase 6a: ship dependency blueprints inside the crate (P2).
+- [remote-deps-from-github.md](remote-deps-from-github.md) — Phase 6b: fetch dependencies from remote addresses (P3).
+- [crate-first-architecture.md](crate-first-architecture.md) — the crate-first vision behind Phase 6, with deferred capabilities (stripping, fingerprint validation, cross-worker cache).
+- [temporal-ids-and-naming.md](temporal-ids-and-naming.md) — implemented design for Temporal IDs, naming, and observability surfaces.
+- [temporal-exception-model-revamp.md](temporal-exception-model-revamp.md) — deferred proposal to reparent workflow exceptions onto `ApplicationError`.
+- [schema-reconstruction-hardening.md](schema-reconstruction-hardening.md) — deferred hardening of cross-process Pydantic-schema reconstruction.
 
 ---
 
@@ -12,22 +22,22 @@ The big direction now is to actually run **activities on standalone Worker pools
 
 | # | Item | Status | Owner file |
 |---|---|---|---|
-| **P0** | **Tracing & cost reporting across separate-process workers** | Done — see [tracing-cost-reporting-as-built.md](tracing-cost-reporting-as-built.md) (T1 marked fixed) | this file (problem statement) |
+| **P0** | **Tracing & cost reporting across separate-process workers** | Done — see [tracing-cost-reporting.md](tracing-cost-reporting.md) (T1 marked fixed) | this file (problem statement) |
 | **P0.1** | **Dry-run through activity dispatch (testing affordance)** | Not started — surfaced during P0 Phase 6 validation | this file (problem statement) |
 | **P0.2** | **Deferred follow-ons from P0** | Not started — surfaced during P0 eng review | this file (problem statement) |
 | **P1** | **Cross-worker cost report assembly wiring** | Not started — depends on P0 design | this file (problem statement) |
-| **P2** | Phase 6a — Local cross-package dependencies in crate | Not started | [phase6a-local-cross-package-deps.md](phase6a-local-cross-package-deps.md) |
-| **P3** | Phase 6b — Remote dependencies from GitHub | Not started — needs P2 | [phase6b-remote-deps-from-github.md](phase6b-remote-deps-from-github.md) |
+| **P2** | Phase 6a — Local cross-package dependencies in crate | Not started | [local-cross-package-deps.md](local-cross-package-deps.md) |
+| **P3** | Phase 6b — Remote dependencies from GitHub | Not started — needs P2 | [remote-deps-from-github.md](remote-deps-from-github.md) |
 
-What's already shipped on this front: see [tracing-cost-reporting-as-built.md](tracing-cost-reporting-as-built.md). It also enumerates the open issues (T1, T2, T3) that motivate P0 and P1.
+What's already shipped on this front: see [tracing-cost-reporting.md](tracing-cost-reporting.md). It also enumerates the open issues (T1, T2, T3) that motivate P0 and P1.
 
-Sibling tracks (separate branches, not in this plan): the error-handling work — see [`error-handling/README.md`](error-handling/README.md).
+Sibling tracks (separate branches, not in this plan): the error-handling work — see [`error-handling/README.md`](../error-handling/README.md).
 
 ---
 
 ## P0 — Tracing & cost reporting across separate-process workers — DONE
 
-Shipped. The current state is summarized in [tracing-cost-reporting-as-built.md](tracing-cost-reporting-as-built.md). The architectural notes below are kept for context. Follow-ons that were explicitly deferred during implementation are tracked under §P0.2.
+Shipped. The current state is summarized in [tracing-cost-reporting.md](tracing-cost-reporting.md). The architectural notes below are kept for context. Follow-ons that were explicitly deferred during implementation are tracked under §P0.2.
 
 ### Why this is top priority
 
@@ -35,7 +45,7 @@ The whole point of the distributed-execution work is to allow **activities on st
 
 ### Problems with the current implementation
 
-(All concretely enumerated in [tracing-cost-reporting-as-built.md](tracing-cost-reporting-as-built.md). Summarized here so the priority is legible.)
+(All concretely enumerated in [tracing-cost-reporting.md](tracing-cost-reporting.md). Summarized here so the priority is legible.)
 
 1. **Standalone activity workers lose usage events.** When an activity runs on a process that never executed `WfPipeRouter.run()`, that process's `ReportingManager._event_log_contexts` is empty for the workflow's `lookup_key`. `_emit_usage_event` misses the fast path and routes to the runner-side fallback (`_emit_usage_event_runner_fallback`, `reporting_manager.py:285`) that P0 added, so the `UsageReportEvent` still lands in the shared backend partition — the feared drop is closed on the emit side. What stays unwired is the cross-worker *read-back* of those events into the cost report (the P1 gap below).
 2. **`BufferingEventLog` + `act_flush_trace_events` is workflow-scoped.** Both pieces are tied to the workflow lifecycle (buffer in workflow context, flush after pipe execution). They cannot serve a standalone activity Worker that has no enclosing workflow process.
@@ -123,7 +133,7 @@ This is a small piece of plumbing once P0's design is settled — the same place
 
 ## P2 — Phase 6a: Local cross-package dependencies in crate
 
-Detailed plan: [phase6a-local-cross-package-deps.md](phase6a-local-cross-package-deps.md).
+Detailed plan: [local-cross-package-deps.md](local-cross-package-deps.md).
 
 In one line: ship dependency blueprints inside the `LibraryCrate` so workers don't need the dependency packages on PIPELEXPATH. Prerequisite for P3.
 
@@ -131,7 +141,7 @@ In one line: ship dependency blueprints inside the `LibraryCrate` so workers don
 
 ## P3 — Phase 6b: Remote dependencies from GitHub
 
-Detailed plan: [phase6b-remote-deps-from-github.md](phase6b-remote-deps-from-github.md).
+Detailed plan: [remote-deps-from-github.md](remote-deps-from-github.md).
 
 In one line: extend the blueprint collector from P2 with a remote (GitHub) resolver so the crate can carry deps fetched from external addresses, making workers fully stateless.
 

@@ -1,4 +1,4 @@
-# Post-tidy code fixes — forward plan
+# Runtime code fixes
 
 > Surfaced by the `_docs/wip/` documentation tidy (see [`../TODOS.md`](../TODOS.md) for the completed tidy record). These are the *runtime code* follow-ups the tidy verified as real but did not act on. They change `pipelex/` (not docs), so they need `make agent-check` + tests and a fresh branch off `main` — **not** the docs-only `docs/Tidy` branch this tidy ran on.
 
@@ -17,11 +17,11 @@ Append the already-in-scope `request_id_suffix` to the `StorageDeliveryError` fa
 
 ### 4b — cross-worker cost report assembly wiring (`[REAL]`, medium, M)
 
-The single genuine functional gap from the tracing work: wire `UsageAggregator.aggregate(events)` → `ReportingManager.inject_tokens_usages(...)` → `generate_report` into the post-run readback, parallel to the existing graph readback, for both direct mode (`pipe_run/pipe_run.py` / `graph_assembly.py`) and Temporal (`act_assemble_graph` / post-workflow). Add a cross-worker test. This is its own scoped piece of work — consider a dedicated plan. Tracked as **P1** in [`02-master-plan.md`](02-master-plan.md); the as-built context and the open T2/T3 gaps are in [`tracing-cost-reporting-as-built.md`](tracing-cost-reporting-as-built.md).
+The single genuine functional gap from the tracing work: wire `UsageAggregator.aggregate(events)` → `ReportingManager.inject_tokens_usages(...)` → `generate_report` into the post-run readback, parallel to the existing graph readback, for both direct mode (`pipe_run/pipe_run.py` / `graph_assembly.py`) and Temporal (`act_assemble_graph` / post-workflow). Add a cross-worker test. This is its own scoped piece of work — consider a dedicated plan. Tracked as **P1** in [the distributed-execution plan](distributed-execution/README.md); the as-built context and the open T2/T3 gaps are in [`distributed-execution/tracing-cost-reporting.md`](distributed-execution/tracing-cost-reporting.md).
 
 ## Deferred / out of scope — pick up individually if prioritized
 
-Consolidated in [`../DEFERRED-BACKLOG.md`](../DEFERRED-BACKLOG.md) and the per-topic deferred indexes ([`deferred-items.md`](deferred-items.md), [`text-then-object/deferred-items.md`](text-then-object/deferred-items.md)):
+Consolidated in [`../DEFERRED-BACKLOG.md`](../DEFERRED-BACKLOG.md), with the text-then-object follow-ups in [`text-then-object-followups.md`](text-then-object-followups.md):
 
 - `[REAL]` GraphSpec causal ordering for parent/child topologies (medium, observability-only).
 - `[REAL]` kajson class-registry race under pytest-xdist (low, test-hygiene; needs runtime repro).

@@ -201,11 +201,11 @@ These show up in multiple items above; collecting them here so the API agent can
 - [x] **Stage 2 — Rendering primitives + total recovery.** Items C + D-1.
 - [x] **Stage 3 — Async error pipe.** Item D-2 (the unblock for API Phase 4).
 - [x] **Stage 4 — DX polish.** Item E.
-- [ ] **Stage 5 — Security tightening.** Item F (cross-repo, tracked at [`../security/webhook-signing.md`](../security/webhook-signing.md)).
+- [ ] **Stage 5 — Security tightening.** Item F (cross-repo, tracked at [`../webhook-signing.md`](../webhook-signing.md)).
 
 **Net to the API team:** the error-handling refactor on the pipelex side is landed. API Phases 0/1/4/5 are unblocked. One thing remains on the pipelex side:
 
-- **Webhook signing (Stage 5 / Item F)** — the cross-repo security track at [`../security/webhook-signing.md`](../security/webhook-signing.md), independent of the rest of this plan, landing on its own schedule.
+- **Webhook signing (Stage 5 / Item F)** — the cross-repo security track at [`../webhook-signing.md`](../webhook-signing.md), independent of the rest of this plan, landing on its own schedule.
 
 The post-review follow-ups have all landed: the STRICT-disclosure INPUT-domain leak, the `request_id` log wiring (§B), the webhook reserved-key collision, and the test-coverage backfill.
 

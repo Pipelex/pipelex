@@ -2,9 +2,9 @@
 
 > **Status**: Shipped — the current tracing & cost-reporting implementation (supersedes an earlier distributed-tracing design, now retired).
 > **Last updated**: 2026-05-04
-> **Related**: [02-master-plan.md](02-master-plan.md).
+> **Related**: [the distributed-execution plan](README.md).
 
-This file documents what actually shipped, plus the known gaps that 02-master-plan addresses.
+This file documents what actually shipped, plus the known gaps that the plan addresses.
 
 ---
 
@@ -38,7 +38,7 @@ The original Step 6 plan called for a `TracingActivityInboundInterceptor` to set
 
 **Severity (was)**: Blocked the whole point of distributed activity workers.
 
-**Status**: Resolved (P0 in [02-master-plan.md](02-master-plan.md)).
+**Status**: Resolved (P0 in [the distributed-execution plan](README.md)).
 
 The fix has two independent parts that ship together:
 
@@ -47,7 +47,7 @@ The fix has two independent parts that ship together:
 
 The `_get_registry` orphan-accumulation TODO at `reporting_manager.py` is gone: the method was split into `_get_registry_strict` (used by `_report_*_job` — runner processes silently skip the registry add) and `_get_or_create_registry` (used by `inject_tokens_usages`, the console cost-report path, and `generate_report`).
 
-The known retry-related over-counting case (R2) is documented and pinned by `test_retried_activity_emits_duplicate_usage_event_documenting_r2`. A `tracing_config.strict_mode` flag (raise instead of WARNING + drop) is deferred — see [02-master-plan.md §P0.2](02-master-plan.md).
+The known retry-related over-counting case (R2) is documented and pinned by `test_retried_activity_emits_duplicate_usage_event_documenting_r2`. A `tracing_config.strict_mode` flag (raise instead of WARNING + drop) is deferred — see [the plan, §P0.2](README.md).
 
 ### Issue T2 — Cross-worker cost report assembly is not wired
 
@@ -75,8 +75,44 @@ Net effect: even when usage events ARE captured (i.e., the same-worker case in t
 
 ---
 
-## How this connects to 02-master-plan
+## How this connects to the plan
 
-- T1 was the **top priority** in [02-master-plan.md](02-master-plan.md) — now resolved.
+- T1 was the **top priority** in the [distributed-execution plan](README.md) — now resolved.
 - T2 is the **next priority** — events now land in the same partition from every worker; the small remaining step is wiring `read events → UsageAggregator → inject_tokens_usages → generate_report`.
 - T3 is the architectural shape; the T1 fix mitigates the immediate impact, the deeper refactor will land alongside T2 / further follow-ups.
+
+---
+
+## Deferred items
+
+Items related to the event log and graph tracing system that are explicitly out of scope for now.
+
+### Event log backends
+
+| Item | Status | Context |
+|---|---|---|
+| DynamoDB backend | **Shipped** | `pipelex/tracing/dynamodb_event_log.py` (+ `TEMPORAL_DYNAMODB` variant). Schema-compatible with `pipelex-api-infra`'s `TraceEventDynamoDBAdapter`. Selected via `[pipelex.tracing] backend = "dynamodb"`. |
+| SQLite backend | **Not planned** — NDJSON + DynamoDB cover the matrix | Not built. Re-evaluate only if a use case appears that NDJSON can't serve and DynamoDB is overkill. |
+
+### Event log protocol extensions
+
+| Item | Status | Context |
+|---|---|---|
+| `subscribe()` on EventLogProtocol | **Deferred** — no consumer exists yet | Polling-based reads are sufficient for now; add when a real-time consumer exists. |
+| Real-time progress consumer | **Deferred** — no consumer exists yet | The protocol supports it; build when needed. |
+| TraceSinkProtocol abstraction | **Deferred** — EventLogProtocol is sufficient | The higher-level sink abstraction can wait for the cloud backend. |
+| Large data externalization | **Deferred** — inline data is sufficient for now | Add StorageProvider offloading when traces grow too large. |
+
+### Tracing architecture
+
+| Item | Status | Context |
+|---|---|---|
+| Unified code path (event log everywhere) | **Effectively unified** | `pipeline_run_setup.py:282` wires `set_event_log()` on the report delegate for direct mode too (using `workflow_id="direct"`). The same `EventLogProtocol` machinery runs in both modes; only the in-process vs. Temporal lifecycle differs. |
+| Auto-cleanup of traces | **Deferred** — manual cleanup is safer for now | NDJSON traces persist on disk until manually deleted. Safer for debugging and allows usage reporting to run after graph generation. DynamoDB cleanup follows TTL on the table. |
+
+### Known issues
+
+| Item | Status | Context |
+|---|---|---|
+| Causal event ordering in assembler | **Known limitation** — works for current topologies | `read_events()` sorts by `(workflow_id, sequence)` which groups by lexicographic workflow ID, not execution order. In parent/child workflow topologies, this can cause `_stuff_producer_map` overwrites in the wrong order during `GraphSpecAssembler.pass_one()`, producing incorrect DATA edge sources. Consider sorting by timestamp or processing events in a topology-aware order. |
+| PipeCondition SELECTED_OUTCOME wiring | **Deferred** — no production use yet | PipeCondition has no tracer calls in production code currently. If SELECTED_OUTCOME edges are needed, that's a separate change. |

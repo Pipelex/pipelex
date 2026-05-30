@@ -239,3 +239,21 @@ Option 1 is cleanest (the crate is fully resolved, no runtime lookup needed) but
 | Remote deps | Step 3 of this vision |
 | Library fingerprint validation | Independent — compares base library fingerprints |
 | Cross-worker cache | Complementary — caches the crate, benefits from stripping |
+
+---
+
+## Deferred / future capabilities
+
+Two capabilities the crate-first direction enables but that are not planned for implementation now. Crate stripping and remote deps are detailed above (Future Capabilities 1 and 2); these two round out the picture.
+
+### Library fingerprint validation
+
+**Status**: Future — no immediate need.
+
+Verify that the worker's base library (PIPELEXPATH) matches the API's expectation. Detect version drift between API and worker deployments.
+
+### Cross-worker cache via shared storage
+
+**Status**: Future — complementary to crate stripping.
+
+Cache loaded crates in shared storage (Redis, S3) so multiple workers don't redundantly load the same crate. Keyed by fingerprint. Smaller crates from stripping make this more effective.
