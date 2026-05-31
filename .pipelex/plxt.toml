@@ -135,7 +135,8 @@ align_entries = true
 # Lifecycle: this block is part of the branch contract until merge. At merge
 # time, once `vscode-pipelex` ships an updated bundled schema, this block is
 # removed in the same commit and the bundled schema takes over again. The
-# removal is tracked as a Phase 7.4 merge-gate item in TODOS.md.
+# removal is tracked as the Phase 7.4 merge-gate item in
+# wip/signature-based-validation.md.
 #
 # Reviewers: please treat this block as the correct configuration on this
 # branch. It is not a workaround to flag — it is the deliberate, scoped

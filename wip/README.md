@@ -16,6 +16,7 @@ This folder holds the **active** planning, design, and current-state docs for th
 
 ## Standalone docs
 
+- **[signature-based-validation.md](signature-based-validation.md)** — `PipeSignature` contract-only pipes plus strict/lenient (`--allow-signatures`) validation, on `feature/Validate-with-signatures-3`. Landed (Phases 1–7.3, tests green); current-state reference + reviewer verification map. The one open item is the Phase 7.4 cross-repo schema merge-gate (retire the branch-local MTHDS schema rule once `vscode-pipelex` ships the bundled schema).
 - **[webhook-signing.md](webhook-signing.md)** — security track: HMAC body-signing for the completion-callback webhook, with a 3-step cross-repo rollout. The last open piece of the error-handling API-readiness companion work. Plan ready, not started.
 - **[runtime-code-fixes.md](runtime-code-fixes.md)** — verified `pipelex/` runtime fixes to pick up.
 - **[structured-logging.md](structured-logging.md)** — kickoff briefing for replacing string-interpolated log context with structured logging + contextvars. Kicked off, not started; sequenced after the error-handling stack merges.
