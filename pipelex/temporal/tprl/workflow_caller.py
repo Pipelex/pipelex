@@ -7,14 +7,16 @@ from temporalio import workflow
 from temporalio.client import Callback, WorkflowFailureError, WorkflowHandle
 from temporalio.client import Client as TemporalClient
 from temporalio.common import RetryPolicy, TypedSearchAttributes
-from temporalio.exceptions import ApplicationError, ChildWorkflowError, WorkflowAlreadyStartedError
+from temporalio.exceptions import ChildWorkflowError, WorkflowAlreadyStartedError
 from temporalio.service import RPCError
 from temporalio.workflow import ChildWorkflowHandle
 
 from pipelex import log
 from pipelex.config import get_config
+from pipelex.pipe_run.exceptions import AsyncExecutionNotEnabledError
 from pipelex.temporal.exceptions import WorkflowExecutionError
 from pipelex.temporal.temporal_manager import TemporalWorkerEnvironment, get_temporal_client, get_temporal_manager
+from pipelex.temporal.tprl.temporal_error import recover_error_report
 
 T = TypeVar("T")
 WorkflowOutput = TypeVar("WorkflowOutput", covariant=True)
@@ -71,8 +73,7 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
     async def temporal_client(self) -> TemporalClient:
         """Get the temporal client, raising an error if not set."""
         if not get_config().temporal.is_enabled:
-            msg = "Temporal is not enabled. Set temporal.is_enabled = true in pipelex.toml or use --temporal CLI flag."
-            raise WorkflowExecutionError(msg)
+            raise AsyncExecutionNotEnabledError.with_default_message()
         if self._temporal_client is None:
             if self.should_auto_connect_temporal:
                 log.debug(f"{self.class_name} auto-connecting to Temporal server")
@@ -119,7 +120,18 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
                 static_details=static_details,
                 memo=memo,
             )
-        except (WorkflowAlreadyStartedError, RPCError, WorkflowFailureError) as exc:
+        except WorkflowFailureError as exc:
+            # The activity bridge packs the structured ErrorReport into the
+            # failed workflow's ApplicationError.details; recover it so the
+            # classification survives the workflow -> submitter hop instead of
+            # flooring to a generic RUNTIME error. ``recover_error_report`` is
+            # total — a failure carrying no recoverable report yields a
+            # synthesized ``UnrecoverableWorkflowFailureError`` report whose
+            # message preserves the underlying exception detail.
+            error_report = recover_error_report(exc)
+            log.error(f"Failed to execute workflow {workflow_class.__name__}: {error_report.message}")
+            raise WorkflowExecutionError(error_report.message, error_report=error_report) from exc
+        except (WorkflowAlreadyStartedError, RPCError) as exc:
             log.error(f"Failed to execute workflow {workflow_class.__name__}: {exc}")
             msg = f"Failed to execute workflow {workflow_class.__name__}"
             raise WorkflowExecutionError(msg) from exc
@@ -220,11 +232,13 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
             )
         except ChildWorkflowError as exc:
             log.error(f"ChildWorkflowError in {workflow_class.__name__} caused by: {exc.cause}")
-            if isinstance(exc.cause, ApplicationError):
-                msg = f"Application error in child workflow {workflow_class.__name__}"
-                raise WorkflowExecutionError(msg) from exc.cause
-            msg = f"Failed to execute child workflow {workflow_class.__name__}"
-            raise WorkflowExecutionError(msg) from exc
+            # Mirror ``execute_workflow``'s recovery path — see its rationale comment.
+            # ``recover_error_report`` is total, so a non-``ApplicationError`` cause (a
+            # plain worker exception) still yields a synthesized report instead of a
+            # generic error. ``ChildWorkflowError`` exposes the underlying failure via
+            # ``exc.cause``; fall back to the error itself when it carries no cause.
+            error_report = recover_error_report(exc.cause if exc.cause is not None else exc)
+            raise WorkflowExecutionError(error_report.message, error_report=error_report) from exc
 
     async def start_child_workflow(
         self,
@@ -266,11 +280,13 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
             )
         except ChildWorkflowError as exc:
             log.error(f"ChildWorkflowError in {workflow_class.__name__} caused by: {exc.cause}")
-            if isinstance(exc.cause, ApplicationError):
-                msg = f"Application error in child workflow {workflow_class.__name__}"
-                raise WorkflowExecutionError(msg) from exc.cause
-            msg = f"Failed to start child workflow {workflow_class.__name__}"
-            raise WorkflowExecutionError(msg) from exc
+            # Mirror ``execute_workflow``'s recovery path — see its rationale comment.
+            # ``recover_error_report`` is total, so a non-``ApplicationError`` cause (a
+            # plain worker exception) still yields a synthesized report instead of a
+            # generic error. ``ChildWorkflowError`` exposes the underlying failure via
+            # ``exc.cause``; fall back to the error itself when it carries no cause.
+            error_report = recover_error_report(exc.cause if exc.cause is not None else exc)
+            raise WorkflowExecutionError(error_report.message, error_report=error_report) from exc
 
 
 class WorkflowExecutorFactory(Generic[WorkflowInput, WorkflowOutput]):

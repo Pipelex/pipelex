@@ -6,19 +6,26 @@ from google.genai.client import Client as GoogleGenAiClient
 
 from pipelex.cogt.document.prompt_document import PromptDocument
 from pipelex.cogt.document.prompt_document_utils import prepare_prompt_document_as_base64
-from pipelex.cogt.exceptions import LLMCompletionError
+from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_utils import prepare_prompt_image_as_base64
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
+from pipelex.config import get_config
 
 
 class GoogleFactory:
     @classmethod
     def make_google_client(cls, backend: InferenceBackend) -> GoogleGenAiClient:
         """Create a Google Gemini API client."""
-        return GoogleGenAiClient(api_key=backend.api_key)
+        # Tier 1 transport retry: the Google GenAI SDK does NOT retry transient transport failures
+        # unless retry_options is set. Wire it explicitly from config so it matches the other
+        # SDK-backed workers. HttpRetryOptions.attempts counts the original attempt, hence the +1.
+        transport_max_retries = get_config().cogt.transport_max_retries
+        http_options = genai_types.HttpOptions(retry_options=genai_types.HttpRetryOptions(attempts=transport_max_retries + 1))
+        return GoogleGenAiClient(api_key=backend.api_key, http_options=http_options)
 
     @classmethod
     async def prepare_image_part(cls, prompt_image: PromptImage) -> genai_types.Part:
@@ -82,12 +89,28 @@ class GoogleFactory:
         """
         if not response.candidates:
             msg = f"No candidates returned from model: {model_desc}"
-            raise LLMCompletionError(msg)
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                provider_metadata=None,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Google Gemini returned no candidates — try rephrasing the prompt or using a different model",
+                ),
+            )
 
         candidate = response.candidates[0]
         if not candidate.content or not candidate.content.parts:
             msg = f"No content parts in response from model: {model_desc}"
-            raise LLMCompletionError(msg)
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                provider_metadata=None,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Google Gemini returned a candidate with no content parts — try rephrasing the prompt or using a different model",
+                ),
+            )
 
         text_parts: list[str] = []
         for part in candidate.content.parts:
@@ -100,7 +123,15 @@ class GoogleFactory:
 
         if not text_parts:
             msg = f"No text content in response from model: {model_desc}"
-            raise LLMCompletionError(msg)
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                provider_metadata=None,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Google Gemini returned only thinking parts and no text — shorten the prompt, raise max_tokens, or disable thinking",
+                ),
+            )
 
         return "\n\n".join(text_parts)
 

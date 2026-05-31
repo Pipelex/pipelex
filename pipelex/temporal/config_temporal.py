@@ -1,9 +1,9 @@
 import difflib
-from dataclasses import dataclass
 from datetime import timedelta
 from typing import TYPE_CHECKING, Annotated, Any, Literal, Union
 
 from pydantic import Field, model_validator
+from pydantic.dataclasses import dataclass
 
 from pipelex import log
 from pipelex.system.configuration.config_model import ConfigModel
@@ -13,6 +13,14 @@ from pipelex.types import Self, StrEnum
 
 if TYPE_CHECKING:
     from temporalio.common import RetryPolicy
+else:
+    # Runtime placeholder so Pydantic resolves the ``DispatchOptions.retry_policy``
+    # field annotation to ``Any`` (no validation, no isinstance) WITHOUT importing
+    # ``temporalio`` — keeping this module importable on installs that skipped the
+    # ``temporal`` extra. Type checkers see the real ``RetryPolicy`` above. With a
+    # bare forward ref instead, the model imports (deferred schema) but raises
+    # ``PydanticUserError`` the moment a ``DispatchOptions`` is constructed.
+    RetryPolicy = Any
 
 
 # Names of the five custom search attributes Pipelex knows how to populate.
@@ -217,6 +225,17 @@ class RetryPolicyConfig(RetryPolicyConfigBase):
     """
 
     non_retryable_error_types: list[str] = Field(default_factory=list)
+    """Class-name fallback list for the retry decision.
+
+    Retryability for a ``CogtError`` carrying an ``InferenceErrorCategory`` is
+    decided by ``category.is_retryable`` (see ``TemporalError.from_message_exception``)
+    — *not* by this list. The class-name list applies to:
+
+    - Non-``CogtError`` ``PipelexError`` subclasses, which carry no category.
+    - Any ``CogtError`` raised without a category set.
+    - Special cases that must override the category default (e.g. forcing a
+      type non-retryable on a specific queue via ``non_retryable_error_types_extra``).
+    """
 
 
 class RetryPolicyConfigOverlay(RetryPolicyConfigBase):
@@ -229,6 +248,13 @@ class RetryPolicyConfigOverlay(RetryPolicyConfigBase):
     """
 
     non_retryable_error_types_extra: list[str] = Field(default_factory=list)
+    """Additive class-name overrides layered onto the baseline non-retryable list.
+
+    Same fallback-and-override semantics as ``RetryPolicyConfig.non_retryable_error_types``:
+    category-carrying ``CogtError`` retryability is decided by category, not by
+    name. Use this list to force a type non-retryable for a specific queue or
+    handle, or to cover category-less exceptions on that route.
+    """
 
 
 class QueueOptions(ConfigModel):
@@ -345,7 +371,7 @@ class WorkerRuntimeProfilesConfig(ConfigModel):
         return self
 
 
-@dataclass
+@dataclass(frozen=True)
 class DispatchOptions:
     """Resolved per-call dispatch bundle returned by ``WorkerConfig.resolve_dispatch``.
 
@@ -356,14 +382,16 @@ class DispatchOptions:
     timeouts are likewise omitted when unset so the Temporal SDK applies its
     own defaults (rather than ``None``, which the SDK rejects).
 
-    Implemented as a dataclass (not a Pydantic BaseModel) so the module can be
-    imported without ``temporalio`` installed — the ``RetryPolicy`` annotation
-    is a forward reference resolved only at attribute access.
+    Frozen, build-once-read-only: constructed only inside ``resolve_dispatch``,
+    immediately splatted via ``to_execute_kwargs``, and never serialized across
+    the Temporal wire. ``retry_policy`` is ``Any`` at runtime (see the
+    ``RetryPolicy`` binding above) — type checkers still see the real
+    ``temporalio`` ``RetryPolicy``.
     """
 
     task_queue: str | None
     start_to_close_timeout: timedelta
-    retry_policy: "RetryPolicy"
+    retry_policy: RetryPolicy
     schedule_to_close_timeout: timedelta | None = None
     schedule_to_start_timeout: timedelta | None = None
     heartbeat_timeout: timedelta | None = None

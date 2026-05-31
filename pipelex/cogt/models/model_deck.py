@@ -29,11 +29,13 @@ from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.model_backends.constraints import ValuedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind, ModelReferenceParseError, ensure_model_reference
+from pipelex.cogt.models.exceptions import ModelReferenceParseError
+from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind, ensure_model_reference
 from pipelex.cogt.search.search_setting import SearchModelChoice, SearchSetting
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.exceptions import ConfigValidationError
 from pipelex.system.runtime import ProblemReaction
+from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.toml_utils import load_toml_from_path_if_exists
 from pipelex.types import Self
 from pipelex.urls import URLs
@@ -118,7 +120,7 @@ class ModelDeck(ConfigModel):
     search_presets: dict[str, SearchSetting] = Field(default_factory=dict)
     search_choice_default: SearchModelChoice
 
-    def _get_aliases_and_waterfalls_for_type(self, model_type: ModelType) -> tuple[dict[str, str], dict[str, list[str]]]:
+    def get_aliases_and_waterfalls_for_type(self, model_type: ModelType) -> tuple[dict[str, str], dict[str, list[str]]]:
         """Return the type-specific aliases and waterfalls dictionaries."""
         match model_type:
             case ModelType.LLM:
@@ -137,7 +139,7 @@ class ModelDeck(ConfigModel):
         them and looking up the appropriate dictionary.
         """
         ref = ModelReference.parse(model_handle)
-        aliases, waterfalls = self._get_aliases_and_waterfalls_for_type(model_type)
+        aliases, waterfalls = self.get_aliases_and_waterfalls_for_type(model_type)
 
         match ref.kind:
             case ModelReferenceKind.ALIAS:
@@ -224,7 +226,7 @@ class ModelDeck(ConfigModel):
         msg = f"Model handle '{ref.name}' was not found in the model deck"
 
         # Add migration hints if the name matches a preset, alias, or waterfall
-        aliases, waterfalls = self._get_aliases_and_waterfalls_for_type(model_type)
+        aliases, waterfalls = self.get_aliases_and_waterfalls_for_type(model_type)
         hints: list[str] = []
         if ref.name in presets:
             hints.append(f"Did you mean preset '${ref.name}' or 'preset:{ref.name}'?")
@@ -704,8 +706,8 @@ class ModelDeck(ConfigModel):
             # Check if model_handle exists as a top-level key (section) in the TOML
             # Exclude special sections like 'defaults'
             return model_handle in backend_toml and model_handle != "defaults"
-        except Exception:
-            # Best-effort: if anything goes wrong, just return None
+        except (TomlError, OSError):
+            # Best-effort: an unreadable or malformed backend TOML is treated as "model not found"
             return None
 
     def _resolve_waterfall(
@@ -791,7 +793,7 @@ class ModelDeck(ConfigModel):
         except ModelReferenceParseError:
             # Invalid model handle (empty string, etc.)
             return None
-        aliases, waterfalls = self._get_aliases_and_waterfalls_for_type(model_type)
+        aliases, waterfalls = self.get_aliases_and_waterfalls_for_type(model_type)
 
         # Handle prefixed alias reference (e.g., @best-gpt)
         match ref.kind:
@@ -854,7 +856,7 @@ class ModelDeck(ConfigModel):
         return None
 
     def is_handle_defined(self, model_handle: str, model_type: ModelType) -> bool:
-        aliases, waterfalls = self._get_aliases_and_waterfalls_for_type(model_type)
+        aliases, waterfalls = self.get_aliases_and_waterfalls_for_type(model_type)
         return model_handle in self.inference_models or model_handle in aliases or model_handle in waterfalls
 
     def get_required_inference_model(self, model_handle: str, model_type: ModelType) -> InferenceModelSpec:

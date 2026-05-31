@@ -12,6 +12,8 @@ Storage Provider Contract Requirements:
 - public_url(uri: str) -> str | None: Must return a human-readable link or None
 """
 
+from pathlib import Path
+
 import pytest
 
 from pipelex.tools.misc.file_utils import load_binary
@@ -56,7 +58,7 @@ class TestStorageProviderContract:
         must be identical to the bytes stored.
         """
         # Use real image data for a realistic test
-        image_bytes = load_binary(path=ImageTestCases.IMAGE_FILE_PATH_LOGO_TINY)
+        image_bytes = load_binary(path=Path(ImageTestCases.IMAGE_FILE_PATH_LOGO_TINY))
         key = "contract/image.png"
 
         uri = await storage_provider.store(data=image_bytes, key=key)

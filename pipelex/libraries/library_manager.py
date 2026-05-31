@@ -8,7 +8,7 @@ from mthds.package.dependency_resolver import ResolvedDependency, determine_expo
 from mthds.package.discovery import find_package_manifest
 from mthds.package.exceptions import DependencyResolveError, ManifestError
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION, MethodsManifest
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, PydanticUserError, ValidationError
 from typing_extensions import override
 
 import pipelex.builder as builder_pkg  # package import — used for __file__ path
@@ -260,14 +260,14 @@ class LibraryManager(LibraryManagerAbstract):
         for library_dir in all_dirs:
             # Only import files that contain StructuredContent subclasses (uses AST pre-check)
             ClassRegistryUtils.import_modules_in_folder(
-                folder_path=str(library_dir),
+                folder_path=library_dir,
                 base_class_names=[StructuredContent.__name__],
-                force_include_dirs=[str(Path(builder_pkg.__file__).parent)],
+                force_include_dirs=[Path(builder_pkg.__file__).parent],
             )
             # Only import files that contain @pipe_func decorated functions (uses AST pre-check)
             FuncRegistryUtils.register_funcs_in_folder(
-                folder_path=str(library_dir),
-                force_include_dirs=[str(Path(builder_pkg.__file__).parent)],
+                folder_path=library_dir,
+                force_include_dirs=[Path(builder_pkg.__file__).parent],
             )
 
         # Auto-discover and register all StructuredContent classes from sys.modules
@@ -336,9 +336,9 @@ class LibraryManager(LibraryManagerAbstract):
         for library_dir in all_dirs:
             # Only import files that contain StructuredContent subclasses (uses AST pre-check)
             ClassRegistryUtils.import_modules_in_folder(
-                folder_path=str(library_dir),
+                folder_path=library_dir,
                 base_class_names=[StructuredContent.__name__],
-                force_include_dirs=[str(Path(builder_pkg.__file__).parent)],
+                force_include_dirs=[Path(builder_pkg.__file__).parent],
             )
             # NOTE: We skip FuncRegistryUtils.register_funcs_in_folder() since we're not loading pipes
 
@@ -1174,7 +1174,7 @@ class LibraryManager(LibraryManagerAbstract):
             if structure_class is not None and issubclass(structure_class, BaseModel):
                 try:
                     structure_class.model_rebuild(_types_namespace=namespace)
-                except Exception as exc:
+                except (NameError, PydanticUserError) as exc:
                     log.debug(f"Could not rebuild model for {concept.concept_ref}: {exc}")
 
     def _detect_concept_cycles(self, concepts: list["Concept"]) -> None:

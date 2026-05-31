@@ -12,7 +12,6 @@ from rich.prompt import Prompt
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.pipelex_service.pipelex_details import PipelexDetails
 from pipelex.tools.misc.dict_utils import extract_vars_from_strings_recursive
-from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 
@@ -70,7 +69,7 @@ def write_env_file(env_path: Path, entries: dict[str, str]) -> None:
     env_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
 
 
-def get_required_vars_for_enabled_backends(backends_toml_path: str) -> dict[str, list[str]]:
+def get_required_vars_for_enabled_backends(backends_toml_path: Path) -> dict[str, list[str]]:
     """Determine which env vars are required by each enabled backend.
 
     Args:
@@ -79,7 +78,7 @@ def get_required_vars_for_enabled_backends(backends_toml_path: str) -> dict[str,
     Returns:
         Dictionary mapping env var names to the list of backend display names that need them.
     """
-    if not path_exists(backends_toml_path):
+    if not backends_toml_path.exists():
         return {}
 
     toml_data = load_toml_from_path(backends_toml_path)
@@ -102,7 +101,7 @@ def get_required_vars_for_enabled_backends(backends_toml_path: str) -> dict[str,
     return var_to_backends
 
 
-def prompt_credentials(console: Console, backends_toml_path: str) -> None:
+def prompt_credentials(console: Console, backends_toml_path: Path) -> None:
     """Prompt the user for missing credentials and persist them to ~/.pipelex/.env.
 
     Reads the backends.toml to find which env vars are needed by enabled backends,

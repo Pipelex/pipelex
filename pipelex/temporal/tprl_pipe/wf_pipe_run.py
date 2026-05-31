@@ -6,12 +6,14 @@ from temporalio.exceptions import ActivityError, ChildWorkflowError
 from typing_extensions import override
 
 with workflow.unsafe.imports_passed_through():
+    from pipelex.base_exceptions import ErrorReport  # noqa: TC001  # must traverse the workflow sandbox
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryStatus
     from pipelex.runtime_bridge.primitives.pipe_run_arg import PipeRunArg
     from pipelex.temporal.exceptions import WorkflowExecutionError
-    from pipelex.temporal.log_temporal import workflow_log
+    from pipelex.temporal.log_temporal import WorkflowLog
     from pipelex.temporal.tprl.observability import build_search_attributes, build_static_summary
+    from pipelex.temporal.tprl.temporal_error import recover_error_report
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
     from pipelex.temporal.tprl_pipe.act_assemble_graph import AssembleGraphArg, act_assemble_graph
     from pipelex.temporal.tprl_pipe.act_deliver import DeliveryActivityArg, act_deliver
@@ -29,9 +31,12 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
     @override
     @workflow.run
     async def run(self, workflow_arg: PipeRunArg) -> PipeOutput:
+        pipe_job = workflow_arg.pipe_job
+        # Bound once per invocation: every record below carries this run's
+        # request_id (None when the run carries no inbound API request id).
+        workflow_log = WorkflowLog(request_id=pipe_job.job_metadata.request_id)
         workflow_log.debug("WfPipeRun start")
 
-        pipe_job = workflow_arg.pipe_job
         delivery_assignment = workflow_arg.delivery_assignment
         pipeline_run_id: str = pipe_job.job_metadata.pipeline_run_id
 
@@ -40,6 +45,7 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
         status: DeliveryStatus = DeliveryStatus.COMPLETED
         pipe_output: PipeOutput | None = None
         execution_error: WorkflowExecutionError | None = None
+        error_report: ErrorReport | None = None
 
         # The wf_pipe_router child runs the same pipe as wf_pipe_run, so its
         # search attributes and static summary are identical — re-derive them
@@ -60,19 +66,18 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
             workflow_log.debug("WfPipeRouter completed successfully")
         except ChildWorkflowError as exc:
             status = DeliveryStatus.FAILED
-            # Wrap the raw ``ChildWorkflowError`` as ``WorkflowExecutionError`` so
-            # the rest of this function and the outer ``execute_workflow`` caller
-            # continue to see the same Pipelex error type as before — the
-            # in-workflow ``WorkflowExecutor.execute_child_workflow`` wrapper used
-            # to do this wrap before; the integration test
-            # ``test_wf_pipe_run_failure_path`` pins the workflow_failure_exception_types
-            # contract on ``WorkflowExecutionError``.
+            # Wrap the raw ``ChildWorkflowError`` as ``WorkflowExecutionError`` so the rest of
+            # this function and the outer ``execute_workflow`` caller continue to see the same
+            # Pipelex error type as before — the integration test ``test_wf_pipe_run_failure_path``
+            # pins the workflow_failure_exception_types contract on ``WorkflowExecutionError``.
+            # ``recover_error_report`` lifts the structured classification out of the child failure
+            # (``ChildWorkflowError`` exposes it via ``exc.cause``) so the FAILED webhook carries it.
             #
-            # Manual ``__cause__`` wire (not ``raise X from exc``): we hold the
-            # wrapped error for a deferred re-raise in the post-delivery block
-            # below so ``act_deliver`` still fires on the failure path. Raising
-            # here would short-circuit delivery.
-            execution_error = WorkflowExecutionError("WfPipeRouter failed")
+            # Manual ``__cause__`` wire (not ``raise X from exc``): we hold the wrapped error for a
+            # deferred re-raise in the post-delivery block below so ``act_deliver`` still fires on
+            # the failure path. Raising here would short-circuit delivery.
+            error_report = recover_error_report(exc.cause if exc.cause is not None else exc)
+            execution_error = WorkflowExecutionError("WfPipeRouter failed", error_report=error_report)
             execution_error.__cause__ = exc
             workflow_log.error(f"WfPipeRouter failed: {exc}")
 
@@ -107,6 +112,8 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
                 pipeline_run_id=pipeline_run_id,
                 delivery_assignment=delivery_assignment,
                 status=status,
+                error_report=error_report,
+                request_id=pipe_job.job_metadata.request_id,
             )
             # Include pipe_output only on success
             if pipe_output is not None:

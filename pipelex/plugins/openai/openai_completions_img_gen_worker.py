@@ -1,19 +1,21 @@
 from typing import TYPE_CHECKING, Any, cast
 
 import openai
-from openai import APIConnectionError, APITimeoutError, AuthenticationError, BadRequestError, NotFoundError, RateLimitError
+from openai import (
+    APIConnectionError,
+    APIStatusError,
+)
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundError, ImgGenParameterError, InferenceErrorCategory, SdkTypeError
+from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError, InferenceErrorCategory, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
-from pipelex.cogt.inference.error_classification import (
-    is_content_policy_violation,
-    is_quota_exhaustion_openai,
-)
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_openai_metadata
+from pipelex.cogt.inference.error_classify import classify_inference_error
+from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory
@@ -21,7 +23,6 @@ from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.base64_utils import extract_base64_str_from_base64_url_if_possible
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl
-from pipelex.urls import URLs
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessage
@@ -83,44 +84,16 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
                 extra_headers=extra_headers,
                 extra_body=extra_body,
             )
-        except NotFoundError as not_found_error:
-            msg = f"ImgGen model or deployment not found:\n{self.inference_model.desc}\nmodel: {self.inference_model.desc}\n{not_found_error}"
-            raise ImgGenModelNotFoundError(message=msg, model_handle=self.inference_model.name) from not_found_error
-        except RateLimitError as rate_limit_error:
-            error_message = str(rate_limit_error)
-            if is_quota_exhaustion_openai(error_message):
-                msg = f"OpenAI quota exhausted for model '{self.inference_model.desc}': {rate_limit_error}"
-                raise ImgGenGenerationError(
-                    msg,
-                    error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=f"Your OpenAI account has exceeded its quota — check billing at {URLs.openai_billing}",
-                ) from rate_limit_error
-            msg = f"OpenAI rate limit exceeded for model '{self.inference_model.desc}': {rate_limit_error}"
-            raise ImgGenGenerationError(
-                msg,
-                error_category=InferenceErrorCategory.TRANSIENT,
-                user_action="Rate limited by OpenAI — the system will retry automatically",
-            ) from rate_limit_error
-        except APITimeoutError as timeout_error:
-            msg = f"OpenAI API request timed out for model '{self.inference_model.desc}': {timeout_error}"
-            raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.TRANSIENT) from timeout_error
-        except APIConnectionError as api_connection_error:
-            msg = f"ImgGen API connection error: {api_connection_error}"
-            raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.TRANSIENT) from api_connection_error
-        except BadRequestError as bad_request_error:
-            error_message = str(bad_request_error)
-            if is_content_policy_violation(error_message):
-                msg = f"Content rejected by safety filters for model '{self.inference_model.desc}': {bad_request_error}"
-                raise ImgGenGenerationError(
-                    msg,
-                    error_category=InferenceErrorCategory.CONTENT,
-                    user_action="Content was rejected by safety filters — revise the prompt",
-                ) from bad_request_error
-            msg = f"ImgGen bad request error with model: {self.inference_model.desc}:\n{bad_request_error}"
-            raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONTENT) from bad_request_error
-        except AuthenticationError as authentication_error:
-            msg = f"ImgGen authentication error: {authentication_error}"
-            raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from authentication_error
+        except (APIStatusError, APIConnectionError) as sdk_exc:
+            metadata = extract_openai_metadata(sdk_exc)
+            classification = classify_inference_error(metadata)
+            raise render_inference_error(
+                metadata=metadata,
+                classification=classification,
+                family=InferenceErrorFamily.IMG_GEN,
+                model_desc=self.inference_model.desc,
+                model_handle=self.inference_model.name,
+            ) from sdk_exc
 
         openai_message: ChatCompletionMessage = response.choices[0].message
         actual_url: str | None = None
@@ -135,7 +108,15 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
                         extracted = extract_base64_str_from_base64_url_if_possible(possibly_base64_url=the_url)
                         if not extracted:
                             msg = "No base64 string found in ImgGenCompletions response message (images)"
-                            raise ImgGenGenerationError(msg)
+                            raise ImgGenGenerationError(
+                                msg,
+                                error_category=InferenceErrorCategory.CONTENT,
+                                user_action=UserAction(
+                                    kind=UserActionKind.CHANGE_INPUT,
+                                    detail="The provider returned no image data — try rephrasing the prompt or using a different model",
+                                ),
+                                provider_metadata=None,
+                            )
                         base64_str, base64_extracted_mime_type = extracted
         elif (content := openai_message.content) and content.startswith("http"):
             # OpenAI response message is a URL, this happens with blackboxai and pipelex_gateway which have a fixed output format.
@@ -157,12 +138,28 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
                             extracted = extract_base64_str_from_base64_url_if_possible(possibly_base64_url=the_url)
                             if not extracted:
                                 msg = "No base64 string found in ImgGenCompletions response message"
-                                raise ImgGenGenerationError(msg)
+                                raise ImgGenGenerationError(
+                                    msg,
+                                    error_category=InferenceErrorCategory.CONTENT,
+                                    user_action=UserAction(
+                                        kind=UserActionKind.CHANGE_INPUT,
+                                        detail="The provider returned no image data — try rephrasing the prompt or using a different model",
+                                    ),
+                                    provider_metadata=None,
+                                )
                             base64_str, base64_extracted_mime_type = extracted
                             break
         if not base64_str and not actual_url:
             msg = f"ImgGenCompletions response has no image. Model: {self.inference_model.desc}"
-            raise ImgGenGenerationError(msg)
+            raise ImgGenGenerationError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="The provider returned no image — try rephrasing the prompt or using a different model",
+                ),
+                provider_metadata=None,
+            )
 
         if (img_gen_tokens_usage := img_gen_job.job_report.img_gen_tokens_usage) and (usage := response.usage):
             img_gen_tokens_usage.nb_tokens_by_category = self.openai_completions_factory.make_nb_tokens_by_category(usage=usage)

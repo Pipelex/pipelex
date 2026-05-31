@@ -28,6 +28,20 @@ class ModelWithLiteralChoices(BaseModel):
     recommendation: Literal["Strong Match", "Good Match", "Partial Match", "Poor Match"]
 
 
+class ModelWithJsonObject(BaseModel):
+    """A model with a free-form JSON object field typed ``dict[str, Any]``.
+
+    Mirrors ``JSONContent``, the native content class that a concept refining the
+    native ``JSON`` concept resolves to. The ``Any`` in ``dict[str, Any]`` is what
+    breaks forward-reference resolution: datamodel-code-generator emits
+    ``from __future__ import annotations``, turning the field annotation into the
+    string ``"dict[str, Any]"``. If the rebuild namespace does not carry ``Any``,
+    ``model_rebuild`` raises ``NameError: name 'Any' is not defined``.
+    """
+
+    json_obj: dict[str, Any] = Field(description="The JSON object")
+
+
 class Address(BaseModel):
     street: str
     city: str
@@ -89,6 +103,56 @@ class TestSchemaToModel:
             "Partial Match",
             "Poor Match",
         }, f"Literal args drifted during round-trip: {get_args(annotation)!r}"
+
+    def test_json_object_field_reconstructs_without_undefined_any(self) -> None:
+        """A schema with a ``dict[str, Any]`` field reconstructs without raising.
+
+        Bug repro: a ``PipeLLM`` whose output is a concept refining the native
+        ``JSON`` concept produces a structured-output model carrying an
+        ``Any``-typed field (inherited from ``JSONContent``). datamodel-code-generator
+        emits ``from __future__ import annotations``, so the field annotation becomes
+        the string ``"dict[str, Any]"``. If ``model_rebuild`` runs against a namespace
+        that lacks ``Any``, it raises ``PydanticUndefinedAnnotation: name 'Any' is
+        not defined``. The rebuild namespace must carry the typing names the generated
+        source was written against.
+        """
+        schema = ModelWithJsonObject.model_json_schema()
+        unique_title = f"JsonObjectRepro_{uuid.uuid4().hex}"
+        schema["title"] = unique_title
+
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, unique_title)
+
+        source = getattr(result_class, "__kajson_class_source__", "")
+        assert "from __future__ import annotations" in source, (
+            f"Expected datamodel-code-generator to emit future annotations (so the regression target is meaningful). Source:\n{source}"
+        )
+        assert "json_obj" in result_class.model_fields
+        instance = result_class(json_obj={"category": "vectors", "count": 3})
+        assert instance.json_obj == {"category": "vectors", "count": 3}  # type: ignore[attr-defined]
+
+    def test_make_types_from_source_resolves_any_annotation(self) -> None:
+        """The receiver path (``make_types_from_source``) rebuilds a model whose
+        string annotation references ``Any`` without raising.
+
+        This is the cross-process path: a ``__kajson_class_source__`` payload carrying
+        ``from __future__ import annotations`` plus a ``dict[str, Any]`` field must
+        rebuild against a namespace that includes ``Any``.
+        """
+        source = (
+            "from __future__ import annotations\n"
+            "from typing import Any\n"
+            "from pydantic import BaseModel, Field\n"
+            "\n\n"
+            "class JsonHolder(BaseModel):\n"
+            "    json_obj: dict[str, Any] = Field(..., description='The JSON object')\n"
+        )
+
+        types = SchemaToModelFactory.make_types_from_source(source)
+
+        json_holder = types["JsonHolder"]
+        assert issubclass(json_holder, BaseModel)
+        instance = json_holder(json_obj={"k": "v"})
+        assert instance.json_obj == {"k": "v"}  # type: ignore[attr-defined]
 
     def test_simple_model_reconstruction(self) -> None:
         """A simple model can be reconstructed from its JSON schema."""

@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from typing import Protocol
 
+from pipelex.cogt.exceptions import CogtError
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.observer.observer_protocol import ObserverProtocol, PayloadKey, PayloadType
 from pipelex.pipe_run.exceptions import PipeRouterError, PipeRunError
@@ -52,15 +53,23 @@ class PipeRouterProtocol(Protocol):
 
         try:
             pipe_output = await self._run_pipe_job(pipe_job)
-        except PipeRunError as exc:
+        except (CogtError, PipeRunError) as exc:
+            # Direct (non-Temporal) execution is a single pipeline-level attempt — there is no
+            # retry here. This handler is error propagation, not retry: a PipeRunError wraps into
+            # PipeRouterError (preserving the pipe location context); a raw CogtError is re-raised
+            # as-is so its cause chain is preserved. Resilience is the Temporal track's job.
             await self._after_failing_run(pipe_job, exc)
-            raise PipeRouterError(
-                message=exc.message,
-                run_mode=pipe_job.pipe_run_params.run_mode,
-                pipe_code=pipe_job.pipe.code,
-                output_name=pipe_job.output_name,
-                pipe_stack=pipe_job.pipe_run_params.pipe_stack,
-            ) from exc
+            if isinstance(exc, PipeRunError):
+                raise PipeRouterError(
+                    message=exc.message,
+                    run_mode=pipe_job.pipe_run_params.run_mode,
+                    pipe_code=pipe_job.pipe.code,
+                    output_name=pipe_job.output_name,
+                    # run_pipe() has already popped the failed pipe's own frame; re-append
+                    # its code so the reported stack still ends with the pipe that failed.
+                    pipe_stack=[*pipe_job.pipe_run_params.pipe_stack, pipe_job.pipe.code],
+                ) from exc
+            raise
 
         await self._after_successful_run(pipe_job, pipe_output)
 

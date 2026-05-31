@@ -19,7 +19,6 @@ from pipelex.system.pipelex_service.exceptions import (
     GatewayApiKeyMissingError,
     GatewayDoNotTrackConflictError,
     GatewayTermsNotAcceptedError,
-    RemoteConfigFetchError,
     RemoteConfigValidationError,
 )
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
@@ -31,13 +30,19 @@ class TestMakePipelexForAgentCli:
 
     @pytest.fixture(autouse=True)
     def _restore_globals(self):
-        """Restore PrettyPrinter.mode and root log level after tests that call the factory successfully."""
+        """Restore PrettyPrinter.mode, root log level, and the process-global
+        ``logging.disable`` threshold after tests that call the factory successfully —
+        otherwise the agent CLI cutoff (armed by ``silence_logging_for_agent_cli`` inside
+        the factory) leaks into other tests in the suite.
+        """
         original_mode = PrettyPrinter.mode
         root_logger = logging.getLogger()
         original_level: int = root_logger.level
+        original_disable = logging.root.manager.disable
         yield
         PrettyPrinter.mode = original_mode
         root_logger.setLevel(original_level)
+        logging.disable(original_disable)
 
     def test_successful_initialization(self, mocker: MockerFixture) -> None:
         """Should return the Pipelex instance when make() succeeds."""
@@ -53,7 +58,6 @@ class TestMakePipelexForAgentCli:
             (GatewayTermsNotAcceptedError, (), "GatewayTermsNotAcceptedError"),
             (GatewayApiKeyMissingError, (), "GatewayApiKeyMissingError"),
             (GatewayDoNotTrackConflictError, ("DO_NOT_TRACK",), "GatewayDoNotTrackConflictError"),
-            (RemoteConfigFetchError, ("cannot reach server",), "RemoteConfigFetchError"),
             (RemoteConfigValidationError, ("bad remote config",), "RemoteConfigValidationError"),
         ],
     )

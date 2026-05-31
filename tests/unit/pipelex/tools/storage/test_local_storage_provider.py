@@ -1,8 +1,14 @@
 from pathlib import Path
 
 import pytest
+from pytest_mock import MockerFixture
 
-from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidKeyError, StorageInvalidUriError
+from pipelex.tools.storage.exceptions import (
+    StorageFileNotFoundError,
+    StorageInvalidKeyError,
+    StorageInvalidUriError,
+    StorageLocalError,
+)
 from pipelex.tools.storage.local_storage_provider import LocalStorageProvider
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
 
@@ -152,3 +158,53 @@ class TestLocalStorageProvider:
         file_path = tmp_path / key
         assert file_path.exists()
         assert file_path.read_bytes() == test_data
+
+    async def test_store_wraps_oserror_as_storage_local_error(self, tmp_path: Path) -> None:
+        """Test that an OSError during store is wrapped as StorageLocalError.
+
+        A regular file blocks the parent-directory creation: mkdir(parents=True) on a
+        path whose ancestor is a file raises FileExistsError (an OSError subclass).
+        """
+        provider = LocalStorageProvider(root_path=tmp_path)
+        (tmp_path / "blocker").write_bytes(b"i am a file, not a directory")
+
+        with pytest.raises(StorageLocalError) as exc_info:
+            await provider.store(data=b"payload", key="blocker/foo.txt")
+
+        assert "blocker/foo.txt" in str(exc_info.value)
+        assert isinstance(exc_info.value.__cause__, OSError)
+
+    async def test_load_wraps_oserror_as_storage_local_error(self, tmp_path: Path) -> None:
+        """Test that a non-not-found OSError during load is wrapped as StorageLocalError.
+
+        Opening a directory as a file raises IsADirectoryError (an OSError subclass),
+        which must surface as StorageLocalError rather than leaking raw.
+        """
+        provider = LocalStorageProvider(root_path=tmp_path)
+        (tmp_path / "a_directory").mkdir()
+
+        with pytest.raises(StorageLocalError) as exc_info:
+            await provider.load(uri=f"{PIPELEX_STORAGE_SCHEME}a_directory")
+
+        assert "a_directory" in str(exc_info.value)
+        assert isinstance(exc_info.value.__cause__, OSError)
+
+    async def test_load_toctou_filenotfound_maps_to_not_found(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Test that a FileNotFoundError raised after the exists() check maps to StorageFileNotFoundError.
+
+        Simulates the TOCTOU window: the file passes exists() but is gone by the time
+        open() runs. A missing file is a not-found, not a generic local-storage error.
+        """
+        provider = LocalStorageProvider(root_path=tmp_path)
+        key = "toctou.bin"
+        await provider.store(data=b"present at check time", key=key)
+
+        mocker.patch(
+            "pipelex.tools.storage.local_storage_provider.aiofiles.open",
+            side_effect=FileNotFoundError(2, "No such file or directory"),
+        )
+
+        with pytest.raises(StorageFileNotFoundError) as exc_info:
+            await provider.load(uri=f"{PIPELEX_STORAGE_SCHEME}{key}")
+
+        assert key in str(exc_info.value)

@@ -9,7 +9,7 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path_and_merge_with_ove
 CONFIG_DIR_NAME = ".pipelex"
 CONFIG_NAME = "pipelex.toml"
 
-PROJECT_ROOT_MARKERS: frozenset[str] = frozenset({".git", "pyproject.toml", "setup.py", "setup.cfg", "package.json", ".hg"})
+PROJECT_ROOT_MARKERS: frozenset[str] = frozenset({CONFIG_DIR_NAME, ".git", "pyproject.toml", "setup.py", "setup.cfg", "package.json", ".hg"})
 
 INFERENCE_DIR_NAME = "inference"
 BACKENDS_FILE_NAME = "backends.toml"
@@ -33,7 +33,8 @@ class ConfigLoader:
         """Walk up from start_dir looking for project root markers.
 
         Excludes the home directory, which may contain stray marker files
-        (e.g. package.json) but is never a real project root.
+        (e.g. the global ~/.pipelex/ or a stray package.json) but is never a
+        real project root.
 
         Returns the directory containing the marker, or None if not found.
         """
@@ -118,22 +119,22 @@ class ConfigLoader:
     @property
     def backends_file_path(self) -> Path:
         """Resolve backends.toml from project dir or global dir."""
-        return self.resolve_config_file(str(Path(INFERENCE_DIR_NAME) / BACKENDS_FILE_NAME))
+        return self.resolve_config_file(f"{INFERENCE_DIR_NAME}/{BACKENDS_FILE_NAME}")
 
     @property
     def backends_dir_path(self) -> Path:
         """Resolve backends/ directory from project dir or global dir."""
-        return self.resolve_config_file(str(Path(INFERENCE_DIR_NAME) / BACKENDS_DIR_NAME))
+        return self.resolve_config_file(f"{INFERENCE_DIR_NAME}/{BACKENDS_DIR_NAME}")
 
     @property
     def routing_profiles_file_path(self) -> Path:
         """Resolve routing_profiles.toml from project dir or global dir."""
-        return self.resolve_config_file(str(Path(INFERENCE_DIR_NAME) / ROUTING_PROFILES_FILE_NAME))
+        return self.resolve_config_file(f"{INFERENCE_DIR_NAME}/{ROUTING_PROFILES_FILE_NAME}")
 
     @property
     def model_decks_dir_path(self) -> Path:
         """Resolve model decks directory from project dir or global dir."""
-        return self.resolve_config_file(str(Path(INFERENCE_DIR_NAME) / MODEL_DECKS_DIR_NAME))
+        return self.resolve_config_file(f"{INFERENCE_DIR_NAME}/{MODEL_DECKS_DIR_NAME}")
 
     def ensure_global_config_exists(self) -> None:
         """Create the global ~/.pipelex/ directory with kit template files if it doesn't exist."""
@@ -191,10 +192,16 @@ class ConfigLoader:
         files.append(config_dir / "pipelex_temporary_override.toml")
         return files
 
-    def load_config(self, extra_overrides: dict[str, Any] | None = None) -> dict[str, Any]:
+    def load_config(self, extra_overrides: dict[str, Any] | None = None, config_dir: Path | None = None) -> dict[str, Any]:
         """Load and merge configurations from pipelex and local config files.
 
-        The configuration is loaded and deep-merged in the following order
+        When ``config_dir`` is provided, the load is scoped to a single directory
+        (package defaults + ``config_dir`` base + ``config_dir`` overrides + ``extra_overrides``).
+        This is what the doctor command uses for ``--global``: it wants the hub to reflect
+        exactly the directory it is reporting on, with no project/global layering muddying
+        the view.
+
+        Otherwise the configuration is loaded and deep-merged in the following order
         (later wins per leaf key):
 
         1. Package defaults (pipelex/pipelex.toml)
@@ -217,27 +224,37 @@ class ConfigLoader:
         precedence. Global and project run_mode files are not loaded, to keep
         test runs hermetic.
 
+        Args:
+            extra_overrides: Optional dict deep-merged on top as the final layer.
+            config_dir: Optional explicit config dir. When given, project/global layering
+                is bypassed and only this directory is read.
+
         Returns:
             dict[str, Any]: The merged configuration dictionary
         """
-        self.ensure_global_config_exists()
-
         is_unit_testing = runtime_manager.is_unit_testing
-        project_dir = self.project_config_dir
 
-        list_of_configs: list[Path] = [
-            self.pipelex_root_dir / CONFIG_NAME,
-            self.global_config_dir / CONFIG_NAME,
-        ]
-        list_of_configs.extend(
-            self._override_files_for_dir(self.global_config_dir, include_run_mode=not is_unit_testing),
-        )
+        list_of_configs: list[Path] = [self.pipelex_root_dir / CONFIG_NAME]
 
-        if project_dir is not None and project_dir != self.global_config_dir:
-            list_of_configs.append(project_dir / CONFIG_NAME)
+        if config_dir is not None:
+            list_of_configs.append(config_dir / CONFIG_NAME)
             list_of_configs.extend(
-                self._override_files_for_dir(project_dir, include_run_mode=not is_unit_testing),
+                self._override_files_for_dir(config_dir, include_run_mode=not is_unit_testing),
             )
+        else:
+            self.ensure_global_config_exists()
+            project_dir = self.project_config_dir
+
+            list_of_configs.append(self.global_config_dir / CONFIG_NAME)
+            list_of_configs.extend(
+                self._override_files_for_dir(self.global_config_dir, include_run_mode=not is_unit_testing),
+            )
+
+            if project_dir is not None and project_dir != self.global_config_dir:
+                list_of_configs.append(project_dir / CONFIG_NAME)
+                list_of_configs.extend(
+                    self._override_files_for_dir(project_dir, include_run_mode=not is_unit_testing),
+                )
 
         if is_unit_testing:
             list_of_configs.append(Path.cwd() / "tests" / f"pipelex_{runtime_manager.run_mode}.toml")

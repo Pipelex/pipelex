@@ -1,4 +1,5 @@
 import base64
+from pathlib import Path
 
 import pytest
 
@@ -25,7 +26,7 @@ class TestBase64Utils:
         with open(file_path, "rb") as file_handle:
             expected = base64.b64encode(file_handle.read()).decode("ascii")
 
-        result = await load_binary_as_base64(path=file_path)
+        result = await load_binary_as_base64(path=Path(file_path))
 
         assert result == expected
         assert isinstance(result, str)
@@ -71,7 +72,7 @@ class TestBase64Utils:
         """Test async creating base64 URL from PNG file path."""
         file_path = ImageTestCases.IMAGE_FILE_PATH_PNG_1
 
-        result = await make_base64_url_from_path(path=file_path)
+        result = await make_base64_url_from_path(path=Path(file_path))
 
         assert result.startswith("data:image/png;base64,")
         base64_part = result.split(",", 1)[1]
@@ -83,7 +84,7 @@ class TestBase64Utils:
         """Test async creating base64 URL from JPEG file path."""
         file_path = ImageTestCases.IMAGE_FILE_PATH_JPG_1
 
-        result = await make_base64_url_from_path(path=file_path)
+        result = await make_base64_url_from_path(path=Path(file_path))
 
         assert result.startswith("data:image/jpeg;base64,")
         base64_part = result.split(",", 1)[1]

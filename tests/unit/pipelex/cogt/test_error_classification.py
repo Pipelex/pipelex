@@ -1,22 +1,30 @@
-"""Tests for the error classification helpers used by inference workers."""
+"""Tests for quota and content-policy detection on ``ProviderErrorMetadata``.
+
+The quota and content-policy probes are exposed via the
+``ProviderErrorMetadata.is_quota_exhaustion`` / ``is_content_policy_violation``
+properties; the helpers backing them are module-private. These tests pin the
+per-provider phrase matching so changes to the patterns surface as test diffs.
+"""
 
 from typing import ClassVar
 
 import pytest
 
-from pipelex.cogt.inference.error_classification import (
-    is_content_policy_violation,
-    is_quota_exhaustion_anthropic,
-    is_quota_exhaustion_aws,
-    is_quota_exhaustion_gateway,
-    is_quota_exhaustion_google,
-    is_quota_exhaustion_mistral,
-    is_quota_exhaustion_openai,
-)
+from pipelex.cogt.inference.error_classification import ProviderErrorMetadata
+from pipelex.cogt.inference.provider_name import ProviderName
+
+
+def _metadata(provider: ProviderName, message: str, status_code: int | None = None) -> ProviderErrorMetadata:
+    return ProviderErrorMetadata(
+        provider=provider,
+        sdk_exception_type="RateLimitError",
+        message=message,
+        status_code=status_code,
+    )
 
 
 class _TestCases:
-    # (topic, error_message, expected_result)
+    # (topic, message, expected_is_quota)
     OPENAI_QUOTA_CASES: ClassVar[list[tuple[str, str, bool]]] = [
         ("insufficient_quota", "Error: insufficient_quota - you have exceeded your billing limit", True),
         ("exceeded_quota", "You exceeded your current quota, please check your plan", True),
@@ -59,7 +67,7 @@ class _TestCases:
         ("billing_api_not_enabled_not_quota", "billing API not enabled", False),
     ]
 
-    # (topic, error_message, status_code, expected_result)
+    # (topic, message, status_code, expected_is_quota)
     MISTRAL_QUOTA_CASES: ClassVar[list[tuple[str, str, int, bool]]] = [
         ("payment_required_402", "Payment required", 402, True),
         ("quota_429", "Quota exceeded for your account", 429, True),
@@ -78,7 +86,7 @@ class _TestCases:
         ("unrelated_error", "Access denied", False),
     ]
 
-    # (topic, error_message, status_code, expected_result)
+    # (topic, message, status_code, expected_is_quota)
     GATEWAY_QUOTA_CASES: ClassVar[list[tuple[str, str, int, bool]]] = [
         ("payment_required_402", "Payment required", 402, True),
         ("quota_429", "Your quota has been exhausted", 429, True),
@@ -110,7 +118,7 @@ class _TestCases:
 
 
 class TestErrorClassification:
-    """Tests for quota detection and content policy classification helpers."""
+    """Tests for quota detection and content policy classification via the public ``ProviderErrorMetadata`` properties."""
 
     @pytest.mark.parametrize(
         ("_topic", "error_message", "expected"),
@@ -118,7 +126,7 @@ class TestErrorClassification:
     )
     def test_is_quota_exhaustion_openai(self, _topic: str, error_message: str, expected: bool) -> None:
         """Discriminate OpenAI quota exhaustion from generic rate limiting."""
-        assert is_quota_exhaustion_openai(error_message) == expected
+        assert _metadata(ProviderName.OPENAI, error_message).is_quota_exhaustion == expected
 
     @pytest.mark.parametrize(
         ("_topic", "error_message", "expected"),
@@ -126,15 +134,15 @@ class TestErrorClassification:
     )
     def test_is_quota_exhaustion_anthropic(self, _topic: str, error_message: str, expected: bool) -> None:
         """Discriminate Anthropic quota exhaustion from generic rate limiting."""
-        assert is_quota_exhaustion_anthropic(error_message) == expected
+        assert _metadata(ProviderName.ANTHROPIC, error_message).is_quota_exhaustion == expected
 
     @pytest.mark.parametrize(
         ("_topic", "error_message", "expected"),
         _TestCases.CONTENT_POLICY_CASES,
     )
     def test_is_content_policy_violation(self, _topic: str, error_message: str, expected: bool) -> None:
-        """Detect content policy and safety filter violations."""
-        assert is_content_policy_violation(error_message) == expected
+        """Detect content policy and safety filter violations (provider-agnostic)."""
+        assert _metadata(ProviderName.OPENAI, error_message).is_content_policy_violation == expected
 
     @pytest.mark.parametrize(
         ("_topic", "error_message", "expected"),
@@ -142,7 +150,7 @@ class TestErrorClassification:
     )
     def test_is_quota_exhaustion_google(self, _topic: str, error_message: str, expected: bool) -> None:
         """Discriminate Google quota exhaustion from generic rate limiting."""
-        assert is_quota_exhaustion_google(error_message) == expected
+        assert _metadata(ProviderName.GOOGLE, error_message).is_quota_exhaustion == expected
 
     @pytest.mark.parametrize(
         ("_topic", "error_message", "status_code", "expected"),
@@ -150,7 +158,7 @@ class TestErrorClassification:
     )
     def test_is_quota_exhaustion_mistral(self, _topic: str, error_message: str, status_code: int, expected: bool) -> None:
         """Discriminate Mistral quota exhaustion from generic rate limiting."""
-        assert is_quota_exhaustion_mistral(error_message, status_code) == expected
+        assert _metadata(ProviderName.MISTRAL, error_message, status_code).is_quota_exhaustion == expected
 
     @pytest.mark.parametrize(
         ("_topic", "error_message", "expected"),
@@ -158,7 +166,7 @@ class TestErrorClassification:
     )
     def test_is_quota_exhaustion_aws(self, _topic: str, error_message: str, expected: bool) -> None:
         """Discriminate AWS quota exhaustion from generic throttling."""
-        assert is_quota_exhaustion_aws(error_message) == expected
+        assert _metadata(ProviderName.BEDROCK, error_message).is_quota_exhaustion == expected
 
     @pytest.mark.parametrize(
         ("_topic", "error_message", "status_code", "expected"),
@@ -166,4 +174,4 @@ class TestErrorClassification:
     )
     def test_is_quota_exhaustion_gateway(self, _topic: str, error_message: str, status_code: int, expected: bool) -> None:
         """Discriminate Gateway quota exhaustion from generic rate limiting."""
-        assert is_quota_exhaustion_gateway(error_message, status_code) == expected
+        assert _metadata(ProviderName.GATEWAY, error_message, status_code).is_quota_exhaustion == expected

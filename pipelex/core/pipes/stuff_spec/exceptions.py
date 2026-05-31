@@ -10,3 +10,7 @@ class StuffSpecError(PipelexError):
 
 class PipeInputsFactoryError(PipelexError):
     pass
+
+
+class StuffSpecFactoryError(PipelexError):
+    pass

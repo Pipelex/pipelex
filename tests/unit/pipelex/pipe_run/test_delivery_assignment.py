@@ -1,3 +1,6 @@
+import pytest
+from pydantic import ValidationError
+
 from pipelex.pipe_run.delivery_assignment import (
     DeliveryAssignment,
     DeliveryStatus,
@@ -64,3 +67,51 @@ class TestDeliveryAssignment:
     def test_delivery_status_values(self) -> None:
         assert DeliveryStatus.COMPLETED == "COMPLETED"
         assert DeliveryStatus.FAILED == "FAILED"
+
+    @pytest.mark.parametrize("reserved_key", ["pipeline_run_id", "status", "result_url", "error"])
+    def test_webhook_rejects_reserved_payload_key(self, reserved_key: str) -> None:
+        """Each Pipelex-owned key is rejected in a caller's static webhook payload."""
+        with pytest.raises(ValidationError) as exc_info:
+            WebhookTarget(url="https://example.com/callback", payload={reserved_key: "caller value"})
+        # Pin the validator's own ``reserved keys: [...]`` phrase. A bare
+        # ``match=reserved_key`` would pass via pydantic's echoed
+        # ``input_value={'<key>': ...}`` even if the validator never named the key.
+        assert f"reserved keys: ['{reserved_key}']" in str(exc_info.value)
+
+    def test_webhook_rejects_multiple_reserved_payload_keys(self) -> None:
+        """The validation error names every offending key, not just the first."""
+        with pytest.raises(ValidationError) as exc_info:
+            WebhookTarget(
+                url="https://example.com/callback",
+                payload={"status": "x", "error": "y", "harmless": "z"},
+            )
+        # The validator lists the colliding keys, sorted, in its own message —
+        # distinct from pydantic boilerplate and the echoed input, which contain
+        # the keys regardless of what the validator says.
+        assert "reserved keys: ['error', 'status']" in str(exc_info.value)
+
+    def test_webhook_accepts_clean_payload(self) -> None:
+        """A payload free of reserved keys passes validation untouched."""
+        webhook = WebhookTarget(
+            url="https://example.com/callback",
+            payload={"customer_id": "abc", "tier": "pro"},
+        )
+        assert webhook.payload == {"customer_id": "abc", "tier": "pro"}
+
+    def test_reserved_key_check_runs_only_at_construction(self) -> None:
+        """Mutating ``webhook.payload`` after construction does not re-trigger the reserved-key validator.
+
+        The model has no ``validate_assignment=True``, so post-construction
+        mutation bypasses ``_reject_reserved_keys``. ``_notify_webhook``'s
+        ``dict(webhook.payload)`` shallow-copies before override, so the wire
+        payload is safe today, but the contract is implicit. This pins the
+        construction-only behavior so a future ``validate_assignment=True``
+        toggle gets caught as a behavior change.
+        """
+        webhook = WebhookTarget(
+            url="https://example.com/callback",
+            payload={"customer_id": "abc"},
+        )
+        # Should not raise — validator runs only at construction.
+        webhook.payload["status"] = "post-construction-mutation"
+        assert webhook.payload["status"] == "post-construction-mutation"

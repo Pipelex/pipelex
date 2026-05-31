@@ -1,3 +1,5 @@
+from typing import Annotated, Literal
+
 import shortuuid
 from pydantic import Field, field_validator, model_validator
 
@@ -95,7 +97,7 @@ class ReportingConfig(ConfigModel):
     cost_report_dir_path: str
     cost_report_base_name: str
     cost_report_extension: str
-    cost_report_unit_scale: float
+    cost_report_unit_scale: Annotated[float, Field(gt=0)]
 
 
 class TracingBackend(StrEnum):
@@ -153,6 +155,10 @@ class PipelineExecutionConfig(ConfigModel):
     is_mock_inputs: bool
     is_generate_graph: bool
     graph_config: GraphConfig
+
+    # Bounded fan-out concurrency for PipeBatch (the resilience-without-Temporal pillar).
+    # An integer caps the number of branches executed at once; the literal "unbounded" disables the bound.
+    max_concurrency: Annotated[int, Field(ge=1)] | Literal["unbounded"]
 
     def with_graph_config_overrides(
         self,

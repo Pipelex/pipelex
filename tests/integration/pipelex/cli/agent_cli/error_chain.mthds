@@ -1,0 +1,12 @@
+
+
+domain = "agent_cli_error_chain"
+
+[pipe]
+[pipe.greet]
+type = "PipeLLM"
+description = "Minimal single-step LLM pipe used to exercise the worker-error delivery chain"
+output = "Text"
+prompt = """
+Say hello.
+"""

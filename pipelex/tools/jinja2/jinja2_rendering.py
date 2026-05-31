@@ -9,14 +9,14 @@ from jinja2.exceptions import (
 
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
-from pipelex.tools.jinja2.jinja2_environment import (
-    make_jinja2_env_from_registry,
-    make_jinja2_env_without_loader,
-)
-from pipelex.tools.jinja2.jinja2_errors import (
+from pipelex.tools.jinja2.exceptions import (
     Jinja2ContextError,
     Jinja2StuffError,
     Jinja2TemplateRenderError,
+)
+from pipelex.tools.jinja2.jinja2_environment import (
+    make_jinja2_env_from_registry,
+    make_jinja2_env_without_loader,
 )
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
 

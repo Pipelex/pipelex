@@ -15,7 +15,7 @@ with workflow.unsafe.imports_passed_through():
     from pipelex.hub import get_library_manager, get_report_delegate, set_current_library, teardown_current_library
     from pipelex.pipe_run.pipe_job import PipeJob
     from pipelex.runtime_bridge.primitives.hydration import hydrate_working_memory
-    from pipelex.temporal.log_temporal import workflow_log
+    from pipelex.temporal.log_temporal import WorkflowLog
     from pipelex.temporal.tprl.temporal_error import TemporalError
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
     from pipelex.temporal.tprl_pipe.act_flush_trace_events import FlushTraceEventsArg, act_flush_trace_events
@@ -30,6 +30,9 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
         self,
         workflow_arg: PipeJob,
     ) -> PipeOutput:
+        # Bound once per invocation: every record below carries this run's
+        # request_id (None when the run carries no inbound API request id).
+        workflow_log = WorkflowLog(request_id=workflow_arg.job_metadata.request_id)
         workflow_log.debug("Workflow start")
 
         pipe = workflow_arg.pipe
@@ -105,20 +108,19 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                         workflow_id=wf_workflow_id,
                         pipeline_run_id=pipeline_run_id,
                     )
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
+                    # Best-effort: per-workflow tracing setup must never fail the workflow — log and continue without it.
                     workflow_log.warning(f"Failed to set up per-workflow tracing, continuing without: {exc}")
                     # Clean up partially initialized resources before nulling (the finally block
                     # won't be able to clean up after we null these references)
                     if wf_graph_tracer_manager is not None and wf_tracer_key is not None:
                         try:
                             wf_graph_tracer_manager.close_tracer(wf_tracer_key)
-                        except Exception as tracer_exc:
+                        except Exception as tracer_exc:  # noqa: BLE001
+                            # Best-effort cleanup: closing a partially-initialized tracer must not mask the setup failure.
                             workflow_log.warning(f"Failed to close partially initialized tracer: {tracer_exc}")
                     if event_log is not None:
-                        try:
-                            event_log.close()
-                        except Exception:  # noqa: S110
-                            pass
+                        event_log.close()
                     get_report_delegate().clear_event_log(context_key=wf_workflow_id)
                     event_log = None
                     wf_graph_tracer_manager = None
@@ -142,7 +144,8 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                     graph_spec = wf_graph_tracer_manager.close_tracer(wf_tracer_key)
                     if graph_spec is not None and pipe_output is not None:
                         pipe_output.graph_spec = graph_spec
-                except Exception as tracer_exc:
+                except Exception as tracer_exc:  # noqa: BLE001
+                    # Best-effort: tracer close in the finally block must never fail the workflow — log and continue.
                     workflow_log.warning(f"Failed to close per-workflow tracer: {tracer_exc}")
 
             # Flush trace events and clean up event log
@@ -157,13 +160,11 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                             start_to_close_timeout=timedelta(seconds=30),
                             retry_policy=RetryPolicy(maximum_attempts=3),
                         )
-                    except Exception as flush_exc:
+                    except Exception as flush_exc:  # noqa: BLE001
+                        # Best-effort: trace-event flush in the finally block must never fail the workflow — log and continue.
                         workflow_log.warning(f"Failed to flush trace events: {flush_exc}")
 
-                try:
-                    event_log.close()
-                except Exception:  # noqa: S110
-                    pass
+                event_log.close()
 
                 # Clear stale event log state from the report delegate
                 if wf_tracer_key is not None:

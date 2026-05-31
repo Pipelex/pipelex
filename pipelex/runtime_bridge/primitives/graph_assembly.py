@@ -42,7 +42,9 @@ async def assemble_graph_for_pipeline_run(  # noqa: RUF029
             return graph_spec
         finally:
             event_log.close()
-    except Exception as exc:
-        # TODO: wip - do not catch all exceptions
+    except Exception as exc:  # noqa: BLE001
+        # Best-effort observability: graph assembly must never fail the pipeline run. Any
+        # backend / parse / assembly error degrades to None, which is why the host-runtime
+        # activity wrapping this primitive is deliberately left undecorated by the error boundary.
         log.warning(f"Graph assembly failed: {exc}")
         return None

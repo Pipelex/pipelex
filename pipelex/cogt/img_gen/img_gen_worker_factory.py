@@ -7,11 +7,6 @@ from pipelex.exceptions import MissingDependencyError
 from pipelex.hub import get_models_manager, get_plugin_manager
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.system.exceptions import CredentialsError
-
-
-class FalCredentialsError(CredentialsError):
-    pass
 
 
 class ImgGenWorkerFactory:

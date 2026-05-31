@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from temporalio import activity
 
 from pipelex.runtime_bridge.primitives.trace_flush import flush_trace_events_to_backend
+from pipelex.temporal.tprl.activity_error_boundary import convert_pipelex_errors
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pipelex.tracing.trace_events import TraceEvent
 
@@ -19,5 +20,6 @@ class FlushTraceEventsArg(BaseModel):
 
 
 @activity.defn(name="act_flush_trace_events")
+@convert_pipelex_errors
 async def act_flush_trace_events(arg: FlushTraceEventsArg) -> None:
     await flush_trace_events_to_backend(arg.events)

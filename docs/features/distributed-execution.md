@@ -9,7 +9,7 @@ Run your `.mthds` methods as durable Temporal workflows.
 
 ## Overview
 
-Pipelex pipelines normally run in-process. With the optional `pipelex[temporal]` integration, the same pipelines run as Temporal workflows: each pipe becomes a workflow, child pipes become child workflows, and every LLM call, image generation, or document extraction becomes an activity. Temporal handles durability, retries, scheduling, and visibility; Pipelex handles the AI work. Flip `[temporal] is_enabled = true` in `pipelex.toml` and the same methods run distributed without changing a line of method code.
+Pipelex pipelines normally run in-process. With the optional `pipelex[temporal]` integration, the same pipelines run as Temporal workflows: each pipe becomes a workflow, child pipes become child workflows, and every LLM call, image generation, or document extraction becomes an activity. Temporal handles durability, retries, scheduling, and visibility; Pipelex handles the AI work. Flip `[temporal] is_enabled = true` in `.pipelex/pipelex.toml` and the same methods run distributed without changing a line of method code.
 
 ## Supported deployment patterns
 
@@ -19,7 +19,7 @@ Pipelex pipelines normally run in-process. With the optional `pipelex[temporal]`
 
 ## Configuration
 
-All knobs live under `[temporal.*]` in `pipelex.toml`:
+All knobs live under `[temporal.*]` in `.pipelex/pipelex.toml`:
 
 - `[temporal.search_attributes]` — custom search attributes attached to every workflow start.
 - `[temporal.worker_config]` — default task queue, workflow and activity timeouts, baseline retry policy.

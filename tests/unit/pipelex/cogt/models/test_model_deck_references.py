@@ -56,8 +56,7 @@ class TestModelDeckReferences:
         known_handles.update(self._get_local_backend_models())
 
         # 2. Get gateway models from cached remote config
-        remote_config = RemoteConfigFetcher.fetch_remote_config()  # Uses cached version
-        gateway_specs = remote_config.backend_model_specs
+        gateway_specs = RemoteConfigFetcher.fetch_remote_config().config.backend_model_specs  # Uses cached version
 
         # Get default model_type from gateway defaults section (same pattern as local backends)
         gateway_defaults = gateway_specs.get("defaults", {})
@@ -94,7 +93,7 @@ class TestModelDeckReferences:
         known_handles: dict[str, ModelType] = {}
         backends_dir = config_manager.backends_dir_path
 
-        toml_files = find_files_in_dir(str(backends_dir), pattern="*.toml", is_recursive=False)
+        toml_files = find_files_in_dir(backends_dir, pattern="*.toml", is_recursive=False)
         for toml_path in toml_files:
             backend_data = load_toml_from_path_if_exists(str(toml_path))
             if backend_data:

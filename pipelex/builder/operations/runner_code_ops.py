@@ -25,7 +25,7 @@ async def build_runner_code_for_pipe(
         Generated Python runner code as a string.
 
     Raises:
-        MthdsDecodeError: If MTHDS content has TOML syntax errors.
+        PipelexInterpreterError: If MTHDS content fails to parse or validate.
         PipeValidationError: If pipe validation fails.
         DryRunError: If dry-running the pipes fails.
     """

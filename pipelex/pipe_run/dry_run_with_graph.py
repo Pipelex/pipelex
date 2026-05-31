@@ -75,6 +75,8 @@ async def dry_run_pipe_with_graph(
         return result
 
     except Exception:
-        # Clean up the tracer on error
+        # Error-path-only cleanup: close the tracer on any failure before re-raising, so a failed dry run
+        # never leaves a tracer open. Re-raises — never swallows. Not a `finally`: on the success path the
+        # tracer is closed above and its result consumed.
         manager.close_tracer(effective_graph_id)
         raise

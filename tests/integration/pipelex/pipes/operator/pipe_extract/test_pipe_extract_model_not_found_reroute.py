@@ -1,0 +1,84 @@
+from typing import Callable
+
+import pytest
+from pytest_mock import MockerFixture
+
+from pipelex.cogt.exceptions import ExtractJobFailureError, ExtractModelNotFoundError, InferenceErrorCategory
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_factory import PipeFactory
+from pipelex.core.stuffs.document_content import DocumentContent
+from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.hub import get_pipe_library, get_pipe_router
+from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
+from pipelex.pipe_operators.extract.pipe_extract import PipeExtract
+from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
+from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
+from pipelex.pipe_run.pipe_run_params import PipeRunMode
+from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.pipeline.job_metadata import JobMetadata
+
+
+@pytest.mark.asyncio(loop_scope="class")
+class TestPipeExtractModelNotFoundReroute:
+    async def test_extract_model_not_found_reroutes_to_model_availability_error(
+        self,
+        job_metadata: JobMetadata,
+        load_empty_library: Callable[[], None],
+        mocker: MockerFixture,
+    ) -> None:
+        """A provider 404 raised as ExtractModelNotFoundError from the content generator escapes the
+        extract operator's generic-error handling, reaches `except ModelNotFoundError` in
+        PipeOperator._live_run_pipe, and surfaces as PipeOperatorModelAvailabilityError.
+        """
+        load_empty_library()
+
+        not_found_error = ExtractModelNotFoundError(
+            message="Extract model 'extract-not-a-real-model' not found",
+            model_handle="extract-not-a-real-model",
+            error_category=InferenceErrorCategory.CONFIGURATION,
+            user_action=UserAction(kind=UserActionKind.CHANGE_MODEL, detail="pick an available model"),
+        )
+        fake_content_generator = mocker.MagicMock()
+        fake_content_generator.make_extract_pages = mocker.AsyncMock(side_effect=not_found_error)
+        mocker.patch("pipelex.pipe_operators.extract.pipe_extract.get_content_generator", return_value=fake_content_generator)
+
+        pipe = PipeFactory[PipeExtract].make_from_blueprint(
+            domain_code="generic",
+            pipe_code="adhoc_for_test_extract_model_not_found_reroute",
+            blueprint=PipeExtractBlueprint(
+                description="Extract model-not-found reroute test",
+                inputs={"source_doc": NativeConceptCode.DOCUMENT},
+                output="Page[]",
+            ),
+        )
+        get_pipe_library().add_new_pipe(pipe)
+
+        pipe_job = PipeJobFactory.make_pipe_job(
+            pipe=pipe,
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.LIVE),
+            job_metadata=job_metadata,
+            working_memory=WorkingMemoryFactory.make_from_single_stuff(
+                stuff=StuffFactory.make_stuff(
+                    concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.DOCUMENT),
+                    content=DocumentContent(url="https://example.com/doc.pdf"),
+                    name="source_doc",
+                ),
+            ),
+        )
+
+        with pytest.raises(PipeOperatorModelAvailabilityError) as exc_info:
+            await get_pipe_router().run(pipe_job=pipe_job)
+
+        availability_error = exc_info.value
+        assert availability_error.model_handle == "extract-not-a-real-model"
+        assert availability_error.fallback_list is None
+        assert availability_error.pipe_type == "PipeExtract"
+        assert availability_error.pipe_code == "adhoc_for_test_extract_model_not_found_reroute"
+        assert isinstance(availability_error.__cause__, ExtractModelNotFoundError)
+        # The reroute hinges on this: ExtractModelNotFoundError is a sibling of ExtractJobFailureError.
+        assert not isinstance(availability_error.__cause__, ExtractJobFailureError)
+        assert availability_error.__cause__.error_category is InferenceErrorCategory.CONFIGURATION
+        assert availability_error.__cause__.error_category.is_retryable is False

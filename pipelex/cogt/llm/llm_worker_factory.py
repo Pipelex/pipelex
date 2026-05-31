@@ -41,7 +41,6 @@ class LLMWorkerFactory:
                 )
             case "gateway_responses":
                 from pipelex.plugins.gateway.gateway_responses_factory import GatewayResponsesFactory  # noqa: PLC0415
-                from pipelex.plugins.openai.openai_responses_factory import OpenAIResponsesFactory  # noqa: PLC0415
                 from pipelex.plugins.openai.openai_responses_llm_worker import OpenAIResponsesLLMWorker  # noqa: PLC0415
 
                 sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(

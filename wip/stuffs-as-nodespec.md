@@ -2,7 +2,7 @@
 
 ## Why this exists
 
-When we promoted `description` and `domain_code` onto `NodeSpec` for pipes (see commits on `feature/Update-html-mthds-ui`), we deliberately stopped at pipes. Concepts have the same metadata (`domain_code`, `description`) and the same problem: today, the only way for a renderer to discover the domain or human description of a stuff's concept is to join with `GraphSpec.concept_registry` — and that registry is empty when `data_inclusion.pipe_and_concept_registry = False`.
+When we promoted `description` and `domain_code` onto `NodeSpec` for pipes, we deliberately stopped at pipes. Concepts have the same metadata (`domain_code`, `description`) and the same problem: today, the only way for a renderer to discover the domain or human description of a stuff's concept is to join with `GraphSpec.concept_registry` — and that registry is empty when `data_inclusion.pipe_and_concept_registry = False`.
 
 So the symmetric fix is to make stuffs self-describing in the graph, just like pipe nodes now are.
 
@@ -47,7 +47,7 @@ Not exhaustive — just the obvious ones to scope from before committing:
 - `pipelex/tracing/trace_events.py` — `PipeStartEvent.input_specs` rethink (events probably emit stuff-node ids instead of inline `IOSpec`).
 - Every renderer that today synthesizes stuff nodes at render time (mermaidflow, reactflow JS bundle, HTML).
 - All `GraphSpec` JSON fixtures under `tests/data/graphs/` — breaking change, will need regeneration.
-- The existing pipe-side `description` / `domain_code` work landed in this branch — confirm semantics stay consistent when extended to stuff kinds.
+- The existing pipe-side `description` / `domain_code` work has already landed — confirm semantics stay consistent when extended to stuff kinds.
 
 ## Open questions to settle before starting
 

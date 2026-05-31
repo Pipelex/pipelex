@@ -20,6 +20,9 @@ class AssembleGraphArg(BaseModel):
     main_pipe_code: str | None = None
 
 
+# Deliberately NOT decorated with @convert_pipelex_errors: this activity is best-effort
+# observability — it swallows every failure and degrades to None, so no error ever
+# crosses the boundary for the decorator to convert.
 @activity.defn(name="act_assemble_graph")
 async def act_assemble_graph(arg: AssembleGraphArg) -> GraphSpec | None:
     return await assemble_graph_for_pipeline_run(

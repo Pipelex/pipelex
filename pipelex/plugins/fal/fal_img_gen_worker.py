@@ -6,15 +6,17 @@ from fal_client.client import FalClientError, FalClientHTTPError, FalClientTimeo
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError, InferenceErrorCategory, SdkTypeError
+from pipelex.cogt.exceptions import ImgGenParameterError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
+from pipelex.cogt.inference.error_classification import extract_fal_metadata
+from pipelex.cogt.inference.error_classify import classify_inference_error
+from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.fal.fal_factory import FalFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.urls import URLs
 
 
 class FalImgGenWorker(ImgGenWorkerAbstract):
@@ -69,43 +71,16 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
                     log_index = len(event.logs)
 
             return await handler.get()
-        except MissingCredentialsError as exc:
-            msg = f"FAL API key not configured for model '{self.inference_model.desc}'"
-            raise ImgGenGenerationError(
-                msg,
-                error_category=InferenceErrorCategory.CONFIGURATION,
-                user_action="Check that the FAL_KEY environment variable is set",
+        except (MissingCredentialsError, FalClientHTTPError, FalClientTimeoutError, FalClientError) as exc:
+            metadata = extract_fal_metadata(exc)
+            classification = classify_inference_error(metadata)
+            raise render_inference_error(
+                metadata=metadata,
+                classification=classification,
+                family=InferenceErrorFamily.IMG_GEN,
+                model_desc=self.inference_model.desc,
+                model_handle=self.inference_model.name,
             ) from exc
-        except FalClientHTTPError as exc:
-            status_code = exc.status_code
-            if status_code == 402:
-                msg = f"FAL quota exhausted for model '{self.inference_model.desc}': {exc}"
-                raise ImgGenGenerationError(
-                    msg,
-                    error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=f"Your FAL account has exceeded its quota — check billing at {URLs.fal_billing}",
-                ) from exc
-            if status_code == 429:
-                msg = f"FAL rate limit exceeded for model '{self.inference_model.desc}': {exc}"
-                raise ImgGenGenerationError(
-                    msg,
-                    error_category=InferenceErrorCategory.TRANSIENT,
-                    user_action="Rate limited by FAL — the system will retry automatically",
-                ) from exc
-            if status_code in {401, 403}:
-                msg = f"FAL authentication error for model '{self.inference_model.desc}': {exc}"
-                raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from exc
-            if status_code == 400:
-                msg = f"FAL bad request for model '{self.inference_model.desc}': {exc}"
-                raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
-            msg = f"FAL API error ({status_code}) for model '{self.inference_model.desc}': {exc}"
-            raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
-        except FalClientTimeoutError as exc:
-            msg = f"FAL request timed out for model '{self.inference_model.desc}': {exc}"
-            raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
-        except FalClientError as exc:
-            msg = f"FAL error for model '{self.inference_model.desc}': {exc}"
-            raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
 
     @override
     async def _gen_image(

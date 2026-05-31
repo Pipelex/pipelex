@@ -1,20 +1,18 @@
 import base64
-
-import aiofiles
+from pathlib import Path
 
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
 from pipelex.tools.misc.file_utils import load_binary_async
 from pipelex.tools.misc.filetype_utils import FileType, detect_file_type_from_bytes
 
 
-async def load_binary_as_base64(path: str) -> str:
+async def load_binary_as_base64(path: Path) -> str:
     """Load a file and return its contents as a base64-encoded string."""
-    async with aiofiles.open(path, "rb") as fp:  # pyright: ignore[reportUnknownMemberType]
-        data_bytes = await fp.read()
-        return base64.b64encode(data_bytes).decode("ascii")
+    data_bytes = await load_binary_async(path=path)
+    return base64.b64encode(data_bytes).decode("ascii")
 
 
-async def make_base64_url_from_path(path: str) -> str:
+async def make_base64_url_from_path(path: Path) -> str:
     """Create a data: URL from a local file path."""
     raw_bytes = await load_binary_async(path=path)
     base64_data = base64.b64encode(raw_bytes).decode("ascii")

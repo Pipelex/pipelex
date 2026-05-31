@@ -8,12 +8,12 @@ from anthropic.types.image_block_param import ImageBlockParam
 from anthropic.types.message_param import MessageParam
 
 from pipelex.cogt.document.prompt_document_utils import prep_prompt_documents
-from pipelex.cogt.exceptions import CogtError
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
+from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicFactoryError
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.tools.aws.aws_config import BedrockAccessVariant
 from pipelex.tools.uri.prepared_file import PreparedFile, PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
@@ -25,10 +25,6 @@ if TYPE_CHECKING:
 
 if TYPE_CHECKING:
     from anthropic.types.text_block_param import TextBlockParam
-
-
-class AnthropicFactoryError(CogtError):
-    pass
 
 
 class AnthropicSdkVariant(StrEnum):
@@ -48,11 +44,16 @@ class AnthropicFactory:
             msg = f"Plugin '{plugin}' is not supported by AnthropicFactory"
             raise AnthropicFactoryError(msg) from exc
 
+        # Tier 1 transport retry: set the SDK client's retry budget explicitly from config
+        # instead of inheriting the silent SDK default (anthropic's own DEFAULT_MAX_RETRIES).
+        transport_max_retries = get_config().cogt.transport_max_retries
+
         match sdk_variant:
             case AnthropicSdkVariant.ANTHROPIC:
                 return AsyncAnthropic(
                     api_key=backend.api_key,
                     base_url=backend.endpoint,
+                    max_retries=transport_max_retries,
                 )
             case AnthropicSdkVariant.BEDROCK_ANTHROPIC:
                 aws_config = get_config().pipelex.aws_config
@@ -63,10 +64,12 @@ class AnthropicFactory:
                             aws_secret_key=aws_secret_access_key,
                             aws_access_key=aws_access_key_id,
                             aws_region=aws_region,
+                            max_retries=transport_max_retries,
                         )
                     case BedrockAccessVariant.BEDROCK_TOKEN:
                         return AsyncAnthropicBedrock(
                             api_key=aws_config.get_bedrock_token(),
+                            max_retries=transport_max_retries,
                         )
 
     @staticmethod

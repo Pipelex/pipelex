@@ -6,9 +6,11 @@ from pipelex.cogt.content_generation.extract_generate import extract_gen_pages_a
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.hub import get_storage_provider
+from pipelex.temporal.tprl.activity_error_boundary import convert_pipelex_errors
 
 
 @activity.defn
+@convert_pipelex_errors
 async def act_extract_gen_extract_pages(extract_assignment: ExtractAssignment) -> list[PageContent]:
     """Extract pages and store extracted images, returning lightweight PageContent references.
 

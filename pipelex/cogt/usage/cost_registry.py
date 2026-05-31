@@ -42,6 +42,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
         tokens_usages: Sequence[TokensUsage],
         unit_scale: float,
         cost_report_file_path: Path | None = None,
+        print_to_console: bool = True,
     ):
         if not tokens_usages:
             if pipeline_run_id != "untitled":
@@ -115,69 +116,70 @@ class CostRegistry(RootModel[CostRegistryRoot]):
             msg = "Empty report aggregation by model name"
             raise CostRegistryError(msg)
 
-        console = get_console()
-        title = f"Costs by model for pipeline '{pipeline_run_id}'"
-        table = Table(title=title, box=box.ROUNDED)
+        if print_to_console:
+            console = get_console()
+            title = f"Costs by model for pipeline '{pipeline_run_id}'"
+            table = Table(title=title, box=box.ROUNDED)
 
-        scale_str: str
-        if unit_scale == 1:
-            scale_str = ""
-        else:
-            scale_str = str(unit_scale)
-        # Add columns
-        table.add_column("Model", style="cyan", overflow="fold", width=30)
-        table.add_column("Type", style="dim cyan", width=8)
-        table.add_column("Input Cached", justify="right", style="green")
-        table.add_column("Input Non Cached", justify="right", style="green")
-        table.add_column("Input Joined", justify="right", style="green")
-        table.add_column("Output", justify="right", style="green")
-        table.add_column(f"Input Cached Cost ({scale_str}$)", justify="right", style="yellow")
-        table.add_column(f"Input Non Cached Cost ({scale_str}$)", justify="right", style="yellow")
-        table.add_column(f"Input Joined Cost ({scale_str}$)", justify="right", style="yellow")
-        table.add_column(f"Output Cost ({scale_str}$)", justify="right", style="yellow")
-        table.add_column(f"Total Cost ({scale_str}$)", justify="right", style="bold yellow")
+            scale_str: str
+            if unit_scale == 1:
+                scale_str = ""
+            else:
+                scale_str = str(unit_scale)
+            # Add columns
+            table.add_column("Model", style="cyan", overflow="fold", width=30)
+            table.add_column("Type", style="dim cyan", width=8)
+            table.add_column("Input Cached", justify="right", style="green")
+            table.add_column("Input Non Cached", justify="right", style="green")
+            table.add_column("Input Joined", justify="right", style="green")
+            table.add_column("Output", justify="right", style="green")
+            table.add_column(f"Input Cached Cost ({scale_str}$)", justify="right", style="yellow")
+            table.add_column(f"Input Non Cached Cost ({scale_str}$)", justify="right", style="yellow")
+            table.add_column(f"Input Joined Cost ({scale_str}$)", justify="right", style="yellow")
+            table.add_column(f"Output Cost ({scale_str}$)", justify="right", style="yellow")
+            table.add_column(f"Total Cost ({scale_str}$)", justify="right", style="bold yellow")
 
-        # Add rows for each model
-        for model_name, aggregated_data in grouped_by_model.items():
-            row_total_cost = cls.compute_total_cost(
-                input_non_cached_cost=aggregated_data[report_field.COST_INPUT_NON_CACHED],
-                input_cached_cost=aggregated_data[report_field.COST_INPUT_CACHED],
-                output_cost=aggregated_data[report_field.COST_OUTPUT],
-            )
+            # Add rows for each model
+            for model_name, aggregated_data in grouped_by_model.items():
+                row_total_cost = cls.compute_total_cost(
+                    input_non_cached_cost=aggregated_data[report_field.COST_INPUT_NON_CACHED],
+                    input_cached_cost=aggregated_data[report_field.COST_INPUT_CACHED],
+                    output_cost=aggregated_data[report_field.COST_OUTPUT],
+                )
+                table.add_row(
+                    model_name,
+                    model_types.get(model_name, "llm"),
+                    f"{int(aggregated_data[report_field.NB_TOKENS_INPUT_CACHED]):,}",
+                    f"{int(aggregated_data[report_field.NB_TOKENS_INPUT_NON_CACHED]):,}",
+                    f"{int(aggregated_data[report_field.NB_TOKENS_INPUT_JOINED]):,}",
+                    f"{int(aggregated_data[report_field.NB_TOKENS_OUTPUT]):,}",
+                    f"{aggregated_data[report_field.COST_INPUT_CACHED] / unit_scale:.4f}",
+                    f"{aggregated_data[report_field.COST_INPUT_NON_CACHED] / unit_scale:.4f}",
+                    f"{aggregated_data[report_field.COST_INPUT_JOINED] / unit_scale:.4f}",
+                    f"{aggregated_data[report_field.COST_OUTPUT] / unit_scale:.4f}",
+                    f"{row_total_cost / unit_scale:.4f}",
+                )
+
+            # add total row
+            footer_style = "bold"
             table.add_row(
-                model_name,
-                model_types.get(model_name, "llm"),
-                f"{int(aggregated_data[report_field.NB_TOKENS_INPUT_CACHED]):,}",
-                f"{int(aggregated_data[report_field.NB_TOKENS_INPUT_NON_CACHED]):,}",
-                f"{int(aggregated_data[report_field.NB_TOKENS_INPUT_JOINED]):,}",
-                f"{int(aggregated_data[report_field.NB_TOKENS_OUTPUT]):,}",
-                f"{aggregated_data[report_field.COST_INPUT_CACHED] / unit_scale:.4f}",
-                f"{aggregated_data[report_field.COST_INPUT_NON_CACHED] / unit_scale:.4f}",
-                f"{aggregated_data[report_field.COST_INPUT_JOINED] / unit_scale:.4f}",
-                f"{aggregated_data[report_field.COST_OUTPUT] / unit_scale:.4f}",
-                f"{row_total_cost / unit_scale:.4f}",
+                "Total",
+                "",
+                f"{total_nb_tokens_input_cached:,}",
+                f"{total_nb_tokens_input_non_cached:,}",
+                f"{total_nb_tokens_input_joined:,}",
+                f"{total_nb_tokens_output:,}",
+                f"{total_cost_input_cached / unit_scale:.4f}",
+                f"{total_cost_input_non_cached / unit_scale:.4f}",
+                f"{total_cost_input_joined / unit_scale:.4f}",
+                f"{total_cost_output / unit_scale:.4f}",
+                f"{total_cost / unit_scale:.4f}",
+                style=footer_style,
+                end_section=True,
             )
 
-        # add total row
-        footer_style = "bold"
-        table.add_row(
-            "Total",
-            "",
-            f"{total_nb_tokens_input_cached:,}",
-            f"{total_nb_tokens_input_non_cached:,}",
-            f"{total_nb_tokens_input_joined:,}",
-            f"{total_nb_tokens_output:,}",
-            f"{total_cost_input_cached / unit_scale:.4f}",
-            f"{total_cost_input_non_cached / unit_scale:.4f}",
-            f"{total_cost_input_joined / unit_scale:.4f}",
-            f"{total_cost_output / unit_scale:.4f}",
-            f"{total_cost / unit_scale:.4f}",
-            style=footer_style,
-            end_section=True,
-        )
-
-        console.print(table)
-        console.print(" [dim]Note: some costs might be missing or not up-to-date.[/dim]")
+            console.print(table)
+            console.print(" [dim]Note: some costs might be missing or not up-to-date.[/dim]")
 
         if cost_report_file_path:
             cls.save_to_csv(records, cost_report_file_path)

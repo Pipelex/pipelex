@@ -461,9 +461,20 @@ The same `.mthds` file runs from multiple execution targets:
 |--------|-----|
 | **CLI** | `pipelex run bundle method.mthds --inputs inputs.json` |
 | **Python** | `PipelexRunner().execute_pipeline(...)` |
+| **TypeScript / Node** | [`mthds`](https://www.npmjs.com/package/mthds) SDK calling a Pipelex API server |
 | **REST API** | Self-hosted API server |
 | **MCP** | Model Context Protocol — agents call methods as tools |
 | **n8n** | Pipelex node for workflow automation |
+
+## Use Pipelex from TypeScript
+
+For Node, Next.js, or any TypeScript app, call a Pipelex API server via the [`mthds`](https://www.npmjs.com/package/mthds) npm SDK (source: [`mthds-js`](https://github.com/mthds-ai/mthds-js)). Self-host the open-source [`pipelex-api`](https://github.com/Pipelex/pipelex-api) and point the SDK at your instance. A Pipelex-hosted runner at `api.pipelex.com` is also available in private beta — [join the waitlist](https://go.pipelex.com/waitlist).
+
+```bash
+npm install mthds
+```
+
+Fastest way to get started: fork the [`pipelex-starter-js`](https://github.com/Pipelex/pipelex-starter-js) template — a Next.js 16 + TypeScript app with three working demos (text entity extraction, PDF summary, image generation). Click *Use this template* on GitHub.
 
 
 # The MTHDS Ecosystem

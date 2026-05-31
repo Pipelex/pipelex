@@ -4,7 +4,7 @@ from pipelex.core.exceptions import PipesAndConceptValidationErrorData
 
 
 class LibraryError(PipelexError):
-    pass
+    _declared_title = "Library error"
 
 
 class LibraryLoadingError(LibraryError):
