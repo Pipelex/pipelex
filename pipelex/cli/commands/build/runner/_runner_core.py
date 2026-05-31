@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import typer
@@ -31,7 +30,8 @@ from pipelex.hub import (
 )
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION
-from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
+from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
@@ -41,6 +41,8 @@ from pipelex.tools.misc.file_utils import (
 )
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 
 COMMAND = "build"
@@ -105,9 +107,9 @@ async def _prepare_runner_core(
     if output_path:
         final_output_path = output_path
     else:
-        bundle_dir = Path(bundle_path).parent
+        bundle_dir = bundle_path.parent
         final_output_path = bundle_dir / f"run_{pipe_code}.py"
-    output_dir = Path(final_output_path).parent
+    output_dir = final_output_path.parent
 
     # Generate structures folder FIRST
     structures_output_dir = output_dir / "structures"
@@ -125,15 +127,15 @@ async def _prepare_runner_core(
 
     if structures_output_dir.exists():
         ClassRegistryUtils.register_classes_in_folder(
-            folder_path=str(structures_output_dir),
+            folder_path=structures_output_dir,
             base_class=StuffContent,
             is_recursive=True,
         )
     ClassRegistryUtils.register_classes_in_folder(
-        folder_path=str(output_dir),
+        folder_path=output_dir,
         base_class=StuffContent,
         is_recursive=True,
-        force_exclude_dirs=[str(structures_output_dir.resolve())] if structures_output_dir.exists() else None,
+        force_exclude_dirs=[structures_output_dir.resolve()] if structures_output_dir.exists() else None,
     )
     get_class_registry().register_classes(CoreRegistryModels.get_all_models())
 
@@ -148,7 +150,7 @@ async def _prepare_runner_core(
     if library_dirs:
         pipelex_library_dir = str(library_dirs[0].resolve())
     elif bundle_path:
-        pipelex_library_dir = str(Path(bundle_path).parent.resolve())
+        pipelex_library_dir = str(bundle_path.parent.resolve())
     else:
         pipelex_library_dir = None
 
@@ -160,8 +162,8 @@ async def _prepare_runner_core(
         raise typer.Exit(1) from exc
 
     try:
-        ensure_directory_for_file_path(file_path=str(final_output_path))
-        save_text_to_path(text=runner_code, path=str(final_output_path))
+        ensure_directory_for_file_path(file_path=final_output_path)
+        save_text_to_path(text=runner_code, path=final_output_path)
         typer.secho(f"Generated runner file: {final_output_path}", fg=typer.colors.GREEN)
     except Exception as exc:
         # CLI command boundary: any failure writing the file is reported to the user and exits via typer.Exit.

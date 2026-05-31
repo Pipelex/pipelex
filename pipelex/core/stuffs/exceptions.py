@@ -2,7 +2,7 @@ from pipelex.base_exceptions import PipelexError
 
 
 class StuffError(PipelexError):
-    pass
+    _declared_title = "Stuff error"
 
 
 class StuffFactoryError(StuffError):

@@ -18,7 +18,7 @@ def display_error_panel(
     *,
     title: str,
     fields: list[tuple[str, str]],          # (label, escaped value)
-    error_message: str,
+    error_message: str | None,              # None omits the error body line
     tip: str,
     links: list[tuple[str, str]],            # (label, url)
 ) -> None:
@@ -34,9 +34,9 @@ Each `handle_*` function constructs the field list and calls the helper; the exc
 `pipelex/cli/agent_cli/commands/agent_output.py` defines:
 
 - `CliOutputFormat` (`StrEnum`): `JSON`, `MARKDOWN`.
-- A module-level `ContextVar` (`_agent_cli_output_format`) with `set_agent_cli_output_format()` / `get_agent_cli_output_format()` — set once per invocation from the command's `--format` option, so every downstream `agent_success` / `agent_error` call inherits it without threading the format argument through.
-- `agent_error(message, error_type, cause, **extra)` — dispatches on the active format: JSON to stderr via `_agent_error_json`, or markdown to stderr via `agent_error_markdown`. Both `raise typer.Exit(1) from cause`.
-- `agent_success(result)` — JSON or markdown to stdout, same dispatch.
+- A module-level `ContextVar` (`_agent_cli_error_format`, default `JSON`) with `set_agent_cli_error_format()` / `get_agent_cli_error_format()` — backs the **error** stream only. Each `--format`-aware command sets it at entry via `set_agent_cli_error_format(error_format or output_format)`, so every downstream `agent_error()` call honors it without threading the format through — including error sites that never see the Typer option (factory init failures in `agent_cli_factory.py`, the unknown-command handler, app-callback validation). The **success** stream is threaded explicitly via an `output_format` argument, not the ContextVar.
+- `agent_error(message, error_type, cause, **extra)` — dispatches on the active error format (the `_agent_cli_error_format` ContextVar): JSON to stderr via `_agent_error_json`, or markdown to stderr via `agent_error_markdown`. Both `raise typer.Exit(1) from cause`.
+- `agent_success(result)` — JSON success envelope to stdout (also drains any pending setup warnings into a `warnings` array). `agent_success_formatted(result, markdown_renderer, output_format)` wraps it for `--format`-aware commands: JSON via `agent_success`, or markdown via `markdown_renderer(result)`, dispatched on the explicit `output_format` argument.
 - `extract_validation_errors(exc: ValidateBundleError)` — flattens blueprint / factory / validation / instantiation errors into a list per-category. This is the most structured error delivery in the codebase and remains the reference shape.
 
 The JSON error payload:
@@ -62,7 +62,7 @@ The JSON error payload:
 
 ### Agent CLI — format coverage
 
-`--format markdown|json` is wired on `run`, `validate`, `init`, `models`, `doctor`, and `check-model`, with **markdown as the default**. The error path inherits the same option via the `ContextVar`. `inputs` / `concept` / `pipe` / `fmt` / `lint` stay JSON-only. The contract is documented in `pipelex/cli/agent_cli/CLAUDE.md`.
+`--format markdown|json` (success, stdout) is wired on `run`, `validate`, `init`, `models`, `doctor`, and `check-model`, with **markdown as the default**. A companion `--error-format markdown|json` (errors, stderr) is accepted by the same commands and, when omitted, inherits `--format`'s value — it is the option backed by the `_agent_cli_error_format` ContextVar. `inputs` / `concept` / `pipe` / `fmt` / `lint` / `accept-gateway-terms` have neither and stay JSON / raw passthrough. The contract is documented in `pipelex/cli/agent_cli/CLAUDE.md`.
 
 `InferenceSetupRequiredError` is a markdown-by-default special case independent of `--format`: it renders setup-guidance to stdout with exit 0 (used by agent skills on first run).
 
@@ -90,7 +90,7 @@ The library stays HTTP-agnostic — no web-framework import, only the mapping ta
 
 Delivery itself is landed — the Rich handlers and the agent JSON/markdown path faithfully consume `to_error_report()`. The Temporal hole in that data source is now closed: the submitter-side recovery (`recover_error_report` → `WorkflowExecutionError(error_report=...)`, owned by [track-temporal-integration.md](track-temporal-integration.md)) rebuilds the structured report from `ApplicationError.details`, so a worker-side failure now reaches delivery with the same `error_category` / `retryable` / `model` / `provider` / `user_action` classification as a local run. The fix lived entirely in the Temporal bridge — delivery and `pipelex/cli/agent_cli/` stay Temporal-agnostic.
 
-The recovered report is carried on `WorkflowExecutionError` as an optional attribute, with a `to_error_report()` override — option (a) from the eng review (2026-05-17). Option (b) (a `RemotePipelexError` carrier in the `__cause__` chain) was rejected: (a) keeps `raise WorkflowExecutionError(msg) from exc` so the Temporal `WorkflowFailureError` stays in the traceback for free, and the override mirrors the 3-line pattern `PipelineExecutionError.to_error_report()` already uses.
+The recovered report is carried on `WorkflowExecutionError` as an optional attribute, with a `to_error_report()` override — option (a) from the eng review. Option (b) (a `RemotePipelexError` carrier in the `__cause__` chain) was rejected: (a) keeps `raise WorkflowExecutionError(msg) from exc` so the Temporal `WorkflowFailureError` stays in the traceback for free, and the override mirrors the 3-line pattern `PipelineExecutionError.to_error_report()` already uses.
 
 The remaining delivery-adjacent work is the metadata migration tracked in [track-metadata-model.md](track-metadata-model.md): while delivery reads `to_error_report()` first, several `PipelexError` subclasses still depend on the fallback dicts because they carry no class-level `error_domain` / `user_action`.
 

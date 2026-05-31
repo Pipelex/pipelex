@@ -27,8 +27,8 @@ def _get_next_output_folder() -> Path:
 
     Creates folders like: temp/test_outputs/mermaid_from_json/run_01, run_02, etc.
     """
-    base_dir = str(Path(TEST_OUTPUTS_DIR) / "mermaid_from_json")
-    return Path(get_incremental_directory_path(base_dir, "run"))
+    base_dir = Path(TEST_OUTPUTS_DIR) / "mermaid_from_json"
+    return get_incremental_directory_path(base_dir, "run")
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -60,7 +60,7 @@ class TestMermaidFromJson:
         json_path = Path(graph_json_path)
         assert json_path.exists(), f"Graph JSON file not found: {json_path}"
 
-        json_str = load_text_from_path(str(json_path))
+        json_str = load_text_from_path(json_path)
         graph_spec = GraphSpec.model_validate_json(json_str)
 
         # Verify graph loaded correctly
@@ -119,7 +119,7 @@ class TestMermaidFromJson:
         """Test that mermaidflow Mermaid combines orchestration and dataflow elements."""
         _ = topic  # Used for test identification
 
-        json_str = load_text_from_path(graph_json_path)
+        json_str = load_text_from_path(Path(graph_json_path))
         graph_spec = GraphSpec.model_validate_json(json_str)
         graph_config = self._get_graph_config_with_data()
         mermaidflow = MermaidflowFactory.make_from_graphspec(graph_spec, graph_config)

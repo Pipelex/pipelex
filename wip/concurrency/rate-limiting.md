@@ -38,10 +38,10 @@ The trap to avoid: building one in-memory limiter and assuming it protects both 
 
 Inspected `pipelex/temporal/config_temporal.py`. The Temporal-side rate-limit knobs are already built and configurable — Temomral mode is a *configuration* story, not a build:
 
-- **`QueueOptions.max_task_queue_activities_per_second`** (`config_temporal.py:273`) — the **cluster-wide** task-queue rate limit. Its own comment: *"Cluster-wide queue rate limit, conveyed to the Temporal server by every worker on this queue."* Server-enforced across all workers — exactly the RPM cap.
-- **`WorkerRuntimeProfile.max_concurrent_activities`** (`config_temporal.py:332`) — per-worker concurrency ceiling.
-- **`WorkerRuntimeProfile.max_activities_per_second`** (`config_temporal.py:336`) — per-worker activity rate limit.
-- **`ActivityRouteConfig`** (`config_temporal.py:287`) with `by_handle` — routes `llm_handle` / `img_gen_handle` / `extract_handle` to dedicated task queues. So **per-provider keying already exists on the Temporal side**: give each provider its own queue, set that queue's `max_task_queue_activities_per_second`.
+- **`QueueOptions.max_task_queue_activities_per_second`** (`config_temporal.py:281`) — the **cluster-wide** task-queue rate limit. Its own comment: *"Cluster-wide queue rate limit, conveyed to the Temporal server by every worker on this queue."* Server-enforced across all workers — exactly the RPM cap.
+- **`WorkerRuntimeProfile.max_concurrent_activities`** (`config_temporal.py:340`) — per-worker concurrency ceiling.
+- **`WorkerRuntimeProfile.max_activities_per_second`** (`config_temporal.py:344`) — per-worker activity rate limit.
+- **`ActivityRouteConfig`** (`config_temporal.py:295`) with `by_handle` — routes `llm_handle` / `img_gen_handle` / `extract_handle` to dedicated task queues. So **per-provider keying already exists on the Temporal side**: give each provider its own queue, set that queue's `max_task_queue_activities_per_second`.
 
 Consequence: the Temporal half needs only sane default values and documentation, not new code. **The actual build is purely the direct-mode gate.**
 

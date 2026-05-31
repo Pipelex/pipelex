@@ -19,8 +19,8 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_native_concept
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
-from pipelex.pipe_operators.llm.template_image_analyzer import WithImagesFilterError
-from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateRenderError
+from pipelex.pipe_operators.shared.exceptions import WithImagesFilterError
+from pipelex.tools.jinja2.exceptions import Jinja2TemplateRenderError
 from tests.cases import ImageTestCases
 
 

@@ -33,13 +33,9 @@ from pipelex.tools.misc.dict_utils import (
 )
 from pipelex.tools.misc.placeholder import value_is_placeholder
 from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_from_path_if_exists
+from pipelex.tools.secrets.exceptions import UnknownVarPrefixError, VarFallbackPatternError, VarNotFoundError
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
-from pipelex.tools.secrets.secrets_utils import (
-    UnknownVarPrefixError,
-    VarFallbackPatternError,
-    VarNotFoundError,
-    substitute_vars,
-)
+from pipelex.tools.secrets.secrets_utils import substitute_vars
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.types import Self
 

@@ -1,5 +1,6 @@
 import sys
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Optional
@@ -492,6 +493,11 @@ def get_current_library() -> str:
     return library_id
 
 
+def get_current_library_id_or_none() -> str | None:
+    """Return the current library_id, or ``None`` if none is set."""
+    return _library_id.get()
+
+
 def get_default_library_dirs() -> list[Path] | None:
     return get_pipelex_hub().get_default_library_dirs()
 
@@ -499,6 +505,24 @@ def get_default_library_dirs() -> list[Path] | None:
 def teardown_current_library() -> None:
     """Teardown the library_id for the current async context."""
     _library_id.set(None)
+
+
+@contextmanager
+def scoped_current_library(library_id: str) -> Iterator[None]:
+    """Set ``library_id`` for the scope, then restore the prior value on exit.
+
+    Captures the prior ``_library_id`` ContextVar value before setting the new
+    one. On exit — success or exception — restores the prior value (or clears
+    the var if there wasn't one). Use this whenever a function temporarily
+    needs a current library for a nested operation without clobbering an
+    outer caller's library_id.
+    """
+    prev = _library_id.get()
+    _library_id.set(library_id)
+    try:
+        yield
+    finally:
+        _library_id.set(prev)
 
 
 def resolve_library_dirs(library_dirs: Sequence[str | Path] | None = None) -> tuple[list[Path], str]:

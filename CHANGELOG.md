@@ -1,5 +1,39 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`PipelexError.title()` and `PipelexError.type_uri()` — every error class now exposes a human-readable title and a stable RFC 7807 `type` URI.** Both auto-derive from the class name; a subclass overrides them only when the derived value is wrong by declaring `_declared_title` / `_declared_type_uri`. `type_uri()` is a pure function resolving to `https://docs.pipelex.com/latest/errors/<kebab-class-name>/`. Every `ErrorReport` now carries `title` and `type_uri` as populated fields, so consumers (CLI, API, SDKs) read `report.title` / `report.type_uri` directly instead of humanizing class names themselves.
+
+- **`ErrorReport.to_problem_document()` and `DisclosureMode` for rendering errors on external surfaces.** `to_problem_document(*, instance=None, request_id=None, disclosure_mode=VERBOSE)` returns an RFC 7807 `application/problem+json` dict (`type`, `title`, `status`, `detail`, `instance`, plus Pipelex classification fields as extension members) with no web-framework dependency. `to_dict(disclosure_mode=...)` projects the same report: `STRICT` drops `provider` / `model` unconditionally and projects `provider_metadata` through a curated subset (only `status_code` and `retry_after_seconds` — actionable HTTP client hints, not provider attribution), then redacts the `message` by *provenance* — a report whose error class authored caller-facing copy (`PipelexInterpreterError`, `ValidateBundleError`) keeps its `message` and `user_action`, while every other report has `message` replaced with a generic placeholder and `user_action` dropped, keeping only the stable identifiers. The keep/redact decision uses a per-class `caller_facing_message` flag rather than `error_domain` (which is inherited up the `__cause__` chain and so cannot distinguish a wrapper's own message from an inherited classification).
+
+- **Per-class error documentation pages.** Every `PipelexError` subclass gets a generated reference page under `docs/errors/`, surfaced in the docs site as "Error Reference" — so a `type_uri` dereferences straight to a populated page. The new `pipelex-dev generate-error-pages` command regenerates them; pages a maintainer claims with a `<!-- pipelex:authored -->` marker are preserved across runs. The generator's discovery walks every `exceptions.py` / `*_exceptions.py` module the Phase 6 filename convention enforces — including modules whose home file is only reached via a deferred import path (plugin worker / factory chains for anthropic, bedrock, gateway, google, mistral, openai/vertex, azure, portkey, plus standalone classes like `FalCredentialsError`, `GraphSpecError`, `PipeBatchFactoryError`, `PyPdfium2RendererError`, `ConceptSpecError`). No manifest to maintain; adding a new error class is one step.
+
+- **`request_id` on `JobMetadata`.** An optional caller-supplied request id, threaded through every activity / workflow / submitter hop and into the Temporal log context. Set it at dispatch with `pipeline_run_setup(..., request_id="...")` and read it back off `job_metadata.request_id`.
+
+- **Failed runs now carry a structured error on the delivery webhook.** When a pipeline run fails, the webhook payload includes an `error` object — the full `ErrorReport` as a dict — so receivers can rehydrate it with `ErrorReport.from_dict(...)`, render an RFC 7807 response, or route on `error_domain` / `retryable`. Applies to both Temporal and direct execution modes. A `WebhookTarget.payload` that declares a Pipelex-owned key (`pipeline_run_id` / `status` / `result_url` / `error`) is now rejected at construction time, so a caller's static payload key can no longer silently shift meaning with delivery status.
+
+- **`--traceback` CLI flag for full stack traces.** By default CLI commands print a friendly one-line error; passing `--traceback` also prints the Rich-rendered stack trace before that message, for debugging. The flag is intercepted in `PipelexCLI.make_context` (mirroring `--no-logo`), so it is position-agnostic — it works both before and after the subcommand (`pipelex run --traceback pipe ...` and `pipelex run pipe ... --traceback`) without changing any command signature.
+
+### Changed
+
+- **Filesystem path helpers in `pipelex.tools.misc.file_utils` and `pipelex.tools.misc.json_utils` now take and return `pathlib.Path` instead of `str`.** Helpers such as `save_text_to_path`, `load_text_from_path`, `load_binary` / `load_binary_async`, `load_json_from_path` / `load_json_dict_from_path` / `load_json_list_from_path`, `save_as_json_to_path`, `copy_file`, `remove_file` / `remove_folder`, `ensure_directory_exists` / `ensure_directory_for_file_path`, and `get_incremental_directory_path` / `get_incremental_file_path` now operate on `Path`. Path handling is `Path`-based throughout `pipelex/`, converting to/from `str` only at boundaries (CLI arguments, environment variables, JSON/TOML serialization). Callers passing bare strings must now wrap them with `Path(...)`.
+
+- **`ErrorReport` is now a frozen Pydantic `BaseModel`** (previously a frozen Pydantic dataclass). It is still immutable and still round-trips through `to_dict()` / `from_dict()`, but an attempted mutation now raises `pydantic.ValidationError` instead of `dataclasses.FrozenInstanceError`.
+
+- **`recover_error_report()` is now a total function.** It returns an `ErrorReport` rather than `ErrorReport | None`: when a Temporal failure carries no embedded report — or its payload fails to rehydrate — it synthesizes one from the new `UnrecoverableWorkflowFailureError`, surfacing the deepest worker-side cause message. Callers no longer branch on `None`.
+
+### Fixed
+
+- **`InputStuffSpecsFactoryError` was shadowed by a duplicate class definition.** `pipelex/core/pipes/inputs/input_stuff_specs_factory.py` declared a local class with the same name as the canonical one in the package's `exceptions.py`, leaving two distinct class objects in play so an `except` on one would miss the other. Consolidated to the single canonical class.
+
+## [v0.30.3] - 2026-05-28
+
+### Added
+
+- **`claude-4.8-opus` model** added to the `anthropic` and `bedrock` backends. Adaptive thinking mode, supports text / images / pdf in and structured outputs, `max_prompt_images = 100`, `max_tokens = 128000`, costs `{ input = 5.0, output = 25.0 }` per million tokens. Carries the `temperature_unsupported` constraint like `claude-4.7-opus`. Also available via the Pipelex Gateway.
+
 ## [v0.30.2] - 2026-05-26
 
 ### Changed

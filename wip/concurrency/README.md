@@ -1,10 +1,10 @@
 # Concurrency & batching — design doc
 
-Status: **design scoping**. Exactly one change is a genuine quick win (retry jitter, below). The three larger pieces of design work are split into their own docs — [`fan-out-scheduling.md`](fan-out-scheduling.md), [`rate-limiting.md`](rate-limiting.md), and [`batch-partial-failure.md`](batch-partial-failure.md).
+Status: **design scoping**. The one quick win this doc identified — retry jitter — has since shipped (see below). What remains is three larger pieces of design work, split into their own docs — [`fan-out-scheduling.md`](fan-out-scheduling.md), [`rate-limiting.md`](rate-limiting.md), and [`batch-partial-failure.md`](batch-partial-failure.md).
 
 ## Context & scope
 
-The resilience strategy is settled: **Temporal is the resilience system.** We deliberately decided *not* to build a cheap resilience system in direct mode (see `TODOS.md` and `wip/error-handling/`).
+The resilience strategy is settled: **Temporal is the resilience system.** We deliberately decided *not* to build a cheap resilience system in direct mode — resilience is the error-handling track's job (see [`../error-handling/`](../error-handling/)).
 
 The open problem is narrower: the direct-mode batching/asyncio system breaks too easily. The driving question: *what is a best-practice basic backpressure / rate-limiting system at the asyncio layer, so the system does not crash when asked to process e.g. 1000 documents?*
 
@@ -50,9 +50,9 @@ Three distinct weaknesses, and they compound under load. Code inspected: `pipele
 
 ### 3. Concurrency ≠ rate — and rate is what providers enforce
 
-Providers rate-limit on **requests-per-minute (RPM)** and **tokens-per-minute (TPM)**, not on concurrency. 8 concurrent calls each finishing in ~200ms = ~40 RPS = ~2400 RPM, which blows a 500-RPM tier instantly. The result is a 429 storm; `transport_retry` then re-fires that storm, and because the exponential backoff has no jitter, the retries re-synchronize into a thundering herd.
+Providers rate-limit on **requests-per-minute (RPM)** and **tokens-per-minute (TPM)**, not on concurrency. 8 concurrent calls each finishing in ~200ms = ~40 RPS = ~2400 RPM, which blows a 500-RPM tier instantly. The result is a 429 storm; `transport_retry` then re-fires that storm. The backoff used to be jitter-free, so retries re-synchronized into a thundering herd — that part is now fixed (full jitter shipped, see below), but the underlying RPM/TPM overrun that triggers the storm remains.
 
-Only the retry-jitter gap is a true quick win (below). Weakness 1 looked like one but is not — fixing it correctly carries a design decision, so it has its own doc, [`fan-out-scheduling.md`](fan-out-scheduling.md). Weaknesses 2 + 3 are the hard part — a real rate limiter — covered in [`rate-limiting.md`](rate-limiting.md).
+The retry-jitter gap was the one true quick win and has since shipped (below). Weakness 1 looked like one but is not — fixing it correctly carries a design decision, so it has its own doc, [`fan-out-scheduling.md`](fan-out-scheduling.md). Weaknesses 2 + 3 are the hard part — a real rate limiter — covered in [`rate-limiting.md`](rate-limiting.md).
 
 ## Where `max_concurrency` lives today
 
@@ -69,13 +69,11 @@ This is the mechanism behind weakness 2: a global *number* applied per-batch is 
 
 **Design option — make it per-`PipeBatch`.** An optional `max_concurrency` field could be added to `BatchParams` (the per-`PipeBatch` object parsed from `.mthds`), falling back to the global config. This is a *fan-out shape* knob — useful, but it does not fix weakness 2, since shape knobs still multiply under nesting. It carries one Temporal advantage worth noting: a value on `BatchParams` is part of the fixed pipe blueprint / workflow input, so it replays deterministically — strictly safer than `PipeBatch` reading global config inside workflow code, which `wf_pipe_run.py` already warns against for "config-derived" values that "change across deploys". Tracked as an open question — see [`rate-limiting.md`](rate-limiting.md).
 
-## The one quick win — retry jitter
+## Shipped — retry jitter
 
-`wait_exponential` in `transport_retry.py` is jitter-free; under a 429 storm every retry re-fires in lockstep. Switch to `wait_random_exponential` (full jitter).
+`transport_retry.py` now uses full-jitter `wait_random_exponential` (`transport_retry.py:46`); it was previously jitter-free `wait_exponential`, so under a 429 storm every retry re-fired in lockstep. With full jitter each wait is drawn from `uniform(0, exponential_bound)`, breaking the lockstep.
 
-**Direct vs Temporal:** `transport_retry` runs inside the activity in both modes — jitter is fine there (non-determinism allowed in activities). Pre-existing nuance, not worsened by this change: under Temporal there are already two retry layers — `tenacity` inside the activity and Temporal's activity `RetryPolicy` outside it. Whether the activity should fail faster and let `RetryPolicy` own retries is a separate, existing design question.
-
-Effort: tiny — a one-line change. This is the only genuinely isolated change here; everything else carries a design decision and is covered below.
+**Direct vs Temporal:** `transport_retry` runs inside the activity in both modes — jitter is fine there (non-determinism allowed in activities). Pre-existing nuance, unaffected by this change: under Temporal there are already two retry layers — `tenacity` inside the activity and Temporal's activity `RetryPolicy` outside it. Whether the activity should fail faster and let `RetryPolicy` own retries is a separate, existing design question.
 
 ## Larger design work — separate docs
 
@@ -99,9 +97,9 @@ Weaknesses 2 + 3 — a per-`PipeBatch` (not global) bound, and the absence of an
 | --- | --- |
 | `PipeBatch` | Fan-out *shape* — how work is split (scheduling redesign in `fan-out-scheduling.md`) |
 | Inference rate/concurrency gate | The actual backpressure — see `rate-limiting.md` |
-| `transport_retry` | Residual 429/5xx — the retry-jitter quick win adds full jitter |
+| `transport_retry` | Residual 429/5xx — full jitter (`wait_random_exponential`) shipped |
 | Temporal | Durability — out of scope here |
 
 ## Suggested next step
 
-Land the retry-jitter quick win — it is the only self-contained change. Then take up the three design docs as design sessions: [`fan-out-scheduling.md`](fan-out-scheduling.md) and [`batch-partial-failure.md`](batch-partial-failure.md) are coupled through the failure-handling policy and are best taken together (or in that order); [`rate-limiting.md`](rate-limiting.md) is independent of both.
+The retry-jitter quick win has shipped. Take up the three design docs as design sessions: [`fan-out-scheduling.md`](fan-out-scheduling.md) and [`batch-partial-failure.md`](batch-partial-failure.md) are coupled through the failure-handling policy and are best taken together (or in that order); [`rate-limiting.md`](rate-limiting.md) is independent of both.

@@ -34,8 +34,8 @@ from pipelex.pipelex import Pipelex
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
+from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.package_utils import get_package_version
-from pipelex.tools.misc.toml_utils import TomlError
 
 if TYPE_CHECKING:
     from pipelex.cogt.models.model_manager import ModelManager

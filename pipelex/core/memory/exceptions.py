@@ -1,5 +1,5 @@
 from pipelex.base_exceptions import PipelexError
-from pipelex.tools.misc.context_provider_abstract import ContextProviderError
+from pipelex.tools.misc.exceptions import ContextProviderError
 
 
 class WorkingMemoryFactoryError(PipelexError):

@@ -7,8 +7,9 @@ Main Functions:
 - generate_runner_code(pipe): Generate complete executable Python script
 """
 
-from dataclasses import dataclass
 from typing import Any
+
+from pydantic import BaseModel, ConfigDict
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_representation_generator import (
@@ -23,9 +24,10 @@ from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 
 
-@dataclass
-class CustomClassInfo:
+class CustomClassInfo(BaseModel):
     """Information about a custom structure class for import generation."""
+
+    model_config = ConfigDict(frozen=True)
 
     class_name: str
     domain_code: str

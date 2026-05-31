@@ -40,6 +40,12 @@
    # Zero output on success; full output on failure.
    ```
 
+### When `make agent-test` hangs or fails opaquely
+
+   Use **`make agent-test-debug`** (alias: `make atd`). Same suite, but with stale-process cleanup upfront, an outer wall-clock `timeout` so fixture-teardown hangs and xdist worker-replace loops can't run forever, direct file redirect for live progress (`tail -f /tmp/pytest-agent-test-debug.log`), and `-v` so each test name lands in the log as it runs. On failure or timeout it prints the failed tests, the log path, and a grep hint.
+
+   For the full debugging methodology — clean-state protocol, when to bail to the user, how to grep failures by error class name, when xdist failures are flakes vs real bugs — see [`docs/agents/debugging-hanging-pytest-runs.md`](docs/agents/debugging-hanging-pytest-runs.md).
+
 ### Running Tests with Prints
 
    > **LOCAL ONLY**: The commands below are meant for a human developer running on their local machine. If you are an AI agent (Claude Code, Cursor, Codex, or any other agent running in the cloud or in a sandboxed environment), **do NOT use these commands**. Use `make agent-test` instead.

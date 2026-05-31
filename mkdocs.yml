@@ -342,6 +342,24 @@ extra_css:
   - stylesheets/mermaid.css
   - stylesheets/general.css
 
+# Pages intentionally excluded from the user-facing nav.
+#
+# - `CLAUDE.md` is a docs-authoring guide for contributors, not a published page.
+# - `errors/*.md` are generated reference stubs (one per PipelexError subclass) reached
+#   via the RFC 7807 `type` URI carried on every ErrorReport. They are not part of any
+#   guided navigation flow — the landing page `errors/index.md` is the only nav entry,
+#   and the individual per-class pages live as orphan pages whose existence is declared
+#   here so `mkdocs build --strict` does not flag them as accidentally unlisted.
+# - `agents/*.md` are AI-agent-facing playbooks (debugging workflows, environment
+#   gotchas) referenced from the root `CLAUDE.md`. They are built and searchable but
+#   intentionally kept out of the user-facing nav so they don't clutter the reading
+#   flow for human readers of the docs site.
+not_in_nav: |
+  CLAUDE.md
+  errors/*.md
+  !errors/index.md
+  agents/*.md
+
 nav:
   - Get Started:
     - Build & Run AI Methods: index.md
@@ -486,6 +504,7 @@ nav:
       - Observer Data Extraction: analytics/data-extraction.md
     - Telemetry: setup/telemetry.md
     - Gateway Available Models: setup/gateway-models.md
+    - Error Reference: errors/index.md
   - Advanced:
     - Advanced Customizations:
       - Overview: advanced/index.md

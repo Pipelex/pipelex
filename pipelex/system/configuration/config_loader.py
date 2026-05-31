@@ -119,22 +119,22 @@ class ConfigLoader:
     @property
     def backends_file_path(self) -> Path:
         """Resolve backends.toml from project dir or global dir."""
-        return self.resolve_config_file(str(Path(INFERENCE_DIR_NAME) / BACKENDS_FILE_NAME))
+        return self.resolve_config_file(f"{INFERENCE_DIR_NAME}/{BACKENDS_FILE_NAME}")
 
     @property
     def backends_dir_path(self) -> Path:
         """Resolve backends/ directory from project dir or global dir."""
-        return self.resolve_config_file(str(Path(INFERENCE_DIR_NAME) / BACKENDS_DIR_NAME))
+        return self.resolve_config_file(f"{INFERENCE_DIR_NAME}/{BACKENDS_DIR_NAME}")
 
     @property
     def routing_profiles_file_path(self) -> Path:
         """Resolve routing_profiles.toml from project dir or global dir."""
-        return self.resolve_config_file(str(Path(INFERENCE_DIR_NAME) / ROUTING_PROFILES_FILE_NAME))
+        return self.resolve_config_file(f"{INFERENCE_DIR_NAME}/{ROUTING_PROFILES_FILE_NAME}")
 
     @property
     def model_decks_dir_path(self) -> Path:
         """Resolve model decks directory from project dir or global dir."""
-        return self.resolve_config_file(str(Path(INFERENCE_DIR_NAME) / MODEL_DECKS_DIR_NAME))
+        return self.resolve_config_file(f"{INFERENCE_DIR_NAME}/{MODEL_DECKS_DIR_NAME}")
 
     def ensure_global_config_exists(self) -> None:
         """Create the global ~/.pipelex/ directory with kit template files if it doesn't exist."""

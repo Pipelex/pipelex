@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from pipelex.base_exceptions import ErrorDomain, ErrorReport, error_domain_to_http_status
+from pipelex.base_exceptions import ErrorDomain, error_domain_to_http_status
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata
 from pipelex.cogt.inference.provider_name import ProviderName
+from tests.helpers.error_report import make_error_report
 
 
 class TestErrorHttpStatus:
@@ -38,7 +39,7 @@ class TestErrorHttpStatus:
     )
     def test_error_report_http_status_follows_domain(self, error_domain: str | None, expected_status: int) -> None:
         """ErrorReport.http_status follows error_domain when there is no provider 429."""
-        report = ErrorReport(error_type="SomeError", message="boom", error_domain=error_domain)
+        report = make_error_report(error_type="SomeError", message="boom", error_domain=error_domain)
         assert report.http_status == expected_status
 
     def test_provider_429_takes_precedence_over_domain(self) -> None:
@@ -49,7 +50,7 @@ class TestErrorHttpStatus:
             status_code=429,
             retry_after_seconds=12.0,
         )
-        report = ErrorReport(
+        report = make_error_report(
             error_type="LLMCompletionError",
             message="rate limited",
             error_domain="input",
@@ -66,7 +67,7 @@ class TestErrorHttpStatus:
             sdk_exception_type="BadRequestError",
             status_code=400,
         )
-        report = ErrorReport(
+        report = make_error_report(
             error_type="LLMCompletionError",
             message="bad request",
             error_domain="input",
@@ -76,5 +77,5 @@ class TestErrorHttpStatus:
 
     def test_unknown_error_domain_falls_back_to_500(self) -> None:
         """An unrecognized error_domain string (e.g. from a newer Pipelex) yields 500, not a crash."""
-        report = ErrorReport(error_type="SomeError", message="boom", error_domain="domain-from-the-future")
+        report = make_error_report(error_type="SomeError", message="boom", error_domain="domain-from-the-future")
         assert report.http_status == 500

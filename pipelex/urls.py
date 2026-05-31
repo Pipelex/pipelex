@@ -17,6 +17,12 @@ class URLs:
     native_concepts_docs = "https://docs.pipelex.com/latest/building-methods/concepts/native-concepts/"
     app_cli_auth = "https://app.pipelex.com/auth/cli"
 
+    # Base for the RFC 7807 ``type`` URI of every PipelexError class. A stable
+    # identifier by spec — kept as a constant so PipelexError.type_uri() stays
+    # pure (no process config, safe inside Temporal workflow code). No trailing
+    # slash: type_uri() appends ``/<kebab-class-name>/``.
+    error_docs_base = "https://docs.pipelex.com/latest/errors"
+
     jpg_example_1 = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/jpg_example_1.jpg"
     jpg_example_2 = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/jpg_example_2.jpg"
     jpg_example_3 = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/jpg_example_3.jpg"

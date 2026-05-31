@@ -14,9 +14,9 @@ from pipelex.tools.misc.toml_sync import TomlSyncResult, sync_toml_values
 from pipelex.types import StrEnum
 
 # Config file paths
-MAIN_CONFIG_PATH = "pipelex/pipelex.toml"
-KIT_CONFIG_PATH = "pipelex/kit/configs/pipelex.toml"
-PROJECT_CONFIG_PATH = ".pipelex/pipelex.toml"
+MAIN_CONFIG_PATH = Path("pipelex/pipelex.toml")
+KIT_CONFIG_PATH = Path("pipelex/kit/configs/pipelex.toml")
+PROJECT_CONFIG_PATH = Path(".pipelex/pipelex.toml")
 
 
 class SyncTarget(StrEnum):
@@ -90,8 +90,7 @@ def sync_main_config_cmd(
     console = get_console()
 
     # Check if main config exists
-    main_path = Path(MAIN_CONFIG_PATH)
-    if not main_path.exists():
+    if not MAIN_CONFIG_PATH.exists():
         if quiet:
             console.print(f"[red]Error:[/red] Main config not found: {MAIN_CONFIG_PATH}")
         else:
@@ -111,12 +110,11 @@ def sync_main_config_cmd(
         console.print(f"  Source: [cyan]{MAIN_CONFIG_PATH}[/cyan]")
         console.print()
 
-    results: list[tuple[str, TomlSyncResult | None, str]] = []
+    results: list[tuple[str, TomlSyncResult | None, Path]] = []
 
     # Sync to kit config
     if sync_kit:
-        kit_path = Path(KIT_CONFIG_PATH)
-        if kit_path.exists():
+        if KIT_CONFIG_PATH.exists():
             try:
                 kit_result = sync_toml_values(MAIN_CONFIG_PATH, KIT_CONFIG_PATH, dry_run=dry_run)
                 results.append(("kit", kit_result, KIT_CONFIG_PATH))
@@ -134,8 +132,7 @@ def sync_main_config_cmd(
 
     # Sync to project config
     if sync_project:
-        project_path = Path(PROJECT_CONFIG_PATH)
-        if project_path.exists():
+        if PROJECT_CONFIG_PATH.exists():
             try:
                 project_result = sync_toml_values(MAIN_CONFIG_PATH, PROJECT_CONFIG_PATH, dry_run=dry_run)
                 results.append(("project", project_result, PROJECT_CONFIG_PATH))

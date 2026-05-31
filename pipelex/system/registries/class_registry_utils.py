@@ -1,14 +1,15 @@
 import inspect
 import sys
 import warnings
+from pathlib import Path
 from typing import Any
 
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.hub import get_class_registry
 from pipelex.tools.misc.file_utils import find_files_in_dir
+from pipelex.tools.typing.exceptions import ModuleFileError
 from pipelex.tools.typing.module_inspector import (
-    ModuleFileError,
     find_classes_in_module,
     import_module_from_file,
     import_module_from_file_if_has_classes,
@@ -19,7 +20,7 @@ class ClassRegistryUtils:
     @classmethod
     def register_classes_in_file(
         cls,
-        file_path: str,
+        file_path: Path,
         base_class: type[Any] | None,
         is_include_imported: bool,
     ) -> None:
@@ -38,11 +39,11 @@ class ClassRegistryUtils:
     @classmethod
     def register_classes_in_folder(
         cls,
-        folder_path: str,
+        folder_path: Path,
         base_class: type[Any] | None = None,
         is_recursive: bool = True,
         is_include_imported: bool = False,
-        force_exclude_dirs: list[str] | None = None,
+        force_exclude_dirs: list[Path] | None = None,
     ) -> None:
         """Registers all classes in Python files within folders that are subclasses of base_class.
         If base_class is None, registers all classes.
@@ -59,12 +60,13 @@ class ClassRegistryUtils:
             dir_path=folder_path,
             pattern="*.py",
             is_recursive=is_recursive,
-            excluded_dirs=list(get_config().pipelex.scan_config.excluded_dirs) + (force_exclude_dirs or []),
+            excluded_dirs=list(get_config().pipelex.scan_config.excluded_dirs)
+            + [str(force_exclude_dir) for force_exclude_dir in (force_exclude_dirs or [])],
         )
 
         for python_file in python_files:
             cls.register_classes_in_file(
-                file_path=str(python_file),
+                file_path=python_file,
                 base_class=base_class,
                 is_include_imported=is_include_imported,
             )
@@ -72,8 +74,8 @@ class ClassRegistryUtils:
     @classmethod
     def import_modules_in_folder(
         cls,
-        folder_path: str,
-        force_include_dirs: list[str] | None = None,
+        folder_path: Path,
+        force_include_dirs: list[Path] | None = None,
         is_recursive: bool = True,
         base_class_names: list[str] | None = None,
     ) -> None:
@@ -100,7 +102,7 @@ class ClassRegistryUtils:
             pattern="*.py",
             is_recursive=is_recursive,
             excluded_dirs=list(get_config().pipelex.scan_config.excluded_dirs),
-            force_include_dirs=force_include_dirs,
+            force_include_dirs=[str(force_include_dir) for force_include_dir in force_include_dirs] if force_include_dirs is not None else None,
         )
 
         for python_file in python_files:
@@ -108,12 +110,12 @@ class ClassRegistryUtils:
                 if base_class_names is not None:
                     # Use AST-based import to avoid executing modules without relevant classes
                     import_module_from_file_if_has_classes(
-                        str(python_file),
+                        python_file,
                         base_class_names=base_class_names,
                     )
                 else:
                     # Import all modules regardless of content
-                    import_module_from_file(str(python_file))
+                    import_module_from_file(python_file)
             except ModuleFileError:
                 # Expected: file validation issues (directories with .py extension, etc.)
                 # log.verbose(f"Skipping file {python_file}: {e}")

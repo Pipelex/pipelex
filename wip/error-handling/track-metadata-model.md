@@ -2,7 +2,7 @@
 
 ## What this track is
 
-The contract for **what every exception carries** so it can be rendered identically to humans, agents, and Temporal: `error_type`, `message`, `error_category` (TRANSIENT / CONFIGURATION / CONTENT / CAPACITY / UNKNOWN), `error_domain` (input / config / runtime), `user_action`, `retryable`, optional `model`, `provider`, and `provider_metadata`. The metadata lives on the exception class itself so there is a single source of truth.
+The contract for **what every exception carries** so it can be rendered identically to humans, agents, and Temporal: `error_type`, `message`, `title`, `type_uri`, `error_category` (TRANSIENT / CONFIGURATION / CONTENT / CAPACITY / AMBIGUOUS / UNKNOWN), `error_domain` (input / config / runtime), `user_action`, `retryable`, optional `model`, `provider`, and `provider_metadata`. The metadata lives on the exception class itself so there is a single source of truth.
 
 The model is **landed for inference errors and the major pipeline/interpreter/service exceptions** — they self-describe via class-level attributes consumed through `to_error_report()`. The remaining work is closing the long tail: a handful of `CogtError` subclasses still carry no class-level `error_category`, and several `PipelexError` subclasses still depend on the fallback dicts in `agent_output.py` rather than carrying their own `error_domain` / `user_action`.
 
@@ -10,28 +10,31 @@ The model is **landed for inference errors and the major pipeline/interpreter/se
 
 ### `ErrorReport` — the serialization schema
 
-`ErrorReport` (`pipelex/base_exceptions.py`) is a frozen pydantic dataclass with `extra="forbid"`:
+`ErrorReport` (`pipelex/base_exceptions.py`) is a frozen `BaseModel` (`ConfigDict(frozen=True, extra="forbid", arbitrary_types_allowed=True)`):
 
 ```
 ErrorReport
-  error_type:        str
-  message:           str
-  error_category:    str | None
-  error_domain:      str | None
-  retryable:         bool | None
-  user_action:       UserAction | None
-  model:             str | None
-  provider:          str | None
-  provider_metadata: ProviderErrorMetadata | None
+  error_type:            str
+  message:               str
+  title:                 str
+  type_uri:              str
+  error_category:        str | None
+  error_domain:          str | None
+  retryable:             bool | None
+  user_action:           UserAction | None
+  model:                 str | None
+  provider:              str | None
+  provider_metadata:     ProviderErrorMetadata | None
+  caller_facing_message: bool
 ```
 
-`to_dict()` drops `None` fields. `http_status` maps the report to an HTTP status for downstream API adapters (see [track-cli-delivery.md](track-cli-delivery.md)).
+`to_dict(disclosure_mode=VERBOSE)` returns the non-`None` fields and round-trips through `from_dict`; `STRICT` is a lossy projection for untrusted external surfaces (see [architecture.md](architecture.md) for `DisclosureMode`). `http_status` maps the report to an HTTP status for downstream API adapters (see [track-cli-delivery.md](track-cli-delivery.md)).
 
-`PipelexError.to_error_report()` returns `error_type`, `message`, and the class-level `error_domain`. `CogtError.to_error_report()` overrides it to add `error_category`, `retryable` (derived from category via `InferenceErrorCategory.is_retryable`), `user_action`, `provider_metadata`, and reads `model_handle` / `backend_name` from the instance when present. `to_error_report()` also enriches from the `__cause__` chain, so a wrapper exception surfaces the inference metadata of the underlying `CogtError`.
+`PipelexError.to_error_report()` returns `error_type`, `message`, `title`, `type_uri`, the class-level `error_domain`, `user_action`, and `caller_facing_message`. `CogtError.to_error_report()` overrides it to layer on `error_category`, `retryable` (derived from category via `InferenceErrorCategory.is_retryable`), `provider_metadata`, and the `model` / `provider` it reads from the instance's `model_handle` / `backend_name` when present. `to_error_report()` also enriches from the `__cause__` chain, so a wrapper exception surfaces the inference metadata of the underlying `CogtError` (`title` / `type_uri` stay wrapper-wins).
 
 ### Inference categories
 
-`InferenceErrorCategory` (`pipelex/cogt/exceptions.py`) is a `StrEnum` with values `TRANSIENT`, `CONFIGURATION`, `CONTENT`, `CAPACITY`, `UNKNOWN` and an `is_retryable` property — `True` only for `TRANSIENT`. Implemented with `match/case` per the project's enum style.
+`InferenceErrorCategory` (`pipelex/cogt/exceptions.py`) is a `StrEnum` with values `TRANSIENT`, `CONFIGURATION`, `CONTENT`, `CAPACITY`, `AMBIGUOUS`, `UNKNOWN` and an `is_retryable` property — `True` only for `TRANSIENT`. Implemented with `match/case` per the project's enum style. `AMBIGUOUS` and `UNKNOWN` are both non-retryable but distinct: `AMBIGUOUS` means the error type is known yet the outcome is not (e.g. a connection dropped mid-request on a non-idempotent call, so a blind retry is unsafe), while `UNKNOWN` means classification failed outright.
 
 ### Error domains
 

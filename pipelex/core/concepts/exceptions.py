@@ -2,7 +2,7 @@ from pipelex.base_exceptions import PipelexError
 
 
 class ConceptError(PipelexError):
-    pass
+    _declared_title = "Concept error"
 
 
 class ConceptValueError(ValueError):
