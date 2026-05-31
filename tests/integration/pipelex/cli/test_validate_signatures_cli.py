@@ -12,7 +12,6 @@ from pipelex.cli.commands.validate._validate_core import (
     _validate_pipe_or_bundle,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
     do_validate_all_libraries_and_dry_run,  # noqa: PLC2701
 )
-from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -99,9 +98,12 @@ class TestValidateSignaturesCli:
         do_validate_all_libraries_and_dry_run(library_dirs=[orphan_signature_dir])
 
     def test_validate_all_strict_fails_with_caller_of_signature(self, signature_caller_dir: Path) -> None:
-        # Non-signature pipe reaching a signature: strict --all should raise SignaturesNotAllowedError.
-        with pytest.raises(SignaturesNotAllowedError):
+        # Non-signature pipe reaching a signature: strict --all must wrap SignaturesNotAllowedError
+        # as a friendly typer.Exit(1) (consistent with the bundle/pipe paths), not bubble a raw
+        # traceback to the user.
+        with pytest.raises(typer.Exit) as exc_info:
             do_validate_all_libraries_and_dry_run(library_dirs=[signature_caller_dir])
+        assert exc_info.value.exit_code == 1
 
     def test_validate_all_allow_signatures_passes(self, signature_caller_dir: Path) -> None:
         # Lenient mode: --all succeeds even when a non-signature pipe reaches a signature.

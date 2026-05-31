@@ -143,8 +143,11 @@ async def validate_pipe_in_bundle_core(
 ) -> dict[str, Any]:
     """Validate a single pipe within a bundle.
 
-    This first validates the bundle to load its pipes into the library,
-    then validates only the specified pipe.
+    Loads the bundle's pipes into the library (so the requested pipe's dependencies resolve),
+    then dry-runs ONLY the requested pipe. Unrelated pipes — including unimplemented
+    `PipeSignature` placeholders — are loaded but not dry-run, so they do not block validating
+    an implemented slice of a partially stubbed bundle. Strict mode is still enforced on the
+    requested pipe: if it reaches a signature, validation fails.
 
     Args:
         bundle_path: Path to the bundle file.
@@ -158,18 +161,14 @@ async def validate_pipe_in_bundle_core(
 
     Raises:
         ValidateBundleError: If validation fails.
+        PipeNotFoundError: If `pipe_code` is not defined in the bundle.
     """
-    # Validate the bundle to load all its pipes into the library
-    # This ensures all dependencies are available
     await validate_bundle(
         mthds_file_path=bundle_path,
         library_dirs=library_dirs,
         allow_signatures=allow_signatures,
+        dry_run_pipe_codes=[pipe_code],
     )
-
-    # Now get the specific pipe and dry-run only that one
-    the_pipe = get_required_pipe(pipe_code=pipe_code)
-    await dry_run_pipe(the_pipe, allow_signatures=allow_signatures, raise_on_failure=True)
 
     return {
         "success": True,

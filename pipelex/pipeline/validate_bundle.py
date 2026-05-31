@@ -28,6 +28,7 @@ from pipelex.hub import (
     teardown_current_library,
 )
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
+from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_run.dry_run import DryRunOutput, dry_run_pipes
 from pipelex.pipe_run.exceptions import DryRunError, PipeRunError
 from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
@@ -125,12 +126,39 @@ def _translate_to_validate_bundle_error(category: Literal["pipe", "concept"]) ->
         ) from sig_error
 
 
+def _pipes_to_dry_run(loaded_pipes: list[PipeAbstract], dry_run_pipe_codes: list[str] | None) -> list[PipeAbstract]:
+    """Select which loaded pipes to dry-run.
+
+    Returns every loaded pipe when ``dry_run_pipe_codes`` is ``None`` (whole-bundle validation).
+    Otherwise returns only the pipes whose bare ``code`` or qualified ``pipe_ref`` is requested —
+    used by the ``--pipe`` path to validate a single implemented slice of a partially stubbed
+    bundle without dry-running (and thus rejecting) unrelated pipes or signatures. Filtering here,
+    before ``dry_run_pipes``, also narrows its strict signature pre-check to just the selected pipe.
+
+    Raises:
+        PipeNotFoundError: when ``dry_run_pipe_codes`` names a pipe absent from the loaded bundle —
+            so a typo'd ``--pipe`` argument fails loudly instead of passing vacuously.
+    """
+    if dry_run_pipe_codes is None:
+        return loaded_pipes
+    wanted = set(dry_run_pipe_codes)
+    selected = [pipe for pipe in loaded_pipes if pipe.code in wanted or pipe.pipe_ref in wanted]
+    matched = {pipe.code for pipe in selected} | {pipe.pipe_ref for pipe in selected}
+    missing = wanted - matched
+    if missing:
+        missing_str = ", ".join(f"'{code}'" for code in sorted(missing))
+        msg = f"Pipe(s) {missing_str} not found in the bundle. Check for typos and make sure they are declared in the bundle."
+        raise PipeNotFoundError(msg)
+    return selected
+
+
 async def validate_bundle(
     mthds_file_path: Path | None = None,
     mthds_contents: list[str] | None = None,
     blueprints: list[PipelexBundleBlueprint] | None = None,
     library_dirs: Sequence[Path] | None = None,
     allow_signatures: bool = False,
+    dry_run_pipe_codes: list[str] | None = None,
 ) -> ValidateBundleResult:
     provided_params = sum(
         [
@@ -171,13 +199,17 @@ async def validate_bundle(
             if blueprints is not None:
                 loaded_blueprints = blueprints
                 loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints)
-                dry_run_results = await dry_run_pipes(pipes=loaded_pipes, allow_signatures=allow_signatures, raise_on_failure=True)
+                dry_run_results = await dry_run_pipes(
+                    pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes), allow_signatures=allow_signatures, raise_on_failure=True
+                )
                 result = ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
 
             elif mthds_contents is not None:
                 loaded_blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
                 loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
-                dry_run_results = await dry_run_pipes(pipes=loaded_pipes, allow_signatures=allow_signatures, raise_on_failure=True)
+                dry_run_results = await dry_run_pipes(
+                    pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes), allow_signatures=allow_signatures, raise_on_failure=True
+                )
                 result = ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
 
             else:
@@ -193,7 +225,9 @@ async def validate_bundle(
                     pipe_codes = list(blueprint.pipe.keys()) if blueprint.pipe else []
                     loaded_pipes = [library.pipe_library.get_required_pipe(pipe_code=code) for code in pipe_codes]
 
-                dry_run_results = await dry_run_pipes(pipes=loaded_pipes, allow_signatures=allow_signatures, raise_on_failure=True)
+                dry_run_results = await dry_run_pipes(
+                    pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes), allow_signatures=allow_signatures, raise_on_failure=True
+                )
                 result = ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
         success = True
         return result

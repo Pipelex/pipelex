@@ -95,6 +95,10 @@ def do_validate_all_libraries_and_dry_run(
             )
             signature_count = sum(1 for pipe in pipes if pipe.is_signature)
             typer.echo(f"Setup sequence passed OK, config and pipelines are validated.{_format_signatures_summary_suffix(signature_count)}")
+    except SignaturesNotAllowedError as sig_error:
+        # A non-signature pipe in the library reaches a PipeSignature. Render it as a friendly
+        # CLI error (matching the bundle/pipe paths) instead of bubbling a raw traceback.
+        handle_signatures_not_allowed_error(sig_error, context=ErrorContext.VALIDATION)
     except PipeOperatorModelAvailabilityError as exc:
         handle_model_availability_error(exc, context=ErrorContext.VALIDATION)
     except PipeOperatorModelChoiceError as exc:

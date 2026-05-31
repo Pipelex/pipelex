@@ -312,6 +312,7 @@ def handle_signatures_not_allowed_error(exc: SignaturesNotAllowedError, *, conte
     friendly error message instead of an unhandled traceback (issue #6 / greptile).
     """
     console = get_console()
+    print_traceback_if_requested(console)
     console.print(f"\n[bold red]❌ {context} failed because of unimplemented PipeSignature placeholders[/bold red]\n")
     console.print(f"[yellow]{escape(str(exc))}[/yellow]\n")
     console.print(

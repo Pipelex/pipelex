@@ -3,6 +3,7 @@ from typing import Literal
 from pydantic import Field, field_validator
 from pydantic.json_schema import SkipJsonSchema
 from rich.console import Group
+from rich.markup import escape
 from rich.table import Table
 from rich.text import Text
 from typing_extensions import override
@@ -21,8 +22,12 @@ class PipeSignatureSpec(PipeSpec):
     once the contract is settled.
 
     Validation behavior:
-        - Strict (default) — `pipelex validate <pipe>` refuses any pipeline that reaches a
-          signature through its dependency graph and reports the controller chain.
+        - Strict (default), single pipe — `pipelex validate <pipe>` refuses any pipeline that
+          reaches a signature through its dependency graph and reports the controller chain.
+        - Strict (default), whole bundle — `validate bundle <file>` refuses a bundle that
+          *contains* a signature at all (reached or not): an unimplemented placeholder means the
+          bundle is not fully runnable. To validate just the implemented slice of a partially
+          stubbed bundle, select it with `--pipe <code>` (only that pipe is dry-run).
         - Lenient — pass `--allow-signatures` to dry-run signatures as mocks (a `Stuff`
           matching the declared output, multiplicity included).
         - Live execution always raises `PipeSignatureNotExecutableError`; signatures have
@@ -67,15 +72,17 @@ class PipeSignatureSpec(PipeSpec):
         pipe_group = Group()
         if title:
             pipe_group.renderables.append(Text(title, style="bold"))
-        pipe_group.renderables.append(Text.from_markup(f"Pipe Signature: [red]{self.pipe_code}[/red]\n", style="bold"))
+        pipe_group.renderables.append(Text.from_markup(f"Pipe Signature: [red]{escape(self.pipe_code)}[/red]\n", style="bold"))
         pipe_group.renderables.append(Text.from_markup(f"Type: [bold magenta]{self.type}[/bold magenta] ({self.pipe_category})\n"))
-        pipe_group.renderables.append(Text.from_markup(f"Description: [yellow italic]{self.description}[/yellow italic]\n"))
+        pipe_group.renderables.append(Text.from_markup(f"Description: [yellow italic]{escape(self.description)}[/yellow italic]\n"))
 
         if not self.inputs:
             pipe_group.renderables.append(Text.from_markup("\nNo inputs"))
         elif len(self.inputs) == 1:
             input_name, concept_spec = next(iter(self.inputs.items()))
-            pipe_group.renderables.append(Text.from_markup(f"\nInput: [cyan]{input_name}[/cyan] ([bold green]{concept_spec}[/bold green])"))
+            pipe_group.renderables.append(
+                Text.from_markup(f"\nInput: [cyan]{escape(input_name)}[/cyan] ([bold green]{escape(concept_spec)}[/bold green])")
+            )
         else:
             inputs_table = Table(
                 title="Inputs:",
@@ -89,11 +96,11 @@ class PipeSignatureSpec(PipeSpec):
             inputs_table.add_column("Variable Name", style="cyan")
             inputs_table.add_column("Concept", style="bold green")
             for input_name, concept_spec in self.inputs.items():
-                inputs_table.add_row(input_name, concept_spec)
+                inputs_table.add_row(escape(input_name), escape(concept_spec))
             pipe_group.renderables.append(inputs_table)
 
-        pipe_group.renderables.append(Text.from_markup(f"\nOutput concept: [bold green]{self.output}[/bold green]"))
+        pipe_group.renderables.append(Text.from_markup(f"\nOutput concept: [bold green]{escape(self.output)}[/bold green]"))
         if self.signature_for is not None:
-            pipe_group.renderables.append(Text.from_markup(f"\nSignature for: [bold yellow]{self.signature_for}[/bold yellow]"))
+            pipe_group.renderables.append(Text.from_markup(f"\nSignature for: [bold yellow]{escape(self.signature_for)}[/bold yellow]"))
 
         return pipe_group

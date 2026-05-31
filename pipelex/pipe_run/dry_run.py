@@ -105,8 +105,13 @@ async def dry_run_pipes(
 
     Args:
         pipes: List of pipes to dry run
-        allow_signatures: If False (default), reject any pipe whose dependency graph reaches a
-            `PipeSignature`. If True, signatures dry-run trivially by minting a mock output.
+        allow_signatures: If False (default), the whole batch is rejected when any pipe in it
+            *is* a `PipeSignature` or *reaches* one through its dependency graph (a signature
+            reaches itself). This is why whole-bundle strict validation rejects a bundle that
+            merely *contains* a signature, reached or not — the signature is itself in the batch.
+            Callers that want to tolerate unreached signatures must keep them out of the batch:
+            the `validate --all` paths filter signatures, and `--pipe <code>` passes only the
+            requested pipe. If True, signatures dry-run trivially by minting a mock output.
         raise_on_failure: If True, raise an exception if any pipe fails.
 
     For each pipe, this method:
