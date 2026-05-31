@@ -32,6 +32,8 @@
 
 ### Fixed
 
+- **The generated MTHDS schema now requires `type` on every pipe.** In the schema consumed by `plxt` lint and the VS Code Taplo LSP, each pipe blueprint variant declared `type` with a literal default — so it was optional, and because the Draft-4 export drops the union discriminator, a pipe table written without `type` matched several `oneOf` branches at once and was rejected with an ambiguous multi-match (worse, a type-less table carrying fields unique to one variant validated silently). `type` is now required on every variant, so a type-less pipe table fails with a clear "missing type" and a typed table resolves to exactly one variant. The patched set is derived from `PipeBlueprintUnion`, so newly added pipe types are covered automatically. Regenerate with `pipelex-dev generate-mthds-schema`; the bundled copy ships in `pipelex-tools` 0.6.0 and the VS Code extension.
+
 - **`InputStuffSpecsFactoryError` was shadowed by a duplicate class definition.** `pipelex/core/pipes/inputs/input_stuff_specs_factory.py` declared a local class with the same name as the canonical one in the package's `exceptions.py`, leaving two distinct class objects in play so an `except` on one would miss the other. Consolidated to the single canonical class.
 
 ## [v0.30.3] - 2026-05-28

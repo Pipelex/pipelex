@@ -1,6 +1,6 @@
 # Signature-Based Validation for Partially-Defined Pipelines
 
-Status: **Implemented and landed** on `feature/Validate-with-signatures-3` — Phases 1–7.3 complete, `make agent-check` and `make agent-test` green. The single open item is the **Phase 7.4 cross-repo merge-gate** (retire the branch-local MTHDS schema rule once `vscode-pipelex` ships a bundled schema that knows `type = "PipeSignature"` — see the end of this doc). The CHANGELOG `[Unreleased]` section is the user-facing record; this doc is the engineering current-state plus a reviewer verification map.
+Status: **Implemented and landed** on `feature/Validate-with-signatures-3` — Phases 1–7.4 complete; `make agent-check`, `make agent-test`, `make ccs` (config-sync) and `make plxt-lint` (against the bundled schema) all green. The cross-repo merge-gate is **closed**: `pipelex-tools` 0.6.0 ships a bundled MTHDS schema that knows `type = "PipeSignature"` (and now requires `type` on every pipe variant), the branch-local schema rule has been removed from both `.pipelex/plxt.toml` and the `pipelex/kit/configs/plxt.toml` template, and the `plxt` floor is bumped to `>=0.6.0`. The branch is ship-ready. The CHANGELOG `[Unreleased]` section is the user-facing record; this doc is the engineering current-state plus a reviewer verification map.
 
 ## What it does
 
@@ -39,6 +39,7 @@ Each row names where the behavior lives and the test that pins it.
 | Agent CLI: same flags (strict default), `--pipe` single-slice validation | `pipelex/cli/agent_cli/commands/validate/_validate_core.py`, `bundle_cmd.py` | `tests/integration/pipelex/cli/test_agent_validate_defaults_strict.py`, `test_agent_validate_pipe_in_bundle.py` |
 | Live-run guard (`PipeSignatureNotExecutableError`) | `pipelex/pipe_signature/pipe_signature.py` | `tests/e2e/test_signature_validation_mthds.py` (live-run case) |
 | Schema generator strips `pipe_category` from `PipeSignatureBlueprint` | schema generator (`pipelex-dev generate-mthds-schema`) | runs clean in `make agent-check` |
+| Schema generator requires `type` on every pipe blueprint variant (set derived from `PipeBlueprintUnion`, no hardcoded drift) so a type-less pipe table fails with a clear "missing type" instead of an ambiguous `oneOf` multi-match | `pipelex/language/mthds_schema_generator.py` (`_require_type_on_pipe_definitions`) | `tests/unit/pipelex/language/test_mthds_schema.py` |
 | Docs + CHANGELOG | `docs/building-methods/pipes/signature-pipes.md`, CHANGELOG `[Unreleased]` | — |
 
 ## Review fixes (post-merge, 2026-05-31, commit `4cc60c52`)
@@ -78,19 +79,15 @@ The dependency-graph walk lives as free functions in `pipelex/pipe_signature/sig
 
 Rejected alternatives: compiling signatures to `PipeFunc` at load (layering violation, silent live success on mock data); a parallel `signature` table in `.mthds` (two resolution paths); implicit "skeletal" pipes such as a prompt-less `PipeLLM` (bug-vs-feature is indistinguishable from field presence).
 
-## Open: Phase 7.4 — cross-repo schema merge-gate (the one remaining item)
+## Done: Phase 7.4 — cross-repo schema merge-gate (closed)
 
-The bundled `plxt` schema (shipped from `vscode-pipelex/`) does not yet know `type = "PipeSignature"`. On this branch the canonical schema for `*.mthds` is the locally-regenerated `derived/mthds_schema.json`, wired in via a `[[rule]] / [rule.schema]` block in `.pipelex/plxt.toml` scoped to `**/*.mthds`. That block is the **intended** configuration on this branch (and `plxt lint` is green against it), not a workaround — the fast-path PostToolUse hook picks it up automatically too.
+The merge-gate is closed. `pipelex-tools` 0.6.0 (PyPI) and the matching `vscode-pipelex` extension release bundle an MTHDS schema that knows `type = "PipeSignature"` and requires `type` on every pipe variant. On this branch, in lock-step:
 
-Merge-gate, in lock-step:
+1. ✅ `vscode-pipelex` / `pipelex-tools` 0.6.0 shipped the schema-aware bundled `plxt`.
+2. ✅ The branch-local `[[rule]] / [rule.schema]` block was removed from **both** `.pipelex/plxt.toml` and the `pipelex/kit/configs/plxt.toml` template (the two are byte-identical again), and the `pipelex-tools` floor in `pyproject.toml` is bumped to `>=0.6.0`.
+3. ✅ Re-verified with the bundled `plxt` 0.6.0 installed and the branch-local rule gone: `make plxt-lint` is green across the repo — including `tests/e2e/fixtures/signature_bundles/*.mthds`, which use `type = "PipeSignature"` and now validate against the bundled schema — and `make ccs` (config-sync) passes.
 
-1. Land the `vscode-pipelex` release that bundles an updated schema knowing `PipeSignature`.
-2. Remove the branch-local `[[rule]]` block from `.pipelex/plxt.toml` in the same merge.
-3. Re-verify `plxt lint` stays green with the new bundled `plxt` installed and the branch-local rule gone — that cross-check, not the branch-local lint, is the ship-readiness signal.
-
-Until step 3 is green, the branch is **not** ship-ready; do not mark "Ready to ship".
-
-⚠️ **Counter-to-merge-gate item to resolve first:** the working tree currently carries an uncommitted edit to `pipelex/kit/configs/plxt.toml` (the kit template shipped to users via `pipelex init`) that copies this same branch-local schema block into it. That points end-user projects at a `derived/mthds_schema.json` path that will not exist for them, and it propagates the exact rule Phase 7.4 says to retire. It should be dropped before merge — the branch-local schema rule belongs only in `.pipelex/plxt.toml` on this branch, never in the shipped user template.
+The earlier ⚠️ counter-item — the branch-local schema block having been copied into the user-shipped `pipelex/kit/configs/plxt.toml` template — is resolved by step 2: the block is gone from the template, so `pipelex init` no longer points end-user projects at a `derived/mthds_schema.json` path that does not exist for them.
 
 ## History
 
