@@ -29,12 +29,14 @@ from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.model_backends.constraints import ValuedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind, ModelReferenceParseError, ensure_model_reference
+from pipelex.cogt.models.exceptions import ModelReferenceParseError
+from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind, ensure_model_reference
 from pipelex.cogt.search.search_setting import SearchModelChoice, SearchSetting
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.exceptions import ConfigValidationError
 from pipelex.system.runtime import ProblemReaction
-from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_path_if_exists
+from pipelex.tools.misc.exceptions import TomlError
+from pipelex.tools.misc.toml_utils import load_toml_from_path_if_exists
 from pipelex.types import Self
 from pipelex.urls import URLs
 

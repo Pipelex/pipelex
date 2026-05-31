@@ -1,10 +1,11 @@
-from dataclasses import replace
-
 from typing_extensions import override
 
 from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexError, PipelexUnexpectedError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
+from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
+from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 
 
 class PipeExecutionError(PipelexError):
@@ -41,10 +42,11 @@ class PipelineExecutionError(PipelexError):
         # RUNTIME / UNKNOWN values are only a floor, applied when the cause
         # surfaced nothing — never overriding a categorized cause action.
         report = super().to_error_report()
-        return replace(
-            report,
-            error_domain=report.error_domain or ErrorDomain.RUNTIME,
-            user_action=report.user_action or UserAction(kind=UserActionKind.UNKNOWN, detail="Check pipe_stack to identify which pipe failed"),
+        return report.model_copy(
+            update={
+                "error_domain": report.error_domain or ErrorDomain.RUNTIME,
+                "user_action": report.user_action or UserAction(kind=UserActionKind.UNKNOWN, detail="Check pipe_stack to identify which pipe failed"),
+            }
         )
 
 
@@ -57,3 +59,69 @@ class PipeStackOverflowError(PipelexError):
 
 class JobMetadataError(PipelexUnexpectedError):
     pass
+
+
+class PipelineManagerNotFoundError(PipelexError):
+    pass
+
+
+class PipelineManagerAlreadyExistsError(PipelexError):
+    pass
+
+
+class ValidateBundleError(PipelexError):
+    """Raised when bundle validation fails.
+
+    This error aggregates validation errors from different stages:
+    - Blueprint validation errors (from interpreter)
+    - Pipe factory errors (from PipeFactoryError exceptions, e.g., missing concepts)
+    - Pipe validation errors (from PipeValidationError exceptions)
+    - Pipe/Concept instantiation errors (from Pydantic ValidationError during factory instantiation)
+    - Dry run errors
+    - Signature pre-check errors (strict-mode validation refused due to PipeSignature placeholders)
+
+    All errors are categorized and stored in their respective lists.
+    """
+
+    error_domain = ErrorDomain.INPUT
+    user_action = UserAction(
+        kind=UserActionKind.CHANGE_INPUT,
+        detail="Check the validation_errors array for specific issues",
+    )
+    # Bundle-validation messages describe faults in the caller's own bundle —
+    # caller-facing copy, kept verbatim under STRICT disclosure.
+    _authors_caller_facing_message = True
+
+    def __init__(
+        self,
+        message: str,
+        pipelex_bundle_blueprint_validation_errors: list[PipelexBundleBlueprintValidationErrorData] | None = None,
+        pipe_factory_errors: list[PipeFactoryErrorData] | None = None,
+        pipe_validation_errors: list[PipesAndConceptValidationErrorData] | None = None,
+        pipe_concept_instantiation_errors: list[PipesAndConceptValidationErrorData] | None = None,
+        dry_run_error_message: str | None = None,
+        signature_check_error: SignaturesNotAllowedError | None = None,
+    ):
+        self.pipelex_bundle_blueprint_validation_errors = pipelex_bundle_blueprint_validation_errors or []
+        self.pipe_factory_errors = pipe_factory_errors or []
+        self.pipe_validation_errors = pipe_validation_errors or []
+
+        # Pipe/Concept instantiation errors from Pydantic ValidationError during factory instantiation
+        # TODO: Currently not caught, but structure is prepared for future implementation
+        self.pipe_concept_instantiation_errors = pipe_concept_instantiation_errors or []
+
+        self.dry_run_error_message = dry_run_error_message
+
+        # Signature pre-check error (strict-mode validation refused due to PipeSignature placeholders)
+        self.signature_check_error = signature_check_error
+
+        super().__init__(message)
+
+    @property
+    def pipe_validation_error_data(self) -> list[PipesAndConceptValidationErrorData]:
+        """Backwards compatibility: combine pipe validation and instantiation errors.
+
+        This property provides the old interface for accessing all pipe/concept validation errors.
+        """
+        # TODO: refactor so we don't need this anymore?
+        return self.pipe_validation_errors + self.pipe_concept_instantiation_errors

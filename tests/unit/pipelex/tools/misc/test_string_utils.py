@@ -10,6 +10,7 @@ from pipelex.tools.misc.string_utils import (
     is_snake_case,
     matches_wildcard_pattern,
     normalize_to_ascii,
+    pascal_case_to_kebab,
     pascal_case_to_sentence,
     pascal_case_to_snake_case,
     snake_to_capitalize_first_letter,
@@ -97,14 +98,43 @@ def test_pascal_case_to_snake_case(pascal: str, expected: str) -> None:
     ("text", "expected"),
     [
         ("HelloWorld", "Hello world"),
-        ("BOB LowKey", "Bob low key"),
-        ("ParseJSONData", "Parse json data"),
-        ("ACDPService", "Acdp service"),
-        ("JSON2XMLConverter", "Json 2 xml converter"),
+        ("BOB LowKey", "BOB low key"),
+        ("ParseJSONData", "Parse JSON data"),
+        ("ACDPService", "ACDP service"),
+        ("JSON2XMLConverter", "JSON 2 XML converter"),
+        ("OpenAIClientFactory", "Open AI client factory"),
     ],
 )
 def test_pascal_case_to_sentence(text: str, expected: str) -> None:
     assert pascal_case_to_sentence(text) == expected
+
+
+@pytest.mark.parametrize(
+    ("pascal", "expected"),
+    [
+        # Basic
+        ("FooBarBaz", "foo-bar-baz"),
+        # Trailing acronym
+        ("APIError", "api-error"),
+        # Embedded acronym
+        ("HTTPError", "http-error"),
+        # No-acronym multi-word
+        ("EnvVarNotFound", "env-var-not-found"),
+        # Numeric + acronym
+        ("OAuth2", "o-auth2"),
+        # Numeric mid-string
+        ("V2APIError", "v2-api-error"),
+        # Single-token
+        ("Cogt", "cogt"),
+        # All caps
+        ("AB", "ab"),
+        # Acronym then PascalCase
+        ("ABCDef", "abc-def"),
+    ],
+)
+def test_pascal_case_to_kebab(pascal: str, expected: str) -> None:
+    """Pinning the behavior of ``pascal_case_to_kebab`` for the per-class ``type_uri()`` derivation."""
+    assert pascal_case_to_kebab(pascal) == expected
 
 
 @pytest.mark.parametrize(

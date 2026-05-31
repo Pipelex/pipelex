@@ -25,11 +25,10 @@ from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.validate_bundle import ValidateBundleError
+from pipelex.pipeline.exceptions import ValidateBundleError
 
 
 def validate_pipe_cmd(
-    ctx: typer.Context,
     pipe_code: Annotated[
         str | None,
         typer.Argument(help="Pipe code to validate"),
@@ -78,7 +77,7 @@ def validate_pipe_cmd(
         if pipe_code:
             agent_error("--all cannot be used with a pipe code", "ArgumentError")
 
-        make_pipelex_for_agent_cli(library_dirs=library_dirs, log_level=ctx.obj["log_level"], needs_inference=False, needs_model_specs=True)
+        make_pipelex_for_agent_cli(library_dirs=library_dirs, needs_inference=False, needs_model_specs=True)
 
         try:
             result = asyncio.run(validate_all_core(library_dirs=library_dirs, allow_signatures=allow_signatures))
@@ -149,7 +148,7 @@ def validate_pipe_cmd(
         else:
             library_dirs = [*export_paths, *library_dirs]
 
-    make_pipelex_for_agent_cli(library_dirs=library_dirs, log_level=ctx.obj["log_level"], needs_inference=False, needs_model_specs=True)
+    make_pipelex_for_agent_cli(library_dirs=library_dirs, needs_inference=False, needs_model_specs=True)
 
     try:
         result = asyncio.run(validate_pipe_core(pipe_code=pipe_code, library_dirs=library_dirs, allow_signatures=allow_signatures))

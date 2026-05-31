@@ -10,7 +10,7 @@ from jinja2.runtime import Context, Undefined
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.templating.templating_style import TagStyle
-from pipelex.tools.jinja2.jinja2_errors import Jinja2ContextError
+from pipelex.tools.jinja2.exceptions import Jinja2ContextError
 from pipelex.tools.jinja2.jinja2_filters import apply_tag_style, tag
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
 from pipelex.tools.jinja2.tag_renderable import TagRenderable

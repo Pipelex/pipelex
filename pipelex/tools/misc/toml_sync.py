@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import BaseModel, Field
 from tomlkit import TOMLDocument
@@ -10,6 +10,9 @@ from tomlkit.items import Item, Table
 
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TomlKeyChange(BaseModel):
@@ -142,7 +145,7 @@ def collect_leaf_key_paths(doc: TOMLDocument | Table | dict[str, Any], prefix: s
     return paths
 
 
-def sync_toml_values(source_path: str, target_path: str, dry_run: bool = False) -> TomlSyncResult:
+def sync_toml_values(source_path: Path, target_path: Path, dry_run: bool = False) -> TomlSyncResult:
     """Sync values from source TOML to target TOML, preserving target's structure and comments.
 
     For each leaf key in the target:

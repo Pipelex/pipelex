@@ -10,19 +10,11 @@ from kajson import kajson
 from kajson.exceptions import UnijsonEncoderError
 from pydantic import BaseModel
 
-from pipelex.system.exceptions import ToolError
+from pipelex.tools.misc.exceptions import ArgumentTypeError, JsonTypeError
 from pipelex.tools.misc.file_utils import save_text_to_path
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 
 JsonContent = Union[dict[str, Any], list[Any]]
-
-
-class ArgumentTypeError(ToolError):
-    pass
-
-
-class JsonTypeError(ToolError):
-    pass
 
 
 CLEAN_JSON_FIELDS_TO_SKIP = ("__class__", "__module__", "__pipelex_class__", "__pipelex_module__")
@@ -135,7 +127,7 @@ def json_str(some_object: Any, title: str | None = None, is_spaced: bool = False
 
 def save_as_json_to_path(
     object_to_save: Any,
-    path: str,
+    path: Path,
     indent: int | None = 4,
     is_warning_enabled: bool = True,
     create_directory: bool = False,
@@ -147,7 +139,7 @@ def save_as_json_to_path(
 
     Args:
         object_to_save (Any): The Python object to be saved as JSON. Can be any JSON-serializable object.
-        path (str): The file path where the JSON file will be saved.
+        path (Path): The file path where the JSON file will be saved.
         indent (int | None, optional): Number of spaces for JSON formatting indentation. Defaults to 4.
         is_warning_enabled (bool, optional): Whether to show warnings during JSON purification. Defaults to True.
         create_directory (bool, optional): Whether to create the directory if it doesn't exist. Defaults to False.
@@ -160,14 +152,14 @@ def save_as_json_to_path(
     save_text_to_path(json_string, path, create_directory=create_directory)
 
 
-def load_json_from_path(path: str) -> JsonContent:
+def load_json_from_path(path: Path) -> JsonContent:
     """Loads and parses a JSON file from the specified path.
 
     This function reads a JSON file and returns its contents as a Python object.
     The file is read using UTF-8 encoding.
 
     Args:
-        path (str): The file path to the JSON file to be loaded.
+        path (Path): The file path to the JSON file to be loaded.
 
     Returns:
         JsonContent: The parsed JSON content as a Python object (can be a dict, list, string, number, bool, or None).
@@ -177,19 +169,18 @@ def load_json_from_path(path: str) -> JsonContent:
         json.JSONDecodeError: If the file contains invalid JSON.
 
     """
-    with open(path, encoding="utf-8") as file:
-        json_content: JsonContent = json.load(file)
-        return json_content
+    json_content: JsonContent = json.loads(path.read_text(encoding="utf-8"))
+    return json_content
 
 
-def load_json_dict_from_path(path: str) -> dict[str, Any]:
+def load_json_dict_from_path(path: Path) -> dict[str, Any]:
     """Loads a JSON file and ensures it contains a dictionary.
 
     This function reads a JSON file and verifies that its content is a dictionary.
     It uses load_json_from_path internally and adds type checking.
 
     Args:
-        path (str): The file path to the JSON file to be loaded.
+        path (Path): The file path to the JSON file to be loaded.
 
     Returns:
         Dict[str, Any]: The parsed JSON content as a Python dictionary.
@@ -207,14 +198,14 @@ def load_json_dict_from_path(path: str) -> dict[str, Any]:
     return json_content
 
 
-def load_json_list_from_path(path: str) -> list[Any]:
+def load_json_list_from_path(path: Path) -> list[Any]:
     """Loads a JSON file and ensures it contains a list.
 
     This function reads a JSON file and verifies that its content is a list.
     It uses load_json_from_path internally and adds type checking.
 
     Args:
-        path (str): The file path to the JSON file to be loaded.
+        path (Path): The file path to the JSON file to be loaded.
 
     Returns:
         List[Any]: The parsed JSON content as a Python list.
@@ -232,17 +223,23 @@ def load_json_list_from_path(path: str) -> list[Any]:
     raise JsonTypeError(msg)
 
 
-def deep_update(target_dict: dict[str, Any], updates: dict[str, Any]):
-    """Recursively updates a dictionary with values from another dictionary.
+def deep_update(target_dict: dict[str, Any], updates: Mapping[str, Any]):
+    """Recursively updates a dictionary with values from another mapping.
 
-    This function performs a deep merge of two dictionaries, handling nested
-    dictionaries. For dictionaries, it recursively updates values. For all other
-    types (including lists), values from updates override the target values.
+    This function performs a deep merge, handling nested mappings (``dict`` or any
+    ``Mapping`` — ``MappingProxyType``, etc.). For mappings, it recursively updates
+    values. For all other types (including lists), values from ``updates`` override
+    the target values.
+
+    The merged ``target_dict`` always holds plain ``dict`` instances at recursion
+    points, even when an input branch was a frozen ``Mapping``. Downstream code that
+    iterates results expecting a real ``dict`` (Pydantic ``model_validate`` on a
+    sub-tree, deep-merge with another layer) stays compatible.
 
     Args:
         target_dict (Dict[str, Any]): The dictionary to update. This dictionary
             will be modified in place.
-        updates (Dict[str, Any]): The dictionary containing updates to apply.
+        updates: The mapping containing updates to apply.
 
     Example:
         >>> base = {"a": 1, "b": {"x": 2, "y": 3}, "c": [1, 2]}
@@ -253,8 +250,10 @@ def deep_update(target_dict: dict[str, Any], updates: dict[str, Any]):
 
     """
     for key, value in updates.items():
-        if isinstance(value, dict) and key in target_dict and isinstance(target_dict[key], dict):
+        if isinstance(value, Mapping) and key in target_dict and isinstance(target_dict[key], dict):
             deep_update(target_dict[key], value)  # pyright: ignore[reportUnknownArgumentType]
+        elif isinstance(value, Mapping) and not isinstance(value, dict):
+            target_dict[key] = dict(value)  # pyright: ignore[reportUnknownArgumentType]
         else:
             target_dict[key] = value
 

@@ -1,10 +1,27 @@
 from typing_extensions import override
 
-from pipelex.base_exceptions import ErrorReport, PipelexError
+from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexError
 
 
 class TemporalFlowError(PipelexError):
     pass
+
+
+class UnrecoverableWorkflowFailureError(TemporalFlowError):
+    """Synthesized when a Temporal workflow failure carries no recoverable ``ErrorReport``.
+
+    ``recover_error_report`` is total — every ``BaseException`` produces an
+    ``ErrorReport``. When the failure has no embedded report (a non-Pipelex
+    worker exception, a Temporal infra error, a heartbeat timeout), we
+    synthesize this exception and return its ``to_error_report()``. That
+    gives consumers a uniform shape with a
+    stable identity (``error_type`` / ``title`` / ``type_uri``) and the
+    ``RUNTIME`` classification, plus the most informative message we could
+    recover from the failure chain.
+    """
+
+    error_domain = ErrorDomain.RUNTIME
+    _declared_title = "Unrecoverable workflow failure"
 
 
 class WorkflowInputError(TemporalFlowError):

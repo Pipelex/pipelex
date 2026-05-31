@@ -27,7 +27,7 @@ class MyContent(StructuredContent):
     value = "imported"
 """)
         module = import_module_from_file_if_has_classes(
-            str(test_file_path),
+            test_file_path,
             base_class_names=["StructuredContent"],
         )
         assert module is not None
@@ -48,7 +48,7 @@ def some_function():
     pass
 """)
         module = import_module_from_file_if_has_classes(
-            str(test_file_path),
+            test_file_path,
             base_class_names=["StructuredContent"],
         )
         assert module is None
@@ -62,7 +62,7 @@ def some_function():
 class AnyClass:
     value = "any_class"
 """)
-        module = import_module_from_file_if_has_classes(str(test_file_path))
+        module = import_module_from_file_if_has_classes(test_file_path)
         assert module is not None
         assert hasattr(module, "AnyClass")
         assert module.AnyClass.value == "any_class"
@@ -76,5 +76,5 @@ def some_function():
 
 variable = 42
 """)
-        module = import_module_from_file_if_has_classes(str(test_file_path))
+        module = import_module_from_file_if_has_classes(test_file_path)
         assert module is None

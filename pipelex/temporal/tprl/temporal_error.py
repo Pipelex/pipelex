@@ -1,5 +1,4 @@
 from collections.abc import Sequence
-from dataclasses import fields
 from typing import Any, cast
 
 from pydantic import ValidationError
@@ -9,8 +8,18 @@ from temporalio.exceptions import ApplicationError
 from pipelex.base_exceptions import ErrorReport, PipelexError
 from pipelex.cogt.exceptions import find_inference_error_category_in_chain
 from pipelex.config import get_config
+from pipelex.temporal.exceptions import UnrecoverableWorkflowFailureError
 from pipelex.temporal.log_temporal import activity_log, workflow_log
 from pipelex.types import Self
+
+_ERROR_REPORT_REQUIRED_KEYS: frozenset[str] = frozenset({"error_type", "message", "title", "type_uri"})
+
+# Suffixed onto the synthesized ``UnrecoverableWorkflowFailureError`` message when
+# the bridge-side schema-validation fallback in :func:`recover_error_report` fires.
+# Detectors (tests, ops dashboards, the documentation in
+# ``docs/under-the-hood/error-model.md``) reference this marker as a stable
+# contract — import the constant instead of duplicating the literal.
+_ERROR_REPORT_VALIDATION_FAILED_MARKER: str = "[error report failed schema validation]"
 
 
 def error_report_dict_from_details(details: Sequence[Any]) -> dict[str, Any] | None:
@@ -18,11 +27,13 @@ def error_report_dict_from_details(details: Sequence[Any]) -> dict[str, Any] | N
 
     The bridge packs ``exc.to_error_report().to_dict()`` as the first details
     entry. After Temporal serialization the dict comes back as a plain mapping;
-    we identify it by its ``error_type`` / ``message`` shape so an unrelated
-    details payload is not mistaken for an error report.
+    we identify it by the presence of every ``ErrorReport``-mandatory key
+    (``error_type`` / ``message`` / ``title`` / ``type_uri``) so an unrelated
+    details payload that happens to carry only two of them is not picked up
+    and routed into the schema-validation fallback.
     """
     for entry in details:
-        if isinstance(entry, dict) and "error_type" in entry and "message" in entry:
+        if isinstance(entry, dict) and all(key in entry for key in _ERROR_REPORT_REQUIRED_KEYS):
             return cast("dict[str, Any]", entry)
     return None
 
@@ -54,29 +65,79 @@ def _find_error_report_dict(exc: BaseException) -> dict[str, Any] | None:
     return None
 
 
-def recover_error_report(exc: BaseException) -> ErrorReport | None:
+def _message_from_exc(exc: BaseException) -> str:
+    """Return the most informative message available from a Temporal failure chain.
+
+    ``WorkflowFailureError`` carries the generic outer text ``"Workflow execution failed"``;
+    the underlying ``__cause__`` (a Temporal ``ApplicationError`` carrying the
+    worker exception, or a non-Temporal exception) holds the real detail. We walk
+    the ``__cause__`` chain and surface the deepest non-empty message, falling
+    back to ``repr(exc)`` when every message in the chain is unset.
+
+    A whitespace-only ``str(node)`` is treated the same as empty — without the
+    ``strip()`` guard, a node whose message is purely spaces or newlines would
+    win and the synthesized preamble would be visually broken.
+    """
+    deepest_message = ""
+    node: BaseException | None = exc
+    seen: set[int] = set()
+    while node is not None and id(node) not in seen:
+        seen.add(id(node))
+        text = str(node)
+        if text.strip():
+            deepest_message = text
+        node = node.__cause__
+    return deepest_message or repr(exc)
+
+
+def recover_error_report(exc: BaseException) -> ErrorReport:
     """Recover the structured ``ErrorReport`` from a Temporal failure.
 
     Walks the ``__cause__`` chain for an ``ApplicationError`` carrying a
     details-packed report (see :func:`error_report_dict_from_details`) and
-    rebuilds an :class:`ErrorReport` from it. Returns ``None`` when no such
-    payload is present, so the caller can fall back to a generic error.
+    rebuilds an :class:`ErrorReport` from it. When no such payload is present
+    in the chain — a non-Pipelex exception, a worker crash, a heartbeat
+    timeout, or anything else that crossed the boundary without going through
+    the activity bridge — synthesizes an :class:`UnrecoverableWorkflowFailureError`
+    report so callers in the error-recovery path always have a structured
+    report to surface. The synthesized report carries the most informative
+    message recoverable from the failure chain (see :func:`_message_from_exc`)
+    and a stable identity / classification
+    (``error_type="UnrecoverableWorkflowFailureError"``,
+    ``error_domain=RUNTIME``).
 
-    Tolerant of worker/submitter version skew (normal during a rolling deploy):
-    unknown keys — a field a newer worker added — are dropped before validation,
-    and a dict that still fails ``ErrorReport.from_dict`` (a malformed or
-    otherwise schema-drifted payload) yields ``None`` rather than propagating a
-    ``ValidationError`` out of the error-recovery path.
+    A report dict that is found but fails :meth:`ErrorReport.from_dict`
+    validation is an internal contract violation within one deploy — the
+    activity bridge and the submitter share the schema. Raising there would
+    abort the caller before it can deliver the failure webhook, leaving the
+    receiver with no notification at all, so this synthesizes the same
+    :class:`UnrecoverableWorkflowFailureError` fallback — carrying the
+    recovered ``message`` and an ``[error report failed schema validation]``
+    marker. The failed run is still reported to the receiver and the contract
+    bug stays visible: a bug to fix, but not at the cost of a silent run.
     """
     report_dict = _find_error_report_dict(exc)
-    if report_dict is None:
-        return None
-    known_fields = {field.name for field in fields(ErrorReport)}
-    trimmed = {key: value for key, value in report_dict.items() if key in known_fields}
-    try:
-        return ErrorReport.from_dict(trimmed)
-    except ValidationError:
-        return None
+    if report_dict is not None:
+        try:
+            return ErrorReport.from_dict(report_dict)
+        except ValidationError:
+            # The details payload looked like a report — it carried error_type
+            # and message — but failed the ErrorReport schema. Synthesize the
+            # fallback instead of raising, so the caller still delivers the
+            # failure webhook; the recovered message plus marker keep the
+            # contract bug visible on the wire.
+            # A whitespace-only ``report_dict["message"]`` is treated the same
+            # as missing — without the ``strip()`` guard, the fallback would not
+            # fire and the synthesized preamble would render as a visually
+            # broken `` [error report failed schema validation]``.
+            raw_message = report_dict.get("message")
+            if isinstance(raw_message, str) and raw_message.strip():
+                recovered_message = raw_message
+            else:
+                recovered_message = _message_from_exc(exc)
+            fallback_message = f"{recovered_message} {_ERROR_REPORT_VALIDATION_FAILED_MARKER}"
+            return UnrecoverableWorkflowFailureError(fallback_message).to_error_report()
+    return UnrecoverableWorkflowFailureError(_message_from_exc(exc)).to_error_report()
 
 
 class TemporalError(ApplicationError):
@@ -87,10 +148,9 @@ class TemporalError(ApplicationError):
     - ``non_retryable``: when the exception's ``__cause__`` chain carries a
       ``CogtError`` with an ``InferenceErrorCategory`` the flag is derived from
       ``category.is_retryable`` — recovered even under the ``PipeRunError`` /
-      ``PipeRouterError`` / ``PipelineExecutionError`` wrappers, by the same
-      chain walk the in-process ``PipeRouter`` retry loop uses. For a chain
-      carrying no category the bridge falls back to the configured
-      ``non_retryable_error_types`` class-name list.
+      ``PipeRouterError`` / ``PipelineExecutionError`` wrappers, by walking the
+      ``__cause__`` chain. For a chain carrying no category the bridge falls
+      back to the configured ``non_retryable_error_types`` class-name list.
     - ``error_report``: the structured ``ErrorReport`` dict is packed into
       ``ApplicationError.details`` so workflow code keeps ``error_category``,
       ``user_action``, ``model`` and ``provider`` — not just the message string.
@@ -210,9 +270,8 @@ class TemporalError(ApplicationError):
         activity boundary, so the ``InferenceErrorCategory`` is recovered by walking the
         ``__cause__`` chain rather than inspecting only the outer exception. This keeps
         ``non_retryable`` consistent with the chain-enriched ``retryable`` field of the
-        ``ErrorReport`` packed alongside it, and with the in-process ``PipeRouter`` retry
-        loop. A chain carrying no category falls back to the configured
-        ``non_retryable_error_types`` class-name list.
+        ``ErrorReport`` packed alongside it. A chain carrying no category falls back to
+        the configured ``non_retryable_error_types`` class-name list.
         """
         error_category = find_inference_error_category_in_chain(exc)
         if error_category is not None:

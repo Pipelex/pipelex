@@ -3,10 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from pipelex.tools.typing.module_inspector import (
-    ModuleFileError,
-    import_module_from_file,
-)
+from pipelex.tools.typing.exceptions import ModuleFileError
+from pipelex.tools.typing.module_inspector import import_module_from_file
 
 
 class TestImportModuleFromFile:
@@ -29,7 +27,7 @@ def test_function():
 class TestClass:
     pass
 """)
-        module = import_module_from_file(str(test_file_path))
+        module = import_module_from_file(test_file_path)
         assert hasattr(module, "test_function")
         assert hasattr(module, "TestClass")
         assert module.test_function() == "test_value"
@@ -39,14 +37,14 @@ class TestClass:
         test_file_path = tmp_path / "test_file.txt"
         test_file_path.write_text("This is not Python code")
         with pytest.raises(ModuleFileError) as excinfo:
-            import_module_from_file(str(test_file_path))
+            import_module_from_file(test_file_path)
         assert "is not a Python file" in str(excinfo.value)
 
     def test_import_nonexistent_file_raises_error(self, tmp_path: Path):
         """Test that importing a nonexistent file raises FileNotFoundError."""
         nonexistent_file_path = tmp_path / "nonexistent.py"
         with pytest.raises(FileNotFoundError):
-            import_module_from_file(str(nonexistent_file_path))
+            import_module_from_file(nonexistent_file_path)
 
     def test_import_file_with_syntax_error_raises_error(self, tmp_path: Path):
         """Test that importing a file with syntax errors raises SyntaxError."""
@@ -56,7 +54,7 @@ def test_function(
     return "missing closing parenthesis"
 """)
         with pytest.raises(SyntaxError):
-            import_module_from_file(str(test_file_path))
+            import_module_from_file(test_file_path)
 
     def test_import_file_with_import_error_raises_error(self, tmp_path: Path):
         """Test that importing a file with import errors raises ImportError."""
@@ -65,7 +63,7 @@ def test_function(
 import nonexistent_module
 """)
         with pytest.raises(ImportError):
-            import_module_from_file(str(test_file_path))
+            import_module_from_file(test_file_path)
 
     def test_module_added_to_sys_modules(self, tmp_path: Path):
         """Test that imported module is added to sys.modules."""
@@ -74,7 +72,7 @@ import nonexistent_module
 def test_function():
     return "test_value"
 """)
-        module = import_module_from_file(str(test_file_path))
+        module = import_module_from_file(test_file_path)
         # The module name is derived from the full file path
         module_name = module.__name__
         assert module_name.endswith("test_module_sys")
@@ -90,6 +88,6 @@ def test_function():
 def test_function():
     return "test_value"
 """)
-        module = import_module_from_file(str(test_file_path))
+        module = import_module_from_file(test_file_path)
         assert hasattr(module, "test_function")
         assert module.test_function() == "test_value"

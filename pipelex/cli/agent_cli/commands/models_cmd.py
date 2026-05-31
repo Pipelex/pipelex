@@ -11,7 +11,6 @@ from pipelex.pipelex import Pipelex
 
 
 def agent_models_cmd(
-    ctx: typer.Context,
     model_type: Annotated[
         list[ModelCategory] | None,
         typer.Option("--type", "-t", help="Filter by model category (repeatable): llm, extract, img_gen, search"),
@@ -36,7 +35,7 @@ def agent_models_cmd(
     """
     set_agent_cli_error_format(error_format or output_format)
     try:
-        make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"], needs_inference=False, needs_model_specs=backend is not None)
+        make_pipelex_for_agent_cli(needs_inference=False, needs_model_specs=backend is not None)
 
         result = list_models(categories=model_type, backend=backend)
 

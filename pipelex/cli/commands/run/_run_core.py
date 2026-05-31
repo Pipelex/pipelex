@@ -15,9 +15,10 @@ from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_availability_error,
     handle_model_choice_error,
+    print_traceback_if_requested,
 )
 from pipelex.config import get_config
-from pipelex.core.interpreter.exceptions import MthdsDecodeError, PipelexInterpreterError
+from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
@@ -30,8 +31,9 @@ from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexRunner
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
+from pipelex.tools.misc.exceptions import JsonTypeError
 from pipelex.tools.misc.file_utils import get_incremental_directory_path
-from pipelex.tools.misc.json_utils import JsonTypeError, load_json_dict_from_path, save_as_json_to_path
+from pipelex.tools.misc.json_utils import load_json_dict_from_path, save_as_json_to_path
 from pipelex.tools.misc.package_utils import get_package_version
 
 COMMAND = "run"
@@ -76,9 +78,11 @@ async def _execute_run(
                     raise typer.Exit(1)
                 pipe_code = main_pipe_code
         except FileNotFoundError as exc:
+            print_traceback_if_requested(get_console())
             typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
-        except (PipelexInterpreterError, MthdsDecodeError) as exc:
+        except PipelexInterpreterError as exc:
+            print_traceback_if_requested(get_console())
             typer.secho(f"Failed to parse bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
     elif not pipe_code:
@@ -92,19 +96,22 @@ async def _execute_run(
             try:
                 pipeline_inputs = json.loads(inputs)
             except json.JSONDecodeError as json_decode_exc:
+                print_traceback_if_requested(get_console())
                 typer.secho(f"Failed to parse inline JSON inputs: {json_decode_exc}", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from json_decode_exc
         else:
             try:
-                pipeline_inputs = load_json_dict_from_path(inputs)
+                pipeline_inputs = load_json_dict_from_path(Path(inputs))
                 # Resolve relative url paths against the inputs file's parent directory
                 base_dir = Path(inputs).parent.resolve()
                 pipeline_inputs = resolve_inputs_paths(pipeline_inputs, base_dir)
                 typer.echo(f"Loaded inputs from: {inputs}")
             except FileNotFoundError as file_not_found_exc:
+                print_traceback_if_requested(get_console())
                 typer.secho(f"Failed to load input file '{inputs}': file not found", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from file_not_found_exc
             except JsonTypeError as json_type_error_exc:
+                print_traceback_if_requested(get_console())
                 typer.secho(f"Failed to parse input file '{inputs}': must be a valid JSON dictionary", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from json_type_error_exc
 
@@ -133,9 +140,11 @@ async def _execute_run(
         )
         pipe_output = response.pipe_output
     except PipelineExecutionError as exc:
+        print_traceback_if_requested(get_console())
         typer.secho(f"Failed to execute pipeline '{exc.pipe_code}': {exc}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1) from exc
     except PipelexError as exc:
+        print_traceback_if_requested(get_console())
         typer.secho(f"Failed to execute pipeline '{pipe_code or bundle_path}': {exc}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1) from exc
 
@@ -150,7 +159,7 @@ async def _execute_run(
     needs_output_path = (graph_spec is not None) or save_main_stuff or save_working_memory
 
     if needs_output_path:
-        output_path = Path(get_incremental_directory_path(base_path=output_dir, base_name=f"{pipe_code}_output"))
+        output_path = get_incremental_directory_path(base_path=Path(output_dir), base_name=f"{pipe_code}_output")
         output_path.mkdir(parents=True, exist_ok=True)
 
     # Save graph outputs if requested
@@ -210,7 +219,7 @@ async def _execute_run(
         else:
             working_memory_output_path = str(output_path / "working_memory.json")
         working_memory_dict = pipe_output.working_memory.smart_dump()
-        save_as_json_to_path(object_to_save=working_memory_dict, path=working_memory_output_path)
+        save_as_json_to_path(object_to_save=working_memory_dict, path=Path(working_memory_output_path))
         log.verbose(f"Working memory saved to: {working_memory_output_path}")
 
     reporting_config = get_config().pipelex.reporting_config
@@ -307,6 +316,7 @@ def execute_run(
 
     except PipelexError as exc:
         console = get_console()
+        print_traceback_if_requested(console)
         console.print("\n[bold red]Failed to execute pipeline[/bold red]\n")
         console.print(f"  {exc.message}\n")
         raise typer.Exit(1) from exc

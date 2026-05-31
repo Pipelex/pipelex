@@ -14,7 +14,7 @@ with workflow.unsafe.imports_passed_through():
     from pipelex.graph.graph_tracer_manager import GraphTracerManager
     from pipelex.hub import get_library_manager, get_report_delegate, set_current_library, teardown_current_library
     from pipelex.pipe_run.pipe_job import PipeJob
-    from pipelex.temporal.log_temporal import workflow_log
+    from pipelex.temporal.log_temporal import WorkflowLog
     from pipelex.temporal.tprl.temporal_error import TemporalError
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
     from pipelex.temporal.tprl_pipe.act_flush_trace_events import FlushTraceEventsArg, act_flush_trace_events
@@ -30,6 +30,9 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
         self,
         workflow_arg: PipeJob,
     ) -> PipeOutput:
+        # Bound once per invocation: every record below carries this run's
+        # request_id (None when the run carries no inbound API request id).
+        workflow_log = WorkflowLog(request_id=workflow_arg.job_metadata.request_id)
         workflow_log.debug("Workflow start")
 
         pipe = workflow_arg.pipe

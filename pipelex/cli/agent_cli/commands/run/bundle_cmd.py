@@ -17,7 +17,7 @@ from pipelex.cli.agent_cli.commands.run._output_helpers import format_run_markdo
 from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core
 from pipelex.cli.agent_cli.commands.run._run_core_api import run_pipeline_core_api
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs
-from pipelex.core.interpreter.exceptions import MthdsDecodeError, PipelexInterpreterError
+from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
@@ -147,7 +147,7 @@ def run_bundle_cmd(
             agent_error(f"Bundle file not found: {bundle_path}", "FileNotFoundError", cause=exc)
         except (OSError, UnicodeDecodeError) as exc:
             agent_error(f"Failed to read bundle file '{bundle_path}': {exc}", type(exc).__name__, cause=exc)
-        except (PipelexInterpreterError, MthdsDecodeError) as exc:
+        except PipelexInterpreterError as exc:
             agent_error(f"Failed to parse bundle '{bundle_path}': {exc}", type(exc).__name__, cause=exc)
 
     # Load inputs: --inputs flag takes priority, then stdin fallback, then auto-detected
@@ -187,7 +187,7 @@ def run_bundle_cmd(
                 agent_error(str(exc), type(exc).__name__, cause=exc)
 
         case RunnerType.PIPELEX:
-            make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"], needs_inference=not dry_run, needs_model_specs=True)
+            make_pipelex_for_agent_cli(needs_inference=not dry_run, needs_model_specs=True)
 
             try:
                 result = asyncio.run(

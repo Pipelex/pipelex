@@ -186,7 +186,7 @@ async def make_base64_url_from_any_uri(
         case ResolvedHttpUrl():
             base64_url = await make_base64_url_from_http_url(url=resolved_uri.url)
         case ResolvedLocalPath():
-            base64_url = await make_base64_url_from_path(path=resolved_uri.path)
+            base64_url = await make_base64_url_from_path(path=Path(resolved_uri.path))
         case ResolvedPipelexStorage():
             if storage_provider is None:
                 msg = f"Cannot convert pipelex-storage:// URI to base64 without a storage provider: {uri}"

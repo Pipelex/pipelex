@@ -1,6 +1,6 @@
 import asyncio
 import base64
-import os
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import aiofiles
@@ -397,7 +397,7 @@ class MistralFactory:
             case PreparedFileLocalPath():
                 uploaded_file_id = await cls.upload_file_to_mistral_for_ocr(
                     mistral_client=mistral_client,
-                    file_path=prepared.path,
+                    file_path=Path(prepared.path),
                 )
                 signed_url_response = await mistral_client.files.get_signed_url_async(file_id=uploaded_file_id)
                 document_url = signed_url_response.url
@@ -422,7 +422,7 @@ class MistralFactory:
     async def upload_file_to_mistral_for_ocr(
         cls,
         mistral_client: Mistral,
-        file_path: str,
+        file_path: Path,
     ) -> str:
         """Upload a local file to Mistral.
 
@@ -438,7 +438,7 @@ class MistralFactory:
             file_content = await file.read()
 
         uploaded_file = await mistral_client.files.upload_async(
-            file={"file_name": os.path.basename(file_path), "content": file_content},
+            file={"file_name": file_path.name, "content": file_content},
             purpose="ocr",
         )
         return uploaded_file.id

@@ -1,7 +1,7 @@
 import pytest
 
 from pipelex import pretty_print
-from pipelex.cogt.templating.template_errors import TemplateSigilSyntaxError
+from pipelex.cogt.templating.exceptions import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 
 

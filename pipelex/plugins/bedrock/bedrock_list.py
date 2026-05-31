@@ -11,7 +11,7 @@ from pipelex.config import get_config
 from pipelex.exceptions import MissingDependencyError
 from pipelex.hub import get_console
 from pipelex.plugins.plugin_sdk_registry import Plugin
-from pipelex.tools.aws.aws_config import AwsCredentialsError
+from pipelex.tools.aws.exceptions import AwsCredentialsError
 
 if TYPE_CHECKING:
     from pipelex.cogt.model_backends.backend import InferenceBackend

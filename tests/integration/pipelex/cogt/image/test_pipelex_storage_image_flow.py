@@ -9,6 +9,7 @@ These tests verify the complete flow:
 """
 
 import base64
+from pathlib import Path
 
 import pytest
 import pytest_asyncio
@@ -33,7 +34,7 @@ async def storage_provider_with_test_image() -> tuple[InMemoryStorageProvider, s
     """Create an in-memory storage with a real test image and return (provider, uri)."""
     provider = InMemoryStorageProvider()
     # Load a real test image
-    image_bytes = load_binary(path=TEST_IMAGE_PATH)
+    image_bytes = load_binary(path=Path(TEST_IMAGE_PATH))
     key = "pipeline_run_123/generated_image.png"
     uri = await provider.store(data=image_bytes, key=key)
     return provider, uri

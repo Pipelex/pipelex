@@ -22,14 +22,10 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
 from pipelex.hub import get_models_manager
+from pipelex.plugins.azure_rest.azure_exceptions import AzureCredentialsError
 from pipelex.plugins.plugin import Plugin
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.system.exceptions import CredentialsError
 from pipelex.tools.log.log import log
-
-
-class AzureCredentialsError(CredentialsError):
-    pass
 
 
 class AzureImgGenWorker(ImgGenWorkerAbstract):

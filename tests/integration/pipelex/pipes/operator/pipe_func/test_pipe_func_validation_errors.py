@@ -12,7 +12,8 @@ from typing import ClassVar
 import pytest
 
 from pipelex.libraries.exceptions import LibraryError
-from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
+from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.registries.func_registry import func_registry
 
 

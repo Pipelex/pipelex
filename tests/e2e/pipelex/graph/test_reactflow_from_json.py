@@ -22,8 +22,8 @@ def _get_next_output_folder() -> Path:
 
     Creates folders like: temp/test_outputs/reactflow_from_json/run_01, run_02, etc.
     """
-    base_dir = str(Path(TEST_OUTPUTS_DIR) / "reactflow_from_json")
-    return Path(get_incremental_directory_path(base_dir, "run"))
+    base_dir = Path(TEST_OUTPUTS_DIR) / "reactflow_from_json"
+    return get_incremental_directory_path(base_dir, "run")
 
 
 class TestReactFlowFromJson:
@@ -47,7 +47,7 @@ class TestReactFlowFromJson:
         json_path = Path(graph_json_path)
         assert json_path.exists(), f"Graph JSON file not found: {json_path}"
 
-        json_str = load_text_from_path(str(json_path))
+        json_str = load_text_from_path(json_path)
         graph_spec = GraphSpec.model_validate_json(json_str)
 
         # Verify graph loaded correctly
@@ -93,7 +93,7 @@ class TestReactFlowFromJson:
         _ = topic  # Used for test identification
 
         # Load graph from JSON
-        json_str = load_text_from_path(graph_json_path)
+        json_str = load_text_from_path(Path(graph_json_path))
         graph_spec = GraphSpec.model_validate_json(json_str)
 
         # Generate ReactFlow HTML

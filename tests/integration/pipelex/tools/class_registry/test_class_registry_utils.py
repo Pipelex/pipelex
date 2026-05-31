@@ -16,7 +16,7 @@ class TestClassRegistryUtilsIntegration:
         """Integration test for registering StuffContent classes recursively."""
         class_registry = get_class_registry()
         ClassRegistryUtils.register_classes_in_folder(
-            folder_path=ClassRegistryTestCases.MODEL_FOLDER_PATH,
+            folder_path=Path(ClassRegistryTestCases.MODEL_FOLDER_PATH),
             base_class=StuffContent,
             is_recursive=True,
         )
@@ -30,7 +30,7 @@ class TestClassRegistryUtilsIntegration:
         """Integration test for registering StuffContent classes non-recursively."""
         class_registry = get_class_registry()
         ClassRegistryUtils.register_classes_in_folder(
-            folder_path=ClassRegistryTestCases.MODEL_FOLDER_PATH,
+            folder_path=Path(ClassRegistryTestCases.MODEL_FOLDER_PATH),
             base_class=StuffContent,
             is_recursive=False,
         )
@@ -50,7 +50,7 @@ class TestClassRegistryUtilsIntegration:
             if class_registry.has_class(class_name):
                 classes_before.add(class_name)
 
-        ClassRegistryUtils.register_classes_in_folder(folder_path=ClassRegistryTestCases.MODEL_FOLDER_PATH, base_class=None, is_recursive=True)
+        ClassRegistryUtils.register_classes_in_folder(folder_path=Path(ClassRegistryTestCases.MODEL_FOLDER_PATH), base_class=None, is_recursive=True)
 
         # Should register all classes
         for class_name in ["Class1", "Class2", "Class3", "Class4", "ClassA", "ClassB"]:
@@ -64,7 +64,7 @@ class TestClassRegistryUtilsIntegration:
         empty_dir.mkdir()
 
         # This should not raise an error and should not register any classes
-        ClassRegistryUtils.register_classes_in_folder(folder_path=str(empty_dir), base_class=StuffContent, is_recursive=True)
+        ClassRegistryUtils.register_classes_in_folder(folder_path=empty_dir, base_class=StuffContent, is_recursive=True)
 
         # Verify no new classes were registered (we can't easily check the exact count,
         # but the operation should complete without error)

@@ -27,9 +27,9 @@ Two entry points:
 """
 
 from collections.abc import Sequence
-from dataclasses import dataclass
 from typing import Final
 
+from pydantic import BaseModel, ConfigDict
 from temporalio.api.enums.v1 import IndexedValueType
 from temporalio.api.operatorservice.v1 import (
     AddSearchAttributesRequest,
@@ -47,14 +47,21 @@ from pipelex.temporal.exceptions import SearchAttributeRegistrationError
 PIPELEX_SETUP_CLI_COMMAND: Final[str] = "pipelex setup-temporal-namespace"
 
 
-@dataclass(frozen=True)
-class RegistrationFailure:
+class RegistrationFailure(BaseModel):
     """Structured permission-denied outcome from
     ``ensure_required_search_attributes_registered``. The CLI command formats
     this into the fallback runbook so operators whose worker API key lacks
     ``OperatorService.AddSearchAttributes`` permission know which raw
     ``temporal`` / ``tcld`` invocations to run instead.
+
+    Modeled (not a ``NamedTuple``) so it stays type-distinct from the
+    ``tuple[str, ...]`` success arm of the
+    ``RegistrationFailure | tuple[str, ...]`` return — callers discriminate via
+    ``isinstance(x, RegistrationFailure)`` and a plain success tuple must never
+    satisfy that check.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     namespace: str
     missing: tuple[str, ...]

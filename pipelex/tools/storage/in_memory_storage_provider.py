@@ -2,7 +2,8 @@ from pydantic import RootModel
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.tools.misc.filetype_utils import FileTypeError, detect_file_type_from_bytes
+from pipelex.tools.misc.exceptions import FileTypeError
+from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract, StoredData
 
