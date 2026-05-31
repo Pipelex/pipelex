@@ -77,11 +77,11 @@ A def is skipped when it is registered with a framework whose calling convention
 
 - Typer/click commands and callbacks — any decorator that is an attribute access ending in `.command` or `.callback`.
 - Temporal handlers — `activity.defn`, `workflow.run`, and defensively `workflow.signal`, `workflow.query`, `workflow.update` (none of the latter three are used yet, but they are part of the worker entrypoint surface). Note `workflow.defn` decorates classes, not functions, so it is irrelevant. The custom `@convert_pipelex_errors` decorator is stacked directly below `@activity.defn` and is NOT a framework decorator — the guard must scan the WHOLE decorator stack for a framework match, not just the innermost or outermost decorator.
-- pytest fixtures — `pytest.fixture` (the only src-side fixtures live in the shipped `pipelex/test_extras/shared_pytest_plugins.py` plugin module).
+- pytest fixtures — `fixture`, matched on the bare decorator name so both `@pytest.fixture` and bare `@fixture` (`from pytest import fixture`) are covered (the only src-side fixtures live in the shipped `pipelex/test_extras/shared_pytest_plugins.py` plugin module).
 
 FastAPI is intentionally absent: there are no route handlers in `pipelex/` source — the FastAPI server lives in the separate `pipelex-api/` repo.
 
-Known coverage gap (documented, not silently ignored): some Typer commands are registered by call-style `app.command(name=...)(some_fn)` against functions defined in separate modules that carry NO decorator, so a decorator-keyed guard cannot see them via the framework carve-out. These target functions consistently type their parameters as `Annotated[T, typer.Argument(...)]` / `Annotated[T, typer.Option(...)]`. The guard treats a def as a framework entrypoint when any of its parameters carry `typer.Argument`/`typer.Option` metadata in their `Annotated[...]` annotation, which closes the gap without resorting to a broad path-based exclusion of CLI modules.
+Known coverage gap (documented, not silently ignored): some Typer commands are registered by call-style `app.command(name=...)(some_fn)` against functions defined in separate modules that carry NO decorator, so a decorator-keyed guard cannot see them via the framework carve-out. These target functions consistently type their parameters as `Annotated[T, typer.Argument(...)]` / `Annotated[T, typer.Option(...)]`. The guard treats a def as a framework entrypoint when any of its parameters carry `Argument`/`Option` metadata in their `Annotated[...]` annotation — matched on the trailing callee name, so both the qualified `typer.Option(...)` form and the bare `Option(...)` form (`from typer import Option`) are recognized — which closes the gap without resorting to a broad path-based exclusion of CLI modules.
 
 ### Base / Protocol / ABC overrides
 
@@ -136,14 +136,16 @@ A symmetric tuple on the allowlist — exempt entirely, stays positional:
 def set_env(key: str, value: str) -> None: ...   # set_env("PIPELEX_ENV", "prod")
 ```
 
-A directional pair with a trailing option — NOT a whole-function exemption; the option becomes keyword-only while the leading pair stays positional under Exception 1:
+A directional pair with a trailing option — under the strict rule only the subject may stay positional, so the second operand and the option both become keyword-only:
 
 ```python
-# before
+# before — copy_file(src, dst, True): what does True mean?
 def copy_file(source_path, target_path, overwrite=True): ...
-# after — copy_file(src, dst, overwrite=False); the bool can no longer be a mystery positional
-def copy_file(source_path, target_path, *, overwrite=True): ...
+# after — copy_file(src, target_path=dst, overwrite=False); only the subject stays positional
+def copy_file(source_path, *, target_path, overwrite=True): ...
 ```
+
+Keeping the `source_path`/`target_path` pair positional while still forcing `overwrite` keyword is not expressible today; it would need the per-entry leading-positional-count allowlist extension described in the Exception 2 open question for burn-down.
 
 An override — skipped because of `@override`; fix the base signature instead:
 
@@ -168,3 +170,5 @@ def normalize(cls, value, info): ...
 ## Rollout
 
 The guard ships red-to-green, not as a one-shot cleanup. On introduction the guard records the current set of violations to a baseline file; the build fails only on NEW violations not present in the baseline, and the baseline shrinks as packages are migrated to the convention. This lets the rule be enforced immediately for new code while the existing population is converted package by package. The baseline is removed once the source tree is fully compliant.
+
+Known limitation (documented, not silently ignored): the baseline key is `<relative_path>::<qualified_name>` with no signature or parameter-count component, so the guard tolerates *growth* of an already-baselined function — adding more positional-or-keyword params to a function that is already a known violation does not trip the build. This is acceptable: a baselined function is already non-compliant and slated for migration, the convention's atomic unit is binary (the bare `*` is either present or not), and the exposure is bounded by the burn-down, after which the baseline is deleted entirely. A signature-aware key was deliberately rejected: keying on parameter count would flag *partial improvements* — shrinking a baselined `f(a, b, c, d)` to `f(a, b, c)` would change the key, drop the old entry to stale, and fail CI on a function that got strictly better — which is exactly contrary to the red-to-green philosophy above.

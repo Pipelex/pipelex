@@ -241,6 +241,17 @@ class TestCheckKeywordOnly:
         )
         assert violations == []
 
+    def test_carveout_bare_fixture_skipped(self) -> None:
+        """A bare @fixture (from pytest import fixture) is skipped like @pytest.fixture."""
+        violations = _violate(
+            """
+            @fixture(scope="session")
+            def my_fixture(request, config, tmp_path):
+                ...
+            """
+        )
+        assert violations == []
+
     def test_carveout_override_skipped(self) -> None:
         """@override defs are skipped — the convention lives on the base."""
         violations = _violate(
@@ -258,6 +269,16 @@ class TestCheckKeywordOnly:
         violations = _violate(
             """
             def serve(host: Annotated[str, typer.Argument(help="host")], port: Annotated[int, typer.Option()]):
+                ...
+            """
+        )
+        assert violations == []
+
+    def test_carveout_bare_typer_annotated_skipped(self) -> None:
+        """Bare Argument/Option (from typer import Argument, Option) are detected like the qualified form."""
+        violations = _violate(
+            """
+            def serve(host: Annotated[str, Argument(help="host")], port: Annotated[int, Option()]):
                 ...
             """
         )

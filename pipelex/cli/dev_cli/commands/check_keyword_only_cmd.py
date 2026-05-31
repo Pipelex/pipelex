@@ -57,6 +57,10 @@ PYDANTIC_DECORATOR_NAMES = frozenset(
 #: Typer/click decorator attribute suffixes (receiver varies: app/graph_app/show_app/...).
 TYPER_DECORATOR_ATTRS = frozenset({"command", "callback"})
 
+#: Framework decorators matched on their bare name, so both ``@receiver.name`` and bare ``@name`` forms hit.
+#: pytest's ``fixture`` is written both as ``@pytest.fixture`` and as bare ``@fixture`` (``from pytest import fixture``).
+BARE_FRAMEWORK_DECORATOR_NAMES = frozenset({"fixture"})
+
 #: Temporal handler decorators matched on their trailing two attribute segments.
 TEMPORAL_DECORATOR_TAILS = frozenset(
     {
@@ -131,14 +135,17 @@ def _decorator_matches_carveout(decorator: ast.expr) -> bool:
     elif isinstance(target, ast.Attribute):
         bare_name = target.attr
 
-    if bare_name is not None and bare_name in PYDANTIC_DECORATOR_NAMES:
-        return True
-    if bare_name == "override":
-        return True
+    # Bare-name matches — valid whether the decorator is written bare (`@name`) or attributed (`@receiver.name`).
+    if bare_name is not None:
+        if bare_name in PYDANTIC_DECORATOR_NAMES:
+            return True
+        if bare_name in BARE_FRAMEWORK_DECORATOR_NAMES:
+            return True
+        if bare_name == "override":
+            return True
+    # Attribute-only matches — these framework decorators are always written as `receiver.attr`, never bare.
     if isinstance(target, ast.Attribute):
         if target.attr in TYPER_DECORATOR_ATTRS:
-            return True
-        if target.attr == "fixture":
             return True
         tail = _attribute_tail(target)
         if len(tail) >= 2 and tail[-2:] in TEMPORAL_DECORATOR_TAILS:
@@ -160,13 +167,26 @@ def _iter_subscript_metadata(annotation: ast.expr) -> Iterator[ast.expr]:
         yield from slice_value.elts[1:]
 
 
+def _callee_name(func: ast.expr) -> str | None:
+    """The trailing name of a call target: ``typer.Option`` -> ``Option``, bare ``Option`` -> ``Option``."""
+    if isinstance(func, ast.Attribute):
+        return func.attr
+    if isinstance(func, ast.Name):
+        return func.id
+    return None
+
+
 def _annotation_has_typer_metadata(annotation: ast.expr | None) -> bool:
-    """Whether an ``Annotated[...]`` annotation carries ``typer.Argument(...)`` / ``typer.Option(...)`` metadata."""
+    """Whether an ``Annotated[...]`` annotation carries ``Argument(...)`` / ``Option(...)`` metadata.
+
+    Matches the qualified ``typer.Argument(...)`` form and the bare ``Argument(...)`` form alike
+    (``from typer import Argument``), so call-style CLI entrypoints are detected either way.
+    """
     if annotation is None:
         return False
     for metadata in _iter_subscript_metadata(annotation):
         for sub_node in ast.walk(metadata):
-            if isinstance(sub_node, ast.Call) and isinstance(sub_node.func, ast.Attribute) and sub_node.func.attr in TYPER_ANNOTATION_ATTRS:
+            if isinstance(sub_node, ast.Call) and _callee_name(sub_node.func) in TYPER_ANNOTATION_ATTRS:
                 return True
     return False
 
