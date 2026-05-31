@@ -51,7 +51,7 @@ None for this track. The one open-ended item is a review (not a change) of wheth
 
 ## Out of scope — dependencies, not part of this track
 
-These are real and belong to the hosted product, but they are platform/product concerns, not the engine's retry behavior. They live in [../temporal-next/00-enterprise-readiness-analysis.md](../temporal-next/00-enterprise-readiness-analysis.md).
+These are real and belong to the hosted product, but they are platform/product concerns, not the engine's retry behavior. They are tracked in the internal enterprise-readiness plans.
 
 - **Multi-tenant admission control and per-tenant quotas / rate limits.** Tier 1 obeys a rate limit *after* hitting it; proactive pacing keyed to a provider account is separate and platform-global, not per-run.
 - **Caller-supplied run deadline / budget** — a ceiling on total time or spend that bounds every tier. Belongs with the API submission envelope.
@@ -62,5 +62,3 @@ These are real and belong to the hosted product, but they are platform/product c
 
 - [track-temporal-integration.md](track-temporal-integration.md) — Tier 2: how `InferenceErrorCategory` drives Temporal's retry decision.
 - [track-metadata-model.md](track-metadata-model.md) — `ProviderErrorMetadata` carries `retry_after_seconds` for the error report; the SDK does its own `Retry-After` handling for retries.
-- [archive-retry-and-resilience.md](archive-retry-and-resilience.md) — the implementation plan and checkpoint history for the two workstreams that landed this track.
-- [../temporal-next/00-enterprise-readiness-analysis.md](../temporal-next/00-enterprise-readiness-analysis.md) — the multi-tenant / hosted concerns scoped out above.
