@@ -12,6 +12,7 @@ from typing_extensions import override
 
 from pipelex.cli.dev_cli.commands.check_config_sync_cmd import LeadingConfig, check_config_sync_cmd
 from pipelex.cli.dev_cli.commands.check_gateway_models_cmd import check_gateway_models_cmd
+from pipelex.cli.dev_cli.commands.check_keyword_only_cmd import check_keyword_only_cmd
 from pipelex.cli.dev_cli.commands.check_mthds_schema_cmd import check_mthds_schema_cmd
 from pipelex.cli.dev_cli.commands.check_rules_sync_cmd import check_rules_sync_cmd
 from pipelex.cli.dev_cli.commands.check_urls_cmd import DEFAULT_TIMEOUT, check_urls_cmd
@@ -36,6 +37,7 @@ class PipelexDevCLI(TyperGroup):
         return [
             "check-config-sync",
             "check-gateway-models",
+            "check-keyword-only",
             "check-mthds-schema",
             "check-rules",
             "check-urls",
@@ -233,6 +235,28 @@ def check_mthds_schema_command(
     """Verify that the MTHDS JSON Schema file is up-to-date."""
     try:
         check_mthds_schema_cmd(show_diff=show_diff, quiet=quiet)
+    except (typer.Exit, typer.Abort):
+        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
+        raise
+    except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
+        console = get_console()
+        console.print()
+        console.print("[bold red]Unexpected error occurred[/bold red]")
+        console.print()
+        console.print(Traceback())
+        sys.exit(1)
+
+
+@app.command(name="check-keyword-only", help="Enforce the keyword-only-arguments convention across pipelex/ source")
+def check_keyword_only_command(
+    report: Annotated[bool, typer.Option("--report", help="Print the full violation inventory grouped by package")] = False,
+    regen_baseline: Annotated[bool, typer.Option("--regen-baseline", help="Rewrite the baseline file with all current violations")] = False,
+    quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only a single validation line")] = False,
+) -> None:
+    """Enforce the keyword-only-arguments convention across pipelex/ source."""
+    try:
+        check_keyword_only_cmd(report=report, regen_baseline=regen_baseline, quiet=quiet)
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
