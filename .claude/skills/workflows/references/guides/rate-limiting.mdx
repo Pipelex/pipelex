@@ -27,8 +27,10 @@ When **a key is provided**, multiple different activities that use the same key 
 ### Example: Shared Rate-Limited API Client (No Key)
 
 ```python
+from typing import Dict, List
 import mistralai.workflows as workflows
-from mistralai import Mistral, Messages, Depends
+from mistralai.client import Mistral
+from mistralai.workflows import Depends
 from pydantic import BaseModel
 
 def get_mistral_client() -> Mistral:
@@ -40,7 +42,7 @@ def get_mistral_client() -> Mistral:
 
 class CompletionParams(BaseModel):
     model: str
-    messages: Messages
+    messages: List[Dict[str, str]]
 
 @workflows.activity(rate_limit=workflows.RateLimit(time_window_in_sec=1, max_calls=100))
 async def generate_chat_response(

@@ -73,10 +73,10 @@ Customize activity identification with:
 Configure execution time limits to prevent runaway activities:
 
 ```python
-from datetime import datetime
+from datetime import timedelta
 
 @workflows.activity(
-    start_to_close_timeout=datetime.timedelta(minutes=10)
+    start_to_close_timeout=timedelta(minutes=10)
 )
 ```
 

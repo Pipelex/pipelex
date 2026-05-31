@@ -21,6 +21,7 @@ Workers automatically register workflow schedules with Workflows during startup.
 Add schedules to workflows using cron expressions:
 
 ```python
+import mistralai.workflows as workflows
 from mistralai.workflows.models import ScheduleDefinition
 
 schedule = ScheduleDefinition(
@@ -30,6 +31,7 @@ schedule = ScheduleDefinition(
 
 @workflows.workflow.define(schedules=[schedule])
 class ReportWorkflow:
+    @workflows.workflow.entrypoint
     async def run(self, report_type: str = "daily"):
         # Generate report
         pass
@@ -40,12 +42,13 @@ class ReportWorkflow:
 Customize schedule behavior with policies:
 
 ```python
-from mistralai.workflows.models import SchedulePolicy, ScheduleOverlapPolicy
+import mistralai.workflows as workflows
+from mistralai.workflows.models import ScheduleDefinition, SchedulePolicy, ScheduleOverlapPolicy
 
 ## Override default schedule policy
 schedule_policy = SchedulePolicy(
-    catchup_window=timedelta(days=1),  # Allow 1 day of catchup
-    overlap_policy=ScheduleOverlapPolicy.SKIP,  # Skip overlapping executions
+    catchup_window_seconds=86400,  # Allow 1 day of catchup
+    overlap=ScheduleOverlapPolicy.SKIP,  # Skip overlapping executions
 )
 
 schedule = ScheduleDefinition(
@@ -56,6 +59,7 @@ schedule = ScheduleDefinition(
 
 @workflows.workflow.define(schedules=[schedule])
 class ReportWorkflow:
+    @workflows.workflow.entrypoint
     async def run(self, report_type: str = "daily"):
         # Generate report
         pass
@@ -78,7 +82,6 @@ For more details on schedule policies, see the [Temporal SchedulePolicy Document
 ## Complete Example
 
 ```python
-from datetime import timedelta
 import mistralai.workflows as workflows
 from mistralai.workflows.models import ScheduleDefinition, SchedulePolicy, ScheduleOverlapPolicy
 
@@ -87,13 +90,14 @@ backup_schedule = ScheduleDefinition(
     input={"retention_days": 30},
     cron_expressions=["0 3 * * 6"],
     policy=SchedulePolicy(
-        catchup_window=timedelta(days=7),
-        overlap_policy=ScheduleOverlapPolicy.SKIP,
+        catchup_window_seconds=604800,
+        overlap=ScheduleOverlapPolicy.SKIP,
     )
 )
 
 @workflows.workflow.define(schedules=[backup_schedule])
 class DatabaseBackupWorkflow:
+    @workflows.workflow.entrypoint
     async def run(self, retention_days: int = 30):
         print(f"Starting backup with {retention_days} day retention")
         # Backup implementation here

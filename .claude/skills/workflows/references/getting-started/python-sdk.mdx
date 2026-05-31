@@ -53,7 +53,7 @@ execution = await client.workflows.execute_workflow_async(
 
 ### 2. Execute and Wait for Results
 
-For workflows where you need immediate results, use the synchronous execution method:
+For workflows where you need immediate results, await `execute_workflow_async`, which blocks until the workflow completes and returns its result:
 
 ```python
 from pydantic import BaseModel
@@ -217,6 +217,8 @@ await client.workflows.schedules.unschedule_workflow_async(schedule_id=schedule_
 Here's a complete example showing workflow execution and result retrieval:
 
 ```python
+import os
+
 from dotenv import load_dotenv
 
 load_dotenv()

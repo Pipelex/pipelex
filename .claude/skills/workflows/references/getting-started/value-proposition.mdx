@@ -108,7 +108,7 @@ Temporal workflows return results only when complete—no way to stream intermed
 - 15-minute message persistence with replay
 - NATS JetStream → Abraxas SSE → Client
 
-📖 **Docs:** [Streaming Guide](../guides/streaming) | [Streaming Architecture](../appendices/streaming)
+📖 **Docs:** [Streaming Guide](../guides/streaming)
 
 ### 2. Dependency Injection
 
@@ -145,7 +145,7 @@ Temporal has a 2MB limit and supports custom codecs for encryption. We add:
 - **Offloadable Fields**: Per-field offloading in activities
 - **Pre-configured Encryption**: AES-GCM + key rotation out of the box
 
-📖 **Docs:** [Handling Large Data](../guides/handling-large-data) | [Payload Encoding](../appendices/payload-encoding)
+📖 **Docs:** [Handling Large Data](../guides/handling-large-data) | [Payload Encoding](../guides/payload-encoding)
 
 ### 6. Observability / Task System
 
@@ -202,8 +202,6 @@ Temporal has worker versioning with PINNED behavior. We simplify it:
 - Auto-registration as current version on startup
 - No manual version management required
 - Temporal Worker Controller integration for Kubernetes
-
-📖 **Docs:** [Worker Versioning](../appendices/worker-versioning)
 
 ### 12. Simplified Sticky Sessions
 

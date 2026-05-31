@@ -21,10 +21,18 @@ NATS_HOST="nats://localhost:4222"
 
 ```python
 import mistralai.workflows as workflows
+from mistralai.workflows import Depends
 from mistralai.workflows.core.task import Task
 
+# `llm` is your streaming LLM client (injected once per worker)
+def get_llm_client():
+    ...  # return your streaming client
+
 @workflows.activity()
-async def chat_activity(messages: list) -> dict:
+async def chat_activity(
+    messages: list,
+    llm = Depends(get_llm_client),
+) -> dict:
     initial_state = {"tokens": []}
 
     async with Task(type="token-stream", state=initial_state) as task:
@@ -49,7 +57,10 @@ The most common pattern - stream tokens as they're generated:
 
 ```python
 @workflows.activity()
-async def chat_activity(messages: list) -> dict:
+async def chat_activity(
+    messages: list,
+    llm = Depends(get_llm_client),
+) -> dict:
     initial_state = {"tokens": []}
 
     async with Task(type="token-stream", state=initial_state) as task:
@@ -145,4 +156,3 @@ Each published event is wrapped with context:
 ## Next Steps
 
 - [Consuming Streaming Events](streaming-consumption) - Subscribe and filter events
-- [Streaming Architecture](../appendices/streaming) - Technical implementation details
