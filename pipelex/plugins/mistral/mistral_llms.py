@@ -17,4 +17,7 @@ def mistral_list_available_models() -> list[BaseModelCard | FTModelCard]:
         msg = "No models found"
         raise MistralModelListingError(msg)
     known_models = [model for model in models_list if isinstance(model, (BaseModelCard, FTModelCard))]
+    if not known_models:
+        msg = "No models found"
+        raise MistralModelListingError(msg)
     return sorted(known_models, key=lambda model: model.id)

@@ -19,6 +19,8 @@ from typing import TYPE_CHECKING, Any, AsyncGenerator, Callable, cast
 from uuid import uuid4
 
 import shortuuid
+from kajson.class_registry import ClassRegistry
+from kajson.kajson_manager import KajsonManager
 from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
@@ -26,8 +28,7 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import (
     get_library_manager,
     get_required_pipe,
-    set_current_library,
-    teardown_current_library,
+    scoped_current_library,
 )
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
@@ -226,14 +227,26 @@ async def _scoped_library_for_crate(library_crate: LibraryCrate | None) -> Async
 
     library_manager = get_library_manager()
     library_id = f"runtime_bridge_{uuid4().hex[:8]}"
-    library_manager.open_library(library_id=library_id)
-    set_current_library(library_id=library_id)
+
+    # Pre-seed a per-call ClassRegistry from the global one so classes generated
+    # from the crate's inline structured concepts register into this scoped
+    # registry (discarded on teardown) rather than leaking into / colliding in
+    # the global Kajson registry. Mirrors the Temporal worker hydration path
+    # (see wf_pipe_router.py).
+    global_registry = KajsonManager.get_class_registry()
+    scoped_registry = ClassRegistry()
+    scoped_registry.register_classes_dict(global_registry.get_classes_dict())
+    _opened_library_id, library = library_manager.open_library(library_id=library_id)
+    library.set_class_registry(scoped_registry)
     try:
-        library_manager.load_from_crate(library_id=library_id, crate=library_crate)
-        yield library_id
+        # scoped_current_library captures and restores the prior current-library
+        # ContextVar, so a bridge call made from within an already-scoped library
+        # doesn't clobber the caller's context.
+        with scoped_current_library(library_id=library_id):
+            library_manager.load_from_crate(library_id=library_id, crate=library_crate)
+            yield library_id
     finally:
         library_manager.teardown(library_id=library_id)
-        teardown_current_library()
 
 
 async def _run_direct(
