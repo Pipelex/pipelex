@@ -10,6 +10,6 @@ A cleanup of the `_docs/wip/` documentation tree (branch `docs/Tidy`), aimed at 
 
 - **Corrected stale claims** in the surviving current-state docs, each verified against the code in this worktree, and trimmed one landed-but-written-as-a-proposal doc down to an as-built reference.
 
-- **Split out the remaining work.** The runtime code-fix follow-ups the tidy surfaced live in [`wip/runtime-code-fixes.md`](wip/runtime-code-fixes.md); the consolidated deferred backlog and its evidence live in `DEFERRED-BACKLOG.md` and `BUG-VERIFICATION.md`.
+- **Split out the remaining work.** The runtime code-fix follow-ups the tidy surfaced live in [`wip/runtime-code-fixes.md`](wip/runtime-code-fixes.md); everything else open is tracked per-feature inside the relevant `wip/` track or standalone doc (see [`wip/README.md`](wip/README.md)).
 
 Result: `wip/` is active-only and link-clean; finished history and internal plans live in the private workspace; the public docs carry no cross-repo references.

@@ -1,8 +1,8 @@
 # Webhook signing — security track
 
-This plan covers webhook signing for the `pipelex → pipelex-api → external receiver` completion-callback flow. It is **independent of the error-handling refactor** ([`error-handling/`](error-handling/)) — the two were originally bundled in the same TODO list because the same cross-repo PR window was convenient, but they have no functional dependency on each other.
+This plan covers webhook signing for the `pipelex → pipelex-api → external receiver` completion-callback flow. It is **independent of the error-handling refactor** ([`error-handling/`](error-handling/)) — they have no functional dependency on each other.
 
-Splitting signing into its own track lets reviewers evaluate it on security merit (trust topology, threat model, tamper detection, rollout safety) rather than as a footnote to an error-handling PR.
+Splitting signing into its own track lets reviewers evaluate it on security merit: trust topology, threat model, tamper detection, rollout safety.
 
 ---
 
@@ -223,6 +223,6 @@ The pipelex-api companion plan (when written) lives at `pipelex-api/wip/security
 
 ## How this relates to the error-handling refactor
 
-The error-handling refactor at [`error-handling/`](error-handling/) (and its execution plan at [`../TODOS.md`](../TODOS.md)) lands Item D-2, which puts a structured `error` dict on the webhook body. That meaningfully expands the tamper surface — a MitM body rewrite previously could change `status` / `result_url`, now it can also rewrite the classification.
+The error-handling work (in [`error-handling/`](error-handling/)) puts a structured `error` dict on the webhook body. That meaningfully expands the tamper surface — a MitM body rewrite previously could change `status` / `result_url`, now it can also rewrite the classification.
 
-The error-handling refactor is **the motivating context** for accelerating this signing work, but the signing fix itself is correct independent of D-2. The two PR series can be merged on independent schedules; there is no functional dependency.
+That expanded tamper surface is **the motivating context** for accelerating this signing work, but the signing fix itself is correct independently. The two can land on independent schedules; there is no functional dependency.

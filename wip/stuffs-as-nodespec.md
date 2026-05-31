@@ -47,7 +47,7 @@ Not exhaustive — just the obvious ones to scope from before committing:
 - `pipelex/tracing/trace_events.py` — `PipeStartEvent.input_specs` rethink (events probably emit stuff-node ids instead of inline `IOSpec`).
 - Every renderer that today synthesizes stuff nodes at render time (mermaidflow, reactflow JS bundle, HTML).
 - All `GraphSpec` JSON fixtures under `tests/data/graphs/` — breaking change, will need regeneration.
-- The existing pipe-side `description` / `domain_code` work landed in this branch — confirm semantics stay consistent when extended to stuff kinds.
+- The existing pipe-side `description` / `domain_code` work has already landed — confirm semantics stay consistent when extended to stuff kinds.
 
 ## Open questions to settle before starting
 

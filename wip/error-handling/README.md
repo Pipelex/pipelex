@@ -55,7 +55,3 @@ These are honored across the codebase today and the tracks below build on them:
 ## Conventions used in track docs
 
 Each `track-*.md` opens with **what this track is** (the concern in one paragraph) and a **current state** section — what is true in the code today, with verified file paths. A track with unfinished work then has an **open gaps** / **what's left** section and concrete **followups**; a fully-landed track says so explicitly. Every doc closes with **related tracks** cross-references. The docs describe the current state, not the history of how it got there.
-
-## Archived plans
-
-Completed implementation plans and sweeps have been retired from this tree — the `track-*.md` docs above are the authoritative current-state reference.

@@ -1,7 +1,6 @@
 # Crate-First Architecture Vision
 
 > **Status**: Vision / future direction
-> **Date**: 2026-03-25
 
 ---
 
@@ -244,7 +243,7 @@ Option 1 is cleanest (the crate is fully resolved, no runtime lookup needed) but
 
 ## Deferred / future capabilities
 
-Two capabilities the crate-first direction enables but that are not planned for implementation now. Crate stripping and remote deps are detailed above (Future Capabilities 1 and 2); these two round out the picture.
+Capabilities the crate-first direction enables but that are not planned for implementation now. Crate stripping and remote deps are detailed above (Future Capabilities 1 and 2); these round out the picture.
 
 ### Library fingerprint validation
 

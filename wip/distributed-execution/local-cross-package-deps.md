@@ -1,15 +1,10 @@
-# Phase 6a — Local Cross-Package Dependencies in Crate
+# Local Cross-Package Dependencies in the Crate
 
-> **Status**: Not started
-> **Goal**: Dependency blueprints are included in the crate. Workers can execute pipelines with cross-package deps without having the dependency packages installed on PIPELEXPATH.
-> **Predecessor**: Phase 2 (crate propagation, shipped).
-> **Related**: [the distributed-execution plan](README.md), [crate-first-architecture.md](crate-first-architecture.md).
-
----
+> Part of the [distributed-execution plan](README.md) (P2); a step toward [crate-first-architecture.md](crate-first-architecture.md).
 
 ## Why
 
-Today, cross-package dependencies (`alias->domain.ConceptCode`, `alias::domain.pipe_code`) resolve through child library lookups at loading time. The `LibraryCrate` shipped to Temporal workers does NOT include dependency content — only the main package's blueprints. This means workers must have all dependency packages pre-installed on PIPELEXPATH. Phase 6 removes this requirement: the crate becomes truly self-contained.
+Today, cross-package dependencies (`alias->domain.ConceptCode`, `alias::domain.pipe_code`) resolve through child library lookups at loading time. The `LibraryCrate` shipped to Temporal workers does NOT include dependency content — only the main package's blueprints. This means workers must have all dependency packages pre-installed on PIPELEXPATH. The goal is to remove this requirement: the crate becomes truly self-contained, so workers can execute cross-package pipelines without the dependency packages installed.
 
 ## Key changes
 
@@ -17,7 +12,7 @@ Today, cross-package dependencies (`alias->domain.ConceptCode`, `alias::domain.p
    - **Collect**: resolve the dependency, parse its `.mthds` files into blueprints, determine exports.
    - **Load**: create child Library, load domains/concepts/pipes, register aliases.
 
-   The collector produces blueprints that accumulate into `_blueprints[library_id]` alongside the main package's blueprints.
+   The collector produces blueprints that accumulate into `_blueprints[library_id]` alongside the main package's blueprints, so `get_crate()` produces a crate that includes dependency content.
 
 2. **Resolve cross-package aliases in the flattened crate**: Cross-package refs use alias-based syntax (`alias->domain.ConceptCode`). In a flattened crate, there are no child libraries. Options:
    - Resolve aliases during crate building (replace `alias->domain.ConceptCode` with `domain.ConceptCode` in all blueprints).
@@ -27,13 +22,6 @@ Today, cross-package dependencies (`alias->domain.ConceptCode`, `alias::domain.p
 
 3. **Update `load_from_crate()`**: Handle dependency content in the flat crate — register domains, concepts, and pipes from deps.
 
-## Done when
+## Acceptance
 
-- [ ] `_load_single_dependency` split into collect + load
-- [ ] Dependency blueprints accumulate into `_blueprints[library_id]`
-- [ ] `get_crate()` produces a crate that includes dependency content
-- [ ] Cross-package aliases resolved (either at crate build time or via alias map)
-- [ ] `load_from_crate()` handles dependency content correctly
-- [ ] Integration test: PipeSequence referencing a cross-package concept/pipe, executed on Temporal worker without the dependency package on PIPELEXPATH
-- [ ] `make agent-check` passes
-- [ ] `make agent-test` passes
+A PipeSequence referencing a cross-package concept/pipe executes on a Temporal worker that does **not** have the dependency package on PIPELEXPATH.

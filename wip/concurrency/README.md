@@ -4,7 +4,7 @@ Status: **design scoping**. The one quick win this doc identified — retry jitt
 
 ## Context & scope
 
-The resilience strategy is settled: **Temporal is the resilience system.** We deliberately decided *not* to build a cheap resilience system in direct mode (see `TODOS.md` and `wip/error-handling/`).
+The resilience strategy is settled: **Temporal is the resilience system.** We deliberately decided *not* to build a cheap resilience system in direct mode — resilience is the error-handling track's job (see [`../error-handling/`](../error-handling/)).
 
 The open problem is narrower: the direct-mode batching/asyncio system breaks too easily. The driving question: *what is a best-practice basic backpressure / rate-limiting system at the asyncio layer, so the system does not crash when asked to process e.g. 1000 documents?*
 

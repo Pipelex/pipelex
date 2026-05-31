@@ -108,7 +108,7 @@ class ErrorReport:
 - Every other report → `message` replaced with `"An internal error occurred."`, `user_action` dropped.
 - **Kept in all modes** (stable identifiers): `error_type`, `error_domain`, `error_category`, `retryable`, `title`, `type_uri`.
 
-> **Gap closed (2026-05-22, TODOS Phase 1).** STRICT originally keyed its `message` passthrough on `error_domain == INPUT`, which is *inherited* up the `__cause__` chain — so a domain-less wrapper raised `from` an `INPUT` cause could leak its own (non-caller-facing) `message`, and `to_problem_document(STRICT)` could echo provider metadata for `INPUT` reports. The passthrough now keys on a per-class `caller_facing_message` flag (message *provenance*, not inherited classification) and provider metadata is stripped unconditionally.
+> **Why provenance, not inherited classification.** STRICT keys its `message` passthrough on the per-class `caller_facing_message` flag, *not* on `error_domain == INPUT`. `error_domain` is inherited up the `__cause__` chain, so keying on it would let a domain-less wrapper raised `from` an `INPUT` cause leak its own (non-caller-facing) `message`, and `to_problem_document(STRICT)` echo provider metadata for `INPUT` reports. Keying on message *provenance* avoids both; provider metadata is stripped unconditionally.
 
 Both methods land in Stage 2 (was 2+4 in the spec). `to_problem_document` is callable from the API's Phase 1 directly.
 

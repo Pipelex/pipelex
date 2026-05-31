@@ -6,7 +6,7 @@ This folder holds the **active** planning, design, and current-state docs for th
 
 - **Track folders** group a multi-doc concern. Each has its own `README.md` that maps the track and states what's open. Open the README first.
 - **Standalone docs** are single-topic designs that have no siblings — they live loose at the root with self-describing names (no folder needed).
-- The **consolidated cross-cutting backlog** is not in `wip/`: it lives one level up in [`../DEFERRED-BACKLOG.md`](../DEFERRED-BACKLOG.md) (every deferred item, with code refs and source-doc breadcrumbs) and [`../BUG-VERIFICATION.md`](../BUG-VERIFICATION.md) (the evidence behind the `[REAL]` verdicts). [`../TODOS.md`](../TODOS.md) is the recap of the tidy that produced this layout. Per-feature follow-ups stay with their feature, in the relevant track or standalone doc below.
+- There is **no consolidated cross-cutting backlog** — deferred items and follow-ups live with their feature, in the relevant track or standalone doc's own "open / deferred" section. Follow-ups to features that already shipped live with that feature's record in the private workspace (`docs/history/`, `docs/plans/`), not here.
 
 ## Tracks
 
@@ -17,10 +17,10 @@ This folder holds the **active** planning, design, and current-state docs for th
 ## Standalone docs
 
 - **[webhook-signing.md](webhook-signing.md)** — security track: HMAC body-signing for the completion-callback webhook, with a 3-step cross-repo rollout. The last open piece of the error-handling API-readiness companion work. Plan ready, not started.
-- **[runtime-code-fixes.md](runtime-code-fixes.md)** — two verified runtime-code follow-ups the docs tidy surfaced but did not act on (they change `pipelex/`, so they need a fresh branch off `main`).
+- **[runtime-code-fixes.md](runtime-code-fixes.md)** — verified `pipelex/` runtime fixes to pick up.
 - **[structured-logging.md](structured-logging.md)** — kickoff briefing for replacing string-interpolated log context with structured logging + contextvars. Kicked off, not started; sequenced after the error-handling stack merges.
 - **[stuffs-as-nodespec.md](stuffs-as-nodespec.md)** — future graph-model rework to make stuffs first-class `NodeSpec` instances. A starter, not a worked plan.
-- **[text-then-object-followups.md](text-then-object-followups.md)** — follow-ups deferred out of the shipped text-then-object work (schema sync, synthetic-pipe rendering, benchmarks, etc.).
+- **[blueprint-elaboration-directives.md](blueprint-elaboration-directives.md)** — extending the build-time blueprint-elaboration system: first-class synthetic-pipe handling, a directive plugin registry, and supporting tooling.
 - **[pathlib-refactor.workflow.js](pathlib-refactor.workflow.js)** — a runnable multi-agent workflow that refactors filesystem path handling to `pathlib.Path` across `pipelex/` (intended for the `refactor/Paths` branch). Tooling, not a doc.
 
 ## Suggested priorities
@@ -32,4 +32,4 @@ A pickup order grounded in each doc's own status — adjust to current signals.
 3. **[webhook-signing.md](webhook-signing.md)** — security-reviewed plan, ready to execute; closes the last open error-handling-companion item. Cross-repo, so coordinate the rollout.
 4. **error-handling long tail** — the metadata-model followups and the `request_id` correlation on delivery error paths in [error-handling/](error-handling/). Mostly landed; these are the remainder.
 5. **[concurrency/](concurrency/)** — pick up when batch-at-scale becomes a priority. Fan-out scheduling and batch partial-failure are coupled (take together); rate limiting is independent.
-6. **Deferred / larger / future** — [structured-logging.md](structured-logging.md) (after error-handling merges), [pathlib-refactor.workflow.js](pathlib-refactor.workflow.js) (run when ready), [stuffs-as-nodespec.md](stuffs-as-nodespec.md), the deferred Temporal-exception and schema-reconstruction proposals in [distributed-execution/](distributed-execution/), and [text-then-object-followups.md](text-then-object-followups.md). Take individually as needs and signals dictate.
+6. **Deferred / larger / future** — [structured-logging.md](structured-logging.md) (after error-handling merges), [pathlib-refactor.workflow.js](pathlib-refactor.workflow.js) (run when ready), [stuffs-as-nodespec.md](stuffs-as-nodespec.md), the deferred Temporal-exception and schema-reconstruction proposals in [distributed-execution/](distributed-execution/), and [blueprint-elaboration-directives.md](blueprint-elaboration-directives.md). Take individually as needs and signals dictate.
