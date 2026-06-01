@@ -106,6 +106,10 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     ),
     # Validation errors
     "PipeValidationError": "Check pipe inputs, outputs, and concept references for consistency",
+    "SignaturesNotAllowedError": (
+        "This pipeline reaches a PipeSignature placeholder that has no implementation. Replace each signature with a real "
+        "pipe, or re-run with --allow-signatures to validate the partial pipeline."
+    ),
     # Execution errors
     "PipeExecutionError": "A pipe input validation failed during pipeline execution. Check the error message for the failing model and field.",
     # File/input errors
@@ -156,6 +160,7 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     # input = agent can fix (bad .mthds, wrong args, bad JSON)
     "ModelChoiceNotFoundError": "input",
     "PipeValidationError": "input",
+    "SignaturesNotAllowedError": "input",
     "FileNotFoundError": "input",
     "JSONDecodeError": "input",
     "JsonTypeError": "input",

@@ -71,6 +71,21 @@ class TestAgentOutput:
         assert "hint" in parsed
         assert parsed["hint"] == AGENT_ERROR_HINTS["PipeOperatorModelChoiceError"]
 
+    def test_agent_error_includes_signature_hint(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """A SignaturesNotAllowedError surfaced through the agent boundary must carry the --allow-signatures hint.
+
+        The agent CLI's strict `validate pipe --all` / single-pipe paths call dry_run directly, so this
+        error reaches agent_error via the command boundary rather than being wrapped in ValidateBundleError;
+        without the fallback-dict entry the agent gets no actionable hint about lenient mode.
+        """
+        with pytest.raises(typer.Exit):
+            agent_error("strict validation reached a PipeSignature", "SignaturesNotAllowedError")
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert parsed["hint"] == AGENT_ERROR_HINTS["SignaturesNotAllowedError"]
+        assert "--allow-signatures" in parsed["hint"]
+        assert parsed["error_domain"] == AGENT_ERROR_DOMAINS["SignaturesNotAllowedError"]
+
     def test_agent_error_no_hint_for_unknown_type(self, capsys: pytest.CaptureFixture[str]) -> None:
         """agent_error should not include hint for unregistered error types."""
         with pytest.raises(typer.Exit):

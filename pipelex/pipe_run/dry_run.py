@@ -1,5 +1,6 @@
 import time
 
+from polyfactory.exceptions import FactoryException
 from pydantic import BaseModel, ValidationError
 
 from pipelex import log
@@ -80,7 +81,10 @@ async def dry_run_pipe(pipe: PipeAbstract, *, allow_signatures: bool = False, ra
         error_message = f"Skipped dry run for pipe '{pipe.code}': unresolved dependency: {not_found_error}"
         log.verbose(error_message)
         return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.SKIPPED, error_message=error_message)
-    except (PipeStackOverflowError, ValidationError, PipeComposeError) as exc:
+    except (PipeStackOverflowError, ValidationError, PipeComposeError, FactoryException) as exc:
+        # FactoryException covers a PipeSignature minting its declared mock output via
+        # make_mock_stuff (the one content-minting path without the make_mock_inputs fallback):
+        # surface it as a clean dry-run failure instead of letting it escape as a raw CLI traceback.
         formatted_error = format_pydantic_validation_error(exc) if isinstance(exc, ValidationError) else str(exc)
         if pipe.code in get_config().pipelex.dry_run_config.allowed_to_fail_pipes:
             error_message = f"Allowed to fail dry run for pipe '{pipe.code}': {formatted_error}"

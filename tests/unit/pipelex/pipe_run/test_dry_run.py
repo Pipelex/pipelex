@@ -1,8 +1,10 @@
 import pytest
+from polyfactory.exceptions import FactoryException
 from pytest_mock import MockerFixture
 
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_run.dry_run import DryRunStatus, dry_run_pipe, dry_run_pipes
+from pipelex.pipe_run.exceptions import PipeRunError
 
 
 class TestDryRun:
@@ -80,3 +82,32 @@ class TestDryRun:
 
         assert result.status == DryRunStatus.SKIPPED
         assert not result.status.is_failure
+
+    @pytest.mark.asyncio
+    async def test_dry_run_pipe_factory_exception_is_handled_failure(self, mocker: MockerFixture) -> None:
+        """A FactoryException from minting a pipe's mock output is a handled FAILURE, never an escaping traceback.
+
+        Reproduces the PipeSignature lenient path: _dry_run_pipe -> make_mock_stuff -> make_mock_content
+        can raise polyfactory's FactoryException — the one content-minting path without the
+        make_mock_inputs fallback — so dry_run_pipe must catch it (clean FAILURE / translated PipeRunError).
+        """
+        mock_config = mocker.patch("pipelex.pipe_run.dry_run.get_config")
+        mock_config.return_value.pipelex.dry_run_config.allowed_to_fail_pipes = []
+
+        mock_pipe = mocker.MagicMock()
+        mock_pipe.code = "sig_pipe"
+        mock_pipe.pipe_ref = "test_domain.sig_pipe"
+        mock_pipe.is_signature = True
+        mock_pipe.pipe_dependencies.return_value = set()
+        mock_pipe.needed_inputs.return_value = mocker.MagicMock(named_stuff_specs=[])
+        mock_pipe.validate_with_libraries.return_value = None
+        mock_pipe.run_pipe = mocker.AsyncMock(side_effect=FactoryException("polyfactory could not build mock content"))
+
+        result = await dry_run_pipe(mock_pipe, allow_signatures=True, raise_on_failure=False)
+
+        assert result.status == DryRunStatus.FAILURE
+        assert result.error_message is not None
+        assert "sig_pipe" in result.error_message
+
+        with pytest.raises(PipeRunError):
+            await dry_run_pipe(mock_pipe, allow_signatures=True, raise_on_failure=True)
