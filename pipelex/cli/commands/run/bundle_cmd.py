@@ -88,6 +88,13 @@ def run_bundle_cmd(
             help="Override config: --cost-report forces the cost table on; --no-cost-report skips reporting entirely (no table and no CSV file).",
         ),
     ] = None,
+    save_csv: Annotated[
+        str | None,
+        typer.Option(
+            "--save-csv",
+            help="Write the main stuff to this CSV path (literal, cwd-relative; NOT under --output-dir). Requires a flat list output.",
+        ),
+    ] = None,
 ) -> None:
     """Run a pipeline from a bundle file (.mthds) or pipeline directory.
 
@@ -182,4 +189,5 @@ def run_bundle_cmd(
         telemetry_command_label=f"{COMMAND} bundle",
         temporal=temporal,
         dynamic_output_concept_ref=dynamic_output_concept_ref,
+        save_csv=save_csv,
     )

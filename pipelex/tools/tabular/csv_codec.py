@@ -225,6 +225,21 @@ def write_rows(
 # Format seam
 # ---------------------------------------------------------------------------------------
 
+# Suffixes the tabular codec claims: the .csv built-in plus the deferred .xlsx seam.
+_TABULAR_SUFFIXES: frozenset[str] = frozenset({".csv", ".xlsx"})
+
+
+def is_tabular_path(path: Path) -> bool:
+    """Whether ``path``'s suffix is one the tabular codec claims.
+
+    ``True`` for ``.csv`` (the v1 built-in) and ``.xlsx`` (the deferred seam). The input
+    hook uses this to decide whether a ``{"url": ...}`` reference is a table to read rather
+    than an ordinary record dict. ``.xlsx`` is claimed here so it reaches the codec's clear
+    "needs pipelex[tabular]" seam error (via ``assert_supported_table_suffix``) instead of
+    being misread as a record.
+    """
+    return path.suffix.lower() in _TABULAR_SUFFIXES
+
 
 def assert_supported_table_suffix(path: Path) -> None:
     """Format seam: accept ``.csv`` (the only v1 built-in); reject everything else.

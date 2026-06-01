@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 import typer
 from posthog import tag
@@ -21,6 +22,7 @@ from pipelex.config import get_config
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
+from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.hub import get_console, get_report_delegate, get_telemetry_manager
@@ -35,6 +37,10 @@ from pipelex.tools.misc.exceptions import JsonTypeError
 from pipelex.tools.misc.file_utils import get_incremental_directory_path
 from pipelex.tools.misc.json_utils import load_json_dict_from_path, save_as_json_to_path
 from pipelex.tools.misc.package_utils import get_package_version
+from pipelex.tools.tabular.csv_codec import csv_from_list_content
+
+if TYPE_CHECKING:
+    from pipelex.core.stuffs.stuff_content import StuffContent
 
 COMMAND = "run"
 
@@ -55,6 +61,8 @@ async def _execute_run(
     library_dir: list[str] | None,
     cost_report: bool | None,
     dynamic_output_concept_ref: str | None = None,
+    *,
+    save_csv: str | None = None,
 ) -> None:
     """Core async execution logic for running a pipe.
 
@@ -222,6 +230,27 @@ async def _execute_run(
         save_as_json_to_path(object_to_save=working_memory_dict, path=Path(working_memory_output_path))
         log.verbose(f"Working memory saved to: {working_memory_output_path}")
 
+    # Save main_stuff as CSV if requested. CQ1: write to the literal <path> (cwd-relative),
+    # NOT resolved under --output-dir. Requires the main stuff to be a flat list (e.g. PersonSummary[]);
+    # the codec rejects a non-flat row concept with a clear CsvFlatnessError.
+    if save_csv:
+        csv_main_stuff = pipe_output.working_memory.get_optional_main_stuff()
+        if csv_main_stuff is None:
+            typer.secho("Failed to --save-csv: the pipeline produced no main stuff to write.", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1)
+        csv_content = csv_main_stuff.content
+        if not isinstance(csv_content, ListContent):
+            typer.secho(
+                f"Failed to --save-csv: the main stuff is a {type(csv_content).__name__}, not a list. "
+                "CSV output requires the pipe to produce a flat list (e.g. 'PersonSummary[]').",
+                fg=typer.colors.RED,
+                err=True,
+            )
+            raise typer.Exit(1)
+        csv_list_content = cast("ListContent[StuffContent]", csv_content)
+        csv_from_list_content(csv_list_content, row_model=csv_main_stuff.concept.get_structure_class(), path=Path(save_csv))
+        log.verbose(f"Main stuff CSV saved to: {save_csv}")
+
     reporting_config = get_config().pipelex.reporting_config
     # --no-cost-report (cost_report is False) skips the report entirely: no table, no CSV.
     # Otherwise: console follows the flag (if given) or config; CSV follows config.
@@ -253,6 +282,9 @@ async def _execute_run(
                 console.print("    [green]✓[/green] working_memory.json")
             else:
                 console.print(f"    [green]✓[/green] working_memory: {working_memory_output_path}")
+    # CSV output is written to a literal cwd-relative path (CQ1), independent of --output-dir.
+    if save_csv:
+        console.print(f"  [green]✓[/green] CSV saved to [bold magenta]{save_csv}[/bold magenta]")
 
 
 def execute_run(
@@ -273,6 +305,8 @@ def execute_run(
     telemetry_command_label: str = COMMAND,
     temporal: bool | None = None,
     dynamic_output_concept_ref: str | None = None,
+    *,
+    save_csv: str | None = None,
 ) -> None:
     """Synchronous entry point that wraps the async execution with Pipelex setup/teardown.
 
@@ -302,6 +336,7 @@ def execute_run(
                     library_dir=library_dir,
                     cost_report=cost_report,
                     dynamic_output_concept_ref=dynamic_output_concept_ref,
+                    save_csv=save_csv,
                 )
             )
 

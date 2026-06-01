@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any, cast
 
 import shortuuid
@@ -16,7 +17,11 @@ from pipelex.core.stuffs.stuff_content_factory import StuffContentFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_class_registry, get_concept_library, get_native_concept, get_required_concept
 from pipelex.libraries.concept.concept_library import ConceptLibraryConceptNotFoundError
+from pipelex.tools.tabular.csv_codec import is_tabular_path, list_content_from_csv
+from pipelex.tools.tabular.exceptions import CsvError
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+from pipelex.tools.uri.resolved_uri import ResolvedLocalPath
+from pipelex.tools.uri.uri_resolver import resolve_uri
 
 
 class StuffBlueprint(BaseModel):
@@ -122,6 +127,50 @@ class StuffFactory:
             content=the_stuff_content,
             name=name,
         )
+
+    @classmethod
+    def _try_make_csv_list_stuff(
+        cls,
+        concept: Concept,
+        content: dict[str, Any],
+        name: str | None,
+        code: str | None,
+    ) -> Stuff | None:
+        """Build a ``ListContent[row-concept]`` from a ``{"url": "...csv"}`` input reference.
+
+        A ``url`` whose suffix is tabular (``.csv``, or ``.xlsx`` via the seam), under a
+        non-native structured concept, is read as a table: each data row becomes one instance
+        of the concept's structure class, so one CSV yields one ``ListContent`` (the concept
+        names the *row* type). Returns ``None`` for an ordinary record dict — no ``url`` key, a
+        non-tabular suffix, or a native concept — so the caller falls through to normal Case 2.5
+        dict handling.
+
+        v1 reads LOCAL paths only: a remote ``url`` (``http(s)``/``s3``/``pipelex-storage``/
+        base64 data URL) with a tabular suffix is rejected with a clear ``CsvError`` rather than
+        opened as a local path.
+        """
+        url = content.get("url")
+        if not isinstance(url, str) or not is_tabular_path(Path(url)):
+            return None
+        if Concept.is_native_concept(concept=concept):
+            # Native file concepts (Image, PDF, ...) own their own url handling; never hijack them.
+            return None
+
+        resolved = resolve_uri(url)
+        # Accept only genuine local paths. `file://` resolves to a scheme-free local path; an http(s)/
+        # base64/pipelex-storage url is a non-local ResolvedUri; an `s3://`/`gs://`-style scheme slips
+        # through as a ResolvedLocalPath but keeps `://` in its path, so reject those too.
+        if not isinstance(resolved, ResolvedLocalPath) or "://" in resolved.path:
+            msg = (
+                f"CSV input supports local file paths only in v1, but stuff '{name}' for concept "
+                f"'{concept.concept_ref}' points at a remote/non-local url: {url!r}. "
+                "Download the file locally and reference it by path."
+            )
+            raise CsvError(msg)
+
+        row_model = concept.get_structure_class()
+        list_content = list_content_from_csv(Path(resolved.path), row_model)
+        return cls.make_stuff(concept=concept, content=list_content, name=name, code=code)
 
     @classmethod
     def make_stuff_from_stuff_content_or_data(
@@ -397,6 +446,12 @@ class StuffFactory:
 
         # Case 2.5: content is a dict
         if isinstance(content, dict):
+            content_dict = cast("dict[str, Any]", content)
+            # CSV input: a {"url": "...csv"} under a structured row concept loads as ListContent[row-concept].
+            csv_stuff = cls._try_make_csv_list_stuff(concept=concept, content=content_dict, name=name, code=code)
+            if csv_stuff is not None:
+                return csv_stuff
+
             the_class = get_class_registry().get_class(name=concept.structure_class_name)
             if the_class is None:
                 msg = (
