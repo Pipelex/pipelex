@@ -15,7 +15,7 @@ from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_signature.pipe_signature import PipeSignature
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
-from pipelex.pipe_signature.signature_walk import collect_signature_refs
+from pipelex.pipe_signature.signature_walk import collect_signature_paths, collect_signature_refs
 from tests.integration.pipelex.pipe_signature.conftest import SIGNATURES_DOMAIN_CODE
 
 
@@ -298,3 +298,112 @@ class TestCollectSignatureRefs:
 
         # Unresolved dep is skipped silently; reachable signature is still found.
         assert collect_signature_refs(pipe=seq_pipe) == {sig_pipe.pipe_ref}
+
+    def test_collect_signature_paths_prefers_longest_chain_in_diamond(
+        self,
+        setup_signature_library: Callable[[], None],
+        make_signature_blueprint: Callable[..., PipeSignatureBlueprint],
+    ) -> None:
+        # Diamond: a single signature S is reachable from `top` by a short branch (top -> b_seq -> S)
+        # and a long branch (top -> c_seq -> d_seq -> S). The short branch sorts first ("b" < "c"),
+        # so a first-path-wins walk would record the short chain. The walk must keep the longest.
+        setup_signature_library()
+        sig_pipe = PipeFactory[PipeSignature].make_from_blueprint(
+            domain_code=SIGNATURES_DOMAIN_CODE,
+            pipe_code="diamond_sig",
+            blueprint=make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary"),
+            concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
+        )
+        get_pipe_library().add_new_pipe(pipe=sig_pipe)
+
+        b_seq = PipeFactory[PipeSequence].make_from_blueprint(
+            domain_code=SIGNATURES_DOMAIN_CODE,
+            pipe_code="b_seq",
+            blueprint=PipeSequenceBlueprint(
+                description="Short branch straight to the signature.",
+                inputs={"doc": "SigTestDoc"},
+                output="SigTestSummary",
+                steps=[SubPipeBlueprint(pipe="diamond_sig", result="summary")],
+            ),
+            concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
+        )
+        d_seq = PipeFactory[PipeSequence].make_from_blueprint(
+            domain_code=SIGNATURES_DOMAIN_CODE,
+            pipe_code="d_seq",
+            blueprint=PipeSequenceBlueprint(
+                description="Last hop of the long branch before the signature.",
+                inputs={"doc": "SigTestDoc"},
+                output="SigTestSummary",
+                steps=[SubPipeBlueprint(pipe="diamond_sig", result="summary")],
+            ),
+            concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
+        )
+        get_pipe_library().add_pipes(pipes=[b_seq, d_seq])
+
+        c_seq = PipeFactory[PipeSequence].make_from_blueprint(
+            domain_code=SIGNATURES_DOMAIN_CODE,
+            pipe_code="c_seq",
+            blueprint=PipeSequenceBlueprint(
+                description="First hop of the long branch.",
+                inputs={"doc": "SigTestDoc"},
+                output="SigTestSummary",
+                steps=[SubPipeBlueprint(pipe="d_seq", result="summary")],
+            ),
+            concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
+        )
+        get_pipe_library().add_new_pipe(pipe=c_seq)
+
+        top = PipeFactory[PipeSequence].make_from_blueprint(
+            domain_code=SIGNATURES_DOMAIN_CODE,
+            pipe_code="diamond_top",
+            blueprint=PipeSequenceBlueprint(
+                description="Diamond root: short branch then long branch.",
+                inputs={"doc": "SigTestDoc"},
+                output="SigTestSummary",
+                steps=[
+                    SubPipeBlueprint(pipe="b_seq", result="via_short"),
+                    SubPipeBlueprint(pipe="c_seq", result="via_long"),
+                ],
+            ),
+            concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
+        )
+        get_pipe_library().add_new_pipe(pipe=top)
+
+        paths = collect_signature_paths(pipe=top)
+        assert paths[sig_pipe.pipe_ref] == [top.pipe_ref, c_seq.pipe_ref, d_seq.pipe_ref]
+
+    def test_collect_signature_paths_breaks_cycles(
+        self,
+        setup_signature_library: Callable[[], None],
+        make_signature_blueprint: Callable[..., PipeSignatureBlueprint],
+    ) -> None:
+        # The path walk uses active-path (back-edge) cycle detection; a self-referencing
+        # controller must terminate and still record the signature reachable off the cycle.
+        setup_signature_library()
+        sig_pipe = PipeFactory[PipeSignature].make_from_blueprint(
+            domain_code=SIGNATURES_DOMAIN_CODE,
+            pipe_code="paths_cycle_sig",
+            blueprint=make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary"),
+            concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
+        )
+        get_pipe_library().add_new_pipe(pipe=sig_pipe)
+
+        seq_a = PipeFactory[PipeSequence].make_from_blueprint(
+            domain_code=SIGNATURES_DOMAIN_CODE,
+            pipe_code="paths_seq_cycle",
+            blueprint=PipeSequenceBlueprint(
+                description="Sequence that depends on itself plus a signature step.",
+                inputs={"doc": "SigTestDoc"},
+                output="SigTestSummary",
+                steps=[
+                    SubPipeBlueprint(pipe="paths_cycle_sig", result="summary_via_sig"),
+                    SubPipeBlueprint(pipe="paths_seq_cycle", result="summary_recurse"),
+                ],
+            ),
+            concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
+        )
+        get_pipe_library().add_new_pipe(pipe=seq_a)
+
+        paths = collect_signature_paths(pipe=seq_a)
+        assert sig_pipe.pipe_ref in paths
+        assert paths[sig_pipe.pipe_ref] == [seq_a.pipe_ref]

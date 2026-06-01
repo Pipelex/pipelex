@@ -16,6 +16,7 @@ _FIXTURE_DIR = Path(__file__).parent / "fixtures" / "signature_bundles"
 _SIGNATURE_ONLY = _FIXTURE_DIR / "signature_only.mthds"
 _MIXED = _FIXTURE_DIR / "mixed_with_signature_step.mthds"
 _MULTIPLICITY = _FIXTURE_DIR / "multi_input_multiplicity.mthds"
+_STRUCTURED = _FIXTURE_DIR / "signature_with_structured_output.mthds"
 
 
 @pytest.mark.asyncio
@@ -59,6 +60,20 @@ class TestSignatureValidationE2E:
         sig_output = result.dry_run_result.get("signature_multiplicity.fuse_docs_and_images")
         assert sig_output is not None
         assert sig_output.status is DryRunStatus.SUCCESS
+
+    async def test_structured_output_signature_lenient_passes(self) -> None:
+        # A signature whose declared output is a custom STRUCTURED concept (fields, not plain Text)
+        # exercises the real make_mock_content/polyfactory minting path during the lenient dry-run —
+        # the path hardened so a polyfactory failure surfaces as a FAILURE instead of a raw traceback.
+        result = await validate_bundle(mthds_file_path=_STRUCTURED, allow_signatures=True)
+        sig_output = result.dry_run_result.get("signature_structured.summarize_structured")
+        assert sig_output is not None
+        assert sig_output.status is DryRunStatus.SUCCESS
+        # Prove polyfactory minted the structured class rather than the TextContent fallback: the
+        # loaded signature's output concept resolves to a generated structure class. structure_class_name
+        # lives on the concept object, so it survives validate_bundle's library teardown.
+        sig_pipe = next(pipe for pipe in result.pipes if pipe.code == "summarize_structured")
+        assert sig_pipe.output.concept.structure_class_name != "TextContent"
 
     async def test_live_run_signature_pipeline_fails(self) -> None:
         runner = PipelexRunner(

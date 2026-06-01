@@ -286,6 +286,70 @@ class TestDryRunStrictMode:
         # Both signatures must appear — not just the one from the first pipe.
         assert exc_info.value.signature_refs == {sig_a.pipe_ref, sig_b.pipe_ref}
 
+    async def test_aggregated_dep_path_prefers_longest_across_callers(
+        self,
+        setup_signature_library: Callable[[], None],
+        make_signature_blueprint: Callable[..., PipeSignatureBlueprint],
+    ) -> None:
+        # Two callers reach the SAME signature by chains of different length: a short caller
+        # (short_seq -> S) and a long caller (long_seq -> mid_seq -> S). The aggregated error must
+        # render the longest chain regardless of batch order (exercises the len(path) > len(existing)
+        # branch that distinct-signature aggregation tests never hit).
+        setup_signature_library()
+        sig_pipe = PipeFactory[PipeSignature].make_from_blueprint(
+            domain_code=SIGNATURES_DOMAIN_CODE,
+            pipe_code="lp_sig",
+            blueprint=make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary"),
+            concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
+        )
+        get_pipe_library().add_new_pipe(pipe=sig_pipe)
+
+        mid_seq = PipeFactory[PipeSequence].make_from_blueprint(
+            domain_code=SIGNATURES_DOMAIN_CODE,
+            pipe_code="lp_mid_seq",
+            blueprint=PipeSequenceBlueprint(
+                description="Middle hop of the long caller.",
+                inputs={"doc": "SigTestDoc"},
+                output="SigTestSummary",
+                steps=[SubPipeBlueprint(pipe="lp_sig", result="summary")],
+            ),
+            concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
+        )
+        get_pipe_library().add_new_pipe(pipe=mid_seq)
+
+        short_seq = PipeFactory[PipeSequence].make_from_blueprint(
+            domain_code=SIGNATURES_DOMAIN_CODE,
+            pipe_code="lp_short_seq",
+            blueprint=PipeSequenceBlueprint(
+                description="Short caller straight to the signature.",
+                inputs={"doc": "SigTestDoc"},
+                output="SigTestSummary",
+                steps=[SubPipeBlueprint(pipe="lp_sig", result="summary")],
+            ),
+            concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
+        )
+        long_seq = PipeFactory[PipeSequence].make_from_blueprint(
+            domain_code=SIGNATURES_DOMAIN_CODE,
+            pipe_code="lp_long_seq",
+            blueprint=PipeSequenceBlueprint(
+                description="Long caller via the middle hop.",
+                inputs={"doc": "SigTestDoc"},
+                output="SigTestSummary",
+                steps=[SubPipeBlueprint(pipe="lp_mid_seq", result="summary")],
+            ),
+            concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
+        )
+        get_pipe_library().add_pipes(pipes=[short_seq, long_seq])
+
+        # Longest chain must win regardless of batch order (short-first then long-first).
+        longest_chain = [long_seq.pipe_ref, mid_seq.pipe_ref]
+        with pytest.raises(SignaturesNotAllowedError) as short_first:
+            await dry_run_pipes(pipes=[short_seq, long_seq])
+        assert short_first.value.dep_paths[sig_pipe.pipe_ref] == longest_chain
+        with pytest.raises(SignaturesNotAllowedError) as long_first:
+            await dry_run_pipes(pipes=[long_seq, short_seq])
+        assert long_first.value.dep_paths[sig_pipe.pipe_ref] == longest_chain
+
     async def test_validate_bundle_lenient_passes_on_signature(self) -> None:
         bundle = _make_bundle_with_signature()
         result = await validate_bundle(blueprints=[bundle], allow_signatures=True)

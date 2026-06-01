@@ -39,34 +39,34 @@ def collect_signature_refs(pipe: PipeAbstract, visited: set[str] | None = None) 
 
 def collect_signature_paths(
     pipe: PipeAbstract,
-    visited: set[str] | None = None,
     current_path: list[str] | None = None,
+    paths: dict[str, list[str]] | None = None,
 ) -> dict[str, list[str]]:
-    """Return mapping from signature pipe_ref to the dep chain that reached it.
+    """Return mapping from signature pipe_ref to the longest dep chain that reaches it.
 
     Each value is the ordered list of controller pipe_refs traversed (entry-point first).
     Keys and path entries are qualified pipe_refs. Companion of `collect_signature_refs`
-    used to render the dep chain in `SignaturesNotAllowedError`.
+    used to render the dep chain in `SignaturesNotAllowedError`. When a signature is reachable
+    by several paths (a diamond), the longest — most informative — chain is kept.
     """
-    if visited is None:
-        visited = set()
     if current_path is None:
         current_path = []
-    if pipe.pipe_ref in visited:
-        return {}
-    visited.add(pipe.pipe_ref)
-
-    paths: dict[str, list[str]] = {}
-    next_path = [*current_path, pipe.pipe_ref]
+    if paths is None:
+        paths = {}
+    # Cycle break: a pipe already on the active dependency path is a back edge — stop.
+    # Unlike a global visited set, this still explores diamonds (distinct paths that
+    # re-converge on the same signature), so we can keep the longest, most informative chain.
+    if pipe.pipe_ref in current_path:
+        return paths
     if pipe.is_signature:
-        paths[pipe.pipe_ref] = list(current_path)
+        existing = paths.get(pipe.pipe_ref)
+        if existing is None or len(current_path) > len(existing):
+            paths[pipe.pipe_ref] = list(current_path)
+    next_path = [*current_path, pipe.pipe_ref]
     # Sort dep iteration for stable dep-chain output (see `collect_signature_refs`).
     for dep_code in sorted(pipe.pipe_dependencies()):
         dep_pipe = get_optional_pipe(pipe_code=dep_code)
         if dep_pipe is None:
             continue
-        sub_paths = collect_signature_paths(pipe=dep_pipe, visited=visited, current_path=next_path)
-        for sig_ref, sub_path in sub_paths.items():
-            if sig_ref not in paths:
-                paths[sig_ref] = sub_path
+        collect_signature_paths(pipe=dep_pipe, current_path=next_path, paths=paths)
     return paths
