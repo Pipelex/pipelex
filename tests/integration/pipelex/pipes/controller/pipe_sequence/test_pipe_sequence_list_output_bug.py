@@ -13,8 +13,8 @@ from typing import ClassVar
 
 import pytest
 
-from pipelex.hub import get_required_pipe
-from pipelex.pipe_run.dry_run import dry_run_pipe
+from pipelex.hub import get_current_library, get_required_pipe
+from pipelex.pipeline.bundle_validator import BundleValidator
 from pipelex.pipeline.validate_bundle import validate_bundle
 
 
@@ -103,7 +103,8 @@ class TestPipeSequenceListOutputBug:
 
             # Run dry run - this should NOT fail
             # BUG: Currently fails with "Content of 'items' is of type 'Item', it should be 'ListContent'"
-            dry_run_output = await dry_run_pipe(main_sequence, raise_on_failure=True)
+            dry_run_results = await BundleValidator().validate_pipes([main_sequence], library_id=get_current_library())
+            dry_run_output = dry_run_results[main_sequence.pipe_ref]
 
             assert dry_run_output.status.name == "SUCCESS", f"Dry run failed: {dry_run_output.error_message}"
 
@@ -135,7 +136,8 @@ class TestPipeSequenceListOutputBug:
             )
 
             # Run dry run on the standalone pipe
-            dry_run_output = await dry_run_pipe(generate_items_pipe, raise_on_failure=True)
+            dry_run_results = await BundleValidator().validate_pipes([generate_items_pipe], library_id=get_current_library())
+            dry_run_output = dry_run_results[generate_items_pipe.pipe_ref]
 
             assert dry_run_output.status.name == "SUCCESS", f"Dry run of generate_items failed: {dry_run_output.error_message}"
 
@@ -269,7 +271,8 @@ class TestNestedPipeSequenceListOutputBug:
 
             # Run dry run - this should NOT fail
             # BUG: Currently may fail with "Content of 'expenses' is of type 'Expense', it should be 'ListContent'"
-            dry_run_output = await dry_run_pipe(main_sequence, raise_on_failure=True)
+            dry_run_results = await BundleValidator().validate_pipes([main_sequence], library_id=get_current_library())
+            dry_run_output = dry_run_results[main_sequence.pipe_ref]
 
             assert dry_run_output.status.name == "SUCCESS", f"Dry run failed: {dry_run_output.error_message}"
 
@@ -292,6 +295,7 @@ class TestNestedPipeSequenceListOutputBug:
             inner_sequence = get_required_pipe("generate_employee_report")
 
             # Run dry run on the inner sequence
-            dry_run_output = await dry_run_pipe(inner_sequence, raise_on_failure=True)
+            dry_run_results = await BundleValidator().validate_pipes([inner_sequence], library_id=get_current_library())
+            dry_run_output = dry_run_results[inner_sequence.pipe_ref]
 
             assert dry_run_output.status.name == "SUCCESS", f"Dry run of inner sequence failed: {dry_run_output.error_message}"

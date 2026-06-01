@@ -108,6 +108,20 @@ class TestBundleValidator:
         assert "allowed_pipe" in results["dom.allowed_pipe"].error_message
 
     @pytest.mark.asyncio
+    async def test_bare_code_in_allowed_to_fail_does_not_match_namespaced_ref(self, mocker: MockerFixture) -> None:
+        # C-7: allowed_to_fail matches the namespaced pipe_ref, not the bare code. A config entry holding
+        # only the bare code ("allowed_pipe") must NOT tolerate the namespaced pipe ("dom.allowed_pipe") —
+        # the failure is unexpected and aggregates into a DryRunError. (The positive namespaced match is
+        # pinned by test_allowed_failure_returned_in_map_without_raising.)
+        validator, _report, _telemetry, _prepare, pipe_run = self._patch_env(mocker, allowed_to_fail=["allowed_pipe"])
+        pipe_run.run = mocker.AsyncMock(side_effect=FactoryException("polyfactory could not build mock content"))
+        pipe = self._make_pipe(mocker, code="allowed_pipe", pipe_ref="dom.allowed_pipe")
+
+        with pytest.raises(DryRunError) as exc_info:
+            await validator.validate_pipes([pipe], library_id="lib-1")
+        assert "dom.allowed_pipe" in str(exc_info.value)
+
+    @pytest.mark.asyncio
     async def test_unexpected_validation_error_raises_dry_run_error(self, mocker: MockerFixture) -> None:
         # A pydantic ValidationError on a non-allowed pipe classifies FAILURE and is aggregated into a
         # single DryRunError (third-party-exception classify — FAILURE, not an escaping traceback).

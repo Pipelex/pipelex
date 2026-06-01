@@ -5,9 +5,9 @@ from pathlib import Path
 import pytest
 
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.pipe_run.dry_run import DryRunStatus
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError, SignaturesNotAllowedError
+from pipelex.pipeline.bundle_validator import DryRunStatus
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexRunner
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle

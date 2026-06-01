@@ -6,12 +6,13 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.list_content import ListContent
-from pipelex.pipe_run.dry_run import DryRunStatus, dry_run_pipe
+from pipelex.hub import get_current_library
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError
 from pipelex.pipe_signature.pipe_signature import PipeSignature
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
+from pipelex.pipeline.bundle_validator import BundleValidator, DryRunStatus
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.system.telemetry.otel_constants import OTelConstants
@@ -85,8 +86,8 @@ class TestPipeSignature:
         setup_signature_library()
         blueprint = make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="Text")
         runtime = _make_runtime(blueprint, pipe_code="sig_for_text")
-        dry_run_output = await dry_run_pipe(runtime, allow_signatures=True)
-        assert dry_run_output.status is DryRunStatus.SUCCESS
+        results = await BundleValidator().validate_pipes([runtime], library_id=get_current_library(), allow_signatures=True)
+        assert results[runtime.pipe_ref].status is DryRunStatus.SUCCESS
 
     @pytest.mark.asyncio
     async def test_dry_run_produces_mock_variable_list(

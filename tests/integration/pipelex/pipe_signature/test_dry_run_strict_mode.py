@@ -5,16 +5,16 @@ import pytest
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactory
-from pipelex.hub import get_pipe_library
+from pipelex.hub import get_current_library, get_pipe_library
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
-from pipelex.pipe_run.dry_run import DryRunStatus, dry_run_pipe, dry_run_pipes
 from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 from pipelex.pipe_signature.pipe_signature import PipeSignature
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
+from pipelex.pipeline.bundle_validator import BundleValidator, DryRunStatus
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 from tests.integration.pipelex.pipe_signature.conftest import SIGNATURES_DOMAIN_CODE
 
@@ -76,8 +76,8 @@ class TestDryRunStrictMode:
         )
         get_pipe_library().add_new_pipe(pipe=seq_pipe)
 
-        result = await dry_run_pipe(seq_pipe)
-        assert result.status is DryRunStatus.SUCCESS
+        results = await BundleValidator().validate_pipes([seq_pipe], library_id=get_current_library())
+        assert results[seq_pipe.pipe_ref].status is DryRunStatus.SUCCESS
 
     async def test_strict_fails_on_signature_in_sequence(
         self,
@@ -106,7 +106,7 @@ class TestDryRunStrictMode:
         get_pipe_library().add_new_pipe(pipe=seq_pipe)
 
         with pytest.raises(SignaturesNotAllowedError) as exc_info:
-            await dry_run_pipe(seq_pipe)
+            await BundleValidator().validate_pipes([seq_pipe], library_id=get_current_library())
         assert sig_pipe.pipe_ref in exc_info.value.signature_refs
 
     async def test_lenient_succeeds_on_signature_in_sequence(
@@ -135,8 +135,8 @@ class TestDryRunStrictMode:
         )
         get_pipe_library().add_new_pipe(pipe=seq_pipe)
 
-        result = await dry_run_pipe(seq_pipe, allow_signatures=True)
-        assert result.status is DryRunStatus.SUCCESS
+        results = await BundleValidator().validate_pipes([seq_pipe], library_id=get_current_library(), allow_signatures=True)
+        assert results[seq_pipe.pipe_ref].status is DryRunStatus.SUCCESS
 
     async def test_strict_error_lists_all_signatures(
         self,
@@ -175,7 +175,7 @@ class TestDryRunStrictMode:
         get_pipe_library().add_new_pipe(pipe=seq_pipe)
 
         with pytest.raises(SignaturesNotAllowedError) as exc_info:
-            await dry_run_pipe(seq_pipe)
+            await BundleValidator().validate_pipes([seq_pipe], library_id=get_current_library())
         assert exc_info.value.signature_refs == {sig_a.pipe_ref, sig_b.pipe_ref}
 
     async def test_strict_error_includes_dep_paths(
@@ -217,7 +217,7 @@ class TestDryRunStrictMode:
         get_pipe_library().add_new_pipe(pipe=outer_seq)
 
         with pytest.raises(SignaturesNotAllowedError) as exc_info:
-            await dry_run_pipe(outer_seq)
+            await BundleValidator().validate_pipes([outer_seq], library_id=get_current_library())
         error = exc_info.value
         assert sig_pipe.pipe_ref in error.dep_paths
         chain = error.dep_paths[sig_pipe.pipe_ref]
@@ -282,7 +282,7 @@ class TestDryRunStrictMode:
         get_pipe_library().add_pipes(pipes=[seq_a, seq_b])
 
         with pytest.raises(SignaturesNotAllowedError) as exc_info:
-            await dry_run_pipes(pipes=[seq_a, seq_b])
+            await BundleValidator().validate_pipes(pipes=[seq_a, seq_b], library_id=get_current_library())
         # Both signatures must appear — not just the one from the first pipe.
         assert exc_info.value.signature_refs == {sig_a.pipe_ref, sig_b.pipe_ref}
 
@@ -344,10 +344,10 @@ class TestDryRunStrictMode:
         # Longest chain must win regardless of batch order (short-first then long-first).
         longest_chain = [long_seq.pipe_ref, mid_seq.pipe_ref]
         with pytest.raises(SignaturesNotAllowedError) as short_first:
-            await dry_run_pipes(pipes=[short_seq, long_seq])
+            await BundleValidator().validate_pipes(pipes=[short_seq, long_seq], library_id=get_current_library())
         assert short_first.value.dep_paths[sig_pipe.pipe_ref] == longest_chain
         with pytest.raises(SignaturesNotAllowedError) as long_first:
-            await dry_run_pipes(pipes=[long_seq, short_seq])
+            await BundleValidator().validate_pipes(pipes=[long_seq, short_seq], library_id=get_current_library())
         assert long_first.value.dep_paths[sig_pipe.pipe_ref] == longest_chain
 
     async def test_validate_bundle_lenient_passes_on_signature(self) -> None:
@@ -402,7 +402,7 @@ class TestDryRunStrictMode:
 
         # Iterate innocent FIRST, offender SECOND — exposes the pipes[0] bug.
         with pytest.raises(SignaturesNotAllowedError) as exc_info:
-            await dry_run_pipes(pipes=[innocent_op, offender_seq])
+            await BundleValidator().validate_pipes(pipes=[innocent_op, offender_seq], library_id=get_current_library())
         error = exc_info.value
         assert offender_seq.pipe_ref in error.offending_pipe_refs
         assert innocent_op.pipe_ref not in error.offending_pipe_refs
@@ -455,7 +455,7 @@ class TestDryRunStrictMode:
         get_pipe_library().add_pipes(pipes=[seq_a, seq_b])
 
         with pytest.raises(SignaturesNotAllowedError) as exc_info:
-            await dry_run_pipes(pipes=[seq_a, seq_b])
+            await BundleValidator().validate_pipes(pipes=[seq_a, seq_b], library_id=get_current_library())
         error = exc_info.value
         assert error.offending_pipe_refs == {seq_a.pipe_ref, seq_b.pipe_ref}
         message = str(error)
@@ -480,7 +480,7 @@ class TestDryRunStrictMode:
         get_pipe_library().add_new_pipe(pipe=sig_pipe)
 
         with pytest.raises(SignaturesNotAllowedError) as exc_info:
-            await dry_run_pipe(sig_pipe)
+            await BundleValidator().validate_pipes([sig_pipe], library_id=get_current_library())
         error = exc_info.value
         assert sig_pipe.pipe_ref in error.signature_refs
         assert sig_pipe.pipe_ref not in error.offending_pipe_refs
@@ -516,7 +516,7 @@ class TestDryRunStrictMode:
         get_pipe_library().add_new_pipe(pipe=seq_pipe)
 
         with pytest.raises(SignaturesNotAllowedError) as exc_info:
-            await dry_run_pipes(pipes=[sig_pipe, seq_pipe])
+            await BundleValidator().validate_pipes(pipes=[sig_pipe, seq_pipe], library_id=get_current_library())
         error = exc_info.value
         assert error.offending_pipe_refs == {seq_pipe.pipe_ref}
         assert sig_pipe.pipe_ref not in error.offending_pipe_refs

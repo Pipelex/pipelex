@@ -17,7 +17,7 @@ from pipelex.hub import (
     get_telemetry_manager,
     teardown_current_library,
 )
-from pipelex.pipeline.bundle_validator import BundleValidator
+from pipelex.pipeline.bundle_validator import BundleValidator, DryRunStatus
 from pipelex.pipeline.execution_seams import acquire_library
 from pipelex.system.telemetry.events import EventName
 
@@ -39,6 +39,37 @@ description = "Pipe used only to dry-run through BundleValidator"
 inputs = {{ subject = "Text" }}
 output = "Topic"
 prompt = "Echo the $subject as a topic"
+"""
+
+# A bundle whose PipeParallel controller references an UNLOADED cross-package sub-pipe
+# ("ext->otherpkg.missing_pipe"). PipeParallel resolves its branches with an unguarded
+# get_required_pipe, so validate_with_libraries raises PipeNotFoundError — the sweep must record the
+# controller SKIPPED and still classify the sibling implemented leaf, never abort (finding #1 / D7).
+_BV_XPKG_DOMAIN = "bundle_validator_xpkg"
+_BV_XPKG_MTHDS = f"""
+domain = "{_BV_XPKG_DOMAIN}"
+description = "Bundle exercising cross-package SKIPPED tolerance in the step-1 wiring pass"
+
+[concept.Doc]
+description = "A document"
+
+[pipe.implemented_leaf]
+type = "PipeLLM"
+description = "A fully implemented sibling leaf"
+inputs = {{ doc = "Doc" }}
+output = "Text"
+prompt = "Summarize $doc"
+
+[pipe.cross_parallel]
+type = "PipeParallel"
+description = "Parallel referencing an unloaded cross-package branch"
+inputs = {{ doc = "Doc" }}
+output = "Text"
+add_each_output = true
+combined_output = "Text"
+branches = [
+  {{ pipe = "ext->otherpkg.missing_pipe", result = "branch_result" }},
+]
 """
 
 
@@ -73,6 +104,23 @@ class TestBundleValidatorIntegration:
             second = await validator.validate_pipes([pipe], library_id=library_id)
             assert first[pipe.pipe_ref].status.is_success
             assert second[pipe.pipe_ref].status.is_success
+        finally:
+            library_manager.teardown(library_id=library_id)
+            teardown_current_library()
+
+    async def test_cross_package_controller_skipped_not_aborting_sweep(self) -> None:
+        # Finding #1 / D7: a controller whose branch references an UNLOADED cross-package sub-pipe
+        # raises PipeNotFoundError in the step-1 validate_with_libraries pass. It must be recorded
+        # SKIPPED (not abort the sweep), and the sibling implemented leaf must still classify SUCCESS.
+        library_manager = get_library_manager()
+        library_id = "bv_xpkg_skip_lib"
+        acquire_library(library_id=library_id, mthds_contents=[_BV_XPKG_MTHDS])
+        try:
+            leaf = get_required_pipe(pipe_code=f"{_BV_XPKG_DOMAIN}.implemented_leaf")
+            controller = get_required_pipe(pipe_code=f"{_BV_XPKG_DOMAIN}.cross_parallel")
+            results = await BundleValidator().validate_pipes([controller, leaf], library_id=library_id)
+            assert results[f"{_BV_XPKG_DOMAIN}.cross_parallel"].status == DryRunStatus.SKIPPED
+            assert results[f"{_BV_XPKG_DOMAIN}.implemented_leaf"].status.is_success
         finally:
             library_manager.teardown(library_id=library_id)
             teardown_current_library()

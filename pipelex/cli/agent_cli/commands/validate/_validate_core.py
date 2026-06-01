@@ -10,7 +10,7 @@ from pipelex.hub import (
     resolve_library_dirs,
     set_current_library,
 )
-from pipelex.pipe_run.dry_run import DryRunStatus, dry_run_pipe, dry_run_pipes
+from pipelex.pipeline.bundle_validator import BundleValidator, DryRunStatus
 from pipelex.pipeline.validate_bundle import validate_bundle
 
 if TYPE_CHECKING:
@@ -34,32 +34,20 @@ async def validate_all_core(
     Raises:
         ValidateBundleError: If validation fails.
     """
-    library_manager = get_library_manager()
-    library_id, library = library_manager.open_library()
-    set_current_library(library_id=library_id)
-    effective_dirs, _ = resolve_library_dirs(library_dirs)
+    # acquire_and_validate opens a fresh library, loads the resolved dirs, sweeps every loaded pipe
+    # (filtering signatures in strict mode), and tears the library down — the standalone validate-all
+    # lifecycle (D6). The returned map is keyed by namespaced pipe_ref.
+    dry_run_results = await BundleValidator().acquire_and_validate(
+        library_dirs=[str(library_dir) for library_dir in library_dirs] if library_dirs else None,
+        allow_signatures=allow_signatures,
+    )
 
-    if effective_dirs:
-        library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
-
-    all_pipes = library.pipe_library.get_pipes()
-    # In strict mode, signatures themselves would always fail the pre-check; filter them out.
-    pipes = all_pipes if allow_signatures else [pipe for pipe in all_pipes if not pipe.is_signature]
-    for the_pipe in pipes:
-        the_pipe.validate_with_libraries()
-
-    dry_run_results = await dry_run_pipes(pipes=pipes, allow_signatures=allow_signatures, raise_on_failure=True)
-
-    validated_pipes: list[dict[str, str]] = []
-    for the_pipe in pipes:
-        dry_run_output = dry_run_results.get(the_pipe.pipe_ref)
-        status: str = dry_run_output.status if dry_run_output else DryRunStatus.SUCCESS
-        validated_pipes.append({"pipe_code": the_pipe.pipe_ref, "status": status})
+    validated_pipes = [{"pipe_code": dry_run_output.pipe_ref, "status": dry_run_output.status} for dry_run_output in dry_run_results.values()]
 
     return {
         "success": True,
         "validated_pipes": validated_pipes,
-        "total_pipes": len(pipes),
+        "total_pipes": len(dry_run_results),
     }
 
 
@@ -88,7 +76,13 @@ async def validate_bundle_core(
         allow_signatures=allow_signatures,
     )
 
-    validated_pipes = [{"pipe_code": the_pipe.pipe_ref, "status": "SUCCESS"} for the_pipe in result.pipes]
+    # Consume the real per-pipe status from the sweep — a fixed all-"SUCCESS" list would hide allowed
+    # failures and SKIPPED cross-package pipes the dry-run actually recorded (C-8).
+    validated_pipes: list[dict[str, str]] = []
+    for the_pipe in result.pipes:
+        dry_run_output = result.dry_run_result.get(the_pipe.pipe_ref)
+        status: str = dry_run_output.status if dry_run_output else DryRunStatus.SUCCESS
+        validated_pipes.append({"pipe_code": the_pipe.pipe_ref, "status": status})
 
     return {
         "success": True,
@@ -126,11 +120,11 @@ async def validate_pipe_core(
         library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
 
     the_pipe = get_required_pipe(pipe_code=pipe_code)
-    await dry_run_pipe(the_pipe, allow_signatures=allow_signatures, raise_on_failure=True)
+    dry_run_results = await BundleValidator().validate_pipes(pipes=[the_pipe], library_id=library_id, allow_signatures=allow_signatures)
 
     return {
         "success": True,
-        "validated_pipes": [{"pipe_code": pipe_code, "status": "SUCCESS"}],
+        "validated_pipes": [{"pipe_code": pipe_code, "status": dry_run_results[the_pipe.pipe_ref].status}],
         "total_pipes": 1,
     }
 

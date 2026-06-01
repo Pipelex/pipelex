@@ -27,14 +27,14 @@ from pipelex.hub import (
 )
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
-from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
 from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 from pipelex.pipe_signature.signature_walk import collect_signature_refs
 from pipelex.pipelex import Pipelex
+from pipelex.pipeline.bundle_validator import BundleValidator
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.runtime import IntegrationMode
-from pipelex.system.telemetry.events import EventName, EventProperty
+from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
@@ -81,16 +81,14 @@ def do_validate_all_libraries_and_dry_run(
             if library_dirs:
                 dirs_str = ", ".join(f'"{lib_dir}"' for lib_dir in library_dirs)
                 typer.echo(f"Validating {len(pipes)} pipe(s) from: {dirs_str}")
-            for pipe in pipes:
-                pipe.validate_with_libraries()
 
-            get_telemetry_manager().track_event(EventName.PIPE_DRY_RUN, properties={EventProperty.NB_PIPES: len(pipes)})
-
+            # BundleValidator.validate_pipes owns the static wiring pass, the strict signature pre-pass,
+            # and the single PIPE_DRY_RUN telemetry event — sweeping against the library we just loaded.
             asyncio.run(
-                dry_run_pipes(
+                BundleValidator().validate_pipes(
                     pipes=pipes,
+                    library_id=library_id,
                     allow_signatures=allow_signatures,
-                    raise_on_failure=True,
                 )
             )
             signature_count = sum(1 for pipe in pipes if pipe.is_signature)
@@ -145,12 +143,11 @@ async def _validate_pipe_or_bundle(
 
         pipe = get_required_pipe(pipe_code=pipe_code)
         typer.echo(f"Validating pipe '{pipe_code}'...")
-        get_telemetry_manager().track_event(EventName.PIPE_DRY_RUN, properties={EventProperty.PIPE_TYPE: pipe.type})
         try:
-            await dry_run_pipe(
-                pipe,
+            await BundleValidator().validate_pipes(
+                pipes=[pipe],
+                library_id=library_id,
                 allow_signatures=allow_signatures,
-                raise_on_failure=True,
             )
         except SignaturesNotAllowedError as sig_error:
             handle_signatures_not_allowed_error(sig_error, context=ErrorContext.VALIDATION)

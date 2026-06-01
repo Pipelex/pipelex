@@ -29,9 +29,9 @@ from pipelex.hub import (
 )
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
-from pipelex.pipe_run.dry_run import DryRunOutput, dry_run_pipes
 from pipelex.pipe_run.exceptions import DryRunError, PipeRunError
 from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
+from pipelex.pipeline.bundle_validator import BundleValidator, DryRunOutput
 from pipelex.pipeline.exceptions import ValidateBundleError
 
 
@@ -199,16 +199,16 @@ async def validate_bundle(
             if blueprints is not None:
                 loaded_blueprints = blueprints
                 loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints)
-                dry_run_results = await dry_run_pipes(
-                    pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes), allow_signatures=allow_signatures, raise_on_failure=True
+                dry_run_results = await BundleValidator().validate_pipes(
+                    pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes), library_id=library_id, allow_signatures=allow_signatures
                 )
                 result = ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
 
             elif mthds_contents is not None:
                 loaded_blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
                 loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
-                dry_run_results = await dry_run_pipes(
-                    pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes), allow_signatures=allow_signatures, raise_on_failure=True
+                dry_run_results = await BundleValidator().validate_pipes(
+                    pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes), library_id=library_id, allow_signatures=allow_signatures
                 )
                 result = ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
 
@@ -225,8 +225,8 @@ async def validate_bundle(
                     pipe_codes = list(blueprint.pipe.keys()) if blueprint.pipe else []
                     loaded_pipes = [library.pipe_library.get_required_pipe(pipe_code=code) for code in pipe_codes]
 
-                dry_run_results = await dry_run_pipes(
-                    pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes), allow_signatures=allow_signatures, raise_on_failure=True
+                dry_run_results = await BundleValidator().validate_pipes(
+                    pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes), library_id=library_id, allow_signatures=allow_signatures
                 )
                 result = ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
         success = True
@@ -262,7 +262,7 @@ async def validate_bundles_from_directory(directory: Path, allow_signatures: boo
                 all_blueprints.append(blueprint)
 
             loaded_pipes = library_manager.load_libraries(library_id=library_id, library_dirs=[Path(directory)])
-            dry_run_results = await dry_run_pipes(pipes=loaded_pipes, allow_signatures=allow_signatures, raise_on_failure=True)
+            dry_run_results = await BundleValidator().validate_pipes(pipes=loaded_pipes, library_id=library_id, allow_signatures=allow_signatures)
             result = ValidateBundleResult(blueprints=all_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
         success = True
         return result

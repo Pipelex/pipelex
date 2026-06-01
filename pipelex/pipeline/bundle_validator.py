@@ -159,7 +159,9 @@ class BundleValidator:
         Borrows the caller's open library and **never tears it down** (D6). Order (D7):
 
         1. ``validate_with_libraries`` wiring pass (before the signature pre-pass, preserving
-           today's error precedence — a wiring error surfaces ahead of a signature error).
+           today's error precedence — a wiring error surfaces ahead of a signature error). A
+           controller referencing an unloaded cross-package sub-pipe is recorded SKIPPED and dropped
+           from the remaining steps rather than aborting the sweep.
         2. Aggregated signature pre-pass (strict mode): one ``SignaturesNotAllowedError`` listing
            every reached signature, never short-circuiting on the first.
         3. One ``PIPE_DRY_RUN`` telemetry event for the whole sweep.
@@ -174,16 +176,33 @@ class BundleValidator:
 
         # 1. Static library-wiring check. This is *more* than a dry run (the runner's DRY path does
         #    not perform it) — keeping it here preserves coverage and removes the old redundancy where
-        #    both `validate --all` and the per-pipe dry run called it.
+        #    both `validate --all` and the per-pipe dry run called it. A controller whose branch
+        #    references an UNLOADED cross-package sub-pipe (PipeParallel / PipeBatch / PipeCondition
+        #    resolve their sub-pipes with an unguarded get_required_pipe) raises PipeNotFoundError here.
+        #    Same-package gaps already hard-fail earlier at library load, so the only case reaching this
+        #    catch is the intended cross-package one — record it SKIPPED and drop it from BOTH the
+        #    signature pre-pass and the sweep, matching the old per-pipe dry-run's PipeNotFoundError
+        #    tolerance instead of aborting the whole sweep (preserves the D7 wiring-before-signature order).
+        sweepable_pipes: list[PipeAbstract] = []
+        results: dict[str, DryRunOutput] = {}
         for pipe in pipes:
-            pipe.validate_with_libraries()
+            try:
+                pipe.validate_with_libraries()
+            except PipeNotFoundError as not_found_error:
+                error_message = f"Skipped dry run for pipe '{pipe.pipe_ref}': unresolved dependency: {not_found_error}"
+                log.verbose(error_message)
+                results[pipe.pipe_ref] = DryRunOutput(
+                    pipe_code=pipe.code, pipe_ref=pipe.pipe_ref, status=DryRunStatus.SKIPPED, error_message=error_message
+                )
+                continue
+            sweepable_pipes.append(pipe)
 
         # 2. Aggregated signature pre-pass (strict mode only).
         if not allow_signatures:
-            self._signature_pre_pass(pipes=pipes)
+            self._signature_pre_pass(pipes=sweepable_pipes)
 
         # 3. One validation telemetry event per sweep (relocated from the CLI's _validate_core).
-        get_telemetry_manager().track_event(event_name=EventName.PIPE_DRY_RUN, properties={EventProperty.NB_PIPES: len(pipes)})
+        get_telemetry_manager().track_event(event_name=EventName.PIPE_DRY_RUN, properties={EventProperty.NB_PIPES: len(sweepable_pipes)})
 
         # 4. The dry-run sweep. The DRY leaf emits a synthetic zero-token LLM report, so open ONE
         #    report registry for the whole sweep and close it in `finally`: the registry is keyed by
@@ -193,10 +212,9 @@ class BundleValidator:
             generate_graph=False,
             mock_inputs=True,
         )
-        results: dict[str, DryRunOutput] = {}
         get_report_delegate().open_registry(pipeline_run_id=SpecialPipelineId.DRY_RUN_UNTITLED)
         try:
-            for pipe in pipes:
+            for pipe in sweepable_pipes:
                 results[pipe.pipe_ref] = await self._classify_pipe(pipe=pipe, library_id=library_id, execution_config=execution_config)
         finally:
             get_report_delegate().close_registry(pipeline_run_id=SpecialPipelineId.DRY_RUN_UNTITLED)

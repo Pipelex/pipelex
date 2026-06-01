@@ -5,7 +5,7 @@ from __future__ import annotations
 from pipelex.builder.runner_code import generate_runner_code
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.hub import get_library_manager, get_required_pipe, set_current_library
-from pipelex.pipe_run.dry_run import dry_run_pipes
+from pipelex.pipeline.bundle_validator import BundleValidator
 
 
 async def build_runner_code_for_pipe(
@@ -39,10 +39,9 @@ async def build_runner_code_for_pipe(
     # Load pipes from the blueprints
     pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints)
 
-    # Validate all pipes then dry-run in a single batch
-    for pipe in pipes:
-        pipe.validate_with_libraries()
-    await dry_run_pipes(pipes=pipes, raise_on_failure=True)
+    # Validate (static wiring + dry run) against the open library — never tears it down, so the
+    # library stays loaded for generate_runner_code below (D6 inner-sweep / loaded-on-success).
+    await BundleValidator().validate_pipes(pipes=pipes, library_id=library_id)
 
     # Get the required pipe and generate runner code
     pipe = get_required_pipe(pipe_code)
