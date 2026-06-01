@@ -2,7 +2,7 @@ import asyncio
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Literal, Sequence
+from typing import Literal, Sequence, TypedDict
 
 from pydantic import BaseModel, ValidationError
 from typing_extensions import assert_never
@@ -31,7 +31,7 @@ from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_run.exceptions import DryRunError, PipeRunError
 from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
-from pipelex.pipeline.bundle_validator import BundleValidator, DryRunOutput
+from pipelex.pipeline.bundle_validator import BundleValidator, DryRunOutput, DryRunStatus
 from pipelex.pipeline.exceptions import ValidateBundleError
 
 
@@ -41,16 +41,27 @@ class ValidateBundleResult(BaseModel):
     dry_run_result: dict[str, DryRunOutput]
 
 
-def build_validated_pipes(dry_run_result: dict[str, DryRunOutput], *, use_ref: bool = False) -> list[dict[str, str]]:
+class ValidatedPipeEntry(TypedDict):
+    """One entry in the ``validated_pipes`` JSON envelope returned by the validate surfaces.
+
+    The ``pipe_code`` key carries the namespaced ``pipe_ref`` (``domain.code``) — the key name is
+    kept for the published JSON contract, but the value is the qualified ref, never the bare code.
+    ``status`` is a ``DryRunStatus`` (a ``StrEnum``), so it serializes to its plain string value.
+    """
+
+    pipe_code: str
+    status: DryRunStatus
+
+
+def build_validated_pipes(dry_run_result: dict[str, DryRunOutput]) -> list[ValidatedPipeEntry]:
     """Project a dry-run result map into the ``validated_pipes`` JSON list (agent CLI + builder ops).
 
-    Each entry is ``{"pipe_code": <id>, "status": <DryRunStatus>}`` — built from the real per-pipe
-    outcome so allowed-to-fail FAILUREs and cross-package SKIPPEDs are reported truthfully rather than
-    flattened to SUCCESS. ``use_ref`` selects the namespaced ``pipe_ref`` (agent all-pipes / bundle
-    surfaces) versus the bare ``pipe_code`` (builder ops and the single-pipe agent slices) for the entry
-    id, preserving each surface's existing identity contract.
+    Each entry is built from the real per-pipe outcome, so allowed-to-fail FAILUREs and cross-package
+    SKIPPEDs are reported truthfully rather than flattened to SUCCESS. The entry id is the namespaced
+    ``pipe_ref`` (``domain.code``) on every surface — one unambiguous identity that cannot collide
+    across domains, so the same pipe is never reported under two identifiers by different commands.
     """
-    return [{"pipe_code": output.pipe_ref if use_ref else output.pipe_code, "status": output.status} for output in dry_run_result.values()]
+    return [ValidatedPipeEntry(pipe_code=output.pipe_ref, status=output.status) for output in dry_run_result.values()]
 
 
 @contextmanager

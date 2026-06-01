@@ -131,7 +131,8 @@ class TestAgentValidatePipeInBundle:
         )
         assert result["success"] is True
         pipe_codes = {entry["pipe_code"] for entry in result["validated_pipes"]}
-        assert "implemented_pipe" in pipe_codes
+        # Identity is the namespaced pipe_ref (domain.code) on every validate surface.
+        assert "slice_bundle.implemented_pipe" in pipe_codes
 
     def test_whole_bundle_strict_still_rejects_unrelated_signature(
         self,
@@ -194,4 +195,5 @@ class TestAgentValidatePipeInBundle:
         )
         assert result["success"] is True
         statuses = {entry["pipe_code"]: entry["status"] for entry in result["validated_pipes"]}
-        assert statuses == {"cross_parallel": "SKIPPED"}
+        # Identity is the namespaced pipe_ref (domain.code), not the bare code.
+        assert statuses == {"slice_xpkg.cross_parallel": "SKIPPED"}

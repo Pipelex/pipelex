@@ -42,10 +42,9 @@ async def validate_all_core(
         allow_signatures=allow_signatures,
     )
 
-    # use_ref=True: the agent all-pipes surface keys entries by the namespaced pipe_ref.
     return {
         "success": True,
-        "validated_pipes": build_validated_pipes(dry_run_results, use_ref=True),
+        "validated_pipes": build_validated_pipes(dry_run_results),
         "total_pipes": len(dry_run_results),
     }
 
@@ -76,12 +75,11 @@ async def validate_bundle_core(
     )
 
     # Consume the real per-pipe status from the sweep — a fixed all-"SUCCESS" list would hide allowed
-    # failures and SKIPPED cross-package pipes the dry-run actually recorded (C-8). use_ref=True keys
-    # entries by the namespaced pipe_ref (the agent bundle surface's identity contract).
+    # failures and SKIPPED cross-package pipes the dry-run actually recorded (C-8).
     return {
         "success": True,
         "bundle_path": str(bundle_path),
-        "validated_pipes": build_validated_pipes(result.dry_run_result, use_ref=True),
+        "validated_pipes": build_validated_pipes(result.dry_run_result),
         "total_pipes": len(result.dry_run_result),
     }
 
@@ -116,7 +114,6 @@ async def validate_pipe_core(
     the_pipe = get_required_pipe(pipe_code=pipe_code)
     dry_run_results = await BundleValidator().validate_pipes(pipes=[the_pipe], library_id=library_id, allow_signatures=allow_signatures)
 
-    # use_ref=False: the single-pipe slice keys its one entry by the bare pipe code.
     return {
         "success": True,
         "validated_pipes": build_validated_pipes(dry_run_results),
@@ -160,8 +157,7 @@ async def validate_pipe_in_bundle_core(
     )
 
     # Consume the real per-pipe status from the sliced sweep — a fixed "SUCCESS" would hide an allowed
-    # failure or a cross-package SKIPPED the dry-run actually recorded (C-8). use_ref=False keys the one
-    # entry by the bare pipe code, matching the single-pipe slice contract.
+    # failure or a cross-package SKIPPED the dry-run actually recorded (C-8).
     return {
         "success": True,
         "bundle_path": str(bundle_path),

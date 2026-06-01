@@ -16,7 +16,7 @@ Only the error format is backed by a module-level `ContextVar` in `agent_output.
 Markdown structure per command:
 
 - `run`: `# Pipeline run complete`, a `## Result` section (the rendered `main_stuff` markdown with `--with-memory`, otherwise the concept JSON in a fenced block), and output / graph file paths.
-- `validate`: `# Validation passed`, the bundle path when relevant, and a list of validated pipes with their status.
+- `validate`: `# Validation passed`, the bundle path when relevant, and a list of validated pipes with their status. Every entry in `validated_pipes` (markdown and JSON) identifies its pipe by the namespaced `pipe_ref` (`domain.code`) — the same unambiguous identity across `validate all`, `validate bundle`, and `validate pipe`, so the same pipe is never reported under two identifiers.
 - `init`: `# Pipelex initialized` with target directory, enabled backends, and routing profile.
 - error path: `# Error: <error_type>`, the message, the hint as a `> 💡` callout, and a `## Details` section. `error_source` (internal stack frames) is omitted from markdown — it remains in the JSON envelope (`--error-format json`) for programmatic consumers.
 
