@@ -37,7 +37,8 @@ def read_rows(path: Path, *, delimiter: str = DEFAULT_DELIMITER, encoding: str =
     """Read a CSV file into a list of header-keyed string rows.
 
     A header row is required. Raises ``CsvReadError`` for a missing/unreadable file,
-    a wrong encoding, malformed quoting, or a duplicate/blank header cell.
+    a wrong encoding, or malformed quoting; raises ``CsvColumnError`` for a duplicate
+    or blank header cell.
     """
     _pending("read_rows", path=path, delimiter=delimiter, encoding=encoding)
 
@@ -52,7 +53,7 @@ def write_rows(
 ) -> None:
     """Write header-keyed string rows to a CSV file, emitting ``headers`` in order.
 
-    An empty ``rows`` still writes the header line. Raises ``CsvReadError`` if the file
+    An empty ``rows`` still writes the header line. Raises ``CsvError`` if the file
     cannot be written.
     """
     _pending("write_rows", path=path, headers=headers, rows=rows, delimiter=delimiter, encoding=encoding)

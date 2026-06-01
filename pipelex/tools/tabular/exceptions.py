@@ -22,6 +22,8 @@ class CsvReadError(CsvError):
     third-party exception escapes into core/runner.
     """
 
+    _declared_title = "CSV read error"
+
 
 class CsvFlatnessError(CsvError):
     """Raised when a concept used with CSV is not flat.
@@ -32,6 +34,8 @@ class CsvFlatnessError(CsvError):
     offending field and telling the author to project to a flat concept first.
     """
 
+    _declared_title = "CSV flatness error"
+
 
 class CsvColumnError(CsvError):
     """Raised when CSV headers do not line up with the row concept's fields.
@@ -41,6 +45,8 @@ class CsvColumnError(CsvError):
     to ``None`` for all rows).
     """
 
+    _declared_title = "CSV column error"
+
 
 class CsvCoercionError(CsvError):
     """Raised when a CSV cell value cannot be coerced to its declared field type.
@@ -48,3 +54,5 @@ class CsvCoercionError(CsvError):
     Carries the 1-based row/column, the concept, and the field so the author can find
     the offending cell.
     """
+
+    _declared_title = "CSV coercion error"

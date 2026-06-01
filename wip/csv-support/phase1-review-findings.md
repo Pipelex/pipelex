@@ -1,6 +1,6 @@
 # CSV Support — Phase 1 code-review findings
 
-Status: **open — to triage/fix before (or alongside) Phase 2.** Produced by an extra-high-recall `/code-review` of the Phase 1 work on branch `feature/Support-csv` (worktree `_csv`). Scope reviewed: the new files only (codec skeleton + error taxonomy + fixtures + tests) — see `TODOS.md` "Phase-1 deliverables". Nothing here is committed yet.
+Status: **R1–R7 resolved (2026-06-01); R8–R12 deferred to their phases — see `TODOS.md` Session state.** R5 was decided as *keep `CsvError`* for the `.xlsx` seam in v1 (no `pipelex[tabular]` extra exists yet; revisit `MissingDependencyError` when the xlsx codec + extra ship). Produced by an extra-high-recall `/code-review` of the Phase 1 work on branch `feature/Support-csv` (worktree `_csv`). Scope reviewed: the new files only (codec skeleton + error taxonomy + fixtures + tests) — see `TODOS.md` "Phase-1 deliverables". Nothing here is committed yet.
 
 This doc is the cold-start anchor for verifying and resolving the findings in a fresh session. Each item carries a file:line anchor, a verification recipe, and the recommended fix. Line numbers are approximate anchors — grep the quoted token if they have drifted.
 

@@ -13,6 +13,7 @@ on-disk side effects stay out of the source tree.
 
 from __future__ import annotations
 
+import csv
 import os
 import shutil
 import subprocess  # noqa: S404 — invokes the real pipelex binary for E2E coverage
@@ -96,9 +97,13 @@ class TestCsvRun:
 
         out_csv = tmp_path / "summaries.csv"
         assert out_csv.exists(), f"--save-csv must write summaries.csv at the literal cwd path; cwd contents: {list(tmp_path.iterdir())}"
-        lines = out_csv.read_text(encoding="utf-8").splitlines()
-        assert lines[0] == "name,country,summary"
-        assert len(lines) == 4  # header + one row per input person
+        with out_csv.open(encoding="utf-8", newline="") as csv_file:
+            reader = csv.DictReader(csv_file)
+            assert reader.fieldnames == ["name", "country", "summary"]
+            records = list(reader)
+        # Count parsed records, not physical lines: the dry-mode summary cell is multi-line,
+        # so the codec RFC-quotes it and one logical row spans several physical lines.
+        assert len(records) == 3  # one record per input person
 
     @pytest.mark.gha_disabled
     def test_missing_csv_input_fails_cleanly(self, tmp_path: Path) -> None:
