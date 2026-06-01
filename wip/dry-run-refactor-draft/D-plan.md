@@ -1,14 +1,14 @@
-# Dry-Run Refactor — Plan (clean base, re-grounded on current code)
+# Dry-Run Refactor — Plan (FINALIZED)
 
-> **Status: clean base, awaiting clarified requirements.** This is the original 8-point plan re-grounded on the live branch (`feature/Validate-with-signatures-4-fix-dry-run`), which now sits on top of the signature-validation feature. The north-star principle is unchanged; the design has not yet been finalized because (a) signature-validation moved the ground under it and (b) the clarified/completed requirements are still to be folded in — see [§9 Requirements to fold in](#9-requirements-to-fold-in-pending). Treat everything below §6 as provisional.
+> **Status: design finalized 2026-06-01.** The open questions from the re-grounded base are resolved (decisions **D1–D3** below). This plan supersedes the earlier "awaiting clarified requirements" draft. The background docs ([`A-taxonomy.md`](./A-taxonomy.md), [`B-load-profile.md`](./B-load-profile.md), [`C-synthesis.md`](./C-synthesis.md), [`E-parity-gate.md`](./E-parity-gate.md)) remain accurate and are referenced where relevant.
 
 ## 1. Context
 
-Pipelex executes MTHDS pipelines — graphs of pipes (LLM calls, controllers like sequence/parallel/batch/condition, operators, and now `PipeSignature` contracts). DRY mode swaps real LLM/IO calls for mock outputs so a pipeline can be validated end-to-end without spending money or making network calls. The hosted deployment runs LIVE pipelines on Temporal (workflows on remote workers); DRY is meant to stay cheap and in-process.
+Pipelex executes MTHDS pipelines — graphs of pipes (LLM calls, controllers like sequence/parallel/batch/condition, operators, and `PipeSignature` contracts). DRY mode swaps real LLM/IO calls for mock outputs so a pipeline can be validated end-to-end without spending money or making network calls. The hosted deployment runs LIVE pipelines on Temporal (workflows on remote workers); DRY is meant to stay cheap and in-process.
 
-Today DRY mode has accumulated parallel code paths that do not go through the same orchestration as LIVE. This plan consolidates them.
+Today DRY mode has accumulated parallel code paths that do not go through the same orchestration as LIVE, plus a confirmed dead `DryPipeRouter`. This plan consolidates them onto a single execution primitive.
 
-## 2. North-star principle (user-stated, unchanged)
+## 2. North-star principle (user-stated)
 
 > "A run is a run, whether it's dry or live or else, it's the SAME THING. The delivery, the preparation, should go through the SAME thing."
 >
@@ -16,88 +16,126 @@ Today DRY mode has accumulated parallel code paths that do not go through the sa
 >
 > "The CLI should ONLY CALL THE PIPELEXRUNNER with the right configuration. There SHOULDN'T BE A dry-run CLI; it should be the RUN cli with a dry mode."
 
-The goal is: one entry point (`PipelexRunner`), `pipe_run_mode=DRY` as the only switch, no bespoke dry-run functions, no router-level mode dispatch.
+One entry point for *running a pipe* (`PipelexRunner`), `pipe_run_mode=DRY` as the only switch, no bespoke dry-run *execution* functions, no router-level mode dispatch.
 
-## 3. Current reality (verified on the live branch)
+## 3. The reframe that drives the design: two operations, not one
 
-What's actually in the tree today — this is the starting point, not the abandoned `fix/dry-run` state described in [`archive/`](./archive/):
+The thing the codebase calls "dry-run" is in fact **two distinct operations** wearing one name. Conflating them is what made the north-star feel slippery. Separating them is what makes the consolidation clean.
 
-- **The four parallel modules all still exist:** `pipelex/pipe_run/dry_run.py`, `dry_run_pipeline.py`, `dry_run_with_graph.py`, `dry_pipe_router.py`.
-- **`DryPipeRouter` is confirmed dead code** — never instantiated outside its own definition. Mode dispatch lives in `PipeAbstract._run_pipe_traced` (`match pipe_run_params.run_mode`), so the regular `PipeRouter` already routes DRY correctly. This finding from the original audit still holds.
-- **`validate_bundle` already dry-runs on load.** The three `# TODO: wip - restore or refactor dry run` are gone; every load path calls `dry_run_pipes(...)`. The "silent regression" that motivated the original plan is **closed** — but it was closed through the old `dry_run.py`, not the consolidation.
-- **`dry_run.py` is now load-bearing for signature-validation** (see [`A-taxonomy.md` §7](./A-taxonomy.md#section-7-signature-validation-deltas-added-since-this-doc)):
-  - `dry_run_pipe` / `dry_run_pipes` thread `allow_signatures` and host the batch-level **strict signature pre-check** (`collect_signature_refs` / `collect_signature_paths` → single aggregated `SignaturesNotAllowedError`).
-  - `convert_stuff_spec_to_typed_named` is exported from `dry_run.py` and **imported by `pipelex/pipe_signature/pipe_signature.py`** — a hard dependency from the signature runtime into the module the plan wants to delete.
-  - `convert_to_working_memory_format` is still in `dry_run.py`, imported by `pipeline_run_setup.py` and `dry_run_with_graph.py`.
-- **`allowed_to_fail_pipes`** is still present in `configs.py` and `pipelex.toml`, still consumed by `dry_run_pipes` (with a `# TODO` noting the bare-code multi-domain collision risk).
-- **`validate_bundle` carries `allow_signatures` + `dry_run_pipe_codes`** (the `--pipe` single-slice selector via `_pipes_to_dry_run`), and `ValidateBundleError` carries `signature_check_error`.
-- **`_run_core.py` has been reworked** (and split into main-CLI + agent-CLI copies): artifact writing is now gated by `save_main_stuff` / `save_working_memory` flags against an `output_path`, not the hand-rolled block the original plan described.
+**A — Execution-dry-run (already through the runner).** `PipelexRunner.execute_pipeline(pipe_run_mode=DRY)` loads the library, builds a `PipeJob`, runs it through `PipeRun → PipeRouter → pipe.run_pipe()` (which dispatches DRY at the pipe level via `PipeAbstract._run_pipe_traced`), optionally delivers/graphs, **raises `PipelineExecutionError` on the first failure**, and tears the library down in `finally`. Single pipe, loads-from-scratch, strict. `pipe_run/dry_run_pipeline.py` (graph path) already does exactly this. **This is the north-star and it already exists.**
 
-## 4. Current dry-run call graph (who to migrate)
+**B — Validation-sweep (the bespoke `dry_run.py` path).** `dry_run_pipes(pipes=[...])` takes **already-loaded** `PipeAbstract` objects, shares one library across all of them, and for each pipe mocks inputs + runs DRY **tolerantly**: it collects `SUCCESS / FAILURE / SKIPPED` per pipe, honors `allowed_to_fail_pipes`, skips cross-package unresolved deps (`PipeNotFoundError → SKIPPED`), and does a **single aggregated** signature pre-check across the whole batch *before* running anything. Consumed by `validate --all`, `validate_bundle`, `builder/operations/validate_ops.py`, and the agent CLI. **This is a quality gate, not a run.**
 
-The callsites the consolidation must move off the bespoke functions and onto `PipelexRunner`, by module (line numbers omitted on purpose — they drift):
+The honest conclusion: a validation sweep is not a run — it is a batch *policy* that *uses* runs. So "drop the dry-run functions and route everything through the runner" is exactly right for the *execution primitive* (A), while the *batch-validation semantics* (B) need a clean, explicit home that **composes** the runner rather than forking it.
 
-- `pipelex/pipeline/validate_bundle.py` — calls `dry_run_pipes(...)` on every load path; threads `allow_signatures` + `dry_run_pipe_codes`.
-- `pipelex/cli/commands/validate/_validate_core.py` — `dry_run_pipe` (single) + `dry_run_pipes` (batch).
-- `pipelex/cli/agent_cli/commands/validate/_validate_core.py` — `dry_run_pipe` + `dry_run_pipes`, plus `--pipe` single-slice.
-- `pipelex/builder/operations/validate_ops.py` — `dry_run_pipe` + `dry_run_pipes`.
-- `pipelex/builder/operations/runner_code_ops.py` — `dry_run_pipes`.
-- `pipelex/graph/graph_rendering.py` — the only consumer of `dry_run_pipeline` (graph-on-dry-run).
-- `pipelex/pipeline/pipeline_run_setup.py` + `pipelex/pipe_run/dry_run_with_graph.py` — consume `convert_to_working_memory_format`.
-- `pipelex/pipe_signature/pipe_signature.py` — consumes `convert_stuff_spec_to_typed_named` (NOT a dry-run caller, but a hard importer of `dry_run.py`).
+## 4. Finalized design
 
-Tests that import these modules and will move with them: `tests/unit/pipelex/pipe_run/test_dry_run.py`, `tests/integration/pipelex/pipe_signature/*`, `tests/e2e/test_signature_validation_mthds.py`, `tests/integration/pipelex/pipes/controller/pipe_sequence/test_pipe_sequence_list_output_bug.py`, `tests/integration/pipelex/temporal/library_crate/conftest.py`.
+### Decisions
 
-## 5. Decided design (carried over — re-validate before committing)
+- **D1 — Architecture.** A first-class `BundleValidator` domain service owns the validation sweep (signature pre-pass, per-pipe loop, tolerant aggregation) and composes `PipelexRunner`. The runner stays a pure single-pipe execution primitive. (Chosen over "runner absorbs a batch method," which would push `SKIPPED` / `allowed_to_fail` / signature-precheck — all irrelevant to LIVE — into the runner and make it a god-object.)
+- **D2 — Library lifecycle.** The runner exposes a `borrowed_library` async context manager so a caller can open + load a library once and run many pipes against it without per-pipe reload/teardown. Inside the scope, `execute_pipeline` reuses the open library and skips teardown; the context manager owns teardown on exit. (Chosen over a bare `keep_library_loaded` flag for a cleaner ownership contract, and over reload-per-pipe which would cost seconds-to-minutes of pure load churn on `validate --all`.)
+- **D3 — Validation model.** The sweep stays **tolerant**: per-pipe `SUCCESS / FAILURE / SKIPPED`, with `SKIPPED` preserved for cross-package unresolved deps and `allowed_to_fail_pipes` kept but **fixed to namespaced `domain.pipe_code` refs** (closing the live bare-code multi-domain-collision `# TODO`). One validation telemetry event, not one per pipe.
 
-These decisions from the original plan still look right, but must be re-checked against the signature surface:
+### 4.1 `PipelexRunner` — the single execution primitive
 
-1. **Delete the bespoke dry-run functions; dry-runs return `PipeOutput` and raise `PipelineExecutionError` on failure** — symmetric with live runs. **Open against current code:** `DryRunStatus` / `DryRunOutput` are now woven into the validator JSON output and the `SKIPPED` path (cross-package unresolved deps); and `convert_stuff_spec_to_typed_named` must survive (move, not delete) because `pipe_signature.py` needs it. So "drop the types" is no longer a clean delete — it's a relocate-and-rewire.
+`execute_pipeline(pipe_code, pipe_run_mode, ...)` remains the only way to *run a pipe*. DRY or LIVE; raises `PipelineExecutionError` on failure (already true today). Two additions:
 
-2. **`PipelexRunner` enforces routing.** If `pipe_run_mode == DRY`, use a local `PipeRun(PipeRouter())` regardless of hub default (Temporal stays for LIVE). Per-request explicit `pipe_run` override beats both. Backed by the load profile (`B`) and the parity gate (`E`), both still valid.
+- **`borrowed_library` context manager** (D2). Contract:
+  - On enter: open a library, load `library_dirs` / `mthds_contents` / a bundle into it, set it current, yield a handle carrying the `library_id`.
+  - Inside: `execute_pipeline` resolves the pipe from the already-open library by `pipe_code`, builds the `PipeJob`, runs it — **no reload, no teardown**.
+  - On exit: tear the library down (and restore the previous current-library), with the same safety ordering `validate_bundle` uses today (restore outer current-library before teardown so a teardown raise can't strand the outer scope).
+  - Implementation touch points: `pipeline_run_setup` currently calls `library_manager.open_library(...)` and `execute_pipeline`'s `finally` calls `library_manager.teardown(...)`. Both must become conditional on an "externally-owned library" signal threaded from the borrowed scope. The self-contained (non-borrowed) path is unchanged — default behavior stays "open, run, teardown."
+- **Validation-context suppression** (telemetry side of D3). When invoked inside a borrowed-library validation scope, `execute_pipeline` must **not** register a new pipeline in the pipeline manager nor emit per-run `PIPELINE_EXECUTE` / `PIPELINE_COMPLETE` events — a validation of N pipes is one logical event, emitted once by `BundleValidator`, not N pipeline runs. Carry this as a flag on the borrowed scope.
 
-3. **Delivery is mode-agnostic.** `PipeRun.run()` does not gate on mode; it honors whatever `DeliveryAssignment` the caller passes. "No S3/webhook for DRY in hosted API" is an endpoint-level policy (caller picks the target), not a runtime branch.
+The runner gains **no** knowledge of signatures, `allowed_to_fail`, or `SKIPPED`. Those are validation concerns and live only in `BundleValidator`.
 
-4. **Validators migrate to `PipelexRunner`.** Each becomes a loop over `runner.execute_pipeline(pipe_code=p, pipe_run_mode=DRY, mock_inputs=True, ...)`, aggregating failures. **Now also has to thread `allow_signatures` and the `--pipe` slice selection** (see §6).
+### 4.2 `BundleValidator` — the batch validation service (D1)
 
-5. **`convert_to_working_memory_format` + mock-input generation move into the runner / `WorkingMemoryFactory`** so validators stop building their own working memory.
+A first-class service (proposed home: `pipelex/pipeline/bundle_validator.py`, next to the existing `validate_bundle.py`, reusing `_translate_to_validate_bundle_error` as the error-translation boundary). All validation entry points route through it — both batch and single-pipe. Responsibilities, in order:
 
-6. **`graph_rendering.py` calls the runner directly** with `generate_graph=True`, reading `response.pipe_output.graph_spec`.
+1. **Open a borrowed library** via `runner.borrowed_library(...)` (loads dirs / contents / bundle once).
+2. **Select pipes to dry-run.** Whole bundle, or the `--pipe` slice via the existing `_pipes_to_dry_run` selector (keeps its `PipeNotFoundError` typo-guard so a misspelled `--pipe` fails loudly).
+3. **Signature pre-pass** (D-plan §4.3). Walk the selected pipes with `collect_signature_refs` / `collect_signature_paths`; if `allow_signatures=False` and any signature is reached, raise the single aggregated `SignaturesNotAllowedError` (longest dep-chain per signature, as today). In strict mode, exclude signature pipes from the sweep itself (validating a signature directly would always trip the check); in lenient mode keep them (they dry-run trivially by minting a mock output). This is the same signature-aware filtering `validate --all` does today, now owned by the service.
+4. **`validate_with_libraries()` pass.** Per selected pipe — this is a static library-wiring check that is *more* than a dry run and the runner's DRY path does not perform it (the runner only triggers `validate_before_run` inside `_run_pipe_traced`). Keeping it here preserves coverage. (It removes today's redundancy where both `validate --all` and `dry_run_pipe` call it.)
+5. **Dry-run sweep.** For each selected pipe: `await runner.execute_pipeline(pipe_code=pipe.code, pipe_run_mode=DRY)` inside the borrowed scope, classifying the outcome:
+   - success → `SUCCESS`
+   - failure rooted in `PipeNotFoundError` (cross-package unresolved dep) → `SKIPPED`
+   - any other `PipelineExecutionError` → `FAILURE`, unless the pipe's namespaced ref is in `allowed_to_fail_pipes`
+6. **Aggregate + report.** Build the per-pipe status map, emit one validation telemetry event (`PIPE_DRY_RUN` with `NB_PIPES`), raise a single aggregated error if there are unexpected failures, else return the result.
 
-7. **`keep_library_loaded` ownership flag.** The abandoned attempt discovered that `PipelexRunner.execute_pipeline` tears down its library in `finally`, which breaks the validator pattern of "pre-load once, iterate N pipes through the runner." The opt-in `keep_library_loaded` flag (caller owns the library) was its fix. This problem is **still latent** in the current runner and any migration will rediscover it — keep the fix on the menu. See [`archive/fix-dry-run-implementation.md`](./archive/fix-dry-run-implementation.md) "Design addition not in the plan".
+Mock inputs are **not** built by the validator — it sets `is_mock_inputs=True` on the execution config and lets the runner generate them (the runner already does this in `pipeline_run_setup`; see §4.5).
 
-## 6. NEW constraints imposed by signature-validation
+### 4.3 `allow_signatures` is a validation gate, not a run parameter
 
-This is the part the original plan never saw. Any consolidation must satisfy all of these or it regresses signature-validation:
+Key finding that simplifies the surface: in DRY, a `PipeSignature` **always** mints its mock output (`PipeSignature._dry_run_pipe`), regardless of `allow_signatures`. The flag changes exactly one thing — whether the **batch pre-check raises**. The per-pipe *run* is identical either way. Therefore `allow_signatures` does **not** ride on `PipeRunParams` or `execute_pipeline`; it is a `BundleValidator` parameter that controls only the pre-pass (§4.2 step 3). This corrects the earlier assumption (old §6) that `allow_signatures` had to thread through the runner alongside `run_mode`.
 
-- **`allow_signatures` rides alongside `run_mode`.** Routing dry-run through `PipelexRunner` means `execute_pipeline` (or `PipeRunParams`) must carry strict-vs-lenient. Decide where it lives: a `PipelexRunner` parameter, a field on `PipeRunParams`, or part of an execution-config. Both CLIs are **strict by default**; lenient is opt-in via `--allow-signatures`.
+`ValidateBundleError.signature_check_error` + `handle_signatures_not_allowed_error` (honoring `--traceback`) are preserved: the pre-pass raises `SignaturesNotAllowedError`, the translation boundary wraps it, the CLI renders it.
 
-- **The batch-level strict pre-check needs a home.** Today `dry_run_pipes` walks the *whole batch* and raises a **single** `SignaturesNotAllowedError` aggregating every offending pipe + dep-chain, *before* running any pipe. `PipelexRunner.execute_pipeline` is single-pipe per call. Options to resolve: (a) keep a thin batch orchestrator above the runner that does the pre-check then loops; (b) push the pre-check into a validate-only pre-pass; (c) accept per-pipe errors and lose the single-aggregated-error UX (probably unacceptable — it's a deliberate property). This is the central design question.
+### 4.4 Tolerant result model (D3)
 
-- **`dry_run_pipe_codes` / `--pipe` single-slice must survive.** "Load the whole bundle so deps resolve, but only dry-run the selected pipe" is a real feature with a typo-guard (`PipeNotFoundError` on an unknown `--pipe`). The runner-based design has to express "load these, run only that."
+`DryRunStatus` (`SUCCESS / FAILURE / SKIPPED`) and `DryRunOutput` survive, but **relocate** out of `pipe_run/dry_run.py` into the `BundleValidator` module — they are validation-report types, not execution types. The CLI / builder JSON consumers (`builder/operations/validate_ops.py`, the agent CLI) keep reading the per-pipe status map.
 
-- **`PipeSignature` minting must keep working.** `PipeSignature._dry_run_pipe` mints its declared output via `WorkingMemoryFactory.make_mock_content`; `convert_stuff_spec_to_typed_named` is part of that path and lives in `dry_run.py`. Relocate it somewhere `pipe_signature.py` can import without a cycle (candidate: `WorkingMemoryFactory`, alongside `convert_input_specs_to_typed` from the abandoned attempt).
+`allowed_to_fail_pipes` stays in `DryRunConfig` + `pipelex.toml`, **migrated to namespaced refs** (`domain.pipe_code`). The current bare entries (`infinite_loop_1`, `pipe_builder`) must be re-expressed with their domains, and the matching in `BundleValidator` keys off `pipe.pipe_ref`, not `pipe.code`. This is a breaking config change (allowed — no backward-compat requirement) and closes the bare-code collision risk.
 
-- **`ValidateBundleError.signature_check_error` + friendly CLI rendering** (`handle_signatures_not_allowed_error`, honoring `--traceback`) must still fire after migration.
+### 4.5 Mock inputs flow through the runner
 
-## 7. Out of scope (carried over)
+The runner already generates mock inputs when `execution_config.is_mock_inputs` is true (`pipeline_run_setup`: `convert_to_working_memory_format` → `WorkingMemoryFactory.make_mock_inputs`, only for inputs the caller didn't provide). `BundleValidator` therefore stops building working memory itself and simply sets `is_mock_inputs=True`. The helper `convert_to_working_memory_format` **relocates** to `WorkingMemoryFactory` (or a `mock_inputs.py` beside it), since the runner — not the deleted `dry_run.py` — is its real owner. (Minor polish: `with_graph_config_overrides` already carries the `mock_inputs` override but is graph-named; consider a clearer `with_overrides`.)
 
-- API endpoint unification (`/validate` + `/execute` → `/run` in `pipelex-api`) — follow-up.
-- CLI artifact dedup — note the target moved; `_run_core.py` now uses `save_main_stuff` / `save_working_memory` flags, and there are two copies (main + agent CLI). Re-scope before touching.
-- Renaming `WfPipeRouter` / `WfPipeRun` for clarity (`A-taxonomy.md` §6 smell #1).
+### 4.6 Graph path
 
-## 8. Kept as-is (carried over)
+- `pipe_run/dry_run_pipeline.py` already routes through the runner (`execute_pipeline(generate_graph=True, mock_inputs=True, DRY)`) and is the sole path used by `graph/graph_rendering.py`. **Keep** it as a thin helper (or inline into `graph_rendering.py`); it is already north-star-compliant.
+- `pipe_run/dry_run_with_graph.py` (`dry_run_pipe_with_graph`, single pre-loaded pipe + graph, direct `pipe.run_pipe()`) has **no consumers** within `pipelex/`. **Delete** it (verify `pipelex-api` and the test tree first).
+
+### 4.7 `convert_stuff_spec_to_typed_named` relocation (unblocks the deletion)
+
+`pipe_signature/pipe_signature.py` imports `convert_stuff_spec_to_typed_named` from `dry_run.py` — a hard dependency from the signature runtime into the module we want to delete. Relocate it alongside `convert_to_working_memory_format` (§4.5) into `WorkingMemoryFactory`, and rewire `pipe_signature.py` + `pipeline_run_setup.py`. This is **step 0** of the migration so `dry_run.py` becomes a deletable leaf.
+
+## 5. What changes — delete / relocate / keep
+
+**Delete**
+
+- `pipe_run/dry_pipe_router.py` (`DryPipeRouter`) — confirmed dead code; mode is a pipe-level concern, not a router-level one.
+- `pipe_run/dry_run_with_graph.py` — no consumers (§4.6).
+- `pipe_run/dry_run.py`'s execution functions `dry_run_pipe` / `dry_run_pipes` — their semantics move into `BundleValidator`. Once the helpers and types relocate, `dry_run.py` is fully removed.
+
+**Relocate**
+
+- `convert_to_working_memory_format`, `convert_stuff_spec_to_typed_named` → `WorkingMemoryFactory` (runner + signature runtime are the real owners).
+- `DryRunStatus`, `DryRunOutput` → `BundleValidator` module (validation-report types).
+
+**Keep**
 
 - `PipeRouterProtocol`, `PipeRunProtocol`, the Router/Run two-layer split (mirrors the Temporal parent/child workflow shape).
-- Pipe-level `_dry_run_pipe` / `_dry_run_operator_pipe` / `_dry_run_controller_pipe` — the legitimate per-pipe-type override boundary; the only place `run_mode` should matter. `PipeSignature._dry_run_pipe` is a clean addition to this set.
+- Pipe-level `_dry_run_pipe` / `_dry_run_operator_pipe` / `_dry_run_controller_pipe` — the legitimate per-pipe-type override boundary; the only place `run_mode` should matter. `PipeSignature._dry_run_pipe` is a clean member of this set.
+- `pipe_run/dry_run_pipeline.py` — already runner-based (§4.6).
 
-## 9. Requirements to fold in (PENDING)
+## 6. Migration sequencing (phased)
 
-> The user has clarified/completed needs that have not yet been written here. When they arrive, fold them into §5–§6 and resolve the central design question in §6 (where the batch strict pre-check lives). Until then, this plan is a re-grounded base, not a commitment.
+Ordered to keep every intermediate state compiling and green, given `dry_run.py` is imported by `pipe_signature.py`.
 
-Likely decision points the requirements will need to settle:
+**Phase 0 — Unblock the leaf.** Relocate `convert_to_working_memory_format` + `convert_stuff_spec_to_typed_named` to `WorkingMemoryFactory`; rewire `pipe_signature.py` and `pipeline_run_setup.py`. No behavior change. Run the suite.
 
-- Where `allow_signatures` lives on the runner surface, and whether DRY/LIVE is the only mode or whether "validate-only" becomes a distinct mode.
-- Whether the batch strict pre-check stays as a pre-pass or the per-pipe-aggregation UX is redesigned.
-- The fate of `DryRunStatus` / `DryRunOutput` / `SKIPPED` / `allowed_to_fail_pipes` under the "dry-run failure is a real failure" model — especially the cross-package `SKIPPED` path, which exists for a reason (unresolved cross-package deps during partial validation).
-- Sequencing: which deletion/migration order minimizes broken intermediate states, given `dry_run.py` is imported by `pipe_signature.py`.
+**Phase 1 — Runner gains borrowed-library + validation-context suppression** (§4.1 / D2). Add the `borrowed_library` context manager and the externally-owned-library + telemetry-suppression signals; make `pipeline_run_setup`'s open and `execute_pipeline`'s teardown conditional. Self-contained path unchanged. Unit-test the borrowed scope (open-once / run-many / teardown-once; teardown-raise safety).
+
+> **Checkpoint A (after Phase 1).** The execution primitive is ready and the signature runtime no longer depends on `dry_run.py`, but nothing consumes the new capability yet — clean handoff point. Update this doc with the final `borrowed_library` signature, the name chosen for the suppression flag, and any `pipeline_run_setup` shape changes.
+
+**Phase 2 — Build `BundleValidator`** (§4.2, D1/D3). Implement the service (signature pre-pass, `validate_with_libraries` pass, runner loop with `SUCCESS/FAILURE/SKIPPED` classification, namespaced `allowed_to_fail`, single telemetry event) against the still-present `dry_run.py`, behind no callers yet. Relocate `DryRunStatus` / `DryRunOutput`. Port the existing `tests/unit/pipelex/pipe_run/test_dry_run.py` coverage onto the service.
+
+**Phase 3 — Migrate the callers.** Point `validate_bundle` / `validate_bundles_from_directory`, both CLI `_validate_core.py` files, `builder/operations/validate_ops.py`, and `builder/operations/runner_code_ops.py` at `BundleValidator`. Migrate `allowed_to_fail_pipes` entries in `pipelex.toml` to namespaced refs. Verify the single-pipe `validate <pipe>` / `--pipe` slice and the friendly `SignaturesNotAllowedError` rendering still fire.
+
+> **Checkpoint B (after Phase 3).** All validation traffic now goes through `BundleValidator → runner`; `dry_run.py`'s execution functions are unreferenced. Re-run the signature e2e + integration suites (`tests/e2e/test_signature_validation_mthds.py`, `tests/integration/pipelex/pipe_signature/*`) and the full `make agent-test`. This is the natural place to split into a fresh session if context has grown.
+
+**Phase 4 — Delete dead code.** Remove `dry_pipe_router.py`, `dry_run_with_graph.py`, and the now-unreferenced `dry_run.py`. Settle `dry_run_pipeline.py` (keep thin or inline into `graph_rendering.py`). Final `make agent-check` + `make agent-test`.
+
+## 7. Out of scope (follow-ups)
+
+- API endpoint unification (`/validate` + `/execute` → `/run` in `pipelex-api`).
+- CLI artifact dedup — `_run_core.py` now gates artifact writing via `save_main_stuff` / `save_working_memory` against an `output_path`, in two copies (main + agent CLI). Re-scope before touching.
+- Renaming `WfPipeRouter` / `WfPipeRun` for clarity ([`A-taxonomy.md` §6 smell #1](./A-taxonomy.md#section-6-smells-and-inconsistencies)).
+
+## 8. Invariants & risks
+
+- **Parity gate holds** ([`E-parity-gate.md`](./E-parity-gate.md)): the API process and the Temporal worker register identical class registries (user concept classes are loaded per-request from the MTHDS payload, not at boot), so routing DRY to a local in-process run is safe even where the hub default is Temporal. Re-opens only if one side gains a boot-time library preload the other lacks.
+- **Load profile is safe in-process** ([`B-load-profile.md`](./B-load-profile.md)): a dry run is CPU-cheap (Pydantic + Jinja2), no network, no disk — fine to loop in the validation sweep.
+- **Risk — telemetry suppression.** If Phase 1's suppression flag is missed on any borrowed-scope path, `validate --all` would emit a flood of per-pipe pipeline-run events. Covered by an explicit test asserting one validation event per sweep.
+- **Risk — `SKIPPED` classification.** Routing through the runner turns `PipeNotFoundError` into `PipelineExecutionError`; `BundleValidator` must inspect the cause to re-classify cross-package unresolved deps as `SKIPPED`, or partial-bundle validation regresses to hard failure. Covered by a cross-package partial-validation test.

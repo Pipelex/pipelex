@@ -3,7 +3,7 @@
 Branch: `feature/Validate-with-signatures-4-fix-dry-run`. Goal: consolidate all dry-run code paths through `PipelexRunner` so dry and live runs share one entry point — **now layered on top of the signature-validation feature**, which already re-wired these paths.
 
 > **Read this first — the situation changed since the draft was written.**
-> The original draft (a few days old) documented this refactor as *already shipped* on a branch called `fix/dry-run`. That branch was **never merged**. It forked at v0.29.1 and the live branch then moved ~55 commits past it independently — landing the **signature-validation** feature (`PipeSignature`, `--allow-signatures`, strict pre-check) which **re-touched the exact dry-run code this refactor wants to delete**. So: none of the deletions/migrations the draft claimed are in the tree, and the refactor's original motivation (a "silent dry-run regression" in `validate_bundle`) **has since been fixed** — through the very path the plan wanted to remove. The implementation/validation docs were moved to [`archive/`](./archive/); everything else was re-grounded on the current code.
+> The original draft (a few days old) documented this refactor as *already shipped* on a branch called `fix/dry-run`. That branch was **never merged**. It forked at v0.29.1 and the live branch then moved ~55 commits past it independently — landing the **signature-validation** feature (`PipeSignature`, `--allow-signatures`, strict pre-check) which **re-touched the exact dry-run code this refactor wants to delete**. So: none of the deletions/migrations the draft claimed are in the tree, and the refactor's original motivation (a "silent dry-run regression" in `validate_bundle`) **has since been fixed** — through the very path the plan wanted to remove. Everything here was re-grounded on the current code.
 
 ## Current state of the world (what's actually true today)
 
@@ -19,13 +19,12 @@ So the consolidation is still desirable, but it is now a **bigger** operation th
 
 | File | Purpose | Status |
 |---|---|---|
-| **[`D-plan.md`](./D-plan.md)** | **The live plan.** Re-grounded on the current signature-aware code. Lists current reality, the in-scope consolidation, the new constraints signature-validation imposes, and an explicit slot for the clarified requirements still to be folded in. | **Read this first.** Rewritten. |
+| **[`D-plan.md`](./D-plan.md)** | **The live plan — FINALIZED.** The core reframe (dry-run is two operations: execution-via-runner vs. validation-sweep), the finalized design (`BundleValidator` service composing a pure single-pipe runner + `borrowed_library` ownership scope), decisions D1–D3, and a phased migration with checkpoints. | **Read this first.** Finalized 2026-06-01. |
 | [`00-questions.md`](./00-questions.md) | The three founding questions of the original audit (is `DryPipeRouter` dead? taxonomy of the runtime classes? FastAPI load profile?). | Historical origin. Answers still hold. |
 | [`A-taxonomy.md`](./A-taxonomy.md) | Side-by-side of `PipeRouter` / `PipeRun` / `WfPipeRouter` / `WfPipeRun`; call chains local vs Temporal; hub swap; `DryPipeRouter` dead-code proof. Plus a signature-validation delta section. | Background. Structurally accurate (line numbers as of ~v0.29.1). |
 | [`B-load-profile.md`](./B-load-profile.md) | CPU/memory/I/O audit of the dry-run path — basis for "dry-run is safe in-process." | Background. Still valid. |
 | [`C-synthesis.md`](./C-synthesis.md) | One-page condensed answers to the founding questions. | Background. §5 updated for the closed regression. |
 | [`E-parity-gate.md`](./E-parity-gate.md) | The blocking check: does the API process load the same class registry as the Temporal worker? Verdict drives "DRY → local". | Background. Verdict still holds. |
-| [`archive/`](./archive/) | The implementation + validation docs for the **abandoned** `fix/dry-run` branch. Reference only. | Archived. Not current. |
 
 ## TL;DR
 
@@ -33,4 +32,4 @@ So the consolidation is still desirable, but it is now a **bigger** operation th
 
 **What changed since the draft.** The "silent regression" motivation is gone — `validate_bundle` dry-runs again. But the path that fixes it (`dry_run.py` / `dry_run_pipes`) is now the home of the signature-validation strict-check and is imported by `pipe_signature.py`. The consolidation therefore has to carry the whole signature surface, not just delete it.
 
-**What's next.** Re-scope the consolidation on top of signatures (`D-plan.md`), then fold in the clarified requirements. The mechanical shopping list from the abandoned attempt ([`archive/fix-dry-run-implementation.md`](./archive/fix-dry-run-implementation.md)) is still a useful starting menu.
+**The finalized design (see [`D-plan.md`](./D-plan.md)).** "Dry-run" is really two operations: **execution-dry-run** (a single pipe through `PipelexRunner`, raises on failure — already exists and *is* the north-star) and the **validation-sweep** (batch, tolerant, over pre-loaded pipes — the bespoke `dry_run.py` path). The consolidation keeps the runner as a pure single-pipe execution primitive and rebuilds the sweep as a first-class `BundleValidator` service that *composes* the runner. Decisions: **D1** `BundleValidator` service (not a batch method on the runner); **D2** a `borrowed_library` ownership context manager on the runner (open-once / run-many / teardown-once); **D3** keep the tolerant `SUCCESS/FAILURE/SKIPPED` sweep, with `allowed_to_fail_pipes` fixed to namespaced refs. Key simplification: `allow_signatures` is a validation gate, **not** a runner parameter. Migration is phased (Phase 0 unblocks the leaf import, then runner → validator → callers → delete) with checkpoints.
