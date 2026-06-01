@@ -160,6 +160,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done.
 
 ## Phase 3a — Migrate the in-repo callers (D3 / D6)
 
+- [ ] **⚠️ PREREQUISITE — do this FIRST, before pointing any caller at `validate_pipes` (review finding #1, [`bundle-validator-review-findings.md`](wip/dry-run-refactor-draft/bundle-validator-review-findings.md)).** `BundleValidator.validate_pipes` step 1 runs `pipe.validate_with_libraries()` for every pipe **outside any try** (`bundle_validator.py:178-179`; the try opens at `open_registry`, `:198`). A controller (`PipeBatch.required_variables`/`PipeCondition.required_variables`/`PipeParallel.needed_inputs`) with an **unresolved cross-package** sub-pipe raises `PipeNotFoundError` there and **aborts the whole sweep**. Today's inner-sweep callers (`validate_bundle` et al.) don't hit this because the old `dry_run_pipe` ran `validate_with_libraries()` *inside* its try with `except PipeNotFoundError → SKIPPED` (`dry_run.py:45,:51`); pointing them at `validate_pipes` regresses that to a hard abort. **Fix:** wrap each step-1 `validate_with_libraries()`; on `PipeNotFoundError` record the pipe **SKIPPED** and drop it from BOTH the signature-pre-pass list and the sweep list (keeps D7 ordering). Same-package typos still hard-fail at load (`Library.validate_pipe_library_with_libraries` → `get_required_pipe`, `library.py:137`), so this tolerates *only* the intended cross-package case — mirror the load-time predicate `Library._has_unresolved_cross_package_deps` (`library.py:142-148`). **Test (integration, NOT a unit mock):** a real bundle whose controller references an unloaded cross-package sub-pipe → that pipe SKIPPED in the result map, sweep completes, sibling pipes still classified. (Also closes the real cross-package SKIPPED coverage the integration suite lacks — finding #12.)
 - [ ] Point at the **acquire-and-sweep** entry: `validate_bundle` / `validate_bundles_from_directory`, both `cli/.../validate/_validate_core.py`, `builder/operations/validate_ops.py`, `builder/operations/runner_code_ops.py`.
 - [ ] Point the **caller-owned-library** flows at the **public inner sweep** (no teardown — D6), preserving the loaded-on-success contract: `builder/operations/inputs_ops.py`, `output_ops.py`, `cli/commands/build/{runner,inputs,output}/_*_core.py`, `validate_pipe_in_bundle` (`validate_ops.py:181`). Add caller tests asserting `get_required_pipe()` still works after validation.
 - [ ] Fix the pre-existing agent-CLI bug: `cli/agent_cli/commands/validate/_validate_core.py:91` discards results and reports all-`SUCCESS` — consume the `SUCCESS/FAILURE/SKIPPED` map (C-8).
@@ -196,6 +197,27 @@ Status legend: ☐ not started · ◐ in progress · ☑ done.
 > **Verify:** full `make agent-test` green · `make agent-check` clean · commit (open the PR for the consolidation here).
 >
 > **Handoff (fill in):** (use template) — **Next:** the deferred backend follow-ups, on their own branches — start with [`followup-leaf-run-mode-mock.md`](wip/dry-run-refactor-draft/followup-leaf-run-mode-mock.md) (resolve its Pre-flight items first).
+
+---
+
+## Follow-ups from the BundleValidator review (post-Checkpoint A2)
+
+Verified findings from [`bundle-validator-review-findings.md`](wip/dry-run-refactor-draft/bundle-validator-review-findings.md) (that doc carries the line-pinned evidence + suggested fix per item; verdicts re-confirmed against the tree). **#1 is folded into Phase 3a above as a prerequisite; #2 (`allowed_to_fail` toml namespacing) is already a Phase-3a item.** The rest, by when they should land:
+
+| # | Sev | Target | Item | Status |
+|---|---|---|---|---|
+| 3 | Med | partial done / Part C | `close_registry`'s undefaulted `pop` could mask an in-flight exception when called from a `finally`; the per-sweep registry is also keyed by the **constant** `DRY_RUN_UNTITLED` id → concurrent sweeps collide. **Hardening done this session** (`reporting_manager.py` `pop(..., None)` + `test_no_orphan_registries.py::test_close_registry_is_idempotent_on_missing`). The **unique per-sweep id** is the remaining Part-C piece (one fix covers #4 too). | ◐ partial |
+| 4 | Med-low | Part C / Phase 3 | Routing through `PipeRun.run` adds a per-SUCCESS-pipe `assemble_graph_on_output` trace-read cycle — gated on `tracing_config.is_enabled` (=`true`), **not** the `generate_graph=False` override — keyed by the shared constant id. Mint a **per-sweep unique `pipeline_run_id`** threaded through `open_registry` + `prepare_pipe_job`: fixes the #3 collision AND scopes the trace read to an empty dir in one move. | ☐ |
+| 5 | Low | when a borrowing caller appears | `acquire_and_validate` tears down its own current-library when a caller passes `library_id` equal to the already-current id (`prev_library_id == acquired_id`). Guard `prev != acquired` (or doc the caveat). Default `library_id=""` is safe. | ☐ |
+| 6 | Med | anytime (cleanup) | The restore-prev-current-then-teardown `finally` is copied across 6 sites (`validate_bundle.py:234/269/367/412`, `execution_seams.py:122`, `bundle_validator.py:139`). Extract one `acquired_library(...)` context manager / `restore_and_teardown_library(...)` helper. | ☐ |
+| 7 | Med | Phase 3a/3 | `acquire_and_validate` has zero tests. Add integration tests: outer current-library restored + acquired torn down on success AND on a raise mid-sweep; the `is_signature` strict-mode filter. (Pass `library_dirs=[]` to avoid sweeping the base/PIPELEXPATH libraries.) Already flagged in the A2 handoff. | ☐ |
+| 8 | Low | Phase 4 | `_signature_pre_pass` + the classify/aggregate strings are near-verbatim copies of `dry_run.py`; they die when `dry_run.py` is deleted. Track the wording drift so the still-live `validate --all` and the new validator don't emit two messages for the same bundle. | ☐ |
+| 9 | Low | anytime | `_aggregate` builds `successful_pipes`/`skipped_pipes` lists only to `len()` them in one log line; only `failed_pipes` feeds logic. Derive the counts inline; drop the dead accumulators. | ☐ |
+| 10 | Low | Phase 4 | `dry_run.py:22` re-imports `DryRunOutput`/`DryRunStatus` from `bundle_validator` (execution layer ← validation layer). Documented transitional; delete with the module in Phase 4. | ☐ |
+| 11 | Low | Part C | `BundleValidator.__init__` hardcodes `PipeRun(PipeRouter(ObserverNoOp()))` — no seam to inject the inline `scoped_content_generator` Part C needs. Revisit when Part C lands. | ☐ |
+| 12 | Low-med | Phase 3 | Integration tests cover only SUCCESS; the no-stray-`PIPELINE_EXECUTE`/`PIPELINE_COMPLETE` assertion checks for events `validate_pipes` structurally can't emit, with the spy attached after `acquire_library`. Add real FAILURE/SKIPPED coverage (the #1 prerequisite test starts this) + a config-backed `allowed_to_fail` match test. | ☐ |
+
+> Refuted candidates (do not re-chase without new evidence) are listed in the findings doc's **Refuted** section — re-verified during this review and confirmed correctly refuted.
 
 ---
 
