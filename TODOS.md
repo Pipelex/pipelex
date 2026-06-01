@@ -2,18 +2,18 @@
 
 Branch `feature/Support-csv` (worktree `_csv`). Design: [`wip/csv-support/design.md`](wip/csv-support/design.md). This file is the single source of truth for execution + cold-start.
 
-**Approach: outside-in TDD.** Write the acceptance tests (integration + e2e) and codec unit tests first (red), then implement until green. Run `make agent-check` after every code change; `make agent-test` (and `make tb` for config) at each checkpoint.
+**Approach: outside-in TDD.** Write the acceptance tests (integration + e2e) and codec unit tests first (red), then implement until green. Run `make agent-check` after every code change; `make agent-test` at each checkpoint. (No `make tb` — D1 cut config from v1.)
 
 ---
 
 ## ⏱️ Session state (UPDATE AT EVERY CHECKPOINT — this is the cold-start anchor)
 
-- **Current phase:** Phase 0 — not started.
+- **Current phase:** Phase 0 — not started. **Plan reviewed (plan-eng-review + Codex) 2026-06-01; 12 decisions locked in the "✅ Plan-eng-review decisions" section below.**
 - **Last checkpoint cleared:** none.
 - **Green so far:** nothing implemented yet.
-- **Next concrete action:** start Phase 1 — author the north-star bundle + fixtures and the (red) acceptance/unit tests.
-- **Open questions blocking:** none.
-- **Notes for next session:** plan just written; nothing built. Read the design doc + "Key code anchors" below before coding.
+- **Next concrete action:** start Phase 1 — author the north-star bundle + fixtures and the (red) acceptance/unit tests. **Read "✅ Plan-eng-review decisions" FIRST — it supersedes conflicting phase text.**
+- **Open questions blocking:** none (all resolved in the review).
+- **Notes for next session:** plan written + reviewed; nothing built. Read the design doc + "Plan-eng-review decisions" + "Key code anchors" before coding. The decisions section changes config (none in v1), the `--save-csv` path (literal), the integration-test structure (split), and adds several required tests + the `date`/None/empty-list fixes.
 
 ---
 
@@ -36,10 +36,48 @@ Checkpoints exist because context grows and these are clean handoff boundaries. 
 - **Typed lists only.** A CSV ⇄ `ListContent[Concept]`. Rows = instances of a declared **row concept**; columns = its fields. **No new native content type / concept**; MTHDS language surface unchanged.
 - **Full round-trip** in v1 (CSV in → process → CSV out).
 - **stdlib `csv` in core; `.xlsx` deferred** behind an optional extra `pipelex[tabular]`, reached through a thin format seam (do NOT add the openpyxl dep or build xlsx now).
-- **Reject non-flat.** A row concept used with CSV must have **scalar fields only** (`text/integer/number/boolean/date` → `str/int/float/bool`, optionals allowed). Any nested/list/dict field → clear error naming the offending field, telling the author to project to a flat concept first. No silent flatten, no JSON-in-cell, no dropped cells.
+- **Reject non-flat.** A row concept used with CSV must have **scalar fields only** (`text/integer/number/boolean/date` → `str/int/float/bool/datetime.date`, optionals allowed; `Literal`/`choices`-constrained scalars allowed). Any nested/list/dict/`Union`/concept-typed/`Any` field → clear error naming the offending field, telling the author to project to a flat concept first. No silent flatten, no JSON-in-cell, no dropped cells. (`date` was missing from the python-target list — it IS supported; see CT-baked decisions.)
 - **CSV is an I/O codec, not a prompt-render format** — it must NOT join the `rendered_plain/markdown/html/json` `TextFormat` router.
-- **Input semantics:** header row required; column headers must exactly match field names (no implicit remap); empty cell → `None` (field must be optional); extra/missing columns → error. Coerce cell strings via pydantic lax validation.
-- **Finer defaults:** explicit `--save-csv <path>` to trigger output (no surprise auto-emit); UTF-8 + comma dialect; **delimiter & encoding configurable, never guessed**.
+- **Input semantics:** header row required; column headers must match field names (no implicit remap); empty cell → `None` (field must be optional); **extra column → error; missing _required_ column → error; missing _optional_ column → that field is `None` for all rows (CT2 lenient — supersedes the old "missing → error" wording)**. Coerce cell strings via pydantic lax validation.
+- **Finer defaults:** explicit `--save-csv <path>` to trigger output (no surprise auto-emit); UTF-8 + comma dialect; **delimiter & encoding configurable** — in v1 via codec params only, never guessed (no user-facing config surface yet, per D1).
+
+---
+
+## ✅ Plan-eng-review decisions (locked 2026-06-01 — these SUPERSEDE any conflicting phase text below)
+
+Twelve decisions from `/plan-eng-review` + a Codex outside-voice pass. Where a phase checkbox below still reflects the old plan, this section wins.
+
+**Scope / config**
+
+- **D1 — No main-config in v1.** Do NOT touch `configs.py` / `pipelex.toml` / `.pipelex/pipelex.toml` for CSV. The codec takes `delimiter`/`encoding` as function params with defaults (`,` / `utf-8`). The user-facing config surface (toml default or `--delimiter`/`--encoding` flags) is a **deferred follow-up TODO** (see Out-of-scope). Drops `make tb` from v1.
+
+**Architecture**
+
+- **A1 — Input hook in CORE.** Intercept in `stuff_factory.make_stuff_from_stuff_content_or_data` Case 2.5 (`stuff_factory.py:399-413`), so CSV input is reachable from the runner API + programmatic callers, not just the CLI. Eager file read is accepted there; keep the codec a **pure module** the factory merely calls. **v1 = LOCAL filesystem paths only.** A remote `url` (`http://`, `s3://`, signed) under a flat concept with a `.csv` suffix must be **actively rejected with a clear error**, never opened as a local path.
+- **A2 — Typed error taxonomy + wrap-all.** Define a small `CsvError` base (PipelexError subclass) with concrete types: file/read error, flatness rejection, column mismatch, cell-coercion error. The codec **catches every raw `OSError` / `csv.Error` / pydantic `ValidationError`** at its boundary and re-raises as the typed error carrying **file path + 1-based row/col + concept + field**. No raw exception escapes into core/runner.
+- **A3 / CT1 — Keep `url` + `.csv`-suffix detection.** Trigger CSV when concept is flat `StructuredContent` AND `url` ends `.csv`. Accept the narrow residual (a single-record concept with a `url`-named field whose value ends `.csv` is misread). **Pin with tests** (CSV-with-url-column reads correctly; non-`.csv` url stays a record) and **document the one limitation**.
+
+**Code quality**
+
+- **CQ1 — `--save-csv <path>` is literal/cwd-relative** (NOT resolved under `--output-dir`). **Drop the redundant `--csv-path`.** Param is **keyword-only** in `_execute_run` (fits the in-flight keyword-only-args refactor). `_execute_run`'s ~15-param signature is a pre-existing data-clump smell → separate `SaveOptions`-struct refactor, out of scope.
+- **CQ2 — One module.** `pipelex/tools/tabular/csv_codec.py` holds row read/write + concept-binding + the **single shared flatness/field-order helper used by BOTH read and write** + error types + a suffix dispatch (`.csv` built-in; `.xlsx` → "needs `pipelex[tabular]`"). No codec/binding file split until xlsx earns it (design §11).
+
+**Tests**
+
+- **T1 — Split the integration test.** (1) input-codec: build WorkingMemory from `{url:people.csv}`, assert `people` is `ListContent[Person]` with `death_year is None`, **no pipeline run**; (2) output-codec: hand-build `ListContent[PersonSummary]` → CSV, assert header+rows; (3) **separate** full-pipeline test for `PipeBatch→Compose→PersonSummary[]`, with dry-mode cardinality/extraction semantics verified first. NB (Codex): `PersonSummary` drops `death_year`, so it can only be asserted on the input list.
+- **T2 — CLI breadth.** One real subprocess e2e on `run pipe`; **cheap wiring checks** (no subprocess) that `bundle_cmd` and `method_cmd` both declare `--save-csv` and forward it to `_execute_run`.
+- **T3 — Pin coercion.** Table-driven test of accepted bool (`true/false/1/0/yes/no/on/off`) / date (ISO) / int / float forms **AND rejected** ones (comma-decimal `1,5`, ambiguous `DD/MM/YYYY`) + one doc line. Converts pydantic's incidental behavior into a verified, bump-proof contract.
+
+**Cross-model (Codex) — baked in**
+
+- **CT2 — Missing OPTIONAL column = lenient (→ all `None`).** Missing **required** column → error; **extra** column → error; missing **optional** column → that field is `None` for all rows. (Our own writer always emits every column, so this only aids hand-authored partial CSVs.) Resolves the design §8 contradiction.
+- **CT3 — Document-only on injection.** Do NOT auto-escape formula-leading cells; preserve data fidelity. Document CSV/Excel formula-injection as a known v1 limitation; opt-in escape flag deferred. **Bake regardless:** serialize via `model_dump(mode="json")`, then map `None`→`""` explicitly; document non-finite floats (`nan`/`inf`).
+- **`None` ↔ empty-cell, both sides (CRITICAL).** Read maps `""`→`None` BEFORE pydantic; write maps `None`→`""` (never `str(None)=="None"`). Test matrix: `Optional[str]=None`, `Optional[str]=""`, required `str=""`. Empty-string text is indistinguishable from `None` (→`None`, documented).
+- **Empty / declared-model headers (CRITICAL).** The writer derives columns from the **declared row model** (resolved via the concept), NEVER from `items[0]` — an empty `ListContent` must still write a correct header-only file.
+- **`date` is a supported scalar (BUG fix).** Design §6's arrow drops `date`; it must map to `datetime.date`. The flatness guard ACCEPTS `date`; round-trip writes `date.isoformat()`. Add a date-field test.
+- **Flatness = a real type-classifier.** Unwrap `Optional`; ACCEPT `Literal`/`choices`-constrained scalars (cf. `ArticleReview.rating`); REJECT `Union`/nested/concept-typed/`Any`/dict/list — each with a clear named error. Not a naive field scan.
+- **Eager-core-I/O coverage.** Add tests for dry-run, validation-only/build-only paths, and repeated working-memory builds after the file mutates on disk.
+- **Sanity-check caveat.** The Phase-1 `--mock-inputs` dry-run only checks **bundle shape** — it bypasses the CSV path. Add a separate real-`inputs.json` check once the input hook exists.
 
 ---
 
@@ -49,7 +87,7 @@ Checkpoints exist because context grows and these are clean handoff boundaries. 
 
 - Content base + render interface: `pipelex/core/stuffs/stuff_content.py`. List container: `pipelex/core/stuffs/list_content.py`. Structured base: `pipelex/core/stuffs/structured_content.py`.
 - Concept → structure class: `pipelex/core/stuffs/stuff_factory.py` (`get_class_registry().get_required_subclass(name=concept.structure_class_name, base_class=StuffContent)`).
-- Structure field types enum: `pipelex/core/concepts/concept_structure_blueprint.py:37` → `text | integer | boolean | number | date`.
+- Structure field types enum: `pipelex/core/concepts/concept_structure_blueprint.py:37-45` → scalars `text | integer | number | boolean | date` **plus non-flat** `list | dict | concept` (the flatness classifier ACCEPTS the scalars + `Literal`/`choices`, REJECTS list/dict/concept/`Union`/`Any`).
 
 **Inputs**
 
@@ -164,7 +202,7 @@ Vint Cerf,Computer Scientist,United States,1943,
 
 Expected: a `summaries.csv` with header `name,country,summary` and one row per input person (dry mode → mock summary text; live mode → real personas). The integration test asserts the round-trip + structure (and `death_year` parsed as `None` for Vint Cerf); the live arm asserts persona content.
 
-> Syntax confirmed against `tests/e2e/pipelex/pipes/pipe_controller/pipe_batch/article_briefing.mthds` (batch + sequence) and `tests/e2e/pipelex/pipes/pipe_operators/pipe_compose/cv_job_match.mthds` (`[pipe.x.construct]` with `{ from = "..." }`). PipeCompose extracts a `Text` stuff into a `str` field automatically.
+> Syntax **verified** (plan-eng-review) against `tests/e2e/pipelex/pipes/pipe_controller/pipe_batch/joke_batch.mthds` (real **standalone** `type = "PipeBatch"` with `branch_pipe_code`/`input_list_name`/`input_item_name` — `pipe_batch_blueprint.py:9-14`) and `tests/e2e/pipelex/pipes/pipe_operators/pipe_compose/cv_job_match.mthds` (`[pipe.x.construct]` with `{ from = "..." }` — `construct_blueprint.py:138-171`). PipeCompose auto-extracts a `Text` stuff into a `str` field (`structured_content_composer.py:329-351`). NB: `article_briefing.mthds` uses **inline** `batch_over`/`batch_as`, a different construct — not a standalone-PipeBatch template; cite `joke_batch.mthds`.
 
 ---
 
@@ -172,12 +210,12 @@ Expected: a `summaries.csv` with header `name,country,summary` and one row per i
 
 Goal: lock the contract with failing tests before any implementation.
 
-- [ ] Confirm codec module home (proposal: `pipelex/tools/tabular/`). If unclear, ask the user (CLAUDE: place configs/modules where they fit, arbitrate if needed). Record decision in Session state.
+- [ ] Codec module home is **LOCKED (CQ2 / Step 0): `pipelex/tools/tabular/csv_codec.py`** — one module (matches the `tools/{pdf,uri,storage}/` pattern; no `concept_table.py` split). No re-decision needed.
 - [ ] Sanity-check the bundle wiring with a quick dry-run (`pipelex run pipe summarize_people --library-dir <bundle> --dry-run --mock-inputs`) to confirm `PipeBatch → PipeSequence(PipeLLM + PipeCompose)` composes and `PersonSummary[]` comes out. Record any surprises.
 - [ ] Create north-star fixtures: `csv_demo.mthds`, `people.csv`, `inputs.json`, and a `StructuredContent`-registering `test_structures.py` if the test bundles need Python-side classes for `Person`/`PersonSummary` (mirror `tests/integration/pipelex/pipes/pipelines/test_structures.py`). Pick the test dir (proposal: `tests/integration/pipelex/csv/`).
-- [ ] Write codec **unit** tests `tests/unit/pipelex/tools/tabular/test_csv_codec.py` (RED): read→list-of-dicts with header; coercion of `integer/number/boolean/date`; empty cell→None; strict columns (extra & missing → error with field name); reject non-flat concept (clear error); write flat list→csv (header order = field order); configurable delimiter/encoding; round-trip stability.
-- [ ] Write the **integration** test `tests/integration/pipelex/csv/test_csv_roundtrip.py` (RED): `PipelexRunner(...).execute_pipeline("summarize_people", inputs=<inputs.json-equivalent dict>)` in dry mode → assert `main_stuff_as_items(item_type=PersonSummary)` length matches input rows, fields present, and `Person.death_year` parsed as `None` for the blank cell; then write that list to CSV via the codec and assert header (`name,country,summary`) + rows. Mark `@pytest.mark.dry_runnable @pytest.mark.llm @pytest.mark.inference`.
-- [ ] Write the **e2e** CLI test `tests/e2e/pipelex/cli/test_csv_run.py` (RED): in a tmp dir, invoke `pipelex run pipe summarize_people --library-dir <bundle> --inputs inputs.json --save-csv summaries.csv --dry-run` via subprocess; assert exit 0 and `summaries.csv` exists with header `name,country,summary` + one row per input person. Model fixtures on `tests/e2e/agent_cli/`. Mark `@pytest.mark.gha_disabled`.
+- [ ] Write codec **unit** tests `tests/unit/pipelex/tools/tabular/test_csv_codec.py` (RED). Happy: read→list-of-dicts with header; coercion `integer/number/boolean/date` (incl. **`date`→`datetime.date`**); write flat list→csv (header = declared field order); configurable delimiter/encoding; round-trip stability. **Error/edge (required — see decisions A2/CT2/CT3/None):** file-not-found & bad-encoding → typed `CsvError`; malformed quotes (`csv.Error`) wrapped; **coercion FAILURE** (`"abc"`→int) → error naming row+col+field; **empty cell on REQUIRED field** → error; strict columns: extra → error, missing **required** → error, missing **optional** → all-`None` (CT2 lenient); reject non-flat via the **type-classifier** (list/dict/`Union`/concept-typed/`Any` reject; `Literal`/`choices` scalar accept); **`None`↔`""` both sides** (`Optional[str]=None`, `Optional[str]=""`, required `str=""`; write `None`→`""` not `"None"`); **empty `ListContent`** → header-only file from the **declared model** (not `items[0]`); `model_dump(mode="json")` serialization; T3 coercion **accept+reject** table (`1,5` rejected etc.); `.xlsx` suffix → "needs `pipelex[tabular]`" error.
+- [ ] Write the **integration** test `tests/integration/pipelex/csv/test_csv_roundtrip.py` (RED) — **split per T1**: (a) **input-codec** — build WorkingMemory from `{"people": {"concept": "csv_demo.Person", "content": {"url": "people.csv"}}}` (no pipeline run) → assert `people` is `ListContent[Person]` with coerced fields and `death_year is None` for Vint Cerf; (b) **output-codec** — hand-build `ListContent[PersonSummary]` → codec → assert header `name,country,summary` + rows; (c) **full pipeline** (separate) — `PipelexRunner(...).execute_pipeline("summarize_people", inputs=...)` → assert `main_stuff_as_items(item_type=PersonSummary)` length = input rows + name/country come from the real rows (verify dry-mode preserves cardinality+extraction FIRST; else mark live). NB: assert `death_year` on (a) only — `PersonSummary` drops it. Mark `@pytest.mark.dry_runnable @pytest.mark.llm @pytest.mark.inference`.
+- [ ] Write the **e2e** CLI test `tests/e2e/pipelex/cli/test_csv_run.py` (RED): in a tmp dir, `pipelex run pipe summarize_people --library-dir <bundle> --inputs inputs.json --save-csv summaries.csv --dry-run` via subprocess → assert exit 0 and `summaries.csv` exists **at the literal cwd path** (CQ1) with header `name,country,summary` + one row per person. **Plus (T2) cheap wiring checks** (no subprocess) that `bundle_cmd` and `method_cmd` declare `--save-csv` and forward it to `_execute_run`. **Plus an error e2e:** missing input `.csv` → non-zero exit + clean message, no stack trace (A2). Model fixtures on `tests/e2e/agent_cli/`. Mark `@pytest.mark.gha_disabled`.
 - [ ] Run the new tests; confirm they fail **for the right reasons** (missing codec / missing `--save-csv` / `.csv` input not parsed), not collection errors.
 
 ### 🛑 CHECKPOINT 1 — contract locked, red for the right reasons
@@ -190,11 +228,12 @@ Verify each new test fails on the intended missing capability. Update Session st
 Goal: a self-contained, well-tested codec. No pipe-runtime coupling.
 
 - [ ] Implement `pipelex/tools/tabular/csv_codec.py` (stdlib `csv`): `read_rows(path, *, delimiter, encoding) -> list[dict[str,str]]` and `write_rows(path, headers, rows, *, delimiter, encoding)`.
-- [ ] Implement the concept binding layer (proposal `pipelex/tools/tabular/concept_table.py` or fold into codec): `list_content_from_csv(path, row_concept_or_class, ...) -> ListContent[T]` and `csv_from_list_content(list_content, path, ...)`. Resolve the row concept's `StructuredContent` subclass via the class registry; build instances with pydantic coercion; extract via `model_dump`.
-- [ ] Flatness guard: inspect the row model's fields; reject any non-scalar field with an error that **names the field and the concept** and says "project to a flat concept first". Errors must carry the **file path + 1-based row/line number** for traceability (cf. keep-metadata-source rule).
-- [ ] Empty-cell→None + strict column/field correspondence (extra & missing → distinct, clear errors).
-- [ ] Format seam: a tiny dispatch keyed by file suffix (`.csv` built-in). `.xlsx` path raises a clear "Excel support requires `pipelex[tabular]`" error (no openpyxl dep yet). Keep it to functions, not a plugin framework.
-- [ ] (Config) Add a minimal config section for default delimiter/encoding: `configs.py` (no class-level defaults; optionals=None) + `pipelex/pipelex.toml` + real values in `.pipelex/pipelex.toml`. Run `make tb` to confirm boot/config load. If this balloons, keep params with inline defaults for now and note config as a Phase-5 item.
+- [ ] Implement the concept binding **in the same module** (CQ2 — one file, no `concept_table.py` split): `list_content_from_csv(path, row_concept_or_class, *, delimiter, encoding) -> ListContent[T]` and `csv_from_list_content(list_content, row_model, path, *, delimiter, encoding)`. Resolve the row concept's `StructuredContent` subclass via the class registry; build instances with pydantic coercion (map `""`→`None` BEFORE validate); **serialize on write via `model_dump(mode="json")` then map `None`→`""`** (never `str(None)`); derive write headers from the **declared `row_model`**, NOT `items[0]` (empty list → header-only file).
+- [ ] **A2 error taxonomy:** define a `CsvError` base (PipelexError subclass) + concrete types (read/file, flatness, column-mismatch, coercion). The codec **catches all raw `OSError`/`csv.Error`/`ValidationError`** and re-raises typed, carrying **file path + 1-based row/col + concept + field**.
+- [ ] **Flatness type-classifier** (CQ2 shared helper, used by read AND write): unwrap `Optional`; ACCEPT `str/int/float/bool/datetime.date` + `Literal`/`choices` scalars; REJECT list/dict/nested/`Union`/concept-typed/`Any`, naming the field+concept + "project to a flat concept first".
+- [ ] Strict columns (CT2): extra → error; missing **required** → error; missing **optional** → field is `None` for all rows. Distinct, clear errors.
+- [ ] Format seam (design §11): a tiny suffix dispatch (`.csv` built-in; `.xlsx` → clear "Excel support requires `pipelex[tabular]`" error, no openpyxl dep). Functions, not a plugin framework.
+- [ ] **NO main-config in v1 (D1).** `delimiter`/`encoding` are codec params with `,`/`utf-8` defaults. Do NOT touch `configs.py`/`pipelex.toml`/`make tb`. User-facing config = deferred follow-up (Out-of-scope).
 - [ ] `make agent-check`; run codec unit tests → GREEN.
 
 ### 🛑 CHECKPOINT 2 — codec landed, unit-green, lint-clean
@@ -206,10 +245,13 @@ Update Session state. Capture the final module layout + public function signatur
 
 Goal: a `.csv` `url` under a structured row concept loads as a typed list.
 
-- [ ] Find the interception point where `{"concept": "...", "content": {"url": "...csv"}}` becomes a Stuff (start at `_inputs_path_resolver.py` + `working_memory_factory.make_from_pipeline_inputs` + `stuff_factory.py`). Record the exact hook in Session state.
+- [ ] Hook the input in `stuff_factory.make_stuff_from_stuff_content_or_data` **Case 2.5** (`stuff_factory.py:399-413`) — the exact point is **pinned by A1, no re-discovery needed**. It's reached via `working_memory_factory.make_from_pipeline_inputs`; relative paths are pre-resolved by `_inputs_path_resolver.py` at CLI time (programmatic/runner callers pass the path as-is, so the codec must handle an already-absolute or caller-supplied path).
 - [ ] When the resolved `url` has a `.csv` suffix and the concept is a flat structured concept, route through the codec to produce `ListContent[row-concept]` (one CSV → one list; concept names the **row** type).
-- [ ] Clear errors for: CSV bound to a non-structured/native concept, non-flat concept, header mismatch — all naming the concept and file.
-- [ ] Run the integration test's input half (load inputs → assert the `people` stuff is `ListContent[Person]` with coerced fields). GREEN for input.
+- [ ] **A1 — reject remote URLs.** A `.csv` `url` that is `http://`/`https://`/`s3://`/signed (not a local path) → clear "CSV input supports local paths only in v1" error, NOT a raw `OSError` from trying to open it locally.
+- [ ] Clear errors for: CSV bound to a non-structured/native concept, non-flat concept, header mismatch — all naming the concept and file (via A2 taxonomy).
+- [ ] **A3/CT1 pinning tests:** a flat concept whose content `{url: ...}` value does NOT end `.csv` stays a single record; a CSV whose rows include a `url` column reads correctly. Document the residual single-record limitation.
+- [ ] **Eager-core-I/O coverage (Codex):** tests for dry-run, validation-only/build-only paths, and repeated working-memory builds after the file mutates on disk.
+- [ ] Run the integration test's input half (T1 part a: build WorkingMemory, assert `people` is `ListContent[Person]` with coerced fields + `death_year is None`). GREEN for input. (NB: the Phase-1 `--mock-inputs` sanity dry-run checks **bundle shape only** — it bypasses the CSV path; this is the first real CSV-input check.)
 
 *(Light checkpoint — fold into CP3 unless context is large; if you stop here, update Session state.)*
 
@@ -219,9 +261,9 @@ Goal: a `.csv` `url` under a structured row concept loads as a typed list.
 
 Goal: the headline integration + e2e tests go GREEN.
 
-- [ ] Add `--save-csv <path>` (+ a `--csv-path` if needed) to `pipe_cmd.py`, `bundle_cmd.py`, `method_cmd.py`; thread through `_execute_run` in `_run_core.py` alongside the existing save blocks.
-- [ ] On save, require the main stuff to be a flat `ListContent[StructuredContent]`; write via the codec; reject non-flat with the same clear error. Resolve the output path against `--output-dir` like the other saves.
-- [ ] Run integration test → GREEN. Run e2e CLI subprocess test (`--dry-run`) → GREEN (file written, header + rows correct).
+- [ ] Add `--save-csv <path>` (Optional[str], `None`=off — **CQ1: NO `--csv-path`**) to `pipe_cmd.py`, `bundle_cmd.py`, `method_cmd.py`; thread through `_execute_run` in `_run_core.py` as a **keyword-only** param alongside the existing save blocks.
+- [ ] On save, require the main stuff to be a flat `ListContent[StructuredContent]` (reject non-list / non-flat with the shared clear error — no silent no-op); write via the codec, passing the **declared output row model**. **Write to the literal `<path>` (cwd-relative) — CQ1, do NOT resolve under `--output-dir`.**
+- [ ] Run integration test (T1 parts b+c) → GREEN. Run e2e CLI subprocess test (`--dry-run`) → GREEN (file at literal path, header + rows correct). Run the T2 bundle/method wiring checks + the missing-file error e2e → GREEN.
 - [ ] `make agent-check`.
 
 ### 🛑 CHECKPOINT 3 — round-trip works end to end (headline milestone)
@@ -229,11 +271,11 @@ CSV in → PipeLLM → CSV out, green in dry mode via both in-process and CLI-su
 
 ---
 
-## Phase 5 — Config, docs, changelog, full-suite polish
+## Phase 5 — Docs, changelog, full-suite polish (config CUT per D1)
 
-- [ ] Finalize the delimiter/encoding config if deferred from Phase 2 (`configs.py` + both `pipelex.toml` files; `make tb`).
+- [ ] ~~Finalize delimiter/encoding config~~ — **CUT from v1 (D1)**. Capture the user-facing config surface as a follow-up TODO instead (see Out-of-scope).
 - [ ] `CHANGELOG.md` under `## [Unreleased]` (do NOT add a versioned header — release skill does that).
-- [ ] Docs: a short "CSV input & output" guide page (Material for MkDocs: blank line before lists; one-paragraph-per-line). Cover the inputs.json `.csv` convention, `--save-csv`, the flat-concept requirement, and the round-trip example. Add to `mkdocs.yml` nav.
+- [ ] Docs: a short "CSV input & output" guide page (Material for MkDocs: blank line before lists; one-paragraph-per-line). Cover the inputs.json `.csv` convention, `--save-csv` (literal path), the flat-concept requirement (incl. `date`), the round-trip example, and **the documented limitations: empty-string text → `None`; the A3/CT1 single-record `.csv`-url residual; CSV/Excel formula-injection (CT3); local-paths-only (no remote URLs)**; the T3 coercion accept/reject rules.
 - [ ] (Optional) a live-mode arm assertion on the integration test guarded by `if pipe_run_mode.is_live`.
 - [ ] Full `make agent-check` + `make agent-test` → all GREEN. If it hangs, use `make agent-test-debug`.
 
@@ -244,12 +286,15 @@ Everything green, docs + changelog in. Update Session state to "v1 complete". Su
 
 ## ⚠️ Risks / things to confirm while implementing
 
-- **PipeCompose field extraction** — confirm dotted-path `{ from = "person.name" }` and `Text`-stuff→`str` extraction behave as in `cv_job_match.mthds`; confirm the `PipeBatch` branch (a `PipeSequence`) sees `person` under `input_item_name`.
-- **Coercion edge cases** — leading zeros, locale decimals, booleans ("true"/"1"/"yes"?), dates. Lean on pydantic's documented coercion; document, don't hand-roll. Decide the boolean/date acceptance set and note it.
-- **Duplicate / blank headers** — define behavior up front (recommend: error). Add a unit test.
-- **Input hook location** — the cleanest interception point for `.csv` urls is unknown until Phase 3; budget for some exploration there.
-- **`--save-csv` when main stuff isn't a list** — must fail clearly, not silently no-op.
-- **Don't over-build the format seam** — two functions keyed by suffix; no plugin system before xlsx exists.
+(Several earlier risks are now RESOLVED by the review — kept here annotated so a fresh session doesn't re-litigate them.)
+
+- **PipeCompose field extraction** — STILL OPEN to confirm at impl time: dotted-path `{ from = "person.name" }` and `Text`-stuff→`str` extraction behave as in `cv_job_match.mthds`; the `PipeBatch` branch (a `PipeSequence`) sees `person` under `input_item_name`. (Syntax + recombination already verified statically — see North-star note — but confirm at runtime in the Phase-1 sanity dry-run.)
+- **Dry-mode pipeline semantics** — STILL OPEN: confirm dry mode preserves `PipeBatch` cardinality and `PipeCompose` real-field extraction before relying on the full-pipeline test (T1 part c); else mark it live.
+- **Coercion edge cases** — RESOLVED by T3: pin the accept/reject set (bool/date/number) with a table test + doc line. Lean on pydantic; don't hand-roll.
+- **Duplicate / blank headers** — RESOLVED: error; unit test required in Phase 1.
+- **Input hook location** — RESOLVED (A1): `stuff_factory.py:399-413` Case 2.5. No exploration needed.
+- **`--save-csv` when main stuff isn't a list** — RESOLVED: Phase 4 rejects with a clear error (shared flatness guard), no silent no-op.
+- **Don't over-build the format seam** — two functions keyed by suffix; no plugin system before xlsx exists (design §11 / CQ2).
 
 ## 🚫 Out of scope for v1 (deferred — see design §10)
 
@@ -257,3 +302,55 @@ Everything green, docs + changelog in. Update Session state to "v1 complete". Su
 - Streaming / out-of-core CSVs; Google Sheets / Parquet.
 - Delimiter/dialect auto-detection; schema/type inference beyond the bound concept.
 - A native `Table` concept / schema-free table primitive (separate language-surface decision).
+- **Remote `.csv` URLs** (`http://`/`s3://`/signed) — local paths only in v1; actively rejected (A1).
+
+### Deferred follow-up TODOs (from the review — capture, don't lose)
+
+- **User-facing delimiter/encoding config** (D1) — toml default and/or `--delimiter`/`--encoding` CLI flags. *Why:* honors the locked "configurable, never guessed" with a real user knob (EU semicolon CSVs). *Where to start:* `configs.py` + both `pipelex.toml` (per convention) or CLI flags on the run commands; codec already accepts the params.
+- **Opt-in CSV/Excel formula-escape flag** (CT3) — `escape_formulas` codec param + CLI flag, default off. *Why:* injection safety when CSVs ship to third parties (hosted runner). *Trade-off:* escaping mutates data; keep it opt-in to preserve fidelity.
+- **`SaveOptions` struct** for `_execute_run` — group the save_* params (pre-existing 15-param data clump). *Why:* the CSV flag is the 4th save-related param; a struct stops the bleed. *Scope:* a refactor across the 3 run commands + `_run_core.py`; out of CSV scope.
+- **Multiplicity-gated CSV detection** (CT1 option C) — only if the `.csv`-url residual proves real in practice. *Why:* fully removes the A3 ambiguity. *Cost:* thread expected concept+multiplicity into `stuff_factory`.
+
+---
+
+## Implementation Tasks
+
+Synthesized from this review. P1 blocks ship; P2 same branch; P3 follow-up. Effort = human / CC.
+
+- [ ] **T1 (P1, human: ~3h / CC: ~20min)** — codec — CSV codec: read/write + binding + flatness type-classifier + A2 typed errors, one module
+  - Surfaced by: CQ2 / A2 / flatness — one `tools/tabular/csv_codec.py`, shared flatness helper, wrap all raw exceptions
+  - Verify: `tests/unit/pipelex/tools/tabular/test_csv_codec.py` green
+- [ ] **T2 (P1, human: ~1h / CC: ~8min)** — codec — `None`↔empty-cell both sides + empty-list header-only from declared model + `model_dump(mode="json")`
+  - Surfaced by: CT3 / Codec-CRIT — write `None`→`""` not `"None"`; headers from declared row model, not `items[0]`
+- [ ] **T3 (P1, human: ~2h / CC: ~15min)** — core — input hook in `stuff_factory` Case 2.5 (eager, local-only, reject remote URLs)
+  - Surfaced by: A1 — core hook reachable from runner; reject `http`/`s3` with clear error
+- [ ] **T4 (P1, human: ~1.5h / CC: ~12min)** — cli — `--save-csv` literal-path keyword-only flag on 3 run commands + `_run_core`, reject non-flat-list
+  - Surfaced by: CQ1 — drop `--csv-path`; literal cwd path; clear error when main stuff isn't a flat list
+- [ ] **T5 (P1, human: ~3h / CC: ~20min)** — tests — codec unit suite: errors / coercion-fail / empty-required / dup-header / date / Literal / strict-columns / round-trip
+  - Surfaced by: Test-review coverage map — 7 critical gaps + T3 accept/reject table
+- [ ] **T6 (P1, human: ~2h / CC: ~15min)** — tests — integration test split (input-codec / output-codec / full-pipeline)
+  - Surfaced by: T1 — mode-independent codec assertions; assert `death_year` on input only
+- [ ] **T7 (P2, human: ~1.5h / CC: ~12min)** — tests — e2e `pipe --save-csv` + bundle/method wiring checks + missing-file error e2e
+  - Surfaced by: T2 / A2 — one e2e on pipe; cheap wiring on bundle/method; clean error not stack trace
+- [ ] **T8 (P2, human: ~45min / CC: ~6min)** — tests — A3/CT1 pinning tests + eager-core-IO coverage (dry-run / validate / refresh-after-mutation)
+  - Surfaced by: CT1 / Codex — fence the `.csv`-url residual; cover validation + dry paths
+- [ ] **T9 (P2, human: ~1h / CC: ~8min)** — docs — CSV guide page + CHANGELOG `[Unreleased]`; document the limitations
+  - Surfaced by: Phase 5 — Material for MkDocs; cite `joke_batch.mthds`
+- [ ] **T10 (P3, follow-up)** — deferred TODOs: user-facing config; opt-in formula-escape; `SaveOptions` struct; multiplicity-gated detection
+
+---
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
+| Codex Review | `/codex review` | Independent 2nd opinion | 1 | issues_found | 3 blockers + 7 high/med; all resolved (2 baked, 3 tensions decided) |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | 12 decisions; 0 unresolved; 0 unaddressed critical gaps |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | n/a (backend feature) |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
+
+- **CODEX:** outside voice found the `date` mapping bug, the empty-list-headers gap, and the design §8 optional-column contradiction — all real misses; folded in.
+- **CROSS-MODEL:** strong overlap on the `None`-round-trip corruption and the eager-core-I/O risk (both models independently). Three tensions surfaced and decided by the user (CT1 hold A3, CT2 lenient, CT3 document-only).
+- **UNRESOLVED:** 0.
+- **VERDICT:** ENG CLEARED (scope reduced per D1) — ready to implement. Recommend `/ship` when the branch is green.
