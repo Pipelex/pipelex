@@ -1,11 +1,11 @@
 ---
 title: "Pipe Routing & Execution"
-description: "How PipeJobs are created, routed, and executed — covering both direct (single-process) and distributed (Temporal) execution modes."
+description: "How PipeJobs are created, routed, and executed — covering both direct (single-process) and distributed (host-runtime) execution."
 ---
 
 # Pipe Routing & Execution
 
-Pipelex supports two execution modes for running pipes: **direct execution** (single-process) and **distributed execution** (via Temporal workers). Both modes share the same pipe definitions, library loading, and controller logic. The key difference is *where* the pipe runs and how the PipeJob travels to get there.
+Pipelex runs pipes either **direct** (single-process) or **distributed** on a host runtime. Both share the same pipe definitions, library loading, and controller logic. The key difference is *where* the pipe runs and how the PipeJob travels to get there. There are two distributed host runtimes — your own Temporal workers ([Pipelex on Temporal](../distributed-execution/temporal/index.md)), and Mistral's managed Workflows control plane ([Pipelex on Mistral Workflows](../distributed-execution/mistral-workflows/index.md), itself built on Temporal) — and they reach pipe execution through the same framework-agnostic runtime bridge.
 
 ---
 
@@ -14,7 +14,12 @@ Pipelex supports two execution modes for running pipes: **direct execution** (si
 | Term | Meaning |
 |------|---------|
 | **Direct execution** | All pipes run in the same Python process. Library, class registry, and pipe resolution are shared in-memory. |
-| **Distributed execution** | PipeJob is serialized and sent to a remote Temporal worker. The worker is a separate process (potentially on a different machine). |
+| **Distributed execution** | PipeJob is serialized and sent to a remote worker — a Pipelex Temporal worker, or a Mistral Workflows activity. The worker is a separate process (potentially on a different machine). |
+
+---
+
+!!! note "The runtime bridge"
+    Both distributed host runtimes go through the framework-agnostic runtime bridge (`pipelex/runtime_bridge/`). Its `primitives/` layer is shared by `pipelex.temporal` and the external `pipelex_mistralai_workflows` package: it classifies controller pipes as child workflows and leaf operators as activities (`pipe_classification.py`), and assembles the execution graph and delivers results in a host-neutral way. See [Execution Modes](../distributed-execution/mistral-workflows/execution-modes.md) for the boundary contract.
 
 ---
 

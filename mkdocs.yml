@@ -396,13 +396,6 @@ nav:
     - Viewpoint:
       - The Know-How Graph: viewpoint/viewpoint.md
   - Guide:
-    - Retries & Resilience: reliability/retries-and-resilience.md
-    - Distributed Execution with Temporal:
-      - Overview: distributed-execution/index.md
-      - Cluster Setup: distributed-execution/cluster-setup.md
-      - Worker Deployment: distributed-execution/workers.md
-      - Task-Queue Routing: distributed-execution/task-routing.md
-      - Workflow Observability: distributed-execution/observability.md
     - Features:
       - Overview: features/index.md
       - Declarative AI Methods:
@@ -423,7 +416,7 @@ nav:
         - Execution Graph Visualization: features/execution-graph.md
       - Production & Operations:
         - Validation & Dry Run: features/validation-dry-run.md
-        - Distributed Execution with Temporal: features/distributed-execution.md
+        - Distributed Execution: features/distributed-execution.md
         - Telemetry & Observability: features/telemetry.md
         - Cloud Storage: features/cloud-storage.md
         - Cost Tracking & Reporting: features/cost-tracking.md
@@ -466,6 +459,26 @@ nav:
           - PipeCondition: building-methods/pipes/pipe-controllers/PipeCondition.md
       - Optimize Cost & Quality: building-methods/configure-ai-llm-to-optimize-methods.md
       - LLM Prompting Style: building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
+    - Retries & Resilience:
+      - Overview: reliability/retries-and-resilience.md
+      - Automatic Retries: reliability/automatic-retries.md
+      - Failure Classification: reliability/failure-classification.md
+      - Durable Execution: reliability/durable-execution.md
+    - Distributed Execution:
+      - Overview: distributed-execution/index.md
+      - Temporal:
+        - Overview: distributed-execution/temporal/index.md
+        - Cluster Setup: distributed-execution/cluster-setup.md
+        - Worker Deployment: distributed-execution/workers.md
+        - Task-Queue Routing: distributed-execution/task-routing.md
+        - Workflow Observability: distributed-execution/observability.md
+      - Mistral Workflows:
+        - Overview: distributed-execution/mistral-workflows/index.md
+        - Installation & Preview Status: distributed-execution/mistral-workflows/installation.md
+        - Your First Pipelex Workflow: distributed-execution/mistral-workflows/your-first-pipelex-workflow.md
+        - Execution Modes: distributed-execution/mistral-workflows/execution-modes.md
+        - Streaming Progress: distributed-execution/mistral-workflows/streaming.md
+        - Choosing a Backend: distributed-execution/mistral-workflows/choosing-a-backend.md
   - Reference:
     - CLI Reference:
       - Overview: tools/cli/index.md
