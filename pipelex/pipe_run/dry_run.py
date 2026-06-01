@@ -1,7 +1,7 @@
 import time
 
 from polyfactory.exceptions import FactoryException
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 
 from pipelex import log
 from pipelex.config import get_config
@@ -14,40 +14,17 @@ from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 from pipelex.pipe_signature.signature_walk import collect_signature_paths, collect_signature_refs
+
+# DryRunStatus / DryRunOutput now live in bundle_validator (their real owner — they are
+# validation-report types, not execution types). Re-imported here so the still-wired callers and
+# tests keep importing them from this module until Phase 3/4 migrates them; this module is deleted
+# in Phase 4 (no permanent re-export).
+from pipelex.pipeline.bundle_validator import DryRunOutput, DryRunStatus
 from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
-from pipelex.types import StrEnum
-
-
-class DryRunStatus(StrEnum):
-    SUCCESS = "SUCCESS"
-    FAILURE = "FAILURE"
-    SKIPPED = "SKIPPED"
-
-    @property
-    def is_failure(self) -> bool:
-        match self:
-            case DryRunStatus.FAILURE:
-                return True
-            case DryRunStatus.SUCCESS | DryRunStatus.SKIPPED:
-                return False
-
-    @property
-    def is_success(self) -> bool:
-        match self:
-            case DryRunStatus.SUCCESS:
-                return True
-            case DryRunStatus.FAILURE | DryRunStatus.SKIPPED:
-                return False
-
-
-class DryRunOutput(BaseModel):
-    pipe_code: str
-    status: DryRunStatus
-    error_message: str | None = None
 
 
 async def dry_run_pipe(pipe: PipeAbstract, *, allow_signatures: bool = False, raise_on_failure: bool = False) -> DryRunOutput:
@@ -75,7 +52,7 @@ async def dry_run_pipe(pipe: PipeAbstract, *, allow_signatures: bool = False, ra
         # Cross-package pipe dependencies may not be loaded; skip gracefully during dry-run
         error_message = f"Skipped dry run for pipe '{pipe.code}': unresolved dependency: {not_found_error}"
         log.verbose(error_message)
-        return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.SKIPPED, error_message=error_message)
+        return DryRunOutput(pipe_code=pipe.code, pipe_ref=pipe.pipe_ref, status=DryRunStatus.SKIPPED, error_message=error_message)
     except (PipeStackOverflowError, ValidationError, PipeComposeError, FactoryException) as exc:
         # FactoryException covers a PipeSignature minting its declared mock output via
         # make_mock_stuff (the one content-minting path without the make_mock_inputs fallback):
@@ -83,15 +60,15 @@ async def dry_run_pipe(pipe: PipeAbstract, *, allow_signatures: bool = False, ra
         formatted_error = format_pydantic_validation_error(exc) if isinstance(exc, ValidationError) else str(exc)
         if pipe.code in get_config().pipelex.dry_run_config.allowed_to_fail_pipes:
             error_message = f"Allowed to fail dry run for pipe '{pipe.code}': {formatted_error}"
-            return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.FAILURE, error_message=error_message)
+            return DryRunOutput(pipe_code=pipe.code, pipe_ref=pipe.pipe_ref, status=DryRunStatus.FAILURE, error_message=error_message)
         elif raise_on_failure:
             msg = f"Dry run failed for pipe '{pipe.code}': {formatted_error}"
             raise PipeRunError(message=msg, run_mode=PipeRunMode.DRY, pipe_code=pipe.code) from exc
         else:
             error_message = f"Dry run failed for pipe '{pipe.code}': {formatted_error}"
-            return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.FAILURE, error_message=error_message)
+            return DryRunOutput(pipe_code=pipe.code, pipe_ref=pipe.pipe_ref, status=DryRunStatus.FAILURE, error_message=error_message)
     log.verbose(f"✅ Pipe '{pipe.code}' dry run completed successfully")
-    return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.SUCCESS)
+    return DryRunOutput(pipe_code=pipe.code, pipe_ref=pipe.pipe_ref, status=DryRunStatus.SUCCESS)
 
 
 async def dry_run_pipes(

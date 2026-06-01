@@ -1,0 +1,214 @@
+"""Unit tests for the BundleValidator classify engine (Phase 2).
+
+These pin the tolerant per-pipe classification, the D3 union catch + recursive SKIPPED
+cause-walk, the D7 wiring-before-signature precedence, the single collect-all aggregate
+(no per-pipe early abort), and the per-sweep telemetry + report-registry lifecycle. The
+seams (``prepare_pipe_job``) and the run primitive (``PipeRun``) are mocked here; the real
+composition is exercised by the integration suite.
+"""
+
+import pytest
+from polyfactory.exceptions import FactoryException
+from pydantic import BaseModel, ValidationError
+from pytest_mock import MockerFixture
+
+from pipelex.base_exceptions import PipelexError
+from pipelex.libraries.pipe.exceptions import PipeNotFoundError
+from pipelex.pipe_run.exceptions import DryRunError, PipeRunError
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
+from pipelex.pipeline.bundle_validator import BundleValidator, DryRunStatus
+from pipelex.pipeline.pipeline_models import SpecialPipelineId
+from pipelex.system.telemetry.events import EventName, EventProperty
+
+
+class TestBundleValidator:
+    def _make_pipe(self, mocker: MockerFixture, *, code: str, pipe_ref: str, is_signature: bool = False):
+        pipe = mocker.MagicMock()
+        pipe.code = code
+        pipe.pipe_ref = pipe_ref
+        pipe.is_signature = is_signature
+        pipe.pipe_dependencies.return_value = set()
+        pipe.validate_with_libraries.return_value = None
+        return pipe
+
+    def _patch_env(self, mocker: MockerFixture, *, allowed_to_fail: list[str] | None = None):
+        """Patch the hub getters, ``prepare_pipe_job``, and the ``PipeRun`` class in bundle_validator.
+
+        Returns ``(validator, report_delegate, telemetry_manager, prepare_mock, pipe_run)`` so callers can
+        assert on the registry / telemetry / seam / run interactions. ``pipe_run.run`` defaults to a
+        success-returning ``AsyncMock`` — individual tests override its ``return_value`` / ``side_effect``.
+        Patching the ``PipeRun`` symbol (rather than reaching into the instance's protected ``_pipe_run``)
+        keeps the test off the validator's private surface.
+        """
+        report_delegate = mocker.patch("pipelex.pipeline.bundle_validator.get_report_delegate").return_value
+        telemetry_manager = mocker.patch("pipelex.pipeline.bundle_validator.get_telemetry_manager").return_value
+        mock_get_config = mocker.patch("pipelex.pipeline.bundle_validator.get_config")
+        mock_get_config.return_value.pipelex.dry_run_config.allowed_to_fail_pipes = allowed_to_fail or []
+        prepare_mock = mocker.patch("pipelex.pipeline.bundle_validator.prepare_pipe_job")
+        prepare_mock.return_value = mocker.MagicMock(name="pipe_job")
+        pipe_run = mocker.MagicMock(name="pipe_run")
+        pipe_run.run = mocker.AsyncMock(return_value=mocker.MagicMock(name="pipe_output"))
+        mocker.patch("pipelex.pipeline.bundle_validator.PipeRun", return_value=pipe_run)
+        return BundleValidator(), report_delegate, telemetry_manager, prepare_mock, pipe_run
+
+    @pytest.mark.asyncio
+    async def test_success_classification(self, mocker: MockerFixture) -> None:
+        validator, _report, _telemetry, _prepare, _pipe_run = self._patch_env(mocker)
+        pipe = self._make_pipe(mocker, code="ok_pipe", pipe_ref="dom.ok_pipe")
+
+        results = await validator.validate_pipes([pipe], library_id="lib-1")
+
+        assert results["dom.ok_pipe"].status.is_success
+        assert results["dom.ok_pipe"].pipe_ref == "dom.ok_pipe"
+        assert results["dom.ok_pipe"].pipe_code == "ok_pipe"
+
+    @pytest.mark.asyncio
+    async def test_skipped_when_prepare_raises_bare_pipe_not_found(self, mocker: MockerFixture) -> None:
+        # A cross-package unresolved dependency surfaces during mock-input build (prepare_pipe_job)
+        # as a bare PipeNotFoundError — reclassify as SKIPPED, never SUCCESS, never a sweep abort.
+        validator, _report, _telemetry, prepare_mock, _pipe_run = self._patch_env(mocker)
+        prepare_mock.side_effect = PipeNotFoundError("dep->other.missing not found")
+        pipe = self._make_pipe(mocker, code="dep_pipe", pipe_ref="dom.dep_pipe")
+
+        results = await validator.validate_pipes([pipe], library_id="lib-1")
+
+        assert results["dom.dep_pipe"].status == DryRunStatus.SKIPPED
+        assert not results["dom.dep_pipe"].status.is_success
+        assert results["dom.dep_pipe"].error_message is not None
+        assert "unresolved dependency" in results["dom.dep_pipe"].error_message
+
+    @pytest.mark.asyncio
+    async def test_skipped_when_run_raises_wrapped_pipe_not_found(self, mocker: MockerFixture) -> None:
+        # Routing through PipeRun.run no longer surfaces a bare PipeNotFoundError: the run layer
+        # re-raises and the router wraps it. The recursive __cause__ walk must still reclassify SKIPPED.
+        validator, _report, _telemetry, _prepare, pipe_run = self._patch_env(mocker)
+        cause = PipeNotFoundError("dep->other.missing not found")
+        wrapped = PipeRunError(message="run failed", run_mode=PipeRunMode.DRY, pipe_code="dep_pipe")
+        wrapped.__cause__ = cause
+        pipe_run.run = mocker.AsyncMock(side_effect=wrapped)
+        pipe = self._make_pipe(mocker, code="dep_pipe", pipe_ref="dom.dep_pipe")
+
+        results = await validator.validate_pipes([pipe], library_id="lib-1")
+
+        assert results["dom.dep_pipe"].status == DryRunStatus.SKIPPED
+
+    @pytest.mark.asyncio
+    async def test_allowed_failure_returned_in_map_without_raising(self, mocker: MockerFixture) -> None:
+        # A FactoryException (e.g. a PipeSignature mint) on an allowed-to-fail pipe is a handled FAILURE
+        # carried in the returned map — the sweep does NOT raise because it is not an unexpected failure.
+        validator, _report, _telemetry, _prepare, pipe_run = self._patch_env(mocker, allowed_to_fail=["dom.allowed_pipe"])
+        pipe_run.run = mocker.AsyncMock(side_effect=FactoryException("polyfactory could not build mock content"))
+        pipe = self._make_pipe(mocker, code="allowed_pipe", pipe_ref="dom.allowed_pipe")
+
+        results = await validator.validate_pipes([pipe], library_id="lib-1")
+
+        assert results["dom.allowed_pipe"].status.is_failure
+        assert results["dom.allowed_pipe"].error_message is not None
+        assert "allowed_pipe" in results["dom.allowed_pipe"].error_message
+
+    @pytest.mark.asyncio
+    async def test_unexpected_validation_error_raises_dry_run_error(self, mocker: MockerFixture) -> None:
+        # A pydantic ValidationError on a non-allowed pipe classifies FAILURE and is aggregated into a
+        # single DryRunError (third-party-exception classify — FAILURE, not an escaping traceback).
+        validator, _report, _telemetry, _prepare, pipe_run = self._patch_env(mocker)
+
+        class _Tiny(BaseModel):
+            value: int
+
+        with pytest.raises(ValidationError) as captured:
+            _Tiny.model_validate({"value": "not-an-int"})
+        pipe_run.run = mocker.AsyncMock(side_effect=captured.value)
+        pipe = self._make_pipe(mocker, code="bad_pipe", pipe_ref="dom.bad_pipe")
+
+        with pytest.raises(DryRunError) as exc_info:
+            await validator.validate_pipes([pipe], library_id="lib-1")
+        assert "dom.bad_pipe" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_widening_non_dependency_error_does_not_abort_remaining_pipes(self, mocker: MockerFixture) -> None:
+        # D3 widening: a non-dependency PipelexError raised mid-run is a per-pipe FAILURE, NOT a sweep
+        # abort. The narrow tuple the old path used would let it escape and abort before the next pipe;
+        # the base-PipelexError catch keeps the loop going, so the second pipe still runs.
+        validator, _report, _telemetry, _prepare, pipe_run = self._patch_env(mocker)
+        pipe_run.run = mocker.AsyncMock(side_effect=[PipelexError("unexpected domain failure"), mocker.MagicMock(name="ok_output")])
+        failing_pipe = self._make_pipe(mocker, code="boom_pipe", pipe_ref="dom.boom_pipe")
+        ok_pipe = self._make_pipe(mocker, code="ok_pipe", pipe_ref="dom.ok_pipe")
+
+        with pytest.raises(DryRunError) as exc_info:
+            await validator.validate_pipes([failing_pipe, ok_pipe], library_id="lib-1")
+
+        # The second pipe ran (no abort) — both were executed before the aggregate raise.
+        assert pipe_run.run.call_count == 2
+        assert "dom.boom_pipe" in str(exc_info.value)
+        assert "dom.ok_pipe" not in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_collect_all_unexpected_failures_reported(self, mocker: MockerFixture) -> None:
+        # Collect-all, not first-failure-abort: a sweep with >= 2 non-allowed failures reports BOTH in one
+        # aggregated error.
+        validator, _report, _telemetry, _prepare, pipe_run = self._patch_env(mocker)
+        pipe_run.run = mocker.AsyncMock(side_effect=[PipelexError("fail one"), PipelexError("fail two")])
+        pipe_a = self._make_pipe(mocker, code="a_pipe", pipe_ref="dom.a_pipe")
+        pipe_b = self._make_pipe(mocker, code="b_pipe", pipe_ref="dom.b_pipe")
+
+        with pytest.raises(DryRunError) as exc_info:
+            await validator.validate_pipes([pipe_a, pipe_b], library_id="lib-1")
+        message = str(exc_info.value)
+        assert "dom.a_pipe" in message
+        assert "dom.b_pipe" in message
+
+    @pytest.mark.asyncio
+    async def test_strict_signature_pre_pass_raises_before_sweep(self, mocker: MockerFixture) -> None:
+        # In strict mode a reached signature raises the aggregated SignaturesNotAllowedError before any
+        # pipe is dry-run — so the seam (prepare_pipe_job) is never invoked.
+        validator, _report, _telemetry, prepare_mock, _pipe_run = self._patch_env(mocker)
+        signature_pipe = self._make_pipe(mocker, code="sig_pipe", pipe_ref="dom.sig_pipe", is_signature=True)
+
+        with pytest.raises(SignaturesNotAllowedError) as exc_info:
+            await validator.validate_pipes([signature_pipe], library_id="lib-1", allow_signatures=False)
+        assert "dom.sig_pipe" in exc_info.value.signature_refs
+        prepare_mock.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_validate_with_libraries_error_precedes_signature_pre_pass(self, mocker: MockerFixture) -> None:
+        # D7 precedence: the static wiring pass runs (and can raise) BEFORE the signature pre-pass, so a
+        # wiring failure surfaces ahead of a signature error even when both are present.
+        validator, _report, _telemetry, _prepare, _pipe_run = self._patch_env(mocker)
+        spy_collect = mocker.patch("pipelex.pipeline.bundle_validator.collect_signature_refs")
+        wiring_pipe = self._make_pipe(mocker, code="wiring_pipe", pipe_ref="dom.wiring_pipe")
+        # Stand-in for a wiring error (real validate_with_libraries raises PipeValidationError).
+        wiring_pipe.validate_with_libraries.side_effect = RuntimeError("wiring failed")
+        signature_pipe = self._make_pipe(mocker, code="sig_pipe", pipe_ref="dom.sig_pipe", is_signature=True)
+
+        with pytest.raises(RuntimeError, match="wiring failed"):
+            await validator.validate_pipes([wiring_pipe, signature_pipe], library_id="lib-1", allow_signatures=False)
+        # The signature pre-pass was never reached — the wiring pass pre-empted it.
+        spy_collect.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_one_pipe_dry_run_event_emitted_for_the_sweep(self, mocker: MockerFixture) -> None:
+        validator, _report, telemetry_manager, _prepare, _pipe_run = self._patch_env(mocker)
+        pipes = [self._make_pipe(mocker, code=f"p{idx}", pipe_ref=f"dom.p{idx}") for idx in range(3)]
+
+        await validator.validate_pipes(pipes, library_id="lib-1")
+
+        telemetry_manager.track_event.assert_called_once_with(
+            event_name=EventName.PIPE_DRY_RUN,
+            properties={EventProperty.NB_PIPES: 3},
+        )
+
+    @pytest.mark.asyncio
+    async def test_registry_opened_once_and_closed_in_finally(self, mocker: MockerFixture) -> None:
+        # One report registry per sweep, keyed by the constant DRY_RUN_UNTITLED id, closed in `finally`
+        # even when a pipe run raises an uncaught (non-classified) exception — so the constant id cannot
+        # collide on the next sweep.
+        validator, report_delegate, _telemetry, _prepare, pipe_run = self._patch_env(mocker)
+        pipe_run.run = mocker.AsyncMock(side_effect=KeyError("uncaught programming bug"))
+        pipe = self._make_pipe(mocker, code="p", pipe_ref="dom.p")
+
+        with pytest.raises(KeyError):
+            await validator.validate_pipes([pipe], library_id="lib-1")
+
+        report_delegate.open_registry.assert_called_once_with(pipeline_run_id=SpecialPipelineId.DRY_RUN_UNTITLED)
+        report_delegate.close_registry.assert_called_once_with(pipeline_run_id=SpecialPipelineId.DRY_RUN_UNTITLED)
