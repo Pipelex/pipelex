@@ -8,7 +8,6 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_blueprint import PipeType
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.pipe_run.dry_run import convert_stuff_spec_to_typed_named
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -94,7 +93,7 @@ class PipeSignature(PipeAbstract):
         library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
         mock_name = output_name or self.code
-        typed_named = convert_stuff_spec_to_typed_named(stuff_spec=self.output, name=mock_name)
+        typed_named = WorkingMemoryFactory.convert_stuff_spec_to_typed_named(stuff_spec=self.output, name=mock_name)
         mock_stuff = WorkingMemoryFactory.make_mock_stuff(typed_named_stuff_spec=typed_named)
         working_memory.set_new_main_stuff(stuff=mock_stuff, name=mock_name)
         return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.pipeline_run_id)

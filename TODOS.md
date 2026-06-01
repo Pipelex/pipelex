@@ -60,8 +60,8 @@ Decisions from the review (apply these as you implement; they override the origi
 
 | Phase | Title | Status | Commit |
 |---|---|---|---|
-| 0 | Unblock the leaf (relocate helpers) | ☐ not started | |
-| 1 | Extract `acquire_library` / `prepare_pipe_job` seams | ☐ | |
+| 0 | Unblock the leaf (relocate helpers) | ☑ done | (Checkpoint A) |
+| 1 | Extract `acquire_library` / `prepare_pipe_job` seams | ☑ done | (Checkpoint A) |
 | | **⛔ CHECKPOINT A** | | |
 | 2 | Build `BundleValidator` (two-lifecycle, union catch) | ☐ | |
 | | **⛔ CHECKPOINT A2 — built + tested, zero callers** | | |
@@ -77,22 +77,22 @@ Status legend: ☐ not started · ◐ in progress · ☑ done.
 
 ## Phase 0 — Unblock the leaf (§4.7)
 
-- [ ] Confirm importers of the two helpers by grep: `convert_to_working_memory_format`, `convert_stuff_spec_to_typed_named`.
-- [ ] Relocate both into `WorkingMemoryFactory` (`pipelex/core/memory/working_memory_factory.py`) — confirmed present — or a `mock_inputs.py` beside it.
-- [ ] Rewire importers — **grep-confirm the live set first** (don't trust this list): `pipe_signature/pipe_signature.py`, `pipeline/pipeline_run_setup.py`, **and `tests/integration/pipelex/temporal/library_crate/conftest.py:11`** (missed in the original list — a Temporal integration conftest; a stale import there fails the whole suite at collection).
-- [ ] `make agent-check` clean; `make agent-test` green. No behavior change expected.
+- [x] Confirm importers of the two helpers by grep: `convert_to_working_memory_format`, `convert_stuff_spec_to_typed_named`.
+- [x] Relocate both into `WorkingMemoryFactory` (`pipelex/core/memory/working_memory_factory.py`) as **classmethods** (`WorkingMemoryFactory.convert_to_working_memory_format`, `WorkingMemoryFactory.convert_stuff_spec_to_typed_named`). Chose the factory (not a `mock_inputs.py`) — verified empirically that importing `pipelex.hub` does **not** pull in `working_memory_factory`, so the new top-level `from pipelex.hub import get_class_registry` can't cycle.
+- [x] Rewire importers — grep-confirmed live set: `pipe_signature/pipe_signature.py`, `pipeline/pipeline_run_setup.py`, **`pipe_run/dry_run.py`** (its own internal call at `:71`), **`pipe_run/dry_run_with_graph.py`** (also an importer — omitted from the original list), `tests/integration/pipelex/temporal/library_crate/conftest.py`, `tests/integration/pipelex/pipe_signature/test_pipe_signature.py`.
+- [x] `make agent-check` clean. Targeted suites green (pipe_run, pipe_signature, pipeline, core — 1266 passed); temporal-crate + signature-e2e collection clean. Full `make agent-test` runs at ⛔ CHECKPOINT A (Phase 0 + Phase 1 land in one commit). No behavior change.
 
 > **(soft stop — after Phase 0).** Phase 0 is mechanical and ends green; it's a safe commit point. Phase 1 now front-loads the characterization test (D4), so if context is tight, commit Phase 0 and resume at Phase 1 next session. No Handoff block required (no decisions taken) — just note the green SHA in the commit.
 
 ## Phase 1 — Extract the execution seams (§4.1 / D2)
 
-- [ ] *Tests first (D4):* write the **characterization test** pinning `pipeline_run_setup`'s current behavior on **both** the success path (library open/teardown, `PIPELINE_EXECUTE` emitted, ContextVar restored) **and** the load-failure path (teardown still runs, no leak, exception propagates) — green against today's code before any extraction. Also pin the Phase-1 traps (truthiness `:246`, `search_domain_codes` mutation `:217`, bare `pipe.code` naming `:215/236/301`).
-- [ ] *Tests first:* a focused test that `prepare_pipe_job(...)` builds an equivalent `PipeJob` against a pre-opened library (vs today's `pipeline_run_setup`).
-- [ ] Extract `acquire_library(...)` from `pipeline_run_setup` (set-current / open / load dirs+blueprints+bundle; owns load-failure teardown).
-- [ ] Extract `prepare_pipe_job(library_id, pipe_code, *, execution_config, pipe_run_mode, inputs, graph_context, otel_context, pipeline_run_id, output_name, ...)` — pure `PipeJob` builder (no registration / telemetry / library mutation).
-- [ ] Recompose `pipeline_run_setup` as the thin self-contained wrapper over the seams (`add_new_pipeline` → `acquire_library` → tracer → `prepare_pipe_job` → registry/otel/`PIPELINE_EXECUTE` → return). Runner public API untouched.
-- [ ] Verify LIVE + self-contained DRY paths unchanged (existing runner/pipeline tests + the D4 char-test green).
-- [ ] `make agent-check` + `make agent-test` green.
+- [x] *Tests first (D4):* characterization test landed — `tests/integration/pipelex/pipeline/test_pipeline_run_setup_characterization.py` (4 tests, green on today's code). Pins: success path (DRY+mock job correctness, **library left OPEN+current on success** — caller owns teardown, one `PIPELINE_EXECUTE`, pipeline registered); `search_domain_codes` **in-place mutation** of a non-empty caller list (pinned to preserve); empty `PipelineInputs` ≡ no inputs (`if inputs:` truthiness — note: not robustly distinguishable at the job level because `make_pipe_job` does `working_memory or make_empty()`, so I also keep `if inputs:` verbatim in the extraction). **⚠️ FINDING (D4 assumption was wrong):** the load-failure path **currently LEAKS** the library — a pre-`try` failure (here `pipe_code` absent → `PipeNotFoundError` at `get_required_pipe`) does **not** tear down, because open/load runs *outside* `pipeline_run_setup`'s `try` and `execute_pipeline`'s `finally` only fires when setup returned a `library_id`. D4 assumed "teardown still runs, no leak" — false. The char-test pins the **current leak** (green now); the `acquire_library` extraction **fixes** it (moves load under try/teardown, matching the already-hardened `validate_bundle`), and I flip that test's assertions to teardown==+1 + current-library-cleared as a **noted intentional bug-fix**. Bare `pipe.code` naming (`:215`) pinned indirectly via `pipe.code == "echo_topic"`.
+- [x] *Tests first:* `tests/integration/pipelex/pipeline/test_execution_seams.py` (`TestExecutionSeams`) — `acquire_library` loads a bundle + returns the domain-qualified main_pipe + leaves the library open/current; `acquire_library` tears down + restores outer current-library on a load failure; `prepare_pipe_job` builds an equivalent `PipeJob` (pipe, DRY run_mode, pipeline_run_id, library_crate, mock input) against a pre-opened library.
+- [x] Extracted `acquire_library(...)` + `prepare_pipe_job(...)` into a **new module** `pipelex/pipeline/execution_seams.py` (NOT inside `pipeline_run_setup.py`, so the Phase-2 `BundleValidator` can compose the seams without importing the runner's wrapper).
+- [x] **Signature deviation from the §4.1 sketch (settled — see Handoff):** `acquire_library` is **load-only** and returns `tuple[str, str | None]` = `(library_id, qualified_main_pipe)`; it does **not** resolve the pipe. `prepare_pipe_job` takes a resolved **`pipe: PipeAbstract`** (not `pipe_code`). Pipe resolution stays in the wrapper because graph-tracer open needs the resolved pipe and must precede `prepare_pipe_job`.
+- [x] Recomposed `pipeline_run_setup` as the thin wrapper: `add_new_pipeline` → `acquire_library` → (resolve pipe → search_domain mutation → tracer → run-mode → registry/event-log → otel) inside one `try/finally` → `prepare_pipe_job` → `PIPELINE_EXECUTE` → return. Runner public API untouched. The post-acquire `except Exception` became a `try/finally + success` block (covers `BaseException`/`CancelledError`, matching `validate_bundle`).
+- [x] LIVE + self-contained DRY paths unchanged: D4 char-test (3 success pins green; load-failure assertion flipped to teardown==+1 as the intended fix) + the seams tests + broad targeted run (pipeline + pipes + pipe_signature + pipe_run + graph e2e + signature e2e = 407 passed).
+- [x] `make agent-check` clean · `make agent-test` **fully green** ("All tests passed").
 
 > ### ⛔ CHECKPOINT A — after Phase 1 — **MANDATORY STOP**
 >
@@ -100,15 +100,25 @@ Status legend: ☐ not started · ◐ in progress · ☑ done.
 >
 > **Verify:** `make agent-check` clean · `make agent-test` green (incl. the D4 char-test) · commit.
 >
-> **Handoff (fill in):**
-> - Completed:
-> - Decisions locked:
-> - Final names/signatures: `acquire_library(...)` = … ; `prepare_pipe_job(...)` = … ; any `pipeline_run_setup` shape change =
-> - Files touched:
-> - Deviations + why:
-> - Surprises / new risks:
-> - Test state (green SHA):
-> - Next entry point: **Phase 2 — Build `BundleValidator`**.
+> **Handoff:**
+> - **Completed:** Phase 0 (helpers relocated to `WorkingMemoryFactory`) + Phase 1 (seams extracted, `pipeline_run_setup` recomposed). Both land in the Checkpoint-A commit.
+> - **Decisions locked:**
+>     - Helpers relocated as **classmethods on `WorkingMemoryFactory`** (`convert_to_working_memory_format`, `convert_stuff_spec_to_typed_named`) — verified `hub` doesn't import `working_memory_factory`, so the new top-level `from pipelex.hub import get_class_registry` can't cycle.
+>     - Seams live in a **new module `pipelex/pipeline/execution_seams.py`** (so Phase-2 `BundleValidator` composes them without importing the runner wrapper).
+>     - `acquire_library` is **load-only** (does NOT resolve the pipe) and returns the domain-qualified `main_pipe`; the wrapper resolves the pipe. `prepare_pipe_job` takes a resolved **`pipe` object**, not a `pipe_code`.
+>     - `acquire_library` mirrors `validate_bundle`'s hardened idiom: open → capture `prev_library_id` → `try: set_current + load` → `finally: if not success → restore prev current-library (or clear), then teardown`. (Restore-prev, not clear — required for the Phase-3 `validate_bundle` callers' contract.)
+> - **Final names/signatures:**
+>     - `acquire_library(library_id: str, *, library_dirs: list[str] | None = None, mthds_contents: list[str] | None = None, bundle_uris: list[str] | None = None) -> tuple[str, str | None]` → `(library_id, qualified_main_pipe)`. Owns load-failure teardown. Sync.
+>     - `async prepare_pipe_job(pipe: PipeAbstract, *, library_id: str, execution_config: PipelineExecutionConfig, pipe_run_mode: PipeRunMode, pipeline_run_id: str, user_id: str, inputs: PipelineInputs | WorkingMemory | None = None, search_domain_codes: list[str] | None = None, graph_context: GraphContext | None = None, otel_context: OtelContext | None = None, output_name: str | None = None, output_multiplicity: VariableMultiplicity | None = None, dynamic_output_concept_ref: str | None = None, request_id: str | None = None) -> PipeJob`. **Pure** (no registration/telemetry/graph-open/library-mutation).
+>     - `pipeline_run_setup` public signature **unchanged** (`-> tuple[PipeJob, str, str]`); internal recomposition only. Its post-acquire `except Exception` is now a `try/finally + success` block (covers `BaseException`/`CancelledError`).
+> - **Files touched:**
+>     - New: `pipelex/pipeline/execution_seams.py`; tests `tests/integration/pipelex/pipeline/test_pipeline_run_setup_characterization.py`, `.../test_execution_seams.py`.
+>     - Changed (Phase 1): `pipelex/pipeline/pipeline_run_setup.py`.
+>     - Changed (Phase 0): `pipelex/core/memory/working_memory_factory.py` (+2 classmethods), `pipelex/pipe_run/dry_run.py`, `pipelex/pipe_run/dry_run_with_graph.py`, `pipelex/pipe_signature/pipe_signature.py`, `tests/integration/pipelex/temporal/library_crate/conftest.py`, `tests/integration/pipelex/pipe_signature/test_pipe_signature.py`.
+> - **Deviations + why:** (1) seam boundary differs from the §4.1 sketch — `acquire_library` load-only + returns `main_pipe`; `prepare_pipe_job` takes a resolved `pipe`; pipe resolution stays in the wrapper because graph-tracer open needs the pipe and must precede `prepare_pipe_job`. (2) Seams in their own module (Phase-2 reuse). (3) **Intentional behavior change (bug fix, NOT a regression):** load/resolve failures now tear down the library — `acquire_library` owns load-time teardown, the wrapper's `try/finally` owns the post-acquire window. Previously these **pre-`try` failures leaked** the library (D4's "no leak today" assumption was wrong — verified). The flipped char-test `test_load_failure_tears_down_library` pins the fix.
+> - **Surprises / new risks:** (a) the load-failure leak finding above. (b) **Preserved (not introduced) inconsistency:** `acquire_library` *restores* the outer current-library on failure (validate_bundle contract); the wrapper's post-acquire `finally` *clears* current to `None` (the runner's original behavior). For a normal run (no outer current library) both → `None`. Flag for Phase 2/3 if unifying is wanted. (c) Within the wrapper, working-memory build now happens after the registry/otel side-effects (no dependency between them — verified green); the truthiness `if inputs:` is kept verbatim in `prepare_pipe_job`.
+> - **Test state:** `make agent-check` clean · `make agent-test` **fully green** ("All tests passed"). Green SHA: **see the Checkpoint-A commit on `feature/Validate-with-signatures-4-fix-dry-run`** (recorded in the Status table below). No skips/xfails introduced by this work.
+> - **Next entry point:** **Phase 2 — Build `BundleValidator`** (`pipelex/pipeline/bundle_validator.py`), composing `acquire_library` + `prepare_pipe_job` against a direct in-process `PipeRun`. Re-verify the seam symbols still exist before editing.
 
 ## Phase 2 — Build `BundleValidator` (§4.2, D1/D3)
 

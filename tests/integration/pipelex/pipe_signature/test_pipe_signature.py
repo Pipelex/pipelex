@@ -6,7 +6,7 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.list_content import ListContent
-from pipelex.pipe_run.dry_run import DryRunStatus, convert_to_working_memory_format, dry_run_pipe
+from pipelex.pipe_run.dry_run import DryRunStatus, dry_run_pipe
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError
@@ -97,7 +97,7 @@ class TestPipeSignature:
         setup_signature_library()
         blueprint = make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="Text[]")
         runtime = _make_runtime(blueprint, pipe_code="sig_for_text_list")
-        needed = convert_to_working_memory_format(needed_inputs_spec=runtime.needed_inputs())
+        needed = WorkingMemoryFactory.convert_to_working_memory_format(needed_inputs_spec=runtime.needed_inputs())
         working_memory = WorkingMemoryFactory.make_mock_inputs(needed_inputs=needed)
         await runtime.run_pipe(
             job_metadata=JobMetadata(user_id=OTelConstants.DEFAULT_USER_ID, pipeline_run_id=SpecialPipelineId.DRY_RUN_UNTITLED),
@@ -116,7 +116,7 @@ class TestPipeSignature:
         setup_signature_library()
         blueprint = make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="Text[3]")
         runtime = _make_runtime(blueprint, pipe_code="sig_for_fixed_list")
-        needed = convert_to_working_memory_format(needed_inputs_spec=runtime.needed_inputs())
+        needed = WorkingMemoryFactory.convert_to_working_memory_format(needed_inputs_spec=runtime.needed_inputs())
         working_memory = WorkingMemoryFactory.make_mock_inputs(needed_inputs=needed)
         await runtime.run_pipe(
             job_metadata=JobMetadata(user_id=OTelConstants.DEFAULT_USER_ID, pipeline_run_id=SpecialPipelineId.DRY_RUN_UNTITLED),

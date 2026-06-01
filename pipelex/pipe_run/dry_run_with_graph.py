@@ -4,7 +4,6 @@ from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.graph.graph_config import DataInclusionConfig
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.graph.graphspec import GraphSpec
-from pipelex.pipe_run.dry_run import convert_to_working_memory_format
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -45,7 +44,7 @@ async def dry_run_pipe_with_graph(
         )
 
         # Get needed inputs and create working memory
-        needed_inputs_for_factory = convert_to_working_memory_format(needed_inputs_spec=pipe.needed_inputs())
+        needed_inputs_for_factory = WorkingMemoryFactory.convert_to_working_memory_format(needed_inputs_spec=pipe.needed_inputs())
         working_memory = WorkingMemoryFactory.make_mock_inputs(needed_inputs=needed_inputs_for_factory)
 
         # Validate the pipe

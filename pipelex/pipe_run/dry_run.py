@@ -6,12 +6,7 @@ from pydantic import BaseModel, ValidationError
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, NamedStuffSpec, TypedNamedStuffSpec
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
-from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_class_registry
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_operators.compose.exceptions import PipeComposeError
 from pipelex.pipe_run.exceptions import DryRunError, PipeRunError
@@ -68,7 +63,7 @@ async def dry_run_pipe(pipe: PipeAbstract, *, allow_signatures: bool = False, ra
                 dep_paths=collect_signature_paths(pipe=pipe),
             )
     try:
-        needed_inputs_for_factory = convert_to_working_memory_format(needed_inputs_spec=pipe.needed_inputs())
+        needed_inputs_for_factory = WorkingMemoryFactory.convert_to_working_memory_format(needed_inputs_spec=pipe.needed_inputs())
         working_memory = WorkingMemoryFactory.make_mock_inputs(needed_inputs=needed_inputs_for_factory)
         pipe.validate_with_libraries()
         await pipe.run_pipe(
@@ -198,80 +193,3 @@ async def dry_run_pipes(
         return results
 
     return results
-
-
-def convert_to_working_memory_format(needed_inputs_spec: InputStuffSpecs) -> list[TypedNamedStuffSpec]:
-    """Convert PipeInput to the format needed by WorkingMemoryFactory.make_for_dry_run.
-
-    Args:
-        needed_inputs_spec: PipeInput with detailed_requirements
-
-    Returns:
-        List of tuples (variable_name, concept_code, structure_class)
-
-    """
-    needed_inputs_for_factory: list[TypedNamedStuffSpec] = []
-    class_registry = get_class_registry()
-
-    # TODO: fail and raise properly
-    for named_stuff_spec in needed_inputs_spec.named_stuff_specs:
-        try:
-            # Get the concept and its structure class
-            concept = named_stuff_spec.concept
-            structure_class_name = concept.structure_class_name
-
-            # Get the actual class from the registry
-            structure_class = class_registry.get_class(name=structure_class_name)
-
-            if structure_class and issubclass(structure_class, StuffContent):
-                typed_named_stuff_spec = TypedNamedStuffSpec.make_from_named(
-                    named=named_stuff_spec,
-                    structure_class=structure_class,
-                )
-                needed_inputs_for_factory.append(typed_named_stuff_spec)
-            else:
-                # Fallback to TextContent if we can't get the proper class
-                log.verbose(
-                    f"Could not get structure class '{structure_class_name}' for "
-                    f"concept '{named_stuff_spec.concept.code}', falling back to TextContent",
-                )
-                text_typed_named_stuff_spec = TypedNamedStuffSpec.make_from_named(
-                    named=named_stuff_spec,
-                    structure_class=TextContent,
-                )
-                needed_inputs_for_factory.append(text_typed_named_stuff_spec)
-
-        except ValidationError as exc:
-            # Fallback to TextContent when the typed stuff spec fails pydantic validation
-            log.warning(f"Error getting structure class for concept '{named_stuff_spec.concept.code}': {exc}, falling back to TextContent")
-            text_typed_named_stuff_spec = TypedNamedStuffSpec.make_from_named(
-                named=named_stuff_spec,
-                structure_class=TextContent,
-            )
-            needed_inputs_for_factory.append(text_typed_named_stuff_spec)
-
-    return needed_inputs_for_factory
-
-
-def convert_stuff_spec_to_typed_named(stuff_spec: StuffSpec, name: str) -> TypedNamedStuffSpec:
-    """Resolve a single output `StuffSpec` to a `TypedNamedStuffSpec`.
-
-    Mirrors the class-registry lookup behavior used inside `convert_to_working_memory_format`:
-    looks up the concept's `structure_class_name`, and falls back to `TextContent` when the
-    class is missing from the registry (matching the existing fallback for inputs).
-    """
-    class_registry = get_class_registry()
-    concept = stuff_spec.concept
-    structure_class_name = concept.structure_class_name
-    named = NamedStuffSpec(
-        variable_name=name,
-        concept=concept,
-        multiplicity=stuff_spec.multiplicity,
-    )
-    structure_class = class_registry.get_class(name=structure_class_name)
-    if structure_class and issubclass(structure_class, StuffContent):
-        return TypedNamedStuffSpec.make_from_named(named=named, structure_class=structure_class)
-    log.verbose(
-        f"Could not get structure class '{structure_class_name}' for concept '{concept.code}', falling back to TextContent",
-    )
-    return TypedNamedStuffSpec.make_from_named(named=named, structure_class=TextContent)
