@@ -8,16 +8,32 @@ row read/write (``read_rows``/``write_rows``), the shared flatness/field-order h
 (``assert_supported_table_suffix``) so an ``openpyxl``-backed ``.xlsx`` codec can be
 added later under ``pipelex[tabular]`` without touching callers.
 
-Phase 1 status: the public contract below is locked by the test suite. The bodies are
-filled in Phase 2 — every function currently raises ``NotImplementedError`` via the
-``_pending`` sentinel.
+Dialect contract: the stdlib default ``QUOTE_MINIMAL`` quoting is the codec's wire
+format — a value is quoted only when it contains the delimiter, the quote char, or a
+newline. The exact-line write assertions in the test suite rely on this.
 """
 
+import csv
+import types
+from datetime import date, datetime
+from enum import Enum
 from pathlib import Path
-from typing import NoReturn
+from typing import TYPE_CHECKING, Any, Literal, Union, get_args, get_origin
+
+from pydantic import ValidationError
 
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
+from pipelex.tools.tabular.exceptions import (
+    CsvCoercionError,
+    CsvColumnError,
+    CsvError,
+    CsvFlatnessError,
+    CsvReadError,
+)
+
+if TYPE_CHECKING:
+    from pydantic_core import ErrorDetails
 
 # v1 dialect defaults. Configurable via codec params, never auto-guessed (design §9).
 # The user-facing config surface (toml default / --delimiter / --encoding flags) is a
@@ -25,22 +41,156 @@ from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
 DEFAULT_DELIMITER = ","
 DEFAULT_ENCODING = "utf-8"
 
+_NONE_TYPE = type(None)
+_UNION_TYPE = getattr(types, "UnionType", None)  # Py3.10+: types.UnionType (PEP 604 `X | None`)
+# Scalar python types a CSV cell can round-trip. `bool` precedes `int` semantically
+# (bool is an int subclass) but membership here is by identity, so both are accepted.
+_FLAT_SCALAR_TYPES: frozenset[type] = frozenset({str, int, float, bool, date, datetime})
 
-def _pending(function_name: str, **context: object) -> NoReturn:
-    """Phase-1 skeleton sentinel: the CSV codec contract is locked but not yet implemented (Phase 2)."""
-    details = ", ".join(f"{key}={value!r}" for key, value in context.items())
-    msg = f"{function_name} is not implemented yet (CSV support Phase 2). Called with: {details}"
-    raise NotImplementedError(msg)
+
+# ---------------------------------------------------------------------------------------
+# Flatness classifier (shared by read AND write)
+# ---------------------------------------------------------------------------------------
+
+
+def _is_flat_annotation(annotation: Any) -> bool:
+    """Return whether a pydantic field annotation is a CSV-flat scalar.
+
+    Unwraps ``Optional`` (a single non-``None`` arm); ACCEPTS the scalar python types,
+    ``Literal[...]`` and ``Enum`` (choice-constrained) scalars; REJECTS genuine unions,
+    containers, nested models, and ``Any``.
+    """
+    origin = get_origin(annotation)
+    if origin in {Union, _UNION_TYPE}:
+        non_none_args = [arg for arg in get_args(annotation) if arg is not _NONE_TYPE]
+        if len(non_none_args) != 1:
+            # A genuine multi-type union (e.g. int | str) is not flat.
+            return False
+        return _is_flat_annotation(non_none_args[0])
+    if origin is Literal:
+        return True
+    if isinstance(annotation, type):
+        if issubclass(annotation, Enum):
+            return True
+        return annotation in _FLAT_SCALAR_TYPES
+    return False
+
+
+def flat_field_names(row_model: type[StuffContent]) -> list[str]:
+    """Validate that ``row_model`` is CSV-flat and return its field names in declared order.
+
+    The single shared flatness classifier used by BOTH read and write. Unwraps
+    ``Optional``; ACCEPTS ``str``/``int``/``float``/``bool``/``datetime.date`` and
+    ``Literal``/choice-constrained scalars; REJECTS list/dict/nested/concept-typed/
+    ``Union``/``Any`` fields with a ``CsvFlatnessError`` naming the offending field.
+    """
+    field_names: list[str] = []
+    for field_name, field_info in row_model.model_fields.items():
+        if not _is_flat_annotation(field_info.annotation):
+            msg = (
+                f"Concept {row_model.__name__!r} is not CSV-flat: field {field_name!r} has type "
+                f"{field_info.annotation!r}, but CSV rows accept scalar fields only "
+                f"(text/integer/number/boolean/date, optionals, and Literal/choice-constrained scalars). "
+                f"Project to a flat concept first."
+            )
+            raise CsvFlatnessError(msg)
+        field_names.append(field_name)
+    return field_names
+
+
+# ---------------------------------------------------------------------------------------
+# read_rows / write_rows primitives
+# ---------------------------------------------------------------------------------------
+
+
+def _assert_single_char_delimiter(delimiter: str) -> None:
+    """Reject a delimiter the stdlib ``csv`` module cannot use (it must be exactly one char).
+
+    Validating up front turns csv's raw ``TypeError`` into a typed ``CsvError`` so no raw
+    exception escapes the codec boundary.
+    """
+    if len(delimiter) != 1:
+        msg = f"CSV delimiter must be a single character, got {delimiter!r}."
+        raise CsvError(msg)
+
+
+def _validate_header(header: list[str], path: Path) -> None:
+    """Reject a CSV header with a blank or duplicate column."""
+    seen: set[str] = set()
+    for column in header:
+        if not column.strip():
+            msg = f"CSV file {path} has a blank header cell; every column needs a non-empty name."
+            raise CsvColumnError(msg)
+        if column in seen:
+            msg = f"CSV file {path} has a duplicate header column {column!r}; column names must be unique."
+            raise CsvColumnError(msg)
+        seen.add(column)
+
+
+def _read_table(path: Path, *, delimiter: str, encoding: str) -> tuple[list[str], list[tuple[int, list[str]]]]:
+    """Read a CSV file into a validated header row + the (1-based-line-numbered) data rows.
+
+    The shared reader behind ``read_rows`` and ``list_content_from_csv`` — keeps the
+    header explicit so column validation works even for a header-only file. Blank physical
+    lines (which ``csv`` yields as ``[]``) are skipped, matching ``csv.DictReader``; a data
+    row wider than the header is rejected (its surplus cells map to no column). Each kept row
+    carries its 1-based data-line number (counting skipped blank lines) so error messages
+    point at the physical CSV line. Wraps every raw
+    ``OSError``/``UnicodeDecodeError``/``LookupError``/``csv.Error`` as ``CsvReadError``.
+    """
+    _assert_single_char_delimiter(delimiter)
+    try:
+        with path.open("r", encoding=encoding, newline="") as csv_file:
+            raw_rows = list(csv.reader(csv_file, delimiter=delimiter))
+    except UnicodeDecodeError as exc:
+        msg = f"Could not decode CSV file {path} as {encoding}: {exc}"
+        raise CsvReadError(msg) from exc
+    except LookupError as exc:
+        msg = f"Unknown encoding {encoding!r} for CSV file {path}: {exc}"
+        raise CsvReadError(msg) from exc
+    except csv.Error as exc:
+        msg = f"Malformed CSV file {path}: {exc}"
+        raise CsvReadError(msg) from exc
+    except OSError as exc:
+        msg = f"Could not read CSV file {path}: {exc}"
+        raise CsvReadError(msg) from exc
+
+    if not raw_rows:
+        msg = f"CSV file {path} is empty; a header row is required."
+        raise CsvReadError(msg)
+
+    header = raw_rows[0]
+    _validate_header(header, path)
+
+    data_rows: list[tuple[int, list[str]]] = []
+    for row_number, row in enumerate(raw_rows[1:], start=1):
+        if not row:
+            # Blank physical line (csv yields []). Skip it; a single empty cell is [''] and is kept.
+            continue
+        if len(row) > len(header):
+            msg = (
+                f"CSV file {path} row {row_number} has {len(row)} fields but the header declares "
+                f"{len(header)} column(s); the surplus cells map to no column."
+            )
+            raise CsvColumnError(msg)
+        data_rows.append((row_number, row))
+    return header, data_rows
+
+
+def _row_to_dict(header: list[str], data_row: list[str]) -> dict[str, str]:
+    """Map a raw data row onto the header, padding a short row with empty cells."""
+    return {column: (data_row[index] if index < len(data_row) else "") for index, column in enumerate(header)}
 
 
 def read_rows(path: Path, *, delimiter: str = DEFAULT_DELIMITER, encoding: str = DEFAULT_ENCODING) -> list[dict[str, str]]:
     """Read a CSV file into a list of header-keyed string rows.
 
-    A header row is required. Raises ``CsvReadError`` for a missing/unreadable file,
-    a wrong encoding, or malformed quoting; raises ``CsvColumnError`` for a duplicate
-    or blank header cell.
+    A header row is required; blank lines are skipped. Raises ``CsvReadError`` for a
+    missing/unreadable file, an unknown/wrong encoding, or malformed quoting; raises
+    ``CsvColumnError`` for a duplicate/blank header cell or a data row wider than the header.
     """
-    _pending("read_rows", path=path, delimiter=delimiter, encoding=encoding)
+    header, data_rows = _read_table(path, delimiter=delimiter, encoding=encoding)
+    return [_row_to_dict(header, row) for _, row in data_rows]
 
 
 def write_rows(
@@ -53,21 +203,27 @@ def write_rows(
 ) -> None:
     """Write header-keyed string rows to a CSV file, emitting ``headers`` in order.
 
-    An empty ``rows`` still writes the header line. Raises ``CsvError`` if the file
-    cannot be written.
+    An empty ``rows`` still writes the header line. Raises ``CsvError`` if the delimiter
+    is invalid, the encoding is unknown, or the file cannot be written.
     """
-    _pending("write_rows", path=path, headers=headers, rows=rows, delimiter=delimiter, encoding=encoding)
+    _assert_single_char_delimiter(delimiter)
+    try:
+        with path.open("w", encoding=encoding, newline="") as csv_file:
+            writer = csv.writer(csv_file, delimiter=delimiter)
+            writer.writerow(headers)
+            for row in rows:
+                writer.writerow([row.get(column, "") for column in headers])
+    except LookupError as exc:
+        msg = f"Unknown encoding {encoding!r} for CSV file {path}: {exc}"
+        raise CsvError(msg) from exc
+    except OSError as exc:
+        msg = f"Could not write CSV file {path}: {exc}"
+        raise CsvError(msg) from exc
 
 
-def flat_field_names(row_model: type[StuffContent]) -> list[str]:
-    """Validate that ``row_model`` is CSV-flat and return its field names in declared order.
-
-    The single shared flatness classifier used by BOTH read and write. Unwraps
-    ``Optional``; ACCEPTS ``str``/``int``/``float``/``bool``/``datetime.date`` and
-    ``Literal``/choice-constrained scalars; REJECTS list/dict/nested/concept-typed/
-    ``Union``/``Any`` fields with a ``CsvFlatnessError`` naming the offending field.
-    """
-    _pending("flat_field_names", row_model=row_model)
+# ---------------------------------------------------------------------------------------
+# Format seam
+# ---------------------------------------------------------------------------------------
 
 
 def assert_supported_table_suffix(path: Path) -> None:
@@ -77,7 +233,22 @@ def assert_supported_table_suffix(path: Path) -> None:
     extra; any other suffix raises a generic unsupported-format ``CsvError``. This is
     the seam an ``openpyxl``-backed codec slots into later without touching callers.
     """
-    _pending("assert_supported_table_suffix", path=path)
+    suffix = path.suffix.lower()
+    if suffix == ".csv":
+        return
+    if suffix == ".xlsx":
+        msg = (
+            f"Reading/writing Excel files ({path.name}) requires the optional 'pipelex[tabular]' extra, "
+            f"which is not part of v1. Convert to .csv, or install 'pipelex[tabular]' once it ships."
+        )
+        raise CsvError(msg)
+    msg = f"Unsupported table file format for {path.name!r}: only .csv is supported (got suffix {path.suffix!r})."
+    raise CsvError(msg)
+
+
+# ---------------------------------------------------------------------------------------
+# Concept binding
+# ---------------------------------------------------------------------------------------
 
 
 def list_content_from_csv(
@@ -96,7 +267,42 @@ def list_content_from_csv(
     pydantic's lax validation. A coercion failure raises ``CsvCoercionError`` naming the
     1-based row/column and field. ``row_model`` must be CSV-flat (see ``flat_field_names``).
     """
-    _pending("list_content_from_csv", path=path, row_model=row_model, delimiter=delimiter, encoding=encoding)
+    assert_supported_table_suffix(path)
+    field_names = flat_field_names(row_model)
+    field_name_set = set(field_names)
+    required_fields = {name for name, field_info in row_model.model_fields.items() if field_info.is_required()}
+
+    header, data_rows = _read_table(path, delimiter=delimiter, encoding=encoding)
+    header_set = set(header)
+
+    extra_columns = header_set - field_name_set
+    if extra_columns:
+        msg = (
+            f"CSV file {path} has column(s) {sorted(extra_columns)} not declared on concept {row_model.__name__!r}. "
+            f"Remove them or project to a matching flat concept."
+        )
+        raise CsvColumnError(msg)
+
+    missing_required = required_fields - header_set
+    if missing_required:
+        msg = f"CSV file {path} is missing required column(s) {sorted(missing_required)} for concept {row_model.__name__!r}."
+        raise CsvColumnError(msg)
+
+    items: list[StuffContentType] = []
+    for row_number, data_row in data_rows:
+        cell_map = _row_to_dict(header, data_row)
+        # Empty cell -> None BEFORE validation (so it targets an optional field, or fails required).
+        row_data = {column: (value or None) for column, value in cell_map.items()}
+        try:
+            item = row_model.model_validate(row_data)
+        except ValidationError as exc:
+            error_fields = sorted({_validation_error_label(error) for error in exc.errors()})
+            fields_label = ", ".join(error_fields) or "?"
+            msg = f"Could not coerce CSV row {row_number} of {path} for concept {row_model.__name__!r}: field(s) {fields_label} — {exc}"
+            raise CsvCoercionError(msg) from exc
+        items.append(item)
+
+    return ListContent(items=items)
 
 
 def csv_from_list_content(
@@ -115,4 +321,38 @@ def csv_from_list_content(
     ``None`` maps to an empty cell (never the string ``"None"``). ``row_model`` must be
     CSV-flat (see ``flat_field_names``).
     """
-    _pending("csv_from_list_content", list_content=list_content, row_model=row_model, path=path, delimiter=delimiter, encoding=encoding)
+    assert_supported_table_suffix(path)
+    headers = flat_field_names(row_model)
+    rows: list[dict[str, str]] = []
+    for item_index, item in enumerate(list_content.items):
+        if not isinstance(item, row_model):
+            msg = f"Cannot write CSV: item {item_index} is a {type(item).__name__}, not the declared row model {row_model.__name__!r}."
+            raise CsvError(msg)
+        dumped = item.model_dump(mode="json")
+        rows.append({field_name: _to_cell(dumped.get(field_name)) for field_name in headers})
+    write_rows(path, headers, rows, delimiter=delimiter, encoding=encoding)
+
+
+def _validation_error_label(error: "ErrorDetails") -> str:
+    """Best field label for one pydantic error: the dotted ``loc``, else the error type.
+
+    A model-level failure (e.g. a ``model_validator``) has an empty ``loc``; falling back to
+    the error type keeps the coercion message from naming an unhelpful ``field(s) ?``.
+    """
+    loc = error.get("loc") or ()
+    if loc:
+        return ".".join(str(part) for part in loc)
+    return str(error.get("type", "model"))
+
+
+def _to_cell(value: Any) -> str:
+    """Serialize one ``model_dump(mode="json")`` scalar to a CSV cell.
+
+    ``None`` becomes an empty cell (never ``"None"``); booleans become lowercase
+    ``true``/``false`` (round-trip-safe under pydantic's lax bool coercion).
+    """
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)

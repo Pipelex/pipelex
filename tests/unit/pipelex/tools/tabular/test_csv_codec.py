@@ -9,11 +9,13 @@ All assertions are RED until Phase 2 fills in ``csv_codec`` — the skeleton cur
 raises ``NotImplementedError`` from every function.
 """
 
+import csv
 from datetime import date
 from pathlib import Path
 from typing import Any, Literal
 
 import pytest
+from pydantic import model_validator
 
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -32,6 +34,7 @@ from pipelex.tools.tabular.exceptions import (
     CsvFlatnessError,
     CsvReadError,
 )
+from pipelex.types import Self
 
 # ---------------------------------------------------------------------------------------
 # Flat row models (CSV-legal: scalar fields only)
@@ -69,6 +72,23 @@ class OptionalTextRow(StructuredContent):
 
 class RequiredTextRow(StructuredContent):
     text: str
+
+
+class OptPairRow(StructuredContent):
+    a: str | None = None
+    b: str | None = None
+
+
+class OrderedPairRow(StructuredContent):
+    a: int
+    b: int
+
+    @model_validator(mode="after")
+    def _check_order(self) -> Self:
+        if self.a > self.b:
+            msg = "a must be <= b"
+            raise ValueError(msg)
+        return self
 
 
 class LiteralRow(StructuredContent):
@@ -109,6 +129,23 @@ def write_csv_file(directory: Path, content: str, name: str = "data.csv", encodi
     """Write *content* to ``directory/name`` and return the path."""
     path = directory / name
     path.write_text(content, encoding=encoding)
+    return path
+
+
+def write_value_csv(directory: Path, cell: str, name: str = "data.csv", header: str = "value") -> Path:
+    """Write a one-column CSV with a single data cell, CSV-quoting it correctly.
+
+    Building the data row through ``csv.writer`` (rather than an f-string) keeps a cell
+    that contains the delimiter — e.g. the comma-decimal ``1,5`` — a single field instead
+    of silently splitting it into two columns. An empty ``cell`` is written as a quoted
+    ``""`` (a genuine empty-cell row that reads back as ``['']``), distinct from a blank
+    physical line (``[]``) which the codec skips.
+    """
+    path = directory / name
+    with path.open("w", encoding="utf-8", newline="") as csv_file:
+        writer = csv.writer(csv_file)
+        writer.writerow([header])
+        writer.writerow([cell])
     return path
 
 
@@ -215,9 +252,10 @@ class TestCsvCodec:
         assert item.nickname is None
 
     def test_empty_cell_on_required_field_raises(self, tmp_path: Path) -> None:
-        path = write_csv_file(tmp_path, "value\n\n", name="req.csv")
+        # A genuine quoted-empty cell (not a blank line) -> None -> required int fails coercion.
+        path = write_value_csv(tmp_path, "", name="req.csv")
         with pytest.raises(CsvCoercionError):
-            list_content_from_csv(path, RequiredTextRow)
+            list_content_from_csv(path, IntRow)
 
     @pytest.mark.parametrize(
         ("row_model", "cell", "expected"),
@@ -236,7 +274,7 @@ class TestCsvCodec:
         ],
     )
     def test_coercion_accept_table(self, tmp_path: Path, row_model: type[StructuredContent], cell: str, expected: object) -> None:
-        path = write_csv_file(tmp_path, f"value\n{cell}\n")
+        path = write_value_csv(tmp_path, cell)
         item = list_content_from_csv(path, row_model).items[0]
         assert item.model_dump()["value"] == expected
 
@@ -249,7 +287,7 @@ class TestCsvCodec:
         ],
     )
     def test_coercion_reject_table(self, tmp_path: Path, row_model: type[StructuredContent], cell: str) -> None:
-        path = write_csv_file(tmp_path, f"value\n{cell}\n")
+        path = write_value_csv(tmp_path, cell)
         with pytest.raises(CsvCoercionError):
             list_content_from_csv(path, row_model)
 
@@ -337,9 +375,64 @@ class TestCsvCodec:
         assert [item.text for item in reloaded.items] == [None, None]
 
     def test_required_text_empty_cell_rejected(self, tmp_path: Path) -> None:
-        path = write_csv_file(tmp_path, "text\n\n", name="reqtext.csv")
+        path = write_value_csv(tmp_path, "", name="reqtext.csv", header="text")
         with pytest.raises(CsvCoercionError):
             list_content_from_csv(path, RequiredTextRow)
+
+    # ----------------------------------------------------------------------------------
+    # Phase-2 review findings (#2 blank lines, #3 over-wide rows, #4 delimiter/encoding,
+    # #5 write item-type guard, #7 model-level coercion label)
+    # ----------------------------------------------------------------------------------
+
+    def test_blank_line_in_body_is_skipped(self, tmp_path: Path) -> None:
+        # A blank physical line (csv yields []) is skipped, not turned into a phantom all-None row.
+        path = write_csv_file(tmp_path, "a,b\nx,y\n\nz,w\n")
+        items = list_content_from_csv(path, OptPairRow).items
+        assert [(item.a, item.b) for item in items] == [("x", "y"), ("z", "w")]
+
+    def test_row_wider_than_header_raises(self, tmp_path: Path) -> None:
+        # A data row with more cells than the header has no column for the surplus → error, not silent drop.
+        path = write_csv_file(tmp_path, "name,age\nAda,36,EXTRA\n")
+        with pytest.raises(CsvColumnError):
+            read_rows(path)
+
+    @pytest.mark.parametrize("bad_delimiter", ["", "||"])
+    def test_bad_delimiter_raises_on_read_and_write(self, tmp_path: Path, bad_delimiter: str) -> None:
+        read_path = write_csv_file(tmp_path, "a,b\n1,2\n")
+        with pytest.raises(CsvError):
+            read_rows(read_path, delimiter=bad_delimiter)
+        with pytest.raises(CsvError):
+            write_rows(tmp_path / "out.csv", headers=["a"], rows=[], delimiter=bad_delimiter)
+
+    def test_unknown_encoding_raises(self, tmp_path: Path) -> None:
+        path = write_csv_file(tmp_path, "a\n1\n")
+        with pytest.raises(CsvReadError):
+            read_rows(path, encoding="not-a-real-codec")
+
+    def test_write_rejects_item_not_matching_row_model(self, tmp_path: Path) -> None:
+        # An item whose class isn't the declared row_model would write silent empty cells → reject loudly.
+        list_content: ListContent[StructuredContent] = ListContent(items=[IntRow(value=1)])
+        with pytest.raises(CsvError):
+            csv_from_list_content(list_content, row_model=RequiredTextRow, path=tmp_path / "x.csv")
+
+    def test_coercion_error_names_model_level_failure(self, tmp_path: Path) -> None:
+        # A model_validator failure has an empty pydantic loc; the message must still name the
+        # row and concept (not the unhelpful "field(s) ?").
+        path = write_csv_file(tmp_path, "a,b\n5,1\n")
+        with pytest.raises(CsvCoercionError) as exc_info:
+            list_content_from_csv(path, OrderedPairRow)
+        message = str(exc_info.value)
+        assert "field(s) ?" not in message
+        assert "row 1" in message
+        assert "OrderedPairRow" in message
+
+    def test_coercion_error_row_number_counts_skipped_blank_lines(self, tmp_path: Path) -> None:
+        # The reported row number is the physical CSV data line, even when a blank line was skipped.
+        path = write_csv_file(tmp_path, "value\n42\n\noops\n")
+        with pytest.raises(CsvCoercionError) as exc_info:
+            list_content_from_csv(path, IntRow)
+        # 'oops' is the 3rd data line (42, blank, oops), not the 2nd kept row.
+        assert "row 3" in str(exc_info.value)
 
     # ----------------------------------------------------------------------------------
     # Format seam
