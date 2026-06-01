@@ -39,6 +39,12 @@ class TestCsvInputDetection:
             "https://example.com/people.csv",
             "s3://bucket/people.csv",
             "gs://bucket/people.csv",
+            # Query-string / fragment forms must still be detected as tabular and rejected: pathlib's
+            # `.suffix` keeps the `?…`/`#…`, so detection must look at the URL path component, not the
+            # raw string (S3 presigned URLs always carry a query string).
+            "https://example.com/people.csv?token=abc",
+            "s3://bucket/people.csv?X-Amz-Signature=deadbeef",
+            "https://example.com/people.csv#frag",
         ],
     )
     def test_remote_csv_url_rejected(self, remote_url: str, load_test_library: Callable[[list[Path]], None]) -> None:

@@ -233,7 +233,10 @@ async def _execute_run(
     # Save main_stuff as CSV if requested. CQ1: write to the literal <path> (cwd-relative),
     # NOT resolved under --output-dir. Requires the main stuff to be a flat list (e.g. PersonSummary[]);
     # the codec rejects a non-flat row concept with a clear CsvFlatnessError.
-    if save_csv:
+    if save_csv is not None:
+        if not save_csv.strip():
+            typer.secho("Failed to --save-csv: an empty output path was given.", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1)
         csv_main_stuff = pipe_output.working_memory.get_optional_main_stuff()
         if csv_main_stuff is None:
             typer.secho("Failed to --save-csv: the pipeline produced no main stuff to write.", fg=typer.colors.RED, err=True)
@@ -248,7 +251,11 @@ async def _execute_run(
             )
             raise typer.Exit(1)
         csv_list_content = cast("ListContent[StuffContent]", csv_content)
-        csv_from_list_content(csv_list_content, row_model=csv_main_stuff.concept.get_structure_class(), path=Path(save_csv))
+        # CQ1: write to the literal cwd-relative path, but still create its parent dirs so a
+        # nested target (e.g. reports/2026/out.csv) doesn't fail late after the run completed.
+        csv_path = Path(save_csv)
+        csv_path.parent.mkdir(parents=True, exist_ok=True)
+        csv_from_list_content(csv_list_content, row_model=csv_main_stuff.concept.get_structure_class(), path=csv_path)
         log.verbose(f"Main stuff CSV saved to: {save_csv}")
 
     reporting_config = get_config().pipelex.reporting_config
@@ -283,7 +290,7 @@ async def _execute_run(
             else:
                 console.print(f"    [green]✓[/green] working_memory: {working_memory_output_path}")
     # CSV output is written to a literal cwd-relative path (CQ1), independent of --output-dir.
-    if save_csv:
+    if save_csv is not None:
         console.print(f"  [green]✓[/green] CSV saved to [bold magenta]{save_csv}[/bold magenta]")
 
 

@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any, cast
+from urllib.parse import urlsplit
 
 import shortuuid
 from mthds.models.pipeline_inputs import StuffContentOrData
@@ -7,6 +8,7 @@ from pydantic import BaseModel, ValidationError, field_validator
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.exceptions import ConceptValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import validate_concept_ref
 from pipelex.core.stuffs.exceptions import StuffFactoryError
@@ -145,12 +147,19 @@ class StuffFactory:
         non-tabular suffix, or a native concept — so the caller falls through to normal Case 2.5
         dict handling.
 
-        v1 reads LOCAL paths only: a remote ``url`` (``http(s)``/``s3``/``pipelex-storage``/
-        base64 data URL) with a tabular suffix is rejected with a clear ``CsvError`` rather than
-        opened as a local path.
+        v1 reads LOCAL paths only: a tabular-suffixed remote ``url`` (``http(s)``/``s3``/``gs``/
+        ``pipelex-storage``) is rejected with a clear ``CsvError`` rather than opened as a local path.
+        (A base64 data URL carries no file suffix, so it is never detected as tabular and simply
+        falls through to ordinary record handling.)
         """
         url = content.get("url")
-        if not isinstance(url, str) or not is_tabular_path(Path(url)):
+        if not isinstance(url, str):
+            return None
+        # Detect the tabular suffix on the URL's PATH component only. A raw URL fed to
+        # ``Path`` keeps any ``?query``/``#fragment`` inside ``.suffix`` (e.g. an S3 presigned
+        # ``...csv?X-Amz-...``), which would hide the ``.csv`` and let a remote ref slip past the
+        # local-only guard below. ``urlsplit`` strips the query/fragment for plain paths and URLs alike.
+        if not is_tabular_path(Path(urlsplit(url).path)):
             return None
         if Concept.is_native_concept(concept=concept):
             # Native file concepts (Image, PDF, ...) own their own url handling; never hijack them.
@@ -168,7 +177,13 @@ class StuffFactory:
             )
             raise CsvError(msg)
 
-        row_model = concept.get_structure_class()
+        try:
+            row_model = concept.get_structure_class()
+        except ConceptValueError as exc:
+            # Keep the codec's typed-error boundary intact: an unregistered structure class is a
+            # caller-fixable input problem, not a raw ValueError that escapes into core/runner.
+            msg = f"CSV input for stuff '{name}': concept '{concept.concept_ref}' has no registered structure class to read CSV rows into."
+            raise CsvError(msg) from exc
         list_content = list_content_from_csv(Path(resolved.path), row_model)
         return cls.make_stuff(concept=concept, content=list_content, name=name, code=code)
 
