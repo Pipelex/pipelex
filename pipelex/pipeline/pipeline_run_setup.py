@@ -6,12 +6,14 @@ from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import (
+    get_current_library_id_or_none,
     get_library_manager,
     get_otel_tracer,
     get_pipeline_manager,
     get_report_delegate,
     get_required_pipe,
     get_telemetry_manager,
+    set_current_library,
     teardown_current_library,
 )
 from pipelex.pipe_run.pipe_job import PipeJob
@@ -135,6 +137,11 @@ async def pipeline_run_setup(
     if not library_id:
         library_id = pipeline_run_id
 
+    # Capture the caller's outer current-library before acquire_library overwrites it with the new id,
+    # so a post-acquire failure can restore it instead of clobbering it (mirrors validate_bundle and
+    # acquire_library's own load-failure teardown).
+    prev_library_id = get_current_library_id_or_none()
+
     # Seam 1: open the library and load dirs + blueprints. Owns its own load-failure teardown.
     library_id, qualified_main_pipe = acquire_library(
         library_id=library_id,
@@ -146,6 +153,7 @@ async def pipeline_run_setup(
     library_manager = get_library_manager()
     graph_context: GraphContext | None = None
     event_log: EventLogProtocol | None = None
+    registry_opened = False
     success = False
     try:
         # Resolve the pipe to execute against the now-open library.
@@ -199,6 +207,7 @@ async def pipeline_run_setup(
                 pipe_run_mode = PipeRunMode.LIVE
 
         get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
+        registry_opened = True
 
         # Set event log on the report delegate for distributed usage event emission
         if event_log is not None:
@@ -254,14 +263,25 @@ async def pipeline_run_setup(
     finally:
         if not success:
             # Error-path-only cleanup for failures after the library was acquired: tear down the graph
-            # tracer, event-log state, and the library, then let the exception propagate. Uses try/finally
-            # (not except) so a BaseException — e.g. asyncio.CancelledError — is covered too. acquire_library
-            # owns teardown for load-time failures (before this try); this block owns the post-acquire window.
+            # tracer, event-log state, the report registry, and the library, and restore the outer
+            # current-library, then let the exception propagate. Uses try/finally (not except) so a
+            # BaseException — e.g. asyncio.CancelledError — is covered too. acquire_library owns teardown
+            # for load-time failures (before this try); this block owns the post-acquire window.
             if graph_context is not None:
                 tracer_manager = GraphTracerManager.get_instance()
                 if tracer_manager is not None:
                     tracer_manager.close_tracer(pipeline_run_id)
             if event_log is not None:
                 get_report_delegate().clear_event_log(context_key=pipeline_run_id)
+            # Close the per-run registry only if open_registry actually ran: close_registry bare-pops
+            # (KeyError on miss) and this finally also runs for failures *before* open_registry.
+            if registry_opened:
+                get_report_delegate().close_registry(pipeline_run_id=pipeline_run_id)
+            # Restore the caller's outer current-library FIRST so the guarantee survives a teardown raise,
+            # then tear the library down — mirroring validate_bundle. set_current_library cannot take None,
+            # so route the "no outer was set" case through teardown_current_library.
+            if prev_library_id is not None:
+                set_current_library(library_id=prev_library_id)
+            else:
+                teardown_current_library()
             library_manager.teardown(library_id=library_id)
-            teardown_current_library()

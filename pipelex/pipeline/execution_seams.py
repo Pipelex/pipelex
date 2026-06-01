@@ -71,7 +71,10 @@ def acquire_library(
     """
     library_manager = get_library_manager()
     prev_library_id = get_current_library_id_or_none()
-    library_manager.open_library(library_id=library_id)
+    # Adopt the canonical id open_library keyed the Library under: when given a falsy library_id it
+    # generates a fresh uuid. Returning/tearing down the passed-in id instead would, for library_id="",
+    # route teardown("") past LibraryManager.teardown's `if library_id:` guard and tear down ALL libraries.
+    library_id, _ = library_manager.open_library(library_id=library_id)
     success = False
     try:
         set_current_library(library_id=library_id)

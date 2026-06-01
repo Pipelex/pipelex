@@ -7,6 +7,7 @@ equivalent :class:`PipeJob` against an already-open library.
 """
 
 import pytest
+from mthds.models.pipeline_inputs import PipelineInputs
 from pytest_mock import MockerFixture
 
 from pipelex.config import get_config
@@ -92,6 +93,53 @@ class TestExecutionSeams:
         # ...and the caller's outer current-library is restored, not left holding the failed one.
         assert get_current_library_id_or_none() == prev_library_id
 
+    async def test_acquire_library_with_empty_id_adopts_generated_id(self) -> None:
+        # open_library generates a fresh uuid when given a falsy library_id. acquire_library must
+        # return THAT id (not the falsy "" it was passed), so every downstream op targets the real
+        # library. A caller passing library_id="" is valid (the signature is `str`), so this must work.
+        library_manager = get_library_manager()
+        returned_id, qualified_main_pipe = acquire_library(library_id="", mthds_contents=[_SEAMS_MTHDS])
+        try:
+            # Non-empty: the generated uuid, not the falsy "" that was passed in.
+            assert returned_id
+            assert qualified_main_pipe is not None
+            assert qualified_main_pipe == f"{_SEAMS_DOMAIN}.echo_topic"
+            # The returned id is the one left open + current and holding the loaded pipe.
+            assert get_current_library_id_or_none() == returned_id
+            assert get_required_pipe(pipe_code=qualified_main_pipe).code == "echo_topic"
+        finally:
+            library_manager.teardown(library_id=returned_id)
+            teardown_current_library()
+
+    async def test_acquire_library_with_empty_id_tears_down_only_the_opened_library(self, mocker: MockerFixture) -> None:
+        # Regression for the teardown-all catastrophe: before the fix, acquire_library kept the falsy
+        # passed-in library_id="" and, on a load failure, called teardown(library_id="") — which falls
+        # past LibraryManager.teardown's `if library_id:` guard and tears down EVERY open library. With
+        # the fix it adopts open_library's generated id and tears down only that one, leaving unrelated
+        # open libraries intact.
+        library_manager = get_library_manager()
+        unrelated_id, _ = library_manager.open_library(library_id="seams_unrelated_lib")
+        try:
+            open_library_spy = mocker.spy(library_manager, "open_library")
+            teardown_spy = mocker.spy(library_manager, "teardown")
+            mocker.patch.object(
+                execution_seams_module,
+                "resolve_library_dirs",
+                side_effect=TypeError("simulated load failure in acquire_library"),
+            )
+            with pytest.raises(TypeError):
+                acquire_library(library_id="", mthds_contents=[_SEAMS_MTHDS])
+
+            # teardown targeted the generated id open_library returned, not the falsy "".
+            generated_id, _ = open_library_spy.spy_return
+            assert generated_id
+            assert teardown_spy.call_args_list[-1].kwargs["library_id"] == generated_id
+            # The unrelated library survived — teardown("") would have nuked it along with all others.
+            assert library_manager.get_library(library_id=unrelated_id) is not None
+        finally:
+            library_manager.teardown(library_id=unrelated_id)
+            teardown_current_library()
+
     async def test_prepare_pipe_job_builds_equivalent_job_against_open_library(self) -> None:
         library_manager = get_library_manager()
         library_id = "seams_prepare_lib"
@@ -113,6 +161,47 @@ class TestExecutionSeams:
             assert pipe_job.library_crate is not None
             # Mock input materialized for the pipe's needed input.
             assert "subject" in pipe_job.get_working_memory().root
+        finally:
+            library_manager.teardown(library_id=library_id)
+            teardown_current_library()
+
+    async def test_prepare_pipe_job_skips_normalize_for_empty_inputs(self, mocker: MockerFixture) -> None:
+        # Pins the falsy-inputs semantics at the normalize gate — the discriminating check the
+        # pipeline_run_setup characterization test could not make. With empty PipelineInputs (falsy) +
+        # normalize enabled + mock disabled, `if inputs:` leaves working_memory None, so the
+        # `if working_memory and is_normalize and not is_mock` gate skips normalize. Under an
+        # `inputs is not None` regression, make_from_pipeline_inputs would build an (always-truthy, since
+        # WorkingMemory defines no __bool__/__len__) empty WorkingMemory and normalize WOULD run. Asserting
+        # the spy never fires catches that regression; the prior root == {} assertion alone did not.
+        library_manager = get_library_manager()
+        library_id = "seams_normalize_gate_lib"
+        _, qualified_main_pipe = acquire_library(library_id=library_id, mthds_contents=[_SEAMS_MTHDS])
+        try:
+            assert qualified_main_pipe is not None
+            pipe = get_required_pipe(pipe_code=qualified_main_pipe)
+            normalize_spy = mocker.spy(execution_seams_module, "normalize_data_urls_to_storage")
+            normalize_config = (
+                get_config()
+                .pipelex.pipeline_execution_config.with_graph_config_overrides(
+                    generate_graph=False,
+                    mock_inputs=False,
+                )
+                .model_copy(update={"is_normalize_data_urls_to_storage": True})
+            )
+
+            pipe_job = await prepare_pipe_job(
+                pipe=pipe,
+                library_id=library_id,
+                execution_config=normalize_config,
+                pipe_run_mode=PipeRunMode.DRY,
+                pipeline_run_id="seams-normalize-run-id",
+                user_id=OTelConstants.DEFAULT_USER_ID,
+                inputs=PipelineInputs(),
+            )
+
+            # Empty (falsy) inputs => no working memory built => normalize gate skipped.
+            assert normalize_spy.call_count == 0
+            assert pipe_job.get_working_memory().root == {}
         finally:
             library_manager.teardown(library_id=library_id)
             teardown_current_library()
