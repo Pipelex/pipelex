@@ -63,7 +63,7 @@ Decisions from the review (apply these as you implement; they override the origi
 | 0 | Unblock the leaf (relocate helpers) | ☑ done | `f04c4c7a` |
 | 1 | Extract `acquire_library` / `prepare_pipe_job` seams | ☑ done | `f04c4c7a` |
 | | **⛔ CHECKPOINT A** | | |
-| 2 | Build `BundleValidator` (two-lifecycle, union catch) | ☑ done | _A2 commit_ |
+| 2 | Build `BundleValidator` (two-lifecycle, union catch) | ☑ done | `23f936cd` |
 | | **⛔ CHECKPOINT A2 — built + tested, zero callers** | | |
 | 3a | Migrate in-repo callers + tests + config | ☐ | |
 | 3b | Migrate `pipelex-api` runner.py (cross-repo PR) | ☐ | |
@@ -155,7 +155,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done.
 > - **Surprises / new risks:**
 >     - **PipeRun.run side-effects are all benign for DRY validation** (this is the price of "a run is a run" — the sweep goes through the full direct primitive, not a bare `pipe.run_pipe()`): tracing disabled → `assemble_graph_on_output` returns early; no tracer opened → `close_tracer` returns `None`; `delivery_assignment=None` → delivery skipped. Verified by the real-path integration test passing.
 >     - **`acquire_and_validate` sweeps ALL loaded pipes** via `get_pipe_library().get_pipes()` (the `validate --all` semantics), filtering signatures in strict mode. It is **not** integration-tested in isolation (it would sweep the base/PIPELEXPATH libraries); its wrapper logic is covered by the seam tests (`acquire_library`) + `validate_pipes` tests + the established restore-then-teardown pattern. **Flag for Phase 3a:** wire it to `validate --all` (`do_validate_all_libraries_and_dry_run`) and pin it there; confirm `validate_bundle` uses `validate_pipes` (NOT `acquire_and_validate`) to preserve its loaded-on-success contract (D6).
-> - **Test state:** `make agent-check` clean (ruff/plxt/pyright 0 errors/mypy) · `make agent-test` **fully green**. Green SHA: **the Checkpoint-A2 commit** on `feature/Validate-with-signatures-4-fix-dry-run` (recorded in the status table). No skips/xfails introduced.
+> - **Test state:** `make agent-check` clean (ruff/plxt/pyright 0 errors/mypy) · `make agent-test` **fully green**. Green SHA: **`23f936cd`** (Checkpoint-A2 commit on `feature/Validate-with-signatures-4-fix-dry-run`). No skips/xfails introduced.
 > - **Next entry point:** **Phase 3a — Migrate the in-repo callers** (point `validate_bundle`/`validate_bundles_from_directory` + both `_validate_core.py` + `validate_ops.py` + `runner_code_ops.py` at `BundleValidator`; the D6 inner-sweep callers at `validate_pipes`; fix the agent-CLI all-SUCCESS bug C-8; migrate `pipelex.toml` `allowed_to_fail_pipes` to namespaced refs). Re-verify the `BundleValidator` symbols still exist before editing.
 
 ## Phase 3a — Migrate the in-repo callers (D3 / D6)
