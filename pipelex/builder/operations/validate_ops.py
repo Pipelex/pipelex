@@ -10,8 +10,8 @@ from pipelex.hub import (
     resolve_library_dirs,
     set_current_library,
 )
-from pipelex.pipeline.bundle_validator import BundleValidator, DryRunStatus
-from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.pipeline.bundle_validator import BundleValidator
+from pipelex.pipeline.validate_bundle import build_validated_pipes, validate_bundle
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -37,11 +37,9 @@ async def validate_all(
         library_dirs=[str(library_dir) for library_dir in library_dirs] if library_dirs else None,
     )
 
-    validated_pipes = [{"pipe_code": dry_run_output.pipe_code, "status": dry_run_output.status} for dry_run_output in dry_run_results.values()]
-
     return {
         "success": True,
-        "validated_pipes": validated_pipes,
+        "validated_pipes": build_validated_pipes(dry_run_results),
         "total_pipes": len(dry_run_results),
     }
 
@@ -64,17 +62,11 @@ async def validate_bundle_file(
     """
     result = await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs)
 
-    validated_pipes: list[dict[str, str]] = []
-    for the_pipe in result.pipes:
-        dry_run_output = result.dry_run_result.get(the_pipe.pipe_ref)
-        status: str = dry_run_output.status if dry_run_output else DryRunStatus.SUCCESS
-        validated_pipes.append({"pipe_code": the_pipe.code, "status": status})
-
     return {
         "success": True,
         "bundle_path": str(bundle_path),
-        "validated_pipes": validated_pipes,
-        "total_pipes": len(result.pipes),
+        "validated_pipes": build_validated_pipes(result.dry_run_result),
+        "total_pipes": len(result.dry_run_result),
     }
 
 
@@ -95,18 +87,12 @@ async def validate_bundle_content(
     validate_bundle_result = await validate_bundle(mthds_contents=mthds_contents)
     blueprints = validate_bundle_result.blueprints
 
-    validated_pipes: list[dict[str, str]] = []
-    for the_pipe in validate_bundle_result.pipes:
-        dry_run_output = validate_bundle_result.dry_run_result.get(the_pipe.pipe_ref)
-        status: str = dry_run_output.status if dry_run_output else DryRunStatus.SUCCESS
-        validated_pipes.append({"pipe_code": the_pipe.code, "status": status})
-
     return {
         "success": True,
         "mthds_contents": mthds_contents,
         "pipelex_bundle_blueprint": [b.model_dump(mode="json") for b in blueprints],
-        "validated_pipes": validated_pipes,
-        "total_pipes": len(validate_bundle_result.pipes),
+        "validated_pipes": build_validated_pipes(validate_bundle_result.dry_run_result),
+        "total_pipes": len(validate_bundle_result.dry_run_result),
     }
 
 
@@ -139,8 +125,8 @@ async def validate_pipe(
 
     return {
         "success": True,
-        "validated_pipes": [{"pipe_code": pipe_code, "status": dry_run_results[the_pipe.pipe_ref].status}],
-        "total_pipes": 1,
+        "validated_pipes": build_validated_pipes(dry_run_results),
+        "total_pipes": len(dry_run_results),
     }
 
 
@@ -151,8 +137,10 @@ async def validate_pipe_in_bundle(
 ) -> dict[str, Any]:
     """Validate a single pipe within a bundle.
 
-    This first validates the bundle to load its pipes into the library,
-    then validates only the specified pipe.
+    Loads the bundle's pipes into the library (so the requested pipe's dependencies resolve), then
+    dry-runs ONLY the requested pipe via ``dry_run_pipe_codes`` — so an unrelated unimplemented
+    ``PipeSignature`` or failing sibling does not block validating one implemented slice. ``validate_bundle``
+    raises ``PipeNotFoundError`` when ``pipe_code`` is not defined in the bundle (no vacuous success).
 
     Args:
         bundle_path: Path to the bundle file.
@@ -164,18 +152,13 @@ async def validate_pipe_in_bundle(
 
     Raises:
         ValidateBundleError: If validation fails.
+        PipeNotFoundError: If ``pipe_code`` is not defined in the bundle.
     """
-    # Validate the bundle to load all its pipes into the library — the sweep already classified the
-    # requested pipe, so read its status from the result map instead of re-running a redundant dry run.
-    result = await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs)
-
-    the_pipe = get_required_pipe(pipe_code=pipe_code)
-    dry_run_output = result.dry_run_result.get(the_pipe.pipe_ref)
-    status: str = dry_run_output.status if dry_run_output else DryRunStatus.SUCCESS
+    result = await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs, dry_run_pipe_codes=[pipe_code])
 
     return {
         "success": True,
         "bundle_path": str(bundle_path),
-        "validated_pipes": [{"pipe_code": pipe_code, "status": status}],
-        "total_pipes": 1,
+        "validated_pipes": build_validated_pipes(result.dry_run_result),
+        "total_pipes": len(result.dry_run_result),
     }

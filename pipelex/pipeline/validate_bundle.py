@@ -41,6 +41,18 @@ class ValidateBundleResult(BaseModel):
     dry_run_result: dict[str, DryRunOutput]
 
 
+def build_validated_pipes(dry_run_result: dict[str, DryRunOutput], *, use_ref: bool = False) -> list[dict[str, str]]:
+    """Project a dry-run result map into the ``validated_pipes`` JSON list (agent CLI + builder ops).
+
+    Each entry is ``{"pipe_code": <id>, "status": <DryRunStatus>}`` — built from the real per-pipe
+    outcome so allowed-to-fail FAILUREs and cross-package SKIPPEDs are reported truthfully rather than
+    flattened to SUCCESS. ``use_ref`` selects the namespaced ``pipe_ref`` (agent all-pipes / bundle
+    surfaces) versus the bare ``pipe_code`` (builder ops and the single-pipe agent slices) for the entry
+    id, preserving each surface's existing identity contract.
+    """
+    return [{"pipe_code": output.pipe_ref if use_ref else output.pipe_code, "status": output.status} for output in dry_run_result.values()]
+
+
 @contextmanager
 def _translate_to_validate_bundle_error(category: Literal["pipe", "concept"]) -> Iterator[None]:
     """Translate the bundle-loading exception surface into a single ``ValidateBundleError``.

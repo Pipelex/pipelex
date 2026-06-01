@@ -39,6 +39,35 @@ inputs = { note = "SliceNote" }
 output = "SliceNote"
 """
 
+# A controller whose branch references an UNLOADED cross-package sub-pipe ("ext->otherpkg.missing_pipe").
+# PipeParallel resolves its branches with an unguarded get_required_pipe, so validate_with_libraries
+# raises PipeNotFoundError and the sliced sweep records the controller SKIPPED — never SUCCESS.
+_BUNDLE_CROSS_PACKAGE_CONTROLLER = """
+domain = "slice_xpkg"
+description = "Bundle whose requested controller references an unloaded cross-package sub-pipe."
+
+[concept.XpkgDoc]
+description = "A document for the cross-package slice test."
+
+[pipe.implemented_leaf]
+type = "PipeLLM"
+description = "A fully implemented sibling leaf."
+inputs = { doc = "XpkgDoc" }
+output = "Text"
+prompt = "Summarize $doc"
+
+[pipe.cross_parallel]
+type = "PipeParallel"
+description = "Parallel referencing an unloaded cross-package branch."
+inputs = { doc = "XpkgDoc" }
+output = "Text"
+add_each_output = true
+combined_output = "Text"
+branches = [
+  { pipe = "ext->otherpkg.missing_pipe", result = "branch_result" },
+]
+"""
+
 # A controller that reaches a signature through its dependency graph.
 _BUNDLE_CALLER_OF_SIGNATURE = """
 domain = "slice_caller"
@@ -75,6 +104,14 @@ def caller_of_signature_dir() -> Iterator[Path]:
     with tempfile.TemporaryDirectory() as temp_dir:
         path = Path(temp_dir)
         (path / "bundle.mthds").write_text(_BUNDLE_CALLER_OF_SIGNATURE)
+        yield path
+
+
+@pytest.fixture
+def cross_package_controller_dir() -> Iterator[Path]:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        path = Path(temp_dir)
+        (path / "bundle.mthds").write_text(_BUNDLE_CROSS_PACKAGE_CONTROLLER)
         yield path
 
 
@@ -140,3 +177,21 @@ class TestAgentValidatePipeInBundle:
                     library_dirs=[implemented_plus_signature_dir],
                 )
             )
+
+    def test_pipe_slice_cross_package_controller_reports_skipped_not_success(
+        self,
+        cross_package_controller_dir: Path,
+    ) -> None:
+        # Regression for the hardcoded-"SUCCESS" bug (#1): when the requested pipe is a controller that
+        # references an UNLOADED cross-package sub-pipe, the sliced sweep records it SKIPPED. The result
+        # must report that real status — not a flattened SUCCESS — and only the requested slice.
+        result = asyncio.run(
+            validate_pipe_in_bundle_core(
+                bundle_path=cross_package_controller_dir / "bundle.mthds",
+                pipe_code="cross_parallel",
+                library_dirs=[cross_package_controller_dir],
+            )
+        )
+        assert result["success"] is True
+        statuses = {entry["pipe_code"]: entry["status"] for entry in result["validated_pipes"]}
+        assert statuses == {"cross_parallel": "SKIPPED"}

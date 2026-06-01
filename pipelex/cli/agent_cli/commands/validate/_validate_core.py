@@ -10,8 +10,8 @@ from pipelex.hub import (
     resolve_library_dirs,
     set_current_library,
 )
-from pipelex.pipeline.bundle_validator import BundleValidator, DryRunStatus
-from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.pipeline.bundle_validator import BundleValidator
+from pipelex.pipeline.validate_bundle import build_validated_pipes, validate_bundle
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -42,11 +42,10 @@ async def validate_all_core(
         allow_signatures=allow_signatures,
     )
 
-    validated_pipes = [{"pipe_code": dry_run_output.pipe_ref, "status": dry_run_output.status} for dry_run_output in dry_run_results.values()]
-
+    # use_ref=True: the agent all-pipes surface keys entries by the namespaced pipe_ref.
     return {
         "success": True,
-        "validated_pipes": validated_pipes,
+        "validated_pipes": build_validated_pipes(dry_run_results, use_ref=True),
         "total_pipes": len(dry_run_results),
     }
 
@@ -77,18 +76,13 @@ async def validate_bundle_core(
     )
 
     # Consume the real per-pipe status from the sweep — a fixed all-"SUCCESS" list would hide allowed
-    # failures and SKIPPED cross-package pipes the dry-run actually recorded (C-8).
-    validated_pipes: list[dict[str, str]] = []
-    for the_pipe in result.pipes:
-        dry_run_output = result.dry_run_result.get(the_pipe.pipe_ref)
-        status: str = dry_run_output.status if dry_run_output else DryRunStatus.SUCCESS
-        validated_pipes.append({"pipe_code": the_pipe.pipe_ref, "status": status})
-
+    # failures and SKIPPED cross-package pipes the dry-run actually recorded (C-8). use_ref=True keys
+    # entries by the namespaced pipe_ref (the agent bundle surface's identity contract).
     return {
         "success": True,
         "bundle_path": str(bundle_path),
-        "validated_pipes": validated_pipes,
-        "total_pipes": len(result.pipes),
+        "validated_pipes": build_validated_pipes(result.dry_run_result, use_ref=True),
+        "total_pipes": len(result.dry_run_result),
     }
 
 
@@ -122,10 +116,11 @@ async def validate_pipe_core(
     the_pipe = get_required_pipe(pipe_code=pipe_code)
     dry_run_results = await BundleValidator().validate_pipes(pipes=[the_pipe], library_id=library_id, allow_signatures=allow_signatures)
 
+    # use_ref=False: the single-pipe slice keys its one entry by the bare pipe code.
     return {
         "success": True,
-        "validated_pipes": [{"pipe_code": pipe_code, "status": dry_run_results[the_pipe.pipe_ref].status}],
-        "total_pipes": 1,
+        "validated_pipes": build_validated_pipes(dry_run_results),
+        "total_pipes": len(dry_run_results),
     }
 
 
@@ -157,16 +152,19 @@ async def validate_pipe_in_bundle_core(
         ValidateBundleError: If validation fails.
         PipeNotFoundError: If `pipe_code` is not defined in the bundle.
     """
-    await validate_bundle(
+    result = await validate_bundle(
         mthds_file_path=bundle_path,
         library_dirs=library_dirs,
         allow_signatures=allow_signatures,
         dry_run_pipe_codes=[pipe_code],
     )
 
+    # Consume the real per-pipe status from the sliced sweep — a fixed "SUCCESS" would hide an allowed
+    # failure or a cross-package SKIPPED the dry-run actually recorded (C-8). use_ref=False keys the one
+    # entry by the bare pipe code, matching the single-pipe slice contract.
     return {
         "success": True,
         "bundle_path": str(bundle_path),
-        "validated_pipes": [{"pipe_code": pipe_code, "status": "SUCCESS"}],
-        "total_pipes": 1,
+        "validated_pipes": build_validated_pipes(result.dry_run_result),
+        "total_pipes": len(result.dry_run_result),
     }
