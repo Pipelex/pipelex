@@ -66,7 +66,7 @@ Decisions from the review (apply these as you implement; they override the origi
 | 2 | Build `BundleValidator` (two-lifecycle, union catch) | ☑ done | `23f936cd` |
 | | **⛔ CHECKPOINT A2 — built + tested, zero callers** | | |
 | 3a | Migrate in-repo callers + tests + config | ☑ done | `60cc15b0` |
-| 3b | Migrate `pipelex-api` runner.py (cross-repo PR) | ☐ | |
+| 3b | Migrate `pipelex-api` runner.py (cross-repo PR) | ☑ done | `_sig` `24f9f9ca` · pipelex-api `56ca06a` |
 | | **⛔ CHECKPOINT B** | | |
 | 4 | Delete dead code | ☐ | |
 | | **⛔ CHECKPOINT C — consolidation done (shippable)** | | |
@@ -189,16 +189,42 @@ Status legend: ☐ not started · ◐ in progress · ☑ done.
 
 ## Phase 3b — Migrate `pipelex-api` (cross-repo, D2)
 
-- [ ] In `../pipelex-api`: replace the module-level `from pipelex.pipe_run.dry_run import dry_run_pipes` + per-pipe call (`api/routes/pipelex/build/runner.py:6,64`) with the **public inner sweep** against runner.py's already-open library (it keeps the library open for `generate_runner_code` afterward — do **not** adopt acquire-and-teardown here).
-- [ ] Coordinate the release: this PR + the `pipelex` pin bump land together (no compat shim — D2). `pipelex-api` tests green.
+- [x] In `../pipelex-api`: replaced the module-level `from pipelex.pipe_run.dry_run import dry_run_pipes` + per-pipe loop (`api/routes/pipelex/build/runner.py`) with the **public inner sweep** `BundleValidator().validate_pipes(pipes=pipes, library_id=library_id, allow_signatures=...)` against runner.py's already-open library (keeps it open for `generate_runner_code` — no acquire-and-teardown). The explicit per-pipe `validate_with_libraries()` is gone (the inner sweep does it in step 1).
+- [x] **NEW (user request, this session): `allow_signatures` opt-in across the API.** Added an `allow_signatures: bool = Field(default=False)` request field to **all four** validation-performing routes (`/validate`, `/build/runner`, `/build/inputs`, `/build/output`) and threaded it to `validate_pipes` / `validate_bundle`. Default false = strict (unchanged behavior); `true` tolerates `PipeSignature` placeholders.
+- [x] **Flag-and-fix (pipelex side): `SignaturesNotAllowedError` reclassified `INPUT`.** It carried no `error_domain` → the API rendered a strict signature rejection as **500**. A strict rejection is a caller-fixable input error (implement the pipes, or opt in) — declared `error_domain = ErrorDomain.INPUT`, so `/build/runner` strict now returns **422** (consistent with `/validate`'s wrapped `ValidateBundleError`). Dropped the now-redundant `AGENT_ERROR_DOMAINS["SignaturesNotAllowedError"]` entry (drift test enforces single-source-of-truth) and updated the agent-output signature test to source the domain from the exception cause.
+- [x] **Test-suite hermeticity (pipelex-api):** the autouse fixture (`tests/unit/conftest.py`) now passes `temporal_enabled=False` so dry-run validation runs in-process regardless of a developer's gitignored `.pipelex/pipelex_override.toml`. Matches CI (no override → Temporal off). Needed because the new `validate_pipes` path routes DRY through `PipeRun.run` (see risk below), unlike the old `dry_run_pipes` which called `pipe.run_pipe()` directly in-process.
+- [x] Integration tests (pipelex-api): `tests/unit/test_allow_signatures.py` (signature opt-in across all four routes — strict **422** vs `allow_signatures` **200**, + runner codegen-with-signatures) and two methods in `test_build_and_agent_routes.py` (runner happy-path 200+`python_code`, and the loaded-on-success contract: library stays open for codegen, teardown once in `finally`).
+- [x] `make agent-check` clean + `make agent-test` green on **both** repos.
+- [ ] **Release coordination (deferred to land-time, D2 — no shim):** the `pipelex-api` `pyproject.toml` pin is currently an **editable `path = "../_sig"`** for co-development. It MUST be flipped to the merged `pipelex` git rev when the consolidation branch lands. **`pipelex-api` CI stays red until then** (the new `bundle_validator` import only exists on the unmerged pipelex branch — this is the expected lock-step, no compat shim).
 
-> ### ⛔ CHECKPOINT B — after Phase 3a + 3b — **MANDATORY STOP**
+> ### ⛔ CHECKPOINT B — after Phase 3a + 3b — **MANDATORY STOP** — REACHED
 >
-> All validation traffic now goes `BundleValidator` → shared seam; `dry_run.py` execution functions unreferenced *inside this repo* **and** in `pipelex-api` (migrated in Phase 3b, D2 — no shim). Nothing references the soon-to-be-deleted symbols anymore.
+> All validation traffic now goes `BundleValidator` → shared seam; `dry_run.py` execution functions unreferenced *inside this repo* **and** in `pipelex-api` (migrated in Phase 3b, D2 — no shim). Nothing references the soon-to-be-deleted execution symbols anymore (`tests/unit/pipelex/pipe_run/test_dry_run.py` is the only remaining in-repo importer, deleted with the module in Phase 4).
 >
-> **Verify:** signature e2e + `pipe_signature` integration suites green · full `make agent-test` green · commit.
+> **Verify:** signature e2e + `pipe_signature` integration suites green ✅ · full `make agent-test` green on both repos ✅ · committed.
 >
-> **Handoff (fill in):** (use template) — **Next entry point: Phase 4 — Delete dead code.**
+> **Handoff:**
+> - **Completed:** Phase 3b. `pipelex-api` `/build/runner` migrated to `BundleValidator.validate_pipes` (inner sweep, no teardown). Added the `allow_signatures` opt-in to all four build/validate routes (user request). Reclassified `SignaturesNotAllowedError` → `INPUT` (pipelex) so strict signature rejection is a 422 not a 500. Made the pipelex-api test suite hermetic (`temporal_enabled=False`). Added integration tests on the pipelex-api side. Both repos `agent-check` clean + `agent-test` green.
+> - **Decisions locked this session:**
+>     - **`allow_signatures` is a request-body field on every validation route**, default `false` (strict, unchanged). Threaded to `validate_pipes` (runner) / `validate_bundle` (validate, inputs, output). Body field (not query param) to match the existing POST request-model convention.
+>     - **`SignaturesNotAllowedError` is `INPUT`-domain.** The agent-CLI already classified it `"input"` via `AGENT_ERROR_DOMAINS`; the class itself carried no domain (latent inconsistency → 500 in the API). Class is now the single source of truth; the lookup-dict entry was removed (drift-test-enforced) and the agent-output test now sources the domain from the cause.
+>     - **pipelex-api test suite forced Temporal-off** (`temporal_enabled=False` in the autouse fixture). All pipeline-route tests already mock the runner, so none need a live server; this just pins local runs to the CI config.
+> - **Final names/signatures:**
+>     - `BundleRunnerRequest` / `ValidateRequest` / `BuildInputsRequest` / `BuildOutputRequest` each gain `allow_signatures: bool = Field(default=False, ...)`.
+>     - `runner.py` call: `await BundleValidator().validate_pipes(pipes=pipes, library_id=library_id, allow_signatures=request_data.allow_signatures)`.
+>     - `validate.py` / `inputs.py` / `output.py`: `validate_bundle(mthds_contents=..., allow_signatures=request_data.allow_signatures)`.
+>     - `SignaturesNotAllowedError.error_domain = ErrorDomain.INPUT` (class attribute).
+> - **Files touched:**
+>     - **pipelex-api** (`feature/Update-dry-run-api`): `api/routes/pipelex/build/runner.py` (migration + flag), `api/routes/pipelex/validate.py`, `api/routes/pipelex/build/inputs.py`, `api/routes/pipelex/build/output.py` (flag), `tests/unit/conftest.py` (hermetic), `tests/unit/test_build_and_agent_routes.py` (+2 runner tests), `tests/unit/test_allow_signatures.py` (new), `pyproject.toml` + `uv.lock` (editable codev pin — must flip at release).
+>     - **pipelex** (`_sig`, `feature/Validate-with-signatures-4-fix-dry-run`): `pipelex/pipe_signature/exceptions.py` (INPUT domain), `pipelex/cli/agent_cli/commands/agent_output.py` (drop redundant dict entry), `tests/unit/pipelex/cli/test_agent_output.py` (test update).
+> - **Deviations from plan + why:**
+>     - **Scope grew (intentionally, by user request) beyond the bare runner migration** to the `allow_signatures` opt-in across all four routes + the `SignaturesNotAllowedError` domain fix. The plan's 3b was only "migrate runner.py"; the user asked for signature validation support, and the 422-vs-500 inconsistency surfaced while testing it (flag-and-fix).
+>     - **No `pipelex-api` `tests/integration/` dir exists** — the repo's TestClient route tests under `tests/unit/` are its integration layer. New tests follow that convention.
+> - **Surprises / new risks — IMPORTANT:**
+>     - **DRY now routes through `PipeRun.run`, which honors the Temporal backend.** The old `dry_run_pipes` called `pipe.run_pipe()` directly (always in-process). `BundleValidator` routes through `PipeRun.run`, so **when `temporal.is_enabled = true`, a dry-run/validation dispatches to Temporal** (observed: it tries to start a `dry_run_untitled` workflow and fails without a server). This is exactly the **deferred Part B** (`followup-leaf-run-mode-mock.md` — "DRY honors the backend"), not yet implemented. **Today it's benign:** the committed pipelex-api config has `temporal.is_enabled = false` and Temporal is not shipped to prod, so build/validate endpoints dry-run in-process. **But before Temporal ships to the runner API, Part B must land**, else `/validate` + `/build/*` would dispatch validation sweeps to Temporal. Surfaced here because the consolidation has now reached a Temporal-configured consumer.
+>     - **pipelex-api CI is red until release coordination** (editable `../_sig` pin; the merged-rev flip is the open Phase-3b box above).
+> - **Test state:** both repos `make agent-check` clean · both `make agent-test` **green**. pipelex-api: signature opt-in (4 routes × strict/allow) + runner happy/teardown + codegen-with-signatures all pass. pipelex: agent_output + drift + errors + type_uri + signature CLI/e2e suites pass under the domain change. Green SHAs: pipelex `24f9f9ca` (`feature/Validate-with-signatures-4-fix-dry-run`), pipelex-api `56ca06a` (`feature/Update-dry-run-api`).
+> - **Next entry point: Phase 4 — Delete dead code** (delete `dry_pipe_router.py`, `dry_run_with_graph.py`, `dry_run.py` + `tests/unit/pipelex/pipe_run/test_dry_run.py`; settle `dry_run_pipeline.py`). Grep for zero in-repo importers first. Note: `../pipelex-api/api/routes/pipelex/validate.py` still imports `dry_run_pipeline` (the graph helper, NOT `dry_run.py`) — that import is fine and stays.
 
 ## Phase 4 — Delete dead code (§5)
 
