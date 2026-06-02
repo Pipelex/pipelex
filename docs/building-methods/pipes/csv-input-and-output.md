@@ -122,7 +122,7 @@ This reads `people.csv` into `ListContent[Person]`, summarizes each person, and 
 
 ## Configuring delimiter and encoding
 
-The codec defaults to a comma delimiter and UTF-8 encoding. Both are parameters of the codec functions (`list_content_from_csv` / `csv_from_list_content`), but there is no user-facing config surface (TOML default or CLI flag) in v1 — they are never guessed from the file. A user-facing knob for European semicolon-delimited CSVs is a planned follow-up.
+The codec defaults to a comma delimiter and UTF-8 encoding. Reads use `utf-8-sig`, which transparently strips a leading byte-order mark (BOM) — Excel's "CSV UTF-8" export always prepends one — and reads plain UTF-8 unchanged when there is no BOM. Writes use plain `utf-8` (no BOM). Both delimiter and encoding are parameters of the codec functions (`list_content_from_csv` / `csv_from_list_content`), but there is no user-facing config surface (TOML default or CLI flag) in v1 — they are never guessed from the file. A user-facing knob for European semicolon-delimited CSVs is a planned follow-up.
 
 ## Limitations in v1
 

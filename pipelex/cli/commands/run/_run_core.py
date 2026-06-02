@@ -19,6 +19,7 @@ from pipelex.cli.error_handlers import (
     print_traceback_if_requested,
 )
 from pipelex.config import get_config
+from pipelex.core.concepts.exceptions import ConceptValueError
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
@@ -264,11 +265,14 @@ async def _execute_run(
             raise typer.Exit(1)
         csv_list_content = cast("ListContent[StuffContent]", csv_content)
         csv_path = Path(save_csv)
-        csv_row_model = csv_main_stuff.concept.get_structure_class()
-        # A CSV-save failure (non-flat output concept, write error) is framed as a --save-csv failure,
-        # not a pipeline failure — the pipeline already succeeded. Without this the CsvError would
-        # escape to execute_run's generic `except PipelexError` and read as "Failed to execute pipeline".
+        # A CSV-save failure (output concept with no structure class, non-flat output, write error) is
+        # framed as a --save-csv failure, not a pipeline failure — the pipeline already succeeded.
+        # ConceptValueError (a ValueError) and CsvError would otherwise escape execute_run's generic
+        # `except PipelexError` and read as "Failed to execute pipeline" (or as a raw traceback).
         try:
+            # get_structure_class() can raise ConceptValueError if the output concept has no registered
+            # structure class; keep it inside the guard so that, too, is framed as a save-csv failure.
+            csv_row_model = csv_main_stuff.concept.get_structure_class()
             # Validate the row flatness BEFORE touching the filesystem, so a non-flat output leaves no
             # directory behind (the suffix was already validated up front).
             flat_field_names(csv_row_model)
@@ -276,7 +280,7 @@ async def _execute_run(
             # nested target (e.g. reports/2026/out.csv) doesn't fail late after the run completed.
             csv_path.parent.mkdir(parents=True, exist_ok=True)
             csv_from_list_content(csv_list_content, row_model=csv_row_model, path=csv_path)
-        except (CsvError, OSError) as csv_exc:
+        except (CsvError, ConceptValueError, OSError) as csv_exc:
             typer.secho(f"Failed to --save-csv to '{save_csv}': {csv_exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from csv_exc
         log.verbose(f"Main stuff CSV saved to: {save_csv}")
