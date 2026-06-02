@@ -37,7 +37,7 @@ from pipelex.tools.misc.exceptions import JsonTypeError
 from pipelex.tools.misc.file_utils import get_incremental_directory_path
 from pipelex.tools.misc.json_utils import load_json_dict_from_path, save_as_json_to_path
 from pipelex.tools.misc.package_utils import get_package_version
-from pipelex.tools.tabular.csv_codec import csv_from_list_content
+from pipelex.tools.tabular.csv_codec import assert_supported_table_suffix, csv_from_list_content, flat_field_names
 
 if TYPE_CHECKING:
     from pipelex.core.stuffs.stuff_content import StuffContent
@@ -251,11 +251,16 @@ async def _execute_run(
             )
             raise typer.Exit(1)
         csv_list_content = cast("ListContent[StuffContent]", csv_content)
+        csv_path = Path(save_csv)
+        csv_row_model = csv_main_stuff.concept.get_structure_class()
+        # Validate the requested suffix and the row flatness BEFORE touching the filesystem, so a
+        # failed --save-csv (e.g. a .xlsx target or a non-flat output) leaves no directory behind.
+        assert_supported_table_suffix(csv_path)
+        flat_field_names(csv_row_model)
         # CQ1: write to the literal cwd-relative path, but still create its parent dirs so a
         # nested target (e.g. reports/2026/out.csv) doesn't fail late after the run completed.
-        csv_path = Path(save_csv)
         csv_path.parent.mkdir(parents=True, exist_ok=True)
-        csv_from_list_content(csv_list_content, row_model=csv_main_stuff.concept.get_structure_class(), path=csv_path)
+        csv_from_list_content(csv_list_content, row_model=csv_row_model, path=csv_path)
         log.verbose(f"Main stuff CSV saved to: {save_csv}")
 
     reporting_config = get_config().pipelex.reporting_config

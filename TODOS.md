@@ -76,7 +76,7 @@ User-facing docs: [`docs/building-methods/pipes/csv-input-and-output.md`](docs/b
 - **Local paths only** — remote tabular URLs rejected.
 - **`.xlsx` recognized but not implemented** — routed to the `pipelex[tabular]` message; backend not built.
 - **Empty string indistinguishable from `None`** — empty cell ⇄ `None` both directions.
-- **Single-field `url` residual (A3/CT1)** — `{"url": "x.csv"}` under a flat concept reads as a table, not a single record. (The residual also extends to multi-field records like `{"label": "Home", "url": "x.csv"}`, which silently drops siblings — see deferred item C.)
+- **Single-key `{"url": "x.csv"}` residual (A3/CT1)** — a bare `{"url": "x.csv"}` reference under a flat concept reads as a table, not a single record. Detection is gated to the exact single-key wrapper, so a record with sibling keys (`{"label": "Home", "url": "x.csv"}`) stays a record — its fields are never dropped (was a silent-drop; fixed in PR #955 review round 1).
 - **No formula-injection escaping (CT3)** — cells written verbatim for data fidelity; opt-in escape deferred.
 
 ---
@@ -87,7 +87,7 @@ Out of scope for v1 (design §10): `.xlsx` via openpyxl; streaming/out-of-core; 
 
 Captured review follow-ups (decisions deferred, not bugs to fix in this PR):
 
-- [`wip/csv-support/phase3-4-review-followups.md`](wip/csv-support/phase3-4-review-followups.md): (A) `resolve_uri` doesn't classify `s3://`/`gs://` — a cross-caller `tools/uri` gap the `"://"` heuristic papers over; fix is its own change. (B) factory-altitude eager I/O + cwd-relative paths for non-CLI callers — design decision. (C) the `url`-field residual extends to multi-field records (silent sibling-drop) — document, or tighten to single-key trigger. Plus minor cleanups (output-side error framing, suffix-vocabulary drift, header-only-vs-empty-list parity, redundant casts).
+- [`wip/csv-support/phase3-4-review-followups.md`](wip/csv-support/phase3-4-review-followups.md): (A) `resolve_uri` doesn't classify `s3://`/`gs://` — a cross-caller `tools/uri` gap the `"://"` heuristic papers over; fix is its own change. The same root cause is the `?`/`#`-in-local-filename mis-strip (niche, graceful). (B) factory-altitude eager I/O + cwd-relative paths for non-CLI callers — design decision. **(C) RESOLVED in PR #955 review round 1** — detection tightened to the single-key `{"url": ...}` wrapper, so a multi-field record no longer silently drops siblings. Plus minor cleanups (output-side error framing, suffix-vocabulary drift, header-only-vs-empty-list parity, redundant casts).
 - [`wip/csv-support/phase2-review-followups.md`](wip/csv-support/phase2-review-followups.md): non-string `Literal`/`Enum` row fields are accepted by the flatness gate but only string-valued ones round-trip — latent gap behind a code path unreachable from `.mthds` today (the structure generator only emits string `Literal`s). Recommended Option A (reject non-string) when the choices/structure-generation typing is next touched.
 
 Deferred feature TODOs: user-facing delimiter/encoding config (D1); opt-in CSV/Excel formula-escape flag (CT3); `SaveOptions` struct for `_execute_run`'s param clump; multiplicity-gated CSV detection (CT1 option C, only if the residual proves real).

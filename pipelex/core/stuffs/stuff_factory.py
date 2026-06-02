@@ -140,12 +140,15 @@ class StuffFactory:
     ) -> Stuff | None:
         """Build a ``ListContent[row-concept]`` from a ``{"url": "...csv"}`` input reference.
 
-        A ``url`` whose suffix is tabular (``.csv``, or ``.xlsx`` via the seam), under a
-        non-native structured concept, is read as a table: each data row becomes one instance
-        of the concept's structure class, so one CSV yields one ``ListContent`` (the concept
-        names the *row* type). Returns ``None`` for an ordinary record dict — no ``url`` key, a
-        non-tabular suffix, or a native concept — so the caller falls through to normal Case 2.5
-        dict handling.
+        Detection is gated to the explicit wrapper shape — ``content`` must be *exactly*
+        ``{"url": <tabular path>}`` — under a non-native structured concept. Each data row then
+        becomes one instance of the concept's structure class, so one CSV yields one
+        ``ListContent`` (the concept names the *row* type). Returns ``None`` for an ordinary
+        record dict — no ``url`` key, sibling keys alongside ``url``, a non-tabular suffix, or a
+        native concept — so the caller falls through to normal Case 2.5 dict handling. The
+        single-key gate keeps a real record that merely *has* a ``url`` field (e.g.
+        ``{"label": "Home", "url": "report.csv"}``) from being silently reduced to a table with
+        its sibling keys dropped.
 
         v1 reads LOCAL paths only: a tabular-suffixed remote ``url`` (``http(s)``/``s3``/``gs``/
         ``pipelex-storage``) is rejected with a clear ``CsvError`` rather than opened as a local path.
@@ -154,6 +157,10 @@ class StuffFactory:
         """
         url = content.get("url")
         if not isinstance(url, str):
+            return None
+        if set(content) != {"url"}:
+            # Only the bare {"url": ...} wrapper is a table reference; a record with other keys
+            # alongside `url` stays a record (its siblings must not be dropped).
             return None
         # Detect the tabular suffix on the URL's PATH component only. A raw URL fed to
         # ``Path`` keeps any ``?query``/``#fragment`` inside ``.suffix`` (e.g. an S3 presigned

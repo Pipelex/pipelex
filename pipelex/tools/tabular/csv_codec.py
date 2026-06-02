@@ -134,8 +134,9 @@ def _read_table(path: Path, *, delimiter: str, encoding: str) -> tuple[list[str]
     header explicit so column validation works even for a header-only file. Blank physical
     lines (which ``csv`` yields as ``[]``) are skipped, matching ``csv.DictReader``; a data
     row wider than the header is rejected (its surplus cells map to no column). Each kept row
-    carries its 1-based data-line number (counting skipped blank lines) so error messages
-    point at the physical CSV line. Wraps every raw
+    carries its 1-based physical CSV line number (the header is line 1, so the first data row
+    is line 2, and skipped blank lines still advance the count) so error messages point at the
+    line the author sees in their editor. Wraps every raw
     ``OSError``/``UnicodeDecodeError``/``LookupError``/``csv.Error`` as ``CsvReadError``.
     """
     _assert_single_char_delimiter(delimiter)
@@ -163,7 +164,10 @@ def _read_table(path: Path, *, delimiter: str, encoding: str) -> tuple[list[str]
     _validate_header(header, path)
 
     data_rows: list[tuple[int, list[str]]] = []
-    for row_number, row in enumerate(raw_rows[1:], start=1):
+    # start=2: the header is physical line 1, so the first data row is line 2. enumerate counts
+    # every post-header physical line (blank lines included, even though they are skipped below),
+    # so row_number stays aligned with the line the author sees in their editor.
+    for row_number, row in enumerate(raw_rows[1:], start=2):
         if not row:
             # Blank physical line (csv yields []). Skip it; a single empty cell is [''] and is kept.
             continue

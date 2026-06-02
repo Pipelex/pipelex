@@ -15,6 +15,8 @@ The CSV input hook works around this with a string heuristic — `not isinstance
 
 **Right-depth fix:** teach `resolve_uri` / `UriKind` to classify an unknown `<scheme>://` as a distinct non-local kind, and expose a single `is_local_uri(resolved) -> bool` predicate. Then the CSV hook and `_inputs_path_resolver` share one authoritative classifier (matching the project's "match/case over a typed enum, no string-sniffing" rule) and the `"://"` heuristic disappears. This is a `tools/uri` change with cross-caller impact → scope and test it on its own, not inside the CSV feature.
 
+**Same root cause — local paths containing URL-reserved `?`/`#` (cubic, PR #955 round 1).** Suffix detection runs on `urlsplit(url).path` so a remote presigned `…csv?X-Amz-…` can't hide its suffix and slip past the local-only guard. The cost: a *local* file whose name literally contains `?` or `#` (POSIX-legal, Windows-illegal) has its suffix mis-stripped, so `data#1.csv` is not detected as tabular and falls through to record handling — a clear validation error, no data loss. The principled fix is the same `resolve_uri` scheme-classification above: resolve first, then take the suffix from the *resolved local path* (`?`/`#` are ordinary filename bytes there) for local refs and from `urlsplit` only for true URLs. Deferred with item A rather than bolted on as a second string heuristic. Niche (pathological local filename) and graceful, so not a v1 blocker.
+
 ### B. CSV detection + eager file I/O live in `StuffFactory`, the universal stuff constructor
 
 A1 deliberately put the hook in `StuffFactory.make_stuff_from_stuff_content_or_data` (Case 2.5) so CSV input is reachable from the runner API and programmatic callers, not just the CLI. The consequence to weigh:
@@ -26,11 +28,11 @@ A1 deliberately put the hook in `StuffFactory.make_stuff_from_stuff_content_or_d
 
 ## Deferred — documentation (fold into the Phase 5 docs page)
 
-### C. `url`-field residual extends to multi-field records (A3/CT1)
+### C. `url`-field residual extends to multi-field records (A3/CT1) — RESOLVED (option b, PR #955 review round 1)
 
-The documented A3/CT1 residual is "a single-record concept with a `url`-named field whose value ends `.csv` is read as a table". The hook keys off `content.get("url")` **only**, so a content dict with *other* keys too — `{"label": "Home", "url": "report.csv"}` — is also hijacked into a table read, **silently dropping the sibling keys**. The pinning tests cover the single-`url` case and the non-`.csv`-stays-a-record case, but not this multi-field drop.
+The documented A3/CT1 residual was "a single-record concept with a `url`-named field whose value ends `.csv` is read as a table". The hook originally keyed off `content.get("url")` **only**, so a content dict with *other* keys too — `{"label": "Home", "url": "report.csv"}` — was also hijacked into a table read, **silently dropping the sibling keys**.
 
-Options: (a) document it as part of the residual (cheapest); (b) tighten detection to only trigger when `content == {"url": <tabular>}` (a single key), which removes the silent-drop surprise at the cost of a slightly narrower trigger. Recommend (b) is worth considering since it makes the residual strictly "a one-field url concept", matching the documented wording exactly.
+**Fixed** by tightening detection to the single-key wrapper: `_try_make_csv_list_stuff` now returns `None` unless `set(content) == {"url"}`. A record with any sibling key stays an ordinary record (pinned by `test_record_with_csv_url_field_and_siblings_stays_record`). The residual is now strictly "a one-field `url` concept given `{"url": <tabular>}`", matching the documented limitation exactly. Codex + cubic both flagged the silent-drop; this removes it.
 
 ## Deferred — minor / cleanup (low priority, no decision needed)
 

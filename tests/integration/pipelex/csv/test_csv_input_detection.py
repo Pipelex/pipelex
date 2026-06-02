@@ -68,6 +68,19 @@ class TestCsvInputDetection:
         assert record["label"] == "Home"
         assert record["url"] == "https://example.com"
 
+    def test_record_with_csv_url_field_and_siblings_stays_record(self, load_test_library: Callable[[list[Path]], None]) -> None:
+        load_test_library([BUNDLE_DIR])
+        # A record that has sibling keys alongside a .csv-suffixed `url` is NOT a table reference:
+        # detection is gated to the bare {"url": ...} wrapper, so the siblings are never dropped.
+        inputs: PipelineInputs = {"link": {"concept": "csv_demo.Link", "content": {"label": "Home", "url": "report.csv"}}}
+        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(inputs)
+
+        content = working_memory.get_stuff("link").content
+        assert not isinstance(content, ListContent)
+        record = content.model_dump()
+        assert record["label"] == "Home"
+        assert record["url"] == "report.csv"
+
     def test_csv_with_url_column_reads(self, load_test_library: Callable[[list[Path]], None]) -> None:
         load_test_library([BUNDLE_DIR])
         # The file-level url ends .csv → read as a table; the inner `url` column is plain data.

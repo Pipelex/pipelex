@@ -423,16 +423,17 @@ class TestCsvCodec:
             list_content_from_csv(path, OrderedPairRow)
         message = str(exc_info.value)
         assert "field(s) ?" not in message
-        assert "row 1" in message
+        # The offending row is the first data row, which is physical CSV line 2 (the header is line 1).
+        assert "row 2" in message
         assert "OrderedPairRow" in message
 
     def test_coercion_error_row_number_counts_skipped_blank_lines(self, tmp_path: Path) -> None:
-        # The reported row number is the physical CSV data line, even when a blank line was skipped.
+        # The reported row number is the physical CSV line, even when a blank line was skipped.
         path = write_csv_file(tmp_path, "value\n42\n\noops\n")
         with pytest.raises(CsvCoercionError) as exc_info:
             list_content_from_csv(path, IntRow)
-        # 'oops' is the 3rd data line (42, blank, oops), not the 2nd kept row.
-        assert "row 3" in str(exc_info.value)
+        # 'oops' is on physical CSV line 4 (line 1 header, line 2 '42', line 3 blank, line 4 'oops').
+        assert "row 4" in str(exc_info.value)
 
     # ----------------------------------------------------------------------------------
     # Format seam

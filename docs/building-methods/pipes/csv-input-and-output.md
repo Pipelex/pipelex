@@ -132,7 +132,7 @@ The codec defaults to a comma delimiter and UTF-8 encoding. Both are parameters 
 
 - **Empty string is indistinguishable from `None`.** An empty cell reads as `None`, and on write `None` is rendered as an empty cell, so a genuinely empty string `""` cannot be told apart from a missing value through a CSV round trip.
 
-- **A single-field `url` concept reads as a table.** Detection triggers when a content reference carries a `url` whose path ends in a tabular suffix. If you have a flat concept that happens to have a field literally named `url` and you pass `{ "url": "report.csv" }`, it is read as a CSV **table**, not as a single record with `url = "report.csv"`. Use a non-tabular value, or rename the field, if you need the single-record reading.
+- **A bare `{ "url": "...csv" }` reference reads as a table.** Detection triggers only on the exact single-key wrapper shape — a content reference that is precisely `{ "url": <tabular path> }`. So a concept whose only field is `url`, given `{ "url": "report.csv" }`, is read as a CSV **table** rather than as a single record holding `url = "report.csv"`; use a non-tabular value if you need the single-record reading. A record with any sibling key (e.g. `{ "label": "Home", "url": "report.csv" }`) is never affected — it stays an ordinary record, with its fields preserved.
 
 - **No formula-injection escaping.** Cells are written verbatim to preserve data fidelity, so a value beginning with `=`, `+`, `-`, or `@` is not escaped. If you hand a generated CSV to a spreadsheet application, treat untrusted content accordingly. An opt-in escape flag is a deferred follow-up.
 
