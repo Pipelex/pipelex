@@ -216,8 +216,10 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
                 # Restore the caller's outer current-library FIRST so the guarantee survives a teardown
                 # raise, then tear the run library down — mirroring pipeline_run_setup's error-path
                 # restore. set_current_library cannot take None, so route the "no outer was set" case
-                # through clear_current_library.
-                if prev_library_id is not None:
+                # through clear_current_library. The `!= library_id_resolved` guard handles the collision
+                # where the caller's outer current-library IS this run's library: "restoring" it would
+                # leave the ContextVar pointing at the library we tear down next, so clear instead.
+                if prev_library_id is not None and prev_library_id != library_id_resolved:
                     set_current_library(library_id=prev_library_id)
                 else:
                     clear_current_library()

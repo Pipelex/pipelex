@@ -14,18 +14,33 @@ registry).
 These cases run fully dry (``PipeRunMode.DRY`` + ``mock_inputs``) so no inference happens.
 """
 
-from collections.abc import Callable
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import pytest
+from typing_extensions import override
 
 from pipelex.config import get_config
 from pipelex.hub import (
     clear_current_library,
     get_current_library_id_or_none,
+    get_library_manager,
+    set_current_library,
 )
+from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
+from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexRunner
-from pipelex.system.configuration.configs import PipelineExecutionConfig
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from pipelex.core.pipes.pipe_output import PipeOutput
+    from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
+    from pipelex.pipe_run.pipe_job import PipeJob
+    from pipelex.system.configuration.configs import PipelineExecutionConfig
 
 _RUNNER_LIFECYCLE_DOMAIN = "runner_lifecycle"
 _RUNNER_LIFECYCLE_MTHDS = f"""
@@ -52,6 +67,23 @@ def _dry_mock_config() -> PipelineExecutionConfig:
         generate_graph=False,
         mock_inputs=True,
     )
+
+
+class _FailingPipeRun(PipeRunProtocol):
+    """A PipeRun whose ``run`` always raises, so the failure lands in ``execute_pipeline``'s finally
+    AFTER setup has succeeded and resolved the run library — exercising the runner's own teardown guard.
+    """
+
+    @override
+    async def run(self, pipe_job: PipeJob, delivery_assignment: DeliveryAssignment | None = None) -> PipeOutput:
+        msg = "Injected pipe-run failure to exercise library teardown."
+        raise PipeRouterError(
+            message=msg,
+            run_mode=PipeRunMode.DRY,
+            pipe_code=pipe_job.pipe.code,
+            output_name=pipe_job.output_name,
+            pipe_stack=[],
+        )
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -90,3 +122,29 @@ class TestRunnerLibraryLifecycle:
             mthds_contents=[_RUNNER_LIFECYCLE_MTHDS],
         )
         assert get_current_library_id_or_none() is None
+
+    async def test_failure_when_outer_is_run_library_clears_instead_of_dangling(self) -> None:
+        # execute_pipeline's OWN finally guard, mirroring pipeline_run_setup's edge: when the runner's
+        # library_id equals the outer current-library, prev == library_id_resolved. Restoring then
+        # tearing down the same id would leave current-library pointing at a torn-down library; the guard
+        # clears instead. Setup succeeds (echo_topic resolves), then the injected pipe_run raises so the
+        # failure lands in the finally with library_id_resolved set to the colliding id.
+        library_manager = get_library_manager()
+        collide_library_id, _ = library_manager.open_library()
+        set_current_library(library_id=collide_library_id)
+        try:
+            runner = PipelexRunner(
+                library_id=collide_library_id,
+                pipe_run_mode=PipeRunMode.DRY,
+                execution_config=_dry_mock_config(),
+                pipe_run=_FailingPipeRun(),
+            )
+            with pytest.raises(PipelineExecutionError):
+                await runner.execute_pipeline(
+                    pipe_code="echo_topic",
+                    mthds_contents=[_RUNNER_LIFECYCLE_MTHDS],
+                )
+            # Cleared, not left dangling at the just-torn-down collide id.
+            assert get_current_library_id_or_none() is None
+        finally:
+            clear_current_library()

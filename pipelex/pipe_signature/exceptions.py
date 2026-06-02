@@ -32,6 +32,7 @@ class SignaturesNotAllowedError(PipelexError):
     """
 
     error_domain = ErrorDomain.INPUT
+    _authors_caller_facing_message = True
 
     def __init__(
         self,

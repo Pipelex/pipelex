@@ -273,14 +273,19 @@ async def pipeline_run_setup(
                     tracer_manager.close_tracer(pipeline_run_id)
             if event_log is not None:
                 get_report_delegate().clear_event_log(context_key=pipeline_run_id)
-            # Close the per-run registry only if open_registry actually ran: close_registry bare-pops
-            # (KeyError on miss) and this finally also runs for failures *before* open_registry.
+            # Close the per-run registry only if open_registry actually ran. This finally also runs for
+            # failures *before* open_registry; the registry_opened guard is a clean semantic gate (close
+            # only the registry we opened). close_registry is itself idempotent via pop(..., None), so the
+            # guard is about intent, not KeyError avoidance.
             if registry_opened:
                 get_report_delegate().close_registry(pipeline_run_id=pipeline_run_id)
             # Restore the caller's outer current-library FIRST so the guarantee survives a teardown raise,
             # then tear the library down — mirroring validate_bundle. set_current_library cannot take None,
-            # so route the "no outer was set" case through clear_current_library.
-            if prev_library_id is not None:
+            # so route the "no outer was set" case through clear_current_library. The `!= library_id` guard
+            # covers the collision validate_bundle never hits (it always opens a fresh uuid): when the caller
+            # passed a library_id equal to its own outer current-library, "restoring" it would leave the
+            # ContextVar pointing at the library we are about to tear down — so clear instead of dangling.
+            if prev_library_id is not None and prev_library_id != library_id:
                 set_current_library(library_id=prev_library_id)
             else:
                 clear_current_library()

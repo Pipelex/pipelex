@@ -38,8 +38,9 @@ What is pinned here:
   ``open_registry`` and a successful return (here ``prepare_pipe_job`` raising)
   closes the per-run ``UsageRegistry`` the wrapper opened, so a long-lived runner
   does not leak one registry per failed run. A failure *before* ``open_registry``
-  must NOT call ``close_registry`` (a ``registry_opened`` guard prevents the
-  ``KeyError`` from ``close_registry``'s bare ``pop``).
+  must NOT call ``close_registry`` (a ``registry_opened`` guard keeps the finally from
+  closing a registry it never opened; ``close_registry`` is idempotent via
+  ``pop(..., None)``, so this is a semantic guard, not ``KeyError`` avoidance).
 - **Failure after acquire restores the outer current-library:** when the caller
   had an outer current-library set, a post-acquire failure restores it rather
   than clobbering it to ``None`` — mirroring ``acquire_library``'s own load-failure
@@ -234,9 +235,10 @@ class TestPipelineRunSetupCharacterization:
 
     async def test_failure_before_open_registry_does_not_close_registry(self, mocker: MockerFixture) -> None:
         # The wrapper finally also runs for failures BEFORE open_registry (pipe resolution here, which
-        # precedes it). Closing the registry unconditionally would raise KeyError — close_registry
-        # bare-pops a registry that was never opened — masking the real error. The registry_opened guard
-        # prevents that: close_registry must not be called, and the original error must propagate intact.
+        # precedes it). The registry_opened guard ensures close_registry is only called for a registry we
+        # actually opened, so it must NOT be called on this pre-open failure, and the original error must
+        # propagate intact. (close_registry is idempotent via pop(..., None); the guard is about not
+        # touching state we never created, not KeyError avoidance.)
         close_spy = mocker.spy(get_report_delegate(), "close_registry")
 
         with pytest.raises(PipeNotFoundError):
@@ -267,5 +269,31 @@ class TestPipelineRunSetupCharacterization:
                 )
             # Restored to the outer id, not clobbered to None.
             assert get_current_library_id_or_none() == outer_library_id
+        finally:
+            clear_current_library()
+
+    async def test_failure_when_outer_is_run_library_clears_instead_of_dangling(self) -> None:
+        # Edge of the outer-restore path: when the caller passes a library_id that is ALSO the outer
+        # current-library, prev_library_id == library_id. Naively restoring then tearing down the same
+        # id leaves the current-library ContextVar pointing at a TORN-DOWN library. The guard
+        # (prev != library_id) routes this through clear_current_library so no dangling pointer survives.
+        # acquire_library re-opens the same id idempotently, and the failing run tears that library down.
+        # Unlike test_failure_after_acquire_restores_outer_current_library (which uses a fresh auto run id,
+        # so prev != run id), here the run id collides with the outer one — the case validate_bundle never
+        # hits because it always opens a fresh uuid.
+        library_manager = get_library_manager()
+        collide_library_id, _ = library_manager.open_library()
+        set_current_library(library_id=collide_library_id)
+        try:
+            with pytest.raises(PipeNotFoundError):
+                await pipeline_run_setup(
+                    execution_config=_dry_mock_config(),
+                    library_id=collide_library_id,
+                    mthds_contents=[_CHAR_MTHDS],
+                    pipe_code="absent_pipe",
+                    pipe_run_mode=PipeRunMode.DRY,
+                )
+            # Cleared, not left dangling at the just-torn-down collide id.
+            assert get_current_library_id_or_none() is None
         finally:
             clear_current_library()

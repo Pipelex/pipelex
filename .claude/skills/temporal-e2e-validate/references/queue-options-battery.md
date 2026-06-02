@@ -280,8 +280,19 @@ for wf in $(temporal workflow list --limit 80 --output json | jq -r --arg r "$RO
 done
 .venv/bin/python - "$tmpf" << 'PY'
 import sys, json
-from datetime import datetime
-def t(s): return datetime.strptime(s, "%Y-%m-%dT%H:%M:%S.%fZ").timestamp()
+from datetime import datetime, timezone
+def t(s):
+    # Temporal eventTime is RFC 3339 UTC: it may carry 0 or 1-9 fractional digits.
+    # strptime's %f only accepts 1-6, so normalize: drop the Z, pad/truncate the
+    # fraction to microseconds, and pick the format with/without a fractional part.
+    s = s.rstrip("Z")
+    if "." in s:
+        head, frac = s.split(".", 1)
+        s = f"{head}.{(frac + '000000')[:6]}"
+        fmt = "%Y-%m-%dT%H:%M:%S.%f"
+    else:
+        fmt = "%Y-%m-%dT%H:%M:%S"
+    return datetime.strptime(s, fmt).replace(tzinfo=timezone.utc).timestamp()
 recs=[json.loads(l) for l in open(sys.argv[1]) if l.strip()]
 recs=[r for r in recs if r.get("started")]
 starts=sorted(t(r["started"]) for r in recs)
