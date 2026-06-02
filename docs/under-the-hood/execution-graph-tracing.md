@@ -33,7 +33,7 @@ Pipe Execution → GraphTracer → GraphSpec → Renderers → HTML/Mermaid
 | Generate execution graph | `pipelex run pipe my_pipe --graph` | `PipelexRunner(execution_config=...).execute_pipeline(...)` | GraphSpec JSON + HTML viewers |
 | Force include full data | `--graph --graph-full-data` | `data_inclusion.stuff_json_content=True` | Data embedded in IOSpec |
 | Force exclude data | `--graph --graph-no-data` | All `data_inclusion.*=False` | Previews only |
-| Dry run with graph | `--dry-run --graph` | `PipelexRunner(pipe_run_mode=DRY, execution_config=...)` | Graph of mock execution |
+| Dry run with graph | `--dry-run --graph` | `PipelexRunner(pipe_run_mode=PipeRunMode.DRY, execution_config=...)` | Graph of mock execution |
 
 !!! info "Full Data Included by Default"
     The default configuration includes full data in graphs (`stuff_json_content`, `stuff_text_content`, `stuff_html_content`, and `error_stack_traces` are all `true`). Use `--graph-full-data` or `--graph-no-data` only to override project-specific settings.
