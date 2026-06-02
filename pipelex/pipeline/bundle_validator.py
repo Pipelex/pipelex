@@ -197,9 +197,16 @@ class BundleValidator:
                 continue
             sweepable_pipes.append(pipe)
 
-        # 2. Aggregated signature pre-pass (strict mode only).
+        # 2. Aggregated signature pre-pass (strict mode only). Run over the FULL `pipes` list — NOT just
+        #    the wiring survivors — so a pipe dropped to SKIPPED in step 1 for an unresolved cross-package
+        #    dependency still gets its signatures checked. Otherwise an unimplemented PipeSignature reached
+        #    through a resolved branch of a pipe whose OTHER branch has a wiring gap would silently pass
+        #    strict validation (collect_signature_refs tolerates the unresolved branch via get_optional_pipe,
+        #    so it still finds the signature). This restores the old dry_run_pipes precedence: the signature
+        #    pre-pass ran over all pipes, before the per-pipe SKIPPED tolerance. A wiring-SKIPPED pipe with no
+        #    signature is unaffected (the pre-pass finds nothing for it and it stays SKIPPED).
         if not allow_signatures:
-            self._signature_pre_pass(pipes=sweepable_pipes)
+            self._signature_pre_pass(pipes=pipes)
 
         # 3. One validation telemetry event per sweep (relocated from the CLI's _validate_core).
         get_telemetry_manager().track_event(event_name=EventName.PIPE_DRY_RUN, properties={EventProperty.NB_PIPES: len(sweepable_pipes)})

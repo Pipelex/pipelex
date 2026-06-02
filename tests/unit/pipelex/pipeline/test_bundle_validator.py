@@ -201,6 +201,27 @@ class TestBundleValidator:
         spy_collect.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_signature_behind_cross_package_wiring_gap_still_raises(self, mocker: MockerFixture) -> None:
+        # A pipe dropped to SKIPPED in step 1 for an unresolved cross-package dependency must STILL be
+        # signature-checked: the strict pre-pass runs over the FULL pipe list, not just the wiring
+        # survivors. Otherwise an unimplemented PipeSignature hidden behind a wiring gap would silently
+        # pass strict validation (the old dry_run_pipes ran the pre-pass over all pipes first).
+        validator, _report, _telemetry, prepare_mock, _pipe_run = self._patch_env(mocker)
+        # Step 1 drops this pipe to SKIPPED — its wiring references an unloaded cross-package sub-pipe...
+        pipe = self._make_pipe(mocker, code="hybrid_pipe", pipe_ref="dom.hybrid_pipe")
+        pipe.validate_with_libraries.side_effect = PipeNotFoundError("hybrid->other.missing not found")
+        # ...but it also reaches an unimplemented signature through a RESOLVED branch (real
+        # collect_signature_refs tolerates the unresolved branch via get_optional_pipe and still finds it).
+        mocker.patch("pipelex.pipeline.bundle_validator.collect_signature_refs", return_value={"dom.unimplemented_sig"})
+        mocker.patch("pipelex.pipeline.bundle_validator.collect_signature_paths", return_value={})
+
+        with pytest.raises(SignaturesNotAllowedError) as exc_info:
+            await validator.validate_pipes([pipe], library_id="lib-1", allow_signatures=False)
+        assert "dom.unimplemented_sig" in exc_info.value.signature_refs
+        # The signature is caught at the pre-pass, before any dry-run of the (SKIPPED) pipe.
+        prepare_mock.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_one_pipe_dry_run_event_emitted_for_the_sweep(self, mocker: MockerFixture) -> None:
         validator, _report, telemetry_manager, _prepare, _pipe_run = self._patch_env(mocker)
         pipes = [self._make_pipe(mocker, code=f"p{idx}", pipe_ref=f"dom.p{idx}") for idx in range(3)]
