@@ -6,6 +6,7 @@ from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import (
+    clear_current_library,
     get_current_library_id_or_none,
     get_library_manager,
     get_otel_tracer,
@@ -14,7 +15,6 @@ from pipelex.hub import (
     get_required_pipe,
     get_telemetry_manager,
     set_current_library,
-    teardown_current_library,
 )
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -279,9 +279,9 @@ async def pipeline_run_setup(
                 get_report_delegate().close_registry(pipeline_run_id=pipeline_run_id)
             # Restore the caller's outer current-library FIRST so the guarantee survives a teardown raise,
             # then tear the library down — mirroring validate_bundle. set_current_library cannot take None,
-            # so route the "no outer was set" case through teardown_current_library.
+            # so route the "no outer was set" case through clear_current_library.
             if prev_library_id is not None:
                 set_current_library(library_id=prev_library_id)
             else:
-                teardown_current_library()
+                clear_current_library()
             library_manager.teardown(library_id=library_id)

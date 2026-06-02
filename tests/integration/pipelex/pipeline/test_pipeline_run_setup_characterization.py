@@ -54,13 +54,13 @@ from pytest_mock import MockerFixture
 
 from pipelex.config import get_config
 from pipelex.hub import (
+    clear_current_library,
     get_current_library_id_or_none,
     get_library_manager,
     get_pipeline_manager,
     get_report_delegate,
     get_telemetry_manager,
     set_current_library,
-    teardown_current_library,
 )
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -140,7 +140,7 @@ class TestPipelineRunSetupCharacterization:
             assert get_pipeline_manager().get_optional_pipeline(pipeline_run_id) is not None
         finally:
             library_manager.teardown(library_id=library_id)
-            teardown_current_library()
+            clear_current_library()
 
     async def test_search_domain_codes_list_is_mutated_in_place(self) -> None:
         caller_domains = ["zzz_other_domain"]
@@ -156,7 +156,7 @@ class TestPipelineRunSetupCharacterization:
             assert caller_domains == [_CHAR_DOMAIN, "zzz_other_domain"]
         finally:
             get_library_manager().teardown(library_id=library_id)
-            teardown_current_library()
+            clear_current_library()
 
     async def test_empty_inputs_behave_like_no_inputs(self) -> None:
         pipe_job, _, library_id = await pipeline_run_setup(
@@ -175,7 +175,7 @@ class TestPipelineRunSetupCharacterization:
             assert pipe_job.get_working_memory().root == {}
         finally:
             get_library_manager().teardown(library_id=library_id)
-            teardown_current_library()
+            clear_current_library()
 
     async def test_load_failure_tears_down_library(self, mocker: MockerFixture) -> None:
         # A failure while resolving the pipe (pipe_code absent from the bundle ->
@@ -268,4 +268,4 @@ class TestPipelineRunSetupCharacterization:
             # Restored to the outer id, not clobbered to None.
             assert get_current_library_id_or_none() == outer_library_id
         finally:
-            teardown_current_library()
+            clear_current_library()

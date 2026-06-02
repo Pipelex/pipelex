@@ -12,10 +12,10 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.hub import (
+    clear_current_library,
     get_library_manager,
     get_required_pipe,
     get_telemetry_manager,
-    teardown_current_library,
 )
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunStatus
 from pipelex.pipeline.execution_seams import acquire_library
@@ -87,7 +87,7 @@ class TestBundleValidatorIntegration:
             assert results[pipe.pipe_ref].pipe_ref == f"{_BV_DOMAIN}.echo_topic"
         finally:
             library_manager.teardown(library_id=library_id)
-            teardown_current_library()
+            clear_current_library()
 
     async def test_two_consecutive_sweeps_no_registry_collision(self) -> None:
         # The sweep opens a report registry keyed by the constant DRY_RUN_UNTITLED id. Without
@@ -106,7 +106,7 @@ class TestBundleValidatorIntegration:
             assert second[pipe.pipe_ref].status.is_success
         finally:
             library_manager.teardown(library_id=library_id)
-            teardown_current_library()
+            clear_current_library()
 
     async def test_cross_package_controller_skipped_not_aborting_sweep(self) -> None:
         # Finding #1 / D7: a controller whose branch references an UNLOADED cross-package sub-pipe
@@ -123,7 +123,7 @@ class TestBundleValidatorIntegration:
             assert results[f"{_BV_XPKG_DOMAIN}.implemented_leaf"].status.is_success
         finally:
             library_manager.teardown(library_id=library_id)
-            teardown_current_library()
+            clear_current_library()
 
     async def test_one_pipe_dry_run_event_and_no_stray_pipeline_events(self, mocker: MockerFixture) -> None:
         library_manager = get_library_manager()
@@ -142,4 +142,4 @@ class TestBundleValidatorIntegration:
             assert EventName.PIPELINE_COMPLETE not in emitted_events
         finally:
             library_manager.teardown(library_id=library_id)
-            teardown_current_library()
+            clear_current_library()

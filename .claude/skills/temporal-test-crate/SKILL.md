@@ -105,7 +105,7 @@ ls tests/integration/pipelex/temporal/library_crate/*.mthds
 | `RuntimeError: Failed decoding arguments` | Temporal can't deserialize PipeJob | Check Kajson data converter; may be a serialization issue with LibraryCrate |
 | `WorkflowFailureError` wrapping `TemporalError` | Pipe execution failed on worker | Read the inner error — it's the real cause |
 | Fixture setup error in `pipe_job_from_*` | Library loading failed before Temporal dispatch | Check bundle file exists and is valid MTHDS |
-| `AssertionError: StructuredContent missing field` | ClassRegistry scoping failed — wrong class used | Per-workflow ContextVar is leaking; check `set_current_library` / `teardown_current_library` |
+| `AssertionError: StructuredContent missing field` | ClassRegistry scoping failed — wrong class used | Per-workflow ContextVar is leaking; check `set_current_library` / `clear_current_library` |
 | `AssertionError` in repeated/high-concurrency tests | Intermittent ContextVar race condition | Scoping mechanism has a race under load |
 
 ## Interactive debugging

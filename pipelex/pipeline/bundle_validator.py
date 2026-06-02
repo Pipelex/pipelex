@@ -37,13 +37,13 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.hub import (
+    clear_current_library,
     get_current_library_id_or_none,
     get_library_manager,
     get_pipe_library,
     get_report_delegate,
     get_telemetry_manager,
     set_current_library,
-    teardown_current_library,
 )
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.observer.observer_protocol import ObserverNoOp
@@ -140,11 +140,11 @@ class BundleValidator:
             # Restore the caller's outer current-library FIRST (so the guarantee survives a teardown
             # raise), then tear the acquired library down — mirroring validate_bundle / acquire_library.
             # set_current_library cannot take None, so route the "no outer was set" case through
-            # teardown_current_library.
+            # clear_current_library.
             if prev_library_id is not None:
                 set_current_library(library_id=prev_library_id)
             else:
-                teardown_current_library()
+                clear_current_library()
             get_library_manager().teardown(library_id=acquired_id)
 
     async def validate_pipes(

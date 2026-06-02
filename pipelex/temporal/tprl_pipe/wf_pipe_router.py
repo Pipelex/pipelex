@@ -12,7 +12,7 @@ with workflow.unsafe.imports_passed_through():
     from pipelex.config import get_config
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.graph.graph_tracer_manager import GraphTracerManager
-    from pipelex.hub import get_library_manager, get_report_delegate, set_current_library, teardown_current_library
+    from pipelex.hub import clear_current_library, get_library_manager, get_report_delegate, set_current_library
     from pipelex.pipe_run.pipe_job import PipeJob
     from pipelex.temporal.log_temporal import WorkflowLog
     from pipelex.temporal.tprl.temporal_error import TemporalError
@@ -174,7 +174,7 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                 try:
                     get_library_manager().teardown(library_id=wf_library_id)
                 finally:
-                    teardown_current_library()
+                    clear_current_library()
 
         # Dehydrate PipeOutput for Temporal transit: serialize WorkingMemory to
         # raw dict so the parent's data converter can deserialize without needing

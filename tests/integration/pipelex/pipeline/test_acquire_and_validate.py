@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Callable
 
 import pytest
 
-from pipelex.hub import get_current_library_id_or_none, get_library_manager, set_current_library, teardown_current_library
+from pipelex.hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunStatus
 
@@ -67,7 +67,7 @@ class TestAcquireAndValidate:
             # All loaded pipes were swept.
             assert f"{_AAV_DOMAIN}.leaf" in results
         finally:
-            teardown_current_library()
+            clear_current_library()
 
     async def test_raise_mid_sweep_restores_outer_current_and_tears_down_acquired(
         self,
@@ -87,7 +87,7 @@ class TestAcquireAndValidate:
             torn_down_ids = {call.kwargs.get("library_id") for call in teardown_spy.call_args_list}
             assert any(library_id not in {None, outer_library_id} for library_id in torn_down_ids)
         finally:
-            teardown_current_library()
+            clear_current_library()
 
     async def test_strict_mode_filters_standalone_signature_from_sweep(
         self,
@@ -103,4 +103,4 @@ class TestAcquireAndValidate:
             assert results[f"{_AAV_DOMAIN}.leaf"].status == DryRunStatus.SUCCESS
             assert f"{_AAV_DOMAIN}.standalone_sig" not in results
         finally:
-            teardown_current_library()
+            clear_current_library()

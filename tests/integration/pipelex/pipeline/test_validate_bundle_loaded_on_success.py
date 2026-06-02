@@ -13,7 +13,7 @@ from __future__ import annotations
 import pytest
 
 from pipelex.builder.operations.runner_code_ops import build_runner_code_for_pipe
-from pipelex.hub import get_current_library_id_or_none, get_library_manager, get_required_pipe, teardown_current_library
+from pipelex.hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_pipe
 from pipelex.pipeline.validate_bundle import validate_bundle
 
 _LOADED_DOMAIN = "loaded_on_success"
@@ -48,7 +48,7 @@ class TestValidateBundleLoadedOnSuccess:
         finally:
             if library_id is not None:
                 get_library_manager().teardown(library_id=library_id)
-            teardown_current_library()
+            clear_current_library()
 
     async def test_runner_code_ops_resolves_pipe_after_inner_sweep(self) -> None:
         # runner_code_ops is the caller that drives the inner sweep (validate_pipes) directly and then
@@ -60,4 +60,4 @@ class TestValidateBundleLoadedOnSuccess:
         finally:
             if library_id is not None:
                 get_library_manager().teardown(library_id=library_id)
-            teardown_current_library()
+            clear_current_library()

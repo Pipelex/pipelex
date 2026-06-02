@@ -12,11 +12,11 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import (
+    clear_current_library,
     get_library_manager,
     get_pipe_run,
     get_report_delegate,
     get_telemetry_manager,
-    teardown_current_library,
 )
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
@@ -208,7 +208,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
             # Only teardown library if it was successfully created
             if library_id_resolved is not None:
                 get_library_manager().teardown(library_id=library_id_resolved)
-                teardown_current_library()
+                clear_current_library()
 
         assert pipe_job is not None  # for type checker, success path requires a resolved job
         properties = {

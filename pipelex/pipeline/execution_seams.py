@@ -30,11 +30,11 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.hub import (
+    clear_current_library,
     get_current_library_id_or_none,
     get_library_manager,
     resolve_library_dirs,
     set_current_library,
-    teardown_current_library,
 )
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
@@ -122,11 +122,11 @@ def acquire_library(
     finally:
         if not success:
             # Restore the caller's outer current-library FIRST so the safety guarantee holds even when
-            # teardown raises; route the "no outer was set" case through teardown_current_library.
+            # teardown raises; route the "no outer was set" case through clear_current_library.
             if prev_library_id is not None:
                 set_current_library(library_id=prev_library_id)
             else:
-                teardown_current_library()
+                clear_current_library()
             library_manager.teardown(library_id=library_id)
 
 

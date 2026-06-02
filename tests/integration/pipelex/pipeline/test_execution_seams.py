@@ -12,10 +12,10 @@ from pytest_mock import MockerFixture
 
 from pipelex.config import get_config
 from pipelex.hub import (
+    clear_current_library,
     get_current_library_id_or_none,
     get_library_manager,
     get_required_pipe,
-    teardown_current_library,
 )
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline import execution_seams as execution_seams_module
@@ -67,7 +67,7 @@ class TestExecutionSeams:
             assert get_required_pipe(pipe_code=qualified_main_pipe).code == "echo_topic"
         finally:
             library_manager.teardown(library_id=library_id)
-            teardown_current_library()
+            clear_current_library()
 
     async def test_acquire_library_tears_down_on_load_failure(self, mocker: MockerFixture) -> None:
         # A failure during the load window (simulated by resolve_library_dirs raising,
@@ -109,7 +109,7 @@ class TestExecutionSeams:
             assert get_required_pipe(pipe_code=qualified_main_pipe).code == "echo_topic"
         finally:
             library_manager.teardown(library_id=returned_id)
-            teardown_current_library()
+            clear_current_library()
 
     async def test_acquire_library_with_empty_id_tears_down_only_the_opened_library(self, mocker: MockerFixture) -> None:
         # Regression for the teardown-all catastrophe: before the fix, acquire_library kept the falsy
@@ -138,7 +138,7 @@ class TestExecutionSeams:
             assert library_manager.get_library(library_id=unrelated_id) is not None
         finally:
             library_manager.teardown(library_id=unrelated_id)
-            teardown_current_library()
+            clear_current_library()
 
     async def test_prepare_pipe_job_builds_equivalent_job_against_open_library(self) -> None:
         library_manager = get_library_manager()
@@ -163,7 +163,7 @@ class TestExecutionSeams:
             assert "subject" in pipe_job.get_working_memory().root
         finally:
             library_manager.teardown(library_id=library_id)
-            teardown_current_library()
+            clear_current_library()
 
     async def test_prepare_pipe_job_skips_normalize_for_empty_inputs(self, mocker: MockerFixture) -> None:
         # Pins the falsy-inputs semantics at the normalize gate — the discriminating check the
@@ -204,4 +204,4 @@ class TestExecutionSeams:
             assert pipe_job.get_working_memory().root == {}
         finally:
             library_manager.teardown(library_id=library_id)
-            teardown_current_library()
+            clear_current_library()

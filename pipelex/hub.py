@@ -502,8 +502,15 @@ def get_default_library_dirs() -> list[Path] | None:
     return get_pipelex_hub().get_default_library_dirs()
 
 
-def teardown_current_library() -> None:
-    """Teardown the library_id for the current async context."""
+def clear_current_library() -> None:
+    """Clear the current-library binding (the ``None`` case of :func:`set_current_library`).
+
+    Resets the ``_library_id`` ContextVar to ``None`` for the current async context. This only
+    drops the *pointer* to which library is current — it does **not** free the ``Library`` object
+    from the ``LibraryManager``. To release the library itself, call
+    ``library_manager.teardown(library_id=...)`` (the two are distinct and a full cleanup typically
+    does both).
+    """
     _library_id.set(None)
 
 

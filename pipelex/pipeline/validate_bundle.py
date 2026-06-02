@@ -21,11 +21,11 @@ from pipelex.core.pipes.handle_pipe_errors import (
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.validation import report_validation_error
 from pipelex.hub import (
+    clear_current_library,
     get_current_library_id_or_none,
     get_library_manager,
     resolve_library_dirs,
     set_current_library,
-    teardown_current_library,
 )
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
@@ -261,11 +261,11 @@ async def validate_bundle(
             # (e.g. ``LibraryError`` on a double-teardown race) — otherwise the
             # outer scope is left holding the just-torn-down ``library_id``.
             # ``set_current_library`` cannot accept ``None``, so route the
-            # "no outer was set" case through ``teardown_current_library``.
+            # "no outer was set" case through ``clear_current_library``.
             if prev_library_id is not None:
                 set_current_library(library_id=prev_library_id)
             else:
-                teardown_current_library()
+                clear_current_library()
             library_manager.teardown(library_id=library_id)
 
 
@@ -296,7 +296,7 @@ async def validate_bundles_from_directory(directory: Path, allow_signatures: boo
             if prev_library_id is not None:
                 set_current_library(library_id=prev_library_id)
             else:
-                teardown_current_library()
+                clear_current_library()
             library_manager.teardown(library_id=library_id)
 
 
@@ -394,7 +394,7 @@ def load_concepts_only(
             if prev_library_id is not None:
                 set_current_library(library_id=prev_library_id)
             else:
-                teardown_current_library()
+                clear_current_library()
             library_manager.teardown(library_id=library_id)
 
 
@@ -439,5 +439,5 @@ def load_concepts_only_from_directory(directory: Path) -> LoadConceptsOnlyResult
             if prev_library_id is not None:
                 set_current_library(library_id=prev_library_id)
             else:
-                teardown_current_library()
+                clear_current_library()
             library_manager.teardown(library_id=library_id)
