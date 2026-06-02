@@ -5,6 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from pipelex.hub import (
+    clear_current_library,
+    get_current_library_id_or_none,
     get_library_manager,
     get_required_pipe,
     resolve_library_dirs,
@@ -113,21 +115,36 @@ async def validate_pipe(
         ValidateBundleError: If validation fails.
     """
     library_manager = get_library_manager()
+    # Capture the caller's outer current-library so it can be restored after this temporary validation
+    # library is torn down (mirrors acquire_and_validate / validate_bundle).
+    prev_library_id = get_current_library_id_or_none()
     library_id, _ = library_manager.open_library()
-    set_current_library(library_id=library_id)
-    effective_dirs, _ = resolve_library_dirs(library_dirs)
+    try:
+        set_current_library(library_id=library_id)
+        effective_dirs, _ = resolve_library_dirs(library_dirs)
 
-    if effective_dirs:
-        library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
+        if effective_dirs:
+            library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
 
-    the_pipe = get_required_pipe(pipe_code=pipe_code)
-    dry_run_results = await BundleValidator().validate_pipes(pipes=[the_pipe], library_id=library_id)
+        the_pipe = get_required_pipe(pipe_code=pipe_code)
+        dry_run_results = await BundleValidator().validate_pipes(pipes=[the_pipe], library_id=library_id)
 
-    return {
-        "success": True,
-        "validated_pipes": build_validated_pipes(dry_run_results),
-        "total_pipes": len(dry_run_results),
-    }
+        return {
+            "success": True,
+            "validated_pipes": build_validated_pipes(dry_run_results),
+            "total_pipes": len(dry_run_results),
+        }
+    finally:
+        # validate_pipes is the D6 inner sweep and never tears the library down, and validate_pipe does
+        # not need the library after returning its results dict — so this caller owns the full lifecycle
+        # on BOTH paths. Restore the outer current-library FIRST (so the guarantee survives a teardown
+        # raise), then tear the temporary library down. set_current_library cannot take None, so route
+        # the "no outer was set" case through clear_current_library.
+        if prev_library_id is not None:
+            set_current_library(library_id=prev_library_id)
+        else:
+            clear_current_library()
+        library_manager.teardown(library_id=library_id)
 
 
 async def validate_pipe_in_bundle(
