@@ -1,5 +1,5 @@
 ---
-description: "Read CSV (or Excel) files into typed lists and write list outputs back to CSV. Covers the inputs.json convention, the --save-csv flag, the flat-concept rule, type coercion, and v1 limitations."
+description: "Read CSV files into typed lists and write list outputs back to CSV. Covers the inputs.json convention, the --save-csv flag, the flat-concept rule, type coercion, and v1 limitations."
 ---
 
 # CSV Input & Output

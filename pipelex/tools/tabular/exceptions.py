@@ -45,8 +45,9 @@ class CsvColumnError(CsvError):
     """Raised when CSV headers do not line up with the row concept's fields.
 
     Covers an unexpected extra column, a missing required column, and duplicate or
-    blank header cells. A missing *optional* column is NOT an error (the field is set
-    to ``None`` for all rows).
+    blank header cells. A missing *optional* column is NOT an error: a nullable field
+    is set to ``None`` for all rows, while a non-nullable field with a default keeps
+    that default.
     """
 
     _declared_title = "CSV column error"

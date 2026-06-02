@@ -38,6 +38,7 @@ from pipelex.tools.misc.file_utils import get_incremental_directory_path
 from pipelex.tools.misc.json_utils import load_json_dict_from_path, save_as_json_to_path
 from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.tabular.csv_codec import assert_supported_table_suffix, csv_from_list_content, flat_field_names
+from pipelex.tools.tabular.exceptions import CsvError
 
 if TYPE_CHECKING:
     from pipelex.core.stuffs.stuff_content import StuffContent
@@ -68,6 +69,19 @@ async def _execute_run(
 
     Shared between the ``method`` and ``pipe`` subcommands.
     """
+    # Fail fast on an unusable --save-csv target BEFORE running the pipeline, so a bad path (empty,
+    # or an unsupported suffix like .xlsx) doesn't waste a full inference run. The output-shape and
+    # row-flatness checks need the result, so they stay in the save block after execution.
+    if save_csv is not None:
+        if not save_csv.strip():
+            typer.secho("Failed to --save-csv: an empty output path was given.", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1)
+        try:
+            assert_supported_table_suffix(Path(save_csv))
+        except CsvError as exc:
+            typer.secho(f"Failed to --save-csv: {exc}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1) from exc
+
     mthds_content: str | None = None
     if bundle_path:
         try:
@@ -234,9 +248,7 @@ async def _execute_run(
     # NOT resolved under --output-dir. Requires the main stuff to be a flat list (e.g. PersonSummary[]);
     # the codec rejects a non-flat row concept with a clear CsvFlatnessError.
     if save_csv is not None:
-        if not save_csv.strip():
-            typer.secho("Failed to --save-csv: an empty output path was given.", fg=typer.colors.RED, err=True)
-            raise typer.Exit(1)
+        # The path string and its suffix were already validated up front (fail-fast, before the run).
         csv_main_stuff = pipe_output.working_memory.get_optional_main_stuff()
         if csv_main_stuff is None:
             typer.secho("Failed to --save-csv: the pipeline produced no main stuff to write.", fg=typer.colors.RED, err=True)
@@ -253,9 +265,8 @@ async def _execute_run(
         csv_list_content = cast("ListContent[StuffContent]", csv_content)
         csv_path = Path(save_csv)
         csv_row_model = csv_main_stuff.concept.get_structure_class()
-        # Validate the requested suffix and the row flatness BEFORE touching the filesystem, so a
-        # failed --save-csv (e.g. a .xlsx target or a non-flat output) leaves no directory behind.
-        assert_supported_table_suffix(csv_path)
+        # Validate the row flatness BEFORE touching the filesystem, so a non-flat output leaves no
+        # directory behind (the suffix was already validated up front).
         flat_field_names(csv_row_model)
         # CQ1: write to the literal cwd-relative path, but still create its parent dirs so a
         # nested target (e.g. reports/2026/out.csv) doesn't fail late after the run completed.

@@ -45,6 +45,9 @@ class TestCsvInputDetection:
             "https://example.com/people.csv?token=abc",
             "s3://bucket/people.csv?X-Amz-Signature=deadbeef",
             "https://example.com/people.csv#frag",
+            # A malformed port must not crash URL sanitization (the `.port` property raises): the
+            # redaction must still produce a clean CsvError without leaking the token via a traceback.
+            "https://example.com:bad/people.csv?token=abc",
         ],
     )
     def test_remote_csv_url_rejected(self, remote_url: str, load_test_library: Callable[[list[Path]], None]) -> None:

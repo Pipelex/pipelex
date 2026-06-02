@@ -182,8 +182,15 @@ class StuffFactory:
             # must not leak its credentials into the message. Keep scheme/host/path to identify it.
             url_parts = urlsplit(url)
             safe_netloc = url_parts.hostname or ""
-            if url_parts.port is not None:
-                safe_netloc = f"{safe_netloc}:{url_parts.port}"
+            try:
+                safe_port = url_parts.port
+            except ValueError:
+                # A malformed/out-of-range port makes the `.port` property raise; don't let that
+                # ValueError escape (it would bypass this redaction and surface the raw url in a
+                # traceback). Drop the port from the sanitized display instead.
+                safe_port = None
+            if safe_port is not None:
+                safe_netloc = f"{safe_netloc}:{safe_port}"
             safe_url = urlunsplit((url_parts.scheme, safe_netloc, url_parts.path, "", ""))
             msg = (
                 f"CSV input supports local file paths only in v1, but stuff '{name}' for concept "
