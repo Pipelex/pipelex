@@ -51,7 +51,7 @@ User-facing docs: [`docs/building-methods/pipes/csv-input-and-output.md`](docs/b
 
 ## The contract (input/output semantics — do not silently change)
 
-- **Flat concepts only.** Scalar fields: `text`→`str`, `integer`→`int`, `number`→`float`, `boolean`→`bool`, `date`→`datetime.date`. Optionals allowed; `Literal`/choice-constrained scalars allowed. Nested/list/dict/`Union`/concept-typed/`Any` → `CsvFlatnessError` naming the field. No silent flatten, no JSON-in-cell, no dropped cells.
+- **Flat concepts only.** Scalar fields: `text`→`str`, `integer`→`int`, `number`→`float`, `boolean`→`bool`, `date`→`datetime.datetime` (the MTHDS `date` type generates `datetime.datetime`; the codec also accepts a hand-built `datetime.date`). Optionals allowed; string-valued `Literal`/`StrEnum` choices allowed. Nested/list/dict/`Union`/concept-typed/`Any`/non-string `Literal`/`Enum` → `CsvFlatnessError` naming the field. No silent flatten, no JSON-in-cell, no dropped cells.
 - **Input headers:** required; must match field names exactly (no implicit remap). **Extra column → error; missing required column → error; missing *nullable* column → that field is `None` for all rows; missing non-nullable-but-defaulted column → that field keeps its own default** (CT2 lenient). Empty cell → `None` before pydantic (field must be optional).
 - **Coercion:** through pydantic lax validation; the accept/reject set is pinned by T3 (see test map). Don't hand-roll coercion.
 - **Output:** `--save-csv` triggers explicitly (no auto-emit). Header from the declared row model (empty list → header-only). `None`→`""` (never `"None"`); bool→lowercase. Literal cwd-relative path, parent dir created.

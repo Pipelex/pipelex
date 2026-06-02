@@ -117,6 +117,11 @@ class IntDefaultRow(StructuredContent):
     count: int = 0
 
 
+class LabeledIntRow(StructuredContent):
+    label: str
+    number: int
+
+
 # ---------------------------------------------------------------------------------------
 # Non-flat row models (must be rejected by the flatness classifier)
 # ---------------------------------------------------------------------------------------
@@ -473,6 +478,12 @@ class TestCsvCodec:
         with pytest.raises(CsvReadError):
             read_rows(path, encoding="not-a-real-codec")
 
+    def test_write_non_encodable_cell_raises(self, tmp_path: Path) -> None:
+        # A cell that the target encoding can't represent must surface a typed CsvError on write,
+        # not let a raw UnicodeEncodeError escape the codec boundary.
+        with pytest.raises(CsvError):
+            write_rows(tmp_path / "out.csv", headers=["name"], rows=[{"name": "café"}], encoding="ascii")
+
     def test_write_rejects_item_not_matching_row_model(self, tmp_path: Path) -> None:
         # An item whose class isn't the declared row_model would write silent empty cells → reject loudly.
         list_content: ListContent[StructuredContent] = ListContent(items=[IntRow(value=1)])
@@ -490,6 +501,15 @@ class TestCsvCodec:
         # The offending row is the first data row, which is physical CSV line 2 (the header is line 1).
         assert "row 2" in message
         assert "OrderedPairRow" in message
+
+    def test_coercion_error_row_number_after_multiline_cell(self, tmp_path: Path) -> None:
+        # A valid quoted cell spanning two physical lines must not skew the line number of a later
+        # bad row: the failing 'bad,oops' record starts on physical line 4 (header=1, multiline cell
+        # =2-3), so the error must say "row 4", not "row 3".
+        path = write_csv_file(tmp_path, 'label,number\n"multi\nline",1\nbad,oops\n')
+        with pytest.raises(CsvCoercionError) as exc_info:
+            list_content_from_csv(path, LabeledIntRow)
+        assert "row 4" in str(exc_info.value)
 
     def test_coercion_error_row_number_counts_skipped_blank_lines(self, tmp_path: Path) -> None:
         # The reported row number is the physical CSV line, even when a blank line was skipped.

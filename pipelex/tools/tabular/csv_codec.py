@@ -162,9 +162,15 @@ def _read_table(path: Path, *, delimiter: str, encoding: str) -> tuple[list[str]
     ``OSError``/``UnicodeDecodeError``/``LookupError``/``csv.Error`` as ``CsvReadError``.
     """
     _assert_single_char_delimiter(delimiter)
+    # Capture each record's physical line number from ``reader.line_num`` (the count of physical lines
+    # consumed so far) rather than enumerating, so a quoted cell that spans multiple physical lines
+    # doesn't skew the line numbers of the records that follow it.
+    numbered_rows: list[tuple[int, list[str]]] = []
     try:
         with path.open("r", encoding=encoding, newline="") as csv_file:
-            raw_rows = list(csv.reader(csv_file, delimiter=delimiter, strict=True))
+            reader = csv.reader(csv_file, delimiter=delimiter, strict=True)
+            for row in reader:
+                numbered_rows.append((reader.line_num, row))
     except UnicodeDecodeError as exc:
         msg = f"Could not decode CSV file {path} as {encoding}: {exc}"
         raise CsvReadError(msg) from exc
@@ -178,28 +184,25 @@ def _read_table(path: Path, *, delimiter: str, encoding: str) -> tuple[list[str]
         msg = f"Could not read CSV file {path}: {exc}"
         raise CsvReadError(msg) from exc
 
-    if not raw_rows:
+    if not numbered_rows:
         msg = f"CSV file {path} is empty; a header row is required."
         raise CsvReadError(msg)
 
-    header = raw_rows[0]
+    header = numbered_rows[0][1]
     _validate_header(header, path)
 
     data_rows: list[tuple[int, list[str]]] = []
-    # start=2: the header is physical line 1, so the first data row is line 2. enumerate counts
-    # every post-header physical line (blank lines included, even though they are skipped below),
-    # so row_number stays aligned with the line the author sees in their editor.
-    for row_number, row in enumerate(raw_rows[1:], start=2):
+    for line_number, row in numbered_rows[1:]:
         if not row:
             # Blank physical line (csv yields []). Skip it; a single empty cell is [''] and is kept.
             continue
         if len(row) > len(header):
             msg = (
-                f"CSV file {path} row {row_number} has {len(row)} fields but the header declares "
+                f"CSV file {path} row {line_number} has {len(row)} fields but the header declares "
                 f"{len(header)} column(s); the surplus cells map to no column."
             )
             raise CsvColumnError(msg)
-        data_rows.append((row_number, row))
+        data_rows.append((line_number, row))
     return header, data_rows
 
 
@@ -230,7 +233,8 @@ def write_rows(
     """Write header-keyed string rows to a CSV file, emitting ``headers`` in order.
 
     An empty ``rows`` still writes the header line. Raises ``CsvError`` if the delimiter
-    is invalid, the encoding is unknown, or the file cannot be written.
+    is invalid, the encoding is unknown, a cell is not encodable in ``encoding``, or the
+    file cannot be written.
     """
     _assert_single_char_delimiter(delimiter)
     try:
@@ -241,6 +245,9 @@ def write_rows(
                 writer.writerow([row.get(column, "") for column in headers])
     except LookupError as exc:
         msg = f"Unknown encoding {encoding!r} for CSV file {path}: {exc}"
+        raise CsvError(msg) from exc
+    except UnicodeEncodeError as exc:
+        msg = f"Could not encode CSV file {path} as {encoding}: {exc}"
         raise CsvError(msg) from exc
     except OSError as exc:
         msg = f"Could not write CSV file {path}: {exc}"

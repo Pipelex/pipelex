@@ -16,7 +16,7 @@ A concept used with CSV must be **flat**: every field is a scalar. The accepted 
 - `integer` → `int`
 - `number` → `float`
 - `boolean` → `bool`
-- `date` → `datetime.date` (ISO `YYYY-MM-DD`)
+- `date` → `datetime.datetime` (an ISO `YYYY-MM-DD` value is accepted and parsed as midnight)
 
 Optional fields are allowed, and so are choice-constrained scalars — but only **string-valued** ones (a `text`-typed `choices` field, a string `Literal`, or a `StrEnum`). A non-string choice such as `Literal[1, 2, 3]` or an `IntEnum` is rejected: it would serialize to a CSV string but cannot coerce back from one, so accepting it would break the round trip. Any nested concept, list, dict, union, or `Any`-typed field is likewise rejected with a clear error that names the offending field — a CSV cell has no room for nested structure, so you must project to a flat concept first.
 
