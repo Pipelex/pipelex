@@ -265,17 +265,20 @@ async def _execute_run(
         csv_list_content = cast("ListContent[StuffContent]", csv_content)
         csv_path = Path(save_csv)
         csv_row_model = csv_main_stuff.concept.get_structure_class()
-        # Validate the row flatness BEFORE touching the filesystem, so a non-flat output leaves no
-        # directory behind (the suffix was already validated up front).
-        flat_field_names(csv_row_model)
-        # CQ1: write to the literal cwd-relative path, but still create its parent dirs so a
-        # nested target (e.g. reports/2026/out.csv) doesn't fail late after the run completed.
+        # A CSV-save failure (non-flat output concept, write error) is framed as a --save-csv failure,
+        # not a pipeline failure — the pipeline already succeeded. Without this the CsvError would
+        # escape to execute_run's generic `except PipelexError` and read as "Failed to execute pipeline".
         try:
+            # Validate the row flatness BEFORE touching the filesystem, so a non-flat output leaves no
+            # directory behind (the suffix was already validated up front).
+            flat_field_names(csv_row_model)
+            # CQ1: write to the literal cwd-relative path, but still create its parent dirs so a
+            # nested target (e.g. reports/2026/out.csv) doesn't fail late after the run completed.
             csv_path.parent.mkdir(parents=True, exist_ok=True)
-        except OSError as mkdir_exc:
-            typer.secho(f"Failed to --save-csv: could not create directory for '{save_csv}': {mkdir_exc}", fg=typer.colors.RED, err=True)
-            raise typer.Exit(1) from mkdir_exc
-        csv_from_list_content(csv_list_content, row_model=csv_row_model, path=csv_path)
+            csv_from_list_content(csv_list_content, row_model=csv_row_model, path=csv_path)
+        except (CsvError, OSError) as csv_exc:
+            typer.secho(f"Failed to --save-csv to '{save_csv}': {csv_exc}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1) from csv_exc
         log.verbose(f"Main stuff CSV saved to: {save_csv}")
 
     reporting_config = get_config().pipelex.reporting_config

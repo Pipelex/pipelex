@@ -203,6 +203,42 @@ class TestCsvCodec:
         rows = read_rows(path, delimiter=";")
         assert rows == [{"name": "Ada", "age": "36"}]
 
+    def test_read_strips_utf8_bom(self, tmp_path: Path) -> None:
+        # Excel's "CSV UTF-8" export prepends a BOM. With the default read encoding it must be stripped,
+        # so the first header is 'name' (not '﻿name') and the file parses identically to its plain twin.
+        path = tmp_path / "bom.csv"
+        path.write_bytes(b"\xef\xbb\xbfname,age\nAda,36\n")
+        assert read_rows(path) == [{"name": "Ada", "age": "36"}]
+
+    def test_read_bom_file_into_list_content(self, tmp_path: Path) -> None:
+        # The headline use case: a BOM-prefixed file (from Excel) binds to a concept without a column error.
+        path = tmp_path / "bom_required.csv"
+        path.write_bytes(b"\xef\xbb\xbftext\nhello\n")
+        item = list_content_from_csv(path, RequiredTextRow).items[0]
+        assert item.text == "hello"
+
+    def test_read_empty_file_raises(self, tmp_path: Path) -> None:
+        # A 0-byte file is a distinct path from a missing file: it must raise CsvReadError naming the header.
+        path = tmp_path / "empty.csv"
+        path.write_text("", encoding="utf-8")
+        with pytest.raises(CsvReadError) as exc_info:
+            read_rows(path)
+        assert "header" in str(exc_info.value).lower()
+
+    def test_read_header_only_into_empty_list_content(self, tmp_path: Path) -> None:
+        # A valid header with zero data rows reads as an empty ListContent (the read-side empty path).
+        path = write_csv_file(tmp_path, "name,age,height,active,born\n")
+        result = list_content_from_csv(path, FlatRow)
+        assert result.items == []
+
+    def test_short_row_pads_missing_trailing_cell_to_none(self, tmp_path: Path) -> None:
+        # A data row with FEWER cells than the header pads the missing trailing column → None on an
+        # optional field (exercises _row_to_dict's padding branch, not just an explicit empty cell).
+        path = write_csv_file(tmp_path, "name,age,height,active,born,nickname\nAda,36,1.7,true,1815-12-10\n")
+        item = list_content_from_csv(path, FlatRow).items[0]
+        assert item.nickname is None
+        assert item.name == "Ada"
+
     def test_read_rows_missing_file_raises(self, tmp_path: Path) -> None:
         with pytest.raises(CsvReadError):
             read_rows(tmp_path / "does_not_exist.csv")
@@ -351,6 +387,30 @@ class TestCsvCodec:
         message = str(exc_info.value)
         assert "value" in message
         assert "row 3" in message  # 'oops' is on physical CSV line 3 (header=1, '42'=2, 'oops'=3)
+
+    def test_coercion_error_does_not_leak_cell_value(self, tmp_path: Path) -> None:
+        # CsvError is caller-facing (survives STRICT disclosure), so the coercion message must NOT echo
+        # the raw offending cell content — only row/field identifiers and the expected-type reason.
+        path = write_csv_file(tmp_path, "value\nSUPERSECRET_TOKEN_xyz\n")
+        with pytest.raises(CsvCoercionError) as exc_info:
+            list_content_from_csv(path, IntRow)
+        message = str(exc_info.value)
+        assert "SUPERSECRET_TOKEN_xyz" not in message
+        assert "value" in message  # the field is still named so the author can locate it
+
+    def test_string_literal_and_str_enum_round_trip_on_read(self, tmp_path: Path) -> None:
+        # The read-side coercion of accepted string Literal / StrEnum cells (flat_field_names accepts
+        # them; this confirms the cell actually coerces to the member through list_content_from_csv).
+        literal_item = list_content_from_csv(write_csv_file(tmp_path, "name,rating\nAda,high\n", name="lit.csv"), LiteralRow).items[0]
+        assert literal_item.rating == "high"
+        enum_item = list_content_from_csv(write_csv_file(tmp_path, "name,grade\nAda,pass\n", name="enum.csv"), StrEnumRow).items[0]
+        assert enum_item.grade == Grade.PASS
+
+    @pytest.mark.parametrize(("row_model", "bad_cell"), [(LiteralRow, "name,rating\nAda,medium\n"), (StrEnumRow, "name,grade\nAda,unknown\n")])
+    def test_out_of_choice_value_raises_coercion(self, tmp_path: Path, row_model: type[StructuredContent], bad_cell: str) -> None:
+        # An out-of-choice value for a Literal/StrEnum column fails coercion with a typed error.
+        with pytest.raises(CsvCoercionError):
+            list_content_from_csv(write_csv_file(tmp_path, bad_cell), row_model)
 
     # ----------------------------------------------------------------------------------
     # Strict columns

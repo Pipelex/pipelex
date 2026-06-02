@@ -106,6 +106,41 @@ class TestCsvRun:
         assert len(records) == 3  # one record per input person
 
     @pytest.mark.gha_disabled
+    def test_save_csv_non_list_output_fails_cleanly(self, tmp_path: Path) -> None:
+        # --save-csv requires a flat LIST output. `summarize_person` produces a single PersonSummary
+        # (not a list), so the run must fail cleanly with the "not a list" guard, framed as a
+        # --save-csv failure (not a pipeline failure) and with no raw traceback.
+        staged = _stage_bundle(tmp_path)
+        result = subprocess.run(  # noqa: S603
+            [
+                str(PIPELEX_BIN),
+                "run",
+                "pipe",
+                "summarize_person",
+                "-L",
+                str(staged),
+                "--mock-inputs",
+                "--dry-run",
+                "--save-csv",
+                "out.csv",
+                "--no-save-working-memory",
+                "--no-save-main-stuff",
+                "--no-graph",
+            ],
+            cwd=str(tmp_path),
+            env=os.environ.copy(),
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=180,
+        )
+        combined = result.stdout + result.stderr
+        assert result.returncode != 0, f"a non-list --save-csv output must fail.\n{combined!r}"
+        assert "Traceback (most recent call last)" not in combined, f"error must be clean: {combined!r}"
+        assert "not a list" in combined, f"the error should explain the output is not a list: {combined!r}"
+        assert not (tmp_path / "out.csv").exists(), "no CSV should be written when the output isn't a list"
+
+    @pytest.mark.gha_disabled
     def test_missing_csv_input_fails_cleanly(self, tmp_path: Path) -> None:
         staged = _stage_bundle(tmp_path)
         (staged / "inputs_missing.json").write_text(

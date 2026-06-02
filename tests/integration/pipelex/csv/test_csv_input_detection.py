@@ -78,6 +78,15 @@ class TestCsvInputDetection:
             WorkingMemoryFactory.make_from_pipeline_inputs(inputs)
         assert "local" in str(exc_info.value).lower()
 
+    def test_xlsx_input_routes_to_tabular_seam(self, load_test_library: Callable[[list[Path]], None]) -> None:
+        load_test_library([BUNDLE_DIR])
+        # A .xlsx url is detected as tabular and routed through the hook to the format seam, which
+        # raises a clear "needs pipelex[tabular]" CsvError (the Excel backend isn't built in v1).
+        inputs: PipelineInputs = {"people": {"concept": "csv_demo.Person", "content": {"url": "people.xlsx"}}}
+        with pytest.raises(CsvError) as exc_info:
+            WorkingMemoryFactory.make_from_pipeline_inputs(inputs)
+        assert "pipelex[tabular]" in str(exc_info.value)
+
     def test_unparseable_url_rejected_without_leak(self, load_test_library: Callable[[list[Path]], None]) -> None:
         load_test_library([BUNDLE_DIR])
         # A malformed url (a bad IPv6 bracket) makes `urlsplit` itself raise; it must become a clean

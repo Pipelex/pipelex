@@ -40,6 +40,10 @@ if TYPE_CHECKING:
 # deferred follow-up — v1 exposes delimiter/encoding only as function params.
 DEFAULT_DELIMITER = ","
 DEFAULT_ENCODING = "utf-8"
+# Read with utf-8-sig so a UTF-8 BOM is transparently stripped — Excel's "CSV UTF-8" export always
+# prepends one, and the headline use case is round-tripping Excel files. utf-8-sig reads plain UTF-8
+# unchanged when no BOM is present. Writes stay on plain utf-8 (utf-8-sig would prepend a BOM).
+DEFAULT_READ_ENCODING = "utf-8-sig"
 
 _NONE_TYPE = type(None)
 _UNION_TYPE = getattr(types, "UnionType", None)  # Py3.10+: types.UnionType (PEP 604 `X | None`)
@@ -211,7 +215,7 @@ def _row_to_dict(header: list[str], data_row: list[str]) -> dict[str, str]:
     return {column: (data_row[index] if index < len(data_row) else "") for index, column in enumerate(header)}
 
 
-def read_rows(path: Path, *, delimiter: str = DEFAULT_DELIMITER, encoding: str = DEFAULT_ENCODING) -> list[dict[str, str]]:
+def read_rows(path: Path, *, delimiter: str = DEFAULT_DELIMITER, encoding: str = DEFAULT_READ_ENCODING) -> list[dict[str, str]]:
     """Read a CSV file into a list of header-keyed string rows.
 
     A header row is required; blank lines are skipped. Raises ``CsvReadError`` for a
@@ -304,7 +308,7 @@ def list_content_from_csv(
     row_model: type[StuffContentType],
     *,
     delimiter: str = DEFAULT_DELIMITER,
-    encoding: str = DEFAULT_ENCODING,
+    encoding: str = DEFAULT_READ_ENCODING,
 ) -> ListContent[StuffContentType]:
     """Read a CSV file into a ``ListContent`` of ``row_model`` instances (one row → one item).
 
@@ -355,7 +359,11 @@ def list_content_from_csv(
         except ValidationError as exc:
             error_fields = sorted({_validation_error_label(error) for error in exc.errors()})
             fields_label = ", ".join(error_fields) or "?"
-            msg = f"Could not coerce CSV row {row_number} of {path} for concept {row_model.__name__!r}: field(s) {fields_label} — {exc}"
+            # Use pydantic's per-error `msg` (e.g. "Input should be a valid integer"), NOT str(exc):
+            # str(exc) appends `input_value=<raw cell>`, which would leak the cell content into this
+            # caller-facing message (CsvError survives STRICT disclosure). Row/field identifiers suffice.
+            reasons = "; ".join(sorted({str(error.get("msg", "")) for error in exc.errors()})) or "invalid value"
+            msg = f"Could not coerce CSV row {row_number} of {path} for concept {row_model.__name__!r}: field(s) {fields_label} — {reasons}"
             raise CsvCoercionError(msg) from exc
         items.append(item)
 
