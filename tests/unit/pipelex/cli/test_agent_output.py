@@ -11,7 +11,6 @@ import typer
 from typer.testing import CliRunner
 
 from pipelex.base_exceptions import PipelexConfigError, PipelexError
-from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 from pipelex.cli.agent_cli._agent_cli import app  # noqa: PLC2701
 from pipelex.cli.agent_cli.commands.agent_output import (
     AGENT_ERROR_DOMAINS,
@@ -30,6 +29,7 @@ from pipelex.cogt.inference.error_classification import UserAction, UserActionKi
 from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
+from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 from pipelex.pipeline.exceptions import ValidateBundleError
 
 if TYPE_CHECKING:
