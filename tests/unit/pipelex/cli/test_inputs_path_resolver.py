@@ -20,6 +20,10 @@ class _IsRelativeLocalPathCases:
     DATA_URL = ("data:application/pdf;base64,AAAA", False)
     PIPELEX_STORAGE = ("pipelex-storage://bucket/file.pdf", False)
     FILE_URI = ("file:///home/user/file.pdf", False)
+    # Unrecognized schemes must NOT be rewritten as relative local paths: resolve_uri returns them as
+    # a ResolvedLocalPath but their `://` shows they are non-local, so the downstream remote guards work.
+    S3_URL = ("s3://bucket/people.csv", False)
+    GS_URL = ("gs://bucket/people.csv", False)
 
 
 class _ResolveInputsPathsCases:
@@ -211,6 +215,8 @@ class TestInputsPathResolver:
             _IsRelativeLocalPathCases.DATA_URL,
             _IsRelativeLocalPathCases.PIPELEX_STORAGE,
             _IsRelativeLocalPathCases.FILE_URI,
+            _IsRelativeLocalPathCases.S3_URL,
+            _IsRelativeLocalPathCases.GS_URL,
         ],
     )
     def test_is_relative_local_path(self, uri: str, expected: bool) -> None:
