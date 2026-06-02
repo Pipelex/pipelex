@@ -296,25 +296,27 @@ class BundleValidator:
         """
         allowed_to_fail_pipes = get_config().pipelex.dry_run_config.allowed_to_fail_pipes
 
-        successful_pipes: list[str] = []
+        # Only the failed refs feed logic (the allowed_to_fail match); success/skipped counts are
+        # log-only, so derive them inline rather than accumulating dead lists.
+        success_count = 0
         failed_pipes: list[str] = []
-        skipped_pipes: list[str] = []
+        skipped_count = 0
         for pipe_ref, dry_run_output in results.items():
             match dry_run_output.status:
                 case DryRunStatus.SUCCESS:
-                    successful_pipes.append(pipe_ref)
+                    success_count += 1
                 case DryRunStatus.FAILURE:
                     failed_pipes.append(pipe_ref)
                 case DryRunStatus.SKIPPED:
-                    skipped_pipes.append(pipe_ref)
+                    skipped_count += 1
 
         # The dict key IS the namespaced pipe_ref, so matching on it keys allowed_to_fail off the
         # qualified ref (C-7) rather than the bare code.
         unexpected_failures = {pipe_ref: results[pipe_ref] for pipe_ref in failed_pipes if pipe_ref not in allowed_to_fail_pipes}
 
         log.verbose(
-            f"Dry run completed: {len(successful_pipes)} successful, {len(failed_pipes)} failed, "
-            f"{len(skipped_pipes)} skipped, {len(allowed_to_fail_pipes)} allowed to fail, in {time.time() - start_time:.2f} seconds",
+            f"Dry run completed: {success_count} successful, {len(failed_pipes)} failed, "
+            f"{skipped_count} skipped, {len(allowed_to_fail_pipes)} allowed to fail, in {time.time() - start_time:.2f} seconds",
         )
         if unexpected_failures:
             details = "\n".join(f"'{pipe_ref}': {results[pipe_ref]}" for pipe_ref in unexpected_failures)

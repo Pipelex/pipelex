@@ -33,7 +33,7 @@ Pipe Execution → GraphTracer → GraphSpec → Renderers → HTML/Mermaid
 | Generate execution graph | `pipelex run pipe my_pipe --graph` | `PipelexRunner(execution_config=...).execute_pipeline(...)` | GraphSpec JSON + HTML viewers |
 | Force include full data | `--graph --graph-full-data` | `data_inclusion.stuff_json_content=True` | Data embedded in IOSpec |
 | Force exclude data | `--graph --graph-no-data` | All `data_inclusion.*=False` | Previews only |
-| Dry run with graph | `--dry-run --graph` | `dry_run_pipe_with_graph(pipe)` | Graph of mock execution |
+| Dry run with graph | `--dry-run --graph` | `PipelexRunner(pipe_run_mode=DRY, execution_config=...)` | Graph of mock execution |
 
 !!! info "Full Data Included by Default"
     The default configuration includes full data in graphs (`stuff_json_content`, `stuff_text_content`, `stuff_html_content`, and `error_stack_traces` are all `true`). Use `--graph-full-data` or `--graph-no-data` only to override project-specific settings.
@@ -62,7 +62,7 @@ pipelex run pipe my_pipe --dry-run --graph --mock-inputs
 
 ```python
 from pipelex.pipeline.runner import PipelexRunner
-from pipelex.pipe_run.dry_run_with_graph import dry_run_pipe_with_graph
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 
 # Execute with graph tracing via config
 runner = PipelexRunner(
@@ -73,9 +73,17 @@ response = await runner.execute_pipeline(
 )
 pipe_output = response.pipe_output
 
-# Dry run directly returns GraphSpec
-graph_spec = await dry_run_pipe_with_graph(pipe)
+# Dry run with graph: the same runner in DRY mode with mock inputs — no separate code path.
+dry_runner = PipelexRunner(
+    pipe_run_mode=PipeRunMode.DRY,
+    execution_config=config.with_graph_config_overrides(generate_graph=True, mock_inputs=True),
+)
+response = await dry_runner.execute_pipeline(pipe_code="my_pipe")
+graph_spec = response.pipe_output.graph_spec
 ```
+
+!!! tip "Dry run from MTHDS content"
+    To dry-run an entire bundle straight from MTHDS content and get back a `GraphSpec`, use `dry_run_pipeline(mthds_contents=...)` (`pipelex/pipe_run/dry_run_pipeline.py`) — the shared entrypoint behind the CLI graph commands and the API, which wires the same DRY-mode runner for you.
 
 ### Outputs
 
