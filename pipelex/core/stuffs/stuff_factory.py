@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import Any, cast
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 
 import shortuuid
 from mthds.models.pipeline_inputs import StuffContentOrData
@@ -177,9 +177,17 @@ class StuffFactory:
         # base64/pipelex-storage url is a non-local ResolvedUri; an `s3://`/`gs://`-style scheme slips
         # through as a ResolvedLocalPath but keeps `://` in its path, so reject those too.
         if not isinstance(resolved, ResolvedLocalPath) or "://" in resolved.path:
+            # Strip query/fragment/userinfo before echoing the url: CsvError is caller-facing and
+            # survives STRICT disclosure, so a signed/token-bearing url (e.g. an S3 presigned link)
+            # must not leak its credentials into the message. Keep scheme/host/path to identify it.
+            url_parts = urlsplit(url)
+            safe_netloc = url_parts.hostname or ""
+            if url_parts.port is not None:
+                safe_netloc = f"{safe_netloc}:{url_parts.port}"
+            safe_url = urlunsplit((url_parts.scheme, safe_netloc, url_parts.path, "", ""))
             msg = (
                 f"CSV input supports local file paths only in v1, but stuff '{name}' for concept "
-                f"'{concept.concept_ref}' points at a remote/non-local url: {url!r}. "
+                f"'{concept.concept_ref}' points at a remote/non-local url: {safe_url!r}. "
                 "Download the file locally and reference it by path."
             )
             raise CsvError(msg)

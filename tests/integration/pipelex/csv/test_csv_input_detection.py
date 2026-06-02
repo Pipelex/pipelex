@@ -54,7 +54,12 @@ class TestCsvInputDetection:
             WorkingMemoryFactory.make_from_pipeline_inputs(inputs)
         message = str(exc_info.value)
         assert "local" in message.lower()
-        assert remote_url in message
+        # The path is preserved so the user can identify the offending input...
+        assert "people.csv" in message
+        # ...but the signed query string / fragment (which can carry credentials) must be stripped:
+        # CsvError is caller-facing and survives STRICT disclosure, so it must not leak the token.
+        for secret in ("token=abc", "X-Amz-Signature=deadbeef", "frag"):
+            assert secret not in message
 
     def test_non_csv_url_stays_record(self, load_test_library: Callable[[list[Path]], None]) -> None:
         load_test_library([BUNDLE_DIR])

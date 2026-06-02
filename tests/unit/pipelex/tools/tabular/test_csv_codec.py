@@ -112,6 +112,11 @@ class OptDefaultRow(StructuredContent):
     nickname: str | None = "anon"
 
 
+class IntDefaultRow(StructuredContent):
+    name: str
+    count: int = 0
+
+
 # ---------------------------------------------------------------------------------------
 # Non-flat row models (must be rejected by the flatness classifier)
 # ---------------------------------------------------------------------------------------
@@ -358,11 +363,18 @@ class TestCsvCodec:
         assert item.name == "Ada"
 
     def test_missing_optional_column_is_none_not_model_default(self, tmp_path: Path) -> None:
-        # CT2: an omitted optional column is None for every row even when the field has a NON-None
+        # CT2: an omitted NULLABLE column is None for every row even when the field has a NON-None
         # default ('anon') — the CSV is the source of truth, not the row model's construction default.
         path = write_csv_file(tmp_path, "name\nAda\n")
         item = list_content_from_csv(path, OptDefaultRow).items[0]
         assert item.nickname is None
+
+    def test_missing_non_nullable_defaulted_column_keeps_default(self, tmp_path: Path) -> None:
+        # A non-required but NON-nullable field (count: int = 0) keeps its own default when its column
+        # is omitted — forcing None there would fail validation rather than honor the absence.
+        path = write_csv_file(tmp_path, "name\nAda\n")
+        item = list_content_from_csv(path, IntDefaultRow).items[0]
+        assert item.count == 0
 
     # ----------------------------------------------------------------------------------
     # csv_from_list_content — write side
