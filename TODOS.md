@@ -2,7 +2,7 @@
 
 Branch `feature/Support-csv` (worktree `_csv`), targeting `dev`. This document describes the shipped CSV input/output feature so a PR-review agent can review the diff against intent without re-deriving the design. Design rationale lives in [`wip/csv-support/design.md`](wip/csv-support/design.md); deferred follow-ups in the other `wip/csv-support/*.md` files.
 
-**Status: v1 complete.** All phases done; `make agent-check` green (pyright 0 / mypy 0 / ruff + plxt clean); full `make agent-test` green. Docs + changelog landed.
+**Status: v1 complete — PR [#955](https://github.com/Pipelex/pipelex/pull/955) finalized, ready to merge.** All phases done; `make agent-check` green (pyright 0 / mypy 0 / ruff + plxt clean); full `make agent-test` green; docs + changelog landed. The PR went through 9 automated review rounds (greptile / cubic / codex) to convergence, then a pre-landing gstack `/review` (5 specialists + Codex adversarial) — which caught 3 issues the bot rounds missed (BOM/Excel input, a coercion-error data leak under STRICT, and `--save-csv` error framing) — and the bot re-review of those fixes also converged. All review threads resolved; CI green; mergeable. Deferred items are documented in `wip/csv-support/` (security-followups, phase2/phase3-4 followups).
 
 ---
 
