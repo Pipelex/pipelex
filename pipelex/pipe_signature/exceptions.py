@@ -1,4 +1,4 @@
-from pipelex.base_exceptions import PipelexError
+from pipelex.base_exceptions import ErrorDomain, PipelexError
 
 
 class PipeSignatureNotExecutableError(PipelexError):
@@ -24,7 +24,14 @@ class SignaturesNotAllowedError(PipelexError):
     Strict mode (the default) refuses to dry-run any pipe whose dependency graph contains a
     `PipeSignature` — they are contract-only stubs and a strict caller is asking for a
     fully-implemented pipeline. Lenient mode (`allow_signatures=True`) bypasses this check.
+
+    Classified ``INPUT``: the bundle the caller submitted carries unimplemented placeholders —
+    the caller fixes it by implementing the pipes or opting in via ``allow_signatures``. This makes
+    the API render it as a 422 (not a 500 server fault) and the CLI log it as a caller mistake,
+    matching the agent-CLI's existing ``AGENT_ERROR_DOMAINS`` classification of this error.
     """
+
+    error_domain = ErrorDomain.INPUT
 
     def __init__(
         self,

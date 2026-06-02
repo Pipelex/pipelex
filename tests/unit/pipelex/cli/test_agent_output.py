@@ -11,6 +11,7 @@ import typer
 from typer.testing import CliRunner
 
 from pipelex.base_exceptions import PipelexConfigError, PipelexError
+from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 from pipelex.cli.agent_cli._agent_cli import app  # noqa: PLC2701
 from pipelex.cli.agent_cli.commands.agent_output import (
     AGENT_ERROR_DOMAINS,
@@ -74,17 +75,20 @@ class TestAgentOutput:
     def test_agent_error_includes_signature_hint(self, capsys: pytest.CaptureFixture[str]) -> None:
         """A SignaturesNotAllowedError surfaced through the agent boundary must carry the --allow-signatures hint.
 
-        The agent CLI's strict `validate pipe --all` / single-pipe paths call dry_run directly, so this
-        error reaches agent_error via the command boundary rather than being wrapped in ValidateBundleError;
-        without the fallback-dict entry the agent gets no actionable hint about lenient mode.
+        The agent CLI's strict `validate pipe --all` / single-pipe paths surface this error through
+        agent_error with the exception as cause. The hint still comes from the AGENT_ERROR_HINTS
+        fallback (the class declares no class-level user_action), while error_domain now flows from the
+        exception's class-level INPUT classification rather than the AGENT_ERROR_DOMAINS dict.
         """
+        cause = SignaturesNotAllowedError(offending_pipe_refs={"d.caller"}, signature_refs={"d.summary_sig"}, dep_paths={})
         with pytest.raises(typer.Exit):
-            agent_error("strict validation reached a PipeSignature", "SignaturesNotAllowedError")
+            agent_error("strict validation reached a PipeSignature", "SignaturesNotAllowedError", cause=cause)
 
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["hint"] == AGENT_ERROR_HINTS["SignaturesNotAllowedError"]
         assert "--allow-signatures" in parsed["hint"]
-        assert parsed["error_domain"] == AGENT_ERROR_DOMAINS["SignaturesNotAllowedError"]
+        # error_domain is now sourced from the class-level metadata (INPUT), not the lookup dict.
+        assert parsed["error_domain"] == "input"
 
     def test_agent_error_no_hint_for_unknown_type(self, capsys: pytest.CaptureFixture[str]) -> None:
         """agent_error should not include hint for unregistered error types."""
