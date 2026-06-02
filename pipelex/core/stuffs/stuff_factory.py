@@ -162,11 +162,22 @@ class StuffFactory:
             # Only the bare {"url": ...} wrapper is a table reference; a record with other keys
             # alongside `url` stays a record (its siblings must not be dropped).
             return None
-        # Detect the tabular suffix on the URL's PATH component only. A raw URL fed to
-        # ``Path`` keeps any ``?query``/``#fragment`` inside ``.suffix`` (e.g. an S3 presigned
-        # ``...csv?X-Amz-...``), which would hide the ``.csv`` and let a remote ref slip past the
-        # local-only guard below. ``urlsplit`` strips the query/fragment for plain paths and URLs alike.
-        if not is_tabular_path(Path(urlsplit(url).path)):
+        # Parse the URL once, up front. A malformed url (e.g. a bad IPv6 bracket like ``https://[``)
+        # makes ``urlsplit`` itself raise ``ValueError`` — convert that to a redacted CsvError rather
+        # than let it escape into a traceback that would surface the raw (possibly token-bearing) url.
+        try:
+            url_parts = urlsplit(url)
+        except ValueError as exc:
+            msg = (
+                f"CSV input supports local file paths only in v1, but stuff '{name}' for concept "
+                f"'{concept.concept_ref}' has a url that could not be parsed. "
+                "Download the file locally and reference it by path."
+            )
+            raise CsvError(msg) from exc
+        # Detect the tabular suffix on the URL's PATH component only. A raw URL fed to ``Path`` keeps
+        # any ``?query``/``#fragment`` inside ``.suffix`` (e.g. an S3 presigned ``...csv?X-Amz-...``),
+        # which would hide the ``.csv`` and let a remote ref slip past the local-only guard below.
+        if not is_tabular_path(Path(url_parts.path)):
             return None
         if Concept.is_native_concept(concept=concept):
             # Native file concepts (Image, PDF, ...) own their own url handling; never hijack them.
@@ -180,7 +191,6 @@ class StuffFactory:
             # Strip query/fragment/userinfo before echoing the url: CsvError is caller-facing and
             # survives STRICT disclosure, so a signed/token-bearing url (e.g. an S3 presigned link)
             # must not leak its credentials into the message. Keep scheme/host/path to identify it.
-            url_parts = urlsplit(url)
             safe_netloc = url_parts.hostname or ""
             try:
                 safe_port = url_parts.port

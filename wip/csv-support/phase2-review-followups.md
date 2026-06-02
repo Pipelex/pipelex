@@ -8,6 +8,14 @@ Line numbers are approximate anchors — grep the quoted token if they have drif
 
 ---
 
+## #2 — Nullable-but-required column: mandatory vs. backfill-None (DEFERRED, PR #955 review round 6)
+
+cubic flagged that a *nullable required* field (`x: str | None` with **no** default — pydantic reports `is_required() == True`) has a mandatory CSV column: omitting it raises `CsvColumnError` rather than backfilling `None`. cubic argues nullable columns should always be backfillable to `None`.
+
+**Decision: keep current behavior (deferred, not adopted).** The rule "a column is mandatory ⟺ the field is pydantic-required" is intentional and *respects the author's signal*: writing `x: str | None` **without** `= None` is a deliberate "must be provided" choice (pydantic gives `X | None` no implicit default). Backfilling `None` would silently override that. The current code already maps an omitted *non-required* nullable column to `None` (round-4 `_annotation_allows_none`); only the *required* nullable case errors, which is correct. This is also unreachable from `.mthds`: a `required = false` field always compiles to `Optional[T] = None` (nullable WITH a None default → non-required → already `None` on omission), and a `required = true` field is non-nullable. So the distinction only arises for hand-built Python models. Revisit only if a real use-case wants "nullable ⟹ optional column" semantics.
+
+---
+
 ## #1 — Non-string `Literal` / `Enum` row fields — RESOLVED (Option A, PR #955 review round 3)
 
 **Resolution:** went with Option A (reject). `_is_flat_annotation` now accepts a `Literal` only when every arg is a `str`, and an `Enum` only when every member value is a `str`; a non-string `Literal`/`IntEnum` falls through to `CsvFlatnessError`. This keeps "flat ⇒ round-trippable" honest. Pinned by `IntLiteralRow`/`IntEnumRow` rejection cases + a `StrEnumRow` acceptance case. greptile + cubic both flagged it across rounds. The original tradeoff analysis is kept below for context.

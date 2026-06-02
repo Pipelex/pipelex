@@ -64,6 +64,19 @@ class TestCsvInputDetection:
         for secret in ("token=abc", "X-Amz-Signature=deadbeef", "frag"):
             assert secret not in message
 
+    def test_unparseable_url_rejected_without_leak(self, load_test_library: Callable[[list[Path]], None]) -> None:
+        load_test_library([BUNDLE_DIR])
+        # A malformed url (a bad IPv6 bracket) makes `urlsplit` itself raise; it must become a clean
+        # CsvError, never a raw ValueError that could surface the token-bearing url in a traceback.
+        bad_url = "https://[bad/people.csv?token=abc"
+        inputs: PipelineInputs = {"people": {"concept": "csv_demo.Person", "content": {"url": bad_url}}}
+        with pytest.raises(CsvError) as exc_info:
+            WorkingMemoryFactory.make_from_pipeline_inputs(inputs)
+        message = str(exc_info.value)
+        assert "local" in message.lower()
+        # The unparseable url can't be sanitized, so it is not echoed at all — the token must not leak.
+        assert "token=abc" not in message
+
     def test_non_csv_url_stays_record(self, load_test_library: Callable[[list[Path]], None]) -> None:
         load_test_library([BUNDLE_DIR])
         # url field value that is NOT a tabular suffix → ordinary single record, not a CSV table.
