@@ -264,7 +264,8 @@ async def _execute_run(
             )
             raise typer.Exit(1)
         csv_list_content = cast("ListContent[StuffContent]", csv_content)
-        csv_path = Path(save_csv)
+        # expanduser so a quoted/`=`-form `~/out.csv` writes to the home dir, not a literal `./~` dir.
+        csv_path = Path(save_csv).expanduser()
         # A CSV-save failure (output concept with no structure class, non-flat output, write error) is
         # framed as a --save-csv failure, not a pipeline failure — the pipeline already succeeded.
         # ConceptValueError (a ValueError) and CsvError would otherwise escape execute_run's generic

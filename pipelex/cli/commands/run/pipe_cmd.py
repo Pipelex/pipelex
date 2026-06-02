@@ -88,7 +88,7 @@ def run_pipe_cmd(
         str | None,
         typer.Option(
             "--save-csv",
-            help="Write the main stuff to this CSV path (literal, cwd-relative; NOT under --output-dir). Requires a flat list output.",
+            help="Write the main stuff to this literal CSV path (not under --output-dir; absolute/~/relative ok). Requires a flat list output.",
         ),
     ] = None,
 ) -> None:
