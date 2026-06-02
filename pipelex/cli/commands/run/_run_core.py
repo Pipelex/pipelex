@@ -270,7 +270,11 @@ async def _execute_run(
         flat_field_names(csv_row_model)
         # CQ1: write to the literal cwd-relative path, but still create its parent dirs so a
         # nested target (e.g. reports/2026/out.csv) doesn't fail late after the run completed.
-        csv_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            csv_path.parent.mkdir(parents=True, exist_ok=True)
+        except OSError as mkdir_exc:
+            typer.secho(f"Failed to --save-csv: could not create directory for '{save_csv}': {mkdir_exc}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1) from mkdir_exc
         csv_from_list_content(csv_list_content, row_model=csv_row_model, path=csv_path)
         log.verbose(f"Main stuff CSV saved to: {save_csv}")
 

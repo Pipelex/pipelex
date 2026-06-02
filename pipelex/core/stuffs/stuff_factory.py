@@ -162,6 +162,10 @@ class StuffFactory:
             # Only the bare {"url": ...} wrapper is a table reference; a record with other keys
             # alongside `url` stays a record (its siblings must not be dropped).
             return None
+        if Concept.is_native_concept(concept=concept):
+            # Native file concepts (Image, PDF, ...) own their own url handling; never hijack them.
+            # Checked BEFORE url parsing so a native concept never raises a CSV-flavored error.
+            return None
         # Parse the URL once, up front. A malformed url (e.g. a bad IPv6 bracket like ``https://[``)
         # makes ``urlsplit`` itself raise ``ValueError`` — convert that to a redacted CsvError rather
         # than let it escape into a traceback that would surface the raw (possibly token-bearing) url.
@@ -178,9 +182,6 @@ class StuffFactory:
         # any ``?query``/``#fragment`` inside ``.suffix`` (e.g. an S3 presigned ``...csv?X-Amz-...``),
         # which would hide the ``.csv`` and let a remote ref slip past the local-only guard below.
         if not is_tabular_path(Path(url_parts.path)):
-            return None
-        if Concept.is_native_concept(concept=concept):
-            # Native file concepts (Image, PDF, ...) own their own url handling; never hijack them.
             return None
 
         resolved = resolve_uri(url)

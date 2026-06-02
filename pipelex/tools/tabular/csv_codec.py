@@ -117,16 +117,20 @@ def _assert_single_char_delimiter(delimiter: str) -> None:
     """Reject a delimiter the stdlib ``csv`` module cannot use.
 
     ``csv`` requires the delimiter to be exactly one character and additionally rejects the
-    newline characters (LF/CR) — a one-character newline passes the length check but makes
-    ``csv.reader``/``csv.writer`` raise a raw ``ValueError``/``TypeError`` at construction.
-    Validating both up front keeps the codec's typed-error boundary intact so no raw exception
-    escapes for the exposed ``delimiter`` parameter.
+    newline characters (LF/CR) and the quote character ``"`` (it collides with the default
+    quotechar) — each passes the length check but makes ``csv.reader``/``csv.writer`` raise a raw
+    ``ValueError``/``TypeError`` at construction. Validating them up front keeps the codec's
+    typed-error boundary intact so no raw exception escapes for the exposed ``delimiter`` parameter.
     """
     if len(delimiter) != 1:
         msg = f"CSV delimiter must be a single character, got {delimiter!r}."
         raise CsvError(msg)
     if delimiter in {"\n", "\r"}:
         msg = f"CSV delimiter cannot be a newline character, got {delimiter!r}."
+        raise CsvError(msg)
+    if delimiter == '"':
+        # The default quote character; csv raises "bad delimiter or quotechar value" if they collide.
+        msg = f"CSV delimiter cannot be the quote character, got {delimiter!r}."
         raise CsvError(msg)
 
 
@@ -152,13 +156,15 @@ def _read_table(path: Path, *, delimiter: str, encoding: str) -> tuple[list[str]
     row wider than the header is rejected (its surplus cells map to no column). Each kept row
     carries its 1-based physical CSV line number (the header is line 1, so the first data row
     is line 2, and skipped blank lines still advance the count) so error messages point at the
-    line the author sees in their editor. Wraps every raw
+    line the author sees in their editor. The reader runs in ``strict=True`` mode so malformed
+    quoting (e.g. an unterminated quoted field) raises ``csv.Error`` at the boundary rather than
+    silently merging the following lines into one cell. Wraps every raw
     ``OSError``/``UnicodeDecodeError``/``LookupError``/``csv.Error`` as ``CsvReadError``.
     """
     _assert_single_char_delimiter(delimiter)
     try:
         with path.open("r", encoding=encoding, newline="") as csv_file:
-            raw_rows = list(csv.reader(csv_file, delimiter=delimiter))
+            raw_rows = list(csv.reader(csv_file, delimiter=delimiter, strict=True))
     except UnicodeDecodeError as exc:
         msg = f"Could not decode CSV file {path} as {encoding}: {exc}"
         raise CsvReadError(msg) from exc

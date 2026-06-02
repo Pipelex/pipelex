@@ -209,6 +209,13 @@ class TestCsvCodec:
         with pytest.raises(CsvReadError):
             read_rows(path, encoding="utf-8")
 
+    def test_malformed_quote_raises(self, tmp_path: Path) -> None:
+        # An unterminated quoted field: strict parsing must surface CsvReadError instead of silently
+        # merging the following lines into one cell and running the pipeline on corrupted data.
+        path = write_csv_file(tmp_path, 'name\n"unterminated\nAda\n')
+        with pytest.raises(CsvReadError):
+            read_rows(path)
+
     def test_duplicate_header_raises(self, tmp_path: Path) -> None:
         path = write_csv_file(tmp_path, "name,name\nAda,Lovelace\n")
         with pytest.raises(CsvColumnError):
@@ -338,7 +345,7 @@ class TestCsvCodec:
             list_content_from_csv(path, IntRow)
         message = str(exc_info.value)
         assert "value" in message
-        assert "2" in message  # the offending data row is the 2nd one (1-based)
+        assert "row 3" in message  # 'oops' is on physical CSV line 3 (header=1, '42'=2, 'oops'=3)
 
     # ----------------------------------------------------------------------------------
     # Strict columns
@@ -451,9 +458,9 @@ class TestCsvCodec:
         with pytest.raises(CsvColumnError):
             read_rows(path)
 
-    # "\n"/"\r" are one character (so they pass the length check) but csv rejects them with a raw
+    # "\n"/"\r"/'"' are one character (so they pass the length check) but csv rejects them with a raw
     # ValueError; the codec must turn that into a typed CsvError, not let it escape the boundary.
-    @pytest.mark.parametrize("bad_delimiter", ["", "||", "\n", "\r"])
+    @pytest.mark.parametrize("bad_delimiter", ["", "||", "\n", "\r", '"'])
     def test_bad_delimiter_raises_on_read_and_write(self, tmp_path: Path, bad_delimiter: str) -> None:
         read_path = write_csv_file(tmp_path, "a,b\n1,2\n")
         with pytest.raises(CsvError):
