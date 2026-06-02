@@ -68,10 +68,13 @@ def _is_flat_annotation(annotation: Any) -> bool:
             return False
         return _is_flat_annotation(non_none_args[0])
     if origin is Literal:
-        return True
+        # Only string-valued choices round-trip through a CSV cell: the codec writes the value as a
+        # bare string and pydantic does not coerce that string back into a non-string Literal member.
+        return all(isinstance(arg, str) for arg in get_args(annotation))
     if isinstance(annotation, type):
         if issubclass(annotation, Enum):
-            return True
+            # Same reason: only a str-valued Enum (e.g. StrEnum) round-trips; an IntEnum would not.
+            return all(isinstance(member.value, str) for member in annotation)
         return annotation in _FLAT_SCALAR_TYPES
     return False
 
@@ -313,11 +316,18 @@ def list_content_from_csv(
         msg = f"CSV file {path} is missing required column(s) {sorted(missing_required)} for concept {row_model.__name__!r}."
         raise CsvColumnError(msg)
 
+    # A CSV that omits an optional column means "no value" for every row → None (CT2), regardless of
+    # the row model's own default. Carrying these as explicit None keeps the contract from silently
+    # depending on a non-None field default (e.g. ``nickname: str | None = "anon"``).
+    omitted_optional_fields = field_name_set - header_set
+
     items: list[StuffContentType] = []
     for row_number, data_row in data_rows:
         cell_map = _row_to_dict(header, data_row)
         # Empty cell -> None BEFORE validation (so it targets an optional field, or fails required).
-        row_data = {column: (value or None) for column, value in cell_map.items()}
+        row_data: dict[str, str | None] = {column: (value or None) for column, value in cell_map.items()}
+        for omitted_field in omitted_optional_fields:
+            row_data[omitted_field] = None
         try:
             item = row_model.model_validate(row_data)
         except ValidationError as exc:

@@ -11,6 +11,7 @@ raises ``NotImplementedError`` from every function.
 
 import csv
 from datetime import date
+from enum import IntEnum
 from pathlib import Path
 from typing import Any, Literal
 
@@ -34,7 +35,7 @@ from pipelex.tools.tabular.exceptions import (
     CsvFlatnessError,
     CsvReadError,
 )
-from pipelex.types import Self
+from pipelex.types import Self, StrEnum
 
 # ---------------------------------------------------------------------------------------
 # Flat row models (CSV-legal: scalar fields only)
@@ -96,9 +97,37 @@ class LiteralRow(StructuredContent):
     rating: Literal["low", "high"]
 
 
+class Grade(StrEnum):
+    PASS = "pass"
+    FAIL = "fail"
+
+
+class StrEnumRow(StructuredContent):
+    name: str
+    grade: Grade
+
+
+class OptDefaultRow(StructuredContent):
+    name: str
+    nickname: str | None = "anon"
+
+
 # ---------------------------------------------------------------------------------------
 # Non-flat row models (must be rejected by the flatness classifier)
 # ---------------------------------------------------------------------------------------
+
+
+class Priority(IntEnum):
+    LOW = 1
+    HIGH = 2
+
+
+class IntLiteralRow(StructuredContent):
+    value: Literal[1, 2, 3]
+
+
+class IntEnumRow(StructuredContent):
+    priority: Priority
 
 
 class Inner(StructuredContent):
@@ -207,6 +236,10 @@ class TestCsvCodec:
     def test_flat_field_names_accepts_literal_scalar(self) -> None:
         assert flat_field_names(LiteralRow) == ["name", "rating"]
 
+    def test_flat_field_names_accepts_str_enum(self) -> None:
+        # A str-valued Enum (StrEnum) round-trips through a CSV cell, so it is flat.
+        assert flat_field_names(StrEnumRow) == ["name", "grade"]
+
     @pytest.mark.parametrize(
         ("row_model", "offending_field"),
         [
@@ -215,6 +248,9 @@ class TestCsvCodec:
             (WithNested, "inner"),
             (WithUnion, "value"),
             (WithAny, "value"),
+            # Non-string choices serialize but do not coerce back from a CSV string → not flat.
+            (IntLiteralRow, "value"),
+            (IntEnumRow, "priority"),
         ],
     )
     def test_flat_field_names_rejects_non_flat(self, row_model: type[StructuredContent], offending_field: str) -> None:
@@ -320,6 +356,13 @@ class TestCsvCodec:
         item = list_content_from_csv(path, FlatRow).items[0]
         assert item.nickname is None
         assert item.name == "Ada"
+
+    def test_missing_optional_column_is_none_not_model_default(self, tmp_path: Path) -> None:
+        # CT2: an omitted optional column is None for every row even when the field has a NON-None
+        # default ('anon') — the CSV is the source of truth, not the row model's construction default.
+        path = write_csv_file(tmp_path, "name\nAda\n")
+        item = list_content_from_csv(path, OptDefaultRow).items[0]
+        assert item.nickname is None
 
     # ----------------------------------------------------------------------------------
     # csv_from_list_content — write side

@@ -8,7 +8,15 @@ Line numbers are approximate anchors — grep the quoted token if they have drif
 
 ---
 
-## #1 — Non-string `Literal` / `Enum` row fields: reject vs. coerce-on-read
+## #1 — Non-string `Literal` / `Enum` row fields — RESOLVED (Option A, PR #955 review round 3)
+
+**Resolution:** went with Option A (reject). `_is_flat_annotation` now accepts a `Literal` only when every arg is a `str`, and an `Enum` only when every member value is a `str`; a non-string `Literal`/`IntEnum` falls through to `CsvFlatnessError`. This keeps "flat ⇒ round-trippable" honest. Pinned by `IntLiteralRow`/`IntEnumRow` rejection cases + a `StrEnumRow` acceptance case. greptile + cubic both flagged it across rounds. The original tradeoff analysis is kept below for context.
+
+---
+
+### Original analysis (for context)
+
+### Non-string `Literal` / `Enum` row fields: reject vs. coerce-on-read
 
 **The finding.** The flatness gate `_is_flat_annotation` (`pipelex/tools/tabular/csv_codec.py:67`, `if origin is Literal: return True`; `:70`, `issubclass(annotation, Enum) → True`) accepts *any* `Literal` and *any* `Enum` as CSV-flat. But the codec can only round-trip **string-valued** ones:
 
