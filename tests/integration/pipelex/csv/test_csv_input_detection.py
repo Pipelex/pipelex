@@ -29,8 +29,12 @@ if TYPE_CHECKING:
     from pipelex.core.stuffs.stuff_content import StuffContent
 
 BUNDLE_DIR = Path(__file__).parent / "csv_demo"
-LINKS_CSV = BUNDLE_DIR / "links.csv"
 PEOPLE_CSV = BUNDLE_DIR / "people.csv"
+
+# A separate fixture bundle whose `Link` concept declares its own `url` field — used to fence the
+# url-key ambiguity in input detection (concept-with-a-url-field vs. the {"url": ...} table wrapper).
+URL_FIELD_DIR = Path(__file__).parent / "url_field_concept"
+LINKS_CSV = URL_FIELD_DIR / "links.csv"
 
 
 class TestCsvInputDetection:
@@ -101,9 +105,9 @@ class TestCsvInputDetection:
         assert "token=abc" not in message
 
     def test_non_csv_url_stays_record(self, load_test_library: Callable[[list[Path]], None]) -> None:
-        load_test_library([BUNDLE_DIR])
+        load_test_library([URL_FIELD_DIR])
         # url field value that is NOT a tabular suffix → ordinary single record, not a CSV table.
-        inputs: PipelineInputs = {"link": {"concept": "csv_demo.Link", "content": {"label": "Home", "url": "https://example.com"}}}
+        inputs: PipelineInputs = {"link": {"concept": "url_field_concept.Link", "content": {"label": "Home", "url": "https://example.com"}}}
         working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(inputs)
 
         content = working_memory.get_stuff("link").content
@@ -113,10 +117,10 @@ class TestCsvInputDetection:
         assert record["url"] == "https://example.com"
 
     def test_record_with_csv_url_field_and_siblings_stays_record(self, load_test_library: Callable[[list[Path]], None]) -> None:
-        load_test_library([BUNDLE_DIR])
+        load_test_library([URL_FIELD_DIR])
         # A record that has sibling keys alongside a .csv-suffixed `url` is NOT a table reference:
         # detection is gated to the bare {"url": ...} wrapper, so the siblings are never dropped.
-        inputs: PipelineInputs = {"link": {"concept": "csv_demo.Link", "content": {"label": "Home", "url": "report.csv"}}}
+        inputs: PipelineInputs = {"link": {"concept": "url_field_concept.Link", "content": {"label": "Home", "url": "report.csv"}}}
         working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(inputs)
 
         content = working_memory.get_stuff("link").content
@@ -126,9 +130,9 @@ class TestCsvInputDetection:
         assert record["url"] == "report.csv"
 
     def test_csv_with_url_column_reads(self, load_test_library: Callable[[list[Path]], None]) -> None:
-        load_test_library([BUNDLE_DIR])
+        load_test_library([URL_FIELD_DIR])
         # The file-level url ends .csv → read as a table; the inner `url` column is plain data.
-        inputs: PipelineInputs = {"links": {"concept": "csv_demo.Link", "content": {"url": str(LINKS_CSV)}}}
+        inputs: PipelineInputs = {"links": {"concept": "url_field_concept.Link", "content": {"url": str(LINKS_CSV)}}}
         working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(inputs)
 
         content = working_memory.get_stuff("links").content

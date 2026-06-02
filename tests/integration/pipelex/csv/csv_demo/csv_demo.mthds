@@ -17,14 +17,6 @@ name    = { type = "text", required = true, description = "Full name" }
 country = { type = "text", required = true, description = "Country of origin" }
 summary = { type = "text", required = true, description = "One-sentence persona summary" }
 
-# A flat concept that carries a `url`-named field — used to pin the A3/CT1 detection residual:
-# a non-`.csv` url stays a single record, while a `.csv` whose rows include a `url` column reads correctly.
-[concept.Link]
-description = "A labelled hyperlink"
-[concept.Link.structure]
-label = { type = "text", required = true, description = "Human-readable label" }
-url   = { type = "text", required = true, description = "Target URL" }
-
 # Batch over the list — branch runs once per person
 [pipe.summarize_people]
 type             = "PipeBatch"
