@@ -104,13 +104,19 @@ def flat_field_names(row_model: type[StuffContent]) -> list[str]:
 
 
 def _assert_single_char_delimiter(delimiter: str) -> None:
-    """Reject a delimiter the stdlib ``csv`` module cannot use (it must be exactly one char).
+    """Reject a delimiter the stdlib ``csv`` module cannot use.
 
-    Validating up front turns csv's raw ``TypeError`` into a typed ``CsvError`` so no raw
-    exception escapes the codec boundary.
+    ``csv`` requires the delimiter to be exactly one character and additionally rejects the
+    newline characters (LF/CR) — a one-character newline passes the length check but makes
+    ``csv.reader``/``csv.writer`` raise a raw ``ValueError``/``TypeError`` at construction.
+    Validating both up front keeps the codec's typed-error boundary intact so no raw exception
+    escapes for the exposed ``delimiter`` parameter.
     """
     if len(delimiter) != 1:
         msg = f"CSV delimiter must be a single character, got {delimiter!r}."
+        raise CsvError(msg)
+    if delimiter in {"\n", "\r"}:
+        msg = f"CSV delimiter cannot be a newline character, got {delimiter!r}."
         raise CsvError(msg)
 
 

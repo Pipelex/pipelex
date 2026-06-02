@@ -396,7 +396,9 @@ class TestCsvCodec:
         with pytest.raises(CsvColumnError):
             read_rows(path)
 
-    @pytest.mark.parametrize("bad_delimiter", ["", "||"])
+    # "\n"/"\r" are one character (so they pass the length check) but csv rejects them with a raw
+    # ValueError; the codec must turn that into a typed CsvError, not let it escape the boundary.
+    @pytest.mark.parametrize("bad_delimiter", ["", "||", "\n", "\r"])
     def test_bad_delimiter_raises_on_read_and_write(self, tmp_path: Path, bad_delimiter: str) -> None:
         read_path = write_csv_file(tmp_path, "a,b\n1,2\n")
         with pytest.raises(CsvError):
