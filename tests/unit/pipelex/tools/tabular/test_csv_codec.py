@@ -262,6 +262,13 @@ class TestCsvCodec:
         with pytest.raises(CsvColumnError):
             read_rows(path)
 
+    def test_empty_header_row_raises(self, tmp_path: Path) -> None:
+        # A leading blank line (the first row names no columns) is a malformed header, not data.
+        path = write_csv_file(tmp_path, "\nname\nAda\n")
+        with pytest.raises(CsvColumnError) as exc_info:
+            read_rows(path)
+        assert "empty header" in str(exc_info.value).lower()
+
     def test_blank_header_raises(self, tmp_path: Path) -> None:
         path = write_csv_file(tmp_path, "name,,country\nAda,x,UK\n")
         with pytest.raises(CsvColumnError):

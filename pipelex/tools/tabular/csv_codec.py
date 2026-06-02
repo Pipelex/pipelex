@@ -139,7 +139,13 @@ def _assert_single_char_delimiter(delimiter: str) -> None:
 
 
 def _validate_header(header: list[str], path: Path) -> None:
-    """Reject a CSV header with a blank or duplicate column."""
+    """Reject an empty header, or a header with a blank or duplicate column."""
+    if not header:
+        # An empty first row (a leading blank line, or a file that is just a newline) names no
+        # columns; treat it as a malformed header rather than letting it surface as a confusing
+        # "row wider than header" / missing-required error downstream.
+        msg = f"CSV file {path} has an empty header row; a header naming the columns is required."
+        raise CsvColumnError(msg)
     seen: set[str] = set()
     for column in header:
         if not column.strip():
