@@ -13,6 +13,7 @@ This folder is the **distributed-execution track**: running MTHDS methods as Tem
 - [temporal-ids-and-naming.md](temporal-ids-and-naming.md) — implemented design for Temporal IDs, naming, and observability surfaces.
 - [temporal-exception-model-revamp.md](temporal-exception-model-revamp.md) — deferred proposal to reparent workflow exceptions onto `ApplicationError`.
 - [schema-reconstruction-hardening.md](schema-reconstruction-hardening.md) — deferred hardening of cross-process Pydantic-schema reconstruction.
+- [unit-testing-worker-sandbox-validation.md](unit-testing-worker-sandbox-validation.md) — deferred bug: a sandboxed worker can't boot under `--is-unit-testing` because the registered test workflows fail temporalio sandbox validation.
 
 ---
 
