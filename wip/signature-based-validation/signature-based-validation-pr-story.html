@@ -124,6 +124,11 @@
   </div>
 </header>
 
+<div class="callout note">
+  <span class="lbl">Update · post-#956</span>
+  <p style="margin:8px 0 0">This story tells how the feature originally landed. A later refactor — <strong>#956, "consolidate validation into <code>BundleValidator</code> + execution seams"</strong> — removed the standalone <code>pipelex/pipe_run/dry_run.py</code> and its <code>dry_run_pipe</code> / <code>dry_run_pipes</code> functions. The strict signature pre-check shown in the diffs below now lives in <code>BundleValidator._signature_pre_pass</code> (run from <code>validate_pipes</code>) in <code>pipelex/pipeline/bundle_validator.py</code>, and library/job setup moved into <code>pipelex/pipeline/execution_seams.py</code>. The <em>behaviour</em> — strict default, one aggregated <code>SignaturesNotAllowedError</code>, lenient mock-mint, live-run guard — is unchanged; only the home moved. Diffs below are kept as the original PR's footprint.</p>
+</div>
+
 <h2>Why we did this</h2>
 <p>Validating a bundle <strong>dry-runs every pipe</strong> with mock inputs. Dry-run requires that every sub-pipe of every controller already exists as a fully-defined pipe. There was simply <em>no way</em> to validate a half-built pipeline.</p>
 
@@ -338,7 +343,7 @@
 <span class="ctx">                return False</span></pre>
 </div>
 
-<p><strong>2 — The strict pre-check.</strong> One guard at the top of <code>dry_run_pipe</code>. Default <code>allow_signatures=False</code> means every caller is strict unless it opts out — the safe default that guards against a missed code path.</p>
+<p><strong>2 — The strict pre-check.</strong> One guard, originally at the top of <code>dry_run_pipe</code> (post-#956: in <code>BundleValidator._signature_pre_pass</code>). Default <code>allow_signatures=False</code> means every caller is strict unless it opts out — the safe default that guards against a missed code path.</p>
 <div class="diff">
   <div class="fname">pipelex/pipe_run/dry_run.py</div>
 <pre><span class="del">- async def dry_run_pipe(pipe, raise_on_failure=False) -> DryRunOutput:</span>
@@ -388,7 +393,7 @@
 
 <div class="callout">
   <span class="lbl">The subtle one — aggregation order</span>
-  <p style="margin:8px 0 0"><code>dry_run_pipes</code> does a pre-pass over the whole batch so the user sees <em>every</em> offending signature in one error, not just the first. The first cut aggregated dep-paths "first wins" — but when the signature pipe itself was iterated before its controller, that recorded an empty chain and never replaced it. Fixed: the aggregator keeps the <strong>longest</strong> known dep chain, so the message always shows the most informative path.</p>
+  <p style="margin:8px 0 0">The aggregated pre-pass over the whole batch (originally <code>dry_run_pipes</code>, now <code>BundleValidator._signature_pre_pass</code>) makes the user see <em>every</em> offending signature in one error, not just the first. The first cut aggregated dep-paths "first wins" — but when the signature pipe itself was iterated before its controller, that recorded an empty chain and never replaced it. Fixed: the aggregator keeps the <strong>longest</strong> known dep chain, so the message always shows the most informative path.</p>
 </div>
 
 <h2>CLI surface</h2>
@@ -414,7 +419,7 @@ core/pipes/pipe_abstract.py
 core/bundles/pipelex_bundle_blueprint.py
 core/memory/working_memory_factory.py
 core/registry_models.py
-pipe_run/dry_run.py
+pipeline/bundle_validator.py <span class="muted">(strict pre-check; post-#956, was pipe_run/dry_run.py)</span>
 pipeline/validate_bundle.py
 pipe_controllers/pipe_controller.py
 builder/pipe/pipe_spec_union.py
@@ -432,19 +437,19 @@ cli/error_handlers.py
 </div>
 <p class="muted">Built strict-TDD across 7 phases with stop-checkpoints at phases 3, 5, and 6: type-system foundations → blueprint + runtime + factory → spec layer → strict pre-check → CLI surface → real-<code>.mthds</code> E2E → docs &amp; CHANGELOG. Failing tests written first (red) in every phase. <code>make agent-check</code> and <code>make agent-test</code> green throughout.</p>
 
-<h2 style="border-left-color:var(--amber)">Merge gate — do not skip</h2>
-<p>One item is open by design. The bundled <code>plxt</code> JSON Schema (shipped from <code>vscode-pipelex</code>) does not yet know about <code>type = "PipeSignature"</code>. On this branch, <code>.pipelex/plxt.toml</code> declares a <code>[[rule]]</code> block pointing <code>**/*.mthds</code> validation at the locally-regenerated <code>derived/mthds_schema.json</code>.</p>
+<h2 style="border-left-color:var(--green)">Merge gate — closed (Phase 7.4 done)</h2>
+<p>This section originally flagged one open item: the bundled <code>plxt</code> JSON Schema (shipped from <code>vscode-pipelex</code>) did not yet know about <code>type = "PipeSignature"</code>, so the branch carried a temporary <code>[[rule]]</code> block in <code>.pipelex/plxt.toml</code> pointing <code>**/*.mthds</code> validation at a locally-regenerated <code>derived/mthds_schema.json</code>. <strong>That gate is now closed</strong> — leaving the history here for context.</p>
 
-<div class="callout">
-  <span class="lbl">Reviewers — read this</span>
-  <p style="margin:8px 0 0">That <code>[[rule]]</code> block is the <strong>intended, correct configuration on this branch</strong> — not a workaround to flag. The local schema is the only one that accurately describes the runtime change here. <code>plxt lint</code> is green against it.</p>
+<div class="callout note">
+  <span class="lbl">Resolved</span>
+  <p style="margin:8px 0 0"><code>pipelex-tools</code> <strong>0.6.0</strong> (and the matching <code>vscode-pipelex</code> extension) now bundle an MTHDS schema that knows <code>type = "PipeSignature"</code> and requires <code>type</code> on every pipe variant. The branch-local <code>[[rule]]</code> block has been <strong>removed</strong> from both <code>.pipelex/plxt.toml</code> and the <code>pipelex/kit/configs/plxt.toml</code> template (the two are byte-identical again), the <code>pipelex-tools</code> floor in <code>pyproject.toml</code> is bumped to <code>&gt;=0.6.0</code>, and <code>plxt lint</code> validates <code>.mthds</code> against the <em>bundled</em> schema directly — green across the repo, including the <code>signature_bundles/*.mthds</code> fixtures.</p>
 </div>
 
-<p>At merge time (tracked as Phase 7.4 in the archived plan):</p>
+<p>What the close-out took (Phase 7.4 in the archived plan), now all done:</p>
 <ol class="phases">
-  <li>In <code>vscode-pipelex</code>: regenerate the bundled MTHDS schema so <code>PipeSignature</code> is a valid pipe type; cut a <code>plxt</code> / extension release.</li>
-  <li>In <em>this</em> repo, in the merge commit: remove the <code>[[rule]]</code> block from <code>.pipelex/plxt.toml</code> so the bundled schema takes over again.</li>
-  <li>Re-run <code>make agent-check</code> with the new <code>plxt</code> and no local rule — <code>plxt lint</code> must accept the signature fixtures against the <em>bundled</em> schema. That green is the actual ship-readiness signal.</li>
+  <li>✅ In <code>vscode-pipelex</code> / <code>pipelex-tools</code> 0.6.0: regenerated the bundled MTHDS schema so <code>PipeSignature</code> is a valid pipe type; cut the <code>plxt</code> / extension release.</li>
+  <li>✅ In this repo: removed the <code>[[rule]]</code> block from <code>.pipelex/plxt.toml</code> <em>and</em> the kit template so the bundled schema takes over again, and bumped the <code>pipelex-tools</code> floor to <code>&gt;=0.6.0</code>.</li>
+  <li>✅ Re-ran <code>make plxt-lint</code> / <code>make agent-check</code> with the bundled <code>plxt</code> 0.6.0 and no local rule — green against the bundled schema, including the signature fixtures. That is the ship-readiness signal.</li>
 </ol>
 
 <h2>Explicit non-goals</h2>
@@ -458,7 +463,7 @@ cli/error_handlers.py
 <footer>
   Full TDD plan with phase-by-phase checkpoints archived at
   <code>wip/archive/signature-based-validation-tdd-plan.md</code>.
-  Design rationale &amp; rejected alternatives in <code>wip/signature-based-validation.md</code>.
+  Design rationale &amp; rejected alternatives in <code>wip/signature-based-validation/signature-based-validation.md</code>.
   Questions → ping me on the PR.
 </footer>
 
