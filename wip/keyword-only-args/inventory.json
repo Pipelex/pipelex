@@ -1,11 +1,11 @@
 {
-  "total": 812,
+  "total": 822,
   "per_package_counts": {
     "<root>": 4,
     "builder": 21,
-    "cli": 109,
+    "cli": 111,
     "cogt": 132,
-    "core": 108,
+    "core": 110,
     "errors": 3,
     "graph": 39,
     "kit": 8,
@@ -14,14 +14,15 @@
     "observer": 2,
     "pipe_controllers": 6,
     "pipe_operators": 40,
-    "pipe_run": 21,
-    "pipeline": 12,
+    "pipe_run": 18,
+    "pipe_signature": 2,
+    "pipeline": 14,
     "plugins": 50,
     "reporting": 7,
     "system": 44,
     "temporal": 40,
     "test_extras": 1,
-    "tools": 131,
+    "tools": 136,
     "tracing": 6
   },
   "violations_by_package": {
@@ -145,25 +146,25 @@
       {
         "relative_path": "pipelex/builder/operations/runner_code_ops.py",
         "qualified_name": "build_runner_code_for_pipe",
-        "lineno": 11,
+        "lineno": 17,
         "key": "pipelex/builder/operations/runner_code_ops.py::build_runner_code_for_pipe"
       },
       {
         "relative_path": "pipelex/builder/operations/validate_ops.py",
         "qualified_name": "validate_bundle_file",
-        "lineno": 61,
+        "lineno": 49,
         "key": "pipelex/builder/operations/validate_ops.py::validate_bundle_file"
       },
       {
         "relative_path": "pipelex/builder/operations/validate_ops.py",
         "qualified_name": "validate_pipe",
-        "lineno": 125,
+        "lineno": 101,
         "key": "pipelex/builder/operations/validate_ops.py::validate_pipe"
       },
       {
         "relative_path": "pipelex/builder/operations/validate_ops.py",
         "qualified_name": "validate_pipe_in_bundle",
-        "lineno": 159,
+        "lineno": 150,
         "key": "pipelex/builder/operations/validate_ops.py::validate_pipe_in_bundle"
       },
       {
@@ -189,31 +190,31 @@
       {
         "relative_path": "pipelex/cli/agent_cli/commands/agent_output.py",
         "qualified_name": "_agent_error_json",
-        "lineno": 308,
+        "lineno": 314,
         "key": "pipelex/cli/agent_cli/commands/agent_output.py::_agent_error_json"
       },
       {
         "relative_path": "pipelex/cli/agent_cli/commands/agent_output.py",
         "qualified_name": "_assemble_error_payload",
-        "lineno": 215,
+        "lineno": 221,
         "key": "pipelex/cli/agent_cli/commands/agent_output.py::_assemble_error_payload"
       },
       {
         "relative_path": "pipelex/cli/agent_cli/commands/agent_output.py",
         "qualified_name": "agent_error",
-        "lineno": 335,
+        "lineno": 341,
         "key": "pipelex/cli/agent_cli/commands/agent_output.py::agent_error"
       },
       {
         "relative_path": "pipelex/cli/agent_cli/commands/agent_output.py",
         "qualified_name": "agent_error_markdown",
-        "lineno": 315,
+        "lineno": 321,
         "key": "pipelex/cli/agent_cli/commands/agent_output.py::agent_error_markdown"
       },
       {
         "relative_path": "pipelex/cli/agent_cli/commands/agent_output.py",
         "qualified_name": "agent_success_formatted",
-        "lineno": 379,
+        "lineno": 385,
         "key": "pipelex/cli/agent_cli/commands/agent_output.py::agent_success_formatted"
       },
       {
@@ -284,8 +285,14 @@
       },
       {
         "relative_path": "pipelex/cli/agent_cli/commands/validate/_validate_core.py",
+        "qualified_name": "validate_all_core",
+        "lineno": 22,
+        "key": "pipelex/cli/agent_cli/commands/validate/_validate_core.py::validate_all_core"
+      },
+      {
+        "relative_path": "pipelex/cli/agent_cli/commands/validate/_validate_core.py",
         "qualified_name": "validate_bundle_core",
-        "lineno": 61,
+        "lineno": 54,
         "key": "pipelex/cli/agent_cli/commands/validate/_validate_core.py::validate_bundle_core"
       },
       {
@@ -297,7 +304,7 @@
       {
         "relative_path": "pipelex/cli/agent_cli/commands/validate/_validate_core.py",
         "qualified_name": "validate_pipe_in_bundle_core",
-        "lineno": 123,
+        "lineno": 141,
         "key": "pipelex/cli/agent_cli/commands/validate/_validate_core.py::validate_pipe_in_bundle_core"
       },
       {
@@ -543,25 +550,25 @@
       {
         "relative_path": "pipelex/cli/commands/run/_inputs_path_resolver.py",
         "qualified_name": "resolve_inputs_paths",
-        "lineno": 68,
+        "lineno": 75,
         "key": "pipelex/cli/commands/run/_inputs_path_resolver.py::resolve_inputs_paths"
       },
       {
         "relative_path": "pipelex/cli/commands/run/_inputs_path_resolver.py",
         "qualified_name": "resolve_url_in_value",
-        "lineno": 38,
+        "lineno": 45,
         "key": "pipelex/cli/commands/run/_inputs_path_resolver.py::resolve_url_in_value"
       },
       {
         "relative_path": "pipelex/cli/commands/run/_run_core.py",
         "qualified_name": "_execute_run",
-        "lineno": 41,
+        "lineno": 50,
         "key": "pipelex/cli/commands/run/_run_core.py::_execute_run"
       },
       {
         "relative_path": "pipelex/cli/commands/run/_run_core.py",
         "qualified_name": "execute_run",
-        "lineno": 250,
+        "lineno": 325,
         "key": "pipelex/cli/commands/run/_run_core.py::execute_run"
       },
       {
@@ -585,13 +592,19 @@
       {
         "relative_path": "pipelex/cli/commands/validate/_validate_core.py",
         "qualified_name": "_validate_pipe_or_bundle",
-        "lineno": 78,
+        "lineno": 106,
         "key": "pipelex/cli/commands/validate/_validate_core.py::_validate_pipe_or_bundle"
       },
       {
         "relative_path": "pipelex/cli/commands/validate/_validate_core.py",
+        "qualified_name": "do_validate_all_libraries_and_dry_run",
+        "lineno": 58,
+        "key": "pipelex/cli/commands/validate/_validate_core.py::do_validate_all_libraries_and_dry_run"
+      },
+      {
+        "relative_path": "pipelex/cli/commands/validate/_validate_core.py",
         "qualified_name": "execute_validate",
-        "lineno": 127,
+        "lineno": 168,
         "key": "pipelex/cli/commands/validate/_validate_core.py::execute_validate"
       },
       {
@@ -777,31 +790,31 @@
       {
         "relative_path": "pipelex/cli/error_handlers.py",
         "qualified_name": "_display_validation_error_details",
-        "lineno": 202,
+        "lineno": 231,
         "key": "pipelex/cli/error_handlers.py::_display_validation_error_details"
       },
       {
         "relative_path": "pipelex/cli/error_handlers.py",
         "qualified_name": "handle_model_availability_error",
-        "lineno": 114,
+        "lineno": 139,
         "key": "pipelex/cli/error_handlers.py::handle_model_availability_error"
       },
       {
         "relative_path": "pipelex/cli/error_handlers.py",
         "qualified_name": "handle_model_choice_error",
-        "lineno": 85,
+        "lineno": 108,
         "key": "pipelex/cli/error_handlers.py::handle_model_choice_error"
       },
       {
         "relative_path": "pipelex/cli/error_handlers.py",
         "qualified_name": "handle_model_deck_preset_error",
-        "lineno": 149,
+        "lineno": 176,
         "key": "pipelex/cli/error_handlers.py::handle_model_deck_preset_error"
       },
       {
         "relative_path": "pipelex/cli/error_handlers.py",
         "qualified_name": "handle_validate_bundle_error",
-        "lineno": 274,
+        "lineno": 326,
         "key": "pipelex/cli/error_handlers.py::handle_validate_bundle_error"
       },
       {
@@ -1633,13 +1646,13 @@
       {
         "relative_path": "pipelex/core/bundles/pipelex_bundle_blueprint.py",
         "qualified_name": "PipelexBundleBlueprint._collect_local_refs_from_concept",
-        "lineno": 286,
+        "lineno": 288,
         "key": "pipelex/core/bundles/pipelex_bundle_blueprint.py::PipelexBundleBlueprint._collect_local_refs_from_concept"
       },
       {
         "relative_path": "pipelex/core/bundles/pipelex_bundle_blueprint.py",
         "qualified_name": "PipelexBundleBlueprint._collect_local_refs_from_pipe",
-        "lineno": 309,
+        "lineno": 311,
         "key": "pipelex/core/bundles/pipelex_bundle_blueprint.py::PipelexBundleBlueprint._collect_local_refs_from_pipe"
       },
       {
@@ -1938,14 +1951,20 @@
       },
       {
         "relative_path": "pipelex/core/memory/working_memory_factory.py",
+        "qualified_name": "WorkingMemoryFactory.convert_stuff_spec_to_typed_named",
+        "lineno": 147,
+        "key": "pipelex/core/memory/working_memory_factory.py::WorkingMemoryFactory.convert_stuff_spec_to_typed_named"
+      },
+      {
+        "relative_path": "pipelex/core/memory/working_memory_factory.py",
         "qualified_name": "WorkingMemoryFactory.make_from_multiple_stuffs",
-        "lineno": 36,
+        "lineno": 38,
         "key": "pipelex/core/memory/working_memory_factory.py::WorkingMemoryFactory.make_from_multiple_stuffs"
       },
       {
         "relative_path": "pipelex/core/memory/working_memory_factory.py",
         "qualified_name": "WorkingMemoryFactory.make_from_pipeline_inputs",
-        "lineno": 64,
+        "lineno": 66,
         "key": "pipelex/core/memory/working_memory_factory.py::WorkingMemoryFactory.make_from_pipeline_inputs"
       },
       {
@@ -1993,103 +2012,103 @@
       {
         "relative_path": "pipelex/core/pipes/output/output_renderer.py",
         "qualified_name": "_render_json_output",
-        "lineno": 147,
+        "lineno": 148,
         "key": "pipelex/core/pipes/output/output_renderer.py::_render_json_output"
       },
       {
         "relative_path": "pipelex/core/pipes/output/output_renderer.py",
         "qualified_name": "_render_schema_output",
-        "lineno": 233,
+        "lineno": 234,
         "key": "pipelex/core/pipes/output/output_renderer.py::_render_schema_output"
       },
       {
         "relative_path": "pipelex/core/pipes/output/output_renderer.py",
         "qualified_name": "render_output",
-        "lineno": 113,
+        "lineno": 114,
         "key": "pipelex/core/pipes/output/output_renderer.py::render_output"
       },
       {
         "relative_path": "pipelex/core/pipes/pipe_abstract.py",
         "qualified_name": "PipeAbstract._dry_run_pipe",
-        "lineno": 680,
+        "lineno": 698,
         "key": "pipelex/core/pipes/pipe_abstract.py::PipeAbstract._dry_run_pipe"
       },
       {
         "relative_path": "pipelex/core/pipes/pipe_abstract.py",
         "qualified_name": "PipeAbstract._end_pipe_span_error",
-        "lineno": 839,
+        "lineno": 857,
         "key": "pipelex/core/pipes/pipe_abstract.py::PipeAbstract._end_pipe_span_error"
       },
       {
         "relative_path": "pipelex/core/pipes/pipe_abstract.py",
         "qualified_name": "PipeAbstract._end_pipe_span_success",
-        "lineno": 805,
+        "lineno": 823,
         "key": "pipelex/core/pipes/pipe_abstract.py::PipeAbstract._end_pipe_span_success"
       },
       {
         "relative_path": "pipelex/core/pipes/pipe_abstract.py",
         "qualified_name": "PipeAbstract._live_run_pipe",
-        "lineno": 669,
+        "lineno": 687,
         "key": "pipelex/core/pipes/pipe_abstract.py::PipeAbstract._live_run_pipe"
       },
       {
         "relative_path": "pipelex/core/pipes/pipe_abstract.py",
         "qualified_name": "PipeAbstract._register_execution_data",
-        "lineno": 88,
+        "lineno": 101,
         "key": "pipelex/core/pipes/pipe_abstract.py::PipeAbstract._register_execution_data"
       },
       {
         "relative_path": "pipelex/core/pipes/pipe_abstract.py",
         "qualified_name": "PipeAbstract._run_pipe_traced",
-        "lineno": 434,
+        "lineno": 452,
         "key": "pipelex/core/pipes/pipe_abstract.py::PipeAbstract._run_pipe_traced"
       },
       {
         "relative_path": "pipelex/core/pipes/pipe_abstract.py",
         "qualified_name": "PipeAbstract._start_pipe_span",
-        "lineno": 690,
+        "lineno": 708,
         "key": "pipelex/core/pipes/pipe_abstract.py::PipeAbstract._start_pipe_span"
       },
       {
         "relative_path": "pipelex/core/pipes/pipe_abstract.py",
         "qualified_name": "PipeAbstract._validate_after_run",
-        "lineno": 362,
+        "lineno": 380,
         "key": "pipelex/core/pipes/pipe_abstract.py::PipeAbstract._validate_after_run"
       },
       {
         "relative_path": "pipelex/core/pipes/pipe_abstract.py",
         "qualified_name": "PipeAbstract._validate_before_run",
-        "lineno": 340,
+        "lineno": 358,
         "key": "pipelex/core/pipes/pipe_abstract.py::PipeAbstract._validate_before_run"
       },
       {
         "relative_path": "pipelex/core/pipes/pipe_abstract.py",
         "qualified_name": "PipeAbstract.dry_run_pipe",
-        "lineno": 650,
+        "lineno": 668,
         "key": "pipelex/core/pipes/pipe_abstract.py::PipeAbstract.dry_run_pipe"
       },
       {
         "relative_path": "pipelex/core/pipes/pipe_abstract.py",
         "qualified_name": "PipeAbstract.live_run_pipe",
-        "lineno": 578,
+        "lineno": 596,
         "key": "pipelex/core/pipes/pipe_abstract.py::PipeAbstract.live_run_pipe"
       },
       {
         "relative_path": "pipelex/core/pipes/pipe_abstract.py",
         "qualified_name": "PipeAbstract.run_pipe",
-        "lineno": 409,
+        "lineno": 427,
         "key": "pipelex/core/pipes/pipe_abstract.py::PipeAbstract.run_pipe"
       },
       {
         "relative_path": "pipelex/core/pipes/pipe_abstract.py",
         "qualified_name": "PipeAbstract.validate_after_run",
-        "lineno": 350,
+        "lineno": 368,
         "key": "pipelex/core/pipes/pipe_abstract.py::PipeAbstract.validate_after_run"
       },
       {
         "relative_path": "pipelex/core/pipes/pipe_abstract.py",
         "qualified_name": "PipeAbstract.validate_before_run",
-        "lineno": 293,
+        "lineno": 306,
         "key": "pipelex/core/pipes/pipe_abstract.py::PipeAbstract.validate_before_run"
       },
       {
@@ -2232,32 +2251,38 @@
       },
       {
         "relative_path": "pipelex/core/stuffs/stuff_factory.py",
+        "qualified_name": "StuffFactory._try_make_csv_list_stuff",
+        "lineno": 134,
+        "key": "pipelex/core/stuffs/stuff_factory.py::StuffFactory._try_make_csv_list_stuff"
+      },
+      {
+        "relative_path": "pipelex/core/stuffs/stuff_factory.py",
         "qualified_name": "StuffFactory.combine_stuffs",
-        "lineno": 107,
+        "lineno": 114,
         "key": "pipelex/core/stuffs/stuff_factory.py::StuffFactory.combine_stuffs"
       },
       {
         "relative_path": "pipelex/core/stuffs/stuff_factory.py",
         "qualified_name": "StuffFactory.make_from_concept_ref",
-        "lineno": 52,
+        "lineno": 59,
         "key": "pipelex/core/stuffs/stuff_factory.py::StuffFactory.make_from_concept_ref"
       },
       {
         "relative_path": "pipelex/core/stuffs/stuff_factory.py",
         "qualified_name": "StuffFactory.make_from_str",
-        "lineno": 44,
+        "lineno": 51,
         "key": "pipelex/core/stuffs/stuff_factory.py::StuffFactory.make_from_str"
       },
       {
         "relative_path": "pipelex/core/stuffs/stuff_factory.py",
         "qualified_name": "StuffFactory.make_stuff",
-        "lineno": 62,
+        "lineno": 69,
         "key": "pipelex/core/stuffs/stuff_factory.py::StuffFactory.make_stuff"
       },
       {
         "relative_path": "pipelex/core/stuffs/stuff_factory.py",
         "qualified_name": "StuffFactory.make_stuff_from_stuff_content_or_data",
-        "lineno": 127,
+        "lineno": 224,
         "key": "pipelex/core/stuffs/stuff_factory.py::StuffFactory.make_stuff_from_stuff_content_or_data"
       },
       {
@@ -2601,13 +2626,13 @@
       {
         "relative_path": "pipelex/language/mthds_schema_generator.py",
         "qualified_name": "_remove_from_required",
-        "lineno": 96,
+        "lineno": 89,
         "key": "pipelex/language/mthds_schema_generator.py::_remove_from_required"
       },
       {
         "relative_path": "pipelex/language/mthds_schema_generator.py",
         "qualified_name": "_walk_schema",
-        "lineno": 290,
+        "lineno": 310,
         "key": "pipelex/language/mthds_schema_generator.py::_walk_schema"
       }
     ],
@@ -2793,13 +2818,13 @@
       {
         "relative_path": "pipelex/pipe_controllers/pipe_controller.py",
         "qualified_name": "PipeController._dry_run_controller_pipe",
-        "lineno": 79,
+        "lineno": 80,
         "key": "pipelex/pipe_controllers/pipe_controller.py::PipeController._dry_run_controller_pipe"
       },
       {
         "relative_path": "pipelex/pipe_controllers/pipe_controller.py",
         "qualified_name": "PipeController._live_run_controller_pipe",
-        "lineno": 68,
+        "lineno": 69,
         "key": "pipelex/pipe_controllers/pipe_controller.py::PipeController._live_run_controller_pipe"
       },
       {
@@ -3101,28 +3126,10 @@
         "key": "pipelex/pipe_run/delivery_executor.py::DeliveryExecutor.execute"
       },
       {
-        "relative_path": "pipelex/pipe_run/dry_run.py",
-        "qualified_name": "dry_run_pipe",
-        "lineno": 54,
-        "key": "pipelex/pipe_run/dry_run.py::dry_run_pipe"
-      },
-      {
-        "relative_path": "pipelex/pipe_run/dry_run.py",
-        "qualified_name": "dry_run_pipes",
-        "lineno": 84,
-        "key": "pipelex/pipe_run/dry_run.py::dry_run_pipes"
-      },
-      {
         "relative_path": "pipelex/pipe_run/dry_run_pipeline.py",
         "qualified_name": "dry_run_pipeline",
         "lineno": 17,
         "key": "pipelex/pipe_run/dry_run_pipeline.py::dry_run_pipeline"
-      },
-      {
-        "relative_path": "pipelex/pipe_run/dry_run_with_graph.py",
-        "qualified_name": "dry_run_pipe_with_graph",
-        "lineno": 15,
-        "key": "pipelex/pipe_run/dry_run_with_graph.py::dry_run_pipe_with_graph"
       },
       {
         "relative_path": "pipelex/pipe_run/graph_assembly.py",
@@ -3177,6 +3184,20 @@
         "qualified_name": "PipeRunProtocol.run",
         "lineno": 20,
         "key": "pipelex/pipe_run/pipe_run_protocol.py::PipeRunProtocol.run"
+      }
+    ],
+    "pipe_signature": [
+      {
+        "relative_path": "pipelex/pipe_signature/signature_walk.py",
+        "qualified_name": "collect_signature_paths",
+        "lineno": 40,
+        "key": "pipelex/pipe_signature/signature_walk.py::collect_signature_paths"
+      },
+      {
+        "relative_path": "pipelex/pipe_signature/signature_walk.py",
+        "qualified_name": "collect_signature_refs",
+        "lineno": 14,
+        "key": "pipelex/pipe_signature/signature_walk.py::collect_signature_refs"
       }
     ],
     "pipeline": [
@@ -3237,45 +3258,57 @@
       {
         "relative_path": "pipelex/pipeline/pipeline_run_setup.py",
         "qualified_name": "pipeline_run_setup",
-        "lineno": 50,
+        "lineno": 41,
         "key": "pipelex/pipeline/pipeline_run_setup.py::pipeline_run_setup"
       },
       {
         "relative_path": "pipelex/pipeline/validate_bundle.py",
+        "qualified_name": "_pipes_to_dry_run",
+        "lineno": 152,
+        "key": "pipelex/pipeline/validate_bundle.py::_pipes_to_dry_run"
+      },
+      {
+        "relative_path": "pipelex/pipeline/validate_bundle.py",
         "qualified_name": "load_concepts_only",
-        "lineno": 246,
+        "lineno": 300,
         "key": "pipelex/pipeline/validate_bundle.py::load_concepts_only"
       },
       {
         "relative_path": "pipelex/pipeline/validate_bundle.py",
         "qualified_name": "validate_bundle",
-        "lineno": 119,
+        "lineno": 178,
         "key": "pipelex/pipeline/validate_bundle.py::validate_bundle"
+      },
+      {
+        "relative_path": "pipelex/pipeline/validate_bundle.py",
+        "qualified_name": "validate_bundles_from_directory",
+        "lineno": 262,
+        "key": "pipelex/pipeline/validate_bundle.py::validate_bundles_from_directory"
       }
     ],
     "plugins": [
       {
         "relative_path": "pipelex/plugins/anthropic/anthropic_factory.py",
         "qualified_name": "AnthropicFactory._make_document_block_param",
-        "lineno": 103,
+        "lineno": 104,
         "key": "pipelex/plugins/anthropic/anthropic_factory.py::AnthropicFactory._make_document_block_param"
       },
       {
         "relative_path": "pipelex/plugins/anthropic/anthropic_factory.py",
         "qualified_name": "AnthropicFactory.make_anthropic_client",
-        "lineno": 37,
+        "lineno": 38,
         "key": "pipelex/plugins/anthropic/anthropic_factory.py::AnthropicFactory.make_anthropic_client"
       },
       {
         "relative_path": "pipelex/plugins/anthropic/anthropic_factory.py",
         "qualified_name": "AnthropicFactory.make_nb_tokens_by_category_from_nb",
-        "lineno": 241,
+        "lineno": 242,
         "key": "pipelex/plugins/anthropic/anthropic_factory.py::AnthropicFactory.make_nb_tokens_by_category_from_nb"
       },
       {
         "relative_path": "pipelex/plugins/anthropic/anthropic_factory.py",
         "qualified_name": "AnthropicFactory.openai_typed_user_message",
-        "lineno": 167,
+        "lineno": 168,
         "key": "pipelex/plugins/anthropic/anthropic_factory.py::AnthropicFactory.openai_typed_user_message"
       },
       {
@@ -4817,6 +4850,36 @@
         "qualified_name": "StorageProviderAbstract.store",
         "lineno": 97,
         "key": "pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract.store"
+      },
+      {
+        "relative_path": "pipelex/tools/tabular/csv_codec.py",
+        "qualified_name": "_row_to_dict",
+        "lineno": 219,
+        "key": "pipelex/tools/tabular/csv_codec.py::_row_to_dict"
+      },
+      {
+        "relative_path": "pipelex/tools/tabular/csv_codec.py",
+        "qualified_name": "_validate_header",
+        "lineno": 141,
+        "key": "pipelex/tools/tabular/csv_codec.py::_validate_header"
+      },
+      {
+        "relative_path": "pipelex/tools/tabular/csv_codec.py",
+        "qualified_name": "csv_from_list_content",
+        "lineno": 379,
+        "key": "pipelex/tools/tabular/csv_codec.py::csv_from_list_content"
+      },
+      {
+        "relative_path": "pipelex/tools/tabular/csv_codec.py",
+        "qualified_name": "list_content_from_csv",
+        "lineno": 312,
+        "key": "pipelex/tools/tabular/csv_codec.py::list_content_from_csv"
+      },
+      {
+        "relative_path": "pipelex/tools/tabular/csv_codec.py",
+        "qualified_name": "write_rows",
+        "lineno": 235,
+        "key": "pipelex/tools/tabular/csv_codec.py::write_rows"
       },
       {
         "relative_path": "pipelex/tools/typing/class_utils.py",

@@ -1,6 +1,6 @@
 # Keyword-only arguments — cold-start state
 
-Status: Checkpoint A VERIFIED — guard built; `make agent-check` clean (pyright 0 errors / mypy 1932 files ok); full `make agent-test` green (exit 0); rule strictness + gate placement confirmed with the user; `convention.md` corrected to match the enforced rule. Ready to start Wave 1. Nothing committed yet — see Current position.
+Status: Checkpoint A VERIFIED — guard built; `make agent-check` clean; full `make agent-test` green; rule strictness + gate placement confirmed with the user; `convention.md` corrected to match the enforced rule. Phase 1 committed (`d18a63fc`, `a58456f3`); `dev` has since been merged into this branch and the guard baseline reconciled (812 → 822 — see Per-package inventory). Ready to start Wave 1.
 
 This is the running cold-start log for the keyword-only-arguments refactor. Read this file plus [`../../TODOS.md`](../../TODOS.md) and you have everything needed to resume with zero lost context. The convention itself lives in [`convention.md`](convention.md).
 
@@ -21,23 +21,23 @@ The guard currently passes against its own baseline (all current violations know
 
 ## Per-package violation inventory (baseline)
 
-These are tracked data captured at Checkpoint A from the `--regen-baseline` run, mirrored from `inventory.json` (`per_package_counts`). Total: 812.
+These are tracked data mirrored from `inventory.json` (`per_package_counts`). Total: 822 — reconciled after merging `dev` (the Checkpoint A figure was 812).
 
 | Package | Violations |
 | --- | --- |
-| `tools` | 131 |
+| `tools` | 136 |
 | `cogt` | 132 |
-| `cli` | 109 |
-| `core` | 108 |
+| `cli` | 111 |
+| `core` | 110 |
 | `plugins` | 50 |
 | `system` | 44 |
-| `temporal` | 40 |
 | `pipe_operators` | 40 |
+| `temporal` | 40 |
 | `graph` | 39 |
 | `libraries` | 24 |
 | `builder` | 21 |
-| `pipe_run` | 21 |
-| `pipeline` | 12 |
+| `pipe_run` | 18 |
+| `pipeline` | 14 |
 | `kit` | 8 |
 | `reporting` | 7 |
 | `pipe_controllers` | 6 |
@@ -46,7 +46,10 @@ These are tracked data captured at Checkpoint A from the `--regen-baseline` run,
 | `language` | 4 |
 | `errors` | 3 |
 | `observer` | 2 |
+| `pipe_signature` | 2 |
 | `test_extras` | 1 |
+
+**One-time growth at the `dev` merge.** Merging `dev` imported code written before the guard existed, so the baseline grew once here: +13 new violations from incoming files (`tools/tabular/csv_codec.py`, the new `pipe_signature/` package, dry-run-with-signatures changes in `pipeline/` and the `cli` validate cores, `core/` CSV-stuff factories) and −3 stale entries pruned (the old `pipe_run/dry_run*` functions `dev`'s #953 reshaped). Net 812 → 822. The "strictly shrinks" invariant resumes from this new waterline; the incoming violations get burned down within their normal packages (`csv_codec` → `tools` wave, `pipe_signature` → its own, the dry-run helpers → `pipe_run`/`pipeline`).
 
 These are the burn-down targets ordered into waves in [`README.md`](README.md). The wave order is risk-based (leaf packages first, framework/public surface last), not violation-count order — so a high-count leaf like `tools/` lands in Wave 1 while a smaller but framework-sensitive package like `cli/` waits for Wave 5.
 
@@ -62,7 +65,7 @@ These are the burn-down targets ordered into waves in [`README.md`](README.md). 
 
 ## Current position
 
-Checkpoint A is VERIFIED and snapshotted in `TODOS.md`. Next: Phase 2 / Wave 1 burn-down (`tools/` → root modules → `reporting/` → `observer/` → `tracing/`). Nothing has been committed yet — the Phase-1 guard, the doc fixes, the Makefile + `_dev_cli.py` changes, and the `wip/keyword-only-args/` track sit unstaged on branch `refactor/Function-calling-1`. Commit Phase 1 (and decide whether it is its own PR or the base of the Wave-1 PR) before or as part of starting Wave 1.
+Checkpoint A is VERIFIED and snapshotted in `TODOS.md`. Phase 1 is committed on branch `refactor/Function-calling-2` (`d18a63fc` add guard, `a58456f3` PR-review fixes). `dev` has since been merged into this branch (CSV #955, dry-run-with-signatures #953, `--traceback` #937, security deps #958); the merge's only conflict was `TODOS.md` (kept the keyword-only tracker over `dev`'s deletion), and the guard baseline was regenerated to absorb the incoming code's violations and prune stale entries (812 → 822). Next: Phase 2 / Wave 1 burn-down (`tools/` → root modules → `reporting/` → `observer/` → `tracing/`).
 
 Open question carried into burn-down (Exception 2): the symmetric allowlist is whole-function, so it cannot express "leading directional pair positional, trailing options keyword". Under the strict rule, `copy_file(source_path, target_path, *, overwrite=True)` is still a violation (`target_path` is a second positional). Resolve per-function when its package is migrated: either reshape to `copy_file(source_path, *, target_path, overwrite=True)`, or extend the allowlist with a per-entry leading-positional-count so a genuine pair stays positional while `*` still forces the options keyword. Affects `copy_file`, `has_diff_dirs`, `sync_toml_values` (and any future directional-pair-plus-options helper).
 

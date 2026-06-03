@@ -9,6 +9,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.content_generation.dry_run_factory import MockFormat
+from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint, PipeCategory, PipeType
 from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, parse_concept_with_multiplicity
@@ -88,8 +89,13 @@ class PipeSpec(StructuredContent):
     def validate_output(cls, output: str) -> str:
         # Extract concept without multiplicity for validation
         parse_result = parse_concept_with_multiplicity(output)
-        validate_concept_ref_or_code(concept_ref_or_code=parse_result.concept_ref_or_code)
-        return output  # Return original with brackets intact
+        try:
+            validate_concept_ref_or_code(concept_ref_or_code=parse_result.concept_ref_or_code)
+        except ConceptStringError as exc:
+            # Wrap so pydantic converts it into a ValidationError; otherwise it escapes the
+            # field_validator unwrapped (pydantic v2 only auto-wraps ValueError/TypeError/AssertionError).
+            raise ValueError(str(exc)) from exc
+        return output
 
     @field_validator("inputs", mode="after")
     @classmethod
@@ -114,7 +120,10 @@ class PipeSpec(StructuredContent):
 
             # Extract the concept part (without multiplicity) and validate it
             concept_ref_or_code = match.group(1)
-            validate_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code)
+            try:
+                validate_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code)
+            except ConceptStringError as exc:
+                raise ValueError(str(exc)) from exc
 
         return inputs
 

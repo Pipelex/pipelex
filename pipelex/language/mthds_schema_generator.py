@@ -8,12 +8,12 @@ autocompletion for .mthds files in the vscode-pipelex extension.
 from __future__ import annotations
 
 import copy
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, cast, get_args
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint
 from pipelex.tools.misc.package_utils import get_package_version
 
 # Fields that are injected at load time, never written by users in .mthds files
@@ -22,20 +22,12 @@ _INTERNAL_FIELDS = {"source"}
 # Fields that are technical union discriminators, not user-facing
 _PIPE_INTERNAL_FIELDS = {"pipe_category"}
 
-# Pipe definition names (as they appear in Pydantic schema $defs)
-_PIPE_DEFINITION_NAMES = {
-    "PipeFuncBlueprint",
-    "PipeImgGenBlueprint",
-    "PipeComposeBlueprint",
-    "PipeLLMBlueprint",
-    "PipeExtractBlueprint",
-    "PipeSearchBlueprint",
-    "PipeStructureBlueprint",
-    "PipeBatchBlueprint",
-    "PipeConditionBlueprint",
-    "PipeParallelBlueprint",
-    "PipeSequenceBlueprint",
-}
+# Pipe definition names (as they appear in Pydantic schema $defs), derived from the
+# discriminated union so a newly added pipe type is covered automatically — no drift.
+# PipeBlueprintUnion is `Annotated[A | B | ..., Field(discriminator="type")]`:
+# get_args(...)[0] is the Union, and get_args(union) yields the member classes, whose
+# __name__ matches the Pydantic $defs key.
+_PIPE_DEFINITION_NAMES: frozenset[str] = frozenset(member.__name__ for member in get_args(get_args(PipeBlueprintUnion)[0]))
 
 
 def generate_mthds_schema() -> dict[str, Any]:
@@ -55,6 +47,7 @@ def generate_mthds_schema() -> dict[str, Any]:
 
     schema = _remove_internal_fields(schema)
     schema = _promote_schema_required_fields(schema)
+    schema = _require_type_on_pipe_definitions(schema)
     schema = _convert_to_draft4(schema)
     schema = _patch_construct_schema(schema)
 
@@ -125,6 +118,33 @@ def _promote_schema_required_fields(schema: dict[str, Any]) -> dict[str, Any]:
                 if field_name not in required:
                     required.append(field_name)
             schema_obj["required"] = required
+
+    return schema
+
+
+def _require_type_on_pipe_definitions(schema: dict[str, Any]) -> dict[str, Any]:
+    """Force `type` into the `required` array of every pipe blueprint definition.
+
+    Each pipe blueprint declares `type` as a Literal with a default
+    (e.g. `type: Literal["PipeLLM"] = "PipeLLM"`), so Pydantic omits it from
+    `required`. The runtime union disambiguates with `Field(discriminator="type")`,
+    but `_convert_to_draft4` strips `discriminator` (Draft 4 has none). Without a
+    required `type`, a type-less table like `{description, output}` matches several
+    `oneOf` arms at once and `oneOf` rejects the multi-match with an ambiguous error.
+    Requiring `type` per variant makes a typed table match exactly one arm and a
+    type-less table fail with a clear "missing type".
+    """
+    schema = copy.deepcopy(schema)
+    defs_key = "$defs" if "$defs" in schema else "definitions"
+    definitions = schema.get(defs_key, {})
+
+    for def_name in _PIPE_DEFINITION_NAMES:
+        def_schema = definitions.get(def_name)
+        if def_schema is None or "type" not in def_schema.get("properties", {}):
+            continue
+        required = def_schema.setdefault("required", [])
+        if "type" not in required:
+            required.append("type")
 
     return schema
 

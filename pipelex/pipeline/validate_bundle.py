@@ -1,8 +1,8 @@
 import asyncio
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Literal, Sequence
+from typing import Literal, Sequence, TypedDict
 
 from pydantic import BaseModel, ValidationError
 from typing_extensions import assert_never
@@ -21,15 +21,17 @@ from pipelex.core.pipes.handle_pipe_errors import (
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.validation import report_validation_error
 from pipelex.hub import (
+    clear_current_library,
     get_current_library_id_or_none,
     get_library_manager,
     resolve_library_dirs,
     set_current_library,
-    teardown_current_library,
 )
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
-from pipelex.pipe_run.dry_run import DryRunOutput, dry_run_pipes
+from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_run.exceptions import DryRunError, PipeRunError
+from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
+from pipelex.pipeline.bundle_validator import BundleValidator, DryRunOutput, DryRunStatus
 from pipelex.pipeline.exceptions import ValidateBundleError
 
 
@@ -39,8 +41,31 @@ class ValidateBundleResult(BaseModel):
     dry_run_result: dict[str, DryRunOutput]
 
 
+class ValidatedPipeEntry(TypedDict):
+    """One entry in the ``validated_pipes`` JSON envelope returned by the validate surfaces.
+
+    The ``pipe_code`` key carries the namespaced ``pipe_ref`` (``domain.code``) — the key name is
+    kept for the published JSON contract, but the value is the qualified ref, never the bare code.
+    ``status`` is a ``DryRunStatus`` (a ``StrEnum``), so it serializes to its plain string value.
+    """
+
+    pipe_code: str
+    status: DryRunStatus
+
+
+def build_validated_pipes(dry_run_result: dict[str, DryRunOutput]) -> list[ValidatedPipeEntry]:
+    """Project a dry-run result map into the ``validated_pipes`` JSON list (agent CLI + builder ops).
+
+    Each entry is built from the real per-pipe outcome, so allowed-to-fail FAILUREs and cross-package
+    SKIPPEDs are reported truthfully rather than flattened to SUCCESS. The entry id is the namespaced
+    ``pipe_ref`` (``domain.code``) on every surface — one unambiguous identity that cannot collide
+    across domains, so the same pipe is never reported under two identifiers by different commands.
+    """
+    return [ValidatedPipeEntry(pipe_code=output.pipe_ref, status=output.status) for output in dry_run_result.values()]
+
+
 @contextmanager
-def _translate_to_validate_bundle_error(category: Literal["pipe", "concept"]) -> Iterator[None]:
+def _translate_to_validate_bundle_error(category: Literal["pipe", "concept"]) -> Generator[None, None, None]:
     """Translate the bundle-loading exception surface into a single ``ValidateBundleError``.
 
     Single source of truth for the bundle-loading error cascade, used by all
@@ -50,11 +75,11 @@ def _translate_to_validate_bundle_error(category: Literal["pipe", "concept"]) ->
     ``category="concept"``). A ``PipelexInterpreterError`` becomes a
     ``ValidateBundleError`` carrying the blueprint validation errors, a
     ``PipeFactoryError`` carries the categorized factory error, etc. Sharing one
-    source of truth means a new handler only needs to be added once. The four
+    source of truth means a new handler only needs to be added once. The
     pipe-loading / dry-run handlers (``PipeFactoryError``, ``PipeValidationError``,
-    ``PipeRunError``, ``DryRunError``) are dead code in the concepts-only paths
-    (those functions never instantiate pipes or run dry runs), but they are
-    harmless there — they simply never fire.
+    ``PipeRunError``, ``DryRunError``, ``SignaturesNotAllowedError``) are dead code
+    in the concepts-only paths (those functions never instantiate pipes or run dry
+    runs), but they are harmless there — they simply never fire.
 
     ``category`` controls the user-facing framing for the one branch that fires
     from both paths: the ``except ValidationError`` arm catches pydantic
@@ -114,26 +139,60 @@ def _translate_to_validate_bundle_error(category: Literal["pipe", "concept"]) ->
             message=dry_run_error.message,
             dry_run_error_message=dry_run_error.message,
         ) from dry_run_error
+    except SignaturesNotAllowedError as sig_error:
+        # Strict-mode dry-run refused because the dependency graph reaches a
+        # ``PipeSignature`` placeholder. Carry the error so the CLI can render the
+        # offending signatures and the dependency chains that reach them.
+        raise ValidateBundleError(
+            message=str(sig_error),
+            signature_check_error=sig_error,
+        ) from sig_error
+
+
+def _pipes_to_dry_run(loaded_pipes: list[PipeAbstract], dry_run_pipe_codes: list[str] | None) -> list[PipeAbstract]:
+    """Select which loaded pipes to dry-run.
+
+    Returns every loaded pipe when ``dry_run_pipe_codes`` is ``None`` (whole-bundle validation).
+    Otherwise returns only the pipes whose bare ``code`` or qualified ``pipe_ref`` is requested —
+    used by the ``--pipe`` path to validate a single implemented slice of a partially stubbed
+    bundle without dry-running (and thus rejecting) unrelated pipes or signatures. Filtering here,
+    before ``BundleValidator.validate_pipes``, also narrows its strict signature pre-check to just the selected pipe.
+
+    Raises:
+        PipeNotFoundError: when ``dry_run_pipe_codes`` names a pipe absent from the loaded bundle —
+            so a typo'd ``--pipe`` argument fails loudly instead of passing vacuously.
+    """
+    if dry_run_pipe_codes is None:
+        return loaded_pipes
+    wanted = set(dry_run_pipe_codes)
+    selected = [pipe for pipe in loaded_pipes if pipe.code in wanted or pipe.pipe_ref in wanted]
+    matched = {pipe.code for pipe in selected} | {pipe.pipe_ref for pipe in selected}
+    missing = wanted - matched
+    if missing:
+        missing_str = ", ".join(f"'{code}'" for code in sorted(missing))
+        msg = f"Pipe(s) {missing_str} not found in the bundle. Check for typos and make sure they are declared in the bundle."
+        raise PipeNotFoundError(msg)
+    return selected
 
 
 async def validate_bundle(
     mthds_file_path: Path | None = None,
     mthds_contents: list[str] | None = None,
-    blueprints: list[PipelexBundleBlueprint] | None = None,
     library_dirs: Sequence[Path] | None = None,
+    allow_signatures: bool = False,
+    dry_run_pipe_codes: list[str] | None = None,
 ) -> ValidateBundleResult:
     provided_params = sum(
         [
-            blueprints is not None,
             mthds_contents is not None,
             mthds_file_path is not None,
         ]
     )
     if provided_params == 0:
-        msg = "At least one of blueprints, mthds_contents, or mthds_file_path must be provided to validate_bundle"
+        msg = "At least one of mthds_contents or mthds_file_path must be provided to validate_bundle"
         raise ValidateBundleError(message=msg)
     if provided_params > 1:
-        msg = "Only one of blueprints, mthds_contents, or mthds_file_path can be provided to validate_bundle, not multiple"
+        msg = "Only one of mthds_contents or mthds_file_path can be provided to validate_bundle, not both"
         raise ValidateBundleError(message=msg)
 
     library_manager = get_library_manager()
@@ -158,19 +217,13 @@ async def validate_bundle(
                 )
             else:
                 log.verbose(f"No library directories to load ({source_label})")
-            if blueprints is not None:
-                loaded_blueprints = blueprints
-                loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints)
-                # TODO: wip - restore or refactor dry run
-                # dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
-                result = ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result={})
-
-            elif mthds_contents is not None:
+            if mthds_contents is not None:
                 loaded_blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
                 loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
-                # TODO: wip - restore or refactor dry run
-                # dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
-                result = ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result={})
+                dry_run_results = await BundleValidator().validate_pipes(
+                    pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes), library_id=library_id, allow_signatures=allow_signatures
+                )
+                result = ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
 
             else:
                 assert mthds_file_path is not None
@@ -185,9 +238,10 @@ async def validate_bundle(
                     pipe_codes = list(blueprint.pipe.keys()) if blueprint.pipe else []
                     loaded_pipes = [library.pipe_library.get_required_pipe(pipe_code=code) for code in pipe_codes]
 
-                # TODO: wip - restore or refactor dry run
-                # dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
-                result = ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result={})
+                dry_run_results = await BundleValidator().validate_pipes(
+                    pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes), library_id=library_id, allow_signatures=allow_signatures
+                )
+                result = ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
         success = True
         return result
     finally:
@@ -197,15 +251,15 @@ async def validate_bundle(
             # (e.g. ``LibraryError`` on a double-teardown race) — otherwise the
             # outer scope is left holding the just-torn-down ``library_id``.
             # ``set_current_library`` cannot accept ``None``, so route the
-            # "no outer was set" case through ``teardown_current_library``.
+            # "no outer was set" case through ``clear_current_library``.
             if prev_library_id is not None:
                 set_current_library(library_id=prev_library_id)
             else:
-                teardown_current_library()
+                clear_current_library()
             library_manager.teardown(library_id=library_id)
 
 
-async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResult:
+async def validate_bundles_from_directory(directory: Path, allow_signatures: bool = False) -> ValidateBundleResult:
     mthds_files = get_pipelex_mthds_files_from_dirs(dirs={directory})
     all_blueprints: list[PipelexBundleBlueprint] = []
 
@@ -221,7 +275,7 @@ async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResu
                 all_blueprints.append(blueprint)
 
             loaded_pipes = library_manager.load_libraries(library_id=library_id, library_dirs=[Path(directory)])
-            dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
+            dry_run_results = await BundleValidator().validate_pipes(pipes=loaded_pipes, library_id=library_id, allow_signatures=allow_signatures)
             result = ValidateBundleResult(blueprints=all_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
         success = True
         return result
@@ -232,7 +286,7 @@ async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResu
             if prev_library_id is not None:
                 set_current_library(library_id=prev_library_id)
             else:
-                teardown_current_library()
+                clear_current_library()
             library_manager.teardown(library_id=library_id)
 
 
@@ -246,7 +300,6 @@ class LoadConceptsOnlyResult(BaseModel):
 def load_concepts_only(
     mthds_file_path: Path | None = None,
     mthds_contents: list[str] | None = None,
-    blueprints: list[PipelexBundleBlueprint] | None = None,
     library_dirs: Sequence[Path] | None = None,
 ) -> LoadConceptsOnlyResult:
     """Load MTHDS files processing only domains and concepts, skipping pipes.
@@ -256,9 +309,8 @@ def load_concepts_only(
     and does not run dry runs.
 
     Args:
-        mthds_file_path: Path to a single MTHDS file to load (mutually exclusive with others)
-        mthds_contents: List of MTHDS content strings to load (mutually exclusive with others)
-        blueprints: Pre-parsed blueprints to load (mutually exclusive with others)
+        mthds_file_path: Path to a single MTHDS file to load (mutually exclusive with mthds_contents)
+        mthds_contents: List of MTHDS content strings to load (mutually exclusive with mthds_file_path)
         library_dirs: Optional directories containing additional MTHDS library files
 
     Returns:
@@ -267,12 +319,12 @@ def load_concepts_only(
     Raises:
         ValidateBundleError: If loading fails due to interpreter or validation errors
     """
-    provided_params = sum([blueprints is not None, mthds_contents is not None, mthds_file_path is not None])
+    provided_params = sum([mthds_contents is not None, mthds_file_path is not None])
     if provided_params == 0:
-        msg = "At least one of blueprints, mthds_contents, or mthds_file_path must be provided to load_concepts_only"
+        msg = "At least one of mthds_contents or mthds_file_path must be provided to load_concepts_only"
         raise ValidateBundleError(message=msg)
     if provided_params > 1:
-        msg = "Only one of blueprints, mthds_contents, or mthds_file_path can be provided to load_concepts_only, not multiple"
+        msg = "Only one of mthds_contents or mthds_file_path can be provided to load_concepts_only, not both"
         raise ValidateBundleError(message=msg)
 
     library_manager = get_library_manager()
@@ -297,12 +349,7 @@ def load_concepts_only(
             else:
                 log.verbose(f"No library directories to load ({source_label})")
 
-            if blueprints is not None:
-                loaded_blueprints = blueprints
-                loaded_concepts = library_manager.load_concepts_only_from_blueprints(library_id=library_id, blueprints=blueprints)
-                result = LoadConceptsOnlyResult(blueprints=loaded_blueprints, concepts=loaded_concepts)
-
-            elif mthds_contents is not None:
+            if mthds_contents is not None:
                 loaded_blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
                 loaded_concepts = library_manager.load_concepts_only_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
                 result = LoadConceptsOnlyResult(blueprints=loaded_blueprints, concepts=loaded_concepts)
@@ -330,7 +377,7 @@ def load_concepts_only(
             if prev_library_id is not None:
                 set_current_library(library_id=prev_library_id)
             else:
-                teardown_current_library()
+                clear_current_library()
             library_manager.teardown(library_id=library_id)
 
 
@@ -375,5 +422,5 @@ def load_concepts_only_from_directory(directory: Path) -> LoadConceptsOnlyResult
             if prev_library_id is not None:
                 set_current_library(library_id=prev_library_id)
             else:
-                teardown_current_library()
+                clear_current_library()
             library_manager.teardown(library_id=library_id)

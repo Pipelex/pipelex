@@ -36,6 +36,7 @@ pipelex/cli/agent_cli/commands/run/_output_helpers.py::format_run_markdown
 pipelex/cli/agent_cli/commands/run/_run_core.py::run_pipeline_core
 pipelex/cli/agent_cli/commands/run/_run_core_api.py::run_pipeline_core_api
 pipelex/cli/agent_cli/commands/run/stdin_resolver.py::parse_cli_inputs
+pipelex/cli/agent_cli/commands/validate/_validate_core.py::validate_all_core
 pipelex/cli/agent_cli/commands/validate/_validate_core.py::validate_bundle_core
 pipelex/cli/agent_cli/commands/validate/_validate_core.py::validate_pipe_core
 pipelex/cli/agent_cli/commands/validate/_validate_core.py::validate_pipe_in_bundle_core
@@ -87,6 +88,7 @@ pipelex/cli/commands/update_cmd.py::_apply_updates
 pipelex/cli/commands/update_cmd.py::_print_status_table
 pipelex/cli/commands/update_cmd.py::update_cmd
 pipelex/cli/commands/validate/_validate_core.py::_validate_pipe_or_bundle
+pipelex/cli/commands/validate/_validate_core.py::do_validate_all_libraries_and_dry_run
 pipelex/cli/commands/validate/_validate_core.py::execute_validate
 pipelex/cli/commands/which_cmd.py::do_which_pipe
 pipelex/cli/dev_cli/commands/check_config_sync_cmd.py::check_config_sync_cmd
@@ -311,6 +313,7 @@ pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff_as_list
 pipelex/core/memory/working_memory.py::WorkingMemory.set_alias
 pipelex/core/memory/working_memory.py::WorkingMemory.set_new_main_stuff
 pipelex/core/memory/working_memory.py::WorkingMemory.set_stuff
+pipelex/core/memory/working_memory_factory.py::WorkingMemoryFactory.convert_stuff_spec_to_typed_named
 pipelex/core/memory/working_memory_factory.py::WorkingMemoryFactory.make_from_multiple_stuffs
 pipelex/core/memory/working_memory_factory.py::WorkingMemoryFactory.make_from_pipeline_inputs
 pipelex/core/pipes/handle_pipe_errors.py::_handle_pipe_errors
@@ -360,6 +363,7 @@ pipelex/core/stuffs/stuff_content.py::StuffContent.rendered_markdown_async
 pipelex/core/stuffs/stuff_content_factory.py::StuffContentFactory.make_content_from_value
 pipelex/core/stuffs/stuff_content_factory.py::StuffContentFactory.make_stuff_content_from_concept_required
 pipelex/core/stuffs/stuff_content_factory.py::StuffContentFactory.make_stuff_content_from_concept_with_fallback
+pipelex/core/stuffs/stuff_factory.py::StuffFactory._try_make_csv_list_stuff
 pipelex/core/stuffs/stuff_factory.py::StuffFactory.combine_stuffs
 pipelex/core/stuffs/stuff_factory.py::StuffFactory.make_from_concept_ref
 pipelex/core/stuffs/stuff_factory.py::StuffFactory.make_from_str
@@ -503,10 +507,7 @@ pipelex/pipe_run/delivery_executor.py::DeliveryExecutor._notify_webhook
 pipelex/pipe_run/delivery_executor.py::DeliveryExecutor._store_results
 pipelex/pipe_run/delivery_executor.py::DeliveryExecutor._try_add_rendered_file
 pipelex/pipe_run/delivery_executor.py::DeliveryExecutor.execute
-pipelex/pipe_run/dry_run.py::dry_run_pipe
-pipelex/pipe_run/dry_run.py::dry_run_pipes
 pipelex/pipe_run/dry_run_pipeline.py::dry_run_pipeline
-pipelex/pipe_run/dry_run_with_graph.py::dry_run_pipe_with_graph
 pipelex/pipe_run/graph_assembly.py::assemble_graph_on_output
 pipelex/pipe_run/pipe_job_factory.py::PipeJobFactory.make_pipe_job
 pipelex/pipe_run/pipe_router_protocol.py::PipeRouterProtocol._after_failing_run
@@ -516,6 +517,8 @@ pipelex/pipe_run/pipe_run_params.py::PipeRunParams.copy_by_injecting_multiplicit
 pipelex/pipe_run/pipe_run_params.py::output_multiplicity_to_apply
 pipelex/pipe_run/pipe_run_params_factory.py::PipeRunParamsFactory.make_run_params
 pipelex/pipe_run/pipe_run_protocol.py::PipeRunProtocol.run
+pipelex/pipe_signature/signature_walk.py::collect_signature_paths
+pipelex/pipe_signature/signature_walk.py::collect_signature_refs
 pipelex/pipelex.py::Pipelex._get_validation_error_msg
 pipelex/pipelex.py::Pipelex.make
 pipelex/pipelex.py::Pipelex.setup
@@ -529,8 +532,10 @@ pipelex/pipeline/pipeline_manager.py::PipelineManager._set_pipeline
 pipelex/pipeline/pipeline_manager_abstract.py::PipelineManagerAbstract.add_new_pipeline
 pipelex/pipeline/pipeline_response.py::PipelexPipelineExecuteResponse.from_pipe_output
 pipelex/pipeline/pipeline_run_setup.py::pipeline_run_setup
+pipelex/pipeline/validate_bundle.py::_pipes_to_dry_run
 pipelex/pipeline/validate_bundle.py::load_concepts_only
 pipelex/pipeline/validate_bundle.py::validate_bundle
+pipelex/pipeline/validate_bundle.py::validate_bundles_from_directory
 pipelex/plugins/anthropic/anthropic_factory.py::AnthropicFactory._make_document_block_param
 pipelex/plugins/anthropic/anthropic_factory.py::AnthropicFactory.make_anthropic_client
 pipelex/plugins/anthropic/anthropic_factory.py::AnthropicFactory.make_nb_tokens_by_category_from_nb
@@ -790,6 +795,11 @@ pipelex/tools/secrets/secrets_utils.py::_handle_fallback_pattern
 pipelex/tools/secrets/secrets_utils.py::substitute_vars
 pipelex/tools/storage/gcp_storage_provider.py::GcpStorageProvider._store_sync
 pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract.store
+pipelex/tools/tabular/csv_codec.py::_row_to_dict
+pipelex/tools/tabular/csv_codec.py::_validate_header
+pipelex/tools/tabular/csv_codec.py::csv_from_list_content
+pipelex/tools/tabular/csv_codec.py::list_content_from_csv
+pipelex/tools/tabular/csv_codec.py::write_rows
 pipelex/tools/typing/class_utils.py::are_classes_equivalent
 pipelex/tools/typing/class_utils.py::has_compatible_field
 pipelex/tools/typing/module_inspector.py::find_class_names_in_file

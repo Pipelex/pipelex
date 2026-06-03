@@ -20,6 +20,7 @@ class PipeController(PipeAbstract):
     def class_name(self) -> str:
         return self.__class__.__name__
 
+    @override
     @abstractmethod
     def pipe_dependencies(self) -> set[str]:
         """Return the pipes that are dependencies of the pipe.

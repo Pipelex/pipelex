@@ -21,7 +21,7 @@ concept/
 pipe/
   pipe_spec.py                 # PipeSpec base class (pipe_code, type, inputs, output)
   pipe_spec_union.py           # PipeSpecUnion — discriminated union of all pipe types
-  pipe_signature.py            # Pipe signature information
+  pipe_signature_spec.py       # Pipe signature information
   sub_pipe_spec.py             # SubPipeSpec — references to pipes inside controllers
   pipe_spec_map.py             # Pipe spec mapping
   pipe_llm_spec.py             # PipeLLM — LLM operator

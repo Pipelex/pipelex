@@ -18,6 +18,7 @@ from pipelex.cogt.exceptions import (
 )
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError, ValidateBundleError
 from pipelex.system.exceptions import EnvVarNotFoundError
 from pipelex.system.pipelex_service.exceptions import (
@@ -26,6 +27,7 @@ from pipelex.system.pipelex_service.exceptions import (
     PipelexServiceError,
     RemoteConfigFetchError,
 )
+from pipelex.tools.tabular.exceptions import CsvError
 
 _PIPELINE_EXEC_ERROR = PipelineExecutionError(
     message="boom",
@@ -46,6 +48,7 @@ class TestClassLevelMetadata:
             ("pipe_execution", PipeExecutionError("boom"), ErrorDomain.RUNTIME),
             ("validate_bundle", ValidateBundleError("boom"), ErrorDomain.INPUT),
             ("interpreter", PipelexInterpreterError("boom"), ErrorDomain.INPUT),
+            ("signatures_not_allowed", SignaturesNotAllowedError(offending_pipe_refs=set(), signature_refs=set(), dep_paths={}), ErrorDomain.INPUT),
             ("setup", PipelexSetupError("boom"), ErrorDomain.CONFIG),
             ("config", PipelexConfigError("boom"), ErrorDomain.CONFIG),
             ("service_base", PipelexServiceError("boom"), ErrorDomain.CONFIG),
@@ -100,6 +103,8 @@ class TestClassLevelMetadata:
         [
             ("interpreter", PipelexInterpreterError("boom"), True),
             ("validate_bundle", ValidateBundleError("boom"), True),
+            ("csv", CsvError("boom"), True),
+            ("signatures_not_allowed", SignaturesNotAllowedError(offending_pipe_refs=set(), signature_refs=set(), dep_paths={}), True),
             ("config", PipelexConfigError("boom"), False),
             ("pipe_execution", PipeExecutionError("boom"), False),
             ("cogt", CogtError("boom"), False),

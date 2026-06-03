@@ -87,6 +87,13 @@ def run_method_cmd(
             help="Override config: --cost-report forces the cost table on; --no-cost-report skips reporting entirely (no table and no CSV file).",
         ),
     ] = None,
+    save_csv: Annotated[
+        str | None,
+        typer.Option(
+            "--save-csv",
+            help="Write the main stuff to this literal CSV path (not under --output-dir; absolute/~/relative ok). Requires a flat list output.",
+        ),
+    ] = None,
 ) -> None:
     """Run an installed method by name.
 
@@ -152,4 +159,5 @@ def run_method_cmd(
         telemetry_command_label=f"{COMMAND} method",
         temporal=temporal,
         dynamic_output_concept_ref=dynamic_output_concept_ref,
+        save_csv=save_csv,
     )

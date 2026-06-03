@@ -21,6 +21,7 @@ from pipelex.core.pipes.validation import is_variable_satisfied_by_inputs
 from pipelex.graph.graph_tracer_manager import GraphTracerManager, IOSpec, NodeKind
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
+from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.system.telemetry.otel_constants import (
@@ -66,6 +67,18 @@ class PipeAbstract(ABC, BaseModel):
     @property
     def is_controller(self) -> bool:
         return PipeCategory.is_controller_by_str(self.pipe_category)
+
+    @property
+    def is_signature(self) -> bool:
+        return PipeCategory(self.pipe_category) is PipeCategory.PIPE_SIGNATURE
+
+    def pipe_dependencies(self) -> set[str]:
+        """Return the set of pipe codes that this pipe depends on.
+
+        Operators and signatures have no sub-pipe dependencies by default. Controllers
+        override this to return the codes of pipes they orchestrate.
+        """
+        return set()
 
     @property
     def concept_dependencies(self) -> list[Concept]:
@@ -297,6 +310,11 @@ class PipeAbstract(ABC, BaseModel):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ):
+        # A PipeSignature has no implementation: reject live execution before the input
+        # checks below, so callers get the actionable error, not a misleading "missing inputs".
+        if self.is_signature and pipe_run_params.run_mode.is_live:
+            raise PipeSignatureNotExecutableError(pipe_ref=self.pipe_ref)
+
         # Check that all the needed inputs are actually in the working memory
         missing_input_names: list[str] = []
 

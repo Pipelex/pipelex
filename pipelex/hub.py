@@ -1,5 +1,5 @@
 import sys
-from collections.abc import Iterator, Sequence
+from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
@@ -502,13 +502,20 @@ def get_default_library_dirs() -> list[Path] | None:
     return get_pipelex_hub().get_default_library_dirs()
 
 
-def teardown_current_library() -> None:
-    """Teardown the library_id for the current async context."""
+def clear_current_library() -> None:
+    """Clear the current-library binding (the ``None`` case of :func:`set_current_library`).
+
+    Resets the ``_library_id`` ContextVar to ``None`` for the current async context. This only
+    drops the *pointer* to which library is current — it does **not** free the ``Library`` object
+    from the ``LibraryManager``. To release the library itself, call
+    ``library_manager.teardown(library_id=...)`` (the two are distinct and a full cleanup typically
+    does both).
+    """
     _library_id.set(None)
 
 
 @contextmanager
-def scoped_current_library(library_id: str) -> Iterator[None]:
+def scoped_current_library(library_id: str) -> Generator[None, None, None]:
     """Set ``library_id`` for the scope, then restore the prior value on exit.
 
     Captures the prior ``_library_id`` ContextVar value before setting the new

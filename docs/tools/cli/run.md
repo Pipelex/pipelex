@@ -33,6 +33,7 @@ Runs a pipe by code from your project's pipe library.
 - `--save-main-stuff` / `--no-save-main-stuff` - Whether to save the main output to a file
 - `--save-working-memory` / `--no-save-working-memory` - Whether to save the full working memory
 - `--working-memory-path` - Custom path for the working memory output file
+- `--save-csv` - Write the main stuff to this literal CSV path (**not** under `--output-dir`; absolute or `~`/relative paths all work). Requires a flat list output. See [CSV Input & Output](../../building-methods/pipes/csv-input-and-output.md)
 - `--no-pretty-print` - Skip pretty printing the main output
 - `--graph` / `--no-graph` - Enable/disable execution graph visualization
 - `--graph-full-data` / `--graph-no-data` - Include full data in the graph visualization
@@ -54,6 +55,9 @@ pipelex run pipe hello_world --output-dir my_output/
 
 # Run without saving or pretty printing
 pipelex run pipe my_pipe --no-save-main-stuff --no-pretty-print
+
+# Write a flat list output to CSV (literal path, not under --output-dir)
+pipelex run pipe summarize_people --inputs people.json --save-csv summaries.csv
 
 # Dry-run (no AI calls)
 pipelex run pipe my_pipe --dry-run
@@ -82,6 +86,7 @@ Runs a pipeline from a bundle file (`.mthds`) or a pipeline directory. When a di
 - `--save-main-stuff` / `--no-save-main-stuff` - Whether to save the main output
 - `--save-working-memory` / `--no-save-working-memory` - Whether to save the full working memory
 - `--working-memory-path` - Custom path for the working memory output file
+- `--save-csv` - Write the main stuff to this literal CSV path (**not** under `--output-dir`; absolute or `~`/relative paths all work). Requires a flat list output. See [CSV Input & Output](../../building-methods/pipes/csv-input-and-output.md)
 - `--no-pretty-print` - Skip pretty printing the main output
 - `--graph` / `--no-graph` - Enable/disable execution graph visualization
 - `--graph-full-data` / `--graph-no-data` - Include full data in the graph visualization
@@ -128,6 +133,7 @@ Runs a pipeline from an installed method package.
 - `--save-main-stuff` / `--no-save-main-stuff` - Whether to save the main output
 - `--save-working-memory` / `--no-save-working-memory` - Whether to save the full working memory
 - `--working-memory-path` - Custom path for the working memory output file
+- `--save-csv` - Write the main stuff to this literal CSV path (**not** under `--output-dir`; absolute or `~`/relative paths all work). Requires a flat list output. See [CSV Input & Output](../../building-methods/pipes/csv-input-and-output.md)
 - `--no-pretty-print` - Skip pretty printing the main output
 - `--graph` / `--no-graph` - Enable/disable execution graph visualization
 - `--graph-full-data` / `--graph-no-data` - Include full data in the graph visualization
@@ -170,4 +176,5 @@ The output JSON contains the complete working memory after pipeline execution, i
 
 - [Executing Pipelines](../../building-methods/pipes/executing-pipelines.md)
 - [Providing Inputs to Pipelines](../../building-methods/pipes/provide-inputs.md)
+- [CSV Input & Output](../../building-methods/pipes/csv-input-and-output.md)
 - [Design and Run Pipelines](../../building-methods/pipes/index.md)
