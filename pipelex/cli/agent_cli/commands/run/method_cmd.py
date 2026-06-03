@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -10,7 +11,8 @@ import typer
 from mthds.runners.types import RunnerType
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
-from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success_formatted, set_agent_cli_error_format
+from pipelex.cli.agent_cli.commands.run._output_helpers import format_run_markdown
 from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core
 from pipelex.cli.agent_cli.commands.run._run_core_api import run_pipeline_core_api
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs
@@ -56,17 +58,28 @@ def run_method_cmd(
         bool,
         typer.Option("--with-memory", help="Include full working memory in output (for piping to another method)"),
     ] = False,
+    output_format: Annotated[
+        CliOutputFormat,
+        typer.Option("--format", help="Success output format: markdown (default) or json (structured)"),
+    ] = CliOutputFormat.MARKDOWN,
+    error_format: Annotated[
+        CliOutputFormat | None,
+        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+    ] = None,
 ) -> None:
-    """Execute a pipeline for an installed method and output JSON results.
+    """Execute a pipeline for an installed method and output the results.
 
     Resolves the method by name, determines the pipe code from the method's main_pipe
-    (or --pipe override), and runs the pipeline.
+    (or --pipe override), and runs the pipeline. Default output is markdown;
+    use --format json for structured JSON.
 
     Examples:
         pipelex-agent run method my-method
         pipelex-agent run method my-method --pipe custom_pipe
         pipelex-agent run method my-method --dry-run --mock-inputs
     """
+    set_agent_cli_error_format(error_format or output_format)
+
     # Validate --mock-inputs requires --dry-run
     if mock_inputs and not dry_run:
         agent_error("--mock-inputs requires --dry-run", "ArgumentError")
@@ -118,7 +131,7 @@ def run_method_cmd(
                         with_memory=with_memory,
                     )
                 )
-                agent_success(result)
+                agent_success_formatted(result, functools.partial(format_run_markdown, with_memory=with_memory), output_format)
 
             except ClientAuthenticationError as exc:
                 agent_error(str(exc), "ClientAuthenticationError", cause=exc)
@@ -126,11 +139,12 @@ def run_method_cmd(
             except PipelineRequestError as exc:
                 agent_error(str(exc), "PipelineRequestError", cause=exc)
 
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
+                # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
                 agent_error(str(exc), type(exc).__name__, cause=exc)
 
         case RunnerType.PIPELEX:
-            make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"], needs_inference=not dry_run, needs_model_specs=True)
+            make_pipelex_for_agent_cli(needs_inference=not dry_run, needs_model_specs=True)
 
             try:
                 result = asyncio.run(
@@ -146,7 +160,7 @@ def run_method_cmd(
                         with_memory=with_memory,
                     )
                 )
-                agent_success(result)
+                agent_success_formatted(result, functools.partial(format_run_markdown, with_memory=with_memory), output_format)
 
             except PipelineExecutionError as exc:
                 extra_fields: dict[str, Any] = {
@@ -179,7 +193,8 @@ def run_method_cmd(
                     availability_extra["pipe_stack"] = exc.pipe_stack
                 agent_error(exc.message, "PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
 
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
+                # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
                 agent_error(str(exc), type(exc).__name__, cause=exc)
 
             finally:

@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Union
+from typing import Any, ClassVar, Union
 
 from temporalio import activity, workflow
 
@@ -27,83 +27,90 @@ def configure_temporal_logs():
     activity.logger.full_activity_info_on_extra = temporal_log_config.is_full_activity_info_on_extra
 
 
-class WorkflowLog:
-    """A class for logging messages in Temporal workflows with different severity levels."""
+class _RequestIdLog:
+    """Base for the Temporal log helpers — carries the per-invocation ``request_id``
+    and the seven severity methods that route through the bound logger.
 
-    def verbose(self, content: Union[str, Any]):
-        """Log a verbose-level message in a workflow."""
-        severity = LOGGING_LEVEL_VERBOSE
-        workflow.logger.log(level=severity, msg=content)
+    A :class:`WorkflowLog` / :class:`ActivityLog` is built once per workflow or
+    activity invocation, bound to that invocation's ``job_metadata.request_id``
+    (``None`` when the run carries no inbound API request id). Every severity
+    method packs that ``request_id`` into the Temporal log record via
+    ``extra={"request_id": ...}``, so downstream log shippers can correlate the
+    record back to the originating API request — the call site never threads the
+    id itself.
 
-    def debug(self, content: Union[str, Any]):
-        """Log a debug-level message in a workflow."""
-        severity = logging.DEBUG
-        workflow.logger.log(level=severity, msg=content)
+    Subclasses point ``_logger`` at the right Temporal logger
+    (``workflow.logger`` or ``activity.logger``).
+    """
 
-    def dev(self, content: Union[str, Any]):
-        """Log a development-level message in a workflow."""
-        severity = LOGGING_LEVEL_DEV
-        workflow.logger.log(level=severity, msg=content)
+    # Set on each subclass to the right Temporal logger. The two loggers are
+    # ``LoggerAdapter`` instances initialized at module import time; a ClassVar
+    # reference holds the same instance the call sites and tests target.
+    _logger: ClassVar[Any]
 
-    def info(self, content: Union[str, Any]):
-        """Log an info-level message in a workflow."""
-        severity = logging.INFO
-        workflow.logger.log(level=severity, msg=content)
+    def __init__(self, request_id: str | None = None) -> None:
+        self._request_id = request_id
 
-    def warning(self, content: Union[str, Any]):
-        """Log a warning-level message in a workflow."""
-        severity = logging.WARNING
-        workflow.logger.log(level=severity, msg=content)
+    def _build_extra(self) -> dict[str, str] | None:
+        """Pack the bound ``request_id`` into the logger ``extra`` dict, omitting when absent.
 
-    def error(self, content: Union[str, Any]):
-        """Log an error-level message in a workflow."""
-        severity = logging.ERROR
-        workflow.logger.log(level=severity, msg=content)
+        The Temporal logger merges ``extra`` into each log record so downstream
+        formatters (and JSON-shipping consumers) can read ``record.request_id``.
+        """
+        if self._request_id is None:
+            return None
+        return {"request_id": self._request_id}
 
-    def critical(self, content: Union[str, Any]):
-        """Log a critical-level message in a workflow."""
-        severity = logging.CRITICAL
-        workflow.logger.log(level=severity, msg=content)
+    def verbose(self, content: Union[str, Any]) -> None:
+        self._logger.log(level=LOGGING_LEVEL_VERBOSE, msg=content, extra=self._build_extra())
 
+    def debug(self, content: Union[str, Any]) -> None:
+        self._logger.log(level=logging.DEBUG, msg=content, extra=self._build_extra())
 
-class ActivityLog:
-    """A class for logging messages in Temporal activities with different severity levels."""
+    def dev(self, content: Union[str, Any]) -> None:
+        self._logger.log(level=LOGGING_LEVEL_DEV, msg=content, extra=self._build_extra())
 
-    def verbose(self, content: Union[str, Any]):
-        """Log a verbose-level message in an activity."""
-        severity = LOGGING_LEVEL_VERBOSE
-        activity.logger.log(level=severity, msg=content)
+    def info(self, content: Union[str, Any]) -> None:
+        self._logger.log(level=logging.INFO, msg=content, extra=self._build_extra())
 
-    def debug(self, content: Union[str, Any]):
-        """Log a debug-level message in an activity."""
-        severity = logging.DEBUG
-        activity.logger.log(level=severity, msg=content)
+    def warning(self, content: Union[str, Any]) -> None:
+        self._logger.log(level=logging.WARNING, msg=content, extra=self._build_extra())
 
-    def dev(self, content: Union[str, Any]):
-        """Log a development-level message in an activity."""
-        severity = LOGGING_LEVEL_DEV
-        activity.logger.log(level=severity, msg=content)
+    def error(self, content: Union[str, Any]) -> None:
+        self._logger.log(level=logging.ERROR, msg=content, extra=self._build_extra())
 
-    def info(self, content: Union[str, Any]):
-        """Log an info-level message in an activity."""
-        severity = logging.INFO
-        activity.logger.log(level=severity, msg=content)
-
-    def warning(self, content: Union[str, Any]):
-        """Log a warning-level message in an activity."""
-        severity = logging.WARNING
-        activity.logger.log(level=severity, msg=content)
-
-    def error(self, content: Union[str, Any]):
-        """Log an error-level message in an activity."""
-        severity = logging.ERROR
-        activity.logger.log(level=severity, msg=content)
-
-    def critical(self, content: Union[str, Any]):
-        """Log a critical-level message in an activity."""
-        severity = logging.CRITICAL
-        activity.logger.log(level=severity, msg=content)
+    def critical(self, content: Union[str, Any]) -> None:
+        self._logger.log(level=logging.CRITICAL, msg=content, extra=self._build_extra())
 
 
+class WorkflowLog(_RequestIdLog):
+    """Logs messages in Temporal workflows at different severity levels.
+
+    Build one per ``@workflow.run`` invocation, bound to that run's
+    ``job_metadata.request_id`` — every record it emits then carries that
+    ``request_id`` (see :class:`_RequestIdLog`). The module-level
+    :data:`workflow_log` singleton is unbound (``request_id is None``); it is
+    used by call sites that have no ``job_metadata`` in scope.
+    """
+
+    _logger: ClassVar[Any] = workflow.logger
+
+
+class ActivityLog(_RequestIdLog):
+    """Logs messages in Temporal activities at different severity levels.
+
+    Build one per activity invocation, bound to that activity's
+    ``job_metadata.request_id`` — every record it emits then carries that
+    ``request_id`` (see :class:`_RequestIdLog`). The module-level
+    :data:`activity_log` singleton is unbound (``request_id is None``); it is
+    used by call sites that have no ``job_metadata`` in scope.
+    """
+
+    _logger: ClassVar[Any] = activity.logger
+
+
+# Unbound singletons for call sites with no ``job_metadata`` in scope (e.g. the
+# ``TemporalError`` severity logs). Entry points that do have ``job_metadata``
+# build their own bound instance instead — see ``WfPipeRun`` / ``WfPipeRouter``.
 workflow_log = WorkflowLog()
 activity_log = ActivityLog()

@@ -2,8 +2,8 @@
 
 import uuid
 from collections import defaultdict
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator, Iterable, Iterator
+from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -24,12 +24,39 @@ from pipelex.graph.graphspec import EdgeKind, EdgeSpec, GraphSpec, NodeStatus, P
 from pipelex.hub import get_report_delegate
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.reporting.reporting_manager import ReportingManager
+from pipelex.temporal.config_temporal import ActivityRouteConfig
 from pipelex.temporal.temporal_hub import get_task_manager
 from pipelex.temporal.tprl_content_generation.act_llm_generate import act_llm_gen_text
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog
 from tests.integration.pipelex.temporal.library_crate.helpers import rehydrate_pipe_output
+
+
+@contextmanager
+def route_activities_to(queue: str, activity_names: Iterable[str]) -> Iterator[None]:
+    """Temporarily route the given activity names to ``queue`` via
+    ``worker_config.activity_queues``, restoring prior entries on exit.
+
+    Tests that run an in-process worker on a UUID-based task queue and
+    substitute activities on that worker need this override: without it the
+    in-workflow dispatcher resolves to ``worker_config.default_task_queue``
+    (the production default) where no worker is listening, and the activity
+    hangs until pytest-timeout fires.
+    """
+    worker_config = get_config().temporal.worker_config
+    originals: dict[str, ActivityRouteConfig | None] = {}
+    for activity_name in activity_names:
+        originals[activity_name] = worker_config.activity_queues.get(activity_name)
+        worker_config.activity_queues[activity_name] = ActivityRouteConfig(default=queue, by_handle={})
+    try:
+        yield
+    finally:
+        for activity_name, original in originals.items():
+            if original is None:
+                worker_config.activity_queues.pop(activity_name, None)
+            else:
+                worker_config.activity_queues[activity_name] = original
 
 
 def inject_graph_context(pipe_job: PipeJob, pipeline_run_id: str) -> PipeJob:
@@ -175,9 +202,9 @@ async def _runner_isolated_act_llm_gen_text(llm_assignment: LLMAssignment) -> st
     fixture defaults to DRY mode, where the LLM activity is normally bypassed
     by `ContentGeneratorDry` reporting inline inside the workflow. Subbing
     `act_llm_gen_text` with this version forces the activity to fire from the
-    workflow's `start_activity` call (because we set
-    `inference_task_queue=q_runner`), exercising the cross-worker path even
-    in DRY mode and keeping the test hermetic.
+    workflow's `start_activity` call (because we route `act_llm_gen_text` to
+    `q_runner` via `worker_config.activity_queues`), exercising the
+    cross-worker path even in DRY mode and keeping the test hermetic.
     """
     delegate = get_report_delegate()
     if isinstance(delegate, ReportingManager):
@@ -201,7 +228,7 @@ async def _runner_isolated_act_llm_gen_text(llm_assignment: LLMAssignment) -> st
         job_metadata=synthetic_metadata,
         llm_prompt=llm_assignment.llm_prompt,
         job_params=llm_assignment.llm_setting.make_llm_job_params(),
-        job_config=LLMJobConfig(max_retries=1),
+        job_config=LLMJobConfig(schema_reask_max_attempts=1),
         job_report=LLMJobReport(llm_tokens_usage=tokens_usage),
     )
     delegate.report_inference_job(inference_job=synthetic_job)
@@ -226,8 +253,9 @@ async def make_split_workers(
       the in-process `_event_log_contexts` cache so the runner cannot
       accidentally use the router's registered context.
 
-    Pair this with `worker_config.inference_task_queue = q_runner` so the
-    workflow on `q_router` actually dispatches `act_llm_gen_text` to `q_runner`.
+    Pair this with `worker_config.activity_queues[act_llm_gen_text.__name__] =
+    ActivityRouteConfig(default=q_runner, by_handle={})` so the workflow on
+    `q_router` actually dispatches `act_llm_gen_text` to `q_runner`.
     """
     worker_scopes = get_config().temporal.worker_scopes
     base_router = worker_scopes.scopes["router"]

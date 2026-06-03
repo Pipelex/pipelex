@@ -18,8 +18,9 @@ from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.configs import ConfigPaths
 from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableError, RemoteConfigValidationError
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
+from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.json_utils import deep_update
-from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_path
+from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -690,8 +691,8 @@ def preprocess_test_models_cmd(
             console.print("  • Fixture generation must not proceed without fresh Gateway model specs")
             console.print()
         sys.exit(1)
-    except Exception as exc:
-        # Catch-all for unexpected errors
+    except Exception as exc:  # noqa: BLE001
+        # Dev CLI command root: any unexpected preprocessing failure is reported as a FAILED status line; exit non-zero.
         if quiet:
             console.print(f"[red]✗ Preprocessing failed:[/red] {escape(str(exc))}")
         else:

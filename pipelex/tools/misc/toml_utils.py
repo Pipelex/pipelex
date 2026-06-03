@@ -9,22 +9,9 @@ if TYPE_CHECKING:
 import tomli
 import tomlkit
 
-from pipelex.system.exceptions import ToolError
+from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.json_utils import deep_update
-
-
-class TomlError(ToolError):
-    def __init__(self, message: str, doc: str, pos: int, lineno: int, colno: int):
-        super().__init__(message)
-        self.doc = doc
-        self.pos = pos
-        self.lineno = lineno
-        self.colno = colno
-
-    @classmethod
-    def from_tomli_error(cls, exc: tomli.TOMLDecodeError) -> TomlError:
-        return cls(message=exc.msg, doc=exc.doc, pos=exc.pos, lineno=exc.lineno, colno=exc.colno)
 
 
 def load_toml_from_content(content: str) -> dict[str, Any]:

@@ -97,12 +97,11 @@ class S3StorageProvider(StorageProviderAbstract):
 
         Raises:
             StorageFileNotFoundError: If the object does not exist.
-            StorageS3Error: If the S3 operation fails.
+            StorageS3Error: If the S3 operation fails (any ClientError or BotoCoreError).
         """
         from botocore.exceptions import (  # noqa: PLC0415 - optional dependency, lazy import
+            BotoCoreError,
             ClientError,
-            EndpointConnectionError,
-            NoCredentialsError,
         )
 
         session = self._get_session()
@@ -129,8 +128,8 @@ class S3StorageProvider(StorageProviderAbstract):
                     raise StorageFileNotFoundError(msg) from exc
                 msg = f"S3 ClientError ({error_code}) for key '{key}'"
                 raise StorageS3Error(msg) from exc
-            except (NoCredentialsError, EndpointConnectionError) as exc:
-                msg = f"S3 connectivity/credentials error for key '{key}'"
+            except BotoCoreError as exc:
+                msg = f"S3 backend error for key '{key}': {type(exc).__name__}"
                 raise StorageS3Error(msg) from exc
 
     @override
@@ -143,12 +142,11 @@ class S3StorageProvider(StorageProviderAbstract):
             content_type: Optional MIME type for the object.
 
         Raises:
-            StorageS3Error: If the S3 operation fails.
+            StorageS3Error: If the S3 operation fails (any ClientError or BotoCoreError).
         """
         from botocore.exceptions import (  # noqa: PLC0415 - optional dependency, lazy import
+            BotoCoreError,
             ClientError,
-            EndpointConnectionError,
-            NoCredentialsError,
         )
 
         session = self._get_session()
@@ -171,8 +169,8 @@ class S3StorageProvider(StorageProviderAbstract):
                 error_code = (exc.response.get("Error") or {}).get("Code", "Unknown")
                 msg = f"S3 ClientError ({error_code}) for key '{key}'"
                 raise StorageS3Error(msg) from exc
-            except (NoCredentialsError, EndpointConnectionError) as exc:
-                msg = f"S3 connectivity/credentials error for key '{key}'"
+            except BotoCoreError as exc:
+                msg = f"S3 backend error for key '{key}': {type(exc).__name__}"
                 raise StorageS3Error(msg) from exc
 
     def _make_public_url(self, key: str) -> str:
@@ -196,7 +194,10 @@ class S3StorageProvider(StorageProviderAbstract):
         Returns:
             Presigned URL if signed_urls_lifespan is configured, otherwise a public URL.
         """
-        from botocore.exceptions import ClientError  # noqa: PLC0415 - optional dependency, lazy import
+        from botocore.exceptions import (  # noqa: PLC0415 - optional dependency, lazy import
+            BotoCoreError,
+            ClientError,
+        )
 
         key = self._strip_scheme(uri)
 
@@ -216,5 +217,7 @@ class S3StorageProvider(StorageProviderAbstract):
                 )
                 presigned_url: str = await maybe_url if inspect.isawaitable(maybe_url) else maybe_url
                 return presigned_url
-            except ClientError:
+            except (BotoCoreError, ClientError):
+                # ClientError (signing rejected) and BotoCoreError (transport failure) both
+                # fall back to the public URL — same "if signing fails, serve unsigned" semantics.
                 return self._make_public_url(key)

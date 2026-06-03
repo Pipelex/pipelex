@@ -7,12 +7,13 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from huggingface_hub.errors import HfHubHTTPError, InferenceTimeoutError
 
-if TYPE_CHECKING:
-    from pytest_mock import MockerFixture
-
 from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategory
+from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.plugins.huggingface.huggingface_img_gen_worker import HuggingFaceImgGenWorker
 from tests.unit.pipelex.plugins.huggingface.test_data import HuggingFaceErrorHandlingTestData
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 
 def _make_hf_http_error(status_code: int | None, message: str) -> HfHubHTTPError:
@@ -63,7 +64,7 @@ class TestHuggingFaceWorkerErrorHandling:
     """Tests for HuggingFace ImgGen worker SDK exception handling and error categorization."""
 
     @pytest.mark.parametrize(
-        ("_topic", "status_code", "message", "expected_category", "expected_message_substring"),
+        ("_topic", "status_code", "message", "expected_category", "expected_user_action_kind"),
         HuggingFaceErrorHandlingTestData.HF_HTTP_ERROR_CASES,
     )
     async def test_hf_http_error_categorization(
@@ -73,7 +74,7 @@ class TestHuggingFaceWorkerErrorHandling:
         status_code: int | None,
         message: str,
         expected_category: InferenceErrorCategory,
-        expected_message_substring: str,
+        expected_user_action_kind: UserActionKind,
     ) -> None:
         """HfHubHTTPError is caught and categorized correctly based on status code."""
         worker = _make_hf_img_gen_worker(mocker)
@@ -90,11 +91,12 @@ class TestHuggingFaceWorkerErrorHandling:
             await worker._generate_single_image(img_gen_job=_make_img_gen_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is expected_user_action_kind
         assert exc_info.value.__cause__ is sdk_exc
-        assert expected_message_substring in exc_info.value.args[0].lower()
 
     @pytest.mark.parametrize(
-        ("_topic", "expected_category", "expected_message_substring"),
+        ("_topic", "expected_category", "expected_user_action_kind"),
         HuggingFaceErrorHandlingTestData.TIMEOUT_CASES,
     )
     async def test_inference_timeout_is_transient(
@@ -102,7 +104,7 @@ class TestHuggingFaceWorkerErrorHandling:
         mocker: MockerFixture,
         _topic: str,
         expected_category: InferenceErrorCategory,
-        expected_message_substring: str,
+        expected_user_action_kind: UserActionKind,
     ) -> None:
         """InferenceTimeoutError is caught and categorized as TRANSIENT."""
         worker = _make_hf_img_gen_worker(mocker)
@@ -119,8 +121,9 @@ class TestHuggingFaceWorkerErrorHandling:
             await worker._generate_single_image(img_gen_job=_make_img_gen_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is expected_user_action_kind
         assert exc_info.value.__cause__ is sdk_exc
-        assert expected_message_substring in exc_info.value.args[0].lower()
 
     async def test_error_report_includes_category(self, mocker: MockerFixture) -> None:
         """to_error_report() includes error_category and retryable from the exception."""
@@ -141,3 +144,6 @@ class TestHuggingFaceWorkerErrorHandling:
         assert report.error_category == "configuration"
         assert report.retryable is False
         assert report.error_type == "ImgGenGenerationError"
+        assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.CHECK_CREDENTIALS

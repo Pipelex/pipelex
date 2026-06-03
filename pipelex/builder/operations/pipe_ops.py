@@ -5,12 +5,13 @@
 # pyright: reportUnknownVariableType=false
 # pyright: reportAttributeAccessIssue=false
 
-from typing import Any
+from typing import Any, cast
 
 import tomlkit
 from pydantic import ValidationError
 from tomlkit.items import Table
 
+from pipelex.builder.pipe.exceptions import PipeSpecError
 from pipelex.builder.pipe.pipe_batch_spec import PipeBatchSpec
 from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.builder.pipe.pipe_condition_spec import PipeConditionSpec
@@ -23,6 +24,7 @@ from pipelex.builder.pipe.pipe_search_spec import PipeSearchSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
+from pipelex.builder.pipe.pipe_structure_spec import PipeStructureSpec
 
 # Aliases that agents may use instead of "pipe_code". First found is promoted when canonical key is absent; extras are dropped.
 _PIPE_CODE_ALIASES = ("pipe", "the_pipe_code", "code", "name", "pipe_name", "pipe_ref")
@@ -40,6 +42,28 @@ def _normalize_sub_pipe_dict(data: dict[str, Any]) -> None:
     # Agents sometimes add "inputs" to individual steps — silently drop.
     # Step-level inputs are not supported; inputs set by the pipe definition.
     data.pop("inputs", None)
+
+
+def _normalize_sub_pipe_list(raw_value: Any, field_name: str) -> list[dict[str, Any]]:
+    """Validate and normalize a raw ``steps`` / ``branches`` value into a list of step dicts.
+
+    Each entry is copied (to avoid mutating the caller's nested dicts) and passed
+    through :func:`_normalize_sub_pipe_dict`. A non-list ``raw_value`` or a
+    non-mapping entry is a caller-input fault, raised as a typed ``PipeSpecError``
+    before validation rather than leaking a bare ``TypeError`` / ``ValueError``.
+    """
+    if not isinstance(raw_value, list):
+        msg = f"Pipe spec '{field_name}' must be a list of step mappings, got {type(raw_value).__name__}"
+        raise PipeSpecError(msg)
+    normalized: list[dict[str, Any]] = []
+    for entry in cast("list[Any]", raw_value):
+        if not isinstance(entry, dict):
+            msg = f"Each entry in pipe spec '{field_name}' must be a mapping, got {type(entry).__name__}"
+            raise PipeSpecError(msg)
+        entry_copy = dict(cast("dict[str, Any]", entry))
+        _normalize_sub_pipe_dict(entry_copy)
+        normalized.append(entry_copy)
+    return normalized
 
 
 def _normalize_pipe_code_aliases(data: dict[str, Any]) -> None:
@@ -62,19 +86,22 @@ def _normalize_prompt_aliases(data: dict[str, Any]) -> None:
                 data.pop(alias)
 
 
-def parse_pipe_spec(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
+def parse_pipe_spec(pipe_type: str, spec_data: Any) -> PipeSpec:
     """Parse and validate a PipeSpec from JSON-like data.
 
     Args:
         pipe_type: The type of pipe (e.g., "PipeLLM", "PipeSequence").
-        spec_data: Raw data for the pipe spec.
+        spec_data: Raw data for the pipe spec (untrusted JSON-like input).
 
     Returns:
         Validated PipeSpec instance of the correct type.
 
     Raises:
         ValueError: If the pipe type is invalid.
-        ValidationError: If validation fails.
+        PipeSpecError: If the top-level value is not a mapping, ``steps`` /
+            ``branches`` is not a list, or an entry within them is not a mapping.
+            Carries the INPUT error domain.
+        ValidationError: If Pydantic validation of the assembled spec fails.
     """
     if pipe_type not in pipe_type_to_spec_class:
         valid_types = list(pipe_type_to_spec_class.keys())
@@ -82,6 +109,14 @@ def parse_pipe_spec(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
         raise ValueError(msg)
 
     spec_class = pipe_type_to_spec_class[pipe_type]
+
+    # Validate the top-level shape before iterating so a non-mapping caller input
+    # (scalar / list / None) surfaces as a typed, INPUT-domain PipeSpecError
+    # instead of a bare TypeError / ValueError from ``dict(...)`` below.
+    if not isinstance(spec_data, dict):
+        msg = f"Pipe spec must be a mapping, got {type(spec_data).__name__}"
+        raise PipeSpecError(msg)
+    spec_data = cast("dict[str, Any]", spec_data)
 
     # Work on a copy to avoid mutating the caller's dict
     spec_data = dict(spec_data)
@@ -97,21 +132,14 @@ def parse_pipe_spec(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
 
     # Handle steps/branches conversion — normalize aliases and drop unknown fields.
     # Deep-copy nested dicts to avoid mutating caller's nested structures.
+    # Validate the raw shape before iterating so a malformed ``steps`` / ``branches``
+    # surfaces as a typed, INPUT-domain PipeSpecError instead of a bare TypeError /
+    # ValueError (which the caller cannot tell apart from a real programming bug).
     if "steps" in spec_data:
-        converted_steps = []
-        for step in spec_data["steps"]:
-            step = dict(step)
-            _normalize_sub_pipe_dict(step)
-            converted_steps.append(step)
-        spec_data["steps"] = converted_steps
+        spec_data["steps"] = _normalize_sub_pipe_list(spec_data["steps"], field_name="steps")
 
     if "branches" in spec_data:
-        converted_branches = []
-        for branch in spec_data["branches"]:
-            branch = dict(branch)
-            _normalize_sub_pipe_dict(branch)
-            converted_branches.append(branch)
-        spec_data["branches"] = converted_branches
+        spec_data["branches"] = _normalize_sub_pipe_list(spec_data["branches"], field_name="branches")
 
     # Handle expression -> jinja2_expression_template for PipeCondition
     if pipe_type == "PipeCondition" and "expression" in spec_data:
@@ -174,6 +202,12 @@ def add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: Table) -> None:
             pipe_table.add("system_prompt", pipe_spec.system_prompt)
         if pipe_spec.prompt:
             pipe_table.add("prompt", pipe_spec.prompt)
+        if pipe_spec.structuring_method is not None:
+            pipe_table.add("structuring_method", pipe_spec.structuring_method)
+
+    elif isinstance(pipe_spec, PipeStructureSpec):
+        if pipe_spec.model:
+            pipe_table.add("model", pipe_spec.model)
 
     elif isinstance(pipe_spec, PipeComposeSpec):
         if pipe_spec.construct_spec is not None:

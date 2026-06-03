@@ -13,6 +13,7 @@ from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cli.commands.login.command import login_cmd
 from pipelex.cli.commands.run.app import run_app
+from pipelex.cli.commands.setup_temporal_namespace_cmd import setup_temporal_namespace_cmd
 from pipelex.cli.commands.show_cmd import show_app
 from pipelex.cli.commands.update_cmd import update_cmd
 from pipelex.cli.commands.validate.app import validate_app
@@ -30,7 +31,20 @@ class PipelexCLI(TyperGroup):
     @override
     def list_commands(self, ctx: Context) -> list[str]:
         # List the commands in the proper order because natural ordering doesn't work between Typer groups and commands
-        return ["login", "init", "doctor", "update", "build", "validate", "run", "graph", "show", "which", "worker"]
+        return [
+            "login",
+            "init",
+            "doctor",
+            "update",
+            "build",
+            "validate",
+            "run",
+            "graph",
+            "show",
+            "which",
+            "worker",
+            "setup-temporal-namespace",
+        ]
 
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
@@ -49,18 +63,24 @@ class PipelexCLI(TyperGroup):
         parent: Context | None = None,
         **extra: object,
     ) -> Context:
-        """Intercept --no-logo from args before Click/Typer processes them.
+        """Intercept global flags from args before Click/Typer processes them.
 
-        This allows --no-logo to be placed anywhere in the command line
-        (before or after subcommands) while keeping the CLI architecture clean.
+        This allows --no-logo and --traceback to be placed anywhere in the
+        command line (before or after subcommands) while keeping the CLI
+        architecture clean.
         """
         no_logo = "--no-logo" in args
         if no_logo:
             args = [arg for arg in args if arg != "--no-logo"]
 
+        traceback = "--traceback" in args
+        if traceback:
+            args = [arg for arg in args if arg != "--traceback"]
+
         ctx = super().make_context(info_name, args, parent, **extra)
         ctx.ensure_object(dict)
         ctx.obj["no_logo"] = no_logo
+        ctx.obj["traceback"] = traceback
         return ctx
 
 
@@ -207,3 +227,7 @@ app.add_typer(graph_app, name="graph", help="Generate and render execution graph
 app.add_typer(show_app, name="show", help="Show configuration, pipes, and list AI models")
 app.command(name="which", help="Locate where a pipe is defined, similar to 'which' for executables")(which_cmd)
 app.command(name="worker", help="Start a Temporal worker for distributed workflow execution")(worker_cmd)
+app.command(
+    name="setup-temporal-namespace",
+    help="Register Pipelex's custom search attributes on the configured Temporal namespace",
+)(setup_temporal_namespace_cmd)

@@ -36,6 +36,8 @@ from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from pipelex.pipe_operators.search.pipe_search import PipeSearch
 from pipelex.pipe_operators.search.pipe_search_factory import PipeSearchFactory
+from pipelex.pipe_operators.structure.pipe_structure import PipeStructure
+from pipelex.pipe_operators.structure.pipe_structure_factory import PipeStructureFactory
 from pipelex.system.registries.registry_base import ModelType, RegistryModels
 
 
@@ -49,6 +51,7 @@ class CoreRegistryModels(RegistryModels):
         PipeLLM,
         PipeExtract,
         PipeSearch,
+        PipeStructure,
     ]
 
     PIPE_OPERATORS_FACTORY: ClassVar[list[PipeFactoryProtocol[Any, Any]]] = [
@@ -58,6 +61,7 @@ class CoreRegistryModels(RegistryModels):
         PipeLLMFactory,
         PipeExtractFactory,
         PipeSearchFactory,
+        PipeStructureFactory,
     ]
 
     PIPE_CONTROLLERS: ClassVar[list[PipeAbstractType]] = [

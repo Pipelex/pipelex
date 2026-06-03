@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelManagerError
@@ -12,10 +14,11 @@ from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.model_routing.routing_models import BackendMatchingMethod
 from pipelex.cogt.model_routing.routing_profile import RoutingProfile
 from pipelex.cogt.model_routing.routing_profile_loader import load_active_routing_profile
+from pipelex.cogt.models.exceptions import ModelReferenceParseError
 from pipelex.cogt.models.model_deck import ModelDeck, ModelDeckBlueprint
 from pipelex.cogt.models.model_deck_loader import load_model_deck_blueprint
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
-from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind, ModelReferenceParseError
+from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind
 from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.config import get_config
 from pipelex.system.configuration.config_loader import config_manager
@@ -43,7 +46,7 @@ class ModelManager(ModelManagerAbstract):
         model_deck_paths = [
             str(path)
             for path in find_files_in_dir(
-                dir_path=deck_dir_path,
+                dir_path=Path(deck_dir_path),
                 pattern="*.toml",
                 is_recursive=True,
             )
@@ -64,21 +67,27 @@ class ModelManager(ModelManagerAbstract):
         gateway_config: GatewayConfig | None,
         gateway_config_source: RemoteConfigSource | None,
         needs_inference: bool = True,
+        backends_library_path: str | None = None,
+        backends_dir_path: str | None = None,
+        routing_profile_library_path: str | None = None,
+        deck_dir_path: str | None = None,
     ) -> None:
+        # Override paths let the doctor scope --global properly; default None falls
+        # back to layered config_manager paths for all other callers.
         self.inference_backend_library.load(
             secrets_provider=secrets_provider,
-            backends_library_path=str(config_manager.backends_file_path),
-            backends_dir_path=str(config_manager.backends_dir_path),
+            backends_library_path=backends_library_path or str(config_manager.backends_file_path),
+            backends_dir_path=backends_dir_path or str(config_manager.backends_dir_path),
             gateway_config=gateway_config,
             lenient=not needs_inference,
         )
         enabled_backends = self.inference_backend_library.all_enabled_backends()
         self._routing_profile = load_active_routing_profile(
-            routing_profile_library_path=str(config_manager.routing_profiles_file_path),
+            routing_profile_library_path=routing_profile_library_path or str(config_manager.routing_profiles_file_path),
             enabled_backends=enabled_backends,
             lenient=not needs_inference,
         )
-        model_deck_paths = ModelManager.get_model_deck_paths(deck_dir_path=str(config_manager.model_decks_dir_path))
+        model_deck_paths = ModelManager.get_model_deck_paths(deck_dir_path=deck_dir_path or str(config_manager.model_decks_dir_path))
         deck_blueprint = load_model_deck_blueprint(model_deck_paths=model_deck_paths)
         self.model_deck = self.build_deck(enabled_backends=enabled_backends, model_deck_blueprint=deck_blueprint)
 

@@ -219,13 +219,7 @@ def generate_structures_from_blueprints(
 
             # Handle concepts with refines
             elif concept_blueprint.refines:
-                try:
-                    current_refine = ConceptFactory.make_refine(refine=concept_blueprint.refines, domain_code=blueprint.domain)
-                except Exception as exc:
-                    msg = (
-                        f"Could not validate refine '{concept_blueprint.refines}' for concept '{concept_code}' in domain '{blueprint.domain}': {exc}"
-                    )
-                    raise PipelexError(msg) from exc
+                current_refine = ConceptFactory.make_refine(refine=concept_blueprint.refines, domain_code=blueprint.domain)
 
                 # For native concepts, the structure class name is "ConceptCode" + "Content" (e.g., TextContent)
                 # For custom concepts, the structure class name is the domain-qualified name

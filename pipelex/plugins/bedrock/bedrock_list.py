@@ -11,7 +11,7 @@ from pipelex.config import get_config
 from pipelex.exceptions import MissingDependencyError
 from pipelex.hub import get_console
 from pipelex.plugins.plugin_sdk_registry import Plugin
-from pipelex.tools.aws.aws_config import AwsCredentialsError
+from pipelex.tools.aws.exceptions import AwsCredentialsError
 
 if TYPE_CHECKING:
     from pipelex.cogt.model_backends.backend import InferenceBackend
@@ -34,6 +34,8 @@ def list_bedrock_models(
             lib_extra_name,
             msg,
         )
+
+    from botocore.exceptions import BotoCoreError, ClientError  # noqa: PLC0415 - optional dependency, lazy import
 
     from pipelex.plugins.bedrock.bedrock_llms import bedrock_list_available_models  # noqa: PLC0415
 
@@ -69,7 +71,7 @@ def list_bedrock_models(
                 aws_region=aws_region,
             )
 
-    except Exception as exc:
+    except (AwsCredentialsError, BotoCoreError, ClientError) as exc:
         msg = f"Error listing Bedrock models: {exc}"
         raise PipelexCLIError(msg) from exc
 

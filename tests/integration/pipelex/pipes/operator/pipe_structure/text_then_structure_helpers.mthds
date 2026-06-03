@@ -1,0 +1,23 @@
+domain      = "test_pipe_structure_seq"
+description = "Helpers for PipeStructure-in-PipeSequence tests"
+
+# The RestaurantReview Python structure class is declared in test_structures_basic.py
+# in this same directory. Auto-registered via StructuredContent discovery on library load.
+[concept]
+RestaurantReview = "A structured review of a restaurant"
+
+[pipe.draft_restaurant_review_text]
+type = "PipeLLM"
+description = "Draft a free-form restaurant review from a short brief"
+inputs = { restaurant_brief = "Text" }
+output = "Text"
+prompt = """
+You are a local food critic. Based on this brief, write a short, opinionated
+restaurant review (3 to 5 sentences):
+
+$restaurant_brief
+
+Mention a believable name for the restaurant, the type of cuisine, the city,
+two or three standout dishes, any caveats, your overall feeling on a 1-10
+scale, and a sense of the price range.
+"""

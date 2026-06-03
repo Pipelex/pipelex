@@ -70,6 +70,25 @@ class Log:
         self.poor_handler = None
         self.log_dispatch.reset()
 
+    def configure_if_unset(self, log_config: LogConfig) -> bool:
+        """Configure logging unless already configured.
+
+        Useful for entry points that may be reached after another caller (a library
+        embedding Pipelex, an interleaved test) has already initialized logging.
+        ``configure`` itself is once-per-process and raises on a second call; this
+        guarded variant returns False instead.
+
+        Args:
+            log_config: The log configuration to use.
+
+        Returns:
+            True if configuration was applied, False if logging was already configured.
+        """
+        if self._log_config_instance is not None:
+            return False
+        self.configure(log_config=log_config)
+        return True
+
     def configure(self, log_config: LogConfig):
         """Configure the logging system with the given project name and log configuration.
 

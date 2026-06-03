@@ -1,10 +1,10 @@
 import re
 from typing import TYPE_CHECKING
 
-from pipelex.base_exceptions import PipelexError
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.validation import validate_concept_ref_or_code
+from pipelex.core.pipes.inputs.exceptions import InputStuffSpecsFactoryError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, PipeInputsRoot
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.hub import get_required_concept
@@ -13,8 +13,7 @@ if TYPE_CHECKING:
     from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 
 
-class InputStuffSpecsFactoryError(PipelexError):
-    pass
+__all__ = ["InputStuffSpecsFactory", "InputStuffSpecsFactoryError"]
 
 
 class InputStuffSpecsFactory:

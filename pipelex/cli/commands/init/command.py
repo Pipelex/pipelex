@@ -1,6 +1,5 @@
 """Main command orchestration for the init command."""
 
-import os
 import shutil
 from pathlib import Path
 
@@ -41,7 +40,6 @@ from pipelex.system.pipelex_service.pipelex_service_config import (
 from pipelex.system.pipelex_service.remote_config_cache import RemoteConfigCache
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
-from pipelex.tools.misc.file_utils import path_exists
 
 
 class CachePrimingResult(BaseModel):
@@ -143,7 +141,7 @@ def prime_remote_config_cache(console: Console, target_config_dir: Path | None =
         console.print("[dim]Re-run 'pipelex init' while online to prime the cache for offline dry-runs.[/dim]")
 
 
-def _check_gateway_terms_if_needed(console: Console, backends_toml_path: str) -> None:
+def _check_gateway_terms_if_needed(console: Console, backends_toml_path: Path) -> None:
     """Check if gateway is enabled and terms not yet accepted, then prompt for acceptance.
 
     This is called after init_config() to ensure users who have gateway enabled
@@ -155,7 +153,7 @@ def _check_gateway_terms_if_needed(console: Console, backends_toml_path: str) ->
         backends_toml_path: Path to backends.toml file.
     """
     # Check if backends.toml exists and gateway is enabled
-    if not path_exists(backends_toml_path):
+    if not backends_toml_path.exists():
         return
 
     selected_backend_keys = get_selected_backend_keys(backends_toml_path)
@@ -187,9 +185,9 @@ def determine_needs(
     check_inference: bool,
     check_routing: bool,
     check_telemetry: bool,
-    backends_toml_path: str,
-    routing_profiles_toml_path: str,
-    telemetry_config_path: str,
+    backends_toml_path: Path,
+    routing_profiles_toml_path: Path,
+    telemetry_config_path: Path,
     target_config_dir: Path | None = None,
 ) -> tuple[bool, bool, bool, bool]:
     """Determine what needs to be initialized based on current state.
@@ -208,13 +206,11 @@ def determine_needs(
     Returns:
         Tuple of (needs_config, needs_inference, needs_routing, needs_telemetry) booleans.
     """
-    nb_missing_config_files = (
-        init_config(reset=False, dry_run=True, target_dir=str(target_config_dir) if target_config_dir else None) if check_config else 0
-    )
+    nb_missing_config_files = init_config(reset=False, dry_run=True, target_dir=target_config_dir) if check_config else 0
     needs_config = check_config and (nb_missing_config_files > 0 or reset)
-    needs_inference = check_inference and (not path_exists(backends_toml_path) or reset)
-    needs_routing = check_routing and (not path_exists(routing_profiles_toml_path) or reset)
-    needs_telemetry = check_telemetry and (not path_exists(telemetry_config_path) or reset)
+    needs_inference = check_inference and (not backends_toml_path.exists() or reset)
+    needs_routing = check_routing and (not routing_profiles_toml_path.exists() or reset)
+    needs_telemetry = check_telemetry and (not telemetry_config_path.exists() or reset)
 
     return needs_config, needs_inference, needs_routing, needs_telemetry
 
@@ -277,8 +273,8 @@ def execute_initialization(
     reset: bool,
     check_inference: bool,
     check_routing: bool,
-    backends_toml_path: str,
-    telemetry_config_path: str,
+    backends_toml_path: Path,
+    telemetry_config_path: Path,
     is_first_time_backends_setup: bool,
     target_config_dir: Path | None = None,
     for_project: bool = False,
@@ -306,14 +302,14 @@ def execute_initialization(
     # Step 1: Initialize config if needed
     if needs_config:
         # Check if backends.toml exists before copying
-        backends_existed_before = path_exists(backends_toml_path)
+        backends_existed_before = backends_toml_path.exists()
 
         console.print()
-        init_config(reset=reset, target_dir=str(target_config_dir) if target_config_dir else None)
+        init_config(reset=reset, target_dir=target_config_dir)
 
         # init_config skips the inference/ directory (handled independently by the inference step).
         # Detect first-time setup: if backends.toml didn't exist before, inference needs to be set up.
-        backends_exists_now = path_exists(backends_toml_path)
+        backends_exists_now = backends_toml_path.exists()
 
         if not backends_existed_before or (check_inference and backends_exists_now):
             needs_inference = True
@@ -338,28 +334,26 @@ def execute_initialization(
 
             # Reset backends.toml
             template_backends_path = template_inference_dir / "backends.toml"
-            Path(backends_toml_path).parent.mkdir(parents=True, exist_ok=True)
+            backends_toml_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(template_backends_path, backends_toml_path)
 
             # Reset all individual backend files in backends/ directory
             template_backends_dir = template_inference_dir / "backends"
             target_backends_dir = target_inference_dir / "backends"
             target_backends_dir.mkdir(parents=True, exist_ok=True)
-            for backend_file in os.listdir(template_backends_dir):
-                if backend_file.endswith((".toml", ".md")):
-                    src_path = template_backends_dir / backend_file
-                    dst_path = target_backends_dir / backend_file
-                    shutil.copy2(src_path, dst_path)
+            for backend_file in template_backends_dir.iterdir():
+                if backend_file.suffix in {".toml", ".md"}:
+                    dst_path = target_backends_dir / backend_file.name
+                    shutil.copy2(backend_file, dst_path)
 
             # Reset deck/ directory files (model deck configurations)
             template_deck_dir = template_inference_dir / "deck"
             target_deck_dir = target_inference_dir / "deck"
             target_deck_dir.mkdir(parents=True, exist_ok=True)
-            for deck_file in os.listdir(template_deck_dir):
-                if deck_file.endswith(".toml"):
-                    src_path = template_deck_dir / deck_file
-                    dst_path = target_deck_dir / deck_file
-                    shutil.copy2(src_path, dst_path)
+            for deck_file in template_deck_dir.iterdir():
+                if deck_file.suffix == ".toml":
+                    dst_path = target_deck_dir / deck_file.name
+                    shutil.copy2(deck_file, dst_path)
 
             # Stamp the deck manifest so future updates can detect drift and
             # `pipelex update` knows the exact kit version this install came from.
@@ -393,9 +387,9 @@ def execute_initialization(
         # If reset is True, copy the template file first
         if reset:
             effective_config_dir_for_routing = target_config_dir or config_manager.pipelex_config_dir
-            routing_profiles_toml_path = str(effective_config_dir_for_routing / "inference" / "routing_profiles.toml")
+            routing_profiles_toml_path = effective_config_dir_for_routing / "inference" / "routing_profiles.toml"
             template_routing_path = Path(str(get_kit_configs_dir())) / "inference" / "routing_profiles.toml"
-            Path(routing_profiles_toml_path).parent.mkdir(parents=True, exist_ok=True)
+            routing_profiles_toml_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(template_routing_path, routing_profiles_toml_path)
             console.print("✅ Reset routing_profiles.toml from template")
 
@@ -462,8 +456,8 @@ def _init_agreement(console: Console) -> None:
         display_gateway_declined_message(console)
         update_service_terms_acceptance(accepted=False, config_dir=config_manager.global_config_dir)
         # Disable the gateway since terms were declined
-        backends_toml_path = str(config_manager.pipelex_config_dir / "inference" / "backends.toml")
-        if path_exists(backends_toml_path):
+        backends_toml_path = config_manager.pipelex_config_dir / "inference" / "backends.toml"
+        if backends_toml_path.exists():
             disable_gateway_backend(backends_toml_path)
 
     console.print()
@@ -493,8 +487,8 @@ def init_cmd(
 
     # Handle credentials-only flow separately (no reset needed)
     if focus == InitFocus.CREDENTIALS:
-        backends_toml_path = str(config_manager.pipelex_config_dir / "inference" / "backends.toml")
-        if not path_exists(backends_toml_path):
+        backends_toml_path = config_manager.pipelex_config_dir / "inference" / "backends.toml"
+        if not backends_toml_path.exists():
             console.print()
             console.print("[yellow]No backends.toml found. Please run 'pipelex init' first.[/yellow]")
             console.print()
@@ -520,9 +514,9 @@ def init_cmd(
     console.print(f"[dim]Target directory: {target_config_dir}[/dim]")
 
     pipelex_config_dir = target_config_dir
-    telemetry_config_path = str(pipelex_config_dir / TELEMETRY_CONFIG_FILE_NAME)
-    backends_toml_path = str(pipelex_config_dir / "inference" / "backends.toml")
-    routing_profiles_toml_path = str(pipelex_config_dir / "inference" / "routing_profiles.toml")
+    telemetry_config_path = pipelex_config_dir / TELEMETRY_CONFIG_FILE_NAME
+    backends_toml_path = pipelex_config_dir / "inference" / "backends.toml"
+    routing_profiles_toml_path = pipelex_config_dir / "inference" / "routing_profiles.toml"
 
     # Determine what to check based on focus parameter
     check_config = focus in {InitFocus.ALL, InitFocus.CONFIG}
@@ -532,7 +526,7 @@ def init_cmd(
     check_telemetry = focus in {InitFocus.ALL, InitFocus.TELEMETRY}
 
     # Track if backends.toml existed before we start
-    is_first_time_backends_setup = not path_exists(backends_toml_path)
+    is_first_time_backends_setup = not backends_toml_path.exists()
 
     # Check what needs to be initialized
     needs_config, needs_inference, needs_routing, needs_telemetry = determine_needs(
@@ -590,7 +584,8 @@ def init_cmd(
     except typer.Exit:
         # Re-raise Exit exceptions
         raise
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
+        # Command-level boundary: any unexpected init failure is reported as a warning and the command returns without crashing.
         console.print(f"\n[red]⚠ Warning: Initialization failed: {escape(str(exc))}[/red]", style="bold")
         if needs_config:
             console.print("[red]Please run 'pipelex init config' manually.[/red]")

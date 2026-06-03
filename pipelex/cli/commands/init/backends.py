@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from rich.markup import escape
+from tomlkit.exceptions import TOMLKitError
 
 from pipelex import log
 from pipelex.cli.commands.init.ide_extension import suggest_extension_install_if_needed
@@ -24,7 +25,6 @@ from pipelex.hub import get_console
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.pipelex_service.pipelex_service_agreement import update_service_terms_acceptance
-from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_with_tomlkit, save_toml_to_path
 
 
@@ -46,7 +46,7 @@ def update_backends_in_toml(toml_doc: Any, selected_indices: list[int], backend_
             backend_section["enabled"] = backend_key in selected_backend_keys  # type: ignore[index]
 
 
-def get_selected_backend_keys(backends_toml_path: str) -> list[str]:
+def get_selected_backend_keys(backends_toml_path: Path) -> list[str]:
     """Extract the list of enabled backend keys from backends.toml.
 
     Args:
@@ -57,7 +57,7 @@ def get_selected_backend_keys(backends_toml_path: str) -> list[str]:
     """
     selected_backends: list[str] = []
 
-    if not path_exists(backends_toml_path):
+    if not backends_toml_path.exists():
         return selected_backends
 
     toml_doc = load_toml_from_path(backends_toml_path)
@@ -73,13 +73,13 @@ def get_selected_backend_keys(backends_toml_path: str) -> list[str]:
     return selected_backends
 
 
-def disable_gateway_backend(backends_toml_path: str) -> None:
+def disable_gateway_backend(backends_toml_path: Path) -> None:
     """Disable the pipelex_gateway backend in backends.toml.
 
     Args:
         backends_toml_path: Path to the backends.toml file.
     """
-    if not path_exists(backends_toml_path):
+    if not backends_toml_path.exists():
         return
 
     toml_doc = load_toml_with_tomlkit(backends_toml_path)
@@ -98,16 +98,16 @@ def customize_backends_config(is_first_time_setup: bool = False, target_config_d
     """
     console = get_console()
     effective_config_dir = target_config_dir or config_manager.pipelex_config_dir
-    backends_toml_path = str(effective_config_dir / "inference" / "backends.toml")
-    template_backends_path = str(get_kit_configs_dir() / "inference" / "backends.toml")
+    backends_toml_path = effective_config_dir / "inference" / "backends.toml"
+    template_backends_path = Path(str(get_kit_configs_dir() / "inference" / "backends.toml"))
 
-    if not path_exists(backends_toml_path):
+    if not backends_toml_path.exists():
         console.print("[yellow]⚠ Warning: backends.toml not found, skipping backend customization[/yellow]")
         return
 
     try:
         # Get backend options from template and existing config
-        existing_path = backends_toml_path if path_exists(backends_toml_path) else None
+        existing_path = backends_toml_path if backends_toml_path.exists() else None
         backend_options = get_backend_options_from_toml(template_backends_path, existing_path)
 
         # Get currently enabled backends to show user their current selection
@@ -134,8 +134,9 @@ def customize_backends_config(is_first_time_setup: bool = False, target_config_d
         # Suggest IDE extension install after backend selection, before gateway terms
         try:
             suggest_extension_install_if_needed(console)
-        except Exception as exc:
-            log.debug(f"IDE extension suggestion failed: {exc}")
+        except EOFError as exc:
+            # No stdin available for the install prompt — skip the optional IDE extension suggestion.
+            log.debug(f"IDE extension suggestion skipped: {exc}")
 
         # Check if pipelex_gateway is selected and handle terms acceptance prompt
         gateway_terms_accepted: bool | None = None
@@ -165,7 +166,9 @@ def customize_backends_config(is_first_time_setup: bool = False, target_config_d
                 global_config_dir = config_manager.global_config_dir
                 global_config_dir.mkdir(parents=True, exist_ok=True)
                 update_service_terms_acceptance(accepted=gateway_terms_accepted, config_dir=global_config_dir)
-            except Exception as terms_exc:
+            except (OSError, TOMLKitError, TypeError) as terms_exc:
+                # TypeError: a malformed service-config TOML (e.g. a scalar [agreement]) makes the
+                # terms writer's dict assignment raise TypeError rather than a TOMLKitError.
                 log.warning(f"Could not save gateway terms acceptance to global config: {terms_exc}")
                 if gateway_terms_accepted:
                     # Gateway enabled in backends.toml but terms not recorded — runtime will fail.
@@ -173,13 +176,14 @@ def customize_backends_config(is_first_time_setup: bool = False, target_config_d
                     try:
                         disable_gateway_backend(backends_toml_path)
                         console.print("[yellow]⚠ Could not save gateway terms. Gateway has been disabled to prevent errors.[/yellow]")
-                    except Exception as disable_exc:
+                    except (OSError, TOMLKitError, TypeError) as disable_exc:
                         log.warning(f"Could not disable gateway backend: {disable_exc}")
                         console.print(
                             "[red]⚠ Could not save gateway terms or disable gateway. Please manually disable pipelex_gateway in backends.toml.[/red]"
                         )
                     console.print("[dim]Re-run 'pipelex init' to set up gateway again.[/dim]")
 
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
+        # Command-level boundary: backend customization is optional during init — any failure is reported and init continues.
         console.print(f"[yellow]⚠ Warning: Failed to customize backends: {escape(str(exc))}[/yellow]")
         console.print("[dim]You can manually edit .pipelex/inference/backends.toml later[/dim]")

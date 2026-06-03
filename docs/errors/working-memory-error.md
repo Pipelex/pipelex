@@ -1,0 +1,19 @@
+---
+title: "Working memory"
+description: "Reference for the `WorkingMemoryError` Pipelex error class."
+---
+
+<!-- pipelex:generated -->
+
+# Working memory
+
+| Field | Value |
+|---|---|
+| `error_type` | `WorkingMemoryError` |
+| `title` | Working memory |
+| `type_uri` | `https://docs.pipelex.com/latest/errors/working-memory-error/` |
+| `error_domain` | _(inherited from parent)_ |
+| Defined in | `pipelex.core.memory.exceptions` |
+| Parent class | [`PipelexError`](pipelex-error.md) |
+
+[Back to Error Model overview](../under-the-hood/error-model.md)

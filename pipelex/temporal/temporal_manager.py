@@ -1,6 +1,5 @@
 from typing import ClassVar, Optional
 
-import shortuuid
 from temporalio.client import Client as TemporalClient
 
 from pipelex import log
@@ -92,7 +91,7 @@ class TemporalManager:
             msg = "Temporal client not connected. Enable should_auto_connect or call TemporalManager.connect_temporal() first."
             raise RuntimeError(msg)
 
-    def make_top_workflow_id(self, base_id: str) -> str:
+    def make_top_workflow_id(self, pipeline_run_id: str) -> str:
         prefix: str
         match runtime_manager.run_mode:
             case RunMode.UNIT_TEST:
@@ -105,9 +104,7 @@ class TemporalManager:
                 prefix = "cc-"
             case RunMode.CODEX_CLOUD_TEST:
                 prefix = "cct-"
-        session_part = self.session_id[:5]
-        random_part = shortuuid.uuid()[:5]
-        return f"{prefix}{session_part}-{random_part}-{base_id}"
+        return f"{prefix}{pipeline_run_id}"
 
 
 def get_temporal_manager() -> TemporalManager:

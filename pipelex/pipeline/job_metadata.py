@@ -43,6 +43,25 @@ class JobMetadata(BaseModel):
     pipeline_run_id: str
     pipe_code: str | None = None
 
+    # Per-process Pipelex session id (``Config.session_id``) captured at the
+    # submitter dispatch boundary. Inheriting it through ``JobMetadata`` lets
+    # the Temporal observability helpers stay pure functions of the workflow
+    # input — replay on a different worker no longer changes the value and
+    # so cannot cause a non-determinism mismatch on child-workflow starts.
+    session_id: str | None = None
+
+    # The API-inbound ``X-Request-ID`` (set by the dispatcher when an external
+    # HTTP request enters Pipelex). Rides on ``JobMetadata`` so it crosses the
+    # Temporal serialization boundary — every activity / workflow can correlate
+    # logs and the resulting ``ErrorReport`` back to the originating request.
+    # Distinct from :class:`pipelex.cogt.inference.error_classification.ProviderErrorMetadata.request_id`,
+    # which is the *provider*-side request id (OpenAI ``x-request-id`` etc.) —
+    # both can appear together when the API surfaces a provider failure.
+    # Constrained at the wire-format boundary (printable ASCII only, max 128
+    # chars) so an unsanitized upstream value cannot inject newlines or control
+    # characters into the log lines or ``ErrorReport`` envelopes that quote it.
+    request_id: str | None = Field(default=None, max_length=128, pattern=r"^[\x20-\x7E]+$")
+
     # Business ID for the current pipe execution (16-char hex string).
     # Always set during pipe runs for tracking purposes.
     pipe_run_id: str | None = None

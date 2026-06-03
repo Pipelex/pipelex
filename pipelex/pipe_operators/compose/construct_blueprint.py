@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, SerializationInfo, SerializerFunctio
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.pipe_operators.compose.exceptions import ConstructFieldBlueprintTypeError, ConstructFieldBlueprintValueError
-from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
+from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.types import Self, StrEnum
@@ -256,7 +256,7 @@ class ConstructBlueprint(BaseModel):
                         # Extract root names and filter out internal variables (same approach as template mode)
                         for var in template_vars:
                             root_var = get_root_from_dotted_path(var)
-                            if not root_var.startswith("_") and root_var not in {"preliminary_text", "place_holder"}:
+                            if not root_var.startswith("_") and root_var != "place_holder":
                                 required.add(root_var)
 
                 case ConstructFieldMethod.NESTED:

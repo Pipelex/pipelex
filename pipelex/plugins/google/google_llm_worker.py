@@ -1,18 +1,23 @@
 import asyncio
 from typing import TYPE_CHECKING, cast
 
+import httpx
 from google.genai import errors as genai_errors
 from google.genai import types as genai_types
 from google.genai.client import Client as GoogleGenAiClient
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError
 from pipelex.cogt.inference.error_classification import (
-    is_content_policy_violation,
-    is_quota_exhaustion_google,
+    UserAction,
+    UserActionKind,
+    extract_google_metadata,
+    extract_underlying_sdk_exception,
 )
+from pipelex.cogt.inference.error_classify import classify_inference_error
+from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
@@ -21,17 +26,13 @@ from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
+from pipelex.plugins.google.google_exceptions import GoogleLLMWorkerError
 from pipelex.plugins.google.google_factory import GoogleFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
-from pipelex.urls import URLs
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
-
-
-class GoogleLLMWorkerError(PipelexError):
-    """Base exception for Google LLM Worker errors."""
 
 
 class GoogleLLMWorker(LLMWorkerInternalAbstract):
@@ -96,59 +97,12 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
                 try:
                     asyncio.run(self.genai_async_client.aclose())
                     log.verbose("Closed Google async client using asyncio.run()")
-                except Exception as exc:
-                    # Log but don't fail teardown if cleanup has issues
+                except Exception as exc:  # noqa: BLE001
+                    # Best-effort: asyncio.run() runs aclose(), whose failure surface is not enumerable; teardown must never fail.
                     log.verbose(f"Error closing Google async client during teardown: {exc}")
-        except Exception as exc:
-            # Log but don't fail teardown if cleanup has issues
+        except Exception as exc:  # noqa: BLE001
+            # Best-effort cleanup boundary: teardown must never fail, whatever client/event-loop close throws.
             log.debug(f"Error during Google async client teardown: {exc}")
-
-    #########################################################
-    # Error classification
-    #########################################################
-
-    def _classify_google_client_error(self, exc: genai_errors.ClientError) -> LLMCompletionError:
-        """Classify a Google GenAI ClientError into a categorized LLMCompletionError."""
-        error_message = str(exc)
-        status_code = exc.code
-
-        if status_code == 404:
-            msg = f"Google model '{self.inference_model.desc}' not found: {exc}"
-            return LLMCompletionError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
-
-        if status_code in {401, 403}:
-            msg = f"Google API permission denied for model '{self.inference_model.desc}': {exc}"
-            return LLMCompletionError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
-
-        if status_code == 429:
-            if is_quota_exhaustion_google(error_message):
-                msg = f"Google quota exhausted for model '{self.inference_model.desc}': {exc}"
-                return LLMCompletionError(
-                    msg,
-                    error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=f"Your Google Cloud account has exceeded its quota — check billing at {URLs.google_billing}",
-                )
-            msg = f"Google rate limit exceeded for model '{self.inference_model.desc}': {exc}"
-            return LLMCompletionError(
-                msg,
-                error_category=InferenceErrorCategory.TRANSIENT,
-                user_action="Rate limited by Google — the system will retry automatically",
-            )
-
-        if status_code == 400:
-            if is_content_policy_violation(error_message):
-                msg = f"Content rejected by safety filters for model '{self.inference_model.desc}': {exc}"
-                return LLMCompletionError(
-                    msg,
-                    error_category=InferenceErrorCategory.CONTENT,
-                    user_action="Content was rejected by safety filters — revise the prompt",
-                )
-            msg = f"Google bad request error for model '{self.inference_model.desc}': {exc}"
-            return LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT)
-
-        # Fallback for other 4xx errors
-        msg = f"Google API client error for model '{self.inference_model.desc}': {exc}"
-        return LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT)
 
     #########################################################
     # Reasoning helpers
@@ -264,11 +218,16 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
                 contents=contents,
                 config=generation_config,
             )
-        except genai_errors.ServerError as exc:
-            msg = f"Google API server error for model '{self.inference_model.desc}': {exc}"
-            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
-        except genai_errors.ClientError as exc:
-            raise self._classify_google_client_error(exc) from exc
+        except (genai_errors.ServerError, genai_errors.ClientError, httpx.TransportError) as sdk_exc:
+            metadata = extract_google_metadata(sdk_exc)
+            classification = classify_inference_error(metadata)
+            raise render_inference_error(
+                metadata=metadata,
+                classification=classification,
+                family=InferenceErrorFamily.LLM,
+                model_desc=self.inference_model.desc,
+                model_handle=self.inference_model.name,
+            ) from sdk_exc
 
         # Extract text from response (skips thinking parts)
         text_content = GoogleFactory.extract_text_from_response(response=response, model_desc=self.inference_model.desc)
@@ -299,26 +258,52 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
         )
 
         # Deferred import: avoid pulling heavy SDK at module-load time
-        from instructor.exceptions import InstructorRetryException  # noqa: PLC0415
+        from instructor.core import InstructorRetryException  # noqa: PLC0415
 
         try:
             result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                 messages=[cast("ChatCompletionMessageParam", contents)],
                 response_model=schema,
-                max_retries=llm_job.job_config.max_retries,
+                # instructor's retry is confined to schema re-ask: this validation-only AsyncRetrying
+                # re-asks on a malformed/invalid output but lets a transport error propagate as the raw
+                # SDK exception — transport retry is the SDK client floor (Tier 1) alone.
+                max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.schema_reask_max_attempts),
                 model=self.inference_model.model_id,
                 generation_config=generation_config,
             )
-        except genai_errors.ServerError as exc:
-            msg = f"Google API server error for model '{self.inference_model.desc}': {exc}"
-            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
-        except genai_errors.ClientError as exc:
-            raise self._classify_google_client_error(exc) from exc
-        except LLMCompletionError:
-            raise
-        except InstructorRetryException as exc:
-            msg = f"Google structured generation failed after retries for model '{self.inference_model.desc}': {exc}"
-            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
+        except InstructorRetryException as instructor_exc:
+            # instructor wraps SDK exceptions during retries; recover the underlying
+            # one so transient/capacity/auth errors aren't all flattened to UNKNOWN.
+            underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
+            if underlying_exc is not None:
+                metadata = extract_google_metadata(underlying_exc)
+                classification = classify_inference_error(metadata)
+                raise render_inference_error(
+                    metadata=metadata,
+                    classification=classification,
+                    family=InferenceErrorFamily.LLM,
+                    model_desc=self.inference_model.desc,
+                    model_handle=self.inference_model.name,
+                ) from instructor_exc
+            msg = f"Google structured generation failed after retries for model '{self.inference_model.desc}': {instructor_exc}"
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.UNKNOWN,
+                user_action=UserAction(
+                    kind=UserActionKind.CONTACT_SUPPORT,
+                    detail="Structured generation failed for an unrecognized reason — retry, and report this if it persists",
+                ),
+            ) from instructor_exc
+        except (genai_errors.ServerError, genai_errors.ClientError, httpx.TransportError) as sdk_exc:
+            metadata = extract_google_metadata(sdk_exc)
+            classification = classify_inference_error(metadata)
+            raise render_inference_error(
+                metadata=metadata,
+                classification=classification,
+                family=InferenceErrorFamily.LLM,
+                model_desc=self.inference_model.desc,
+                model_handle=self.inference_model.name,
+            ) from sdk_exc
 
         if not isinstance(result_object, schema):
             msg = f"Google Gemini API returned an object that is not of type {schema}: {result_object}"

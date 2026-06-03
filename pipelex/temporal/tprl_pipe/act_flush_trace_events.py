@@ -9,6 +9,7 @@ from temporalio import activity
 
 from pipelex import log
 from pipelex.config import get_config
+from pipelex.temporal.tprl.activity_error_boundary import convert_pipelex_errors
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pipelex.tracing.event_log_factory import make_event_log
 from pipelex.tracing.trace_events import TraceEvent
@@ -21,6 +22,7 @@ class FlushTraceEventsArg(BaseModel):
 
 
 @activity.defn(name="act_flush_trace_events")
+@convert_pipelex_errors
 async def act_flush_trace_events(arg: FlushTraceEventsArg) -> None:  # noqa: RUF029
     """Write buffered trace events to the configured backend. Runs as a Temporal
     activity so synchronous I/O (boto3, file writes) doesn't block the workflow thread.

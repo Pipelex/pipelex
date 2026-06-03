@@ -29,6 +29,7 @@ Behaviour:
 
 from __future__ import annotations
 
+import json
 from datetime import datetime  # noqa: TC003 — Pydantic v2 resolves this annotation at runtime
 from typing import Any
 
@@ -149,7 +150,7 @@ class RemoteConfigFetcher:
 
         try:
             payload: dict[str, Any] = response.json()
-        except ValueError as parse_exc:
+        except (json.JSONDecodeError, UnicodeDecodeError) as parse_exc:
             msg = f"Failed to parse remote configuration JSON: {parse_exc}"
             raise RemoteConfigValidationError(msg) from parse_exc
 

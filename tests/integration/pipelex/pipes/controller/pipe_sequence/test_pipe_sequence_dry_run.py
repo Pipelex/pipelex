@@ -35,7 +35,7 @@ class TestPipeSequenceDryRun:
         """Test that the Discord newsletter pipeline creates correct working memory with ListContent for batched inputs."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_sequence")])
         # Load the discord channel updates data from JSON
-        discord_channel_updates_data = load_json_list_from_path(path="tests/data/discord_newsletter/discord_sample.json")
+        discord_channel_updates_data = load_json_list_from_path(path=Path("tests/data/discord_newsletter/discord_sample.json"))
 
         # Create structured DiscordChannelUpdate objects
         discord_channel_updates = ListContent[DiscordChannelUpdate](

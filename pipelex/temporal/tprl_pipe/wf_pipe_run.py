@@ -6,9 +6,13 @@ from temporalio.exceptions import ActivityError, ChildWorkflowError
 from typing_extensions import override
 
 with workflow.unsafe.imports_passed_through():
+    from pipelex.base_exceptions import ErrorReport  # noqa: TC001  # must traverse the workflow sandbox
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryStatus
-    from pipelex.temporal.log_temporal import workflow_log
+    from pipelex.temporal.exceptions import WorkflowExecutionError
+    from pipelex.temporal.log_temporal import WorkflowLog
+    from pipelex.temporal.tprl.observability import build_search_attributes, build_static_summary
+    from pipelex.temporal.tprl.temporal_error import recover_error_report
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
     from pipelex.temporal.tprl_pipe.act_assemble_graph import AssembleGraphArg, act_assemble_graph
     from pipelex.temporal.tprl_pipe.act_deliver import DeliveryActivityArg, act_deliver
@@ -27,9 +31,12 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
     @override
     @workflow.run
     async def run(self, workflow_arg: PipeRunArg) -> PipeOutput:
+        pipe_job = workflow_arg.pipe_job
+        # Bound once per invocation: every record below carries this run's
+        # request_id (None when the run carries no inbound API request id).
+        workflow_log = WorkflowLog(request_id=pipe_job.job_metadata.request_id)
         workflow_log.debug("WfPipeRun start")
 
-        pipe_job = workflow_arg.pipe_job
         delivery_assignment = workflow_arg.delivery_assignment
         pipeline_run_id: str = pipe_job.job_metadata.pipeline_run_id
 
@@ -37,18 +44,33 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
         workflow_log.debug(f"Starting child WfPipeRouter for pipe '{pipe_job.pipe.code}'")
         status: DeliveryStatus = DeliveryStatus.COMPLETED
         pipe_output: PipeOutput | None = None
-        execution_error: ChildWorkflowError | None = None
+        execution_error: WorkflowExecutionError | None = None
+        error_report: ErrorReport | None = None
 
+        # The wf_pipe_router child runs the same pipe as wf_pipe_run, so its
+        # search attributes and static summary are identical — re-derive them
+        # from the same pipe_job. Dispatched via ``workflow.execute_child_workflow``
+        # directly so the recorded ``StartChildWorkflowExecution`` command is a
+        # pure function of the workflow input: no config-derived
+        # execution_timeout / retry_policy / task_queue smuggled in via the
+        # ``WorkflowExecutorFactory``, which would change across deploys and
+        # break determinism on replay after a config edit.
         try:
             pipe_output = await workflow.execute_child_workflow(
                 WfPipeRouter.run,
                 arg=pipe_job,
-                id=f"{workflow.info().workflow_id}-pipe-router",
+                id=f"{workflow.info().workflow_id}/pipe-router",
+                search_attributes=build_search_attributes(pipe_job),
+                static_summary=build_static_summary(pipe_job.pipe),
             )
             workflow_log.debug("WfPipeRouter completed successfully")
         except ChildWorkflowError as exc:
             status = DeliveryStatus.FAILED
-            execution_error = exc
+            # Hold the wrapped error for a deferred re-raise after delivery — raising here would short-circuit ``act_deliver``.
+            # ``ChildWorkflowError`` exposes the underlying failure via ``exc.cause``, not ``__cause__``.
+            error_report = recover_error_report(exc.cause if exc.cause is not None else exc)
+            execution_error = WorkflowExecutionError("WfPipeRouter failed", error_report=error_report)
+            execution_error.__cause__ = exc
             workflow_log.error(f"WfPipeRouter failed: {exc}")
 
         # Step 2: Assemble full graph from trace events (cross-worker)
@@ -82,6 +104,8 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
                 pipeline_run_id=pipeline_run_id,
                 delivery_assignment=delivery_assignment,
                 status=status,
+                error_report=error_report,
+                request_id=pipe_job.job_metadata.request_id,
             )
             # Include pipe_output only on success
             if pipe_output is not None:

@@ -11,14 +11,12 @@ from portkey_ai.api_resources import exceptions as portkey_exceptions
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-from pipelex.cogt.exceptions import ExtractJobFailureError, ImgGenGenerationError, InferenceErrorCategory
-from pipelex.plugins.gateway.gateway_exceptions import GatewaySearchResponseError
+from pipelex.cogt.exceptions import ExtractJobFailureError, ImgGenGenerationError, InferenceErrorCategory, SearchJobFailureError
+from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.plugins.gateway.gateway_extract_worker import GatewayExtractWorker
-from pipelex.plugins.gateway.gateway_factory import GatewayFactory
 from pipelex.plugins.gateway.gateway_img_gen_worker import GatewayImgGenWorker
 from pipelex.plugins.gateway.gateway_protocols import GatewayExtractProtocol
 from pipelex.plugins.gateway.gateway_search_worker import GatewaySearchWorker
-from tests.unit.pipelex.plugins.gateway.test_data import GatewayQuotaDetectionTestData
 
 
 def _make_portkey_exception(exception_type_name: str, status_code: int, message: str) -> portkey_exceptions.APIError:
@@ -61,13 +59,6 @@ def _make_gateway_extract_worker(mocker: MockerFixture) -> GatewayExtractWorker:
     mock_client = mocker.MagicMock()
     worker.portkey_client = mock_client
 
-    mock_tenacity = mocker.MagicMock()
-    mock_tenacity.wait_multiplier = 1
-    mock_tenacity.wait_max = 10
-    mock_tenacity.wait_exp_base = 2
-    mock_tenacity.max_retries = 1
-    worker._tenacity_config = mock_tenacity  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
-
     return worker
 
 
@@ -103,42 +94,12 @@ def _make_gateway_search_worker(mocker: MockerFixture) -> GatewaySearchWorker:
     mock_client = mocker.MagicMock()
     worker.portkey_client = mock_client
 
-    mock_tenacity = mocker.MagicMock()
-    mock_tenacity.wait_multiplier = 1
-    mock_tenacity.wait_max = 10
-    mock_tenacity.wait_exp_base = 2
-    mock_tenacity.max_retries = 1
-    worker._tenacity_config = mock_tenacity  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
-
     return worker
 
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestGatewayQuotaDetection:
     """Tests for Portkey error classification across gateway workers."""
-
-    # ---- Classification method tests (direct unit tests) ----
-
-    @pytest.mark.parametrize(
-        ("_topic", "exception_type_name", "status_code", "error_message", "expected_category"),
-        GatewayQuotaDetectionTestData.CLASSIFY_CASES,
-    )
-    async def test_classify_error_category(
-        self,
-        _topic: str,
-        exception_type_name: str,
-        status_code: int,
-        error_message: str,
-        expected_category: InferenceErrorCategory,
-    ) -> None:
-        """GatewayFactory.classify_error_category returns correct category for Portkey errors."""
-        exc = _make_portkey_exception(exception_type_name, status_code, error_message)
-
-        result = GatewayFactory.classify_error_category(exc)
-
-        assert result is expected_category
-
-    # ---- Full flow tests: verify the exception propagates with category ----
 
     async def test_imggen_worker_propagates_rate_limit_as_transient(self, mocker: MockerFixture) -> None:
         """GatewayImgGenWorker raises ImgGenGenerationError with TRANSIENT for rate limit."""
@@ -158,10 +119,6 @@ class TestGatewayQuotaDetection:
             "pipelex.plugins.gateway.gateway_img_gen_worker.GatewayDeck.get_config_id",
             return_value="test-config",
         )
-        mocker.patch(
-            "pipelex.plugins.gateway.gateway_img_gen_worker.GatewayFactory.make_error_summary_from_portkey_error",
-            return_value="Rate limit exceeded",
-        )
 
         img_gen_job = mocker.MagicMock()
         img_gen_job.job_report.img_gen_tokens_usage = None
@@ -170,10 +127,12 @@ class TestGatewayQuotaDetection:
             await worker._gen_image_list(img_gen_job=img_gen_job, nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
         assert exc_info.value.__cause__ is sdk_exc
 
     async def test_search_worker_propagates_auth_error_as_configuration(self, mocker: MockerFixture) -> None:
-        """GatewaySearchWorker raises GatewaySearchResponseError with CONFIGURATION for auth error."""
+        """GatewaySearchWorker raises SearchJobFailureError with CONFIGURATION for auth error."""
         worker = _make_gateway_search_worker(mocker)
         sdk_exc = _make_portkey_exception("AuthenticationError", 401, "Invalid API key")
 
@@ -185,12 +144,8 @@ class TestGatewayQuotaDetection:
             "pipelex.plugins.gateway.gateway_search_worker.GatewayDeck.get_config_id",
             return_value="test-config",
         )
-        mocker.patch(
-            "pipelex.plugins.gateway.gateway_search_worker.GatewayFactory.make_error_summary_from_portkey_error",
-            return_value="Invalid API key",
-        )
 
-        with pytest.raises(GatewaySearchResponseError) as exc_info:
+        with pytest.raises(SearchJobFailureError) as exc_info:
             await worker._call_relay(model="linkup/standard", content='{"query": "test"}')  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
@@ -208,10 +163,6 @@ class TestGatewayQuotaDetection:
         mocker.patch(
             "pipelex.plugins.gateway.gateway_extract_worker.GatewayDeck.get_config_id",
             return_value="test-config",
-        )
-        mocker.patch(
-            "pipelex.plugins.gateway.gateway_extract_worker.GatewayFactory.make_error_summary_from_portkey_error",
-            return_value="Quota exhausted",
         )
         mocker.patch(
             "pipelex.plugins.gateway.gateway_extract_worker.GatewayFactory.make_extras",

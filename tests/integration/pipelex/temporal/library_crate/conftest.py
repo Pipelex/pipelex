@@ -3,7 +3,12 @@ from pathlib import Path
 
 import pytest
 
+from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.hub import get_library_manager
+from pipelex.pipe_run.dry_run import convert_to_working_memory_format
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from tests.integration.pipelex.fixtures.pipe_job_helpers import pipe_job_from_bundle, pipe_job_from_library
@@ -13,6 +18,7 @@ from tests.integration.pipelex.temporal.test_data import (
     ConflictConceptBetaTestData,
     ConflictPipeAlphaTestData,
     ConflictPipeBetaTestData,
+    CvBatchScreeningTemporalTestData,
     LibraryCrateTestData,
     MultiConceptAlphaTestData,
     MultiConceptBetaTestData,
@@ -182,4 +188,35 @@ def combined_job(pipe_run_mode: PipeRunMode, is_class_registry_isolated: bool) -
         pipe_code=CombinedPipelineTemporalTestData.PIPE_CODE,
         pipe_run_mode=pipe_run_mode,
         isolated_registry=is_class_registry_isolated,
+    )
+
+
+# --- CV batch screening fixture (deeply-nested controller + PipeExtract + PipeLLM) ---
+
+
+@pytest.fixture(scope="class")
+def cv_batch_screening_job(pipe_run_mode: PipeRunMode, is_class_registry_isolated: bool) -> Generator[PipeJob, None, None]:
+    """PipeJob for the CV batch screening pipeline, pre-populated with mock cvs + job_offer_pdf.
+
+    Mirrors the demos example 21 pipeline (PipeSequence -> PipeSequence -> PipeBatch).
+    The top-level pipe requires ``cvs: Document[]`` and ``job_offer_pdf: Document``
+    inputs; we synthesize them via ``make_mock_inputs`` so the fixture works in dry
+    mode (the default for the temporal in-process test).
+    """
+
+    def _load(library_id: str) -> None:
+        mthds_content = Path(CvBatchScreeningTemporalTestData.BUNDLE_FILE).read_text(encoding="utf-8")
+        blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
+        get_library_manager().load_from_blueprints(library_id=library_id, blueprints=[blueprint])
+
+    def _build_working_memory(pipe: PipeAbstract) -> WorkingMemory:
+        needed_inputs = convert_to_working_memory_format(needed_inputs_spec=pipe.needed_inputs())
+        return WorkingMemoryFactory.make_mock_inputs(needed_inputs=needed_inputs)
+
+    yield from pipe_job_from_library(
+        load_fn=_load,
+        pipe_code=CvBatchScreeningTemporalTestData.PIPE_CODE,
+        pipe_run_mode=pipe_run_mode,
+        isolated_registry=is_class_registry_isolated,
+        working_memory_builder=_build_working_memory,
     )

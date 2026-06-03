@@ -7,7 +7,8 @@ from pytest import LogCaptureFixture
 
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.system.registries.func_registry import FuncRegistry, FuncRegistryError
+from pipelex.system.registries.exceptions import FuncRegistryError
+from pipelex.system.registries.func_registry import FuncRegistry
 
 
 def sample_function():

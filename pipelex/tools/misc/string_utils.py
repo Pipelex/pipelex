@@ -55,7 +55,8 @@ def can_inject_text(value: Any | None) -> bool:
         return False
     try:
         return has_text(f"{value}")
-    except Exception:
+    except Exception:  # noqa: BLE001
+        # f-string formatting invokes arbitrary __str__/__format__ on type-uncertain input; this helper is contractually safe for such input.
         return False
 
 
@@ -117,6 +118,43 @@ def pascal_case_to_snake_case(name: str) -> str:
     return camel_to_snake_case(name=name)
 
 
+def pascal_case_to_kebab(name: str) -> str:
+    """Converts a PascalCase string to kebab-case format.
+
+    Acronym-aware: groups of uppercase letters stay together when followed by
+    another acronym character (``HTTPError`` -> ``http-error``,
+    ``V2APIError`` -> ``v2-api-error``), and a single uppercase introducer in
+    front of a CamelCase tail also breaks (``OAuth2`` -> ``o-auth2``).
+
+    Splits on the two transitions that mark a word boundary in PascalCase:
+    ``[a-z0-9] -> [A-Z]`` (lowercase/digit followed by uppercase) and
+    ``[A-Z] -> [A-Z][a-z]`` (uppercase followed by uppercase + lowercase).
+
+    Args:
+        name (str): The PascalCase string to convert (e.g., "MyVariableName" or "APIError").
+
+    Returns:
+        str: The kebab-case version of the string (e.g., "my-variable-name" or "api-error").
+
+    Examples:
+        >>> pascal_case_to_kebab("FooBarBaz")
+        'foo-bar-baz'
+        >>> pascal_case_to_kebab("APIError")
+        'api-error'
+        >>> pascal_case_to_kebab("HTTPError")
+        'http-error'
+        >>> pascal_case_to_kebab("EnvVarNotFound")
+        'env-var-not-found'
+        >>> pascal_case_to_kebab("OAuth2")
+        'o-auth2'
+        >>> pascal_case_to_kebab("V2APIError")
+        'v2-api-error'
+
+    """
+    parts = re.split(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", name)
+    return "-".join(part.lower() for part in parts if part)
+
+
 def pascal_case_to_sentence(name: str) -> str:
     """Converts a PascalCase string to a capitalized sentence.
 
@@ -153,7 +191,9 @@ def pascal_case_to_sentence(name: str) -> str:
             processed_words: list[str] = [word if word.isupper() else word.lower() for word in words]
             result_parts.append(" ".join(processed_words))
 
-    return " ".join(result_parts).capitalize()
+    # Capitalize only the leading character so preserved uppercase acronyms (e.g. "JSON") survive.
+    joined = " ".join(result_parts)
+    return joined[:1].upper() + joined[1:] if joined else joined
 
 
 def snake_to_pascal_case(snake_str: str) -> str:

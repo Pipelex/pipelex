@@ -105,11 +105,11 @@ def _setup_mocks(mocker: MockerFixture) -> None:
 class TestAgentModelsCmd:
     """Tests for agent_models_cmd JSON output with --type and --backend filters."""
 
-    def test_no_filters_returns_all_categories(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_no_filters_returns_all_categories(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """No filters should return all categories in every section."""
         _setup_mocks(mocker)
 
-        agent_models_cmd(ctx=agent_ctx, output_format=CliOutputFormat.JSON)
+        agent_models_cmd(output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         assert parsed["success"] is True
@@ -118,21 +118,21 @@ class TestAgentModelsCmd:
             assert "img_gen" in parsed[section], f"img_gen missing from {section}"
             assert "extract" in parsed[section], f"extract missing from {section}"
 
-    def test_no_talent_mappings_in_output(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_no_talent_mappings_in_output(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """Output should not contain talent_mappings or usage hint."""
         _setup_mocks(mocker)
 
-        agent_models_cmd(ctx=agent_ctx, output_format=CliOutputFormat.JSON)
+        agent_models_cmd(output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         assert "talent_mappings" not in parsed
         assert "talent_mappings_usage_hint" not in parsed
 
-    def test_no_filters_preset_content(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_no_filters_preset_content(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """No filters should include all preset entries with correct data."""
         _setup_mocks(mocker)
 
-        agent_models_cmd(ctx=agent_ctx, output_format=CliOutputFormat.JSON)
+        agent_models_cmd(output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         llm_preset_names = [preset["name"] for preset in parsed["presets"]["llm"]]
@@ -141,11 +141,11 @@ class TestAgentModelsCmd:
         fast_preset = next(preset for preset in parsed["presets"]["llm"] if preset["name"] == "fast")
         assert fast_preset["description"] == "Fast LLM"
 
-    def test_type_llm_only(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_type_llm_only(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """--type llm should return only llm keys in all sections."""
         _setup_mocks(mocker)
 
-        agent_models_cmd(ctx=agent_ctx, model_type=[ModelCategory.LLM], output_format=CliOutputFormat.JSON)
+        agent_models_cmd(model_type=[ModelCategory.LLM], output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         for section in ("presets", "aliases", "waterfalls"):
@@ -153,11 +153,11 @@ class TestAgentModelsCmd:
             assert "img_gen" not in parsed[section], f"img_gen should not be in {section}"
             assert "extract" not in parsed[section], f"extract should not be in {section}"
 
-    def test_type_extract_only(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_type_extract_only(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """--type extract should return only extract keys in all sections."""
         _setup_mocks(mocker)
 
-        agent_models_cmd(ctx=agent_ctx, model_type=[ModelCategory.EXTRACT], output_format=CliOutputFormat.JSON)
+        agent_models_cmd(model_type=[ModelCategory.EXTRACT], output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         for section in ("presets", "aliases", "waterfalls"):
@@ -165,11 +165,11 @@ class TestAgentModelsCmd:
             assert "llm" not in parsed[section], f"llm should not be in {section}"
             assert "img_gen" not in parsed[section], f"img_gen should not be in {section}"
 
-    def test_type_img_gen_only(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_type_img_gen_only(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """--type img_gen should return only img_gen keys in all sections."""
         _setup_mocks(mocker)
 
-        agent_models_cmd(ctx=agent_ctx, model_type=[ModelCategory.IMG_GEN], output_format=CliOutputFormat.JSON)
+        agent_models_cmd(model_type=[ModelCategory.IMG_GEN], output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         for section in ("presets", "aliases", "waterfalls"):
@@ -177,11 +177,11 @@ class TestAgentModelsCmd:
             assert "llm" not in parsed[section], f"llm should not be in {section}"
             assert "extract" not in parsed[section], f"extract should not be in {section}"
 
-    def test_type_llm_and_img_gen(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_type_llm_and_img_gen(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """--type llm --type img_gen should return both llm and img_gen, but not extract."""
         _setup_mocks(mocker)
 
-        agent_models_cmd(ctx=agent_ctx, model_type=[ModelCategory.LLM, ModelCategory.IMG_GEN], output_format=CliOutputFormat.JSON)
+        agent_models_cmd(model_type=[ModelCategory.LLM, ModelCategory.IMG_GEN], output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         for section in ("presets", "aliases", "waterfalls"):
@@ -189,11 +189,11 @@ class TestAgentModelsCmd:
             assert "img_gen" in parsed[section], f"img_gen missing from {section}"
             assert "extract" not in parsed[section], f"extract should not be in {section}"
 
-    def test_backend_filter_openai(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_backend_filter_openai(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """--backend openai should filter presets/aliases/waterfalls to only openai-backed models."""
         _setup_mocks(mocker)
 
-        agent_models_cmd(ctx=agent_ctx, backend="openai", output_format=CliOutputFormat.JSON)
+        agent_models_cmd(backend="openai", output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         llm_preset_names = [preset["name"] for preset in parsed["presets"]["llm"]]
@@ -204,11 +204,11 @@ class TestAgentModelsCmd:
         assert "hd-image" in img_gen_preset_names
         assert len(parsed["presets"]["extract"]) == 0
 
-    def test_backend_filter_anthropic(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_backend_filter_anthropic(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """--backend anthropic should include only anthropic-backed models."""
         _setup_mocks(mocker)
 
-        agent_models_cmd(ctx=agent_ctx, backend="anthropic", output_format=CliOutputFormat.JSON)
+        agent_models_cmd(backend="anthropic", output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         llm_preset_names = [preset["name"] for preset in parsed["presets"]["llm"]]
@@ -216,11 +216,11 @@ class TestAgentModelsCmd:
         assert "fast" not in llm_preset_names
         assert "best-llm" in parsed["aliases"]["llm"]
 
-    def test_type_and_backend_combined(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_type_and_backend_combined(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """--type llm --backend openai should combine both filters."""
         _setup_mocks(mocker)
 
-        agent_models_cmd(ctx=agent_ctx, model_type=[ModelCategory.LLM], backend="openai", output_format=CliOutputFormat.JSON)
+        agent_models_cmd(model_type=[ModelCategory.LLM], backend="openai", output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         assert "llm" in parsed["presets"]
@@ -230,11 +230,11 @@ class TestAgentModelsCmd:
         assert "fast" in llm_preset_names
         assert "smart" not in llm_preset_names
 
-    def test_backend_nonexistent(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_backend_nonexistent(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """--backend nonexistent should produce empty presets/aliases/waterfalls."""
         _setup_mocks(mocker)
 
-        agent_models_cmd(ctx=agent_ctx, backend="nonexistent", output_format=CliOutputFormat.JSON)
+        agent_models_cmd(backend="nonexistent", output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         assert parsed["success"] is True
@@ -242,11 +242,11 @@ class TestAgentModelsCmd:
             for category in ("llm", "img_gen", "extract"):
                 assert len(parsed[section][category]) == 0, f"{section}.{category} should be empty"
 
-    def test_waterfalls_backend_filter(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_waterfalls_backend_filter(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """--backend anthropic should include llm waterfall (has claude-sonnet) but not img waterfall."""
         _setup_mocks(mocker)
 
-        agent_models_cmd(ctx=agent_ctx, backend="anthropic", output_format=CliOutputFormat.JSON)
+        agent_models_cmd(backend="anthropic", output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         assert "llm-wf" in parsed["waterfalls"]["llm"]

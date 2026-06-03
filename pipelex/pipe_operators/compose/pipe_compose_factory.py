@@ -2,7 +2,7 @@ from typing import Any
 
 from typing_extensions import override
 
-from pipelex.cogt.templating.template_errors import TemplateSigilSyntaxError
+from pipelex.cogt.templating.exceptions import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
@@ -10,7 +10,7 @@ from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.pipe_operators.compose.exceptions import PipeComposeFactoryError
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
-from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
+from pipelex.tools.jinja2.exceptions import Jinja2TemplateSyntaxError
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 
 

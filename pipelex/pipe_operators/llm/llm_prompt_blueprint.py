@@ -17,8 +17,9 @@ from pipelex.pipe_operators.llm.exceptions import LLMPromptBlueprintValueError
 from pipelex.pipe_operators.llm.image_reference import ImageReference, ImageReferenceKind
 from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
-from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract, ContextProviderError
+from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract
 from pipelex.tools.misc.dict_utils import substitute_nested_in_context
+from pipelex.tools.misc.exceptions import ContextProviderError
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 if TYPE_CHECKING:
@@ -53,11 +54,7 @@ class LLMPromptBlueprint(BaseModel):
             required_variables.update(get_root_from_dotted_path(path) for path in self.prompt_blueprint.required_variables())
         if self.system_prompt_blueprint:
             required_variables.update(get_root_from_dotted_path(path) for path in self.system_prompt_blueprint.required_variables())
-        return {
-            variable_name
-            for variable_name in required_variables
-            if not variable_name.startswith("_") and variable_name not in {"preliminary_text", "place_holder"}
-        }
+        return {variable_name for variable_name in required_variables if not variable_name.startswith("_") and variable_name != "place_holder"}
 
     # TODO: make this consistent with `LLMPromptFactoryAbstract` or `LLMPromptTemplate`,
     # let's get back to it when we have a better solution for structuring_method

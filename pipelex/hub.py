@@ -1,5 +1,6 @@
 import sys
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Optional
@@ -28,7 +29,6 @@ from pipelex.libraries.library import Library
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.observer.observer_protocol import ObserverProtocol
-from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipeline.pipeline import Pipeline
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
 from pipelex.plugins.plugin_manager import PluginManager
@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     # Deferred import: avoid pulling heavy SDK at module-load time
     from opentelemetry.trace import Tracer as OTelTracer
 
+    from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 
 
@@ -111,7 +112,7 @@ class PipelexHub:
 
     # tools
 
-    def setup_config(self, config_cls: type[ConfigRoot], config_overrides: dict[str, Any] | None = None):
+    def setup_config(self, config_cls: type[ConfigRoot], config_overrides: dict[str, Any] | None = None, config_dir: Path | None = None):
         """Set the global configuration instance.
 
         Args:
@@ -119,8 +120,12 @@ class PipelexHub:
             config_overrides: Optional dict deep-merged on top of all TOML layers
                 as the highest-priority override. Useful for tests that need
                 specific config without editing TOML files.
+            config_dir: Optional explicit config dir. When provided, project/global
+                layering is bypassed and only this directory is read. Used by the
+                doctor ``--global`` path so the hub reflects exactly the directory
+                being reported on.
         """
-        config_dict = config_manager.load_config(extra_overrides=config_overrides)
+        config_dict = config_manager.load_config(extra_overrides=config_overrides, config_dir=config_dir)
         self.set_config(config=config_cls.model_validate(config_dict))
 
     def set_config(self, config: ConfigRoot):
@@ -187,7 +192,7 @@ class PipelexHub:
     def set_pipe_library(self, pipe_library: PipeLibraryAbstract):
         self._pipe_library = pipe_library
 
-    def set_pipe_router(self, pipe_router: PipeRouterProtocol):
+    def set_pipe_router(self, pipe_router: "PipeRouterProtocol"):
         self._pipe_router = pipe_router
 
     def set_pipe_run(self, pipe_run: "PipeRunProtocol") -> None:
@@ -220,6 +225,15 @@ class PipelexHub:
         if self._config is None:
             msg = "Config instance is not set. You must initialize Pipelex first."
             raise RuntimeError(msg)
+        return self._config
+
+    def get_optional_config(self) -> ConfigRoot | None:
+        """Get the current configuration if it has been set, otherwise None.
+
+        Non-raising counterpart to ``get_required_config``. Used by callers that must
+        run before/around bootstrap (e.g. ``report_validation_error`` invoked from the
+        doctor's setup helper when ``setup_config`` itself failed).
+        """
         return self._config
 
     def get_console(self) -> Console:
@@ -304,7 +318,7 @@ class PipelexHub:
             raise RuntimeError(msg)
         return self._pipe_library
 
-    def get_required_pipe_router(self) -> PipeRouterProtocol:
+    def get_required_pipe_router(self) -> "PipeRouterProtocol":
         if self._pipe_router is None:
             msg = "PipeRouter is not initialized"
             raise RuntimeError(msg)
@@ -479,6 +493,11 @@ def get_current_library() -> str:
     return library_id
 
 
+def get_current_library_id_or_none() -> str | None:
+    """Return the current library_id, or ``None`` if none is set."""
+    return _library_id.get()
+
+
 def get_default_library_dirs() -> list[Path] | None:
     return get_pipelex_hub().get_default_library_dirs()
 
@@ -486,6 +505,24 @@ def get_default_library_dirs() -> list[Path] | None:
 def teardown_current_library() -> None:
     """Teardown the library_id for the current async context."""
     _library_id.set(None)
+
+
+@contextmanager
+def scoped_current_library(library_id: str) -> Iterator[None]:
+    """Set ``library_id`` for the scope, then restore the prior value on exit.
+
+    Captures the prior ``_library_id`` ContextVar value before setting the new
+    one. On exit — success or exception — restores the prior value (or clears
+    the var if there wasn't one). Use this whenever a function temporarily
+    needs a current library for a nested operation without clobbering an
+    outer caller's library_id.
+    """
+    prev = _library_id.get()
+    _library_id.set(library_id)
+    try:
+        yield
+    finally:
+        _library_id.set(prev)
 
 
 def resolve_library_dirs(library_dirs: Sequence[str | Path] | None = None) -> tuple[list[Path], str]:
@@ -565,7 +602,7 @@ def get_required_concept(concept_ref: str) -> Concept:
     return get_pipelex_hub().get_library().concept_library.get_required_concept(concept_ref=concept_ref)
 
 
-def get_pipe_router() -> PipeRouterProtocol:
+def get_pipe_router() -> "PipeRouterProtocol":
     return get_pipelex_hub().get_required_pipe_router()
 
 

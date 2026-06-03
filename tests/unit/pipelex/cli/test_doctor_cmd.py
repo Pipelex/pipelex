@@ -34,7 +34,14 @@ class TestDoctorLayeredResolution:
     """
 
     def test_do_doctor_cmd_delegates_layered_resolution_to_checks(self, mocker: MockerFixture) -> None:
-        """do_doctor_cmd should call check functions with no config_dir so they use layered resolution."""
+        """do_doctor_cmd should call check functions with no config_dir so they use layered resolution.
+
+        Also asserts the bootstrap is invoked exactly once (no overrides) — pinning the
+        contract that human doctor inherits the user's configured log targets.
+        """
+        # Stub the runtime bootstrap so the test doesn't load real config or call log.configure
+        # (once-per-process). The bootstrap call itself is exercised separately.
+        mock_setup = mocker.patch("pipelex.cli.commands.doctor_cmd.setup_doctor_runtime")
         mock_check_config = mocker.patch(
             "pipelex.cli.commands.doctor_cmd.check_config_files",
             return_value=(True, 0, "OK"),
@@ -65,12 +72,74 @@ class TestDoctorLayeredResolution:
             do_doctor_cmd(fix=False)
         assert exc_info.value.code == 0
 
+        # Bootstrap runs exactly once with no overrides (human doctor inherits user log targets)
+        mock_setup.assert_called_once_with()
         # All checks must be called without config_dir (layered resolution)
         mock_check_config.assert_called_once_with()
         mock_check_telemetry.assert_called_once_with()
         mock_check_backends.assert_called_once_with()
         mock_check_models.assert_called_once_with()
         mock_check_deck.assert_called_once_with()
+
+    def test_pipelex_config_error_from_bootstrap_preserves_partial_report(self, mocker: MockerFixture) -> None:
+        """Regression: a config that passes check_config_files's shape check but fails full
+        validation inside setup_doctor_runtime must still produce the partial health report
+        with models marked as skipped — not crash into the outer "Unexpected error" handler.
+
+        This is the human-CLI counterpart of the agent doctor's
+        test_pipelex_config_error_from_bootstrap_preserves_partial_report: layered overrides
+        can pass the shape check on disk yet fail Pydantic validation inside
+        setup_doctor_runtime, and the user deserves the friendly translation in the report
+        rather than a generic failure message.
+        """
+        from pipelex.base_exceptions import PipelexConfigError  # noqa: PLC0415
+
+        mock_setup = mocker.patch(
+            "pipelex.cli.commands.doctor_cmd.setup_doctor_runtime",
+            side_effect=PipelexConfigError("translated validation message"),
+        )
+        mock_check_models = mocker.patch("pipelex.cli.commands.doctor_cmd.check_models")
+        mocker.patch(
+            "pipelex.cli.commands.doctor_cmd.check_config_files",
+            return_value=(True, 0, "All config files present"),
+        )
+        mocker.patch(
+            "pipelex.cli.commands.doctor_cmd.check_telemetry_config",
+            return_value=(True, "OK"),
+        )
+        mocker.patch(
+            "pipelex.cli.commands.doctor_cmd.check_backend_credentials",
+            return_value=(True, {}, "OK"),
+        )
+        mocker.patch(
+            "pipelex.cli.commands.doctor_cmd.check_deck_sync",
+            return_value=(
+                True,
+                DeckSyncReport(kit_version="1.0.0", installed_kit_version="1.0.0", manifest_present=True, files={}),
+                "OK",
+            ),
+        )
+        mock_display = mocker.patch("pipelex.cli.commands.doctor_cmd.display_health_report")
+
+        with pytest.raises(SystemExit) as exc_info:
+            do_doctor_cmd(fix=False)
+        # Exits with non-zero because models check is unhealthy
+        assert exc_info.value.code != 0
+
+        # Bootstrap ran (and raised); check_models was skipped.
+        mock_setup.assert_called_once_with()
+        mock_check_models.assert_not_called()
+
+        # display_health_report was still called, with models marked as skipped + translated message.
+        mock_display.assert_called_once()
+        kwargs = mock_display.call_args.kwargs
+        assert kwargs["models_skipped"] is True
+        assert kwargs["models_healthy"] is False
+        assert "translated validation message" in kwargs["models_message"]
+        # All other partial check tuples survived intact.
+        assert kwargs["config_healthy"] is True
+        assert kwargs["telemetry_healthy"] is True
+        assert kwargs["backends_healthy"] is True
 
     def test_telemetry_check_falls_back_to_global(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """When project .pipelex/ exists but has no telemetry.toml, fall back to global ~/.pipelex/."""

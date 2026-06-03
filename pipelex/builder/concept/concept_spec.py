@@ -8,7 +8,7 @@ from rich.text import Text
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.base_exceptions import PipelexError
+from pipelex.builder.concept.exceptions import ConceptSpecError
 from pipelex.cogt.content_generation.dry_run_factory import MockFormat
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
@@ -42,10 +42,6 @@ class ConceptStructureSpecFieldType(StrEnum):
                 | ConceptStructureSpecFieldType.LIST
             ):
                 return False
-
-
-class ConceptSpecError(PipelexError):
-    pass
 
 
 class ConceptStructureSpec(StructuredContent):

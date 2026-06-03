@@ -13,7 +13,6 @@ from pipelex.cogt.extract.bounding_box import BoundingBox
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.hub import get_storage_provider
-from pipelex.system.exceptions import ToolError
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
 from pipelex.tools.misc.image_utils import ImageFormat, pil_image_to_bytes
 from pipelex.tools.uri.resolved_uri import (
@@ -34,10 +33,6 @@ DEFAULT_IMAGE_EXTRACTION_MAX_DEPTH = 15
 # Note: JPEG2000 (JPXDecode) could also be extracted directly, but ImageFormat
 # doesn't support jp2 output, so JPEG2000 images go through bitmap extraction
 FILTER_JPEG = "DCTDecode"
-
-
-class PyPdfium2RendererError(ToolError):
-    pass
 
 
 PdfInput = str | pathlib.Path | bytes

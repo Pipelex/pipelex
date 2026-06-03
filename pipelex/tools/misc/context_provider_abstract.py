@@ -1,14 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from pipelex.system.exceptions import ToolError
-
-
-class ContextProviderError(ToolError):
-    def __init__(self, message: str, variable_name: str):
-        super().__init__(message=message)
-        self.variable_name = variable_name
-
 
 class ContextProviderAbstract(ABC):
     """A ContextProvider provides context to templating engine. This interface is implemented by WorkingMemory.

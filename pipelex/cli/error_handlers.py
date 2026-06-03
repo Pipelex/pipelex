@@ -1,15 +1,17 @@
 from pathlib import Path
 from typing import NoReturn
 
+import click
 import typer
 from rich.console import Console
 from rich.markup import escape
+from rich.traceback import Traceback
 
 from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelDeckPresetValidatonError
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.hub import get_console
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
-from pipelex.pipeline.validate_bundle import ValidateBundleError
+from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.system.pipelex_service.exceptions import (
     GatewayApiKeyMissingError,
     GatewayDoNotTrackConflictError,
@@ -43,6 +45,65 @@ class ErrorContext(StrEnum):
     KIT = "Kit operation"
 
 
+def is_traceback_requested() -> bool:
+    """Check whether the --traceback global flag was passed on the CLI invocation."""
+    try:
+        ctx = click.get_current_context(silent=True)
+    except RuntimeError:
+        return False
+    if ctx is None:
+        return False
+    obj = ctx.find_root().obj
+    if obj is None:
+        return False
+    return bool(obj.get("traceback", False))
+
+
+def print_traceback_if_requested(console: Console) -> None:
+    """Print a Rich traceback of the current exception when --traceback is active."""
+    if is_traceback_requested():
+        console.print(Traceback())
+
+
+def display_error_panel(
+    console: Console,
+    *,
+    title: str,
+    fields: list[tuple[str, str]],
+    error_message: str | None,
+    tip: str,
+    links: list[tuple[str, str]],
+) -> None:
+    """Print the canonical CLI error panel.
+
+    Layout: a red ❌ banner, an aligned block of structured fields, the error
+    message, a 💡 tip, and dimmed help links. Field labels are right-padded to
+    a common width so the values line up.
+
+    Exception-specific logic (which fields to include, what tip to derive)
+    stays in each ``handle_*`` function; this helper owns only the panel shape.
+
+    Args:
+        console: Rich console to print to.
+        title: Headline text after the ❌ (already markup-safe).
+        fields: ``(label, value)`` pairs; values must already be escaped.
+        error_message: The error message body, or None to omit it.
+        tip: The 💡 tip text (may span multiple lines / carry markup).
+        links: ``(label, url)`` pairs printed dimmed at the bottom.
+    """
+    console.print(f"\n[bold red]❌ {title}[/bold red]\n")
+    label_width = max((len(label) for label, _ in fields), default=0)
+    for label, value in fields:
+        padded_label = f"{label}:".ljust(label_width + 1)
+        console.print(f"[bold cyan]{padded_label}[/bold cyan] {value}")
+    if error_message is not None:
+        console.print(f"\n[bold red]Error:[/bold red] {error_message}\n")
+    console.print(f"[bold green]💡 Tip:[/bold green] {tip}")
+    for link_label, link_url in links:
+        console.print(f"[dim]{link_label}: {link_url}[/dim]")
+    console.print()
+
+
 def handle_model_choice_error(exc: PipeOperatorModelChoiceError, context: ErrorContext) -> NoReturn:
     """Handle and display PipeOperatorModelChoiceError with formatted output.
 
@@ -50,17 +111,27 @@ def handle_model_choice_error(exc: PipeOperatorModelChoiceError, context: ErrorC
         exc: The model choice error exception
         context: Context for the error message
     """
-    report = exc.to_error_report()
     console = get_console()
-    console.print(f"\n[bold red]❌ {context} failed because of a model choice could not be interpreted correctly[/bold red]\n")
-    console.print(f"[bold cyan]Pipe:[/bold cyan]         [yellow]'{escape(exc.pipe_code)}'[/yellow] [dim]({escape(exc.pipe_type)})[/dim]")
-    console.print(f"[bold cyan]Model Type:[/bold cyan]   [yellow]'{escape(exc.model_type)}'[/yellow]")
-    console.print(f"[bold cyan]Model Choice:[/bold cyan] [yellow]'{escape(str(exc.model_choice))}'[/yellow]")
-    console.print(f"\n[bold red]Error:[/bold red]        {escape(exc.message)}\n")
-    tip = report.user_action or (f"Check your model configuration in .pipelex/inference/ or specify a different model in the '{exc.pipe_code}' pipe.")
-    console.print(f"\n[bold green]💡 Tip:[/bold green] {escape(tip)}")
-    console.print(f"[dim]Learn more about the inference backend system: {URLs.backend_provider_docs}[/dim]")
-    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
+    print_traceback_if_requested(console)
+    report = exc.to_error_report()
+    tip = report.user_action_detail() or (
+        f"Check your model configuration in .pipelex/inference/ or specify a different model in the '{exc.pipe_code}' pipe."
+    )
+    display_error_panel(
+        console,
+        title=f"{context} failed because of a model choice could not be interpreted correctly",
+        fields=[
+            ("Pipe", f"[yellow]'{escape(exc.pipe_code)}'[/yellow] [dim]({escape(exc.pipe_type)})[/dim]"),
+            ("Model Type", f"[yellow]'{escape(exc.model_type)}'[/yellow]"),
+            ("Model Choice", f"[yellow]'{escape(str(exc.model_choice))}'[/yellow]"),
+        ],
+        error_message=escape(exc.message),
+        tip=escape(tip),
+        links=[
+            ("Learn more about the inference backend system", URLs.backend_provider_docs),
+            ("Join our Discord for help", URLs.discord),
+        ],
+    )
     raise typer.Exit(1) from exc
 
 
@@ -71,22 +142,33 @@ def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, con
         exc: The model availability error exception
         context: Context for the error message
     """
-    report = exc.to_error_report()
     console = get_console()
-    console.print(f"\n[bold red]❌ {context} failed because a model wasn't available[/bold red]\n")
-    console.print(f"[bold cyan]Pipe:[/bold cyan]         [yellow]'{escape(exc.pipe_code)}'[/yellow] [dim]({escape(exc.pipe_type)})[/dim]")
-    console.print(f"[bold cyan]Model:[/bold cyan]        [yellow]'{escape(exc.model_handle)}'[/yellow]")
+    print_traceback_if_requested(console)
+    report = exc.to_error_report()
+    fields: list[tuple[str, str]] = [
+        ("Pipe", f"[yellow]'{escape(exc.pipe_code)}'[/yellow] [dim]({escape(exc.pipe_type)})[/dim]"),
+        ("Model", f"[yellow]'{escape(exc.model_handle or '')}'[/yellow]"),
+    ]
     if exc.fallback_list:
-        fallbacks_str = ", ".join([f"[yellow]{escape(fb)}[/yellow]" for fb in exc.fallback_list])
-        console.print(f"[bold cyan]Fallbacks:[/bold cyan]    {fallbacks_str}")
+        fallbacks_str = ", ".join([f"[yellow]{escape(fallback)}[/yellow]" for fallback in exc.fallback_list])
+        fields.append(("Fallbacks", fallbacks_str))
     if len(exc.pipe_stack) > 1:
-        stack_str = " [dim]→[/dim] ".join([f"[yellow]{escape(p)}[/yellow]" for p in exc.pipe_stack])
-        console.print(f"[bold cyan]Pipe Stack:[/bold cyan]   {stack_str}")
-    console.print(f"\n[bold red]Error:[/bold red]        {escape(str(exc))}\n")
-    tip = report.user_action or (f"Check your model configuration in .pipelex/inference/ or specify a different model in the '{exc.pipe_code}' pipe.")
-    console.print(f"[bold green]💡 Tip:[/bold green] {escape(tip)}")
-    console.print(f"[dim]Learn more about the inference backend system: {URLs.backend_provider_docs}[/dim]")
-    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
+        stack_str = " [dim]→[/dim] ".join([f"[yellow]{escape(stacked_pipe)}[/yellow]" for stacked_pipe in exc.pipe_stack])
+        fields.append(("Pipe Stack", stack_str))
+    tip = report.user_action_detail() or (
+        f"Check your model configuration in .pipelex/inference/ or specify a different model in the '{exc.pipe_code}' pipe."
+    )
+    display_error_panel(
+        console,
+        title=f"{context} failed because a model wasn't available",
+        fields=fields,
+        error_message=escape(str(exc)),
+        tip=escape(tip),
+        links=[
+            ("Learn more about the inference backend system", URLs.backend_provider_docs),
+            ("Join our Discord for help", URLs.discord),
+        ],
+    )
     raise typer.Exit(1) from exc
 
 
@@ -97,34 +179,51 @@ def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, context: 
         exc: The model deck preset validation error exception
         context: Context for the error message
     """
-    report = exc.to_error_report()
     console = get_console()
-    console.print(f"\n[bold red]❌ {context} failed due to model deck preset validation error[/bold red]\n")
-    console.print(f"[bold cyan]Preset ID:[/bold cyan]    [yellow]'{escape(exc.preset_id)}'[/yellow]")
-    console.print(f"[bold cyan]Model Type:[/bold cyan]   [yellow]'{escape(exc.model_type)}'[/yellow]")
-    console.print(f"[bold cyan]Model Handle:[/bold cyan] [yellow]'{escape(exc.model_handle)}'[/yellow]")
+    print_traceback_if_requested(console)
+    report = exc.to_error_report()
+    model_handle = exc.model_handle or ""
+    fields: list[tuple[str, str]] = [
+        ("Preset ID", f"[yellow]'{escape(exc.preset_id)}'[/yellow]"),
+        ("Model Type", f"[yellow]'{escape(exc.model_type)}'[/yellow]"),
+        ("Model Handle", f"[yellow]'{escape(model_handle)}'[/yellow]"),
+    ]
     if exc.enabled_backends:
-        backends_str = ", ".join([f"[yellow]{escape(b)}[/yellow]" for b in sorted(exc.enabled_backends)])
-        console.print(f"[bold cyan]Enabled Backends:[/bold cyan] {backends_str}")
-    console.print(f"\n[bold red]Error:[/bold red]        {escape(exc.message)}\n")
-    if report.user_action:
-        console.print(f"[bold green]💡 Tip:[/bold green] {escape(report.user_action)}")
+        backends_str = ", ".join([f"[yellow]{escape(backend)}[/yellow]" for backend in sorted(exc.enabled_backends)])
+        fields.append(("Enabled Backends", backends_str))
+
+    tip_detail = report.user_action_detail()
+    if tip_detail is not None:
+        tip = escape(tip_detail)
     else:
-        console.print(
-            f"[bold green]💡 Tip:[/bold green] The preset [yellow]'{escape(exc.preset_id)}'[/yellow] references model handle "
-            f"[yellow]'{escape(exc.model_handle)}'[/yellow] which is not available in any enabled backend."
-        )
+        tip_lines: list[str] = [
+            (
+                f"The preset [yellow]'{escape(exc.preset_id)}'[/yellow] references model handle "
+                f"[yellow]'{escape(model_handle)}'[/yellow] which is not available in any enabled backend."
+            )
+        ]
         if exc.enabled_backends:
-            backends_str = ", ".join([f"[yellow]{escape(b)}[/yellow]" for b in sorted(exc.enabled_backends)])
-            console.print(f"The enabled backends are: {backends_str}.")
-        console.print(
+            backends_str = ", ".join([f"[yellow]{escape(backend)}[/yellow]" for backend in sorted(exc.enabled_backends)])
+            tip_lines.append(f"The enabled backends are: {backends_str}.")
+        tip_lines.append(
             "[bold]Possible solutions:[/bold]\n"
             "  1. Update the preset to use a different model\n"
-            f"  2. Configure model '{escape(exc.model_handle)}' in one of your enabled backends\n"
-            f"  3. Enable a backend that supports [yellow]'{escape(exc.model_handle)}'[/yellow]"
+            f"  2. Configure model '{escape(model_handle)}' in one of your enabled backends\n"
+            f"  3. Enable a backend that supports [yellow]'{escape(model_handle)}'[/yellow]"
         )
-    console.print(f"\n[dim]Learn more about the inference backend system: {URLs.backend_provider_docs}[/dim]")
-    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
+        tip = "\n".join(tip_lines)
+
+    display_error_panel(
+        console,
+        title=f"{context} failed due to model deck preset validation error",
+        fields=fields,
+        error_message=escape(exc.message),
+        tip=tip,
+        links=[
+            ("Learn more about the inference backend system", URLs.backend_provider_docs),
+            ("Join our Discord for help", URLs.discord),
+        ],
+    )
     raise typer.Exit(1) from exc
 
 
@@ -163,9 +262,9 @@ def _display_validation_error_details(console: Console, exc: ValidateBundleError
             console.print()
 
     # Display pipe validation errors
-    if exc.pipe_validation_error_data:
+    if exc.pipe_validation_errors:
         console.print("[bold cyan]Pipe Validation Errors:[/bold cyan]\n")
-        for pipe_index, pipe_error in enumerate(exc.pipe_validation_error_data, 1):
+        for pipe_index, pipe_error in enumerate(exc.pipe_validation_errors, 1):
             console.print(f"[bold yellow]{pipe_index}. {pipe_error.error_type.replace('_', ' ').title()}[/bold yellow]")
 
             # Display key identification info
@@ -209,6 +308,7 @@ def handle_validate_bundle_error(exc: ValidateBundleError, bundle_path: Path | N
     """
     report = exc.to_error_report()
     console = get_console()
+    print_traceback_if_requested(console)
     console.print("\n[bold red]❌ Bundle validation failed[/bold red]\n")
 
     if bundle_path:
@@ -217,7 +317,7 @@ def handle_validate_bundle_error(exc: ValidateBundleError, bundle_path: Path | N
     _display_validation_error_details(console=console, exc=exc)
 
     # Display helpful tips
-    tip = report.user_action or (
+    tip = report.user_action_detail() or (
         "Review the error messages above and check your pipeline configuration. Make sure all required fields are present and correctly formatted."
     )
     console.print(f"[bold green]💡 Tip:[/bold green] {escape(tip)}")
@@ -235,6 +335,7 @@ def handle_inference_setup_required_error(exc: InferenceSetupRequiredError) -> N
         exc: The inference setup required error exception
     """
     console = get_console()
+    print_traceback_if_requested(console)
     console.print("\n[bold yellow]⚠ First-time inference setup required[/bold yellow]\n")
 
     console.print(
@@ -261,6 +362,7 @@ def handle_telemetry_config_validation_error(exc: TelemetryConfigValidationError
         exc: The telemetry config validation error exception
     """
     console = get_console()
+    print_traceback_if_requested(console)
     console.print("\n[bold red]❌ Telemetry configuration format has changed[/bold red]\n")
 
     console.print(
@@ -290,6 +392,7 @@ def handle_gateway_terms_not_accepted_error(exc: GatewayTermsNotAcceptedError) -
         exc: The gateway terms not accepted error exception
     """
     console = get_console()
+    print_traceback_if_requested(console)
     console.print("\n[bold red]❌ Pipelex Gateway terms not accepted[/bold red]\n")
 
     console.print("[bold yellow]⚠ Action Required:[/bold yellow] Pipelex Gateway is enabled but you haven't accepted\nthe terms of service yet.\n")
@@ -316,6 +419,7 @@ def handle_gateway_api_key_missing_error(exc: GatewayApiKeyMissingError) -> NoRe
         exc: The gateway API key missing error exception
     """
     console = get_console()
+    print_traceback_if_requested(console)
     console.print("\n[bold red]❌ Pipelex Gateway API key not set[/bold red]\n")
 
     console.print("[bold yellow]⚠ Action Required:[/bold yellow] Pipelex Gateway is enabled but the API key\nenvironment variable is not set.\n")
@@ -345,6 +449,7 @@ def handle_gateway_do_not_track_conflict_error(exc: GatewayDoNotTrackConflictErr
         exc: The gateway do not track conflict error exception
     """
     console = get_console()
+    print_traceback_if_requested(console)
     console.print("\n[bold red]❌ Pipelex Gateway requires telemetry[/bold red]\n")
 
     console.print(
@@ -373,6 +478,7 @@ def handle_remote_config_validation_error(exc: RemoteConfigValidationError) -> N
         exc: The remote config validation error exception
     """
     console = get_console()
+    print_traceback_if_requested(console)
     console.print("\n[bold red]❌ Pipelex Gateway configuration is invalid[/bold red]\n")
 
     console.print(
@@ -409,6 +515,7 @@ def handle_remote_config_unavailable_error(exc: RemoteConfigUnavailableError) ->
         exc: The remote config unavailable error exception
     """
     console = get_console()
+    print_traceback_if_requested(console)
     console.print("\n[bold red]❌ Pipelex Gateway is unreachable and no cached config is available[/bold red]\n")
 
     console.print(
@@ -442,6 +549,7 @@ def handle_gateway_unknown_model_error(exc: GatewayUnknownModelError) -> NoRetur
         exc: The gateway unknown model error exception
     """
     console = get_console()
+    print_traceback_if_requested(console)
     console.print("\n[bold red]❌ Unknown gateway model handle[/bold red]\n")
 
     console.print(f"[bold cyan]Model handle:[/bold cyan] [yellow]'{escape(exc.model_name)}'[/yellow]")

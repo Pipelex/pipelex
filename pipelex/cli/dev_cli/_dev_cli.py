@@ -15,10 +15,12 @@ from pipelex.cli.dev_cli.commands.check_gateway_models_cmd import check_gateway_
 from pipelex.cli.dev_cli.commands.check_mthds_schema_cmd import check_mthds_schema_cmd
 from pipelex.cli.dev_cli.commands.check_rules_sync_cmd import check_rules_sync_cmd
 from pipelex.cli.dev_cli.commands.check_urls_cmd import DEFAULT_TIMEOUT, check_urls_cmd
+from pipelex.cli.dev_cli.commands.generate_error_pages_cmd import generate_error_pages_cmd
 from pipelex.cli.dev_cli.commands.generate_mthds_schema_cmd import generate_mthds_schema_cmd
 from pipelex.cli.dev_cli.commands.kit_cmd import kit_app
 from pipelex.cli.dev_cli.commands.preprocess_test_models_cmd import preprocess_test_models_cmd
 from pipelex.cli.dev_cli.commands.refresh_graph_ui_sri_cmd import refresh_graph_ui_sri_cmd
+from pipelex.cli.dev_cli.commands.sync_kit_configs_cmd import sync_kit_configs_cmd
 from pipelex.cli.dev_cli.commands.sync_main_config_cmd import SyncTarget, sync_main_config_cmd
 from pipelex.cli.dev_cli.commands.update_gateway_models_cmd import update_gateway_models_cmd
 from pipelex.hub import get_console
@@ -37,10 +39,12 @@ class PipelexDevCLI(TyperGroup):
             "check-mthds-schema",
             "check-rules",
             "check-urls",
+            "generate-error-pages",
             "generate-mthds-schema",
             "kit",
             "preprocess-test-models",
             "refresh-graph-ui-sri",
+            "sync-kit-configs",
             "sync-main-config",
             "update-gateway-models",
         ]
@@ -101,7 +105,11 @@ def check_config_sync_command(
     """Verify that .pipelex and pipelex/kit/configs are in sync."""
     try:
         check_config_sync_cmd(show_diff=show_diff, leading=leading, quiet=quiet)
-    except Exception:
+    except (typer.Exit, typer.Abort):
+        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
+        raise
+    except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
         console.print("[bold red]Unexpected error occurred[/bold red]")
@@ -118,7 +126,11 @@ def check_rules_command(
     """Verify that installed agent rules match kit templates."""
     try:
         check_rules_sync_cmd(show_diff=show_diff, quiet=quiet)
-    except Exception:
+    except (typer.Exit, typer.Abort):
+        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
+        raise
+    except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
         console.print("[bold red]Unexpected error occurred[/bold red]")
@@ -135,7 +147,33 @@ def check_urls_command(
     """Check all URLs in pipelex/urls.py for broken links."""
     try:
         check_urls_cmd(quiet=quiet, timeout=timeout)
-    except Exception:
+    except (typer.Exit, typer.Abort):
+        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
+        raise
+    except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
+        console = get_console()
+        console.print()
+        console.print("[bold red]Unexpected error occurred[/bold red]")
+        console.print()
+        console.print(Traceback())
+        sys.exit(1)
+
+
+@app.command(name="generate-error-pages", help="Generate one docs page per PipelexError subclass under docs/errors/")
+def generate_error_pages_command(
+    output: Annotated[str | None, typer.Option("--output", "-o", help="Custom output directory for the error pages")] = None,
+    quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only a single status line")] = False,
+) -> None:
+    """Generate per-class error documentation pages under ``docs/errors/``."""
+    try:
+        output_path = Path(output) if output else None
+        generate_error_pages_cmd(output=output_path, quiet=quiet)
+    except (typer.Exit, typer.Abort):
+        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
+        raise
+    except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
         console.print("[bold red]Unexpected error occurred[/bold red]")
@@ -153,7 +191,11 @@ def generate_mthds_schema_command(
     try:
         output_path = Path(output) if output else None
         generate_mthds_schema_cmd(output=output_path, quiet=quiet)
-    except Exception:
+    except (typer.Exit, typer.Abort):
+        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
+        raise
+    except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
         console.print("[bold red]Unexpected error occurred[/bold red]")
@@ -170,7 +212,11 @@ def check_gateway_models_command(
     """Verify that the Pipelex Gateway models reference file is up-to-date."""
     try:
         check_gateway_models_cmd(show_diff=show_diff, quiet=quiet)
-    except Exception:
+    except (typer.Exit, typer.Abort):
+        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
+        raise
+    except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
         console.print("[bold red]Unexpected error occurred[/bold red]")
@@ -187,7 +233,11 @@ def check_mthds_schema_command(
     """Verify that the MTHDS JSON Schema file is up-to-date."""
     try:
         check_mthds_schema_cmd(show_diff=show_diff, quiet=quiet)
-    except Exception:
+    except (typer.Exit, typer.Abort):
+        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
+        raise
+    except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
         console.print("[bold red]Unexpected error occurred[/bold red]")
@@ -209,7 +259,32 @@ def sync_main_config_command(
     """Sync values from main config (pipelex/pipelex.toml) to kit and project configs."""
     try:
         sync_main_config_cmd(target=target, dry_run=dry_run, quiet=quiet, show_diff=show_diff)
-    except Exception:
+    except (typer.Exit, typer.Abort):
+        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
+        raise
+    except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
+        console = get_console()
+        console.print()
+        console.print("[bold red]Unexpected error occurred[/bold red]")
+        console.print()
+        console.print(Traceback())
+        sys.exit(1)
+
+
+@app.command(name="sync-kit-configs", help="Mirror .pipelex/ into pipelex/kit/configs/")
+def sync_kit_configs_command(
+    dry_run: Annotated[bool, typer.Option("--dry-run", "-n", help="Preview changes without applying")] = False,
+    quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only a single status line")] = False,
+) -> None:
+    """Mirror the .pipelex/ directory into pipelex/kit/configs/."""
+    try:
+        sync_kit_configs_cmd(quiet=quiet, dry_run=dry_run)
+    except (typer.Exit, typer.Abort):
+        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
+        raise
+    except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
         console.print("[bold red]Unexpected error occurred[/bold red]")
@@ -228,7 +303,11 @@ def preprocess_test_models_command(
     """Preprocess test models and generate fixture files for parametrized tests."""
     try:
         preprocess_test_models_cmd(profile=profile, generate_fixtures=generate_fixtures, output_json=output_json, quiet=quiet)
-    except Exception:
+    except (typer.Exit, typer.Abort):
+        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
+        raise
+    except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
         console.print("[bold red]Unexpected error occurred[/bold red]")
@@ -259,7 +338,11 @@ def refresh_graph_ui_sri_command(
             elkjs_version=elkjs_version,
             quiet=quiet,
         )
-    except Exception:
+    except (typer.Exit, typer.Abort):
+        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
+        raise
+    except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
         console.print("[bold red]Unexpected error occurred[/bold red]")
@@ -275,7 +358,11 @@ def update_gateway_models_command(
     """Update the Pipelex Gateway models reference file from remote config."""
     try:
         update_gateway_models_cmd(quiet=quiet)
-    except Exception:
+    except (typer.Exit, typer.Abort):
+        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
+        raise
+    except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
         console.print("[bold red]Unexpected error occurred[/bold red]")

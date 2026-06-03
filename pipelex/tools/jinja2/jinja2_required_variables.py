@@ -1,14 +1,15 @@
-from dataclasses import dataclass, field
+from dataclasses import field
 
 from jinja2 import nodes
 from jinja2.exceptions import (
     TemplateSyntaxError,
     UndefinedError,
 )
+from pydantic.dataclasses import dataclass
 
 from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError, Jinja2StuffError
 from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_loader
-from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError, Jinja2StuffError
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 
@@ -16,13 +17,16 @@ from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 class VariableReference:
     """Represents a variable reference in a Jinja2 template with its applied filters.
 
+    Mutated in place: ``_collect_variable_references`` does ``.filters.append(...)``
+    on re-seen variables, so this is intentionally NOT frozen.
+
     Attributes:
         path: The full dotted path to the variable (e.g., "document.cover", "pages")
         filters: List of filter names applied to this variable (e.g., ["with_images", "tag"])
     """
 
     path: str
-    filters: list[str] = field(default_factory=list)  # pyright: ignore[reportUnknownVariableType]
+    filters: list[str] = field(default_factory=list[str])
 
 
 def _build_full_path(node: nodes.Node) -> str | None:

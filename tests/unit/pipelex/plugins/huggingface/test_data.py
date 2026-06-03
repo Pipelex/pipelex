@@ -3,70 +3,73 @@
 from typing import ClassVar
 
 from pipelex.cogt.exceptions import InferenceErrorCategory
+from pipelex.cogt.inference.error_classification import UserActionKind
 
 
 class HuggingFaceErrorHandlingTestData:
     """Test cases for HuggingFace ImgGen worker SDK exception handling.
 
-    Each tuple: (topic, status_code_or_none, message, expected_category, expected_message_substring)
+    Each tuple: (topic, status_code_or_none, message, expected_category, expected_user_action_kind)
     """
 
-    HF_HTTP_ERROR_CASES: ClassVar[list[tuple[str, int | None, str, InferenceErrorCategory, str]]] = [
+    HF_HTTP_ERROR_CASES: ClassVar[list[tuple[str, int | None, str, InferenceErrorCategory, UserActionKind]]] = [
         (
             "rate_limit_429",
             429,
             "Rate limit exceeded",
             InferenceErrorCategory.TRANSIENT,
-            "rate limit",
+            UserActionKind.WAIT_AND_RETRY,
         ),
         (
             "quota_exhausted_402",
             402,
             "Quota exhausted",
             InferenceErrorCategory.CAPACITY,
-            "quota",
+            UserActionKind.CHECK_BILLING,
         ),
         (
             "auth_error_401",
             401,
             "Invalid token",
             InferenceErrorCategory.CONFIGURATION,
-            "authentication error",
+            UserActionKind.CHECK_CREDENTIALS,
         ),
         (
             "forbidden_403",
             403,
             "Access denied",
             InferenceErrorCategory.CONFIGURATION,
-            "authentication error",
+            UserActionKind.CHECK_CREDENTIALS,
         ),
         (
             "bad_request_400",
             400,
             "Invalid parameters",
             InferenceErrorCategory.CONTENT,
-            "bad request",
+            UserActionKind.CHANGE_INPUT,
         ),
         (
+            # An HfHubHTTPError without an HTTP status is statusless from the classifier's
+            # point of view; the unified classifier maps it to UNKNOWN/CONTACT_SUPPORT.
             "unknown_status_none",
             None,
             "Unknown error occurred",
-            InferenceErrorCategory.TRANSIENT,
-            "api error",
+            InferenceErrorCategory.UNKNOWN,
+            UserActionKind.CONTACT_SUPPORT,
         ),
         (
             "server_error_503",
             503,
             "Service unavailable",
             InferenceErrorCategory.TRANSIENT,
-            "api error",
+            UserActionKind.WAIT_AND_RETRY,
         ),
     ]
 
-    TIMEOUT_CASES: ClassVar[list[tuple[str, InferenceErrorCategory, str]]] = [
+    TIMEOUT_CASES: ClassVar[list[tuple[str, InferenceErrorCategory, UserActionKind]]] = [
         (
             "inference_timeout",
             InferenceErrorCategory.TRANSIENT,
-            "timed out",
+            UserActionKind.WAIT_AND_RETRY,
         ),
     ]

@@ -3,15 +3,15 @@ from typing import Any, Literal
 from pydantic import ConfigDict, Field, model_validator
 from typing_extensions import override
 
+from pipelex.cogt.templating.exceptions import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.cogt.templating.template_errors import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
-from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
+from pipelex.tools.jinja2.exceptions import Jinja2TemplateSyntaxError
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
@@ -123,7 +123,7 @@ class PipeComposeBlueprint(PipeBlueprint):
         required_variables: set[str] = set()
         for path in full_paths:
             root = get_root_from_dotted_path(path)
-            if not root.startswith("_") and root not in {"preliminary_text", "place_holder"}:
+            if not root.startswith("_") and root != "place_holder":
                 required_variables.add(root)
         for required_variable_name in required_variables:
             if required_variable_name not in self.input_names:

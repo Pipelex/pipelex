@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.base_exceptions import ErrorReport, PipelexError, PipelexUnexpectedError
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus
 from pipelex.pipe_run.delivery_executor import DeliveryExecutor
@@ -30,18 +31,27 @@ class PipeRun(PipeRunProtocol):
         self,
         pipe_job: PipeJob,
         delivery_assignment: DeliveryAssignment | None = None,
-        wfid: str | None = None,
     ) -> PipeOutput:
         pipeline_run_id: str = pipe_job.job_metadata.pipeline_run_id
         status: DeliveryStatus = DeliveryStatus.COMPLETED
         pipe_output: PipeOutput | None = None
         execution_error: Exception | None = None
+        error_report: ErrorReport | None = None
 
         try:
-            pipe_output = await self._pipe_router.run(pipe_job, wfid=wfid)
-        except Exception as exc:
+            pipe_output = await self._pipe_router.run(pipe_job)
+        except Exception as exc:  # noqa: BLE001
+            # Observe-and-reraise: records FAILED status so the finally delivery sees it, then re-raises the original error below.
             status = DeliveryStatus.FAILED
             execution_error = exc
+            # Always build a report for the FAILED webhook: Pipelex errors carry their own
+            # classification; a bare exception is wrapped in PipelexUnexpectedError so the
+            # webhook still receives an `error` object — matching Temporal mode, where
+            # recover_error_report() is total.
+            if isinstance(exc, PipelexError):
+                error_report = exc.to_error_report()
+            else:
+                error_report = PipelexUnexpectedError(str(exc) or repr(exc)).to_error_report()
             log.error(f"Pipe execution failed for pipeline_run_id={pipeline_run_id}: {exc}")
         finally:
             tracer_manager = GraphTracerManager.get_instance()
@@ -74,6 +84,8 @@ class PipeRun(PipeRunProtocol):
                         pipeline_run_id=pipeline_run_id,
                         delivery_assignment=delivery_assignment,
                         status=status,
+                        error_report=error_report,
+                        request_id=pipe_job.job_metadata.request_id,
                     )
                 except DeliveryError as delivery_error:
                     if execution_error is None:

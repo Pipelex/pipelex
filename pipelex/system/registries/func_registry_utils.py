@@ -2,16 +2,15 @@ import importlib
 import inspect
 import pkgutil
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.system.registries.func_registry import func_registry, pipe_func
 from pipelex.tools.misc.file_utils import find_files_in_dir
-from pipelex.tools.typing.module_inspector import (
-    ModuleFileError,
-    import_module_from_file_if_has_decorated_functions,
-)
+from pipelex.tools.typing.exceptions import ModuleFileError
+from pipelex.tools.typing.module_inspector import import_module_from_file_if_has_decorated_functions
 
 
 class FuncRegistryUtils:
@@ -75,8 +74,8 @@ class FuncRegistryUtils:
     @classmethod
     def register_funcs_in_folder(
         cls,
-        folder_path: str,
-        force_include_dirs: list[str] | None = None,
+        folder_path: Path,
+        force_include_dirs: list[Path] | None = None,
         is_recursive: bool = True,
     ) -> None:
         """Discovers and attempts to register all functions in Python files within a folder.
@@ -103,16 +102,16 @@ class FuncRegistryUtils:
             pattern="*.py",
             is_recursive=is_recursive,
             excluded_dirs=list(get_config().pipelex.scan_config.excluded_dirs),
-            force_include_dirs=force_include_dirs,
+            force_include_dirs=[str(force_include_dir) for force_include_dir in force_include_dirs] if force_include_dirs is not None else None,
         )
 
         for python_file in python_files:
-            cls._register_funcs_in_file(file_path=str(python_file))
+            cls._register_funcs_in_file(file_path=python_file)
 
     @classmethod
     def _register_funcs_in_file(
         cls,
-        file_path: str,
+        file_path: Path,
     ) -> None:
         """Processes a Python file to find and register eligible @pipe_func decorated functions.
 
@@ -157,7 +156,7 @@ class FuncRegistryUtils:
                     func_registry.register_ineligible_function(
                         func=func,
                         reason=eligibility_error,
-                        source_file=file_path,
+                        source_file=str(file_path),
                     )
                     log.warning(f"Function '{func_name}' in '{file_path}' has @pipe_func() decorator but is not eligible: {eligibility_error}")
         except ModuleFileError:

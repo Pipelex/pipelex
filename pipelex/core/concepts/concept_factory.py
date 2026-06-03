@@ -1,4 +1,4 @@
-from typing import cast
+from typing import NamedTuple, cast
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
 from pydantic import BaseModel
@@ -27,6 +27,11 @@ def _get_class_registry() -> ClassRegistryAbstract:
 
     hub = importlib.import_module("pipelex.hub")
     return hub.get_class_registry()  # type: ignore[no-any-return]
+
+
+class StructureNameAndRefine(NamedTuple):
+    structure_class_name: str
+    refine_string: str | None
 
 
 class ConceptDeclarationType(StrEnum):
@@ -339,25 +344,24 @@ class ConceptFactory:
         concept_code: str,
         domain_code: str,
         description: str,
-    ) -> tuple[str, str | None]:
-        """Handle BASIC_BLUEPRINT declaration type.
-
-        Returns:
-            Tuple of (structure_class_name, refine_string)
-        """
+    ) -> StructureNameAndRefine:
+        """Handle BASIC_BLUEPRINT declaration type."""
         qualified_class_name = make_qualified_structure_class_name(domain_code, concept_code)
 
         # Check if a valid structure class already exists — first by bare concept_code
         # (for pre-existing Python classes registered under their own name), then by
         # qualified name (for previously generated dynamic classes)
         if Concept.is_valid_structure_class(structure_class_name=concept_code):
-            return concept_code, None
+            return StructureNameAndRefine(structure_class_name=concept_code, refine_string=None)
         if Concept.is_valid_structure_class(structure_class_name=qualified_class_name):
-            return qualified_class_name, None
+            return StructureNameAndRefine(structure_class_name=qualified_class_name, refine_string=None)
 
         # Because native concepts have structure class names diffrent than other (with "Content")
         if concept_code in NativeConceptCode.values_list():
-            return NativeConceptCode.TEXT.structure_class_name, NativeConceptCode.TEXT.concept_ref
+            return StructureNameAndRefine(
+                structure_class_name=NativeConceptCode.TEXT.structure_class_name,
+                refine_string=NativeConceptCode.TEXT.concept_ref,
+            )
 
         try:
             _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
@@ -372,7 +376,7 @@ class ConceptFactory:
         # Register the generated class
         _get_class_registry().register_class(the_generated_class)
 
-        return qualified_class_name, NativeConceptCode.TEXT.concept_ref
+        return StructureNameAndRefine(structure_class_name=qualified_class_name, refine_string=NativeConceptCode.TEXT.concept_ref)
 
     @classmethod
     def _handle_refines(
@@ -380,14 +384,11 @@ class ConceptFactory:
         blueprint: ConceptBlueprint,
         concept_code: str,
         domain_code: str,
-    ) -> tuple[str, str]:
+    ) -> StructureNameAndRefine:
         """Handle REFINES declaration type.
 
         Concept refines another concept - generate a new class that inherits from the refined
         structure class.
-
-        Returns:
-            Tuple of (structure_class_name, refine_string)
         """
         if blueprint.refines is None:
             msg = "Expected refines to be set"
@@ -419,7 +420,7 @@ class ConceptFactory:
                 raise ConceptFactoryError(msg) from exc
 
             _get_class_registry().register_class(the_generated_class)
-            return qualified_class_name, current_refine
+            return StructureNameAndRefine(structure_class_name=qualified_class_name, refine_string=current_refine)
 
         # Get the refined concept's structure class name
         # For native concepts, the structure class name is "ConceptCode" + "Content" (e.g., TextContent)
@@ -451,7 +452,7 @@ class ConceptFactory:
         # Register the generated class
         _get_class_registry().register_class(the_generated_class)
 
-        return qualified_class_name, current_refine
+        return StructureNameAndRefine(structure_class_name=qualified_class_name, refine_string=current_refine)
 
     @classmethod
     def make_from_blueprint(

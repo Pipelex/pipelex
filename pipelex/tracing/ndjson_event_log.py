@@ -5,7 +5,6 @@ One JSON event per line, one file per workflow, organized by pipeline run:
 """
 
 import json
-import os
 import shutil
 import threading
 from pathlib import Path
@@ -41,8 +40,8 @@ class NdjsonEventLog(EventLogProtocol):
     DynamoDB backend for fully separated hosts.
     """
 
-    def __init__(self, traces_dir: str, writer_id: str = "primary") -> None:
-        self._traces_dir = traces_dir
+    def __init__(self, traces_dir: str | Path, writer_id: str = "primary") -> None:
+        self._traces_dir = Path(traces_dir)
         self._file_handles: dict[tuple[str, str, str], IO[str]] = {}
         self._sequence: int = 0
         self._sequence_lock = threading.Lock()
@@ -74,12 +73,17 @@ class NdjsonEventLog(EventLogProtocol):
     def _file_name_for(workflow_id: str, writer_id: str) -> str:
         """File name for a (workflow_id, writer_id) pair.
 
+        Child workflow IDs now use ``/`` as a path separator (e.g.
+        ``ut-{uuid}/step_two-9a262f1f``); replace it with ``__`` so the
+        derived file name stays flat inside the run directory.
+
         The legacy single-writer name is preserved when writer_id="primary"
         so existing files continue to be written and read correctly.
         """
+        safe_id = workflow_id.replace("/", "__")
         if writer_id == "primary":
-            return f"wf_{workflow_id}.ndjson"
-        return f"wf_{workflow_id}__w_{writer_id}.ndjson"
+            return f"wf_{safe_id}.ndjson"
+        return f"wf_{safe_id}__w_{writer_id}.ndjson"
 
     # ------------------------------------------------------------------
     # Write
@@ -100,9 +104,9 @@ class NdjsonEventLog(EventLogProtocol):
             with self._handles_lock:
                 handle = self._file_handles.get(cache_key)
                 if handle is None:
-                    run_dir = os.path.join(self._traces_dir, event.pipeline_run_id)
-                    os.makedirs(run_dir, exist_ok=True)
-                    file_path = os.path.join(run_dir, self._file_name_for(event.workflow_id, event.writer_id))
+                    run_dir = self._traces_dir / event.pipeline_run_id
+                    run_dir.mkdir(parents=True, exist_ok=True)
+                    file_path = run_dir / self._file_name_for(event.workflow_id, event.writer_id)
                     handle = open(file_path, "a", encoding="utf-8")  # noqa: SIM115
                     self._file_handles[cache_key] = handle
 
@@ -122,18 +126,17 @@ class NdjsonEventLog(EventLogProtocol):
         Corrupt lines (truncated JSON from crash-mid-write) are skipped with
         a warning log.
         """
-        run_dir = os.path.join(self._traces_dir, pipeline_run_id)
-        if not os.path.isdir(run_dir):
+        run_dir = self._traces_dir / pipeline_run_id
+        if not run_dir.is_dir():
             return []
 
-        ndjson_files = sorted(Path(run_dir).glob("*.ndjson"))
+        ndjson_files = sorted(run_dir.glob("*.ndjson"))
 
         seen: set[tuple[str, str, str, int]] = set()
         events: list[TraceEvent] = []
 
         for ndjson_path in ndjson_files:
-            file_path = str(ndjson_path)
-            with open(file_path, encoding="utf-8") as fhandle:
+            with open(ndjson_path, encoding="utf-8") as fhandle:
                 for line_number, raw_line in enumerate(fhandle, start=1):
                     stripped = raw_line.strip()
                     if not stripped:
@@ -141,7 +144,7 @@ class NdjsonEventLog(EventLogProtocol):
                     try:
                         event = _any_trace_event_adapter.validate_json(stripped)
                     except (ValidationError, json.JSONDecodeError) as exc:
-                        log.warning(f"Skipping corrupt line in {file_path}:{line_number} — {exc}")
+                        log.warning(f"Skipping corrupt line in {ndjson_path}:{line_number} — {exc}")
                         continue
 
                     dedup_key = (event.workflow_id, event.writer_id, type(event).__name__, event.sequence)
@@ -168,8 +171,8 @@ class NdjsonEventLog(EventLogProtocol):
             self._file_handles[cache_key].close()
             del self._file_handles[cache_key]
 
-        run_dir = os.path.join(self._traces_dir, pipeline_run_id)
-        if os.path.isdir(run_dir):
+        run_dir = self._traces_dir / pipeline_run_id
+        if run_dir.is_dir():
             shutil.rmtree(run_dir)
 
     @override
@@ -182,6 +185,6 @@ class NdjsonEventLog(EventLogProtocol):
     def __del__(self) -> None:
         try:
             self.close()
-        except Exception:  # noqa: S110
+        except Exception:  # noqa: BLE001, S110
             # Safety net during interpreter shutdown — logging may not be available
             pass

@@ -16,84 +16,85 @@ from linkup import (
 )
 
 from pipelex.cogt.exceptions import InferenceErrorCategory
+from pipelex.cogt.inference.error_classification import UserActionKind
 
 
 class LinkupExtractErrorHandlingTestData:
     """Test cases for Linkup extract worker exception handling.
 
-    Each tuple: (topic, exception_class, exception_message, expected_category, expected_message_substring)
+    Each tuple: (topic, exception_class, exception_message, expected_category, expected_user_action_kind)
     """
 
-    EXTRACT_ERROR_CASES: ClassVar[list[tuple[str, type[Exception], str, InferenceErrorCategory, str]]] = [
+    EXTRACT_ERROR_CASES: ClassVar[list[tuple[str, type[Exception], str, InferenceErrorCategory, UserActionKind]]] = [
         (
             "auth_error",
             LinkupAuthenticationError,
             "Invalid API key",
             InferenceErrorCategory.CONFIGURATION,
-            "authentication",
+            UserActionKind.CHECK_CREDENTIALS,
         ),
         (
             "insufficient_credit",
             LinkupInsufficientCreditError,
             "No credits remaining",
             InferenceErrorCategory.CAPACITY,
-            "credits exhausted",
+            UserActionKind.CHECK_BILLING,
         ),
         (
             "rate_limit",
             LinkupTooManyRequestsError,
             "Too many requests",
             InferenceErrorCategory.TRANSIENT,
-            "rate limit",
+            UserActionKind.WAIT_AND_RETRY,
         ),
         (
             "timeout",
             LinkupTimeoutError,
             "Request timed out",
             InferenceErrorCategory.TRANSIENT,
-            "timed out",
+            UserActionKind.WAIT_AND_RETRY,
         ),
         (
             "invalid_request",
             LinkupInvalidRequestError,
             "Bad URL format",
             InferenceErrorCategory.CONTENT,
-            "invalid request",
+            UserActionKind.CHANGE_INPUT,
         ),
         (
             "response_too_large",
             LinkupFetchResponseTooLargeError,
             "Response exceeds size limit",
             InferenceErrorCategory.CONTENT,
-            "fetch error",
+            UserActionKind.CHANGE_INPUT,
         ),
         (
             "url_is_file",
             LinkupFetchUrlIsFileError,
             "URL points to a file",
             InferenceErrorCategory.CONTENT,
-            "fetch error",
+            UserActionKind.CHANGE_INPUT,
         ),
         (
             "failed_fetch",
             LinkupFailedFetchError,
             "Could not fetch URL",
             InferenceErrorCategory.TRANSIENT,
-            "linkup error",
+            UserActionKind.WAIT_AND_RETRY,
         ),
         (
             "no_result",
             LinkupNoResultError,
             "No results found",
-            InferenceErrorCategory.TRANSIENT,
-            "linkup error",
+            InferenceErrorCategory.CONTENT,
+            UserActionKind.CHANGE_INPUT,
         ),
         (
             "unknown_error",
             LinkupUnknownError,
             "Something went wrong",
             InferenceErrorCategory.TRANSIENT,
-            "linkup error",
+            UserActionKind.WAIT_AND_RETRY,
         ),
     ]
 
@@ -101,57 +102,57 @@ class LinkupExtractErrorHandlingTestData:
 class LinkupSearchErrorHandlingTestData:
     """Test cases for Linkup search worker exception handling.
 
-    Each tuple: (topic, exception_class, exception_message, expected_category, expected_message_substring)
+    Each tuple: (topic, exception_class, exception_message, expected_category, expected_user_action_kind)
     """
 
-    SEARCH_ERROR_CASES: ClassVar[list[tuple[str, type[Exception], str, InferenceErrorCategory, str]]] = [
+    SEARCH_ERROR_CASES: ClassVar[list[tuple[str, type[Exception], str, InferenceErrorCategory, UserActionKind]]] = [
         (
             "auth_error",
             LinkupAuthenticationError,
             "Invalid API key",
             InferenceErrorCategory.CONFIGURATION,
-            "authentication",
+            UserActionKind.CHECK_CREDENTIALS,
         ),
         (
             "insufficient_credit",
             LinkupInsufficientCreditError,
             "No credits remaining",
             InferenceErrorCategory.CAPACITY,
-            "credits exhausted",
+            UserActionKind.CHECK_BILLING,
         ),
         (
             "rate_limit",
             LinkupTooManyRequestsError,
             "Too many requests",
             InferenceErrorCategory.TRANSIENT,
-            "rate limit",
+            UserActionKind.WAIT_AND_RETRY,
         ),
         (
             "timeout",
             LinkupTimeoutError,
             "Request timed out",
             InferenceErrorCategory.TRANSIENT,
-            "timed out",
+            UserActionKind.WAIT_AND_RETRY,
         ),
         (
             "invalid_request",
             LinkupInvalidRequestError,
             "Bad query format",
             InferenceErrorCategory.CONTENT,
-            "invalid request",
+            UserActionKind.CHANGE_INPUT,
         ),
         (
             "no_result",
             LinkupNoResultError,
             "No results found",
-            InferenceErrorCategory.TRANSIENT,
-            "linkup error",
+            InferenceErrorCategory.CONTENT,
+            UserActionKind.CHANGE_INPUT,
         ),
         (
             "unknown_error",
             LinkupUnknownError,
             "Something went wrong",
             InferenceErrorCategory.TRANSIENT,
-            "linkup error",
+            UserActionKind.WAIT_AND_RETRY,
         ),
     ]

@@ -34,7 +34,7 @@ def register_test_concepts(load_test_library: Callable[[list[Path]], None]):
 
     # Register the test structure classes
     ClassRegistryUtils.register_classes_in_file(
-        file_path=data.__file__,
+        file_path=Path(data.__file__),
         base_class=StructuredContent,
         is_include_imported=False,
     )

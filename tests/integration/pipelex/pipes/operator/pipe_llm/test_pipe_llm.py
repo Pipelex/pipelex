@@ -67,8 +67,7 @@ class TestPipeLLMBasic:
     @pytest.mark.parametrize(
         "structuring_method",
         [
-            # StructuringMethod.DIRECT,
-            StructuringMethod.PRELIMINARY_TEXT,
+            StructuringMethod.DIRECT,
         ],
     )
     @pytest.mark.parametrize(

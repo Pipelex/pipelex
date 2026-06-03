@@ -18,10 +18,12 @@ from temporalio.testing import WorkflowEnvironment
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.temporal.codec.storage_payload_codec import StoragePayloadCodec
+from pipelex.temporal.config_temporal import BUILTIN_SEARCH_ATTRIBUTES
 from pipelex.temporal.tasks import Tasks
 from pipelex.temporal.temporal_data_converter import make_data_converter
 from pipelex.temporal.temporal_hub import get_task_manager, temporal_hub
 from pipelex.temporal.temporal_task_manager import TemporalTaskManager
+from pipelex.temporal.tprl.namespace_check import ensure_required_search_attributes_registered
 from pipelex.tools.storage.local_storage_provider import LocalStorageProvider
 from tests.integration.pipelex.fixtures.pipe_job_helpers import pipe_job_from_bundle
 from tests.integration.pipelex.temporal.library_crate.helpers import assert_stuff_names, assert_text_stuff_names, execute_workflow
@@ -69,17 +71,20 @@ def boot_temporal(reset_pipelex_config_fixture: None) -> Generator[None, None, N
 
     from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory  # noqa: PLC0415
     from pipelex.hub import get_pipelex_hub, get_storage_provider  # noqa: PLC0415
-    from pipelex.temporal.tprl_content_generation.content_generator_child_factory import ContentGeneratorChildFactory  # noqa: PLC0415
+    from pipelex.temporal.tprl_content_generation.content_generator_in_workflow_factory import (  # noqa: PLC0415
+        ContentGeneratorInWorkflowFactory,
+    )
     from pipelex.temporal.tprl_pipe.temporal_pipe_router import make_temporal_pipe_router  # noqa: PLC0415
 
     pipelex_hub = get_pipelex_hub()
     pipelex_hub.set_pipe_router(make_temporal_pipe_router())
 
     generated_content_factory = GeneratedContentFactory(storage_provider=get_storage_provider())
-    content_generator_child = ContentGeneratorChildFactory.make_content_generator_child(
-        generated_content_factory=generated_content_factory,
+    pipelex_hub.set_content_generator(
+        ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow(
+            generated_content_factory=generated_content_factory,
+        )
     )
-    pipelex_hub.set_content_generator(content_generator_child)
 
     yield
     manager.teardown()
@@ -113,6 +118,14 @@ async def codec_env(tmp_path_factory: pytest.TempPathFactory) -> AsyncGenerator[
     )
     converter = make_data_converter(payload_codec=codec)
     async with await WorkflowEnvironment.start_local(data_converter=converter) as env:  # pyright: ignore[reportUnknownMemberType]
+        # The in-process server rejects workflows that set custom search attributes
+        # until they are registered. Pipelex sets five on every workflow start; register
+        # them here so this module's class-scoped server accepts dispatches.
+        await ensure_required_search_attributes_registered(
+            temporal_client=env.client,
+            namespace=env.client.namespace,
+            configured_attributes=BUILTIN_SEARCH_ATTRIBUTES,
+        )
         yield env, storage_root
 
 

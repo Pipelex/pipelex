@@ -3,41 +3,56 @@
 from typing import ClassVar
 
 from pipelex.cogt.exceptions import InferenceErrorCategory
+from pipelex.cogt.inference.error_classification import UserActionKind
 
 
 class DoclingErrorHandlingTestData:
     """Test cases for Docling extract worker exception handling.
 
-    Each tuple: (topic, exception_class, exception_message, expected_category, expected_message_substring)
+    Each tuple: (topic, exception_class, exception_message, expected_category, expected_user_action_kind)
     """
 
-    EXTRACTION_ERROR_CASES: ClassVar[list[tuple[str, type[Exception], str, InferenceErrorCategory, str]]] = [
+    EXTRACTION_ERROR_CASES: ClassVar[list[tuple[str, type[Exception], str, InferenceErrorCategory, UserActionKind]]] = [
         (
             "file_not_found",
             FileNotFoundError,
             "No such file: /tmp/missing.pdf",
-            InferenceErrorCategory.CONFIGURATION,
-            "file not found",
+            InferenceErrorCategory.CONTENT,
+            UserActionKind.CHANGE_INPUT,
         ),
         (
             "invalid_format_value_error",
             ValueError,
             "Unsupported document format: .xyz",
             InferenceErrorCategory.CONTENT,
-            "invalid document format",
+            UserActionKind.CHANGE_INPUT,
         ),
         (
             "runtime_conversion_failure",
             RuntimeError,
             "Docling engine crashed during conversion",
             InferenceErrorCategory.CONTENT,
-            "conversion failed",
+            UserActionKind.CHANGE_INPUT,
         ),
         (
             "io_error_transient",
             OSError,
             "Disk read error on /tmp/doc.pdf",
             InferenceErrorCategory.TRANSIENT,
-            "i/o error",
+            UserActionKind.WAIT_AND_RETRY,
+        ),
+        (
+            "permission_error_subclass_of_os_error",
+            PermissionError,
+            "Permission denied: /tmp/restricted.pdf",
+            InferenceErrorCategory.TRANSIENT,
+            UserActionKind.WAIT_AND_RETRY,
+        ),
+        (
+            "not_implemented_error_subclass_of_runtime_error",
+            NotImplementedError,
+            "Conversion path not implemented",
+            InferenceErrorCategory.CONTENT,
+            UserActionKind.CHANGE_INPUT,
         ),
     ]
