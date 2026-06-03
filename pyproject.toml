@@ -24,6 +24,7 @@ dependencies = [
   "datamodel-code-generator>=0.55.0",
   "filetype>=1.2.0",
   "httpx>=0.23.0,<1.0.0",
+  "idna>=3.15",
   "instructor>=1.13",                                   # 1.13+ exposes instructor.core; 1.11/1.12 had mypy typing errors
   "jinja2>=3.1.4",
   "json2html>=1.3.0",
@@ -36,15 +37,17 @@ dependencies = [
   "opentelemetry-exporter-otlp-proto-http",
   "opentelemetry-semantic-conventions",
   "opentelemetry-sdk",
-  "pillow>=11.2.1",
+  "pillow>=12.1.1",
   "polyfactory>=2.21.0",
   "portkey-ai>=2.1.0",
   "posthog>=6.7.0",
+  "protobuf>=6.33.5",
   "pypdfium2>=4.30.0,!=4.30.1,<5.0.0",
   "pydantic>=2.10.6,<3.0.0",
-  "python-dotenv>=1.0.1",
+  "python-dotenv>=1.2.2",
   "PyYAML>=6.0.2",
   "reportlab>=4.0,<5",                                  # for generating synthetic PDFs
+  "requests>=2.33.0",
   "rich>=13.8.1",
   "semantic-version>=2.10.0",
   "shortuuid>=1.0.13",
@@ -52,6 +55,7 @@ dependencies = [
   "tomlkit>=0.13.2",
   "typer>=0.16.0",
   "typing-extensions>=4.13.2",
+  "urllib3>=2.7.0",
 ]
 
 [project.urls]
@@ -87,7 +91,7 @@ linkup = ["linkup-sdk>=0.12.0"]
 mistralai = ["mistralai>=1.12.0"]
 dynamodb = ["boto3>=1.34.131"]
 s3 = ["boto3>=1.34.131", "aioboto3>=13.4.0"]
-temporal = ["temporalio==1.23.0", "aiohttp>=3.9.0"]
+temporal = ["temporalio==1.23.0", "aiohttp>=3.12.14"]
 docs = [
   "mike>=2.1.3",
   "mkdocs>=1.6.1",
@@ -96,6 +100,8 @@ docs = [
   "mkdocs-meta-manager>=1.1.0",
   "mkdocs-redirects==1.2.2",
   "mkdocs-llmstxt-md>=0.2.0",
+  "Pygments>=2.20.0",
+  "pymdown-extensions>=10.21.3",
 ]
 
 dev = [

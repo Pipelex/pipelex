@@ -1707,11 +1707,11 @@ wheels = [
 
 [[package]]
 name = "idna"
-version = "3.13"
+version = "3.18"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ce/cc/762dfb036166873f0059f3b7de4565e1b5bc3d6f28a414c13da27e442f99/idna-3.13.tar.gz", hash = "sha256:585ea8fe5d69b9181ec1afba340451fba6ba764af97026f92a91d4eef164a242", size = 194210, upload-time = "2026-04-22T16:42:42.314Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cd/63/9496c57188a2ee585e0f1db071d75089a11e98aa86eb99d9d7618fc1edce/idna-3.18.tar.gz", hash = "sha256:ffb385a7e039654cef1ab9ef32c6fafe283c0c0467bba1d9029738ce4a14a848", size = 196711, upload-time = "2026-06-02T14:34:07.794Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5d/13/ad7d7ca3808a898b4612b6fe93cde56b53f3034dcde235acb1f0e1df24c6/idna-3.13-py3-none-any.whl", hash = "sha256:892ea0cde124a99ce773decba204c5552b69c3c67ffd5f232eb7696135bc8bb3", size = 68629, upload-time = "2026-04-22T16:42:40.909Z" },
+    { url = "https://files.pythonhosted.org/packages/1e/5e/d4e9f1a599fb8e573b7b87160658329fbf28d19eac2718f51fc3def3aa5a/idna-3.18-py3-none-any.whl", hash = "sha256:7f952cbe720b688055e3f87de14f5c3e5fdaa8bc3928985c4077ca689de849a2", size = 65455, upload-time = "2026-06-02T14:34:06.319Z" },
 ]
 
 [[package]]
@@ -3652,6 +3652,7 @@ dependencies = [
     { name = "datamodel-code-generator" },
     { name = "filetype" },
     { name = "httpx" },
+    { name = "idna" },
     { name = "instructor" },
     { name = "jinja2" },
     { name = "json2html" },
@@ -3669,11 +3670,13 @@ dependencies = [
     { name = "polyfactory" },
     { name = "portkey-ai" },
     { name = "posthog" },
+    { name = "protobuf" },
     { name = "pydantic" },
     { name = "pypdfium2" },
     { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "reportlab" },
+    { name = "requests" },
     { name = "rich" },
     { name = "semantic-version" },
     { name = "shortuuid" },
@@ -3681,6 +3684,7 @@ dependencies = [
     { name = "tomlkit" },
     { name = "typer" },
     { name = "typing-extensions" },
+    { name = "urllib3" },
 ]
 
 [package.optional-dependencies]
@@ -3727,6 +3731,8 @@ docs = [
     { name = "mkdocs-material" },
     { name = "mkdocs-meta-manager" },
     { name = "mkdocs-redirects" },
+    { name = "pygments" },
+    { name = "pymdown-extensions" },
 ]
 dynamodb = [
     { name = "boto3" },
@@ -3770,7 +3776,7 @@ requires-dist = [
     { name = "aioboto3", marker = "extra == 'bedrock'", specifier = ">=13.4.0" },
     { name = "aioboto3", marker = "extra == 's3'", specifier = ">=13.4.0" },
     { name = "aiofiles", specifier = ">=23.2.1" },
-    { name = "aiohttp", marker = "extra == 'temporal'", specifier = ">=3.9.0" },
+    { name = "aiohttp", marker = "extra == 'temporal'", specifier = ">=3.12.14" },
     { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.78.0" },
     { name = "backports-strenum", marker = "python_full_version < '3.11'", specifier = ">=1.3.0" },
     { name = "boto3", marker = "extra == 'bedrock'", specifier = ">=1.34.131" },
@@ -3790,6 +3796,7 @@ requires-dist = [
     { name = "google-genai", marker = "extra == 'google-genai'" },
     { name = "httpx", specifier = ">=0.23.0,<1.0.0" },
     { name = "huggingface-hub", marker = "extra == 'huggingface'", specifier = ">=0.23,<1.0.0" },
+    { name = "idna", specifier = ">=3.15" },
     { name = "instructor", specifier = ">=1.13" },
     { name = "instructor", extras = ["google-genai"], marker = "extra == 'google-genai'" },
     { name = "jinja2", specifier = ">=3.1.4" },
@@ -3816,13 +3823,16 @@ requires-dist = [
     { name = "opentelemetry-exporter-otlp-proto-http" },
     { name = "opentelemetry-sdk" },
     { name = "opentelemetry-semantic-conventions" },
-    { name = "pillow", specifier = ">=11.2.1" },
+    { name = "pillow", specifier = ">=12.1.1" },
     { name = "pipelex-tools", marker = "extra == 'dev'", specifier = ">=0.6.0" },
     { name = "polyfactory", specifier = ">=2.21.0" },
     { name = "portkey-ai", specifier = ">=2.1.0" },
     { name = "posthog", specifier = ">=6.7.0" },
+    { name = "protobuf", specifier = ">=6.33.5" },
     { name = "pydantic", specifier = ">=2.10.6,<3.0.0" },
+    { name = "pygments", marker = "extra == 'docs'", specifier = ">=2.20.0" },
     { name = "pylint", marker = "extra == 'dev'", specifier = "==4.0.4" },
+    { name = "pymdown-extensions", marker = "extra == 'docs'", specifier = ">=10.21.3" },
     { name = "pypdfium2", specifier = ">=4.30.0,!=4.30.1,<5.0.0" },
     { name = "pyright", marker = "extra == 'dev'", specifier = "==1.1.408" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.3" },
@@ -3832,9 +3842,10 @@ requires-dist = [
     { name = "pytest-sugar", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "pytest-timeout", marker = "extra == 'dev'", specifier = ">=2.3.1" },
     { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.6.1" },
-    { name = "python-dotenv", specifier = ">=1.0.1" },
+    { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "reportlab", specifier = ">=4.0,<5" },
+    { name = "requests", specifier = ">=2.33.0" },
     { name = "rich", specifier = ">=13.8.1" },
     { name = "ruff", marker = "extra == 'dev'", specifier = "==0.14.13" },
     { name = "semantic-version", specifier = ">=2.10.0" },
@@ -3850,6 +3861,7 @@ requires-dist = [
     { name = "types-networkx", marker = "extra == 'dev'", specifier = ">=3.3.0.20241020" },
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.12.20250326" },
     { name = "typing-extensions", specifier = ">=4.13.2" },
+    { name = "urllib3", specifier = ">=2.7.0" },
 ]
 provides-extras = ["anthropic", "bedrock", "docling", "fal", "gcp-storage", "google", "google-genai", "huggingface", "linkup", "mistralai", "dynamodb", "s3", "temporal", "docs", "dev"]
 
@@ -4367,15 +4379,15 @@ wheels = [
 
 [[package]]
 name = "pymdown-extensions"
-version = "10.21.2"
+version = "10.21.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "markdown" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/df/08/f1c908c581fd11913da4711ea7ba32c0eee40b0190000996bb863b0c9349/pymdown_extensions-10.21.2.tar.gz", hash = "sha256:c3f55a5b8a1d0edf6699e35dcbea71d978d34ff3fa79f3d807b8a5b3fa90fbdc", size = 853922, upload-time = "2026-03-29T15:01:55.233Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9e/26/d1015444da4d952a1ca487a236b522eb979766f0295a0bd0c5fc089989a9/pymdown_extensions-10.21.3.tar.gz", hash = "sha256:72cfcf55f07aea0d4af2c4f11dd4e52466ddfb1bb819673146398e0bd3a77354", size = 854140, upload-time = "2026-05-13T12:57:32.267Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f7/27/a2fc51a4a122dfd1015e921ae9d22fee3d20b0b8080d9a704578bf9deece/pymdown_extensions-10.21.2-py3-none-any.whl", hash = "sha256:5c0fd2a2bea14eb39af8ff284f1066d898ab2187d81b889b75d46d4348c01638", size = 268901, upload-time = "2026-03-29T15:01:53.244Z" },
+    { url = "https://files.pythonhosted.org/packages/7e/85/545a951eecc270fcd688288c600017e2050a1aacb56c711d208586d3e470/pymdown_extensions-10.21.3-py3-none-any.whl", hash = "sha256:d7a5d08014fc571e80ca21dd6f854e31f94c489800350564d55d15b3c41e76b6", size = 269002, upload-time = "2026-05-13T12:57:30.296Z" },
 ]
 
 [[package]]
@@ -6112,11 +6124,11 @@ wheels = [
 
 [[package]]
 name = "urllib3"
-version = "2.6.3"
+version = "2.7.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/c7/24/5f1b3bdffd70275f6661c76461e25f024d5a38a46f04aaca912426a2b1d3/urllib3-2.6.3.tar.gz", hash = "sha256:1b62b6884944a57dbe321509ab94fd4d3b307075e0c2eae991ac71ee15ad38ed", size = 435556, upload-time = "2026-01-07T16:24:43.925Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/53/0c/06f8b233b8fd13b9e5ee11424ef85419ba0d8ba0b3138bf360be2ff56953/urllib3-2.7.0.tar.gz", hash = "sha256:231e0ec3b63ceb14667c67be60f2f2c40a518cb38b03af60abc813da26505f4c", size = 433602, upload-time = "2026-05-07T16:13:18.596Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/39/08/aaaad47bc4e9dc8c725e68f9d04865dbcb2052843ff09c97b08904852d84/urllib3-2.6.3-py3-none-any.whl", hash = "sha256:bf272323e553dfb2e87d9bfd225ca7b0f467b919d7bbd355436d3fd37cb0acd4", size = 131584, upload-time = "2026-01-07T16:24:42.685Z" },
+    { url = "https://files.pythonhosted.org/packages/7f/3e/5db95bcf282c52709639744ca2a8b149baccf648e39c8cc87553df9eae0c/urllib3-2.7.0-py3-none-any.whl", hash = "sha256:9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897", size = 131087, upload-time = "2026-05-07T16:13:17.151Z" },
 ]
 
 [[package]]
