@@ -11,6 +11,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.observer.observer_protocol import ObserverNoOp
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
+from pipelex.runtime_bridge.primitives.submitter_hydration import rehydrate_pipe_output_with_crate
 from pipelex.temporal.exceptions import WorkflowExecutionError
 from pipelex.temporal.temporal_manager import TemporalWorkerEnvironment
 from pipelex.temporal.temporal_workflow_utils import is_in_temporal_workflow
@@ -22,7 +23,6 @@ from pipelex.temporal.tprl.observability import (
     stamp_submitter_session_id,
 )
 from pipelex.temporal.tprl.workflow_caller import WorkflowExecutor, WorkflowExecutorFactory
-from pipelex.temporal.tprl_pipe.submitter_hydration import rehydrate_pipe_output_with_crate
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 
 

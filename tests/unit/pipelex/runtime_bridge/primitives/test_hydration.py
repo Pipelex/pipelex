@@ -11,7 +11,10 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_class_registry
 from pipelex.pipe_run.exceptions import PipeJobError
-from pipelex.temporal.tprl_pipe.hydration import _hydrate_list_item, hydrate_working_memory  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+from pipelex.runtime_bridge.primitives.hydration import (
+    _hydrate_list_item,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+    hydrate_working_memory,
+)
 
 
 def _make_text_concept() -> Concept:

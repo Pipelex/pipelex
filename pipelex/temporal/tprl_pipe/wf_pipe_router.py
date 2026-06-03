@@ -14,11 +14,11 @@ with workflow.unsafe.imports_passed_through():
     from pipelex.graph.graph_tracer_manager import GraphTracerManager
     from pipelex.hub import clear_current_library, get_library_manager, get_report_delegate, set_current_library
     from pipelex.pipe_run.pipe_job import PipeJob
+    from pipelex.runtime_bridge.primitives.hydration import hydrate_working_memory
     from pipelex.temporal.log_temporal import WorkflowLog
     from pipelex.temporal.tprl.temporal_error import TemporalError
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
     from pipelex.temporal.tprl_pipe.act_flush_trace_events import FlushTraceEventsArg, act_flush_trace_events
-    from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
     from pipelex.tracing.buffering_event_log import BufferingEventLog
 
 

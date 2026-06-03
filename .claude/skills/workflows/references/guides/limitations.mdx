@@ -1,0 +1,255 @@
+---
+id: limitations
+title: System Limitations
+sidebar_position: 3
+---
+
+# Limitations
+
+This document outlines the key constraints and requirements when working with workflows and activities in the system. Understanding these limitations helps you design robust and efficient applications.
+
+## Workflow Limitations
+
+Workflows should focus on orchestration logic, keeping operations deterministic and fast (under 2 seconds between activities), while delegating all I/O, non-deterministic operations, and heavy computations to activities.
+
+### Timeout of 2 seconds between activities
+
+Workflows must complete CPU-intensive operations within 2 seconds between activity invocations. This means:
+
+- Workflow code itself must execute quickly
+- Heavy computations should be moved to activities (with appropriate `start_to_close_timeout`, [see more](#set-appropriate-timeouts))
+- The 2-second limit applies to the workflow's processing time between activity calls
+
+_Why?_ Workflows are designed for orchestration rather than heavy computation. The 2-second limit ensures quick recovery/resume from the last checkpoint, as the system creates checkpoints at each activity call.
+
+**Operations that should be moved to activities** (not done in workflows):
+
+- Large data validation
+
+```python
+## ❌ Wrong - Should be in an activity
+Dataset.model_validate(large_amount_of_data)
+```
+
+- Complex computations
+
+```python
+## ❌ Wrong - Should be in an activity
+sum([x for x in range(1000000)])
+```
+
+- Cryptographic operations
+
+```python
+## ❌ Wrong - Should be in an activity
+hashlib.sha256(large_data).hexdigest()
+```
+
+- Heavy data transformations
+
+```python
+## ❌ Wrong - Should be in an activity
+map(lambda x: x * 2, large_list)
+```
+
+- Any operation that might exceed 2 seconds of CPU time
+
+### No I/O operations
+
+**All I/O operations must be performed in activities.** This includes:
+
+- Network calls (HTTP, gRPC, database queries)
+
+```python
+## ❌ Wrong - Should be in an activity
+await conn.execute("SELECT * FROM users")
+```
+
+- File system operations
+
+```python
+## ❌ Wrong - Should be in an activity
+async with aiofiles.open("file.txt", mode="r") as f:
+     contents = await f.read()
+```
+
+- Any external system interactions
+
+```python
+## ❌ Wrong - Should be in an activity
+await client.send_message("Hello")
+```
+
+_Why?_ Workflow code may be replayed during recovery, and I/O operations would violate determinism requirements.
+
+### Allowed long-running operations
+
+Workflows can safely perform these operations that don't block execution:
+
+- Activity execution (which can run much longer, [see Activity Limitations](#activity-limitations))
+  ```python
+  # ✅ Correct - Activity can run for hours
+  result = await my_activity(...)
+  ```
+- Waiting for conditions
+  ```python
+  # ✅ Correct - Can wait for years
+  await workflows.workflow.wait_condition(lambda: self.processing_complete)
+  ```
+- Timed delays
+  ```python
+  # ✅ Correct - Can sleep for years
+  await asyncio.sleep(60 * 60 * 24 * 365)
+  ```
+- Child workflows
+  ```python
+  # ✅ Correct - Can run for at most 1 year (see `execution_timeout`)
+  child_result = await workflows.workflow.execute_workflow(
+      workflow=MyWorkflow,
+      params=MyWorkflowParams(...),
+      execution_timeout=timedelta(days=365)
+  )
+  ```
+
+### Code must be deterministic
+
+Workflow code must be deterministic - given the same activity history and inputs, it must produce the same outputs. This means that any non-deterministic operations like:
+
+- Generating random numbers
+
+```python
+## ❌ Wrong - Non-deterministic
+if random.random() > 0.5:
+   ...
+else:
+   ...
+```
+
+- Getting current time
+
+```python
+## ❌ Wrong - Non-deterministic
+import time
+
+await my_activity(time.time())
+```
+
+- Reading environment variables
+
+```python
+## ❌ Wrong - Non-deterministic
+if os.getenv("ENV") == "prod":
+   ...
+```
+
+must be performed in activities. While activities themselves can produce different outputs for the same inputs (as they might contain non-deterministic operations), the workflow code must behave deterministically based on the activity results it receives.
+
+### Maximum Execution History
+
+The execution history for each workflow is capped at 51,200 events or 50MB per workflow execution. This limit is again due to temporal's current constraints. In order to avoid hitting this limit, we recommend using `workflows.execute_activities_in_parallel`, that allows you to execute large amounts of activities in parallel, while having the lowest footprint on the execution history. [Learn more about concurrency patterns](concurrency).
+
+## Activity Limitations
+
+Activities are where you should perform all non-deterministic, I/O-bound, or CPU-intensive operations. Here's how to properly structure activity code:
+
+### Perform all I/O operations
+
+Activities are the proper place for all I/O operations, including:
+
+- Database queries
+
+```python
+@workflows.activity()
+async def query_database(
+   params: QueryParams,
+   conn: asyncpg.Connection = Depends(get_db_connection),
+) -> QueryResult:
+   # ✅ Correct - I/O in activity
+   return await conn.fetch(params.query)
+```
+
+- API calls
+
+```python
+@workflows.activity()
+async def call_external_api(params: ApiParams) -> ApiResponse:
+   # ✅ Correct - network I/O in activity
+   async with httpx.AsyncClient() as client:
+      response = await client.post(params.url, json=params.data)
+      return ApiResponse(data=response.json())
+```
+
+- File operations
+
+```python
+@workflows.activity()
+async def process_file(params: FileParams) -> FileResult:
+   # ✅ Correct - file I/O in activity
+   async with aiofiles.open(params.path, mode='r') as f:
+      contents = await f.read()
+   return FileResult(content=contents)
+```
+
+### Handle CPU-intensive operations
+
+Move all heavy computations to activities:
+
+```python
+@workflows.activity()
+def process_large_dataset(params: DatasetParams) -> ProcessedResult:
+   # ✅ Correct - heavy computation in activity
+   large_dataset = await load_large_dataset(params.dataset_id)
+   processed = [transform(x) for x in large_dataset]
+   return ProcessedResult(data=processed)
+```
+
+### Use non-deterministic operations
+
+Activities can safely use non-deterministic operations:
+
+```python
+@workflows.activity()
+def get_current_time_with_id(params: TimeParams) -> TimeResult:
+   # ✅ Correct - non-deterministic operations in activity
+   current_time = datetime.now().isoformat()
+   random_id = str(uuid.uuid4())
+   return TimeResult(id=random_id, timestamp=current_time, timezone=params.timezone)
+```
+
+### Set appropriate timeouts
+
+Configure timeouts based on operation characteristics:
+
+```python
+@workflows.activity(start_to_close_timeout=timedelta(hours=1))
+async def long_running_process(params: ProcessParams) -> ProcessResult:
+   # ✅ Correct - long operation with appropriate timeout
+   result = await perform_complex_operation(params)
+   return ProcessResult(data=result)
+```
+
+### Asynchronous Requirement
+
+**All your code must be asynchronous or extremely CPU-bound.** This means:
+
+1. **For I/O operations (network calls, file operations, etc.), always use async libraries:**
+
+   ✅ **Do use:**
+
+   - `httpx.AsyncClient` or `aiohttp` instead of synchronous `requests`
+   - `aiofiles` instead of `open()` for file operations
+   - Async database drivers (e.g., `sqlalchemy.ext.asyncio`)
+
+   ❌ **Don’t use:**
+
+   - Synchronous `requests` for HTTP calls
+   - Blocking `open()` for file operations
+   - Synchronous database drivers (e.g., `sqlalchemy`)
+
+2. For CPU-bound operations that cannot be made async, ensure they're implemented in activities with appropriate timeouts.
+
+## Additional Considerations
+
+Most limitations stem from Temporal's underlying architecture. For comprehensive details, refer to the [official Temporal documentation](https://docs.temporal.io/workflow-execution/limits).
+
+When designing workflows, remember that workflow code is replayed during recovery, so keep logic simple and deterministic, while moving complex operations and all I/O to activities.

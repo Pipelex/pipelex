@@ -9,7 +9,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_run.pipe_job import PipeJob
-from pipelex.temporal.tprl_pipe.submitter_hydration import rehydrate_pipe_output_with_crate
+from pipelex.runtime_bridge.primitives.submitter_hydration import rehydrate_pipe_output_with_crate
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 
 

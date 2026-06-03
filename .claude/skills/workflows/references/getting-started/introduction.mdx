@@ -1,0 +1,30 @@
+---
+id: introduction
+title: Welcome to the Workflows documentation
+sidebar_position: 1.1
+---
+
+Mistral Workflows is an orchestration control plane designed to accelerate the development and reliable execution of complex, AI-driven workflows. Built on Temporal for fault-tolerant workflow execution, Workflows combines a user-friendly API with a rich Python framework optimized for Mistral's AI services.
+
+# What is Workflows?
+
+Workflows addresses the complexity of building, managing, and scaling multi-step AI processes reliably. It provides a structured environment for defining, executing, and monitoring workflows—from simple sequences to complex, stateful processes—ensuring completion even with transient failures.
+
+### Core Architecture
+
+- **Worker Framework** (`workflows/worker`): Python decorators for building and running Temporal workflows with minimal boilerplate
+- **Python SDK** (`mistralai.Mistral`): Convenient client library for programmatic interaction with the Workflows API via `client.workflows.*`
+- **Built-in Observability**: Deep OpenTelemetry integration linking Temporal executions with distributed traces
+
+### Key Features
+
+- **Rapid Development**: Python-first framework with intuitive decorators and pre-built components
+- **Reliable Execution**: Leverages Temporal's battle-tested fault tolerance, automatic retries, and state management
+- **Mistral-Native**: Optimized for orchestrating workflows utilizing Mistral's AI models and services
+- **Scalable & Flexible**: Handles complex, long-running processes with multiple deployment patterns
+
+## Why Choose Workflows?
+
+Modern AI applications involve multi-step processes that are complex to build reliably. Integrating services, handling retries, ensuring observability, and managing long-running tasks quickly becomes an engineering challenge. Workflows provides the infrastructure to focus on your AI workflow logic rather than orchestration complexity.
+
+📖 **For a detailed comparison with raw Temporal and a full feature list, see [Value Proposition](./value-proposition).**

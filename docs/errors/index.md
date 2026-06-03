@@ -349,6 +349,13 @@ classification rules, and the cross-boundary Temporal bridge.
 - [`BundleElaboratorError`](bundle-elaborator-error.md) — Bundle elaborator
 - [`PipelexInterpreterError`](pipelex-interpreter-error.md) — Pipelex interpreter
 
+## PipelexRuntimeBridgeError
+
+- [`MissingMistralWorkflowsPluginError`](missing-mistral-workflows-plugin-error.md) — Missing mistral workflows plugin
+- [`MissingPipelexTemporalExtraError`](missing-pipelex-temporal-extra-error.md) — Missing pipelex temporal extra
+- [`PipelexBridgeRuntimeError`](pipelex-bridge-runtime-error.md) — Pipelex bridge runtime
+- [`PipelexRuntimeBridgeError`](pipelex-runtime-bridge-error.md) — Pipelex runtime bridge
+
 ## PipelexServiceConfigValidationError
 
 - [`PipelexServiceConfigValidationError`](pipelex-service-config-validation-error.md) — Pipelex service config validation

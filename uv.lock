@@ -2899,14 +2899,14 @@ wheels = [
 
 [[package]]
 name = "nexus-rpc"
-version = "1.3.0"
+version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2e/f2/d54f5c03d8f4672ccc0875787a385f53dcb61f98a8ae594b5620e85b9cb3/nexus_rpc-1.3.0.tar.gz", hash = "sha256:e56d3b57b60d707ce7a72f83f23f106b86eca1043aa658e44582ab5ff30ab9ad", size = 75650, upload-time = "2025-12-08T22:59:13.002Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/35/d5/cd1ffb202b76ebc1b33c1332a3416e55a39929006982adc2b1eb069aaa9b/nexus_rpc-1.4.0.tar.gz", hash = "sha256:3b8b373d4865671789cc43623e3dc0bcbf192562e40e13727e17f1c149050fba", size = 82367, upload-time = "2026-02-25T22:01:34.053Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d6/74/0afd841de3199c148146c1d43b4bfb5605b2f1dc4c9a9087fe395091ea5a/nexus_rpc-1.3.0-py3-none-any.whl", hash = "sha256:aee0707b4861b22d8124ecb3f27d62dafbe8777dc50c66c91e49c006f971b92d", size = 28873, upload-time = "2025-12-08T22:59:12.024Z" },
+    { url = "https://files.pythonhosted.org/packages/11/52/6327a5f4fda01207205038a106a99848a41c83e933cd23ea2cab3d2ebc6c/nexus_rpc-1.4.0-py3-none-any.whl", hash = "sha256:14c953d3519113f8ccec533a9efdb6b10c28afef75d11cdd6d422640c40b3a49", size = 29645, upload-time = "2026-02-25T22:01:33.122Z" },
 ]
 
 [[package]]
@@ -3850,7 +3850,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = "==0.14.13" },
     { name = "semantic-version", specifier = ">=2.10.0" },
     { name = "shortuuid", specifier = ">=1.0.13" },
-    { name = "temporalio", marker = "extra == 'temporal'", specifier = "==1.23.0" },
+    { name = "temporalio", marker = "extra == 'temporal'", specifier = "==1.24.0" },
     { name = "tomli", specifier = ">=2.3.0" },
     { name = "tomlkit", specifier = ">=0.13.2" },
     { name = "typer", specifier = ">=0.16.0" },
@@ -5531,7 +5531,7 @@ wheels = [
 
 [[package]]
 name = "temporalio"
-version = "1.23.0"
+version = "1.24.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "nexus-rpc" },
@@ -5540,13 +5540,13 @@ dependencies = [
     { name = "types-protobuf" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/67/48/ba7413e2fab8dcd277b9df00bafa572da24e9ca32de2f38d428dc3a2825c/temporalio-1.23.0.tar.gz", hash = "sha256:72750494b00eb73ded9db76195e3a9b53ff548780f73d878ec3f807ee3191410", size = 1933051, upload-time = "2026-02-18T17:48:22.353Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a7/b1/7d9b3104ab7994e7d49e765b92495aaff44810b1e066c874c284a93ebd55/temporalio-1.24.0.tar.gz", hash = "sha256:e534e2e71b4a721193ec4ff3dae521146d093554bd47a64f5605d4ca33e56718", size = 2040485, upload-time = "2026-03-23T15:33:33.638Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6f/71/26c8f21dca9092201b3b9cb7aff42460b4864b5999aa4c6a4343ac66f1fd/temporalio-1.23.0-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:6b69ac8d75f2d90e66f4edce4316f6a33badc4a30b22efc50e9eddaa9acdc216", size = 12311037, upload-time = "2026-02-18T17:47:47.628Z" },
-    { url = "https://files.pythonhosted.org/packages/ec/47/43102816139f2d346680cb7cc1e53da5f6968355ac65b4d35d4edbfca896/temporalio-1.23.0-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:1bbbb2f9c3cdd09451565163f6d741e51f109694c49435d475fdfa42b597219d", size = 11821906, upload-time = "2026-02-18T17:47:55.314Z" },
-    { url = "https://files.pythonhosted.org/packages/00/b0/899ff28464a0e17adf17476bdfac8faf4ea41870358ff2d14737e43f9e66/temporalio-1.23.0-cp310-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:cf6570e0ee696f99a38d855da4441a890c7187357c16505ed458ac9ef274ed70", size = 12063601, upload-time = "2026-02-18T17:48:03.994Z" },
-    { url = "https://files.pythonhosted.org/packages/ed/17/b8c6d2ec3e113c6a788322513a5ff635bdd54b3791d092ed0e273467748a/temporalio-1.23.0-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b82d6cca54c9f376b50e941dd10d12f7fe5b692a314fb087be72cd2898646a79", size = 12394579, upload-time = "2026-02-18T17:48:11.65Z" },
-    { url = "https://files.pythonhosted.org/packages/b4/b7/f9ef7fd5ee65aef7d59ab1e95cb1b45df2fe49c17e3aa4d650ae3322f015/temporalio-1.23.0-cp310-abi3-win_amd64.whl", hash = "sha256:43c3b99a46dd329761a256f3855710c4a5b322afc879785e468bdd0b94faace6", size = 12834494, upload-time = "2026-02-18T17:48:19.071Z" },
+    { url = "https://files.pythonhosted.org/packages/84/a9/30517c21d6155bce1c3dc0e420db48da0231230dbc683f40ab6d5fe22b37/temporalio-1.24.0-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:7f11e7b4f4d09bafba499b43188353e23dc128b1fe3f3160014476e3dce70760", size = 12223918, upload-time = "2026-03-23T15:33:05.045Z" },
+    { url = "https://files.pythonhosted.org/packages/73/d0/11aa103bde794524008c1850a84e06cde98698395ca1f8b12e1bd2390aa8/temporalio-1.24.0-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:5cff75a0ca922575b808a7fca1b0de38f6eea061f49e026664b8be9d5bb06ab8", size = 11708887, upload-time = "2026-03-23T15:33:11.67Z" },
+    { url = "https://files.pythonhosted.org/packages/1d/f4/774b56100e6bb94e3757ec96fb5c2bc62d42defc7d6de0ee35a12273827a/temporalio-1.24.0-cp310-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:ee7c13b6724dd0c304aa846aecf6da72a8550f4ade40a0a7f6dcc1c92ef35710", size = 12028303, upload-time = "2026-03-23T15:33:18.022Z" },
+    { url = "https://files.pythonhosted.org/packages/e5/91/c05d0e9c2432fe8b1ea0d6fae321866ee49a320ad5e494e6ec9424ca5c28/temporalio-1.24.0-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:aa71b9bfa42f951dd04ade97ce7f92ecedee8903047b4b41b122bb8cbd87a337", size = 12375155, upload-time = "2026-03-23T15:33:24.234Z" },
+    { url = "https://files.pythonhosted.org/packages/c4/97/5c939e4609c164c8690a3b5a135eb828d531de8ef63ff447a2a439c0b0fb/temporalio-1.24.0-cp310-abi3-win_amd64.whl", hash = "sha256:52f6833647eceddbebcc376e2ea663a9f73b2b3a42675f503aeb27c98fd4daeb", size = 12720174, upload-time = "2026-03-23T15:33:30.826Z" },
 ]
 
 [[package]]
