@@ -34,11 +34,22 @@
 
 - **`recover_error_report()` is now a total function.** It returns an `ErrorReport` rather than `ErrorReport | None`: when a Temporal failure carries no embedded report — or its payload fails to rehydrate — it synthesizes one from the new `UnrecoverableWorkflowFailureError`, surfacing the deepest worker-side cause message. Callers no longer branch on `None`.
 
+- **Dev tooling: `pyright` bumped `1.1.408 → 1.1.410`.** Drove two internal, behavior-neutral adjustments: `@contextmanager` / `@asynccontextmanager` helpers now annotate their return as `Generator` / `AsyncGenerator` (was `Iterator` / `AsyncIterator`), and `AsyncAnthropicBedrock` is imported from `anthropic.lib.bedrock` (relocated in the SDK).
+
 ### Fixed
 
 - **The generated MTHDS schema now requires `type` on every pipe.** In the schema consumed by `plxt` lint and the VS Code Taplo LSP, each pipe blueprint variant declared `type` with a literal default — so it was optional, and because the Draft-4 export drops the union discriminator, a pipe table written without `type` matched several `oneOf` branches at once and was rejected with an ambiguous multi-match (worse, a type-less table carrying fields unique to one variant validated silently). `type` is now required on every variant, so a type-less pipe table fails with a clear "missing type" and a typed table resolves to exactly one variant. The patched set is derived from `PipeBlueprintUnion`, so newly added pipe types are covered automatically. Regenerate with `pipelex-dev generate-mthds-schema`; the bundled copy ships in `pipelex-tools` 0.6.0 and the VS Code extension.
 
 - **`InputStuffSpecsFactoryError` was shadowed by a duplicate class definition.** `pipelex/core/pipes/inputs/input_stuff_specs_factory.py` declared a local class with the same name as the canonical one in the package's `exceptions.py`, leaving two distinct class objects in play so an `except` on one would miss the other. Consolidated to the single canonical class.
+
+### Security
+
+- **urllib3 floor `>=2.7.0`** to patch two high-severity issues: CVE-2026-44431 (GHSA-qccp-gfcp-xxvc) forwards sensitive headers across origins on proxied low-level redirects, and CVE-2026-44432 (GHSA-mf9v-mfxr-j63j) bypasses the decompression-bomb safeguards in parts of the streaming API. Floor added to the runtime `dependencies` in `pyproject.toml` so downstream installs cannot resolve a vulnerable version.
+- **pymdown-extensions floor `>=10.21.3`** to patch CVE-2026-46338 (GHSA-62q4-447f-wv8h, medium): a regression in `pymdownx.snippets` reintroduced the sibling-prefix path-traversal bypass despite `restrict_base_path`. Docs-only dependency; floor added to the `docs` extra.
+- **idna floor `>=3.15`** (lockfile resolves to 3.18) to patch CVE-2026-45409 (GHSA-65pc-fj4g-8rjx, medium): specially crafted inputs to `idna.encode()` could bypass the CVE-2024-3651 fix. Floor added to the runtime `dependencies`.
+- **Proactive floor bumps in the same hardening pass** — past known-vulnerable releases, so fresh resolves can't pick a bad version: pillow `>=12.1.1`, protobuf `>=6.33.5`, python-dotenv `>=1.2.2`, and requests `>=2.33.0` (runtime); aiohttp `>=3.12.14` (`temporal` extra); Pygments `>=2.20.0` (`docs` extra).
+
+Together these close the open GitHub Dependabot alerts on the default branch — urllib3 (two high), pymdown-extensions (medium), and idna (medium); the alerts remain visible on `main` only until this branch merges.
 
 ## [v0.30.3] - 2026-05-28
 

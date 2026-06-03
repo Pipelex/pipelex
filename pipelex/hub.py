@@ -1,5 +1,5 @@
 import sys
-from collections.abc import Iterator, Sequence
+from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
@@ -515,7 +515,7 @@ def clear_current_library() -> None:
 
 
 @contextmanager
-def scoped_current_library(library_id: str) -> Iterator[None]:
+def scoped_current_library(library_id: str) -> Generator[None, None, None]:
     """Set ``library_id`` for the scope, then restore the prior value on exit.
 
     Captures the prior ``_library_id`` ContextVar value before setting the new

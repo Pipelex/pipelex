@@ -1,7 +1,8 @@
 import math
 from typing import TYPE_CHECKING
 
-from anthropic import AsyncAnthropic, AsyncAnthropicBedrock
+from anthropic import AsyncAnthropic
+from anthropic.lib.bedrock import AsyncAnthropicBedrock
 from anthropic.types import Usage
 from anthropic.types.document_block_param import DocumentBlockParam
 from anthropic.types.image_block_param import ImageBlockParam

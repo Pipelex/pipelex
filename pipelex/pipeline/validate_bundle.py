@@ -1,5 +1,5 @@
 import asyncio
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Literal, Sequence, TypedDict
@@ -65,7 +65,7 @@ def build_validated_pipes(dry_run_result: dict[str, DryRunOutput]) -> list[Valid
 
 
 @contextmanager
-def _translate_to_validate_bundle_error(category: Literal["pipe", "concept"]) -> Iterator[None]:
+def _translate_to_validate_bundle_error(category: Literal["pipe", "concept"]) -> Generator[None, None, None]:
     """Translate the bundle-loading exception surface into a single ``ValidateBundleError``.
 
     Single source of truth for the bundle-loading error cascade, used by all
