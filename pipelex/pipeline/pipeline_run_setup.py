@@ -1,38 +1,30 @@
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from mthds.models.pipeline_inputs import PipelineInputs
 
-from pipelex import log
 from pipelex.config import get_config
-from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import (
+    clear_current_library,
+    get_current_library_id_or_none,
     get_library_manager,
     get_otel_tracer,
     get_pipeline_manager,
     get_report_delegate,
     get_required_pipe,
     get_telemetry_manager,
-    resolve_library_dirs,
     set_current_library,
-    teardown_current_library,
 )
-from pipelex.pipe_run.dry_run import convert_to_working_memory_format
 from pipelex.pipe_run.pipe_job import PipeJob
-from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import (
     FORCE_DRY_RUN_MODE_ENV_KEY,
     VariableMultiplicity,
 )
-from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.exceptions import PipeExecutionError
-from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
-from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
+from pipelex.pipeline.execution_seams import acquire_library, prepare_pipe_job
+from pipelex.pipeline.job_metadata import OtelContext
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.environment import get_optional_env
 from pipelex.system.telemetry.events import EventName, EventProperty
@@ -41,7 +33,6 @@ from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.tracing.event_log_factory import make_event_log
 
 if TYPE_CHECKING:
-    from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
     from pipelex.core.pipes.pipe_abstract import PipeAbstract
     from pipelex.graph.graph_context import GraphContext
     from pipelex.tracing.event_log_protocol import EventLogProtocol
@@ -146,134 +137,67 @@ async def pipeline_run_setup(
     if not library_id:
         library_id = pipeline_run_id
 
+    # Capture the caller's outer current-library before acquire_library overwrites it with the new id,
+    # so a post-acquire failure can restore it instead of clobbering it (mirrors validate_bundle and
+    # acquire_library's own load-failure teardown).
+    prev_library_id = get_current_library_id_or_none()
+
+    # Seam 1: open the library and load dirs + blueprints. Owns its own load-failure teardown.
+    library_id, qualified_main_pipe = acquire_library(
+        library_id=library_id,
+        library_dirs=library_dirs,
+        mthds_contents=mthds_contents,
+        bundle_uris=bundle_uris,
+    )
+
     library_manager = get_library_manager()
-    set_current_library(library_id=library_id)
-    library_manager.open_library(library_id=library_id)
-
-    pipe: PipeAbstract | None = None
-    blueprint: PipelexBundleBlueprint | None = None
-
-    effective_dirs, source_label = resolve_library_dirs(library_dirs)
-
-    if effective_dirs:
-        log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}):")
-        for index_dir, dir_path in enumerate(effective_dirs):
-            log.verbose(f"  [{index_dir + 1}] {dir_path}")
-        library_manager.load_libraries(
-            library_id=library_id,
-            library_dirs=effective_dirs,
-        )
-    else:
-        log.verbose(f"No library directories to load ({source_label})")
-
-    # Then handle MTHDS content(s) or pipe_code
-    if mthds_contents:
-        all_blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
-
-        # Filter out blueprints whose URIs are already loaded
-        blueprints_to_load: list[PipelexBundleBlueprint] = list(all_blueprints)
-        if bundle_uris:
-            current_library = library_manager.get_library(library_id=library_id)
-            blueprints_to_load = []
-            for blueprint, uri in zip(all_blueprints, bundle_uris, strict=True):
-                try:
-                    resolved_uri = Path(uri).resolve()
-                except (OSError, RuntimeError):
-                    resolved_uri = Path(uri)
-                if resolved_uri in current_library.loaded_mthds_paths:
-                    log.verbose(f"Bundle '{uri}' already loaded from library directories, skipping")
-                else:
-                    blueprints_to_load.append(blueprint)
-
-        if blueprints_to_load:
-            library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints_to_load)
-
-        # Find the pipe to execute
-        if pipe_code:
-            pipe = get_required_pipe(pipe_code=pipe_code)
-        else:
-            # Find main_pipe from the first blueprint that declares one
-            # Qualify main_pipe with domain to avoid ambiguity when multiple domains define pipes with the same code.
-            # Note: main_pipe is validated as snake_case (no dots allowed), so it is always a bare code — never
-            # already domain-qualified. See PipelexBundleBlueprint.validate_main_pipe_syntax.
-            qualified_main_pipe: str | None = None
-            for blueprint in all_blueprints:
-                if blueprint.main_pipe:
-                    qualified_main_pipe = PipeFactory.make_pipe_ref_with_domain(domain_code=blueprint.domain, pipe_code=blueprint.main_pipe)
-                    break
-            if not qualified_main_pipe:
-                msg = "No pipe_code provided and no main_pipe found in any of the MTHDS contents."
-                raise PipeExecutionError(message=msg)
-            pipe = get_required_pipe(pipe_code=qualified_main_pipe)
-
-    elif pipe_code:
-        pipe = get_required_pipe(pipe_code=pipe_code)
-    else:
-        msg = "Either provide pipe_code or mthds_contents to the pipeline API."
-        raise PipeExecutionError(message=msg)
-
-    pipe_code = pipe.code
-
-    search_domain_codes = search_domain_codes or []
-    if pipe.domain_code not in search_domain_codes:
-        search_domain_codes.insert(0, pipe.domain_code)
-
-    # Initialize graph tracing if requested (after pipe is loaded so we have domain info)
     graph_context: GraphContext | None = None
     event_log: EventLogProtocol | None = None
-    if execution_config.is_generate_graph:
-        # Create event log when tracing is enabled
-        config = get_config()
-        tracing_config = config.pipelex.tracing_config
-        if tracing_config.is_enabled:
-            event_log = make_event_log(tracing_config)
-
-        graph_tracer_manager = GraphTracerManager.get_or_create_instance()
-        graph_context = graph_tracer_manager.open_tracer(
-            graph_id=pipeline_run_id,
-            data_inclusion=execution_config.graph_config.data_inclusion,
-            pipeline_ref_domain=pipe.domain_code,
-            pipeline_ref_main_pipe=pipe_code,
-            event_log=event_log,
-            workflow_id="direct",
-            pipeline_run_id=pipeline_run_id,
-        )
-
+    registry_opened = False
+    success = False
     try:
-        working_memory: WorkingMemory | None = None
-
-        # First, process user-provided inputs
-        if inputs:
-            if isinstance(inputs, WorkingMemory):
-                working_memory = inputs
+        # Resolve the pipe to execute against the now-open library.
+        pipe: PipeAbstract
+        if mthds_contents:
+            if pipe_code:
+                pipe = get_required_pipe(pipe_code=pipe_code)
+            elif qualified_main_pipe:
+                # main_pipe is validated as snake_case (no dots), so acquire_library returns it already
+                # domain-qualified. See PipelexBundleBlueprint.validate_main_pipe_syntax.
+                pipe = get_required_pipe(pipe_code=qualified_main_pipe)
             else:
-                working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(
-                    pipeline_inputs=inputs,
-                    search_domain_codes=search_domain_codes,
-                )
+                msg = "No pipe_code provided and no main_pipe found in any of the MTHDS contents."
+                raise PipeExecutionError(message=msg)
+        elif pipe_code:
+            pipe = get_required_pipe(pipe_code=pipe_code)
+        else:
+            msg = "Either provide pipe_code or mthds_contents to the pipeline API."
+            raise PipeExecutionError(message=msg)
 
-        # If mock inputs is enabled, generate mock data for missing required inputs
-        if execution_config.is_mock_inputs:
-            needed_inputs_spec = pipe.needed_inputs()
-            needed_inputs_for_factory = convert_to_working_memory_format(needed_inputs_spec)
+        pipe_code = pipe.code
 
-            # Filter out inputs that were already provided by the user
-            if working_memory:
-                provided_names = set(working_memory.root.keys())
-                missing_inputs = [spec for spec in needed_inputs_for_factory if spec.variable_name not in provided_names]
-            else:
-                missing_inputs = needed_inputs_for_factory
-                working_memory = WorkingMemoryFactory.make_empty()
+        search_domain_codes = search_domain_codes or []
+        if pipe.domain_code not in search_domain_codes:
+            search_domain_codes.insert(0, pipe.domain_code)
 
-            # Generate mock data only for missing inputs
-            if missing_inputs:
-                mock_memory = WorkingMemoryFactory.make_mock_inputs(needed_inputs=missing_inputs)
-                for name, stuff in mock_memory.root.items():
-                    working_memory.add_new_stuff(name=name, stuff=stuff)
+        # Initialize graph tracing if requested (after pipe is loaded so we have domain info)
+        if execution_config.is_generate_graph:
+            # Create event log when tracing is enabled
+            config = get_config()
+            tracing_config = config.pipelex.tracing_config
+            if tracing_config.is_enabled:
+                event_log = make_event_log(tracing_config)
 
-        # Normalize data URLs to pipelex-storage:// URIs if configured
-        if working_memory and execution_config.is_normalize_data_urls_to_storage and not execution_config.is_mock_inputs:
-            working_memory = await normalize_data_urls_to_storage(working_memory)
+            graph_tracer_manager = GraphTracerManager.get_or_create_instance()
+            graph_context = graph_tracer_manager.open_tracer(
+                graph_id=pipeline_run_id,
+                data_inclusion=execution_config.graph_config.data_inclusion,
+                pipeline_ref_domain=pipe.domain_code,
+                pipeline_ref_main_pipe=pipe_code,
+                event_log=event_log,
+                workflow_id="direct",
+                pipeline_run_id=pipeline_run_id,
+            )
 
         # TODO: rethink this, it's not forcing
         if pipe_run_mode is None:
@@ -283,6 +207,7 @@ async def pipeline_run_setup(
                 pipe_run_mode = PipeRunMode.LIVE
 
         get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
+        registry_opened = True
 
         # Set event log on the report delegate for distributed usage event emission
         if event_log is not None:
@@ -309,52 +234,59 @@ async def pipeline_run_setup(
             # This must happen before any pipe spans are created/exported
             get_telemetry_manager().handle_trace_start(trace_name=trace_name, trace_name_redacted=trace_name_redacted, trace_id=trace_id)
 
-        job_metadata = JobMetadata(
+        # Seam 2: build the pipe job (pure — no registration, telemetry, graph open, or library mutation).
+        pipe_job = await prepare_pipe_job(
+            pipe=pipe,
+            library_id=library_id,
+            execution_config=execution_config,
+            pipe_run_mode=pipe_run_mode,
+            pipeline_run_id=pipeline_run_id,
             user_id=user_id,
-            pipeline_run_id=pipeline.pipeline_run_id,
-            otel_context=otel_context,
+            inputs=inputs,
+            search_domain_codes=search_domain_codes,
             graph_context=graph_context,
+            otel_context=otel_context,
+            output_name=output_name,
+            output_multiplicity=output_multiplicity,
+            dynamic_output_concept_ref=dynamic_output_concept_ref,
             request_id=request_id,
         )
 
-        pipe_run_params = PipeRunParamsFactory.make_run_params(
-            output_multiplicity=output_multiplicity,
-            dynamic_output_concept_ref=dynamic_output_concept_ref,
-            pipe_run_mode=pipe_run_mode,
-        )
-
-        # Build the library crate from all accumulated blueprints for Temporal dispatch
-        library_crate = library_manager.get_crate(library_id=library_id)
-
-        pipe_job = PipeJobFactory.make_pipe_job(
-            pipe=pipe,
-            pipe_run_params=pipe_run_params,
-            job_metadata=job_metadata,
-            working_memory=working_memory,
-            output_name=output_name,
-            library_crate=library_crate,
-        )
-
         properties = {
-            EventProperty.PIPELINE_RUN_ID: job_metadata.pipeline_run_id,
+            EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
             EventProperty.PIPE_TYPE: pipe.pipe_type,
         }
         get_telemetry_manager().track_event(event_name=EventName.PIPELINE_EXECUTE, properties=properties)
 
+        success = True
         return pipe_job, pipeline_run_id, library_id
-    except Exception:
-        # Error-path-only cleanup: on any failure during setup, tear down the graph tracer, event-log state
-        # and library that were partially created, then re-raise. Re-raises — never swallows. Cannot be a
-        # `finally`: on success these resources are returned alive for the pipeline run to use.
-        # Cleanup graph tracer if it was opened
-        if graph_context is not None:
-            tracer_manager = GraphTracerManager.get_instance()
-            if tracer_manager is not None:
-                tracer_manager.close_tracer(pipeline_run_id)
-        # Cleanup event log state from the report delegate
-        if event_log is not None:
-            get_report_delegate().clear_event_log(context_key=pipeline_run_id)
-        # Cleanup library
-        library_manager.teardown(library_id=library_id)
-        teardown_current_library()
-        raise
+    finally:
+        if not success:
+            # Error-path-only cleanup for failures after the library was acquired: tear down the graph
+            # tracer, event-log state, the report registry, and the library, and restore the outer
+            # current-library, then let the exception propagate. Uses try/finally (not except) so a
+            # BaseException — e.g. asyncio.CancelledError — is covered too. acquire_library owns teardown
+            # for load-time failures (before this try); this block owns the post-acquire window.
+            if graph_context is not None:
+                tracer_manager = GraphTracerManager.get_instance()
+                if tracer_manager is not None:
+                    tracer_manager.close_tracer(pipeline_run_id)
+            if event_log is not None:
+                get_report_delegate().clear_event_log(context_key=pipeline_run_id)
+            # Close the per-run registry only if open_registry actually ran. This finally also runs for
+            # failures *before* open_registry; the registry_opened guard is a clean semantic gate (close
+            # only the registry we opened). close_registry is itself idempotent via pop(..., None), so the
+            # guard is about intent, not KeyError avoidance.
+            if registry_opened:
+                get_report_delegate().close_registry(pipeline_run_id=pipeline_run_id)
+            # Restore the caller's outer current-library FIRST so the guarantee survives a teardown raise,
+            # then tear the library down — mirroring validate_bundle. set_current_library cannot take None,
+            # so route the "no outer was set" case through clear_current_library. The `!= library_id` guard
+            # covers the collision validate_bundle never hits (it always opens a fresh uuid): when the caller
+            # passed a library_id equal to its own outer current-library, "restoring" it would leave the
+            # ContextVar pointing at the library we are about to tear down — so clear instead of dangling.
+            if prev_library_id is not None and prev_library_id != library_id:
+                set_current_library(library_id=prev_library_id)
+            else:
+                clear_current_library()
+            library_manager.teardown(library_id=library_id)

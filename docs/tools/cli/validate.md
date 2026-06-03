@@ -34,6 +34,7 @@ Validates and dry-runs a specific pipe from your imported packages, or all pipes
 
 - `--all`, `-a` - Validate all discovered pipes
 - `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
+- `--allow-signatures` - Accept `PipeSignature` placeholders in the dependency graph (lenient mode). See [Signature Pipes](../../building-methods/pipes/signature-pipes.md).
 
 **Examples:**
 
@@ -51,6 +52,10 @@ pipelex validate pipe --all
 # Validate with custom library directories
 pipelex validate my_pipe -L ./pipelines
 pipelex validate --all -L ./pipelines -L ./shared_pipes
+
+# Allow PipeSignature placeholders during dry-run
+pipelex validate my_draft_pipe --allow-signatures
+pipelex validate --all --allow-signatures
 ```
 
 ## Validate Bundle
@@ -68,6 +73,7 @@ Validates all pipes defined in a bundle file (`.mthds`) or a pipeline directory.
 **Options:**
 
 - `--library-dir`, `-L` - Directory to search for additional pipe definitions. Can be specified multiple times.
+- `--allow-signatures` - Accept `PipeSignature` placeholders in the dependency graph (lenient mode). See [Signature Pipes](../../building-methods/pipes/signature-pipes.md).
 
 **Examples:**
 
@@ -81,6 +87,9 @@ pipelex validate bundle pipelines/invoice_processor/
 
 # Validate with additional library directories
 pipelex validate bundle my_bundle.mthds -L ./shared_pipes
+
+# Allow PipeSignature placeholders during dry-run
+pipelex validate bundle methods/draft_pipeline.mthds --allow-signatures
 ```
 
 !!! note

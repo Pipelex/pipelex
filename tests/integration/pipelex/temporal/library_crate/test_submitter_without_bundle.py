@@ -18,7 +18,7 @@ from temporalio.client import Client as TemporalClient
 
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.hub import get_current_library, set_current_library, teardown_current_library
+from pipelex.hub import clear_current_library, get_current_library, set_current_library
 from pipelex.pipe_run.exceptions import PipeJobError
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.temporal.temporal_hub import get_task_manager
@@ -109,7 +109,7 @@ class TestSubmitterWithoutBundleLoaded:
         )
 
         previous_library_id = _current_library_id_or_none()
-        teardown_current_library()
+        clear_current_library()
         try:
             rehydrated = rehydrate_pipe_output_with_crate(
                 pipe_output,
@@ -153,7 +153,7 @@ class TestSubmitterWithoutBundleLoaded:
         assert pipe_output.working_memory_raw is not None
 
         previous_library_id = _current_library_id_or_none()
-        teardown_current_library()
+        clear_current_library()
         try:
             with pytest.raises(PipeJobError):
                 hydrate_working_memory(pipe_output.working_memory_raw)
@@ -186,7 +186,7 @@ class TestSubmitterWithoutBundleLoaded:
         assert global_registry.get_class(name=GREETING_CLASS_NAME) is None
 
         previous_library_id = _current_library_id_or_none()
-        teardown_current_library()
+        clear_current_library()
         try:
             crate = pipe_job_isolated_dynamic_concept.library_crate
             for _index in range(2):

@@ -31,7 +31,7 @@ import pytest
 from pydantic import BaseModel
 from pytest_mock import MockerFixture
 
-from pipelex.hub import get_current_library, get_library_manager, set_current_library, teardown_current_library
+from pipelex.hub import clear_current_library, get_current_library, get_library_manager, set_current_library
 from pipelex.pipeline import validate_bundle as validate_bundle_module
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import (
@@ -279,7 +279,7 @@ class TestValidateBundleRestoresOuterLibraryOnFailure:
                 await validate_bundle(mthds_contents=[_VALID_MTHDS])
             assert get_current_library() == outer_library_id
         finally:
-            teardown_current_library()
+            clear_current_library()
 
     async def test_validate_bundles_from_directory_restores_previous_current_library(
         self,
@@ -296,7 +296,7 @@ class TestValidateBundleRestoresOuterLibraryOnFailure:
                     await validate_bundles_from_directory(directory=Path(tmp_dir))
             assert get_current_library() == outer_library_id
         finally:
-            teardown_current_library()
+            clear_current_library()
 
     async def test_load_concepts_only_restores_previous_current_library(
         self,
@@ -311,7 +311,7 @@ class TestValidateBundleRestoresOuterLibraryOnFailure:
                 load_concepts_only(mthds_contents=[_VALID_MTHDS])
             assert get_current_library() == outer_library_id
         finally:
-            teardown_current_library()
+            clear_current_library()
 
     async def test_load_concepts_only_from_directory_restores_previous_current_library(
         self,
@@ -328,4 +328,4 @@ class TestValidateBundleRestoresOuterLibraryOnFailure:
                     load_concepts_only_from_directory(directory=Path(tmp_dir))
             assert get_current_library() == outer_library_id
         finally:
-            teardown_current_library()
+            clear_current_library()

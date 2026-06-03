@@ -6,7 +6,7 @@ from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.hub import get_library_manager, get_report_delegate, get_required_pipe, set_current_library, teardown_current_library
+from pipelex.hub import clear_current_library, get_library_manager, get_report_delegate, get_required_pipe, set_current_library
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
@@ -97,7 +97,7 @@ def pipe_job_from_library(
         if needs_registry:
             get_report_delegate().close_registry(pipeline_run_id=pipeline_run_id)
         library_manager.teardown(library_id=library_id)
-        teardown_current_library()
+        clear_current_library()
 
 
 def pipe_job_from_bundle(

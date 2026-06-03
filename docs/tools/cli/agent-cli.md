@@ -57,6 +57,7 @@ pipelex-agent validate method <NAME> [OPTIONS]
 **Common options:**
 
 - `--library-dir`, `-L` - Additional library directory
+- `--allow-signatures` - Accept [`PipeSignature`](../../building-methods/pipes/signature-pipes.md) placeholders in the dependency graph (lenient mode)
 - `--format` - Success output format: `markdown` (default) or `json`
 - `--error-format` - Error output format: `markdown` or `json` (defaults to `--format`'s value)
 
@@ -66,6 +67,9 @@ For `bundle`, additional options are available:
 - `--graph`, `-g` - Generate an execution graph visualization
 - `--graph-format`, `-f` - Graph output format (`mermaidflow`, `reactflow`, or `both`)
 - `--direction` - Graph layout direction
+
+!!! note "Signature pipes"
+    `pipelex-agent validate` is strict by default — same as `pipelex validate`. A bundle whose dependency graph reaches a `PipeSignature` is rejected unless you pass `--allow-signatures`, which dry-runs signatures as mocks.
 
 ### Inputs
 

@@ -12,11 +12,13 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import (
+    clear_current_library,
+    get_current_library_id_or_none,
     get_library_manager,
     get_pipe_run,
     get_report_delegate,
     get_telemetry_manager,
-    teardown_current_library,
+    set_current_library,
 )
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
@@ -133,6 +135,10 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         pipeline_run_id: str | None = None
         library_id_resolved: str | None = None
         pipe_job: PipeJob | None = None
+        # Capture the caller's outer current-library before pipeline_run_setup overwrites it with the
+        # run library, so the finally can restore it instead of clobbering it (mirrors pipeline_run_setup's
+        # own error-path restore).
+        prev_library_id = get_current_library_id_or_none()
         try:
             pipe_job, pipeline_run_id, library_id_resolved = await pipeline_run_setup(
                 execution_config=execution_config,
@@ -207,8 +213,17 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
 
             # Only teardown library if it was successfully created
             if library_id_resolved is not None:
+                # Restore the caller's outer current-library FIRST so the guarantee survives a teardown
+                # raise, then tear the run library down — mirroring pipeline_run_setup's error-path
+                # restore. set_current_library cannot take None, so route the "no outer was set" case
+                # through clear_current_library. The `!= library_id_resolved` guard handles the collision
+                # where the caller's outer current-library IS this run's library: "restoring" it would
+                # leave the ContextVar pointing at the library we tear down next, so clear instead.
+                if prev_library_id is not None and prev_library_id != library_id_resolved:
+                    set_current_library(library_id=prev_library_id)
+                else:
+                    clear_current_library()
                 get_library_manager().teardown(library_id=library_id_resolved)
-                teardown_current_library()
 
         assert pipe_job is not None  # for type checker, success path requires a resolved job
         properties = {

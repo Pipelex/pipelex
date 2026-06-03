@@ -2,7 +2,7 @@
 
 Status: **deferred — captured for a deliberate decision later, NOT a blocker for Phase 2.** Produced by an extra-high-recall `/code-review` of the Phase-2 codec implementation (`pipelex/tools/tabular/csv_codec.py`) on branch `feature/Support-csv` (worktree `_csv`).
 
-This file holds review findings that are real but involve a **design tradeoff** rather than a rote fix — they shouldn't be patched reflexively. The mechanical/silent-correctness findings from the same review (blank-line phantom rows, over-wide-row truncation, delimiter/encoding boundary leak, write item-type guard, model-level coercion label) are tracked separately as the "fix-now" set in `TODOS.md`.
+This file holds review findings that are real but involve a **design tradeoff** rather than a rote fix — they shouldn't be patched reflexively. The mechanical/silent-correctness findings from the same review (blank-line phantom rows, over-wide-row truncation, delimiter/encoding boundary leak, write item-type guard, model-level coercion label) were the "fix-now" set and have since been resolved (see this folder's [`README.md`](README.md)).
 
 Line numbers are approximate anchors — grep the quoted token if they have drifted.
 

@@ -15,7 +15,7 @@ This step validates the v2 surfaces shipped on top of v1 routing:
 - **Named worker-runtime profiles** (`[temporal.worker_runtime_profiles.profiles.<name>]`) — concurrency slots, pollers, and rate-limit knobs become per-worker config selected via `--profile`.
 - **Startup validation** — warn on unknown routing queues; fail with "did you mean?" on unknown `--task-queue`.
 
-All scenarios A-D below are **live-only** for the same reason as Step 8 (`routing-battery.md`): dry-run short-circuits inference inside the workflow process, so `act_*` activities never get scheduled and the routing/timeout/rate-limit assertions are meaningless.
+Scenarios A, B, D, E below are **live** for the same reason as Step 8 (`routing-battery.md`): dry-run short-circuits inference inside the workflow process, so `act_*` activities never get scheduled and the routing/timeout/rate-limit assertions are meaningless. Scenario C is a pytest/unit check and Scenario F is a CLI-startup check — neither submits a live workflow.
 
 **Step 9.0 — Preflight + setup**
 
@@ -52,8 +52,11 @@ start_to_close_timeout = "0:05:00"
 [temporal.queue_options.q_imggen]
 [temporal.queue_options.q_extract]
 
-[temporal.queue_options.q_capped]
-max_task_queue_activities_per_second = 2              # scenario D — cluster rate cap
+# NOTE: q_capped (Scenario D's rate-limited queue) is intentionally NOT declared
+# here. The config validator rejects a queue_options entry that no activity_queues
+# route references (orphan-queue / "the overlay will never apply" error), and the
+# router refuses to boot. Scenario D routes act_llm_gen_text -> q_capped in its own
+# override block, so q_capped lives there, not in this base setup.
 
 # Scenario C — per-handle override on top of per-queue.
 [temporal.worker_config.activity_queues.act_llm_gen_text.handle_options."claude-opus-4-7-1m"]
@@ -101,6 +104,16 @@ tmux new-session -d -c "$PWD" -s temporal-worker-router \
   '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope router'
 sleep 4
 tmux capture-pane -t temporal-worker-router -p -S -30 | grep "Temporal Worker started"
+```
+
+**Also keep a general `runner` on the default task queue.** Un-routed activities — tracing (`act_flush_trace_events`, `act_assemble_graph`) and `act_deliver` — are not in `activity_queues`, so they fall through to `default_task_queue` (`temporal_task_queue`). The specialized runners below only poll their own named queues, so without a general runner those activities have no poller and any `--graph` run (Scenarios A–B use `--graph`) **hangs** on the first trace flush (the activity sits `PENDING_SCHEDULED` forever). Spawn it:
+
+```bash
+tmux kill-session -t temporal-worker-runner 2>/dev/null
+tmux new-session -d -c "$PWD" -s temporal-worker-runner \
+  '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope runner'
+sleep 3
+tmux capture-pane -t temporal-worker-runner -p -S -20 | grep "Temporal Worker started"
 ```
 
 Spawn one specialized runner per queue, each with a profile shaped for its workload. Note the use of the new `runner-llm` / `runner-img-gen` / `runner-extract` scopes shipped in Phase 5:
@@ -182,12 +195,12 @@ temporal workflow show --workflow-id "$WF_ID" --run-id "$RUN_ID" --output json \
 
 Expected output: `"300s"`. Anything else (especially `"30s"`) means the resolver didn't pick up the per-queue overlay — Scenario B FAIL.
 
-**Scenario C — Per-handle override wins over per-queue (live)**
+**Scenario C — Per-handle override wins over per-queue (pytest/unit)**
 
-Two LLM calls routed to `q_llm_anthropic`: one with a regular Anthropic handle (uses queue baseline `0:05:00`), one with `claude-opus-4-7-1m` (the handle_options entry overrides to `0:25:00`). The reusable `per_handle_routing.mthds` bundle from Step 8 (`routing-battery.md`) can serve here, but with a manual pipe definition where step 2 uses model `"claude-opus-4-7-1m"` — adapt or write a new bundle. For now, validate via the per-queue value flowing as in Scenario B, plus inspect the `start_to_close_timeout` per scheduled activity in history: one should be `300s`, one should be `1500s`.
+Two `act_llm_gen_text` calls (queue baseline `0:05:00`): one with a regular handle (stays at the `0:05:00` baseline), one with `claude-opus-4-7-1m` (the handle_options entry overrides to `0:25:00`). The queue is incidental — the per-handle override applies on top of whatever queue the (activity, handle) pair resolves to (here `q_llm`, since only `claude-4.6-sonnet` is routed to `q_llm_anthropic`). The reusable `per_handle_routing.mthds` bundle from Step 8 (`routing-battery.md`) can serve as a starting point if you want a live variant, but Scenario C is validated via pytest, not a live submission — inspect the `start_to_close_timeout` per scheduled activity: one should be `300s`, one should be `1500s`.
 
 The full pytest integration sibling for this scenario already exists at:
-`tests/integration/pipelex/temporal/tracing/test_split_worker_extract_pages.py::test_queue_options_start_to_close_timeout_flows_to_dispatch`.
+`tests/integration/pipelex/temporal/tracing/test_split_worker_extract_pages.py::TestSplitWorkerExtractPages::test_queue_options_start_to_close_timeout_flows_to_dispatch`.
 Run that to validate the resolver layer without spinning up the live CLI:
 
 ```bash
@@ -195,55 +208,149 @@ timeout 120 .venv/bin/pytest -xvs tests/integration/pipelex/temporal/tracing/tes
   -m temporal --temporal-server local --timeout=60
 ```
 
-PASS = per-queue timeout flows through the resolver into the actual dispatch. The handle-options layer is covered by `tests/unit/pipelex/temporal/test_resolve_dispatch.py::test_handle_options_override_queue`.
+PASS = per-queue timeout flows through the resolver into the actual dispatch. The handle-options layer is covered by the unit test below — note the class in the node ID (`TestResolveDispatch::`), which the bare function name omits:
+
+```bash
+timeout 90 .venv/bin/pytest -x -q \
+  "tests/unit/pipelex/temporal/test_resolve_dispatch.py::TestResolveDispatch::test_handle_options_override_queue" \
+  --timeout=60
+```
 
 **Scenario D — Queue-level rate limit observed (live)**
 
-`queue_options.q_capped.max_task_queue_activities_per_second = 2`. Submit a burst (workflow with ≥10 activity dispatches to `q_capped`). The server enforces 2 RPS, so the tail activities should show non-zero `scheduledToStartTimeout` latency (waited in the queue before being picked up).
+`max_task_queue_activities_per_second = 2` on `q_capped` is server-enforced across all pollers. Fan out ≥10 activities to `q_capped` and the server releases them at ~2/s, so the tail activities show a growing `schedule_to_start` latency.
 
-There is no canned pipeline for this — write a temporary bundle that fans out, e.g. a PipeBatch on 10 items each calling `act_llm_gen_text` routed to `q_capped`. After completion:
+Scenario D needs its **own** override — it routes `act_llm_gen_text` to `q_capped`, which conflicts with the base setup's `act_llm_gen_text -> q_llm`. Rewrite the override, restart the router, and run a `q_capped` worker plus the general runner (for tracing/deliver):
 
 ```bash
-temporal workflow show --workflow-id "<wf_id>" --run-id "<run_id>" --output json \
-  | jq '[.events[] | select(.activityTaskStartedEventAttributes != null)] | length as $started
-        | [.events[] | select(.activityTaskScheduledEventAttributes != null and
-                                .activityTaskScheduledEventAttributes.taskQueue.name == "q_capped") |
-           .eventTime] | sort | map(fromdateiso8601) |
-          {first: .[0], last: .[-1], span_seconds: (.[-1] - .[0]), total: length}'
+cat > .pipelex/pipelex_temporary_override.toml << 'EOF'
+[temporal.worker_config.activity_queues.act_llm_gen_text]
+default = "q_capped"
+
+[temporal.queue_options.q_capped]
+max_task_queue_activities_per_second = 2
+EOF
+
+# kill the base-setup specialized runners (their routing no longer applies)
+for s in temporal-worker-q-llm temporal-worker-q-llm-anthropic temporal-worker-q-imggen temporal-worker-q-extract; do
+  tmux kill-session -t "$s" 2>/dev/null
+done
+# router (reads new routing) + general runner (tracing/deliver) + q_capped worker (runs the LLM activity)
+tmux kill-session -t temporal-worker-router 2>/dev/null
+tmux new-session -d -c "$PWD" -s temporal-worker-router \
+  '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope router'
+tmux kill-session -t temporal-worker-runner 2>/dev/null
+tmux new-session -d -c "$PWD" -s temporal-worker-runner \
+  '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope runner'
+tmux kill-session -t temporal-worker-q-capped 2>/dev/null
+tmux new-session -d -c "$PWD" -s temporal-worker-q-capped \
+  '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope runner-llm --task-queue q_capped'
+sleep 5
+for s in temporal-worker-router temporal-worker-runner temporal-worker-q-capped; do
+  tmux capture-pane -t "$s" -p -S -15 | grep -q "Temporal Worker started" && echo "$s: started" || echo "$s: NOT started"
+done
 ```
 
-PASS criteria (per TODOS.md): ordering of dispatches is preserved AND `span_seconds` is non-zero for 10 activities at 2 RPS. Don't pin exact timing — the server's rate-limit precision is per-second, not millisecond.
+Reuse the existing batch bundle with a 10-item input — no need to author a bundle. `batch_temporal_describe_topics` dispatches one `act_llm_gen_text` per topic (each in its own child workflow):
+
+```bash
+cat > /tmp/batch10_inputs.json << 'EOF'
+{ "topics": { "concept": "temporal_batch_test.Topic",
+  "content": ["science","history","music","sports","cooking","travel","cinema","biology","economics","architecture"] } }
+EOF
+
+timeout 600 .venv/bin/pipelex run bundle \
+  tests/integration/pipelex/temporal/library_crate/temporal_batch.mthds \
+  --pipe batch_temporal_describe_topics \
+  --inputs /tmp/batch10_inputs.json \
+  --temporal --no-logo
+echo "EXIT=$?"
+```
+
+Measure the throttle. The `act_llm_gen_text` activities live in **child** workflows, so aggregate scheduled→started times across all children of the run (a single `workflow show` on the root will NOT contain them). `jq`'s `fromdateiso8601` can't parse the fractional-second timestamps, so do the math in Python:
+
+```bash
+ROOT=$(temporal workflow list --limit 40 --output json | jq -r '.[] | select(.type.name=="wf_pipe_run") | .execution.workflowId' | head -1)
+tmpf=$(mktemp)
+for wf in $(temporal workflow list --limit 80 --output json | jq -r --arg r "$ROOT" '.[] | select(.execution.workflowId|startswith($r)) | .execution.workflowId' | sort -u); do
+  temporal workflow show --workflow-id "$wf" --output json | jq -c '
+    [.events[]? | select(.activityTaskScheduledEventAttributes.activityType.name=="act_llm_gen_text" and .activityTaskScheduledEventAttributes.taskQueue.name=="q_capped") | {sid:.eventId, sched:.eventTime}] as $sch
+    | [.events[]? | select(.activityTaskStartedEventAttributes!=null) | {sid:(.activityTaskStartedEventAttributes.scheduledEventId), started:.eventTime}] as $st
+    | $sch | map(. as $s | {sched:$s.sched, started:(($st[] | select(.sid==$s.sid) | .started) // null)}) | .[]' >> "$tmpf"
+done
+.venv/bin/python - "$tmpf" << 'PY'
+import sys, json
+from datetime import datetime, timezone
+def t(s):
+    # Temporal eventTime is RFC 3339 UTC: it may carry 0 or 1-9 fractional digits.
+    # strptime's %f only accepts 1-6, so normalize: drop the Z, pad/truncate the
+    # fraction to microseconds, and pick the format with/without a fractional part.
+    s = s.rstrip("Z")
+    if "." in s:
+        head, frac = s.split(".", 1)
+        s = f"{head}.{(frac + '000000')[:6]}"
+        fmt = "%Y-%m-%dT%H:%M:%S.%f"
+    else:
+        fmt = "%Y-%m-%dT%H:%M:%S"
+    return datetime.strptime(s, fmt).replace(tzinfo=timezone.utc).timestamp()
+recs=[json.loads(l) for l in open(sys.argv[1]) if l.strip()]
+recs=[r for r in recs if r.get("started")]
+starts=sorted(t(r["started"]) for r in recs)
+lat=sorted(t(r["started"])-t(r["sched"]) for r in recs)
+print(f"activities={len(recs)} started_span={starts[-1]-starts[0]:.2f}s max_schedule_to_start={lat[-1]:.2f}s")
+print(f"schedule->start latencies={[round(x,1) for x in lat]}")
+PY
+rm -f "$tmpf"
+```
+
+PASS = `started_span` is clearly non-zero (≳4–5s for 10 activities at 2 RPS) with a growing tail latency (e.g. `[0,0,…,1,1,3]`); the initial token-bucket burst (~first 4 immediate) is expected. Don't pin exact timing — the server's rate-limit precision is per-second.
 
 **Scenario E — Missing-worker negative (live, bounded)**
 
-Route an activity to a queue nothing polls. Override:
+Route a real, triggerable activity to a queue nothing polls; the bounded `schedule_to_start_timeout` must make it fail fast instead of hanging forever.
+
+> Do **not** use `act_jinja2_gen_text` here. `PipeJinja2` was renamed to `PipeCompose`, which renders templates **inline** via `render_template` (deterministic, in-process) — no pipe dispatches `act_jinja2_gen_text` anymore, so it can't be triggered from a bundle (the activity is vestigial: still registered in `tasks.py` and the `runner-jinja2` scope, but unreachable via any pipe). Use `act_llm_gen_text` and the stock `native_text_sequence` bundle instead — the objective (bounded timeout vs hang) is activity-agnostic.
 
 ```bash
-cat >> .pipelex/pipelex_temporary_override.toml << 'EOF'
-
-[temporal.worker_config.activity_queues.act_jinja2_gen_text]
+cat > .pipelex/pipelex_temporary_override.toml << 'EOF'
+[temporal.worker_config.activity_queues.act_llm_gen_text]
 default = "q_orphan"
 
-# q_orphan must have a queue_options entry to pass the orphan-queue validator;
-# the schedule_to_start_timeout bounds the wait so a workflow dispatched to a
-# queue nothing polls fails fast instead of hanging.
+# q_orphan has a route (above) AND a queue_options entry (below) so it passes the
+# orphan-queue validator; the schedule_to_start_timeout bounds the wait so a
+# dispatch to a queue nothing polls fails fast instead of hanging. Keep it small
+# (10s) — see the retry note below for why.
 [temporal.queue_options.q_orphan]
-schedule_to_start_timeout = "0:00:30"
+schedule_to_start_timeout = "0:00:10"
 EOF
+
+# router reads the new routing; keep a general runner up but start NO q_orphan worker
+tmux kill-session -t temporal-worker-router 2>/dev/null
+tmux new-session -d -c "$PWD" -s temporal-worker-router \
+  '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope router'
+tmux has-session -t temporal-worker-runner 2>/dev/null || tmux new-session -d -c "$PWD" -s temporal-worker-runner \
+  '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope runner'
+sleep 4
+pgrep -fl "q_orphan" >/dev/null && echo "WARNING: a worker polls q_orphan" || echo "confirmed: nothing polls q_orphan"
+
+timeout 120 .venv/bin/pipelex run bundle \
+  tests/integration/pipelex/temporal/library_crate/native_text_sequence.mthds \
+  --pipe native_text_sequence \
+  --temporal --no-logo
+echo "EXIT=$?"
 ```
 
-Restart the router (re-read the override), then submit a pipeline that fires `act_jinja2_gen_text`. With Phase 4's strict CLI validation, the worker process would refuse to start on `--task-queue q_orphan` if you tried — but a routing-only orphan queue (referenced in `activity_queues` with a `queue_options` entry but polled by no worker) is fine until dispatch.
-
-After submission, the workflow's first `act_jinja2_gen_text` invocation will time out on `schedule_to_start` thanks to the bound set above. Expected: the workflow fails with a clear `schedule_to_start` timeout, not a hang.
+Expected: non-zero exit with `activity ScheduleToStart timeout` in the message. Confirm in workflow history that the scheduled `act_llm_gen_text` event on `q_orphan` carries `scheduleToStartTimeout=10s` and fails with `TIMEOUT_TYPE_SCHEDULE_TO_START`:
 
 ```bash
-timeout 600 .venv/bin/pipelex run bundle \
-  <some_bundle_using_jinja2>.mthds \
-  --pipe <pipe_using_templating> \
-  --temporal --no-logo
+WF=$(temporal workflow list --limit 20 --output json | jq -r '.[] | select(.type.name=="wf_pipe_router") | .execution.workflowId' | grep step_one | head -1)
+temporal workflow show --workflow-id "$WF" --output json \
+  | jq -r '.events[]? | select(.activityTaskScheduledEventAttributes.activityType.name=="act_llm_gen_text") | "taskQueue=\(.activityTaskScheduledEventAttributes.taskQueue.name) s2s=\(.activityTaskScheduledEventAttributes.scheduleToStartTimeout)"'
+temporal workflow show --workflow-id "$WF" --output json \
+  | jq -r '.events[]? | .activityTaskTimedOutEventAttributes.failure.timeoutFailureInfo.timeoutType // empty'
 ```
 
-Expected: non-zero exit within ~35s with `ScheduleToStartTimeout` in the error chain. PASS = bounded timeout, clear error. FAIL = hangs > 60s or unclear error.
+PASS = bounded timeout, clear error. **Note on total time:** each pipe step runs as a child workflow that **retries on failure** (≈3 attempts), so the run takes ≈`maxAttempts × schedule_to_start` (≈30s at a 10s bound), not a single bound — that's why the bound is kept small. It is still bounded; the point is "fails fast per attempt, no infinite hang." FAIL = the run exceeds `maxAttempts × bound` substantially (true hang) or the error is an unclear wrapper with no `ScheduleToStart`.
 
 **Scenario F — CLI startup typo (no live submission)**
 
@@ -262,24 +369,36 @@ Known queues: [...]. Did you mean 'temporal_task_queue'?
 
 FAIL = process starts up, hangs, or errors with a different message.
 
-Sanity-check that a known queue passes:
+Sanity-check that a **known** queue is accepted by the validator. Target `temporal_task_queue` (the `default_task_queue`) — it is always known regardless of which scenario's override is currently loaded. Do **not** use `q_llm` here: each scenario's override is written with `cat >` (full replace), so by this point the active override is Scenario E's, which declares only `q_orphan` — `q_llm` would be (correctly) rejected as unknown.
 
 ```bash
-.venv/bin/python -m pipelex.temporal.worker_cli --task-queue q_llm --is-unit-testing 2>&1 | head -10
+OUT=$(timeout 60 .venv/bin/python -m pipelex.temporal.worker_cli \
+  --task-queue temporal_task_queue --is-unit-testing 2>&1); RC=$?
+if echo "$OUT" | grep -q "WorkerTaskQueueUnknownError"; then
+  echo "Scenario F sanity FAIL — known queue 'temporal_task_queue' wrongly rejected by the task-queue validator"
+else
+  echo "Scenario F sanity PASS — 'temporal_task_queue' passed the task-queue validator (no WorkerTaskQueueUnknownError; rc=$RC)"
+fi
 ```
 
-Should start up (proceed past the validator without raising).
+PASS = no `WorkerTaskQueueUnknownError` — the run proceeds *past* the task-queue validator, which runs early (`worker_cli.py`, before library load and `Worker(...)` construction) and only guards the `--task-queue` name; it does **not** boot a worker by itself.
+
+> Note: under `--is-unit-testing` the run then dies on an unrelated `RuntimeError: Failed validating workflow <test-only workflow>` (the exact one varies, e.g. `wf_test_content_generator_child` or `wf_test_structured_output_cross_process`) — temporalio sandbox validation of a test-only workflow, queue-name-independent and orthogonal to this check. (If that test-workflow issue is ever fixed, the known queue boots a real polling worker instead and the `timeout 60` fires at `rc=124`.) Either outcome is "past the validator" and PASSES; only `WorkerTaskQueueUnknownError` is a Scenario F failure. The sandbox-validation issue is tracked as a product follow-up in `wip/temporal-e2e-validate-skill.md`.
 
 **Step 9.t — Teardown**
 
 ```bash
 .venv/bin/python -c "from pathlib import Path; Path('.pipelex/pipelex_temporary_override.toml').unlink(missing_ok=True)"
-for q in q-llm q-llm-anthropic q-imggen q-extract; do
+rm -f /tmp/batch10_inputs.json
+for q in q-llm q-llm-anthropic q-imggen q-extract q-capped; do
   tmux kill-session -t "temporal-worker-$q" 2>/dev/null
 done
+tmux kill-session -t temporal-worker-runner 2>/dev/null
 tmux kill-session -t temporal-worker-router 2>/dev/null
 tmux new-session -d -c "$PWD" -s temporal-worker-router \
   '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope router'
+tmux new-session -d -c "$PWD" -s temporal-worker-runner \
+  '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed --scope runner'
 sleep 4
 tmux capture-pane -t temporal-worker-router -p -S -10 | grep "Temporal Worker started"
 ```

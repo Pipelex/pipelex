@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PR Story — Signature-Based Validation</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #181b24;
+    --panel-2: #1f2330;
+    --ink: #e8eaf0;
+    --muted: #9aa3b6;
+    --line: #2c3142;
+    --accent: #6ea8fe;
+    --green: #5fd38f;
+    --amber: #f0c060;
+    --red: #f08a8a;
+    --violet: #b89cf0;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 56px 28px 120px; }
+  header.hero { border-bottom: 1px solid var(--line); padding-bottom: 32px; margin-bottom: 40px; }
+  .eyebrow { font: 600 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+  h1 { font-size: 34px; line-height: 1.2; margin: 14px 0 10px; letter-spacing: -.01em; }
+  .sub { color: var(--muted); font-size: 17px; max-width: 700px; }
+  .meta { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    font: 600 12px/1 var(--mono); padding: 6px 10px; border-radius: 999px;
+    background: var(--panel-2); border: 1px solid var(--line); color: var(--muted);
+  }
+  h2 {
+    font-size: 22px; margin: 52px 0 16px; letter-spacing: -.01em;
+    padding-left: 12px; border-left: 3px solid var(--accent);
+  }
+  h3 { font-size: 16px; margin: 28px 0 10px; color: var(--ink); }
+  p { margin: 12px 0; }
+  .muted { color: var(--muted); }
+  code {
+    font: 13.5px/1.5 var(--mono); background: var(--panel-2);
+    padding: 1.5px 6px; border-radius: 5px; border: 1px solid var(--line);
+  }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 20px 22px; margin: 18px 0;
+  }
+  .callout {
+    border-left: 3px solid var(--amber); background: var(--panel);
+    border-radius: 0 10px 10px 0; padding: 14px 18px; margin: 18px 0;
+  }
+  .callout.bug { border-left-color: var(--red); }
+  .callout.note { border-left-color: var(--accent); }
+  .callout .lbl { font: 600 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--amber); }
+  .callout.bug .lbl { color: var(--red); }
+  .callout.note .lbl { color: var(--accent); }
+
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 18px 0; }
+  .cards.two { grid-template-columns: repeat(2, 1fr); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+  .card .n { font: 700 13px/1 var(--mono); color: var(--accent); }
+  .card h4 { margin: 8px 0 6px; font-size: 15px; }
+  .card p { margin: 0; font-size: 14px; color: var(--muted); }
+
+  .figure { margin: 22px 0; }
+  .figure svg { display: block; width: 100%; height: auto; }
+  .figcap { color: var(--muted); font-size: 13px; margin-top: 8px; text-align: center; }
+
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13.5px; }
+  th, td { text-align: left; padding: 9px 11px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font: 600 11px/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  td .dot { font-weight: 700; }
+  .dot.g { color: var(--green); }
+  .dot.a { color: var(--amber); }
+  .dot.r { color: var(--red); }
+  tbody tr:hover { background: var(--panel); }
+
+  .diff {
+    background: #11141c; border: 1px solid var(--line); border-radius: 10px;
+    overflow-x: auto; margin: 14px 0; font: 12.5px/1.7 var(--mono);
+  }
+  .diff .fname {
+    padding: 8px 14px; border-bottom: 1px solid var(--line);
+    color: var(--muted); background: var(--panel-2); font-weight: 600;
+  }
+  .diff pre { margin: 0; padding: 12px 14px; }
+  .diff .add { color: var(--green); display: block; }
+  .diff .del { color: var(--red); display: block; }
+  .diff .ctx { color: #8b93a7; display: block; }
+  .diff .hdr { color: var(--accent); display: block; }
+
+  ul.tight { margin: 10px 0; padding-left: 22px; }
+  ul.tight li { margin: 5px 0; }
+  ol.phases { margin: 10px 0; padding-left: 22px; }
+  ol.phases li { margin: 6px 0; }
+  .files { columns: 2; column-gap: 26px; font: 12.5px/1.9 var(--mono); color: var(--muted); }
+  .files .new { color: var(--green); }
+  footer { margin-top: 70px; padding-top: 24px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+  @media (max-width: 680px) {
+    .cards, .cards.two { grid-template-columns: 1fr; }
+    .files { columns: 1; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">Pull Request Story</div>
+  <h1>Signature-Based Validation</h1>
+  <p class="sub">A new <code>PipeSignature</code> pipe type lets authors and AI agents sketch a whole pipeline <strong>top-down</strong> — declaring each pipe's contract before writing its implementation — and still validate it at every step.</p>
+  <div class="meta">
+    <span class="chip">branch · feature/Validate-with-signatures</span>
+    <span class="chip">7 phases · strict TDD</span>
+    <span class="chip">new pipe type across 3 layers</span>
+    <span class="chip">~1,800 LOC of tests</span>
+  </div>
+</header>
+
+<div class="callout note">
+  <span class="lbl">Update · post-#956</span>
+  <p style="margin:8px 0 0">This story tells how the feature originally landed. A later refactor — <strong>#956, "consolidate validation into <code>BundleValidator</code> + execution seams"</strong> — removed the standalone <code>pipelex/pipe_run/dry_run.py</code> and its <code>dry_run_pipe</code> / <code>dry_run_pipes</code> functions. The strict signature pre-check shown in the diffs below now lives in <code>BundleValidator._signature_pre_pass</code> (run from <code>validate_pipes</code>) in <code>pipelex/pipeline/bundle_validator.py</code>, and library/job setup moved into <code>pipelex/pipeline/execution_seams.py</code>. The <em>behaviour</em> — strict default, one aggregated <code>SignaturesNotAllowedError</code>, lenient mock-mint, live-run guard — is unchanged; only the home moved. Diffs below are kept as the original PR's footprint.</p>
+</div>
+
+<h2>Why we did this</h2>
+<p>Validating a bundle <strong>dry-runs every pipe</strong> with mock inputs. Dry-run requires that every sub-pipe of every controller already exists as a fully-defined pipe. There was simply <em>no way</em> to validate a half-built pipeline.</p>
+
+<p>That blocks the most natural way to build a pipeline: sketch the orchestration first, fill in the operators one at a time. It blocks AI agents especially — they want to lay out a <code>PipeSequence</code> of five steps, then implement step 1, validate, implement step 2, validate, and so on. Until now, the bundle wouldn't even load for validation until <em>all five</em> were done.</p>
+
+<div class="callout bug">
+  <span class="lbl">The gap</span>
+  <p style="margin:8px 0 0">A controller referencing a not-yet-written pipe fails at dry-run with a generic "pipe not found" — indistinguishable from a typo. There was no first-class way to say <em>"this pipe is a deliberate placeholder; here is its contract; I'll implement it later."</em></p>
+</div>
+
+<h2>The idea — a contract-only pipe</h2>
+<p>A <code>PipeSignature</code> is a <strong>contract</strong>: <code>inputs</code>, <code>output</code>, <code>description</code> — and no implementation. It is a first-class pipe type that any pipe in a bundle can reference as a placeholder.</p>
+
+<div class="panel" style="padding:0">
+  <div class="diff" style="margin:0;border:0">
+    <div class="fname">a PipeSignature in a .mthds file</div>
+<pre><span class="ctx">[pipe.summarize_extracted]</span>
+<span class="hdr">type = "PipeSignature"</span>
+<span class="ctx">description = "Summarize extracted text (contract only)."</span>
+<span class="ctx">inputs = { extracted = "Text" }</span>
+<span class="ctx">output = "Summary"</span></pre>
+  </div>
+</div>
+
+<p>Three use cases drove the design:</p>
+<div class="cards">
+  <div class="card">
+    <span class="n">01</span>
+    <h4>Agents building iteratively</h4>
+    <p>Sketch the orchestration with signatures, fill implementations one pipe at a time, validate at every step.</p>
+  </div>
+  <div class="card">
+    <span class="n">02</span>
+    <h4>Contract bundles</h4>
+    <p>Library authors publish a bundle of signatures for downstream teams to implement against.</p>
+  </div>
+  <div class="card">
+    <span class="n">03</span>
+    <h4>Safe refactors</h4>
+    <p>Stub a pipe with its prior contract while the body is rewritten — the rest of the graph still validates.</p>
+  </div>
+</div>
+
+<h2>Two validation modes</h2>
+<p>This is the central design decision. Validation has two distinct purposes, so it gets two distinct modes — selected by one flag, <code>--allow-signatures</code>.</p>
+
+<div class="cards two">
+  <div class="card">
+    <span class="n" style="color:var(--red)">STRICT · default</span>
+    <h4>"Ready to ship"</h4>
+    <p>Fails fast if <em>any</em> pipe reachable from the target is a <code>PipeSignature</code>. CI gates, release checks, and production deploys must reject half-built bundles. Raises <code>SignaturesNotAllowedError</code> listing every signature and the controller chain that reached it.</p>
+  </div>
+  <div class="card">
+    <span class="n" style="color:var(--green)">LENIENT · --allow-signatures</span>
+    <h4>"Still authoring"</h4>
+    <p>Accepts signatures. They participate in dry-run by minting a mock output from their declared contract. This is the agent / authoring loop — the agent CLI's <code>validate</code> surfaces the flag for exactly this use.</p>
+  </div>
+</div>
+
+<p>The two modes are complementary with a third line of defense — <strong>live-run enforcement</strong>. Even if strict validation is skipped, executing a signature for real raises <code>PipeSignatureNotExecutableError</code>. A half-built pipeline can never silently run on mock data.</p>
+
+<h2>The design in one picture</h2>
+<p>A signature is a real pipe type, mirrored across all three layers of the Pipelex stack — the same spec → blueprint → runtime path every other pipe takes. No discriminator machinery changed; the factory lookup convention (<code>f"{pipe_type}Factory"</code>) just needed one new registration.</p>
+
+<div class="figure">
+<svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, Menlo, Consolas, monospace">
+  <defs>
+    <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3.2" orient="auto">
+      <path d="M0,0 L7,3.2 L0,6.4 Z" fill="#9aa3b6"/>
+    </marker>
+    <marker id="ahg" markerWidth="9" markerHeight="9" refX="7" refY="3.2" orient="auto">
+      <path d="M0,0 L7,3.2 L0,6.4 Z" fill="#5fd38f"/>
+    </marker>
+    <marker id="ahr" markerWidth="9" markerHeight="9" refX="7" refY="3.2" orient="auto">
+      <path d="M0,0 L7,3.2 L0,6.4 Z" fill="#f08a8a"/>
+    </marker>
+  </defs>
+
+  <!-- layer labels -->
+  <text x="20" y="40" fill="#9aa3b6" font-size="11" letter-spacing="1.5">SPEC / BUILDER</text>
+  <text x="330" y="40" fill="#9aa3b6" font-size="11" letter-spacing="1.5">BLUEPRINT / CORE</text>
+  <text x="645" y="40" fill="#9aa3b6" font-size="11" letter-spacing="1.5">RUNTIME</text>
+
+  <!-- spec box -->
+  <rect x="20" y="56" width="250" height="78" rx="10" fill="#1f2330" stroke="#b89cf0"/>
+  <text x="36" y="84" fill="#e8eaf0" font-size="14" font-weight="700">PipeSignatureSpec</text>
+  <text x="36" y="106" fill="#9aa3b6" font-size="11.5">authoring format · literal type,</text>
+  <text x="36" y="122" fill="#9aa3b6" font-size="11.5">multiplicity inputs, no `result`</text>
+
+  <!-- blueprint box -->
+  <rect x="330" y="56" width="250" height="78" rx="10" fill="#1f2330" stroke="#6ea8fe"/>
+  <text x="346" y="84" fill="#e8eaf0" font-size="14" font-weight="700">PipeSignatureBlueprint</text>
+  <text x="346" y="106" fill="#9aa3b6" font-size="11.5">MTHDS language · what a</text>
+  <text x="346" y="122" fill="#9aa3b6" font-size="11.5">.mthds file parses into</text>
+
+  <!-- runtime box -->
+  <rect x="640" y="56" width="220" height="78" rx="10" fill="#1f2330" stroke="#5fd38f"/>
+  <text x="656" y="84" fill="#e8eaf0" font-size="14" font-weight="700">PipeSignature</text>
+  <text x="656" y="106" fill="#9aa3b6" font-size="11.5">: PipeAbstract</text>
+  <text x="656" y="122" fill="#9aa3b6" font-size="11.5">executable runtime object</text>
+
+  <!-- arrows between layers -->
+  <line x1="270" y1="95" x2="326" y2="95" stroke="#9aa3b6" stroke-width="1.6" marker-end="url(#ah)"/>
+  <text x="272" y="88" fill="#9aa3b6" font-size="10.5">to_blueprint()</text>
+  <line x1="580" y1="95" x2="636" y2="95" stroke="#9aa3b6" stroke-width="1.6" marker-end="url(#ah)"/>
+  <text x="566" y="88" fill="#9aa3b6" font-size="10.5">Factory.make()</text>
+
+  <!-- runtime branches -->
+  <line x1="750" y1="134" x2="660" y2="196" stroke="#5fd38f" stroke-width="1.6" marker-end="url(#ahg)"/>
+  <line x1="750" y1="134" x2="780" y2="196" stroke="#f08a8a" stroke-width="1.6" marker-end="url(#ahr)"/>
+
+  <rect x="430" y="200" width="270" height="92" rx="10" fill="#181b24" stroke="#2f5d44"/>
+  <text x="446" y="226" fill="#5fd38f" font-size="12" font-weight="700">_dry_run_pipe()</text>
+  <text x="446" y="248" fill="#9aa3b6" font-size="11.5">mints a mock Stuff matching the</text>
+  <text x="446" y="264" fill="#9aa3b6" font-size="11.5">declared output concept +</text>
+  <text x="446" y="280" fill="#9aa3b6" font-size="11.5">multiplicity → validation passes</text>
+
+  <rect x="715" y="200" width="145" height="92" rx="10" fill="#181b24" stroke="#5d3434"/>
+  <text x="731" y="226" fill="#f08a8a" font-size="12" font-weight="700">_live_run_pipe()</text>
+  <text x="731" y="248" fill="#9aa3b6" font-size="11.5">raises PipeSignature-</text>
+  <text x="731" y="264" fill="#9aa3b6" font-size="11.5">NotExecutableError</text>
+  <text x="731" y="280" fill="#9aa3b6" font-size="11.5">— fails loudly</text>
+
+  <!-- enum note -->
+  <rect x="20" y="200" width="385" height="92" rx="10" fill="#181b24" stroke="#2c3142"/>
+  <text x="36" y="226" fill="#e8eaf0" font-size="12" font-weight="700">New enum values (Phase 1 foundation)</text>
+  <text x="36" y="248" fill="#9aa3b6" font-size="11.5">PipeType.PIPE_SIGNATURE = "PipeSignature"</text>
+  <text x="36" y="264" fill="#9aa3b6" font-size="11.5">PipeCategory.PIPE_SIGNATURE — a third category,</text>
+  <text x="36" y="280" fill="#9aa3b6" font-size="11.5">not operator, not controller. is_controller → False.</text>
+</svg>
+<div class="figcap">A signature is neither an operator (no inference) nor a controller (no sub-pipe orchestration) — it earns its own <code>PipeCategory</code>.</div>
+</div>
+
+<p class="muted">A third category is a feature, not overhead: Pipelex enums are matched exhaustively with no <code>case _</code> default, so the linter forces <em>every</em> match-case in the codebase to acknowledge the new value. Nothing that needs to know about signatures can silently forget them.</p>
+
+<h2>How strict mode finds signatures</h2>
+<p>Before any dry-run starts, strict mode walks the dependency graph from the target pipe and collects every reachable signature. The walk is a pair of free functions in <code>pipe_signature/signature_walk.py</code> — <code>collect_signature_refs(pipe)</code> and its companion <code>collect_signature_paths(pipe)</code>, which records the controller chain that reached each signature so the error message is actionable.</p>
+
+<div class="figure">
+<svg viewBox="0 0 880 300" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, Menlo, Consolas, monospace">
+  <defs>
+    <marker id="b1" markerWidth="9" markerHeight="9" refX="7" refY="3.2" orient="auto">
+      <path d="M0,0 L7,3.2 L0,6.4 Z" fill="#9aa3b6"/>
+    </marker>
+  </defs>
+
+  <!-- graph on the left -->
+  <text x="20" y="34" fill="#9aa3b6" font-size="11" letter-spacing="1.5">DEPENDENCY GRAPH WALK</text>
+
+  <rect x="40" y="56" width="190" height="50" rx="9" fill="#1f2330" stroke="#6ea8fe"/>
+  <text x="56" y="78" fill="#e8eaf0" font-size="12.5" font-weight="700">process_doc</text>
+  <text x="56" y="95" fill="#9aa3b6" font-size="10.5">PipeSequence · controller</text>
+
+  <rect x="20" y="160" width="190" height="50" rx="9" fill="#1f2330" stroke="#5fd38f"/>
+  <text x="36" y="182" fill="#e8eaf0" font-size="12.5" font-weight="700">extract_doc</text>
+  <text x="36" y="199" fill="#9aa3b6" font-size="10.5">PipeLLM · operator ✓</text>
+
+  <rect x="240" y="160" width="210" height="50" rx="9" fill="#1f2330" stroke="#f0c060"/>
+  <text x="256" y="182" fill="#e8eaf0" font-size="12.5" font-weight="700">summarize_extracted</text>
+  <text x="256" y="199" fill="#f0c060" font-size="10.5">PipeSignature · placeholder</text>
+
+  <line x1="110" y1="106" x2="105" y2="156" stroke="#9aa3b6" stroke-width="1.5" marker-end="url(#b1)"/>
+  <line x1="160" y1="106" x2="320" y2="156" stroke="#9aa3b6" stroke-width="1.5" marker-end="url(#b1)"/>
+  <text x="118" y="135" fill="#9aa3b6" font-size="10">step 1</text>
+  <text x="235" y="128" fill="#9aa3b6" font-size="10">step 2</text>
+
+  <text x="20" y="248" fill="#9aa3b6" font-size="11">collect_signature_refs() →</text>
+  <text x="20" y="266" fill="#5fd38f" font-size="11">{ "signature_mixed.summarize_extracted" }</text>
+  <text x="20" y="284" fill="#9aa3b6" font-size="11">paths → { sig: ["...process_doc"] }</text>
+
+  <!-- divider -->
+  <line x1="500" y1="56" x2="500" y2="284" stroke="#2c3142" stroke-width="1"/>
+
+  <!-- two outcomes on the right -->
+  <text x="530" y="34" fill="#9aa3b6" font-size="11" letter-spacing="1.5">OUTCOME PER MODE</text>
+
+  <rect x="530" y="56" width="330" height="92" rx="10" fill="#181b24" stroke="#5d3434"/>
+  <text x="548" y="82" fill="#f08a8a" font-size="12.5" font-weight="700">strict (default) — refuses</text>
+  <text x="548" y="104" fill="#9aa3b6" font-size="11">raise SignaturesNotAllowedError</text>
+  <text x="548" y="122" fill="#9aa3b6" font-size="11">"process_doc depends on a placeholder:</text>
+  <text x="548" y="138" fill="#9aa3b6" font-size="11">  summarize_extracted (via process_doc)"</text>
+
+  <rect x="530" y="166" width="330" height="92" rx="10" fill="#181b24" stroke="#2f5d44"/>
+  <text x="548" y="192" fill="#5fd38f" font-size="12.5" font-weight="700">lenient — accepts</text>
+  <text x="548" y="214" fill="#9aa3b6" font-size="11">signature dry-runs trivially: mints a</text>
+  <text x="548" y="232" fill="#9aa3b6" font-size="11">mock `Summary` Stuff. Sequence</text>
+  <text x="548" y="248" fill="#9aa3b6" font-size="11">validation passes end-to-end.</text>
+</svg>
+<div class="figcap">The walk is cycle-safe (visited-set keyed by qualified <code>pipe_ref</code>) and deterministic (sorted dependency iteration), so error messages are stable.</div>
+</div>
+
+<div class="callout note">
+  <span class="lbl">A real import-cycle constraint</span>
+  <p style="margin:8px 0 0">The walk needs to resolve dependency codes to pipe objects via <code>pipelex.hub.get_optional_pipe</code>. That import cannot live in <code>pipe_abstract</code> — the cycle <code>pipe_abstract → hub → library → pipe_library → pipe_abstract</code> is real and breaks at <em>runtime</em>, not just under pyright. So the walk is <strong>not a method on <code>PipeAbstract</code></strong>: it lives as free functions in <code>pipe_signature/signature_walk.py</code>, a module downstream of <code>hub</code>, where importing <code>get_optional_pipe</code> is free of any cycle. <code>PipeAbstract</code> keeps only <code>pipe_dependencies()</code> and <code>is_signature</code> — pure local data the walk reads.</p>
+</div>
+
+<h2>The critical code changes</h2>
+
+<p><strong>1 — The enum foundation.</strong> A new pipe type and a new category, threaded through the two exhaustive match statements that classify pipes.</p>
+<div class="diff">
+  <div class="fname">pipelex/core/pipes/pipe_blueprint.py</div>
+<pre><span class="ctx">class PipeCategory(StrEnum):</span>
+<span class="ctx">    PIPE_OPERATOR = "PipeOperator"</span>
+<span class="ctx">    PIPE_CONTROLLER = "PipeController"</span>
+<span class="add">+   PIPE_SIGNATURE = "PipeSignature"</span>
+<span class="ctx">    ...</span>
+<span class="ctx">        match self:</span>
+<span class="ctx">            case PipeCategory.PIPE_CONTROLLER:</span>
+<span class="ctx">                return True</span>
+<span class="del">-           case PipeCategory.PIPE_OPERATOR:</span>
+<span class="add">+           case PipeCategory.PIPE_OPERATOR | PipeCategory.PIPE_SIGNATURE:</span>
+<span class="ctx">                return False</span></pre>
+</div>
+
+<p><strong>2 — The strict pre-check.</strong> One guard, originally at the top of <code>dry_run_pipe</code> (post-#956: in <code>BundleValidator._signature_pre_pass</code>). Default <code>allow_signatures=False</code> means every caller is strict unless it opts out — the safe default that guards against a missed code path.</p>
+<div class="diff">
+  <div class="fname">pipelex/pipe_run/dry_run.py</div>
+<pre><span class="del">- async def dry_run_pipe(pipe, raise_on_failure=False) -> DryRunOutput:</span>
+<span class="add">+ async def dry_run_pipe(pipe, *, allow_signatures=False, raise_on_failure=False) -> DryRunOutput:</span>
+<span class="add">+     if not allow_signatures:</span>
+<span class="add">+         signature_refs = collect_signature_refs(pipe=pipe)</span>
+<span class="add">+         if signature_refs:</span>
+<span class="add">+             offending = set() if pipe.is_signature else {pipe.pipe_ref}</span>
+<span class="add">+             raise SignaturesNotAllowedError(</span>
+<span class="add">+                 offending_pipe_refs=offending,</span>
+<span class="add">+                 signature_refs=signature_refs,</span>
+<span class="add">+                 dep_paths=collect_signature_paths(pipe=pipe),</span>
+<span class="add">+             )</span>
+<span class="ctx">      try:</span>
+<span class="ctx">          ...  # existing dry-run logic unchanged</span></pre>
+</div>
+
+<p><strong>3 — The runtime's two paths.</strong> The whole point of the type is in these two methods: dry-run mints a contract-shaped mock; live-run refuses.</p>
+<div class="diff">
+  <div class="fname">pipelex/pipe_signature/pipe_signature.py</div>
+<pre><span class="hdr">  async def _live_run_pipe(self, ...) -> PipeOutput:</span>
+<span class="add">+     raise PipeSignatureNotExecutableError(pipe_ref=self.pipe_ref)</span>
+<span class="ctx"></span>
+<span class="hdr">  async def _dry_run_pipe(self, ..., output_name=None, ...) -> PipeOutput:</span>
+<span class="add">+     mock_name = output_name or self.code</span>
+<span class="add">+     typed_named = convert_stuff_spec_to_typed_named(stuff_spec=self.output, name=mock_name)</span>
+<span class="add">+     mock_stuff = WorkingMemoryFactory.make_mock_stuff(typed_named_stuff_spec=typed_named)</span>
+<span class="add">+     working_memory.set_new_main_stuff(stuff=mock_stuff, name=mock_name)</span>
+<span class="add">+     return PipeOutput(working_memory=working_memory, ...)</span></pre>
+</div>
+<p class="muted">No content generator, no LLM-mock — just <code>make_mock_stuff</code>, a helper extracted from the existing <code>make_mock_inputs</code> so the per-stuff mock logic is shared rather than duplicated.</p>
+
+<h2>The behaviour matrix we validated</h2>
+<table>
+  <thead><tr><th>Scenario</th><th>Mode</th><th>Outcome</th></tr></thead>
+  <tbody>
+    <tr><td>Pipeline with no signatures</td><td>strict</td><td><span class="dot g">●</span> passes — graph walk finds nothing</td></tr>
+    <tr><td>Signature anywhere in dep graph</td><td>strict</td><td><span class="dot r">●</span> <code>SignaturesNotAllowedError</code> — every signature + dep chain listed</td></tr>
+    <tr><td>Same pipeline</td><td>lenient</td><td><span class="dot g">●</span> passes — signature mints a mock output</td></tr>
+    <tr><td><code>validate --all</code>, orphan signature (no caller)</td><td>strict</td><td><span class="dot g">●</span> passes — iteration skips signature pipes</td></tr>
+    <tr><td><code>validate --all</code>, a real pipe reaches a signature</td><td>strict</td><td><span class="dot r">●</span> fails — the caller is flagged</td></tr>
+    <tr><td>Signature inside Sequence / Parallel / Condition / Batch</td><td>both</td><td><span class="dot a">●</span> walk descends every controller kind</td></tr>
+    <tr><td>Live-run a bundle containing a signature</td><td>—</td><td><span class="dot r">●</span> <code>PipeSignatureNotExecutableError</code> — never runs on mock data</td></tr>
+    <tr><td>Multiplicity inputs (<code>Doc[]</code>, <code>Image[3]</code>)</td><td>lenient</td><td><span class="dot g">●</span> round-trip through interpreter unchanged</td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <span class="lbl">The subtle one — aggregation order</span>
+  <p style="margin:8px 0 0">The aggregated pre-pass over the whole batch (originally <code>dry_run_pipes</code>, now <code>BundleValidator._signature_pre_pass</code>) makes the user see <em>every</em> offending signature in one error, not just the first. The first cut aggregated dep-paths "first wins" — but when the signature pipe itself was iterated before its controller, that recorded an empty chain and never replaced it. Fixed: the aggregator keeps the <strong>longest</strong> known dep chain, so the message always shows the most informative path.</p>
+</div>
+
+<h2>CLI surface</h2>
+<ul class="tight">
+  <li><code>pipelex validate pipe &lt;code&gt; [--allow-signatures]</code> and <code>validate bundle &lt;path&gt; [--allow-signatures]</code> — strict by default.</li>
+  <li><code>pipelex validate --all</code> — strict; iterates non-signature pipes only (orphan signatures aren't flagged — they're deliberate placeholders).</li>
+  <li>The agent CLI's <code>validate</code> subcommands carry the same flag — strict by default, so CI behaviour is consistent across both CLIs.</li>
+  <li>In lenient mode the summary line gains a suffix in-place: <code>Successfully validated bundle 'X' (2 signatures)</code> — empty when no signature was involved, so finished bundles read naturally.</li>
+  <li>Strict-mode failures render under an <strong>"Unimplemented Signatures"</strong> heading showing the dep chain, via <code>error_handlers.py</code>.</li>
+</ul>
+
+<h2>What landed</h2>
+<div class="panel">
+<div class="files">
+<span class="new">+ pipe_signature/pipe_signature.py</span>
+<span class="new">+ pipe_signature/pipe_signature_blueprint.py</span>
+<span class="new">+ pipe_signature/pipe_signature_factory.py</span>
+<span class="new">+ pipe_signature/exceptions.py</span>
+<span class="new">+ pipe_signature/signature_walk.py</span>
+<span class="new">+ builder/pipe/pipe_signature_spec.py</span>
+core/pipes/pipe_blueprint.py
+core/pipes/pipe_abstract.py
+core/bundles/pipelex_bundle_blueprint.py
+core/memory/working_memory_factory.py
+core/registry_models.py
+pipeline/bundle_validator.py <span class="muted">(strict pre-check; post-#956, was pipe_run/dry_run.py)</span>
+pipeline/validate_bundle.py
+pipe_controllers/pipe_controller.py
+builder/pipe/pipe_spec_union.py
+builder/pipe/pipe_spec_map.py
+language/mthds_schema_generator.py
+cli/commands/validate/*
+cli/agent_cli/commands/validate/*
+cli/error_handlers.py
+<span class="new">+ docs/.../pipes/signature-pipes.md</span>
+<span class="new">+ tests/integration/.../pipe_signature/ (5 suites)</span>
+<span class="new">+ tests/e2e/test_signature_validation_*.py</span>
+<span class="new">+ tests/e2e/fixtures/signature_bundles/*.mthds</span>
+<span class="new">+ tests/unit/.../test_pipe_signature_*.py</span>
+</div>
+</div>
+<p class="muted">Built strict-TDD across 7 phases with stop-checkpoints at phases 3, 5, and 6: type-system foundations → blueprint + runtime + factory → spec layer → strict pre-check → CLI surface → real-<code>.mthds</code> E2E → docs &amp; CHANGELOG. Failing tests written first (red) in every phase. <code>make agent-check</code> and <code>make agent-test</code> green throughout.</p>
+
+<h2 style="border-left-color:var(--green)">Merge gate — closed (Phase 7.4 done)</h2>
+<p>This section originally flagged one open item: the bundled <code>plxt</code> JSON Schema (shipped from <code>vscode-pipelex</code>) did not yet know about <code>type = "PipeSignature"</code>, so the branch carried a temporary <code>[[rule]]</code> block in <code>.pipelex/plxt.toml</code> pointing <code>**/*.mthds</code> validation at a locally-regenerated <code>derived/mthds_schema.json</code>. <strong>That gate is now closed</strong> — leaving the history here for context.</p>
+
+<div class="callout note">
+  <span class="lbl">Resolved</span>
+  <p style="margin:8px 0 0"><code>pipelex-tools</code> <strong>0.6.0</strong> (and the matching <code>vscode-pipelex</code> extension) now bundle an MTHDS schema that knows <code>type = "PipeSignature"</code> and requires <code>type</code> on every pipe variant. The branch-local <code>[[rule]]</code> block has been <strong>removed</strong> from both <code>.pipelex/plxt.toml</code> and the <code>pipelex/kit/configs/plxt.toml</code> template (the two are byte-identical again), the <code>pipelex-tools</code> floor in <code>pyproject.toml</code> is bumped to <code>&gt;=0.6.0</code>, and <code>plxt lint</code> validates <code>.mthds</code> against the <em>bundled</em> schema directly — green across the repo, including the <code>signature_bundles/*.mthds</code> fixtures.</p>
+</div>
+
+<p>What the close-out took (Phase 7.4 in the archived plan), now all done:</p>
+<ol class="phases">
+  <li>✅ In <code>vscode-pipelex</code> / <code>pipelex-tools</code> 0.6.0: regenerated the bundled MTHDS schema so <code>PipeSignature</code> is a valid pipe type; cut the <code>plxt</code> / extension release.</li>
+  <li>✅ In this repo: removed the <code>[[rule]]</code> block from <code>.pipelex/plxt.toml</code> <em>and</em> the kit template so the bundled schema takes over again, and bumped the <code>pipelex-tools</code> floor to <code>&gt;=0.6.0</code>.</li>
+  <li>✅ Re-ran <code>make plxt-lint</code> / <code>make agent-check</code> with the bundled <code>plxt</code> 0.6.0 and no local rule — green against the bundled schema, including the signature fixtures. That is the ship-readiness signal.</li>
+</ol>
+
+<h2>Explicit non-goals</h2>
+<ul class="tight muted">
+  <li><strong>Signature concepts</strong> — concept stubs analogous to pipe signatures. Bigger design, separate plan.</li>
+  <li><strong><code>signature_for</code>-driven mocks</strong> — e.g. <code>signature_for = "PipeImgGen"</code> minting a real <code>ImageContent</code> URL. The field is captured today as a tooling hint only; specialization is deferred.</li>
+  <li><strong>Bundle migration</strong> — existing bundles are untouched. Authors opt in.</li>
+  <li><strong>Parallel <code>[signature.foo]</code> TOML table</strong> — possible syntactic sugar later, not a structural alternative.</li>
+</ul>
+
+<footer>
+  Full TDD plan with phase-by-phase checkpoints archived at
+  <code>wip/archive/signature-based-validation-tdd-plan.md</code>.
+  Design rationale &amp; rejected alternatives in <code>wip/signature-based-validation/signature-based-validation.md</code>.
+  Questions → ping me on the PR.
+</footer>
+
+</div>
+</body>
+</html>

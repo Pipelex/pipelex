@@ -14,6 +14,7 @@ from pipelex.types import Self, StrEnum
 class PipeCategory(StrEnum):
     PIPE_OPERATOR = "PipeOperator"
     PIPE_CONTROLLER = "PipeController"
+    PIPE_SIGNATURE = "PipeSignature"
 
     @classmethod
     def value_list(cls) -> list[str]:
@@ -24,7 +25,7 @@ class PipeCategory(StrEnum):
         match self:
             case PipeCategory.PIPE_CONTROLLER:
                 return True
-            case PipeCategory.PIPE_OPERATOR:
+            case PipeCategory.PIPE_OPERATOR | PipeCategory.PIPE_SIGNATURE:
                 return False
 
     @classmethod
@@ -50,6 +51,7 @@ class PipeType(StrEnum):
     PIPE_CONDITION = "PipeCondition"
     PIPE_PARALLEL = "PipeParallel"
     PIPE_SEQUENCE = "PipeSequence"
+    PIPE_SIGNATURE = "PipeSignature"
 
     @classmethod
     def value_list(cls) -> list[str]:
@@ -80,6 +82,8 @@ class PipeType(StrEnum):
                 return PipeCategory.PIPE_CONTROLLER
             case PipeType.PIPE_SEQUENCE:
                 return PipeCategory.PIPE_CONTROLLER
+            case PipeType.PIPE_SIGNATURE:
+                return PipeCategory.PIPE_SIGNATURE
 
 
 class PipeBlueprint(ABC, BaseModel):
@@ -99,6 +103,10 @@ class PipeBlueprint(ABC, BaseModel):
     @property
     def input_names(self) -> list[str]:
         return list(self.inputs.keys()) if self.inputs else []
+
+    @property
+    def is_signature(self) -> bool:
+        return PipeCategory(self.pipe_category) is PipeCategory.PIPE_SIGNATURE
 
     @property
     def pipe_dependencies(self) -> set[str]:

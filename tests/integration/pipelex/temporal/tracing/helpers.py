@@ -2,7 +2,7 @@
 
 import uuid
 from collections import defaultdict
-from collections.abc import AsyncIterator, Iterable, Iterator
+from collections.abc import AsyncGenerator, Generator, Iterable
 from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -34,7 +34,7 @@ from tests.integration.pipelex.temporal.library_crate.helpers import rehydrate_p
 
 
 @contextmanager
-def route_activities_to(queue: str, activity_names: Iterable[str]) -> Iterator[None]:
+def route_activities_to(queue: str, activity_names: Iterable[str]) -> Generator[None, None, None]:
     """Temporarily route the given activity names to ``queue`` via
     ``worker_config.activity_queues``, restoring prior entries on exit.
 
@@ -240,7 +240,7 @@ async def make_split_workers(
     temporal_client: TemporalClient,
     q_router: str,
     q_runner: str,
-) -> AsyncIterator[None]:
+) -> AsyncGenerator[None, None]:
     """Open two scoped workers on two task queues in the current process.
 
     - `q_router`: workflows + `act_flush_trace_events`. We don't use the bare
