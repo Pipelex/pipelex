@@ -140,6 +140,13 @@ class GalleryWithListContent(StructuredContent):
     album_list: ListContent[PhotoAlbumItem]
 
 
+class GalleryWithImageListContent(StructuredContent):
+    """A gallery using ListContent to hold images directly."""
+
+    title: TextContent
+    photos: ListContent[ImageContent]
+
+
 class TestData:
     """Test data for find_nested_image_fields_in_structure_class tests."""
 
@@ -179,4 +186,6 @@ class TestData:
         ("ComplexNestedGallery", ["gallery_entries"]),
         # ListContent with nested images
         ("GalleryWithListContent", ["album_list"]),
+        # ListContent with direct images
+        ("GalleryWithImageListContent", ["photos"]),
     ]

@@ -8,6 +8,7 @@ import pytest
 from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_artefact import StuffArtefact
@@ -54,6 +55,13 @@ class CustomStructuredWithTuple(StructuredContent):
     image_tuple: tuple[ImageContent, ...]
 
 
+class CustomStructuredWithImageListContent(StructuredContent):
+    """Test class with ListContent containing images directly."""
+
+    title: str
+    image_list: ListContent[ImageContent]
+
+
 class TestData:
     """Expected values for render_with_images tests."""
 
@@ -62,6 +70,7 @@ class TestData:
     EXPECTED_MIXED_DICT = "title: Mixed Gallery\nmixed_map: cover: [Image 1]\nnote: Keep this context"
     EXPECTED_NESTED_LIST = "title: Nested Gallery\n[Image 1]\n[Image 2]\n[Image 3]"
     EXPECTED_TUPLE = "title: Tuple Gallery\n[Image 1]\n[Image 2]"
+    EXPECTED_IMAGE_LIST_CONTENT = "title: ListContent Gallery\n[Image 1]\n[Image 2]"
     EXPECTED_IMAGE_RENDERABLE = "text_and_images: Some document text\n[Image 1]\npage_view: [Image 2]"
     EXPECTED_PAGE_CONTENT_ALL = "text_and_images: Page content\n[Image 1]\n[Image 2]\npage_view: [Image 3]"
     EXPECTED_EMPTY_LIST = "title: Empty Gallery"
@@ -158,6 +167,24 @@ class TestStructuredContentRenderWithImages:
         result = content.render_with_images(registry, TextFormat.PLAIN)
 
         assert result == TestData.EXPECTED_TUPLE
+        assert len(registry.images) == 2
+
+    def test_list_content_of_images_extracts_all(self) -> None:
+        """Test that ListContent[ImageContent] is treated as an image collection."""
+        content = CustomStructuredWithImageListContent(
+            title="ListContent Gallery",
+            image_list=ListContent[ImageContent](
+                items=[
+                    ImageContent(url=URLs.png_example_1),
+                    ImageContent(url=URLs.png_example_2),
+                ]
+            ),
+        )
+        registry = ImageRegistry()
+
+        result = content.render_with_images(registry, TextFormat.PLAIN)
+
+        assert result == TestData.EXPECTED_IMAGE_LIST_CONTENT
         assert len(registry.images) == 2
 
     def test_image_renderable_field_delegates_properly(self) -> None:

@@ -7,6 +7,59 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 
 
+def _is_union_type(type_hint: Any) -> bool:
+    """Return True when the annotation is a Union/Optional."""
+    is_typing_union = hasattr(type_hint, "__origin__") and type_hint.__origin__ is typing.Union  # type: ignore[union-attr] # pyright: ignore[reportOptionalMemberAccess]
+    is_types_union = hasattr(types, "UnionType") and isinstance(type_hint, types.UnionType)  # pyright: ignore[reportUnnecessaryIsInstance]
+    return is_typing_union or is_types_union
+
+
+def _get_list_content_item_types(list_content_type: Any) -> tuple[Any, ...]:
+    """Return the item types stored in a ListContent annotation or subclass."""
+    if hasattr(list_content_type, "__pydantic_generic_metadata__"):  # pyright: ignore[reportUnknownArgumentType]
+        generic_metadata = list_content_type.__pydantic_generic_metadata__  # type: ignore[attr-defined]
+        if "args" in generic_metadata:  # pyright: ignore[reportUnnecessaryIsInstance]
+            return tuple(generic_metadata["args"])
+
+    return tuple(getattr(list_content_type, "__args__", ()))
+
+
+def _annotation_contains_images(type_hint: Any) -> bool:
+    """Return True when an annotation contains images directly or indirectly."""
+    if type_hint is Ellipsis or type_hint is type(None):
+        return False
+
+    if _is_union_type(type_hint):
+        union_args = getattr(type_hint, "__args__", ())
+        return any(_annotation_contains_images(arg_type) for arg_type in union_args)
+
+    origin = getattr(type_hint, "__origin__", None)
+    if origin in {list, tuple, dict}:
+        return check_generic_container_for_images(type_hint)
+    if origin is ListContent:
+        return any(_annotation_contains_images(arg_type) for arg_type in getattr(type_hint, "__args__", ()))
+
+    if not isinstance(type_hint, type):
+        return False
+
+    try:
+        if issubclass(type_hint, ImageContent):
+            return True
+        if issubclass(type_hint, ListContent):
+            return any(_annotation_contains_images(arg_type) for arg_type in _get_list_content_item_types(type_hint))
+        if issubclass(type_hint, StuffContent):
+            return bool(
+                search_for_nested_image_fields(
+                    content_class=type_hint,
+                    current_path="",
+                )
+            )
+    except TypeError:
+        return False
+
+    return False
+
+
 def search_for_nested_image_fields(
     content_class: type[StuffContent],
     current_path: str = "",
@@ -31,15 +84,8 @@ def search_for_nested_image_fields(
         field_type = field_info.annotation
 
         # Handle Optional types (Union with None)
-        is_union = False
-        union_args = None
-
-        # Check for typing.Union (typing.Optional)
-        is_typing_union = hasattr(field_type, "__origin__") and field_type.__origin__ is typing.Union  # type: ignore[union-attr] # pyright: ignore[reportOptionalMemberAccess]
-        is_types_union = hasattr(types, "UnionType") and isinstance(field_type, types.UnionType)  # pyright: ignore[reportUnnecessaryIsInstance]
-        if is_typing_union or is_types_union:
-            is_union = True
-            union_args = field_type.__args__  # type: ignore[union-attr]
+        is_union = _is_union_type(field_type)
+        union_args = field_type.__args__ if is_union else None  # type: ignore[union-attr]
 
         potential_types: list[Any] = []
         potential_field_types: list[Any] = []  # Keep track of the full type with generics
@@ -54,11 +100,12 @@ def search_for_nested_image_fields(
             # Get the corresponding field type with full generic info
             current_field_type = potential_field_types[idx]
 
-            # Check if it's a generic container type (list/tuple/dict).
+            # Check if it's a generic container type.
             # Example: list[ImageContent], tuple[ImageContent, ...], dict[str, ImageContent].
-            if hasattr(field_specific_type, "__origin__") and field_specific_type.__origin__ in {list, tuple, dict}:  # type: ignore[union-attr]
+            origin = getattr(field_specific_type, "__origin__", None)
+            if origin in {list, tuple, dict, ListContent}:
                 # Check if this container or its nested contents have images.
-                if check_generic_container_for_images(field_specific_type):
+                if _annotation_contains_images(field_specific_type):
                     paths.append(field_path)
                 continue  # Move to next field after handling generic containers
 
@@ -77,40 +124,12 @@ def search_for_nested_image_fields(
 
                 # Check if it's a ListContent subclass (Pydantic creates actual classes, not generic aliases)
                 if issubclass(field_specific_type, ListContent):
-                    # For ListContent, check if the items have images
-                    # Get the generic argument from Pydantic v2's __pydantic_generic_metadata__
-                    list_item_types = None
-                    if hasattr(field_specific_type, "__pydantic_generic_metadata__"):  # pyright: ignore[reportUnknownArgumentType]
-                        # Pydantic v2 stores generic info as a dict
-                        generic_metadata = field_specific_type.__pydantic_generic_metadata__  # type: ignore[attr-defined]
-                        # generic_metadata is PydanticGenericMetadata which inherits from dict
-                        if "args" in generic_metadata:  # pyright: ignore[reportUnnecessaryIsInstance]
-                            list_item_types = generic_metadata["args"]
-                    elif hasattr(current_field_type, "__args__"):
-                        list_item_types = current_field_type.__args__  # type: ignore[union-attr]
+                    list_item_types = _get_list_content_item_types(field_specific_type)
+                    if not list_item_types and hasattr(current_field_type, "__args__"):
+                        list_item_types = tuple(current_field_type.__args__)  # type: ignore[union-attr]
 
-                    if list_item_types:
-                        has_images_in_list = False
-                        for list_item_type in list_item_types:
-                            if isinstance(list_item_type, type):
-                                try:
-                                    # Check if the item type is ImageContent
-                                    if issubclass(list_item_type, ImageContent):
-                                        has_images_in_list = True
-                                        break
-                                    # Check if the item type has nested images
-                                    if issubclass(list_item_type, StuffContent) and not issubclass(list_item_type, ListContent):
-                                        nested_paths = search_for_nested_image_fields(
-                                            content_class=list_item_type,
-                                            current_path="",
-                                        )
-                                        if nested_paths:
-                                            has_images_in_list = True
-                                            break
-                                except TypeError:
-                                    continue
-                        if has_images_in_list:
-                            paths.append(field_path)
+                    if any(_annotation_contains_images(list_item_type) for list_item_type in list_item_types):
+                        paths.append(field_path)
                     continue
 
                 # If it's a StuffContent subclass (excluding ListContent which we just handled), recurse into it
@@ -142,29 +161,12 @@ def check_generic_container_for_images(container_type: Any) -> bool:
     if not hasattr(container_type, "__origin__"):
         return False
 
-    # Get the args (item types) from the generic
+    origin = getattr(container_type, "__origin__", None)
     container_args = getattr(container_type, "__args__", ())
-    for arg_type in container_args:
-        # Check if arg_type is itself a generic container - recurse!
-        if hasattr(arg_type, "__origin__") and arg_type.__origin__ in {list, tuple, dict}:  # type: ignore[union-attr]
-            if check_generic_container_for_images(arg_type):
-                return True
-        # Check if it's a regular type
-        elif isinstance(arg_type, type):
-            try:
-                # Check if it's directly ImageContent
-                if issubclass(arg_type, ImageContent):
-                    return True
-                # Check if it's a StuffContent that might have nested images
-                if issubclass(arg_type, StuffContent) and not issubclass(arg_type, ListContent):
-                    # Check if this type has nested image fields
-                    nested_paths = search_for_nested_image_fields(
-                        content_class=arg_type,
-                        current_path="",
-                    )
-                    if nested_paths:
-                        return True
-            except TypeError:
-                # Handle edge cases where issubclass fails
-                continue
-    return False
+
+    if origin is dict:
+        if len(container_args) < 2:
+            return False
+        return _annotation_contains_images(container_args[1])
+
+    return any(_annotation_contains_images(arg_type) for arg_type in container_args)
