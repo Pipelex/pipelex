@@ -6,6 +6,7 @@ from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.hub import get_current_library, get_pipe_library
+from pipelex.language.mthds_factory import MthdsFactory
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
@@ -227,9 +228,9 @@ class TestDryRunStrictMode:
             assert "." in entry, f"dep chain entries must be qualified pipe_refs, got: {entry}"
 
     async def test_validate_bundle_strict_fails_on_signature(self) -> None:
-        bundle = _make_bundle_with_signature()
+        mthds_content = MthdsFactory.make_mthds_content(blueprint=_make_bundle_with_signature())
         with pytest.raises(ValidateBundleError) as exc_info:
-            await validate_bundle(blueprints=[bundle])
+            await validate_bundle(mthds_contents=[mthds_content])
         sig_error = exc_info.value.signature_check_error
         assert sig_error is not None
         assert "bundle_strict_domain.bundle_sig_step" in sig_error.signature_refs
@@ -351,8 +352,8 @@ class TestDryRunStrictMode:
         assert long_first.value.dep_paths[sig_pipe.pipe_ref] == longest_chain
 
     async def test_validate_bundle_lenient_passes_on_signature(self) -> None:
-        bundle = _make_bundle_with_signature()
-        result = await validate_bundle(blueprints=[bundle], allow_signatures=True)
+        mthds_content = MthdsFactory.make_mthds_content(blueprint=_make_bundle_with_signature())
+        result = await validate_bundle(mthds_contents=[mthds_content], allow_signatures=True)
         assert "bundle_strict_domain.bundle_sig_step" in result.dry_run_result
         assert "bundle_strict_domain.bundle_seq" in result.dry_run_result
         for entry in result.dry_run_result.values():
