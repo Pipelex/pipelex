@@ -197,6 +197,36 @@
   <p style="margin:8px 0 0">This PR is <strong>Part A</strong> — the in-process consolidation. The design (<code>wip/dry-run-refactor-draft/D-plan.md</code>) also defines <strong>Part B</strong> (move the LIVE/DRY mock down to the cogt leaf so DRY honors the Temporal backend) and <strong>Part C</strong> (run the whole sweep as one standalone Temporal activity). Both are deferred to their own branches — see <a href="#deferred" style="color:var(--accent)">What's deferred</a>.</p>
 </div>
 
+<!-- ─────────────────────────────────  RUN ⟷ VALIDATOR BOUNDARY (D6)  ───────────────────────────────── -->
+<h2>The run ⟷ validator boundary <span class="muted" style="font-size:15px">· clarification (D6)</span></h2>
+<div class="callout note">
+  <div class="lbl">Design note · the run ⟷ validator seam</div>
+  <p style="margin:8px 0 0">A fair question one could raise: <em>shouldn't all those <code>except</code> clauses belong to the run, in the Runner's sense — rather than the validation layer?</em> Resolution (<code>D-plan.md</code> <strong>D6</strong>): the boundary holds — <strong>the validator <em>uses</em> the run</strong> — but the question has a valid kernel worth naming. The error-handling isn't two layers fighting over one home; it's <strong>three altitudes</strong>.</p>
+</div>
+
+<div class="cards">
+  <div class="card" style="border-left:3px solid var(--accent)">
+    <div class="n" style="color:var(--accent)">L1 · RUN PRIMITIVE</div>
+    <h4>Outcome + classification</h4>
+    <p><code>PipeRun.run</code> executes one pipe and <strong>already classifies</strong> its failure — it builds a structured <code>ErrorReport</code> (and <code>WfPipeRun</code> recovers the same one via <code>recover_error_report</code>, so it's backend-symmetric). ← the valid kernel: <em>classification is a run output.</em></p>
+  </div>
+  <div class="card" style="border-left:3px solid var(--green)">
+    <div class="n" style="color:var(--green)">L2 · BUNDLEVALIDATOR</div>
+    <h4>Batch policy over outcomes</h4>
+    <p><code>SKIPPED</code> (a missing cross-package dep — which a LIVE run <em>must</em> hard-fail on; “skipped” is only the <em>sweep's</em> reading of that raise), <code>allowed_to_fail</code>, aggregation, the signature pre-pass. <strong>Irreducibly batch</strong> — moving it into the run rebuilds the god-object D1 rejected and corrupts the strict LIVE contract.</p>
+  </div>
+  <div class="card" style="border-left:3px solid var(--violet)">
+    <div class="n" style="color:var(--violet)">L3 · TRANSLATE</div>
+    <h4>User-facing shaping</h4>
+    <p><code>_translate_to_validate_bundle_error</code> turns the run/load surface into one <code>ValidateBundleError</code> the CLI renders. A presentation concern of the entry point — neither run nor policy.</p>
+  </div>
+</div>
+
+<div class="callout">
+  <div class="lbl">The valid kernel — and why it's deferred, not denied</div>
+  <p style="margin:8px 0 0">The run <strong>discards</strong> the <code>ErrorReport</code> it already computed (it re-raises the raw exception), so <code>BundleValidator</code> re-derives classification with a <em>second</em> <code>try/except</code> + the <code>_root_cause_is</code> <code>__cause__</code>/<code>__context__</code> walk — a real seam smell. The clean fix is <strong>not</strong> “move the excepts into the run”; it's giving the run an outcome-<em>returning</em> sibling (<code>run_to_outcome</code> on <code>PipeRunProtocol</code>, in both <code>PipeRun</code> and <code>WfPipeRun</code>) the validator consumes, with <code>execute_pipeline</code> staying the strict raise-on-failure wrapper. Deferred because the payoff is bounded — <code>ErrorReport</code> is <em>wrapper-wins</em> and collapses the cause chain (a <code>PipeRunError</code> wrapping a <code>PipeNotFoundError</code> reports <code>error_type="PipeRunError"</code>), so the validator would <em>still</em> need the raw chain for <code>SKIPPED</code> — and it reopens the freshly-hardened signature path. Tracked in <code>followup-run-outcome-seam.md</code>.</p>
+</div>
+
 <!-- ─────────────────────────────────  NORTH STAR  ───────────────────────────────── -->
 <h2>The north-star: "a run is a run"</h2>
 <div class="panel">
@@ -651,7 +681,9 @@ sequenceDiagram
   </div>
 </div>
 
-<p class="muted">Design source: <code>wip/dry-run-refactor-draft/D-plan.md</code> (decisions D1–D8). Execution tracker for Part A: <code>TODOS.md</code> (checkpoints A / A2 / B / C, all cleared).</p>
+<p class="muted">A third deferred item is non-backend: the <strong>run-outcome seam</strong> (D6) — have the run <em>return</em> its classified outcome so the validator stops re-catching it. Optional tightening, not a req; see <code>followup-run-outcome-seam.md</code>.</p>
+
+<p class="muted">Design source: <code>wip/dry-run-refactor-draft/D-plan.md</code> (architecture decisions <strong>D1–D6</strong>; eng-review decisions D1–D8 live separately in <code>TODOS.md</code>). Execution tracker for Part A: <code>TODOS.md</code> (checkpoints A / A2 / B / C, all cleared).</p>
 
 <footer>
   <p><strong>PR #956</strong> · <code>refactor(dry-run): consolidate validation into BundleValidator + execution seams</code> · Part A of the dry-run refactor.</p>

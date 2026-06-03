@@ -6,6 +6,9 @@ Execution spine for the in-process dry-run / validation consolidation on branch 
 
 - [`followup-leaf-run-mode-mock.md`](wip/dry-run-refactor-draft/followup-leaf-run-mode-mock.md) — move the LIVE/DRY decision down to the cogt leaf so DRY honors the Temporal backend (D-plan Part B / D4 / req 1).
 - [`followup-temporal-validation-activity.md`](wip/dry-run-refactor-draft/followup-temporal-validation-activity.md) — run validation as a standalone Temporal activity (D-plan Part C / D5 / req 2).
+- [`followup-run-outcome-seam.md`](wip/dry-run-refactor-draft/followup-run-outcome-seam.md) — optional tightening: have the run primitive *return* its classified outcome so `BundleValidator` consumes it instead of re-catching + chain-walking the re-raised exception (D-plan **D6**). Not req-driven.
+
+**Headline change — the validation entry points now delegate to `BundleValidator`.** The public validation surfaces — `validate_bundle` / `validate_bundles_from_directory` (`pipelex/pipeline/validate_bundle.py`) — were rewired in Phase 3a to delegate the per-pipe sweep to `BundleValidator.validate_pipes`. The entry points keep only library lifecycle + `_translate_to_validate_bundle_error` (presentation); per-pipe classification lives in the validator. Tracked under Phase 3a below — pulled up here because it is the conceptual center of the refactor. Boundary affirmed in [`D-plan.md`](wip/dry-run-refactor-draft/D-plan.md) **D6**.
 
 ## Eng-review decisions — 2026-06-01 (`/plan-eng-review`, locked)
 
