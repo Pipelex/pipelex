@@ -3,10 +3,10 @@ from kajson.kajson_manager import KajsonManager
 from pydantic import BaseModel
 
 from pipelex.hub import (
+    clear_current_library,
     get_class_registry,
     get_library_manager,
     set_current_library,
-    teardown_current_library,
 )
 from pipelex.libraries.library_factory import LibraryFactory
 
@@ -36,7 +36,7 @@ class TestHubClassRegistry:
             assert result is workflow_registry
             assert result.has_class(name="ScopedModel")
         finally:
-            teardown_current_library()
+            clear_current_library()
             library_manager.teardown(library_id=library_id)
 
     def test_get_class_registry_library_without_registry_falls_back_to_global(self) -> None:
@@ -50,7 +50,7 @@ class TestHubClassRegistry:
             result = get_class_registry()
             assert result is KajsonManager.get_class_registry()
         finally:
-            teardown_current_library()
+            clear_current_library()
             library_manager.teardown(library_id=library_id)
 
     def test_library_class_registry_not_in_model_dump(self) -> None:
@@ -75,7 +75,7 @@ class TestHubClassRegistry:
         set_current_library(library_id=library_id)
         assert get_class_registry().has_class(name="ScopedModel")
 
-        teardown_current_library()
+        clear_current_library()
         library_manager.teardown(library_id=library_id)
 
         # After teardown, hub falls back to global (which doesn't have ScopedModel)

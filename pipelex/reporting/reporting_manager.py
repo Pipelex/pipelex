@@ -391,4 +391,6 @@ class ReportingManager(ReportingProtocol):
 
     @override
     def close_registry(self, pipeline_run_id: str):
-        self._usage_registries.pop(pipeline_run_id)
+        # Idempotent on miss (mirrors clear_event_log): close_registry runs from sweep / runner
+        # `finally` blocks, where a KeyError from a bare `pop` would mask the in-flight exception.
+        self._usage_registries.pop(pipeline_run_id, None)

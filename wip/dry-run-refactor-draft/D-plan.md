@@ -1,0 +1,264 @@
+# Dry-Run Refactor — Plan (FINALIZED)
+
+> **Status: design finalized 2026-06-01; revised same day (code-grounded review), then expanded same day with the execution-backend dimension (decisions D4–D5).** Decisions **D1–D3** cover the in-process validation consolidation; **D4–D5** add the backend dimension the first cut ignored: *run mode (LIVE/DRY) is orthogonal to execution backend (direct in-process vs Temporal distributed)*. This was driven by three user requirements — (1) DRY must be testable through the **real distributed path** (Temporal workers, no shortcuts; mock at the operation/activity leaf), (2) production pipeline validation runs as a **single standalone Temporal activity** dispatched by the API, (3) direct in-process execution must still work unchanged. The expansion **retires the "DRY → local in-process" shortcut** that `E-parity-gate.md` was written to justify (see the banner there) and splits the work into three parts: **A** in-process consolidation (D1–D3), **B** run-mode/backend orthogonality at the cogt leaf (D4), **C** distributed validation as a Temporal activity (D5). The background docs ([`A-taxonomy.md`](./A-taxonomy.md), [`B-load-profile.md`](./B-load-profile.md), [`C-synthesis.md`](./C-synthesis.md), [`E-parity-gate.md`](./E-parity-gate.md)) remain accurate except where this status note supersedes the parity-gate conclusion.
+
+> **▶ Execution is tracked in [`/TODOS.md`](../../TODOS.md)** (repo-root tracker: checkboxes, status table, mandatory ⛔ checkpoints, per-session handoff blocks). This doc is the **design reference** (the *why*); `TODOS.md` is the **execution spine** (the *do, in order, stop here*). A new session cold-starts from `TODOS.md`. **Line numbers in this doc are indicative** (pinned to the branch state when written) — always **verify by symbol** (grep the function/class), never edit by line number.
+
+## 1. Context
+
+Pipelex executes MTHDS pipelines — graphs of pipes (LLM calls, controllers like sequence/parallel/batch/condition, operators, and `PipeSignature` contracts). DRY mode swaps real LLM/IO calls for mock outputs so a pipeline can be validated end-to-end without spending money or making network calls. The hosted deployment runs LIVE pipelines on Temporal (workflows on remote workers); DRY is meant to stay cheap and in-process.
+
+Today DRY mode has accumulated parallel code paths that do not go through the same orchestration as LIVE, plus a confirmed dead `DryPipeRouter`. This plan consolidates them onto a single execution primitive.
+
+## 2. North-star principle (user-stated)
+
+> "A run is a run, whether it's dry or live or else, it's the SAME THING. The delivery, the preparation, should go through the SAME thing."
+>
+> "Everything should go through the PipelexRunner. Runner protocol. JUST FUCKIN DROP those dry-run functions."
+>
+> "The CLI should ONLY CALL THE PIPELEXRUNNER with the right configuration. There SHOULDN'T BE A dry-run CLI; it should be the RUN cli with a dry mode."
+
+One entry point for *running a pipe* (`PipelexRunner`), `pipe_run_mode=DRY` as the only switch, no bespoke dry-run *execution* functions, no router-level mode dispatch.
+
+## 3. The reframe that drives the design: two operations, not one
+
+The thing the codebase calls "dry-run" is in fact **two distinct operations** wearing one name. Conflating them is what made the north-star feel slippery. Separating them is what makes the consolidation clean.
+
+**A — Execution-dry-run (already through the runner).** `PipelexRunner.execute_pipeline(pipe_run_mode=DRY)` loads the library, builds a `PipeJob`, runs it through `PipeRun → PipeRouter → pipe.run_pipe()` (which dispatches DRY at the pipe level via `PipeAbstract._run_pipe_traced`), optionally delivers/graphs, **raises `PipelineExecutionError` on the first failure**, and tears the library down in `finally`. Single pipe, loads-from-scratch, strict. `pipe_run/dry_run_pipeline.py` (graph path) already does exactly this. **This is the north-star and it already exists.**
+
+**B — Validation-sweep (the bespoke `dry_run.py` path).** `dry_run_pipes(pipes=[...])` takes **already-loaded** `PipeAbstract` objects, shares one library across all of them, and for each pipe mocks inputs + runs DRY **tolerantly**: it collects `SUCCESS / FAILURE / SKIPPED` per pipe, honors `allowed_to_fail_pipes`, skips cross-package unresolved deps (`PipeNotFoundError → SKIPPED`), and does a **single aggregated** signature pre-check across the whole batch *before* running anything. Consumed by `validate --all`, `validate_bundle`, `builder/operations/validate_ops.py`, and the agent CLI. **This is a quality gate, not a run.**
+
+The honest conclusion: a validation sweep is not a run — it is a batch *policy* that *uses* runs. So "drop the dry-run functions and route everything through the runner" is exactly right for the *execution primitive* (A), while the *batch-validation semantics* (B) need a clean, explicit home that **composes** the runner rather than forking it.
+
+## 3.5 The second axis: run mode is orthogonal to execution backend
+
+The first cut treated "dry" as if it implied "local in-process" (the whole point of `E-parity-gate.md` was to justify shortcutting DRY to a local `PipeRun` even under a Temporal hub). **That conflation is wrong and is now retired.** Two independent axes:
+
+- **Run mode** — `LIVE` (real operations) vs `DRY` (mock the operation, e.g. mint a fake LLM result instead of calling the model). Carried on `PipeRunParams.run_mode` (`pipe_run_params.py:138`), serialized inside the `PipeJob` across the worker boundary.
+- **Execution backend** — `direct` (in-process; hub gives `PipeRun`/`PipeRouter` + inline `ContentGenerator`) vs `Temporal` (distributed; hub gives `TemporalPipeRun` → `WfPipeRun`/`WfPipeRouter` workflows + `ContentGeneratorInWorkflow` dispatching `act_llm_gen_*` activities). Chosen by config at boot (`pipelex.py:443-461`, `366-381`), **not** by run mode.
+
+These compose into a matrix, and all four cells must work:
+
+- **direct + LIVE** — in-process, real ops. (today)
+- **direct + DRY** — in-process, mock ops. The CLI/local validation case; req 3.
+- **Temporal + LIVE** — full workflow path, real ops as activities. (today)
+- **Temporal + DRY** — full workflow path, **mock ops at the activity leaf**. req 1 — "dry-run through the same workers, no shortcuts, mock instead of the LLM call." Today this cell is *broken by a shortcut*: the pipe-level dry path hardcodes the inline `ContentGeneratorDry` (`PipeLLM._dry_run_pipe` → `ContentGeneratorDry()`), so DRY never dispatches an activity even under a Temporal hub. **D4 fixes this.**
+
+**Where the LIVE/DRY decision belongs.** Today it is made twice and in the wrong place: at the pipe level (`_run_pipe_traced` → `dry_run_pipe()`) and by swapping in `ContentGeneratorDry` *above* the activity boundary. Per the user's requirement, the decision must move **down to the cogt leaf** — `llm_gen_text` / `llm_gen_object[_list]` / extract / img-gen (`pipelex/cogt/content_generation/`, wrapped by `act_llm_gen_*` etc.). The leaf honors `run_mode`: DRY → mint a mock, LIVE → real call. The content generator (inline vs in-workflow) is then **run-mode-agnostic** — it only decides *where* the leaf runs (here vs in an activity), while the leaf decides *real vs mock*. Result, with no further branching:
+
+- Temporal + DRY → `ContentGeneratorInWorkflow` dispatches `act_llm_gen_text` (as always) → the activity runs `llm_gen_text(run_mode=DRY)` → mock **inside the activity** (so activity scheduling + arg/result serialization are exercised — req 1, "mock inside activities").
+- direct + DRY (and the validation sweep) → inline `ContentGenerator` runs `llm_gen_text(run_mode=DRY)` → mock inline, no activity.
+
+This is **D4** (§4.8). The validation sweep (B) is then just "run the bundle's pipes DRY on the *direct* backend, in-process" — and because that is backend-independent, it can itself be hosted *inside* one Temporal activity for production (**D5**, §4.9) without any pipe re-dispatching through Temporal.
+
+## 4. Finalized design
+
+### Decisions
+
+- **D1 — Architecture.** A first-class `BundleValidator` domain service owns the validation sweep (signature pre-pass, per-pipe loop, tolerant aggregation) and composes the shared execution seam (§4.1 / D2) — the same seam `PipelexRunner` composes for single runs. The runner stays a pure single-pipe execution primitive. (Chosen over "runner absorbs a batch method," which would push `SKIPPED` / `allowed_to_fail` / signature-precheck — all irrelevant to LIVE — into the runner and make it a god-object.)
+- **D2 — Shared execution seam (no flags on the runner).** Decompose `pipeline_run_setup` into two reusable seams — `acquire_library(...)` (set current, open, load dirs/contents/bundle; owns its own load-failure teardown) and `prepare_pipe_job(library_id, pipe_code, ...)` (resolve the pipe, build mock/real working memory, run params, job metadata, crate → a `PipeJob`; **pure**: no telemetry, no pipeline registration, no library mutation). Both the self-contained runner path and `BundleValidator` compose these seams; the runner gains **no** `borrowed_library` method and **no** suppression flags. `BundleValidator` acquires the library **once**, then per pipe calls `prepare_pipe_job` + a **direct, in-process** execution primitive (see D5 — *not* the hub's `get_pipe_run()`, which would be the Temporal runner under a Temporal hub), and owns library teardown once via `try/finally`. (Chosen over threading ≥3 validation-only flags through `execute_pipeline`/`pipeline_run_setup`, which would have branched the monolith and contradicted D1's "keep the runner pure": pipeline-registration, report-registry, and `PIPELINE_EXECUTE/COMPLETE` telemetry are side effects of the single-run *wrapper*, not of building-and-running a job — so the sweep simply never invokes the wrapper, and there is nothing to "suppress." Also avoids reload-per-pipe churn on `validate --all`.)
+- **D3 — Validation model.** The sweep stays **tolerant**: per-pipe `SUCCESS / FAILURE / SKIPPED`, with `SKIPPED` preserved for cross-package unresolved deps and `allowed_to_fail_pipes` kept but **fixed to namespaced `domain.pipe_code` refs** (closing the live bare-code multi-domain-collision `# TODO`). One validation telemetry event, not one per pipe.
+- **D4 — Run mode ⟂ backend; mock at the cogt leaf** (§3.5, §4.8). The LIVE/DRY decision moves out of the pipe level and the pipe-level `ContentGeneratorDry` swap, **down to the cogt leaf** (`llm_gen_*`/extract/img-gen). The leaf honors `run_mode` (DRY → mock, LIVE → real); the content generator (inline `ContentGenerator` vs `ContentGeneratorInWorkflow`) becomes run-mode-agnostic and only decides *where* the leaf runs. This makes DRY honor the configured backend — so DRY-on-Temporal goes through the real workers and mocks **inside** `act_llm_gen_*` (req 1) — and **retires the "DRY → local in-process" shortcut** entirely. (Chosen over keeping the pipe-level inline-mock shortcut, which by construction can never exercise the distributed path.)
+- **D5 — Validation hosting: one in-process service, optionally one Temporal activity** (§4.9). `BundleValidator` is a **self-contained, fully in-process DRY executor** — direct router + inline content generator, never the hub's Temporal components — so the *same* code runs (a) in-process for CLI / local / tests / direct-mode API, and (b) inside a **single standalone Temporal activity** (`act_validate_bundle`) dispatched by the API for production. Per-pipe runs never re-dispatch through Temporal (choice #4 — "in-process within the sweep"); one activity validates the whole bundle. Production dispatch uses a **true standalone activity**, which requires bumping `temporalio` (pinned `1.23.0` predates the feature) and verifying Temporal server/Cloud support (§4.9, §8).
+
+### 4.1 The shared execution seam (extracted from `pipeline_run_setup`)
+
+`PipelexRunner.execute_pipeline(...)` keeps its current public API and behavior — DRY or LIVE, raises `PipelineExecutionError` on failure, owns its library open/teardown and per-run telemetry. It gains **no** `borrowed_library` method, **no** suppression flags, and **no** knowledge of signatures, `allowed_to_fail`, or `SKIPPED`. Instead we factor the *reusable middle* of `pipeline_run_setup` into two seams that both the runner and `BundleValidator` compose:
+
+- **`acquire_library(library_id, library_dirs, mthds_contents, bundle_uris, ...) -> str`.** Sets the current library, opens it, loads dirs + blueprints + bundle into it. Owns its own load-failure teardown (open, then load in a `try`, teardown on failure). This is the "set_current / open_library / load_libraries / load_from_blueprints" block of today's `pipeline_run_setup` (`pipeline_run_setup.py:150-189`).
+- **`prepare_pipe_job(library_id, pipe_code, *, execution_config, pipe_run_mode, inputs=None, graph_context=None, otel_context=None, pipeline_run_id, output_name=None, ...) -> PipeJob`.** Against an already-open library: resolves the pipe (or the bundle's `main_pipe`), builds working memory — generating mock inputs when `execution_config.is_mock_inputs` — resolves run mode, and assembles `PipeRunParams` / `JobMetadata` / `library_crate` into a `PipeJob`. **Pure:** no pipeline-manager registration, no report-registry open, no `PIPELINE_EXECUTE` emission, no library mutation. (Exact signature is settled in Phase 1 and recorded at Checkpoint A.)
+
+`pipeline_run_setup` is then recomposed as a thin wrapper the self-contained runner path uses unchanged: `add_new_pipeline` → `acquire_library` → open graph tracer (if requested) → `prepare_pipe_job` → open report registry + otel trace-start (live) + emit `PIPELINE_EXECUTE` → return. `execute_pipeline`'s `finally` still owns teardown for this path. **Net behavior of the LIVE / self-contained DRY path is identical to today — it is the same code, re-expressed through the seams.**
+
+`BundleValidator` composes the *same* seams without the wrapper: `acquire_library` once, then per pipe `prepare_pipe_job(...)` + a **direct, in-process** execution primitive — a locally-constructed `PipeRun`/`PipeRouter` (or `pipe.run_pipe()` reached through one), explicitly **not** `get_pipe_run()`. Under a Temporal hub `get_pipe_run()` returns `TemporalPipeRun`, which would spawn a workflow *per pipe* (and the sweep itself may already be running inside a Temporal activity, where dispatching a workflow is illegal). The validator must also force the **inline** content generator, not the hub's `ContentGeneratorInWorkflow` (see §4.9 for the mechanism). It owns the single library teardown via `try/finally`. Because it never invokes the runner wrapper, it inherits none of the per-run registration/telemetry — there is nothing to suppress.
+
+> **North-star, refined.** The shared execution *core* is `prepare_pipe_job` → `PipeRouter` → `pipe.run_pipe()` → cogt leaf. `PipelexRunner.execute_pipeline` reaches it via the hub-selected `get_pipe_run()` (so the **backend** — direct or Temporal — is honored; a top-level DRY run on Temporal really runs on the workers, req 1). `BundleValidator` reaches the *same core* via an explicitly-**direct** primitive (so the batch sweep stays in-process and can be hosted in one activity). Both share `pipe.run_pipe()` and the run-mode-aware cogt leaf (D4); they differ only in backend selection and lifecycle (single-run vs batch). This is a stronger realization of "a run is a run" than flag-threading — the execution core is literally shared code — and it keeps run mode orthogonal to backend (§3.5).
+
+### 4.2 `BundleValidator` — the batch validation service (D1)
+
+A first-class service (proposed home: `pipelex/pipeline/bundle_validator.py`, next to the existing `validate_bundle.py`, reusing `_translate_to_validate_bundle_error` as the error-translation boundary). All validation entry points route through it — both batch and single-pipe. Responsibilities, in order:
+
+1. **Acquire the library once** via `acquire_library(...)` (loads dirs / contents / bundle once), inside a `try/finally` that owns teardown for the whole sweep (restore-then-teardown ordering, matching `validate_bundle` today).
+2. **Select pipes to dry-run.** Whole bundle, or the `--pipe` slice via the existing `_pipes_to_dry_run` selector (keeps its `PipeNotFoundError` typo-guard so a misspelled `--pipe` fails loudly).
+3. **Signature pre-pass** (D-plan §4.3). Walk the selected pipes with `collect_signature_refs` / `collect_signature_paths`; if `allow_signatures=False` and any signature is reached, raise the single aggregated `SignaturesNotAllowedError` (longest dep-chain per signature, as today). In strict mode, exclude signature pipes from the sweep itself (validating a signature directly would always trip the check); in lenient mode keep them (they dry-run trivially by minting a mock output). This is the same signature-aware filtering `validate --all` does today, now owned by the service.
+4. **`validate_with_libraries()` pass.** Per selected pipe — this is a static library-wiring check that is *more* than a dry run and the runner's DRY path does not perform it (the runner only triggers `validate_before_run` inside `_run_pipe_traced`). Keeping it here preserves coverage. (It removes today's redundancy where both `validate --all` and `dry_run_pipe` call it.)
+5. **Dry-run sweep.** For each selected pipe, build the job against the open library and run it through the **direct, in-process** primitive (D5) — `prepare_pipe_job(library_id, pipe_code=pipe.code, execution_config=<DRY, is_mock_inputs=True>, pipe_run_mode=DRY, pipeline_run_id=SpecialPipelineId.DRY_RUN_UNTITLED)` then `await direct_pipe_run.run(pipe_job)` (a locally-constructed `PipeRun`, **never** `get_pipe_run()` — see §4.1/§4.9) — classifying the outcome:
+   - success → `SUCCESS`
+   - failure whose `__cause__` chain contains `PipeNotFoundError` (cross-package unresolved dep) → `SKIPPED`. The reclassification must **walk the chain recursively** (a `_root_cause_is(exc, PipeNotFoundError)` helper), *not* check only the top-level exception: post-refactor the error no longer arrives as the bare `PipeNotFoundError` that today's `dry_run_pipe` `except` catches — `PipeRun.run` re-raises the original (`pipe_run.py:99-100`) and the router may add `__cause__` links. Pinned by a cross-package partial-validation test.
+   - any other failure → `FAILURE`, unless the pipe's **namespaced** ref (`pipe.pipe_ref`) is in `allowed_to_fail_pipes`. Catch the project base `PipelexError` from the run (a legitimately broad domain-failure surface — not `except Exception`), classify by cause.
+6. **Aggregate + report.** Build the per-pipe status map, emit one validation telemetry event (`PIPE_DRY_RUN` with `NB_PIPES`, relocated from `_validate_core.py:87`), raise a single aggregated error if there are unexpected failures, else return the result.
+
+Mock inputs are **not** built by the validator — it passes a DRY + `is_mock_inputs=True` execution config and lets `prepare_pipe_job` generate them (§4.5).
+
+### 4.3 `allow_signatures` is a validation gate, not a run parameter
+
+Key finding that simplifies the surface: in DRY, a `PipeSignature` **always** mints its mock output (`PipeSignature._dry_run_pipe`), regardless of `allow_signatures`. The flag changes exactly one thing — whether the **batch pre-check raises**. The per-pipe *run* is identical either way. Therefore `allow_signatures` does **not** ride on `PipeRunParams` or `execute_pipeline`; it is a `BundleValidator` parameter that controls only the pre-pass (§4.2 step 3). This corrects the earlier assumption (old §6) that `allow_signatures` had to thread through the runner alongside `run_mode`.
+
+`ValidateBundleError.signature_check_error` + `handle_signatures_not_allowed_error` (honoring `--traceback`) are preserved: the pre-pass raises `SignaturesNotAllowedError`, the translation boundary wraps it, the CLI renders it.
+
+### 4.4 Tolerant result model (D3)
+
+`DryRunStatus` (`SUCCESS / FAILURE / SKIPPED`) and `DryRunOutput` survive, but **relocate** out of `pipe_run/dry_run.py` into the `BundleValidator` module — they are validation-report types, not execution types. The CLI / builder JSON consumers (`builder/operations/validate_ops.py`, the agent CLI) keep reading the per-pipe status map.
+
+`allowed_to_fail_pipes` stays in `DryRunConfig` + `pipelex.toml`, **migrated to namespaced refs** (`domain.pipe_code`), and the matching in `BundleValidator` keys off `pipe.pipe_ref`, not `pipe.code`. Concretely: `infinite_loop_1` → `failing_pipelines.infinite_loop_1` (defined in `tests/integration/pipelex/pipes/pipelines/failing_pipelines.mthds`); **`pipe_builder` is obsolete and long gone — drop the entry entirely** (no pipe with that code exists in the libraries or fixtures; it is dead config). This is a breaking config change (allowed — no backward-compat requirement) and closes the bare-code collision risk.
+
+### 4.5 Mock inputs flow through the runner
+
+Mock-input generation lives in the `prepare_pipe_job` seam (§4.1): when `execution_config.is_mock_inputs` is true it runs `convert_to_working_memory_format` → `WorkingMemoryFactory.make_mock_inputs` for inputs the caller didn't provide (the logic at `pipeline_run_setup.py:256-272` today). `BundleValidator` therefore stops building working memory itself and simply passes a DRY + `is_mock_inputs=True` execution config. The helper `convert_to_working_memory_format` **relocates** to `WorkingMemoryFactory` (or a `mock_inputs.py` beside it), since `prepare_pipe_job` / the signature runtime — not the deleted `dry_run.py` — are its real owners. (Minor polish: `with_graph_config_overrides` already carries the `mock_inputs` override but is graph-named; consider a clearer `with_overrides`.)
+
+### 4.6 Graph path
+
+- `pipe_run/dry_run_pipeline.py` already routes through the runner (`execute_pipeline(generate_graph=True, mock_inputs=True, DRY)`) and is the sole path used by `graph/graph_rendering.py`. **Keep** it as a thin helper (or inline into `graph_rendering.py`); it is already north-star-compliant.
+- `pipe_run/dry_run_with_graph.py` (`dry_run_pipe_with_graph`, single pre-loaded pipe + graph, direct `pipe.run_pipe()`) has **no consumers** within `pipelex/`. **Delete** it (verify `pipelex-api` and the test tree first).
+
+### 4.7 `convert_stuff_spec_to_typed_named` relocation (unblocks the deletion)
+
+`pipe_signature/pipe_signature.py` imports `convert_stuff_spec_to_typed_named` from `dry_run.py` — a hard dependency from the signature runtime into the module we want to delete. Relocate it alongside `convert_to_working_memory_format` (§4.5) into `WorkingMemoryFactory`, and rewire `pipe_signature.py` + `pipeline_run_setup.py`. This is **step 0** of the migration so `dry_run.py` becomes a deletable leaf.
+
+### 4.8 Leaf-level run-mode mock — DRY honors the backend (D4, Part B)
+
+**The problem.** Today the DRY mock is minted *above* the activity boundary, so it can never travel through the distributed path:
+
+- `PipeAbstract._run_pipe_traced` (`pipe_abstract.py:522-538`) dispatches `dry_run_pipe()` vs `live_run_pipe()` at the pipe level.
+- Each operator's `_dry_run_pipe` hardcodes the inline mock generator — e.g. `PipeLLM._dry_run_pipe` runs its shared body with `content_generator=ContentGeneratorDry()` (`pipe_llm.py:406`), while `_live_run_pipe` uses `get_content_generator()` (the hub's — `ContentGeneratorInWorkflow` under Temporal).
+- So under a Temporal hub, a DRY run **mocks inline and never dispatches `act_llm_gen_*`** — the worker/activity path is bypassed. This is the shortcut req 1 forbids.
+
+**Why the leaf is the right chokepoint (verified).** Both content generators funnel through the *same* assignment → leaf-function pair, differing only in where the leaf runs:
+
+- `ContentGenerator.make_llm_text` (direct, `content_generator.py`) builds an `LLMAssignment` and calls `await llm_gen_text(llm_assignment)` **inline**.
+- `ContentGeneratorInWorkflow.make_llm_text` (`content_generator_in_workflow.py:65`) builds the *same* `LLMAssignment` and `await workflow.execute_activity(act_llm_gen_text, llm_assignment, …)`; `act_llm_gen_text` (`act_llm_generate.py`) calls `await llm_gen_text(llm_assignment)` **inside the activity**.
+
+So `llm_gen_text` / `llm_gen_object` / `llm_gen_object_list` / `img_gen_*` / `extract_gen_pages` / `templating_gen_text` are the single point both paths cross. Put the DRY branch there and it is honored identically inline and in-activity. (`llm_gen_text` calls `get_llm_worker(...)` only *after* the branch, so DRY never needs inference configured — preserving today's "dry works with no API keys.")
+
+**Where `run_mode` rides — carrier decision.** The leaf receives only the assignment, so `run_mode` must be reachable from it. Two options:
+
+- **(recommended) On `JobMetadata`.** `JobMetadata` is *already* a field on every assignment (`LLMAssignment`, `ImgGenAssignment`, `ExtractAssignment`, `TemplatingAssignment`, `RenderPageViewsAssignment`; `ObjectAssignment` via its inner `LLMAssignment`) **and** a parameter of every `ContentGeneratorProtocol` method, and it already serializes across the Temporal boundary. Adding `run_mode` to it is near-zero plumbing: no protocol-signature changes, no new assignment fields, no new activity args. Cost: it duplicates `PipeRunParams.run_mode`, so enforce **single-writer discipline** — `prepare_pipe_job` (or `JobMetadata` construction) sets `JobMetadata.run_mode = pipe_run_params.run_mode` once; `PipeRunParams.run_mode` stays the authoritative switch `_run_pipe_traced` matches on; `JobMetadata.run_mode` is *only* the carrier to the leaf.
+- **(alternative) Explicit field on each assignment.** More honest typing, but touches every `ContentGeneratorProtocol` method signature + every call site + every assignment model. Higher churn for the same effect. Pick this only if overloading `JobMetadata` proves objectionable in review.
+
+**Per-leaf mock inventory** (what each leaf's DRY branch produces — lift from today's `ContentGeneratorDry`):
+
+- `llm_gen_text` → a `"DRY RUN: …"` string **and** a synthetic zero-token `LLMJob` report via `_report_dry_llm_job → get_report_delegate().report_inference_job(...)` (so the runner-side usage-emission path stays observable in dry e2e — keep this).
+- `llm_gen_object` / `llm_gen_object_list` → `DryRunFactory.make_dry_run_factory(...).build()` + synthetic report. **Schema wrinkle (real):** the direct generator mocks from the live `object_class`, but the leaf only has `ObjectAssignment.object_class_schema` (the class can't cross the activity boundary — `make_for_class` ships `model_json_schema()`). To keep ONE mock site, mock from the schema-reconstructed model in both cases — but verify `DryRunFactory`'s constraint detection survives the round-trip (`json_schema_extra={"mock_format": …}` and field `examples` survive in JSON Schema; `Literal` → `enum`; nested models reconstruct). Accept marginally lower fidelity for direct-dry object mocks, or keep a class-based mock in `make_object` for the direct path and a schema-based one at the activity — at the cost of two sites. **Decide in Phase B1; default = single schema-based site + a fidelity test on a representative `StructuredContent`.**
+- `img_gen_*` → fake `ImageContent` (example URL / requested size). `extract_gen_pages` → mock `Page`/`PageContent` list.
+- `templating_gen_text` → **runs the real `check_jinja2_parsing`** then returns a mock string. DRY templating is a *validation*, not a skip — preserve the parse check at the leaf.
+
+**Operators stop swapping generators by mode.** Each *operator*'s `_dry_run_pipe`/`_live_run_pipe` collapses toward one path that uses the hub content generator and threads `run_mode` (via `JobMetadata`) to the leaf. Net per cell: direct+DRY → inline leaf mocks (same result, new path); Temporal+DRY → `act_llm_gen_*` **is dispatched** and the leaf mocks **inside the activity** (req 1 — scheduling + arg/result serialization exercised); LIVE cells unchanged.
+
+**Keep at the pipe level only what has no leaf op:** `PipeSignature._dry_run_pipe` (mints its declared output — no LLM/activity) and the controller dry behavior (controllers orchestrate sub-pipes; the leaves they reach handle DRY). The `_dry_run_pipe` override boundary does **not** disappear — it shrinks to the no-operation cases. Refines §5's "only place `run_mode` should matter": `run_mode` now matters at the **cogt leaf** (operations) **and** at `PipeSignature`/controllers (mock-minting / orchestration with no op).
+
+**`ContentGeneratorDry`'s fate.** Its per-method mock bodies move into the leaf DRY branches (or a shared `cogt/content_generation/dry_mock.py` the leaves call). The boot-time `not needs_inference → ContentGeneratorDry()` fallback (`pipelex.py:366-368`) is re-expressed as "force `run_mode=DRY`" (no inference configured ⇒ everything mocks) so there is one mock path, not a parallel generator class. `DryRunFactory` stays (it's the mock-building engine the leaf calls). **Decide in Phase B2** whether `ContentGeneratorDry` is deleted outright or kept as a thin "force-DRY" facade for the boot fallback.
+
+> **Scope honesty.** This is a real refactor of the operator/cogt dry path (assignments, the four leaf families, every operator's `_dry_run_pipe`, the boot fallback), independent of the validation-sweep consolidation. It is the price of "no shortcuts." Part B is sequenced so it can land on its own and be verified by a Temporal-DRY e2e arm before Part C builds on it.
+
+### 4.9 Distributed validation as a Temporal activity (D5, Part C)
+
+Production flow (req 2): the web app calls the Pipelex API to validate a bundle; the API dispatches the validation to a Temporal worker as a **single standalone activity**; the worker runs the whole sweep in-process and returns the per-pipe status map.
+
+- **`BundleValidator` is backend-independent and self-contained.** It constructs its own **direct** stack — a local `PipeRun`/`PipeRouter` and the **inline** `ContentGenerator` — and runs every pipe DRY in-process (D5, §4.1). It never touches `get_pipe_run()` or `ContentGeneratorInWorkflow`. So the exact same object works in the API process (direct mode), in a CLI/test, or inside an activity.
+- **Why it must force the inline generator.** Inside a Temporal *activity* there is no workflow context, so `ContentGeneratorInWorkflow.execute_activity(...)` is illegal; and even from a workflow we do **not** want each validated pipe to spawn its own activity (choice #4 — in-process within the sweep). The validator therefore runs the inline leaf (which, post-D4, mocks on `run_mode=DRY`).
+- **Mechanism — a content-generator `ContextVar` override (mirror the library pattern).** The operators read the generator from the hub *inside* `_live_run_pipe` (`content_generator or get_content_generator()`), so the override must intercept `get_content_generator()`. The hub already stores the content generator as a plain process-global attribute (`PipelexHub._content_generator`, `set_content_generator`), so a bare `set_content_generator(inline)` swap is **racy** across concurrent activities on one worker. **But the repo already solved this exact problem for the library:** `_library_id: ContextVar` + the `scoped_current_library(library_id)` save/restore context manager (`hub.py:479-514`), with `get_class_registry()` preferring the scoped value. **Recommendation: add the parallel construct for the content generator** — a `_content_generator_override: ContextVar[ContentGeneratorProtocol | None]`, a `scoped_content_generator(generator)` context manager, and make `get_content_generator()` return the override when set, else the hub default. `BundleValidator` (and therefore `act_validate_bundle`) wraps its sweep in `with scoped_content_generator(inline_dry_generator):`. This is coroutine-local (each concurrent activity gets its own value — concurrency-safe), needs no change to operator code, and never touches the serialized `PipeJob`. *(The earlier "thread it through `PipeJob`" idea is wrong: `PipeJob` is the serialized Temporal workflow arg and cannot carry a live generator object.)* *Risk if missed:* the sweep tries to dispatch nested activities/workflows and fails (§8).
+- **`act_validate_bundle` activity.** A thin activity whose body is `BundleValidator.validate(...)`. Inputs (serializable): `mthds_contents` / bundle + `library_dirs`, `allow_signatures`, the optional `--pipe` selection. Output (serializable): the `{pipe_ref: DryRunOutput}` map (+ aggregated signature-check error if any). Wrap with the existing `convert_pipelex_errors` activity-error boundary (`tprl/activity_error_boundary.py`) so failures cross back as structured `ErrorReport`s like other activities.
+- **Standalone dispatch (choice #2).** Dispatched as a **true standalone activity** (no workflow). This requires **bumping `temporalio`** beyond `1.23.0` to a version that supports standalone-activity execution, and verifying our Temporal server / Temporal Cloud version supports it. The SDK bump is a prerequisite task with its own regression surface (it is the same SDK the whole worker/runtime uses) — call it out in Part C and run the full Temporal e2e suite after bumping. *(If the bump proves blocked, the fallback is a minimal one-step wrapper workflow that runs the single `act_validate_bundle` and returns — functionally identical to the caller — but the chosen direction is standalone.)*
+- **API wiring (cross-repo, `pipelex-api`).** The validate route (`pipelex-api/api/routes/pipelex/validate.py` and `build/runner.py`) stops calling `dry_run_pipes` in-process and instead, when Temporal is enabled, dispatches `act_validate_bundle` and awaits the result; in direct mode it calls `BundleValidator` in-process. This supersedes the §7 "let it break on the pin bump" note for `build/runner.py` (that consumer is now actively migrated as part of Part C, not deferred).
+- **Parity.** `E-parity-gate.md`'s evidence (API and worker boot identical registries, user classes loaded per-request from the MTHDS payload) now supports a *different* conclusion: hosting the sweep in-process (API) vs in a worker activity is **correctness-equivalent**, because both load the same bundle per request. The gate's original "so we can shortcut DRY to local" conclusion is retired (D4); its parity evidence is repurposed here.
+
+## 5. What changes — delete / relocate / keep
+
+**Delete**
+
+- `pipe_run/dry_pipe_router.py` (`DryPipeRouter`) — confirmed dead code; mode is a pipe-level concern, not a router-level one.
+- `pipe_run/dry_run_with_graph.py` — no consumers (§4.6).
+- `pipe_run/dry_run.py`'s execution functions `dry_run_pipe` / `dry_run_pipes` — their semantics move into `BundleValidator`. Once the helpers and types relocate, `dry_run.py` is fully removed.
+
+**Relocate**
+
+- `convert_to_working_memory_format`, `convert_stuff_spec_to_typed_named` → `WorkingMemoryFactory` (the `prepare_pipe_job` seam + signature runtime are the real owners).
+- `DryRunStatus`, `DryRunOutput` → `BundleValidator` module (validation-report types).
+
+**Extract (new seams)**
+
+- `acquire_library(...)` and `prepare_pipe_job(...)` out of `pipeline_run_setup` (§4.1 / D2) — composed by both the runner's recomposed `pipeline_run_setup` wrapper and `BundleValidator`.
+
+**Refactor — leaf-level run-mode mock (Part B / D4, §4.8)**
+
+- Carry `run_mode` on the cogt assignments (`assignment_models.py`); make the leaf generators (`llm_gen_*`, extract, img-gen) mock when `run_mode.is_dry`.
+- Collapse each *operator*'s `_dry_run_pipe`/`_live_run_pipe` toward one path that threads `run_mode` to the hub content generator (stop hardcoding `ContentGeneratorDry()`).
+- Fold `ContentGeneratorDry` / `DryRunFactory` mock logic into the leaf DRY branch; re-express the boot-time `not needs_inference` fallback as "force `run_mode=DRY`".
+
+**Add (Part C / D5, §4.9)**
+
+- `act_validate_bundle` Temporal activity (thin wrapper over `BundleValidator.validate`) + standalone dispatch + `temporalio` bump.
+
+**Keep**
+
+- `PipeRouterProtocol`, `PipeRunProtocol`, the Router/Run two-layer split (mirrors the Temporal parent/child workflow shape).
+- The pipe-level `_dry_run_pipe` override boundary, **narrowed by D4** to the cases with no operation to dispatch: `PipeSignature._dry_run_pipe` (mints its declared output) and the controller dry behavior (orchestrate sub-pipes; leaves handle DRY). Operator `_dry_run_pipe` swaps are removed (Part B). `run_mode` now matters at the **cogt leaf** (operations) plus these no-op cases.
+- `pipe_run/dry_run_pipeline.py` — already runner-based (§4.6).
+
+## 6. Migration sequencing (phased)
+
+Three parts, sequenced by dependency and risk. **Part A** (in-process consolidation, D1–D3) is the branch's original goal and lands first — it is independent of where the mock is minted. **Part B** (leaf-level run-mode mock, D4) delivers req 1 and is a separable cogt refactor. **Part C** (Temporal validation activity, D5) delivers req 2 and depends on Part A (`BundleValidator` exists) and benefits from Part B (clean inline leaf mock). Each part ends green; checkpoints mark session-handoff points.
+
+### Part A — In-process validation consolidation (D1–D3, reqs 3)
+
+Ordered to keep every intermediate state compiling and green, given `dry_run.py` is imported by `pipe_signature.py`.
+
+**Phase 0 — Unblock the leaf.** Relocate `convert_to_working_memory_format` + `convert_stuff_spec_to_typed_named` to `WorkingMemoryFactory`; rewire `pipe_signature.py` and `pipeline_run_setup.py`. No behavior change. Run the suite.
+
+**Phase 1 — Extract the execution seams** (§4.1 / D2). Factor `acquire_library(...)` and `prepare_pipe_job(...)` out of `pipeline_run_setup`, then recompose `pipeline_run_setup` as the thin self-contained wrapper on top of them. **Pure refactor — no new capability, no behavior change.** The runner's public API is untouched. Verify the LIVE + self-contained DRY paths are unchanged (existing runner / pipeline tests stay green); add a focused test that `prepare_pipe_job` builds an equivalent `PipeJob` against a pre-opened library.
+
+> **Checkpoint A (after Phase 1).** The seams exist and the self-contained path is recomposed on them with no behavior change; the signature runtime no longer depends on `dry_run.py` (Phase 0); nothing yet composes the seams for batch use — clean handoff point. Update this doc with the final `acquire_library` / `prepare_pipe_job` signatures and any `pipeline_run_setup` shape changes.
+
+**Phase 2 — Build `BundleValidator`** (§4.2, D1/D3/D5). Implement the service composing the seams against a **direct, in-process** primitive: `acquire_library` once → signature pre-pass → `validate_with_libraries` pass → per-pipe `prepare_pipe_job` + `direct_pipe_run.run` loop (a locally-constructed `PipeRun`, **not** `get_pipe_run()`) with `SUCCESS/FAILURE/SKIPPED` classification (recursive `__cause__` walk for the `PipeNotFoundError → SKIPPED` case), namespaced `allowed_to_fail`, single `PIPE_DRY_RUN` telemetry event, `try/finally` library teardown. Build it behind no callers yet, against the still-present `dry_run.py`. **Verify** a direct DRY run with no `delivery_assignment` and no opened tracer needs no open report registry — if it does, open **one** lightweight per-sweep registry (§8). Relocate `DryRunStatus` / `DryRunOutput`. Port `tests/unit/pipelex/pipe_run/test_dry_run.py` onto the service.
+
+**Phase 3 — Migrate the callers.** Point `validate_bundle` / `validate_bundles_from_directory`, both CLI `_validate_core.py` files, `builder/operations/validate_ops.py`, and `builder/operations/runner_code_ops.py` at `BundleValidator`. Rewire the **tests that import soon-to-be-deleted symbols** (`dry_run_pipe` / `dry_run_pipes` / `DryRunStatus` / `convert_to_working_memory_format`) onto the new surfaces: `tests/integration/pipelex/pipe_signature/test_dry_run_strict_mode.py`, `.../test_pipe_signature.py`, `tests/integration/pipelex/pipes/controller/pipe_sequence/test_pipe_sequence_dry_run.py`, `.../test_pipe_sequence_list_output_bug.py`, `tests/e2e/test_signature_validation_mthds.py`. Migrate `pipelex.toml`'s `allowed_to_fail_pipes` to namespaced refs (`infinite_loop_1` → `failing_pipelines.infinite_loop_1`; **delete the obsolete `pipe_builder` entry**). Verify the single-pipe `validate <pipe>` / `--pipe` slice and the friendly `SignaturesNotAllowedError` rendering still fire.
+
+> **Checkpoint B (after Phase 3).** All validation traffic now goes through `BundleValidator` → the shared seam; `dry_run.py`'s execution functions are unreferenced *inside this repo* (the external `pipelex-api` consumer is handled separately — §7). Re-run the signature e2e + integration suites (`tests/e2e/test_signature_validation_mthds.py`, `tests/integration/pipelex/pipe_signature/*`) and the full `make agent-test`. This is the natural place to split into a fresh session if context has grown.
+
+**Phase 4 — Delete dead code.** Remove `dry_pipe_router.py`, `dry_run_with_graph.py`, and the now-unreferenced `dry_run.py`. Settle `dry_run_pipeline.py` (keep thin or inline into `graph_rendering.py`). Final `make agent-check` + `make agent-test`.
+
+> **Checkpoint C (after Part A).** The in-process consolidation is complete and the branch's original goal is met. DRY still mocks at the pipe level (pre-D4) — that's fine; Part B changes *where* the mock is minted, not the validation outcomes. Natural point to ship Part A on its own if desired, then open a fresh session for Part B.
+
+### Part B — Run-mode/backend orthogonality at the cogt leaf (D4, req 1)
+
+A separable cogt/operator refactor (§4.8). Can run independently of Part A, but is described after it because Part C builds on both.
+
+**Phase B1 — Thread `run_mode` to the leaf, add the leaf DRY branch.** Carry `run_mode` on `JobMetadata` (§4.8 carrier decision; single-writer from `prepare_pipe_job`/`PipeRunParams`). Add the DRY branch to each leaf (`llm_gen_text` / `llm_gen_object` / `llm_gen_object_list` / `img_gen_*` / `extract_gen_pages` / `templating_gen_text`), lifting the mock bodies from `ContentGeneratorDry` into the leaves (or a shared `dry_mock.py`): the `"DRY RUN: …"` string + `_report_dry_llm_job`, the `DryRunFactory` object build, the fake image/pages, and the preserved `check_jinja2_parsing` for templating. Settle the **object-mock-from-schema** question (§4.8 — default: single schema-based site + a fidelity test on a representative `StructuredContent`). Keep operators calling `ContentGeneratorDry` for now — no behavior change yet; unit-test each leaf DRY branch directly (incl. the synthetic report fires and needs an open report registry — see §8).
+
+**Phase B2 — Collapse the operator dry path.** Remove the pipe-level `ContentGeneratorDry()` swap from each operator's `_dry_run_pipe` (`PipeLLM` `:406`, plus `PipeImgGen`/`PipeExtract`/`PipeOcr`/templating operators); route DRY through the hub content generator with `run_mode` threaded via `JobMetadata`. Re-express the boot-time `not needs_inference` fallback (`pipelex.py:366-368`) as force-`run_mode=DRY`; decide `ContentGeneratorDry`'s disposition (delete vs thin force-DRY facade). `PipeSignature` and controllers keep their pipe-level dry behavior. Verify **direct + DRY** results are unchanged (full `make agent-test`).
+
+> **Checkpoint D (after Phase B2).** Direct DRY is re-expressed through the leaf with identical outcomes; the Temporal cell is not yet verified. Update this doc with the final assignment/`run_mode` shape and `ContentGeneratorDry` disposition.
+
+**Phase B3 — Verify Temporal + DRY end-to-end.** With a Temporal server (per the `temporal-e2e-validate` topology), run a pipeline `run_mode=DRY` and assert: `act_llm_gen_*` (and extract/img-gen activities) **are dispatched** and **mock inside the activity**; LibraryCrate propagation, cross-process serialization, and graph tracing behave as in LIVE; no real LLM/IO occurs. Add a DRY arm to the Temporal e2e suite. **This is the req-1 acceptance gate.**
+
+> **Checkpoint E (after Part B).** Run mode is now orthogonal to backend across all four cells. Foundation for Part C is in place.
+
+### Part C — Distributed validation as a Temporal activity (D5, req 2)
+
+Depends on Part A (`BundleValidator`) and Part B (inline leaf mock). Cross-repo (`pipelex-api`).
+
+**Phase C0 — Bump `temporalio` + verify standalone-activity support.** Upgrade the SDK beyond `1.23.0` to a version supporting standalone activities; verify our Temporal server / Cloud version supports it. Run the **full** Temporal e2e suite after the bump (the SDK underpins the whole worker/runtime — treat this as a self-contained, separately-reviewable step). If blocked, fall back to the one-step wrapper-workflow dispatch (§4.9) and note it here.
+
+**Phase C1 — `scoped_content_generator` + `act_validate_bundle`.** Add the `_content_generator_override` `ContextVar` + `scoped_content_generator(...)` context manager mirroring `_library_id`/`scoped_current_library` (`hub.py:479-514`), and make `get_content_generator()` prefer the override. Have `BundleValidator` wrap its sweep in `with scoped_content_generator(inline_dry_generator):` so per-pipe runs use the inline leaf and never dispatch nested activities (concurrency-safe across concurrent activities — §4.9). Then wrap `BundleValidator.validate` as a standalone activity (`tprl_pipe/act_validate_bundle.py`) with `convert_pipelex_errors`. Test: a worker runs the activity; assert zero activity/workflow dispatches occur during the sweep (§8 nested-dispatch risk) and that concurrent invocations don't cross-contaminate the override.
+
+**Phase C2 — API dispatch (cross-repo).** In `pipelex-api`, switch the validate route + `build/runner.py` to dispatch `act_validate_bundle` when Temporal is enabled, and call `BundleValidator` in-process otherwise. Removes the last `dry_run_pipes` consumer (supersedes the §7 deferral). Test both backends against the API.
+
+> **Checkpoint F (after Part C).** All three requirements met: direct in-process (req 3), distributed DRY testing with activity-level mocks (req 1), production validation as a standalone Temporal activity (req 2).
+
+## 7. Out of scope (follow-ups)
+
+- ~~`pipelex-api` consumer migration as a deferred follow-up~~ — **now in scope as Part C / Phase C2** (the API route is actively migrated to dispatch `act_validate_bundle`, removing the `dry_run_pipes` consumer rather than letting it break on a pin bump). Note for sequencing: if Part A ships *before* Part C, then between them `pipelex-api`'s `build/runner.py:64` still imports the (now-deleted) `dry_run_pipes` and would break on its next `pipelex` pin bump — so either land Part C in the same release train, or temporarily keep a `dry_run_pipes` shim until C2.
+- API endpoint unification (`/validate` + `/execute` → `/run` in `pipelex-api`).
+- CLI artifact dedup — `_run_core.py` now gates artifact writing via `save_main_stuff` / `save_working_memory` against an `output_path`, in two copies (main + agent CLI). Re-scope before touching.
+- Renaming `WfPipeRouter` / `WfPipeRun` for clarity ([`A-taxonomy.md` §6 smell #1](./A-taxonomy.md#section-6-smells-and-inconsistencies)).
+
+## 8. Invariants & risks
+
+- **Parity invariant, repurposed** ([`E-parity-gate.md`](./E-parity-gate.md)): the API process and the Temporal worker register identical class registries (user concept classes loaded per-request from the MTHDS payload, not at boot). The original conclusion ("so route DRY to a local run even under a Temporal hub") is **retired** (D4 — DRY now honors the backend). The same evidence now supports D5: hosting the validation sweep in-process (API) vs in a worker activity is **correctness-equivalent**. Re-opens only if one side gains a boot-time library preload the other lacks.
+- **Load profile is safe in-process** ([`B-load-profile.md`](./B-load-profile.md)): a dry run is CPU-cheap (Pydantic + Jinja2), no network, no disk — fine to loop in the validation sweep (and cheap enough to host the whole sweep in one activity).
+- **Report-delegate registry — confirmed needed (not just a maybe).** DRY is **not** report-silent: the LLM leaf's DRY branch emits a synthetic zero-token job (`_report_dry_llm_job → get_report_delegate().report_inference_job(...)`, lifted from `ContentGeneratorDry`). So `BundleValidator`, running each pipe through a direct `PipeRun.run`, *will* hit the report delegate. It must open **one** report registry per *sweep* (single open/clear, discard contents — validation doesn't surface usage), never per pipe. Covered by a test asserting exactly one `PIPE_DRY_RUN` event per sweep and **no** stray `PIPELINE_EXECUTE`/`PIPELINE_COMPLETE`. (If we'd rather validation be fully report-silent, gate `_report_dry_llm_job` on a "report synthetic dry usage" flag that the sweep turns off and the runner-emission e2e turns on — decide in Phase B1/B2.)
+- **Risk — object-mock fidelity from schema (Part B / Phase B1).** Moving the object mock to the leaf means building it from `ObjectAssignment.object_class_schema` (JSON Schema), not the live class (the class can't cross the activity boundary). `DryRunFactory`'s `mock_format`/`examples`/`Literal`/nested-model detection mostly survives the schema round-trip, but not provably for every structured output. Pin with a fidelity test on a representative `StructuredContent`; if a class relies on signals lost in JSON Schema, either enrich the schema or accept a two-site mock (class-based direct, schema-based activity).
+- **Risk — `SKIPPED` classification.** Routing through `PipeRun.run` no longer surfaces a bare `PipeNotFoundError`: the run layer re-raises the original (`pipe_run.py:99-100`) and the router may add `__cause__` links. `BundleValidator` must **walk the `__cause__` chain recursively** to re-classify a cross-package unresolved dep as `SKIPPED`, not just check the top-level exception — otherwise partial-bundle validation regresses to hard failure. Covered by a cross-package partial-validation test.
+- **Risk — nested-dispatch from the validation sweep (D5/Part C).** If `BundleValidator` fails to force the **inline** content generator and direct runner, then under a Temporal hub its per-pipe runs would try to dispatch activities/workflows — illegal from inside the `act_validate_bundle` activity, and a per-pipe workflow explosion even from a workflow. The inline-generator mechanism (§4.9) is load-bearing; cover with a test that runs the sweep with a Temporal-enabled hub and asserts zero activity/workflow dispatches occur during the sweep.
+- **Risk — `temporalio` bump regression surface (Part C / Phase C0).** Standalone activities need an SDK beyond `1.23.0`; that SDK underpins the entire worker/runtime, so the bump can perturb LIVE Temporal execution. Gate it behind a full Temporal e2e pass before building C1. Fallback: wrapper-workflow dispatch (§4.9).
+- **Risk — req-1 fidelity regressions (Part B / Phase B3).** Moving the mock to the leaf changes the DRY code path for every operator. The acceptance gate is the Temporal+DRY e2e arm asserting activities are dispatched and mock internally with no real IO; also re-run direct+DRY to confirm identical validation outcomes (Checkpoint D).

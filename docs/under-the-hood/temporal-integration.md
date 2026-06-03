@@ -152,7 +152,7 @@ Each `WfPipeRouter.run()` creates its own scoped state:
 
 3. **ClassRegistry lookup chain**: `hub.get_class_registry()` reads `_library_id` from the `ContextVar`, gets the library's attached `ClassRegistry`. Falls back to the global registry if no library is set.
 
-4. **Cleanup**: `library_manager.teardown(library_id)` deletes the library and its `ClassRegistry`. The `ContextVar` is reset via `teardown_current_library()`. No manual GC needed — the `ClassRegistry` is garbage-collected with the `Library`.
+4. **Cleanup**: `library_manager.teardown(library_id)` deletes the library and its `ClassRegistry`. The `ContextVar` is reset via `clear_current_library()`. No manual GC needed — the `ClassRegistry` is garbage-collected with the `Library`.
 
 ### Kajson integration
 

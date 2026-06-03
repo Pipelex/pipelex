@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PR Story — Dry-Run Consolidation: BundleValidator + Execution Seams</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #181b24;
+    --panel-2: #1f2330;
+    --ink: #e8eaf0;
+    --muted: #9aa3b6;
+    --line: #2c3142;
+    --accent: #6ea8fe;
+    --green: #5fd38f;
+    --amber: #f0c060;
+    --red: #f08a8a;
+    --violet: #b89cf0;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 56px 28px 120px; }
+  header.hero { border-bottom: 1px solid var(--line); padding-bottom: 32px; margin-bottom: 40px; }
+  .eyebrow { font: 600 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+  h1 { font-size: 34px; line-height: 1.2; margin: 14px 0 10px; letter-spacing: -.01em; }
+  .sub { color: var(--muted); font-size: 17px; max-width: 760px; }
+  .meta { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    font: 600 12px/1 var(--mono); padding: 6px 10px; border-radius: 999px;
+    background: var(--panel-2); border: 1px solid var(--line); color: var(--muted);
+  }
+  .chip.a { color: var(--accent); border-color: #2f4368; }
+  .chip.g { color: var(--green); border-color: #2c5340; }
+  h2 {
+    font-size: 22px; margin: 56px 0 16px; letter-spacing: -.01em;
+    padding-left: 12px; border-left: 3px solid var(--accent);
+  }
+  h3 { font-size: 16px; margin: 28px 0 10px; color: var(--ink); }
+  p { margin: 12px 0; }
+  .muted { color: var(--muted); }
+  strong { color: #f3f5fa; }
+  code {
+    font: 13.5px/1.5 var(--mono); background: var(--panel-2);
+    padding: 1.5px 6px; border-radius: 5px; border: 1px solid var(--line);
+  }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 20px 22px; margin: 18px 0;
+  }
+  .callout {
+    border-left: 3px solid var(--amber); background: var(--panel);
+    border-radius: 0 10px 10px 0; padding: 14px 18px; margin: 18px 0;
+  }
+  .callout.bug { border-left-color: var(--red); }
+  .callout.note { border-left-color: var(--accent); }
+  .callout.win { border-left-color: var(--green); }
+  .callout .lbl { font: 600 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--amber); }
+  .callout.bug .lbl { color: var(--red); }
+  .callout.note .lbl { color: var(--accent); }
+  .callout.win .lbl { color: var(--green); }
+
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 18px 0; }
+  .cards.two { grid-template-columns: repeat(2, 1fr); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+  .card .n { font: 700 13px/1 var(--mono); color: var(--accent); }
+  .card h4 { margin: 8px 0 6px; font-size: 15px; }
+  .card p { margin: 0; font-size: 14px; color: var(--muted); }
+
+  .figure { margin: 22px 0; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+  .figure .mermaid { display: flex; justify-content: center; }
+  .figcap { color: var(--muted); font-size: 13px; margin-top: 12px; text-align: center; }
+
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13.5px; }
+  th, td { text-align: left; padding: 9px 11px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font: 600 11px/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  td .dot { font-weight: 700; }
+  .dot.g { color: var(--green); }
+  .dot.a { color: var(--amber); }
+  .dot.r { color: var(--red); }
+  tbody tr:hover { background: var(--panel); }
+
+  .diff {
+    background: #11141c; border: 1px solid var(--line); border-radius: 10px;
+    overflow-x: auto; margin: 14px 0; font: 12.5px/1.7 var(--mono);
+  }
+  .diff .fname {
+    padding: 8px 14px; border-bottom: 1px solid var(--line);
+    color: var(--muted); background: var(--panel-2); font-weight: 600;
+  }
+  .diff pre { margin: 0; padding: 12px 14px; }
+  .diff .add { color: var(--green); display: block; }
+  .diff .del { color: var(--red); display: block; }
+  .diff .ctx { color: #8b93a7; display: block; }
+  .diff .hdr { color: var(--accent); display: block; }
+  .diff .cmt { color: #7a8195; }
+
+  ul.tight { margin: 10px 0; padding-left: 22px; }
+  ul.tight li { margin: 6px 0; }
+  ol.phases { margin: 10px 0; padding-left: 22px; }
+  ol.phases li { margin: 7px 0; }
+  .files { columns: 2; column-gap: 26px; font: 12.5px/1.9 var(--mono); color: var(--muted); }
+  .files .new { color: var(--green); }
+  .files .del { color: var(--red); }
+
+  details { margin: 14px 0; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); overflow: hidden; }
+  details > summary {
+    cursor: pointer; padding: 13px 18px; font: 600 14px/1.3 -apple-system, sans-serif;
+    background: var(--panel-2); list-style: none; user-select: none;
+  }
+  details > summary::-webkit-details-marker { display: none; }
+  details > summary::before { content: "▸ "; color: var(--accent); font-family: var(--mono); }
+  details[open] > summary::before { content: "▾ "; }
+  details > summary:hover { color: var(--accent); }
+  details .body { padding: 4px 20px 16px; }
+
+  .tabs { margin: 18px 0; }
+  .tab-bar { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid var(--line); margin-bottom: 0; }
+  .tab-btn {
+    font: 600 12.5px/1 var(--mono); padding: 9px 14px; cursor: pointer;
+    background: transparent; border: none; border-bottom: 2px solid transparent; color: var(--muted);
+  }
+  .tab-btn:hover { color: var(--ink); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-panel { display: none; padding: 6px 2px; }
+  .tab-panel.active { display: block; }
+
+  .kbd { font: 600 12px/1 var(--mono); color: var(--violet); }
+  footer { margin-top: 70px; padding-top: 24px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+  @media (max-width: 720px) {
+    .cards, .cards.two { grid-template-columns: 1fr; }
+    .files { columns: 1; }
+  }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: "dark",
+    themeVariables: {
+      background: "#181b24", primaryColor: "#1f2330", primaryTextColor: "#e8eaf0",
+      primaryBorderColor: "#2c3142", lineColor: "#6ea8fe", fontFamily: "ui-monospace, monospace",
+      fontSize: "13px"
+    },
+    flowchart: { curve: "basis", htmlLabels: true }
+  });
+  function showTab(group, idx, btn) {
+    document.querySelectorAll('[data-tabgroup="' + group + '"] .tab-btn').forEach((b, i) => b.classList.toggle('active', i === idx));
+    document.querySelectorAll('[data-tabgroup="' + group + '"] .tab-panel').forEach((p, i) => p.classList.toggle('active', i === idx));
+  }
+</script>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">Pull Request Story · #956</div>
+  <h1>Dry-Run Consolidation</h1>
+  <p class="sub">Four parallel dry-run code paths (plus a confirmed dead router) collapse into one first-class <code>BundleValidator</code> service composed over a shared <code>acquire_library</code> / <code>prepare_pipe_job</code> execution seam. Validation stops forking the runner — it now <em>composes the same execution core</em> a real run uses.</p>
+  <div class="meta">
+    <span class="chip a">branch · feature/Validate-with-signatures-4-fix-dry-run</span>
+    <span class="chip">base · feature/Validate-with-signatures-3 (stacked)</span>
+    <span class="chip g">Part A of 3 · in-process consolidation</span>
+    <span class="chip">~4.9k +/− · 70 files</span>
+  </div>
+</header>
+
+<!-- ─────────────────────────────────  TL;DR  ───────────────────────────────── -->
+<h2>TL;DR</h2>
+<div class="cards">
+  <div class="card">
+    <div class="n">THE PROBLEM</div>
+    <h4>Four doors to one room</h4>
+    <p>DRY mode had grown <code>dry_run.py</code>, <code>dry_run_with_graph.py</code>, <code>dry_pipe_router.py</code> and a pile of bespoke setup — each bypassing the real <code>PipelexRunner</code> orchestration. <code>DryPipeRouter</code> was dead code.</p>
+  </div>
+  <div class="card">
+    <div class="n">THE INSIGHT</div>
+    <h4>It's two operations, not one</h4>
+    <p>"Dry-run" was secretly <strong>two</strong> things wearing one name: a single-pipe <em>execution</em> (already the runner's job) and a tolerant batch <em>validation sweep</em> (a quality gate that <em>uses</em> runs).</p>
+  </div>
+  <div class="card">
+    <div class="n">THE FIX</div>
+    <h4>Compose, don't fork</h4>
+    <p>A new <code>BundleValidator</code> owns the sweep and <em>composes</em> the shared execution seam — the exact same core the runner reaches. The runner stays a pure single-pipe primitive with zero validation flags bolted on.</p>
+  </div>
+</div>
+
+<div class="callout note">
+  <div class="lbl">Scope</div>
+  <p style="margin:8px 0 0">This PR is <strong>Part A</strong> — the in-process consolidation. The design (<code>wip/dry-run-refactor-draft/D-plan.md</code>) also defines <strong>Part B</strong> (move the LIVE/DRY mock down to the cogt leaf so DRY honors the Temporal backend) and <strong>Part C</strong> (run the whole sweep as one standalone Temporal activity). Both are deferred to their own branches — see <a href="#deferred" style="color:var(--accent)">What's deferred</a>.</p>
+</div>
+
+<!-- ─────────────────────────────────  NORTH STAR  ───────────────────────────────── -->
+<h2>The north-star: "a run is a run"</h2>
+<div class="panel">
+  <p style="margin-top:0" class="muted">The whole refactor is anchored on a user-stated principle:</p>
+  <p style="font-size:17px; color:var(--ink); border-left:3px solid var(--violet); padding-left:16px; margin:0">
+    “A run is a run, whether it's dry or live — it's the <strong>same thing</strong>. The delivery, the preparation, should go through the <strong>same thing</strong>. Everything should go through the <code>PipelexRunner</code>. <strong>Just drop those dry-run functions.</strong>”
+  </p>
+</div>
+<p>Taken literally that says "delete the dry-run functions and route everything through the runner." But a validation sweep is <em>tolerant</em> (collect <code>SUCCESS/FAILURE/SKIPPED</code>, honor <code>allowed_to_fail</code>, skip cross-package gaps) and the runner is <em>strict</em> (raise on first failure). You can't make one method be both without turning the runner into a god-object. The reframe below is what made the north-star achievable without that compromise.</p>
+
+<!-- ─────────────────────────────────  THE REFRAME  ───────────────────────────────── -->
+<h2>The reframe that drives the design</h2>
+<div class="cards two">
+  <div class="card" style="border-left:3px solid var(--accent)">
+    <div class="n" style="color:var(--accent)">A · EXECUTION-DRY-RUN</div>
+    <h4>Already through the runner</h4>
+    <p><code>PipelexRunner.execute_pipeline(pipe_run_mode=DRY)</code> — one pipe, loads from scratch, <strong>raises on first failure</strong>, owns its library teardown. This is the north-star and it already existed. We don't touch its public behavior.</p>
+  </div>
+  <div class="card" style="border-left:3px solid var(--green)">
+    <div class="n" style="color:var(--green)">B · VALIDATION-SWEEP</div>
+    <h4>The bespoke <code>dry_run.py</code> path</h4>
+    <p>Takes <strong>already-loaded</strong> pipes, shares one library, runs each DRY <strong>tolerantly</strong>, does a single aggregated signature pre-check. This is a quality gate, <em>not</em> a run — it needs its own explicit home.</p>
+  </div>
+</div>
+<p>The honest conclusion: <strong>a validation sweep is not a run — it's a batch <em>policy</em> that <em>uses</em> runs.</strong> So "route everything through the runner" is exactly right for the execution primitive (A), while the batch semantics (B) need a clean home that <em>composes</em> the runner instead of forking it. That home is <code>BundleValidator</code>.</p>
+
+<!-- ─────────────────────────────────  BEFORE / AFTER  ───────────────────────────────── -->
+<h2>Before &amp; after</h2>
+
+<div class="tabs" data-tabgroup="ba">
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="showTab('ba',0,this)">Before — four parallel paths</button>
+    <button class="tab-btn" onclick="showTab('ba',1,this)">After — one seam, two composers</button>
+  </div>
+  <div class="tab-panel active">
+    <div class="figure">
+      <div class="mermaid">
+flowchart TD
+    subgraph callers["validate callers"]
+      VA["validate --all"]
+      VB["validate_bundle"]
+      AG["agent CLI validate"]
+      BO["builder validate_ops / runner_code_ops"]
+    end
+    VA --> DR["dry_run_pipes()"]
+    VB --> DR
+    AG --> DRP["dry_run_pipe()"]
+    BO --> DR
+    DR --> SETUP["bespoke library setup<br/>+ mock inputs<br/>(duplicated in each caller)"]
+    DRG["dry_run_with_graph.py<br/>(no consumers)"]:::dead
+    DPR["DryPipeRouter<br/>(never instantiated)"]:::dead
+    SETUP --> RUN["pipe.run_pipe(DRY)"]
+    classDef dead fill:#2a1a1f,stroke:#f08a8a,color:#f08a8a;
+      </div>
+      <div class="figcap">Each caller hand-rolled its own library open / load / mock-input setup, then funneled into <code>dry_run_pipe(s)</code> — none of which shared a path with the real runner. Two modules were outright dead.</div>
+    </div>
+  </div>
+  <div class="tab-panel">
+    <div class="figure">
+      <div class="mermaid">
+flowchart TD
+    subgraph seam["execution_seams.py — the shared core"]
+      AL["acquire_library()<br/>open + load dirs/blueprints<br/>owns load-failure teardown"]
+      PJ["prepare_pipe_job()<br/>working memory + mock inputs<br/>run params + crate → PipeJob<br/><i>pure: no telemetry/registry</i>"]
+    end
+    RUNNER["PipelexRunner.execute_pipeline<br/>(single run · strict · LIVE or DRY)"] --> WRAP["pipeline_run_setup<br/>(thin wrapper)"]
+    WRAP --> AL
+    WRAP --> PJ
+    BV["BundleValidator<br/>(batch sweep · tolerant)"] --> AL
+    BV --> PJ
+    BV --> DPR["direct in-process PipeRun<br/>(NOT get_pipe_run)"]
+    classDef seamcls fill:#16241a,stroke:#5fd38f,color:#cfeede;
+    class AL,PJ seamcls;
+      </div>
+      <div class="figcap">Both the runner's thin <code>pipeline_run_setup</code> wrapper and <code>BundleValidator</code> compose the <em>same two seams</em>. The runner gains no flags; the validator gains no fork. "A run is a run" is now literal shared code.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────────────────────  THE SEAMS  ───────────────────────────────── -->
+<h2>The shared execution seam (D2)</h2>
+<p>The reusable middle of <code>pipeline_run_setup</code> was factored into two building blocks in <code>pipelex/pipeline/execution_seams.py</code>. The key discipline: <code>prepare_pipe_job</code> is <strong>pure</strong> — it builds a job and nothing else (no pipeline-manager registration, no report-registry open, no telemetry, no library mutation). Those side effects are properties of the single-run <em>wrapper</em>, not of building-and-running a job — which is exactly why the sweep can skip them with nothing to "suppress."</p>
+
+<div class="cards two">
+  <div class="card">
+    <div class="n">acquire_library(...)</div>
+    <h4>Set current → open → load</h4>
+    <p>Loads dirs + blueprints into a fresh library. Owns its <strong>own</strong> load-failure teardown (restore the caller's outer current-library, then tear the just-opened one down) so a failed load never leaks a <code>Library</code>. Returns <code>(library_id, qualified_main_pipe)</code>.</p>
+  </div>
+  <div class="card">
+    <div class="n">prepare_pipe_job(...)</div>
+    <h4>Build a <code>PipeJob</code>, purely</h4>
+    <p>Working memory (user inputs + mock inputs when <code>is_mock_inputs</code>), run params, job metadata, library crate. Mock-input generation now lives <em>here</em>, so callers stop building working memory themselves.</p>
+  </div>
+</div>
+
+<details>
+  <summary>Minimal diff — <code>pipeline_run_setup</code> recomposed onto the seams</summary>
+  <div class="body">
+    <p class="muted">~130 lines of inline library-open + mock-input logic became two seam calls. Net behavior of the LIVE / self-contained DRY path is identical — it's the same code, re-expressed.</p>
+    <div class="diff">
+      <div class="fname">pipelex/pipeline/pipeline_run_setup.py</div>
+<pre><span class="del">-    library_manager = get_library_manager()</span>
+<span class="del">-    set_current_library(library_id=library_id)</span>
+<span class="del">-    library_manager.open_library(library_id=library_id)</span>
+<span class="del">-    effective_dirs, source_label = resolve_library_dirs(library_dirs)</span>
+<span class="del">-    if effective_dirs:</span>
+<span class="del">-        library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)</span>
+<span class="del">-    if mthds_contents:</span>
+<span class="del">-        all_blueprints = [PipelexInterpreter.make_...(content) for content in mthds_contents]</span>
+<span class="del">-        ...  # ~40 lines: filter already-loaded URIs, load_from_blueprints, resolve main_pipe</span>
+<span class="del">-    # ...then ~30 more lines of mock-input + working-memory assembly inline</span>
+<span class="ctx"> </span>
+<span class="add">+    # Seam 1: open the library and load dirs + blueprints. Owns its own load-failure teardown.</span>
+<span class="add">+    library_id, qualified_main_pipe = acquire_library(</span>
+<span class="add">+        library_id=library_id, library_dirs=library_dirs,</span>
+<span class="add">+        mthds_contents=mthds_contents, bundle_uris=bundle_uris,</span>
+<span class="add">+    )</span>
+<span class="ctx">     ...</span>
+<span class="add">+    # Seam 2 (later, against the now-open library): build the job purely.</span>
+<span class="add">+    pipe_job = await prepare_pipe_job(pipe=pipe, library_id=library_id, ...)</span></pre>
+    </div>
+  </div>
+</details>
+
+<!-- ─────────────────────────────────  BUNDLEVALIDATOR  ───────────────────────────────── -->
+<h2>BundleValidator — the batch validation service (D1)</h2>
+<p>A first-class domain service in <code>pipelex/pipeline/bundle_validator.py</code>. It owns the sweep semantics and runs every pipe through a <strong>locally-constructed, direct in-process <code>PipeRun</code></strong> — explicitly <em>not</em> the hub's <code>get_pipe_run()</code>, which under a Temporal hub would spawn a workflow <em>per pipe</em> (and is illegal from inside an activity). Keeping it direct is what lets the whole sweep later be hosted in one Temporal activity (Part C).</p>
+
+<div class="diff">
+  <div class="fname">pipelex/pipeline/bundle_validator.py — the direct primitive</div>
+<pre><span class="ctx">class BundleValidator:</span>
+<span class="ctx">    def __init__(self) -> None:</span>
+<span class="add">        # Locally-constructed, direct execution primitive — NOT get_pipe_run().</span>
+<span class="add">        # ObserverNoOp keeps the sweep observation-silent; validation surfaces its own report.</span>
+<span class="add">        self._pipe_run: PipeRunProtocol = PipeRun(pipe_router=PipeRouter(observer=ObserverNoOp()))</span></pre>
+</div>
+
+<h3>Two lifecycles (D6)</h3>
+<p>The subtlety that an outside-voice review pass caught: <code>validate --all</code> wants the library torn down afterward, but <code>validate_bundle</code> and the build CLIs depend on the library staying <em>loaded</em> so they can keep using it. One method couldn't satisfy both — so there are two:</p>
+
+<div class="tabs" data-tabgroup="lc">
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="showTab('lc',0,this)">acquire_and_validate — owns teardown</button>
+    <button class="tab-btn" onclick="showTab('lc',1,this)">validate_pipes — loaded-on-success</button>
+  </div>
+  <div class="tab-panel active">
+    <p><strong>The standalone <code>validate --all</code> lifecycle.</strong> Opens a fresh library, loads dirs + contents, sweeps <em>all</em> loaded pipes, and <strong>always</strong> tears the library down in a <code>finally</code> — restoring the caller's outer current-library first so the guarantee survives a teardown raise.</p>
+    <div class="diff">
+      <div class="fname">acquire_and_validate(...)</div>
+<pre><span class="ctx">prev_library_id = get_current_library_id_or_none()</span>
+<span class="ctx">acquired_id, _ = acquire_library(library_id=library_id, library_dirs=library_dirs, ...)</span>
+<span class="ctx">try:</span>
+<span class="ctx">    all_pipes = get_pipe_library().get_pipes()</span>
+<span class="cmt">    # strict mode excludes signatures; lenient keeps them (they mint a mock trivially)</span>
+<span class="ctx">    pipes = all_pipes if allow_signatures else [p for p in all_pipes if not p.is_signature]</span>
+<span class="ctx">    return await self.validate_pipes(pipes, library_id=acquired_id, allow_signatures=allow_signatures)</span>
+<span class="ctx">finally:</span>
+<span class="add">    if prev_library_id is not None: set_current_library(library_id=prev_library_id)</span>
+<span class="add">    else: clear_current_library()</span>
+<span class="add">    get_library_manager().teardown(library_id=acquired_id)</span></pre>
+    </div>
+  </div>
+  <div class="tab-panel">
+    <p><strong>The public inner sweep.</strong> Classifies a caller-supplied list of pipes against the caller's <em>already-open</em> library and <strong>never tears it down</strong> — preserving the loaded-on-success contract (pinned by <code>test_validate_bundle_loaded_on_success</code>). This is what <code>validate_bundle</code>, <code>validate_pipe</code> and <code>build_runner_code_for_pipe</code> call.</p>
+    <p class="muted">Order matters (D7): the static <code>validate_with_libraries</code> wiring check runs <em>before</em> the signature pre-pass, so a wiring error keeps its precedence over a signature error — exactly as before.</p>
+  </div>
+</div>
+
+<h3>The sweep, step by step</h3>
+<div class="figure">
+  <div class="mermaid">
+flowchart TD
+    START([validate_pipes pipes, library_id, allow_signatures]) --> WIRE
+    WIRE["1 · wiring check<br/>pipe.validate_with_libraries()"] -->|PipeNotFoundError| SKIP1[["record SKIPPED<br/>drop from sweep"]]
+    WIRE -->|ok| COLLECT[collect sweepable_pipes]
+    SKIP1 --> COLLECT
+    COLLECT --> SIG{2 · allow_signatures?}
+    SIG -->|false| PRE["signature pre-pass<br/>aggregated SignaturesNotAllowedError<br/>lists every reached signature"]
+    SIG -->|true| TEL
+    PRE --> TEL["3 · one PIPE_DRY_RUN telemetry event"]
+    TEL --> REG[open ONE report registry for the sweep]
+    REG --> LOOP["4 · per pipe: prepare_pipe_job DRY<br/>+ self._pipe_run.run(job)"]
+    LOOP --> CLS{classify}
+    CLS -->|success| OK[SUCCESS]
+    CLS -->|cause chain has PipeNotFoundError| SK[SKIPPED]
+    CLS -->|other PipelexError / ValidationError| FAIL[FAILURE]
+    OK --> AGG
+    SK --> AGG
+    FAIL --> AGG["5 · aggregate<br/>allowed_to_fail match on namespaced pipe_ref<br/>collect ALL unexpected failures → one DryRunError"]
+    AGG --> DONE([per-pipe status map])
+  </div>
+  <div class="figcap">The tolerant sweep: classify, never abort early. Unexpected failures are collected into a single aggregated error, not raised on the first one.</div>
+</div>
+
+<div class="callout bug">
+  <div class="lbl">Subtle bug avoided · SKIPPED classification</div>
+  <p style="margin:8px 0 0">Routing each pipe through <code>PipeRun.run</code> means a cross-package unresolved dependency no longer arrives as a bare <code>PipeNotFoundError</code> — the run layer re-raises the original and the router may add <code>__cause__</code> links. If <code>BundleValidator</code> only checked the top-level exception, partial-bundle validation would regress from <span class="dot a">SKIPPED</span> to a hard <span class="dot r">FAILURE</span>. So <code>_root_cause_is</code> walks the entire <code>__cause__</code> / <code>__context__</code> chain (with a seen-set guard against cyclic contexts).</p>
+</div>
+
+<details>
+  <summary>Minimal diff — <code>_classify_pipe</code> and the recursive cause walk</summary>
+  <div class="body">
+    <div class="diff">
+      <div class="fname">pipelex/pipeline/bundle_validator.py</div>
+<pre><span class="ctx">try:</span>
+<span class="ctx">    pipe_job = await prepare_pipe_job(pipe=pipe, library_id=library_id,</span>
+<span class="ctx">        execution_config=execution_config, pipe_run_mode=PipeRunMode.DRY,</span>
+<span class="ctx">        pipeline_run_id=SpecialPipelineId.DRY_RUN_UNTITLED, ...)</span>
+<span class="ctx">    await self._pipe_run.run(pipe_job)</span>
+<span class="cmt">except (PipelexError, ValidationError, FactoryException) as exc:</span>
+<span class="cmt">    # broad DOMAIN surface — never `except Exception`</span>
+<span class="add">    if self._root_cause_is(exc=exc, exc_type=PipeNotFoundError):</span>
+<span class="add">        return DryRunOutput(..., status=DryRunStatus.SKIPPED, ...)   # cross-package gap</span>
+<span class="ctx">    return DryRunOutput(..., status=DryRunStatus.FAILURE, ...)</span>
+<span class="ctx">return DryRunOutput(..., status=DryRunStatus.SUCCESS)</span>
+<span class="ctx"> </span>
+<span class="add">@classmethod</span>
+<span class="add">def _root_cause_is(cls, *, exc, exc_type) -> bool:</span>
+<span class="add">    seen: set[int] = set(); stack = [exc]</span>
+<span class="add">    while stack:</span>
+<span class="add">        current = stack.pop()</span>
+<span class="add">        if id(current) in seen: continue        # cyclic __context__ guard</span>
+<span class="add">        seen.add(id(current))</span>
+<span class="add">        if isinstance(current, exc_type): return True</span>
+<span class="add">        for linked in (current.__cause__, current.__context__):</span>
+<span class="add">            if linked is not None: stack.append(linked)</span>
+<span class="add">    return False</span></pre>
+    </div>
+  </div>
+</details>
+
+<!-- ─────────────────────────────────  LIBRARY LIFECYCLE  ───────────────────────────────── -->
+<h2>Library lifecycle hardening</h2>
+<p>A recurring, easy-to-get-wrong pattern shows up across every code path that opens a temporary library: <strong>the current-library binding is a <code>ContextVar</code>, and naive teardown clobbers the caller's outer binding.</strong> The fix is one disciplined idiom, applied everywhere.</p>
+
+<div class="figure">
+  <div class="mermaid">
+sequenceDiagram
+    participant C as Caller (has outer library X)
+    participant H as hub _library_id ContextVar
+    participant V as validate path
+    C->>H: outer current = X
+    C->>V: enter
+    V->>H: prev = get_current_library_id_or_none()  (= X)
+    V->>H: set_current = Y (the temp/run library)
+    Note over V: ...do the work (may raise)...
+    rect rgb(42,26,31)
+    Note over V,H: finally / teardown
+    V->>H: restore prev FIRST → set_current = X
+    V->>H: teardown(Y)
+    end
+    V->>C: return (outer current still = X)
+  </div>
+  <div class="figcap">Restore the outer binding <em>before</em> teardown, so the safety guarantee holds even if teardown itself raises. <code>set_current_library</code> can't take <code>None</code>, so the "no outer was set" case routes through the renamed <code>clear_current_library()</code>.</div>
+</div>
+
+<div class="callout note">
+  <div class="lbl">Rename · teardown_current_library → clear_current_library</div>
+  <p style="margin:8px 0 0">The old name implied it freed the <code>Library</code>. It doesn't — it only resets the <code>_library_id</code> <em>pointer</em> to <code>None</code>. Releasing the library is a separate <code>library_manager.teardown(library_id=...)</code> call. The rename makes the two distinct operations honest at every call site.</p>
+</div>
+
+<details>
+  <summary>Minimal diff — runner restores the outer binding, with a collision guard</summary>
+  <div class="body">
+    <p class="muted">The recent review fix in <code>PipelexRunner.execute_pipeline</code>: capture the outer binding up front, and on teardown restore it — <em>unless</em> the caller's outer library <em>is</em> this run's library (in which case "restoring" would leave the ContextVar pointing at the library we're about to tear down, so we clear instead).</p>
+    <div class="diff">
+      <div class="fname">pipelex/pipeline/runner.py</div>
+<pre><span class="add">+ prev_library_id = get_current_library_id_or_none()   # before pipeline_run_setup overwrites it</span>
+<span class="ctx">  try:</span>
+<span class="ctx">      pipe_job, pipeline_run_id, library_id_resolved = await pipeline_run_setup(...)</span>
+<span class="ctx">      ...</span>
+<span class="ctx">  finally:</span>
+<span class="ctx">      if library_id_resolved is not None:</span>
+<span class="del">-         get_library_manager().teardown(library_id=library_id_resolved)</span>
+<span class="del">-         teardown_current_library()</span>
+<span class="add">+         # restore outer FIRST so the guarantee survives a teardown raise</span>
+<span class="add">+         if prev_library_id is not None and prev_library_id != library_id_resolved:</span>
+<span class="add">+             set_current_library(library_id=prev_library_id)</span>
+<span class="add">+         else:</span>
+<span class="add">+             clear_current_library()           # collision OR no outer → clear, don't dangle</span>
+<span class="add">+         get_library_manager().teardown(library_id=library_id_resolved)</span></pre>
+    </div>
+  </div>
+</details>
+
+<details>
+  <summary>Minimal diff — builder ops now own their library lifecycle</summary>
+  <div class="body">
+    <p class="muted"><code>build_runner_code_for_pipe</code> keeps the library loaded on success (it generates runner code against it) but restores + tears down on failure. <code>validate_pipe</code> owns the full lifecycle on both paths since it doesn't need the library after returning. Both pinned by new lifecycle tests.</p>
+    <div class="diff">
+      <div class="fname">pipelex/builder/operations/runner_code_ops.py</div>
+<pre><span class="del">- set_current_library(library_id)</span>
+<span class="del">- for pipe in pipes: pipe.validate_with_libraries()</span>
+<span class="del">- await dry_run_pipes(pipes=pipes, raise_on_failure=True)</span>
+<span class="del">- pipe = get_required_pipe(pipe_code)</span>
+<span class="del">- return generate_runner_code(pipe=pipe)</span>
+<span class="add">+ prev_library_id = get_current_library_id_or_none()</span>
+<span class="add">+ success = False</span>
+<span class="add">+ try:</span>
+<span class="add">+     set_current_library(library_id=library_id)</span>
+<span class="add">+     pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints)</span>
+<span class="add">+     # validate (static wiring + dry run) — never tears the library down (D6 inner sweep)</span>
+<span class="add">+     await BundleValidator().validate_pipes(pipes=pipes, library_id=library_id)</span>
+<span class="add">+     runner_code = generate_runner_code(pipe=get_required_pipe(pipe_code))</span>
+<span class="add">+     success = True</span>
+<span class="add">+     return runner_code</span>
+<span class="add">+ finally:</span>
+<span class="add">+     if not success:                       # loaded-on-success; this caller owns cleanup on failure</span>
+<span class="add">+         if prev_library_id is not None: set_current_library(library_id=prev_library_id)</span>
+<span class="add">+         else: clear_current_library()</span>
+<span class="add">+         library_manager.teardown(library_id=library_id)</span></pre>
+    </div>
+  </div>
+</details>
+
+<div class="callout win">
+  <div class="lbl">Win · idempotent close_registry</div>
+  <p style="margin:8px 0 0"><code>ReportingManager.close_registry</code> now pops with a default instead of raising <code>KeyError</code> on a miss. It runs from sweep / runner <code>finally</code> blocks, where a <code>KeyError</code> would <em>mask the in-flight exception</em> — exactly the kind of silent-failure swap we want gone. (Mirrors the existing <code>clear_event_log</code> behavior.)</p>
+</div>
+
+<!-- ─────────────────────────────────  SIGNATURES  ───────────────────────────────── -->
+<h2>Signature validation fixes</h2>
+<div class="cards two">
+  <div class="card">
+    <div class="n">CLASSIFICATION</div>
+    <h4><code>SignaturesNotAllowedError</code> → INPUT domain</h4>
+    <p>An unimplemented placeholder in a submitted bundle is a <em>caller</em> mistake, not a server fault. Now marked <code>error_domain = ErrorDomain.INPUT</code> + <code>_authors_caller_facing_message = True</code> → the API renders it <strong>422</strong> (not 500), and the CLI logs it as a caller error. Matches the agent-CLI's existing classification.</p>
+  </div>
+  <div class="card">
+    <div class="n">IDENTITY</div>
+    <h4><code>validated_pipes</code> unified on namespaced <code>pipe_ref</code></h4>
+    <p>Previously <code>validate all</code> reported <code>domain.code</code> while <code>validate pipe</code> reported the bare <code>code</code> — the same pipe under two identities depending on the command. Now <strong>every</strong> surface emits the qualified ref, which can't collide across domains.</p>
+  </div>
+</div>
+
+<details>
+  <summary>Minimal diff — the caller-facing classification</summary>
+  <div class="body">
+    <div class="diff">
+      <div class="fname">pipelex/pipe_signature/exceptions.py</div>
+<pre><span class="del">- from pipelex.base_exceptions import PipelexError</span>
+<span class="add">+ from pipelex.base_exceptions import ErrorDomain, PipelexError</span>
+<span class="ctx"> </span>
+<span class="ctx">  class SignaturesNotAllowedError(PipelexError):</span>
+<span class="add">+     error_domain = ErrorDomain.INPUT          # 422, not 500 — caller fixes their bundle</span>
+<span class="add">+     _authors_caller_facing_message = True</span></pre>
+    </div>
+    <p class="muted">The shared projection helper <code>build_validated_pipes</code> dropped its <code>use_ref</code> parameter and now always emits <code>output.pipe_ref</code>; its entry type is a named <code>ValidatedPipeEntry</code> <code>TypedDict</code>. Allowed-to-fail FAILUREs and cross-package SKIPPEDs are reported truthfully rather than flattened to SUCCESS.</p>
+  </div>
+</details>
+
+<!-- ─────────────────────────────────  BREAKING CHANGES  ───────────────────────────────── -->
+<h2>Breaking changes</h2>
+<p class="muted">No backward-compat period (per project policy) — note them and move.</p>
+<table>
+  <thead><tr><th>Change</th><th>What breaks</th><th>Migration</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>validated_pipes</code> identity</td>
+      <td>The JSON <code>pipe_code</code> key now carries the namespaced <code>domain.code</code> ref on every surface (it used to be bare on some).</td>
+      <td>Consumers parsing <code>pipe_code</code> (e.g. MTHDS skills) must match on the qualified ref.</td>
+    </tr>
+    <tr>
+      <td><code>allowed_to_fail_pipes</code></td>
+      <td>Config now keys off namespaced refs. <code>infinite_loop_1</code> → <code>failing_pipelines.infinite_loop_1</code>; obsolete <code>pipe_builder</code> entry dropped.</td>
+      <td>Update <code>pipelex.toml</code> <code>dry_run_config.allowed_to_fail_pipes</code> to qualified refs.</td>
+    </tr>
+    <tr>
+      <td><code>teardown_current_library</code></td>
+      <td>Renamed to <code>clear_current_library</code>.</td>
+      <td>Rename the call. Remember: it only clears the pointer; <code>teardown(library_id=...)</code> frees the library.</td>
+    </tr>
+    <tr>
+      <td>Deleted dry-run functions</td>
+      <td><code>dry_run_pipe</code>, <code>dry_run_pipes</code>, <code>dry_run_pipe_with_graph</code>, <code>DryPipeRouter</code> are gone.</td>
+      <td>Use <code>BundleValidator</code> (sweep) or <code>PipelexRunner(..., pipe_run_mode=DRY)</code> (single run / graph).</td>
+    </tr>
+    <tr>
+      <td>Moved conversion helpers</td>
+      <td><code>convert_to_working_memory_format</code> &amp; <code>convert_stuff_spec_to_typed_named</code> left <code>dry_run.py</code>.</td>
+      <td>Import from <code>WorkingMemoryFactory</code>.</td>
+    </tr>
+    <tr>
+      <td><code>DryRunStatus</code> / <code>DryRunOutput</code></td>
+      <td>Relocated (they're validation-report types, not execution types).</td>
+      <td>Import from <code>pipelex.pipeline.bundle_validator</code>.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout bug">
+  <div class="lbl">Cross-repo follow-up · pipelex-api</div>
+  <p style="margin:8px 0 0"><code>pipelex-api</code>'s <code>build/runner.py</code> still imports the now-deleted <code>dry_run_pipes</code> and will break on its next <code>pipelex</code> pin bump. Either land Part C (which migrates that route to <code>act_validate_bundle</code>) in the same release train, or keep a temporary <code>dry_run_pipes</code> shim until then.</p>
+</div>
+
+<!-- ─────────────────────────────────  DELETED  ───────────────────────────────── -->
+<h2>What got deleted (Phase 4)</h2>
+<div class="panel">
+  <div class="files">
+    <div class="del">− pipe_run/dry_run.py <span style="color:var(--muted)">(277)</span></div>
+    <div class="del">− pipe_run/dry_run_with_graph.py <span style="color:var(--muted)">(82, no consumers)</span></div>
+    <div class="del">− pipe_run/dry_pipe_router.py <span style="color:var(--muted)">(24, dead code)</span></div>
+    <div class="del">− tests/unit/.../pipe_run/test_dry_run.py <span style="color:var(--muted)">(113, ported)</span></div>
+  </div>
+  <p class="muted" style="margin:14px 0 0">Phase 0 first relocated the two conversion helpers (so the signature runtime no longer imported <code>dry_run.py</code>), which turned the module into a deletable leaf. <code>dry_run_pipeline.py</code> survives — it was already runner-based and north-star-compliant.</p>
+</div>
+
+<!-- ─────────────────────────────────  TESTS  ───────────────────────────────── -->
+<h2>Test coverage</h2>
+<div class="cards">
+  <div class="card">
+    <div class="n">SERVICE</div>
+    <h4>BundleValidator</h4>
+    <p><code>test_bundle_validator</code> (unit + integration), <code>test_acquire_and_validate</code> — the sweep, classification, signature pre-pass, aggregation.</p>
+  </div>
+  <div class="card">
+    <div class="n">SEAMS</div>
+    <h4>Execution seams</h4>
+    <p><code>test_execution_seams</code>, <code>test_pipeline_run_setup_characterization</code> — proves the recomposition is behavior-identical.</p>
+  </div>
+  <div class="card">
+    <div class="n">LIFECYCLE</div>
+    <h4>Library &amp; registries</h4>
+    <p><code>test_validate_pipe_library_lifecycle</code>, <code>test_runner_code_ops_library_lifecycle</code>, <code>test_runner_library_lifecycle</code>, <code>test_validate_bundle_loaded_on_success</code>, <code>test_no_orphan_registries</code>.</p>
+  </div>
+</div>
+<p class="muted">Existing dry-run / signature / library-crate tests were rewired onto the new surface (importing from <code>bundle_validator</code> / <code>WorkingMemoryFactory</code> instead of the deleted modules).</p>
+
+<!-- ─────────────────────────────────  DEFERRED  ───────────────────────────────── -->
+<h2 id="deferred">What's deferred (and why the design looks the way it does)</h2>
+<p>The whole conceptual frame is <strong>run mode (LIVE/DRY) is orthogonal to execution backend (direct vs Temporal)</strong>. Four cells, all must eventually work — and that's <em>why</em> <code>BundleValidator</code> is built as a self-contained in-process executor that never touches the hub's Temporal components.</p>
+
+<table>
+  <thead><tr><th></th><th>direct (in-process)</th><th>Temporal (distributed)</th></tr></thead>
+  <tbody>
+    <tr><td><strong>LIVE</strong></td><td><span class="dot g">●</span> works today</td><td><span class="dot g">●</span> works today</td></tr>
+    <tr><td><strong>DRY</strong></td><td><span class="dot g">●</span> this PR (the sweep)</td><td><span class="dot a">◐</span> Part B — mock at the activity leaf</td></tr>
+  </tbody>
+</table>
+
+<div class="cards two">
+  <div class="card" style="border-left:3px solid var(--amber)">
+    <div class="n" style="color:var(--amber)">PART B · own branch</div>
+    <h4>Leaf-level run-mode mock (req 1)</h4>
+    <p>Today the DRY mock is minted <em>above</em> the activity boundary (operators hardcode <code>ContentGeneratorDry()</code>), so DRY on a Temporal hub never dispatches <code>act_llm_gen_*</code>. Part B moves the LIVE/DRY decision down to the cogt leaf (<code>llm_gen_*</code> / extract / img-gen, carried on <code>JobMetadata.run_mode</code>) so DRY honors the backend and mocks <em>inside</em> the activity. Retires the "DRY → local" shortcut.</p>
+  </div>
+  <div class="card" style="border-left:3px solid var(--violet)">
+    <div class="n" style="color:var(--violet)">PART C · own branch, gated</div>
+    <h4>Validation as a Temporal activity (req 2)</h4>
+    <p>The API dispatches the whole sweep as one standalone <code>act_validate_bundle</code> activity. Needs a <code>scoped_content_generator</code> ContextVar (mirroring <code>scoped_current_library</code>) to force the inline generator, a <code>temporalio</code> bump beyond 1.23.0 for standalone activities, and the cross-repo <code>pipelex-api</code> route migration.</p>
+  </div>
+</div>
+
+<p class="muted">Design source: <code>wip/dry-run-refactor-draft/D-plan.md</code> (decisions D1–D8). Execution tracker for Part A: <code>TODOS.md</code> (checkpoints A / A2 / B / C, all cleared).</p>
+
+<footer>
+  <p><strong>PR #956</strong> · <code>refactor(dry-run): consolidate validation into BundleValidator + execution seams</code> · Part A of the dry-run refactor.</p>
+  <p>Key files: <code>pipelex/pipeline/bundle_validator.py</code> · <code>pipelex/pipeline/execution_seams.py</code> · <code>pipelex/pipeline/pipeline_run_setup.py</code> · <code>pipelex/pipeline/validate_bundle.py</code> · <code>pipelex/builder/operations/{validate_ops,runner_code_ops}.py</code> · <code>pipelex/pipeline/runner.py</code>.</p>
+</footer>
+
+</div>
+</body>
+</html>

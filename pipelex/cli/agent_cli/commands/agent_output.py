@@ -160,7 +160,8 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     # input = agent can fix (bad .mthds, wrong args, bad JSON)
     "ModelChoiceNotFoundError": "input",
     "PipeValidationError": "input",
-    "SignaturesNotAllowedError": "input",
+    # SignaturesNotAllowedError intentionally absent: it carries a class-level error_domain = INPUT,
+    # so the report is its single source of truth (enforced by test_agent_output_drift).
     "FileNotFoundError": "input",
     "JSONDecodeError": "input",
     "JsonTypeError": "input",
