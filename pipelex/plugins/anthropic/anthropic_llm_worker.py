@@ -4,9 +4,9 @@ from anthropic import (
     APIConnectionError,
     APIStatusError,
     AsyncAnthropic,
-    AsyncAnthropicBedrock,
     omit,
 )
+from anthropic.lib.bedrock import AsyncAnthropicBedrock
 from anthropic.types import OutputConfigParam, ThinkingConfigParam
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 from typing_extensions import override
