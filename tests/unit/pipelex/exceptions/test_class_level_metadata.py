@@ -27,6 +27,7 @@ from pipelex.system.pipelex_service.exceptions import (
     PipelexServiceError,
     RemoteConfigFetchError,
 )
+from pipelex.tools.tabular.exceptions import CsvError
 
 _PIPELINE_EXEC_ERROR = PipelineExecutionError(
     message="boom",
@@ -102,6 +103,7 @@ class TestClassLevelMetadata:
         [
             ("interpreter", PipelexInterpreterError("boom"), True),
             ("validate_bundle", ValidateBundleError("boom"), True),
+            ("csv", CsvError("boom"), True),
             ("signatures_not_allowed", SignaturesNotAllowedError(offending_pipe_refs=set(), signature_refs=set(), dep_paths={}), True),
             ("config", PipelexConfigError("boom"), False),
             ("pipe_execution", PipeExecutionError("boom"), False),

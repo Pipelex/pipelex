@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 import typer
 from posthog import tag
@@ -18,9 +19,11 @@ from pipelex.cli.error_handlers import (
     print_traceback_if_requested,
 )
 from pipelex.config import get_config
+from pipelex.core.concepts.exceptions import ConceptValueError
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
+from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.hub import get_console, get_report_delegate, get_telemetry_manager
@@ -35,6 +38,11 @@ from pipelex.tools.misc.exceptions import JsonTypeError
 from pipelex.tools.misc.file_utils import get_incremental_directory_path
 from pipelex.tools.misc.json_utils import load_json_dict_from_path, save_as_json_to_path
 from pipelex.tools.misc.package_utils import get_package_version
+from pipelex.tools.tabular.csv_codec import assert_supported_table_suffix, csv_from_list_content, flat_field_names
+from pipelex.tools.tabular.exceptions import CsvError
+
+if TYPE_CHECKING:
+    from pipelex.core.stuffs.stuff_content import StuffContent
 
 COMMAND = "run"
 
@@ -55,11 +63,26 @@ async def _execute_run(
     library_dir: list[str] | None,
     cost_report: bool | None,
     dynamic_output_concept_ref: str | None = None,
+    *,
+    save_csv: str | None = None,
 ) -> None:
     """Core async execution logic for running a pipe.
 
     Shared between the ``method`` and ``pipe`` subcommands.
     """
+    # Fail fast on an unusable --save-csv target BEFORE running the pipeline, so a bad path (empty,
+    # or an unsupported suffix like .xlsx) doesn't waste a full inference run. The output-shape and
+    # row-flatness checks need the result, so they stay in the save block after execution.
+    if save_csv is not None:
+        if not save_csv.strip():
+            typer.secho("Failed to --save-csv: an empty output path was given.", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1)
+        try:
+            assert_supported_table_suffix(Path(save_csv))
+        except CsvError as exc:
+            typer.secho(f"Failed to --save-csv: {exc}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1) from exc
+
     mthds_content: str | None = None
     if bundle_path:
         try:
@@ -222,6 +245,47 @@ async def _execute_run(
         save_as_json_to_path(object_to_save=working_memory_dict, path=Path(working_memory_output_path))
         log.verbose(f"Working memory saved to: {working_memory_output_path}")
 
+    # Save main_stuff as CSV if requested. CQ1: write to the literal <path> (cwd-relative),
+    # NOT resolved under --output-dir. Requires the main stuff to be a flat list (e.g. PersonSummary[]);
+    # the codec rejects a non-flat row concept with a clear CsvFlatnessError.
+    if save_csv is not None:
+        # The path string and its suffix were already validated up front (fail-fast, before the run).
+        csv_main_stuff = pipe_output.working_memory.get_optional_main_stuff()
+        if csv_main_stuff is None:
+            typer.secho("Failed to --save-csv: the pipeline produced no main stuff to write.", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1)
+        csv_content = csv_main_stuff.content
+        if not isinstance(csv_content, ListContent):
+            typer.secho(
+                f"Failed to --save-csv: the main stuff is a {type(csv_content).__name__}, not a list. "
+                "CSV output requires the pipe to produce a flat list (e.g. 'PersonSummary[]').",
+                fg=typer.colors.RED,
+                err=True,
+            )
+            raise typer.Exit(1)
+        csv_list_content = cast("ListContent[StuffContent]", csv_content)
+        # expanduser so a quoted/`=`-form `~/out.csv` writes to the home dir, not a literal `./~` dir.
+        csv_path = Path(save_csv).expanduser()
+        # A CSV-save failure (output concept with no structure class, non-flat output, write error) is
+        # framed as a --save-csv failure, not a pipeline failure — the pipeline already succeeded.
+        # ConceptValueError (a ValueError) and CsvError would otherwise escape execute_run's generic
+        # `except PipelexError` and read as "Failed to execute pipeline" (or as a raw traceback).
+        try:
+            # get_structure_class() can raise ConceptValueError if the output concept has no registered
+            # structure class; keep it inside the guard so that, too, is framed as a save-csv failure.
+            csv_row_model = csv_main_stuff.concept.get_structure_class()
+            # Validate the row flatness BEFORE touching the filesystem, so a non-flat output leaves no
+            # directory behind (the suffix was already validated up front).
+            flat_field_names(csv_row_model)
+            # CQ1: write to the literal cwd-relative path, but still create its parent dirs so a
+            # nested target (e.g. reports/2026/out.csv) doesn't fail late after the run completed.
+            csv_path.parent.mkdir(parents=True, exist_ok=True)
+            csv_from_list_content(csv_list_content, row_model=csv_row_model, path=csv_path)
+        except (CsvError, ConceptValueError, OSError) as csv_exc:
+            typer.secho(f"Failed to --save-csv to '{save_csv}': {csv_exc}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1) from csv_exc
+        log.verbose(f"Main stuff CSV saved to: {save_csv}")
+
     reporting_config = get_config().pipelex.reporting_config
     # --no-cost-report (cost_report is False) skips the report entirely: no table, no CSV.
     # Otherwise: console follows the flag (if given) or config; CSV follows config.
@@ -253,6 +317,9 @@ async def _execute_run(
                 console.print("    [green]✓[/green] working_memory.json")
             else:
                 console.print(f"    [green]✓[/green] working_memory: {working_memory_output_path}")
+    # CSV output is written to a literal cwd-relative path (CQ1), independent of --output-dir.
+    if save_csv is not None:
+        console.print(f"  [green]✓[/green] CSV saved to [bold magenta]{save_csv}[/bold magenta]")
 
 
 def execute_run(
@@ -273,6 +340,8 @@ def execute_run(
     telemetry_command_label: str = COMMAND,
     temporal: bool | None = None,
     dynamic_output_concept_ref: str | None = None,
+    *,
+    save_csv: str | None = None,
 ) -> None:
     """Synchronous entry point that wraps the async execution with Pipelex setup/teardown.
 
@@ -302,6 +371,7 @@ def execute_run(
                     library_dir=library_dir,
                     cost_report=cost_report,
                     dynamic_output_concept_ref=dynamic_output_concept_ref,
+                    save_csv=save_csv,
                 )
             )
 

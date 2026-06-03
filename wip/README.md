@@ -13,6 +13,7 @@ This folder holds the **active** planning, design, and current-state docs for th
 - **[distributed-execution/](distributed-execution/)** — running MTHDS methods as Temporal workflows across separate worker processes. Its [README](distributed-execution/README.md) is the priority-ordered plan; the folder also holds the tracing/cost-reporting as-built reference, the crate-packaging phases (6a/6b) and crate-first vision, the implemented Temporal IDs/naming design, and the deferred Temporal-exception and schema-reconstruction hardening proposals. **This is the active headline track.**
 - **[error-handling/](error-handling/)** — the current-state reference for error handling across Pipelex, track-organized (metadata model, worker classification, extract/classify/render, retry, CLI delivery, Temporal integration, testing). Mostly landed; its [README](error-handling/README.md) lists what's still open.
 - **[concurrency/](concurrency/)** — direct-mode batching / backpressure design. The retry-jitter quick win shipped; the remaining design work is split into fan-out scheduling, rate limiting, and batch partial-failure docs. Status: design scoping.
+- **[csv-support/](csv-support/)** — reading `.csv` files into typed `ListContent` and writing flat list outputs back out via `--save-csv`. Its [README](csv-support/README.md) is the feature + reviewer reference (codec, core input hook, CLI output hook, the I/O contract, locked decisions); the folder also holds the design rationale and the deferred review/security follow-ups. Landed in #955.
 
 ## Standalone docs
 
