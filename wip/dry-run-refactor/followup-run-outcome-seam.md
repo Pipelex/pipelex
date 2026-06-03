@@ -2,7 +2,7 @@
 
 > **Status: deferred — own branch, not yet started. OPTIONAL tightening, not a bug.** Implements the deferred half of **D-plan [`D-plan.md`](./D-plan.md) D6**. Unlike the leaf-mock and Temporal-activity follow-ups, this is **not** tied to a user requirement — it's a seam cleanup. Only pursue if the seam smell is judged worth the cross-backend churn.
 >
-> **Design rationale:** D-plan **D6** (the three-altitude model: L1 run primitive / L2 batch policy / L3 presentation). **Depends on:** the consolidation ([`/TODOS.md`](../../TODOS.md)) has landed (`BundleValidator`, `PipeRun`). Backend symmetry means touching `WfPipeRun` too. **Branch off the same D-plan.**
+> **Design rationale:** D-plan **D6** (the three-altitude model: L1 run primitive / L2 batch policy / L3 presentation). **Depends on:** the consolidation ([`consolidation-as-built.md`](./consolidation-as-built.md)) has landed (`BundleValidator`, `PipeRun`). Backend symmetry means touching `WfPipeRun` too. **Branch off the same D-plan.**
 
 ## What and why
 

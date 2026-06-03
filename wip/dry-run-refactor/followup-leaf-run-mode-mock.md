@@ -1,10 +1,10 @@
 # Follow-up — Leaf-level run-mode mock (DRY honors the backend)
 
-> **Status: deferred — own branch, not yet started.** Implements **D-plan Part B / D4 / req 1**. Split out of [`/TODOS.md`](../../TODOS.md) on 2026-06-01 (eng-review D1) so the in-process consolidation ships alone.
+> **Status: deferred — own branch, not yet started.** Implements **D-plan Part B / D4 / req 1**. Split out of [`consolidation-as-built.md`](./consolidation-as-built.md) on 2026-06-01 (eng-review D1) so the in-process consolidation ships alone.
 >
 > **Design rationale:** [`D-plan.md`](./D-plan.md) §3.5 (run mode ⟂ backend) and §4.8 (leaf-level mock). **Risks:** D-plan §8 (object-mock fidelity, req-1 fidelity regressions).
 >
-> **Depends on:** the consolidation ([`/TODOS.md`](../../TODOS.md)) is *not* a hard prerequisite (this is a separable cogt/operator refactor), but the Temporal-validation follow-up builds on **both**, so sequence this after the consolidation lands. **Branch off the same D-plan.**
+> **Depends on:** the consolidation ([`consolidation-as-built.md`](./consolidation-as-built.md)) is *not* a hard prerequisite (this is a separable cogt/operator refactor), but the Temporal-validation follow-up builds on **both**, so sequence this after the consolidation lands. **Branch off the same D-plan.**
 
 Goal: move the LIVE/DRY decision **down to the cogt leaf** so DRY honors the configured backend — DRY-on-Temporal dispatches `act_llm_gen_*` and mocks **inside** the activity, retiring the "DRY → local in-process" shortcut. Separable cogt/operator refactor (§4.8). **Resolve the Pre-flight items before starting.**
 

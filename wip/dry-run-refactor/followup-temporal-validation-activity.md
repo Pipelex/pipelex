@@ -1,10 +1,10 @@
 # Follow-up — Distributed validation as a Temporal activity
 
-> **Status: deferred — own branch, not yet started, HARD-GATED.** Implements **D-plan Part C / D5 / req 2**. Split out of [`/TODOS.md`](../../TODOS.md) on 2026-06-01 (eng-review D1).
+> **Status: deferred — own branch, not yet started, HARD-GATED.** Implements **D-plan Part C / D5 / req 2**. Split out of [`consolidation-as-built.md`](./consolidation-as-built.md) on 2026-06-01 (eng-review D1).
 >
 > **Design rationale:** [`D-plan.md`](./D-plan.md) §4.9 (distributed validation activity). **Risks:** D-plan §8 (nested-dispatch from the sweep, `temporalio` bump regression surface).
 >
-> **Depends on:** the consolidation (`BundleValidator`, [`/TODOS.md`](../../TODOS.md)) **and** the leaf run-mode follow-up ([`followup-leaf-run-mode-mock.md`](./followup-leaf-run-mode-mock.md)). **Branch off the same D-plan.**
+> **Depends on:** the consolidation (`BundleValidator`, [`consolidation-as-built.md`](./consolidation-as-built.md)) **and** the leaf run-mode follow-up ([`followup-leaf-run-mode-mock.md`](./followup-leaf-run-mode-mock.md)). **Branch off the same D-plan.**
 >
 > **Scope note (D2):** the consolidation already migrated `pipelex-api/build/runner.py` to call `BundleValidator` in-process. So Phase C2 here only adds the **Temporal-dispatch** half on the validate route — not the in-process consumer.
 
