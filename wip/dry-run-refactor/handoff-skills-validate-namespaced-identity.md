@@ -90,7 +90,7 @@ Landed on branch `feature/Validate-with-signatures-4-fix-dry-run`.
 
 - Source of truth: `pipelex/pipeline/validate_bundle.py::build_validated_pipes` → returns `ValidatedPipeEntry` whose `pipe_code` is `output.pipe_ref` (namespaced) on every surface.
 - Contract doc: the `validate` output section in `pipelex/cli/agent_cli/CLAUDE.md`.
-- Rationale + full in-repo change list: `wip/dry-run-refactor-draft/followup-validate-result-projection.md` (the "RESOLVED" record this handoff is the cross-repo tail of).
+- Rationale + the consolidation it shipped with: `wip/dry-run-refactor/consolidation-as-built.md` ("Validate-result identity"). This handoff is the cross-repo tail.
 - Changelog: the `[Unreleased] → Changed` entry naming the `validated_pipes` identity unification.
 
 The decision was to **unify on `pipe_ref`** so the same pipe is never reported under two identifiers by different `validate` commands. This handoff exists because the skills repo could not be inspected or edited from the pipelex worktree where the change was made.

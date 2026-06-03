@@ -178,23 +178,21 @@ def _pipes_to_dry_run(loaded_pipes: list[PipeAbstract], dry_run_pipe_codes: list
 async def validate_bundle(
     mthds_file_path: Path | None = None,
     mthds_contents: list[str] | None = None,
-    blueprints: list[PipelexBundleBlueprint] | None = None,
     library_dirs: Sequence[Path] | None = None,
     allow_signatures: bool = False,
     dry_run_pipe_codes: list[str] | None = None,
 ) -> ValidateBundleResult:
     provided_params = sum(
         [
-            blueprints is not None,
             mthds_contents is not None,
             mthds_file_path is not None,
         ]
     )
     if provided_params == 0:
-        msg = "At least one of blueprints, mthds_contents, or mthds_file_path must be provided to validate_bundle"
+        msg = "At least one of mthds_contents or mthds_file_path must be provided to validate_bundle"
         raise ValidateBundleError(message=msg)
     if provided_params > 1:
-        msg = "Only one of blueprints, mthds_contents, or mthds_file_path can be provided to validate_bundle, not multiple"
+        msg = "Only one of mthds_contents or mthds_file_path can be provided to validate_bundle, not both"
         raise ValidateBundleError(message=msg)
 
     library_manager = get_library_manager()
@@ -219,15 +217,7 @@ async def validate_bundle(
                 )
             else:
                 log.verbose(f"No library directories to load ({source_label})")
-            if blueprints is not None:
-                loaded_blueprints = blueprints
-                loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints)
-                dry_run_results = await BundleValidator().validate_pipes(
-                    pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes), library_id=library_id, allow_signatures=allow_signatures
-                )
-                result = ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
-
-            elif mthds_contents is not None:
+            if mthds_contents is not None:
                 loaded_blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
                 loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
                 dry_run_results = await BundleValidator().validate_pipes(
@@ -310,7 +300,6 @@ class LoadConceptsOnlyResult(BaseModel):
 def load_concepts_only(
     mthds_file_path: Path | None = None,
     mthds_contents: list[str] | None = None,
-    blueprints: list[PipelexBundleBlueprint] | None = None,
     library_dirs: Sequence[Path] | None = None,
 ) -> LoadConceptsOnlyResult:
     """Load MTHDS files processing only domains and concepts, skipping pipes.
@@ -320,9 +309,8 @@ def load_concepts_only(
     and does not run dry runs.
 
     Args:
-        mthds_file_path: Path to a single MTHDS file to load (mutually exclusive with others)
-        mthds_contents: List of MTHDS content strings to load (mutually exclusive with others)
-        blueprints: Pre-parsed blueprints to load (mutually exclusive with others)
+        mthds_file_path: Path to a single MTHDS file to load (mutually exclusive with mthds_contents)
+        mthds_contents: List of MTHDS content strings to load (mutually exclusive with mthds_file_path)
         library_dirs: Optional directories containing additional MTHDS library files
 
     Returns:
@@ -331,12 +319,12 @@ def load_concepts_only(
     Raises:
         ValidateBundleError: If loading fails due to interpreter or validation errors
     """
-    provided_params = sum([blueprints is not None, mthds_contents is not None, mthds_file_path is not None])
+    provided_params = sum([mthds_contents is not None, mthds_file_path is not None])
     if provided_params == 0:
-        msg = "At least one of blueprints, mthds_contents, or mthds_file_path must be provided to load_concepts_only"
+        msg = "At least one of mthds_contents or mthds_file_path must be provided to load_concepts_only"
         raise ValidateBundleError(message=msg)
     if provided_params > 1:
-        msg = "Only one of blueprints, mthds_contents, or mthds_file_path can be provided to load_concepts_only, not multiple"
+        msg = "Only one of mthds_contents or mthds_file_path can be provided to load_concepts_only, not both"
         raise ValidateBundleError(message=msg)
 
     library_manager = get_library_manager()
@@ -361,12 +349,7 @@ def load_concepts_only(
             else:
                 log.verbose(f"No library directories to load ({source_label})")
 
-            if blueprints is not None:
-                loaded_blueprints = blueprints
-                loaded_concepts = library_manager.load_concepts_only_from_blueprints(library_id=library_id, blueprints=blueprints)
-                result = LoadConceptsOnlyResult(blueprints=loaded_blueprints, concepts=loaded_concepts)
-
-            elif mthds_contents is not None:
+            if mthds_contents is not None:
                 loaded_blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
                 loaded_concepts = library_manager.load_concepts_only_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
                 result = LoadConceptsOnlyResult(blueprints=loaded_blueprints, concepts=loaded_concepts)
