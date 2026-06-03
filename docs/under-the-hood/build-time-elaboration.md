@@ -57,7 +57,7 @@ Practical consequences:
 - Across any serialization boundary — kajson dump, library cache, Temporal payload, MTHDS export — the metadata is gone. Downstream consumers that need it today have to re-elaborate.
 - The dependency loader handles one specific consequence: when a manifest restricts exports, synthetic helpers of exported parents are still loaded, even though they are never named in the manifest. This is implemented inline in `LibraryManager._load_single_dependency`.
 
-When a future consumer (graph viewer, persistent observability store) wants the metadata across boundaries, dropping `exclude=True` is the deliberate next step — captured as a follow-up in `TODOS.md`.
+When a future consumer (graph viewer, persistent observability store) wants the metadata across boundaries, dropping `exclude=True` is the deliberate next step.
 
 ## Multiplicity rule
 

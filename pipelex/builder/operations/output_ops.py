@@ -29,8 +29,10 @@ async def build_output_for_pipe(
     Raises:
         ValidateBundleError: If bundle validation fails.
     """
-    # validate_bundle opens a library, loads blueprints, and sets it as current
-    await validate_bundle(mthds_contents=mthds_contents)
+    # validate_bundle opens a library, loads blueprints, and sets it as current.
+    # allow_signatures=True: rendering a pipe's output representation only needs the pipes loaded,
+    # not a fully runnable pipeline — an in-progress bundle with PipeSignature placeholders is fine.
+    await validate_bundle(mthds_contents=mthds_contents, allow_signatures=True)
 
     the_pipe = get_required_pipe(pipe_code=pipe_code)
     output_str = render_output(the_pipe, output_format=output_format)

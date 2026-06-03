@@ -23,12 +23,20 @@ def validate_bundle_cmd(
             help="Directory to search for pipe definitions (.mthds files). Can be specified multiple times.",
         ),
     ] = None,
+    allow_signatures: Annotated[
+        bool,
+        typer.Option(
+            "--allow-signatures",
+            help="Accept PipeSignature placeholders in the dependency graph (lenient mode).",
+        ),
+    ] = False,
 ) -> None:
     """Validate a bundle file (.mthds) or pipeline directory.
 
     Examples:
         pipelex validate bundle my_bundle.mthds
         pipelex validate bundle pipeline_01/
+        pipelex validate bundle my_bundle.mthds --allow-signatures
     """
     bundle_path: str | None = None
     target_path = Path(path)
@@ -87,4 +95,5 @@ def validate_bundle_cmd(
         bundle_path=Path(bundle_path) if bundle_path else None,
         library_dirs=library_dirs_paths,
         telemetry_command_label=f"{COMMAND} bundle",
+        allow_signatures=allow_signatures,
     )

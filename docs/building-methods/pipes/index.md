@@ -15,6 +15,8 @@ A pipeline is composed of pipes. There are two fundamental types of pipes you wi
 *   **[Pipe Operators](./pipe-operators/index.md)**: These are the "workers" of your pipeline. They perform concrete actions like calling an LLM (`PipeLLM`), extracting text from a document (`PipeExtract`), searching the web (`PipeSearch`), or running a Python function (`PipeFunc`). Each operator is a specialized tool designed for a specific task.
 *   **[Pipe Controllers](./pipe-controllers/index.md)**: These are the "managers" of your pipeline. They don't perform tasks themselves but orchestrate the execution flow of other pipes. They define the logic of your method, such as running pipes in sequence (`PipeSequence`), in parallel (`PipeParallel`), or based on a condition (`PipeCondition`).
 
+A third, design-time-only kind of pipe — **[Signature Pipes](./signature-pipes.md)** (`PipeSignature`) — lets you stub a pipe's contract (inputs and output) without an implementation. Signatures dry-run as mocks under `--allow-signatures`, so you can sketch a pipeline top-down before writing each operator. Strict validation refuses pipelines that still depend on a signature.
+
 ## Designing a Pipeline: Composition in MTHDS
 
 The most common way to design a pipeline is by defining and composing pipes in a `.mthds` configuration file. This provides a clear, declarative way to see the structure of your method.

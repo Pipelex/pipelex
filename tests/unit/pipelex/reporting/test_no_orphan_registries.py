@@ -111,6 +111,27 @@ class TestNoOrphanRegistries:
         with pytest.raises(KeyError):
             manager._get_registry_strict("never_opened")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
+    def test_close_registry_is_idempotent_on_missing(self) -> None:
+        """close_registry on an unopened (or already-closed) run is a no-op, never a KeyError.
+
+        close_registry runs from sweep / runner ``finally`` blocks (e.g. BundleValidator's
+        per-sweep registry). A bare ``pop`` would raise KeyError there and mask the in-flight
+        exception. Pin the defaulted-pop hardening: closing a run that was never opened, and
+        double-closing an opened run, must both be silent.
+        """
+        manager = ReportingManager()
+        manager.setup()
+
+        # Never opened → no-op.
+        manager.close_registry("never_opened")
+
+        # Opened then double-closed → first removes it, second is a silent no-op.
+        manager.open_registry("run_once")
+        manager.close_registry("run_once")
+        manager.close_registry("run_once")
+
+        assert "run_once" not in manager._usage_registries  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
     def test_generate_report_for_unopened_run_creates_empty_registry_and_renders(self) -> None:
         """generate_report on a never-opened run does not crash; renders empty cost report."""
         manager = ReportingManager()
