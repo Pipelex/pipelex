@@ -18,6 +18,7 @@ Two pure-ish building blocks composed by both the single-run wrapper
   library mutation.
 """
 
+from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -128,6 +129,26 @@ def acquire_library(
             else:
                 clear_current_library()
             library_manager.teardown(library_id=library_id)
+
+
+def load_libraries_and_activate(library_dirs: Sequence[str | Path] | None = None) -> str:
+    """Open a fresh library, set it current, resolve + load ``library_dirs``, and leave it loaded.
+
+    The single public entry for the open/set/load ceremony that ``Pipelex.make`` deliberately does
+    **not** perform (``make`` only records default dirs). Returns the new ``library_id``; the library
+    stays open and current for the caller to query or sweep (e.g. via
+    :meth:`BundleValidator.validate_current_library`). Delegates to :func:`acquire_library` for the
+    tested open + set-current + load + load-failure teardown, dropping the bundle ``main_pipe`` element
+    that directory-loading callers do not need.
+
+    ``library_dirs`` follows the standard 3-tier resolution (see :func:`resolve_library_dirs`): ``None``
+    falls back to the instance defaults / ``PIPELEXPATH``; an explicit ``[]`` disables loading.
+    """
+    library_id, _ = acquire_library(
+        library_id="",
+        library_dirs=[str(lib_dir) for lib_dir in library_dirs] if library_dirs is not None else None,
+    )
+    return library_id
 
 
 async def prepare_pipe_job(

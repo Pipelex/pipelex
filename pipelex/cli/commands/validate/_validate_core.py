@@ -7,7 +7,6 @@ import typer
 from posthog import tag
 from rich.traceback import Traceback
 
-from pipelex import log
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import (
     ErrorContext,
@@ -20,6 +19,7 @@ from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.hub import (
     get_console,
     get_library_manager,
+    get_pipes,
     get_required_pipe,
     get_telemetry_manager,
     resolve_library_dirs,
@@ -32,6 +32,7 @@ from pipelex.pipe_signature.signature_walk import collect_signature_refs
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.bundle_validator import BundleValidator
 from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.execution_seams import load_libraries_and_activate
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
@@ -65,32 +66,23 @@ def do_validate_all_libraries_and_dry_run(
             tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} all")
 
-            library_manager = get_library_manager()
-            library_id, library = library_manager.open_library()
-            set_current_library(library_id=library_id)
-            effective_dirs, source_label = resolve_library_dirs(library_dirs)
-            if effective_dirs:
-                library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
-            else:
-                log.info(f"No library directories to load ({source_label})")
+            # Single public composer for the open/set/load ceremony — leaves the library loaded and
+            # current for the sweep below, owning the standard 3-tier dir resolution and load-failure
+            # teardown. No teardown on success here: the caller (validate_pipe_cmd) owns Pipelex teardown.
+            load_libraries_and_activate(library_dirs)
 
-            all_pipes = library.pipe_library.get_pipes()
-            # In strict mode, signatures themselves are skipped (validating them would always fail
-            # the signature pre-check). In lenient mode, iterate all pipes — signatures dry-run trivially.
+            # The pipe list is needed only to render the "Validating N" line and the signature-count
+            # suffix; validate_current_library re-derives it (with the same strict-mode signature filter)
+            # from the current library for the sweep itself.
+            all_pipes = get_pipes()
             pipes = all_pipes if allow_signatures else [pipe for pipe in all_pipes if not pipe.is_signature]
             if library_dirs:
                 dirs_str = ", ".join(f'"{lib_dir}"' for lib_dir in library_dirs)
                 typer.echo(f"Validating {len(pipes)} pipe(s) from: {dirs_str}")
 
-            # BundleValidator.validate_pipes owns the static wiring pass, the strict signature pre-pass,
-            # and the single PIPE_DRY_RUN telemetry event — sweeping against the library we just loaded.
-            asyncio.run(
-                BundleValidator().validate_pipes(
-                    pipes=pipes,
-                    library_id=library_id,
-                    allow_signatures=allow_signatures,
-                )
-            )
+            # validate_current_library owns the static wiring pass, the strict signature pre-pass, and the
+            # single PIPE_DRY_RUN telemetry event — sweeping the library we just loaded, without teardown.
+            asyncio.run(BundleValidator().validate_current_library(allow_signatures=allow_signatures))
             signature_count = sum(1 for pipe in pipes if pipe.is_signature)
             typer.echo(f"Setup sequence passed OK, config and pipelines are validated.{_format_signatures_summary_suffix(signature_count)}")
     except SignaturesNotAllowedError as sig_error:
