@@ -45,6 +45,7 @@ from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.system.configuration.configs import PipelineExecutionConfig
+from pipelex.tools.misc.file_utils import reject_bare_str_or_path
 
 if TYPE_CHECKING:
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
@@ -142,8 +143,10 @@ def load_libraries_and_activate(library_dirs: Sequence[str | Path] | None = None
     that directory-loading callers do not need.
 
     ``library_dirs`` follows the standard 3-tier resolution (see :func:`resolve_library_dirs`): ``None``
-    falls back to the instance defaults / ``PIPELEXPATH``; an explicit ``[]`` disables loading.
+    falls back to the instance defaults / ``PIPELEXPATH``; an explicit ``[]`` disables loading. A bare
+    ``str``/``Path`` (a single directory) is rejected — wrap it in a list.
     """
+    reject_bare_str_or_path(library_dirs, param_name="library_dirs")
     library_id, _ = acquire_library(
         library_id="",
         library_dirs=[str(lib_dir) for lib_dir in library_dirs] if library_dirs is not None else None,
