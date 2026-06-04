@@ -39,6 +39,7 @@ from pipelex.system.console_target import ConsoleTarget
 from pipelex.system.environment import PIPELEXPATH_ENV_KEY, get_pipelexpath_dirs
 from pipelex.system.registries.func_registry import FuncRegistry
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
+from pipelex.tools.misc.file_utils import reject_bare_str_or_path
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
@@ -551,6 +552,7 @@ def resolve_library_dirs(library_dirs: Sequence[str | Path] | None = None) -> tu
         - effective_dirs: The resolved list of Path objects
         - source_label: A string describing the source for logging (e.g., "per-call")
     """
+    reject_bare_str_or_path(library_dirs, param_name="library_dirs")
     if library_dirs is not None:
         return [Path(lib_dir) for lib_dir in library_dirs], "per-call"
 
