@@ -436,7 +436,7 @@ Define user-friendly names that map to model names. Aliases are defined in the d
 # Simple aliases map to a single model
 best-claude = "claude-4.5-opus"
 best-gpt = "gpt-5.2"
-best-gemini = "gemini-3.0-pro"
+best-gemini = "gemini-3.1-pro"
 
 # Default aliases (used in presets)
 default-general = "claude-4.5-sonnet"
@@ -580,7 +580,7 @@ for_object = "@my-custom-alias"
 
 # Add custom waterfalls - lists of models tried in order
 [llm.waterfalls]
-premium-llm = ["claude-4.5-opus", "gemini-3.0-pro", "gpt-5.2"]
+premium-llm = ["claude-4.5-opus", "gemini-3.1-pro", "gpt-5.2"]
 small-llm = ["gemini-2.5-flash-lite", "gpt-4o-mini", "claude-3-haiku"]
 ```
 
@@ -594,7 +594,7 @@ document_extractor = ["azure-document-intelligence", "mistral-document-ai-2505"]
 When using waterfalls in `.mthds` files, prefix them with `~`:
 
 ```toml
-model = "~premium-llm"    # Will try claude-4.5-opus, then gemini-3.0-pro, then gpt-5.2
+model = "~premium-llm"    # Will try claude-4.5-opus, then gemini-3.1-pro, then gpt-5.2
 model = "~small-llm"      # Will try gemini-2.5-flash-lite, then gpt-4o-mini, etc.
 ```
 
