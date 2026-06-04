@@ -286,8 +286,8 @@ thinking_mode = "manual"
 prompting_target = "gemini"
 x-portkey-provider = "@google"
 
-["gemini-3.0-pro"]
-model_id = "gemini-3-pro-preview"
+["gemini-3.1-pro"]
+model_id = "gemini-3.1-pro-preview"
 inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 3000
