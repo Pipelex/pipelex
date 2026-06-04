@@ -1,15 +1,11 @@
 import openai
 
 from pipelex import log
-from pipelex.cogt.exceptions import CogtError
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.config import get_config
+from pipelex.plugins.openai.openai_exceptions import OpenAIClientFactoryError
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.types import StrEnum
-
-
-class OpenAIClientFactoryError(CogtError):
-    pass
 
 
 class OpenAISdkVariant(StrEnum):

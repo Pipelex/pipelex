@@ -1,5 +1,60 @@
 # Changelog
 
+## [v0.31.0] - 2026-06-04
+
+This release hardens Pipelex at its edges. The headliners: a full **error-handling overhaul** that gives every error a stable, RFC 7807-shaped identity and carries it all the way out to webhooks and external surfaces; **lenient validation with pipe signatures**, so you can sketch and dry-run a whole pipeline top-down before a single pipe is implemented; and a first, **experimental cut of CSV tabular support** for reading and writing typed lists straight from `.csv`.
+
+### Added
+
+- **Stable error identity (RFC 7807).** Every `PipelexError` now exposes `title()` and a stable `type_uri()` — a real, dereferenceable `https://docs.pipelex.com/latest/errors/<error>/` URL — and every `ErrorReport` carries both as populated fields, so consumers read `report.title` / `report.type_uri` directly instead of humanizing class names. `ErrorReport.to_problem_document()` renders an `application/problem+json` document with no web-framework dependency, and a new `DisclosureMode` (`VERBOSE` / `STRICT`) controls how much leaks onto external surfaces: `STRICT` drops provider/model attribution and redacts any message that wasn't authored to be caller-facing, keeping only the stable identifiers.
+
+- **Structured error payloads on failure webhooks.** When a run fails, the delivery webhook now includes an `error` object — the full `ErrorReport` as a dict — so receivers can rehydrate it with `ErrorReport.from_dict(...)`, render an RFC 7807 response, or route on `error_domain` / `retryable`. Applies to both Temporal and direct execution. A `WebhookTarget.payload` that collides with a Pipelex-reserved key (`pipeline_run_id`, `status`, `result_url`, `error`) is now rejected at construction.
+
+- **Per-class error reference pages.** Every `PipelexError` subclass now has a generated reference page under `docs/errors/`, surfaced in the docs site as "Error Reference" — so a `type_uri` dereferences straight to a populated page. Regenerate with the new `pipelex-dev generate-error-pages` command (`make generate-error-pages`, alias `make gep`); pages a maintainer claims with a `<!-- pipelex:authored -->` marker are preserved across runs.
+
+- **`request_id` on `JobMetadata`.** An optional caller-supplied request id, threaded through every activity / workflow / submitter hop and into the Temporal log context. Set it at dispatch with `pipeline_run_setup(..., request_id="...")` and read it back off `job_metadata.request_id`.
+
+- **`PipeSignature` — contract-only pipes for top-down design.** A new pipe type (`type = "PipeSignature"`) declares a pipe's `inputs`, `output`, and `description` with no implementation, so an author or agent can sketch a complete pipeline before committing to the operator that will eventually do the work. At dry-run time a signature mints a mock output matching its declared type and multiplicity; at runtime it raises `PipeSignatureNotExecutableError`. The optional `signature_for` field hints which pipe type the stub stands in for. See [Signature Pipes](https://docs.pipelex.com/latest/building-methods/pipes/signature-pipes/).
+
+- **Lenient validation with `--allow-signatures`.** `pipelex validate pipe|bundle` and every `pipelex-agent validate` subcommand take `--allow-signatures` (default off) to dry-run a pipeline that still contains `PipeSignature` stubs. Strict by default: without the flag, validation refuses any pipeline whose dependency graph reaches a signature and raises `SignaturesNotAllowedError`, reporting every reachable stub plus the controller chain that leads to it — so you know exactly which pipes are still placeholders.
+
+- **CSV tabular support (experimental).** Read a `.csv` straight into a typed `ListContent[YourConcept]`: point an `inputs.json` reference at a `.csv` whose column headers match the concept's field names, and each row becomes an instance, with cells coerced via Pydantic (`birth_year` → `int`, ISO dates → `date`; an empty cell becomes `None`, so the field must be optional). Write a flat-list output back out with the new `--save-csv <path>` flag on `pipelex run pipe|bundle|method`. v1 is deliberately narrow — local file paths only (remote URLs with a tabular suffix are rejected), the row concept must be flat (scalar fields only; a nested/list/concept-typed field is rejected with a clear error naming it), and `.xlsx` is recognized but routed to a "needs `pipelex[tabular]`" message (the Excel backend isn't built yet). See the [CSV Input & Output guide](https://docs.pipelex.com/latest/building-methods/pipes/csv-input-and-output/).
+
+- **`--traceback` CLI flag for full stack traces.** By default CLI commands print a friendly one-line error; `--traceback` also prints the Rich-rendered stack trace before it. It's position-agnostic — `pipelex run --traceback pipe ...` and `pipelex run pipe ... --traceback` both work.
+
+- **Test tooling for hanging runs.** New `make agent-test-debug` (alias `make atd`) runs the suite with upfront stale-process cleanup, an outer wall-clock timeout, and live per-test logging — for when `make agent-test` hangs or fails opaquely. Paired with a debugging playbook at `docs/agents/debugging-hanging-pytest-runs.md`.
+
+### Changed
+
+- **`ErrorReport` is now a frozen Pydantic `BaseModel`** (was a frozen Pydantic dataclass) — still immutable and still round-trips through `to_dict()` / `from_dict()`, but an attempted mutation now raises `pydantic.ValidationError` instead of `dataclasses.FrozenInstanceError`. Relatedly, **`recover_error_report()` is now total**: it always returns an `ErrorReport`, synthesizing one from the new `UnrecoverableWorkflowFailureError` (surfacing the deepest worker-side cause) when a Temporal failure carries no embedded report — callers no longer branch on `None`.
+
+- **Dry-run and validation consolidated into `BundleValidator`.** The standalone `dry_run_pipe` / `dry_run_pipes` functions and the modules `pipelex/pipe_run/dry_run.py`, `dry_run_with_graph.py`, and `dry_pipe_router.py` are gone; their work now lives in `BundleValidator`, and `validate_bundle` / `BundleValidator` gained the `allow_signatures: bool = False` flag (strict by default). Validation ordering and outputs are unchanged — only the import surface moved. Callers importing from `pipelex.pipe_run.dry_run` must switch to `BundleValidator`.
+
+- **`validated_pipes` now identifies every pipe by its qualified `pipe_ref` (`domain.code`).** Previously `validate pipe` reported the bare code while `validate bundle` / `validate all` reported the namespaced ref, so the same pipe could appear under two identities depending on which command produced it. Every validate surface now emits the qualified ref, which can't collide across domains. Consumers that parsed `pipe_code` expecting the bare form (e.g. the MTHDS skills) must match on the namespaced ref.
+
+- **Gemini deck refresh.** Google shut down `gemini-3-pro-preview`, so the `gemini-3.0-pro` handle is removed across the `google`, `portkey`, and `openrouter` backends (and the test-profile collections) — use `gemini-3.1-pro` (→ `gemini-3.1-pro-preview`) instead, now registered on `portkey` too for parity with `google`. The `gemini-3.0-flash-preview` handle is renamed to `gemini-3.0-flash`. The Pipelex Gateway lists models from its own remote config, so drop `gemini-3.0-pro` there separately.
+
+- **Filesystem path helpers moved to `pathlib.Path`.** Helpers in `pipelex.tools.misc.file_utils` and `pipelex.tools.misc.json_utils` (`save_text_to_path`, `load_json_from_path`, `load_binary`, `copy_file`, `ensure_directory_exists`, `get_incremental_file_path`, and the rest) now take and return `Path` instead of `str`; path handling is `Path`-based throughout `pipelex/`, converting to/from `str` only at boundaries. Callers passing bare strings must wrap them with `Path(...)`.
+
+- **Safer Temporal defaults.** `[temporal.search_attributes]` now ships `enabled = false` (opt in per env) so a local boot can't fail on the unregistered-attribute check, and the default `[temporal.queue_options.temporal_task_queue]` block is removed to avoid leaving an orphan overlay when a queue is renamed.
+
+- **`teardown_current_library()` renamed to `clear_current_library()`** in `pipelex.hub`, pairing it cleanly with `set_current_library()`.
+
+- **Dev tooling: `pyright` bumped `1.1.408 → 1.1.410`** (drove two behavior-neutral internal adjustments).
+
+### Fixed
+
+- **The generated MTHDS schema now requires `type` on every pipe.** In the schema consumed by `plxt` lint and the VS Code Taplo LSP, each pipe blueprint variant declared `type` with a literal default — so it was optional, and because the Draft-4 export drops the union discriminator, a pipe table written without `type` matched several `oneOf` branches at once and was rejected with an ambiguous multi-match (worse, a type-less table carrying fields unique to one variant validated silently). `type` is now required on every variant, so a type-less pipe table fails with a clear "missing type" and a typed table resolves to exactly one variant. The patched set derives from `PipeBlueprintUnion`, so new pipe types are covered automatically. Regenerate with `pipelex-dev generate-mthds-schema`.
+
+- **`InputStuffSpecsFactoryError` was shadowed by a duplicate class definition.** `input_stuff_specs_factory.py` declared a local class with the same name as the canonical one in `exceptions.py`, leaving two distinct class objects in play so an `except` on one would miss the other. Consolidated to the single canonical class.
+
+### Security
+
+- **urllib3 floor `>=2.7.0`** to patch two high-severity issues: CVE-2026-44431 (GHSA-qccp-gfcp-xxvc) forwards sensitive headers across origins on proxied low-level redirects, and CVE-2026-44432 (GHSA-mf9v-mfxr-j63j) bypasses the decompression-bomb safeguards in parts of the streaming API. Floor added to the runtime `dependencies`.
+- **pymdown-extensions floor `>=10.21.3`** to patch CVE-2026-46338 (GHSA-62q4-447f-wv8h, medium): a regression in `pymdownx.snippets` reintroduced the sibling-prefix path-traversal bypass despite `restrict_base_path`. Docs-only; floor added to the `docs` extra.
+- **idna floor `>=3.15`** (lockfile resolves to 3.18) to patch CVE-2026-45409 (GHSA-65pc-fj4g-8rjx, medium): specially crafted inputs to `idna.encode()` could bypass the CVE-2024-3651 fix. Floor added to the runtime `dependencies`.
+- **Proactive floor bumps in the same hardening pass**, past known-vulnerable releases: pillow `>=12.1.1`, protobuf `>=6.33.5`, python-dotenv `>=1.2.2`, requests `>=2.33.0` (runtime); aiohttp `>=3.12.14` (`temporal` extra); Pygments `>=2.20.0` (`docs` extra).
+
 ## [v0.30.3] - 2026-05-28
 
 ### Added

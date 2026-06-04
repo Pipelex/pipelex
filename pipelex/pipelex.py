@@ -599,7 +599,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             if needs_inference:
                 pipelex_instance.models_manager.validate_model_deck()
         except BaseException:
-            # Cleanup the singleton instance if setup fails to avoid "already initialized" errors
+            # Cleanup the singleton instance if setup fails to avoid "already initialized" errors.
             if cls in MetaSingleton.instances:
                 del MetaSingleton.instances[cls]
             raise

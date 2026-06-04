@@ -19,7 +19,8 @@ from pipelex.core.pipes.inputs.input_renderer import NoInputsRequiredError, rend
 from pipelex.hub import get_library_manager, get_required_pipe, get_telemetry_manager, resolve_library_dirs, set_current_library
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION
-from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
+from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.file_utils import (
@@ -102,8 +103,8 @@ async def _generate_inputs_core(
         final_output_path = Path("results") / DEFAULT_INPUTS_FILE_NAME
 
     try:
-        ensure_directory_for_file_path(file_path=str(final_output_path))
-        save_text_to_path(text=inputs_json_str, path=str(final_output_path))
+        ensure_directory_for_file_path(file_path=final_output_path)
+        save_text_to_path(text=inputs_json_str, path=final_output_path)
         typer.secho(f"Generated input JSON file: {final_output_path}", fg=typer.colors.GREEN)
     except Exception as exc:
         # CLI command boundary: any failure writing the file is reported to the user and exits via typer.Exit.

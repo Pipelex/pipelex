@@ -1,0 +1,22 @@
+domain      = "url_field_concept"
+description = "Detection-test fixture: a real concept whose own structure declares a `url` field"
+
+# Why this bundle exists (it is NOT a runnable demo — there are no pipes on purpose):
+#
+# Pipelex reads a CSV file when a pipeline input is the bare wrapper `{ "url": "<...>.csv" }`
+# under a row concept. But `url` is also a perfectly ordinary field name a concept may declare
+# for its own data. `Link` is exactly such a concept — a real-world shape that legitimately
+# carries a `url` field — so it lets the input-detection tests fence the ambiguous corners:
+#
+#   { "label": ..., "url": "https://example.com" }  -> stays ONE record  (url value is not a tabular path)
+#   { "label": ..., "url": "report.csv" }           -> stays ONE record  (sibling `label` => not a table ref)
+#   { "url": "links.csv" }  (and links.csv has a `url` column)  -> reads as a TABLE; the inner
+#                                                                  `url` column is ordinary cell data
+#
+# The detection tests live in tests/integration/pipelex/csv/test_csv_input_detection.py.
+
+[concept.Link]
+description = "A labelled hyperlink — a real concept that naturally has a `url` field"
+[concept.Link.structure]
+label = { type = "text", required = true, description = "Human-readable label" }
+url   = { type = "text", required = true, description = "Target URL — ordinary cell data, not a table reference" }

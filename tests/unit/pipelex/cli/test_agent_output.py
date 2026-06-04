@@ -29,7 +29,8 @@ from pipelex.cogt.inference.error_classification import UserAction, UserActionKi
 from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
-from pipelex.pipeline.validate_bundle import ValidateBundleError
+from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
+from pipelex.pipeline.exceptions import ValidateBundleError
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -70,6 +71,24 @@ class TestAgentOutput:
         parsed = json.loads(capsys.readouterr().err)
         assert "hint" in parsed
         assert parsed["hint"] == AGENT_ERROR_HINTS["PipeOperatorModelChoiceError"]
+
+    def test_agent_error_includes_signature_hint(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """A SignaturesNotAllowedError surfaced through the agent boundary must carry the --allow-signatures hint.
+
+        The agent CLI's strict `validate pipe --all` / single-pipe paths surface this error through
+        agent_error with the exception as cause. The hint still comes from the AGENT_ERROR_HINTS
+        fallback (the class declares no class-level user_action), while error_domain now flows from the
+        exception's class-level INPUT classification rather than the AGENT_ERROR_DOMAINS dict.
+        """
+        cause = SignaturesNotAllowedError(offending_pipe_refs={"d.caller"}, signature_refs={"d.summary_sig"}, dep_paths={})
+        with pytest.raises(typer.Exit):
+            agent_error("strict validation reached a PipeSignature", "SignaturesNotAllowedError", cause=cause)
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert parsed["hint"] == AGENT_ERROR_HINTS["SignaturesNotAllowedError"]
+        assert "--allow-signatures" in parsed["hint"]
+        # error_domain is now sourced from the class-level metadata (INPUT), not the lookup dict.
+        assert parsed["error_domain"] == "input"
 
     def test_agent_error_no_hint_for_unknown_type(self, capsys: pytest.CaptureFixture[str]) -> None:
         """agent_error should not include hint for unregistered error types."""
@@ -136,24 +155,15 @@ class TestAgentOutput:
                     variable_names=["y"],
                 ),
             ],
-            pipe_concept_instantiation_errors=[
-                PipesAndConceptValidationErrorData(
-                    error_type=PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR,
-                    pipe_code="pipe_d",
-                    message="pydantic validation failed",
-                    field_path="pipe_d.output",
-                ),
-            ],
         )
 
         result = extract_validation_errors(exc)
-        assert len(result) == 4
+        assert len(result) == 3
 
         categories = [entry["category"] for entry in result]
         assert "blueprint_validation" in categories
         assert "pipe_factory" in categories
         assert "pipe_validation" in categories
-        assert "instantiation" in categories
 
         # Check factory error has extra fields
         factory_entry = next(entry for entry in result if entry["category"] == "pipe_factory")

@@ -1,0 +1,38 @@
+# `wip/` — Work in Progress
+
+This folder holds the **active** planning, design, and current-state docs for the Pipelex runtime — the things that are started or about to start. Finished plans and design history live in the private workspace (`docs/history/`, `docs/plans/`), not here. If a doc describes how the code got to where it is rather than where it is or is going, it does not belong in `wip/`.
+
+## How this is organized
+
+- **Track folders** group a multi-doc concern. Each has its own `README.md` that maps the track and states what's open. Open the README first.
+- **Standalone docs** are single-topic designs that have no siblings — they live loose at the root with self-describing names (no folder needed).
+- There is **no consolidated cross-cutting backlog** — deferred items and follow-ups live with their feature, in the relevant track or standalone doc's own "open / deferred" section. Follow-ups to features that already shipped live with that feature's record in the private workspace (`docs/history/`, `docs/plans/`), not here.
+
+## Tracks
+
+- **[distributed-execution/](distributed-execution/)** — running MTHDS methods as Temporal workflows across separate worker processes. Its [README](distributed-execution/README.md) is the priority-ordered plan; the folder also holds the tracing/cost-reporting as-built reference, the crate-packaging phases (6a/6b) and crate-first vision, the implemented Temporal IDs/naming design, and the deferred Temporal-exception and schema-reconstruction hardening proposals. **This is the active headline track.**
+- **[error-handling/](error-handling/)** — the current-state reference for error handling across Pipelex, track-organized (metadata model, worker classification, extract/classify/render, retry, CLI delivery, Temporal integration, testing). Mostly landed; its [README](error-handling/README.md) lists what's still open.
+- **[concurrency/](concurrency/)** — direct-mode batching / backpressure design. The retry-jitter quick win shipped; the remaining design work is split into fan-out scheduling, rate limiting, and batch partial-failure docs. Status: design scoping.
+- **[csv-support/](csv-support/)** — reading `.csv` files into typed `ListContent` and writing flat list outputs back out via `--save-csv`. Its [README](csv-support/README.md) is the feature + reviewer reference (codec, core input hook, CLI output hook, the I/O contract, locked decisions); the folder also holds the design rationale and the deferred review/security follow-ups. Landed in #955.
+
+## Standalone docs
+
+- **[signature-based-validation.md](signature-based-validation.md)** — `PipeSignature` contract-only pipes plus strict/lenient (`--allow-signatures`) validation, on `feature/Validate-with-signatures-3`. Landed (Phases 1–7.3, tests green); current-state reference + reviewer verification map. The one open item is the Phase 7.4 cross-repo schema merge-gate (retire the branch-local MTHDS schema rule once `vscode-pipelex` ships the bundled schema).
+- **[temporal-e2e-validate-skill.md](temporal-e2e-validate-skill.md)** — validation status of the `/temporal-e2e-validate` skill and the Step 9 (queue-options) skill bugs patched in its `queue-options-battery.md`. Full dry + live run all green; open follow-ups are the vestigial `act_jinja2_gen_text` removal and a stale Mode 1 "Known xfails" note.
+- **[webhook-signing.md](webhook-signing.md)** — security track: HMAC body-signing for the completion-callback webhook, with a 3-step cross-repo rollout. The last open piece of the error-handling API-readiness companion work. Plan ready, not started.
+- **[runtime-code-fixes.md](runtime-code-fixes.md)** — verified `pipelex/` runtime fixes to pick up.
+- **[structured-logging.md](structured-logging.md)** — kickoff briefing for replacing string-interpolated log context with structured logging + contextvars. Kicked off, not started; sequenced after the error-handling stack merges.
+- **[stuffs-as-nodespec.md](stuffs-as-nodespec.md)** — future graph-model rework to make stuffs first-class `NodeSpec` instances. A starter, not a worked plan.
+- **[blueprint-elaboration-directives.md](blueprint-elaboration-directives.md)** — extending the build-time blueprint-elaboration system: first-class synthetic-pipe handling, a directive plugin registry, and supporting tooling.
+- **[pathlib-refactor.workflow.js](pathlib-refactor.workflow.js)** — a runnable multi-agent workflow that refactors filesystem path handling to `pathlib.Path` across `pipelex/` (intended for the `refactor/Paths` branch). Tooling, not a doc.
+
+## Suggested priorities
+
+A pickup order grounded in each doc's own status — adjust to current signals.
+
+1. **[runtime-code-fixes.md](runtime-code-fixes.md)** — smallest and already verified. The `request_id`-on-delivery-failure fix is a quick win; the cross-worker cost-report assembly wiring is the one genuine functional gap (it is also **P1** of the distributed-execution track).
+2. **[distributed-execution/](distributed-execution/)** — the active headline track. Take P1 (cross-worker cost report assembly) first, then the crate phases P2 (local cross-package deps) → P3 (remote deps).
+3. **[webhook-signing.md](webhook-signing.md)** — security-reviewed plan, ready to execute; closes the last open error-handling-companion item. Cross-repo, so coordinate the rollout.
+4. **error-handling long tail** — the metadata-model followups and the `request_id` correlation on delivery error paths in [error-handling/](error-handling/). Mostly landed; these are the remainder.
+5. **[concurrency/](concurrency/)** — pick up when batch-at-scale becomes a priority. Fan-out scheduling and batch partial-failure are coupled (take together); rate limiting is independent.
+6. **Deferred / larger / future** — [structured-logging.md](structured-logging.md) (after error-handling merges), [pathlib-refactor.workflow.js](pathlib-refactor.workflow.js) (run when ready), [stuffs-as-nodespec.md](stuffs-as-nodespec.md), the deferred Temporal-exception and schema-reconstruction proposals in [distributed-execution/](distributed-execution/), and [blueprint-elaboration-directives.md](blueprint-elaboration-directives.md). Take individually as needs and signals dictate.

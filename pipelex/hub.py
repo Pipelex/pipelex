@@ -1,5 +1,6 @@
 import sys
-from collections.abc import Sequence
+from collections.abc import Generator, Sequence
+from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Optional
@@ -38,6 +39,7 @@ from pipelex.system.console_target import ConsoleTarget
 from pipelex.system.environment import PIPELEXPATH_ENV_KEY, get_pipelexpath_dirs
 from pipelex.system.registries.func_registry import FuncRegistry
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
+from pipelex.tools.misc.file_utils import reject_bare_str_or_path
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
@@ -492,13 +494,43 @@ def get_current_library() -> str:
     return library_id
 
 
+def get_current_library_id_or_none() -> str | None:
+    """Return the current library_id, or ``None`` if none is set."""
+    return _library_id.get()
+
+
 def get_default_library_dirs() -> list[Path] | None:
     return get_pipelex_hub().get_default_library_dirs()
 
 
-def teardown_current_library() -> None:
-    """Teardown the library_id for the current async context."""
+def clear_current_library() -> None:
+    """Clear the current-library binding (the ``None`` case of :func:`set_current_library`).
+
+    Resets the ``_library_id`` ContextVar to ``None`` for the current async context. This only
+    drops the *pointer* to which library is current — it does **not** free the ``Library`` object
+    from the ``LibraryManager``. To release the library itself, call
+    ``library_manager.teardown(library_id=...)`` (the two are distinct and a full cleanup typically
+    does both).
+    """
     _library_id.set(None)
+
+
+@contextmanager
+def scoped_current_library(library_id: str) -> Generator[None, None, None]:
+    """Set ``library_id`` for the scope, then restore the prior value on exit.
+
+    Captures the prior ``_library_id`` ContextVar value before setting the new
+    one. On exit — success or exception — restores the prior value (or clears
+    the var if there wasn't one). Use this whenever a function temporarily
+    needs a current library for a nested operation without clobbering an
+    outer caller's library_id.
+    """
+    prev = _library_id.get()
+    _library_id.set(library_id)
+    try:
+        yield
+    finally:
+        _library_id.set(prev)
 
 
 def resolve_library_dirs(library_dirs: Sequence[str | Path] | None = None) -> tuple[list[Path], str]:
@@ -520,6 +552,7 @@ def resolve_library_dirs(library_dirs: Sequence[str | Path] | None = None) -> tu
         - effective_dirs: The resolved list of Path objects
         - source_label: A string describing the source for logging (e.g., "per-call")
     """
+    reject_bare_str_or_path(library_dirs, param_name="library_dirs")
     if library_dirs is not None:
         return [Path(lib_dir) for lib_dir in library_dirs], "per-call"
 

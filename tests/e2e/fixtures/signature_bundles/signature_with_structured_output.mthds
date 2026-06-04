@@ -1,0 +1,19 @@
+domain    = "signature_structured"
+main_pipe = "summarize_structured"
+
+[concept.SigStructDoc]
+description = "A document concept for the structured-output signature test."
+
+[concept.SigStructuredSummary]
+description = "A structured summary returned by the signature (custom fields, not plain Text)."
+
+[concept.SigStructuredSummary.structure]
+title      = { type = "text", description = "Summary title", required = true }
+body       = { type = "text", description = "Summary body", required = true }
+word_count = { type = "integer", description = "Number of words in the summary", required = true }
+
+[pipe.summarize_structured]
+type        = "PipeSignature"
+description = "Summarize a document into a structured summary (contract only)."
+inputs      = { doc = "SigStructDoc" }
+output      = "SigStructuredSummary"

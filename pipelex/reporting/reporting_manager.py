@@ -1,7 +1,7 @@
 from collections.abc import Sequence
-from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import NamedTuple
 
 from pydantic import Field, RootModel
 from typing_extensions import override
@@ -33,12 +33,8 @@ try:
 except ImportError:
     _BotoClientError = None  # type: ignore[assignment, misc]
 
-if TYPE_CHECKING:
-    from pathlib import Path
 
-
-@dataclass
-class _EventLogContext:
+class _EventLogContext(NamedTuple):
     """Per-workflow/run event log state. Private to ReportingManager."""
 
     event_log: EventLogProtocol
@@ -369,7 +365,7 @@ class ReportingManager(ReportingProtocol):
     def generate_report(self, pipeline_run_id: str | None = None, print_to_console: bool = True):
         is_csv_enabled = self._reporting_config.is_generate_cost_report_file_enabled
         if is_csv_enabled:
-            ensure_path(self._reporting_config.cost_report_dir_path)
+            ensure_path(Path(self._reporting_config.cost_report_dir_path))
 
         registries_to_process: dict[str, UsageRegistry] = {}
         if pipeline_run_id:
@@ -381,7 +377,7 @@ class ReportingManager(ReportingProtocol):
             cost_report_file_path: Path | None = None
             if is_csv_enabled:
                 cost_report_file_path = get_incremental_file_path(
-                    base_path=self._reporting_config.cost_report_dir_path,
+                    base_path=Path(self._reporting_config.cost_report_dir_path),
                     base_name=self._reporting_config.cost_report_base_name,
                     extension=self._reporting_config.cost_report_extension,
                 )
@@ -395,4 +391,6 @@ class ReportingManager(ReportingProtocol):
 
     @override
     def close_registry(self, pipeline_run_id: str):
-        self._usage_registries.pop(pipeline_run_id)
+        # Idempotent on miss (mirrors clear_event_log): close_registry runs from sweep / runner
+        # `finally` blocks, where a KeyError from a bare `pop` would mask the in-flight exception.
+        self._usage_registries.pop(pipeline_run_id, None)

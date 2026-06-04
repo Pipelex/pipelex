@@ -44,8 +44,10 @@ async def build_inputs_for_pipe(
         ValueError: If no pipe code can be determined.
     """
     if mthds_contents:
-        # validate_bundle opens a library, loads blueprints, and sets it as current
-        validate_bundle_result = await validate_bundle(mthds_contents=mthds_contents, library_dirs=library_dirs)
+        # validate_bundle opens a library, loads blueprints, and sets it as current.
+        # allow_signatures=True: rendering inputs only needs the pipes loaded, not a fully
+        # runnable pipeline — so an in-progress bundle with PipeSignature placeholders is fine here.
+        validate_bundle_result = await validate_bundle(mthds_contents=mthds_contents, library_dirs=library_dirs, allow_signatures=True)
         blueprints = validate_bundle_result.blueprints
         if not pipe_code:
             # Find the first blueprint that declares a main_pipe, domain-qualified
@@ -59,7 +61,8 @@ async def build_inputs_for_pipe(
                 raise ValueError(msg)
             pipe_code = main_pipe_code
     elif bundle_path:
-        validate_bundle_result = await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs)
+        # allow_signatures=True: see the mthds_contents branch — rendering inputs tolerates placeholders.
+        validate_bundle_result = await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs, allow_signatures=True)
         bundle_blueprint = validate_bundle_result.blueprints[0]
         if not pipe_code:
             main_pipe_code = bundle_blueprint.main_pipe

@@ -27,7 +27,7 @@ from typing import Any, NoReturn, cast
 import typer
 
 from pipelex.base_exceptions import PipelexError
-from pipelex.pipeline.validate_bundle import ValidateBundleError
+from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.tools.misc.json_utils import clean_json_dumps
 from pipelex.types import StrEnum
 
@@ -106,6 +106,10 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     ),
     # Validation errors
     "PipeValidationError": "Check pipe inputs, outputs, and concept references for consistency",
+    "SignaturesNotAllowedError": (
+        "This pipeline reaches a PipeSignature placeholder that has no implementation. Replace each signature with a real "
+        "pipe, or re-run with --allow-signatures to validate the partial pipeline."
+    ),
     # Execution errors
     "PipeExecutionError": "A pipe input validation failed during pipeline execution. Check the error message for the failing model and field.",
     # File/input errors
@@ -114,7 +118,6 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "JSONDecodeError": "Verify the JSON input is valid (check for trailing commas, unquoted keys, etc.)",
     # Interpreter errors
     "PipelexInterpreterError": "Check MTHDS file TOML syntax and ensure all referenced concepts and pipes are defined",
-    "MthdsDecodeError": "The MTHDS file has TOML syntax errors; validate TOML syntax before retrying",
     # Configuration/initialization errors
     "TelemetryConfigValidationError": "Run 'pipelex init telemetry' to create a valid telemetry configuration",
     "GatewayTermsNotAcceptedError": "Run 'pipelex init config' to accept gateway terms, or disable pipelex_gateway in backends.toml",
@@ -157,11 +160,12 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     # input = agent can fix (bad .mthds, wrong args, bad JSON)
     "ModelChoiceNotFoundError": "input",
     "PipeValidationError": "input",
+    # SignaturesNotAllowedError intentionally absent: it carries a class-level error_domain = INPUT,
+    # so the report is its single source of truth (enforced by test_agent_output_drift).
     "FileNotFoundError": "input",
     "JSONDecodeError": "input",
     "JsonTypeError": "input",
     "ArgumentError": "input",
-    "MthdsDecodeError": "input",
     "ValidationError": "input",
     "ValueError": "input",
     "BundleError": "input",
@@ -467,23 +471,6 @@ def extract_validation_errors(exc: ValidateBundleError) -> list[dict[str, Any]]:
             entry["field_path"] = pipe_error.field_path
         if pipe_error.variable_names:
             entry["variable_names"] = pipe_error.variable_names
-        validation_errors.append(entry)
-
-    for instantiation_error in exc.pipe_concept_instantiation_errors:
-        entry = {
-            "category": "instantiation",
-            "error_type": str(instantiation_error.error_type),
-            "pipe_code": instantiation_error.pipe_code,
-            "message": instantiation_error.message,
-        }
-        if instantiation_error.domain_code:
-            entry["domain_code"] = instantiation_error.domain_code
-        if instantiation_error.concept_code:
-            entry["concept_code"] = instantiation_error.concept_code
-        if instantiation_error.field_path:
-            entry["field_path"] = instantiation_error.field_path
-        if instantiation_error.variable_names:
-            entry["variable_names"] = instantiation_error.variable_names
         validation_errors.append(entry)
 
     return validation_errors

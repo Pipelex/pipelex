@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from typing import Any, Callable
 
@@ -20,7 +19,7 @@ def setup_test_concept(load_test_library: Callable[[list[Path]], None]):
     load_test_library([Path(__file__).parent])
     # Register the class in the class registry
     ClassRegistryUtils.register_classes_in_file(
-        file_path=os.path.join(os.path.dirname(__file__), "data.py"),
+        file_path=Path(__file__).parent / "data.py",
         base_class=StructuredContent,
         is_include_imported=False,
     )

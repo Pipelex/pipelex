@@ -7,7 +7,9 @@ from typing import Any, ClassVar
 import pytest
 from pydantic import ValidationError
 
+from pipelex.base_exceptions import error_domain_is_input
 from pipelex.builder.operations.pipe_ops import parse_pipe_spec
+from pipelex.builder.pipe.exceptions import PipeSpecError
 from pipelex.builder.pipe.pipe_batch_spec import PipeBatchSpec
 from pipelex.builder.pipe.pipe_condition_spec import PipeConditionSpec
 from pipelex.builder.pipe.pipe_extract_spec import PipeExtractSpec
@@ -228,6 +230,54 @@ class TestParsePipeSpec:
         result = parse_pipe_spec("PipeParallel", spec)
         assert isinstance(result, PipeParallelSpec)
         assert result.branches[0].pipe_code == "branch_a"
+
+    # -- malformed steps/branches shape (typed, not bare TypeError/ValueError) --
+
+    @pytest.mark.parametrize("bad_steps", ["notalist", 42, {"a": "b"}])
+    def test_non_list_steps_raises_pipe_spec_error(self, bad_steps: Any) -> None:
+        """A non-list ``steps`` is a caller-input fault, surfaced as a typed PipeSpecError."""
+        spec: dict[str, Any] = {"pipe_code": "my_seq", "description": "d", "output": "Text", "steps": bad_steps}
+        with pytest.raises(PipeSpecError, match="'steps' must be a list of step mappings"):
+            parse_pipe_spec("PipeSequence", spec)
+
+    @pytest.mark.parametrize("bad_entry", [42, "astring", [1, 2]])
+    def test_non_mapping_step_entry_raises_pipe_spec_error(self, bad_entry: Any) -> None:
+        """A step entry that is not a mapping is a typed input error, not a bare TypeError."""
+        spec: dict[str, Any] = {"pipe_code": "my_seq", "description": "d", "output": "Text", "steps": [bad_entry]}
+        with pytest.raises(PipeSpecError, match="entry in pipe spec 'steps' must be a mapping"):
+            parse_pipe_spec("PipeSequence", spec)
+
+    @pytest.mark.parametrize("bad_branches", ["notalist", 42, {"a": "b"}])
+    def test_non_list_branches_raises_pipe_spec_error(self, bad_branches: Any) -> None:
+        spec: dict[str, Any] = {"pipe_code": "my_par", "description": "d", "output": "Text", "branches": bad_branches}
+        with pytest.raises(PipeSpecError, match="'branches' must be a list of step mappings"):
+            parse_pipe_spec("PipeParallel", spec)
+
+    @pytest.mark.parametrize("bad_entry", [42, "astring", [1, 2]])
+    def test_non_mapping_branch_entry_raises_pipe_spec_error(self, bad_entry: Any) -> None:
+        spec: dict[str, Any] = {"pipe_code": "my_par", "description": "d", "output": "Text", "branches": [bad_entry]}
+        with pytest.raises(PipeSpecError, match="entry in pipe spec 'branches' must be a mapping"):
+            parse_pipe_spec("PipeParallel", spec)
+
+    def test_malformed_steps_classifies_as_input_domain(self) -> None:
+        """The raised error carries the INPUT domain so HTTP consumers render it as a 422."""
+        spec: dict[str, Any] = {"pipe_code": "my_seq", "description": "d", "output": "Text", "steps": "notalist"}
+        with pytest.raises(PipeSpecError) as exc_info:
+            parse_pipe_spec("PipeSequence", spec)
+        assert error_domain_is_input(exc_info.value.error_domain)
+
+    # -- malformed top-level shape (typed, not bare TypeError/ValueError) --
+
+    @pytest.mark.parametrize("bad_spec", ["a string", ["a", "b"], 123, 3.14, None])
+    def test_non_mapping_top_level_raises_pipe_spec_error(self, bad_spec: Any) -> None:
+        """A non-mapping top-level spec leaks a bare TypeError/ValueError from dict() without the guard."""
+        with pytest.raises(PipeSpecError, match="must be a mapping"):
+            parse_pipe_spec("PipeLLM", bad_spec)
+
+    def test_non_mapping_top_level_classifies_as_input_domain(self) -> None:
+        with pytest.raises(PipeSpecError) as exc_info:
+            parse_pipe_spec("PipeLLM", "not a mapping")
+        assert error_domain_is_input(exc_info.value.error_domain)
 
     # -- PipeCondition expression alias -----------------------------------
 

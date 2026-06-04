@@ -20,15 +20,14 @@ from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_bundle_core,
     validate_pipe_in_bundle_core,
 )
-from pipelex.core.interpreter.exceptions import MthdsDecodeError, PipelexInterpreterError
+from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.graph.graph_rendering import GraphFormat, generate_graph_for_bundle, generate_view_for_bundle
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.exceptions import PipelineExecutionError
-from pipelex.pipeline.validate_bundle import ValidateBundleError
+from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 
 
@@ -61,6 +60,13 @@ def validate_bundle_cmd(
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
     ] = None,
+    allow_signatures: Annotated[
+        bool,
+        typer.Option(
+            "--allow-signatures",
+            help="Accept PipeSignature placeholders in the dependency graph (lenient mode).",
+        ),
+    ] = False,
     output_format: Annotated[
         CliOutputFormat,
         typer.Option("--format", help="Success output format: markdown (default) or json (structured)"),
@@ -81,6 +87,7 @@ def validate_bundle_cmd(
         pipelex-agent validate bundle my_bundle.mthds --graph
         pipelex-agent validate bundle pipeline_01/
         pipelex-agent validate bundle pipeline_01/ --graph
+        pipelex-agent validate bundle draft_pipeline.mthds --allow-signatures
     """
     set_agent_cli_error_format(error_format or output_format)
 
@@ -131,10 +138,16 @@ def validate_bundle_cmd(
     try:
         if pipe:
             # Validate a specific pipe within the bundle
-            result = asyncio.run(validate_pipe_in_bundle_core(bundle_path=Path(bundle_path), pipe_code=pipe, library_dirs=library_dirs))  # type: ignore[arg-type]
+            result = asyncio.run(
+                validate_pipe_in_bundle_core(
+                    bundle_path=Path(bundle_path), pipe_code=pipe, library_dirs=library_dirs, allow_signatures=allow_signatures
+                )  # type: ignore[arg-type]
+            )
         else:
             # Validate the entire bundle
-            result = asyncio.run(validate_bundle_core(bundle_path=Path(bundle_path), library_dirs=library_dirs))  # type: ignore[arg-type]
+            result = asyncio.run(
+                validate_bundle_core(bundle_path=Path(bundle_path), library_dirs=library_dirs, allow_signatures=allow_signatures)  # type: ignore[arg-type]
+            )
 
         # Generate graph if requested and validation succeeded
         if graph:
@@ -157,7 +170,7 @@ def validate_bundle_cmd(
                     graph_extra["cause_type"] = type(exc.__cause__).__name__
                     graph_extra["cause_message"] = str(exc.__cause__)
                 agent_error(f"Graph generation failed: {exc.message}", "PipelineExecutionError", cause=exc, **graph_extra)
-            except (PipelexInterpreterError, MthdsDecodeError) as exc:
+            except PipelexInterpreterError as exc:
                 agent_error(f"Graph generation failed: {exc}", type(exc).__name__, cause=exc)
             except typer.Exit:
                 raise
@@ -185,7 +198,7 @@ def validate_bundle_cmd(
                     view_extra["cause_type"] = type(exc.__cause__).__name__
                     view_extra["cause_message"] = str(exc.__cause__)
                 agent_error(f"View generation failed: {exc.message}", "PipelineExecutionError", cause=exc, **view_extra)
-            except (PipelexInterpreterError, MthdsDecodeError) as exc:
+            except PipelexInterpreterError as exc:
                 agent_error(f"View generation failed: {exc}", type(exc).__name__, cause=exc)
             except typer.Exit:
                 raise

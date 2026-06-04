@@ -19,7 +19,8 @@ from pipelex.core.pipes.output.output_renderer import render_output
 from pipelex.hub import get_library_manager, get_required_pipe, get_telemetry_manager, resolve_library_dirs, set_current_library
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION
-from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
+from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.file_utils import (
@@ -116,8 +117,8 @@ async def _generate_output_core(
                 final_output_path = Path("results/output_schema.json")
 
     try:
-        ensure_directory_for_file_path(file_path=str(final_output_path))
-        save_text_to_path(text=output_str, path=str(final_output_path))
+        ensure_directory_for_file_path(file_path=final_output_path)
+        save_text_to_path(text=output_str, path=final_output_path)
         typer.secho(f"Generated output file: {final_output_path}", fg=typer.colors.GREEN)
     except Exception as exc:
         # CLI command boundary: any failure writing the file is reported to the user and exits via typer.Exit.

@@ -8,6 +8,7 @@ from kajson.exceptions import KajsonException
 from pydantic import ValidationError
 
 from pipelex import log
+from pipelex.base_exceptions import DisclosureMode, ErrorReport
 from pipelex.config import get_config
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
@@ -19,6 +20,7 @@ from pipelex.hub import get_class_registry, get_storage_provider
 from pipelex.pipe_run.exceptions import PipeJobError, StorageDeliveryError, WebhookDeliveryError
 from pipelex.temporal.tprl_pipe.hydration import hydrate_content
 from pipelex.tools.misc.json_utils import clean_json_dumps
+from pipelex.tools.network.ssrf_guard import SsrfGuardedTransport
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_output import PipeOutput
@@ -42,16 +44,23 @@ class DeliveryExecutor:
         pipeline_run_id: str,
         delivery_assignment: DeliveryAssignment,
         status: DeliveryStatus,
+        error_report: ErrorReport | None = None,
+        request_id: str | None = None,
     ) -> None:
-        """Execute a full delivery: generate result files, store them, then notify webhooks."""
+        """Execute a full delivery: generate result files, store them, then notify webhooks.
+
+        ``request_id`` is the originating API request id (when set). It is threaded
+        into the storage / webhook completion log lines so the delivery phase can be
+        correlated with the workflow logs and the inbound request.
+        """
         # Step 1: Persist the result files to storage (only on success with output)
         result_url: str | None = None
         if delivery_assignment.storage is not None and pipe_output is not None:
-            result_url = await self._store_results(pipe_output, user_id, pipeline_run_id, delivery_assignment.storage)
+            result_url = await self._store_results(pipe_output, user_id, pipeline_run_id, delivery_assignment.storage, request_id=request_id)
 
         # Step 2: Notify webhooks with status + result_url (always, even on failure)
         for webhook in delivery_assignment.webhooks:
-            await self._notify_webhook(pipeline_run_id, status, result_url, webhook)
+            await self._notify_webhook(pipeline_run_id, status, result_url, webhook, error_report, request_id=request_id)
 
     # ---- Result file generation ----
 
@@ -209,6 +218,7 @@ class DeliveryExecutor:
         user_id: str,
         pipeline_run_id: str,
         storage: StorageTarget,
+        request_id: str | None = None,
     ) -> str:
         """Generate all result files and store them. Returns the base result URL."""
         try:
@@ -226,7 +236,8 @@ class DeliveryExecutor:
             # TODO: include the full S3 URI (s3://bucket/key/) so result_url is
             # self-contained and doesn't depend on knowing the bucket externally.
             result_url: str = f"{base_key}/"
-            log.info(f"Storage delivery completed: pipeline_run_id={pipeline_run_id}, files={len(result_files)}")
+            request_id_suffix = f", request_id={request_id}" if request_id else ""
+            log.info(f"Storage delivery completed: pipeline_run_id={pipeline_run_id}, files={len(result_files)}{request_id_suffix}")
             return result_url
         except Exception as exc:
             # Delivery boundary: any failure across result-file generation or storage is converted to StorageDeliveryError. Re-raises, never swallows.
@@ -241,16 +252,32 @@ class DeliveryExecutor:
         status: DeliveryStatus,
         result_url: str | None,
         webhook: WebhookTarget,
+        error_report: ErrorReport | None = None,
+        request_id: str | None = None,
     ) -> None:
-        """POST status + result_url to a webhook URL."""
+        """POST status, optional result_url, and optional VERBOSE error report to a webhook URL.
+
+        VERBOSE on the wire is deliberate: the receiver decides what to re-expose
+        downstream (it can render STRICT via :meth:`ErrorReport.to_problem_document`).
+
+        The HTTP client uses :class:`SsrfGuardedTransport`, which re-resolves the
+        callback host at connect time and refuses private/loopback/metadata
+        destinations — closing the DNS-rebinding gap a request-time literal-IP
+        check leaves open. A blocked destination raises
+        :class:`pipelex.tools.network.exceptions.SsrfBlockedError`, which (being a
+        security signal) is deliberately *not* caught and re-wrapped as a
+        ``WebhookDeliveryError`` here — it propagates so the delivery aborts loudly.
+        """
         try:
             payload: dict[str, Any] = dict(webhook.payload)
             payload["pipeline_run_id"] = pipeline_run_id
             payload["status"] = status
             if result_url is not None:
                 payload["result_url"] = result_url
+            if error_report is not None:
+                payload["error"] = error_report.to_dict(disclosure_mode=DisclosureMode.VERBOSE)
 
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(transport=SsrfGuardedTransport()) as client:
                 response = await client.post(
                     webhook.url,
                     json=payload,
@@ -258,7 +285,8 @@ class DeliveryExecutor:
                     timeout=30.0,
                 )
                 response.raise_for_status()
-            log.info(f"Webhook delivery completed: pipeline_run_id={pipeline_run_id}, url={webhook.url}")
+            request_id_suffix = f", request_id={request_id}" if request_id else ""
+            log.info(f"Webhook delivery completed: pipeline_run_id={pipeline_run_id}, url={webhook.url}{request_id_suffix}")
         except httpx.HTTPStatusError as exc:
             msg = f"Webhook delivery failed for pipeline_run_id={pipeline_run_id}: HTTP {exc.response.status_code}"
             raise WebhookDeliveryError(msg) from exc

@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 
 import kajson
 from typing_extensions import override
@@ -15,9 +15,9 @@ class LocalObserverEventType(StrEnum):
 
 
 class LocalObserver(ObserverProtocol):
-    def __init__(self, storage_dir: str | None = None) -> None:
-        self.storage_dir = storage_dir or get_config().pipelex.observer_config.observer_dir
-        os.makedirs(self.storage_dir, exist_ok=True)
+    def __init__(self, storage_dir: str | Path | None = None) -> None:
+        self.storage_dir = Path(storage_dir or get_config().pipelex.observer_config.observer_dir)
+        self.storage_dir.mkdir(parents=True, exist_ok=True)
 
     def _write_to_jsonl(self, event_type: str, payload: PayloadType) -> None:
         payload = {
@@ -25,7 +25,7 @@ class LocalObserver(ObserverProtocol):
             **payload,
         }
 
-        file_path = os.path.join(self.storage_dir, f"{event_type}.jsonl")
+        file_path = self.storage_dir / f"{event_type}.jsonl"
         with open(file_path, "a", encoding="utf-8") as file:
             file.write(kajson.dumps(payload) + "\n")
 

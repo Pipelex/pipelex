@@ -32,6 +32,13 @@ def is_relative_local_path(uri: str) -> bool:
     resolved = resolve_uri(uri)
     if not isinstance(resolved, ResolvedLocalPath):
         return False
+    if "://" in resolved.path:
+        # An unrecognized scheme (``s3://``, ``gs://``, …) slips through ``resolve_uri`` as a
+        # ResolvedLocalPath but is NOT a local file path; do not rewrite it relative to base_dir
+        # (that would mangle ``s3://bucket/x`` into ``<base_dir>/s3:/bucket/x`` and defeat the
+        # downstream remote-url guards). Mirrors the same ``"://"`` stopgap in the CSV input hook;
+        # both go away once ``resolve_uri`` classifies schemes (tools/uri follow-up).
+        return False
     return not Path(resolved.path).is_absolute()
 
 

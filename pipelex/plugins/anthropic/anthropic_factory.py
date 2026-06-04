@@ -1,19 +1,20 @@
 import math
 from typing import TYPE_CHECKING
 
-from anthropic import AsyncAnthropic, AsyncAnthropicBedrock
+from anthropic import AsyncAnthropic
+from anthropic.lib.bedrock import AsyncAnthropicBedrock
 from anthropic.types import Usage
 from anthropic.types.document_block_param import DocumentBlockParam
 from anthropic.types.image_block_param import ImageBlockParam
 from anthropic.types.message_param import MessageParam
 
 from pipelex.cogt.document.prompt_document_utils import prep_prompt_documents
-from pipelex.cogt.exceptions import CogtError
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
+from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicFactoryError
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.tools.aws.aws_config import BedrockAccessVariant
 from pipelex.tools.uri.prepared_file import PreparedFile, PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
@@ -25,10 +26,6 @@ if TYPE_CHECKING:
 
 if TYPE_CHECKING:
     from anthropic.types.text_block_param import TextBlockParam
-
-
-class AnthropicFactoryError(CogtError):
-    pass
 
 
 class AnthropicSdkVariant(StrEnum):

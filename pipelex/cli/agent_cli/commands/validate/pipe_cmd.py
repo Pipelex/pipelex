@@ -25,7 +25,7 @@ from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.validate_bundle import ValidateBundleError
+from pipelex.pipeline.exceptions import ValidateBundleError
 
 
 def validate_pipe_cmd(
@@ -41,6 +41,13 @@ def validate_pipe_cmd(
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
     ] = None,
+    allow_signatures: Annotated[
+        bool,
+        typer.Option(
+            "--allow-signatures",
+            help="Accept PipeSignature placeholders in the dependency graph (lenient mode).",
+        ),
+    ] = False,
     output_format: Annotated[
         CliOutputFormat,
         typer.Option("--format", help="Success output format: markdown (default) or json (structured)"),
@@ -59,6 +66,7 @@ def validate_pipe_cmd(
         pipelex-agent validate pipe my_pipe
         pipelex-agent validate pipe --all
         pipelex-agent validate pipe --all -L ./my_pipes
+        pipelex-agent validate pipe my_draft_pipe --allow-signatures
     """
     set_agent_cli_error_format(error_format or output_format)
 
@@ -72,7 +80,7 @@ def validate_pipe_cmd(
         make_pipelex_for_agent_cli(library_dirs=library_dirs, needs_inference=False, needs_model_specs=True)
 
         try:
-            result = asyncio.run(validate_all_core(library_dirs=library_dirs))
+            result = asyncio.run(validate_all_core(library_dirs=library_dirs, allow_signatures=allow_signatures))
             agent_success_formatted(result, format_validate_markdown, output_format)
 
         except ValidateBundleError as exc:
@@ -143,7 +151,7 @@ def validate_pipe_cmd(
     make_pipelex_for_agent_cli(library_dirs=library_dirs, needs_inference=False, needs_model_specs=True)
 
     try:
-        result = asyncio.run(validate_pipe_core(pipe_code=pipe_code, library_dirs=library_dirs))
+        result = asyncio.run(validate_pipe_core(pipe_code=pipe_code, library_dirs=library_dirs, allow_signatures=allow_signatures))
         agent_success_formatted(result, format_validate_markdown, output_format)
 
     except PipeNotFoundError as exc:

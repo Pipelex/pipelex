@@ -8,7 +8,6 @@ from google.genai.client import Client as GoogleGenAiClient
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategory, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
@@ -21,10 +20,6 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.google.google_factory import GoogleFactory
 from pipelex.plugins.google.google_img_gen_factory import GoogleImgGenFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-
-
-class GoogleImgGenWorkerError(PipelexError):
-    """Base exception for Google Image Generation Worker errors."""
 
 
 class GoogleImgGenWorker(ImgGenWorkerAbstract):

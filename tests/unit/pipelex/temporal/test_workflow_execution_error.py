@@ -12,6 +12,8 @@ from pipelex.temporal.exceptions import WorkflowExecutionError
 _FULL_REPORT = ErrorReport(
     error_type="CogtError",
     message="rate limited on the worker",
+    title="AI inference failed",
+    type_uri="https://docs.pipelex.com/latest/errors/cogt-error/",
     error_category="capacity",
     error_domain=ErrorDomain.RUNTIME,
     retryable=False,

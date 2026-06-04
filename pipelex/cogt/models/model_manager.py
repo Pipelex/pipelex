@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelManagerError
@@ -12,10 +14,11 @@ from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.model_routing.routing_models import BackendMatchingMethod
 from pipelex.cogt.model_routing.routing_profile import RoutingProfile
 from pipelex.cogt.model_routing.routing_profile_loader import load_active_routing_profile
+from pipelex.cogt.models.exceptions import ModelReferenceParseError
 from pipelex.cogt.models.model_deck import ModelDeck, ModelDeckBlueprint
 from pipelex.cogt.models.model_deck_loader import load_model_deck_blueprint
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
-from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind, ModelReferenceParseError
+from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind
 from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.config import get_config
 from pipelex.system.configuration.config_loader import config_manager
@@ -43,7 +46,7 @@ class ModelManager(ModelManagerAbstract):
         model_deck_paths = [
             str(path)
             for path in find_files_in_dir(
-                dir_path=deck_dir_path,
+                dir_path=Path(deck_dir_path),
                 pattern="*.toml",
                 is_recursive=True,
             )

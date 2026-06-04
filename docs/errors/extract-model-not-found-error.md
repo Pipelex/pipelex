@@ -1,0 +1,19 @@
+---
+title: "Extract model not found"
+description: "Reference for the `ExtractModelNotFoundError` Pipelex error class."
+---
+
+<!-- pipelex:generated -->
+
+# Extract model not found
+
+| Field | Value |
+|---|---|
+| `error_type` | `ExtractModelNotFoundError` |
+| `title` | Extract model not found |
+| `type_uri` | `https://docs.pipelex.com/latest/errors/extract-model-not-found-error/` |
+| `error_domain` | _(inherited from parent)_ |
+| Defined in | `pipelex.cogt.exceptions` |
+| Parent class | [`ModelNotFoundError`](model-not-found-error.md) |
+
+[Back to Error Model overview](../under-the-hood/error-model.md)

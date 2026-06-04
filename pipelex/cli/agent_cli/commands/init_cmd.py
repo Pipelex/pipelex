@@ -1,7 +1,6 @@
 """Agent CLI init command -- non-interactive Pipelex initialization."""
 
 import json
-import os
 import shutil
 from pathlib import Path
 from typing import Annotated, Any, cast
@@ -29,7 +28,6 @@ from pipelex.system.pipelex_service.pipelex_service_agreement import (
     update_service_terms_acceptance,
 )
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TELEMETRY_PROJECT_TEMPLATE_FILE_NAME
-from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 
 
@@ -132,17 +130,17 @@ def _copy_inference_templates(target_dir: Path) -> None:
     template_backends_dir = template_inference_dir / "backends"
     target_backends_dir = target_inference_dir / "backends"
     target_backends_dir.mkdir(parents=True, exist_ok=True)
-    for backend_file in os.listdir(template_backends_dir):
-        if backend_file.endswith(".toml"):
-            shutil.copy2(template_backends_dir / backend_file, target_backends_dir / backend_file)
+    for backend_file in template_backends_dir.iterdir():
+        if backend_file.suffix == ".toml":
+            shutil.copy2(backend_file, target_backends_dir / backend_file.name)
 
     # Copy deck/*.toml
     template_deck_dir = template_inference_dir / "deck"
     target_deck_dir = target_inference_dir / "deck"
     target_deck_dir.mkdir(parents=True, exist_ok=True)
-    for deck_file in os.listdir(template_deck_dir):
-        if deck_file.endswith(".toml"):
-            shutil.copy2(template_deck_dir / deck_file, target_deck_dir / deck_file)
+    for deck_file in template_deck_dir.iterdir():
+        if deck_file.suffix == ".toml":
+            shutil.copy2(deck_file, target_deck_dir / deck_file.name)
 
     write_manifest(target_deck_dir, compute_kit_manifest())
 
@@ -174,8 +172,8 @@ def _copy_telemetry_template(target_dir: Path, for_project: bool) -> None:
 
 def _configure_backends(
     config: dict[str, Any],
-    backends_toml_path: str,
-    template_backends_path: str,
+    backends_toml_path: Path,
+    template_backends_path: Path,
 ) -> list[str]:
     """Configure backends in backends.toml based on config input.
 
@@ -187,7 +185,7 @@ def _configure_backends(
     Returns:
         List of enabled backend keys.
     """
-    if not path_exists(backends_toml_path):
+    if not backends_toml_path.exists():
         agent_error("backends.toml not found after config initialization", "InitConfigError")
 
     requested_backends: list[str] | None = config.get("backends")
@@ -237,9 +235,9 @@ def _configure_routing(selected_backend_keys: list[str], config: dict[str, Any],
     Returns:
         Name of the active routing profile.
     """
-    routing_profiles_toml_path = str(target_dir / "inference" / "routing_profiles.toml")
+    routing_profiles_toml_path = target_dir / "inference" / "routing_profiles.toml"
 
-    if not path_exists(routing_profiles_toml_path):
+    if not routing_profiles_toml_path.exists():
         agent_error("routing_profiles.toml not found after config initialization", "InitConfigError")
 
     toml_doc = load_toml_with_tomlkit(routing_profiles_toml_path)
@@ -384,7 +382,7 @@ def agent_init_cmd(
         target_dir = _resolve_target_dir(global_)
 
         # Step 1: Copy config files (skips inference/ directory)
-        config_files_copied = init_config(reset=True, target_dir=str(target_dir))
+        config_files_copied = init_config(reset=True, target_dir=target_dir)
 
         # Step 1.5: Copy inference templates (init_config skips inference/)
         _copy_inference_templates(target_dir)
@@ -395,8 +393,8 @@ def agent_init_cmd(
         _copy_telemetry_template(target_dir, for_project=not global_)
 
         # Step 2: Configure backends
-        template_backends_path = str(get_kit_configs_dir() / "inference" / "backends.toml")
-        backends_toml_path = str(target_dir / "inference" / "backends.toml")
+        template_backends_path = Path(str(get_kit_configs_dir() / "inference" / "backends.toml"))
+        backends_toml_path = target_dir / "inference" / "backends.toml"
         backends_enabled = _configure_backends(parsed_config, backends_toml_path, template_backends_path)
 
         # Step 3: Configure routing

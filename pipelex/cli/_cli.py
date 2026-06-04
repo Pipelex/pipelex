@@ -63,18 +63,24 @@ class PipelexCLI(TyperGroup):
         parent: Context | None = None,
         **extra: object,
     ) -> Context:
-        """Intercept --no-logo from args before Click/Typer processes them.
+        """Intercept global flags from args before Click/Typer processes them.
 
-        This allows --no-logo to be placed anywhere in the command line
-        (before or after subcommands) while keeping the CLI architecture clean.
+        This allows --no-logo and --traceback to be placed anywhere in the
+        command line (before or after subcommands) while keeping the CLI
+        architecture clean.
         """
         no_logo = "--no-logo" in args
         if no_logo:
             args = [arg for arg in args if arg != "--no-logo"]
 
+        traceback = "--traceback" in args
+        if traceback:
+            args = [arg for arg in args if arg != "--traceback"]
+
         ctx = super().make_context(info_name, args, parent, **extra)
         ctx.ensure_object(dict)
         ctx.obj["no_logo"] = no_logo
+        ctx.obj["traceback"] = traceback
         return ctx
 
 

@@ -3,8 +3,9 @@ from pathlib import Path
 import aiofiles
 from typing_extensions import override
 
-from pipelex.tools.misc.filetype_utils import FileTypeError, detect_file_type_from_path
-from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidUriError
+from pipelex.tools.misc.exceptions import FileTypeError
+from pipelex.tools.misc.filetype_utils import detect_file_type_from_path
+from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidUriError, StorageLocalError
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract, StoredData
 
 
@@ -64,6 +65,7 @@ class LocalStorageProvider(StorageProviderAbstract):
         Raises:
             StorageFileNotFoundError: If the file does not exist.
             StorageInvalidUriError: If the key is invalid.
+            StorageLocalError: If the filesystem read fails (e.g. permission denied, I/O error).
         """
         file_path = self._validate_key(key)
 
@@ -71,8 +73,16 @@ class LocalStorageProvider(StorageProviderAbstract):
             msg = f"File not found: '{key}'"
             raise StorageFileNotFoundError(msg)
 
-        async with aiofiles.open(file_path, "rb") as file_handle:  # pyright: ignore[reportUnknownMemberType]
-            data = await file_handle.read()
+        try:
+            async with aiofiles.open(file_path, "rb") as file_handle:  # pyright: ignore[reportUnknownMemberType]
+                data = await file_handle.read()
+        except FileNotFoundError as exc:
+            # TOCTOU: the file passed exists() above but was removed before the open.
+            msg = f"File not found: '{key}'"
+            raise StorageFileNotFoundError(msg) from exc
+        except OSError as exc:
+            msg = f"Failed to read file '{key}': {exc}"
+            raise StorageLocalError(msg) from exc
 
         # Detect MIME type from file path
         mime_type: str | None = None
@@ -95,14 +105,19 @@ class LocalStorageProvider(StorageProviderAbstract):
 
         Raises:
             StorageInvalidUriError: If the key is invalid.
+            StorageLocalError: If the filesystem write fails (e.g. disk full, permission denied).
         """
         file_path = self._validate_key(key)
 
-        # Create parent directories if they don't exist
-        file_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            # Create parent directories if they don't exist
+            file_path.parent.mkdir(parents=True, exist_ok=True)
 
-        async with aiofiles.open(file_path, "wb") as file_handle:  # pyright: ignore[reportUnknownMemberType]
-            await file_handle.write(data)
+            async with aiofiles.open(file_path, "wb") as file_handle:  # pyright: ignore[reportUnknownMemberType]
+                await file_handle.write(data)
+        except OSError as exc:
+            msg = f"Failed to write file '{key}': {exc}"
+            raise StorageLocalError(msg) from exc
 
     @override
     async def public_url(self, uri: str) -> str:

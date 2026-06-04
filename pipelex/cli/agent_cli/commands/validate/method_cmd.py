@@ -25,7 +25,7 @@ from pipelex.cli.method_resolver import resolve_method_target
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.validate_bundle import ValidateBundleError
+from pipelex.pipeline.exceptions import ValidateBundleError
 
 
 def validate_method_cmd(
@@ -41,6 +41,13 @@ def validate_method_cmd(
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
     ] = None,
+    allow_signatures: Annotated[
+        bool,
+        typer.Option(
+            "--allow-signatures",
+            help="Accept PipeSignature placeholders in the dependency graph (lenient mode).",
+        ),
+    ] = False,
     output_format: Annotated[
         CliOutputFormat,
         typer.Option("--format", help="Success output format: markdown (default) or json (structured)"),
@@ -59,6 +66,7 @@ def validate_method_cmd(
     Examples:
         pipelex-agent validate method my-method
         pipelex-agent validate method my-method --pipe custom_pipe
+        pipelex-agent validate method my-method --allow-signatures
     """
     set_agent_cli_error_format(error_format or output_format)
 
@@ -82,10 +90,14 @@ def validate_method_cmd(
     try:
         if pipe:
             # Validate a specific pipe within the method's bundle
-            result = asyncio.run(validate_pipe_in_bundle_core(bundle_path=bundle_path, pipe_code=pipe_code, library_dirs=library_dirs_paths))
+            result = asyncio.run(
+                validate_pipe_in_bundle_core(
+                    bundle_path=bundle_path, pipe_code=pipe_code, library_dirs=library_dirs_paths, allow_signatures=allow_signatures
+                )
+            )
         else:
             # Validate the entire bundle
-            result = asyncio.run(validate_bundle_core(bundle_path=bundle_path, library_dirs=library_dirs_paths))
+            result = asyncio.run(validate_bundle_core(bundle_path=bundle_path, library_dirs=library_dirs_paths, allow_signatures=allow_signatures))
 
         agent_success_formatted(result, format_validate_markdown, output_format)
 

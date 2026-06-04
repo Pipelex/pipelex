@@ -103,20 +103,20 @@ class TestInitCredentials:
             '[anthropic]\nenabled = false\napi_key = "${ANTHROPIC_API_KEY}"\n\n'
             "[internal]\nenabled = true\n"
         )
-        result = get_required_vars_for_enabled_backends(str(backends_toml))
+        result = get_required_vars_for_enabled_backends(backends_toml)
         assert "OPENAI_API_KEY" in result
         assert "ANTHROPIC_API_KEY" not in result
 
     def test_get_required_vars_returns_empty_for_no_file(self, tmp_path: Path) -> None:
         """Returns empty dict when file doesn't exist."""
-        result = get_required_vars_for_enabled_backends(str(tmp_path / "nonexistent.toml"))
+        result = get_required_vars_for_enabled_backends(tmp_path / "nonexistent.toml")
         assert result == {}
 
     def test_get_required_vars_maps_to_display_names(self, tmp_path: Path) -> None:
         """Vars are mapped to their backend display names."""
         backends_toml = tmp_path / "backends.toml"
         backends_toml.write_text('[openai]\ndisplay_name = "OpenAI"\nenabled = true\napi_key = "${OPENAI_API_KEY}"\n\n[internal]\nenabled = true\n')
-        result = get_required_vars_for_enabled_backends(str(backends_toml))
+        result = get_required_vars_for_enabled_backends(backends_toml)
         assert result["OPENAI_API_KEY"] == ["OpenAI"]
 
     def test_prompt_credentials_skips_when_all_set(self, tmp_path: Path, mocker: MockerFixture) -> None:
@@ -130,7 +130,7 @@ class TestInitCredentials:
         )
         mock_prompt = mocker.patch("pipelex.cli.commands.init.credentials.Prompt.ask")
         mock_console: MagicMock = mocker.MagicMock()
-        prompt_credentials(mock_console, str(backends_toml))
+        prompt_credentials(mock_console, backends_toml)
         # Should print "already set" message, no Prompt.ask calls
         mock_console.print.assert_called()
         mock_prompt.assert_not_called()
@@ -152,7 +152,7 @@ class TestInitCredentials:
             return_value="sk-test-value",
         )
         mock_console: MagicMock = mocker.MagicMock()
-        prompt_credentials(mock_console, str(backends_toml))
+        prompt_credentials(mock_console, backends_toml)
 
         # Verify .env was written
         env_path = tmp_path / ".env"
@@ -182,7 +182,7 @@ class TestInitCredentials:
             return_value="",
         )
         mock_console: MagicMock = mocker.MagicMock()
-        prompt_credentials(mock_console, str(backends_toml))
+        prompt_credentials(mock_console, backends_toml)
 
         # Verify .env was NOT written (no values entered)
         env_path = tmp_path / ".env"
@@ -207,7 +207,7 @@ class TestInitCredentials:
             return_value="sk-new",
         )
         mock_console: MagicMock = mocker.MagicMock()
-        prompt_credentials(mock_console, str(backends_toml))
+        prompt_credentials(mock_console, backends_toml)
 
         result = read_env_file(env_path)
         assert result["EXISTING_KEY"] == "existing_value"
@@ -226,5 +226,5 @@ class TestInitCredentials:
         )
         mock_prompt = mocker.patch("pipelex.cli.commands.init.credentials.Prompt.ask")
         mock_console: MagicMock = mocker.MagicMock()
-        prompt_credentials(mock_console, str(backends_toml))
+        prompt_credentials(mock_console, backends_toml)
         mock_prompt.assert_not_called()

@@ -24,7 +24,7 @@ from kajson.class_registry import ClassRegistry
 from kajson.kajson_manager import KajsonManager
 
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.hub import get_current_library, get_library_manager, set_current_library, teardown_current_library
+from pipelex.hub import clear_current_library, get_current_library, get_library_manager, set_current_library
 from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
 
 if TYPE_CHECKING:
@@ -82,7 +82,7 @@ def rehydrate_pipe_output_with_crate(
                 if prev_library_id is not None:
                     set_current_library(library_id=prev_library_id)
                 else:
-                    teardown_current_library()
+                    clear_current_library()
 
     return pipe_output
 
