@@ -78,7 +78,7 @@ Effort is translated to a `thinking_budget` token count:
 model = { model = "gemini-2.5-pro", temperature = 0.3, reasoning_effort = "medium" }
 ```
 
-**Gemini 3.0 Pro — adaptive mode**
+**Gemini 3.1 Pro — adaptive mode**
 
 Effort maps to a `ThinkingLevel` enum sent to the Google SDK:
 

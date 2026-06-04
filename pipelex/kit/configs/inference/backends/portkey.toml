@@ -296,7 +296,7 @@ thinking_mode = "adaptive"
 prompting_target = "gemini"
 x-portkey-provider = "@google"
 
-["gemini-3.0-flash-preview"]
+["gemini-3.0-flash"]
 model_id = "gemini-3-flash-preview"
 inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
