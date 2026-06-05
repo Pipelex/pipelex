@@ -8,7 +8,7 @@
 #
 # Configuration structure:
 # - Each model is defined in its own section with the model name as the header
-# - Headers with dots must be quoted (e.g., ["gemini-3.0-pro"])
+# - Headers with dots must be quoted (e.g., ["gemini-3.1-pro"])
 # - Model costs are in USD per million tokens (input/output)
 #
 # Documentation: https://docs.pipelex.com
@@ -54,14 +54,6 @@ max_prompt_images = 3000
 costs = { input = 0.10, output = 0.40 }
 
 # --- Gemini 3.0 Series ----------------------------------------
-["gemini-3.0-pro"]
-model_id = "gemini-3-pro-preview"
-inputs = ["text", "images", "pdf"]
-outputs = ["text", "structured"]
-max_prompt_images = 3000
-costs = { input = 2, output = 12.0 }
-thinking_mode = "adaptive"
-
 ["gemini-3.0-flash"]
 model_id = "gemini-3-flash-preview"
 inputs = ["text", "images", "pdf"]

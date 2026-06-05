@@ -38,6 +38,7 @@ from pipelex.config import get_config
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.hub import (
     clear_current_library,
+    get_current_library,
     get_current_library_id_or_none,
     get_library_manager,
     get_pipe_library,
@@ -131,11 +132,9 @@ class BundleValidator:
             bundle_uris=bundle_uris,
         )
         try:
-            all_pipes = get_pipe_library().get_pipes()
-            # In strict mode, signatures themselves are excluded (validating one directly would always
-            # trip the pre-check); in lenient mode they stay (they dry-run trivially by minting a mock).
-            pipes = all_pipes if allow_signatures else [pipe for pipe in all_pipes if not pipe.is_signature]
-            return await self.validate_pipes(pipes, library_id=acquired_id, allow_signatures=allow_signatures)
+            # acquire_library left the freshly-acquired library current, so the inner sweep over the
+            # current library targets exactly acquired_id (it filters signatures in strict mode itself).
+            return await self.validate_current_library(allow_signatures=allow_signatures)
         finally:
             # Restore the caller's outer current-library FIRST (so the guarantee survives a teardown
             # raise), then tear the acquired library down — mirroring validate_bundle / acquire_library.
@@ -146,6 +145,21 @@ class BundleValidator:
             else:
                 clear_current_library()
             get_library_manager().teardown(library_id=acquired_id)
+
+    async def validate_current_library(self, *, allow_signatures: bool = False) -> dict[str, DryRunOutput]:
+        """Sweep every pipe in the already-open **current** library, **without** tearing it down.
+
+        The public inner sweep over the active library (D6): the caller owns the library lifecycle —
+        this borrows the current library, classifies its pipes, and leaves it loaded. In strict mode
+        signatures are excluded (validating one directly would always trip the pre-check); in lenient
+        mode they stay (they dry-run trivially by minting a mock). This is the loaded-library twin of
+        :meth:`acquire_and_validate` (which acquires + tears down) and the shared core both the
+        ``validate --all`` CLI and downstream consumers (e.g. cocode) build on instead of re-deriving
+        ``get_pipes`` + signature filtering + ``validate_pipes`` by hand.
+        """
+        all_pipes = get_pipe_library().get_pipes()
+        pipes = all_pipes if allow_signatures else [pipe for pipe in all_pipes if not pipe.is_signature]
+        return await self.validate_pipes(pipes, library_id=get_current_library(), allow_signatures=allow_signatures)
 
     async def validate_pipes(
         self,

@@ -69,6 +69,12 @@
      .venv/bin/pipelex-dev generate-mthds-schema
      ```
 
+   - **`generate-error-pages`**: Regenerate the per-class error reference pages under `docs/errors/` (one page per `PipelexError` subclass). Run after adding or renaming an error class. Also available as `make generate-error-pages` (alias `make gep`).
+
+     ```bash
+     .venv/bin/pipelex-dev generate-error-pages
+     ```
+
 ### Pipelex CLI Commands
 
    To run the Pipelex CLI commands without the logo, you can use the `--no-logo` flag, this will avoid useless tokens in the console output.
