@@ -10,7 +10,7 @@ import tomli
 import tomlkit
 
 from pipelex.tools.misc.exceptions import TomlError
-from pipelex.tools.misc.file_utils import path_exists
+from pipelex.tools.misc.file_utils import path_exists, reject_bare_str_or_path
 from pipelex.tools.misc.json_utils import deep_update
 
 
@@ -82,6 +82,7 @@ def load_toml_from_path_and_merge_with_overrides(paths: Sequence[str | Path]) ->
     Returns:
         dict[str, Any]: The merged dictionary
     """
+    reject_bare_str_or_path(paths, param_name="paths")
     merged_dict: dict[str, Any] = {}
     for path in paths:
         if one_dict := load_toml_from_path_if_exists(path):

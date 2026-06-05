@@ -538,12 +538,6 @@ inputs = ["text", "images", "pdf", "audio", "video"]
 outputs = ["text", "structured"]
 costs = { input = 0.5, output = 3 }
 
-["google/gemini-3-pro-preview"]
-max_tokens = 1048576
-inputs = ["text", "images", "pdf", "audio", "video"]
-outputs = ["text", "structured"]
-costs = { input = 2, output = 12 }
-
 ["google/gemini-3.1-pro-preview"]
 max_tokens = 1048576
 inputs = ["audio", "pdf", "images", "text", "video"]

@@ -20,6 +20,13 @@ The Pipelex CLI is organized into several command groups:
 | [**run**](run.md) | Execute pipelines |
 | [**build**](build/index.md) | Generate pipelines, runners, and structures |
 
+## Global flags
+
+These flags work on any `pipelex` command and are position-agnostic — place them anywhere in the invocation:
+
+- `--traceback` - print the full Rich-rendered stack trace before the friendly one-line error. Off by default. Both `pipelex run --traceback pipe ...` and `pipelex run pipe ... --traceback` work.
+- `--no-logo` - suppress the startup logo banner. Handy for clean logs and to save tokens in agent output.
+
 ## Related CLI Surface
 
 Package manifest management currently lives in the `mthds` CLI:

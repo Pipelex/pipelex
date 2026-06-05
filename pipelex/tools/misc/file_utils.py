@@ -9,6 +9,27 @@ from pydantic import BaseModel, ConfigDict, Field
 
 MAX_FILE_PATH_LENGTH = 4096
 
+
+def reject_bare_str_or_path(value: object, *, param_name: str) -> None:
+    """Reject a bare ``str``/``Path`` passed where a ``Sequence[str | Path]`` is expected.
+
+    A bare ``str`` satisfies ``Sequence[str | Path]`` (``Sequence`` is covariant), so type checkers
+    silently accept it and it gets iterated character-by-character; a bare ``Path`` is not a
+    ``Sequence`` and dies with a confusing deep error instead. Reject both early with a message that
+    tells the caller to wrap the value in a list. ``None`` and real sequences fall through untouched.
+
+    Args:
+        value: The argument received for a ``Sequence[str | Path]`` parameter.
+        param_name: The parameter's name, used to make the error message actionable.
+
+    Raises:
+        TypeError: If ``value`` is a bare ``str`` or ``Path``.
+    """
+    if isinstance(value, (str, Path)):
+        msg = f"{param_name} must be a sequence of paths, not a single {type(value).__name__}; wrap it as [{value!r}]"
+        raise TypeError(msg)
+
+
 ########################################################
 # Save & Load
 ########################################################
