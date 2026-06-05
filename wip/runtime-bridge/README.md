@@ -11,6 +11,7 @@ Each is a **confirmed** finding whose resolution is a genuine design choice, not
 - **[direct-mode-nested-router-leak.md](direct-mode-nested-router-leak.md)** — (greptile P1, + cubic P2 on the enabler) In `DIRECT` mode, nested controller sub-pipes resolve the *hub default* router and leak to Temporal when a worker has `[temporal] is_enabled`. Fix needs a `scoped_pipe_router` helper (cubic's hub.py:615 comment). Fork is about the `multi_observer` side-effect + whether to fix now.
 - **[graph-context-temporal-contract.md](graph-context-temporal-contract.md)** — (greptile P2) `graph_context` is threaded into the `PipeJob` for *all* modes, but the docstring says DIRECT-only and `WfPipeRouter` actually consumes it. Fork: honor the contract (null it for Temporal) vs fix the docstring (keep threading it).
 - **[trace-flush-blocking-io.md](trace-flush-blocking-io.md)** — (cubic P2) `flush_trace_events_to_backend` is `async` with blocking boto3/file I/O. Assessed as **false positive / acceptable** (runs in an activity), with an optional throughput-offload note. Documented here so the thread reply has a paper trail.
+- **[bridge-error-name-collision.md](bridge-error-name-collision.md)** — (spotted during the dev merge, not a review bot) `PipelexRuntimeBridgeError` (base) and `PipelexBridgeRuntimeError` (concrete leaf) differ only by word order — both are live and correct, but the mirror names are easy to misread / mis-`except`. Cosmetic/API-clarity only; lowest urgency. Fork: rename the leaf vs leave it.
 
 ## 2. Mechanical fixes still pending (no design needed)
 
