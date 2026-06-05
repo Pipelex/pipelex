@@ -632,6 +632,30 @@ def teardown_current_pipe_router() -> None:
     _current_pipe_router.set(None)
 
 
+@contextmanager
+def scoped_pipe_router(pipe_router: "PipeRouterProtocol") -> Generator[None, None, None]:
+    """Set ``pipe_router`` as the active router for the scope, then restore the prior value on exit.
+
+    Captures the prior ``_current_pipe_router`` ContextVar value before setting
+    the new one. On exit — success or exception — restores the prior override
+    (or clears it if there wasn't one). Use this whenever a call needs its own
+    router for the *whole* run (root pipe + nested controller sub-pipes, which
+    resolve :func:`get_pipe_router`) without clobbering an outer caller's
+    override. Mirrors :func:`scoped_current_library`.
+
+    Prefer this over the raw ``set_pipe_router`` / ``teardown_current_pipe_router``
+    pair internally: the raw teardown unconditionally resets the override to
+    ``None`` and so does not restore an outer override. The raw pair is kept
+    because the external ``pipelex-mistralai-workflows`` plugin depends on it.
+    """
+    prev = _current_pipe_router.get()
+    _current_pipe_router.set(pipe_router)
+    try:
+        yield
+    finally:
+        _current_pipe_router.set(prev)
+
+
 def get_pipe_router() -> "PipeRouterProtocol":
     override = _current_pipe_router.get()
     if override is not None:

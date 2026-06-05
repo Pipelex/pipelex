@@ -1,6 +1,6 @@
 # `flush_trace_events_to_backend` — async with blocking I/O
 
-**Status:** **false positive / acceptable as-is.** No code change recommended. Documented so the PR thread reply has a paper trail and so a future throughput concern has a starting point.
+**Status:** ✅ **RESOLVED — false positive / by-design.** No code change. The `asyncio.to_thread` offload below is kept on file for if/when Temporal ships and we profile activity-worker contention.
 **Source:** PR #959 review — cubic-dev-ai (P2, `pipelex/runtime_bridge/primitives/trace_flush.py:14`).
 
 ## The finding

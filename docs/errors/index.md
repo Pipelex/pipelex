@@ -357,7 +357,7 @@ classification rules, and the cross-boundary Temporal bridge.
 
 - [`MissingMistralWorkflowsPluginError`](missing-mistral-workflows-plugin-error.md) — Missing mistral workflows plugin
 - [`MissingPipelexTemporalExtraError`](missing-pipelex-temporal-extra-error.md) — Missing pipelex temporal extra
-- [`PipelexBridgeRuntimeError`](pipelex-bridge-runtime-error.md) — Pipelex bridge runtime
+- [`PipelexBridgeDispatchError`](pipelex-bridge-dispatch-error.md) — Pipelex bridge dispatch
 - [`PipelexRuntimeBridgeError`](pipelex-runtime-bridge-error.md) — Pipelex runtime bridge
 
 ## PipelexServiceConfigValidationError

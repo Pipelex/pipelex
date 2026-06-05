@@ -1,6 +1,6 @@
 # Bridge error name collision — `PipelexRuntimeBridgeError` vs `PipelexBridgeRuntimeError`
 
-**Status:** deferred design fork (cosmetic / maintainability — no runtime impact). Lowest urgency of the runtime-bridge follow-ups.
+**Status:** ✅ **RESOLVED — leaf renamed to `PipelexBridgeDispatchError`.** (Option A.) Applied: renamed the class in `exceptions.py`; updated the import + raise sites in `bridge.py` and the `pytest.raises` references in `test_validation.py`; regenerated `docs/errors/` (`pipelex-bridge-runtime-error.md` removed, `pipelex-bridge-dispatch-error.md` written, `index.md` updated — no spurious mistral-page churn); updated the `TODOS.md` prose. `make agent-check` + `make agent-test` green. Original triage retained below.
 
 **Spotted:** during the `dev` → `feature/Runtime-bridge-extraction` merge triage. Not a merge regression and not a stale duplicate — verified both classes are live and their docs are in sync (`pipelex-dev generate-error-pages` reports `Removed: 0`, no orphans).
 

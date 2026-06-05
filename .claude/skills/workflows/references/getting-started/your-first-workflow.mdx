@@ -47,7 +47,7 @@ class SimpleExampleWorkflow:
     @workflows.workflow.entrypoint
     async def run(self, name: str) -> dict:
         """Workflow entry point.
-        1. It coordinate multiple activities
+        1. It coordinates multiple activities
         2. It may need to wait for external events
         """
         return await hello_world(name)
@@ -80,7 +80,7 @@ Next step is now execute your workflow.
 1. Select `simple_example_workflow`
 1. Launch the workflow using the `Start Workflow` button and the input `{"name": "<your_name>"}`
 1. Find your execution in the `Executions` list
-1. Make sure the workflow ran until the end by checking if the output is correct, like in this example: ![expected_workflow_output](expected_workflow_output.png)
+1. Make sure the workflow ran until the end by checking that the output is correct.
 
 ## Multi-Worker Setup
 

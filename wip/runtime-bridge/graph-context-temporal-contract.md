@@ -1,8 +1,16 @@
 # `graph_context` threaded into Temporal modes despite a DIRECT-only contract
 
-**Status:** confirmed contract/docstring mismatch, **deferred pending decision — do not fix yet.**
+**Status:** ✅ **RESOLVED — Option A applied.** (was: confirmed contract/docstring mismatch, deferred pending decision)
 **Source:** PR #959 review — greptile-apps (P2, `bridge.py:111-128`, "Temporal modes inherit tracing").
-**Severity:** real but **latent** — only matters when a host passes a non-None `graph_context` *and* selects a Temporal mode. `graph_context` defaults to `None`, Temporal isn't in prod, and no current caller does this. The fork is about which side of the mismatch is the source of truth.
+**Severity:** real but **latent** — only mattered when a host passed a non-None `graph_context` *and* selected a Temporal mode.
+
+## Resolution (Option A)
+
+`run_pipe_via_bridge` now computes `is_direct = input_payload.execution_mode is PipelexExecutionMode.DIRECT` and passes `graph_context=graph_context if is_direct else None` to `build_pipe_job_from_input`, so a host `graph_context` is honored for DIRECT and **nulled for the Temporal modes** — honoring the documented contract and removing the cross-contamination foot-gun (`WfPipeRouter`'s `graph_context is not None` guard makes the None a clean no-op). The now-inaccurate "would be ignored anyway" docstring clause was rewritten to state the nulling plainly. Regression test: `tests/unit/pipelex/runtime_bridge/test_graph_context_contract.py` (DIRECT forwards the host context; TEMPORAL_BLOCKING nulls it). `make agent-check` + `make agent-test` green.
+
+The original triage below is retained as the record of why Option A over B/C.
+
+---
 
 ## The finding
 

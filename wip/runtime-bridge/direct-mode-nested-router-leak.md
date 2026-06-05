@@ -1,8 +1,22 @@
 # DIRECT mode: nested controller sub-pipes leak to the hub default router
 
-**Status:** confirmed bug, **deferred pending decision — do not fix yet.**
+**Status:** ✅ **RESOLVED — Option A applied.** (was: confirmed bug, deferred pending decision)
 **Source:** PR #959 review — greptile-apps (P1, `bridge.py:252-258`); the enabler is cubic-dev-ai (P2, `hub.py:615`, "prefer a `scoped_pipe_router` context manager").
-**Severity:** real but **latent** — only bites when a worker runs with `[temporal] is_enabled = true`, and Temporal hasn't shipped to prod. In the common (non-Temporal) worker it's silently harmless today *except* for an observer inconsistency (see the fork).
+**Severity:** real but **latent** — only bites when a worker runs with `[temporal] is_enabled = true`, and Temporal hasn't shipped to prod. In the common (non-Temporal) worker it was silently harmless *except* for an observer inconsistency (see the fork, now resolved).
+
+## Resolution (Option A)
+
+Decision: **Option A** — scope the bridge's bare `PipeRouter()` for the whole DIRECT run. The observer sub-question was investigated and cleared the way for A: the router-level observer's *only* job is best-effort PostHog telemetry, it's inert by default and only live for Gateway users, the DIRECT root pipe already emitted none, and Temporal mode already uses `ObserverNoOp`. Threading the observer in (Option B) would have required a hub `get_observer` getter that doesn't exist — re-coupling the bridge to internals. Full analysis: [`../observer-and-telemetry/observer-telemetry-posthog.md`](../observer-and-telemetry/observer-telemetry-posthog.md).
+
+Applied:
+
+- Added `scoped_pipe_router(pipe_router)` to `pipelex/hub.py` (mirrors `scoped_current_library`: captures the prior `_current_pipe_router` override and restores it on exit — fixes cubic's hub.py:615/teardown-clobber point too). The raw `set_pipe_router` / `teardown_current_pipe_router` pair is kept for the external `pipelex-mistralai-workflows` plugin.
+- Wrapped `_run_direct` (`pipelex/runtime_bridge/bridge.py`) in `with scoped_pipe_router(direct_router):` so root + nested sub-pipes both resolve the in-process router. Kills the Temporal leak.
+- Tests: `tests/unit/pipelex/pipe_run/test_scoped_pipe_router.py` (set/restore/nested/raise semantics) and `tests/unit/pipelex/runtime_bridge/test_direct_router_scoping.py` (nested dispatch resolves the scoped router, not the hub default; override torn down after the run). `make agent-check` + `make agent-test` green.
+
+Everything below is the original triage write-up, retained as the record of why.
+
+---
 
 ## The finding
 

@@ -1,38 +1,32 @@
 # runtime-bridge — review follow-ups from PR #959
 
-Cold-start entry point for finishing the triage of the SWE-agent review comments on **PR #959** (`feat: extract framework-agnostic Pipelex runtime bridge`, branch `feature/Runtime-bridge-extraction`). The PR extracts `pipelex/runtime_bridge/` — a host-runtime-agnostic surface (`run_pipe_via_bridge`) that lets Mistral Workflows / raw Temporal / future plugins invoke Pipelex pipes from inside their own activities.
+Triage of the SWE-agent review comments on **PR #959** (`feat: extract framework-agnostic Pipelex runtime bridge`, branch `feature/Runtime-bridge-extraction`). The PR extracts `pipelex/runtime_bridge/` — a host-runtime-agnostic surface (`run_pipe_via_bridge`) that lets Mistral Workflows / raw Temporal / future plugins invoke Pipelex pipes from inside their own activities.
 
-Two review bots left 12 unresolved threads: **greptile-apps** and **cubic-dev-ai**. All 12 were verified against the code. They split into three buckets.
+Two review bots left 12 unresolved threads (**greptile-apps** + **cubic-dev-ai**). All 12 were verified against the code. **All are now resolved in the working tree** — the only thing left is replying to / resolving the GitHub threads (see "Remaining" at the bottom).
 
-## 1. Deferred design forks (this folder)
+## 1. Design forks — all resolved
 
-Each is a **confirmed** finding whose resolution is a genuine design choice, not a mechanical fix. **Do not apply a fix yet** — each doc lays out the fork, pros/cons, and a recommendation for a human to decide. All three are low-urgency: the Temporal integration has not shipped to production, so the Temporal-routing/tracing ones are *latent*.
+Each was a **confirmed** finding whose resolution was a genuine design choice. Each doc retains its full triage as the record of why.
 
-- **[direct-mode-nested-router-leak.md](direct-mode-nested-router-leak.md)** — (greptile P1, + cubic P2 on the enabler) In `DIRECT` mode, nested controller sub-pipes resolve the *hub default* router and leak to Temporal when a worker has `[temporal] is_enabled`. Fix needs a `scoped_pipe_router` helper (cubic's hub.py:615 comment). Fork is about the `multi_observer` side-effect + whether to fix now.
-- **[graph-context-temporal-contract.md](graph-context-temporal-contract.md)** — (greptile P2) `graph_context` is threaded into the `PipeJob` for *all* modes, but the docstring says DIRECT-only and `WfPipeRouter` actually consumes it. Fork: honor the contract (null it for Temporal) vs fix the docstring (keep threading it).
-- **[trace-flush-blocking-io.md](trace-flush-blocking-io.md)** — (cubic P2) `flush_trace_events_to_backend` is `async` with blocking boto3/file I/O. Assessed as **false positive / acceptable** (runs in an activity), with an optional throughput-offload note. Documented here so the thread reply has a paper trail.
-- **[bridge-error-name-collision.md](bridge-error-name-collision.md)** — (spotted during the dev merge, not a review bot) `PipelexRuntimeBridgeError` (base) and `PipelexBridgeRuntimeError` (concrete leaf) differ only by word order — both are live and correct, but the mirror names are easy to misread / mis-`except`. Cosmetic/API-clarity only; lowest urgency. Fork: rename the leaf vs leave it.
+- **[direct-mode-nested-router-leak.md](direct-mode-nested-router-leak.md)** — ✅ **RESOLVED (Option A).** (greptile P1, + cubic P2 enabler) In `DIRECT` mode, nested controller sub-pipes resolved the *hub default* router and leaked to Temporal when a worker has `[temporal] is_enabled`. Fixed with a `scoped_pipe_router` helper in `hub.py` wrapping `_run_direct` (also resolves cubic's hub.py:615/teardown-clobber). The observer sub-question that gated the fork is written up in [`../observer-and-telemetry/observer-telemetry-posthog.md`](../observer-and-telemetry/observer-telemetry-posthog.md).
+- **[graph-context-temporal-contract.md](graph-context-temporal-contract.md)** — ✅ **RESOLVED (Option A).** (greptile P2) `graph_context` was threaded into the `PipeJob` for *all* modes despite the DIRECT-only docstring, and `WfPipeRouter` consumes it. Fixed: `run_pipe_via_bridge` now nulls `graph_context` for the Temporal modes (honoring the contract); docstring corrected. + regression test.
+- **[trace-flush-blocking-io.md](trace-flush-blocking-io.md)** — ✅ **RESOLVED (false positive / by-design).** (cubic P2) `flush_trace_events_to_backend` is `async` with blocking boto3/file I/O — but it runs in an *activity*, which is exactly where Temporal allows blocking I/O. No code change. The optional `asyncio.to_thread` throughput-offload note is kept on file for if/when Temporal ships and we profile worker contention.
+- **[bridge-error-name-collision.md](bridge-error-name-collision.md)** — ✅ **RESOLVED (renamed).** The near-mirror `PipelexBridgeRuntimeError` (leaf) vs `PipelexRuntimeBridgeError` (base) was renamed: the leaf is now **`PipelexBridgeDispatchError`**. Updated the class, `bridge.py` raises, `test_validation.py`, regenerated `docs/errors/` (old slug removed, new written; no mistral churn), and the `TODOS.md` prose.
 
-## 2. Mechanical fixes still pending (no design needed)
+## 2. Mechanical fixes — all applied
 
-These were confirmed during triage but **not yet applied** (the session was redirected to write up the forks first). They're local and unambiguous — just do them, add the two small regression tests, then reply/resolve their threads:
+- **Boot race** — ✅ `pipelex/runtime_bridge/bootstrap.py`. Double-checked locking with a module-level `threading.Lock` (re-check inside the lock). Regression test: `tests/unit/pipelex/runtime_bridge/test_bootstrap_concurrency.py` (threaded barrier; asserts make runs once, no raise).
+- **Exceptions caller-facing flag** — ✅ `pipelex/runtime_bridge/exceptions.py`. Added `_authors_caller_facing_message = True` to `MissingPipelexTemporalExtraError` and `MissingMistralWorkflowsPluginError` so the pip-install hint survives STRICT disclosure. Regression test: `test_exceptions_disclosure.py`.
+- **streaming.mdx missing import** — ✅ added `import asyncio` to the example's import block.
+- **observability.mdx frontmatter id** — ✅ `id: observabilities` → `id: observability`.
+- **your-first-workflow.mdx grammar** — ✅ "It coordinate" → "It coordinates".
+- **your-first-workflow.mdx broken image** — ✅ removed the missing-PNG image, kept the instruction text.
+- **durable-execution.md overgeneralization** — ✅ rewrote the line to distinguish the two durable backends (the `[temporal] is_enabled` flag is the Pipelex-on-Temporal backend only; the Mistral Workflows path runs pipes via the runtime bridge inside Workflows activities).
 
-- **Boot race** — `pipelex/runtime_bridge/bootstrap.py:24` (greptile P1 + cubic P2). `ensure_pipelex_booted` does check-then-`Pipelex.make()` with no lock; two concurrent first-calls in a fresh worker → one wins, the other hits `PipelexSetupError("Pipelex is already initialized")`. `MetaSingleton` has no lock either. Fix: double-checked locking with a module-level `threading.Lock` (re-check inside the lock). Test: threaded barrier forcing two concurrent first-calls; assert no raise + singleton made once. *(Note: race is only across threads — the function is a sync `def` with no `await` between check and make, so asyncio tasks on one loop can't interleave there; it bites Temporal's sync-activity thread-pool / multi-thread workers.)*
-- **Exceptions caller-facing flag** — `pipelex/runtime_bridge/exceptions.py:8,12` (cubic P2). `MissingPipelexTemporalExtraError` and `MissingMistralWorkflowsPluginError` carry pip-install hints but don't set `_authors_caller_facing_message: ClassVar[bool] = True`; under STRICT disclosure their message is replaced by `INTERNAL_ERROR_PLACEHOLDER`, hiding the hint. Siblings like `PipelexInterpreterError` set it. Fix: add the flag to both. Test: assert STRICT disclosure keeps the message.
-- **streaming.mdx missing import** — `.claude/skills/workflows/references/guides/streaming.mdx:99` (cubic P1). Example uses `asyncio.sleep(0.1)` but never imports `asyncio`. Fix: add `import asyncio` to the example's import block.
-- **observability.mdx frontmatter id** — `.claude/skills/workflows/references/guides/observability.mdx:2` (cubic P2). `id: observabilities` breaks every link targeting `observability` (SKILL.md, value-proposition.mdx, _deployment-patterns.mdx, …). Fix: `id: observability`.
-- **your-first-workflow.mdx grammar** — `.../getting-started/your-first-workflow.mdx:~50-53` (cubic P3). "It coordinate multiple activities" → "It coordinates".
-- **your-first-workflow.mdx broken image** — same file, `:~83` (cubic P3). `![expected_workflow_output](expected_workflow_output.png)` — PNG does not exist in the repo. Fix: remove the broken image, keep the instruction text.
-- **durable-execution.md overgeneralization** — `docs/reliability/durable-execution.md:21` (cubic P2). "flip `[temporal] is_enabled = true` and the work dispatches through Temporal" conflates the two backends — that flag is the *Pipelex Temporal* backend only, not the *Mistral Workflows* path. Apply cubic's suggested rewrite distinguishing the two (Mistral path is configured through the runtime bridge in a worker activity).
+## Verification
 
-## 3. False positive
+`make agent-check` (ruff, plxt, pyright 0/0/0, mypy) and `make agent-test` (full suite) both green.
 
-Folded into [trace-flush-blocking-io.md](trace-flush-blocking-io.md) (the #8 thread). No code change.
+## Remaining
 
-## How to resume
-
-1. Read the three fork docs, get a human decision on each.
-2. Apply the mechanical fixes in §2 (+ the two regression tests).
-3. Apply whatever was decided for the forks.
-4. `make agent-check` + `make agent-test`.
-5. Per the `/review-pr-agents` skill: reply on each PR thread (`✅ Fixed` / `➖ False positive` / `⏭️ Deferred`) and resolve the addressed ones; leave deferred forks' threads open until decided.
+Code/docs are done. What's left is the GitHub side, per the `/review-pr-agents` skill: reply on each PR #959 thread (`✅ Fixed` / `➖ False positive`) and resolve them. No threads need to stay open — every fork was decided and applied.

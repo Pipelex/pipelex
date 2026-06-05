@@ -9,7 +9,7 @@ from pipelex.runtime_bridge.bridge import (
     _validate_input,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
     run_pipe_via_bridge,
 )
-from pipelex.runtime_bridge.exceptions import PipelexBridgeRuntimeError
+from pipelex.runtime_bridge.exceptions import PipelexBridgeDispatchError
 from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
 
 
@@ -27,7 +27,7 @@ class TestBridgeValidationAndDecoding:
             pipe_code="any",
             execution_mode=PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET,
         )
-        with pytest.raises(PipelexBridgeRuntimeError, match="TEMPORAL_FIRE_AND_FORGET"):
+        with pytest.raises(PipelexBridgeDispatchError, match="TEMPORAL_FIRE_AND_FORGET"):
             _validate_input(payload)
 
     def test_validate_input_accepts_fire_and_forget_with_delivery(self):
@@ -71,5 +71,5 @@ class TestBridgeValidationAndDecoding:
             pipe_code="any",
             execution_mode=PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET,
         )
-        with pytest.raises(PipelexBridgeRuntimeError, match="TEMPORAL_FIRE_AND_FORGET"):
+        with pytest.raises(PipelexBridgeDispatchError, match="TEMPORAL_FIRE_AND_FORGET"):
             await run_pipe_via_bridge(payload)

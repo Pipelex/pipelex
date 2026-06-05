@@ -29,6 +29,7 @@ from pipelex.hub import (
     get_library_manager,
     get_required_pipe,
     scoped_current_library,
+    scoped_pipe_router,
 )
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
@@ -43,7 +44,7 @@ from pipelex.runtime_bridge.bootstrap import ensure_pipelex_booted
 from pipelex.runtime_bridge.exceptions import (
     MissingMistralWorkflowsPluginError,
     MissingPipelexTemporalExtraError,
-    PipelexBridgeRuntimeError,
+    PipelexBridgeDispatchError,
 )
 from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
 from pipelex.system.telemetry.otel_constants import OTelConstants
@@ -97,10 +98,12 @@ async def run_pipe_via_bridge(
     The optional ``graph_context`` is plumbed into ``JobMetadata`` so callers
     (e.g. a streaming activity) that already opened a ``GraphTracerManager``
     tracer for this pipeline run get per-step trace events flowing through
-    the configured event log. ``graph_context`` is only honored for
-    ``DIRECT`` execution mode — TEMPORAL modes already have their own
-    event-log infrastructure via ``pipeline_run_setup`` and a passed-in
-    context would be ignored anyway.
+    the configured event log. ``graph_context`` is honored for ``DIRECT``
+    mode only — it is deliberately nulled for the Temporal modes, which have
+    their own event-log infrastructure via ``pipeline_run_setup``. Forwarding
+    a host ``graph_context`` to a Temporal mode would make Pipelex's Temporal
+    workflow open its tracer under the host's graph id and merge its trace
+    events into the host's graph, so the bridge does not thread it through.
     """
     ensure_pipelex_booted()
     _validate_input(input_payload)
@@ -109,10 +112,17 @@ async def run_pipe_via_bridge(
     delivery_assignment = _decode_delivery_assignment(input_payload.delivery_assignment_dump)
 
     async with _scoped_library_for_crate(library_crate):
+        # graph_context is honored for DIRECT only. The Temporal modes have their
+        # own event-log infrastructure (via pipeline_run_setup); forwarding a host
+        # graph_context there would make WfPipeRouter open its tracer under the
+        # host's graph_id and merge Pipelex's Temporal trace events into the host
+        # graph — exactly the cross-contamination the contract forbids. Null it
+        # for the non-DIRECT modes.
+        is_direct = input_payload.execution_mode is PipelexExecutionMode.DIRECT
         pipe_job = build_pipe_job_from_input(
             input_payload=input_payload,
             library_crate=library_crate,
-            graph_context=graph_context,
+            graph_context=graph_context if is_direct else None,
         )
 
         match input_payload.execution_mode:
@@ -196,7 +206,7 @@ def _validate_input(input_payload: PipelexPipeRunInput) -> None:
             "PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET requires a delivery_assignment_dump; "
             "otherwise the pipe completion would be silently dropped."
         )
-        raise PipelexBridgeRuntimeError(msg)
+        raise PipelexBridgeDispatchError(msg)
 
 
 def _decode_library_crate(library_crate_dump: dict[str, Any] | None) -> LibraryCrate | None:
@@ -253,12 +263,21 @@ async def _run_direct(
     pipe_job: PipeJob,
     delivery_assignment: DeliveryAssignment | None,
 ) -> PipelexPipeRunOutput:
-    pipe_run = PipeRun(pipe_router=PipeRouter())
-    try:
-        pipe_output = await pipe_run.run(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
-    except (PipeRunError, PipeJobError, PipeRouterError, PipeExecutionError, PipelineExecutionError) as exc:
-        msg = f"Pipe execution failed in DIRECT mode for pipe '{pipe_job.pipe.code}': {exc}"
-        raise PipelexBridgeRuntimeError(msg) from exc
+    # DIRECT mode forces in-process execution even inside a Temporal-enabled
+    # worker. Scope the in-process router as the active router for the WHOLE
+    # run so nested controller sub-pipes — which dispatch through
+    # get_pipe_router() — resolve THIS router rather than falling back to the
+    # hub default. Without the scope, the hub default in a Temporal-enabled
+    # worker is the Temporal router, so a DIRECT-mode sequence/batch would leak
+    # its nested pipes to Temporal, defeating the point of DIRECT.
+    direct_router = PipeRouter()
+    with scoped_pipe_router(direct_router):
+        pipe_run = PipeRun(pipe_router=direct_router)
+        try:
+            pipe_output = await pipe_run.run(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
+        except (PipeRunError, PipeJobError, PipeRouterError, PipeExecutionError, PipelineExecutionError) as exc:
+            msg = f"Pipe execution failed in DIRECT mode for pipe '{pipe_job.pipe.code}': {exc}"
+            raise PipelexBridgeDispatchError(msg) from exc
 
     return _serialize_completed_output(
         pipe_output=pipe_output,
@@ -278,7 +297,7 @@ async def _run_temporal_blocking(
         pipe_output = await temporal_pipe_run.run(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
     except (PipeRunError, PipeJobError, PipeRouterError, PipeExecutionError, PipelineExecutionError) as exc:
         msg = f"Pipe execution failed in TEMPORAL_BLOCKING mode for pipe '{pipe_job.pipe.code}': {exc}"
-        raise PipelexBridgeRuntimeError(msg) from exc
+        raise PipelexBridgeDispatchError(msg) from exc
 
     return _serialize_completed_output(
         pipe_output=pipe_output,
@@ -298,7 +317,7 @@ async def _run_temporal_fire_and_forget(
         workflow_id, _handle = await temporal_pipe_run.start(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
     except (PipeRunError, PipeJobError, PipeRouterError, PipeExecutionError, PipelineExecutionError) as exc:
         msg = f"Pipe dispatch failed in TEMPORAL_FIRE_AND_FORGET mode for pipe '{pipe_job.pipe.code}': {exc}"
-        raise PipelexBridgeRuntimeError(msg) from exc
+        raise PipelexBridgeDispatchError(msg) from exc
 
     return PipelexPipeRunOutput(
         output_dict={},
@@ -377,7 +396,7 @@ async def _run_mistral_native(
         pipe_output = await pipe_run.run(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
     except (PipeRunError, PipeJobError, PipeRouterError, PipeExecutionError, PipelineExecutionError) as exc:
         msg = f"Pipe execution failed in MISTRAL_NATIVE mode for pipe '{pipe_job.pipe.code}': {exc}"
-        raise PipelexBridgeRuntimeError(msg) from exc
+        raise PipelexBridgeDispatchError(msg) from exc
 
     return _serialize_completed_output(
         pipe_output=pipe_output,

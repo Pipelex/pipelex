@@ -18,7 +18,7 @@ Move to a [durable backend](../distributed-execution/index.md) when you need:
 - **Large durable batches** — running a pipe over thousands of items, durably and rate-limited.
 - **Horizontal scale** — fan work out across multiple worker machines.
 
-The same `.mthds` methods run on both paths without changing a line — flip `[temporal] is_enabled = true` and the work dispatches through Temporal.
+The same `.mthds` methods run on every path without changing a line — which durable backend runs them is a deployment choice, not a code change. The [Pipelex on Temporal](../distributed-execution/temporal/index.md) backend is switched on with `[temporal] is_enabled = true`, which dispatches the work through your Temporal cluster. The [Mistral Workflows](../distributed-execution/mistral-workflows/index.md) backend is wired differently: that flag does not apply — Pipelex pipes run inside Workflows activities via the runtime bridge.
 
 !!! note "Two durable backends"
     Durable execution (Tier 2) is available on two backends, both built on Temporal: your own Temporal cluster ([Pipelex on Temporal](../distributed-execution/temporal/index.md)), and Mistral's managed Workflows control plane ([Pipelex on Mistral Workflows](../distributed-execution/mistral-workflows/index.md), preview). The resilience model described here applies to both; they differ in who operates the control plane. See [Choosing a Backend](../distributed-execution/mistral-workflows/choosing-a-backend.md).

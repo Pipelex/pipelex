@@ -20,6 +20,8 @@ NATS_HOST="nats://localhost:4222"
 ### 2. Publish from an Activity
 
 ```python
+import asyncio
+
 import mistralai.workflows as workflows
 from mistralai.workflows import Depends
 from mistralai.workflows.core.task import Task
