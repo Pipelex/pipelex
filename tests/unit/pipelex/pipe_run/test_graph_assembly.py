@@ -7,6 +7,7 @@ from pytest_mock import MockerFixture
 from pipelex.base_exceptions import PipelexConfigError
 from pipelex.pipe_run.graph_assembly import assemble_graph_on_output
 from pipelex.system.exceptions import MissingDependencyError
+from pipelex.tracing.exceptions import EventLogReadError
 
 
 class TestAssembleGraphOnOutput:
@@ -123,6 +124,26 @@ class TestAssembleGraphOnOutput:
         original_graph_spec = mock_pipe_output.graph_spec
 
         assemble_graph_on_output(pipe_output=mock_pipe_output, pipeline_run_id="plr-jsondecode")
+
+        assert mock_pipe_output.graph_spec is original_graph_spec
+        mock_event_log.close.assert_called_once()
+
+    def test_swallows_event_log_read_error(self, mocker: MockerFixture) -> None:
+        """EventLogReadError (backend infra failure, e.g. DynamoDB throttle) is caught; graph_spec is left unchanged."""
+        mock_config = mocker.patch("pipelex.pipe_run.graph_assembly.get_config")
+        mock_config.return_value.pipelex.tracing_config.is_enabled = True
+
+        mock_event_log = mocker.MagicMock()
+        mock_event_log.read_events = mocker.MagicMock(side_effect=EventLogReadError("dynamodb throttled"))
+        mocker.patch(
+            "pipelex.pipe_run.graph_assembly.make_event_log",
+            return_value=mock_event_log,
+        )
+
+        mock_pipe_output = mocker.MagicMock()
+        original_graph_spec = mock_pipe_output.graph_spec
+
+        assemble_graph_on_output(pipe_output=mock_pipe_output, pipeline_run_id="plr-read-error")
 
         assert mock_pipe_output.graph_spec is original_graph_spec
         mock_event_log.close.assert_called_once()

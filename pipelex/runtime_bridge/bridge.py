@@ -201,12 +201,14 @@ def serialize_pipe_output(pipe_output: PipeOutput) -> dict[str, Any]:
 
 
 def _validate_input(input_payload: PipelexPipeRunInput) -> None:
-    if input_payload.execution_mode is PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET and input_payload.delivery_assignment_dump is None:
-        msg = (
-            "PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET requires a delivery_assignment_dump; "
-            "otherwise the pipe completion would be silently dropped."
-        )
-        raise PipelexBridgeDispatchError(msg)
+    if input_payload.execution_mode is PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET:
+        delivery_assignment = _decode_delivery_assignment(input_payload.delivery_assignment_dump)
+        if delivery_assignment is None or not delivery_assignment.has_delivery_target:
+            msg = (
+                "PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET requires a delivery_assignment_dump with at least one "
+                "delivery target (storage or a webhook); otherwise the pipe completion would be silently dropped."
+            )
+            raise PipelexBridgeDispatchError(msg)
 
 
 def _decode_library_crate(library_crate_dump: dict[str, Any] | None) -> LibraryCrate | None:

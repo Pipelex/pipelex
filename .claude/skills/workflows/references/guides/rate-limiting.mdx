@@ -44,11 +44,11 @@ class CompletionParams(BaseModel):
     model: str
     messages: List[Dict[str, str]]
 
-@workflows.activity(rate_limit=workflows.RateLimit(time_window_in_sec=1, max_calls=100))
+@workflows.activity(rate_limit=workflows.RateLimit(time_window_in_sec=1, max_execution=100))
 async def generate_chat_response(
     params: CompletionParams,
     client: Mistral = Depends(get_mistral_client)
-):
+) -> dict:
     """Generates a chat response using a shared client"""
     # This activity can be called from multiple workflows
     # but will share the same rate limit across all of them

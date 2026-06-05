@@ -6,10 +6,17 @@ activity decorator so both ``pipelex.temporal`` and
 ``pipelex_mistralai_workflows`` can wrap it in their own activities.
 """
 
+import json
+
+from pydantic import ValidationError
+
 from pipelex import log
+from pipelex.base_exceptions import PipelexConfigError
 from pipelex.config import get_config
 from pipelex.graph.graphspec import GraphSpec, PipelineRef
+from pipelex.system.exceptions import MissingDependencyError
 from pipelex.tracing.event_log_factory import make_event_log
+from pipelex.tracing.exceptions import EventLogReadError
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
 
 
@@ -42,9 +49,11 @@ async def assemble_graph_for_pipeline_run(  # noqa: RUF029
             return graph_spec
         finally:
             event_log.close()
-    except Exception as exc:  # noqa: BLE001
-        # Best-effort observability: graph assembly must never fail the pipeline run. Any
-        # backend / parse / assembly error degrades to None, which is why the host-runtime
+    except (OSError, json.JSONDecodeError, ValidationError, PipelexConfigError, MissingDependencyError, EventLogReadError) as exc:
+        # Best-effort observability: graph assembly must never fail the pipeline run. Expected
+        # backend / parse / assembly failures degrade to None, which is why the host-runtime
         # activity wrapping this primitive is deliberately left undecorated by the error boundary.
+        # Programming bugs (KeyError, AttributeError, ...) are NOT caught here so they surface
+        # during development — this mirrors the in-process path in pipelex/pipe_run/graph_assembly.py.
         log.warning(f"Graph assembly failed: {exc}")
         return None

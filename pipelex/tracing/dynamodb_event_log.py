@@ -21,6 +21,7 @@ from pipelex import log
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.tracing.event_log_protocol import EventLogProtocol
+from pipelex.tracing.exceptions import EventLogReadError
 from pipelex.tracing.trace_events import AnyTraceEvent, TraceEvent
 
 try:
@@ -106,22 +107,36 @@ class DynamoDBEventLog(EventLogProtocol):
 
     @override
     def read_events(self, pipeline_run_id: str) -> list[TraceEvent]:
-        """Read all events for a pipeline run from DynamoDB."""
-        items: list[dict[str, Any]] = []
+        """Read all events for a pipeline run from DynamoDB.
 
-        response = self._table.query(
-            KeyConditionExpression=self._key_condition(pipeline_run_id),
-            ScanIndexForward=True,
+        Store-level failures (throttling, auth, network) are translated into
+        ``EventLogReadError`` so best-effort callers (graph assembly) can degrade
+        gracefully without catching raw botocore exceptions. Individual
+        unparseable items are skipped with a warning rather than failing the read.
+        """
+        from botocore.exceptions import (  # noqa: PLC0415 - optional dependency, lazy import
+            BotoCoreError,
+            ClientError,
         )
-        items.extend(response.get("Items", []))
 
-        while "LastEvaluatedKey" in response:
+        items: list[dict[str, Any]] = []
+        try:
             response = self._table.query(
                 KeyConditionExpression=self._key_condition(pipeline_run_id),
                 ScanIndexForward=True,
-                ExclusiveStartKey=response["LastEvaluatedKey"],
             )
             items.extend(response.get("Items", []))
+
+            while "LastEvaluatedKey" in response:
+                response = self._table.query(
+                    KeyConditionExpression=self._key_condition(pipeline_run_id),
+                    ScanIndexForward=True,
+                    ExclusiveStartKey=response["LastEvaluatedKey"],
+                )
+                items.extend(response.get("Items", []))
+        except (ClientError, BotoCoreError) as exc:
+            msg = f"Failed to read trace events from DynamoDB for pipeline_run_id={pipeline_run_id}: {type(exc).__name__}"
+            raise EventLogReadError(msg) from exc
 
         events: list[TraceEvent] = []
         for item in items:

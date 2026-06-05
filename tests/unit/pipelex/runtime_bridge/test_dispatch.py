@@ -112,7 +112,7 @@ class TestDispatch:
             PipelexPipeRunInput(
                 pipe_code="fake_pipe",
                 execution_mode=PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET,
-                delivery_assignment_dump={"webhooks": [], "storage": None},
+                delivery_assignment_dump={"webhooks": [{"url": "https://example.test/hook"}], "storage": None},
                 pipeline_run_id="caller-run-id",
             )
         )

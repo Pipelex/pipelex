@@ -167,6 +167,11 @@ classification rules, and the cross-boundary Temporal bridge.
 
 - [`DryRunError`](dry-run-error.md) — Dry run
 
+## EventLogError
+
+- [`EventLogError`](event-log-error.md) — Event log
+- [`EventLogReadError`](event-log-read-error.md) — Event log read
+
 ## GraphSpecError
 
 - [`GraphSpecError`](graph-spec-error.md) — Graph spec

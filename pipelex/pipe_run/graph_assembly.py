@@ -16,6 +16,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.graph.graphspec import PipelineRef
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.tracing.event_log_factory import make_event_log
+from pipelex.tracing.exceptions import EventLogReadError
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
 
 
@@ -63,5 +64,5 @@ def assemble_graph_on_output(
                 log.debug(f"Graph assembled from {len(events)} events for pipeline_run_id={pipeline_run_id}")
         finally:
             event_log.close()
-    except (OSError, json.JSONDecodeError, ValidationError, PipelexConfigError, MissingDependencyError) as graph_assembly_error:
+    except (OSError, json.JSONDecodeError, ValidationError, PipelexConfigError, MissingDependencyError, EventLogReadError) as graph_assembly_error:
         log.warning(f"Graph assembly failed, using existing graph: {graph_assembly_error}")

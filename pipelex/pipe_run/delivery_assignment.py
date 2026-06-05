@@ -70,3 +70,13 @@ class DeliveryAssignment(BaseModel):
 
     storage: StorageTarget | None = None
     webhooks: list[WebhookTarget] = Field(default_factory=empty_list_factory_of(WebhookTarget))
+
+    @property
+    def has_delivery_target(self) -> bool:
+        """True when at least one real delivery target (storage or a webhook) is configured.
+
+        A ``DeliveryAssignment`` with no storage and no webhooks is a no-op: it would
+        persist nothing and notify no one, so a fire-and-forget completion would be
+        silently dropped.
+        """
+        return self.storage is not None or bool(self.webhooks)
