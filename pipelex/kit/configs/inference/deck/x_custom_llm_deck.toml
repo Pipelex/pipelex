@@ -35,21 +35,21 @@ for_object = "disabled"
 
 # Example (uncomment to use):
 # [llm.waterfalls]
-# premium-llm = ["claude-4.5-opus", "gemini-3.0-pro", "gpt-5.2", "grok-4"]
+# premium-llm = ["claude-4.5-opus", "gemini-3.1-pro", "gpt-5.2", "grok-4"]
 # premium-llm-vision = [
 #     "claude-4.5-opus",
-#     "gemini-3.0-pro",
+#     "gemini-3.1-pro",
 #     "gpt-5.2",
 #     "grok-4-fast-reasoning",
 # ]
 # premium-llm-structured = [
 #     "claude-4.5-opus",
-#     "gemini-3.0-pro",
+#     "gemini-3.1-pro",
 #     "gpt-5.2",
 #     "grok-4",
 # ]
 # large-context-llm-code = [
-#     "gemini-3.0-pro",
+#     "gemini-3.1-pro",
 #     "claude-4.5-opus",
 #     "gpt-5.2",
 #     "grok-4-fast-reasoning",

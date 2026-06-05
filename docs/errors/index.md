@@ -319,6 +319,10 @@ classification rules, and the cross-boundary Temporal bridge.
 
 - [`PipeSequenceFactoryError`](pipe-sequence-factory-error.md) — Pipe sequence factory
 
+## PipeSignatureNotExecutableError
+
+- [`PipeSignatureNotExecutableError`](pipe-signature-not-executable-error.md) — Pipe signature not executable
+
 ## PipeSpecError
 
 - [`PipeSpecError`](pipe-spec-error.md) — Pipe spec
@@ -393,6 +397,10 @@ classification rules, and the cross-boundary Temporal bridge.
 - [`SsrfBlockedError`](ssrf-blocked-error.md) — Outbound request blocked (SSRF guard)
 - [`UnsafeSchemaError`](unsafe-schema-error.md) — Unsafe schema
 
+## SignaturesNotAllowedError
+
+- [`SignaturesNotAllowedError`](signatures-not-allowed-error.md) — Signatures not allowed
+
 ## StuffError
 
 - [`StuffArtefactError`](stuff-artefact-error.md) — Stuff artefact
@@ -434,6 +442,11 @@ classification rules, and the cross-boundary Temporal bridge.
 
 - [`ArgumentTypeError`](argument-type-error.md) — Argument type
 - [`ContextProviderError`](context-provider-error.md) — Context provider
+- [`CsvCoercionError`](csv-coercion-error.md) — CSV coercion error
+- [`CsvColumnError`](csv-column-error.md) — CSV column error
+- [`CsvError`](csv-error.md) — CSV error
+- [`CsvFlatnessError`](csv-flatness-error.md) — CSV flatness error
+- [`CsvReadError`](csv-read-error.md) — CSV read error
 - [`EnvVarNotFoundError`](env-var-not-found-error.md) — Environment variable not set
 - [`FileTypeError`](file-type-error.md) — File type
 - [`FuncRegistryError`](func-registry-error.md) — Func registry
