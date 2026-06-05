@@ -21,7 +21,7 @@ from uuid import uuid4
 import shortuuid
 from kajson.class_registry import ClassRegistry
 from kajson.kajson_manager import KajsonManager
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
@@ -106,10 +106,10 @@ async def run_pipe_via_bridge(
     events into the host's graph, so the bridge does not thread it through.
     """
     ensure_pipelex_booted()
-    _validate_input(input_payload)
 
     library_crate = _decode_library_crate(input_payload.library_crate_dump)
     delivery_assignment = _decode_delivery_assignment(input_payload.delivery_assignment_dump)
+    _validate_input(input_payload, delivery_assignment=delivery_assignment)
 
     async with _scoped_library_for_crate(library_crate):
         # graph_context is honored for DIRECT only. The Temporal modes have their
@@ -200,9 +200,8 @@ def serialize_pipe_output(pipe_output: PipeOutput) -> dict[str, Any]:
     return pipe_output.working_memory.dump_for_temporal()
 
 
-def _validate_input(input_payload: PipelexPipeRunInput) -> None:
+def _validate_input(input_payload: PipelexPipeRunInput, delivery_assignment: DeliveryAssignment | None) -> None:
     if input_payload.execution_mode is PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET:
-        delivery_assignment = _decode_delivery_assignment(input_payload.delivery_assignment_dump)
         if delivery_assignment is None or not delivery_assignment.has_delivery_target:
             msg = (
                 "PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET requires a delivery_assignment_dump with at least one "
@@ -214,13 +213,21 @@ def _validate_input(input_payload: PipelexPipeRunInput) -> None:
 def _decode_library_crate(library_crate_dump: dict[str, Any] | None) -> LibraryCrate | None:
     if library_crate_dump is None:
         return None
-    return LibraryCrate.model_validate(library_crate_dump)
+    try:
+        return LibraryCrate.model_validate(library_crate_dump)
+    except ValidationError as exc:
+        msg = f"Invalid library_crate_dump passed to the runtime bridge: {exc}"
+        raise PipelexBridgeDispatchError(msg) from exc
 
 
 def _decode_delivery_assignment(delivery_assignment_dump: dict[str, Any] | None) -> DeliveryAssignment | None:
     if delivery_assignment_dump is None:
         return None
-    return DeliveryAssignment.model_validate(delivery_assignment_dump)
+    try:
+        return DeliveryAssignment.model_validate(delivery_assignment_dump)
+    except ValidationError as exc:
+        msg = f"Invalid delivery_assignment_dump passed to the runtime bridge: {exc}"
+        raise PipelexBridgeDispatchError(msg) from exc
 
 
 @asynccontextmanager
@@ -238,7 +245,7 @@ async def _scoped_library_for_crate(library_crate: LibraryCrate | None) -> Async
         return
 
     library_manager = get_library_manager()
-    library_id = f"runtime_bridge_{uuid4().hex[:8]}"
+    library_id = f"runtime_bridge_{uuid4().hex}"
 
     # Pre-seed a per-call ClassRegistry from the global one so classes generated
     # from the crate's inline structured concepts register into this scoped
@@ -248,9 +255,15 @@ async def _scoped_library_for_crate(library_crate: LibraryCrate | None) -> Async
     global_registry = KajsonManager.get_class_registry()
     scoped_registry = ClassRegistry()
     scoped_registry.register_classes_dict(global_registry.get_classes_dict())
-    _opened_library_id, library = library_manager.open_library(library_id=library_id)
-    library.set_class_registry(scoped_registry)
+    # open_library + set_class_registry live inside the try so a throw between
+    # opening the library and reaching the yield still tears it down (the entry
+    # is registered in the manager the moment open_library returns). Mirrors the
+    # library_opened guard in submitter_hydration.rehydrate_pipe_output_with_crate.
+    library_opened = False
     try:
+        _opened_library_id, library = library_manager.open_library(library_id=library_id)
+        library_opened = True
+        library.set_class_registry(scoped_registry)
         # scoped_current_library captures and restores the prior current-library
         # ContextVar, so a bridge call made from within an already-scoped library
         # doesn't clobber the caller's context.
@@ -258,7 +271,8 @@ async def _scoped_library_for_crate(library_crate: LibraryCrate | None) -> Async
             library_manager.load_from_crate(library_id=library_id, crate=library_crate)
             yield library_id
     finally:
-        library_manager.teardown(library_id=library_id)
+        if library_opened:
+            library_manager.teardown(library_id=library_id)
 
 
 async def _run_direct(

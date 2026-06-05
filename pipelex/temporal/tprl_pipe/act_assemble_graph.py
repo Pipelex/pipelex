@@ -20,9 +20,11 @@ class AssembleGraphArg(BaseModel):
     main_pipe_code: str | None = None
 
 
-# Deliberately NOT decorated with @convert_pipelex_errors: this activity is best-effort
-# observability — it swallows every failure and degrades to None, so no error ever
-# crosses the boundary for the decorator to convert.
+# Deliberately NOT decorated with @convert_pipelex_errors: the shared primitive degrades
+# EXPECTED failures (backend / parse / assembly errors) to None for best-effort observability,
+# so those never reach the boundary. Programming bugs (KeyError, AttributeError, ...) are left
+# to propagate on purpose, mirroring the in-process path, so they surface loudly in dev instead
+# of being silently converted.
 @activity.defn(name="act_assemble_graph")
 async def act_assemble_graph(arg: AssembleGraphArg) -> GraphSpec | None:
     return await assemble_graph_for_pipeline_run(

@@ -55,7 +55,7 @@ def rehydrate_pipe_output_with_crate(
         return pipe_output
 
     library_manager = get_library_manager()
-    rehydration_library_id = f"rehydrate_{uuid.uuid4().hex[:8]}"
+    rehydration_library_id = f"rehydrate_{uuid.uuid4().hex}"
     prev_library_id = _get_current_library_id_or_none()
     library_opened = False
     library_set_as_current = False

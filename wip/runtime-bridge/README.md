@@ -1,4 +1,4 @@
-# runtime-bridge — review follow-ups from PR #959
+# runtime-bridge — review follow-ups
 
 Triage of the SWE-agent review comments on **PR #959** (`feat: extract framework-agnostic Pipelex runtime bridge`, branch `feature/Runtime-bridge-extraction`). The PR extracts `pipelex/runtime_bridge/` — a host-runtime-agnostic surface (`run_pipe_via_bridge`) that lets Mistral Workflows / raw Temporal / future plugins invoke Pipelex pipes from inside their own activities.
 
@@ -15,13 +15,25 @@ Each was a **confirmed** finding whose resolution was a genuine design choice. E
 
 ## 2. Mechanical fixes — all applied
 
-- **Boot race** — ✅ `pipelex/runtime_bridge/bootstrap.py`. Double-checked locking with a module-level `threading.Lock` (re-check inside the lock). Regression test: `tests/unit/pipelex/runtime_bridge/test_bootstrap_concurrency.py` (threaded barrier; asserts make runs once, no raise).
+- **Boot race** — ✅ `pipelex/runtime_bridge/bootstrap.py`. Double-checked locking with a module-level `threading.Lock` (re-check inside the lock). Regression test: `tests/unit/pipelex/runtime_bridge/test_bootstrap_concurrency.py` (threaded barrier; asserts make runs once, no raise). **Follow-up (PR #966 review):** this closed the write-write race but not a lock-free read of a half-built singleton mid-`setup()` — see §3 / [`bootstrap-half-built-singleton-race.md`](bootstrap-half-built-singleton-race.md) (deferred P1).
 - **Exceptions caller-facing flag** — ✅ `pipelex/runtime_bridge/exceptions.py`. Added `_authors_caller_facing_message = True` to `MissingPipelexTemporalExtraError` and `MissingMistralWorkflowsPluginError` so the pip-install hint survives STRICT disclosure. Regression test: `test_exceptions_disclosure.py`.
 - **streaming.mdx missing import** — ✅ added `import asyncio` to the example's import block.
 - **observability.mdx frontmatter id** — ✅ `id: observabilities` → `id: observability`.
 - **your-first-workflow.mdx grammar** — ✅ "It coordinate" → "It coordinates".
 - **your-first-workflow.mdx broken image** — ✅ removed the missing-PNG image, kept the instruction text.
 - **durable-execution.md overgeneralization** — ✅ rewrote the line to distinguish the two durable backends (the `[temporal] is_enabled` flag is the Pipelex-on-Temporal backend only; the Mistral Workflows path runs pipes via the runtime bridge inside Workflows activities).
+
+## 3. PR #966 pre-landing review
+
+A later `/review` pass on PR #966 (the bridge + the trace-event read hardening). One deferred item plus four cheap hardening fixes applied to the working tree.
+
+- **Bootstrap half-built-singleton race** — ⏸️ **deferred (P1)**, see [`bootstrap-half-built-singleton-race.md`](bootstrap-half-built-singleton-race.md). The #959 lock closed the write-write race; a lock-free read of a mid-`setup()` singleton remains. The recommended boot-at-entry-point path is unaffected and it fails loud, not silent — fix shape + test-lifecycle caveat are in the doc.
+- **`library_id` widened** — ✅ `bridge.py` + `primitives/submitter_hydration.py`. Dropped the `uuid4().hex[:8]` truncation (32 bits) to full hex. `open_library` silently *reuses* a colliding id (`library_manager.py:148-149`), so a 32-bit collision between two overlapping calls would share and prematurely tear down one library; full hex matches the collision-safe Temporal path (full `workflow_id`).
+- **`act_assemble_graph` comment corrected** — ✅ the lifted primitive catches only a specific exception tuple, so the old "swallows every failure / no error ever crosses the boundary" comment was stale; reworded to say expected failures degrade to None while programming bugs deliberately propagate (pinned by `test_propagates_unexpected_keyerror`).
+- **Scoped-library open guarded** — ✅ `bridge.py::_scoped_library_for_crate` now opens the library inside the `try` (with a `library_opened` flag) so a throw between open and yield can't leak the manager entry — matches the sibling `rehydrate_pipe_output_with_crate`.
+- **Input decode wrapped** — ✅ `bridge.py` decodes `library_crate_dump` / `delivery_assignment_dump` once, translating raw `pydantic.ValidationError` into `PipelexBridgeDispatchError` so a malformed dump no longer escapes the entry point as a non-`PipelexError`; also removes the double-decode of the delivery dump. `_validate_input` now takes the decoded assignment (its unit tests updated).
+
+`make agent-check` (pyright 0/0/0, mypy clean) and `tests/unit/pipelex/runtime_bridge/` green after these.
 
 ## Verification
 

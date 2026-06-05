@@ -16,11 +16,11 @@ from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
 class TestBridgeValidationAndDecoding:
     def test_validate_input_passes_for_direct_without_delivery(self):
         payload = PipelexPipeRunInput(pipe_code="any", execution_mode=PipelexExecutionMode.DIRECT)
-        _validate_input(payload)  # must not raise
+        _validate_input(payload, delivery_assignment=_decode_delivery_assignment(payload.delivery_assignment_dump))  # must not raise
 
     def test_validate_input_passes_for_temporal_blocking_without_delivery(self):
         payload = PipelexPipeRunInput(pipe_code="any", execution_mode=PipelexExecutionMode.TEMPORAL_BLOCKING)
-        _validate_input(payload)  # must not raise
+        _validate_input(payload, delivery_assignment=_decode_delivery_assignment(payload.delivery_assignment_dump))  # must not raise
 
     def test_validate_input_rejects_fire_and_forget_without_delivery(self):
         payload = PipelexPipeRunInput(
@@ -28,7 +28,7 @@ class TestBridgeValidationAndDecoding:
             execution_mode=PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET,
         )
         with pytest.raises(PipelexBridgeDispatchError, match="TEMPORAL_FIRE_AND_FORGET"):
-            _validate_input(payload)
+            _validate_input(payload, delivery_assignment=_decode_delivery_assignment(payload.delivery_assignment_dump))
 
     def test_validate_input_rejects_fire_and_forget_with_empty_delivery(self):
         # A DeliveryAssignment with no storage and no webhooks is a no-op: completion would
@@ -39,7 +39,7 @@ class TestBridgeValidationAndDecoding:
             delivery_assignment_dump={"webhooks": [], "storage": None},
         )
         with pytest.raises(PipelexBridgeDispatchError, match="delivery target"):
-            _validate_input(payload)
+            _validate_input(payload, delivery_assignment=_decode_delivery_assignment(payload.delivery_assignment_dump))
 
     def test_validate_input_accepts_fire_and_forget_with_storage_target(self):
         payload = PipelexPipeRunInput(
@@ -47,7 +47,7 @@ class TestBridgeValidationAndDecoding:
             execution_mode=PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET,
             delivery_assignment_dump={"webhooks": [], "storage": {"key_prefix": "runs/abc"}},
         )
-        _validate_input(payload)  # must not raise
+        _validate_input(payload, delivery_assignment=_decode_delivery_assignment(payload.delivery_assignment_dump))  # must not raise
 
     def test_validate_input_accepts_fire_and_forget_with_webhook_target(self):
         payload = PipelexPipeRunInput(
@@ -55,7 +55,7 @@ class TestBridgeValidationAndDecoding:
             execution_mode=PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET,
             delivery_assignment_dump={"webhooks": [{"url": "https://example.test/hook"}], "storage": None},
         )
-        _validate_input(payload)  # must not raise
+        _validate_input(payload, delivery_assignment=_decode_delivery_assignment(payload.delivery_assignment_dump))  # must not raise
 
     def test_decode_library_crate_returns_none_for_none(self):
         assert _decode_library_crate(None) is None
