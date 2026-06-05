@@ -25,11 +25,11 @@ from typing import Callable, cast
 
 import pytest
 
+from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle
 from pipelex.cogt.templating.text_format import TextFormat
-from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_factory import PipeFactory
@@ -142,7 +142,8 @@ class TestComposeDropsEmbeddedImage:
         load_empty_library: Callable[[], None],
     ) -> None:
         """DESIRED behavior: the image embedded via PipeCompose should be delivered to the
-        image model, i.e. it should appear in `input_images`."""
+        image model, i.e. it should appear in `input_images`.
+        """
         load_empty_library()
         _composed_prompt_text, img_gen_prompt = await _compose_then_build_img_gen_prompt(job_metadata)
 
