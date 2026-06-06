@@ -35,7 +35,7 @@
 is_normalize_data_urls_to_storage = true
 # Set to false to disable generation of execution graphs
 is_generate_graph = true
-# Set to false to disable cost reporting (usage collection + end-of-run cost report)
+# Set to false to stop emitting usage (cost) tracing events
 is_generate_costs = true
 
 # Bounded fan-out concurrency for PipeBatch: at most this many branches run at once.

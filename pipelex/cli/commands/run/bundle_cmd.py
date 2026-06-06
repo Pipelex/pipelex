@@ -92,7 +92,7 @@ def run_bundle_cmd(
         bool | None,
         typer.Option(
             "--costs/--no-costs",
-            help="Override config: enable or disable cost reporting (usage collection + end-of-run cost report). Default on.",
+            help="Override config: emit usage (cost) tracing events. The cost report is still controlled by --cost-report. Default on.",
         ),
     ] = None,
     save_csv: Annotated[

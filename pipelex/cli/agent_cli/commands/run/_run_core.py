@@ -38,7 +38,7 @@ async def run_pipeline_core(
         mock_inputs: Whether to generate mock data for missing inputs.
         library_dirs: List of library directories to search for pipe definitions.
         graph: Whether to generate execution graph visualizations.
-        costs: Whether to enable cost reporting (usage collection + assembly). Default True.
+        costs: Whether to emit usage (cost) tracing events. Default True.
         with_memory: Whether to include full working memory in output (True) or
             return compact concept JSON only (False, default).
 

@@ -172,7 +172,7 @@ class PipelineExecutionConfig(ConfigModel):
 
         Args:
             generate_graph: If not None, overrides is_generate_graph (graph node/edge events + GraphSpec assembly).
-            generate_costs: If not None, overrides is_generate_costs (usage events + cost-report assembly).
+            generate_costs: If not None, overrides is_generate_costs (emit usage/cost tracing events).
             force_include_full_data: If not None, overrides all graph_config.data_inclusion flags
                 (stuff_json_content, stuff_text_content, stuff_html_content, error_stack_traces).
             mock_inputs: If not None, overrides is_mock_inputs. When True, generates mock

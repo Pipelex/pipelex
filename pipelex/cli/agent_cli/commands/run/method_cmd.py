@@ -52,7 +52,7 @@ def run_method_cmd(
     ] = True,
     costs: Annotated[
         bool,
-        typer.Option("--costs/--no-costs", help="Enable cost reporting (usage collection + assembly). Default on."),
+        typer.Option("--costs/--no-costs", help="Emit usage (cost) tracing events. Default on."),
     ] = True,
     library_dir: Annotated[
         list[str] | None,
