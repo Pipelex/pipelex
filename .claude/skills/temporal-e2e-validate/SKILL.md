@@ -7,8 +7,10 @@ description: >
   test cases, and (2) true 3-process setup (server + separate worker process
   + submitter) that validates the actual deployment topology including
   cross-process serialization, LibraryCrate propagation, deferred hydration,
-  concurrent isolation, image payload storage, and cross-worker graph
-  tracing with GraphSpec assembly. Step 8 validates v1 per-activity routing.
+  concurrent isolation, image payload storage, cross-worker graph
+  tracing with GraphSpec assembly, and cross-worker cost-report assembly
+  (runner-side usage aggregated into a single submitter cost report, validated
+  cheaply via `--mock-inference`). Step 8 validates v1 per-activity routing.
   Step 9 validates v2 per-queue submitter options (timeouts, retry,
   rate-limit), per-handle option overrides, named worker-runtime profiles
   selected via `--profile`, and the strict `--task-queue` CLI typo check
@@ -22,10 +24,12 @@ description: >
   "temporal regression", "temporal validation", "3-process test", "full temporal
   test", "validate phases", "image temporal", "queue options", "runtime profile",
   "validate error handling", "error report", "error propagation",
+  "cost report", "distributed cost", "mock inference",
   or wants comprehensive verification that distributed execution works
   end-to-end. Also use proactively after changes to LibraryCrate, deferred
   hydration, ClassRegistry scoping, graph tracing, image generation activities,
   content storage, queue options resolution, worker-runtime profiles,
+  usage / cost reporting, the `--costs` / `--mock-inference` flags,
   error classification / `ErrorReport` / the Temporal error boundary, or
   Temporal workflow code.
 allowed-tools:
@@ -293,7 +297,7 @@ loaded only for the work at hand. Read them as needed:
 | Reference file | Covers | Read it when |
 |---|---|---|
 | `references/mode-2-setup.md` | Steps 1–2: Temporal server + worker processes; run-mode (dry vs live) | **Always — start here.** Every other Mode 2 file assumes the server + worker(s) are already up. |
-| `references/mode-2-tiers.md` | Steps 3–7: Tiers 1–14 (sequence, hydration, parallel, image gen/flow, isolation, object gen, extract, CV batch, error propagation), codec, final report | Validating core distributed execution, or running the full suite. |
+| `references/mode-2-tiers.md` | Steps 3–7: Tiers 1–16 (sequence, hydration, parallel, image gen/flow, isolation, cross-worker usage + cost report, object gen, extract, CV batch, error propagation), codec, final report | Validating core distributed execution, cost reporting, or running the full suite. |
 | `references/routing-battery.md` | Step 8: v1 `activity_queues` per-activity / per-handle routing (Tiers 10a–10c) | Validating that `activity_queues` isolates workers. Opt-in. |
 | `references/queue-options-battery.md` | Step 9: v2 per-queue options, per-handle overrides, rate limits, worker-runtime profiles, CLI typo check (Scenarios A–F) | Validating queue options / worker-runtime profiles. Opt-in. |
 
@@ -301,6 +305,7 @@ loaded only for the work at hand. Read them as needed:
 
 - "validate temporal" / "full temporal test" / a broad regression check → `mode-2-setup.md`, then `mode-2-tiers.md`; offer the two batteries as opt-in extras.
 - "validate temporal error handling" / "error report" / "error propagation" → Mode 1 Step 2b above (the precise pytest assertions) **plus** `mode-2-setup.md` + `mode-2-tiers.md` Step 5f (Tiers 13–16, cross-process).
+- "cost report" / "distributed cost" / "mock inference" → `mode-2-setup.md` (split workers), then `mode-2-tiers.md` Step 5b' (Tier 8b) — `--mock-inference` makes it free and deterministic; no live spend needed.
 - "queue options" / "runtime profile" / "routing" → `mode-2-setup.md`, then `routing-battery.md` and/or `queue-options-battery.md`.
 - Anything image-related → `mode-2-setup.md` + `mode-2-tiers.md` Tiers 4–5, run **live** — dry-run cannot surface payload-size bugs.
 

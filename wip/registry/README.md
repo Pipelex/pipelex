@@ -2,18 +2,19 @@
 
 This folder tracks one topic that grew as we worked it: the lifecycle of the per-run `UsageRegistry` held in the process-global `ReportingManager`. It started as a narrow "success-path leak" bug and, on investigation, turned out to be the same lifecycle as the deferred **distributed cost-report aggregation** (the distributed-execution track's T2 / P1). The leak is the missing *close*; cost aggregation is the missing *replay-populate*. Same buffer, same lifecycle, one piece of work.
 
-**Status: analysis complete, all design decisions locked. Next is the implementation plan** — start a fresh planning session from the synthesis doc's "For the planning phase" section.
+**Status: IMPLEMENTED.** All design decisions were locked, then built out across the phased plan in [`../../TODOS.md`](../../TODOS.md). Phases 1–5 (emit decoupling → usage on `PipeOutput` → renderer cutover → registry removal → `--mock-inference`) are committed on `fix/For-API-update`; Phase 6 (the `temporal-e2e-validate` skill's Tier 8b) and Phase 7 (changelog + these as-built docs) landed on top. The leak is fixed by removal and cross-worker cost reporting works end to end.
 
 ## Start here
 
-- [`registry-lifecycle-synthesis.md`](registry-lifecycle-synthesis.md) — **the canonical doc.** The unified model, the locked decisions (Option B; a default-on `--costs` switch that folds in `--cost-report`; events as the single source; usage carried on `PipeOutput`), the readiness checklist, and the planning-phase scope + test surface.
-- [`../../TODOS.md`](../../TODOS.md) — the sequenced implementation plan derived from the synthesis. **Phase 1 (emit decoupling) is implemented** (CHECKPOINT 1), Phases 2–7 pending.
+- [`../../TODOS.md`](../../TODOS.md) — **the canonical as-built record.** The sequenced phases, every checkpoint's cold-start notes (deleted symbols, new anchors, deviations), and §7's deferred-items list. Read this first when reviewing the branch.
+- [`registry-lifecycle-synthesis.md`](registry-lifecycle-synthesis.md) — the locked design the plan implemented: the unified model, Option B (usage on `PipeOutput`), the default-on `--costs` switch folding in `--cost-report`, events as the single source.
+- [`deferred-followups.md`](deferred-followups.md) — **the deferred non-goals** of this feature (D5 costs-only tracer skip, cost-per-node correlation, A1 factory, T5, T3, `--mock-inference` coverage). The two deferred *design decisions* are in [`cost-report-deferred-decisions.md`](cost-report-deferred-decisions.md).
 
-## Open review items (Phase 1 as-built)
+## Review records (all resolved — kept for the audit trail)
 
-- [`phase1-emit-decoupling-review.md`](phase1-emit-decoupling-review.md) — **multi-angle review of the Phase 1 implementation.** Correctness gaps (TEMPORAL `--no-graph` graph_spec leak, usage fast-path missing its gate, stale docs), an efficiency regression (costs-only pays full per-pipe graph serialization), and altitude items (the DIRECT/TEMPORAL gating decision has no single owner and already drifted; emit flags set via post-hoc `model_copy`). Cold-start-ready triage with a suggested sequencing into Phase 2.
-- [`cost-report-deferred-decisions.md`](cost-report-deferred-decisions.md) — **two deferred design decisions from the Phase 3 review** (the correctness/cleanup findings #1/#2/#4/#7 were already fixed in Phase 3). #3: cost reporting is now coupled to `tracing_config.is_enabled` (costs-on + tracing-off ⇒ silently no report). #6: the agent CLI gates costs on a hard-default-True param while the main CLI gates on the resolved config. Both need a deliberate call — ideally collapsed into one owner of "is cost reporting on?" when Phase 4 removes the registry.
-- [`phase5-mock-inference-review.md`](phase5-mock-inference-review.md) — **multi-angle review of the Phase 5 `--mock-inference` change with a verify/solve plan.** No correctness bug found. The punch-list: F1 (highest impact) `--mock-inference` on an img-gen/extract pipe silently calls the real provider and spends — land the cheap hard guard now; F2 the object mock built from the schema-reconstructed class can fail re-validation against the original class (wrap in a clear typed error now, full fidelity is B2); F3 the run-subcommand flag guards are copy-pasted (extract one validator); F4/F5 a likely-irrelevant `mock_main` divergence and minor reuse. F1/F2 are documented deferrals (TODOS §7 + the dry-run-refactor followup).
+- [`phase1-emit-decoupling-review.md`](phase1-emit-decoupling-review.md) — multi-angle review of the Phase 1 implementation. Its correctness/efficiency/altitude cluster (F1/F2/E1/A2 etc.) was folded into Phase 2 — see TODOS Phase 2's review-driven additions and CHECKPOINT 2's "review cluster confirmed landed".
+- [`cost-report-deferred-decisions.md`](cost-report-deferred-decisions.md) — the two **still-deferred** design decisions from the Phase 3 review (the correctness/cleanup findings #1/#2/#4/#7 were fixed in Phase 3). #3: cost reporting is coupled to `tracing_config.is_enabled` (costs-on + tracing-off ⇒ no report). #6: the agent CLI gates on the raw `costs` param while the main CLI gates on the resolved config. Both still want a deliberate call — the only open design items from this track.
+- [`phase5-mock-inference-review.md`](phase5-mock-inference-review.md) — review of the Phase 5 `--mock-inference` change. The whole punch-list (F1 hard guard for img-gen/extract/search, F2 typed object-fidelity error, F3 shared flag validator, F4/F5) **landed** — see TODOS §7 "Post-CP5 review punch-list landed (2026-06-07)". The full per-operator mock coverage and the `is_mock_inference → run_mode=DRY` re-keying remain tracked in [`../dry-run-refactor/followup-leaf-run-mode-mock.md`](../dry-run-refactor/followup-leaf-run-mode-mock.md).
 
 ## The trail (how we got here — findings still valid, recommendations superseded by the synthesis)
 
@@ -23,7 +24,7 @@ This folder tracks one topic that grew as we worked it: the lifecycle of the per
 
 ## Companion track
 
-The cost-reporting half lives in the distributed-execution plan, and the architecture to mirror (graph-spec assembly) is documented there:
+The cost-reporting half lives in the distributed-execution plan, where the mirrored architecture (graph-spec assembly) is documented:
 
-- [`../distributed-execution/tracing-cost-reporting.md`](../distributed-execution/tracing-cost-reporting.md) — as-built tracing & cost reporting, including **T2** (cross-worker cost report assembly not wired). Line references in that doc are somewhat stale, but the architecture description holds.
-- [`../distributed-execution/README.md`](../distributed-execution/README.md) — the priority plan; **P1** is the cost-report assembly wiring this synthesis designs.
+- [`../distributed-execution/tracing-cost-reporting.md`](../distributed-execution/tracing-cost-reporting.md) — as-built tracing & cost reporting; **T2** (cross-worker cost report assembly) is now **FIXED** via this track's Option B.
+- [`../distributed-execution/README.md`](../distributed-execution/README.md) — the priority plan; **P0.1** (`--mock-inference`) and **P1** (cost-report assembly) are both **shipped** by this work.

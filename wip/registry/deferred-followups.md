@@ -1,0 +1,27 @@
+# Registry / cost-reporting — deferred follow-ups
+
+Durable home for the follow-ups this feature deliberately left out of scope. The leak fix + distributed cost reporting shipped (Phases 1–7 in [`../../TODOS.md`](../../TODOS.md)); the items below are the known, intentional non-goals. None blocks the shipped work.
+
+Two further deferred items — both *design decisions* rather than follow-up work — live in their own doc: [`cost-report-deferred-decisions.md`](cost-report-deferred-decisions.md) (#3 cost reporting coupled to `tracing_config.is_enabled`; #6 agent-CLI vs main-CLI "is cost reporting on?" gating divergence). Those want a deliberate call; the items here are scoped work to pick up when signals warrant.
+
+## Optimizations
+
+- **D5 — costs-only in-memory tracer skip (deep half of review item E1).** In `--no-graph --costs` mode the graph tracer still runs in memory (minting node ids, accumulating the in-memory graph) even though no `GraphSpec` is ever assembled or output. Phase 2 landed the *cheap* half: per-pipe graph serialization (`pipe_abstract.py` IOSpec dumps, pipe/concept registry, `pipe_parallel.py` controller-output registration, `graph_tracer.teardown` spec build) is gated on `emit_graph_events`, so costs-only no longer pays for serialization. The *deep* half — skipping the in-memory tracer entirely in costs-only mode — is deferred. Watch-item: `on_pipe_start` still mints node ids so usage-event `node_id` correlation is unaffected; any skip must preserve that.
+
+- **Cost-per-node correlation via `UsageReportEvent.node_id`.** Each `UsageReportEvent` already carries the `node_id` of the pipe that produced it, but the assembled cost report aggregates by model only. A future report could break cost down per graph node (which pipe/step cost what), correlating usage events to graph nodes via `node_id`. Not built; the data is already in the event stream.
+
+## Altitude / architecture
+
+- **Review item A1 — `GraphContext.from_execution_config(...)` factory.** The `(graph, costs) → (event_log routing, set_event_log, flags)` decision is currently made at each tracing arm (DIRECT `pipeline_run_setup`, TEMPORAL `wf_pipe_router`). Phase 2's A2 captured most of the value by threading the emit flags into `open_tracer`/`setup` (so the returned `GraphContext` is born correct and the post-hoc `model_copy` footguns are gone). A single factory that owns the whole decision for both arms is the remaining polish — deferred as low-value-now.
+
+- **Review item T5 — `wf_pipe_router.py` setup-failure `except` doesn't restore `job_metadata.graph_context`.** On a tracer-setup failure the pipe can run with a `tracer_key` pointing at a closed tracer. Pre-existing latent issue (not introduced by this work; Temporal is unshipped — see [[project_temporal_not_shipped]]). Flag-and-fix candidate, parked.
+
+- **T3 — request-scoped tracing state instead of the process-singleton `ReportingManager`.** The deeper refactor in the distributed-execution track ([`../distributed-execution/tracing-cost-reporting.md`](../distributed-execution/tracing-cost-reporting.md) T3). Removing the submitter-side `UsageRegistry` shrank the singleton's surface, but the per-context `_event_log_contexts` dict on a process-global manager remains. Open follow-up.
+
+## `--mock-inference` coverage
+
+- **LLM leaf only.** `--mock-inference` mocks the LLM inference leaf (`llm_gen_text`/`object`/`object_list`). Image-gen / extract / search **fail loud** with `MockInferenceUnsupportedError` (their output is stored *above* the leaf by `generated_content_factory`, so a leaf-level mock would push synthetic data through the storage path — whereas `ContentGeneratorDry` short-circuits storage). Full per-operator synthetic-output coverage comes via [`../dry-run-refactor/followup-leaf-run-mode-mock.md`](../dry-run-refactor/followup-leaf-run-mode-mock.md) B2, which replaces each hard guard with a real synthetic-output branch.
+
+- **Main `run` subcommands only.** The flag is on `pipelex run pipe|method|bundle`, not the agent CLI. The mechanism (`JobMetadata.is_mock_inference` + leaf branch + `PipelexRunner`) is surface-agnostic, so the agent CLI can adopt it trivially when needed.
+
+- **`is_mock_inference` fate after the dry-run-refactor follow-up.** Decided 2026-06-06: build the interim flag now (Phase 5 is the follow-up's B1 core — a reusable leaf-level dry helper), settle retirement at B2. Open sub-decision: *fully retire* `--mock-inference` (DRY-on-Temporal covers cross-worker dispatch + `tokens_usages` assembly once it dispatches) vs *keep a thin reportable-mock* (DRY emits zero-token usage → suppressed report, so the cheap *rendered* cost-report validation — Tier 8b — is unique to a non-zero mock). Decide at B2 time. See [`../dry-run-refactor/followup-leaf-run-mode-mock.md`](../dry-run-refactor/followup-leaf-run-mode-mock.md).

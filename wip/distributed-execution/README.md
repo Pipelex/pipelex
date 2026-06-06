@@ -22,13 +22,13 @@ This folder is the **distributed-execution track**: running MTHDS methods as Tem
 | # | Item | Detail |
 |---|---|---|
 | **P0 ✓** | Tracing & cost reporting across separate-process workers | shipped — [tracing-cost-reporting.md](tracing-cost-reporting.md) |
-| **P0.1** | Dry-run through activity dispatch (testing affordance) | below |
+| **P0.1 ✓** | Dry-run through activity dispatch (testing affordance) | shipped as `--mock-inference` — below |
 | **P0.2** | Deferred follow-ons from P0 | below |
-| **P1** | Cross-worker cost report assembly wiring | depends on P0 — below |
+| **P1 ✓** | Cross-worker cost report assembly | shipped (Option B — usage rides on `PipeOutput`) — below |
 | **P2** | Local cross-package dependencies in the crate | [local-cross-package-deps.md](local-cross-package-deps.md) |
 | **P3** | Remote dependencies from GitHub | needs P2 — [remote-deps-from-github.md](remote-deps-from-github.md) |
 
-P0/P0.1/P0.2/P1 form one chain (P0 unlocks the rest); P2/P3 are an independent chain (P2 blocks P3). [tracing-cost-reporting.md](tracing-cost-reporting.md) carries the as-built design and the open T2/T3 gaps that motivate P1.
+P0/P0.1/P0.2/P1 formed one chain (P0 unlocked the rest); **P0, P0.1, and P1 are now shipped** (see [the registry tracker](../registry/README.md) for the as-built sequencing). P0.2 is still open (independent follow-ons). P2/P3 are an independent chain (P2 blocks P3). [tracing-cost-reporting.md](tracing-cost-reporting.md) carries the as-built design; T1 and T2 are fixed, T3 (request-scoped tracing state) remains open.
 
 Sibling track (separate branch, not in this plan): the error-handling work — see [`error-handling/README.md`](../error-handling/README.md).
 
@@ -40,13 +40,17 @@ Shipped. The as-built design, what works today, and the open T2/T3 gaps are in [
 
 ---
 
-## P0.1 — Dry-run through activity dispatch (testing affordance)
+## P0.1 — Dry-run through activity dispatch (testing affordance) — DONE
 
-Today `--dry-run` instantiates `ContentGeneratorDry()` directly inside the workflow body (`pipe_llm.py:515`, and similar sites in `pipe_extract.py`, `pipe_compose.py`, `pipe_img_gen.py`). The activity (`act_llm_gen_text` etc.) is never dispatched, so the cross-worker `UsageReportEvent` emission path cannot be exercised in dry-run against router+runner workers — the runner-side fallback only fires when the activity actually dispatches across processes. (Observed validating P0: `pipelex run bundle --temporal --dry-run --mock-inputs` against a router+runner topology produces only `writer_id="primary"` events; no `wf_*__w_act_*.ndjson` files.)
+Shipped as **`--mock-inference`** (distinct from `--dry-run`): a LIVE run (`run_mode` stays LIVE so operators dispatch normally) whose AI call is faked at the cogt inference *leaf*, inside the dispatched activity. So the cross-process surfaces — `_event_log_contexts` lookup miss, runner-side fallback, `writer_id="act_*"` emission — all fire, with no LLM spend.
 
-What's needed: a run mode that keeps activity dispatch but mocks inference *inside* the activity (use `ContentGeneratorDry` inside the activity body, not in place of dispatching it), so the cross-process surfaces — `_event_log_contexts` lookup miss, runner-side fallback, `writer_id="act_*"` emission — all fire. Concretely: a `--mock-inference` flag distinct from `--dry-run` (or redefine `--dry-run` to dispatch-and-mock-inside and rename the current behavior); equivalent mock sites in `pipe_extract.py` / `pipe_compose.py` / `pipe_img_gen.py`; and `temporal-e2e-validate` Tier 8 able to run in this mode and surface `wf_*__w_act_*.ndjson` deterministically.
+As built:
 
-Beyond P0, the same affordance unlocks dry-run e2e for any cross-process work (P1 cost report assembly, distributed graph assembly, payload codec stress testing) without real LLM spend.
+- `JobMetadata.is_mock_inference: bool` carries the signal into every activity (it crosses the Temporal boundary), written single-source from `prepare_pipe_job`. The leaf (`cogt/content_generation/llm_generate.py`) branches to a shared mock in `cogt/content_generation/dry_mock.py` when the flag is set.
+- The synthetic usage is **reportable non-zero** (`MOCK_INFERENCE_NB_TOKENS_BY_CATEGORY = {INPUT: 100, OUTPUT: 50}`, model `mock_inference`) — distinct from `--dry-run`'s zero-token, suppressed usage — so the cross-worker cost report actually renders. This is the durable reason `--mock-inference` ≠ `--dry-run` at the reporting layer.
+- `temporal-e2e-validate` Tier 8b runs in this mode and surfaces `wf_*__w_act_*.ndjson` + a rendered cost report deterministically.
+
+**Scope deviations (deliberate):** the leaf mock covers the **LLM leaf only**; image-gen / extract / search under `--mock-inference` fail loud with `MockInferenceUnsupportedError` (their output is stored *above* the leaf, so a leaf mock would push synthetic data through storage). `--mock-inference` is on the main `run` subcommands only (not the agent CLI). Full per-operator coverage and the eventual `is_mock_inference → run_mode=DRY` re-keying are tracked in [`../dry-run-refactor/followup-leaf-run-mode-mock.md`](../dry-run-refactor/followup-leaf-run-mode-mock.md) (B2). See [the registry tracker](../registry/README.md) and `../registry/phase5-mock-inference-review.md` for the full as-built.
 
 ---
 
@@ -62,21 +66,18 @@ Each is independently scoped and not blocking. Pick up individually as signals d
 
 ---
 
-## P1 — Cross-worker cost report assembly wiring
+## P1 — Cross-worker cost report assembly — DONE
 
-### Why this is second, not first
+Shipped via **Option B** (locked in [`../registry/registry-lifecycle-synthesis.md`](../registry/registry-lifecycle-synthesis.md)): rather than wire `read events → inject_tokens_usages → generate_report` onto the process-singleton manager, usage rides on `PipeOutput` exactly like the graph spec, and the submitter renders the report from that field. This resolved P1 **and** the `UsageRegistry` success-path leak in one move — with nothing populating a submitter-side registry, the registry was removed outright.
 
-Even with P0 shipped, the events still need to be turned into a cost report. The read-back path exists for the **graph** (`assemble_graph_on_output` / `act_assemble_graph` → `GraphSpecAssembler`) but not for **usage**. The pieces all exist on the manager side:
+As built:
 
-- `UsageAggregator.aggregate(events) → list[AnyTokensUsage]` (`pipelex/tracing/usage_aggregator.py`).
-- `ReportingManager.inject_tokens_usages(pipeline_run_id, tokens_usages)` (`reporting_manager.py:223`) — docstring: *"Used after assembling usage data from distributed trace events, so that generate_report() can produce a complete cost report across all workers."*
-- `ReportingManager.generate_report(pipeline_run_id)` (`reporting_manager.py:365`).
+- The single trace-event read in `assemble_tracing` / `act_assemble_tracing` (renamed from `graph_assembly` / `act_assemble_graph`) feeds `UsageAggregator.aggregate()` when `--costs` is on, setting `PipeOutput.tokens_usages` in both direct and Temporal modes (the same hook that builds the `GraphSpec`).
+- The submitter renders via `CostRegistry.generate_report(tokens_usages=...)` fed from `pipe_output.tokens_usages` (main CLI: `pipelex/reporting/cost_report_renderer.py::render_run_cost_report`).
+- A dedicated `--costs` / `is_generate_costs` switch (default on) gates usage events + `UsageAggregator` over the shared event-log transport, independent of `--graph`.
+- Retired: `ReportingManager.inject_tokens_usages` / `generate_report` / `open_registry` / `close_registry`, the `UsageRegistry` model, and the local-only registry fallback (`_get_registry_strict` / `_try_add_to_registry`) are all gone.
 
-`generate_report()` has a runtime caller — the CLI run path invokes it at `_run_core.py:224` — but that path reports only from the **local, in-process** usage registries; it never reads back the distributed trace events. `UsageAggregator.aggregate()` and `inject_tokens_usages()` still have zero runtime callers, so `UsageReportEvent`s emitted by runner/worker processes sit in the backend and never get assembled into the cost report. The missing piece is the cross-worker read-back, not `generate_report` itself.
-
-### The work
-
-Read events for `pipeline_run_id` → `UsageAggregator.aggregate()` → `ReportingManager.inject_tokens_usages()` → `generate_report()`, wired in both direct mode (`pipelex/pipeline/runner.py`) and Temporal mode (alongside or inside the existing graph-assembly hook) — the same place that calls the graph assembler can call the usage aggregator and inject the result before `generate_report` runs. Verify the cross-worker case: parent workflow on Worker A, child on Worker B, activity on Worker C → one end-of-run cost report carrying usage from all three. Once the read-back lands, revisit the local-only registry fallback (`_get_registry_strict` at `reporting_manager.py:115`, `_try_add_to_registry` at `:137`), whose local-only behaviour stands until the cross-worker path is wired.
+Cross-worker case verified without spend: parent + child + activity usage aggregates into one end-of-run cost report — `tests/integration/pipelex/temporal/tracing/test_split_worker_usage.py`, `test_mock_inference_temporal.py`, and the `temporal-e2e-validate` skill's Tier 8b. The full phased as-built is in [the registry tracker](../registry/README.md).
 
 ---
 
@@ -113,4 +114,4 @@ P2 (Local cross-package deps)
 P3 (Remote deps from GitHub)
 ```
 
-P0/P0.1/P0.2/P1 and P2/P3 are independent tracks; P0 unlocks P0.1, P0.2, and P1; P2 blocks P3. P0.1 is a parallel testing affordance that raises confidence in P0 / P1 / future cross-process work.
+P0/P0.1/P0.2/P1 and P2/P3 are independent tracks; P0 unlocked P0.1, P0.2, and P1; P2 blocks P3. **P0, P0.1, and P1 are shipped**; P0.2 (independent follow-ons) and P2/P3 remain. P0.1 (`--mock-inference`) is a testing affordance that raised confidence in P0 / P1 and unlocks future cross-process work.
