@@ -17,13 +17,13 @@ WorkflowEnvironment + concurrent pipe execution hangs under CI xdist); verify lo
 
 import uuid
 from collections.abc import Generator
+from typing import TYPE_CHECKING
 
 import pytest
 from temporalio.client import Client as TemporalClient
 
 from pipelex.cogt.content_generation.dry_mock import MOCK_INFERENCE_MODEL_NAME
 from pipelex.cogt.usage.cost_registry import CostRegistry
-from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.temporal.temporal_hub import get_task_manager
@@ -33,6 +33,9 @@ from tests.integration.pipelex.fixtures.pipe_job_helpers import pipe_job_from_bu
 from tests.integration.pipelex.temporal.library_crate.helpers import rehydrate_pipe_output
 from tests.integration.pipelex.temporal.tracing.helpers import inject_graph_context
 from tests.integration.pipelex.temporal.tracing.test_data import SequenceTracingTestData
+
+if TYPE_CHECKING:
+    from pipelex.core.pipes.pipe_output import PipeOutput
 
 
 @pytest.mark.temporal

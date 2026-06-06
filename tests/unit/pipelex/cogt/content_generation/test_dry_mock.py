@@ -28,8 +28,12 @@ class TestDryMock:
     def _capture_reported_job(self, mocker: MockerFixture) -> list[LLMJob]:
         """Patch get_report_delegate in dry_mock and capture every reported LLMJob."""
         captured: list[LLMJob] = []
+
+        def _capture(inference_job: LLMJob) -> None:
+            captured.append(inference_job)
+
         mock_delegate = mocker.MagicMock()
-        mock_delegate.report_inference_job.side_effect = lambda inference_job: captured.append(inference_job)
+        mock_delegate.report_inference_job.side_effect = _capture
         mocker.patch("pipelex.cogt.content_generation.dry_mock.get_report_delegate", return_value=mock_delegate)
         return captured
 

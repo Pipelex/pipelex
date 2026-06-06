@@ -23,7 +23,7 @@ class TestMockInferenceCliGuard:
         assert "mock_inference" in signature(command).parameters, f"{command.__name__} must declare a --mock-inference option"
 
     @pytest.mark.parametrize(
-        "command, required_kwargs",
+        ("command", "required_kwargs"),
         [
             (run_pipe_cmd, {"pipe_code": "some_pipe"}),
             (run_bundle_cmd, {"path": "some_path"}),

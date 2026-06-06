@@ -80,9 +80,7 @@ class TestMockInferenceDirect:
         response = await runner.execute_pipeline(pipe_code=pipe_code, mthds_contents=[_MTHDS])
         return response.pipe_output
 
-    async def test_text_pipe_mocks_leaf_and_assembles_reportable_usage(
-        self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture
-    ) -> None:
+    async def test_text_pipe_mocks_leaf_and_assembles_reportable_usage(self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture) -> None:
         """A LIVE text pipe under --mock-inference never calls the worker, yet assembles non-zero usage."""
         self._enable_ndjson_tracing(mocker, str(tmp_path_factory.mktemp("traces_mock_text")))
         worker_spy = mocker.patch("pipelex.cogt.content_generation.llm_generate.get_llm_worker")

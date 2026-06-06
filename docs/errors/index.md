@@ -202,6 +202,10 @@ classification rules, and the cross-boundary Temporal bridge.
 
 - [`MissingDependencyError`](missing-dependency-error.md) — Missing dependency
 
+## MockInferenceUnsupportedError
+
+- [`MockInferenceUnsupportedError`](mock-inference-unsupported-error.md) — Mock inference unsupported
+
 ## ModelReferenceParseError
 
 - [`ModelReferenceParseError`](model-reference-parse-error.md) — Model reference parse
