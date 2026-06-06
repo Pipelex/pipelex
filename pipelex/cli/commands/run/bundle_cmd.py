@@ -61,6 +61,13 @@ def run_bundle_cmd(
         bool,
         typer.Option("--dry-run", help="Run pipeline in dry mode (no actual inference calls)"),
     ] = False,
+    mock_inference: Annotated[
+        bool,
+        typer.Option(
+            "--mock-inference",
+            help="Live run that fakes AI calls at the inference leaf with reportable synthetic usage. Mutually exclusive with --dry-run.",
+        ),
+    ] = False,
     mock_inputs: Annotated[
         bool,
         typer.Option("--mock-inputs", help="Generate mock data for missing required inputs (requires --dry-run)"),
@@ -109,6 +116,16 @@ def run_bundle_cmd(
     if mock_inputs and not dry_run:
         typer.secho(
             "Failed to run: --mock-inputs requires --dry-run",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    # --mock-inference fakes AI at the leaf during a LIVE run; --dry-run swaps the generator pre-dispatch
+    # (so the leaf is never reached), making the two mutually exclusive — reject rather than silently ignore.
+    if mock_inference and dry_run:
+        typer.secho(
+            "Failed to run: --mock-inference cannot be combined with --dry-run",
             fg=typer.colors.RED,
             err=True,
         )
@@ -183,6 +200,7 @@ def run_bundle_cmd(
         graph_full_data=graph_full_data,
         output_dir=output_dir,
         dry_run=dry_run,
+        mock_inference=mock_inference,
         mock_inputs=mock_inputs,
         library_dir=library_dir,
         costs=costs,

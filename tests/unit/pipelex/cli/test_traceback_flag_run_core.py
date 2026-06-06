@@ -83,6 +83,7 @@ class TestTracebackFlagInExecuteRunInnerExcepts:
                             graph_full_data=None,
                             output_dir=OUTPUT_DIR,
                             dry_run=False,
+                            mock_inference=False,
                             mock_inputs=False,
                             library_dir=None,
                         )
@@ -112,6 +113,7 @@ class TestTracebackFlagInExecuteRunInnerExcepts:
                     graph_full_data=None,
                     output_dir=OUTPUT_DIR,
                     dry_run=False,
+                    mock_inference=False,
                     mock_inputs=False,
                     library_dir=None,
                 )
@@ -140,6 +142,7 @@ class TestTracebackFlagInExecuteRunInnerExcepts:
                     graph_full_data=None,
                     output_dir=OUTPUT_DIR,
                     dry_run=False,
+                    mock_inference=False,
                     mock_inputs=False,
                     library_dir=None,
                 )
@@ -168,6 +171,7 @@ class TestTracebackFlagInExecuteRunInnerExcepts:
                     graph_full_data=None,
                     output_dir=OUTPUT_DIR,
                     dry_run=False,
+                    mock_inference=False,
                     mock_inputs=False,
                     library_dir=None,
                 )

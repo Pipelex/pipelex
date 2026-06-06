@@ -60,6 +60,7 @@ async def _execute_run(
     graph_full_data: bool | None,
     output_dir: str,
     dry_run: bool,
+    mock_inference: bool,
     mock_inputs: bool,
     library_dir: list[str] | None,
     costs: bool | None = None,
@@ -154,6 +155,7 @@ async def _execute_run(
         runner = PipelexRunner(
             bundle_uris=[bundle_path] if bundle_path else None,
             pipe_run_mode=pipe_run_mode,
+            is_mock_inference=mock_inference,
             execution_config=execution_config,
             library_dirs=library_dir,
         )
@@ -330,6 +332,7 @@ def execute_run(
     graph_full_data: bool | None,
     output_dir: str,
     dry_run: bool,
+    mock_inference: bool,
     mock_inputs: bool,
     library_dir: list[str] | None,
     costs: bool | None = None,
@@ -363,6 +366,7 @@ def execute_run(
                     graph_full_data=graph_full_data,
                     output_dir=output_dir,
                     dry_run=dry_run,
+                    mock_inference=mock_inference,
                     mock_inputs=mock_inputs,
                     library_dir=library_dir,
                     costs=costs,

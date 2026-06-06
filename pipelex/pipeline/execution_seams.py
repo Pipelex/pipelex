@@ -170,6 +170,7 @@ async def prepare_pipe_job(
     output_multiplicity: VariableMultiplicity | None = None,
     dynamic_output_concept_ref: str | None = None,
     request_id: str | None = None,
+    is_mock_inference: bool = False,
 ) -> PipeJob:
     """Build a :class:`PipeJob` for ``pipe`` against an already-open library.
 
@@ -178,7 +179,9 @@ async def prepare_pipe_job(
     params, job metadata, and the library crate. Performs no pipeline-manager
     registration, no report-registry open, no telemetry, no graph-tracer open,
     and no library mutation. ``graph_context`` / ``otel_context`` are created by
-    the caller and threaded onto the job metadata.
+    the caller and threaded onto the job metadata. ``is_mock_inference`` (the
+    ``--mock-inference`` trigger) is the single-writer point onto
+    :attr:`JobMetadata.is_mock_inference` — a LIVE run whose AI calls the cogt leaf fakes.
     """
     working_memory: WorkingMemory | None = None
 
@@ -220,6 +223,7 @@ async def prepare_pipe_job(
         otel_context=otel_context,
         graph_context=graph_context,
         request_id=request_id,
+        is_mock_inference=is_mock_inference,
     )
 
     pipe_run_params = PipeRunParamsFactory.make_run_params(
