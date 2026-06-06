@@ -7,6 +7,11 @@ This folder tracks one topic that grew as we worked it: the lifecycle of the per
 ## Start here
 
 - [`registry-lifecycle-synthesis.md`](registry-lifecycle-synthesis.md) — **the canonical doc.** The unified model, the locked decisions (Option B; a default-on `--costs` switch that folds in `--cost-report`; events as the single source; usage carried on `PipeOutput`), the readiness checklist, and the planning-phase scope + test surface.
+- [`../../TODOS.md`](../../TODOS.md) — the sequenced implementation plan derived from the synthesis. **Phase 1 (emit decoupling) is implemented** (CHECKPOINT 1), Phases 2–7 pending.
+
+## Open review items (Phase 1 as-built)
+
+- [`phase1-emit-decoupling-review.md`](phase1-emit-decoupling-review.md) — **multi-angle review of the Phase 1 implementation.** Correctness gaps (TEMPORAL `--no-graph` graph_spec leak, usage fast-path missing its gate, stale docs), an efficiency regression (costs-only pays full per-pipe graph serialization), and altitude items (the DIRECT/TEMPORAL gating decision has no single owner and already drifted; emit flags set via post-hoc `model_copy`). Cold-start-ready triage with a suggested sequencing into Phase 2.
 
 ## The trail (how we got here — findings still valid, recommendations superseded by the synthesis)
 

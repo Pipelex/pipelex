@@ -66,7 +66,7 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 
 # Execute with graph tracing via config
 runner = PipelexRunner(
-    execution_config=config.with_graph_config_overrides(generate_graph=True),
+    execution_config=config.with_execution_overrides(generate_graph=True),
 )
 response = await runner.execute_pipeline(
     pipe_code="my_pipe",
@@ -76,7 +76,7 @@ pipe_output = response.pipe_output
 # Dry run with graph: the same runner in DRY mode with mock inputs — no separate code path.
 dry_runner = PipelexRunner(
     pipe_run_mode=PipeRunMode.DRY,
-    execution_config=config.with_graph_config_overrides(generate_graph=True, mock_inputs=True),
+    execution_config=config.with_execution_overrides(generate_graph=True, mock_inputs=True),
 )
 response = await dry_runner.execute_pipeline(pipe_code="my_pipe")
 graph_spec = response.pipe_output.graph_spec

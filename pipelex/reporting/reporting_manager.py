@@ -250,6 +250,17 @@ class ReportingManager(ReportingProtocol):
         if graph_context is None:
             return
 
+        # Gate cost emission on emit_usage_events BEFORE the context lookup, so both the fast path
+        # (_emit_via_registered_context) and the runner fallback are guarded by the same check. This
+        # keeps correctness from resting on the cross-file invariant "a context is registered (via
+        # set_event_log) only when costs are on": _event_log_contexts is a process-global singleton
+        # and clear_event_log is best-effort in finally blocks, so a leaked context from a prior
+        # costs-enabled run could otherwise let a later graph-only run (emit_usage_events=False) emit
+        # usage events through the fast path on a colliding lookup_key (reused pipeline_run_id /
+        # workflow_id).
+        if not graph_context.emit_usage_events:
+            return
+
         context = self._event_log_contexts.get(graph_context.lookup_key)
         if context is not None:
             self._emit_via_registered_context(context, graph_context, tokens_usage)
@@ -309,13 +320,6 @@ class ReportingManager(ReportingProtocol):
             DynamoDB throttle / auth fail at PutItem time.
         Other exceptions propagate.
         """
-        # Graph-only mode (--graph --no-costs): the usage event-log context was never registered
-        # (set_event_log is called only when cost reporting is on), so we land here. Suppress the
-        # usage event — graph-only runs must not emit cost data. The fast path is unreachable in
-        # this mode for the same reason (no registered context).
-        if not graph_context.emit_usage_events:
-            return
-
         tracing_config = get_config().pipelex.tracing_config
         if not tracing_config.is_enabled:
             return

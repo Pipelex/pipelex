@@ -83,7 +83,12 @@ def _enable_ndjson_tracing(mocker: MockerFixture, traces_dir: Path) -> None:
 
 
 class TestEmitUsageEventGating:
-    """Pins that the runner fallback honors graph_context.emit_usage_events."""
+    """Pins that usage emission honors graph_context.emit_usage_events on BOTH paths.
+
+    The gate lives in the dispatcher (_emit_usage_event), before the context lookup, so it guards the
+    fast path (a registered set_event_log context) and the runner fallback alike — correctness no
+    longer rests on the cross-file invariant "a context is registered only when costs are on".
+    """
 
     def test_graph_only_suppresses_usage_event(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """--graph --no-costs: emit_usage_events=False -> the runner fallback writes no usage event."""
@@ -118,3 +123,56 @@ class TestEmitUsageEventGating:
         assert usage_events[0].pipeline_run_id == "run_costs"
         assert usage_events[0].writer_id.startswith("act_")
         ActivityEventLogCache.reset_for_tests()
+
+    def test_registered_context_suppresses_usage_when_costs_off(self, mocker: MockerFixture) -> None:
+        """Fast path: a REGISTERED context with emit_usage_events=False must emit nothing.
+
+        Simulates the leak scenario the hoisted gate defends against — a usage event-log context that
+        outlived its run (clear_event_log skipped) and collides on lookup_key with a later graph-only
+        run. Without the gate the fast path would emit; the dispatcher's early-return suppresses it.
+        """
+        manager = ReportingManager()
+        manager.setup()
+        graph_context = _make_graph_context("run_leaked", emit_usage_events=False, emit_graph_events=True)
+
+        event_log_spy = mocker.MagicMock()
+        event_log_spy.writer_id = "leaked_writer"
+        event_log_spy.next_sequence.return_value = 0
+        manager.set_event_log(
+            context_key=graph_context.lookup_key,
+            event_log=event_log_spy,
+            workflow_id="direct",
+            pipeline_run_id="run_leaked",
+        )
+
+        manager.report_inference_job(_make_llm_job("run_leaked", graph_context=graph_context))
+
+        event_log_spy.emit.assert_not_called()
+
+    def test_registered_context_emits_when_costs_on(self, mocker: MockerFixture) -> None:
+        """Control: with the SAME registration but emit_usage_events=True, the fast path DOES emit.
+
+        Proves the suppression above is the gate's doing, not a mis-wired registration that never
+        reaches the fast path.
+        """
+        manager = ReportingManager()
+        manager.setup()
+        graph_context = _make_graph_context("run_fastpath", emit_usage_events=True, emit_graph_events=True)
+
+        event_log_spy = mocker.MagicMock()
+        event_log_spy.writer_id = "fastpath_writer"
+        event_log_spy.next_sequence.return_value = 0
+        manager.set_event_log(
+            context_key=graph_context.lookup_key,
+            event_log=event_log_spy,
+            workflow_id="direct",
+            pipeline_run_id="run_fastpath",
+        )
+
+        manager.report_inference_job(_make_llm_job("run_fastpath", graph_context=graph_context))
+
+        event_log_spy.emit.assert_called_once()
+        emitted_event = event_log_spy.emit.call_args.args[0]
+        assert isinstance(emitted_event, UsageReportEvent)
+        assert emitted_event.pipeline_run_id == "run_fastpath"
+        assert emitted_event.writer_id == "fastpath_writer"
