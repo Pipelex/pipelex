@@ -233,7 +233,7 @@ class BundleValidator:
         #    the id self-describing if it ever surfaces in a log. The same id is threaded into every
         #    prepare_pipe_job call below so the synthetic reports land in the registry that gets closed.
         #    Mock inputs are built by prepare_pipe_job from this DRY + is_mock_inputs config.
-        execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
+        execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
             generate_graph=False,
             mock_inputs=True,
         )

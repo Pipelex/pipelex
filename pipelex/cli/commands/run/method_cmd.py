@@ -87,6 +87,13 @@ def run_method_cmd(
             help="Override config: --cost-report forces the cost table on; --no-cost-report skips reporting entirely (no table and no CSV file).",
         ),
     ] = None,
+    costs: Annotated[
+        bool | None,
+        typer.Option(
+            "--costs/--no-costs",
+            help="Override config: enable or disable cost reporting (usage collection + end-of-run cost report). Default on.",
+        ),
+    ] = None,
     save_csv: Annotated[
         str | None,
         typer.Option(
@@ -156,6 +163,7 @@ def run_method_cmd(
         mock_inputs=mock_inputs,
         library_dir=effective_library_dir,
         cost_report=cost_report,
+        costs=costs,
         telemetry_command_label=f"{COMMAND} method",
         temporal=temporal,
         dynamic_output_concept_ref=dynamic_output_concept_ref,

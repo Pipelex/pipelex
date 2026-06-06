@@ -180,9 +180,14 @@ async def pipeline_run_setup(
         if pipe.domain_code not in search_domain_codes:
             search_domain_codes.insert(0, pipe.domain_code)
 
-        # Initialize graph tracing if requested (after pipe is loaded so we have domain info)
-        if execution_config.is_generate_graph:
-            # Create event log when tracing is enabled
+        # Initialize the tracing context if graph OR cost reporting is requested (after pipe is loaded so we
+        # have domain info). The two concerns share one event-log transport and one in-memory tracer; the
+        # booleans on GraphContext (emit_graph_events / emit_usage_events) say which event stream to emit.
+        is_generate_graph = execution_config.is_generate_graph
+        is_generate_costs = execution_config.is_generate_costs
+        if is_generate_graph or is_generate_costs:
+            # Create the event log when tracing is enabled — it is the shared transport for both graph
+            # (node/edge) events and usage (cost) events.
             config = get_config()
             tracing_config = config.pipelex.tracing_config
             if tracing_config.is_enabled:
@@ -194,9 +199,16 @@ async def pipeline_run_setup(
                 data_inclusion=execution_config.graph_config.data_inclusion,
                 pipeline_ref_domain=pipe.domain_code,
                 pipeline_ref_main_pipe=pipe_code,
-                event_log=event_log,
+                # D5: in costs-only mode (--no-graph --costs) pass event_log=None so the tracer accumulates
+                # the in-memory graph and keeps minting node ids, but emits NO graph events. Usage events
+                # are wired separately via set_event_log below.
+                event_log=event_log if is_generate_graph else None,
                 workflow_id="direct",
                 pipeline_run_id=pipeline_run_id,
+            )
+            # Record which event streams this run emits (D4). Propagated to child contexts via copy_for_child.
+            graph_context = graph_context.model_copy(
+                update={"emit_graph_events": is_generate_graph, "emit_usage_events": is_generate_costs},
             )
 
         # TODO: rethink this, it's not forcing
@@ -209,8 +221,11 @@ async def pipeline_run_setup(
         get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
         registry_opened = True
 
-        # Set event log on the report delegate for distributed usage event emission
-        if event_log is not None:
+        # Register the event log on the report delegate for usage event emission — only when cost reporting
+        # is on. In graph-only mode (--graph --no-costs) the tracer owns the event_log for graph events, but
+        # no usage-event context is registered, so usage events are suppressed (the runner fallback also
+        # gates on emit_usage_events).
+        if is_generate_costs and event_log is not None:
             get_report_delegate().set_event_log(
                 context_key=pipeline_run_id,
                 event_log=event_log,

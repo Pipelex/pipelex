@@ -91,14 +91,14 @@ prompt = "Echo the $subject as a topic"
 
 
 def _dry_mock_config() -> PipelineExecutionConfig:
-    return get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
+    return get_config().pipelex.pipeline_execution_config.with_execution_overrides(
         generate_graph=False,
         mock_inputs=True,
     )
 
 
 def _no_mock_config() -> PipelineExecutionConfig:
-    return get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
+    return get_config().pipelex.pipeline_execution_config.with_execution_overrides(
         generate_graph=False,
         mock_inputs=False,
     )

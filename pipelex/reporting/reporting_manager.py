@@ -309,6 +309,13 @@ class ReportingManager(ReportingProtocol):
             DynamoDB throttle / auth fail at PutItem time.
         Other exceptions propagate.
         """
+        # Graph-only mode (--graph --no-costs): the usage event-log context was never registered
+        # (set_event_log is called only when cost reporting is on), so we land here. Suppress the
+        # usage event — graph-only runs must not emit cost data. The fast path is unreachable in
+        # this mode for the same reason (no registered context).
+        if not graph_context.emit_usage_events:
+            return
+
         tracing_config = get_config().pipelex.tracing_config
         if not tracing_config.is_enabled:
             return

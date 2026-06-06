@@ -62,6 +62,7 @@ async def _execute_run(
     mock_inputs: bool,
     library_dir: list[str] | None,
     cost_report: bool | None,
+    costs: bool | None = None,
     dynamic_output_concept_ref: str | None = None,
     *,
     save_csv: str | None = None,
@@ -142,8 +143,9 @@ async def _execute_run(
     pipe_run_mode = PipeRunMode.DRY if dry_run else None
 
     # Build effective execution config with CLI overrides
-    execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
+    execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
         generate_graph=graph,
+        generate_costs=costs,
         force_include_full_data=graph_full_data,
         mock_inputs=mock_inputs or None,
     )
@@ -337,6 +339,7 @@ def execute_run(
     mock_inputs: bool,
     library_dir: list[str] | None,
     cost_report: bool | None = None,
+    costs: bool | None = None,
     telemetry_command_label: str = COMMAND,
     temporal: bool | None = None,
     dynamic_output_concept_ref: str | None = None,
@@ -370,6 +373,7 @@ def execute_run(
                     mock_inputs=mock_inputs,
                     library_dir=library_dir,
                     cost_report=cost_report,
+                    costs=costs,
                     dynamic_output_concept_ref=dynamic_output_concept_ref,
                     save_csv=save_csv,
                 )

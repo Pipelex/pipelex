@@ -294,6 +294,7 @@ pipe_stack_limit = 20
 is_normalize_data_urls_to_storage = true
 is_mock_inputs = false
 is_generate_graph = true
+is_generate_costs = true
 
 # Bounded fan-out concurrency for PipeBatch: at most this many branches run at once.
 # A modest default keeps a large workload (one pipe over many items) from overwhelming

@@ -21,6 +21,12 @@ class GraphContext(BaseModel):
         parent_node_id: The node ID of the parent pipe (None for root).
         node_sequence: Monotonic counter for generating unique node IDs within this graph.
         data_inclusion: Configuration controlling which data formats to capture in IOSpec fields.
+        emit_graph_events: Whether graph (node/edge) trace events should be emitted for this run
+            (driven by ``is_generate_graph``). The in-memory tracer always accumulates; this only
+            gates event emission onto the shared event-log transport.
+        emit_usage_events: Whether usage (cost) trace events should be emitted for this run
+            (driven by ``is_generate_costs``). Independent of ``emit_graph_events`` so cost reporting
+            survives ``--no-graph``.
     """
 
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -30,6 +36,8 @@ class GraphContext(BaseModel):
     parent_node_id: str | None = Field(default=None, description="Node ID of the parent pipe, None for root")
     node_sequence: int = Field(default=0, description="Monotonic counter for generating node IDs")
     data_inclusion: DataInclusionConfig = Field(description="Controls which data formats to capture")
+    emit_graph_events: bool = Field(default=True, description="Whether to emit graph (node/edge) trace events")
+    emit_usage_events: bool = Field(default=True, description="Whether to emit usage (cost) trace events")
 
     @property
     def lookup_key(self) -> str:
@@ -60,4 +68,6 @@ class GraphContext(BaseModel):
             parent_node_id=child_node_id,
             node_sequence=next_sequence,
             data_inclusion=self.data_inclusion,
+            emit_graph_events=self.emit_graph_events,
+            emit_usage_events=self.emit_usage_events,
         )

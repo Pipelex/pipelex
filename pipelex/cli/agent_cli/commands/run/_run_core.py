@@ -24,6 +24,7 @@ async def run_pipeline_core(
     mock_inputs: bool = False,
     library_dirs: list[str] | None = None,
     graph: bool = False,
+    costs: bool = True,
     with_memory: bool = False,
 ) -> dict[str, Any]:
     """Core logic for running a pipeline and returning JSON-serializable output.
@@ -37,6 +38,7 @@ async def run_pipeline_core(
         mock_inputs: Whether to generate mock data for missing inputs.
         library_dirs: List of library directories to search for pipe definitions.
         graph: Whether to generate execution graph visualizations.
+        costs: Whether to enable cost reporting (usage collection + assembly). Default True.
         with_memory: Whether to include full working memory in output (True) or
             return compact concept JSON only (False, default).
 
@@ -48,8 +50,9 @@ async def run_pipeline_core(
     """
     pipe_run_mode = PipeRunMode.DRY if dry_run else None
 
-    execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
+    execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
         generate_graph=graph,
+        generate_costs=costs,
         mock_inputs=mock_inputs or None,
     )
 

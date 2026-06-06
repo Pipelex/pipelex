@@ -67,7 +67,12 @@ class PipeRun(PipeRunProtocol):
                         f"Suppressed tracer close error: {tracer_close_error}"
                     )
 
-            if pipe_output is not None:
+            # Assemble the graph onto pipe_output only when graph events were requested. Cost reporting
+            # now keeps the shared event stream alive under --no-graph, so without this gate a costs-only
+            # run would read its usage events and set an empty GraphSpec, breaking the --no-graph contract.
+            # (Phase 2 generalizes this hook to also assemble usage onto pipe_output.)
+            graph_context = pipe_job.job_metadata.graph_context
+            if pipe_output is not None and graph_context is not None and graph_context.emit_graph_events:
                 assemble_graph_on_output(
                     pipe_output=pipe_output,
                     pipeline_run_id=pipeline_run_id,

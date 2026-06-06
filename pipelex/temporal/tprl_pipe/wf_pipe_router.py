@@ -87,27 +87,38 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                     wf_graph_context = wf_graph_tracer_manager.open_tracer(
                         graph_id=graph_context.graph_id,
                         data_inclusion=graph_context.data_inclusion,
-                        event_log=event_log,
+                        # D5: only feed the event log to the tracer when graph events are wanted. In
+                        # costs-only mode the tracer still mints node ids but emits no graph events;
+                        # usage events flow via the report delegate's set_event_log below.
+                        event_log=event_log if graph_context.emit_graph_events else None,
                         workflow_id=wf_workflow_id,
                         pipeline_run_id=pipeline_run_id,
                         tracer_key=wf_tracer_key,
                     )
                     # Update job_metadata with the per-workflow graph_context (carries tracer_key),
-                    # but preserve parent_node_id from the incoming context so CONTAINS edges
-                    # link back to the parent workflow's controller node.
+                    # but preserve parent_node_id from the incoming context so CONTAINS edges link back
+                    # to the parent workflow's controller node, and carry the emit flags (open_tracer
+                    # returns a fresh context with default flags).
                     wf_graph_context = wf_graph_context.model_copy(
-                        update={"parent_node_id": graph_context.parent_node_id},
+                        update={
+                            "parent_node_id": graph_context.parent_node_id,
+                            "emit_graph_events": graph_context.emit_graph_events,
+                            "emit_usage_events": graph_context.emit_usage_events,
+                        },
                     )
                     workflow_arg.job_metadata = workflow_arg.job_metadata.model_copy(
                         update={"graph_context": wf_graph_context},
                     )
-                    # Configure the report delegate for usage event emission
-                    get_report_delegate().set_event_log(
-                        context_key=wf_workflow_id,
-                        event_log=event_log,
-                        workflow_id=wf_workflow_id,
-                        pipeline_run_id=pipeline_run_id,
-                    )
+                    # Configure the report delegate for usage event emission — only when cost reporting
+                    # is on. In graph-only mode no usage context is registered, so usage events are
+                    # suppressed (the runner fallback also gates on emit_usage_events).
+                    if graph_context.emit_usage_events:
+                        get_report_delegate().set_event_log(
+                            context_key=wf_workflow_id,
+                            event_log=event_log,
+                            workflow_id=wf_workflow_id,
+                            pipeline_run_id=pipeline_run_id,
+                        )
                 except Exception as exc:  # noqa: BLE001
                     # Best-effort: per-workflow tracing setup must never fail the workflow — log and continue without it.
                     workflow_log.warning(f"Failed to set up per-workflow tracing, continuing without: {exc}")

@@ -200,9 +200,10 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
             msg = f"Input validation failed for '{model_name}': {formatted_error}"
             raise PipeExecutionError(message=msg) from exc
         finally:
-            # Close graph tracer if it was opened (cleanup only — the PipeRun is
-            # responsible for capturing the graph spec on pipe_output)
-            if execution_config.is_generate_graph and pipeline_run_id is not None:
+            # Close the tracer if it was opened (cleanup only — the PipeRun is responsible for capturing
+            # the graph spec on pipe_output). The tracer is opened whenever graph OR cost reporting is on
+            # (costs-only mode opens it with event_log=None), so the close gate must match that condition.
+            if (execution_config.is_generate_graph or execution_config.is_generate_costs) and pipeline_run_id is not None:
                 tracer_manager = GraphTracerManager.get_instance()
                 if tracer_manager is not None:
                     tracer_manager.close_tracer(pipeline_run_id)
