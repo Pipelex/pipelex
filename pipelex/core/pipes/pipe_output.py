@@ -26,8 +26,9 @@ class PipeOutput(PipeOutputAbstract[WorkingMemory]):
     graph_spec: GraphSpec | None = None
     graph_assembly_error: str | None = None
     # Token usage assembled from the trace-event stream at the end of the run (mirrors graph_spec):
-    # the submitter renders the cost report from this field. None when cost reporting was off; an empty
-    # list when on but no inference happened. usage_assembly_error mirrors graph_assembly_error.
+    # the submitter renders the cost report from this field. None when cost reporting was off or the run
+    # emitted no trace events at all; an empty list when on with events present but no inference happened.
+    # usage_assembly_error mirrors graph_assembly_error.
     tokens_usages: list[AnyTokensUsage] | None = None
     usage_assembly_error: str | None = None
 

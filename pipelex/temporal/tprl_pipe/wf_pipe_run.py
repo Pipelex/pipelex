@@ -92,10 +92,18 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
                     start_to_close_timeout=timedelta(seconds=30),
                     retry_policy=RetryPolicy(maximum_attempts=3),
                 )
+                # Mirror DIRECT's assemble_tracing_on_output: copy every populated field, including the
+                # best-effort *_assembly_error fields. assemble_tracing catches the expected read/assemble
+                # failures internally and returns them on these fields (no exception raised), so without
+                # this the failure would be observable in DIRECT but silently lost in TEMPORAL.
                 if tracing_assembly.graph_spec is not None:
                     pipe_output.graph_spec = tracing_assembly.graph_spec
+                if tracing_assembly.graph_assembly_error is not None:
+                    pipe_output.graph_assembly_error = tracing_assembly.graph_assembly_error
                 if tracing_assembly.tokens_usages is not None:
                     pipe_output.tokens_usages = tracing_assembly.tokens_usages
+                if tracing_assembly.usage_assembly_error is not None:
+                    pipe_output.usage_assembly_error = tracing_assembly.usage_assembly_error
             except ActivityError as assembly_exc:
                 workflow_log.warning(f"Tracing assembly failed, continuing with delivery: {assembly_exc}")
                 # Record the failure only on the concern(s) actually requested, so a costs-only run never

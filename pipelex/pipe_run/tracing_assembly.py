@@ -114,8 +114,8 @@ def assemble_tracing(
                 ),
             )
             log.debug(f"Graph assembled from {len(events)} events for pipeline_run_id={pipeline_run_id}")
-        except ValidationError as graph_assembly_error:
-            message = f"Graph assembly failed for pipeline_run_id={pipeline_run_id}: {graph_assembly_error}"
+        except ValidationError as validation_error:
+            message = f"Graph assembly failed for pipeline_run_id={pipeline_run_id}: {validation_error}"
             log.warning(message)
             result.graph_assembly_error = message
 

@@ -59,11 +59,20 @@ def route_activities_to(queue: str, activity_names: Iterable[str]) -> Generator[
                 worker_config.activity_queues[activity_name] = original
 
 
-def inject_graph_context(pipe_job: PipeJob, pipeline_run_id: str) -> PipeJob:
+def inject_graph_context(
+    pipe_job: PipeJob,
+    pipeline_run_id: str,
+    *,
+    emit_graph_events: bool = True,
+    emit_usage_events: bool = True,
+) -> PipeJob:
     """Deep-copy a PipeJob and inject a GraphContext onto its JobMetadata.
 
     Also overrides pipeline_run_id (must not be the dry-run sentinel,
     since NdjsonEventLog uses it as a directory name).
+
+    The emit flags default to True (the legacy "context present → emit both"
+    behavior); pass ``emit_graph_events=False`` to exercise costs-only mode.
     """
     graph_context = GraphContext(
         graph_id=pipeline_run_id,
@@ -76,6 +85,8 @@ def inject_graph_context(pipe_job: PipeJob, pipeline_run_id: str) -> PipeJob:
             stuff_html_content=False,
             error_stack_traces=False,
         ),
+        emit_graph_events=emit_graph_events,
+        emit_usage_events=emit_usage_events,
     )
     new_metadata = pipe_job.job_metadata.model_copy(
         update={
