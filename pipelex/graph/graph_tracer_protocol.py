@@ -25,6 +25,8 @@ class GraphTracerProtocol(Protocol):
         event_log: "EventLogProtocol | None" = None,
         workflow_id: str = "direct",
         pipeline_run_id: str | None = None,
+        emit_graph_events: bool = True,
+        emit_usage_events: bool = True,
     ) -> GraphContext:
         """Initialize tracing for a new pipeline run.
 
@@ -36,6 +38,10 @@ class GraphTracerProtocol(Protocol):
             event_log: Optional event log for distributed tracing.
             workflow_id: Temporal workflow ID or "direct" for single-process mode.
             pipeline_run_id: Pipeline run ID for event emission.
+            emit_graph_events: Whether graph (node/edge) trace events should be emitted for this run.
+                Stamped onto the returned GraphContext so it is born with the correct flag.
+            emit_usage_events: Whether usage (cost) trace events should be emitted for this run.
+                Stamped onto the returned GraphContext so it is born with the correct flag.
 
         Returns:
             Initial GraphContext to pass through JobMetadata.
@@ -244,10 +250,14 @@ class GraphTracerNoOp(GraphTracerProtocol):
         event_log: "EventLogProtocol | None" = None,
         workflow_id: str = "direct",
         pipeline_run_id: str | None = None,
+        emit_graph_events: bool = True,
+        emit_usage_events: bool = True,
     ) -> GraphContext:
         return GraphContext(
             graph_id=graph_id,
             data_inclusion=data_inclusion,
+            emit_graph_events=emit_graph_events,
+            emit_usage_events=emit_usage_events,
         )
 
     @override

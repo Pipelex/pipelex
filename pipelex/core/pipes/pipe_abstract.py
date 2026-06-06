@@ -479,21 +479,33 @@ class PipeAbstract(ABC, BaseModel):
                 for var_name in self.needed_inputs().required_names:
                     stuff = working_memory.get_optional_stuff(var_name)
                     if stuff is not None:
+                        # E1: gate the expensive payload serialization on emit_graph_events too — in
+                        # costs-only mode the GraphSpec is never assembled, so these dumps would be built
+                        # then discarded. The lightweight IOSpec (name/concept/content_type/digest) is kept
+                        # so node ids and usage-event correlation are unaffected.
+                        include_graph_data = parent_graph_context.emit_graph_events
                         input_spec = IOSpec(
                             name=var_name,
                             concept=stuff.concept.code,
                             content_type=stuff.content.content_type,
                             digest=stuff.stuff_code,
-                            data=stuff.content.smart_dump() if parent_graph_context.data_inclusion.stuff_json_content else None,
-                            data_text=stuff.content.rendered_pretty_text() if parent_graph_context.data_inclusion.stuff_text_content else None,
-                            data_html=stuff.content.rendered_pretty_html() if parent_graph_context.data_inclusion.stuff_html_content else None,
+                            data=stuff.content.smart_dump()
+                            if (include_graph_data and parent_graph_context.data_inclusion.stuff_json_content)
+                            else None,
+                            data_text=stuff.content.rendered_pretty_text()
+                            if (include_graph_data and parent_graph_context.data_inclusion.stuff_text_content)
+                            else None,
+                            data_html=stuff.content.rendered_pretty_html()
+                            if (include_graph_data and parent_graph_context.data_inclusion.stuff_html_content)
+                            else None,
                         )
                         input_specs.append(input_spec)
 
-                # Serialize pipe and concept data for registries if enabled
+                # Serialize pipe and concept data for registries if enabled (E1: also gated on
+                # emit_graph_events — the registries only feed the GraphSpec).
                 pipe_data: dict[str, Any] | None = None
                 concept_data: list[dict[str, Any]] | None = None
-                if parent_graph_context.data_inclusion.pipe_and_concept_registry:
+                if parent_graph_context.emit_graph_events and parent_graph_context.data_inclusion.pipe_and_concept_registry:
                     pipe_data = self.model_dump(mode="json")
                     concept_data = self._make_concept_data_for_registry()
 
@@ -567,19 +579,25 @@ class PipeAbstract(ABC, BaseModel):
             main_stuff = pipe_output.working_memory.get_optional_main_stuff()
             output_spec: IOSpec | None = None
             if main_stuff is not None:
+                # E1: same gating as the input block — skip the discarded payload dumps in costs-only mode.
+                include_graph_data = parent_graph_context.emit_graph_events
                 output_spec = IOSpec(
                     name=output_name or main_stuff.stuff_name or "main_stuff",
                     concept=main_stuff.concept.code,
                     content_type=main_stuff.content.content_type,
                     digest=main_stuff.stuff_code,
-                    data=main_stuff.content.smart_dump() if parent_graph_context.data_inclusion.stuff_json_content else None,
-                    data_text=main_stuff.content.rendered_pretty_text() if parent_graph_context.data_inclusion.stuff_text_content else None,
-                    data_html=main_stuff.content.rendered_pretty_html() if parent_graph_context.data_inclusion.stuff_html_content else None,
+                    data=main_stuff.content.smart_dump() if (include_graph_data and parent_graph_context.data_inclusion.stuff_json_content) else None,
+                    data_text=main_stuff.content.rendered_pretty_text()
+                    if (include_graph_data and parent_graph_context.data_inclusion.stuff_text_content)
+                    else None,
+                    data_html=main_stuff.content.rendered_pretty_html()
+                    if (include_graph_data and parent_graph_context.data_inclusion.stuff_html_content)
+                    else None,
                 )
 
-            # Serialize output concept for registry if enabled
+            # Serialize output concept for registry if enabled (E1: also gated on emit_graph_events).
             output_concept_data: dict[str, Any] | None = None
-            if parent_graph_context.data_inclusion.pipe_and_concept_registry and main_stuff is not None:
+            if parent_graph_context.emit_graph_events and parent_graph_context.data_inclusion.pipe_and_concept_registry and main_stuff is not None:
                 output_concept_data = self._make_single_concept_data_for_registry(main_stuff.concept)
 
             tracer_manager.on_pipe_end_success(

@@ -279,7 +279,7 @@ async def make_split_workers(
                 "act_jinja2_gen_text",
                 "act_extract_gen_extract_pages",
                 "act_render_page_views",
-                "act_assemble_graph",
+                "act_assemble_tracing",
                 "act_deliver",
             ],
         },

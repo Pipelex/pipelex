@@ -16,6 +16,7 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
+from pipelex.reporting.reporting_types import AnyTokensUsage
 
 
 class PipeOutput(PipeOutputAbstract[WorkingMemory]):
@@ -24,6 +25,11 @@ class PipeOutput(PipeOutputAbstract[WorkingMemory]):
     pipeline_run_id: str = Field(default=SpecialPipelineId.UNTITLED)
     graph_spec: GraphSpec | None = None
     graph_assembly_error: str | None = None
+    # Token usage assembled from the trace-event stream at the end of the run (mirrors graph_spec):
+    # the submitter renders the cost report from this field. None when cost reporting was off; an empty
+    # list when on but no inference happened. usage_assembly_error mirrors graph_assembly_error.
+    tokens_usages: list[AnyTokensUsage] | None = None
+    usage_assembly_error: str | None = None
 
     def prepare_for_temporal(self, library_crate: LibraryCrate | None = None) -> "PipeOutput":
         """Dehydrate WorkingMemory to raw dict for Temporal transit.

@@ -106,7 +106,7 @@ sleep 4
 tmux capture-pane -t temporal-worker-router -p -S -30 | grep "Temporal Worker started"
 ```
 
-**Also keep a general `runner` on the default task queue.** Un-routed activities — tracing (`act_flush_trace_events`, `act_assemble_graph`) and `act_deliver` — are not in `activity_queues`, so they fall through to `default_task_queue` (`temporal_task_queue`). The specialized runners below only poll their own named queues, so without a general runner those activities have no poller and any `--graph` run (Scenarios A–B use `--graph`) **hangs** on the first trace flush (the activity sits `PENDING_SCHEDULED` forever). Spawn it:
+**Also keep a general `runner` on the default task queue.** Un-routed activities — tracing (`act_flush_trace_events`, `act_assemble_tracing`) and `act_deliver` — are not in `activity_queues`, so they fall through to `default_task_queue` (`temporal_task_queue`). The specialized runners below only poll their own named queues, so without a general runner those activities have no poller and any `--graph` run (Scenarios A–B use `--graph`) **hangs** on the first trace flush (the activity sits `PENDING_SCHEDULED` forever). Spawn it:
 
 ```bash
 tmux kill-session -t temporal-worker-runner 2>/dev/null

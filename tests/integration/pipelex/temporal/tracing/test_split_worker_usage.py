@@ -33,6 +33,7 @@ from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 from pipelex.tracing.activity_event_log import ActivityEventLogCache
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog
 from pipelex.tracing.trace_events import PipeStartEvent, UsageReportEvent
+from pipelex.tracing.usage_aggregator import UsageAggregator
 from tests.integration.pipelex.fixtures.pipe_job_helpers import pipe_job_from_bundle
 from tests.integration.pipelex.temporal.library_crate.helpers import rehydrate_pipe_output
 from tests.integration.pipelex.temporal.tracing.helpers import (
@@ -203,3 +204,29 @@ class TestSplitWorkerUsageEmission:
 
         for key, count in counts.items():
             assert count == 1, f"Duplicate UsageReportEvent for (node_id, workflow_id)={key}: count={count}"
+
+    async def test_runner_usage_aggregates_to_tokens_usages(
+        self,
+        live_sequence_tracing_job: PipeJob,
+        temporal_client: TemporalClient,
+        tracing_tmp_dir: Path,
+        split_queues: tuple[str, str],
+        route_llm_text_to_runner_queue: None,  # noqa: ARG002
+    ) -> None:
+        """The cross-worker usage events feed the production ``UsageAggregator`` (the same path that
+        rides ``tokens_usages`` back on PipeOutput): aggregating the read-back stream yields one usage
+        record per emitted ``UsageReportEvent``, none dropped.
+        """
+        run_id = await self._execute_split(live_sequence_tracing_job, temporal_client, split_queues)
+
+        reader = NdjsonEventLog(traces_dir=str(tracing_tmp_dir))
+        try:
+            events = reader.read_events(run_id)
+        finally:
+            reader.close()
+
+        usage_events = [evt for evt in events if isinstance(evt, UsageReportEvent)]
+        tokens_usages = UsageAggregator.aggregate(events)
+        assert tokens_usages, "Expected the aggregator to surface at least one token-usage record"
+        assert len(tokens_usages) == len(usage_events)
+        assert tokens_usages == [evt.tokens_usage for evt in usage_events]

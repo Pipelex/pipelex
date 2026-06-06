@@ -100,6 +100,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         workflow_id: str = "direct",
         pipeline_run_id: str | None = None,
         tracer_key: str | None = None,
+        emit_graph_events: bool = True,
+        emit_usage_events: bool = True,
     ) -> GraphContext:
         """Create and initialize a new tracer for a pipeline run.
 
@@ -115,6 +117,11 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             tracer_key: Lookup key for the tracer in the manager's dict. Defaults to graph_id.
                 In Temporal mode, use the workflow_id to avoid collisions when multiple
                 workflows share the same graph_id on the same process.
+            emit_graph_events: Whether this run assembles a GraphSpec / emits graph events.
+                Threaded into setup so the returned GraphContext is born with the correct flag
+                (no post-hoc model_copy needed at the call site).
+            emit_usage_events: Whether this run emits usage (cost) events. Threaded into setup
+                so the returned GraphContext is born with the correct flag.
 
         Returns:
             Initial GraphContext to pass through JobMetadata.
@@ -138,6 +145,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             event_log=event_log,
             workflow_id=workflow_id,
             pipeline_run_id=pipeline_run_id,
+            emit_graph_events=emit_graph_events,
+            emit_usage_events=emit_usage_events,
         )
         # Set the tracer_key on the GraphContext so downstream lookups use the same key
         if tracer_key is not None:

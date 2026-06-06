@@ -94,17 +94,16 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                         workflow_id=wf_workflow_id,
                         pipeline_run_id=pipeline_run_id,
                         tracer_key=wf_tracer_key,
+                        # Threaded in so the returned context is born with the correct flags (no emit-flag
+                        # footgun in the model_copy below).
+                        emit_graph_events=graph_context.emit_graph_events,
+                        emit_usage_events=graph_context.emit_usage_events,
                     )
-                    # Update job_metadata with the per-workflow graph_context (carries tracer_key),
-                    # but preserve parent_node_id from the incoming context so CONTAINS edges link back
-                    # to the parent workflow's controller node, and carry the emit flags (open_tracer
-                    # returns a fresh context with default flags).
+                    # Update job_metadata with the per-workflow graph_context (carries tracer_key + emit
+                    # flags), but preserve parent_node_id from the incoming context so CONTAINS edges link
+                    # back to the parent workflow's controller node.
                     wf_graph_context = wf_graph_context.model_copy(
-                        update={
-                            "parent_node_id": graph_context.parent_node_id,
-                            "emit_graph_events": graph_context.emit_graph_events,
-                            "emit_usage_events": graph_context.emit_usage_events,
-                        },
+                        update={"parent_node_id": graph_context.parent_node_id},
                     )
                     workflow_arg.job_metadata = workflow_arg.job_metadata.model_copy(
                         update={"graph_context": wf_graph_context},
@@ -149,11 +148,13 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         finally:
-            # Close per-workflow graph tracer (collects in-memory graph spec)
+            # Close per-workflow graph tracer (collects in-memory graph spec). F1: only assign the spec
+            # when graph events were requested — in costs-only mode close_tracer returns None (teardown
+            # skips the spec build), and this guard keeps the contract explicit even if that changes.
             if wf_graph_tracer_manager is not None and wf_tracer_key is not None:
                 try:
                     graph_spec = wf_graph_tracer_manager.close_tracer(wf_tracer_key)
-                    if graph_spec is not None and pipe_output is not None:
+                    if graph_spec is not None and pipe_output is not None and graph_context is not None and graph_context.emit_graph_events:
                         pipe_output.graph_spec = graph_spec
                 except Exception as tracer_exc:  # noqa: BLE001
                     # Best-effort: tracer close in the finally block must never fail the workflow — log and continue.

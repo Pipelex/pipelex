@@ -194,6 +194,8 @@ async def pipeline_run_setup(
                 event_log = make_event_log(tracing_config)
 
             graph_tracer_manager = GraphTracerManager.get_or_create_instance()
+            # The emit flags (D4) are threaded into open_tracer so the returned GraphContext is born with
+            # the correct values — no post-hoc model_copy. Propagated to child contexts via copy_for_child.
             graph_context = graph_tracer_manager.open_tracer(
                 graph_id=pipeline_run_id,
                 data_inclusion=execution_config.graph_config.data_inclusion,
@@ -205,10 +207,8 @@ async def pipeline_run_setup(
                 event_log=event_log if is_generate_graph else None,
                 workflow_id="direct",
                 pipeline_run_id=pipeline_run_id,
-            )
-            # Record which event streams this run emits (D4). Propagated to child contexts via copy_for_child.
-            graph_context = graph_context.model_copy(
-                update={"emit_graph_events": is_generate_graph, "emit_usage_events": is_generate_costs},
+                emit_graph_events=is_generate_graph,
+                emit_usage_events=is_generate_costs,
             )
 
         # TODO: rethink this, it's not forcing

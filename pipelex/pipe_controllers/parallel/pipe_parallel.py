@@ -339,6 +339,11 @@ class PipeParallel(PipeController):
         graph_context = job_metadata.graph_context
         if graph_context is None:
             return
+        # E1: in costs-only mode the GraphSpec is never assembled, so skip the controller-output
+        # registration entirely — its IOSpec payloads (smart_dump / rendered_pretty_*) would be built
+        # then discarded. The node ids minted by on_pipe_start are unaffected.
+        if not graph_context.emit_graph_events:
+            return
         tracer_manager = GraphTracerManager.get_instance()
         if tracer_manager is None or graph_context.parent_node_id is None:
             return

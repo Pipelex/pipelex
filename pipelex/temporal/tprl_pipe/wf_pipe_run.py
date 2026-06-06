@@ -14,7 +14,7 @@ with workflow.unsafe.imports_passed_through():
     from pipelex.temporal.tprl.observability import build_search_attributes, build_static_summary
     from pipelex.temporal.tprl.temporal_error import recover_error_report
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
-    from pipelex.temporal.tprl_pipe.act_assemble_graph import AssembleGraphArg, act_assemble_graph
+    from pipelex.temporal.tprl_pipe.act_assemble_tracing import AssembleTracingArg, act_assemble_tracing
     from pipelex.temporal.tprl_pipe.act_deliver import DeliveryActivityArg, act_deliver
     from pipelex.temporal.tprl_pipe.pipe_run_arg import PipeRunArg
     from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
@@ -73,25 +73,37 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
             execution_error.__cause__ = exc
             workflow_log.error(f"WfPipeRouter failed: {exc}")
 
-        # Step 2: Assemble full graph from trace events (cross-worker)
-        # Runs as an activity because DynamoDB reads are I/O forbidden in workflows.
-        if pipe_output is not None:
+        # Step 2: Assemble full graph + usage from trace events (cross-worker)
+        # Runs as an activity because DynamoDB reads are I/O forbidden in workflows. The dispatch is
+        # gated on the run's emit flags (F1): a costs-only run assembles usage but no graph, so
+        # graph_spec stays None — matching DIRECT mode and preserving the --no-graph contract.
+        graph_context = pipe_job.job_metadata.graph_context
+        if pipe_output is not None and graph_context is not None and (graph_context.emit_graph_events or graph_context.emit_usage_events):
             try:
-                graph_spec = await workflow.execute_activity(
-                    act_assemble_graph,
-                    arg=AssembleGraphArg(
+                tracing_assembly = await workflow.execute_activity(
+                    act_assemble_tracing,
+                    arg=AssembleTracingArg(
                         pipeline_run_id=pipeline_run_id,
                         domain_code=pipe_job.pipe.domain_code,
                         main_pipe_code=pipe_job.pipe.code,
+                        assemble_graph=graph_context.emit_graph_events,
+                        assemble_usage=graph_context.emit_usage_events,
                     ),
                     start_to_close_timeout=timedelta(seconds=30),
                     retry_policy=RetryPolicy(maximum_attempts=3),
                 )
-                if graph_spec is not None:
-                    pipe_output.graph_spec = graph_spec
-            except ActivityError as graph_exc:
-                workflow_log.warning(f"Graph assembly failed, continuing with delivery: {graph_exc}")
-                pipe_output.graph_assembly_error = str(graph_exc)
+                if tracing_assembly.graph_spec is not None:
+                    pipe_output.graph_spec = tracing_assembly.graph_spec
+                if tracing_assembly.tokens_usages is not None:
+                    pipe_output.tokens_usages = tracing_assembly.tokens_usages
+            except ActivityError as assembly_exc:
+                workflow_log.warning(f"Tracing assembly failed, continuing with delivery: {assembly_exc}")
+                # Record the failure only on the concern(s) actually requested, so a costs-only run never
+                # surfaces a graph_assembly_error (and vice versa).
+                if graph_context.emit_graph_events:
+                    pipe_output.graph_assembly_error = str(assembly_exc)
+                if graph_context.emit_usage_events:
+                    pipe_output.usage_assembly_error = str(assembly_exc)
 
         # Step 3: Run delivery activity if requested — notifies the completion
         # Lambda of success or failure when a delivery_assignment was provided.
