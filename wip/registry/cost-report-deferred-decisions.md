@@ -47,6 +47,12 @@ Both touch the same question the registry track is converging on: *what is the s
 
 **Lean:** A — consistency across the two surfaces is worth more than the agent being unconditionally chatty, and `--no-costs` still lets a caller force it off. But it's a behavior change for agent consumers, so it needs a deliberate sign-off rather than being folded silently into the Phase 3 fix.
 
+### #6b — Agent `--costs` is a silent no-op in API mode (same root)
+
+**What.** The agent `run` subcommands declare `--costs/--no-costs` unconditionally, but the agent has two runner paths: `run_pipeline_core` (local) and `run_pipeline_core_api` (remote API runner). Only the local path builds an `execution_config` and renders/attaches a cost summary. In **API mode** the flag is accepted and then **silently ignored** — execution happens remotely and the local `costs` value does nothing. Flagged by cubic (P2, `pipe_cmd.py:51`) and Greptile's summary ("the agent API runner accepts cost flags but does not apply or report them", `_run_core_api.py`) on PR #967.
+
+**Why it's a design decision, not a reflexive patch.** "Rejecting `--costs` as unsupported in API mode" needs to distinguish an *explicitly-passed* flag from the `True` default — but the agent uses `bool = True`, so a user passing `--costs` is indistinguishable from the default (the exact same ambiguity #6 Option A would resolve by going tri-state `bool | None`). And whether API-mode cost reporting should instead surface costs *from the API response* is a product call, not a lint fix. So #6b is a strict consequence of #6: making the agent `costs` tri-state (#6 Option A) is the prerequisite for any honest API-mode handling (warn / reject / surface-from-response). Resolve them together; do not bolt a one-off rejection onto the `True`-default param.
+
 ---
 
 ## Cross-cutting note

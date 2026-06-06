@@ -7,6 +7,8 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+from pipelex import log
+from pipelex.base_exceptions import PipelexError
 from pipelex.cli.agent_cli.commands.run._output_helpers import build_run_output
 from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.config import get_config
@@ -110,9 +112,16 @@ async def run_pipeline_core(
     # envelope: on disk always, and in the stdout result under --with-memory. The markdown renderer
     # ignores the key, so the cost report is JSON-only.
     if costs and pipe_output.tokens_usages:
-        cost_summary = CostRegistry.build_cost_summary(tokens_usages=pipe_output.tokens_usages)
-        if cost_summary is not None:
-            side_effects["cost_report"] = cost_summary
+        # A cost-summary failure must never fail an otherwise-successful run (mirrors the main CLI's
+        # render_run_cost_report guard): CostRegistry can raise CostRegistryError (a PipelexError) during
+        # aggregation. Catch it, log, and skip the cost_report rather than propagate.
+        try:
+            cost_summary = CostRegistry.build_cost_summary(tokens_usages=pipe_output.tokens_usages)
+        except PipelexError as cost_summary_error:
+            log.warning(f"Cost summary generation failed (run succeeded): {cost_summary_error}")
+        else:
+            if cost_summary is not None:
+                side_effects["cost_report"] = cost_summary
 
     # Generate and save graph visualizations if requested
     if graph and pipe_output.graph_spec:

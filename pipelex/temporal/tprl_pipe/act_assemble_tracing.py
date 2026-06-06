@@ -9,7 +9,6 @@ happen inside a workflow thread.
 from pydantic import BaseModel
 from temporalio import activity
 
-from pipelex import log
 from pipelex.pipe_run.tracing_assembly import TracingAssembly, assemble_tracing
 
 
@@ -25,23 +24,27 @@ class AssembleTracingArg(BaseModel):
     assemble_usage: bool = True
 
 
-# Deliberately NOT decorated with @convert_pipelex_errors: this activity is best-effort
-# observability — it swallows every failure and degrades to an empty result, so no error ever
-# crosses the boundary for the decorator to convert.
+# NOT decorated with @convert_pipelex_errors: tracing assembly is observability, not a pipe step.
+# `assemble_tracing` already catches the EXPECTED best-effort failures (backend read errors, malformed
+# events, broken tracing infra) and returns them on the *_assembly_error fields — those never raise here.
+# A genuinely unexpected error (a programming bug in assembly) is deliberately allowed to propagate so the
+# activity fails and `WfPipeRun` records it on usage_assembly_error / graph_assembly_error (its existing
+# `except ActivityError` branch), mirroring DIRECT mode where assemble_tracing_on_output lets the same
+# errors surface. Swallowing them here would make the workflow see success and silently produce no cost
+# report and no diagnostic. The plain ActivityError carries the message WfPipeRun stringifies; no
+# ErrorReport classification is needed for an observability artifact.
 @activity.defn(name="act_assemble_tracing")
 async def act_assemble_tracing(arg: AssembleTracingArg) -> TracingAssembly:  # noqa: RUF029
-    """Read trace events and assemble graph + usage. Returns an empty result if no events found."""
-    try:
-        return assemble_tracing(
-            pipeline_run_id=arg.pipeline_run_id,
-            assemble_graph=arg.assemble_graph,
-            assemble_usage=arg.assemble_usage,
-            domain_code=arg.domain_code,
-            main_pipe_code=arg.main_pipe_code,
-        )
-    except Exception as exc:  # noqa: BLE001
-        # Temporal activity root: tracing assembly is best-effort observability — any unexpected failure
-        # degrades to an empty result rather than failing the workflow (assemble_tracing already handles
-        # the expected read/assemble exceptions internally).
-        log.warning(f"Tracing assembly activity failed: {exc}")
-        return TracingAssembly()
+    """Read trace events and assemble graph + usage.
+
+    Returns an empty result when no events are found or tracing is disabled. Expected best-effort
+    failures are caught inside :func:`assemble_tracing` and returned on the ``*_assembly_error`` fields;
+    unexpected errors propagate so the workflow surfaces them (see the module-level note above).
+    """
+    return assemble_tracing(
+        pipeline_run_id=arg.pipeline_run_id,
+        assemble_graph=arg.assemble_graph,
+        assemble_usage=arg.assemble_usage,
+        domain_code=arg.domain_code,
+        main_pipe_code=arg.main_pipe_code,
+    )
