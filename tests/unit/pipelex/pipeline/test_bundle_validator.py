@@ -2,9 +2,9 @@
 
 These pin the tolerant per-pipe classification, the D3 union catch + recursive SKIPPED
 cause-walk, the D7 wiring-before-signature precedence, the single collect-all aggregate
-(no per-pipe early abort), and the per-sweep telemetry + report-registry lifecycle. The
-seams (``prepare_pipe_job``) and the run primitive (``PipeRun``) are mocked here; the real
-composition is exercised by the integration suite.
+(no per-pipe early abort), and the per-sweep telemetry. The seams (``prepare_pipe_job``)
+and the run primitive (``PipeRun``) are mocked here; the real composition is exercised by
+the integration suite.
 """
 
 import pytest
@@ -34,13 +34,12 @@ class TestBundleValidator:
     def _patch_env(self, mocker: MockerFixture, *, allowed_to_fail: list[str] | None = None):
         """Patch the hub getters, ``prepare_pipe_job``, and the ``PipeRun`` class in bundle_validator.
 
-        Returns ``(validator, report_delegate, telemetry_manager, prepare_mock, pipe_run)`` so callers can
-        assert on the registry / telemetry / seam / run interactions. ``pipe_run.run`` defaults to a
-        success-returning ``AsyncMock`` — individual tests override its ``return_value`` / ``side_effect``.
-        Patching the ``PipeRun`` symbol (rather than reaching into the instance's protected ``_pipe_run``)
-        keeps the test off the validator's private surface.
+        Returns ``(validator, telemetry_manager, prepare_mock, pipe_run)`` so callers can assert on the
+        telemetry / seam / run interactions. ``pipe_run.run`` defaults to a success-returning
+        ``AsyncMock`` — individual tests override its ``return_value`` / ``side_effect``. Patching the
+        ``PipeRun`` symbol (rather than reaching into the instance's protected ``_pipe_run``) keeps the
+        test off the validator's private surface.
         """
-        report_delegate = mocker.patch("pipelex.pipeline.bundle_validator.get_report_delegate").return_value
         telemetry_manager = mocker.patch("pipelex.pipeline.bundle_validator.get_telemetry_manager").return_value
         mock_get_config = mocker.patch("pipelex.pipeline.bundle_validator.get_config")
         mock_get_config.return_value.pipelex.dry_run_config.allowed_to_fail_pipes = allowed_to_fail or []
@@ -49,11 +48,11 @@ class TestBundleValidator:
         pipe_run = mocker.MagicMock(name="pipe_run")
         pipe_run.run = mocker.AsyncMock(return_value=mocker.MagicMock(name="pipe_output"))
         mocker.patch("pipelex.pipeline.bundle_validator.PipeRun", return_value=pipe_run)
-        return BundleValidator(), report_delegate, telemetry_manager, prepare_mock, pipe_run
+        return BundleValidator(), telemetry_manager, prepare_mock, pipe_run
 
     @pytest.mark.asyncio
     async def test_success_classification(self, mocker: MockerFixture) -> None:
-        validator, _report, _telemetry, _prepare, _pipe_run = self._patch_env(mocker)
+        validator, _telemetry, _prepare, _pipe_run = self._patch_env(mocker)
         pipe = self._make_pipe(mocker, code="ok_pipe", pipe_ref="dom.ok_pipe")
 
         results = await validator.validate_pipes([pipe], library_id="lib-1")
@@ -66,7 +65,7 @@ class TestBundleValidator:
     async def test_skipped_when_prepare_raises_bare_pipe_not_found(self, mocker: MockerFixture) -> None:
         # A cross-package unresolved dependency surfaces during mock-input build (prepare_pipe_job)
         # as a bare PipeNotFoundError — reclassify as SKIPPED, never SUCCESS, never a sweep abort.
-        validator, _report, _telemetry, prepare_mock, _pipe_run = self._patch_env(mocker)
+        validator, _telemetry, prepare_mock, _pipe_run = self._patch_env(mocker)
         prepare_mock.side_effect = PipeNotFoundError("dep->other.missing not found")
         pipe = self._make_pipe(mocker, code="dep_pipe", pipe_ref="dom.dep_pipe")
 
@@ -81,7 +80,7 @@ class TestBundleValidator:
     async def test_skipped_when_run_raises_wrapped_pipe_not_found(self, mocker: MockerFixture) -> None:
         # Routing through PipeRun.run no longer surfaces a bare PipeNotFoundError: the run layer
         # re-raises and the router wraps it. The recursive __cause__ walk must still reclassify SKIPPED.
-        validator, _report, _telemetry, _prepare, pipe_run = self._patch_env(mocker)
+        validator, _telemetry, _prepare, pipe_run = self._patch_env(mocker)
         cause = PipeNotFoundError("dep->other.missing not found")
         wrapped = PipeRunError(message="run failed", run_mode=PipeRunMode.DRY, pipe_code="dep_pipe")
         wrapped.__cause__ = cause
@@ -96,7 +95,7 @@ class TestBundleValidator:
     async def test_allowed_failure_returned_in_map_without_raising(self, mocker: MockerFixture) -> None:
         # A FactoryException (e.g. a PipeSignature mint) on an allowed-to-fail pipe is a handled FAILURE
         # carried in the returned map — the sweep does NOT raise because it is not an unexpected failure.
-        validator, _report, _telemetry, _prepare, pipe_run = self._patch_env(mocker, allowed_to_fail=["dom.allowed_pipe"])
+        validator, _telemetry, _prepare, pipe_run = self._patch_env(mocker, allowed_to_fail=["dom.allowed_pipe"])
         pipe_run.run = mocker.AsyncMock(side_effect=FactoryException("polyfactory could not build mock content"))
         pipe = self._make_pipe(mocker, code="allowed_pipe", pipe_ref="dom.allowed_pipe")
 
@@ -112,7 +111,7 @@ class TestBundleValidator:
         # only the bare code ("allowed_pipe") must NOT tolerate the namespaced pipe ("dom.allowed_pipe") —
         # the failure is unexpected and aggregates into a DryRunError. (The positive namespaced match is
         # pinned by test_allowed_failure_returned_in_map_without_raising.)
-        validator, _report, _telemetry, _prepare, pipe_run = self._patch_env(mocker, allowed_to_fail=["allowed_pipe"])
+        validator, _telemetry, _prepare, pipe_run = self._patch_env(mocker, allowed_to_fail=["allowed_pipe"])
         pipe_run.run = mocker.AsyncMock(side_effect=FactoryException("polyfactory could not build mock content"))
         pipe = self._make_pipe(mocker, code="allowed_pipe", pipe_ref="dom.allowed_pipe")
 
@@ -124,7 +123,7 @@ class TestBundleValidator:
     async def test_unexpected_validation_error_raises_dry_run_error(self, mocker: MockerFixture) -> None:
         # A pydantic ValidationError on a non-allowed pipe classifies FAILURE and is aggregated into a
         # single DryRunError (third-party-exception classify — FAILURE, not an escaping traceback).
-        validator, _report, _telemetry, _prepare, pipe_run = self._patch_env(mocker)
+        validator, _telemetry, _prepare, pipe_run = self._patch_env(mocker)
 
         class _Tiny(BaseModel):
             value: int
@@ -143,7 +142,7 @@ class TestBundleValidator:
         # D3 widening: a non-dependency PipelexError raised mid-run is a per-pipe FAILURE, NOT a sweep
         # abort. The narrow tuple the old path used would let it escape and abort before the next pipe;
         # the base-PipelexError catch keeps the loop going, so the second pipe still runs.
-        validator, _report, _telemetry, _prepare, pipe_run = self._patch_env(mocker)
+        validator, _telemetry, _prepare, pipe_run = self._patch_env(mocker)
         pipe_run.run = mocker.AsyncMock(side_effect=[PipelexError("unexpected domain failure"), mocker.MagicMock(name="ok_output")])
         failing_pipe = self._make_pipe(mocker, code="boom_pipe", pipe_ref="dom.boom_pipe")
         ok_pipe = self._make_pipe(mocker, code="ok_pipe", pipe_ref="dom.ok_pipe")
@@ -160,7 +159,7 @@ class TestBundleValidator:
     async def test_collect_all_unexpected_failures_reported(self, mocker: MockerFixture) -> None:
         # Collect-all, not first-failure-abort: a sweep with >= 2 non-allowed failures reports BOTH in one
         # aggregated error.
-        validator, _report, _telemetry, _prepare, pipe_run = self._patch_env(mocker)
+        validator, _telemetry, _prepare, pipe_run = self._patch_env(mocker)
         pipe_run.run = mocker.AsyncMock(side_effect=[PipelexError("fail one"), PipelexError("fail two")])
         pipe_a = self._make_pipe(mocker, code="a_pipe", pipe_ref="dom.a_pipe")
         pipe_b = self._make_pipe(mocker, code="b_pipe", pipe_ref="dom.b_pipe")
@@ -175,7 +174,7 @@ class TestBundleValidator:
     async def test_strict_signature_pre_pass_raises_before_sweep(self, mocker: MockerFixture) -> None:
         # In strict mode a reached signature raises the aggregated SignaturesNotAllowedError before any
         # pipe is dry-run — so the seam (prepare_pipe_job) is never invoked.
-        validator, _report, _telemetry, prepare_mock, _pipe_run = self._patch_env(mocker)
+        validator, _telemetry, prepare_mock, _pipe_run = self._patch_env(mocker)
         signature_pipe = self._make_pipe(mocker, code="sig_pipe", pipe_ref="dom.sig_pipe", is_signature=True)
 
         with pytest.raises(SignaturesNotAllowedError) as exc_info:
@@ -187,7 +186,7 @@ class TestBundleValidator:
     async def test_validate_with_libraries_error_precedes_signature_pre_pass(self, mocker: MockerFixture) -> None:
         # D7 precedence: the static wiring pass runs (and can raise) BEFORE the signature pre-pass, so a
         # wiring failure surfaces ahead of a signature error even when both are present.
-        validator, _report, _telemetry, _prepare, _pipe_run = self._patch_env(mocker)
+        validator, _telemetry, _prepare, _pipe_run = self._patch_env(mocker)
         spy_collect = mocker.patch("pipelex.pipeline.bundle_validator.collect_signature_refs")
         wiring_pipe = self._make_pipe(mocker, code="wiring_pipe", pipe_ref="dom.wiring_pipe")
         # Stand-in for a wiring error (real validate_with_libraries raises PipeValidationError).
@@ -205,7 +204,7 @@ class TestBundleValidator:
         # signature-checked: the strict pre-pass runs over the FULL pipe list, not just the wiring
         # survivors. Otherwise an unimplemented PipeSignature hidden behind a wiring gap would silently
         # pass strict validation (the old dry_run_pipes ran the pre-pass over all pipes first).
-        validator, _report, _telemetry, prepare_mock, _pipe_run = self._patch_env(mocker)
+        validator, _telemetry, prepare_mock, _pipe_run = self._patch_env(mocker)
         # Step 1 drops this pipe to SKIPPED — its wiring references an unloaded cross-package sub-pipe...
         pipe = self._make_pipe(mocker, code="hybrid_pipe", pipe_ref="dom.hybrid_pipe")
         pipe.validate_with_libraries.side_effect = PipeNotFoundError("hybrid->other.missing not found")
@@ -222,7 +221,7 @@ class TestBundleValidator:
 
     @pytest.mark.asyncio
     async def test_one_pipe_dry_run_event_emitted_for_the_sweep(self, mocker: MockerFixture) -> None:
-        validator, _report, telemetry_manager, _prepare, _pipe_run = self._patch_env(mocker)
+        validator, telemetry_manager, _prepare, _pipe_run = self._patch_env(mocker)
         pipes = [self._make_pipe(mocker, code=f"p{idx}", pipe_ref=f"dom.p{idx}") for idx in range(3)]
 
         await validator.validate_pipes(pipes, library_id="lib-1")
@@ -233,21 +232,17 @@ class TestBundleValidator:
         )
 
     @pytest.mark.asyncio
-    async def test_registry_opened_once_and_closed_in_finally(self, mocker: MockerFixture) -> None:
-        # One report registry per sweep, keyed by a UNIQUE per-sweep id, closed in `finally` even when a
-        # pipe run raises an uncaught (non-classified) exception. The id must be unique (not a constant) so
-        # concurrent sweeps on the process-global ReportingManager cannot collide on open_registry. Assert
-        # the registry is opened once and closed once, that open/close use the SAME id, and that the same id
-        # is threaded into the pipe job (so the synthetic DRY report lands in the registry that gets closed).
-        validator, report_delegate, _telemetry, prepare, pipe_run = self._patch_env(mocker)
+    async def test_sweep_threads_unique_dry_run_id_into_prepare(self, mocker: MockerFixture) -> None:
+        # Each sweep dry-runs its pipes under a UNIQUE per-sweep pipeline run id (a `dry_run_`-prefixed
+        # uuid) threaded into prepare_pipe_job. The live registry is gone (usage rides on PipeOutput), so
+        # there is no per-sweep cleanup to verify — but the id threading survives. Pin that prepare is
+        # called with a `dry_run_`-prefixed id even when a pipe run raises an uncaught exception.
+        validator, _telemetry, prepare, pipe_run = self._patch_env(mocker)
         pipe_run.run = mocker.AsyncMock(side_effect=KeyError("uncaught programming bug"))
         pipe = self._make_pipe(mocker, code="p", pipe_ref="dom.p")
 
         with pytest.raises(KeyError):
             await validator.validate_pipes([pipe], library_id="lib-1")
 
-        report_delegate.open_registry.assert_called_once()
-        report_delegate.close_registry.assert_called_once()
-        opened_id = report_delegate.open_registry.call_args.kwargs["pipeline_run_id"]
-        assert report_delegate.close_registry.call_args.kwargs["pipeline_run_id"] == opened_id
-        assert prepare.call_args.kwargs["pipeline_run_id"] == opened_id
+        threaded_id = prepare.call_args.kwargs["pipeline_run_id"]
+        assert threaded_id.startswith("dry_run_")

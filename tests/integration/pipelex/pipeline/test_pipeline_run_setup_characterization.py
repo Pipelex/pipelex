@@ -34,13 +34,11 @@ What is pinned here:
   a ``library_id``, which it never did). ``acquire_library`` now owns load-time
   teardown and the recomposed ``try``/``finally`` owns the post-acquire window,
   matching the already-hardened ``validate_bundle``.
-- **Failure after ``open_registry`` closes the registry:** a failure between
-  ``open_registry`` and a successful return (here ``prepare_pipe_job`` raising)
-  closes the per-run ``UsageRegistry`` the wrapper opened, so a long-lived runner
-  does not leak one registry per failed run. A failure *before* ``open_registry``
-  must NOT call ``close_registry`` (a ``registry_opened`` guard keeps the finally from
-  closing a registry it never opened; ``close_registry`` is idempotent via
-  ``pop(..., None)``, so this is a semantic guard, not ``KeyError`` avoidance).
+- **Success path leaves no per-run reporting state (Phase 4 — leak fixed by removal):** a
+  successful run through ``execute_pipeline`` leaves the ``ReportingManager`` with no accumulated
+  per-run state — the per-run event-log context is cleared on the way out, and the live usage
+  registry has been removed entirely, so the success-path leak it used to suffer (a per-run
+  registry opened in setup and never closed) is structurally impossible.
 - **Failure after acquire restores the outer current-library:** when the caller
   had an outer current-library set, a post-acquire failure restores it rather
   than clobbering it to ``None`` — mirroring ``acquire_library``'s own load-failure
@@ -65,9 +63,10 @@ from pipelex.hub import (
 )
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline import pipeline_run_setup as pipeline_run_setup_module
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
-from pipelex.system.configuration.configs import PipelineExecutionConfig
+from pipelex.pipeline.runner import PipelexRunner
+from pipelex.reporting.reporting_manager import ReportingManager
+from pipelex.system.configuration.configs import NdjsonTracingConfig, PipelineExecutionConfig, TracingBackend
 from pipelex.system.telemetry.events import EventName
 
 _CHAR_DOMAIN = "prs_char"
@@ -211,45 +210,36 @@ class TestPipelineRunSetupCharacterization:
         assert teardown_spy.call_count == teardown_before + 1
         assert get_current_library_id_or_none() == prev_library_id
 
-    async def test_failure_after_open_registry_closes_registry(self, mocker: MockerFixture) -> None:
-        # The seam reorder put working-memory assembly (prepare_pipe_job) AFTER open_registry. A
-        # failure there must close the registry the wrapper opened, or a long-lived runner leaks one
-        # UsageRegistry per failed run. Patch the module-level prepare_pipe_job to raise (it runs after
-        # open_registry) and assert the registry opened for this run is closed exactly once.
-        open_spy = mocker.spy(get_report_delegate(), "open_registry")
-        close_spy = mocker.spy(get_report_delegate(), "close_registry")
-        mocker.patch.object(pipeline_run_setup_module, "prepare_pipe_job", side_effect=RuntimeError("boom in prepare_pipe_job"))
+    async def test_success_path_leaves_no_per_run_reporting_state(self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture) -> None:
+        # Phase 4: the live usage registry is removed entirely, so the success-path leak (a per-run
+        # registry opened in pipeline_run_setup and never closed) is structurally impossible. Run a real
+        # DRY pipeline through execute_pipeline with tracing + costs on (so a usage event-log context IS
+        # registered during the run), then assert the ReportingManager carries NO per-run state afterward:
+        # the registry concept no longer exists, and the event-log context was cleared on the success path.
+        traces_dir = str(tmp_path_factory.mktemp("char_no_leak"))
+        tracing_config = get_config().pipelex.tracing_config
+        mocker.patch.object(tracing_config, "is_enabled", True)
+        mocker.patch.object(tracing_config, "backend", TracingBackend.NDJSON)
+        mocker.patch.object(tracing_config, "ndjson", NdjsonTracingConfig(traces_dir=traces_dir))
 
-        with pytest.raises(RuntimeError):
-            await pipeline_run_setup(
-                execution_config=_dry_mock_config(),
-                mthds_contents=[_CHAR_MTHDS],
-                pipe_code="echo_topic",
-                pipe_run_mode=PipeRunMode.DRY,
-            )
+        delegate = get_report_delegate()
+        # The registry attribute is gone for good — the leak cannot recur.
+        assert not hasattr(delegate, "_usage_registries")
 
-        assert open_spy.call_count == 1
-        opened_run_id = open_spy.call_args.kwargs["pipeline_run_id"]
-        assert close_spy.call_count == 1
-        assert close_spy.call_args.kwargs["pipeline_run_id"] == opened_run_id
+        execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+            generate_graph=False,
+            generate_costs=True,
+            mock_inputs=True,
+        )
+        runner = PipelexRunner(pipe_run_mode=PipeRunMode.DRY, execution_config=execution_config)
+        response = await runner.execute_pipeline(pipe_code="echo_topic", mthds_contents=[_CHAR_MTHDS])
 
-    async def test_failure_before_open_registry_does_not_close_registry(self, mocker: MockerFixture) -> None:
-        # The wrapper finally also runs for failures BEFORE open_registry (pipe resolution here, which
-        # precedes it). The registry_opened guard ensures close_registry is only called for a registry we
-        # actually opened, so it must NOT be called on this pre-open failure, and the original error must
-        # propagate intact. (close_registry is idempotent via pop(..., None); the guard is about not
-        # touching state we never created, not KeyError avoidance.)
-        close_spy = mocker.spy(get_report_delegate(), "close_registry")
-
-        with pytest.raises(PipeNotFoundError):
-            await pipeline_run_setup(
-                execution_config=_dry_mock_config(),
-                mthds_contents=[_CHAR_MTHDS],
-                pipe_code="absent_pipe",
-                pipe_run_mode=PipeRunMode.DRY,
-            )
-
-        assert close_spy.call_count == 0
+        assert not hasattr(delegate, "_usage_registries")
+        # This run registered a usage event-log context (tracing + costs on); the success path must have
+        # cleared it. Assert against THIS run's key rather than global emptiness — _event_log_contexts is a
+        # process-global singleton that sibling tests on the same xdist worker can populate.
+        if isinstance(delegate, ReportingManager):
+            assert response.pipeline_run_id not in delegate._event_log_contexts  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
     async def test_failure_after_acquire_restores_outer_current_library(self, load_empty_library: Callable[[], str]) -> None:
         # acquire_library restores the outer current-library on its own load failure; the wrapper's

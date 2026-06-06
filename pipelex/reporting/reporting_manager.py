@@ -1,29 +1,20 @@
-from collections.abc import Sequence
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import NamedTuple
 
-from pydantic import Field, RootModel
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexConfigError
-from pipelex.cogt.exceptions import ReportingManagerError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.search.search_job import SearchJob
-from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.config import get_config
 from pipelex.graph.graph_context import GraphContext
-from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.reporting.reporting_types import AnyTokensUsage, TokensUsage
+from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.system.exceptions import MissingDependencyError
-from pipelex.tools.misc.file_utils import ensure_path, get_incremental_file_path
-from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pipelex.tracing.activity_event_log import ActivityEventLogCache
 from pipelex.tracing.event_log_protocol import EventLogProtocol
 from pipelex.tracing.trace_events import UsageReportEvent
@@ -42,23 +33,8 @@ class _EventLogContext(NamedTuple):
     pipeline_run_id: str
 
 
-UsageRegistryRoot = list[TokensUsage]
-
-
-class UsageRegistry(RootModel[UsageRegistryRoot]):
-    root: UsageRegistryRoot = Field(default_factory=empty_list_factory_of(LLMTokensUsage))
-
-    def get_current_tokens_usage(self) -> UsageRegistryRoot:
-        return self.root
-
-    def add_tokens_usage(self, tokens_usage: TokensUsage):
-        self.root.append(tokens_usage)
-
-
 class ReportingManager(ReportingProtocol):
     def __init__(self):
-        self._reporting_config = get_config().pipelex.reporting_config
-        self._usage_registries: dict[str, UsageRegistry] = {}
         # Per-context event log state, keyed by graph_context.lookup_key.
         # Each concurrent workflow/run gets its own isolated context.
         self._event_log_contexts: dict[str, _EventLogContext] = {}
@@ -100,54 +76,15 @@ class ReportingManager(ReportingProtocol):
 
     @override
     def setup(self):
-        self._usage_registries.clear()
-        self._usage_registries[SpecialPipelineId.UNTITLED] = UsageRegistry()
+        self._event_log_contexts.clear()
 
     @override
     def teardown(self):
-        self._usage_registries.clear()
         self._event_log_contexts.clear()
 
     ############################################################
     # Private methods
     ############################################################
-
-    def _get_registry_strict(self, pipeline_run_id: str) -> UsageRegistry:
-        """Return the registry for ``pipeline_run_id`` or raise ``KeyError`` on miss.
-
-        Used by ``_report_*_job``: on the runner, the registry is never opened
-        because ``open_registry`` runs on the API process. Callers swallow
-        ``KeyError`` and skip the local-add — the runner-side
-        ``UsageReportEvent`` emission (Phase 2 fallback) is independent of
-        the registry, so distributed reassembly still gets the data.
-        """
-        return self._usage_registries[pipeline_run_id]
-
-    def _get_or_create_registry(self, pipeline_run_id: str) -> UsageRegistry:
-        """Return the registry for ``pipeline_run_id``, creating it on miss.
-
-        Used by ``inject_tokens_usages`` (the P1 cross-worker assembly path),
-        the console cost-report path, and ``generate_report`` when called for
-        a specific run that wasn't opened on this process.
-        """
-        if pipeline_run_id not in self._usage_registries:
-            self._usage_registries[pipeline_run_id] = UsageRegistry()
-        return self._usage_registries[pipeline_run_id]
-
-    def _try_add_to_registry(self, pipeline_run_id: str, tokens_usage: AnyTokensUsage) -> None:
-        """Add to the registry if it exists; silently skip if not.
-
-        Skipping on miss is the runner-process behavior — the registry was
-        never opened here. The local-skip is intentional: the
-        ``UsageReportEvent`` emitted by ``_emit_usage_event`` carries the
-        data into the shared backend partition, and the P1 readback path
-        will assemble it on the process that owns ``inject_tokens_usages``.
-        """
-        try:
-            registry = self._get_registry_strict(pipeline_run_id)
-        except KeyError:
-            return
-        registry.add_tokens_usage(tokens_usage)
 
     def _report_llm_job(self, llm_job: LLMJob):
         llm_tokens_usage = llm_job.job_report.llm_tokens_usage
@@ -156,8 +93,6 @@ class ReportingManager(ReportingProtocol):
             log.warning("LLM job has no llm_tokens_usage")
             return
 
-        pipeline_run_id = llm_job.job_metadata.pipeline_run_id
-        self._try_add_to_registry(pipeline_run_id, llm_tokens_usage)
         self._emit_usage_event(llm_job, llm_tokens_usage)
 
     def _report_img_gen_job(self, img_gen_job: ImgGenJob):
@@ -167,8 +102,6 @@ class ReportingManager(ReportingProtocol):
             log.warning("ImgGen job has no img_gen_tokens_usage")
             return
 
-        pipeline_run_id = img_gen_job.job_metadata.pipeline_run_id
-        self._try_add_to_registry(pipeline_run_id, img_gen_tokens_usage)
         self._emit_usage_event(img_gen_job, img_gen_tokens_usage)
 
     def _report_extract_job(self, extract_job: ExtractJob):
@@ -178,8 +111,6 @@ class ReportingManager(ReportingProtocol):
             log.warning("Extract job has no extract_tokens_usage")
             return
 
-        pipeline_run_id = extract_job.job_metadata.pipeline_run_id
-        self._try_add_to_registry(pipeline_run_id, extract_tokens_usage)
         self._emit_usage_event(extract_job, extract_tokens_usage)
 
     def _report_search_job(self, search_job: SearchJob):
@@ -189,34 +120,7 @@ class ReportingManager(ReportingProtocol):
             log.warning("Search job has no search_tokens_usage")
             return
 
-        pipeline_run_id = search_job.job_metadata.pipeline_run_id
-        self._try_add_to_registry(pipeline_run_id, search_tokens_usage)
         self._emit_usage_event(search_job, search_tokens_usage)
-
-    ############################################################
-    # ReportingProtocol
-    ############################################################
-
-    @override
-    def open_registry(self, pipeline_run_id: str):
-        if pipeline_run_id in self._usage_registries:
-            msg = f"Registry for pipeline '{pipeline_run_id}' already exists"
-            raise ReportingManagerError(msg)
-        self._usage_registries[pipeline_run_id] = UsageRegistry()
-
-    def inject_tokens_usages(self, pipeline_run_id: str, tokens_usages: Sequence[AnyTokensUsage]) -> None:
-        """Inject externally-collected token usage records into a pipeline's registry.
-
-        Used after assembling usage data from distributed trace events, so that
-        generate_report() can produce a complete cost report across all workers.
-
-        Args:
-            pipeline_run_id: The pipeline run to add usage data to.
-            tokens_usages: Token usage records to inject.
-        """
-        registry = self._get_or_create_registry(pipeline_run_id)
-        for tokens_usage in tokens_usages:
-            registry.add_tokens_usage(tokens_usage)
 
     def _emit_usage_event(self, inference_job: InferenceJobAbstract, tokens_usage: AnyTokensUsage) -> None:
         """Emit a UsageReportEvent for this job.
@@ -355,37 +259,3 @@ class ReportingManager(ReportingProtocol):
             self._report_search_job(search_job=inference_job)
         else:
             log.warning(f"ReportingManager does not support reporting for inference job type: {type(inference_job).__name__}")
-
-    @override
-    def generate_report(self, pipeline_run_id: str | None = None, print_to_console: bool = True):
-        is_csv_enabled = self._reporting_config.is_generate_cost_report_file_enabled
-        if is_csv_enabled:
-            ensure_path(Path(self._reporting_config.cost_report_dir_path))
-
-        registries_to_process: dict[str, UsageRegistry] = {}
-        if pipeline_run_id:
-            registries_to_process = {pipeline_run_id: self._get_or_create_registry(pipeline_run_id)}
-        else:
-            registries_to_process = self._usage_registries
-
-        for run_id, registry in registries_to_process.items():
-            cost_report_file_path: Path | None = None
-            if is_csv_enabled:
-                cost_report_file_path = get_incremental_file_path(
-                    base_path=Path(self._reporting_config.cost_report_dir_path),
-                    base_name=self._reporting_config.cost_report_base_name,
-                    extension=self._reporting_config.cost_report_extension,
-                )
-            CostRegistry.generate_report(
-                pipeline_run_id=run_id,
-                tokens_usages=registry.get_current_tokens_usage(),
-                unit_scale=self._reporting_config.cost_report_unit_scale,
-                cost_report_file_path=cost_report_file_path,
-                print_to_console=print_to_console,
-            )
-
-    @override
-    def close_registry(self, pipeline_run_id: str):
-        # Idempotent on miss (mirrors clear_event_log): close_registry runs from sweep / runner
-        # `finally` blocks, where a KeyError from a bare `pop` would mask the in-flight exception.
-        self._usage_registries.pop(pipeline_run_id, None)

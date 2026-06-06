@@ -1,8 +1,7 @@
 """Unit tests for ReportingManager event emission.
 
 Validates that when an EventLogProtocol is provided, ReportingManager emits
-UsageReportEvent alongside existing local accumulation, with per-context
-isolation for concurrent workflows.
+UsageReportEvent with per-context isolation for concurrent workflows.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -99,7 +98,6 @@ class TestReportingEventEmission:
             workflow_id=self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
         )
-        manager.open_registry(self.PIPELINE_RUN_ID)
         return manager, event_log
 
     # ------------------------------------------------------------------
@@ -139,63 +137,16 @@ class TestReportingEventEmission:
         assert usage_events[0].node_id == "test-graph:node_42"
         assert usage_events[0].workflow_id == self.WORKFLOW_ID
 
-    # ------------------------------------------------------------------
-    # Registry tests (unchanged behavior)
-    # ------------------------------------------------------------------
-
-    def test_inject_tokens_usages_adds_to_registry(self) -> None:
-        """inject_tokens_usages adds externally-collected usage data to the pipeline's registry."""
-        manager = ReportingManager()
-        manager.setup()
-        manager.open_registry(self.PIPELINE_RUN_ID)
-
-        tokens_usage = LLMTokensUsage(
-            job_metadata=_make_test_llm_job(self.PIPELINE_RUN_ID).job_metadata,
-            inference_model_name="test-model",
-            inference_model_id="test-model-id",
-            unit_costs={CostCategory.INPUT: 1.0, CostCategory.OUTPUT: 2.0},
-            nb_tokens_by_category={TokenCategory.INPUT: 200, TokenCategory.OUTPUT: 100},
-        )
-
-        manager.inject_tokens_usages(
-            pipeline_run_id=self.PIPELINE_RUN_ID,
-            tokens_usages=[tokens_usage],
-        )
-
-        registry = manager._get_or_create_registry(self.PIPELINE_RUN_ID)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
-        usages = registry.get_current_tokens_usage()
-        assert len(usages) == 1
-        assert usages[0].nb_tokens_by_category[TokenCategory.INPUT] == 200
-
-    def test_inject_tokens_usages_auto_creates_registry(self) -> None:
-        """inject_tokens_usages auto-creates registry if it doesn't exist yet."""
+    def test_setup_and_teardown_without_event_log(self) -> None:
+        """Without any event_log registered, setup/teardown are inert and report_inference_job no-ops."""
         manager = ReportingManager()
         manager.setup()
 
-        tokens_usage = LLMTokensUsage(
-            job_metadata=_make_test_llm_job("new_run").job_metadata,
-            inference_model_name="test-model",
-            inference_model_id="test-model-id",
-            unit_costs={CostCategory.INPUT: 1.0, CostCategory.OUTPUT: 2.0},
-            nb_tokens_by_category={TokenCategory.INPUT: 50, TokenCategory.OUTPUT: 25},
-        )
+        # A job whose graph_context is None must not emit anything and must not raise.
+        manager.report_inference_job(_make_test_llm_job("direct_run", graph_context=None))
 
-        manager.inject_tokens_usages(
-            pipeline_run_id="new_run",
-            tokens_usages=[tokens_usage],
-        )
-
-        registry = manager._get_or_create_registry("new_run")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
-        usages = registry.get_current_tokens_usage()
-        assert len(usages) == 1
-
-    def test_no_event_log_works_as_before(self) -> None:
-        """ReportingManager without event_log works exactly as before."""
-        manager = ReportingManager()
-        manager.setup()
-        manager.open_registry("direct_run")
-        manager.close_registry("direct_run")
         manager.teardown()
+        assert len(manager._event_log_contexts) == 0  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
     # ------------------------------------------------------------------
     # Per-context isolation regression tests
@@ -210,8 +161,6 @@ class TestReportingEventEmission:
 
         manager.set_event_log(context_key="wf_a", event_log=event_log_a, workflow_id="wf_a", pipeline_run_id="run_a")
         manager.set_event_log(context_key="wf_b", event_log=event_log_b, workflow_id="wf_b", pipeline_run_id="run_b")
-        manager.open_registry("run_a")
-        manager.open_registry("run_b")
 
         ctx_a = _make_graph_context(graph_id="run_a", tracer_key="wf_a")
         ctx_b = _make_graph_context(graph_id="run_b", tracer_key="wf_b")
@@ -240,8 +189,6 @@ class TestReportingEventEmission:
 
         manager.set_event_log(context_key="wf_a", event_log=event_log_a, workflow_id="wf_a", pipeline_run_id="run_a")
         manager.set_event_log(context_key="wf_b", event_log=event_log_b, workflow_id="wf_b", pipeline_run_id="run_b")
-        manager.open_registry("run_a")
-        manager.open_registry("run_b")
 
         # Clear context A before any emission
         manager.clear_event_log(context_key="wf_a")
@@ -292,8 +239,6 @@ class TestReportingEventEmission:
 
         manager.set_event_log(context_key="wf_a", event_log=event_log_a, workflow_id="wf_a", pipeline_run_id="run_a")
         manager.set_event_log(context_key="wf_b", event_log=event_log_b, workflow_id="wf_b", pipeline_run_id="run_b")
-        manager.open_registry("run_a")
-        manager.open_registry("run_b")
 
         ctx_a = _make_graph_context(graph_id="run_a", tracer_key="wf_a")
         ctx_b = _make_graph_context(graph_id="run_b", tracer_key="wf_b")
@@ -321,7 +266,6 @@ class TestReportingEventEmission:
 
         manager = ReportingManager()
         manager.setup()
-        manager.open_registry("run_silent")
 
         graph_context = _make_graph_context(graph_id="run_silent", tracer_key="wf_silent", parent_node_id="g:node_0")
         llm_job = _make_test_llm_job("run_silent", graph_context=graph_context)

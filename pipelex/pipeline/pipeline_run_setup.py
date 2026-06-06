@@ -153,7 +153,6 @@ async def pipeline_run_setup(
     library_manager = get_library_manager()
     graph_context: GraphContext | None = None
     event_log: EventLogProtocol | None = None
-    registry_opened = False
     success = False
     try:
         # Resolve the pipe to execute against the now-open library.
@@ -218,9 +217,6 @@ async def pipeline_run_setup(
             else:
                 pipe_run_mode = PipeRunMode.LIVE
 
-        get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
-        registry_opened = True
-
         # Register the event log on the report delegate for usage event emission — only when cost reporting
         # is on. In graph-only mode (--graph --no-costs) the tracer owns the event_log for graph events, but
         # no usage-event context is registered, so usage events are suppressed (the runner fallback also
@@ -278,22 +274,16 @@ async def pipeline_run_setup(
     finally:
         if not success:
             # Error-path-only cleanup for failures after the library was acquired: tear down the graph
-            # tracer, event-log state, the report registry, and the library, and restore the outer
-            # current-library, then let the exception propagate. Uses try/finally (not except) so a
-            # BaseException — e.g. asyncio.CancelledError — is covered too. acquire_library owns teardown
-            # for load-time failures (before this try); this block owns the post-acquire window.
+            # tracer, event-log state, and the library, and restore the outer current-library, then let
+            # the exception propagate. Uses try/finally (not except) so a BaseException — e.g.
+            # asyncio.CancelledError — is covered too. acquire_library owns teardown for load-time
+            # failures (before this try); this block owns the post-acquire window.
             if graph_context is not None:
                 tracer_manager = GraphTracerManager.get_instance()
                 if tracer_manager is not None:
                     tracer_manager.close_tracer(pipeline_run_id)
             if event_log is not None:
                 get_report_delegate().clear_event_log(context_key=pipeline_run_id)
-            # Close the per-run registry only if open_registry actually ran. This finally also runs for
-            # failures *before* open_registry; the registry_opened guard is a clean semantic gate (close
-            # only the registry we opened). close_registry is itself idempotent via pop(..., None), so the
-            # guard is about intent, not KeyError avoidance.
-            if registry_opened:
-                get_report_delegate().close_registry(pipeline_run_id=pipeline_run_id)
             # Restore the caller's outer current-library FIRST so the guarantee survives a teardown raise,
             # then tear the library down — mirroring validate_bundle. set_current_library cannot take None,
             # so route the "no outer was set" case through clear_current_library. The `!= library_id` guard

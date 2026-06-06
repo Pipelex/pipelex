@@ -22,7 +22,6 @@ from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.hub import get_report_delegate
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.pipeline.runner import PipelexRunner
@@ -143,9 +142,9 @@ class TestCostReportRendering:
         assert "test-model" in contents
 
     async def test_direct_dry_run_suppresses_table_but_populates_usage(self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture) -> None:
-        """A DIRECT dry run assembles (zero-token) usage onto PipeOutput and matches the still-present
-        registry, but the renderer prints NOTHING because the run did no reportable work (zero tokens and
-        zero cost) — only dry runs are suppressed; a free model with real tokens would still render.
+        """A DIRECT dry run assembles (zero-token) usage onto PipeOutput, but the renderer prints NOTHING
+        because the run did no reportable work (zero tokens and zero cost) — only dry runs are suppressed;
+        a free model with real tokens would still render.
         """
         self._enable_ndjson_tracing(mocker, str(tmp_path_factory.mktemp("traces_render")))
         reporting_config = get_config().pipelex.reporting_config
@@ -166,14 +165,6 @@ class TestCostReportRendering:
         )
         # Dry runs emit zero-token synthetic usage -> no tokens and no cost -> no table printed.
         assert console.export_text() == ""
-
-        # Fidelity: the live registry (still populated in parallel until Phase 4) holds the same
-        # count of records as the usage assembled onto PipeOutput for this run.
-        registries = getattr(get_report_delegate(), "_usage_registries", None)
-        assert registries is not None, "DIRECT mode must keep a ReportingManager with per-run registries"
-        registry = registries.get(pipe_output.pipeline_run_id)
-        assert registry is not None
-        assert len(registry.get_current_tokens_usage()) == len(pipe_output.tokens_usages)
 
     async def test_no_costs_renders_nothing(self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture) -> None:
         """--no-costs assembles no usage, so the renderer prints nothing."""

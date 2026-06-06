@@ -42,7 +42,6 @@ from pipelex.hub import (
     get_current_library_id_or_none,
     get_library_manager,
     get_pipe_library,
-    get_report_delegate,
     get_telemetry_manager,
     set_current_library,
 )
@@ -225,27 +224,21 @@ class BundleValidator:
         # 3. One validation telemetry event per sweep (relocated from the CLI's _validate_core).
         get_telemetry_manager().track_event(event_name=EventName.PIPE_DRY_RUN, properties={EventProperty.NB_PIPES: len(sweepable_pipes)})
 
-        # 4. The dry-run sweep. The DRY leaf emits a synthetic zero-token LLM report, so open ONE
-        #    report registry for the whole sweep and close it in `finally`. The registry is keyed by a
-        #    UNIQUE per-sweep id (a `dry_run_`-prefixed uuid, not a constant): the ReportingManager is a
-        #    process-global singleton, so two concurrent sweeps (e.g. overlapping `/validate` API requests)
-        #    keyed by the same constant would collide on `open_registry` ("already exists"). The prefix keeps
-        #    the id self-describing if it ever surfaces in a log. The same id is threaded into every
-        #    prepare_pipe_job call below so the synthetic reports land in the registry that gets closed.
+        # 4. The dry-run sweep. Each pipe is dry-run under a UNIQUE per-sweep pipeline run id (a
+        #    `dry_run_`-prefixed uuid, not a constant — self-describing if it ever surfaces in a log).
+        #    The DRY leaf emits a synthetic zero-token LLM report; with the live registry gone (usage now
+        #    rides on PipeOutput) the sweep accumulates no per-run state on the process-global reporting
+        #    manager, so overlapping sweeps (e.g. concurrent `/validate` API requests) cannot collide.
         #    Mock inputs are built by prepare_pipe_job from this DRY + is_mock_inputs config.
         execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
             generate_graph=False,
             mock_inputs=True,
         )
         dry_run_pipeline_id = f"dry_run_{PipelineFactory.make_pipeline_run_id()}"
-        get_report_delegate().open_registry(pipeline_run_id=dry_run_pipeline_id)
-        try:
-            for pipe in sweepable_pipes:
-                results[pipe.pipe_ref] = await self._classify_pipe(
-                    pipe=pipe, library_id=library_id, execution_config=execution_config, dry_run_pipeline_id=dry_run_pipeline_id
-                )
-        finally:
-            get_report_delegate().close_registry(pipeline_run_id=dry_run_pipeline_id)
+        for pipe in sweepable_pipes:
+            results[pipe.pipe_ref] = await self._classify_pipe(
+                pipe=pipe, library_id=library_id, execution_config=execution_config, dry_run_pipeline_id=dry_run_pipeline_id
+            )
 
         # 5. Aggregate + report.
         return self._aggregate(results=results, start_time=start_time)
