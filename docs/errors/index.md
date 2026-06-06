@@ -202,6 +202,10 @@ classification rules, and the cross-boundary Temporal bridge.
 
 - [`MissingDependencyError`](missing-dependency-error.md) — Missing dependency
 
+## MockInferenceObjectFidelityError
+
+- [`MockInferenceObjectFidelityError`](mock-inference-object-fidelity-error.md) — Mock inference object fidelity
+
 ## MockInferenceUnsupportedError
 
 - [`MockInferenceUnsupportedError`](mock-inference-unsupported-error.md) — Mock inference unsupported

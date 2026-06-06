@@ -5,7 +5,7 @@ from typing import Annotated
 
 import typer
 
-from pipelex.cli.commands.run._run_core import COMMAND, execute_run
+from pipelex.cli.commands.run._run_core import COMMAND, execute_run, validate_run_flag_combination
 from pipelex.cli.method_resolver import resolve_pipe_from_exports
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 
@@ -118,24 +118,7 @@ def run_pipe_cmd(
         )
         raise typer.Exit(1)
 
-    # Validate --mock-inputs requires --dry-run
-    if mock_inputs and not dry_run:
-        typer.secho(
-            "Failed to run: --mock-inputs requires --dry-run",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    # --mock-inference fakes AI at the leaf during a LIVE run; --dry-run swaps the generator pre-dispatch
-    # (so the leaf is never reached), making the two mutually exclusive — reject rather than silently ignore.
-    if mock_inference and dry_run:
-        typer.secho(
-            "Failed to run: --mock-inference cannot be combined with --dry-run",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        raise typer.Exit(1)
+    validate_run_flag_combination(dry_run=dry_run, mock_inference=mock_inference, mock_inputs=mock_inputs)
 
     # Check installed methods' exports for additional library dirs
     try:

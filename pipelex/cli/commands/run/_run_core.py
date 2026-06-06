@@ -48,6 +48,28 @@ if TYPE_CHECKING:
 COMMAND = "run"
 
 
+def validate_run_flag_combination(*, dry_run: bool, mock_inference: bool, mock_inputs: bool) -> None:
+    """Reject illegal ``--dry-run`` / ``--mock-inference`` / ``--mock-inputs`` combinations.
+
+    Single owner of which run-flag combinations are legal, shared by the ``pipe`` / ``method`` / ``bundle``
+    run subcommands so they can't drift:
+
+    - ``--mock-inputs`` requires ``--dry-run`` — it fills missing required inputs for the dry generator
+      that ``--dry-run`` swaps in pre-dispatch; without ``--dry-run`` there is nothing for it to feed.
+    - ``--mock-inference`` cannot be combined with ``--dry-run`` — ``--dry-run`` swaps the generator
+      pre-dispatch so the leaf is never reached, which would silently ignore ``--mock-inference``.
+
+    Prints the offending combination to stderr and raises ``typer.Exit(1)``; returns ``None`` when the
+    combination is legal.
+    """
+    if mock_inputs and not dry_run:
+        typer.secho("Failed to run: --mock-inputs requires --dry-run", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+    if mock_inference and dry_run:
+        typer.secho("Failed to run: --mock-inference cannot be combined with --dry-run", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
 async def _execute_run(
     pipe_code: str | None,
     bundle_path: str | None,

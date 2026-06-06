@@ -160,14 +160,13 @@ def mock_llm_gen_text(llm_assignment: LLMAssignment) -> str:
     return _mock_text(llm_prompt=llm_assignment.llm_prompt, llm_setting=llm_assignment.llm_setting)
 
 
-def mock_llm_gen_object(object_assignment: ObjectAssignment) -> BaseModel:
-    """Leaf mock for ``llm_gen_object``: a polyfactory-built instance of the schema model + reportable usage.
+def _reconstruct_class_and_report(object_assignment: ObjectAssignment) -> type[BaseModel]:
+    """Reconstruct the object's model class from its JSON schema and report one synthetic usage event.
 
-    Built from the schema-reconstructed class (the leaf carries only the JSON schema, not the original
-    class), so format hints encoded via ``json_schema_extra`` that datamodel-code-generator drops on
-    round-trip are not honored — exotic-format schemas may yield mock data the original class would
-    reject. This is the known object-mock fidelity gap (followup-leaf-run-mode-mock.md §8); the direct
-    ``ContentGeneratorDry`` dry-run path keeps full fidelity by building the original class.
+    Shared by both object mocks. The leaf carries only the JSON schema (not the original class), so the
+    class is rebuilt via :class:`SchemaToModelFactory`. Reports exactly once — the live leaf makes one
+    ``gen_object`` call (a list is one call against a list-wrapper schema), so a single ``UsageReportEvent``
+    matches the real one-call topology that cross-worker assertions count.
     """
     llm_assignment = object_assignment.llm_assignment_for_object
     content_class = SchemaToModelFactory.make_from_json_schema(
@@ -179,26 +178,30 @@ def mock_llm_gen_object(object_assignment: ObjectAssignment) -> BaseModel:
         llm_setting=llm_assignment.llm_setting,
         llm_prompt=llm_assignment.llm_prompt,
     )
-    return build_mock_object(content_class)
+    return content_class
+
+
+def mock_llm_gen_object(object_assignment: ObjectAssignment) -> BaseModel:
+    """Leaf mock for ``llm_gen_object``: a polyfactory-built instance of the schema model + reportable usage.
+
+    Built from the schema-reconstructed class (the leaf carries only the JSON schema, not the original
+    class), so format hints encoded via ``json_schema_extra`` that datamodel-code-generator drops on
+    round-trip are not honored — exotic-format schemas may yield mock data the original class would
+    reject. ``ContentGenerator.make_object`` re-validates against the original class and re-raises that
+    failure as ``MockInferenceObjectFidelityError`` (review F2); the direct ``ContentGeneratorDry``
+    dry-run path keeps full fidelity by building the original class. Durable fix:
+    followup-leaf-run-mode-mock.md §8.
+    """
+    return build_mock_object(_reconstruct_class_and_report(object_assignment))
 
 
 def mock_llm_gen_object_list(object_assignment: ObjectAssignment) -> list[BaseModel]:
-    """Leaf mock for ``llm_gen_object_list``: ``nb_list_items`` builds + one reportable usage event.
-
-    Reports once — the live leaf makes one ``gen_object`` call against a list-wrapper schema, so a
-    single ``UsageReportEvent`` matches the real one-call topology (cross-worker assertions count
-    one usage record per LLM call).
-    """
-    llm_assignment = object_assignment.llm_assignment_for_object
-    item_class = SchemaToModelFactory.make_from_json_schema(
-        schema=object_assignment.object_class_schema,
-        class_name=object_assignment.object_class_name,
-    )
+    """Leaf mock for ``llm_gen_object_list``: ``nb_list_items`` builds + one reportable usage event."""
+    item_class = _reconstruct_class_and_report(object_assignment)
     nb_list_items = get_config().pipelex.dry_run_config.nb_list_items
-    items: list[BaseModel] = [build_mock_object(item_class) for _ in range(nb_list_items)]
-    report_mock_inference_llm_job(
-        job_metadata=llm_assignment.job_metadata,
-        llm_setting=llm_assignment.llm_setting,
-        llm_prompt=llm_assignment.llm_prompt,
-    )
-    return items
+    # Unlike ``ContentGeneratorDry.make_object_list``, the first item's ``pipe_code`` is intentionally NOT
+    # set to ``"mock_main"``: that coordination satisfies ``BundleHeaderSpec.main_pipe`` during bundle
+    # dry-validation, which runs under ``run_mode=DRY`` (``ContentGeneratorDry``, never this leaf mock).
+    # ``--mock-inference`` is a LIVE run and never drives bundle dry-validation, so there is no main_pipe
+    # check to satisfy here.
+    return [build_mock_object(item_class) for _ in range(nb_list_items)]

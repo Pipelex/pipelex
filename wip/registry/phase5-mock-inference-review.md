@@ -2,17 +2,17 @@
 
 Multi-angle code review of the Phase 5 staged changes (the `--mock-inference` flag + the shared `cogt/content_generation/dry_mock.py` leaf mocks). **No correctness bug was found** by any finder angle — the change is well-tested and the TODOS/docstrings already pre-empt most review questions. What follows is the punch-list that did survive: one real-money safety hazard, one documented runtime-crash risk, and some cleanup. Each item has a **verify** step (reproduce / pin with a failing test first) and a **solve** step.
 
-**Status:** F1 **DONE** (cheap hard guard landed, extended to web search beyond the review's original img-gen/extract scope). F2 and the rest remain a *deliberate, already-documented* deferral (TODOS §7 + [`../dry-run-refactor/followup-leaf-run-mode-mock.md`](../dry-run-refactor/followup-leaf-run-mode-mock.md)); reproduced here with a concrete remediation so the decision is explicit rather than lost. F3–F5 are mechanical and can land whenever.
+**Status:** **ALL DONE.** F1 cheap hard guard landed earlier (extended to web search beyond the review's original img-gen/extract scope). F2–F5 landed in this pass: F2's typed-error wrap on the object re-validation boundary (extended beyond the review's direct-only scope to the Temporal arm, mirroring F1's Temporal-reachable treatment) + a constrained-field regression test on both arms; F3's shared flag-combination validator; F4's intentional-omission comment; F5's object-mock dedup. The *full* leaf mock for img-gen/extract/search and the full object-fidelity fix (build against the original class) stay deferred to followup-leaf B2 (TODOS §7 + [`../dry-run-refactor/followup-leaf-run-mode-mock.md`](../dry-run-refactor/followup-leaf-run-mode-mock.md)).
 
 ## Triage
 
-| # | Finding | Type | Recommended action |
-|---|---------|------|--------------------|
-| F1 | `--mock-inference` on an img-gen / extract / **search** pipe silently calls the real provider and spends | Safety / altitude (documented) | ✅ **DONE** — cheap hard guard landed (raise at those leaves); full leaf mock stays B2 |
-| F2 | Object mock built from the schema-reconstructed class can fail re-validation against the original class | Correctness, plausible (documented) | Wrap the failure in a clear typed error now; full fidelity is B2 |
-| F3 | The `--mock-inference`/`--dry-run` + `--mock-inputs`/`--dry-run` guards are copy-pasted across the run subcommands | Cleanup | Extract one shared flag-combination validator |
-| F4 | `mock_llm_gen_object_list` omits the first-item `pipe_code="mock_main"` coordination of the dry path | Divergence, likely-irrelevant | Document why it's intentionally omitted (don't mirror) |
-| F5 | `build_mock_object` is unused by `ContentGeneratorDry.make_object`; the two object mocks duplicate `schema→report→build` | Cleanup | Optional dedup |
+| # | Finding | Type | Action taken |
+|---|---------|------|--------------|
+| F1 | `--mock-inference` on an img-gen / extract / **search** pipe silently calls the real provider and spends | Safety / altitude (documented) | ✅ **DONE** — cheap hard guard (raise at those leaves); full leaf mock stays B2 |
+| F2 | Object mock built from the schema-reconstructed class can fail re-validation against the original class | Correctness, plausible (documented) | ✅ **DONE** — typed `MockInferenceObjectFidelityError` wrap on the mock path, both DIRECT + Temporal; full fidelity stays B2 |
+| F3 | The `--mock-inference`/`--dry-run` + `--mock-inputs`/`--dry-run` guards are copy-pasted across the run subcommands | Cleanup | ✅ **DONE** — one shared `validate_run_flag_combination` in `_run_core.py`, called by all three subcommands |
+| F4 | `mock_llm_gen_object_list` omits the first-item `pipe_code="mock_main"` coordination of the dry path | Divergence, likely-irrelevant | ✅ **DONE** — verified no LIVE path asserts it; intentional-omission comment added (not mirrored) |
+| F5 | `build_mock_object` is unused by `ContentGeneratorDry.make_object`; the two object mocks duplicate `schema→report→build` | Cleanup | ✅ **DONE** — `_reconstruct_class_and_report` shared by both object mocks; dry `make_object` points at `build_mock_object` |
 
 ---
 
@@ -69,6 +69,13 @@ Multi-angle code review of the Phase 5 staged changes (the `--mock-inference` fl
 
 **Decision.** Deferred design limitation — keep it deferred, but upgrade the failure mode from "opaque pydantic crash" to "clear typed error" now, since that is a few lines and makes the documented gap self-explaining when someone hits it.
 
+**As built.**
+
+- New typed error `MockInferenceObjectFidelityError(PipelexError)` in `pipelex/cogt/content_generation/exceptions.py` — `error_domain = INPUT` (caller can fix by using `--dry-run` for this pipe), `_authors_caller_facing_message = True` (the message names the caller's own output concept class and points at `--dry-run`, no secrets). A `for_object_class(object_class_name)` classmethod owns the wording (mirrors `MockInferenceUnsupportedError.for_operation`). Docs page `docs/errors/mock-inference-object-fidelity-error.md` regenerated; error-class-location + `type_uri` uniqueness tests stay green.
+- DIRECT: a private `_revalidate_against_object_class(raw_obj, object_class, *, is_mock_inference)` helper in `content_generator.py` owns the re-validation; under `is_mock_inference` it catches `ValidationError` and re-raises the typed error (`from exc`). `make_object` / `make_object_list` both route through it. The catch is **scoped to the mock path only** — a LIVE provider's invalid output keeps its existing `ValidationError`.
+- **Extended beyond the review's direct-only scope to the Temporal arm** (mirrors how F1 covered Temporal-reachable paths). `--mock-inference` crosses the Temporal boundary (CP5), so `ContentGeneratorInWorkflow.make_object` / `make_object_list` (`temporal/tprl_content_generation/content_generator_in_workflow.py`) hit the identical re-validation boundary (lines that round-trip the activity-boundary object via `model_dump(mode="json", …)`). A parallel module-local `_revalidate_against_object_class` (same guard, `mode="json"` dump) covers both sites. The error class is workflow-safe (`exceptions.py` imports only base errors).
+- Tests: `tests/integration/pipelex/cogt/content_generation/test_mock_inference_object_fidelity.py` (DIRECT — a `StructuredContent` subclass with a custom `@field_validator` the JSON-schema round-trip drops → `make_object`/`make_object_list` raise the typed error; a plain class round-trips and validates as a control) and `tests/unit/pipelex/temporal/test_content_generator_in_workflow_object_fidelity.py` (Temporal arm via mocked `execute_activity` — object + list raise the typed error under the flag; a non-mock run keeps the raw `ValidationError`, proving the scoping). The full object-fidelity fix (thread the original class to the leaf) stays B2.
+
 ---
 
 ## F3 — Run-subcommand flag-combination guards are copy-pasted  (cleanup)
@@ -88,6 +95,8 @@ Multi-angle code review of the Phase 5 staged changes (the `--mock-inference` fl
 - Add one helper, e.g. `validate_run_flag_combination(*, dry_run, mock_inference, mock_inputs) -> None` in `pipelex/cli/commands/run/_run_core.py`, that raises `typer.Exit(1)` with the right message for each illegal combination, and call it once at the top of each subcommand in place of the inlined blocks. One owner of "which run-flag combinations are legal", three call sites that can no longer drift.
 
 **Decision.** Mechanical, low-risk; land whenever F1/F2 are touched.
+
+**As built.** `validate_run_flag_combination(*, dry_run, mock_inference, mock_inputs) -> None` added to `_run_core.py`; the inlined guard blocks in `pipe_cmd.py` / `method_cmd.py` / `bundle_cmd.py` are replaced by a single call. Behavior and messages are unchanged. The existing `test_mock_inference_cli_guard.py` (rejects `--mock-inference --dry-run` through each subcommand) stays green unchanged — it now proves each subcommand *wires* the shared validator. New `tests/unit/pipelex/cli/test_run_flag_combination.py` pins the validator's full truth table directly (both illegal combos rejected, the legal combos pass). The agent CLI is out of scope (no `--mock-inference`; its `--mock-inputs` guard uses `agent_error`, a different mechanism).
 
 ---
 
@@ -110,6 +119,8 @@ Multi-angle code review of the Phase 5 staged changes (the `--mock-inference` fl
 
 **Decision.** Lowest priority; comment-only unless verification finds a reachable path.
 
+**As built.** Verified the negative by grep: every `mock_main` site (`working_memory_factory.py`, `pipe_batch.py`, `content_generator_dry.py`, `bundle_header_spec.py`) is dry-validation only, and the leaf `mock_llm_gen_object_list` is reached solely from `llm_generate.py` under `is_mock_inference` (a LIVE path that never drives bundle dry-validation). No LIVE path asserts `pipe_code == "mock_main"`. So the assignment is **not** mirrored — a comment in `dry_mock.mock_llm_gen_object_list` records the intentional omission and why.
+
 ---
 
 ## F5 — Minor reuse  (optional cleanup)
@@ -123,6 +134,8 @@ Multi-angle code review of the Phase 5 staged changes (the `--mock-inference` fl
 
 **Decision.** Cosmetic; fold in only if F1/F2 already have the file open. Note these helpers collapse further in B2, so don't over-invest.
 
+**As built.** Both folded in (minimally). In `dry_mock.py`, a `_reconstruct_class_and_report(object_assignment)` helper now owns the shared "rebuild the schema class + report exactly one synthetic usage event" step; `mock_llm_gen_object` and `mock_llm_gen_object_list` each call it then build (1 vs `nb_list_items`). `ContentGeneratorDry.make_object` now calls `build_mock_object(object_class)` instead of inlining `DryRunFactory.make_dry_run_factory(...).build()` (the now-unused `DryRunFactory` import is dropped). Behavior-identical; covered by the existing dry tests + `test_dry_mock.py`.
+
 ---
 
 ## Suggested sequencing
@@ -133,7 +146,7 @@ Multi-angle code review of the Phase 5 staged changes (the `--mock-inference` fl
 
 ## Verification gate (before wrapping)
 
-- `make agent-check` (ruff/plxt, pyright, mypy) clean.
-- `make agent-test` green, including the new F1 guard test and the F2 constrained-field test.
-- The Temporal arm (`tests/integration/pipelex/temporal/tracing/test_mock_inference_temporal.py`) is `gha_disabled`; if F1/F2 touch the activity-side leaf path, re-verify it locally/serially with `--temporal-server none` as the as-built note describes.
-- New error classes (F1, optionally F2) appear under `docs/errors/` after `make generate-error-pages`, and the error-class-location test stays green.
+- ✅ `make agent-check` (ruff/plxt, pyright 0/0, mypy 2024 files) clean.
+- ✅ `make agent-test` green (full suite — F2/F4/F5 touch the cross-cutting dry path + the Temporal workflow content generator).
+- ✅ New `MockInferenceObjectFidelityError` (F2) appears under `docs/errors/` after `make generate-error-pages`; error-class-location + `type_uri` uniqueness tests stay green.
+- The Temporal arm (`tests/integration/pipelex/temporal/tracing/test_mock_inference_temporal.py`) is `gha_disabled` and exercises only the text path, so it is unaffected by F2's object-path change; the Temporal F2 guard is pinned by the server-free `test_content_generator_in_workflow_object_fidelity.py` unit test (mocked `execute_activity`).

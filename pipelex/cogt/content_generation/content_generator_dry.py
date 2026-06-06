@@ -4,8 +4,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
-from pipelex.cogt.content_generation.dry_mock import report_dry_llm_job
-from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
+from pipelex.cogt.content_generation.dry_mock import build_mock_object, report_dry_llm_job
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.extract.extract_output import ExtractOutput, Page
@@ -71,12 +70,10 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_object: LLMPrompt,
     ) -> BaseModelTypeVar:
-        object_factory = DryRunFactory.make_dry_run_factory(object_class)
-        # We run validators to ensure mock data is valid. Fields with format constraints
-        # (snake_case, PascalCase, etc.) should have `examples` defined in their Field()
-        # so polyfactory uses those instead of random strings.
         report_dry_llm_job(job_metadata=job_metadata, llm_setting=llm_setting_for_object, llm_prompt=llm_prompt_for_object)
-        return object_factory.build()
+        # build_mock_object runs validators so the mock is valid; fields with format constraints
+        # (snake_case, PascalCase, ...) should declare examples / mock_format in their Field().
+        return build_mock_object(object_class)
 
     @override
     @update_job_metadata
