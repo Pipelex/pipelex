@@ -12,6 +12,7 @@ This folder tracks one topic that grew as we worked it: the lifecycle of the per
 ## Open review items (Phase 1 as-built)
 
 - [`phase1-emit-decoupling-review.md`](phase1-emit-decoupling-review.md) — **multi-angle review of the Phase 1 implementation.** Correctness gaps (TEMPORAL `--no-graph` graph_spec leak, usage fast-path missing its gate, stale docs), an efficiency regression (costs-only pays full per-pipe graph serialization), and altitude items (the DIRECT/TEMPORAL gating decision has no single owner and already drifted; emit flags set via post-hoc `model_copy`). Cold-start-ready triage with a suggested sequencing into Phase 2.
+- [`cost-report-deferred-decisions.md`](cost-report-deferred-decisions.md) — **two deferred design decisions from the Phase 3 review** (the correctness/cleanup findings #1/#2/#4/#7 were already fixed in Phase 3). #3: cost reporting is now coupled to `tracing_config.is_enabled` (costs-on + tracing-off ⇒ silently no report). #6: the agent CLI gates costs on a hard-default-True param while the main CLI gates on the resolved config. Both need a deliberate call — ideally collapsed into one owner of "is cost reporting on?" when Phase 4 removes the registry.
 
 ## The trail (how we got here — findings still valid, recommendations superseded by the synthesis)
 

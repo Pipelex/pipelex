@@ -41,6 +41,17 @@ def _zero_cost_usage(job_metadata: JobMetadata) -> LLMTokensUsage:
     )
 
 
+def _free_model_usage(job_metadata: JobMetadata) -> LLMTokensUsage:
+    """A free/zero-price model: real tokens, no unit costs -> tokens but zero cost."""
+    return LLMTokensUsage(
+        job_metadata=job_metadata,
+        inference_model_name="ollama-x",
+        inference_model_id="ollama-x-id",
+        nb_tokens_by_category={TokenCategory.INPUT: 100, TokenCategory.OUTPUT: 50},
+        unit_costs={},
+    )
+
+
 @pytest.mark.asyncio(loop_scope="class")
 class TestAgentRunCostReport:
     def _patch_runner(self, mocker: MockerFixture, pipe_output: PipeOutput) -> None:
@@ -69,7 +80,27 @@ class TestAgentRunCostReport:
         assert result["cost_report"]["total_cost"] == 0.2
         assert result["cost_report"]["by_model"][0]["model"] == "claude-x"
 
-    async def test_no_cost_report_for_zero_cost_run(self, mocker: MockerFixture, job_metadata: JobMetadata, tmp_path: Path) -> None:
+    async def test_cost_report_for_free_model_run(self, mocker: MockerFixture, job_metadata: JobMetadata, tmp_path: Path) -> None:
+        """A free/zero-price model with real tokens still surfaces a cost_report (total_cost 0)."""
+        pipe_output = PipeOutput(
+            working_memory=WorkingMemory(),
+            pipeline_run_id="agent-free",
+            tokens_usages=[_free_model_usage(job_metadata)],
+        )
+        self._patch_runner(mocker, pipe_output)
+
+        result = await run_pipeline_core(
+            pipe_code="my_pipe",
+            bundle_uris=[str(tmp_path / "bundle.mthds")],
+            costs=True,
+            with_memory=True,
+        )
+
+        assert "cost_report" in result
+        assert result["cost_report"]["total_cost"] == 0.0
+        assert result["cost_report"]["by_model"][0]["nb_tokens_input"] == 100
+
+    async def test_no_cost_report_for_dry_run(self, mocker: MockerFixture, job_metadata: JobMetadata, tmp_path: Path) -> None:
         pipe_output = PipeOutput(
             working_memory=WorkingMemory(),
             pipeline_run_id="agent-dry",

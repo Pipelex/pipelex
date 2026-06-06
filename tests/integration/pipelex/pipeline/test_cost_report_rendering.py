@@ -64,6 +64,17 @@ def _non_zero_usage(job_metadata: JobMetadata) -> LLMTokensUsage:
     )
 
 
+def _free_model_usage(job_metadata: JobMetadata) -> LLMTokensUsage:
+    # Real tokens, no unit costs (a local/free model) -> token counts but total cost 0.
+    return LLMTokensUsage(
+        job_metadata=job_metadata,
+        inference_model_name="free-model",
+        inference_model_id="free-model-id",
+        nb_tokens_by_category={TokenCategory.INPUT: 100, TokenCategory.OUTPUT: 50},
+        unit_costs={},
+    )
+
+
 @pytest.mark.asyncio(loop_scope="class")
 class TestCostReportRendering:
     def _enable_ndjson_tracing(self, mocker: MockerFixture, traces_dir: str) -> None:
@@ -99,6 +110,24 @@ class TestCostReportRendering:
         assert "Total" in rendered
         assert "0.2000" in rendered  # 100 input @ $1/M + 50 output @ $2/M
 
+    async def test_renders_free_model_tokens_with_zero_cost(self, mocker: MockerFixture, job_metadata: JobMetadata) -> None:
+        """A free/zero-price model with real tokens IS rendered (token counts shown, cost 0.0000) — NOT
+        suppressed like a dry run. Gating on zero cost alone would wrongly hide a real local-model run.
+        """
+        reporting_config = get_config().pipelex.reporting_config
+        mocker.patch.object(reporting_config, "is_log_costs_to_console", True)
+        mocker.patch.object(reporting_config, "is_generate_cost_report_file_enabled", False)
+        console = _recording_console()
+        mocker.patch("pipelex.cogt.usage.cost_registry.get_console", return_value=console)
+
+        render_run_cost_report(pipeline_run_id="free-run", tokens_usages=[_free_model_usage(job_metadata)], is_generate_costs=True)
+
+        rendered = console.export_text()
+        assert "free-model" in rendered
+        assert "Total" in rendered  # the table is rendered, not suppressed
+        assert "100" in rendered  # input-joined token count still reported
+        assert "0.0000" in rendered  # cost is zero, but the table is shown anyway
+
     async def test_csv_channel_writes_file(self, mocker: MockerFixture, job_metadata: JobMetadata, tmp_path: Path) -> None:
         """The CSV channel writes a populated report file under the configured directory."""
         reporting_config = get_config().pipelex.reporting_config
@@ -115,7 +144,8 @@ class TestCostReportRendering:
 
     async def test_direct_dry_run_suppresses_table_but_populates_usage(self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture) -> None:
         """A DIRECT dry run assembles (zero-token) usage onto PipeOutput and matches the still-present
-        registry, but the renderer prints NOTHING because the total cost is zero (no zero-cost table).
+        registry, but the renderer prints NOTHING because the run did no reportable work (zero tokens and
+        zero cost) — only dry runs are suppressed; a free model with real tokens would still render.
         """
         self._enable_ndjson_tracing(mocker, str(tmp_path_factory.mktemp("traces_render")))
         reporting_config = get_config().pipelex.reporting_config
@@ -134,7 +164,7 @@ class TestCostReportRendering:
             tokens_usages=pipe_output.tokens_usages,
             is_generate_costs=True,
         )
-        # Dry runs emit zero-token synthetic usage -> total cost 0 -> no table printed.
+        # Dry runs emit zero-token synthetic usage -> no tokens and no cost -> no table printed.
         assert console.export_text() == ""
 
         # Fidelity: the live registry (still populated in parallel until Phase 4) holds the same

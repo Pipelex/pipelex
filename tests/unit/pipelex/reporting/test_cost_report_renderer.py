@@ -30,12 +30,23 @@ def _usage(job_metadata: JobMetadata) -> LLMTokensUsage:
 
 
 def _zero_cost_usage(job_metadata: JobMetadata) -> LLMTokensUsage:
-    """A dry-run-shaped usage: no tokens -> zero cost."""
+    """A dry-run-shaped usage: no tokens -> zero tokens and zero cost."""
     return LLMTokensUsage(
         job_metadata=job_metadata,
         inference_model_name="dry-model",
         inference_model_id="dry-run",
         nb_tokens_by_category={},
+        unit_costs={},
+    )
+
+
+def _free_model_usage(job_metadata: JobMetadata) -> LLMTokensUsage:
+    """A free/zero-price model: real tokens, no unit costs -> tokens but zero cost."""
+    return LLMTokensUsage(
+        job_metadata=job_metadata,
+        inference_model_name="ollama-x",
+        inference_model_id="ollama-x-id",
+        nb_tokens_by_category={TokenCategory.INPUT: 100, TokenCategory.OUTPUT: 50},
         unit_costs={},
     )
 
@@ -49,7 +60,7 @@ class TestRenderRunCostReport:
             mocker.patch.object(reporting_config, "cost_report_dir_path", str(csv_dir))
 
     def test_no_op_when_costs_off(self, mocker: MockerFixture, job_metadata: JobMetadata) -> None:
-        spy = mocker.patch("pipelex.reporting.cost_report_renderer.CostRegistry.generate_report")
+        spy = mocker.patch("pipelex.reporting.cost_report_renderer.CostRegistry.render_report")
         self._set_channels(mocker, console=True, csv=True)
 
         render_run_cost_report(pipeline_run_id=_RUN_ID, tokens_usages=[_usage(job_metadata)], is_generate_costs=False)
@@ -57,7 +68,7 @@ class TestRenderRunCostReport:
         spy.assert_not_called()
 
     def test_no_op_when_tokens_none(self, mocker: MockerFixture) -> None:
-        spy = mocker.patch("pipelex.reporting.cost_report_renderer.CostRegistry.generate_report")
+        spy = mocker.patch("pipelex.reporting.cost_report_renderer.CostRegistry.render_report")
         self._set_channels(mocker, console=True, csv=True)
 
         render_run_cost_report(pipeline_run_id=_RUN_ID, tokens_usages=None, is_generate_costs=True)
@@ -65,24 +76,36 @@ class TestRenderRunCostReport:
         spy.assert_not_called()
 
     def test_no_op_when_tokens_empty(self, mocker: MockerFixture) -> None:
-        spy = mocker.patch("pipelex.reporting.cost_report_renderer.CostRegistry.generate_report")
+        spy = mocker.patch("pipelex.reporting.cost_report_renderer.CostRegistry.render_report")
         self._set_channels(mocker, console=True, csv=True)
 
         render_run_cost_report(pipeline_run_id=_RUN_ID, tokens_usages=[], is_generate_costs=True)
 
         spy.assert_not_called()
 
-    def test_no_op_when_total_cost_zero(self, mocker: MockerFixture, job_metadata: JobMetadata) -> None:
-        """Zero-token (dry-run-shaped) usage costs nothing -> no report, even with channels on."""
-        spy = mocker.patch("pipelex.reporting.cost_report_renderer.CostRegistry.generate_report")
+    def test_no_op_when_no_reportable_usage(self, mocker: MockerFixture, job_metadata: JobMetadata) -> None:
+        """A dry-run-shaped usage (zero tokens, zero cost) does no reportable work -> no report, channels on."""
+        spy = mocker.patch("pipelex.reporting.cost_report_renderer.CostRegistry.render_report")
         self._set_channels(mocker, console=True, csv=True)
 
         render_run_cost_report(pipeline_run_id=_RUN_ID, tokens_usages=[_zero_cost_usage(job_metadata)], is_generate_costs=True)
 
         spy.assert_not_called()
 
+    def test_renders_free_model_with_tokens(self, mocker: MockerFixture, job_metadata: JobMetadata) -> None:
+        """A free/zero-price model with real tokens IS reported (cost 0) — not suppressed like a dry run."""
+        spy = mocker.patch("pipelex.reporting.cost_report_renderer.CostRegistry.render_report")
+        self._set_channels(mocker, console=True, csv=False)
+
+        render_run_cost_report(pipeline_run_id=_RUN_ID, tokens_usages=[_free_model_usage(job_metadata)], is_generate_costs=True)
+
+        spy.assert_called_once()
+        aggregated = spy.call_args.args[0]
+        assert aggregated.total_cost == 0.0
+        assert aggregated.total_nb_tokens == 150
+
     def test_no_op_when_both_channels_off(self, mocker: MockerFixture, job_metadata: JobMetadata) -> None:
-        spy = mocker.patch("pipelex.reporting.cost_report_renderer.CostRegistry.generate_report")
+        spy = mocker.patch("pipelex.reporting.cost_report_renderer.CostRegistry.render_report")
         self._set_channels(mocker, console=False, csv=False)
 
         render_run_cost_report(pipeline_run_id=_RUN_ID, tokens_usages=[_usage(job_metadata)], is_generate_costs=True)
@@ -90,21 +113,20 @@ class TestRenderRunCostReport:
         spy.assert_not_called()
 
     def test_console_channel_only(self, mocker: MockerFixture, job_metadata: JobMetadata) -> None:
-        spy = mocker.patch("pipelex.reporting.cost_report_renderer.CostRegistry.generate_report")
+        spy = mocker.patch("pipelex.reporting.cost_report_renderer.CostRegistry.render_report")
         self._set_channels(mocker, console=True, csv=False)
-        usages = [_usage(job_metadata)]
 
-        render_run_cost_report(pipeline_run_id=_RUN_ID, tokens_usages=usages, is_generate_costs=True)
+        render_run_cost_report(pipeline_run_id=_RUN_ID, tokens_usages=[_usage(job_metadata)], is_generate_costs=True)
 
         spy.assert_called_once()
+        assert spy.call_args.args[0].total_cost == 0.2  # the aggregated total, computed once
         kwargs = spy.call_args.kwargs
         assert kwargs["pipeline_run_id"] == _RUN_ID
-        assert kwargs["tokens_usages"] is usages
         assert kwargs["print_to_console"] is True
         assert kwargs["cost_report_file_path"] is None
 
     def test_csv_channel_only(self, mocker: MockerFixture, job_metadata: JobMetadata, tmp_path: Path) -> None:
-        spy = mocker.patch("pipelex.reporting.cost_report_renderer.CostRegistry.generate_report")
+        spy = mocker.patch("pipelex.reporting.cost_report_renderer.CostRegistry.render_report")
         self._set_channels(mocker, console=False, csv=True, csv_dir=tmp_path)
 
         render_run_cost_report(pipeline_run_id=_RUN_ID, tokens_usages=[_usage(job_metadata)], is_generate_costs=True)

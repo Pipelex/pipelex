@@ -104,8 +104,9 @@ async def run_pipeline_core(
     side_effects: dict[str, Any] = {}
 
     # Cost report: surfaced as a structured `cost_report` object in the JSON output (machine-first;
-    # no Rich table on stderr like the human CLI). build_cost_summary returns None for zero-cost runs
-    # (dry runs emit zero-token usage), so a dry run carries no cost_report. It rides the side-effect
+    # no Rich table on stderr like the human CLI). build_cost_summary returns None only for runs that did
+    # no reportable work (dry runs: zero tokens and zero cost), so a real run on a free/zero-price model
+    # still carries a cost_report (with total_cost 0) while a dry run carries none. It rides the side-effect
     # envelope: on disk always, and in the stdout result under --with-memory. The markdown renderer
     # ignores the key, so the cost report is JSON-only.
     if costs and pipe_output.tokens_usages:
