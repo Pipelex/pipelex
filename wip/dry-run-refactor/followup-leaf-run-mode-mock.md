@@ -5,6 +5,8 @@
 > **Design rationale:** [`D-plan.md`](./D-plan.md) §3.5 (run mode ⟂ backend) and §4.8 (leaf-level mock). **Risks:** D-plan §8 (object-mock fidelity, req-1 fidelity regressions).
 >
 > **Depends on:** the consolidation ([`consolidation-as-built.md`](./consolidation-as-built.md)) is *not* a hard prerequisite (this is a separable cogt/operator refactor), but the Temporal-validation follow-up builds on **both**, so sequence this after the consolidation lands. **Branch off the same D-plan.**
+>
+> **⚠️ Coordinate with the registry branch's Phase 5 (`fix/For-API-update`, decided 2026-06-06).** That branch ships `--mock-inference` / `is_mock_inference` as an *interim* trigger, deliberately built **leaf-first so it lands B1's core ahead of time**: a shared `cogt/content_generation/dry_mock.py` + a per-leaf dry branch keyed on a per-run flag carried on `JobMetadata`. So when this follow-up runs, **B1 collapses to "re-key that helper from `is_mock_inference` → `run_mode`"** (carrier + helper already exist — verify before building from scratch), and **B2 settles the fate of `is_mock_inference`** (retire vs keep a thin reportable-mock — see B2). One distinction to preserve when re-keying: `--mock-inference` emits *non-zero* synthetic usage so a cost report renders; `--dry-run` stays zero-token and Phase 3 *suppresses* its report. See that branch's `TODOS.md` Phase 5 + §7.
 
 Goal: move the LIVE/DRY decision **down to the cogt leaf** so DRY honors the configured backend — DRY-on-Temporal dispatches `act_llm_gen_*` and mocks **inside** the activity, retiring the "DRY → local in-process" shortcut. Separable cogt/operator refactor (§4.8). **Resolve the Pre-flight items before starting.**
 
@@ -31,6 +33,8 @@ Resolve **before** the phase that depends on it. Record the answer in the releva
 
 ## Phase B1 — Thread `run_mode` to the leaf + add the leaf DRY branch (§4.8)
 
+> **Likely already done in large part by the registry branch's Phase 5.** If `JobMetadata.is_mock_inference`, `cogt/content_generation/dry_mock.py`, and the per-leaf dry branch already exist, B1 reduces to: (1) carry `run_mode` on `JobMetadata` alongside `is_mock_inference`, and (2) re-key the leaf branch from `is_mock_inference` → `run_mode==DRY`. Don't rebuild the helper.
+
 - [ ] Confirm the funnel by grep: `ContentGenerator.make_llm_text` and `ContentGeneratorInWorkflow.make_llm_text` both build `LLMAssignment` and converge on `llm_gen_text(assignment)` (inline vs via `act_llm_gen_text`).
 - [ ] Carry `run_mode` on `JobMetadata` (or the confirmed carrier); single-writer from `prepare_pipe_job` / `PipeRunParams`.
 - [ ] *Tests first:* per-leaf DRY-branch unit tests; the object-mock-from-schema fidelity test on a representative `StructuredContent`.
@@ -39,8 +43,9 @@ Resolve **before** the phase that depends on it. Record the answer in the releva
 
 ## Phase B2 — Collapse the operator dry path (§4.8)
 
-- [ ] Remove the pipe-level `ContentGeneratorDry()` swap from each operator's `_dry_run_pipe` (`PipeLLM`, `PipeImgGen`, `PipeExtract`/`PipeOcr`, templating operators — grep for `ContentGeneratorDry()` and `_dry_run_pipe`). Route DRY through the hub content generator with `run_mode` threaded.
-- [ ] Re-express the boot `not needs_inference` fallback as force-`run_mode=DRY`; apply the confirmed `ContentGeneratorDry` disposition.
+- [ ] Remove the pipe-level `ContentGeneratorDry()` swap from each operator's `_dry_run_operator_pipe` (`PipeLLM`, `PipeCompose`, `PipeImgGen`, `PipeExtract`, `PipeStructure` — grep for `ContentGeneratorDry()`). Route DRY through the hub content generator with `run_mode` threaded.
+- [ ] Re-express the boot `not needs_inference` fallback (`pipelex.py:368`) as force-`run_mode=DRY`; apply the confirmed `ContentGeneratorDry` disposition.
+- [ ] **Settle `is_mock_inference` / `--mock-inference`** (the registry branch's interim trigger). Now that `run_mode=DRY` honors the backend, **either** (a) *fully retire* the flag, its `JobMetadata` field, its CLI option, and the leaf branch's `is_mock_inference` arm — `run_mode=DRY` becomes the sole trigger — and re-key the registry branch's `temporal-e2e-validate` Tier 8b to assert on assembled `tokens_usages` (plain DRY emits zero-token usage, which Phase 3 *suppresses*, so the rendered table can't be asserted under DRY); **or** (b) *keep a thin reportable-mock* (the non-zero-synthetic-usage arm) precisely so Tier 8b can still validate the rendered cost report cheaply. Pick based on whether cheap rendered-report validation is worth one surviving flag. (Cross-ref: registry branch `TODOS.md` §7.)
 - [ ] `PipeSignature._dry_run_pipe` and controller dry behavior unchanged (no leaf op).
 - [ ] Verify **direct + DRY** outcomes unchanged: full `make agent-test` green + spot-check a dry `validate --all` and a dry single-pipe run.
 
