@@ -160,10 +160,6 @@ class ReportingManager(ReportingProtocol):
         self._try_add_to_registry(pipeline_run_id, llm_tokens_usage)
         self._emit_usage_event(llm_job, llm_tokens_usage)
 
-        if self._reporting_config.is_log_costs_to_console:
-            llm_token_cost_report = CostRegistry.complete_cost_report(tokens_usage=llm_tokens_usage)
-            log.verbose(llm_token_cost_report, title="Token Cost report")
-
     def _report_img_gen_job(self, img_gen_job: ImgGenJob):
         img_gen_tokens_usage = img_gen_job.job_report.img_gen_tokens_usage
 
@@ -174,10 +170,6 @@ class ReportingManager(ReportingProtocol):
         pipeline_run_id = img_gen_job.job_metadata.pipeline_run_id
         self._try_add_to_registry(pipeline_run_id, img_gen_tokens_usage)
         self._emit_usage_event(img_gen_job, img_gen_tokens_usage)
-
-        if self._reporting_config.is_log_costs_to_console:
-            img_gen_token_cost_report = CostRegistry.complete_cost_report(tokens_usage=img_gen_tokens_usage)
-            log.verbose(img_gen_token_cost_report, title="Token Cost report")
 
     def _report_extract_job(self, extract_job: ExtractJob):
         extract_tokens_usage = extract_job.job_report.extract_tokens_usage
@@ -190,10 +182,6 @@ class ReportingManager(ReportingProtocol):
         self._try_add_to_registry(pipeline_run_id, extract_tokens_usage)
         self._emit_usage_event(extract_job, extract_tokens_usage)
 
-        if self._reporting_config.is_log_costs_to_console:
-            extract_token_cost_report = CostRegistry.complete_cost_report(tokens_usage=extract_tokens_usage)
-            log.verbose(extract_token_cost_report, title="Token Cost report")
-
     def _report_search_job(self, search_job: SearchJob):
         search_tokens_usage = search_job.job_report.search_tokens_usage
 
@@ -204,10 +192,6 @@ class ReportingManager(ReportingProtocol):
         pipeline_run_id = search_job.job_metadata.pipeline_run_id
         self._try_add_to_registry(pipeline_run_id, search_tokens_usage)
         self._emit_usage_event(search_job, search_tokens_usage)
-
-        if self._reporting_config.is_log_costs_to_console:
-            search_token_cost_report = CostRegistry.complete_cost_report(tokens_usage=search_tokens_usage)
-            log.verbose(search_token_cost_report, title="Token Cost report")
 
     ############################################################
     # ReportingProtocol

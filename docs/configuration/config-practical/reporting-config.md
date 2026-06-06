@@ -15,12 +15,12 @@ The reporting configuration controls how Pipelex generates and manages cost repo
 ### Console Logging
 
 ```toml
-is_log_costs_to_console = false
+is_log_costs_to_console = true
 ```
 
-- Controls whether costs are logged to the console in **real-time**
-- When enabled, displays token cost reports after each LLM operation (and other operations with costs)
-- Default: `false`
+- Controls whether the end-of-run cost table is printed to the console
+- When enabled (and `--costs` is on), prints a single cost-by-model table after the pipeline finishes
+- Default: `true` — library embedders who don't want console output can set it to `false`
 
 ### Cost Report File Generation
 

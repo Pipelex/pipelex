@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from pipelex.cli.agent_cli.commands.run._output_helpers import build_run_output
+from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.config import get_config
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -101,6 +102,16 @@ async def run_pipeline_core(
     # leaks into the compact stdout output.  It is written to the on-disk
     # JSON file and, when with_memory is True, included in the returned dict.
     side_effects: dict[str, Any] = {}
+
+    # Cost report: surfaced as a structured `cost_report` object in the JSON output (machine-first;
+    # no Rich table on stderr like the human CLI). build_cost_summary returns None for zero-cost runs
+    # (dry runs emit zero-token usage), so a dry run carries no cost_report. It rides the side-effect
+    # envelope: on disk always, and in the stdout result under --with-memory. The markdown renderer
+    # ignores the key, so the cost report is JSON-only.
+    if costs and pipe_output.tokens_usages:
+        cost_summary = CostRegistry.build_cost_summary(tokens_usages=pipe_output.tokens_usages)
+        if cost_summary is not None:
+            side_effects["cost_report"] = cost_summary
 
     # Generate and save graph visualizations if requested
     if graph and pipe_output.graph_spec:

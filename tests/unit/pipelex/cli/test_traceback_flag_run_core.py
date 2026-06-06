@@ -85,7 +85,6 @@ class TestTracebackFlagInExecuteRunInnerExcepts:
                             dry_run=False,
                             mock_inputs=False,
                             library_dir=None,
-                            cost_report=None,
                         )
                     )
 
@@ -115,7 +114,6 @@ class TestTracebackFlagInExecuteRunInnerExcepts:
                     dry_run=False,
                     mock_inputs=False,
                     library_dir=None,
-                    cost_report=None,
                 )
             )
 
@@ -144,7 +142,6 @@ class TestTracebackFlagInExecuteRunInnerExcepts:
                     dry_run=False,
                     mock_inputs=False,
                     library_dir=None,
-                    cost_report=None,
                 )
             )
 
@@ -173,7 +170,6 @@ class TestTracebackFlagInExecuteRunInnerExcepts:
                     dry_run=False,
                     mock_inputs=False,
                     library_dir=None,
-                    cost_report=None,
                 )
             )
 

@@ -50,12 +50,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
             else:
                 log.verbose(f"No report to generate for pipeline '{pipeline_run_id}'")
             return
-        cost_registry = CostRegistry()
-        for tokens_usage in tokens_usages:
-            cost_report = cls.complete_cost_report(tokens_usage=tokens_usage)
-            cost_registry.root.append(cost_report)
-
-        records = cost_registry.to_records()
+        records, grouped_by_model, model_types = cls._aggregate_by_model(tokens_usages=tokens_usages)
 
         # Use LLMTokenCostReportField for field names (same string values as ImgGenTokenCostReportField)
         report_field = LLMTokenCostReportField
@@ -74,43 +69,6 @@ class CostRegistry(RootModel[CostRegistryRoot]):
             input_cached_cost=total_cost_input_cached,
             output_cost=total_cost_output,
         )
-
-        # Calculate costs per model - group by model name
-        grouped_by_model: dict[str, dict[str, float]] = {}
-        model_types: dict[str, str] = {}
-        for record in records:
-            model_name = (
-                record.get(report_field.LLM_NAME)
-                or record.get(ImgGenTokenCostReportField.IMG_GEN_NAME)
-                or record.get(ExtractTokenCostReportField.EXTRACT_NAME)
-                or record.get(SearchTokenCostReportField.SEARCH_NAME, "unknown")
-            )
-            model_type = record.get(report_field.MODEL_TYPE, "llm")
-            model_types[model_name] = model_type
-            if model_name not in grouped_by_model:
-                grouped_by_model[model_name] = {
-                    report_field.NB_TOKENS_INPUT_CACHED: 0,
-                    report_field.NB_TOKENS_INPUT_NON_CACHED: 0,
-                    report_field.NB_TOKENS_INPUT_JOINED: 0,
-                    report_field.NB_TOKENS_OUTPUT: 0,
-                    report_field.COST_INPUT_CACHED: 0.0,
-                    report_field.COST_INPUT_NON_CACHED: 0.0,
-                    report_field.COST_INPUT_JOINED: 0.0,
-                    report_field.COST_OUTPUT: 0.0,
-                }
-
-            # Aggregate values
-            for field in [
-                report_field.NB_TOKENS_INPUT_CACHED,
-                report_field.NB_TOKENS_INPUT_NON_CACHED,
-                report_field.NB_TOKENS_INPUT_JOINED,
-                report_field.NB_TOKENS_OUTPUT,
-                report_field.COST_INPUT_CACHED,
-                report_field.COST_INPUT_NON_CACHED,
-                report_field.COST_INPUT_JOINED,
-                report_field.COST_OUTPUT,
-            ]:
-                grouped_by_model[model_name][field] += record.get(field, 0)
 
         if not grouped_by_model:
             msg = "Empty report aggregation by model name"
@@ -206,6 +164,109 @@ class CostRegistry(RootModel[CostRegistryRoot]):
     @classmethod
     def compute_total_cost(cls, input_non_cached_cost: float, input_cached_cost: float, output_cost: float) -> float:
         return input_non_cached_cost + input_cached_cost + output_cost
+
+    @classmethod
+    def _aggregate_by_model(
+        cls,
+        tokens_usages: Sequence[TokensUsage],
+    ) -> tuple[list[dict[str, Any]], dict[str, dict[str, float]], dict[str, str]]:
+        """Build flat per-call records plus a per-model aggregation from token usages.
+
+        Shared by ``generate_report`` (renders them as a Rich table / CSV) and ``build_cost_summary``
+        (serializes them for the agent CLI JSON output). Returns ``(records, grouped_by_model, model_types)``.
+        """
+        cost_registry = cls()
+        for tokens_usage in tokens_usages:
+            cost_registry.root.append(cls.complete_cost_report(tokens_usage=tokens_usage))
+        records = cost_registry.to_records()
+
+        report_field = LLMTokenCostReportField
+        grouped_by_model: dict[str, dict[str, float]] = {}
+        model_types: dict[str, str] = {}
+        for record in records:
+            model_name = (
+                record.get(report_field.LLM_NAME)
+                or record.get(ImgGenTokenCostReportField.IMG_GEN_NAME)
+                or record.get(ExtractTokenCostReportField.EXTRACT_NAME)
+                or record.get(SearchTokenCostReportField.SEARCH_NAME, "unknown")
+            )
+            model_types[model_name] = record.get(report_field.MODEL_TYPE, "llm")
+            if model_name not in grouped_by_model:
+                grouped_by_model[model_name] = {
+                    report_field.NB_TOKENS_INPUT_CACHED: 0,
+                    report_field.NB_TOKENS_INPUT_NON_CACHED: 0,
+                    report_field.NB_TOKENS_INPUT_JOINED: 0,
+                    report_field.NB_TOKENS_OUTPUT: 0,
+                    report_field.COST_INPUT_CACHED: 0.0,
+                    report_field.COST_INPUT_NON_CACHED: 0.0,
+                    report_field.COST_INPUT_JOINED: 0.0,
+                    report_field.COST_OUTPUT: 0.0,
+                }
+            for field in [
+                report_field.NB_TOKENS_INPUT_CACHED,
+                report_field.NB_TOKENS_INPUT_NON_CACHED,
+                report_field.NB_TOKENS_INPUT_JOINED,
+                report_field.NB_TOKENS_OUTPUT,
+                report_field.COST_INPUT_CACHED,
+                report_field.COST_INPUT_NON_CACHED,
+                report_field.COST_INPUT_JOINED,
+                report_field.COST_OUTPUT,
+            ]:
+                grouped_by_model[model_name][field] += record.get(field, 0)
+        return records, grouped_by_model, model_types
+
+    @classmethod
+    def compute_total_cost_of_usages(cls, tokens_usages: Sequence[TokensUsage]) -> float:
+        """Sum the real (unscaled) total cost across a list of token usages.
+
+        Used to gate cost reporting on a non-zero total: dry runs report zero-token usage, so their
+        total cost is 0 and no cost report (table, CSV, or JSON) should be produced.
+        """
+        total_cost = 0.0
+        for tokens_usage in tokens_usages:
+            cost_report = cls.complete_cost_report(tokens_usage=tokens_usage)
+            total_cost += cls.compute_total_cost(
+                input_non_cached_cost=cost_report.costs_by_token_category.get(CostCategory.INPUT_NON_CACHED, 0),
+                input_cached_cost=cost_report.costs_by_token_category.get(CostCategory.INPUT_CACHED, 0),
+                output_cost=cost_report.costs_by_token_category.get(CostCategory.OUTPUT, 0),
+            )
+        return total_cost
+
+    @classmethod
+    def build_cost_summary(cls, tokens_usages: Sequence[TokensUsage]) -> dict[str, Any] | None:
+        """Build a JSON-serializable cost summary (real/unscaled USD) for machine consumers.
+
+        Returns ``None`` when the total cost is zero (dry runs, or runs with no priced usage), so callers
+        naturally omit the cost report in those cases. Otherwise returns
+        ``{"total_cost": float, "by_model": [{model, model_type, nb_tokens_input, nb_tokens_output, cost}, ...]}``.
+        """
+        records, grouped_by_model, model_types = cls._aggregate_by_model(tokens_usages=tokens_usages)
+        report_field = LLMTokenCostReportField
+        total_cost = cls.compute_total_cost(
+            input_non_cached_cost=sum(record.get(report_field.COST_INPUT_NON_CACHED, 0) for record in records),
+            input_cached_cost=sum(record.get(report_field.COST_INPUT_CACHED, 0) for record in records),
+            output_cost=sum(record.get(report_field.COST_OUTPUT, 0) for record in records),
+        )
+        if not total_cost:
+            return None
+
+        by_model: list[dict[str, Any]] = []
+        for model_name, aggregated_data in grouped_by_model.items():
+            model_cost = cls.compute_total_cost(
+                input_non_cached_cost=aggregated_data[report_field.COST_INPUT_NON_CACHED],
+                input_cached_cost=aggregated_data[report_field.COST_INPUT_CACHED],
+                output_cost=aggregated_data[report_field.COST_OUTPUT],
+            )
+            by_model.append(
+                {
+                    "model": model_name,
+                    "model_type": model_types.get(model_name, "llm"),
+                    "nb_tokens_input": int(aggregated_data[report_field.NB_TOKENS_INPUT_JOINED]),
+                    "nb_tokens_output": int(aggregated_data[report_field.NB_TOKENS_OUTPUT]),
+                    "cost": model_cost,
+                }
+            )
+        return {"total_cost": total_cost, "by_model": by_model}
 
     @classmethod
     def compute_cost_report(cls, tokens_usage: TokensUsage) -> TokenCostReport:

@@ -77,18 +77,11 @@ def run_pipe_cmd(
             help="Concept ref (e.g. 'document_qa.ReferenceCount') used to resolve a pipe whose output is declared as 'Dynamic'.",
         ),
     ] = None,
-    cost_report: Annotated[
-        bool | None,
-        typer.Option(
-            "--cost-report/--no-cost-report",
-            help="Override config: --cost-report forces the cost table on; --no-cost-report skips reporting entirely (no table and no CSV file).",
-        ),
-    ] = None,
     costs: Annotated[
         bool | None,
         typer.Option(
             "--costs/--no-costs",
-            help="Override config: emit usage (cost) tracing events. The cost report is still controlled by --cost-report. Default on.",
+            help="Override config: emit usage (cost) tracing events and render the end-of-run cost report. Default on.",
         ),
     ] = None,
     save_csv: Annotated[
@@ -157,7 +150,6 @@ def run_pipe_cmd(
         dry_run=dry_run,
         mock_inputs=mock_inputs,
         library_dir=library_dir,
-        cost_report=cost_report,
         costs=costs,
         telemetry_command_label=f"{COMMAND} pipe",
         temporal=temporal,

@@ -194,7 +194,7 @@ is_reporting_enabled = true
 
 [pipelex.reporting_config]
 # Cost reporting settings
-is_log_costs_to_console = false
+is_log_costs_to_console = true
 is_generate_cost_report_file_enabled = false
 cost_report_dir_path = "reports"
 cost_report_base_name = "cost_report"

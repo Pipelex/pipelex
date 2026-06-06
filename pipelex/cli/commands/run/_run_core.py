@@ -26,12 +26,13 @@ from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
-from pipelex.hub import get_console, get_report_delegate, get_telemetry_manager
+from pipelex.hub import get_console, get_telemetry_manager
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexRunner
+from pipelex.reporting.cost_report_renderer import render_run_cost_report
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.exceptions import JsonTypeError
@@ -61,7 +62,6 @@ async def _execute_run(
     dry_run: bool,
     mock_inputs: bool,
     library_dir: list[str] | None,
-    cost_report: bool | None,
     costs: bool | None = None,
     dynamic_output_concept_ref: str | None = None,
     *,
@@ -288,19 +288,13 @@ async def _execute_run(
             raise typer.Exit(1) from csv_exc
         log.verbose(f"Main stuff CSV saved to: {save_csv}")
 
-    reporting_config = get_config().pipelex.reporting_config
-    # --no-cost-report (cost_report is False) skips the report entirely: no table, no CSV.
-    # Otherwise: console follows the flag (if given) or config; CSV follows config.
-    if cost_report is not False:
-        print_to_console = cost_report or reporting_config.is_log_costs_to_console
-        if print_to_console or reporting_config.is_generate_cost_report_file_enabled:
-            try:
-                get_report_delegate().generate_report(
-                    pipeline_run_id=response.pipeline_run_id,
-                    print_to_console=print_to_console,
-                )
-            except (OSError, PipelexError) as cost_report_error:
-                log.warning(f"Cost report generation failed (run succeeded): {cost_report_error}")
+    # Render the end-of-run cost report from the usage assembled onto pipe_output (event-sourced),
+    # gated by the resolved --costs. Channels (console / CSV) follow the reporting config (D6).
+    render_run_cost_report(
+        pipeline_run_id=response.pipeline_run_id,
+        tokens_usages=pipe_output.tokens_usages,
+        is_generate_costs=execution_config.is_generate_costs,
+    )
 
     # Print completion recap
     console = get_console()
@@ -338,7 +332,6 @@ def execute_run(
     dry_run: bool,
     mock_inputs: bool,
     library_dir: list[str] | None,
-    cost_report: bool | None = None,
     costs: bool | None = None,
     telemetry_command_label: str = COMMAND,
     temporal: bool | None = None,
@@ -372,7 +365,6 @@ def execute_run(
                     dry_run=dry_run,
                     mock_inputs=mock_inputs,
                     library_dir=library_dir,
-                    cost_report=cost_report,
                     costs=costs,
                     dynamic_output_concept_ref=dynamic_output_concept_ref,
                     save_csv=save_csv,
