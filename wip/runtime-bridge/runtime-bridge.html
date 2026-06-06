@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Framework-agnostic Pipelex runtime bridge</title>
+<style>
+  :root {
+    --bg: #0e1116;
+    --panel: #161b22;
+    --panel-2: #1c2330;
+    --ink: #e6edf3;
+    --ink-dim: #9aa6b2;
+    --accent: #79c0ff;
+    --accent-2: #d2a8ff;
+    --good: #7ee787;
+    --warn: #f5b352;
+    --bad: #ff7b72;
+    --line: #30363d;
+    --kbd: #21262d;
+  }
+  html { color-scheme: dark; }
+  body {
+    margin: 0; padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.55;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 28px 96px; }
+  header.title { border-bottom: 1px solid var(--line); margin-bottom: 24px; padding-bottom: 16px; }
+  header.title h1 { margin: 0 0 6px; font-size: 28px; line-height: 1.25; }
+  header.title p.lede { margin: 0; color: var(--ink-dim); font-size: 15px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 14px; font-size: 13px; color: var(--ink-dim); }
+  .pill { display: inline-block; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; color: var(--ink); }
+  .pill.added { color: var(--good); border-color: rgba(126,231,135,.4); }
+  .pill.changed { color: var(--accent); border-color: rgba(121,192,255,.4); }
+  .pill.moved { color: var(--accent-2); border-color: rgba(210,168,255,.4); }
+  h2 { margin: 40px 0 12px; font-size: 21px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+  h3 { margin: 26px 0 8px; font-size: 17px; color: var(--accent); }
+  h4 { margin: 18px 0 6px; font-size: 13px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: .04em; }
+  p { margin: 8px 0 12px; }
+  ul, ol { margin: 8px 0 14px; padding-left: 22px; }
+  li { margin: 4px 0; }
+  a { color: var(--accent); }
+  code, pre, kbd { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 13px; }
+  code { background: var(--kbd); border: 1px solid var(--line); padding: 1px 5px; border-radius: 4px; }
+  pre { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow: auto; margin: 10px 0 16px; line-height: 1.45; }
+  pre code { background: none; border: none; padding: 0; font-size: 12.5px; }
+  .lede-box { background: linear-gradient(180deg, var(--panel-2), var(--panel)); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; margin: 18px 0 8px; }
+  .lede-box p:first-child { margin-top: 0; }
+  .lede-box p:last-child { margin-bottom: 0; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 820px) { .grid-2 { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+  .card h3 { margin-top: 0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 18px; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--ink-dim); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  td code { white-space: nowrap; }
+  .figure { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin: 16px 0; }
+  .figure .cap { color: var(--ink-dim); font-size: 12.5px; margin-top: 10px; text-align: center; }
+  .figure .mermaid { display: flex; justify-content: center; }
+  /* diff styling */
+  pre.diff { line-height: 1.5; }
+  pre.diff .add { color: var(--good); display: block; background: rgba(126,231,135,.08); }
+  pre.diff .del { color: var(--bad); display: block; background: rgba(255,123,114,.08); }
+  pre.diff .ctx { color: var(--ink-dim); display: block; }
+  pre.diff .hd { color: var(--accent-2); display: block; }
+  pre.diff .cmt { color: #6e7681; display: block; }
+  /* callouts */
+  .note { border-left: 3px solid var(--accent); background: rgba(121,192,255,.06); padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; }
+  .note.good { border-left-color: var(--good); background: rgba(126,231,135,.06); }
+  .note.warn { border-left-color: var(--warn); background: rgba(245,179,82,.06); }
+  .note.bad  { border-left-color: var(--bad);  background: rgba(255,123,114,.06); }
+  .note p:first-child { margin-top: 0; } .note p:last-child { margin-bottom: 0; }
+  .tag { font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-dim); }
+  .tag.ok { color: var(--good); border-color: rgba(126,231,135,.4); }
+  .tag.fix { color: var(--accent); border-color: rgba(121,192,255,.4); }
+  .tag.defer { color: var(--warn); border-color: rgba(245,179,82,.4); }
+  /* details */
+  details { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin: 10px 0; padding: 0 16px; }
+  details[open] { padding-bottom: 6px; }
+  summary { cursor: pointer; padding: 12px 0; font-weight: 600; color: var(--ink); list-style: none; display: flex; align-items: center; gap: 8px; }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸"; color: var(--accent); transition: transform .15s ease; }
+  details[open] summary::before { transform: rotate(90deg); }
+  /* tabs */
+  .tabs { margin: 14px 0; }
+  .tab-bar { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 0; }
+  .tab-btn { background: transparent; border: 1px solid transparent; border-bottom: none; color: var(--ink-dim); padding: 8px 14px; cursor: pointer; font-size: 13px; border-radius: 8px 8px 0 0; font-family: inherit; }
+  .tab-btn.active { color: var(--ink); background: var(--panel); border-color: var(--line); }
+  .tab-panel { display: none; border: 1px solid var(--line); border-top: none; border-radius: 0 0 8px 8px; padding: 4px 16px 8px; background: var(--panel); }
+  .tab-panel.active { display: block; }
+  .tab-panel pre { background: var(--bg); }
+  .small { font-size: 12.5px; color: var(--ink-dim); }
+  hr { border: none; border-top: 1px solid var(--line); margin: 28px 0; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: "dark",
+    securityLevel: "loose",
+    themeVariables: {
+      background: "#161b22", primaryColor: "#1c2330", primaryTextColor: "#e8eaf0",
+      primaryBorderColor: "#2c3142", lineColor: "#6ea8fe", fontFamily: "ui-monospace, monospace",
+      fontSize: "13px"
+    },
+    flowchart: { curve: "basis", htmlLabels: true }
+  });
+  function showTab(group, idx, btn) {
+    document.querySelectorAll('[data-tabgroup="' + group + '"] .tab-btn').forEach((b, i) => b.classList.toggle('active', i === idx));
+    document.querySelectorAll('[data-tabgroup="' + group + '"] .tab-panel').forEach((p, i) => p.classList.toggle('active', i === idx));
+  }
+</script>
+</head>
+<body>
+<div class="wrap">
+
+<header class="title">
+  <h1>Framework-agnostic Pipelex runtime bridge</h1>
+  <p class="lede"><strong>Mistral Workflows and Temporal are both execution frameworks that embed Pipelex — and they need the same things from it.</strong> The runtime bridge is the single surface that gives them those things, so each one stops re-implementing the handshake.</p>
+  <div class="meta">
+    <span class="pill">PR #959 + #966</span>
+    <span class="pill">branch <code>feature/Runtime-bridge-extraction</code></span>
+    <span class="pill">base <code>dev</code></span>
+    <span class="pill added">new package <code>pipelex/runtime_bridge/</code></span>
+    <span class="pill">~795 lines of core code</span>
+  </div>
+</header>
+
+<div class="lede-box">
+  <p><strong>The problem.</strong> Pipelex never runs in a vacuum — it runs <em>inside</em> an execution framework. Two of them matter to us today: <strong>Mistral Workflows</strong> and <strong>Temporal</strong>. They look nothing alike, but the moment either one wants to run a Pipelex pipe from inside one of its own activities, it asks Pipelex for the <em>exact same things</em>, in the same order:</p>
+  <ul>
+    <li><strong>boot</strong> the Pipelex runtime (once, safely, even under concurrency);</li>
+    <li><strong>validate</strong> the incoming request;</li>
+    <li><strong>load</strong> the pipe's definition (which may travel inside the request itself);</li>
+    <li><strong>hydrate</strong> a job from plain JSON inputs;</li>
+    <li><strong>dispatch</strong> the pipe;</li>
+    <li><strong>serialize</strong> the result back into something that survives the wire.</li>
+  </ul>
+  <p>That handshake was being copy-pasted into every framework — and quietly drifting apart, so a fix or a hardening landing in one copy rotted in the others.</p>
+  <p><strong>What we did.</strong> We named that shared handshake and gave it one home — the <em>runtime bridge</em>. Now Mistral Workflows, Temporal, a future plugin, or plain Python all ask for what they need through one function and one JSON-safe input type:</p>
+  <pre><code>from pipelex.runtime_bridge.bridge import run_pipe_via_bridge, PipelexPipeRunInput
+
+output = await run_pipe_via_bridge(
+    PipelexPipeRunInput(pipe_code=..., inputs={...}, execution_mode=...)
+)</code></pre>
+  <p>Input and output are <code>extra="forbid"</code> pydantic models, so the boundary survives a serialization hop across a worker/activity without leaking Pipelex internals. <strong>The diff touches ~140 files, but the code core is small and concentrated</strong> — most of the line count is a vendored skill and triage notes that are explicitly out of scope.</p>
+</div>
+
+<h2>Why we built it</h2>
+
+<p>Pipelex is increasingly embedded inside <em>other people's</em> execution engines. Three live consumers already exist: our own raw-Temporal worker path, the new Mistral Workflows plugin, and plain in-process Python. Each one needs to take a serialized request from somewhere (an activity argument, an HTTP body) and turn it into a running pipe. That request-to-pipe path is identical every time — and was being copied every time.</p>
+
+<div class="grid-2">
+  <div class="card">
+    <h3 style="color:var(--bad)">Before — N hosts, N copies</h3>
+    <p class="small">Each host re-implements boot, validation, working-memory hydration, dispatch, and result serialization. Bug fixes and hardening land in one copy and rot in the others. The optional Temporal SDK leaks into import paths that don't need it.</p>
+  </div>
+  <div class="card">
+    <h3 style="color:var(--good)">After — one boundary</h3>
+    <p class="small">Every host goes through <code>run_pipe_via_bridge</code> and the same JSON-safe types. Boot/validate/hydrate/dispatch live once. Host SDKs (<code>temporalio</code>, <code>mistralai</code>) are lazy-imported only inside the matching mode branch.</p>
+  </div>
+</div>
+
+<div class="figure">
+  <div class="mermaid">
+flowchart LR
+  subgraph hosts["host runtimes (callers)"]
+    direction TB
+    M["Mistral Workflows<br/>activity"]
+    T["raw Temporal<br/>worker"]
+    P["plain Python /<br/>future plugin"]
+  end
+  hosts ==> BR{{"run_pipe_via_bridge<br/>(one entry point)"}}
+  BR --> IN["PipelexPipeRunInput<br/>PipelexPipeRunOutput<br/><i>JSON-safe, extra=forbid</i>"]
+  BR --> CORE["boot · validate · scope library<br/>· hydrate PipeJob · dispatch"]
+  CORE --> MODES{{"execution_mode"}}
+  MODES --> D["DIRECT<br/>in-process"]
+  MODES --> TB["TEMPORAL_BLOCKING"]
+  MODES --> FF["TEMPORAL_FIRE_AND_FORGET"]
+  MODES --> MN["MISTRAL_NATIVE"]
+  classDef e fill:#16241a,stroke:#5fd38f,color:#cfeede;
+  class BR,CORE e;
+  </div>
+  <div class="cap">One surface, four modes. The caller picks <em>how</em> the pipe runs; the bridge owns everything up to dispatch.</div>
+</div>
+
+<h2>The entry point &amp; boundary types</h2>
+
+<p>The whole public surface is two pydantic models and one async function in <code>pipelex/runtime_bridge/bridge.py</code>. Both models forbid extra fields so a malformed or version-skewed payload fails loud at the boundary instead of silently dropping data.</p>
+
+<pre class="diff"><span class="hd">+ pipelex/runtime_bridge/bridge.py  (new)</span>
+<span class="add">class PipelexPipeRunInput(BaseModel):</span>
+<span class="add">    """JSON-safe input crossing the host-runtime / Temporal boundary."""</span>
+<span class="add">    model_config = ConfigDict(extra="forbid")</span>
+<span class="add"></span>
+<span class="add">    pipe_code: str</span>
+<span class="add">    inputs: dict[str, Any] = Field(default_factory=dict)</span>
+<span class="add">    output_name: str | None = None</span>
+<span class="add">    pipeline_run_id: str | None = None</span>
+<span class="add">    user_id: str | None = None</span>
+<span class="add">    library_crate_dump: dict[str, Any] | None = None        # pipe definition travels in the request</span>
+<span class="add">    execution_mode: PipelexExecutionMode = PipelexExecutionMode.DIRECT</span>
+<span class="add">    delivery_assignment_dump: dict[str, Any] | None = None  # webhook / storage target</span>
+<span class="add"></span>
+<span class="add">class PipelexPipeRunOutput(BaseModel):</span>
+<span class="add">    model_config = ConfigDict(extra="forbid")</span>
+<span class="add"></span>
+<span class="add">    output_dict: dict[str, Any]        # WorkingMemory.dump_for_temporal()</span>
+<span class="add">    main_stuff_name: str | None = None</span>
+<span class="add">    pipeline_run_id: str</span>
+<span class="add">    workflow_id: str | None = None     # set for the Temporal / Mistral modes</span>
+<span class="add">    is_completed: bool                 # False for fire-and-forget</span>
+<span class="add">    graph_spec_dump: dict[str, Any] | None = None</span></pre>
+
+<p class="small">The output always uses <code>WorkingMemory.dump_for_temporal()</code> — the same format Pipelex uses internally for Temporal transit — so the shape is stable whether or not a <code>library_crate</code> was attached, and a caller with the matching class registry in scope can reconstruct a typed <code>WorkingMemory</code>.</p>
+
+<h2>Execution modes</h2>
+
+<p>The caller chooses the runtime via <code>PipelexExecutionMode</code> (a flat <code>StrEnum</code> — not a plugin registry; there is no speculative extensibility here).</p>
+
+<table>
+  <thead><tr><th>Mode</th><th>What it does</th><th>Needs</th><th>Blocks?</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>DIRECT</code></td>
+      <td>In-process, no Temporal. The activity blocks until the pipe completes. Works even inside a Temporal-enabled worker — it <em>forces</em> local execution.</td>
+      <td>nothing</td>
+      <td>yes</td>
+    </tr>
+    <tr>
+      <td><code>TEMPORAL_BLOCKING</code></td>
+      <td>Dispatch the pipe as a Pipelex Temporal workflow and await it. Runs durably on Pipelex's worker fleet.</td>
+      <td><code>pipelex[temporal]</code></td>
+      <td>yes</td>
+    </tr>
+    <tr>
+      <td><code>TEMPORAL_FIRE_AND_FORGET</code></td>
+      <td>Dispatch and return the <code>workflow_id</code> immediately. Completion arrives out-of-band via the <code>DeliveryAssignment</code> (webhook / storage).</td>
+      <td><code>pipelex[temporal]</code> + delivery target</td>
+      <td>no</td>
+    </tr>
+    <tr>
+      <td><code>MISTRAL_NATIVE</code></td>
+      <td>Decompose the pipe into native Mistral Workflows primitives — controllers become child workflows, leaves become activities — surfacing per-step retry / signals / cancellation through the host APIs.</td>
+      <td><code>pipelex-mistralai-workflows</code></td>
+      <td>yes</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Optional deps stay optional</h3>
+
+<p>The bridge module imports <strong>nothing host-specific at top level</strong>. Mode-specific dependencies are pulled in by a lazy import <em>inside the matching branch only</em>. So <code>DIRECT</code> runs with neither extra installed, and a missing extra raises a precise, install-hint error rather than an <code>ImportError</code> at module load.</p>
+
+<div class="figure">
+  <div class="mermaid">
+flowchart TD
+  IMP["import run_pipe_via_bridge"] --> TOP["module top-level<br/>no temporalio · no mistralai"]
+  TOP --> CALL{"execution_mode?"}
+  CALL -->|DIRECT| OK["runs · zero extras needed"]:::ok
+  CALL -->|TEMPORAL_*| TRY["_require_pipelex_temporal_extra()<br/>lazy: import temporalio"]
+  TRY -->|installed| OKT["dispatch to Temporal"]:::ok
+  TRY -->|missing| ERRT["MissingPipelexTemporalExtraError<br/><i>pip install pipelex&#91;temporal&#93;</i>"]:::bad
+  CALL -->|MISTRAL_NATIVE| TRYM["lazy: import<br/>pipelex_mistralai_workflows"]
+  TRYM -->|installed| OKM["dispatch to Mistral"]:::ok
+  TRYM -->|missing| ERRM["MissingMistralWorkflowsPluginError<br/><i>pip install pipelex-mistralai-workflows</i>"]:::bad
+  classDef ok fill:#16241a,stroke:#5fd38f,color:#cfeede;
+  classDef bad fill:#2a1a1f,stroke:#f08a8a,color:#f7c3c3;
+  </div>
+  <div class="cap">The two install-hint errors carry <code>_authors_caller_facing_message = True</code>, so the actionable pip-install hint survives STRICT error disclosure.</div>
+</div>
+
+<h2>How a call flows</h2>
+
+<p><code>run_pipe_via_bridge</code> is a short, linear pipeline. Every step is a guard or a hydration; the only branch is the final mode dispatch.</p>
+
+<div class="figure">
+  <div class="mermaid">
+flowchart TD
+  A["1 · ensure_pipelex_booted()<br/>idempotent · thread-safe · adopts external singleton"] --> B
+  B["2 · decode library_crate_dump + delivery_assignment_dump<br/>ValidationError → PipelexBridgeDispatchError"] --> C
+  C["3 · _validate_input<br/>e.g. fire-and-forget MUST carry a delivery target"] --> D
+  D["4 · _scoped_library_for_crate<br/>per-call library + ClassRegistry, torn down on exit"] --> E
+  E["5 · build_pipe_job_from_input<br/>working memory · job metadata · graph context"] --> F
+  F{"6 · match execution_mode"}
+  F --> G1["_run_direct"]
+  F --> G2["_run_temporal_blocking"]
+  F --> G3["_run_temporal_fire_and_forget"]
+  F --> G4["_run_mistral_native"]
+  G1 --> OUT["PipelexPipeRunOutput"]
+  G2 --> OUT
+  G3 --> OUT
+  G4 --> OUT
+  classDef step fill:#1c2330,stroke:#6ea8fe,color:#e8eaf0;
+  class A,B,C,D,E step;
+  </div>
+  <div class="cap">Step 4 is what lets a stateless / multi-tenant worker run a pipe whose <em>definition</em> travels in the request — without leaking dynamic concept classes into the global registry.</div>
+</div>
+
+<h3>The scoped library (step 4)</h3>
+
+<p>When the caller passes a <code>library_crate_dump</code>, the bridge opens a per-call scoped library with its own <code>ClassRegistry</code> pre-seeded from the global one, loads the crate into it, and tears it down on exit. Classes generated from the crate's inline structured concepts register into the scoped registry — discarded on teardown — rather than colliding in the global Kajson registry. This mirrors the Temporal worker hydration path.</p>
+
+<h2>The primitives lift</h2>
+
+<p>The framework-agnostic bodies behind the Temporal activities — graph assembly, delivery, trace flush, hydration, pipe classification, submitter hydration — were moved out of <code>pipelex.temporal</code> into <code>runtime_bridge.primitives</code>. The <code>pipelex/temporal/tprl_pipe/act_*.py</code> files are now <strong>thin <code>@activity.defn</code> wrappers</strong> that decode their arg and delegate to the shared primitive. The Mistral-native path calls the same primitives. <strong>Behaviour-neutral: only the home of the logic changed.</strong></p>
+
+<div class="figure">
+  <div class="mermaid">
+flowchart LR
+  subgraph before["BEFORE — logic welded to Temporal"]
+    direction TB
+    AA1["act_assemble_graph.py<br/>@activity.defn + full body"]
+    AB1["act_deliver.py<br/>@activity.defn + full body"]
+    AC1["act_flush_trace_events.py<br/>@activity.defn + full body"]
+  end
+  subgraph after["AFTER — wrappers over shared core"]
+    direction TB
+    subgraph prim["runtime_bridge/primitives/ (no host imports)"]
+      P1["graph_assembly.py"]
+      P2["delivery.py"]
+      P3["trace_flush.py"]
+      P4["hydration.py · submitter_hydration.py<br/>pipe_classification.py · pipe_run_arg.py"]
+    end
+    W1["act_*.py<br/><i>thin @activity.defn</i>"] --> P1 & P2 & P3
+    MW["pipelex_mistralai_workflows<br/>primitives"] --> P1 & P2 & P3 & P4
+  end
+  before -.lift.-> after
+  classDef p fill:#16241a,stroke:#5fd38f,color:#cfeede;
+  class P1,P2,P3,P4 p;
+  </div>
+  <div class="cap"><code>hydration.py</code>, <code>pipe_run_arg.py</code>, and <code>submitter_hydration.py</code> moved verbatim (git rename, ~100% similarity). <code>graph_assembly.py</code>, <code>delivery.py</code>, <code>trace_flush.py</code>, <code>pipe_classification.py</code> were lifted out of the activity bodies.</div>
+</div>
+
+<h3>What a thin wrapper looks like now</h3>
+
+<div class="tabs" data-tabgroup="wrap">
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="showTab('wrap',0,this)">act_assemble_graph.py (wrapper)</button>
+    <button class="tab-btn" onclick="showTab('wrap',1,this)">graph_assembly.py (shared core)</button>
+  </div>
+  <div class="tab-panel active">
+<pre class="diff"><span class="cmt"># Thin @activity.defn wrapper — decodes the arg, delegates to the shared primitive.</span>
+<span class="ctx">from pipelex.runtime_bridge.primitives.graph_assembly import assemble_graph_for_pipeline_run</span>
+
+<span class="ctx">class AssembleGraphArg(BaseModel):</span>
+<span class="ctx">    pipeline_run_id: str</span>
+<span class="ctx">    domain_code: str | None = None</span>
+<span class="ctx">    main_pipe_code: str | None = None</span>
+
+<span class="cmt"># Deliberately NOT decorated with @convert_pipelex_errors: the shared primitive degrades</span>
+<span class="cmt"># EXPECTED failures to None for best-effort observability; programming bugs propagate.</span>
+<span class="ctx">@activity.defn(name="act_assemble_graph")</span>
+<span class="ctx">async def act_assemble_graph(arg: AssembleGraphArg) -> GraphSpec | None:</span>
+<span class="ctx">    return await assemble_graph_for_pipeline_run(</span>
+<span class="ctx">        pipeline_run_id=arg.pipeline_run_id,</span>
+<span class="ctx">        domain_code=arg.domain_code,</span>
+<span class="ctx">        main_pipe_code=arg.main_pipe_code,</span>
+<span class="ctx">    )</span></pre>
+  </div>
+  <div class="tab-panel">
+<pre class="diff"><span class="cmt"># No host-runtime import. Both Temporal and Mistral wrap this.</span>
+<span class="ctx">async def assemble_graph_for_pipeline_run(pipeline_run_id, domain_code=None, main_pipe_code=None) -> GraphSpec | None:</span>
+<span class="ctx">    tracing_config = get_config().pipelex.tracing_config</span>
+<span class="ctx">    if not tracing_config.is_enabled:</span>
+<span class="ctx">        return None</span>
+<span class="ctx">    try:</span>
+<span class="ctx">        event_log = make_event_log(tracing_config)</span>
+<span class="ctx">        try:</span>
+<span class="ctx">            events = event_log.read_events(pipeline_run_id)</span>
+<span class="ctx">            if not events:</span>
+<span class="ctx">                return None</span>
+<span class="ctx">            return GraphSpecAssembler.assemble(events=events, graph_id=pipeline_run_id, ...)</span>
+<span class="ctx">        finally:</span>
+<span class="ctx">            event_log.close()</span>
+<span class="ctx">    except (OSError, json.JSONDecodeError, ValidationError, PipelexConfigError,</span>
+<span class="ctx">            MissingDependencyError, EventLogReadError) as exc:</span>
+<span class="cmt">        # Best-effort observability: graph assembly must never fail the pipeline run.</span>
+<span class="cmt">        # Programming bugs (KeyError, ...) are NOT caught here — they surface in dev.</span>
+<span class="ctx">        log.warning(f"Graph assembly failed: {exc}")</span>
+<span class="ctx">        return None</span></pre>
+  </div>
+</div>
+
+<h2>The two subtle hardening fixes worth your attention</h2>
+
+<p>Most of the bridge is mechanical. Two correctness fixes are not, and they came out of the PR review threads. Both are about <strong>context not leaking across a boundary</strong>.</p>
+
+<h3>1 · DIRECT mode must scope its own router <span class="tag fix">fixed</span></h3>
+
+<p>Inside a Temporal-enabled worker, the hub's <em>default</em> pipe router is the Temporal router. <code>DIRECT</code> mode runs the root pipe in-process — but nested controller sub-pipes (a sequence, a batch) dispatch through <code>get_pipe_router()</code>, which would resolve the hub default and <strong>leak the nested pipes back to Temporal</strong> — defeating the entire point of <code>DIRECT</code>.</p>
+
+<p>The fix adds a contextvar-scoped router override in <code>hub.py</code> and wraps the whole <code>_run_direct</code> body in it, so the root pipe <em>and</em> every nested sub-pipe resolve the in-process router.</p>
+
+<div class="tabs" data-tabgroup="router">
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="showTab('router',0,this)">hub.py — the override</button>
+    <button class="tab-btn" onclick="showTab('router',1,this)">bridge.py — _run_direct uses it</button>
+  </div>
+  <div class="tab-panel active">
+<pre class="diff"><span class="hd">  pipelex/hub.py</span>
+<span class="add">+_current_pipe_router: ContextVar["PipeRouterProtocol | None"] = ContextVar("current_pipe_router", default=None)</span>
+<span class="add">+</span>
+<span class="add">+@contextmanager</span>
+<span class="add">+def scoped_pipe_router(pipe_router):</span>
+<span class="add">+    """Set as active router for the scope; restore prior value on exit (success or error)."""</span>
+<span class="add">+    prev = _current_pipe_router.get()</span>
+<span class="add">+    _current_pipe_router.set(pipe_router)</span>
+<span class="add">+    try:</span>
+<span class="add">+        yield</span>
+<span class="add">+    finally:</span>
+<span class="add">+        _current_pipe_router.set(prev)   # restores OUTER override, not just None</span>
+<span class="add">+</span>
+ <span class="ctx">def get_pipe_router() -> "PipeRouterProtocol":</span>
+<span class="add">+    override = _current_pipe_router.get()</span>
+<span class="add">+    if override is not None:</span>
+<span class="add">+        return override</span>
+     <span class="ctx">return get_pipelex_hub().get_required_pipe_router()</span></pre>
+<p class="small">The scoped form is preferred internally over the raw <code>set_pipe_router</code> / <code>teardown_current_pipe_router</code> pair: the raw teardown unconditionally resets to <code>None</code>, clobbering an outer caller's override. The raw pair is kept only because the external Mistral plugin still depends on it.</p>
+  </div>
+  <div class="tab-panel">
+<pre class="diff"><span class="hd">  pipelex/runtime_bridge/bridge.py :: _run_direct</span>
+ <span class="ctx">async def _run_direct(pipe_job, delivery_assignment) -> PipelexPipeRunOutput:</span>
+<span class="add">+    # Scope the in-process router for the WHOLE run so nested controller sub-pipes</span>
+<span class="add">+    # — which dispatch through get_pipe_router() — resolve THIS router rather than</span>
+<span class="add">+    # falling back to the hub default (the Temporal router in a temporal worker).</span>
+     <span class="ctx">direct_router = PipeRouter()</span>
+<span class="add">+    with scoped_pipe_router(direct_router):</span>
+<span class="add">+        pipe_run = PipeRun(pipe_router=direct_router)</span>
+<span class="add">+        pipe_output = await pipe_run.run(pipe_job=pipe_job, delivery_assignment=delivery_assignment)</span>
+     <span class="ctx">return _serialize_completed_output(pipe_output=pipe_output, pipe_job=pipe_job, workflow_id=None)</span></pre>
+  </div>
+</div>
+
+<h3>2 · <code>graph_context</code> is honored for DIRECT only <span class="tag fix">fixed</span></h3>
+
+<p>A host (e.g. a streaming activity) can pass a <code>graph_context</code> so per-step trace events flow through its tracer. But threading it into the Temporal modes would make Pipelex's Temporal workflow open its tracer under the <em>host's</em> graph id and merge its trace events into the host's graph — exactly the cross-contamination the contract forbids. The Temporal modes already have their own event-log infrastructure via <code>pipeline_run_setup</code>.</p>
+
+<pre class="diff"><span class="hd">  pipelex/runtime_bridge/bridge.py :: run_pipe_via_bridge</span>
+<span class="add">+    is_direct = input_payload.execution_mode is PipelexExecutionMode.DIRECT</span>
+     <span class="ctx">pipe_job = build_pipe_job_from_input(</span>
+         <span class="ctx">input_payload=input_payload,</span>
+         <span class="ctx">library_crate=library_crate,</span>
+<span class="del">-        graph_context=graph_context,</span>
+<span class="add">+        graph_context=graph_context if is_direct else None,  # null it for the Temporal modes</span>
+     <span class="ctx">)</span></pre>
+
+<details>
+  <summary>More hardening that landed in the same review pass</summary>
+  <table>
+    <thead><tr><th>Fix</th><th>What &amp; why</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Boot race</td>
+        <td>Two concurrent first-calls in a fresh worker could both pass the <code>is None</code> check and both call <code>Pipelex.make()</code> — the loser hit <code>PipelexSetupError</code>. Fixed with double-checked locking on a module-level <code>threading.Lock</code> in <code>bootstrap.py</code> (race is across threads — sync def, no await between check and make).</td>
+        <td><span class="tag ok">fixed + test</span></td>
+      </tr>
+      <tr>
+        <td><code>library_id</code> widened</td>
+        <td>Dropped the <code>uuid4().hex[:8]</code> (32-bit) truncation to full hex. <code>open_library</code> silently <em>reuses</em> a colliding id, so a 32-bit collision between two overlapping calls would share — and prematurely tear down — one library. Full hex matches the collision-safe Temporal path.</td>
+        <td><span class="tag ok">fixed</span></td>
+      </tr>
+      <tr>
+        <td>Input decode wrapped</td>
+        <td>Decode <code>library_crate_dump</code> / <code>delivery_assignment_dump</code> once, translating raw <code>pydantic.ValidationError</code> into <code>PipelexBridgeDispatchError</code> so a malformed dump no longer escapes the entry point as a non-<code>PipelexError</code>. Also removed a double-decode.</td>
+        <td><span class="tag ok">fixed</span></td>
+      </tr>
+      <tr>
+        <td>Scoped-library open guarded</td>
+        <td><code>_scoped_library_for_crate</code> now opens the library <em>inside</em> the <code>try</code> (with a <code>library_opened</code> flag) so a throw between open and yield can't leak the manager entry — matches the sibling <code>rehydrate_pipe_output_with_crate</code>.</td>
+        <td><span class="tag ok">fixed</span></td>
+      </tr>
+      <tr>
+        <td>Error rename</td>
+        <td>The near-mirror <code>PipelexBridgeRuntimeError</code> (leaf) vs <code>PipelexRuntimeBridgeError</code> (base) was a footgun. The leaf is now <code>PipelexBridgeDispatchError</code>; <code>docs/errors/</code> regenerated.</td>
+        <td><span class="tag ok">fixed</span></td>
+      </tr>
+      <tr>
+        <td>Half-built singleton read</td>
+        <td>The lock closed the write-write race, but a lock-free read of a mid-<code>setup()</code> singleton remains theoretically possible. The recommended boot-at-entry-point path is unaffected and fails loud, not silent.</td>
+        <td><span class="tag defer">deferred (P1)</span></td>
+      </tr>
+    </tbody>
+  </table>
+</details>
+
+<h2>Why this is the right shape</h2>
+
+<p>Each of these is a claim a reviewer can check against the diff.</p>
+
+<div class="grid-2">
+  <div class="card">
+    <h4>Separation of concerns</h4>
+    <p class="small">"How a host invokes a pipe" (bridge) is now distinct from "how Pipelex executes a pipe" (<code>pipe_run</code>) and from "Temporal SDK glue" (<code>pipelex.temporal</code>).</p>
+    <p class="small"><strong>Verify:</strong> <code>grep -rn "import temporalio\|import mistralai" pipelex/runtime_bridge/</code> returns only docstring prose.</p>
+  </div>
+  <div class="card">
+    <h4>One boundary, not N</h4>
+    <p class="small">Every host goes through the same entry point and the same JSON-safe types.</p>
+    <p class="small"><strong>Verify:</strong> the Mistral plugin and the Temporal activities both consume <code>runtime_bridge</code> rather than duplicating it.</p>
+  </div>
+  <div class="card">
+    <h4>No duplication across runtimes</h4>
+    <p class="small">The lift means Temporal and Mistral share one copy of graph-assembly / delivery / etc.</p>
+    <p class="small"><strong>Verify:</strong> <code>act_*.py</code> are wrappers; the logic lives once under <code>primitives/</code>.</p>
+  </div>
+  <div class="card">
+    <h4>Not overengineered</h4>
+    <p class="small">No abstraction without a real second consumer. The mode set is a flat enum, not a plugin registry; <code>__init__.py</code> is empty (no re-export indirection, per project convention); no speculative interfaces or config.</p>
+  </div>
+</div>
+
+<h2>What's <em>not</em> part of this work</h2>
+
+<div class="note warn">
+  <p>The diff looks like ~140 files, but the <code>/workflows</code> skill under <code>.claude/skills/workflows/</code> accounts for most of the line count and is <strong>not part of this PR</strong>. It was vendored from Mistral's own Workflows skill and adapted for Claude Code; it rode along on this branch for convenience. Internal triage notes under <code>wip/</code> are likewise not review material.</p>
+  <p style="margin-top:8px"><strong>Review the code core:</strong> <code>pipelex/runtime_bridge/</code>, <code>pipelex/temporal/tprl_pipe/act_*.py</code>, <code>pipelex/hub.py</code>, and <code>tests/{unit,integration}/pipelex/runtime_bridge/</code>.</p>
+</div>
+
+<h2>File map</h2>
+
+<table>
+  <thead><tr><th>Path</th><th>Role</th><th></th></tr></thead>
+  <tbody>
+    <tr><td><code>runtime_bridge/bridge.py</code></td><td>Boundary types + <code>run_pipe_via_bridge</code> + the four mode runners</td><td><span class="pill added">new</span></td></tr>
+    <tr><td><code>runtime_bridge/execution_mode.py</code></td><td><code>PipelexExecutionMode</code> enum + capability properties</td><td><span class="pill added">new</span></td></tr>
+    <tr><td><code>runtime_bridge/bootstrap.py</code></td><td>Idempotent, thread-safe <code>ensure_pipelex_booted</code></td><td><span class="pill added">new</span></td></tr>
+    <tr><td><code>runtime_bridge/exceptions.py</code></td><td>Bridge error family (base + two install-hint errors + dispatch error)</td><td><span class="pill added">new</span></td></tr>
+    <tr><td><code>runtime_bridge/primitives/graph_assembly.py</code><br/><code>…/delivery.py · …/trace_flush.py · …/pipe_classification.py</code></td><td>Framework-agnostic bodies lifted out of the Temporal activities</td><td><span class="pill added">lifted</span></td></tr>
+    <tr><td><code>runtime_bridge/primitives/hydration.py</code><br/><code>…/submitter_hydration.py · …/pipe_run_arg.py</code></td><td>Moved verbatim from <code>temporal/tprl_pipe/</code></td><td><span class="pill moved">moved</span></td></tr>
+    <tr><td><code>temporal/tprl_pipe/act_*.py</code></td><td>Now thin <code>@activity.defn</code> wrappers delegating to primitives</td><td><span class="pill changed">slimmed</span></td></tr>
+    <tr><td><code>hub.py</code></td><td><code>scoped_pipe_router</code> + contextvar override in <code>get_pipe_router</code></td><td><span class="pill changed">changed</span></td></tr>
+  </tbody>
+</table>
+
+<h2>Verification</h2>
+
+<div class="note good">
+  <p><code>make agent-check</code> (ruff, plxt, pyright 0/0/0, mypy) and <code>make agent-test</code> (full suite) both green on this branch. The bridge ships with unit coverage for dispatch, validation, exception disclosure, the boot concurrency race, DIRECT router scoping, the graph-context contract, marker isolation, and the lifted primitives.</p>
+</div>
+
+<p class="small" style="margin-top:28px; color:#6e7681;">Generated for co-developer review of the runtime-bridge work (PR #959 + #966). Diagrams render via mermaid from CDN.</p>
+
+</div>
+</body>
+</html>

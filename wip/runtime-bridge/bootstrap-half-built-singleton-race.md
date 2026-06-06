@@ -1,6 +1,6 @@
 # `ensure_pipelex_booted` can publish a half-built Pipelex singleton under concurrent first-boot
 
-**Status:** ⏸️ **DEFERRED by decision** (PR #966 review). Real P1 race in new code; ships as-is for now because the recommended boot path is unaffected and it fails loud, not silent.
+**Status:** ✅ **APPLIED** — Approach B (instance-level `is_ready`). Real P1 race in new code, now fixed: `ensure_pipelex_booted` gates on `Pipelex.is_fully_booted()`, and the singleton is published as ready only at the very end of `make()` (after `setup()` + the optional `validate_model_deck()`). See [As applied](#as-applied) below.
 **Source:** PR #966 pre-landing review (`/review`), adversarial pass + source verification.
 **Severity:** real, but **scoped**: only bites when two threads race the *first* boot from inside activities; the recommended "boot once at the worker entry-point" path never hits it. Fails with a loud `RuntimeError`, not silent corruption.
 **Relation to the #959 "Boot race" fix:** this **extends** it. The double-checked `threading.Lock` added in #959 (`bootstrap.py`, see README §2) correctly serializes the two *writers* so the loser no longer raises `PipelexSetupError("already initialized")`. It does **not** close the second hole below: a *reader* taking the lock-free fast path while the winner is mid-`setup()`.
@@ -43,6 +43,8 @@ The window is wide: `setup()` does real work (library load + model-deck validati
 
 ## Recommended fix
 
+> **Note:** the shape sketched here (a module-global `_booted`) is **not** what shipped — see [As applied](#as-applied). The applied fix is the `is_ready`-on-instance alternative called out in the caveat, chosen against the test lifecycle. This section is kept as the record of the original sketch and its trade-off.
+
 Gate the fast path on a "fully booted" flag flipped **only after** `make()` returns, and move the existence check inside the lock so the lock-free path can never read a half-built instance:
 
 ```python
@@ -66,11 +68,22 @@ This preserves the documented "adopt an externally-created singleton" contract: 
 
 `_booted` is module-global, so it survives across tests. The existing concurrency test (and any test that boots/tears down Pipelex) needs a reset hook (e.g. a fixture that sets `bootstrap._booted = False`), or the flag has to live somewhere resettable. A "check the instance is fully set up" alternative (an `is_ready` flag on `Pipelex` flipped at the end of `setup()`) avoids the module global but is more invasive (touches `pipelex.py`). Pick the shape against the boot/teardown lifecycle the test suite expects — hence deferred rather than auto-applied in the review pass.
 
-## Test ideas (when fixed)
+## As applied
 
-- Three-thread test: A wins the lock and is held inside a patched `make()` whose "setup" sleeps **after** the singleton is registered; B and C arrive during that window and must NOT return until A finishes — assert neither observed a half-built hub (e.g. patch `get_required_pipe`/`get_library_manager` to record whether they were called before setup completed).
-- Setup-failure interleaving: A's patched `make()` registers then raises; assert B does not silently proceed against a deleted instance (it should re-boot under the lock).
-- Keep the existing `make_calls == 1` assertion (no regression of the #959 write-write fix).
+Shipped the `is_ready`-on-`Pipelex` alternative from the caveat, **not** the module-global `_booted` sketch above. The deciding factor is exactly the test-lifecycle point the caveat raised: the suite's module-scoped autouse fixture (`tests/conftest.py`) tears Pipelex down with `Pipelex.teardown_if_needed()`, which deletes the singleton from `MetaSingleton.instances`. An instance-level flag dies with the instance, so it auto-resets between test modules — no module-global to leak, no reset fixture to add, no second source of truth that can drift from the registry.
+
+Changes:
+
+- `pipelex/pipelex.py` — `__init__` initializes `self.is_ready = False` (set before the metaclass registers the instance, so it always exists before the instance is observable); `make()` flips `pipelex_instance.is_ready = True` on its success tail, **after** the `try/except`, so it is set only once `setup()` and the optional `validate_model_deck()` have both succeeded and the delete-on-failure handler is behind us; new classmethod `is_fully_booted()` returns `instance is not None and instance.is_ready`.
+- `pipelex/runtime_bridge/bootstrap.py` — `ensure_pipelex_booted` gates both the lock-free fast path and the in-lock re-check on `Pipelex.is_fully_booted()` instead of `get_optional_instance() is not None`. A registered-but-not-ready instance (mid-`setup()`, or about to be deleted on setup failure) is now treated as not-booted, so the reader blocks on the lock and re-checks. The "adopt an externally-created singleton" contract is preserved: a fully-booted external instance is `is_ready` → no-op.
+
+## Tests (done)
+
+`tests/unit/pipelex/runtime_bridge/test_bootstrap_concurrency.py` (all mock at the `Pipelex` classmethod boundary — never touching `MetaSingleton.instances`, so they coexist with the autouse session singleton):
+
+- `test_reader_arriving_mid_setup_blocks_until_ready` — three-thread test: A is held inside a patched `make()` that registers an `is_ready=False` instance, then flips it ready only just before returning; B and C arrive during the window and must block on the lock until A finishes (asserted via `is_alive()` mid-window). Fails against the pre-fix bare-presence check.
+- `test_setup_failure_lets_next_thread_reboot` — A's patched `make()` registers then clears + raises (mirroring delete-on-failure); B must fall through to the lock, find nothing booted, and re-boot rather than proceed against the deleted instance.
+- The original `test_concurrent_first_calls_boot_once_without_error` keeps the `make_calls == 1` assertion (no regression of the #959 write-write fix).
 
 ## Related
 
