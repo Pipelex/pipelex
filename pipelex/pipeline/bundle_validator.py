@@ -55,7 +55,7 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 from pipelex.pipe_signature.signature_walk import collect_signature_paths, collect_signature_refs
 from pipelex.pipeline.execution_seams import acquire_library, prepare_pipe_job
-from pipelex.pipeline.pipeline_models import SpecialPipelineId
+from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTelConstants
@@ -226,19 +226,26 @@ class BundleValidator:
         get_telemetry_manager().track_event(event_name=EventName.PIPE_DRY_RUN, properties={EventProperty.NB_PIPES: len(sweepable_pipes)})
 
         # 4. The dry-run sweep. The DRY leaf emits a synthetic zero-token LLM report, so open ONE
-        #    report registry for the whole sweep and close it in `finally`: the registry is keyed by
-        #    the constant DRY_RUN_UNTITLED id, which would collide ("already exists") on a second sweep
-        #    if left open. Mock inputs are built by prepare_pipe_job from this DRY + is_mock_inputs config.
+        #    report registry for the whole sweep and close it in `finally`. The registry is keyed by a
+        #    UNIQUE per-sweep id (a `dry_run_`-prefixed uuid, not a constant): the ReportingManager is a
+        #    process-global singleton, so two concurrent sweeps (e.g. overlapping `/validate` API requests)
+        #    keyed by the same constant would collide on `open_registry` ("already exists"). The prefix keeps
+        #    the id self-describing if it ever surfaces in a log. The same id is threaded into every
+        #    prepare_pipe_job call below so the synthetic reports land in the registry that gets closed.
+        #    Mock inputs are built by prepare_pipe_job from this DRY + is_mock_inputs config.
         execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
             generate_graph=False,
             mock_inputs=True,
         )
-        get_report_delegate().open_registry(pipeline_run_id=SpecialPipelineId.DRY_RUN_UNTITLED)
+        dry_run_pipeline_id = f"dry_run_{PipelineFactory.make_pipeline_run_id()}"
+        get_report_delegate().open_registry(pipeline_run_id=dry_run_pipeline_id)
         try:
             for pipe in sweepable_pipes:
-                results[pipe.pipe_ref] = await self._classify_pipe(pipe=pipe, library_id=library_id, execution_config=execution_config)
+                results[pipe.pipe_ref] = await self._classify_pipe(
+                    pipe=pipe, library_id=library_id, execution_config=execution_config, dry_run_pipeline_id=dry_run_pipeline_id
+                )
         finally:
-            get_report_delegate().close_registry(pipeline_run_id=SpecialPipelineId.DRY_RUN_UNTITLED)
+            get_report_delegate().close_registry(pipeline_run_id=dry_run_pipeline_id)
 
         # 5. Aggregate + report.
         return self._aggregate(results=results, start_time=start_time)
@@ -274,7 +281,9 @@ class BundleValidator:
                 dep_paths=all_dep_paths,
             )
 
-    async def _classify_pipe(self, *, pipe: PipeAbstract, library_id: str, execution_config: PipelineExecutionConfig) -> DryRunOutput:
+    async def _classify_pipe(
+        self, *, pipe: PipeAbstract, library_id: str, execution_config: PipelineExecutionConfig, dry_run_pipeline_id: str
+    ) -> DryRunOutput:
         """Build the mock job and run the pipe DRY through the direct primitive; classify the outcome.
 
         Wraps **both** the mock-input build (``prepare_pipe_job``) and the run in one try, catching the
@@ -289,7 +298,7 @@ class BundleValidator:
                 library_id=library_id,
                 execution_config=execution_config,
                 pipe_run_mode=PipeRunMode.DRY,
-                pipeline_run_id=SpecialPipelineId.DRY_RUN_UNTITLED,
+                pipeline_run_id=dry_run_pipeline_id,
                 user_id=OTelConstants.DEFAULT_USER_ID,
             )
             await self._pipe_run.run(pipe_job)

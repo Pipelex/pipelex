@@ -18,7 +18,6 @@ from pipelex.pipe_run.exceptions import DryRunError, PipeRunError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunStatus
-from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.system.telemetry.events import EventName, EventProperty
 
 
@@ -235,15 +234,20 @@ class TestBundleValidator:
 
     @pytest.mark.asyncio
     async def test_registry_opened_once_and_closed_in_finally(self, mocker: MockerFixture) -> None:
-        # One report registry per sweep, keyed by the constant DRY_RUN_UNTITLED id, closed in `finally`
-        # even when a pipe run raises an uncaught (non-classified) exception — so the constant id cannot
-        # collide on the next sweep.
-        validator, report_delegate, _telemetry, _prepare, pipe_run = self._patch_env(mocker)
+        # One report registry per sweep, keyed by a UNIQUE per-sweep id, closed in `finally` even when a
+        # pipe run raises an uncaught (non-classified) exception. The id must be unique (not a constant) so
+        # concurrent sweeps on the process-global ReportingManager cannot collide on open_registry. Assert
+        # the registry is opened once and closed once, that open/close use the SAME id, and that the same id
+        # is threaded into the pipe job (so the synthetic DRY report lands in the registry that gets closed).
+        validator, report_delegate, _telemetry, prepare, pipe_run = self._patch_env(mocker)
         pipe_run.run = mocker.AsyncMock(side_effect=KeyError("uncaught programming bug"))
         pipe = self._make_pipe(mocker, code="p", pipe_ref="dom.p")
 
         with pytest.raises(KeyError):
             await validator.validate_pipes([pipe], library_id="lib-1")
 
-        report_delegate.open_registry.assert_called_once_with(pipeline_run_id=SpecialPipelineId.DRY_RUN_UNTITLED)
-        report_delegate.close_registry.assert_called_once_with(pipeline_run_id=SpecialPipelineId.DRY_RUN_UNTITLED)
+        report_delegate.open_registry.assert_called_once()
+        report_delegate.close_registry.assert_called_once()
+        opened_id = report_delegate.open_registry.call_args.kwargs["pipeline_run_id"]
+        assert report_delegate.close_registry.call_args.kwargs["pipeline_run_id"] == opened_id
+        assert prepare.call_args.kwargs["pipeline_run_id"] == opened_id
