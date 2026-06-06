@@ -53,6 +53,8 @@ The known retry-related over-counting case (R2) is documented and pinned by `tes
 
 **Status**: Still open. P0 (T1 above) ensures the events now land in the same backend partition from every worker; P1 is the remaining plumbing change to read them back into a cost report.
 
+> **Design note:** T2/P1 is the same lifecycle as the `UsageRegistry` success-path leak — the leak is the missing *close*, T2 is the missing *replay-populate*, of one per-run cost-aggregation buffer. The unified model, the design fork (ride usage on `PipeOutput` mirroring graph-spec assembly vs. the manager-centric `inject_tokens_usages` replay below), and the recommendation live in [`../registry/registry-lifecycle-synthesis.md`](../registry/registry-lifecycle-synthesis.md).
+
 **Severity**: High — events are persisted but never turned into a report.
 
 The pieces all exist:
