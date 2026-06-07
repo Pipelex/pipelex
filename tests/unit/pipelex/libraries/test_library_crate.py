@@ -1,5 +1,6 @@
 import pytest
 
+from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
@@ -135,3 +136,70 @@ class TestLibraryCrate:
             LibraryCrateFactory.make_from_blueprints(
                 blueprints=[BlueprintSamples.NONE_SOURCE_BUNDLE, BlueprintSamples.NONE_SOURCE_DUPLICATE_CONCEPT_BUNDLE],
             )
+
+    def test_signature_then_concrete_concrete_wins(self):
+        """A signature followed by a concrete pipe reconciles: the concrete wins."""
+        crate = LibraryCrateFactory.make_from_blueprints(
+            blueprints=[BlueprintSamples.SIG_SIGNATURE_BUNDLE, BlueprintSamples.SIG_CONCRETE_BUNDLE],
+        )
+        winner = crate.pipes["reconcile.summarize"]
+        assert winner.is_signature is False
+        assert crate.source_map["reconcile.summarize"] == "/fake/reconcile_concrete.mthds"
+
+    def test_concrete_then_signature_concrete_wins(self):
+        """A concrete pipe followed by a signature reconciles the same way (order-independent)."""
+        crate = LibraryCrateFactory.make_from_blueprints(
+            blueprints=[BlueprintSamples.SIG_CONCRETE_BUNDLE, BlueprintSamples.SIG_SIGNATURE_BUNDLE],
+        )
+        winner = crate.pipes["reconcile.summarize"]
+        assert winner.is_signature is False
+        assert crate.source_map["reconcile.summarize"] == "/fake/reconcile_concrete.mthds"
+
+    def test_signature_plus_signature_matching_is_order_independent(self):
+        """Two matching signatures collapse to one, and the winner does not depend on load order."""
+        crate_ab = LibraryCrateFactory.make_from_blueprints(
+            blueprints=[BlueprintSamples.SIG_SIGNATURE_BUNDLE, BlueprintSamples.SIG_SIGNATURE_DUP_BUNDLE],
+        )
+        crate_ba = LibraryCrateFactory.make_from_blueprints(
+            blueprints=[BlueprintSamples.SIG_SIGNATURE_DUP_BUNDLE, BlueprintSamples.SIG_SIGNATURE_BUNDLE],
+        )
+        assert crate_ab.pipes["reconcile.summarize"].is_signature is True
+        assert crate_ba.pipes["reconcile.summarize"].is_signature is True
+        # Deterministic tie-break: same surviving source and same fingerprint regardless of order.
+        assert crate_ab.source_map["reconcile.summarize"] == crate_ba.source_map["reconcile.summarize"]
+        assert crate_ab.fingerprint == crate_ba.fingerprint
+
+    def test_signature_plus_signature_mismatched_raises(self):
+        """Two signatures with differing contracts raise a PipeLibraryError."""
+        with pytest.raises(PipeLibraryError, match=r"mismatched contracts"):
+            LibraryCrateFactory.make_from_blueprints(
+                blueprints=[BlueprintSamples.SIG_SIGNATURE_BUNDLE, BlueprintSamples.SIG_SIGNATURE_MISMATCH_BUNDLE],
+            )
+
+    def test_signature_plus_concrete_mismatched_inputs_raises(self):
+        """A signature and a concrete with differing inputs raise a PipeLibraryError."""
+        with pytest.raises(PipeLibraryError, match=r"mismatched contracts"):
+            LibraryCrateFactory.make_from_blueprints(
+                blueprints=[BlueprintSamples.SIG_SIGNATURE_BUNDLE, BlueprintSamples.SIG_CONCRETE_MISMATCH_BUNDLE],
+            )
+
+    def test_signature_with_inputs_plus_concrete_without_inputs_raises(self):
+        """Exact-match: a header with explicit inputs and a concrete that omits them mismatch."""
+        with pytest.raises(PipeLibraryError, match=r"mismatched contracts"):
+            LibraryCrateFactory.make_from_blueprints(
+                blueprints=[BlueprintSamples.SIG_SIGNATURE_BUNDLE, BlueprintSamples.SIG_CONCRETE_NO_INPUTS_BUNDLE],
+            )
+
+    @pytest.mark.parametrize(
+        "blueprints",
+        [
+            [BlueprintSamples.SIG_SIGNATURE_BUNDLE, BlueprintSamples.SIG_CONCRETE_NO_SOURCE_BUNDLE],
+            [BlueprintSamples.SIG_CONCRETE_NO_SOURCE_BUNDLE, BlueprintSamples.SIG_SIGNATURE_BUNDLE],
+        ],
+    )
+    def test_sourceless_concrete_winner_clears_stale_source(self, blueprints: list[PipelexBundleBlueprint]):
+        """A concrete with no source wins over a signature without leaving the signature's file in source_map."""
+        crate = LibraryCrateFactory.make_from_blueprints(blueprints=blueprints)
+        assert crate.pipes["reconcile.summarize"].is_signature is False
+        # The losing signature's file must not be misattributed to the winning concrete.
+        assert "reconcile.summarize" not in crate.source_map

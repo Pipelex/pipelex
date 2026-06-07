@@ -3,6 +3,7 @@ from typing import ClassVar
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
+from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
 
 
 class BlueprintSamples:
@@ -144,5 +145,114 @@ class BlueprintSamples:
         description="Domain with no source file (duplicate)",
         concept={
             "Item": ConceptBlueprint(description="Duplicate item"),
+        },
+    )
+
+    # --- Phase 1 (Part A): pipe signature/concrete reconciliation ---
+    # All bundles below use the native concept Text in their contracts, so per-file
+    # concept-reference validation passes without declaring any concept. The shared pipe
+    # code is `summarize` with contract (inputs={"doc": "Text"}, output="Text").
+
+    # Concrete definition of `summarize`.
+    SIG_CONCRETE_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/reconcile_concrete.mthds",
+        domain="reconcile",
+        description="Reconciliation domain",
+        pipe={
+            "summarize": PipeLLMBlueprint(
+                description="Summarize a document",
+                inputs={"doc": "Text"},
+                output="Text",
+                prompt="Summarize $doc.",
+            ),
+        },
+    )
+
+    # Forward declaration (header) of `summarize` with a matching contract.
+    SIG_SIGNATURE_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/reconcile_header.mthds",
+        domain="reconcile",
+        description="Reconciliation domain",
+        pipe={
+            "summarize": PipeSignatureBlueprint(
+                description="Header for summarize",
+                inputs={"doc": "Text"},
+                output="Text",
+            ),
+        },
+    )
+
+    # A second forward declaration of `summarize` with the same matching contract
+    # (a sub-pipe forward-declared by several callers).
+    SIG_SIGNATURE_DUP_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/reconcile_header_2.mthds",
+        domain="reconcile",
+        description="Reconciliation domain",
+        pipe={
+            "summarize": PipeSignatureBlueprint(
+                description="Second header for summarize",
+                inputs={"doc": "Text"},
+                output="Text",
+            ),
+        },
+    )
+
+    # A forward declaration of `summarize` with a mismatched contract (extra input).
+    SIG_SIGNATURE_MISMATCH_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/reconcile_header_bad.mthds",
+        domain="reconcile",
+        description="Reconciliation domain",
+        pipe={
+            "summarize": PipeSignatureBlueprint(
+                description="Mismatched header for summarize",
+                inputs={"doc": "Text", "lang": "Text"},
+                output="Text",
+            ),
+        },
+    )
+
+    # A concrete definition of `summarize` whose contract mismatches the header (extra input).
+    SIG_CONCRETE_MISMATCH_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/reconcile_concrete_bad.mthds",
+        domain="reconcile",
+        description="Reconciliation domain",
+        pipe={
+            "summarize": PipeLLMBlueprint(
+                description="Summarize a document in a language",
+                inputs={"doc": "Text", "lang": "Text"},
+                output="Text",
+                prompt="Summarize $doc in $lang.",
+            ),
+        },
+    )
+
+    # A concrete definition of `summarize` with a matching contract but NO bundle source
+    # (in-memory bundle). Exercises that a sourceless winner clears any stale source_map entry.
+    SIG_CONCRETE_NO_SOURCE_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source=None,
+        domain="reconcile",
+        description="Reconciliation domain",
+        pipe={
+            "summarize": PipeLLMBlueprint(
+                description="Summarize a document",
+                inputs={"doc": "Text"},
+                output="Text",
+                prompt="Summarize $doc.",
+            ),
+        },
+    )
+
+    # A concrete definition of `summarize` that omits inputs entirely (mismatches the
+    # explicit-inputs header under exact-match semantics).
+    SIG_CONCRETE_NO_INPUTS_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/reconcile_concrete_no_inputs.mthds",
+        domain="reconcile",
+        description="Reconciliation domain",
+        pipe={
+            "summarize": PipeLLMBlueprint(
+                description="Summarize without declared inputs",
+                output="Text",
+                prompt="Summarize the document.",
+            ),
         },
     )

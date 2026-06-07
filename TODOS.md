@@ -14,12 +14,25 @@ Both are required. Part A alone does **not** unblock the goal: any pipe whose co
 > This block is the single source of truth for resuming in a fresh session. A new agent should read this first. Overwrite it at each checkpoint.
 
 - **Branch:** `feature/Support-recursive-design`
-- **Plan state:** ✅ finalized, **not started**
-- **Current phase:** — (awaiting kickoff of Phase 1)
-- **Last verified green:** n/a
-- **Next concrete action:** begin Phase 1, Part A — edit `pipelex/libraries/library_crate_factory.py` pipe-merge block
-- **Working tree:** only `TODOS.md` modified (this plan). No code changes yet.
-- **Decisions/surprises since last checkpoint:** n/a
+- **Plan state:** ✅ finalized, **Phase 1 (Part A) complete — at Checkpoint A**
+- **Current phase:** Phase 1 done. Next: Phase 2 (Part B) — concept references validate at library level. **Do not start Phase 2 in this session** (checkpoint = stop).
+- **Last verified green (after `/code-review` fixes applied):**
+  - `tests/unit/pipelex/libraries/test_library_crate.py` — 21 passed (reconciliation tests now include order-independence + sourceless-winner cases)
+  - broad targeted suite (`libraries/` + `core/` + `pipes/` + `pipe_signature/` + `bundle_validator`) — 1490 passed, 1 pre-existing xfail (unrelated `pipe_condition_continue` bug)
+  - `make agent-check` — clean (ruff, plxt, pyright 0 errors, mypy success)
+- **Next concrete action:** begin Phase 2, Part B — relax `PipelexBundleBlueprint.validate_local_concept_references` (per-file) and add a library-level concept-reference check in `LibraryCrateFactory.make_from_blueprints`. NOTE: a shared `duplicate_ref_msg` helper now exists (`pipelex/libraries/collision_messages.py`) — reuse it for the Part B concept-collision path; do not add a 4th inline copy.
+- **Working tree (uncommitted — NOT committed, no authorization given):**
+  - `pipelex/core/pipes/pipe_blueprint.py` — added `PipeBlueprint.contract_equals(other)` (raw-string inputs+output equality; None/empty-dict treated alike). Home for the merge contract check; future dry-run substitutability should build on it. **Complete.**
+  - `pipelex/libraries/collision_messages.py` — NEW. `duplicate_ref_msg(ref_kind, ref, existing_source, incoming_source)` — single source of truth for same-file/cross-file duplicate-declaration wording. **Complete.**
+  - `pipelex/libraries/library_crate_factory.py` — concept + pipe collision branches both call `duplicate_ref_msg`; pipe-merge builds `PipeDeclaration(blueprint, source)` pairs and assigns the returned winner unconditionally (source_map follows the winner, `pop` when winner has no source). `_reconcile_pipe_collision` returns a `PipeDeclaration`, uses `contract_equals`, and tie-breaks two matching signatures deterministically via `_declaration_sort_key` (order-independent). Helpers `_contracts_match`/`_duplicate_pipe_msg` removed; `_contract_mismatch_msg` now takes declarations. **Complete.**
+  - `pipelex/libraries/library_manager.py` — concept-collision path in `_load_concepts_from_blueprints` now calls `duplicate_ref_msg` (removed the 3rd inline copy). **Complete.**
+  - `tests/unit/pipelex/libraries/test_library_crate_data.py` — reconciliation fixtures in domain `reconcile` (native `Text`), incl. new `SIG_CONCRETE_NO_SOURCE_BUNDLE` (sourceless concrete). **Complete.**
+  - `tests/unit/pipelex/libraries/test_library_crate.py` — reconciliation tests; sig+sig test rewritten to assert order-independence (same source_map + same fingerprint across load orders); added parametrized sourceless-concrete-clears-stale-source test. **Complete.**
+  - `TODOS.md` — this checkpoint update.
+- **Decisions/surprises since last checkpoint:**
+  - Applied a `/code-review` pass (xhigh). Fixes landed: source_map now always follows the reconciliation winner (no stale entry when a sourceless concrete wins); two matching signatures tie-break deterministically so the merged crate + fingerprint are load-order-independent; identity-based `winner is pipe_blueprint` coupling replaced by a `PipeDeclaration` return; contract comparison moved onto `PipeBlueprint.contract_equals`; the triplicate duplicate-declaration message consolidated into `collision_messages.duplicate_ref_msg`.
+  - Known v1 limitation (by design, documented): `contract_equals` is exact-string — same-domain qualified-vs-bare refs (`reconcile.X` vs `X`) and multiplicity-notation differences are treated as mismatches. The additive orchestrator must emit identical `inputs`/`output` strings on header and definition. Substitutability is deferred to the dry-run.
+  - Fixtures use native `Text` contracts so per-file `validate_local_concept_references` (still in force until Part B) passes at construction without declaring concepts.
 - **Open questions blocking progress:** none
 
 ---
@@ -41,7 +54,7 @@ The point of a checkpoint is a clean cold start: a new session reading the cold-
 
 ## Progress overview
 
-- [ ] **Phase 1 — Part A:** pipe signature/concrete reconciliation → 🛑 **Checkpoint A**
+- [x] **Phase 1 — Part A:** pipe signature/concrete reconciliation → 🛑 **Checkpoint A** ✅ (at checkpoint — stop here)
 - [ ] **Phase 2 — Part B:** concept references validate at library level → 🛑 **Checkpoint B**
 - [ ] **Phase 3 — End-to-end proof** + full suite + lint → 🛑 **Checkpoint C (UNBLOCK POINT)**
 - [ ] **Phase 4 — Handoff** (separate scope, `mthds-plugins` repo + `design.md`)
@@ -69,11 +82,11 @@ Whenever at least one side is a signature, the two declarations' **contracts mus
 
 ### Tasks
 
-- [ ] Replace the duplicate-detection branch in the pipe loop with a `_reconcile_pipe_collision(...)` call (snippet below).
-- [ ] Add `_reconcile_pipe_collision` (classmethod), `_contracts_match` (staticmethod), `_duplicate_pipe_msg` (the current same-file vs cross-file messages), and `_contract_mismatch_msg`.
-- [ ] `_contract_mismatch_msg` must read correctly for **both** signature+concrete and signature+signature (two headers can disagree). Phrase as "declared with mismatched contracts," not "a signature and its implementation."
-- [ ] Add unit tests + fixtures (see below).
-- [ ] `make agent-check` clean; libraries targeted suite green.
+- [x] Replace the duplicate-detection branch in the pipe loop with a `_reconcile_pipe_collision(...)` call (snippet below).
+- [x] Add `_reconcile_pipe_collision` (classmethod), `_contracts_match` (staticmethod), `_duplicate_pipe_msg` (the current same-file vs cross-file messages), and `_contract_mismatch_msg`.
+- [x] `_contract_mismatch_msg` must read correctly for **both** signature+concrete and signature+signature (two headers can disagree). Phrase as "declared with mismatched contracts," not "a signature and its implementation."
+- [x] Add unit tests + fixtures (see below).
+- [x] `make agent-check` clean; libraries targeted suite green.
 
 ```python
 # Pipes
@@ -149,18 +162,18 @@ The merge runs at *blueprint* level (raw strings, before concepts resolve), so o
 
 Keep existing `test_pipe_collision_*` (two concretes still raise). Add:
 
-- [ ] signature **then** concrete (cross-file) → concrete wins; `crate.pipes[ref].is_signature is False`; `source_map[ref]` is the concrete's file.
-- [ ] concrete **then** signature (reverse order) → concrete wins; same assertions (order-independence).
-- [ ] signature + signature, matching contract → one survives, still a signature.
-- [ ] signature + signature, mismatched contract → `PipeLibraryError`.
-- [ ] signature + concrete, mismatched inputs/output → `PipeLibraryError`.
-- [ ] signature with explicit `inputs` + concrete that **omits** `inputs` → `PipeLibraryError` (pins exact-match; documents the orchestrator requirement).
-- [ ] New fixtures: a `PipeSignatureBlueprint` for an existing concrete code (matching contract), a mismatched-contract concrete, a second signature variant. Mirror the `SCORING_*` shape.
+- [x] signature **then** concrete (cross-file) → concrete wins; `crate.pipes[ref].is_signature is False`; `source_map[ref]` is the concrete's file. — `test_signature_then_concrete_concrete_wins`
+- [x] concrete **then** signature (reverse order) → concrete wins; same assertions (order-independence). — `test_concrete_then_signature_concrete_wins`
+- [x] signature + signature, matching contract → one survives, still a signature. — `test_signature_plus_signature_matching_keeps_one_signature`
+- [x] signature + signature, mismatched contract → `PipeLibraryError`. — `test_signature_plus_signature_mismatched_raises`
+- [x] signature + concrete, mismatched inputs/output → `PipeLibraryError`. — `test_signature_plus_concrete_mismatched_inputs_raises`
+- [x] signature with explicit `inputs` + concrete that **omits** `inputs` → `PipeLibraryError` (pins exact-match; documents the orchestrator requirement). — `test_signature_with_inputs_plus_concrete_without_inputs_raises`
+- [x] New fixtures: a `PipeSignatureBlueprint` for an existing concrete code (matching contract), a mismatched-contract concrete, a second signature variant. Built a self-contained `reconcile` domain using native `Text` contracts (sidesteps per-file concept validation still active until Part B), rather than coupling to `SCORING_*`.
 
 ### Downstream — confirm only, no change expected
 
-- [ ] Signature pre-pass (`pipelex/pipeline/bundle_validator.py::_signature_pre_pass`, `pipelex/pipe_signature/signature_walk.py`) runs post-merge on the instantiated library — a reconciled signature is gone, a pending one still reported. No change.
-- [ ] `PipeLibrary` resolution sees only the winning blueprint. No change.
+- [x] Signature pre-pass (`pipelex/pipeline/bundle_validator.py::_signature_pre_pass`, `pipelex/pipe_signature/signature_walk.py`) runs post-merge on the instantiated library — a reconciled signature is gone, a pending one still reported. No change. (Confirmed: `test_bundle_validator.py` 13 passed, pipe_signature suites 43 passed.)
+- [x] `PipeLibrary` resolution sees only the winning blueprint. No change. (Confirmed via libraries targeted suite — 100 passed.)
 
 ### 🛑 CHECKPOINT A — MANDATORY STOP
 

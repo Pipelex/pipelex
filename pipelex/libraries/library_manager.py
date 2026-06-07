@@ -28,6 +28,7 @@ from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.validation import report_validation_error
 from pipelex.hub import get_class_registry, get_current_library
+from pipelex.libraries.collision_messages import duplicate_ref_msg
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.exceptions import (
     LibraryError,
@@ -564,18 +565,14 @@ class LibraryManager(LibraryManagerAbstract):
                     # Detect duplicate concept declarations across different bundles in the same library
                     if concept_ref in concept_source_in_this_load:
                         existing_source = concept_source_in_this_load[concept_ref]
-                        if existing_source == new_source:
-                            msg = (
-                                f"Concept '{concept_ref}' is declared twice in the same bundle file: '{existing_source}'. "
-                                "Please remove the duplicate declaration."
+                        raise ConceptLibraryError(
+                            duplicate_ref_msg(
+                                ref_kind="concept",
+                                ref=concept_ref,
+                                existing_source=str(existing_source) if existing_source else None,
+                                incoming_source=str(new_source) if new_source else None,
                             )
-                        else:
-                            msg = (
-                                f"Concept '{concept_ref}' is declared in two different bundle files: "
-                                f"'{existing_source}' and '{new_source}'. "
-                                "Please remove one of the declarations or rename one of the concepts."
-                            )
-                        raise ConceptLibraryError(msg)
+                        )
                     concept_source_in_this_load[concept_ref] = new_source
                     ref_to_entry[concept_ref] = (
                         blueprint.domain,

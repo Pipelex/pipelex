@@ -108,6 +108,17 @@ class PipeBlueprint(ABC, BaseModel):
     def is_signature(self) -> bool:
         return PipeCategory(self.pipe_category) is PipeCategory.PIPE_SIGNATURE
 
+    def contract_equals(self, other: "PipeBlueprint") -> bool:
+        """True if this blueprint and `other` declare the same contract (inputs + output).
+
+        Comparison is at the raw-string level (before concept refs resolve): the `inputs`
+        dicts must be equal — a missing `inputs` and an empty `inputs` are treated alike —
+        and the `output` strings must be identical. This is intentionally exact: it can only
+        reject, never wrongly accept. Refinement-aware substitutability (covariant output,
+        contravariant inputs, multiplicity) is the dry-run's job, not the merge's.
+        """
+        return (self.inputs or {}) == (other.inputs or {}) and self.output == other.output
+
     @property
     def pipe_dependencies(self) -> set[str]:
         """Return the set of pipe codes that this pipe depends on.
