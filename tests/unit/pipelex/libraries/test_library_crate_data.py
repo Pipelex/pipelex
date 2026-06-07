@@ -256,3 +256,33 @@ class BlueprintSamples:
             ),
         },
     )
+
+    # --- Phase 2 (Part B): cross-file concept references resolve at library level ---
+    # `crossref` declares a non-native concept `Summary` in one file and references it by bare
+    # code from a sibling file of the same domain. With per-file validation gone, both files
+    # construct, and the reference resolves against the merged crate.
+
+    # File A: declares the non-native concept `Summary`.
+    CROSSREF_CONCEPT_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/crossref_concept.mthds",
+        domain="crossref",
+        description="Cross-reference domain",
+        concept={
+            "Summary": ConceptBlueprint(description="A summary of a document"),
+        },
+    )
+
+    # File B: a pipe that references `Summary` (declared in file A) by bare code.
+    CROSSREF_PIPE_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/crossref_pipe.mthds",
+        domain="crossref",
+        description="Cross-reference domain",
+        pipe={
+            "make_summary": PipeLLMBlueprint(
+                description="Summarize a document",
+                inputs={"doc": "Text"},
+                output="Summary",
+                prompt="Summarize $doc.",
+            ),
+        },
+    )

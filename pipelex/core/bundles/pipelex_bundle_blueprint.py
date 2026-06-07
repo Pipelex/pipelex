@@ -143,49 +143,6 @@ class PipelexBundleBlueprint(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def validate_local_concept_references(self) -> Self:
-        """Validate that local concept references are declared in this bundle or are native concepts.
-
-        This validates two cases:
-        1. Concept codes without domain prefix (e.g., 'MyConceptName')
-        2. Concept refs with the same domain as this bundle (e.g., 'this_domain.MyConceptName')
-
-        External references (concepts from other domains) are not validated here - they're
-        assumed to be declared in their respective bundles and loaded via dependencies.
-        """
-        declared_concepts: set[str] = set(self.concept.keys()) if self.concept else set()
-        native_codes = {native.value for native in NativeConceptCode.values_list()}
-        all_refs = self._collect_local_concept_references()
-
-        undeclared_refs: list[str] = []
-        for concept_ref_or_code, context in all_refs:
-            # Cross-package references are validated at package level, not bundle level
-            if QualifiedRef.has_cross_package_prefix(concept_ref_or_code):
-                continue
-
-            # Parse the reference using QualifiedRef
-            ref = QualifiedRef.parse(concept_ref_or_code)
-
-            if ref.is_external_to(self.domain):
-                # External reference - skip validation (will be validated when loading dependencies)
-                continue
-
-            # Local reference (bare code or same domain) - validate
-            concept_code = ref.local_code
-            if concept_code not in declared_concepts and concept_code not in native_codes:
-                undeclared_refs.append(f"'{concept_ref_or_code}' in {context}")
-
-        if undeclared_refs:
-            msg = (
-                f"The following local concept references are not declared in domain '{self.domain}' at '{self.source}' "
-                f"and are not native concepts: {', '.join(undeclared_refs)}. "
-                f"Declared concepts: {sorted(declared_concepts) if declared_concepts else '(none)'}. "
-                f"Native concepts: {sorted(native_codes)}"
-            )
-            raise ValueError(msg)
-        return self
-
-    @model_validator(mode="after")
     def validate_local_pipe_references(self) -> Self:
         """Validate that domain-qualified pipe references pointing to this bundle's domain exist locally.
 
@@ -270,7 +227,18 @@ class PipelexBundleBlueprint(BaseModel):
 
         return pipe_refs
 
-    def _collect_local_concept_references(self) -> list[tuple[str, str]]:
+    def collect_concept_references(self) -> list[tuple[str, str]]:
+        """Collect all concept references from this bundle's concepts and pipes.
+
+        Mirrors collect_pipe_references(): returns every concept reference (bare code,
+        same-domain, external-domain, or cross-package) paired with a context path. The
+        caller decides which references to resolve and where. Reference resolution for
+        same-domain refs is performed at library level over the merged crate, not per file,
+        so a concept declared in one file can be referenced from a sibling file.
+
+        Returns:
+            List of (concept_ref_or_code, context_description) tuples
+        """
         local_refs: list[tuple[str, str]] = []
 
         # Collect from concepts

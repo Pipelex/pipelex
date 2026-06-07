@@ -14,26 +14,31 @@ Both are required. Part A alone does **not** unblock the goal: any pipe whose co
 > This block is the single source of truth for resuming in a fresh session. A new agent should read this first. Overwrite it at each checkpoint.
 
 - **Branch:** `feature/Support-recursive-design`
-- **Plan state:** ✅ finalized, **Phase 1 (Part A) complete — at Checkpoint A**
-- **Current phase:** Phase 1 done. Next: Phase 2 (Part B) — concept references validate at library level. **Do not start Phase 2 in this session** (checkpoint = stop).
-- **Last verified green (after `/code-review` fixes applied):**
-  - `tests/unit/pipelex/libraries/test_library_crate.py` — 21 passed (reconciliation tests now include order-independence + sourceless-winner cases)
-  - broad targeted suite (`libraries/` + `core/` + `pipes/` + `pipe_signature/` + `bundle_validator`) — 1490 passed, 1 pre-existing xfail (unrelated `pipe_condition_continue` bug)
-  - `make agent-check` — clean (ruff, plxt, pyright 0 errors, mypy success)
-- **Next concrete action:** begin Phase 2, Part B — relax `PipelexBundleBlueprint.validate_local_concept_references` (per-file) and add a library-level concept-reference check in `LibraryCrateFactory.make_from_blueprints`. NOTE: a shared `duplicate_ref_msg` helper now exists (`pipelex/libraries/collision_messages.py`) — reuse it for the Part B concept-collision path; do not add a 4th inline copy.
-- **Working tree (uncommitted — NOT committed, no authorization given):**
-  - `pipelex/core/pipes/pipe_blueprint.py` — added `PipeBlueprint.contract_equals(other)` (raw-string inputs+output equality; None/empty-dict treated alike). Home for the merge contract check; future dry-run substitutability should build on it. **Complete.**
-  - `pipelex/libraries/collision_messages.py` — NEW. `duplicate_ref_msg(ref_kind, ref, existing_source, incoming_source)` — single source of truth for same-file/cross-file duplicate-declaration wording. **Complete.**
-  - `pipelex/libraries/library_crate_factory.py` — concept + pipe collision branches both call `duplicate_ref_msg`; pipe-merge builds `PipeDeclaration(blueprint, source)` pairs and assigns the returned winner unconditionally (source_map follows the winner, `pop` when winner has no source). `_reconcile_pipe_collision` returns a `PipeDeclaration`, uses `contract_equals`, and tie-breaks two matching signatures deterministically via `_declaration_sort_key` (order-independent). Helpers `_contracts_match`/`_duplicate_pipe_msg` removed; `_contract_mismatch_msg` now takes declarations. **Complete.**
-  - `pipelex/libraries/library_manager.py` — concept-collision path in `_load_concepts_from_blueprints` now calls `duplicate_ref_msg` (removed the 3rd inline copy). **Complete.**
-  - `tests/unit/pipelex/libraries/test_library_crate_data.py` — reconciliation fixtures in domain `reconcile` (native `Text`), incl. new `SIG_CONCRETE_NO_SOURCE_BUNDLE` (sourceless concrete). **Complete.**
-  - `tests/unit/pipelex/libraries/test_library_crate.py` — reconciliation tests; sig+sig test rewritten to assert order-independence (same source_map + same fingerprint across load orders); added parametrized sourceless-concrete-clears-stale-source test. **Complete.**
+- **Plan state:** ✅ finalized, **Phase 1 (Part A) + Phase 2 (Part B) complete — at Checkpoint B**
+- **Current phase:** Phase 2 done. Next: Phase 3 — end-to-end multi-file `validate bundle <root> -L <dir>` integration proof + full `make agent-test`. **Do not start Phase 3 in this session** (checkpoint = stop).
+- **Last verified green (Part B):**
+  - `tests/unit/pipelex/libraries/test_library_crate_concept_references.py` — 16 passed (NEW: cross-file resolve, negative cross-file, native/external/cross-package skips, relocated undeclared cases).
+  - unit `libraries/` + `core/` + `builder/` — 1452 passed.
+  - integration `libraries/` + `core/` + `pipes/` + `builder/` + `pipeline/` + `pipe_signature/` — 357 passed, 1 pre-existing xfail (unrelated `pipe_condition_continue`).
+  - e2e + cli signature/validate suites — 20 passed.
+  - `make agent-check` — clean (ruff, plxt, pyright 0 errors, mypy success).
+- **Next concrete action:** begin Phase 3 — add an integration test under `tests/integration/pipelex/` using a multi-file fixture library with a **non-native** shared concept (e.g. `KeyFinding`): a header file forward-declaring `find_key_findings(...) -> KeyFinding` (`PipeSignature`) + a controller referencing it by bare code + a sibling definition file with the concrete `find_key_findings`. Assert lenient (`--allow-signatures`) passes with only the signature, strict passes once the definition is present, concrete wins. Then full `make agent-test`. The directory-load path batches all files into one `make_from_blueprints` call (`library_manager._load_mthds_files_into_library` → `load_from_blueprints`), so cross-file refs resolve — **verified by reading the loader, not yet by an integration test.**
+- **Part A working tree (already committed in `f5fd826f` — the prior cold-start block was stale on commit status):** `pipe_blueprint.py` (`contract_equals`), `collision_messages.py` (`duplicate_ref_msg`), `library_crate_factory.py` (reconciliation), `library_manager.py` (collision msg), Part A test fixtures/tests. Do not re-do.
+- **Part B working tree (uncommitted — NOT committed, no authorization given):**
+  - `pipelex/core/bundles/pipelex_bundle_blueprint.py` — removed `validate_local_concept_references` model_validator; renamed `_collect_local_concept_references` → public `collect_concept_references()`. **Complete.**
+  - `pipelex/libraries/library_crate_factory.py` — added `_validate_concept_references(blueprints, declared_concept_refs)` classmethod + a call from `make_from_blueprints` after the merge (before fingerprint). New imports: `NativeConceptCode`, `QualifiedRef`. **Complete.**
+  - `tests/unit/pipelex/libraries/test_library_crate_data.py` — added `CROSSREF_CONCEPT_BUNDLE` + `CROSSREF_PIPE_BUNDLE` (domain `crossref`, non-native `Summary`). **Complete.**
+  - `tests/unit/pipelex/libraries/test_library_crate_concept_references.py` — NEW module, `TestLibraryCrateConceptReferences`. **Complete.**
+  - `tests/unit/pipelex/core/bundles/test_pipelex_bundle_blueprint_concept_construction.py` — RENAMED from `..._concept_validation.py` (git mv), trimmed to construction smoke tests, class → `TestPipelexBundleBlueprintConceptConstruction`. **Complete.**
   - `TODOS.md` — this checkpoint update.
-- **Decisions/surprises since last checkpoint:**
-  - Applied a `/code-review` pass (xhigh). Fixes landed: source_map now always follows the reconciliation winner (no stale entry when a sourceless concrete wins); two matching signatures tie-break deterministically so the merged crate + fingerprint are load-order-independent; identity-based `winner is pipe_blueprint` coupling replaced by a `PipeDeclaration` return; contract comparison moved onto `PipeBlueprint.contract_equals`; the triplicate duplicate-declaration message consolidated into `collision_messages.duplicate_ref_msg`.
-  - Known v1 limitation (by design, documented): `contract_equals` is exact-string — same-domain qualified-vs-bare refs (`reconcile.X` vs `X`) and multiplicity-notation differences are treated as mismatches. The additive orchestrator must emit identical `inputs`/`output` strings on header and definition. Substitutability is deferred to the dry-run.
-  - Fixtures use native `Text` contracts so per-file `validate_local_concept_references` (still in force until Part B) passes at construction without declaring concepts.
+- **Decisions/surprises (Part B):**
+  - "Promote a public collector" resolved as a **rename** (`_collect_local_concept_references` → `collect_concept_references`), not a wrapper — mirrors `collect_pipe_references`, no redundancy. The TODOS' literal "keep `_collect_local_concept_references`" meant keep the *logic*.
+  - The cold-start note to "reuse `duplicate_ref_msg` for the Part B concept-collision path" did **not** apply: Part B is about *undeclared* refs (a distinct message), not duplicate declarations. `duplicate_ref_msg` and the duplicate-concept guard were left untouched; no 4th copy was needed or added.
+  - Cross-package concept refs only appear in `refines`/structure fields (pipe input/output's multiplicity parser rejects `->`); the cross-package skip is tested via a structure `concept_ref`.
+  - Helper takes `declared_concept_refs: set[str]` (not the concept dict) because `ConceptBlueprint` is a `TYPE_CHECKING`-only import in the factory and would NameError as a runtime param annotation.
 - **Open questions blocking progress:** none
+- **Checkpoint B `/code-review` (xhigh) outcome:** ran after Part B. Two real findings **folded into Phase 3** (see "Review findings folded in" under Phase 3): **#1** the new check is batch-local → false-positives valid cross-file refs loaded in separate batches (CONFIRMED LIVE; not a regression; fix = make the check library-aware); **#2/#3** undeclared concept refs surface as a raw untranslated `ConceptLibraryError` (regression in validate UX; fix = add a translation arm). **#5** (a doc-note mechanism error) was fixed in this block. **#4** stays the recorded deferred item; **#6** (partial-hierarchical typo skipped as external) noted as a pre-existing gap. One candidate (cross-package ref crashing the collector) was **refuted** — rejected at blueprint construction, never reaches the new check.
+- **Deferred (see "Deferred follow-ups" below):** the concepts-only loader no longer validates undeclared structure `concept_ref`/`item_concept_ref` at construction (narrow, secondary path; refines still raises via `ConceptFactoryError`). Not blocking; recursive flow uses the full load path which is fully covered.
 
 ---
 
@@ -54,8 +59,8 @@ The point of a checkpoint is a clean cold start: a new session reading the cold-
 
 ## Progress overview
 
-- [x] **Phase 1 — Part A:** pipe signature/concrete reconciliation → 🛑 **Checkpoint A** ✅ (at checkpoint — stop here)
-- [ ] **Phase 2 — Part B:** concept references validate at library level → 🛑 **Checkpoint B**
+- [x] **Phase 1 — Part A:** pipe signature/concrete reconciliation → 🛑 **Checkpoint A** ✅
+- [x] **Phase 2 — Part B:** concept references validate at library level → 🛑 **Checkpoint B** ✅ (at checkpoint — stop here)
 - [ ] **Phase 3 — End-to-end proof** + full suite + lint → 🛑 **Checkpoint C (UNBLOCK POINT)**
 - [ ] **Phase 4 — Handoff** (separate scope, `mthds-plugins` repo + `design.md`)
 
@@ -195,24 +200,25 @@ A per-file validator cannot tell a typo from a valid cross-file ref, so it must 
 
 ### Tasks
 
-- [ ] **Relax the per-file validator.** Remove the same-domain "must be declared locally" gate. Syntax/multiplicity validation stays (in `PipeBlueprint.generic_validate_inputs/output` and `ConceptBlueprint`). External-domain + cross-package refs remain deferred. With the local gate gone the validator does nothing useful → remove `validate_local_concept_references`; **keep** the reference collectors (`_collect_local_concept_references`, `_collect_local_refs_from_pipe`, `_collect_local_refs_from_concept`).
-- [ ] **Promote a public collector.** Add `collect_concept_references()` on `PipelexBundleBlueprint` (mirroring the existing public `collect_pipe_references()`) returning `(concept_ref_or_code, context)` pairs, for the factory to consume.
-- [ ] **Add library-level reference check** in `LibraryCrateFactory.make_from_blueprints`, after the merge (full `concepts` dict known). For each blueprint's collected refs (factory has each ref's `domain` + `source`):
-    - skip cross-package (`->`); skip external-domain (qualified to a different domain);
-    - otherwise qualify bare/same-domain to `domain.Code` and require it in merged `concepts` **or** native;
-    - accumulate undeclared refs with context + source; raise `ConceptLibraryError` listing **all** of them with the same message content as today (offending ref, context path, source file, sorted declared concepts, sorted native concepts).
-    - Runs **always** (not gated by `--allow-signatures`): a signature mocks a pipe's output *value*, not the concept's existence.
-- [ ] **Duplicate-concept guard unchanged** — two declarations of the same concept code stay a `ConceptLibraryError`.
-- [ ] Verify the `ConceptLibraryError` from `make_from_blueprints` surfaces cleanly through `validate bundle` (load path: `library_manager.load_from_blueprints` → `make_from_blueprints`). It is a `PipelexError` subclass, so it should propagate like the others; confirm the CLI message is clean.
-- [ ] Grep the suite for other tests that construct a single-file bundle expecting a per-file "not declared in domain" `ValidationError` (beyond the dedicated file) and relocate/adjust them.
+- [x] **Relax the per-file validator.** Removed `validate_local_concept_references` (the same-domain "must be declared locally" gate). Syntax/multiplicity validation stays (`PipeBlueprint`/`ConceptBlueprint` field validators). Kept the reference collectors.
+- [x] **Promote a public collector.** Renamed `_collect_local_concept_references` → public `collect_concept_references()` (mirrors `collect_pipe_references()`); `_collect_local_refs_from_pipe`/`_concept` stay private. (No redundant wrapper — "promote" = rename to public.)
+- [x] **Add library-level reference check** `LibraryCrateFactory._validate_concept_references`, called from `make_from_blueprints` after the merge:
+    - skips cross-package (`->`) and external-domain refs; qualifies bare/same-domain to `domain.Code` and requires it in merged `concepts` **or** native;
+    - accumulates **all** undeclared refs (ref + context + source) and raises one `ConceptLibraryError` listing each (with "not declared in domain '<domain>'"), plus sorted declared + native concepts;
+    - takes `declared_concept_refs: set[str]` (not the concept dict) to sidestep the `TYPE_CHECKING`-only `ConceptBlueprint` param-annotation pitfall;
+    - runs **always** (no `allow_signatures` param on `make_from_blueprints`).
+- [x] **Duplicate-concept guard unchanged** — untouched; still raises in-loop in `make_from_blueprints` and `_load_concepts_from_blueprints`.
+- [x] Verified `ConceptLibraryError` propagation: it is **not** caught by `_translate_to_validate_bundle_error` (whose arms are interpreter/factory/pydantic/run/dry-run/signature). It propagates to the CLI root as a `PipelexError` — **identical** to the already-shipped duplicate-concept `ConceptLibraryError` from the same function. Full CLI-render e2e is folded into Phase 3.
+- [x] Grepped the suite: the only other "not declared in domain" expectation is `test_pipelex_bundle_blueprint_pipe_validation.py`, which is for **pipe** refs (`validate_local_pipe_references`, untouched). No relocation needed there.
 
 ### Phase 2 tests
 
-- [ ] **Relocate** `test_invalid_*` cases from `tests/unit/pipelex/core/bundles/test_pipelex_bundle_blueprint_concept_validation.py` to a library-level test (assert `ConceptLibraryError` from `make_from_blueprints`, same message substrings). `test_valid_*` per-file-construction cases can stay (construction still succeeds), but reference-resolution coverage now lives at library level.
-- [ ] **Positive cross-file:** concept declared in file A, referenced by bare code from a pipe in file B (same domain) → crate builds, ref resolves.
-- [ ] **Negative cross-file:** concept referenced (bare) but declared in no file → `ConceptLibraryError` naming the ref + source.
-- [ ] Keep duplicate-concept collision tests (cross-file + same-file) green.
-- [ ] `make agent-check` clean; core + libraries targeted suites green.
+- [x] **Relocated** the `test_invalid_*` + `test_error_message_*` cases out of the per-file bundle test into a new library-level module `tests/unit/pipelex/libraries/test_library_crate_concept_references.py` (assert `ConceptLibraryError` from `make_from_blueprints`, same substrings). The per-file file was trimmed to construction smoke tests and renamed `test_pipelex_bundle_blueprint_concept_construction.py` (class `TestPipelexBundleBlueprintConceptConstruction`).
+- [x] **Positive cross-file** (order-independent, parametrized): `CROSSREF_CONCEPT_BUNDLE` (declares `Summary`) + `CROSSREF_PIPE_BUNDLE` (refers `Summary` by bare code) → crate builds, ref resolves.
+- [x] **Negative cross-file:** `CROSSREF_PIPE_BUNDLE` alone → `ConceptLibraryError` naming `Summary`, context `pipe.make_summary.output`, and source `/fake/crossref_pipe.mthds`.
+- [x] Deferred-skip coverage: native, external-domain, and cross-package (structure `concept_ref` `docs->documents.Document`) refs do **not** raise.
+- [x] Duplicate-concept collision tests (cross-file + same-file) still green (in `test_library_crate.py`).
+- [x] `make agent-check` clean; core + libraries (+ builder + pipeline + pipe_signature + e2e/cli signature) targeted suites green.
 
 ### 🛑 CHECKPOINT B — MANDATORY STOP
 
@@ -234,6 +240,16 @@ The real proof that both parts compose: a multi-file `validate bundle <root> -L 
 - [ ] Run **`make agent-test`** (full suite — change spans `libraries/` + `core/` + load path). Must be green.
 - [ ] `make agent-check` clean.
 
+### Review findings folded in from the Checkpoint B `/code-review` (xhigh) — fix here
+
+These are end-to-end validate-behavior issues surfaced by the Part B review; they belong in Phase 3, not as a Part B re-open.
+
+- [ ] **#1 — `_validate_concept_references` is batch-local (false-positive on valid cross-file refs loaded in separate batches).** `LibraryCrateFactory._validate_concept_references` checks refs only against `set(concepts.keys())` from the blueprints in *that* `make_from_blueprints` call — it has no knowledge of concepts already present in the live `Library` (loaded by a prior, separate `load_from_blueprints`) or in dependency libraries. **CONFIRMED LIVE:** load file A (declares `crossref.Summary`) then file B (bare `Summary` ref) in two separate `load_from_blueprints` calls into the same library → batch 2 wrongly raises `ConceptLibraryError`. Net effect: the cross-file goal is delivered only for the **single-batch / whole-dir** path (`validate_bundles_from_directory`, and `validate bundle <root> -L <dir>` when `root ∈ dir` so it's already loaded in the dir batch). Broken for `root ∉ dir` referencing a `-L` concept, and for any incremental/programmatic load sequence; also `get_crate` (cumulative) and per-batch `load_from_blueprints` disagree on the same library. **Not a regression** (the old per-file validator failed cross-file too), and the docstring's "merged library" oversells it.
+    - Fix direction (decide before implementing): make the check **library-aware** — move it into `load_from_crate` where the live `Library`'s existing concept refs (and dependency-library refs) are available, OR pass the existing declared refs into `make_from_blueprints`. Validate against `batch concepts ∪ already-loaded library concepts ∪ native`. Fix the docstring accordingly.
+    - The Phase 3 integration test **must exercise the cross-batch case** (e.g. concept file loaded via `-L` dir, then a root file referencing it loaded separately) so this is actually proven, not just the single-batch happy path.
+- [ ] **#2 / #3 — undeclared concept refs surface as a raw, untranslated `ConceptLibraryError` (lost structured reporting + ugly CLI).** `ConceptLibraryError` from `make_from_blueprints` has no arm in `_translate_to_validate_bundle_error` (`pipelex/pipeline/validate_bundle.py`), and `_validate_pipe_or_bundle` (`pipelex/cli/commands/validate/_validate_core.py`) only catches `FileNotFoundError`/`ValidateBundleError` — so it propagates raw to the typer root. Regression vs the deleted per-file validator, which raised a pydantic `ValidationError` → `PipelexInterpreterError` → structured `ValidateBundleError` (domain/source/concept_code). Also `_load_mthds_files_into_library` only wraps `ValidationError`, so the directory-load path loses its "Could not load blueprints from [files]" file-context wrapper.
+    - Fix: add a `ConceptLibraryError`/`LibraryError` arm to `_translate_to_validate_bundle_error` (and widen the `_load_mthds_files_into_library` catch) so undeclared-ref errors become clean structured `ValidateBundleError`s. This also fixes the **pre-existing** duplicate-concept `ConceptLibraryError`, which surfaces raw the same way today. Add a test asserting the CLI/`validate_bundle` surface is clean for an undeclared cross-file ref.
+
 ### 🛑 CHECKPOINT C — MANDATORY STOP (UNBLOCK POINT)
 
 Run the **Checkpoint protocol** with the **full** `make agent-test`. This is the unblock point: workers can add definition files in parallel against forward-declared signatures — no in-place overwrites, no transient collisions. Record the green full-suite result and prepare the handoff notes for Phase 4. Suggested commit message if authorized: `test(libraries): end-to-end additive multi-file library (signature + cross-file concept)`.
@@ -249,6 +265,12 @@ Different repo / likely a fresh session. Do not start before Checkpoint C is gre
 - [ ] Adopt the additive flow in the `mthds-vibe` orchestrator and the `mthds-signature-expander` worker.
 
 ---
+
+## Deferred follow-ups
+
+- **Concepts-only loader skips structure concept-ref validation.** Removing the per-file `validate_local_concept_references` (Part B) means the lightweight concepts-only path (`LibraryManager.load_concepts_only_from_blueprints`, used by `validate_bundle.load_concepts_only*`) no longer rejects an undeclared `concept_ref`/`item_concept_ref` in a concept **structure** field at blueprint construction. **Verified live:** an undeclared structure `concept_ref` loads silently (surfaces only as a debug-logged forward-ref rebuild failure, not a raised error); an undeclared **`refines`** still *does* raise on this path, but via `ConceptFactoryError` during structure-class generation — **not** via `ConceptLibrary.validation_static` (that `@model_validator` does not fire on `add_concepts`, which mutates `root` in place with no `validate_assignment`). The full load path (`load_from_blueprints` → `make_from_blueprints`) — which the recursive/additive flow uses — is fully covered by the new `_validate_concept_references`. Proper fix: validate structure concept refs against the loaded concept set on the concepts-only path too (or fold it into a shared check), so both paths are symmetric. Narrow, secondary path; not blocking the feature.
+
+- **Pre-existing gap (noted, not fixed): partial-hierarchical same-domain typo skipped as external.** In `_validate_concept_references` (and identically in the old per-file validator), a ref like `legal.Foo` when the bundle domain is `legal.contracts` is treated as external (`is_external_to('legal.contracts')` is True because `legal` != `legal.contracts`) and skipped — so the typo escapes the check and only fails later at resolution. Same `QualifiedRef.is_external_to` logic everywhere; not introduced by Part B. Fixing would require a "is `domain_path` a prefix/ancestor of the bundle domain?" notion rather than exact equality — out of scope for this feature.
 
 ## Decisions (resolved)
 
