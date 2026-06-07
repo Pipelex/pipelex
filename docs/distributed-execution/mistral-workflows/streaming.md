@@ -22,7 +22,7 @@ async with Task(type="pipelex_progress", state={"completed_steps": []}) as task:
     await task.update_state({"completed_steps": task.state["completed_steps"] + ["answer_question"]})
 ```
 
-Mistral Workflows wraps each update with workflow/activity context and publishes it over NATS for consumers to subscribe to.
+Mistral Workflows wraps each update with workflow/activity context and publishes it through its event streaming system, which consumers subscribe to via the Workflows client's event-streaming APIs.
 
 ## Two granularities
 

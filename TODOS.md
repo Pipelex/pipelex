@@ -4,14 +4,14 @@ What this PR does, how, and why it's the right shape. Base branch: `dev`.
 
 > `dev` has been merged in (distributed cost reporting, #967/#968). See the "Tracing reconciliation" section below for how the bridge was realigned onto dev's unified tracing assembly.
 
-The diff looks large (~140 files) but the **code** core is small and concentrated. Concentrate review on:
+The **code** core is small and concentrated. Concentrate review on:
 
 - `pipelex/runtime_bridge/` — the new package (the point of the PR)
 - `pipelex/temporal/tprl_pipe/act_*.py` — the thin-wrapper rewiring
 - `pipelex/hub.py` — the `scoped_pipe_router` addition
 - `tests/{unit,integration}/pipelex/runtime_bridge/`
 
-**Out of scope for review — please disregard:** the `/workflows` skill under `.claude/skills/workflows/` accounts for most of the diff's line count but is **not part of this PR's work**. It was vendored from Mistral's own (drafty) Workflows skill and adapted for Claude Code; it rode along on this branch only for convenience. Do not review it as PR content. Internal triage notes under `wip/` are likewise not review material.
+**Removed from this PR:** the vendored `/workflows` skill under `.claude/skills/workflows/` (a verbatim copy of Mistral's own drafty Workflows skill that had ridden along on this branch for convenience) has been deleted — it was never part of this PR's work. Internal triage notes under `wip/` are not review material.
 
 ## What it does
 

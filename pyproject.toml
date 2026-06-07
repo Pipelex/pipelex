@@ -308,7 +308,6 @@ exclude_lines = [
 
 [tool.ruff]
 exclude = [
-  ".claude/skills/workflows",
   ".cursor",
   ".git",
   ".github",

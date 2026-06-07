@@ -15,12 +15,14 @@ Pipes are invoked through `run_pipe_via_bridge`, which takes a `PipelexPipeRunIn
 
 | Mode | What it does | Requires |
 |------|--------------|----------|
-| `DIRECT` | Runs the pipe in-process, inside the calling activity, blocking until it completes. Fastest feedback, simplest ops. The default. | Pipelex core |
-| `TEMPORAL_BLOCKING` | Dispatches the pipe as a Pipelex Temporal workflow and awaits completion. The pipe runs durably on your own Temporal worker fleet. | `pipelex[temporal]` |
-| `TEMPORAL_FIRE_AND_FORGET` | Dispatches the pipe as a Pipelex Temporal workflow and returns immediately with the `workflow_id`. Completion is signalled out-of-band via a delivery assignment (webhook / storage). | `pipelex[temporal]`, and `delivery_assignment_dump` |
-| `MISTRAL_NATIVE` | Decomposes the pipe into native Mistral Workflows primitives — controllers as child workflows, leaf operators as activities — surfacing per-step retry, signals, and cancellation through the host runtime. | `pipelex-mistralai-workflows` |
+| `direct` | Runs the pipe in-process, inside the calling activity, blocking until it completes. Fastest feedback, simplest ops. The default. | Pipelex core |
+| `temporal_blocking` | Dispatches the pipe as a Pipelex Temporal workflow and awaits completion. The pipe runs durably on your own Temporal worker fleet. | `pipelex[temporal]` |
+| `temporal_fire_and_forget` | Dispatches the pipe as a Pipelex Temporal workflow and returns immediately with the `workflow_id`. Completion is signalled out-of-band via a delivery assignment (webhook / storage). | `pipelex[temporal]`, and `delivery_assignment_dump` |
+| `mistral_native` | Decomposes the pipe into native Mistral Workflows primitives — controllers as child workflows, leaf operators as activities — surfacing per-step retry, signals, and cancellation through the host runtime. | `pipelex-mistralai-workflows` |
 
-For local and most in-activity use, `DIRECT` is the right default: the pipe simply runs where the activity runs, and Mistral Workflows provides the durability and retry around the activity as a whole.
+The `Mode` values above are the literal strings you set on the `execution_mode` field — lowercase, matching the `PipelexExecutionMode` enum values. (Mode names written in uppercase elsewhere in this guide refer to the same modes by name.)
+
+For local and most in-activity use, `direct` is the right default: the pipe simply runs where the activity runs, and Mistral Workflows provides the durability and retry around the activity as a whole.
 
 ## Input fields that matter
 
@@ -30,7 +32,7 @@ For local and most in-activity use, `DIRECT` is the right default: the pipe simp
 - `inputs` — the pipe's inputs, as a JSON dict.
 - `output_name` — optional override for the output variable name.
 - `pipeline_run_id`, `user_id` — identity carried into tracing and observability.
-- `execution_mode` — one of the modes above (defaults to `DIRECT`).
+- `execution_mode` — one of the modes above (defaults to `direct`).
 - `library_crate_dump` — an optional serialized library snapshot. Use it when the pipe isn't already loaded at boot: the bridge opens a per-call scoped library from the crate, runs the pipe, and tears it down afterward. This is the dump-based library transport that lets a worker run methods it didn't load at startup.
 - `delivery_assignment_dump` — required for `TEMPORAL_FIRE_AND_FORGET`; describes where to deliver the result (webhook / storage).
 

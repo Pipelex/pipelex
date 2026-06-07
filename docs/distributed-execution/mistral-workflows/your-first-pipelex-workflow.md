@@ -85,7 +85,7 @@ You can also start it programmatically with the Mistral SDK via `client.workflow
 ## What just happened
 
 - The activity called `run_pipe_via_bridge`, which **booted Pipelex on first call** (idempotent — subsequent activities reuse the running instance).
-- With no `execution_mode` set, the pipe ran in **`DIRECT`** mode: in-process inside the activity, blocking until it completed.
+- With no `execution_mode` set, the pipe ran in **`direct`** mode: in-process inside the activity, blocking until it completed.
 - The bridge returned a `PipelexPipeRunOutput` — `output_dict`, `main_stuff_name`, `pipeline_run_id`, `is_completed`, and more — which the activity serialized with `model_dump()`.
 - The boundary is **JSON-only**: no Pipelex internal types (`PipeJob`, `WorkingMemory`, `PipeOutput`) cross the activity edge, which is what keeps the pipe replayable and the activity serializable.
 
