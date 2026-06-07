@@ -44,6 +44,8 @@ async def validate_all_core(
         allow_signatures=allow_signatures,
     )
 
+    # No `pending_signatures` here by design — see validate_all in builder/operations/validate_ops.py:
+    # it is a per-bundle top-down-build nudge surfaced only by `validate bundle`, not the whole-library sweep.
     return {
         "success": True,
         "validated_pipes": build_validated_pipes(dry_run_results),

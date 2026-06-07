@@ -39,6 +39,10 @@ async def validate_all(
         library_dirs=[str(library_dir) for library_dir in library_dirs] if library_dirs else None,
     )
 
+    # No `pending_signatures` here by design: it is a per-bundle, top-down-build nudge ("which headers
+    # are still unimplemented in this bundle"), surfaced only by `validate bundle`. The validate-all
+    # sweep is a whole-library check, not a build step — and `acquire_and_validate` tears its library
+    # down before returning, so the set could not be computed post-hoc without reshaping a shared method.
     return {
         "success": True,
         "validated_pipes": build_validated_pipes(dry_run_results),
