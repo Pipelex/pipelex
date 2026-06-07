@@ -43,10 +43,10 @@ prompt = "Echo the $subject as a topic"
 """
 
 
-def _config(*, generate_graph: bool, generate_costs: bool, full_data: bool = False) -> PipelineExecutionConfig:
+def _config(*, generate_graph: bool, generate_usage: bool, full_data: bool = False) -> PipelineExecutionConfig:
     return get_config().pipelex.pipeline_execution_config.with_execution_overrides(
         generate_graph=generate_graph,
-        generate_costs=generate_costs,
+        generate_usage=generate_usage,
         mock_inputs=True,
         force_include_full_data=full_data or None,
     )
@@ -68,7 +68,7 @@ class TestDirectTracingAssembly:
     async def test_costs_on_populates_tokens_usages(self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture) -> None:
         self._enable_ndjson_tracing(mocker, str(tmp_path_factory.mktemp("traces_costs_on")))
 
-        pipe_output = await self._run(_config(generate_graph=True, generate_costs=True))
+        pipe_output = await self._run(_config(generate_graph=True, generate_usage=True))
 
         assert pipe_output.tokens_usages is not None
         assert len(pipe_output.tokens_usages) >= 1
@@ -79,7 +79,7 @@ class TestDirectTracingAssembly:
         """F1 (DIRECT): a costs-only run must not produce a node-less GraphSpec under --no-graph."""
         self._enable_ndjson_tracing(mocker, str(tmp_path_factory.mktemp("traces_costs_only")))
 
-        pipe_output = await self._run(_config(generate_graph=False, generate_costs=True))
+        pipe_output = await self._run(_config(generate_graph=False, generate_usage=True))
 
         assert pipe_output.tokens_usages is not None
         assert len(pipe_output.tokens_usages) >= 1
@@ -88,7 +88,7 @@ class TestDirectTracingAssembly:
     async def test_graph_only_leaves_tokens_usages_none(self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture) -> None:
         self._enable_ndjson_tracing(mocker, str(tmp_path_factory.mktemp("traces_graph_only")))
 
-        pipe_output = await self._run(_config(generate_graph=True, generate_costs=False))
+        pipe_output = await self._run(_config(generate_graph=True, generate_usage=False))
 
         assert pipe_output.graph_spec is not None
         assert pipe_output.tokens_usages is None
@@ -98,7 +98,7 @@ class TestDirectTracingAssembly:
         self._enable_ndjson_tracing(mocker, str(tmp_path_factory.mktemp("traces_graph_full")))
         render_spy = mocker.spy(StuffContent, "rendered_pretty_html")
 
-        await self._run(_config(generate_graph=True, generate_costs=True, full_data=True))
+        await self._run(_config(generate_graph=True, generate_usage=True, full_data=True))
 
         assert render_spy.call_count >= 1
 
@@ -107,7 +107,7 @@ class TestDirectTracingAssembly:
         self._enable_ndjson_tracing(mocker, str(tmp_path_factory.mktemp("traces_costs_full")))
         render_spy = mocker.spy(StuffContent, "rendered_pretty_html")
 
-        pipe_output = await self._run(_config(generate_graph=False, generate_costs=True, full_data=True))
+        pipe_output = await self._run(_config(generate_graph=False, generate_usage=True, full_data=True))
 
         assert render_spy.call_count == 0
         # And the usage still rode back — the optimization didn't break cost reporting.

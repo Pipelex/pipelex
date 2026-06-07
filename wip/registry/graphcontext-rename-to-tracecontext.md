@@ -1,6 +1,15 @@
-# Deferred: rename `GraphContext` → `TraceContext`
+# Done: rename `GraphContext` → `TraceContext`
 
-**Status: DECIDED, DEFERRED.** Direction approved (Option 1 below). Not done in this PR — capture-only, to land as its own clean rename change. A companion rename rides along in the same pass: align the internal usage-gate flag to the layer it gates (`is_generate_costs` → `is_generate_usage`). See "Companion rename" below.
+**Status: DONE (Option 1).** Landed on branch `refactor/Renamings` as its own change, separate from #967. As-built:
+
+- `GraphContext` → `TraceContext`; file `pipelex/graph/graph_context.py` → `pipelex/graph/trace_context.py`; attribute `graph_context` → `trace_context` everywhere (incl. `JobMetadata.trace_context`). Class + module docstrings re-document the object as the shared per-execution trace transport with graph and usage as two streams over one node tree.
+- Companion gate rename: `PipelineExecutionConfig.is_generate_costs` → `is_generate_usage` (+ key in all three `pipelex.toml` files), and the override param `with_execution_overrides(generate_costs=…)` → `generate_usage=…`, plus the `pipeline_run_setup.py` / `runner.py` reads. The **cost-domain renderer stays cost-named**: `render_run_cost_report(is_generate_costs=…)` and `cost_report_renderer.py` are untouched — the seam is `render_run_cost_report(is_generate_costs=execution_config.is_generate_usage)` ("if usage was generated, render the cost view"). The public `--costs` CLI flag is unchanged; it maps to `generate_usage=costs`.
+- **Deferred (NOT done this pass):** the optional `graph_id` → `run_id` nit. It ripples into the deliberately graph-named `GraphTracerManager.open_tracer(graph_id=…)` plumbing and the `make_node_id` format; left for a focused follow-up. The `GraphTracer` / `GraphTracerManager` / `GraphTracerProtocol` family stays graph-named (they own the graph stream).
+- Published doc `docs/under-the-hood/execution-graph-tracing.md` updated to the new identifiers. `make agent-check`, `make tb`, and the suite are green.
+
+Original decision record (preserved below).
+
+A companion rename rides along in the same pass: align the internal usage-gate flag to the layer it gates (`is_generate_costs` → `is_generate_usage`). See "Companion rename" below.
 
 ## The problem
 

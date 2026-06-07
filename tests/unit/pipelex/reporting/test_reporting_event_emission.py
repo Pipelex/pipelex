@@ -19,7 +19,7 @@ from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.config import get_config
 from pipelex.graph.graph_config import DataInclusionConfig
-from pipelex.graph.graph_context import GraphContext
+from pipelex.graph.trace_context import TraceContext
 from pipelex.pipeline.job_metadata import JobMetadata, UnitJobId
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
@@ -36,14 +36,14 @@ DATA_INCLUSION_OFF = DataInclusionConfig(
 
 def _make_test_llm_job(
     pipeline_run_id: str,
-    graph_context: GraphContext | None = None,
+    trace_context: TraceContext | None = None,
 ) -> LLMJob:
     """Create a minimal LLMJob for testing event emission."""
     now = datetime.now(timezone.utc)
     job_metadata = JobMetadata(
         user_id="test_user",
         pipeline_run_id=pipeline_run_id,
-        graph_context=graph_context,
+        trace_context=trace_context,
         started_at=now,
         completed_at=now + timedelta(seconds=1),
         unit_job_id=UnitJobId.LLM_GEN_TEXT,
@@ -64,14 +64,14 @@ def _make_test_llm_job(
     )
 
 
-def _make_graph_context(
+def _make_trace_context(
     graph_id: str,
     parent_node_id: str | None = None,
     tracer_key: str | None = None,
     node_sequence: int = 0,
-) -> GraphContext:
-    """Create a GraphContext for testing with lookup_key resolution."""
-    return GraphContext(
+) -> TraceContext:
+    """Create a TraceContext for testing with lookup_key resolution."""
+    return TraceContext(
         graph_id=graph_id,
         tracer_key=tracer_key,
         parent_node_id=parent_node_id,
@@ -89,7 +89,7 @@ class TestReportingEventEmission:
     def _make_reporting_manager_with_event_log(self) -> tuple[ReportingManager, InMemoryEventLog]:
         """Create a ReportingManager configured with an event log.
 
-        The context_key is PIPELINE_RUN_ID, matching the lookup_key of GraphContexts
+        The context_key is PIPELINE_RUN_ID, matching the lookup_key of TraceContexts
         created with graph_id=PIPELINE_RUN_ID and no tracer_key.
         """
         event_log = InMemoryEventLog()
@@ -111,27 +111,27 @@ class TestReportingEventEmission:
         """UsageReportEvent is emitted when reporting an LLM inference job with event_log set."""
         manager, event_log = self._make_reporting_manager_with_event_log()
 
-        graph_context = _make_graph_context(graph_id=self.PIPELINE_RUN_ID)
-        llm_job = _make_test_llm_job(self.PIPELINE_RUN_ID, graph_context=graph_context)
+        trace_context = _make_trace_context(graph_id=self.PIPELINE_RUN_ID)
+        llm_job = _make_test_llm_job(self.PIPELINE_RUN_ID, trace_context=trace_context)
         manager.report_inference_job(llm_job)
 
         events = event_log.read_events(self.PIPELINE_RUN_ID)
         usage_events = [evt for evt in events if isinstance(evt, UsageReportEvent)]
         assert len(usage_events) == 1
         assert usage_events[0].tokens_usage.nb_tokens_by_category[TokenCategory.INPUT] == 100
-        assert usage_events[0].node_id == "unknown"  # No graph_context parent set
+        assert usage_events[0].node_id == "unknown"  # No trace_context parent set
 
-    def test_report_inference_job_captures_node_id_from_graph_context(self) -> None:
+    def test_report_inference_job_captures_node_id_from_trace_context(self) -> None:
         """UsageReportEvent captures the parent node_id from graph context."""
         manager, event_log = self._make_reporting_manager_with_event_log()
 
-        graph_context = _make_graph_context(
+        trace_context = _make_trace_context(
             graph_id=self.PIPELINE_RUN_ID,
             parent_node_id="test-graph:node_42",
             node_sequence=43,
         )
 
-        llm_job = _make_test_llm_job(self.PIPELINE_RUN_ID, graph_context=graph_context)
+        llm_job = _make_test_llm_job(self.PIPELINE_RUN_ID, trace_context=trace_context)
         manager.report_inference_job(llm_job)
 
         events = event_log.read_events(self.PIPELINE_RUN_ID)
@@ -167,8 +167,8 @@ class TestReportingEventEmission:
         manager, event_log = self._make_reporting_manager_with_event_log()
         mocker.patch.object(event_log, "emit", side_effect=emit_error)
 
-        graph_context = _make_graph_context(graph_id=self.PIPELINE_RUN_ID)
-        llm_job = _make_test_llm_job(self.PIPELINE_RUN_ID, graph_context=graph_context)
+        trace_context = _make_trace_context(graph_id=self.PIPELINE_RUN_ID)
+        llm_job = _make_test_llm_job(self.PIPELINE_RUN_ID, trace_context=trace_context)
 
         with caplog.at_level(logging.WARNING):
             # Must not raise — the failure is logged and dropped.
@@ -181,8 +181,8 @@ class TestReportingEventEmission:
         manager = ReportingManager()
         manager.setup()
 
-        # A job whose graph_context is None must not emit anything and must not raise.
-        manager.report_inference_job(_make_test_llm_job("direct_run", graph_context=None))
+        # A job whose trace_context is None must not emit anything and must not raise.
+        manager.report_inference_job(_make_test_llm_job("direct_run", trace_context=None))
 
         manager.teardown()
         assert len(manager._event_log_contexts) == 0  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
@@ -201,11 +201,11 @@ class TestReportingEventEmission:
         manager.set_event_log(context_key="wf_a", event_log=event_log_a, workflow_id="wf_a", pipeline_run_id="run_a")
         manager.set_event_log(context_key="wf_b", event_log=event_log_b, workflow_id="wf_b", pipeline_run_id="run_b")
 
-        ctx_a = _make_graph_context(graph_id="run_a", tracer_key="wf_a")
-        ctx_b = _make_graph_context(graph_id="run_b", tracer_key="wf_b")
+        ctx_a = _make_trace_context(graph_id="run_a", tracer_key="wf_a")
+        ctx_b = _make_trace_context(graph_id="run_b", tracer_key="wf_b")
 
-        job_a = _make_test_llm_job("run_a", graph_context=ctx_a)
-        job_b = _make_test_llm_job("run_b", graph_context=ctx_b)
+        job_a = _make_test_llm_job("run_a", trace_context=ctx_a)
+        job_b = _make_test_llm_job("run_b", trace_context=ctx_b)
 
         manager.report_inference_job(job_a)
         manager.report_inference_job(job_b)
@@ -232,11 +232,11 @@ class TestReportingEventEmission:
         # Clear context A before any emission
         manager.clear_event_log(context_key="wf_a")
 
-        ctx_a = _make_graph_context(graph_id="run_a", tracer_key="wf_a")
-        ctx_b = _make_graph_context(graph_id="run_b", tracer_key="wf_b")
+        ctx_a = _make_trace_context(graph_id="run_a", tracer_key="wf_a")
+        ctx_b = _make_trace_context(graph_id="run_b", tracer_key="wf_b")
 
-        job_a = _make_test_llm_job("run_a", graph_context=ctx_a)
-        job_b = _make_test_llm_job("run_b", graph_context=ctx_b)
+        job_a = _make_test_llm_job("run_a", trace_context=ctx_a)
+        job_b = _make_test_llm_job("run_b", trace_context=ctx_b)
 
         manager.report_inference_job(job_a)  # Should NOT emit (context cleared)
         manager.report_inference_job(job_b)  # Should emit
@@ -246,11 +246,11 @@ class TestReportingEventEmission:
         assert len(events_a) == 0
         assert len(events_b) == 1
 
-    def test_no_graph_context_skips_emission(self) -> None:
-        """Jobs without graph_context skip event emission even when event logs are configured."""
+    def test_no_trace_context_skips_emission(self) -> None:
+        """Jobs without trace_context skip event emission even when event logs are configured."""
         manager, event_log = self._make_reporting_manager_with_event_log()
 
-        llm_job = _make_test_llm_job(self.PIPELINE_RUN_ID, graph_context=None)
+        llm_job = _make_test_llm_job(self.PIPELINE_RUN_ID, trace_context=None)
         manager.report_inference_job(llm_job)
 
         events = event_log.read_events(self.PIPELINE_RUN_ID)
@@ -279,13 +279,13 @@ class TestReportingEventEmission:
         manager.set_event_log(context_key="wf_a", event_log=event_log_a, workflow_id="wf_a", pipeline_run_id="run_a")
         manager.set_event_log(context_key="wf_b", event_log=event_log_b, workflow_id="wf_b", pipeline_run_id="run_b")
 
-        ctx_a = _make_graph_context(graph_id="run_a", tracer_key="wf_a")
-        ctx_b = _make_graph_context(graph_id="run_b", tracer_key="wf_b")
+        ctx_a = _make_trace_context(graph_id="run_a", tracer_key="wf_a")
+        ctx_b = _make_trace_context(graph_id="run_b", tracer_key="wf_b")
 
         # Emit 3 events for context A, 1 for context B
         for _index in range(3):
-            manager.report_inference_job(_make_test_llm_job("run_a", graph_context=ctx_a))
-        manager.report_inference_job(_make_test_llm_job("run_b", graph_context=ctx_b))
+            manager.report_inference_job(_make_test_llm_job("run_a", trace_context=ctx_a))
+        manager.report_inference_job(_make_test_llm_job("run_b", trace_context=ctx_b))
 
         events_a = [evt for evt in event_log_a.read_events("run_a") if isinstance(evt, UsageReportEvent)]
         events_b = [evt for evt in event_log_b.read_events("run_b") if isinstance(evt, UsageReportEvent)]
@@ -306,8 +306,8 @@ class TestReportingEventEmission:
         manager = ReportingManager()
         manager.setup()
 
-        graph_context = _make_graph_context(graph_id="run_silent", tracer_key="wf_silent", parent_node_id="g:node_0")
-        llm_job = _make_test_llm_job("run_silent", graph_context=graph_context)
+        trace_context = _make_trace_context(graph_id="run_silent", tracer_key="wf_silent", parent_node_id="g:node_0")
+        llm_job = _make_test_llm_job("run_silent", trace_context=trace_context)
         manager.report_inference_job(llm_job)
 
         # No event log was ever set; no event should have been emitted anywhere.

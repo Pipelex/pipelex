@@ -38,7 +38,7 @@ from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import Self
 
 if TYPE_CHECKING:
-    from pipelex.graph.graph_context import GraphContext
+    from pipelex.graph.trace_context import TraceContext
     from pipelex.libraries.library_crate import LibraryCrate
 
 PipeAbstractType = type["PipeAbstract"]
@@ -104,15 +104,15 @@ class PipeAbstract(ABC, BaseModel):
         Called by pipe subclasses during execution to capture runtime-resolved data
         (rendered prompts, resolved models, etc.) for the GraphSpec.
         """
-        graph_context = job_metadata.graph_context
-        if graph_context is None:
+        trace_context = job_metadata.trace_context
+        if trace_context is None:
             return
         tracer_manager = GraphTracerManager.get_instance()
-        if tracer_manager is None or graph_context.parent_node_id is None:
+        if tracer_manager is None or trace_context.parent_node_id is None:
             return
         tracer_manager.register_execution_data(
-            lookup_key=graph_context.lookup_key,
-            node_id=graph_context.parent_node_id,
+            lookup_key=trace_context.lookup_key,
+            node_id=trace_context.parent_node_id,
             execution_data=execution_data,
         )
 
@@ -464,11 +464,11 @@ class PipeAbstract(ABC, BaseModel):
         """
         # Handle graph tracing if enabled
         graph_node_id: str | None = None
-        child_graph_context: GraphContext | None = None
+        child_trace_context: TraceContext | None = None
         tracer_manager = None
 
-        parent_graph_context = job_metadata.graph_context
-        if parent_graph_context is not None:
+        parent_trace_context = job_metadata.trace_context
+        if parent_trace_context is not None:
             tracer_manager = GraphTracerManager.get_instance()
             if tracer_manager is not None:
                 started_at = datetime.now(timezone.utc)
@@ -483,20 +483,20 @@ class PipeAbstract(ABC, BaseModel):
                         # costs-only mode the GraphSpec is never assembled, so these dumps would be built
                         # then discarded. The lightweight IOSpec (name/concept/content_type/digest) is kept
                         # so node ids and usage-event correlation are unaffected.
-                        include_graph_data = parent_graph_context.emit_graph_events
+                        include_graph_data = parent_trace_context.emit_graph_events
                         input_spec = IOSpec(
                             name=var_name,
                             concept=stuff.concept.code,
                             content_type=stuff.content.content_type,
                             digest=stuff.stuff_code,
                             data=stuff.content.smart_dump()
-                            if (include_graph_data and parent_graph_context.data_inclusion.stuff_json_content)
+                            if (include_graph_data and parent_trace_context.data_inclusion.stuff_json_content)
                             else None,
                             data_text=stuff.content.rendered_pretty_text()
-                            if (include_graph_data and parent_graph_context.data_inclusion.stuff_text_content)
+                            if (include_graph_data and parent_trace_context.data_inclusion.stuff_text_content)
                             else None,
                             data_html=stuff.content.rendered_pretty_html()
-                            if (include_graph_data and parent_graph_context.data_inclusion.stuff_html_content)
+                            if (include_graph_data and parent_trace_context.data_inclusion.stuff_html_content)
                             else None,
                         )
                         input_specs.append(input_spec)
@@ -505,12 +505,12 @@ class PipeAbstract(ABC, BaseModel):
                 # emit_graph_events — the registries only feed the GraphSpec).
                 pipe_data: dict[str, Any] | None = None
                 concept_data: list[dict[str, Any]] | None = None
-                if parent_graph_context.emit_graph_events and parent_graph_context.data_inclusion.pipe_and_concept_registry:
+                if parent_trace_context.emit_graph_events and parent_trace_context.data_inclusion.pipe_and_concept_registry:
                     pipe_data = self.model_dump(mode="json")
                     concept_data = self._make_concept_data_for_registry()
 
-                graph_node_id, child_graph_context = tracer_manager.on_pipe_start(
-                    graph_context=parent_graph_context,
+                graph_node_id, child_trace_context = tracer_manager.on_pipe_start(
+                    trace_context=parent_trace_context,
                     pipe_code=self.code,
                     pipe_type=self.type,
                     node_kind=node_kind,
@@ -521,11 +521,11 @@ class PipeAbstract(ABC, BaseModel):
                     description=self.description,
                     domain_code=self.domain_code,
                 )
-                # Update job metadata with child graph context for nested pipes
-                if child_graph_context is not None:
+                # Update job metadata with child trace context for nested pipes
+                if child_trace_context is not None:
                     job_metadata = job_metadata.copy_with_update(
                         otel_context=job_metadata.otel_context,
-                        graph_context=child_graph_context,
+                        trace_context=child_trace_context,
                     )
         try:
             await self.validate_before_run(
@@ -558,12 +558,12 @@ class PipeAbstract(ABC, BaseModel):
             # Can't be a `finally`: the success/error paths record different things and
             # the error path needs the exception object.
             # Record graph tracing error
-            if tracer_manager is not None and parent_graph_context is not None:
+            if tracer_manager is not None and parent_trace_context is not None:
                 error_stack: str | None = None
-                if parent_graph_context.data_inclusion.error_stack_traces:
+                if parent_trace_context.data_inclusion.error_stack_traces:
                     error_stack = traceback.format_exc()
                 tracer_manager.on_pipe_end_error(
-                    lookup_key=parent_graph_context.lookup_key,
+                    lookup_key=parent_trace_context.lookup_key,
                     node_id=graph_node_id,
                     ended_at=datetime.now(timezone.utc),
                     error_type=type(exc).__name__,
@@ -573,35 +573,35 @@ class PipeAbstract(ABC, BaseModel):
             raise
 
         # Record graph tracing success
-        if tracer_manager is not None and parent_graph_context is not None:
+        if tracer_manager is not None and parent_trace_context is not None:
             # Capture output spec for data flow tracking
             # Note: main_stuff may not exist for pipes like PipeParallel with add_each_output=true
             main_stuff = pipe_output.working_memory.get_optional_main_stuff()
             output_spec: IOSpec | None = None
             if main_stuff is not None:
                 # E1: same gating as the input block — skip the discarded payload dumps in costs-only mode.
-                include_graph_data = parent_graph_context.emit_graph_events
+                include_graph_data = parent_trace_context.emit_graph_events
                 output_spec = IOSpec(
                     name=output_name or main_stuff.stuff_name or "main_stuff",
                     concept=main_stuff.concept.code,
                     content_type=main_stuff.content.content_type,
                     digest=main_stuff.stuff_code,
-                    data=main_stuff.content.smart_dump() if (include_graph_data and parent_graph_context.data_inclusion.stuff_json_content) else None,
+                    data=main_stuff.content.smart_dump() if (include_graph_data and parent_trace_context.data_inclusion.stuff_json_content) else None,
                     data_text=main_stuff.content.rendered_pretty_text()
-                    if (include_graph_data and parent_graph_context.data_inclusion.stuff_text_content)
+                    if (include_graph_data and parent_trace_context.data_inclusion.stuff_text_content)
                     else None,
                     data_html=main_stuff.content.rendered_pretty_html()
-                    if (include_graph_data and parent_graph_context.data_inclusion.stuff_html_content)
+                    if (include_graph_data and parent_trace_context.data_inclusion.stuff_html_content)
                     else None,
                 )
 
             # Serialize output concept for registry if enabled (E1: also gated on emit_graph_events).
             output_concept_data: dict[str, Any] | None = None
-            if parent_graph_context.emit_graph_events and parent_graph_context.data_inclusion.pipe_and_concept_registry and main_stuff is not None:
+            if parent_trace_context.emit_graph_events and parent_trace_context.data_inclusion.pipe_and_concept_registry and main_stuff is not None:
                 output_concept_data = self._make_single_concept_data_for_registry(main_stuff.concept)
 
             tracer_manager.on_pipe_end_success(
-                lookup_key=parent_graph_context.lookup_key,
+                lookup_key=parent_trace_context.lookup_key,
                 node_id=graph_node_id,
                 ended_at=datetime.now(timezone.utc),
                 output_spec=output_spec,

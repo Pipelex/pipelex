@@ -168,7 +168,7 @@ async def _execute_run(
     # Build effective execution config with CLI overrides
     execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
         generate_graph=graph,
-        generate_costs=costs,
+        generate_usage=costs,
         force_include_full_data=graph_full_data,
         mock_inputs=mock_inputs or None,
     )
@@ -314,10 +314,13 @@ async def _execute_run(
 
     # Render the end-of-run cost report from the usage assembled onto pipe_output (event-sourced),
     # gated by the resolved --costs. Channels (console / CSV) follow the reporting config (D6).
+    # The renderer keeps its cost-domain name (`is_generate_costs`) on purpose; it is fed the usage
+    # gate (`is_generate_usage`) — "if usage was generated, render the cost view". Do not "align" the
+    # keyword to the field: the cost report is a view over usage, not the same switch.
     render_run_cost_report(
         pipeline_run_id=response.pipeline_run_id,
         tokens_usages=pipe_output.tokens_usages,
-        is_generate_costs=execution_config.is_generate_costs,
+        is_generate_costs=execution_config.is_generate_usage,
     )
 
     # Print completion recap

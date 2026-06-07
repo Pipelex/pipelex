@@ -77,8 +77,8 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
         # Runs as an activity because DynamoDB reads are I/O forbidden in workflows. The dispatch is
         # gated on the run's emit flags (F1): a costs-only run assembles usage but no graph, so
         # graph_spec stays None — matching DIRECT mode and preserving the --no-graph contract.
-        graph_context = pipe_job.job_metadata.graph_context
-        if pipe_output is not None and graph_context is not None and (graph_context.emit_graph_events or graph_context.emit_usage_events):
+        trace_context = pipe_job.job_metadata.trace_context
+        if pipe_output is not None and trace_context is not None and (trace_context.emit_graph_events or trace_context.emit_usage_events):
             try:
                 tracing_assembly = await workflow.execute_activity(
                     act_assemble_tracing,
@@ -86,8 +86,8 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
                         pipeline_run_id=pipeline_run_id,
                         domain_code=pipe_job.pipe.domain_code,
                         main_pipe_code=pipe_job.pipe.code,
-                        assemble_graph=graph_context.emit_graph_events,
-                        assemble_usage=graph_context.emit_usage_events,
+                        assemble_graph=trace_context.emit_graph_events,
+                        assemble_usage=trace_context.emit_usage_events,
                     ),
                     start_to_close_timeout=timedelta(seconds=30),
                     retry_policy=RetryPolicy(maximum_attempts=3),
@@ -108,9 +108,9 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
                 workflow_log.warning(f"Tracing assembly failed, continuing with delivery: {assembly_exc}")
                 # Record the failure only on the concern(s) actually requested, so a costs-only run never
                 # surfaces a graph_assembly_error (and vice versa).
-                if graph_context.emit_graph_events:
+                if trace_context.emit_graph_events:
                     pipe_output.graph_assembly_error = str(assembly_exc)
-                if graph_context.emit_usage_events:
+                if trace_context.emit_usage_events:
                     pipe_output.usage_assembly_error = str(assembly_exc)
 
         # Step 3: Run delivery activity if requested — notifies the completion

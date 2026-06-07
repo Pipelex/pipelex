@@ -6,7 +6,6 @@ from typing import Any
 from typing_extensions import override
 
 from pipelex.graph.graph_config import DataInclusionConfig
-from pipelex.graph.graph_context import GraphContext
 from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
 from pipelex.graph.graphspec import (
     EdgeKind,
@@ -21,6 +20,7 @@ from pipelex.graph.graphspec import (
     PipelineRef,
     TimingSpec,
 )
+from pipelex.graph.trace_context import TraceContext
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # noqa: TC001 - used in __init__ annotations
 from pipelex.tracing.trace_events import (
     BatchAggregateEvent,
@@ -222,7 +222,7 @@ class GraphTracer(GraphTracerProtocol):
         pipeline_run_id: str | None = None,
         emit_graph_events: bool = True,
         emit_usage_events: bool = True,
-    ) -> GraphContext:
+    ) -> TraceContext:
         """Initialize tracing for a new pipeline run.
 
         Args:
@@ -236,9 +236,9 @@ class GraphTracer(GraphTracerProtocol):
                 When not "direct", node/edge IDs include the workflow_id segment.
             pipeline_run_id: Pipeline run ID for event emission. Required when event_log is set.
             emit_graph_events: Whether this run assembles a GraphSpec. When False (costs-only mode),
-                teardown skips the discarded spec build; the returned GraphContext carries the flag.
+                teardown skips the discarded spec build; the returned TraceContext carries the flag.
             emit_usage_events: Whether this run emits usage (cost) events. Stamped onto the returned
-                GraphContext so it is born with the correct flag.
+                TraceContext so it is born with the correct flag.
         """
         self._is_active = True
         self._emit_graph_events = emit_graph_events
@@ -263,7 +263,7 @@ class GraphTracer(GraphTracerProtocol):
         self._pipe_registry = {}
         self._concept_registry = {}
 
-        return GraphContext(
+        return TraceContext(
             graph_id=graph_id,
             parent_node_id=None,
             node_sequence=0,
@@ -591,7 +591,7 @@ class GraphTracer(GraphTracerProtocol):
     @override
     def on_pipe_start(
         self,
-        graph_context: GraphContext,
+        trace_context: TraceContext,
         pipe_code: str,
         pipe_type: str,
         node_kind: NodeKind,
@@ -601,12 +601,12 @@ class GraphTracer(GraphTracerProtocol):
         concept_data: list[dict[str, Any]] | None = None,
         description: str | None = None,
         domain_code: str | None = None,
-    ) -> tuple[str, GraphContext]:
+    ) -> tuple[str, TraceContext]:
         """Record the start of a pipe execution."""
         if not self._is_active:
             # Return dummy values when not active
-            node_id = graph_context.make_node_id()
-            child_context = graph_context.copy_for_child(node_id, graph_context.node_sequence + 1)
+            node_id = trace_context.make_node_id()
+            child_context = trace_context.copy_for_child(node_id, trace_context.node_sequence + 1)
             return node_id, child_context
 
         # Generate node ID (includes workflow_id in Temporal mode)
@@ -619,7 +619,7 @@ class GraphTracer(GraphTracerProtocol):
             pipe_type=pipe_type,
             node_kind=node_kind,
             started_at=started_at,
-            parent_node_id=graph_context.parent_node_id,
+            parent_node_id=trace_context.parent_node_id,
             input_specs=input_specs,
             description=description,
             domain_code=domain_code,
@@ -627,7 +627,7 @@ class GraphTracer(GraphTracerProtocol):
         self._nodes[node_id] = node_data
 
         # Accumulate pipe and concept registry data (deduplicated)
-        if graph_context.data_inclusion.pipe_and_concept_registry:
+        if trace_context.data_inclusion.pipe_and_concept_registry:
             if pipe_data is not None:
                 pipe_ref = f"{pipe_data.get('domain_code', '')}.{pipe_data.get('code', '')}"
                 if pipe_ref not in self._pipe_registry:
@@ -648,7 +648,7 @@ class GraphTracer(GraphTracerProtocol):
                     timestamp=started_at,
                     sequence=self._next_event_sequence(),
                     node_id=node_id,
-                    parent_node_id=graph_context.parent_node_id,
+                    parent_node_id=trace_context.parent_node_id,
                     pipe_code=pipe_code,
                     pipe_type=pipe_type,
                     node_kind=node_kind,
@@ -661,15 +661,15 @@ class GraphTracer(GraphTracerProtocol):
             )
 
         # Add containment edge from parent if this is a child pipe
-        if graph_context.parent_node_id is not None:
+        if trace_context.parent_node_id is not None:
             self.add_edge(
-                source_node_id=graph_context.parent_node_id,
+                source_node_id=trace_context.parent_node_id,
                 target_node_id=node_id,
                 edge_kind=EdgeKind.CONTAINS,
             )
 
         # Create child context - use copy_for_child to preserve include_full_data
-        child_context = graph_context.copy_for_child(
+        child_context = trace_context.copy_for_child(
             child_node_id=node_id,
             next_sequence=self._node_sequence,
         )

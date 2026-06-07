@@ -32,7 +32,7 @@ from pipelex.temporal.temporal_hub import get_task_manager
 from pipelex.temporal.tprl_pipe.pipe_run_arg import PipeRunArg
 from pipelex.temporal.tprl_pipe.wf_pipe_run import WfPipeRun
 from tests.integration.pipelex.temporal.library_crate.helpers import rehydrate_pipe_output
-from tests.integration.pipelex.temporal.tracing.helpers import inject_graph_context
+from tests.integration.pipelex.temporal.tracing.helpers import inject_trace_context
 
 
 @pytest.mark.temporal
@@ -48,7 +48,7 @@ class TestWfPipeRunTracingAssembly:
     ) -> PipeOutput:
         """Run a full ``WfPipeRun`` (router child + Step-2 assembly) on a single worker."""
         execution_run_id = f"wfrun_assembly_{uuid.uuid4().hex[:12]}"
-        execution_job = inject_graph_context(
+        execution_job = inject_trace_context(
             sequence_tracing_job,
             execution_run_id,
             emit_graph_events=emit_graph_events,

@@ -70,7 +70,7 @@ class TestMockInferenceDirect:
         # Costs on (default) so usage assembles; mock_inputs fills the `subject` input for the LIVE run.
         return get_config().pipelex.pipeline_execution_config.with_execution_overrides(
             generate_graph=False,
-            generate_costs=True,
+            generate_usage=True,
             mock_inputs=True,
         )
 

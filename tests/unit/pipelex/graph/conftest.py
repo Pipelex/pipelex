@@ -4,7 +4,7 @@ import pytest
 
 from pipelex.config import get_config
 from pipelex.graph.graph_config import DataInclusionConfig, GraphConfig
-from pipelex.graph.graph_context import GraphContext
+from pipelex.graph.trace_context import TraceContext
 
 
 def make_defaulted_data_inclusion_config(
@@ -35,7 +35,7 @@ def make_defaulted_data_inclusion_config(
     )
 
 
-def make_graph_context(
+def make_trace_context(
     graph_id: str = "test-graph",
     parent_node_id: str | None = None,
     node_sequence: int = 0,
@@ -43,8 +43,8 @@ def make_graph_context(
     stuff_text_content: bool = False,
     stuff_html_content: bool = False,
     error_stack_traces: bool = False,
-) -> GraphContext:
-    """Create a GraphContext for testing.
+) -> TraceContext:
+    """Create a TraceContext for testing.
 
     Args:
         graph_id: The graph identifier.
@@ -56,9 +56,9 @@ def make_graph_context(
         error_stack_traces: Whether to include error stack traces.
 
     Returns:
-        A GraphContext configured for testing.
+        A TraceContext configured for testing.
     """
-    return GraphContext(
+    return TraceContext(
         graph_id=graph_id,
         parent_node_id=parent_node_id,
         node_sequence=node_sequence,

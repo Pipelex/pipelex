@@ -1,4 +1,4 @@
-"""Unit tests for the GraphContext emit-stream flags (D4).
+"""Unit tests for the TraceContext emit-stream flags (D4).
 
 Pins that ``emit_graph_events`` / ``emit_usage_events`` default to True (backward-compatible
 "context present means emit both") and that ``copy_for_child`` propagates whatever the parent
@@ -6,7 +6,7 @@ carried — so a costs-only or graph-only run keeps its gating as nested pipes s
 """
 
 from pipelex.graph.graph_config import DataInclusionConfig
-from pipelex.graph.graph_context import GraphContext
+from pipelex.graph.trace_context import TraceContext
 
 DATA_INCLUSION_OFF = DataInclusionConfig(
     pipe_and_concept_registry=False,
@@ -17,16 +17,16 @@ DATA_INCLUSION_OFF = DataInclusionConfig(
 )
 
 
-class TestGraphContextEmitFlags:
+class TestTraceContextEmitFlags:
     def test_defaults_emit_both_streams(self) -> None:
-        """A GraphContext built without explicit flags emits both streams (legacy behavior)."""
-        context = GraphContext(graph_id="run_1", data_inclusion=DATA_INCLUSION_OFF)
+        """A TraceContext built without explicit flags emits both streams (legacy behavior)."""
+        context = TraceContext(graph_id="run_1", data_inclusion=DATA_INCLUSION_OFF)
         assert context.emit_graph_events is True
         assert context.emit_usage_events is True
 
     def test_copy_for_child_preserves_costs_only_flags(self) -> None:
         """costs-only flags survive into a child context (graph off, costs on)."""
-        parent = GraphContext(
+        parent = TraceContext(
             graph_id="run_1",
             data_inclusion=DATA_INCLUSION_OFF,
             emit_graph_events=False,
@@ -40,7 +40,7 @@ class TestGraphContextEmitFlags:
 
     def test_copy_for_child_preserves_graph_only_flags(self) -> None:
         """graph-only flags survive into a child context (graph on, costs off)."""
-        parent = GraphContext(
+        parent = TraceContext(
             graph_id="run_1",
             data_inclusion=DATA_INCLUSION_OFF,
             emit_graph_events=True,

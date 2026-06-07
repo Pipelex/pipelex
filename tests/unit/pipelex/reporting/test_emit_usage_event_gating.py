@@ -1,6 +1,6 @@
 """Unit tests for the emit_usage_events gate in ReportingManager (Phase 1 decoupling).
 
-Pins the load-bearing decoupling: usage emission is gated by ``graph_context.emit_usage_events``,
+Pins the load-bearing decoupling: usage emission is gated by ``trace_context.emit_usage_events``,
 independent of graph events. In graph-only mode (``--graph --no-costs``) no usage event-log context
 is registered, so reporting lands on the runner fallback — which must suppress the usage event. In
 costs-only / default mode the same fallback emits. This is what lets ``--no-graph`` keep cost data
@@ -20,7 +20,7 @@ from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.config import get_config
 from pipelex.graph.graph_config import DataInclusionConfig
-from pipelex.graph.graph_context import GraphContext
+from pipelex.graph.trace_context import TraceContext
 from pipelex.pipeline.job_metadata import JobMetadata, UnitJobId
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.system.configuration.configs import NdjsonTracingConfig, TracingBackend
@@ -37,12 +37,12 @@ DATA_INCLUSION_OFF = DataInclusionConfig(
 )
 
 
-def _make_llm_job(pipeline_run_id: str, graph_context: GraphContext | None) -> LLMJob:
+def _make_llm_job(pipeline_run_id: str, trace_context: TraceContext | None) -> LLMJob:
     now = datetime.now(timezone.utc)
     job_metadata = JobMetadata(
         user_id="test_user",
         pipeline_run_id=pipeline_run_id,
-        graph_context=graph_context,
+        trace_context=trace_context,
         started_at=now,
         completed_at=now + timedelta(seconds=1),
         unit_job_id=UnitJobId.LLM_GEN_TEXT,
@@ -63,8 +63,8 @@ def _make_llm_job(pipeline_run_id: str, graph_context: GraphContext | None) -> L
     )
 
 
-def _make_graph_context(graph_id: str, *, emit_usage_events: bool, emit_graph_events: bool = True) -> GraphContext:
-    return GraphContext(
+def _make_trace_context(graph_id: str, *, emit_usage_events: bool, emit_graph_events: bool = True) -> TraceContext:
+    return TraceContext(
         graph_id=graph_id,
         tracer_key=f"wf_{graph_id}",
         parent_node_id=f"{graph_id}:node_0",
@@ -83,7 +83,7 @@ def _enable_ndjson_tracing(mocker: MockerFixture, traces_dir: Path) -> None:
 
 
 class TestEmitUsageEventGating:
-    """Pins that usage emission honors graph_context.emit_usage_events on BOTH paths.
+    """Pins that usage emission honors trace_context.emit_usage_events on BOTH paths.
 
     The gate lives in the dispatcher (_emit_usage_event), before the context lookup, so it guards the
     fast path (a registered set_event_log context) and the runner fallback alike — correctness no
@@ -97,9 +97,9 @@ class TestEmitUsageEventGating:
 
         manager = ReportingManager()
         manager.setup()
-        graph_context = _make_graph_context("run_graph_only", emit_usage_events=False, emit_graph_events=True)
+        trace_context = _make_trace_context("run_graph_only", emit_usage_events=False, emit_graph_events=True)
 
-        manager.report_inference_job(_make_llm_job("run_graph_only", graph_context=graph_context))
+        manager.report_inference_job(_make_llm_job("run_graph_only", trace_context=trace_context))
 
         # Nothing emitted anywhere: no usage context was registered (set_event_log skipped) and the
         # fallback returns early on emit_usage_events=False.
@@ -113,9 +113,9 @@ class TestEmitUsageEventGating:
 
         manager = ReportingManager()
         manager.setup()
-        graph_context = _make_graph_context("run_costs", emit_usage_events=True, emit_graph_events=False)
+        trace_context = _make_trace_context("run_costs", emit_usage_events=True, emit_graph_events=False)
 
-        manager.report_inference_job(_make_llm_job("run_costs", graph_context=graph_context))
+        manager.report_inference_job(_make_llm_job("run_costs", trace_context=trace_context))
 
         reader = NdjsonEventLog(traces_dir=str(tmp_path))
         usage_events = [evt for evt in reader.read_events("run_costs") if isinstance(evt, UsageReportEvent)]
@@ -133,19 +133,19 @@ class TestEmitUsageEventGating:
         """
         manager = ReportingManager()
         manager.setup()
-        graph_context = _make_graph_context("run_leaked", emit_usage_events=False, emit_graph_events=True)
+        trace_context = _make_trace_context("run_leaked", emit_usage_events=False, emit_graph_events=True)
 
         event_log_spy = mocker.MagicMock()
         event_log_spy.writer_id = "leaked_writer"
         event_log_spy.next_sequence.return_value = 0
         manager.set_event_log(
-            context_key=graph_context.lookup_key,
+            context_key=trace_context.lookup_key,
             event_log=event_log_spy,
             workflow_id="direct",
             pipeline_run_id="run_leaked",
         )
 
-        manager.report_inference_job(_make_llm_job("run_leaked", graph_context=graph_context))
+        manager.report_inference_job(_make_llm_job("run_leaked", trace_context=trace_context))
 
         event_log_spy.emit.assert_not_called()
 
@@ -157,19 +157,19 @@ class TestEmitUsageEventGating:
         """
         manager = ReportingManager()
         manager.setup()
-        graph_context = _make_graph_context("run_fastpath", emit_usage_events=True, emit_graph_events=True)
+        trace_context = _make_trace_context("run_fastpath", emit_usage_events=True, emit_graph_events=True)
 
         event_log_spy = mocker.MagicMock()
         event_log_spy.writer_id = "fastpath_writer"
         event_log_spy.next_sequence.return_value = 0
         manager.set_event_log(
-            context_key=graph_context.lookup_key,
+            context_key=trace_context.lookup_key,
             event_log=event_log_spy,
             workflow_id="direct",
             pipeline_run_id="run_fastpath",
         )
 
-        manager.report_inference_job(_make_llm_job("run_fastpath", graph_context=graph_context))
+        manager.report_inference_job(_make_llm_job("run_fastpath", trace_context=trace_context))
 
         event_log_spy.emit.assert_called_once()
         emitted_event = event_log_spy.emit.call_args.args[0]

@@ -55,7 +55,7 @@ async def run_pipeline_core(
 
     execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
         generate_graph=graph,
-        generate_costs=costs,
+        generate_usage=costs,
         mock_inputs=mock_inputs or None,
     )
 

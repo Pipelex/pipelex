@@ -18,7 +18,7 @@ class AssembleTracingArg(BaseModel):
     pipeline_run_id: str
     domain_code: str | None = None
     main_pipe_code: str | None = None
-    # Which artifacts to assemble (mirror of the run's GraphContext emit flags). The submitter gates
+    # Which artifacts to assemble (mirror of the run's TraceContext emit flags). The submitter gates
     # the dispatch on these too; passing them through keeps the activity a pure function of its input.
     assemble_graph: bool = True
     assemble_usage: bool = True

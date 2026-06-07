@@ -31,7 +31,7 @@ from pipelex.temporal.tprl_pipe.pipe_run_arg import PipeRunArg
 from pipelex.temporal.tprl_pipe.wf_pipe_run import WfPipeRun
 from tests.integration.pipelex.fixtures.pipe_job_helpers import pipe_job_from_bundle
 from tests.integration.pipelex.temporal.library_crate.helpers import rehydrate_pipe_output
-from tests.integration.pipelex.temporal.tracing.helpers import inject_graph_context
+from tests.integration.pipelex.temporal.tracing.helpers import inject_trace_context
 from tests.integration.pipelex.temporal.tracing.test_data import SequenceTracingTestData
 
 if TYPE_CHECKING:
@@ -67,13 +67,13 @@ class TestTemporalMockInference:
         """The flag crosses the boundary, the real activity mocks the leaf, and reportable usage rides back."""
         execution_run_id = f"mock_inf_{uuid.uuid4().hex[:12]}"
         # costs-only (no graph) mirrors the realistic --no-graph --costs default the skill validates.
-        execution_job = inject_graph_context(
+        execution_job = inject_trace_context(
             mock_inference_sequence_job,
             execution_run_id,
             emit_graph_events=False,
             emit_usage_events=True,
         )
-        assert execution_job.job_metadata.is_mock_inference, "inject_graph_context must preserve is_mock_inference"
+        assert execution_job.job_metadata.is_mock_inference, "inject_trace_context must preserve is_mock_inference"
 
         pipe_run_arg = PipeRunArg(pipe_job=execution_job).prepare_for_temporal()
         task_queue = str(uuid.uuid4())

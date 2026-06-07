@@ -228,7 +228,7 @@ class TestPipelineRunSetupCharacterization:
 
         execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
             generate_graph=False,
-            generate_costs=True,
+            generate_usage=True,
             mock_inputs=True,
         )
         runner = PipelexRunner(pipe_run_mode=PipeRunMode.DRY, execution_config=execution_config)
