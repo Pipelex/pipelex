@@ -2,7 +2,7 @@
 
 > **Status: ✅ BOTH DONE** — shipped on `feature/Support-recursive-design`. Task 1 (`pending_signatures` on validate) and Task 2 (normalized contract conformance) are implemented and verified. The detail below is kept as the record of what was built.
 
-Two follow-ups on the pipelex side, surfaced during the `mthds-plugins` design review. Both build on the additive multi-file model already shipped on this branch (`feature/Support-recursive-design`; see `TODOS.md` for Parts A + B). Neither blocks the additive model; both make it robust/complete. Independent of each other — land in either order.
+Two follow-ups on the pipelex side, surfaced during the `mthds-plugins` design review. Both build on the additive multi-file model already shipped on this branch (`feature/Support-recursive-design`; see `../../TODOS.md` for Parts A + B). Neither blocks the additive model; both make it robust/complete. Independent of each other — land in either order.
 
 Verify after each: `make agent-test` (green) + `make agent-check` (clean).
 

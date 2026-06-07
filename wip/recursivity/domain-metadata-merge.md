@@ -1,6 +1,6 @@
 # Handoff — domain metadata merge under the additive multi-file model (pipelex)
 
-> **Status: DONE.** Implemented on `feature/Support-recursive-design`. Surfaced during the final `mthds-plugins/wip/recursive/design.md` review. Small, self-contained pipelex change. Builds on the additive multi-file model already shipped on this branch (see `TODOS.md` Parts A+B and `HANDOFF-recursive-followups.md` Tasks 1–2). Does **not** block the additive model — it removes friction the model introduces.
+> **Status: DONE.** Implemented on `feature/Support-recursive-design`. Surfaced during the final `mthds-plugins/wip/recursive/design.md` review. Small, self-contained pipelex change. Builds on the additive multi-file model already shipped on this branch (see `../../TODOS.md` Parts A+B and [`recursive-followups.md`](recursive-followups.md) Tasks 1–2). Does **not** block the additive model — it removes friction the model introduces.
 >
 > Verified: `make agent-test` (green) + `make agent-check` (clean).
 >

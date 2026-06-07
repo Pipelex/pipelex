@@ -14,6 +14,9 @@ Both are required. Part A alone does **not** unblock the goal: any pipe whose co
 > This block is the single source of truth for resuming in a fresh session. A new agent should read this first. Overwrite it at each checkpoint.
 
 - **Branch:** `feature/Support-recursive-design` (pipelex worktree `_recursive`). Handoff doc lives in sibling repo `mthds-plugins`, branch `feature/Recursive-building`.
+- **Related handoff records (`wip/recursivity/`):** follow-up work built on top of Parts A+B, all shipped on this branch:
+    - [`recursive-followups.md`](wip/recursivity/recursive-followups.md) — Task 1 (`pending_signatures` on lenient validate) + Task 2 (normalized contract conformance, replacing raw-string `contract_equals`). ✅ both DONE.
+    - [`domain-metadata-merge.md`](wip/recursivity/domain-metadata-merge.md) — order-independent, omission-quiet merge of domain metadata (`description`/`system_prompt`) across additive files. ✅ DONE.
 - **Plan state:** ✅ **ALL PHASES DONE.** Phase 1 (Part A) `f5fd826f`, Phase 2 (Part B) `d91701f4`, Phase 3 (end-to-end + both folded-in review fixes) `13660d3a` — all **committed**, full `make agent-test` green. Phase 4 (handoff) **done**: `mthds-plugins/wip/recursive/design.md` flipped overwrite-in-place → additive model (**uncommitted in mthds-plugins**, see below).
 - **Current phase:** **Feature complete.** The pipelex runtime support (Parts A+B + end-to-end proof) is shipped on this branch; the design handoff (Phase 4) is written. The only remaining work is **downstream in `mthds-plugins`** — building the recursive `mthds-vibe` orchestrator + `mthds-signature-expander` worker + the hook `--allow-signatures` change per `design.md` §7. Those artifacts **do not exist yet** (still the single-pass skill); that is a separate effort, not part of this pipelex feature.
 - **Last verified green (Phase 3):**
