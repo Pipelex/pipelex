@@ -25,6 +25,11 @@ from pipelex.tracing.event_log_factory import make_event_log
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
 from pipelex.tracing.usage_aggregator import UsageAggregator
 
+try:
+    from botocore.exceptions import ClientError as _BotoClientError  # type: ignore[import-untyped]
+except ImportError:
+    _BotoClientError = None  # type: ignore[assignment, misc]
+
 
 class TracingAssembly(BaseModel):
     """Artifacts assembled from a single read of the trace-event stream.
@@ -59,11 +64,12 @@ def assemble_tracing(
     Feeds the single event read into ``GraphSpecAssembler`` (when ``assemble_graph``)
     and ``UsageAggregator`` (when ``assemble_usage``).
 
-    Tracing is observability and treated as best-effort: runtime I/O issues,
-    malformed event data, and broken tracing infrastructure (config errors,
-    missing optional dependencies) are caught and recorded in the ``*_error``
-    fields, not propagated. Programming bugs (KeyError, AttributeError, etc.)
-    propagate so they surface during development.
+    Tracing is observability and treated as best-effort: runtime I/O issues
+    (including the DynamoDB backend's botocore ``ClientError`` — throttle / auth /
+    network — when boto3 is installed), malformed event data, and broken tracing
+    infrastructure (config errors, missing optional dependencies) are caught and
+    recorded in the ``*_error`` fields, not propagated. Programming bugs (KeyError,
+    AttributeError, etc.) propagate so they surface during development.
 
     Args:
         pipeline_run_id: The pipeline run ID to query events for.
@@ -82,13 +88,21 @@ def assemble_tracing(
     if not (assemble_graph or assemble_usage):
         return result
 
+    # Best-effort read: a backend failure degrades to an *_assembly_error note rather than failing the run.
+    # Mirrors reporting_manager's emit-side handling — the DynamoDB backend's query can raise botocore
+    # ClientError (throttle / auth / network), which is neither an OSError nor a PipelexError, so it is added
+    # explicitly when boto3 is installed.
+    read_errors: tuple[type[BaseException], ...] = (OSError, json.JSONDecodeError, ValidationError, PipelexConfigError, MissingDependencyError)
+    if _BotoClientError is not None:
+        read_errors = (*read_errors, _BotoClientError)
+
     try:
         event_log = make_event_log(tracing_config)
         try:
             events = event_log.read_events(pipeline_run_id)
         finally:
             event_log.close()
-    except (OSError, json.JSONDecodeError, ValidationError, PipelexConfigError, MissingDependencyError) as read_error:
+    except read_errors as read_error:
         message = f"Tracing assembly failed to read events for pipeline_run_id={pipeline_run_id}: {read_error}"
         log.warning(message)
         if assemble_graph:

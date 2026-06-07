@@ -53,6 +53,8 @@ Both touch the same question the registry track is converging on: *what is the s
 
 **Why it's a design decision, not a reflexive patch.** "Rejecting `--costs` as unsupported in API mode" needs to distinguish an *explicitly-passed* flag from the `True` default — but the agent uses `bool = True`, so a user passing `--costs` is indistinguishable from the default (the exact same ambiguity #6 Option A would resolve by going tri-state `bool | None`). And whether API-mode cost reporting should instead surface costs *from the API response* is a product call, not a lint fix. So #6b is a strict consequence of #6: making the agent `costs` tri-state (#6 Option A) is the prerequisite for any honest API-mode handling (warn / reject / surface-from-response). Resolve them together; do not bolt a one-off rejection onto the `True`-default param.
 
+**Broader framing (found at PR #967 final review): API-mode flag handling is inconsistent across the board.** The `RunnerType.API` branch in the agent `run` subcommands *rejects* `--dry-run` and `--mock-inputs` (`agent_error("... not supported with --runner api")`) but *silently ignores* `--graph` AND `--costs` (neither is threaded into `run_pipeline_core_api`). So a one-off `--no-costs` rejection would deepen the inconsistency (why reject `--no-costs` but not `--graph`?). The right fix is one holistic decision about how the agent CLI handles local-runner-only flags under `--runner api` — reject them all uniformly, or document them all as no-ops — covering `--graph` and `--costs` together. That is the deliberate call #6/#6b is waiting on; a partial patch on just `--costs` is explicitly the wrong move.
+
 ---
 
 ## Cross-cutting note
