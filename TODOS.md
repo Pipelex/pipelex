@@ -1,8 +1,6 @@
-# PR #966 — Framework-agnostic Pipelex runtime bridge (reviewer's guide)
+# PR #969 — Framework-agnostic Pipelex runtime bridge (reviewer's guide)
 
 What this PR does, how, and why it's the right shape. Base branch: `dev`.
-
-> `dev` has been merged in (distributed cost reporting, #967/#968). See the "Tracing reconciliation" section below for how the bridge was realigned onto dev's unified tracing assembly.
 
 The **code** core is small and concentrated. Concentrate review on:
 
@@ -11,7 +9,10 @@ The **code** core is small and concentrated. Concentrate review on:
 - `pipelex/hub.py` — the `scoped_pipe_router` addition
 - `tests/{unit,integration}/pipelex/runtime_bridge/`
 
-**Removed from this PR:** the vendored `/workflows` skill under `.claude/skills/workflows/` (a verbatim copy of Mistral's own drafty Workflows skill that had ridden along on this branch for convenience) has been deleted — it was never part of this PR's work. Internal triage notes under `wip/` are not review material.
+**Not review material:**
+
+- `wip/` — internal planning / triage notes, not part of the shipped surface. The bridge's own review-triage and deferred-items record lives in `wip/runtime-bridge/README.md`; the rest is unrelated track planning.
+- `docs/distributed-execution/mistral-workflows/` — forward-looking user docs for the `MISTRAL_NATIVE` mode, whose host package (`pipelex-mistralai-workflows`) ships separately. The mode's bridge-side plumbing is in this PR; the host integration is not.
 
 ## What it does
 
@@ -26,7 +27,7 @@ Input and output are JSON-safe pydantic models (`PipelexPipeRunInput` / `Pipelex
 
 ## Execution modes (`execution_mode.py`)
 
-The caller chooses how the pipe runs via `PipelexExecutionMode`:
+The caller chooses how the pipe runs via `PipelexExecutionMode` (a `StrEnum`; the JSON wire values are lowercase — `direct`, `temporal_blocking`, `temporal_fire_and_forget`, `mistral_native`):
 
 - `DIRECT` — in-process, no Temporal; the activity blocks until the pipe completes. Fastest, simplest; works even inside a Temporal-enabled worker (forces local execution).
 - `TEMPORAL_BLOCKING` — dispatch the pipe as a Pipelex Temporal workflow and await it. Needs `pipelex[temporal]`.
@@ -38,37 +39,36 @@ Mode-specific dependencies are pulled in by **lazy import inside the matching br
 ## How a call flows (`bridge.py::run_pipe_via_bridge`)
 
 1. `ensure_pipelex_booted()` — idempotent, thread-safe boot; adopts an externally-created singleton if one already exists.
-2. `_validate_input` — mode-specific guards (e.g. fire-and-forget must carry a delivery assignment, else completion would be silently dropped).
-3. `_scoped_library_for_crate` — if the caller passed a `library_crate_dump`, open a **per-call scoped library** with its own `ClassRegistry`, load it from the crate, tear it down on exit. This is what lets a stateless / multi-tenant worker run a pipe whose definition travels in the request, without leaking dynamic concept classes into the global registry.
-4. `build_pipe_job_from_input` — hydrate a `PipeJob` (working memory from inputs, job metadata, optional graph context).
+2. Decode `library_crate_dump` / `delivery_assignment_dump` and `_validate_input` — mode-specific guards (e.g. fire-and-forget must carry a delivery target, else completion would be silently dropped). A malformed dump becomes a `PipelexBridgeDispatchError`, not a raw `pydantic.ValidationError`.
+3. `_scoped_library_for_crate` — if the caller passed a `library_crate_dump`, open a **per-call scoped library** with its own `ClassRegistry` (pre-seeded from the global one), load it from the crate, tear it down on exit. This is what lets a stateless / multi-tenant worker run a pipe whose definition travels in the request, without leaking dynamic concept classes into the global registry.
+4. `build_pipe_job_from_input` — hydrate a `PipeJob` (working memory from inputs, job metadata, optional `trace_context`).
 5. `match execution_mode:` — dispatch to that mode's runner.
 
 ## The primitives lift (`runtime_bridge/primitives/`)
 
-The framework-agnostic bodies behind the Temporal activities (delivery, trace flush, hydration, pipe classification, submitter hydration) were moved verbatim out of `pipelex.temporal` into `runtime_bridge.primitives`. The `pipelex/temporal/tprl_pipe/act_*.py` files are now **thin `@activity.defn` wrappers** that decode their arg and delegate to the shared primitive (see `act_deliver.py`). The Mistral-native path calls the same primitives. Behaviour-neutral: only the home of the logic changed.
+The framework-agnostic bodies behind the Temporal activities (delivery, trace flush, hydration, pipe classification, submitter hydration) live in `runtime_bridge.primitives`. The `pipelex/temporal/tprl_pipe/act_*.py` files are **thin `@activity.defn` wrappers** that decode their arg and delegate to the shared primitive (see `act_deliver.py`). The Mistral-native path calls the same primitives. One copy of each primitive, two host runtimes.
 
-> **Note (post-`dev` merge):** graph assembly is no longer a bridge primitive. `dev`'s #967 unified graph + usage assembly into `pipe_run/tracing_assembly.py` (`assemble_tracing`, read the event stream once, produce both `GraphSpec` and token usage) behind the thin `act_assemble_tracing` activity. That module now plays the framework-agnostic role the bridge's old `primitives/graph_assembly.py` lift was created for, so the lift was dropped on merge. See "Tracing reconciliation".
+Graph + usage assembly is deliberately **not** a bridge primitive: it lives in `pipe_run/tracing_assembly.py` (`assemble_tracing` reads the event stream once and produces both the `GraphSpec` and token usage), behind the thin `act_assemble_tracing` activity. That module is the framework-agnostic home for tracing assembly; the bridge consumes the same execution path as any local run and does not own it.
 
 ## Why this is the right shape (claims a reviewer can check)
 
-- **Separation of concerns.** "How a host invokes a pipe" (bridge) is now distinct from "how Pipelex executes a pipe" (`pipe_run` / `pipe_controllers`) and from "Temporal SDK glue" (`pipelex.temporal`). *Verify:* `runtime_bridge/` has no `temporalio` / `mistralai` import at module top level — host SDKs appear only inside lazy-import branches (`grep -rn "import temporalio\|import mistralai" pipelex/runtime_bridge/` returns only docstring prose).
+- **Separation of concerns.** "How a host invokes a pipe" (bridge) is now distinct from "how Pipelex executes a pipe" (`pipe_run` / `pipe_controllers`) and from "Temporal SDK glue" (`pipelex.temporal`). *Verify:* `runtime_bridge/` has no `temporalio` / `mistralai` import at module top level — host SDKs appear only inside lazy-import branches (`grep -rn "import temporalio\|import mistralai" pipelex/runtime_bridge/` returns nothing at top level).
 - **One boundary, not N.** Every host runtime goes through the same `run_pipe_via_bridge` and the same JSON-safe types, instead of each plugin re-implementing boot / validate / hydrate / dispatch. *Verify:* the Mistral plugin and the Temporal activities both consume `runtime_bridge` rather than duplicating it.
-- **No duplication across runtimes.** The lift means the Temporal and Mistral paths share one copy of delivery / trace-flush / hydration / etc. *Verify:* `act_*.py` are wrappers; the logic lives once under `primitives/` (graph+usage assembly lives once in `pipe_run/tracing_assembly.py` after the `dev` merge).
+- **No duplication across runtimes.** The lift means the Temporal and Mistral paths share one copy of delivery / trace-flush / hydration / etc. *Verify:* `act_*.py` are wrappers; the logic lives once under `primitives/` (graph+usage assembly lives once in `pipe_run/tracing_assembly.py`).
 - **Optional deps stay optional.** Lazy imports keep `pipelex[temporal]` and the Mistral plugin off the import path for DIRECT / plain-Python users. *Verify:* import `run_pipe_via_bridge` with neither extra installed → DIRECT runs; the other modes raise the install-hint errors (`test_dispatch.py`, `test_validation.py`).
 - **Not overengineered.** No abstraction was added without a real second consumer: the bridge exists because there are already two host runtimes (Temporal, Mistral) plus plain Python; the primitives were extracted only once two paths shared them; `__init__.py` is empty (no re-export indirection, per project convention); the mode set is a flat enum, not a plugin registry. No speculative interfaces or config.
-- **Solid, not a workaround.** Boundary types forbid extras; missing deps fail with actionable messages; the crate path isolates per-call dynamic classes from the global registry; fire-and-forget refuses to run without a delivery target. All covered by the bridge tests.
+- **Solid, not a workaround.** Boundary types forbid extras; missing deps fail with actionable messages; the crate path isolates per-call dynamic classes from the global registry; fire-and-forget refuses to run without a delivery target; `trace_context` is honored for DIRECT only (forwarding it to a Temporal mode would merge Pipelex's trace events into the host's graph — the contract forbids that). All covered by the bridge tests.
 
-## Review follow-ups already addressed
+## Known deferred items (don't re-flag these)
 
-The SWE-review threads on this PR are all resolved (commit `5e6c86c2`); the triage and rationale live in `wip/runtime-bridge/README.md`. Notably: DIRECT mode now scopes its in-process router (`scoped_pipe_router`) so nested sub-pipes can't leak to Temporal; `trace_context` is honored for DIRECT only; `ensure_pipelex_booted` is race-safe.
+These are intentionally out of scope for this PR; each is recorded so review tooling doesn't re-raise them as new findings. Details in `wip/runtime-bridge/`.
 
-## Tracing reconciliation (post-`dev` merge)
+- **Half-built-singleton boot race.** `ensure_pipelex_booted()` closed the write-write race with a double-checked lock. A narrower lock-free read of a half-built singleton mid-`setup()` remains theoretically possible (the singleton is published when `__init__` returns, before the slow `setup()` runs). Low practical exposure — Temporal is not in production. Full mechanism + fix shape: `wip/runtime-bridge/bootstrap-half-built-singleton-race.md`.
+- **Unused `PipelexExecutionMode` `@property` helpers.** `requires_pipelex_temporal`, `requires_mistral_workflows_extra`, and `is_fire_and_forget` are tested but not yet consumed by `bridge.py` (which currently inlines the equivalent `match`/identity checks). Kept as a tested, intention-revealing surface; wiring them in is a follow-up, not a bug.
 
-`dev` landed distributed cost reporting (#967) and the `GraphContext → TraceContext` rename (#968), which reshaped the surface this branch extracted. The merge adopts `dev`'s architecture and realigns the bridge onto it:
+## Downstream impact
 
-- **Unified assembly, graph-only lift dropped.** `dev` folded graph + usage assembly into one `assemble_tracing` (`pipe_run/tracing_assembly.py`) behind `act_assemble_tracing`. The bridge's separate `primitives/graph_assembly.py` (only consumer: the old `act_assemble_graph`) was deleted — `tracing_assembly.py` now fills its framework-agnostic role.
-- **Read hardening carried forward, better layered.** This branch made `DynamoDBEventLog.read_events` convert botocore `ClientError`/`BotoCoreError` into the domain `EventLogReadError` at the store boundary. `assemble_tracing` now catches `EventLogReadError` (instead of `dev`'s direct botocore catch, which is unreachable once the backend converts), so the assembly layer no longer imports boto3. Botocore specifics stay tested at the backend layer.
-- **`trace_context` at the bridge boundary.** `run_pipe_via_bridge(trace_context=...)` (was `graph_context`) now threads a `TraceContext` — graph **and** usage — into `JobMetadata`, DIRECT-only as before.
+The two consumers of the lifted surface — `pipelex-mistralai-workflows` (the `MISTRAL_NATIVE` host package) and the `_workflows` integration branch — are pinned to a pre-extraction `pipelex` and are not broken by this PR landing. The reconciliation they need once this merges to `dev` is sequenced and documented in `wip/distributed-execution/bridge-changes-sibling-repo-reconciliation.md`. No sibling-repo code changes are in this PR.
 
 ## Verification
 
