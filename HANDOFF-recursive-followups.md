@@ -1,12 +1,16 @@
 # Handoff — recursive-building runtime follow-ups (pipelex)
 
+> **Status: ✅ BOTH DONE** — shipped on `feature/Support-recursive-design`. Task 1 (`pending_signatures` on validate) and Task 2 (normalized contract conformance) are implemented and verified. The detail below is kept as the record of what was built.
+
 Two follow-ups on the pipelex side, surfaced during the `mthds-plugins` design review. Both build on the additive multi-file model already shipped on this branch (`feature/Support-recursive-design`; see `TODOS.md` for Parts A + B). Neither blocks the additive model; both make it robust/complete. Independent of each other — land in either order.
 
 Verify after each: `make agent-test` (green) + `make agent-check` (clean).
 
 ---
 
-## Task 1 — Expose the unsatisfied-signature set on a successful lenient validate
+## Task 1 — Expose the unsatisfied-signature set on a successful lenient validate ✅ DONE
+
+> Shipped: `validate bundle` now emits `pending_signatures: string[]` (library-wide namespaced refs still typed `PipeSignature`; empty when complete) in the JSON envelope and as a "Pending signatures" markdown section, on agent-CLI + builder surfaces.
 
 **Why.** The `mthds-plugins` PostToolUse hook wants a non-blocking "these pipes are still unimplemented" nudge on a *successful* `--allow-signatures` run (design.md §5.2). Today the reachable-signature list is surfaced only on *strict* failure (`SignaturesNotAllowedError`); a lenient success emits no machine-readable list of what remains.
 
@@ -30,7 +34,9 @@ Verify after each: `make agent-test` (green) + `make agent-check` (clean).
 
 ---
 
-## Task 2 — Proper (normalized) contract conformance, replacing raw-string `contract_equals`
+## Task 2 — Proper (normalized) contract conformance, replacing raw-string `contract_equals` ✅ DONE
+
+> Shipped: header↔definition contracts reconcile by concept identity (bare ≡ qualified, `Text` ≡ `native.Text`, structural multiplicity); genuinely different concepts or differing multiplicity still error; refinement substitutability stays deferred.
 
 **Why.** `PipeBlueprint.contract_equals` (pipe_blueprint.py:111-120) compares raw strings. But Part B resolves concept refs flexibly (bare ↔ domain-qualified), so a header `output = "Brief"` and a definition `output = "thisdomain.Brief"` denote the *same* concept yet fail `contract_equals` → a false mismatch. Raw-string is not a proper check.
 
