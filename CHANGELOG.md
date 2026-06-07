@@ -38,6 +38,12 @@ This cycle reworks **cost reporting** so it survives distributed execution and s
 
 - **`UsageRegistry` success-path leak.** The per-run cost registry was opened during run setup but closed only on the failure path, so every successful run leaked its registry — and in a long-lived process (e.g. the Pipelex API) reusing a `pipeline_run_id` could collide on the orphaned registry. The registry is removed entirely, so the leak is structurally impossible.
 
+- **Additive multi-file libraries: qualified same-domain pipe references resolve across files.** A controller could reference a pipe in its own domain by qualified name (e.g. `research.find_key_findings`) only when that pipe was declared in the *same* file — the bare form already resolved across sibling files. Qualified same-domain references are now deferred to the merged library like bare ones, so a header file can reference a pipe whose concrete definition lives in a sibling file. A reference that no file in the merged library declares is still rejected at load.
+
+- **Concepts-only loading validates concept references.** Loading a bundle with concepts only (the `pipelex structures` path / `load_concepts_only`) skipped the cross-file concept-reference check that the full load runs, so a structure field pointing at an undeclared concept (`concept_ref` / `item_concept_ref`) was silently accepted, leaving an invalid schema in the library. It is now validated on the concepts-only path too, matching the full load.
+
+- **Multi-file dependency packages reconcile signatures with their definitions.** A dependency package split across files — a `PipeSignature` header plus its concrete sibling — collided on the duplicate pipe code and silently dropped one declaration (which one depended on load order). Dependencies now go through the same additive merge as the main library: the signature and its concrete reconcile to the concrete, same-domain concept references are validated, and a genuine duplicate definition raises instead of being swallowed as a warning.
+
 ## [v0.31.0] - 2026-06-04
 
 This release hardens Pipelex at its edges. The headliners: a full **error-handling overhaul** that gives every error a stable, RFC 7807-shaped identity and carries it all the way out to webhooks and external surfaces; **lenient validation with pipe signatures**, so you can sketch and dry-run a whole pipeline top-down before a single pipe is implemented; and a first, **experimental cut of CSV tabular support** for reading and writing typed lists straight from `.csv`.

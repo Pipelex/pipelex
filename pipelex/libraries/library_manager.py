@@ -539,6 +539,16 @@ class LibraryManager(LibraryManagerAbstract):
             all_domains.append(domain)
         library.domain_library.add_domains(domains=all_domains)
 
+        # Validate same-domain concept references against the live library before adding this batch's
+        # concepts — mirrors load_from_blueprints so the lightweight concepts-only path rejects a
+        # dangling concept_ref / item_concept_ref instead of leaving an invalid schema behind. The
+        # batch's own concepts come from `blueprints` (not yet in the library); concepts loaded by
+        # prior batches resolve via already_loaded_concept_refs.
+        validate_concept_references_in_blueprints(
+            blueprints=blueprints,
+            already_loaded_concept_refs=set(library.concept_library.root.keys()),
+        )
+
         # Load concepts (forward references resolved after all are loaded)
         all_concepts = self._load_concepts_from_blueprints(blueprints)
         library.concept_library.add_concepts(concepts=all_concepts)
@@ -950,6 +960,15 @@ class LibraryManager(LibraryManagerAbstract):
                 package_address=resolved_dep.address,
             )
 
+        # Merge the dependency's files into one crate so a multi-file package reconciles exactly like
+        # the main load path: a PipeSignature header and its concrete sibling collapse to a single
+        # pipe (concrete wins), and genuine duplicates / signature-concrete contract mismatches raise
+        # here rather than colliding later in add_new_pipe (which the per-pipe handler below would
+        # swallow as a warning, silently dropping one declaration). Same-domain concept references are
+        # validated across the merged files; cross-package and external-domain refs are deferred.
+        crate = LibraryCrateFactory.make_from_blueprints(blueprints=dep_blueprints)
+        validate_concept_references_in_blueprints(blueprints=dep_blueprints)
+
         # Create isolated child library for this dependency
         child_library = LibraryFactory.make_empty()
 
@@ -1015,27 +1034,37 @@ class LibraryManager(LibraryManagerAbstract):
                 library.concept_library.add_new_concept(concept=concept)
                 temp_concept_refs.append(concept.concept_ref)
 
-        # Load exported pipes into child library, ensuring temp concepts are
-        # always cleaned up even if an unexpected exception occurs
+        # Per-domain concept codes let a pipe resolve a same-domain concept by bare code, mirroring
+        # load_from_crate. A multi-file dependency may span several domains.
+        domain_concept_codes: dict[str, list[str]] = {}
+        for concept in dep_concepts:
+            parsed_concept = QualifiedRef.parse_concept_ref(raw=concept.concept_ref)
+            if parsed_concept.domain_path is not None:
+                domain_concept_codes.setdefault(parsed_concept.domain_path, []).append(parsed_concept.local_code)
+
+        # Load exported pipes (reconciled by the crate) into child library, ensuring temp concepts
+        # are always cleaned up even if an unexpected exception occurs
         try:
-            concept_codes = [concept.code for concept in dep_concepts]
-            for blueprint in dep_blueprints:
-                if blueprint.pipe is None:
+            for pipe_ref, pipe_blueprint in crate.pipes.items():
+                parsed_pipe = QualifiedRef.parse_pipe_ref(raw=pipe_ref)
+                if parsed_pipe.domain_path is None:
+                    msg = f"Crate pipe_ref '{pipe_ref}' must be domain-qualified"
+                    raise PipeLibraryError(msg)
+                domain_code = parsed_pipe.domain_path
+                pipe_code = parsed_pipe.local_code
+                # If manifest has exports, only load exported pipes
+                if has_exports and pipe_code not in all_exported:
                     continue
-                for pipe_code, pipe_blueprint in blueprint.pipe.items():
-                    # If manifest has exports, only load exported pipes
-                    if has_exports and pipe_code not in all_exported:
-                        continue
-                    try:
-                        pipe = PipeFactory[PipeAbstract].make_from_blueprint(
-                            domain_code=blueprint.domain,
-                            pipe_code=pipe_code,
-                            blueprint=pipe_blueprint,
-                            concept_codes_from_the_same_domain=concept_codes,
-                        )
-                        child_library.pipe_library.add_new_pipe(pipe=pipe)
-                    except (PipeLibraryError, ValidationError) as exc:
-                        log.warning(f"Could not load dependency '{alias}' pipe '{pipe_code}': {exc}")
+                try:
+                    pipe = PipeFactory[PipeAbstract].make_from_blueprint(
+                        domain_code=domain_code,
+                        pipe_code=pipe_code,
+                        blueprint=pipe_blueprint,
+                        concept_codes_from_the_same_domain=domain_concept_codes.get(domain_code, []),
+                    )
+                    child_library.pipe_library.add_new_pipe(pipe=pipe)
+                except ValidationError as exc:
+                    log.warning(f"Could not load dependency '{alias}' pipe '{pipe_code}': {exc}")
         finally:
             # Remove temporary concept entries from main library
             library.concept_library.remove_concepts_by_concept_refs(concept_refs=temp_concept_refs)

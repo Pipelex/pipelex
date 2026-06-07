@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from pipelex.hub import get_library_manager
+from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import (
     LoadConceptsOnlyResult,
     load_concepts_only,
@@ -287,6 +288,40 @@ refines = "Customer"
             concept_codes = [concept.code for concept in result.concepts]
             assert "Customer" in concept_codes
             assert "VIPCustomer" in concept_codes
+
+    def test_load_concepts_only_rejects_dangling_concept_ref(self, load_empty_library: Callable[[], str]):
+        """A dangling concept_ref in a structure field is rejected, matching the full-load path."""
+        load_empty_library()
+        mthds_content = """
+domain = "testapp"
+description = "Test domain with a dangling concept_ref"
+
+[concept.Invoice]
+description = "An invoice"
+
+[concept.Invoice.structure]
+customer = { type = "concept", concept_ref = "testapp.MissingCustomer", description = "The customer" }
+"""
+
+        with pytest.raises(ValidateBundleError, match="MissingCustomer"):
+            load_concepts_only(mthds_contents=[mthds_content])
+
+    def test_load_concepts_only_rejects_dangling_item_concept_ref(self, load_empty_library: Callable[[], str]):
+        """A dangling item_concept_ref in a list structure field is rejected, matching the full-load path."""
+        load_empty_library()
+        mthds_content = """
+domain = "testapp"
+description = "Test domain with a dangling item_concept_ref"
+
+[concept.Order]
+description = "An order"
+
+[concept.Order.structure]
+items = { type = "list", item_type = "concept", item_concept_ref = "testapp.MissingLineItem", description = "Line items" }
+"""
+
+        with pytest.raises(ValidateBundleError, match="MissingLineItem"):
+            load_concepts_only(mthds_contents=[mthds_content])
 
     def test_load_concepts_only_directory_skips_pipes(self, load_empty_library: Callable[[], str]):
         """Test that pipes are skipped when loading from directory."""

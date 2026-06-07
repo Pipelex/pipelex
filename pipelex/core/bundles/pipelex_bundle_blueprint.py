@@ -11,10 +11,8 @@ from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
 from pipelex.core.pipes.validation import is_pipe_code_valid
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
-from pipelex.core.qualified_ref import QualifiedRef, QualifiedRefError
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
-from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
@@ -25,7 +23,7 @@ from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.search.pipe_search_blueprint import PipeSearchBlueprint
 from pipelex.pipe_operators.structure.pipe_structure_blueprint import PipeStructureBlueprint
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
-from pipelex.types import Self, StrEnum
+from pipelex.types import StrEnum
 from pipelex.urls import URLs
 
 PipeBlueprintUnion = Annotated[
@@ -139,59 +137,6 @@ class PipelexBundleBlueprint(BaseModel):
     def validate_main_pipe(self) -> "PipelexBundleBlueprint":
         if self.main_pipe and (not self.pipe or (self.main_pipe not in self.pipe)):
             msg = f"Main pipe '{self.main_pipe}' could not be found in pipelex bundle at source '{self.source}' and domain '{self.domain}'"
-            raise ValueError(msg)
-        return self
-
-    @model_validator(mode="after")
-    def validate_local_pipe_references(self) -> Self:
-        """Validate that domain-qualified pipe references pointing to this bundle's domain exist locally.
-
-        Three categories:
-        - Bare refs (no dot): no validation here (deferred to package-level resolution)
-        - Domain-qualified, same domain: must exist in self.pipe
-        - Domain-qualified, different domain: skip (external, validated at load time)
-
-        Special outcomes ("fail", "continue") are excluded from validation.
-        """
-        declared_pipes: set[str] = set(self.pipe.keys()) if self.pipe else set()
-        special_outcomes = SpecialOutcome.value_list()
-        all_pipe_refs = self.collect_pipe_references()
-
-        invalid_refs: list[str] = []
-        for pipe_ref_str, context in all_pipe_refs:
-            # Skip special outcomes
-            if pipe_ref_str in special_outcomes:
-                continue
-
-            # Cross-package references are validated at package level, not bundle level
-            if QualifiedRef.has_cross_package_prefix(pipe_ref_str):
-                continue
-
-            # Try to parse as a pipe ref
-            try:
-                ref = QualifiedRef.parse_pipe_ref(pipe_ref_str)
-            except QualifiedRefError:
-                # If it doesn't parse as a valid pipe ref, skip (will be caught elsewhere)
-                continue
-
-            if not ref.is_qualified:
-                # Bare ref - no validation at bundle level
-                continue
-
-            if ref.is_external_to(self.domain):
-                # External domain - skip
-                continue
-
-            # Same domain, qualified ref - must exist locally
-            if ref.local_code not in declared_pipes:
-                invalid_refs.append(f"'{pipe_ref_str}' in {context}")
-
-        if invalid_refs:
-            msg = (
-                f"The following same-domain pipe references are not declared in domain '{self.domain}' "
-                f"at '{self.source}': {', '.join(invalid_refs)}. "
-                f"Declared pipes: {sorted(declared_pipes) if declared_pipes else '(none)'}"
-            )
             raise ValueError(msg)
         return self
 
