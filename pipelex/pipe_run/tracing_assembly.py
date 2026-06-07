@@ -11,6 +11,7 @@ that crosses the Temporal activity boundary (returned by ``act_assemble_tracing`
 """
 
 import json
+from typing import cast
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
@@ -25,9 +26,15 @@ from pipelex.tracing.event_log_factory import make_event_log
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
 from pipelex.tracing.usage_aggregator import UsageAggregator
 
+# DynamoDB-backend read failures come in two sibling botocore base classes (neither subclasses the other):
+# ClientError (service-side throttle / auth) and BotoCoreError (transport / credential / timeout, e.g.
+# EndpointConnectionError, ReadTimeoutError, NoCredentialsError). Both are imported together (present or
+# absent together) and join the best-effort read catch when boto3 is installed — matching s3_storage_provider.
 try:
+    from botocore.exceptions import BotoCoreError as _BotoCoreError  # type: ignore[import-untyped]
     from botocore.exceptions import ClientError as _BotoClientError  # type: ignore[import-untyped]
 except ImportError:
+    _BotoCoreError = None  # type: ignore[assignment, misc]
     _BotoClientError = None  # type: ignore[assignment, misc]
 
 
@@ -65,8 +72,9 @@ def assemble_tracing(
     and ``UsageAggregator`` (when ``assemble_usage``).
 
     Tracing is observability and treated as best-effort: runtime I/O issues
-    (including the DynamoDB backend's botocore ``ClientError`` — throttle / auth /
-    network — when boto3 is installed), malformed event data, and broken tracing
+    (including the DynamoDB backend's botocore ``ClientError`` — service-side
+    throttle / auth — and ``BotoCoreError`` — transport / credential / timeout —
+    when boto3 is installed), malformed event data, and broken tracing
     infrastructure (config errors, missing optional dependencies) are caught and
     recorded in the ``*_error`` fields, not propagated. Programming bugs (KeyError,
     AttributeError, etc.) propagate so they surface during development.
@@ -89,12 +97,11 @@ def assemble_tracing(
         return result
 
     # Best-effort read: a backend failure degrades to an *_assembly_error note rather than failing the run.
-    # Mirrors reporting_manager's emit-side handling — the DynamoDB backend's query can raise botocore
-    # ClientError (throttle / auth / network), which is neither an OSError nor a PipelexError, so it is added
-    # explicitly when boto3 is installed.
+    # Both botocore base classes (ClientError + BotoCoreError) join the catch together when boto3 is installed.
     read_errors: tuple[type[BaseException], ...] = (OSError, json.JSONDecodeError, ValidationError, PipelexConfigError, MissingDependencyError)
-    if _BotoClientError is not None:
-        read_errors = (*read_errors, _BotoClientError)
+    if _BotoClientError is not None and _BotoCoreError is not None:
+        # cast: botocore is untyped, so the imported classes are Unknown; we know they are BaseException types.
+        read_errors = (*read_errors, cast("type[BaseException]", _BotoClientError), cast("type[BaseException]", _BotoCoreError))
 
     try:
         event_log = make_event_log(tracing_config)

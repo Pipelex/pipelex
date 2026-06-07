@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import NamedTuple
+from typing import NamedTuple, cast
 
 from typing_extensions import override
 
@@ -19,9 +19,15 @@ from pipelex.tracing.activity_event_log import ActivityEventLogCache
 from pipelex.tracing.event_log_protocol import EventLogProtocol
 from pipelex.tracing.trace_events import UsageReportEvent
 
+# DynamoDB PutItem failures come in two sibling botocore base classes (neither subclasses the other):
+# ClientError (service-side throttle / auth) and BotoCoreError (transport / credential / timeout, e.g.
+# EndpointConnectionError, ReadTimeoutError, NoCredentialsError). Both are imported together (present or
+# absent together) and join the best-effort emit catch when boto3 is installed — matching s3_storage_provider.
 try:
+    from botocore.exceptions import BotoCoreError as _BotoCoreError  # type: ignore[import-untyped]
     from botocore.exceptions import ClientError as _BotoClientError  # type: ignore[import-untyped]
 except ImportError:
+    _BotoCoreError = None  # type: ignore[assignment, misc]
     _BotoClientError = None  # type: ignore[assignment, misc]
 
 
@@ -205,7 +211,11 @@ class ReportingManager(ReportingProtocol):
         - ``MissingDependencyError``: ``boto3`` missing for the DynamoDB backend.
         - ``PipelexConfigError``: factory misconfigured.
         - ``botocore.exceptions.ClientError`` (when boto3 is installed):
-            DynamoDB throttle / auth fail at PutItem time.
+            DynamoDB service-side error (throttle / auth) at PutItem time.
+        - ``botocore.exceptions.BotoCoreError`` (when boto3 is installed):
+            transport / credential / timeout failure at PutItem time
+            (EndpointConnectionError, ReadTimeoutError, NoCredentialsError, ...) —
+            a SEPARATE base class, not a ClientError subclass.
         Other exceptions propagate.
         """
         tracing_config = get_config().pipelex.tracing_config
@@ -238,8 +248,9 @@ class ReportingManager(ReportingProtocol):
         )
 
         emit_exceptions: tuple[type[BaseException], ...] = (OSError,)
-        if _BotoClientError is not None:
-            emit_exceptions = (*emit_exceptions, _BotoClientError)
+        if _BotoClientError is not None and _BotoCoreError is not None:
+            # cast: botocore is untyped, so the imported classes are Unknown; we know they are BaseException types.
+            emit_exceptions = (*emit_exceptions, cast("type[BaseException]", _BotoClientError), cast("type[BaseException]", _BotoCoreError))
 
         try:
             process_event_log.emit(event)

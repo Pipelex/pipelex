@@ -143,27 +143,30 @@ class TestTracingAssembly:
         assert result.usage_assembly_error is not None
         event_log.close.assert_called_once()
 
-    def test_read_botocore_clienterror_is_caught(self, mocker: MockerFixture) -> None:
-        """The DynamoDB backend's botocore ClientError (throttle/auth/network) degrades to an assembly error,
-        never failing the run — it is neither an OSError nor a PipelexError, so it must be caught explicitly.
+    def test_read_botocore_errors_are_caught(self, mocker: MockerFixture) -> None:
+        """DynamoDB backend failures degrade to an assembly error, never failing the run. Covers BOTH botocore
+        base classes (siblings, neither a subclass of the other): ClientError (service-side throttle / auth)
+        and BotoCoreError subclasses (transport / credential / timeout, e.g. EndpointConnectionError).
         """
         botocore_exceptions = pytest.importorskip("botocore.exceptions")
         client_error = botocore_exceptions.ClientError(
             error_response={"Error": {"Code": "ProvisionedThroughputExceededException", "Message": "throttled"}},
             operation_name="Query",
         )
-        self._enable_tracing(mocker)
-        event_log = mocker.MagicMock()
-        event_log.read_events = mocker.MagicMock(side_effect=client_error)
-        mocker.patch(f"{_MODULE}.make_event_log", return_value=event_log)
+        transport_error = botocore_exceptions.EndpointConnectionError(endpoint_url="https://dynamodb.test")
+        for backend_error in (client_error, transport_error):
+            self._enable_tracing(mocker)
+            event_log = mocker.MagicMock()
+            event_log.read_events = mocker.MagicMock(side_effect=backend_error)
+            mocker.patch(f"{_MODULE}.make_event_log", return_value=event_log)
 
-        result = assemble_tracing(pipeline_run_id="plr", assemble_graph=True, assemble_usage=True)
+            result = assemble_tracing(pipeline_run_id="plr", assemble_graph=True, assemble_usage=True)
 
-        assert result.graph_spec is None
-        assert result.tokens_usages is None
-        assert result.graph_assembly_error is not None
-        assert result.usage_assembly_error is not None
-        event_log.close.assert_called_once()
+            assert result.graph_spec is None, backend_error
+            assert result.tokens_usages is None, backend_error
+            assert result.graph_assembly_error is not None, backend_error
+            assert result.usage_assembly_error is not None, backend_error
+            event_log.close.assert_called_once()
 
     def test_read_error_only_marks_requested_concern(self, mocker: MockerFixture) -> None:
         """A costs-only read failure sets usage_assembly_error but never graph_assembly_error."""
