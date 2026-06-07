@@ -9,5 +9,6 @@ Sub-track of [distributed-execution](../README.md): bringing the `pipelex-mistra
 - [mistral-workflows-sub-module.md](mistral-workflows-sub-module.md) — design: the sub-module layout option.
 - [mistral-workflows-merge-4-refresh-now-prompt.md](mistral-workflows-merge-4-refresh-now-prompt.md) — ready-to-paste prompt to keep `merge-4` alive while held: merge `dev` in now (only `CHANGELOG.md` conflicts; the mistral bump must survive).
 - [mistral-workflows-merge-4-rebuild-after-bridge-lands-prompt.md](mistral-workflows-merge-4-rebuild-after-bridge-lands-prompt.md) — ready-to-paste prompt for after the bridge squash-merges to `dev`: rebuild the branch off `dev` and re-apply only the mistral delta, to dodge the squash-merge tangle.
+- [docs-held-back-from-live-site.md](docs-held-back-from-live-site.md) — **re-publish checklist.** The Mistral Workflows user docs ship in the repo but are excluded from the published docs site (so it doesn't advertise the unreleased `pipelex-mistralai-workflows` package). What's held back and how to restore it when the package launches — claim the PyPI name first.
 
 Pairs with [bridge-changes-sibling-repo-reconciliation.md](../bridge-changes-sibling-repo-reconciliation.md) in the parent track, which tracks what the downstream `pipelex-mistralai-workflows` repo needs reconciled after the `_bridge` surface changes.

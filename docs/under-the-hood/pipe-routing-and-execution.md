@@ -5,7 +5,7 @@ description: "How PipeJobs are created, routed, and executed — covering both d
 
 # Pipe Routing & Execution
 
-Pipelex runs pipes either **direct** (single-process) or **distributed** on a host runtime. Both share the same pipe definitions, library loading, and controller logic. The key difference is *where* the pipe runs and how the PipeJob travels to get there. There are two distributed host runtimes — your own Temporal workers ([Pipelex on Temporal](../distributed-execution/temporal/index.md)), and Mistral's managed Workflows control plane ([Pipelex on Mistral Workflows](../distributed-execution/mistral-workflows/index.md), itself built on Temporal) — and they reach pipe execution through the same framework-agnostic runtime bridge.
+Pipelex runs pipes either **direct** (single-process) or **distributed** on a host runtime. Both share the same pipe definitions, library loading, and controller logic. The key difference is *where* the pipe runs and how the PipeJob travels to get there. The distributed host runtime today is your own Temporal workers ([Pipelex on Temporal](../distributed-execution/temporal/index.md)); a managed Mistral Workflows backend (also built on Temporal) is coming soon. Both reach pipe execution through the same framework-agnostic runtime bridge.
 
 ---
 
@@ -19,7 +19,7 @@ Pipelex runs pipes either **direct** (single-process) or **distributed** on a ho
 ---
 
 !!! note "The runtime bridge"
-    Both distributed host runtimes go through the framework-agnostic runtime bridge (`pipelex/runtime_bridge/`). Its `primitives/` layer is shared by `pipelex.temporal` and the external `pipelex_mistralai_workflows` package: it classifies controller pipes as child workflows and leaf operators as activities (`pipe_classification.py`), hydrates working memory, flushes trace events, and delivers results in a host-neutral way. Graph and token-usage assembly is not a bridge primitive — it lives in `pipelex/pipe_run/tracing_assembly.py` and runs the same way for local and distributed runs. See [Execution Modes](../distributed-execution/mistral-workflows/execution-modes.md) for the boundary contract.
+    Both distributed paths go through the framework-agnostic runtime bridge (`pipelex/runtime_bridge/`). Its `primitives/` layer is shared by `pipelex.temporal` and the in-development Mistral Workflows host package: it classifies controller pipes as child workflows and leaf operators as activities (`pipe_classification.py`), hydrates working memory, flushes trace events, and delivers results in a host-neutral way. Graph and token-usage assembly is not a bridge primitive — it lives in `pipelex/pipe_run/tracing_assembly.py` and runs the same way for local and distributed runs.
 
 ---
 

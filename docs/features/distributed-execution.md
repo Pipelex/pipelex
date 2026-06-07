@@ -11,14 +11,12 @@ Run your `.mthds` methods as durable workflows.
 
 Pipelex pipelines normally run in-process. When you need durability, retries that survive failure, and horizontal scale, the same pipelines run as durable workflows — each pipe becomes a workflow, child pipes become child workflows, and every LLM call, image generation, or document extraction becomes an activity. The orchestration layer handles durability, retries, scheduling, and visibility; Pipelex handles the AI work, and the same methods run distributed without changing a line of method code.
 
-## Two backends
+## Backends
 
-Both backends are durable execution on Temporal underneath. The difference is who runs the control plane:
+Distributed execution runs on Temporal. Today there is one backend, with a managed option coming soon:
 
 - **[Pipelex on Temporal](../distributed-execution/temporal/index.md)** — you run Pipelex's own Temporal workers against a Temporal cluster you operate (self-hosted or Temporal Cloud). Python 3.10+, `pipelex[temporal]`. Generally available.
-- **[Pipelex on Mistral Workflows](../distributed-execution/mistral-workflows/index.md)** *(preview)* — you run pipes inside Mistral Workflows, Mistral's managed orchestration control plane (itself built on Temporal). Python 3.12+, `pipelex-mistralai-workflows`.
-
-See [Choosing a Backend](../distributed-execution/mistral-workflows/choosing-a-backend.md) to decide between them.
+- **Pipelex on Mistral Workflows** *(coming soon)* — run pipes inside Mistral Workflows, Mistral's managed orchestration control plane (itself built on Temporal), with no cluster to operate. In active development; docs land once it ships.
 
 ## Pipelex on Temporal
 
@@ -44,4 +42,4 @@ All knobs live under `[temporal.*]` in `.pipelex/pipelex.toml`:
 
 ## Get started
 
-See the **[Distributed Execution](../distributed-execution/index.md)** guide for the full walkthrough. For Temporal: overview, cluster setup, worker deployment, task-queue routing, and workflow observability. For Mistral Workflows *(preview)*: overview, installation, and your first Pipelex workflow.
+See the **[Distributed Execution](../distributed-execution/index.md)** guide for the full walkthrough — overview, cluster setup, worker deployment, task-queue routing, and workflow observability. A managed Mistral Workflows backend is coming soon.

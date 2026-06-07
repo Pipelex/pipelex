@@ -7,7 +7,7 @@ description: "Run Pipelex pipelines as durable Temporal workflows on your own Te
 
 Run your Pipelex pipelines as durable Temporal workflows across one or more worker processes. This section walks through setting up the cluster, running workers, routing work to the right pools, and reading the Temporal Web UI.
 
-This is one of two distributed-execution backends. Here you run **Pipelex's own Temporal workers** against a Temporal cluster you operate (self-hosted or Temporal Cloud) — you own the control plane. For the managed alternative, see [Pipelex on Mistral Workflows](../mistral-workflows/index.md), and [Choosing a Backend](../mistral-workflows/choosing-a-backend.md) to decide between them. Both are summarized on the [Distributed Execution overview](../index.md).
+This is the Temporal backend for distributed execution: you run **Pipelex's own Temporal workers** against a Temporal cluster you operate (self-hosted or Temporal Cloud) — you own the control plane. A second, managed alternative (Pipelex on Mistral Workflows) is coming soon. See the [Distributed Execution overview](../index.md) for the big picture.
 
 ## What it is
 

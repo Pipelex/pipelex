@@ -361,6 +361,16 @@ not_in_nav: |
   !errors/index.md
   agents/*.md
 
+# exclude_docs: forward-looking pages kept in the repo but NOT built or served on
+#   the live site yet. The Mistral Workflows backend ships as a separate package
+#   (pipelex-mistralai-workflows) that is not published yet, so its user docs are
+#   held back to avoid advertising an unreleased package. Re-publish them — delete
+#   this block and restore the "Mistral Workflows" nav entries under Distributed
+#   Execution — once the package lands. See
+#   wip/distributed-execution/bridge-changes-sibling-repo-reconciliation.md.
+exclude_docs: |
+  distributed-execution/mistral-workflows/
+
 nav:
   - Get Started:
     - Build & Run AI Methods: index.md
@@ -475,13 +485,6 @@ nav:
         - Worker Deployment: distributed-execution/workers.md
         - Task-Queue Routing: distributed-execution/task-routing.md
         - Workflow Observability: distributed-execution/observability.md
-      - Mistral Workflows:
-        - Overview: distributed-execution/mistral-workflows/index.md
-        - Installation & Preview Status: distributed-execution/mistral-workflows/installation.md
-        - Your First Pipelex Workflow: distributed-execution/mistral-workflows/your-first-pipelex-workflow.md
-        - Execution Modes: distributed-execution/mistral-workflows/execution-modes.md
-        - Streaming Progress: distributed-execution/mistral-workflows/streaming.md
-        - Choosing a Backend: distributed-execution/mistral-workflows/choosing-a-backend.md
   - Reference:
     - CLI Reference:
       - Overview: tools/cli/index.md

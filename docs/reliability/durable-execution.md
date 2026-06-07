@@ -18,10 +18,10 @@ Move to a [durable backend](../distributed-execution/index.md) when you need:
 - **Large durable batches** — running a pipe over thousands of items, durably and rate-limited.
 - **Horizontal scale** — fan work out across multiple worker machines.
 
-The same `.mthds` methods run on every path without changing a line — which durable backend runs them is a deployment choice, not a code change. The [Pipelex on Temporal](../distributed-execution/temporal/index.md) backend is switched on with `[temporal] is_enabled = true`, which dispatches the work through your Temporal cluster. The [Mistral Workflows](../distributed-execution/mistral-workflows/index.md) backend is wired differently: that flag does not apply — Pipelex pipes run inside Workflows activities via the runtime bridge.
+The same `.mthds` methods run on every path without changing a line — which durable backend runs them is a deployment choice, not a code change. The [Pipelex on Temporal](../distributed-execution/temporal/index.md) backend is switched on with `[temporal] is_enabled = true`, which dispatches the work through your Temporal cluster. A second, managed backend (Mistral Workflows) is coming soon: that flag will not apply to it — pipes run inside Workflows activities via the runtime bridge.
 
-!!! note "Two durable backends"
-    Durable execution (Tier 2) is available on two backends, both built on Temporal: your own Temporal cluster ([Pipelex on Temporal](../distributed-execution/temporal/index.md)), and Mistral's managed Workflows control plane ([Pipelex on Mistral Workflows](../distributed-execution/mistral-workflows/index.md), preview). The resilience model described here applies to both; they differ in who operates the control plane. See [Choosing a Backend](../distributed-execution/mistral-workflows/choosing-a-backend.md).
+!!! note "Durable backend"
+    Durable execution (Tier 2) runs on Temporal: your own Temporal cluster ([Pipelex on Temporal](../distributed-execution/temporal/index.md)). A managed option — Mistral's Workflows control plane, also built on Temporal — is coming soon; the resilience model described here will apply to it too, the difference being who operates the control plane.
 
 !!! tip "The error you see is the same on both paths"
     A pipe that fails on a Temporal worker reaches your CLI or HTTP adapter with the *same* classification — category, retryable flag, model, provider, suggested action — as the identical failure run locally. Switching to a durable backend changes the resilience, not the error contract.
