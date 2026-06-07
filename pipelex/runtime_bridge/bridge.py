@@ -162,39 +162,21 @@ def build_pipe_job_from_input(
     ``GraphTracerManager`` tracer for this pipeline run can have per-step
     ``PipeStartEvent`` / ``PipeEndSuccessEvent`` events flow through the
     pipe execution. When ``None``, no tracing happens (current default).
-
-    Raises ``PipelexBridgeDispatchError`` when ``trace_context`` carries a
-    ``tracer_key`` that diverges from its ``graph_id`` — an unsupported
-    keyed-tracer configuration for the in-process path (see the guard below).
     """
     pipe = get_required_pipe(pipe_code=input_payload.pipe_code)
 
-    # Boundary precondition. The bridge runs the in-process PipeRun path, which keys BOTH the
-    # tracer close (close_tracer) AND the end-of-run tracing assembly off a single
-    # job_metadata.pipeline_run_id (see pipe_run.py). A GraphTracerManager tracer registers under
-    # its lookup_key (tracer_key or graph_id) but emits events under its own pipeline_run_id — which
-    # a well-behaved host sets to graph_id, exactly how pipeline_run_setup opens tracers. Those keys
-    # coincide only when tracer_key is unset or equals graph_id. A divergent tracer_key is the
-    # nested-tracer disambiguation the Temporal child path uses (wf_pipe_router), never the in-process
-    # path: routed through the bridge it would make assembly read a partition no events were emitted
-    # under, silently dropping the run's graph + cost output. The in-process bridge does not support
-    # that configuration, so reject it loudly here rather than return a silently-empty result.
-    if trace_context is not None and trace_context.tracer_key is not None and trace_context.tracer_key != trace_context.graph_id:
-        msg = (
-            f"The runtime bridge does not support a TraceContext whose tracer_key ({trace_context.tracer_key!r}) differs from "
-            f"its graph_id ({trace_context.graph_id!r}). The in-process execution path keys both tracer close and tracing "
-            f"assembly off a single pipeline_run_id, so a divergent tracer_key would silently drop the run's graph and cost "
-            f"data. Open the host tracer with tracer_key unset (or equal to graph_id) for bridge runs."
-        )
-        raise PipelexBridgeDispatchError(msg)
-
     # When the caller supplies a trace_context but no explicit pipeline_run_id, adopt the
-    # trace_context's lookup_key (= tracer_key or graph_id) as the run id. The guard above proves
-    # lookup_key == graph_id here, so this single value is at once: the key the caller's already-open
-    # tracer is registered under in GraphTracerManager (open raises if a tracer for that key already
-    # exists), the key PipeRun.run closes it under (close_tracer takes pipeline_run_id), AND the
-    # partition events are emitted/read under by tracing_assembly. Minting a fresh id instead would
-    # split event emission from assembly (dropping the run's graph + cost data) and leak the tracer.
+    # trace_context's lookup_key (= tracer_key or graph_id) as the run id. lookup_key is the key the
+    # caller's already-open tracer is registered under in GraphTracerManager AND the key PipeRun.run
+    # closes it under (close_tracer takes pipeline_run_id); minting a fresh id would leak the tracer.
+    #
+    # On every reachable path lookup_key == graph_id, so it is also the partition tracing_assembly
+    # reads under: only the Temporal child path (wf_pipe_router) opens a tracer with tracer_key !=
+    # graph_id, and it never routes through the bridge — non-DIRECT modes null trace_context, and it
+    # builds its PipeJob directly, not via this function. A host that hand-built a divergent keyed
+    # trace_context and forced it through DIRECT would split event emission (under graph_id) from
+    # assembly (under tracer_key); nothing constructs that, and it is documented as unsupported in
+    # wip/runtime-bridge/bridge-keyed-tracer-unsupported.md (graph_id "is typically the pipeline run id").
     if input_payload.pipeline_run_id is not None:
         pipeline_run_id = input_payload.pipeline_run_id
     elif trace_context is not None:
