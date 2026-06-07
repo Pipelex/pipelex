@@ -27,6 +27,7 @@ from pipelex.hub import (
     resolve_library_dirs,
     set_current_library,
 )
+from pipelex.libraries.exceptions import LibraryError, LibraryLoadingError
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_run.exceptions import DryRunError, PipeRunError
@@ -129,6 +130,31 @@ def _translate_to_validate_bundle_error(category: Literal["pipe", "concept"]) ->
             message=msg,
             pipe_validation_errors=pipe_validation_errors,
         ) from validation_error
+    except PipeNotFoundError:
+        # PipeNotFoundError is a PipeLibraryError (hence a LibraryError), but it is NOT a bundle
+        # merge/load failure: it means a requested --pipe slice names a pipe absent from the bundle.
+        # It has its own dedicated CLI handler (execute_validate's `except PipeNotFoundError`), so it
+        # must propagate raw rather than be folded into a ValidateBundleError by the arm below.
+        raise
+    except LibraryError as library_error:
+        # Library merge / load failures that are NOT pydantic ValidationErrors: undeclared
+        # cross-file concept references (ConceptLibraryError), signature/concrete contract
+        # mismatches and duplicate concept/pipe refs (ConceptLibraryError / PipeLibraryError), and
+        # the structured LibraryLoadingError aggregate (concept cycles, reserved-domain
+        # violations, factory failures). Surface them as a clean ValidateBundleError instead of a
+        # raw traceback. LibraryLoadingError carries blueprint- and pipe/concept-validation errors;
+        # forward them so the CLI renders the same structured detail it does for the other arms.
+        if isinstance(library_error, LibraryLoadingError):
+            blueprint_validation_errors = library_error.blueprint_validation_errors
+            pipe_concept_validation_errors = library_error.pipe_concept_validation_errors
+        else:
+            blueprint_validation_errors = None
+            pipe_concept_validation_errors = None
+        raise ValidateBundleError(
+            message=library_error.message,
+            pipelex_bundle_blueprint_validation_errors=blueprint_validation_errors,
+            pipe_validation_errors=pipe_concept_validation_errors,
+        ) from library_error
     except PipeRunError as pipe_run_error:
         raise ValidateBundleError(
             message=pipe_run_error.message,

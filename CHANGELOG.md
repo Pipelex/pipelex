@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **Additive multi-file library construction.** Two merge-time rules now support building a same-domain `.mthds` library as separate, additive files (forward-declared headers + separate definitions), enabling parallel top-down method construction:
+  - A `PipeSignature` and a concrete pipe with the same code reconcile — the concrete pipe satisfies the signature instead of raising a duplicate-code error. `PipeSignature` works like a forward declaration ("header"), its concrete pipe like the definition; their `inputs`/`output` contracts must match. Two concrete pipes with the same code, or two signatures with differing contracts, remain errors.
+  - Concept references resolve against the merged library instead of per file, so a concept declared once can be referenced by bare code from sibling files of the same domain — whether those files are loaded in the same directory batch or across separate load batches (e.g. a concept declared in a `-L` library directory referenced from a separately-loaded bundle). A concept declared twice remains a `ConceptLibraryError`, and a reference resolvable nowhere now surfaces as a structured validation error instead of a raw traceback.
+
 ## [v0.31.0] - 2026-06-04
 
 This release hardens Pipelex at its edges. The headliners: a full **error-handling overhaul** that gives every error a stable, RFC 7807-shaped identity and carries it all the way out to webhooks and external surfaces; **lenient validation with pipe signatures**, so you can sketch and dry-run a whole pipeline top-down before a single pipe is implemented; and a first, **experimental cut of CSV tabular support** for reading and writing typed lists straight from `.csv`.

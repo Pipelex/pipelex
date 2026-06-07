@@ -30,6 +30,7 @@ from pipelex.core.validation import report_validation_error
 from pipelex.hub import get_class_registry, get_current_library
 from pipelex.libraries.collision_messages import duplicate_ref_msg
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
+from pipelex.libraries.concept_reference_validation import validate_concept_references_in_blueprints
 from pipelex.libraries.exceptions import (
     LibraryError,
     LibraryLoadingError,
@@ -411,9 +412,18 @@ class LibraryManager(LibraryManagerAbstract):
         # Detect cycles in concept references (A -> B -> A is forbidden)
         self._detect_concept_cycles(all_concepts)
 
-        # Precompute domain -> concept local codes mapping (avoids O(N*M) re-parsing per pipe)
+        # Precompute domain -> concept local codes mapping (avoids O(N*M) re-parsing per pipe).
+        # Sourced from the LIVE library (native concepts + concepts from prior load batches + this
+        # batch's concepts, already added above), not just this crate — so a pipe can reference, by
+        # bare code, a same-domain concept that a prior batch (e.g. a -L library directory) loaded.
+        # This is the pipe-factory counterpart to the loader's cross-batch concept-reference check:
+        # without it, that check would pass a bare cross-batch ref only for the factory to reject
+        # it. Cross-package aliased entries ('alias->...') are skipped — they resolve through the
+        # dependency resolver, not by bare code, and would not parse as a concept ref.
         domain_concept_codes: dict[str, list[str]] = {}
-        for concept_ref in crate.concepts:
+        for concept_ref in library.concept_library.root:
+            if QualifiedRef.has_cross_package_prefix(concept_ref):
+                continue
             parsed_concept = QualifiedRef.parse_concept_ref(raw=concept_ref)
             if parsed_concept.domain_path is not None:
                 domain_concept_codes.setdefault(parsed_concept.domain_path, []).append(parsed_concept.local_code)
@@ -478,6 +488,17 @@ class LibraryManager(LibraryManagerAbstract):
 
         # Build the crate (merges, qualifies, detects duplicates)
         crate = LibraryCrateFactory.make_from_blueprints(blueprints=blueprints)
+
+        # Validate same-domain concept references against the live library: the concepts declared
+        # in this batch plus those already loaded by prior batches (e.g. via a -L library
+        # directory). This is done in the loader, not the crate factory, so a bare concept ref can
+        # resolve across separate load batches into the same library. The batch's own concepts are
+        # not in the library yet (load_from_crate adds them below), so they come from `blueprints`.
+        library = self.get_library(library_id=library_id)
+        validate_concept_references_in_blueprints(
+            blueprints=blueprints,
+            already_loaded_concept_refs=set(library.concept_library.root.keys()),
+        )
 
         # Load from crate (domains, concepts, pipes, validation)
         return self.load_from_crate(library_id=library_id, crate=crate)
@@ -742,6 +763,14 @@ class LibraryManager(LibraryManagerAbstract):
             raise LibraryError(
                 message=msg,
             ) from validation_error
+        except (ConceptLibraryError, PipeLibraryError) as ref_error:
+            # Merge-time reference errors (undeclared cross-file concept refs, signature/concrete
+            # contract mismatches, duplicate refs) carry no structured validation payload — unlike
+            # LibraryLoadingError, which must propagate intact so its aggregated errors survive.
+            # Add the batch's file list as context, then let the outer
+            # _translate_to_validate_bundle_error LibraryError arm shape it into a ValidateBundleError.
+            msg = f"Could not load blueprints from {[str(pth) for pth in valid_mthds_paths]} because of: {ref_error}"
+            raise type(ref_error)(msg) from ref_error
 
     def _warn_if_mthds_version_unsatisfied(
         self,

@@ -4,17 +4,17 @@ from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
-from pipelex.libraries.library_crate_factory import LibraryCrateFactory
+from pipelex.libraries.concept_reference_validation import validate_concept_references_in_blueprints
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from tests.unit.pipelex.libraries.test_library_crate_data import BlueprintSamples
 
 
-class TestLibraryCrateConceptReferences:
+class TestConceptReferenceValidation:
     """Concept references resolve against the merged library, not per file.
 
-    These cases moved here from the per-file blueprint validator: a bundle now constructs even
-    when it references a concept declared in a sibling file, and an undeclared reference is caught
-    at merge time by LibraryCrateFactory.make_from_blueprints.
+    `validate_concept_references_in_blueprints` runs in the loader after the structural merge: a
+    bundle that references a concept declared in a sibling file (in the same batch or already in
+    the library) validates, while a reference declared nowhere raises ConceptLibraryError.
     """
 
     # ========== CROSS-FILE RESOLUTION (the unblock) ==========
@@ -27,15 +27,20 @@ class TestLibraryCrateConceptReferences:
         ],
     )
     def test_cross_file_concept_reference_resolves(self, blueprints: list[PipelexBundleBlueprint]):
-        """A concept declared in one file, referenced by bare code from a sibling file, resolves (order-independent)."""
-        crate = LibraryCrateFactory.make_from_blueprints(blueprints=blueprints)
-        assert "crossref.Summary" in crate.concepts
-        assert "crossref.make_summary" in crate.pipes
+        """A concept declared in one file, referenced by bare code from a sibling file in the same batch, resolves (order-independent)."""
+        validate_concept_references_in_blueprints(blueprints=blueprints)
+
+    def test_cross_batch_concept_reference_resolves_via_already_loaded(self):
+        """A bare ref resolves against a concept loaded by a prior batch (passed as already_loaded_concept_refs)."""
+        validate_concept_references_in_blueprints(
+            blueprints=[BlueprintSamples.CROSSREF_PIPE_BUNDLE],
+            already_loaded_concept_refs={"crossref.Summary"},
+        )
 
     def test_cross_file_undeclared_concept_raises_naming_ref_and_source(self):
         """A bare concept reference declared in no file raises ConceptLibraryError naming the ref and its source."""
         with pytest.raises(ConceptLibraryError) as exc_info:
-            LibraryCrateFactory.make_from_blueprints(blueprints=[BlueprintSamples.CROSSREF_PIPE_BUNDLE])
+            validate_concept_references_in_blueprints(blueprints=[BlueprintSamples.CROSSREF_PIPE_BUNDLE])
         message = str(exc_info.value)
         assert "Summary" in message
         assert "pipe.make_summary.output" in message
@@ -57,8 +62,7 @@ class TestLibraryCrateConceptReferences:
                 ),
             },
         )
-        crate = LibraryCrateFactory.make_from_blueprints(blueprints=[bundle])
-        assert "native_ok.echo" in crate.pipes
+        validate_concept_references_in_blueprints(blueprints=[bundle])
 
     def test_external_domain_reference_not_validated(self):
         """An external-domain concept ref is deferred to dependency loading, not flagged here."""
@@ -74,8 +78,7 @@ class TestLibraryCrateConceptReferences:
                 ),
             },
         )
-        crate = LibraryCrateFactory.make_from_blueprints(blueprints=[bundle])
-        assert "my_domain.use_external" in crate.pipes
+        validate_concept_references_in_blueprints(blueprints=[bundle])
 
     def test_cross_package_reference_not_validated(self):
         """A cross-package concept ref ('alias->...') is deferred to package resolution, not flagged here."""
@@ -95,13 +98,12 @@ class TestLibraryCrateConceptReferences:
                 ),
             },
         )
-        crate = LibraryCrateFactory.make_from_blueprints(blueprints=[bundle])
-        assert "my_domain.Wrapper" in crate.concepts
+        validate_concept_references_in_blueprints(blueprints=[bundle])
 
-    # ========== RELOCATED UNDECLARED-REFERENCE CASES (now caught at merge) ==========
+    # ========== UNDECLARED-REFERENCE CASES (caught by the loader-level check) ==========
 
     def test_undeclared_concept_in_pipe_output_raises(self):
-        """An undeclared concept in a pipe output is caught at merge with its context path."""
+        """An undeclared concept in a pipe output is caught with its context path."""
         bundle = PipelexBundleBlueprint(
             domain="test_domain",
             description="Test bundle",
@@ -114,14 +116,14 @@ class TestLibraryCrateConceptReferences:
             },
         )
         with pytest.raises(ConceptLibraryError) as exc_info:
-            LibraryCrateFactory.make_from_blueprints(blueprints=[bundle])
+            validate_concept_references_in_blueprints(blueprints=[bundle])
         message = str(exc_info.value)
         assert "UndeclaredConcept" in message
         assert "pipe.my_pipe.output" in message
         assert "not declared in domain" in message
 
     def test_undeclared_concept_in_pipe_input_raises(self):
-        """An undeclared concept in a pipe input is caught at merge with its context path."""
+        """An undeclared concept in a pipe input is caught with its context path."""
         bundle = PipelexBundleBlueprint(
             domain="test_domain",
             description="Test bundle",
@@ -135,13 +137,13 @@ class TestLibraryCrateConceptReferences:
             },
         )
         with pytest.raises(ConceptLibraryError) as exc_info:
-            LibraryCrateFactory.make_from_blueprints(blueprints=[bundle])
+            validate_concept_references_in_blueprints(blueprints=[bundle])
         message = str(exc_info.value)
         assert "UndeclaredInput" in message
         assert "pipe.my_pipe.inputs.data" in message
 
     def test_undeclared_same_domain_qualified_reference_raises(self):
-        """A same-domain qualified ref (domain.Concept) not declared anywhere is caught at merge."""
+        """A same-domain qualified ref (domain.Concept) not declared anywhere is caught."""
         bundle = PipelexBundleBlueprint(
             domain="my_domain",
             description="Test bundle",
@@ -154,13 +156,13 @@ class TestLibraryCrateConceptReferences:
             },
         )
         with pytest.raises(ConceptLibraryError) as exc_info:
-            LibraryCrateFactory.make_from_blueprints(blueprints=[bundle])
+            validate_concept_references_in_blueprints(blueprints=[bundle])
         message = str(exc_info.value)
         assert "NotDeclaredConcept" in message
         assert "pipe.my_pipe.output" in message
 
     def test_undeclared_hierarchical_same_domain_reference_raises(self):
-        """A hierarchical same-domain qualified ref not declared anywhere is caught at merge."""
+        """A hierarchical same-domain qualified ref not declared anywhere is caught."""
         bundle = PipelexBundleBlueprint(
             domain="legal.contracts",
             description="Test bundle",
@@ -173,13 +175,13 @@ class TestLibraryCrateConceptReferences:
             },
         )
         with pytest.raises(ConceptLibraryError) as exc_info:
-            LibraryCrateFactory.make_from_blueprints(blueprints=[bundle])
+            validate_concept_references_in_blueprints(blueprints=[bundle])
         message = str(exc_info.value)
         assert "Missing" in message
         assert "not declared in domain" in message
 
     def test_undeclared_concept_in_refines_raises(self):
-        """An undeclared concept in a refines field is caught at merge with its context path."""
+        """An undeclared concept in a refines field is caught with its context path."""
         bundle = PipelexBundleBlueprint(
             domain="my_domain",
             description="Test bundle",
@@ -191,13 +193,13 @@ class TestLibraryCrateConceptReferences:
             },
         )
         with pytest.raises(ConceptLibraryError) as exc_info:
-            LibraryCrateFactory.make_from_blueprints(blueprints=[bundle])
+            validate_concept_references_in_blueprints(blueprints=[bundle])
         message = str(exc_info.value)
         assert "NonExistentBaseConcept" in message
         assert "concept.DerivedConcept.refines" in message
 
     def test_undeclared_concept_ref_in_structure_raises(self):
-        """An undeclared concept_ref in a structure field is caught at merge with its context path."""
+        """An undeclared concept_ref in a structure field is caught with its context path."""
         bundle = PipelexBundleBlueprint(
             domain="my_domain",
             description="Test bundle",
@@ -216,13 +218,13 @@ class TestLibraryCrateConceptReferences:
             },
         )
         with pytest.raises(ConceptLibraryError) as exc_info:
-            LibraryCrateFactory.make_from_blueprints(blueprints=[bundle])
+            validate_concept_references_in_blueprints(blueprints=[bundle])
         message = str(exc_info.value)
         assert "UndeclaredAddress" in message
         assert "concept.Person.structure.address.concept_ref" in message
 
     def test_undeclared_item_concept_ref_in_structure_raises(self):
-        """An undeclared item_concept_ref in a list structure field is caught at merge."""
+        """An undeclared item_concept_ref in a list structure field is caught."""
         bundle = PipelexBundleBlueprint(
             domain="my_domain",
             description="Test bundle",
@@ -242,13 +244,13 @@ class TestLibraryCrateConceptReferences:
             },
         )
         with pytest.raises(ConceptLibraryError) as exc_info:
-            LibraryCrateFactory.make_from_blueprints(blueprints=[bundle])
+            validate_concept_references_in_blueprints(blueprints=[bundle])
         message = str(exc_info.value)
         assert "UndeclaredLineItem" in message
         assert "concept.Order.structure.items.item_concept_ref" in message
 
     def test_undeclared_concept_with_multiplicity_raises(self):
-        """A multiplicity-bracketed undeclared concept resolves to its base code and is caught at merge."""
+        """A multiplicity-bracketed undeclared concept resolves to its base code and is caught."""
         bundle = PipelexBundleBlueprint(
             domain="test_domain",
             description="Test bundle",
@@ -262,7 +264,7 @@ class TestLibraryCrateConceptReferences:
             },
         )
         with pytest.raises(ConceptLibraryError) as exc_info:
-            LibraryCrateFactory.make_from_blueprints(blueprints=[bundle])
+            validate_concept_references_in_blueprints(blueprints=[bundle])
         message = str(exc_info.value)
         assert "UndeclaredItem" in message
         assert "pipe.my_pipe.inputs.items" in message
@@ -282,7 +284,7 @@ class TestLibraryCrateConceptReferences:
             },
         )
         with pytest.raises(ConceptLibraryError) as exc_info:
-            LibraryCrateFactory.make_from_blueprints(blueprints=[bundle])
+            validate_concept_references_in_blueprints(blueprints=[bundle])
         message = str(exc_info.value)
         assert "Undeclared1" in message
         assert "Undeclared2" in message
@@ -306,7 +308,7 @@ class TestLibraryCrateConceptReferences:
             },
         )
         with pytest.raises(ConceptLibraryError) as exc_info:
-            LibraryCrateFactory.make_from_blueprints(blueprints=[bundle])
+            validate_concept_references_in_blueprints(blueprints=[bundle])
         message = str(exc_info.value)
         assert "DeclaredConcept1" in message
         assert "DeclaredConcept2" in message

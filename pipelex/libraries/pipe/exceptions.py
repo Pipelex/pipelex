@@ -1,7 +1,7 @@
-from pipelex.base_exceptions import PipelexError
+from pipelex.libraries.exceptions import LibraryError
 
 
-class PipeLibraryError(PipelexError):
+class PipeLibraryError(LibraryError):
     pass
 
 
