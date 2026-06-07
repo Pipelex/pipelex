@@ -4,8 +4,11 @@ Validates that when an EventLogProtocol is provided, ReportingManager emits
 UsageReportEvent with per-context isolation for concurrent workflows.
 """
 
+import logging
 from datetime import datetime, timedelta, timezone
 
+import pytest
+from botocore.exceptions import ClientError
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.llm.llm_job import LLMJob
@@ -136,6 +139,42 @@ class TestReportingEventEmission:
         assert len(usage_events) == 1
         assert usage_events[0].node_id == "test-graph:node_42"
         assert usage_events[0].workflow_id == self.WORKFLOW_ID
+
+    @pytest.mark.parametrize(
+        "emit_error",
+        [
+            ClientError(
+                error_response={"Error": {"Code": "ProvisionedThroughputExceededException"}},
+                operation_name="PutItem",
+            ),
+            OSError("disk full"),
+        ],
+        ids=["client_error", "os_error"],
+    )
+    def test_registered_context_emit_failure_is_best_effort(
+        self,
+        mocker: MockerFixture,
+        caplog: pytest.LogCaptureFixture,
+        emit_error: Exception,
+    ) -> None:
+        """A backend emit failure on the registered-context fast path is dropped with a WARNING, never raised.
+
+        report_inference_job runs synchronously after the inference has already succeeded (and been
+        billed), so a transient event-log write failure — DynamoDB throttle/auth/timeout (ClientError)
+        or NDJSON disk error (OSError) — must not propagate and turn a successful inference into a
+        failed pipeline. Mirrors the runner-fallback contract in test_emit_runner_fallback.
+        """
+        manager, event_log = self._make_reporting_manager_with_event_log()
+        mocker.patch.object(event_log, "emit", side_effect=emit_error)
+
+        graph_context = _make_graph_context(graph_id=self.PIPELINE_RUN_ID)
+        llm_job = _make_test_llm_job(self.PIPELINE_RUN_ID, graph_context=graph_context)
+
+        with caplog.at_level(logging.WARNING):
+            # Must not raise — the failure is logged and dropped.
+            manager.report_inference_job(llm_job)
+
+        assert any(record.levelno == logging.WARNING for record in caplog.records)
 
     def test_setup_and_teardown_without_event_log(self) -> None:
         """Without any event_log registered, setup/teardown are inert and report_inference_job no-ops."""

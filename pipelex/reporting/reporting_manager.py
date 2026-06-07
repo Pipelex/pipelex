@@ -31,6 +31,24 @@ except ImportError:
     _BotoClientError = None  # type: ignore[assignment, misc]
 
 
+# Infra-level failures an event-log backend can raise from emit(). Usage/cost reporting is a side
+# concern: by the time report_inference_job runs, the inference has already succeeded (and been
+# billed), so a transient event-log write failure must never propagate and turn a successful
+# inference into a failed pipeline. Both emit paths — the registered-context fast path and the
+# runner fallback — drop these with a WARNING. OSError covers the NDJSON backend (dir/file write
+# errors); ClientError (service-side throttle / auth) and BotoCoreError (transport / credential /
+# timeout, e.g. EndpointConnectionError, ReadTimeoutError, NoCredentialsError) cover the DynamoDB
+# backend when boto3 is installed. ClientError and BotoCoreError are sibling botocore base classes
+# (neither subclasses the other), so both must be listed.
+# cast: botocore is untyped, so the imported classes are Unknown; we know they are BaseException types.
+# Single assignment (no reassignment) so the uppercase constant satisfies reportConstantRedefinition.
+_EMIT_BEST_EFFORT_EXCEPTIONS: tuple[type[BaseException], ...] = (
+    (OSError, cast("type[BaseException]", _BotoClientError), cast("type[BaseException]", _BotoCoreError))
+    if _BotoClientError is not None and _BotoCoreError is not None
+    else (OSError,)
+)
+
+
 class _EventLogContext(NamedTuple):
     """Per-workflow/run event log state. Private to ReportingManager."""
 
@@ -185,7 +203,22 @@ class ReportingManager(ReportingProtocol):
             node_id=node_id,
             tokens_usage=tokens_usage,
         )
-        context.event_log.emit(event)
+        ReportingManager._emit_best_effort(event_log=context.event_log, event=event)
+
+    @staticmethod
+    def _emit_best_effort(event_log: EventLogProtocol, event: UsageReportEvent) -> None:
+        """Emit a usage event, dropping infra-level backend failures with a WARNING.
+
+        Shared by both emit paths (the registered-context fast path and the runner fallback).
+        report_inference_job runs synchronously after the inference has already succeeded, so an
+        event-log write failure must not propagate and fail the pipeline. We catch the specific
+        infra exception classes the backends raise at emit() time (see
+        ``_EMIT_BEST_EFFORT_EXCEPTIONS``) and drop the event. Other exceptions propagate.
+        """
+        try:
+            event_log.emit(event)
+        except _EMIT_BEST_EFFORT_EXCEPTIONS as exc:
+            log.warning(f"Usage event emit failed; dropping: {exc}")
 
     def _emit_usage_event_runner_fallback(
         self,
@@ -206,16 +239,12 @@ class ReportingManager(ReportingProtocol):
         Suppression of retried-emit duplicates is a separate, harder problem
         (deferred follow-up).
 
-        Specific exceptions caught and dropped with WARNING:
+        Construction-time failures (lazy event-log build) caught and dropped with WARNING:
         - ``OSError``: NDJSON dir unwritable, file system errors.
         - ``MissingDependencyError``: ``boto3`` missing for the DynamoDB backend.
         - ``PipelexConfigError``: factory misconfigured.
-        - ``botocore.exceptions.ClientError`` (when boto3 is installed):
-            DynamoDB service-side error (throttle / auth) at PutItem time.
-        - ``botocore.exceptions.BotoCoreError`` (when boto3 is installed):
-            transport / credential / timeout failure at PutItem time
-            (EndpointConnectionError, ReadTimeoutError, NoCredentialsError, ...) —
-            a SEPARATE base class, not a ClientError subclass.
+        The emit() itself is delegated to ``_emit_best_effort``, which drops the
+        backend's emit-time infra failures (see ``_EMIT_BEST_EFFORT_EXCEPTIONS``).
         Other exceptions propagate.
         """
         tracing_config = get_config().pipelex.tracing_config
@@ -247,15 +276,7 @@ class ReportingManager(ReportingProtocol):
             tokens_usage=tokens_usage,
         )
 
-        emit_exceptions: tuple[type[BaseException], ...] = (OSError,)
-        if _BotoClientError is not None and _BotoCoreError is not None:
-            # cast: botocore is untyped, so the imported classes are Unknown; we know they are BaseException types.
-            emit_exceptions = (*emit_exceptions, cast("type[BaseException]", _BotoClientError), cast("type[BaseException]", _BotoCoreError))
-
-        try:
-            process_event_log.emit(event)
-        except emit_exceptions as exc:
-            log.warning(f"Runner-side usage event emit failed; dropping: {exc}")
+        self._emit_best_effort(event_log=process_event_log, event=event)
 
     @override
     def report_inference_job(self, inference_job: InferenceJobAbstract):
