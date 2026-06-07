@@ -2,7 +2,7 @@
 
 **Branch:** `feature/Mistral-workflows-merge-4` · **Assessed:** 2026-06-03 · **HEAD:** `ff15bd58` · **dev tip / merge-base:** `fa15d15c`
 
-Cold-start reference for the decision: *is this branch safe to PR into `dev`?* Verified against the actual code. **This doc — not `../TODOS.md` — is the merge basis** (`TODOS.md` records the earlier extraction milestone; it was refreshed 2026-06-03 to match the live tree, but the decision lives here). Companion design docs: [`mistral-workflows-plugin-extract.md`](mistral-workflows-plugin-extract.md), [`mistral-workflows-sub-module.md`](mistral-workflows-sub-module.md). In-flight task notes: [`../TODOS.md`](../TODOS.md).
+Cold-start reference for the decision: *is this branch safe to PR into `dev`?* Verified against the actual code. **This doc — not `../../../TODOS.md` — is the merge basis** (`TODOS.md` records the earlier extraction milestone; it was refreshed 2026-06-03 to match the live tree, but the decision lives here). Companion design docs: [`mistral-workflows-plugin-extract.md`](mistral-workflows-plugin-extract.md), [`mistral-workflows-sub-module.md`](mistral-workflows-sub-module.md). In-flight task notes: [`../../../TODOS.md`](../../../TODOS.md).
 
 ## TL;DR verdict
 
@@ -90,7 +90,7 @@ Acceptable **only if `dev` is treated as a pure integration branch**: merge as-i
 
 ## Housekeeping
 
-- **`../TODOS.md` — refreshed 2026-06-03 (done).** Its "End state delivered" had predated the `runtime_bridge/primitives/` subpackage and the `MISTRAL_NATIVE` mode, and implied no mistral-missing exception existed (the old `MistralWorkflowsNotInstalledError` was deleted, but the new `MissingMistralWorkflowsPluginError` replaced it). The runtime_bridge end-state bullet + the Temporal-rewiring bullet were corrected, and a banner now points here as the merge basis. If `runtime_bridge`'s surface changes again, update both files.
+- **`../../../TODOS.md` — refreshed 2026-06-03 (done).** Its "End state delivered" had predated the `runtime_bridge/primitives/` subpackage and the `MISTRAL_NATIVE` mode, and implied no mistral-missing exception existed (the old `MistralWorkflowsNotInstalledError` was deleted, but the new `MissingMistralWorkflowsPluginError` replaced it). The runtime_bridge end-state bullet + the Temporal-rewiring bullet were corrected, and a banner now points here as the merge basis. If `runtime_bridge`'s surface changes again, update both files.
 - **`mistralai-workflows` companion version** lives in the separate `pipelex-mistralai-workflows` repo (TODOS notes `mistralai-workflows==3.4.0` there) — out of scope for this pipelex-side merge decision.
 
 ### Tracking issue for the `instructor` fork pin (to file)
