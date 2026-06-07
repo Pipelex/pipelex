@@ -14,6 +14,7 @@ This folder is the **distributed-execution track**: running MTHDS methods as Tem
 - [temporal-exception-model-revamp.md](temporal-exception-model-revamp.md) — deferred proposal to reparent workflow exceptions onto `ApplicationError`.
 - [schema-reconstruction-hardening.md](schema-reconstruction-hardening.md) — deferred hardening of cross-process Pydantic-schema reconstruction.
 - [unit-testing-worker-sandbox-validation.md](unit-testing-worker-sandbox-validation.md) — deferred bug: a sandboxed worker can't boot under `--is-unit-testing` because the registered test workflows fail temporalio sandbox validation.
+- [bridge-changes-sibling-repo-reconciliation.md](bridge-changes-sibling-repo-reconciliation.md) — **OPEN handoff:** how the `_bridge` dev-merge changed the runtime-bridge surface (param renames, deleted graph-assembly primitive, `graph_context→trace_context`, #967/#968) and what the downstream `pipelex-mistralai-workflows` + `_workflows` repos need reconciled. Greps/diagnosis not yet done.
 
 ---
 
