@@ -181,7 +181,7 @@ async def prepare_pipe_job(
     and no library mutation. ``graph_context`` / ``otel_context`` are created by
     the caller and threaded onto the job metadata. ``is_mock_inference`` (the
     ``--mock-inference`` trigger) is the single-writer point onto
-    :attr:`JobMetadata.is_mock_inference` — a LIVE run whose LLM cogt leaf calls are
+    :attr:`JobMetadata.is_mock_inference` — a LIVE run whose LLM inference-leaf calls are
     faked (non-LLM leaves — image-gen / extract / search — raise ``MockInferenceUnsupportedError``).
     """
     working_memory: WorkingMemory | None = None

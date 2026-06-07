@@ -19,7 +19,7 @@ is_log_costs_to_console = true
 ```
 
 - Controls whether the end-of-run cost table is printed to the console
-- When enabled (and `--costs` is on), prints a single cost-by-model table after the pipeline finishes
+- When enabled (and `--costs` is on), prints a single cost-by-model table after the pipeline finishes — but only when the run had reportable usage; it is suppressed for dry runs (zero tokens and zero cost) and on a usage-assembly/aggregation failure (which never fails the run)
 - Default: `true` — library embedders who don't want console output can set it to `false`
 
 ### Cost Report File Generation

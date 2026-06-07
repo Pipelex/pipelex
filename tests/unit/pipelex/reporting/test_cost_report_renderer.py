@@ -7,8 +7,10 @@ usage assembled onto ``pipe_output.tokens_usages`` and renders it through the tw
 
 from pathlib import Path
 
+import pytest
 from pytest_mock import MockerFixture
 
+from pipelex.cogt.exceptions import CostRegistryError
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
@@ -137,3 +139,19 @@ class TestRenderRunCostReport:
         cost_report_file_path = kwargs["cost_report_file_path"]
         assert cost_report_file_path is not None
         assert Path(cost_report_file_path).parent == tmp_path
+
+    @pytest.mark.parametrize(
+        "render_error",
+        [
+            UnicodeEncodeError("utf-8", "\ud800", 0, 1, "surrogates not allowed"),
+            CostRegistryError("aggregation blew up"),
+            OSError("disk full while writing CSV"),
+        ],
+    )
+    def test_render_failure_never_fails_the_run(self, mocker: MockerFixture, job_metadata: JobMetadata, render_error: Exception) -> None:
+        """A reporting-side failure (UTF-8 CSV encode, cost-registry, or I/O) is caught — the run still succeeds."""
+        mocker.patch("pipelex.reporting.cost_report_renderer.CostRegistry.render_report", side_effect=render_error)
+        self._set_channels(mocker, console=True, csv=False)
+
+        # Must not raise: the guard degrades the failure to a warning rather than failing the successful run.
+        render_run_cost_report(pipeline_run_id=_RUN_ID, tokens_usages=[_usage(job_metadata)], is_generate_costs=True)

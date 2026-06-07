@@ -36,8 +36,9 @@ def render_run_cost_report(
     - CSV file: gated by ``reporting_config.is_generate_cost_report_file_enabled``
 
     A cost-report failure never fails an otherwise-successful run: the aggregation, the CSV directory/path
-    setup, and the render all run inside one try, so ``OSError`` (directory create / CSV write) and
-    ``PipelexError`` (e.g. ``CostRegistryError``) are caught and logged as a warning rather than propagating.
+    setup, and the render all run inside one try, so ``OSError`` (directory create / CSV write),
+    ``UnicodeEncodeError`` (a record string the CSV's UTF-8 encoder can't represent, e.g. a lone surrogate),
+    and ``PipelexError`` (e.g. ``CostRegistryError``) are caught and logged as a warning rather than propagating.
 
     Args:
         pipeline_run_id: The run whose usage is being reported (titles the table, names nothing else).
@@ -75,5 +76,5 @@ def render_run_cost_report(
             cost_report_file_path=cost_report_file_path,
             print_to_console=print_to_console,
         )
-    except (OSError, PipelexError) as cost_report_error:
+    except (OSError, UnicodeEncodeError, PipelexError) as cost_report_error:
         log.warning(f"Cost report generation failed (run succeeded): {cost_report_error}")
