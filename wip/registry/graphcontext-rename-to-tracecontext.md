@@ -1,6 +1,6 @@
 # Deferred: rename `GraphContext` → `TraceContext`
 
-**Status: DECIDED, DEFERRED.** Direction approved (Option 1 below). Not done in this PR — capture-only, to land as its own clean rename change.
+**Status: DECIDED, DEFERRED.** Direction approved (Option 1 below). Not done in this PR — capture-only, to land as its own clean rename change. A companion rename rides along in the same pass: align the internal usage-gate flag to the layer it gates (`is_generate_costs` → `is_generate_usage`). See "Companion rename" below.
 
 ## The problem
 
@@ -38,9 +38,29 @@ The node tree is **always built**, even in `--no-graph --costs` mode: per D5 (`p
 
 Do **not** touch `UsageReportEvent.node_id` — cost-per-node is a deliberate feature, and that coupling to the tree is correct.
 
+## Companion rename: align the gate flag to the layer it gates
+
+Same species of smell as the `GraphContext` one, surfaced while reviewing the flag layer: a flag named for the downstream *deliverable* (cost) controls the upstream *measurement* stream (usage). The event/data layer already committed to "usage" everywhere — `emit_usage_events`, `UsageReportEvent`, `TokensUsage` / `LLMTokensUsage` / `AnyTokensUsage`, the `cogt/usage/` package. The gate flag never followed: `is_generate_costs` feeds straight into `emit_usage_events`. A "costs" switch turning on "usage" emission is the drift.
+
+**The narrow, genuinely-correct fix.** Rename the internal gate to match the stream it gates:
+
+- `PipelineExecutionConfig.is_generate_costs` → `is_generate_usage` (and the matching key in `pipelex/pipelex.toml`).
+- `PipelineExecutionConfig.with_execution_overrides(generate_costs=...)` → `generate_usage=...`.
+- The local `is_generate_costs` in `pipeline_run_setup.py` and the `execution_config.is_generate_costs` reads in `pipeline_run_setup.py` / `runner.py`.
+
+After the rename the gating reads cleanly at every layer: `is_generate_usage` → `emit_usage_events` (usage gates usage), and the cost report is correctly a *view* gated on usage being present ("if we generated usage, render the cost view") rather than a same-named thing gating itself.
+
+**Leave alone — deliberately:**
+
+- **The public `--costs` / `--no-costs` CLI flag.** It is a public surface, and from the user's seat "costs" is the deliverable they asked for (the run emits a cost report: console log + `cost_report` in JSON + CSV). At the CLI boundary the `--costs` value simply maps to the renamed internal `generate_usage` override param. Renaming the public flag to `--usage` is a *capability* question, not a naming one — tracked separately in [`usage-reporting-without-cost.md`](usage-reporting-without-cost.md).
+- **The whole cost-computation / reporting cluster.** `CostRegistry`, `TokenCostReport`, `CostCategory`, `costs_per_token.py`, `cost_report_renderer.py`, and the `ReportingConfig` fields (`is_log_costs_to_console`, `cost_report_dir_path`, `cost_report_unit_scale`, …) genuinely compute money. They are correctly named; renaming them to "usage" would both lie about what they do and collide with the existing `TokensUsage` vocabulary. A *partial* rename (flag → usage, report stays cost) would create a new, worse mismatch than today's — so the rule is: align the gate, leave the cost domain.
+
+This rides along with the `GraphContext` → `TraceContext` pass because it is the same kind of cleanup and touches the same files (`pipeline_run_setup.py`, `runner.py`, `configs.py`, plus `pipelex.toml`). Pure mechanical rename, no behavior change.
+
 ## Scope / blast radius when executing
 
 - Rename the `GraphContext` type (referenced across roughly a dozen modules) and the `graph_context` attribute (used throughout pipe execution, including the `JobMetadata.graph_context` field). Broad but mechanical.
+- Companion flag rename: `is_generate_costs` → `is_generate_usage` (`configs.py` + `pipelex.toml`), the `generate_costs` override param → `generate_usage`, and the reads in `pipeline_run_setup.py` / `runner.py`. Narrow; the public `--costs` CLI flag and the cost-computation/reporting cluster stay as-is (see "Companion rename" above). Run `make tb` after touching the config to confirm the boot/config-load still passes.
 - Optional same-pass nit: `graph_id → run_id`.
 - Wire format is a non-issue: the object serializes across the Temporal boundary, but Temporal is not shipped to prod, so there is no version-skew concern. See [[project_temporal_not_shipped]].
 - This is a design-tradeoff cleanup, not a bug fix — land it as its own change, not folded into #967.
