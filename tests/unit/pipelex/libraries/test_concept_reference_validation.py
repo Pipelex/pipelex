@@ -64,6 +64,27 @@ class TestConceptReferenceValidation:
         )
         validate_concept_references_in_blueprints(blueprints=[bundle])
 
+    def test_same_domain_qualified_ref_sharing_native_local_code_is_flagged(self):
+        """A same-domain qualified ref that merely shares a native local code (e.g. `my_domain.Text`)
+        is NOT native and must still be validated — matching how it actually resolves. A bare-local-code
+        native check would wrongly suppress the undeclared-reference error.
+        """
+        bundle = PipelexBundleBlueprint(
+            domain="my_domain",
+            description="Qualified ref sharing a native local code",
+            pipe={
+                "make_text": PipeLLMBlueprint(
+                    description="Produce a domain-qualified text",
+                    inputs={"doc": "Text"},
+                    output="my_domain.Text",
+                    prompt="Echo $doc.",
+                ),
+            },
+        )
+        with pytest.raises(ConceptLibraryError) as exc_info:
+            validate_concept_references_in_blueprints(blueprints=[bundle])
+        assert "my_domain.Text" in str(exc_info.value)
+
     def test_external_domain_reference_not_validated(self):
         """An external-domain concept ref is deferred to dependency loading, not flagged here."""
         bundle = PipelexBundleBlueprint(

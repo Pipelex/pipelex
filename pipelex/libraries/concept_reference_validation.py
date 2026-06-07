@@ -55,8 +55,12 @@ def validate_concept_references_in_blueprints(
             # External-domain references resolve when their own domain's bundles load.
             if ref.is_external_to(domain_code):
                 continue
-            # Native concepts are always available.
-            if ref.local_code in native_codes:
+            # Native concepts are always available. Use the canonical check (bare `Text` or
+            # `native.Text` only) — not a bare local-code match — so a same-domain ref that merely
+            # *shares* a native local code (e.g. `mydomain.Text`) is NOT mistaken for native and still
+            # gets the membership check. This matches how the concept actually resolves
+            # (ConceptLibrary.get_required_concept_from_concept_ref_or_code) and contract_match.
+            if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code):
                 continue
             concept_ref = ConceptFactory.make_concept_ref_with_domain(domain_code=domain_code, concept_code=ref.local_code)
             if concept_ref not in resolvable_concept_refs:
