@@ -533,13 +533,15 @@ Install all extras:
 uv pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal,linkup,docling]"
 ```
 
-> **Mistral Workflows orchestration** is not a pipelex extra. It runs pipes through the runtime bridge inside Mistral Workflows activities and requires **Python 3.12+**, so it ships as the separate `pipelex-mistralai-workflows` package (which pulls in pipelex automatically):
+> **Mistral Workflows orchestration** *(preview)* is not a pipelex extra. It runs pipes through the runtime bridge inside Mistral Workflows activities and requires **Python 3.12+**, so it ships as the separate `pipelex-mistralai-workflows` package (which pulls in pipelex automatically):
 >
 > ```bash
 > pip install pipelex-mistralai-workflows
 > ```
 >
 > pipelex itself supports **Python 3.10+**; only this optional orchestration path needs 3.12.
+>
+> _**Preview:** `pipelex-mistralai-workflows` is in active development and publishes shortly — until then the `pip install` above may not resolve yet._
 
 ---
 

@@ -18,7 +18,7 @@ This cycle reworks **cost reporting** so it survives distributed execution and s
 
 ### Changed
 
-- **Mistral Workflows integration extracted into a dedicated package.** The optional `pipelex[mistralai-workflows]` extra and the `pipelex.plugins.mistralai_workflows.*` modules have been removed from `pipelex`. Install the new package instead: `pip install pipelex-mistralai-workflows`, and import from `pipelex_mistralai_workflows.*`. The framework-agnostic runtime-bridge core (boundary types, `run_pipe_via_bridge`, `PipelexExecutionMode`, `ensure_pipelex_booted`) has been promoted from `pipelex.plugins.mistralai_workflows.*` to `pipelex.runtime_bridge.*` so any host runtime — not just Mistral Workflows — can embed Pipelex. No behavior changes; activities, boundary types, and execution modes are identical.
+- **Mistral Workflows integration extracted into a dedicated package.** The optional `pipelex[mistralai-workflows]` extra and the `pipelex.plugins.mistralai_workflows.*` modules have been removed from `pipelex`. Install the new package instead: `pip install pipelex-mistralai-workflows` _(preview — publishes shortly)_, and import from `pipelex_mistralai_workflows.*`. The framework-agnostic runtime-bridge core (boundary types, `run_pipe_via_bridge`, `PipelexExecutionMode`, `ensure_pipelex_booted`) has been promoted from `pipelex.plugins.mistralai_workflows.*` to `pipelex.runtime_bridge.*` so any host runtime — not just Mistral Workflows — can embed Pipelex. No behavior changes; activities, boundary types, and execution modes are identical.
 
 - **`--cost-report` removed, folded into `--costs`.** Breaking: `--cost-report/--no-cost-report` is gone from `run pipe|method|bundle`. Use `--costs` (default on) instead.
 
