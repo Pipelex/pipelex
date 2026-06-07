@@ -544,6 +544,11 @@ class PipelexConfigError(PipelexError):
 
 class PipelexSetupError(PipelexError):
     error_domain = ErrorDomain.CONFIG
+    # Setup failures carry actionable config / credential hints meant for the caller (e.g. surfaced
+    # when booting via runtime_bridge.ensure_pipelex_booted), so the message must survive STRICT
+    # disclosure rather than being redacted to the generic internal-error text. Mirrors the bridge's
+    # missing-extra errors, which are also caller-facing setup hints.
+    _authors_caller_facing_message = True
 
 
 class SecurityError(PipelexError):

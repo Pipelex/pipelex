@@ -83,10 +83,12 @@ class PipelexPipeRunOutput(BaseModel):
     workflow_id: str | None = None
     is_completed: bool
     graph_spec_dump: dict[str, Any] | None = None
-    # Token usage + the assembly-error string, mirroring PipeOutput.tokens_usages /
-    # usage_assembly_error so a host runtime can render the end-of-run cost report from
-    # the returned result. JSON-safe dumps of the AnyTokensUsage discriminated union;
-    # None when cost reporting was off, [] when on but no inference happened.
+    # graph_assembly_error / usage_assembly_error mirror the same fields on PipeOutput: a non-None
+    # value means assembly of the graph / token usage failed, which a host must be able to tell
+    # apart from "assembly was off" (a None graph_spec_dump / tokens_usages_dump). tokens_usages_dump
+    # is the JSON-safe dump of the AnyTokensUsage discriminated union so a host can render the
+    # end-of-run cost report: None when cost reporting was off, [] when on but no inference happened.
+    graph_assembly_error: str | None = None
     tokens_usages_dump: list[dict[str, Any]] | None = None
     usage_assembly_error: str | None = None
 
@@ -163,7 +165,18 @@ def build_pipe_job_from_input(
     """
     pipe = get_required_pipe(pipe_code=input_payload.pipe_code)
 
-    pipeline_run_id = input_payload.pipeline_run_id or shortuuid.uuid()
+    # When the caller supplies a trace_context but no explicit pipeline_run_id, derive the run id
+    # from trace_context.graph_id. The caller's already-open tracer emits events under that id
+    # (GraphTracer._event_pipeline_run_id falls back to graph_id), and tracing_assembly reads them
+    # back by job_metadata.pipeline_run_id — minting a fresh id here would split the two, so graph /
+    # usage assembly would read an empty stream and silently drop the run's graph + cost data.
+    # graph_id is "typically the pipeline run id" by contract.
+    if input_payload.pipeline_run_id is not None:
+        pipeline_run_id = input_payload.pipeline_run_id
+    elif trace_context is not None:
+        pipeline_run_id = trace_context.graph_id
+    else:
+        pipeline_run_id = shortuuid.uuid()
 
     working_memory: WorkingMemory
     if input_payload.inputs:
@@ -370,6 +383,7 @@ def _serialize_completed_output(
         workflow_id=workflow_id,
         is_completed=True,
         graph_spec_dump=graph_spec_dump,
+        graph_assembly_error=pipe_output.graph_assembly_error,
         tokens_usages_dump=tokens_usages_dump,
         usage_assembly_error=pipe_output.usage_assembly_error,
     )

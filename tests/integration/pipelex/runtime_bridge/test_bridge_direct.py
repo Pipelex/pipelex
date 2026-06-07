@@ -13,8 +13,14 @@ from typing import Any
 import pytest
 from kajson.kajson_manager import KajsonManager
 
+from pipelex.graph.graph_config import DataInclusionConfig
+from pipelex.graph.trace_context import TraceContext
 from pipelex.hub import get_current_library_id_or_none, get_library_manager
-from pipelex.runtime_bridge.bridge import PipelexPipeRunInput, run_pipe_via_bridge
+from pipelex.runtime_bridge.bridge import (
+    PipelexPipeRunInput,
+    build_pipe_job_from_input,
+    run_pipe_via_bridge,
+)
 from pipelex.runtime_bridge.exceptions import PipelexBridgeDispatchError
 from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
 
@@ -154,6 +160,48 @@ class TestBridgeDirect:
         )
 
         assert get_current_library_id_or_none() == bridge_test_library
+
+    async def test_run_id_derives_from_trace_context_when_pipeline_run_id_omitted(
+        self,
+        bridge_test_library: str,  # noqa: ARG002
+    ) -> None:
+        """With a trace_context but no pipeline_run_id, the run id adopts the graph_id.
+
+        The caller's tracer emits events under trace_context.graph_id; tracing assembly
+        reads them back by job_metadata.pipeline_run_id. Minting a fresh id would split the
+        two and silently drop the run's graph + cost data, so the bridge adopts the graph_id.
+        An explicit pipeline_run_id still wins; absent both, a fresh id is minted.
+        """
+        data_inclusion = DataInclusionConfig(
+            stuff_json_content=False,
+            stuff_text_content=False,
+            stuff_html_content=False,
+            error_stack_traces=False,
+            pipe_and_concept_registry=False,
+        )
+        trace_context = TraceContext(graph_id="host-graph-id", data_inclusion=data_inclusion)
+
+        job_from_trace = build_pipe_job_from_input(
+            input_payload=PipelexPipeRunInput(pipe_code=PIPE_REF, inputs={"input_text": "x"}),
+            library_crate=None,
+            trace_context=trace_context,
+        )
+        assert job_from_trace.job_metadata.pipeline_run_id == "host-graph-id"
+
+        job_explicit = build_pipe_job_from_input(
+            input_payload=PipelexPipeRunInput(pipe_code=PIPE_REF, inputs={"input_text": "x"}, pipeline_run_id="explicit-id"),
+            library_crate=None,
+            trace_context=trace_context,
+        )
+        assert job_explicit.job_metadata.pipeline_run_id == "explicit-id"
+
+        job_minted = build_pipe_job_from_input(
+            input_payload=PipelexPipeRunInput(pipe_code=PIPE_REF, inputs={"input_text": "x"}),
+            library_crate=None,
+            trace_context=None,
+        )
+        assert job_minted.job_metadata.pipeline_run_id
+        assert job_minted.job_metadata.pipeline_run_id != "host-graph-id"
 
     async def test_direct_mode_wraps_user_code_exception_in_dispatch_error(
         self,
