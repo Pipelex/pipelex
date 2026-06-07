@@ -3,6 +3,7 @@ import builtins
 import pytest
 from pytest_mock import MockerFixture
 
+from pipelex.base_exceptions import ErrorDomain, ErrorReport
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_run.pipe_job import PipeJob
@@ -10,8 +11,9 @@ from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.runtime_bridge.bridge import PipelexPipeRunInput, run_pipe_via_bridge
-from pipelex.runtime_bridge.exceptions import MissingMistralWorkflowsPluginError
+from pipelex.runtime_bridge.exceptions import MissingMistralWorkflowsPluginError, PipelexBridgeDispatchError
 from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
+from pipelex.temporal.exceptions import WorkflowExecutionError
 
 
 def _make_fake_pipe_job(mocker: MockerFixture, pipe_code: str, pipeline_run_id: str) -> PipeJob:
@@ -99,6 +101,51 @@ class TestDispatch:
         fake_factory.return_value.make_workflow_id.assert_called_once_with(pipeline_run_id="caller-run-id")
         assert result.is_completed is True
         assert result.workflow_id == "ut-temporal-run-id"
+
+    async def test_temporal_blocking_failure_wraps_in_dispatch_error_preserving_report(self, mocker: MockerFixture) -> None:
+        """A Temporal-mode pipe failure surfaces as WorkflowExecutionError, which the bridge wraps into
+        the uniform PipelexBridgeDispatchError (same contract as DIRECT/mistral). The structured
+        ErrorReport is not lost: it stays reachable via __cause__, and PipelexBridgeDispatchError's
+        to_error_report() surfaces the underlying classification via cause-chain enrichment.
+        """
+        fake_job = _make_fake_pipe_job(mocker=mocker, pipe_code="fake_pipe", pipeline_run_id="caller-run-id")
+        mocker.patch(
+            "pipelex.runtime_bridge.bridge.build_pipe_job_from_input",
+            return_value=fake_job,
+        )
+
+        report = ErrorReport(
+            error_type="CogtError",
+            message="rate limited on the worker",
+            title="AI inference failed",
+            type_uri="https://docs.pipelex.com/latest/errors/cogt-error/",
+            error_category="capacity",
+            error_domain=ErrorDomain.RUNTIME,
+            retryable=False,
+            model="gpt-5",
+            provider="openai",
+        )
+        workflow_failure = WorkflowExecutionError(report.message, error_report=report)
+        fake_factory = mocker.patch("pipelex.temporal.tprl_pipe.temporal_pipe_run.make_temporal_pipe_run")
+        fake_factory.return_value.run = mocker.AsyncMock(side_effect=workflow_failure)
+
+        with pytest.raises(PipelexBridgeDispatchError) as exc_info:
+            await run_pipe_via_bridge(
+                PipelexPipeRunInput(
+                    pipe_code="fake_pipe",
+                    execution_mode=PipelexExecutionMode.TEMPORAL_BLOCKING,
+                )
+            )
+
+        # The raw Temporal failure is preserved as the cause...
+        assert exc_info.value.__cause__ is workflow_failure
+        # ...and the structured classification is surfaced through the wrapper's report.
+        recovered = exc_info.value.to_error_report()
+        assert recovered.error_type == "PipelexBridgeDispatchError"
+        assert recovered.error_category == "capacity"
+        assert recovered.retryable is False
+        assert recovered.model == "gpt-5"
+        assert recovered.provider == "openai"
 
     async def test_temporal_fire_and_forget_returns_workflow_id_without_completion(self, mocker: MockerFixture) -> None:
         fake_job = _make_fake_pipe_job(mocker=mocker, pipe_code="fake_pipe", pipeline_run_id="caller-run-id")

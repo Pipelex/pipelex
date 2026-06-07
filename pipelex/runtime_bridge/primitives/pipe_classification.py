@@ -1,9 +1,13 @@
-"""Pipe classification helpers used by host-runtime routers.
+"""Pipe classification helpers for per-step-decomposition host runtimes.
 
 Framework-agnostic — answers the single question "should this pipe be
 dispatched as a child workflow (controller) or as an activity (leaf)?".
-Both ``pipelex.temporal`` and ``pipelex_mistralai_workflows.primitives``
-use these to make that branching decision.
+This is bridge-side plumbing for the ``MISTRAL_NATIVE`` mode: the
+``pipelex_mistralai_workflows`` host package is the intended consumer of
+this controller/leaf split. There is no in-tree caller yet — the Temporal
+path makes the same decision elsewhere (``temporal_pipe_router``) — so the
+helpers live here, framework-agnostic, ready to be shared once the Mistral
+host integration lands.
 """
 
 from pipelex.core.pipes.pipe_abstract import PipeAbstract

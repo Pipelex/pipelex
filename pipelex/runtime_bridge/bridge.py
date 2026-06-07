@@ -50,11 +50,26 @@ from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
 from pipelex.system.telemetry.otel_constants import OTelConstants
 
 if TYPE_CHECKING:
+    from pipelex.base_exceptions import PipelexError
     from pipelex.core.memory.working_memory import WorkingMemory
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.graph.trace_context import TraceContext
     from pipelex.pipe_run.pipe_job import PipeJob
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
+
+
+# Pipe-execution failures the bridge converts into PipelexBridgeDispatchError so a host can catch a
+# single error type regardless of execution mode. The Temporal branches additionally catch
+# WorkflowExecutionError (lazy-imported there to keep temporal off the module import path); wrapping
+# it with ``from exc`` loses no signal — the structured ErrorReport stays reachable via ``__cause__``
+# and is surfaced by PipelexBridgeDispatchError.to_error_report()'s cause-chain enrichment.
+_PIPE_DISPATCH_ERRORS: tuple[type[PipelexError], ...] = (
+    PipeRunError,
+    PipeJobError,
+    PipeRouterError,
+    PipeExecutionError,
+    PipelineExecutionError,
+)
 
 
 class PipelexPipeRunInput(BaseModel):
@@ -316,13 +331,12 @@ async def _run_direct(
         pipe_run = PipeRun(pipe_router=direct_router)
         try:
             pipe_output = await pipe_run.run(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
-        except (PipeRunError, PipeJobError, PipeRouterError, PipeExecutionError, PipelineExecutionError) as exc:
+        except _PIPE_DISPATCH_ERRORS as exc:
             msg = f"Pipe execution failed in DIRECT mode for pipe '{pipe_job.pipe.code}': {exc}"
             raise PipelexBridgeDispatchError(msg) from exc
 
     return _serialize_completed_output(
         pipe_output=pipe_output,
-        pipe_job=pipe_job,
         workflow_id=None,
     )
 
@@ -331,12 +345,17 @@ async def _run_temporal_blocking(
     pipe_job: PipeJob,
     delivery_assignment: DeliveryAssignment | None,
 ) -> PipelexPipeRunOutput:
+    from pipelex.temporal.exceptions import WorkflowExecutionError  # noqa: PLC0415
     from pipelex.temporal.tprl_pipe.temporal_pipe_run import make_temporal_pipe_run  # noqa: PLC0415
 
+    # A pipe failure inside the Temporal workflow surfaces as WorkflowExecutionError (a
+    # TemporalFlowError, not in _PIPE_DISPATCH_ERRORS); catch it too so a Temporal-mode failure is
+    # wrapped just like DIRECT/mistral. `from exc` keeps its structured ErrorReport reachable.
+    dispatch_errors: tuple[type[PipelexError], ...] = (*_PIPE_DISPATCH_ERRORS, WorkflowExecutionError)
     temporal_pipe_run = make_temporal_pipe_run()
     try:
         pipe_output = await temporal_pipe_run.run(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
-    except (PipeRunError, PipeJobError, PipeRouterError, PipeExecutionError, PipelineExecutionError) as exc:
+    except dispatch_errors as exc:
         msg = f"Pipe execution failed in TEMPORAL_BLOCKING mode for pipe '{pipe_job.pipe.code}': {exc}"
         raise PipelexBridgeDispatchError(msg) from exc
 
@@ -350,7 +369,6 @@ async def _run_temporal_blocking(
 
     return _serialize_completed_output(
         pipe_output=pipe_output,
-        pipe_job=pipe_job,
         workflow_id=workflow_id,
     )
 
@@ -359,12 +377,16 @@ async def _run_temporal_fire_and_forget(
     pipe_job: PipeJob,
     delivery_assignment: DeliveryAssignment | None,
 ) -> PipelexPipeRunOutput:
+    from pipelex.temporal.exceptions import WorkflowExecutionError  # noqa: PLC0415
     from pipelex.temporal.tprl_pipe.temporal_pipe_run import make_temporal_pipe_run  # noqa: PLC0415
 
+    # start() raises WorkflowExecutionError on a dispatch failure (a TemporalFlowError, not in
+    # _PIPE_DISPATCH_ERRORS); catch it too so fire-and-forget dispatch failures wrap uniformly.
+    dispatch_errors: tuple[type[PipelexError], ...] = (*_PIPE_DISPATCH_ERRORS, WorkflowExecutionError)
     temporal_pipe_run = make_temporal_pipe_run()
     try:
         workflow_id, _handle = await temporal_pipe_run.start(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
-    except (PipeRunError, PipeJobError, PipeRouterError, PipeExecutionError, PipelineExecutionError) as exc:
+    except dispatch_errors as exc:
         msg = f"Pipe dispatch failed in TEMPORAL_FIRE_AND_FORGET mode for pipe '{pipe_job.pipe.code}': {exc}"
         raise PipelexBridgeDispatchError(msg) from exc
 
@@ -380,7 +402,6 @@ async def _run_temporal_fire_and_forget(
 
 def _serialize_completed_output(
     pipe_output: PipeOutput,
-    pipe_job: PipeJob,  # noqa: ARG001 — kept for symmetry with future per-crate serialization tweaks
     workflow_id: str | None,
 ) -> PipelexPipeRunOutput:
     output_dict = serialize_pipe_output(pipe_output=pipe_output)
@@ -453,6 +474,5 @@ async def _run_mistral_native(
 
     return _serialize_completed_output(
         pipe_output=pipe_output,
-        pipe_job=pipe_job,
         workflow_id=pipe_output.pipeline_run_id,
     )

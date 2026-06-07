@@ -1,13 +1,8 @@
-from typing import TYPE_CHECKING, cast
-
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.runtime_bridge.bridge import (
     _serialize_completed_output,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
 )
-
-if TYPE_CHECKING:
-    from pipelex.pipe_run.pipe_job import PipeJob
 
 
 class TestSerializeCompletedOutput:
@@ -28,7 +23,6 @@ class TestSerializeCompletedOutput:
 
         dto = _serialize_completed_output(
             pipe_output=pipe_output,
-            pipe_job=cast("PipeJob", None),
             workflow_id=None,
         )
 
@@ -47,7 +41,6 @@ class TestSerializeCompletedOutput:
 
         dto = _serialize_completed_output(
             pipe_output=pipe_output,
-            pipe_job=cast("PipeJob", None),
             workflow_id=None,
         )
 
