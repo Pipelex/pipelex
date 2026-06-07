@@ -102,6 +102,7 @@ See `wip/recursivity/` for the deeper records:
 ## Deferred (intentionally out of scope)
 
 - **Partial-hierarchical same-domain typo skipped as external.** A ref like `legal.Foo` when the bundle domain is `legal.contracts` is treated as external (`QualifiedRef.is_external_to` uses exact-equality) and skipped, so the typo only fails later at resolution. Pre-existing — identical in the old per-file validator; fixing needs an ancestor/prefix notion of domain. Tracked in `wip/recursivity/`.
+- **P3 polish from the pre-landing `/review`** (docstring accuracy, an advisory-description silent-drop note, one low-confidence test-coverage gap) — none are bugs; recorded in [`review-followups.md`](wip/recursivity/review-followups.md).
 
 ---
 
