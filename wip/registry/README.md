@@ -9,6 +9,7 @@ This folder tracks one topic that grew as we worked it: the lifecycle of the per
 - [`../../TODOS.md`](../../TODOS.md) — **the canonical as-built record.** The sequenced phases, every checkpoint's cold-start notes (deleted symbols, new anchors, deviations), and §7's deferred-items list. Read this first when reviewing the branch.
 - [`registry-lifecycle-synthesis.md`](registry-lifecycle-synthesis.md) — the locked design the plan implemented: the unified model, Option B (usage on `PipeOutput`), the default-on `--costs` switch folding in `--cost-report`, events as the single source.
 - [`deferred-followups.md`](deferred-followups.md) — **the deferred non-goals** of this feature (D5 costs-only tracer skip, cost-per-node correlation, A1 factory, T5, T3, `--mock-inference` coverage). The two deferred *design decisions* are in [`cost-report-deferred-decisions.md`](cost-report-deferred-decisions.md).
+- [`graphcontext-rename-to-tracecontext.md`](graphcontext-rename-to-tracecontext.md) — **deferred naming cleanup** surfaced by the #967 fast-path emit fix: usage/cost events now ride on `GraphContext`, which was born graph-only. Decided (Option 1): rename `GraphContext` → `TraceContext` as its own change. The diagnosis, field taxonomy, and the "graph substrate is always present" constraint that bounds a deeper split are recorded there.
 
 ## Review records (all resolved — kept for the audit trail)
 
