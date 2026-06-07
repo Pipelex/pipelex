@@ -76,6 +76,14 @@ The finalization `/review` pass (specialist army + adversarial Claude/Codex) on 
 - **`output_dict` python-mode dump** (`bridge.py:80`, api-contract conf 8) — ➖ **Declined.** `dump_for_temporal()` uses `model_dump(serialize_as_any=True)`, but the model is JSON-safe via pydantic's own `model_dump(mode="json")`/`model_dump_json()` (and the kajson Temporal converter); only the naive `json.dumps(output.model_dump())` misuse fails, loudly. Usage caveat, not a defect. `extra="forbid"` skew, `trace_flush` async-IO, `delivery` pass-through, and the scoped-library 3× duplication were all re-confirmed as previously-considered/by-design.
 - **Test gaps** (testing conf 5–7) — `_decode_*` error path, `trace_flush` guards, `_run_mistral_native` success path are untested "lake" gaps; noted, added per the user's finalization call.
 
+## Open deferred follow-ups (not bugs)
+
+Carried forward, each recorded so review tooling doesn't re-raise them as new findings:
+
+- **[execution-mode-property-helpers-unused.md](execution-mode-property-helpers-unused.md)** — the three `PipelexExecutionMode` `@property` helpers are tested but not yet consumed by `bridge.py` (which inlines the equivalent checks). Wire them in or remove; no correctness impact.
+- **[library-manager-pipe-source-map-concurrency.md](library-manager-pipe-source-map-concurrency.md)** — pre-existing `LibraryManager._pipe_source_map` is manager-level, not per-call scoped. Observability-only, Temporal not in prod.
+- **[bridge-bootstrap-external-race.md](bridge-bootstrap-external-race.md)** — residual race against a *concurrent external* `Pipelex.make()` mid-setup; narrow/non-standard, bounded-wait fix deferred.
+
 ## Remaining
 
 Code/docs are done. What's left is the GitHub side, per the `/review-pr-agents` skill: reply on each PR #969 thread (`✅ Fixed` / `➖ False positive`) and resolve them. No threads need to stay open — every fork was decided and applied.

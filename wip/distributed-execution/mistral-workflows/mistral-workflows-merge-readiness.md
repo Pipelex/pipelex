@@ -2,7 +2,7 @@
 
 **Branch:** `feature/Mistral-workflows-merge-4` · **Assessed:** 2026-06-03 · **HEAD:** `ff15bd58` · **dev tip / merge-base:** `fa15d15c`
 
-Cold-start reference for the decision: *is this branch safe to PR into `dev`?* Verified against the actual code. **This doc — not `../../../TODOS.md` — is the merge basis** (`TODOS.md` records the earlier extraction milestone; it was refreshed 2026-06-03 to match the live tree, but the decision lives here). Companion design docs: [`mistral-workflows-plugin-extract.md`](mistral-workflows-plugin-extract.md), [`mistral-workflows-sub-module.md`](mistral-workflows-sub-module.md). In-flight task notes: [`../../../TODOS.md`](../../../TODOS.md).
+Cold-start reference for the decision: *is this branch safe to PR into `dev`?* Verified against the actual code. **This doc is the merge basis.** Companion design docs: [`mistral-workflows-plugin-extract.md`](mistral-workflows-plugin-extract.md), [`mistral-workflows-sub-module.md`](mistral-workflows-sub-module.md). Runtime-bridge review-triage + open follow-ups: [`../../runtime-bridge/README.md`](../../runtime-bridge/README.md).
 
 ## TL;DR verdict
 

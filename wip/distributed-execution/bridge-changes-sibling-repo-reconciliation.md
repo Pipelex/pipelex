@@ -98,8 +98,7 @@ Original open question: did `_run_mistral_native` or the sibling package consume
 
 ## Pointers / prior art
 
-- `TODOS.md` (this worktree) — PR #966 reviewer's guide, incl. the "Tracing reconciliation (post-`dev` merge)" section with the exact decisions.
-- `wip/runtime-bridge/` — review-triage of #959/#966. README is the cold-start entry.
+- `wip/runtime-bridge/` — review-triage of #959/#966/#969 + open deferred follow-ups. README is the cold-start entry. (Superseded the retired `TODOS.md` PR reviewer's guide.)
 - `wip/distributed-execution/tracing-cost-reporting.md` — #967's as-built tracing/cost-reporting design.
 - Memory (auto-loaded): `project_runtime_bridge_pr959_review` (this PR's state), `project_registry_leak_fix` (#967), `project_temporal_not_shipped` (Temporal not in prod).
 - Reference impls in `_bridge` for the Mistral-package fix: `pipelex/pipe_run/tracing_assembly.py`, `pipelex/temporal/tprl_pipe/act_assemble_tracing.py`, `pipelex/temporal/tprl_pipe/wf_pipe_run.py`.
