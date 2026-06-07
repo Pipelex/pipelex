@@ -14,6 +14,12 @@ description   = "Echoes the input text back as output (DIRECT mode only — Pipe
 output        = "Text"
 function_name = "mistralai_workflows_bridge_echo"
 
+[pipe.bridge_raise_pipe]
+type          = "PipeFunc"
+description   = "Raises a plain ValueError to exercise the bridge error boundary (DIRECT mode only)"
+output        = "Text"
+function_name = "mistralai_workflows_bridge_raise"
+
 [pipe.bridge_compose_pipe]
 type        = "PipeCompose"
 description = "Echoes the input_text via a Jinja2 template (Temporal-compatible)"

@@ -11,7 +11,7 @@ Whichever execution path you run, Pipelex applies a fixed set of automatic, boun
 
 Every inference SDK call retries transient transport failures before giving up. Pipelex makes this an explicit, uniform policy rather than inheriting each provider SDK's silent default.
 
-It is controlled by one top-level setting in `pipelex.toml`:
+It is controlled by one top-level setting, which you override in your project's `.pipelex/pipelex.toml`:
 
 ```toml
 [cogt]

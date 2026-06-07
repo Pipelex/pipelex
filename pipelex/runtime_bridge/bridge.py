@@ -83,6 +83,12 @@ class PipelexPipeRunOutput(BaseModel):
     workflow_id: str | None = None
     is_completed: bool
     graph_spec_dump: dict[str, Any] | None = None
+    # Token usage + the assembly-error string, mirroring PipeOutput.tokens_usages /
+    # usage_assembly_error so a host runtime can render the end-of-run cost report from
+    # the returned result. JSON-safe dumps of the AnyTokensUsage discriminated union;
+    # None when cost reporting was off, [] when on but no inference happened.
+    tokens_usages_dump: list[dict[str, Any]] | None = None
+    usage_assembly_error: str | None = None
 
 
 async def run_pipe_via_bridge(
@@ -355,6 +361,7 @@ def _serialize_completed_output(
     main_stuff_name = _resolve_main_stuff_root_key(pipe_output=pipe_output)
 
     graph_spec_dump = pipe_output.graph_spec.model_dump(mode="json") if pipe_output.graph_spec is not None else None
+    tokens_usages_dump = [usage.model_dump(mode="json") for usage in pipe_output.tokens_usages] if pipe_output.tokens_usages is not None else None
 
     return PipelexPipeRunOutput(
         output_dict=output_dict,
@@ -363,6 +370,8 @@ def _serialize_completed_output(
         workflow_id=workflow_id,
         is_completed=True,
         graph_spec_dump=graph_spec_dump,
+        tokens_usages_dump=tokens_usages_dump,
+        usage_assembly_error=pipe_output.usage_assembly_error,
     )
 
 

@@ -24,7 +24,7 @@ from kajson.class_registry import ClassRegistry
 from kajson.kajson_manager import KajsonManager
 
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.hub import clear_current_library, get_current_library, get_library_manager, set_current_library
+from pipelex.hub import get_library_manager, scoped_current_library
 from pipelex.runtime_bridge.primitives.hydration import hydrate_working_memory
 
 if TYPE_CHECKING:
@@ -56,11 +56,13 @@ def rehydrate_pipe_output_with_crate(
 
     library_manager = get_library_manager()
     rehydration_library_id = f"rehydrate_{uuid.uuid4().hex}"
-    prev_library_id = _get_current_library_id_or_none()
+    # open_library + set_class_registry live inside the try so a throw before the yield
+    # still tears the library down. scoped_current_library captures and restores the
+    # prior current-library ContextVar, so this rehydration doesn't clobber the caller's
+    # context. Mirrors bridge._scoped_library_for_crate.
     library_opened = False
-    library_set_as_current = False
     try:
-        _lib_id, rehydration_library = library_manager.open_library(library_id=rehydration_library_id)
+        _opened_library_id, rehydration_library = library_manager.open_library(library_id=rehydration_library_id)
         library_opened = True
 
         global_registry = KajsonManager.get_class_registry()
@@ -68,28 +70,12 @@ def rehydrate_pipe_output_with_crate(
         scoped_registry.register_classes_dict(global_registry.get_classes_dict())
         rehydration_library.set_class_registry(scoped_registry)
 
-        set_current_library(library_id=rehydration_library_id)
-        library_set_as_current = True
-        library_manager.load_from_crate(library_id=rehydration_library_id, crate=library_crate)
-        pipe_output.working_memory = hydrate_working_memory(pipe_output.working_memory_raw)
-        pipe_output.working_memory_raw = None
+        with scoped_current_library(library_id=rehydration_library_id):
+            library_manager.load_from_crate(library_id=rehydration_library_id, crate=library_crate)
+            pipe_output.working_memory = hydrate_working_memory(pipe_output.working_memory_raw)
+            pipe_output.working_memory_raw = None
     finally:
-        try:
-            if library_opened:
-                library_manager.teardown(library_id=rehydration_library_id)
-        finally:
-            if library_set_as_current:
-                if prev_library_id is not None:
-                    set_current_library(library_id=prev_library_id)
-                else:
-                    clear_current_library()
+        if library_opened:
+            library_manager.teardown(library_id=rehydration_library_id)
 
     return pipe_output
-
-
-def _get_current_library_id_or_none() -> str | None:
-    """Get the current library_id without raising if none is set."""
-    try:
-        return get_current_library()
-    except RuntimeError:
-        return None

@@ -12,3 +12,14 @@ def mistralai_workflows_bridge_echo(working_memory: WorkingMemory) -> TextConten
     """
     input_text = working_memory.get_stuff_as_str("input_text")
     return TextContent(text=input_text)
+
+
+def mistralai_workflows_bridge_raise(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001
+    """Raise a plain ``ValueError`` to exercise the bridge's error boundary.
+
+    The PipeFunc operator wraps any exception from user code into a
+    ``PipeRunError``, which the bridge converts to ``PipelexBridgeDispatchError`` —
+    so a raw ``ValueError`` never escapes the bridge across the host-runtime seam.
+    """
+    msg = "intentional failure from bridge test func"
+    raise ValueError(msg)

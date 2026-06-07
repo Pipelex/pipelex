@@ -15,10 +15,12 @@ from kajson.kajson_manager import KajsonManager
 
 from pipelex.hub import get_current_library_id_or_none, get_library_manager
 from pipelex.runtime_bridge.bridge import PipelexPipeRunInput, run_pipe_via_bridge
+from pipelex.runtime_bridge.exceptions import PipelexBridgeDispatchError
 from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
 
 PIPE_REF = "mistralai_workflows_bridge_test.bridge_func_pipe"
 ENVELOPE_PIPE_REF = "mistralai_workflows_bridge_test.bridge_envelope_pipe"
+RAISE_PIPE_REF = "mistralai_workflows_bridge_test.bridge_raise_pipe"
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -41,6 +43,10 @@ class TestBridgeDirect:
         assert result.main_stuff_name is not None
         main_stuff_dump = result.output_dict["root"][result.main_stuff_name]
         assert main_stuff_dump["content"]["text"] == "hello world"
+        # Usage fields exist on the boundary DTO (None here — this run does no inference
+        # and opens no tracer, so the cost-assembly path produces nothing).
+        assert result.tokens_usages_dump is None
+        assert result.usage_assembly_error is None
 
     async def test_direct_mode_with_library_crate_dump(
         self,
@@ -148,6 +154,25 @@ class TestBridgeDirect:
         )
 
         assert get_current_library_id_or_none() == bridge_test_library
+
+    async def test_direct_mode_wraps_user_code_exception_in_dispatch_error(
+        self,
+        bridge_test_library: str,  # noqa: ARG002
+    ) -> None:
+        """A non-Pipelex exception from user pipe code surfaces as PipelexBridgeDispatchError.
+
+        The PipeFunc operator wraps the user function's ValueError into a
+        PipeRunError, which the bridge converts to its boundary error type — so a
+        raw ValueError never escapes the bridge across the host-runtime seam.
+        """
+        with pytest.raises(PipelexBridgeDispatchError):
+            await run_pipe_via_bridge(
+                PipelexPipeRunInput(
+                    pipe_code=RAISE_PIPE_REF,
+                    inputs={"input_text": "boom"},
+                    execution_mode=PipelexExecutionMode.DIRECT,
+                )
+            )
 
     async def test_crate_inline_concept_does_not_leak_into_global_registry(
         self,

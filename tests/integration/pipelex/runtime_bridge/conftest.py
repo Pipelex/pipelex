@@ -4,7 +4,10 @@ from pathlib import Path
 import pytest
 
 from pipelex.hub import get_func_registry, get_library_manager, set_current_library
-from tests.integration.pipelex.runtime_bridge.test_data.bridge_funcs import mistralai_workflows_bridge_echo
+from tests.integration.pipelex.runtime_bridge.test_data.bridge_funcs import (
+    mistralai_workflows_bridge_echo,
+    mistralai_workflows_bridge_raise,
+)
 
 TEST_DATA_DIR = Path(__file__).parent / "test_data"
 
@@ -19,6 +22,7 @@ def bridge_test_library() -> Generator[str, None, None]:
     """
     func_registry = get_func_registry()
     func_registry.register_function(mistralai_workflows_bridge_echo)
+    func_registry.register_function(mistralai_workflows_bridge_raise)
 
     library_manager = get_library_manager()
     library_id, _ = library_manager.open_library()
@@ -31,5 +35,6 @@ def bridge_test_library() -> Generator[str, None, None]:
         yield library_id
     finally:
         library_manager.teardown(library_id=library_id)
-        if func_registry.has_function("mistralai_workflows_bridge_echo"):
-            func_registry.unregister_function_by_name("mistralai_workflows_bridge_echo")
+        for func_name in ("mistralai_workflows_bridge_echo", "mistralai_workflows_bridge_raise"):
+            if func_registry.has_function(func_name):
+                func_registry.unregister_function_by_name(func_name)
