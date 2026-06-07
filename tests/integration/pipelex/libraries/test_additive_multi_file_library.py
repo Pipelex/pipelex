@@ -112,6 +112,8 @@ class TestAdditiveMultiFileLibrary:
         assert "research_brief" in pipe_codes
         find_key_findings = next(pipe for pipe in result.pipes if pipe.code == "find_key_findings")
         assert find_key_findings.is_signature
+        # The unimplemented header is reported library-wide as a pending signature.
+        assert result.pending_signatures == ["research.find_key_findings"]
 
     async def test_strict_validation_passes_with_definition_and_concrete_wins(self, load_empty_library: Callable[[], str]):
         """Adding the definition lets strict validation pass; the concrete pipe replaces the signature."""
@@ -126,6 +128,8 @@ class TestAdditiveMultiFileLibrary:
         find_key_findings = next((pipe for pipe in result.pipes if pipe.code == "find_key_findings"), None)
         assert find_key_findings is not None
         assert not find_key_findings.is_signature
+        # With every header now satisfied by a concrete definition, nothing remains pending.
+        assert result.pending_signatures == []
 
     async def test_cross_batch_bare_concept_reference_via_library_dir(self, load_empty_library: Callable[[], str]):
         """A root pipe references, by bare code, a concept declared in a -L library directory loaded in a separate batch."""

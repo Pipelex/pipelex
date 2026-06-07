@@ -33,6 +33,14 @@ def format_validate_markdown(result: dict[str, Any]) -> str:
     for entry in validated_pipes:
         lines.append(f"- `{entry.get('pipe_code')}` — {entry.get('status')}")
 
+    pending_signatures: list[str] = result.get("pending_signatures") or []
+    if pending_signatures:
+        lines += ["", f"## Pending signatures ({len(pending_signatures)})", ""]
+        lines.append("These pipes are still forward declarations (`PipeSignature`) awaiting a concrete definition:")
+        lines.append("")
+        for pending_ref in pending_signatures:
+            lines.append(f"- `{pending_ref}`")
+
     graph_files = result.get("graph_files")
     if isinstance(graph_files, dict):
         lines += ["", "## Graph files", ""]

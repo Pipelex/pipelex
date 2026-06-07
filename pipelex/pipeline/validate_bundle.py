@@ -19,6 +19,7 @@ from pipelex.core.pipes.handle_pipe_errors import (
     categorize_pipe_validation_with_libraries_error,
 )
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.validation import report_validation_error
 from pipelex.hub import (
     clear_current_library,
@@ -40,6 +41,14 @@ class ValidateBundleResult(BaseModel):
     blueprints: list[PipelexBundleBlueprint]
     pipes: list[PipeAbstract]
     dry_run_result: dict[str, DryRunOutput]
+    pending_signatures: list[str]
+    """Qualified refs of pipes still declared as ``PipeSignature`` in the assembled library.
+
+    These are the unimplemented headers left after the merge: a forward-declared pipe that no
+    concrete definition has satisfied yet. Computed library-wide (not just from the triggering
+    file's pipes), so a lenient ``--allow-signatures`` success can report exactly what remains to
+    be implemented even when validating one file of a multi-file library at a time.
+    """
 
 
 class ValidatedPipeEntry(TypedDict):
@@ -63,6 +72,21 @@ def build_validated_pipes(dry_run_result: dict[str, DryRunOutput]) -> list[Valid
     across domains, so the same pipe is never reported under two identifiers by different commands.
     """
     return [ValidatedPipeEntry(pipe_code=output.pipe_ref, status=output.status) for output in dry_run_result.values()]
+
+
+def build_pending_signatures(pipes_by_ref: dict[str, PipeAbstract]) -> list[str]:
+    """Qualified refs of pipes still declared as ``PipeSignature`` (unsatisfied forward declarations).
+
+    Once a concrete pipe reconciles with a signature, the concrete replaces it in the merged
+    library (Part A), so the unsatisfied set is exactly the pipes still typed ``PipeSignature`` —
+    no ``{signatures} - {concretes}`` arithmetic needed. Pass the assembled library's pipe map
+    (``pipe_library.get_pipes_dict()``, not a single file's pipes) to get the library-wide set.
+
+    Cross-package dependency pipes (keyed ``alias->...`` by the loader) are excluded: another
+    package's unimplemented headers are not the caller's to satisfy, so they must not appear in the
+    "what remains to implement" nudge.
+    """
+    return sorted(pipe.pipe_ref for ref_key, pipe in pipes_by_ref.items() if pipe.is_signature and not QualifiedRef.has_cross_package_prefix(ref_key))
 
 
 @contextmanager
@@ -249,7 +273,12 @@ async def validate_bundle(
                 dry_run_results = await BundleValidator().validate_pipes(
                     pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes), library_id=library_id, allow_signatures=allow_signatures
                 )
-                result = ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
+                result = ValidateBundleResult(
+                    blueprints=loaded_blueprints,
+                    pipes=loaded_pipes,
+                    dry_run_result=dry_run_results,
+                    pending_signatures=build_pending_signatures(library.pipe_library.get_pipes_dict()),
+                )
 
             else:
                 assert mthds_file_path is not None
@@ -267,7 +296,12 @@ async def validate_bundle(
                 dry_run_results = await BundleValidator().validate_pipes(
                     pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes), library_id=library_id, allow_signatures=allow_signatures
                 )
-                result = ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
+                result = ValidateBundleResult(
+                    blueprints=loaded_blueprints,
+                    pipes=loaded_pipes,
+                    dry_run_result=dry_run_results,
+                    pending_signatures=build_pending_signatures(library.pipe_library.get_pipes_dict()),
+                )
         success = True
         return result
     finally:
@@ -290,7 +324,7 @@ async def validate_bundles_from_directory(directory: Path, allow_signatures: boo
     all_blueprints: list[PipelexBundleBlueprint] = []
 
     library_manager = get_library_manager()
-    library_id, _ = library_manager.open_library()
+    library_id, library = library_manager.open_library()
     success = False
     prev_library_id = get_current_library_id_or_none()
     try:
@@ -302,7 +336,12 @@ async def validate_bundles_from_directory(directory: Path, allow_signatures: boo
 
             loaded_pipes = library_manager.load_libraries(library_id=library_id, library_dirs=[Path(directory)])
             dry_run_results = await BundleValidator().validate_pipes(pipes=loaded_pipes, library_id=library_id, allow_signatures=allow_signatures)
-            result = ValidateBundleResult(blueprints=all_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
+            result = ValidateBundleResult(
+                blueprints=all_blueprints,
+                pipes=loaded_pipes,
+                dry_run_result=dry_run_results,
+                pending_signatures=build_pending_signatures(library.pipe_library.get_pipes_dict()),
+            )
         success = True
         return result
     finally:

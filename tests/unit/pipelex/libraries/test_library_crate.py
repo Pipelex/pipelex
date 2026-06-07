@@ -203,3 +203,44 @@ class TestLibraryCrate:
         assert crate.pipes["reconcile.summarize"].is_signature is False
         # The losing signature's file must not be misattributed to the winning concrete.
         assert "reconcile.summarize" not in crate.source_map
+
+    @pytest.mark.parametrize(
+        "blueprints",
+        [
+            # Header outputs bare `Summary`; concrete outputs same-domain-qualified `reconcile.Summary`.
+            [BlueprintSamples.SIG_SIGNATURE_BARE_SUMMARY_BUNDLE, BlueprintSamples.SIG_CONCRETE_QUALIFIED_SUMMARY_BUNDLE],
+            # Header contract uses `native.Text`; concrete uses bare native `Text`.
+            [BlueprintSamples.SIG_SIGNATURE_NATIVE_QUALIFIED_BUNDLE, BlueprintSamples.SIG_CONCRETE_BUNDLE],
+            # Same variable-length output, bare `Summary[]` vs qualified `reconcile.Summary[]`.
+            [BlueprintSamples.SIG_SIGNATURE_LIST_BARE_BUNDLE, BlueprintSamples.SIG_CONCRETE_LIST_QUALIFIED_BUNDLE],
+            # Same fixed-count output, bare `Summary[2]` vs qualified `reconcile.Summary[2]`.
+            [BlueprintSamples.SIG_SIGNATURE_LIST_FIXED_BUNDLE, BlueprintSamples.SIG_CONCRETE_LIST_FIXED_QUALIFIED_BUNDLE],
+            # Same external-domain output `other_domain.Insight` on both sides (kept verbatim).
+            [BlueprintSamples.SIG_SIGNATURE_EXTERNAL_OUTPUT_BUNDLE, BlueprintSamples.SIG_CONCRETE_EXTERNAL_OUTPUT_BUNDLE],
+        ],
+    )
+    def test_contracts_reconcile_across_equivalent_concept_spellings(self, blueprints: list[PipelexBundleBlueprint]):
+        """Bare<->qualified, native, fixed-count, and external-domain spellings of the same contract reconcile (concrete wins)."""
+        crate = LibraryCrateFactory.make_from_blueprints(blueprints=blueprints)
+        assert crate.pipes["reconcile.summarize"].is_signature is False
+
+    @pytest.mark.parametrize(
+        "blueprints",
+        [
+            # Differing multiplicity: `Summary[]` (header, variable) vs `reconcile.Summary` (concrete, single).
+            [BlueprintSamples.SIG_SIGNATURE_LIST_BARE_BUNDLE, BlueprintSamples.SIG_CONCRETE_QUALIFIED_SUMMARY_BUNDLE],
+            # Variable `Summary[]` vs fixed `reconcile.Summary[2]` — `[]` must NOT conflate with `[N]`.
+            [BlueprintSamples.SIG_SIGNATURE_LIST_BARE_BUNDLE, BlueprintSamples.SIG_CONCRETE_LIST_FIXED_QUALIFIED_BUNDLE],
+            # Regression guard: variable `Summary[]` vs fixed `reconcile.Summary[1]` — the exact pair the
+            # `True == 1` bool/int conflation would have wrongly accepted.
+            [BlueprintSamples.SIG_SIGNATURE_LIST_BARE_BUNDLE, BlueprintSamples.SIG_CONCRETE_LIST_ONE_QUALIFIED_BUNDLE],
+            # Genuinely different output concept: `Brief` (header) vs `reconcile.Summary` (concrete).
+            [BlueprintSamples.SIG_SIGNATURE_BRIEF_BUNDLE, BlueprintSamples.SIG_CONCRETE_QUALIFIED_SUMMARY_BUNDLE],
+            # External-domain `other_domain.Insight` (header) vs same-domain bare `Summary` (concrete) — must not match.
+            [BlueprintSamples.SIG_SIGNATURE_EXTERNAL_OUTPUT_BUNDLE, BlueprintSamples.SIG_CONCRETE_QUALIFIED_SUMMARY_BUNDLE],
+        ],
+    )
+    def test_contracts_still_mismatch_when_genuinely_different(self, blueprints: list[PipelexBundleBlueprint]):
+        """Differing multiplicity (incl. `[]` vs `[N]`), a different concept, or an external-domain ref still raises."""
+        with pytest.raises(PipeLibraryError, match=r"mismatched contracts"):
+            LibraryCrateFactory.make_from_blueprints(blueprints=blueprints)

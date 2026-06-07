@@ -286,3 +286,173 @@ class BlueprintSamples:
             ),
         },
     )
+
+    # --- Normalized contract conformance: bare <-> qualified <-> native equivalence ---
+    # The merge is a pure structural step (no concept-ref validation), so these contracts may name
+    # an undeclared concept `Summary`; only the contract identity matters here. All share the pipe
+    # code `summarize` in domain `reconcile` so they collide with each other / SIG_CONCRETE_BUNDLE.
+
+    # Header whose output is the same-domain concept written bare: `Summary`.
+    SIG_SIGNATURE_BARE_SUMMARY_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/reconcile_header_bare_summary.mthds",
+        domain="reconcile",
+        description="Reconciliation domain",
+        pipe={
+            "summarize": PipeSignatureBlueprint(
+                description="Header for summarize (bare Summary output)",
+                inputs={"doc": "Text"},
+                output="Summary",
+            ),
+        },
+    )
+
+    # Concrete whose output is the SAME concept written domain-qualified: `reconcile.Summary`.
+    # Normalized identity makes this reconcile with SIG_SIGNATURE_BARE_SUMMARY_BUNDLE.
+    SIG_CONCRETE_QUALIFIED_SUMMARY_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/reconcile_concrete_qualified_summary.mthds",
+        domain="reconcile",
+        description="Reconciliation domain",
+        pipe={
+            "summarize": PipeLLMBlueprint(
+                description="Summarize a document",
+                inputs={"doc": "Text"},
+                output="reconcile.Summary",
+                prompt="Summarize $doc.",
+            ),
+        },
+    )
+
+    # Header whose contract uses the native concept in its fully-qualified form (`native.Text`).
+    # Normalized identity makes this reconcile with SIG_CONCRETE_BUNDLE (bare `Text`).
+    SIG_SIGNATURE_NATIVE_QUALIFIED_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/reconcile_header_native_qualified.mthds",
+        domain="reconcile",
+        description="Reconciliation domain",
+        pipe={
+            "summarize": PipeSignatureBlueprint(
+                description="Header for summarize (native.Text contract)",
+                inputs={"doc": "native.Text"},
+                output="native.Text",
+            ),
+        },
+    )
+
+    # Header with a list-valued output written bare: `Summary[]`.
+    SIG_SIGNATURE_LIST_BARE_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/reconcile_header_list_bare.mthds",
+        domain="reconcile",
+        description="Reconciliation domain",
+        pipe={
+            "summarize": PipeSignatureBlueprint(
+                description="Header for summarize (Summary[] output)",
+                inputs={"doc": "Text"},
+                output="Summary[]",
+            ),
+        },
+    )
+
+    # Concrete with the SAME list-valued output written domain-qualified: `reconcile.Summary[]`.
+    SIG_CONCRETE_LIST_QUALIFIED_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/reconcile_concrete_list_qualified.mthds",
+        domain="reconcile",
+        description="Reconciliation domain",
+        pipe={
+            "summarize": PipeLLMBlueprint(
+                description="Summarize a document into key points",
+                inputs={"doc": "Text"},
+                output="reconcile.Summary[]",
+                prompt="Summarize $doc.",
+            ),
+        },
+    )
+
+    # Header whose output is a genuinely DIFFERENT same-domain concept: `Brief` (not `Summary`).
+    SIG_SIGNATURE_BRIEF_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/reconcile_header_brief.mthds",
+        domain="reconcile",
+        description="Reconciliation domain",
+        pipe={
+            "summarize": PipeSignatureBlueprint(
+                description="Header for summarize (Brief output)",
+                inputs={"doc": "Text"},
+                output="Brief",
+            ),
+        },
+    )
+
+    # Header with a FIXED-count list output `Summary[2]` — distinct from the variable-length
+    # `Summary[]` (pins that `[]` and `[N]` must not be conflated via Python's `True == 1`).
+    SIG_SIGNATURE_LIST_FIXED_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/reconcile_header_list_fixed.mthds",
+        domain="reconcile",
+        description="Reconciliation domain",
+        pipe={
+            "summarize": PipeSignatureBlueprint(
+                description="Header for summarize (Summary[2] output)",
+                inputs={"doc": "Text"},
+                output="Summary[2]",
+            ),
+        },
+    )
+
+    # Concrete with the SAME fixed-count output, domain-qualified: `reconcile.Summary[2]`.
+    SIG_CONCRETE_LIST_FIXED_QUALIFIED_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/reconcile_concrete_list_fixed_qualified.mthds",
+        domain="reconcile",
+        description="Reconciliation domain",
+        pipe={
+            "summarize": PipeLLMBlueprint(
+                description="Summarize a document into exactly two points",
+                inputs={"doc": "Text"},
+                output="reconcile.Summary[2]",
+                prompt="Summarize $doc.",
+            ),
+        },
+    )
+
+    # Concrete with a list output of EXACTLY ONE, domain-qualified: `reconcile.Summary[1]`. Paired
+    # against `Summary[]` this is the precise regression guard: parsing `[]`->True and `[1]`->int 1
+    # and comparing them conflates the two because Python evaluates `True == 1` as true.
+    SIG_CONCRETE_LIST_ONE_QUALIFIED_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/reconcile_concrete_list_one_qualified.mthds",
+        domain="reconcile",
+        description="Reconciliation domain",
+        pipe={
+            "summarize": PipeLLMBlueprint(
+                description="Summarize a document into exactly one point",
+                inputs={"doc": "Text"},
+                output="reconcile.Summary[1]",
+                prompt="Summarize $doc.",
+            ),
+        },
+    )
+
+    # Header whose output is an EXTERNAL-domain concept `other_domain.Insight` — must NOT canonicalize
+    # to `reconcile.Insight`, so it stays distinct from a same-domain `Insight`.
+    SIG_SIGNATURE_EXTERNAL_OUTPUT_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/reconcile_header_external.mthds",
+        domain="reconcile",
+        description="Reconciliation domain",
+        pipe={
+            "summarize": PipeSignatureBlueprint(
+                description="Header for summarize (external-domain output)",
+                inputs={"doc": "Text"},
+                output="other_domain.Insight",
+            ),
+        },
+    )
+
+    # Concrete with the SAME external-domain output `other_domain.Insight` — kept verbatim, matches.
+    SIG_CONCRETE_EXTERNAL_OUTPUT_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/reconcile_concrete_external.mthds",
+        domain="reconcile",
+        description="Reconciliation domain",
+        pipe={
+            "summarize": PipeLLMBlueprint(
+                description="Summarize a document into an insight",
+                inputs={"doc": "Text"},
+                output="other_domain.Insight",
+                prompt="Summarize $doc.",
+            ),
+        },
+    )

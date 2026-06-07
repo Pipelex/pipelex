@@ -69,6 +69,7 @@ async def validate_bundle_file(
         "bundle_path": str(bundle_path),
         "validated_pipes": build_validated_pipes(result.dry_run_result),
         "total_pipes": len(result.dry_run_result),
+        "pending_signatures": result.pending_signatures,
     }
 
 
@@ -95,6 +96,7 @@ async def validate_bundle_content(
         "pipelex_bundle_blueprint": [b.model_dump(mode="json") for b in blueprints],
         "validated_pipes": build_validated_pipes(validate_bundle_result.dry_run_result),
         "total_pipes": len(validate_bundle_result.dry_run_result),
+        "pending_signatures": validate_bundle_result.pending_signatures,
     }
 
 
@@ -178,4 +180,5 @@ async def validate_pipe_in_bundle(
         "bundle_path": str(bundle_path),
         "validated_pipes": build_validated_pipes(result.dry_run_result),
         "total_pipes": len(result.dry_run_result),
+        "pending_signatures": result.pending_signatures,
     }

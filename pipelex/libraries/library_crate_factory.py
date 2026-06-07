@@ -7,6 +7,7 @@ from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.libraries.collision_messages import duplicate_ref_msg
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
+from pipelex.libraries.contract_match import contracts_match
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 
@@ -107,6 +108,7 @@ class LibraryCrateFactory:
                             pipe_ref=pipe_ref,
                             existing=PipeDeclaration(blueprint=pipes[pipe_ref], source=source_map.get(pipe_ref)),
                             incoming=PipeDeclaration(blueprint=pipe_blueprint, source=source),
+                            domain_code=domain_code,
                         )
                         # source_map must always track the winner's file (or drop the entry when
                         # the winner has no source) so it never points at the discarded declaration.
@@ -139,6 +141,7 @@ class LibraryCrateFactory:
         pipe_ref: str,
         existing: PipeDeclaration,
         incoming: PipeDeclaration,
+        domain_code: str,
     ) -> PipeDeclaration:
         """Resolve two declarations of the same pipe_ref into a single winning declaration.
 
@@ -147,6 +150,10 @@ class LibraryCrateFactory:
         signature is involved. Two concrete pipes are a genuine duplicate (error). Two
         matching signatures collapse to one via a deterministic, load-order-independent
         tie-break. Returns the winning (blueprint, source) declaration.
+
+        Both declarations share ``domain_code`` (they collided on the same qualified ``pipe_ref``),
+        which the contract check uses to normalize bare and same-domain-qualified concept spellings
+        to one identity.
         """
         existing_is_signature = existing.blueprint.is_signature
         incoming_is_signature = incoming.blueprint.is_signature
@@ -162,8 +169,8 @@ class LibraryCrateFactory:
                 )
             )
 
-        # At least one is a signature: the declarations' contracts must match.
-        if not existing.blueprint.contract_equals(incoming.blueprint):
+        # At least one is a signature: the declarations' contracts must match (normalized identity).
+        if not contracts_match(existing.blueprint, incoming.blueprint, domain_code=domain_code):
             raise PipeLibraryError(cls._contract_mismatch_msg(pipe_ref=pipe_ref, existing=existing, incoming=incoming))
 
         # A concrete definition beats a forward declaration.
