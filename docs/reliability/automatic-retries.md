@@ -18,7 +18,7 @@ It is controlled by one top-level setting, which you override in your project's 
 transport_max_retries = 2
 ```
 
-`transport_max_retries` (default `2`) is the number of retries attempted **on top of** the initial request. A value of `2` allows up to 3 attempts total. Retries fire on a connection error or an HTTP `408` / `409` / `429` / `5xx` response, and they honor a `Retry-After` response header when the provider sends one.
+`transport_max_retries` (default `2`) is the number of retries attempted **on top of** the initial request. A value of `2` allows up to 3 attempts total. What Pipelex sets uniformly is this *retry count*; the exact set of failures a retry fires on is the provider SDK's own transient-failure set — broadly connection errors, request timeouts (`408`), rate limits (`429`), and server errors (`5xx`), with minor per-SDK variation (Google's client, for instance, omits `409`). Pipelex's own SDK-less path (the raw-HTTP Azure image-generation client) pins this set explicitly to `408` / `409` / `429` / `5xx`. A `Retry-After` response header is honored where the SDK or that path supports it.
 
 This setting is wired into every inference SDK client that exposes a client-side retry budget — Anthropic, OpenAI / Azure OpenAI, the Pipelex Gateway LLM clients, Mistral, and Google — as well as the raw-HTTP Azure image-generation path. So the retry posture is one deliberate policy across those provider SDK clients. (The Pipelex Gateway's document-extraction and image-generation calls go through the Portkey SDK, which has no client-side retry budget; transport retries for those are owned by the gateway itself.)
 
