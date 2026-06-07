@@ -13,16 +13,16 @@ Both are required. Part A alone does **not** unblock the goal: any pipe whose co
 
 > This block is the single source of truth for resuming in a fresh session. A new agent should read this first. Overwrite it at each checkpoint.
 
-- **Branch:** `feature/Support-recursive-design`
-- **Plan state:** ✅ finalized, **Phase 1 (Part A) + Phase 2 (Part B) + Phase 3 (end-to-end + both folded-in review fixes) complete — at Checkpoint C (the UNBLOCK POINT).** Phases 1–2 committed (`f5fd826f`, `d91701f4`). Phase 3 changes are **uncommitted** at time of writing (commit pending user authorization — see file list below).
-- **Current phase:** Phase 3 **done & fully verified.** Both Findings landed; full `make agent-test` is green ("All tests passed"); `make agent-check` clean. **Next: Phase 4 (handoff — different repo `mthds-plugins` + `design.md`; do not start before the Phase 3 commit lands).**
+- **Branch:** `feature/Support-recursive-design` (pipelex worktree `_recursive`). Handoff doc lives in sibling repo `mthds-plugins`, branch `feature/Recursive-building`.
+- **Plan state:** ✅ **ALL PHASES DONE.** Phase 1 (Part A) `f5fd826f`, Phase 2 (Part B) `d91701f4`, Phase 3 (end-to-end + both folded-in review fixes) `13660d3a` — all **committed**, full `make agent-test` green. Phase 4 (handoff) **done**: `mthds-plugins/wip/recursive/design.md` flipped overwrite-in-place → additive model (**uncommitted in mthds-plugins**, see below).
+- **Current phase:** **Feature complete.** The pipelex runtime support (Parts A+B + end-to-end proof) is shipped on this branch; the design handoff (Phase 4) is written. The only remaining work is **downstream in `mthds-plugins`** — building the recursive `mthds-vibe` orchestrator + `mthds-signature-expander` worker + the hook `--allow-signatures` change per `design.md` §7. Those artifacts **do not exist yet** (still the single-pass skill); that is a separate effort, not part of this pipelex feature.
 - **Last verified green (Phase 3):**
   - NEW unit `tests/unit/pipelex/libraries/test_concept_reference_validation.py` (renamed from `test_library_crate_concept_references.py`) — targets the pure `validate_concept_references_in_blueprints`; added a cross-batch (`already_loaded_concept_refs`) case. All pass.
   - NEW integration `tests/integration/pipelex/libraries/test_cross_file_concept_references.py` (cross-batch + single-batch bare-ref resolve, undeclared→`ConceptLibraryError`) and `test_additive_multi_file_library.py` (lenient-with-signature, strict-with-definition/concrete-wins, cross-batch via `-L`, undeclared→clean `ValidateBundleError`) — all pass.
   - Targeted regression sweep (unit+integration `libraries/` + `pipeline/` + unit `errors/`) — all pass, incl. error-location + `type_uri` uniqueness (reparenting clean) and reserved-domains `LibraryLoadingError`.
   - **Full `make agent-test` — green ("All tests passed", exit 0).** `make agent-check` — clean (ruff, plxt, pyright 0 errors/0 informations, mypy success).
-- **Next concrete action:** decide on the Phase 3 commit (suggested msg: `test(libraries): end-to-end additive multi-file library (signature + cross-file concept)` — but the diff is more than tests, so a broader msg like `feat(libraries): resolve cross-batch concept references in the loader + clean validate errors` fits better). Then **Phase 4 handoff** in `mthds-plugins/wip/recursive/design.md` (separate repo / fresh session).
-- **Phase 3 working tree (UNCOMMITTED — precise file list):**
+- **Next concrete action:** (pipelex side already committed.) **Commit the Phase 4 handoff in `mthds-plugins`** (branch `feature/Recursive-building`, working tree = `wip/recursive/design.md` only) — suggested msg: `docs(recursive): flip design to the shipped additive model (header + definition)`. After that this feature is closed; the downstream skill work (design.md §7) is a fresh effort.
+- **Phase 3 working tree (now committed in `13660d3a` — precise file list, historical):**
   - `pipelex/libraries/concept_reference_validation.py` — **NEW.** Pure `validate_concept_references_in_blueprints(blueprints, already_loaded_concept_refs=None)`: batch-declared (for the message) + membership against batch ∪ already-loaded ∪ native. Raises `ConceptLibraryError`. **Complete.**
   - `pipelex/libraries/library_crate_factory.py` — removed `_validate_concept_references` + its call; `make_from_blueprints` is now a pure structural merge + fingerprint (dropped `NativeConceptCode`/`QualifiedRef` imports). **Complete.**
   - `pipelex/libraries/library_manager.py` — `load_from_blueprints` now calls `validate_concept_references_in_blueprints` (batch ∪ `library.concept_library.root` keys); `load_from_crate` builds `domain_concept_codes` from the **live library** (not just `crate.concepts`) so the pipe factory's bare same-domain guard is library-aware too; `_load_mthds_files_into_library` gained a surgical `except (ConceptLibraryError, PipeLibraryError)` file-context arm. **Complete.**
@@ -38,7 +38,13 @@ Both are required. Part A alone does **not** unblock the goal: any pipe whose co
   - **Pure-fn extraction over a manager method.** The check is a free function in a focused module (`concept_reference_validation.py`), keeping `make_from_blueprints` world-agnostic AND the message-format unit tests fast (no live library); the loader supplies the library's concepts as `already_loaded_concept_refs`. The error *message* lists only the batch's declarations (clean), while *membership* honors already-loaded library concepts.
   - **`_load_mthds_files_into_library` widening kept surgical** (`ConceptLibraryError`/`PipeLibraryError` only, re-raised same-type with file context) rather than `except LibraryError`, to avoid clobbering `LibraryLoadingError`'s structured `blueprint_validation_errors`/`pipe_concept_validation_errors`.
   - **Process note:** the first full run reported "exit 0" because it was piped through `tail` (pipeline exit = `tail`'s). Re-ran `make agent-test` directly so the notification carried `make`'s real exit code.
-- **Open questions blocking progress:** none
+- **Phase 4 (handoff) — what changed & findings:**
+  - Rewrote `mthds-plugins/wip/recursive/design.md` to make the **additive** model primary throughout (TL;DR, §2.1/§2.3/§2.5/§2.6 methodology, §2.7 layout, §3 worked example, §4.1/§4.4/§4.5, §5.2/§5.4 hook nudge, §6 decisions, §7 plan). Retired overwrite-in-place; added the **exact-match contract** rule (explicit identical `inputs`/`output` on header + definition — pipes don't infer inputs from prompt sigils). **No code touched in mthds-plugins.**
+  - **Finding:** the mthds-plugins recursive impl is **entirely unstarted** (single-pass `mthds-vibe/SKILL.md.j2`, no `agents/`, no `mthds-signature-expander`, no `PipeSignature`/`--allow-signatures` in templates). So Phase 4 task "adopt additive in orchestrator/worker" became "make `design.md` prescribe additive for them" (§4.4, §4.5, §7 items 3-4) — there is nothing to edit yet.
+  - **Version floor:** lenient validation needs pipelex ≥ 0.31.0 (released); the additive model needs Part A+B which are **[Unreleased]** (only this branch) → additive floor = the next pipelex release > 0.31.0. (design.md §6.)
+  - **Hook nudge correctness:** under additive, headers persist, so `grep -q '"PipeSignature"'` false-positives — leftover-signature detection must use the validator's reachable-signature report (`{signatures} − {concretes}`). (design.md §5.2/§5.4.)
+  - `Page` is a native concept (`NativeConceptCode.PAGE`), so the worked example's `Page[]` needs no declaration (carried over from the original, verified).
+- **Open questions blocking progress:** none for the pipelex feature. Downstream-open (tracked in design.md §6): the exact pipelex release carrying Part A+B, and the matching mthds-agent version.
 - **Deferred (see "Deferred follow-ups" below):** the concepts-only loader still does not validate undeclared structure `concept_ref`/`item_concept_ref` at construction (narrow, secondary path; recursive flow uses the full load path, fully covered). Finding #4 (the original recorded deferred item). The bare-ref cross-batch limitation is **no longer deferred — it was fixed in this phase.**
 
 ---
@@ -62,8 +68,8 @@ The point of a checkpoint is a clean cold start: a new session reading the cold-
 
 - [x] **Phase 1 — Part A:** pipe signature/concrete reconciliation → 🛑 **Checkpoint A** ✅
 - [x] **Phase 2 — Part B:** concept references validate at library level → 🛑 **Checkpoint B** ✅
-- [x] **Phase 3 — End-to-end proof** + full suite + lint → 🛑 **Checkpoint C (UNBLOCK POINT)** ✅ (at checkpoint — stop here)
-- [ ] **Phase 4 — Handoff** (separate scope, `mthds-plugins` repo + `design.md`)
+- [x] **Phase 3 — End-to-end proof** + full suite + lint → 🛑 **Checkpoint C (UNBLOCK POINT)** ✅
+- [x] **Phase 4 — Handoff:** `design.md` flipped to the additive model ✅ — orchestrator/worker/hook still unbuilt; their implementation is mthds-plugins §7 (downstream, separate effort)
 
 ---
 
@@ -256,11 +262,11 @@ Run the **Checkpoint protocol** with the **full** `make agent-test`. This is the
 
 ## Phase 4 — Handoff (separate scope — `mthds-plugins` repo + `design.md`)
 
-Different repo / likely a fresh session. Do not start before Checkpoint C is green.
+Different repo (`mthds-plugins`, branch `feature/Recursive-building`). **DONE** — design-doc handoff only; the working tree there is `wip/recursive/design.md` (uncommitted).
 
-- [ ] Update `mthds-plugins/wip/recursive/design.md` §2.7 from overwrite-in-place to the **additive** model (forward-declared header + separate definition file). Note the overwrite model was itself broken by the Part B concept bug.
-- [ ] Document the **explicit-`inputs`/`output` on both header and definition** requirement (the exact-match contract).
-- [ ] Adopt the additive flow in the `mthds-vibe` orchestrator and the `mthds-signature-expander` worker.
+- [x] Update `mthds-plugins/wip/recursive/design.md` §2.7 from overwrite-in-place to the **additive** model (forward-declared header + separate definition file). Noted the overwrite model was itself broken by the Part B concept bug (§4.5 "Why the old overwrite-in-place model is retired"). Also flipped the methodology (§2.1/§2.3/§2.5/§2.6), TL;DR, §3 worked example, §4.1/§4.4, §5.2/§5.4 hook nudge, §6 decisions, §7 plan for whole-doc consistency.
+- [x] Document the **explicit-`inputs`/`output` on both header and definition** requirement (the exact-match contract) — §2.7 "Contract must match exactly", §2.6 "Contract stability", §4.4 "Contract & collisions", §4.5 "The exact-match contract".
+- [x] Adopt the additive flow in the `mthds-vibe` orchestrator and the `mthds-signature-expander` worker — **N/A as a code change: neither exists yet.** The single-pass `mthds-vibe/SKILL.md.j2` is untouched and there is no `agents/`/`mthds-signature-expander`. Instead, `design.md` §4.4/§4.5/§7 (items 3-4) now **prescribe** the additive flow for them, so the downstream §7 implementation builds them additively from the start.
 
 ---
 
