@@ -71,6 +71,8 @@ For `bundle`, additional options are available:
 !!! note "Signature pipes"
     `pipelex-agent validate` is strict by default — same as `pipelex validate`. A bundle whose dependency graph reaches a `PipeSignature` is rejected unless you pass `--allow-signatures`, which dry-runs signatures as mocks.
 
+    On a successful `validate bundle` run, the envelope also carries `pending_signatures` — the library-wide list of pipes still declared as `PipeSignature` (unimplemented forward declarations), each namespaced by `pipe_ref` (`domain.code`). It is a non-blocking nudge: in JSON it is a `pending_signatures` array, in markdown a "Pending signatures" section. A top-down build reads it to see exactly which headers remain to implement.
+
 ### Inputs
 
 Generate example input JSON for a pipe, bundle, or method.

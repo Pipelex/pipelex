@@ -134,6 +134,11 @@ pipelex validate --all --allow-signatures
 
 When `--all` runs in strict mode, signature pipes themselves are skipped during the iteration (an unreached signature is fine). Strict mode only fires when a non-signature pipe *depends on* a signature.
 
+!!! note "Signatures and definitions can live in separate files"
+    A signature and the concrete pipe that implements it do not have to sit in the same `.mthds` file. A same-domain library can be split across sibling files in one directory: a header file forward-declares pipes as `PipeSignature` (plus the concepts those contracts reference), and definition files supply the concrete pipes. Loading the set merges them — a `PipeSignature` and a concrete pipe of the same code reconcile (the concrete satisfies the header), provided their `inputs`/`output` contracts match. Order does not matter.
+
+    On a successful lenient run, `validate bundle` reports `pending_signatures` — the headers still unimplemented across the *whole merged* library — so you can see exactly what is left to define. See [Validate Commands](../../tools/cli/validate.md) for the output surface.
+
 ## Replacing a signature with a real implementation
 
 When you are ready to implement, change the `type` of the pipe and add the operator-specific fields. The pipe code, `description`, `inputs`, and `output` typically carry over unchanged — that is the value of having declared the contract first.
