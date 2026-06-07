@@ -20,7 +20,7 @@ transport_max_retries = 2
 
 `transport_max_retries` (default `2`) is the number of retries attempted **on top of** the initial request. A value of `2` allows up to 3 attempts total. Retries fire on a connection error or an HTTP `408` / `409` / `429` / `5xx` response, and they honor a `Retry-After` response header when the provider sends one.
 
-This setting is wired uniformly into every inference SDK client — Anthropic, OpenAI / Azure OpenAI, the Pipelex Gateway clients, Mistral, and Google — as well as the raw-HTTP Azure image-generation path. So the retry posture is one deliberate policy across all providers.
+This setting is wired into every inference SDK client that exposes a client-side retry budget — Anthropic, OpenAI / Azure OpenAI, the Pipelex Gateway LLM clients, Mistral, and Google — as well as the raw-HTTP Azure image-generation path. So the retry posture is one deliberate policy across those provider SDK clients. (The Pipelex Gateway's document-extraction and image-generation calls go through the Portkey SDK, which has no client-side retry budget; transport retries for those are owned by the gateway itself.)
 
 !!! info "Transport retry is not pipeline retry"
     Tier 1 retries a *single* HTTP request to a provider. It does not re-run a pipe, re-run a step, or restart a pipeline. If a call still fails after its transport retries are exhausted, the error surfaces.
