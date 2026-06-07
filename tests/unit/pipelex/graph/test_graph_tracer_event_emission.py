@@ -59,7 +59,7 @@ class TestGraphTracerEventEmission:
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
         node_id, _child_ctx = tracer.on_pipe_start(
-            graph_context=context,
+            trace_context=context,
             pipe_code="test_pipe",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -93,7 +93,7 @@ class TestGraphTracerEventEmission:
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
         parent_id, child_ctx = tracer.on_pipe_start(
-            graph_context=context,
+            trace_context=context,
             pipe_code="parent_pipe",
             pipe_type="PipeSequence",
             node_kind=NodeKind.CONTROLLER,
@@ -101,7 +101,7 @@ class TestGraphTracerEventEmission:
         )
 
         child_id, _ = tracer.on_pipe_start(
-            graph_context=child_ctx,
+            trace_context=child_ctx,
             pipe_code="child_pipe",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -129,7 +129,7 @@ class TestGraphTracerEventEmission:
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
         node_id, _ = tracer.on_pipe_start(
-            graph_context=context,
+            trace_context=context,
             pipe_code="test_pipe",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -170,7 +170,7 @@ class TestGraphTracerEventEmission:
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
         node_id, _ = tracer.on_pipe_start(
-            graph_context=context,
+            trace_context=context,
             pipe_code="test_pipe",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -210,14 +210,14 @@ class TestGraphTracerEventEmission:
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
         node_a, _ctx_a = tracer.on_pipe_start(
-            graph_context=context,
+            trace_context=context,
             pipe_code="pipe_a",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
             started_at=started_at,
         )
         node_b, _ = tracer.on_pipe_start(
-            graph_context=context,
+            trace_context=context,
             pipe_code="pipe_b",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -258,7 +258,7 @@ class TestGraphTracerEventEmission:
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
         node_id, _ = tracer.on_pipe_start(
-            graph_context=context,
+            trace_context=context,
             pipe_code="parallel_pipe",
             pipe_type="PipeParallel",
             node_kind=NodeKind.CONTROLLER,
@@ -350,7 +350,7 @@ class TestGraphTracerEventEmission:
 
         # Create controller node
         ctrl_id, ctrl_ctx = tracer.on_pipe_start(
-            graph_context=context,
+            trace_context=context,
             pipe_code="parallel_ctrl",
             pipe_type="PipeParallel",
             node_kind=NodeKind.CONTROLLER,
@@ -359,7 +359,7 @@ class TestGraphTracerEventEmission:
 
         # Create branch nodes and end them with outputs
         branch_a_id, _ = tracer.on_pipe_start(
-            graph_context=ctrl_ctx,
+            trace_context=ctrl_ctx,
             pipe_code="branch_a",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -372,7 +372,7 @@ class TestGraphTracerEventEmission:
         )
 
         branch_b_id, _ = tracer.on_pipe_start(
-            graph_context=ctrl_ctx,
+            trace_context=ctrl_ctx,
             pipe_code="branch_b",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -413,7 +413,7 @@ class TestGraphTracerEventEmission:
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
         node_id, _child_ctx = tracer.on_pipe_start(
-            graph_context=context,
+            trace_context=context,
             pipe_code="test_pipe",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -446,7 +446,7 @@ class TestGraphTracerEventEmission:
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
         node_id, _ = tracer.on_pipe_start(
-            graph_context=context,
+            trace_context=context,
             pipe_code="test_pipe",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -470,14 +470,14 @@ class TestGraphTracerEventEmission:
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
         node_a, _ = tracer.on_pipe_start(
-            graph_context=context,
+            trace_context=context,
             pipe_code="pipe_a",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
             started_at=started_at,
         )
         node_b, _ = tracer.on_pipe_start(
-            graph_context=context,
+            trace_context=context,
             pipe_code="pipe_b",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -510,7 +510,7 @@ class TestGraphTracerEventEmission:
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
         for index in range(5):
             node_id, _ = tracer.on_pipe_start(
-                graph_context=context,
+                trace_context=context,
                 pipe_code=f"pipe_{index}",
                 pipe_type="PipeLLM",
                 node_kind=NodeKind.OPERATOR,
@@ -536,7 +536,7 @@ class TestGraphTracerEventEmission:
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
         node_id, _ = tracer.on_pipe_start(
-            graph_context=context,
+            trace_context=context,
             pipe_code="test_pipe",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,

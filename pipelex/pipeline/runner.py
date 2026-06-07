@@ -54,10 +54,12 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
 
     def __init__(
         self,
+        *,
         library_id: str | None = None,
         library_dirs: list[str] | None = None,
         bundle_uris: list[str] | None = None,
         pipe_run_mode: PipeRunMode | None = None,
+        is_mock_inference: bool = False,
         search_domain_codes: list[str] | None = None,
         user_id: str | None = None,
         execution_config: PipelineExecutionConfig | None = None,
@@ -67,6 +69,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         self.library_dirs = library_dirs
         self.bundle_uris = bundle_uris
         self.pipe_run_mode = pipe_run_mode
+        self.is_mock_inference = is_mock_inference
         self.search_domain_codes = search_domain_codes
         self.user_id = user_id
         self.execution_config = execution_config
@@ -152,6 +155,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
                 output_multiplicity=output_multiplicity,
                 dynamic_output_concept_ref=dynamic_output_concept_ref,
                 pipe_run_mode=self.pipe_run_mode,
+                is_mock_inference=self.is_mock_inference,
                 search_domain_codes=self.search_domain_codes,
                 user_id=self.user_id,
             )
@@ -200,9 +204,10 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
             msg = f"Input validation failed for '{model_name}': {formatted_error}"
             raise PipeExecutionError(message=msg) from exc
         finally:
-            # Close graph tracer if it was opened (cleanup only — the PipeRun is
-            # responsible for capturing the graph spec on pipe_output)
-            if execution_config.is_generate_graph and pipeline_run_id is not None:
+            # Close the tracer if it was opened (cleanup only — the PipeRun is responsible for capturing
+            # the graph spec on pipe_output). The tracer is opened whenever graph OR cost reporting is on
+            # (costs-only mode opens it with event_log=None), so the close gate must match that condition.
+            if (execution_config.is_generate_graph or execution_config.is_generate_usage) and pipeline_run_id is not None:
                 tracer_manager = GraphTracerManager.get_instance()
                 if tracer_manager is not None:
                     tracer_manager.close_tracer(pipeline_run_id)

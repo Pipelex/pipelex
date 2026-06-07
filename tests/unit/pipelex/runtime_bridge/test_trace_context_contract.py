@@ -4,7 +4,7 @@ from pytest_mock import MockerFixture
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.graph.graph_config import DataInclusionConfig
-from pipelex.graph.graph_context import GraphContext
+from pipelex.graph.trace_context import TraceContext
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
@@ -13,7 +13,7 @@ from pipelex.runtime_bridge.bridge import PipelexPipeRunInput, run_pipe_via_brid
 from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
 
 
-def _make_graph_context() -> GraphContext:
+def _make_trace_context() -> TraceContext:
     data_inclusion = DataInclusionConfig(
         stuff_json_content=False,
         stuff_text_content=False,
@@ -21,7 +21,7 @@ def _make_graph_context() -> GraphContext:
         error_stack_traces=False,
         pipe_and_concept_registry=False,
     )
-    return GraphContext(graph_id="host-graph-id", data_inclusion=data_inclusion)
+    return TraceContext(graph_id="host-graph-id", data_inclusion=data_inclusion)
 
 
 def _fake_pipe_job(mocker: MockerFixture) -> PipeJob:
@@ -38,14 +38,14 @@ def _fake_pipe_job(mocker: MockerFixture) -> PipeJob:
 
 
 @pytest.mark.asyncio
-class TestGraphContextContract:
-    async def test_direct_mode_forwards_host_graph_context(self, mocker: MockerFixture) -> None:
-        graph_context = _make_graph_context()
+class TestTraceContextContract:
+    async def test_direct_mode_forwards_host_trace_context(self, mocker: MockerFixture) -> None:
+        trace_context = _make_trace_context()
         captured: dict[str, object] = {}
         fake_job = _fake_pipe_job(mocker)
 
         def spy(**kwargs: object) -> PipeJob:
-            captured["graph_context"] = kwargs["graph_context"]
+            captured["trace_context"] = kwargs["trace_context"]
             return fake_job
 
         mocker.patch("pipelex.runtime_bridge.bridge.build_pipe_job_from_input", side_effect=spy)
@@ -58,18 +58,18 @@ class TestGraphContextContract:
 
         await run_pipe_via_bridge(
             PipelexPipeRunInput(pipe_code="fake_pipe", execution_mode=PipelexExecutionMode.DIRECT),
-            graph_context=graph_context,
+            trace_context=trace_context,
         )
 
-        assert captured["graph_context"] is graph_context
+        assert captured["trace_context"] is trace_context
 
-    async def test_temporal_mode_nulls_host_graph_context(self, mocker: MockerFixture) -> None:
-        graph_context = _make_graph_context()
+    async def test_temporal_mode_nulls_host_trace_context(self, mocker: MockerFixture) -> None:
+        trace_context = _make_trace_context()
         captured: dict[str, object] = {}
         fake_job = _fake_pipe_job(mocker)
 
         def spy(**kwargs: object) -> PipeJob:
-            captured["graph_context"] = kwargs["graph_context"]
+            captured["trace_context"] = kwargs["trace_context"]
             return fake_job
 
         mocker.patch("pipelex.runtime_bridge.bridge.build_pipe_job_from_input", side_effect=spy)
@@ -80,7 +80,7 @@ class TestGraphContextContract:
 
         await run_pipe_via_bridge(
             PipelexPipeRunInput(pipe_code="fake_pipe", execution_mode=PipelexExecutionMode.TEMPORAL_BLOCKING),
-            graph_context=graph_context,
+            trace_context=trace_context,
         )
 
-        assert captured["graph_context"] is None
+        assert captured["trace_context"] is None

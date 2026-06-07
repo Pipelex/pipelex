@@ -46,6 +46,10 @@ def run_pipe_cmd(
         bool,
         typer.Option("--graph/--no-graph", help="Generate execution graph visualizations (saved alongside output)"),
     ] = True,
+    costs: Annotated[
+        bool,
+        typer.Option("--costs/--no-costs", help="Emit usage (cost) tracing events. Default on."),
+    ] = True,
     library_dir: Annotated[
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
@@ -152,6 +156,7 @@ def run_pipe_cmd(
                         mock_inputs=mock_inputs,
                         library_dirs=library_dir,
                         graph=graph,
+                        costs=costs,
                         with_memory=with_memory,
                     )
                 )

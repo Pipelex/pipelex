@@ -152,7 +152,7 @@ class LogDispatch:
             message_for_console = f"{caller_info_str}: {message}"
 
         if include_exception:
-            message += f"\n{traceback.format_exc()}"
+            message_for_console += f"\n{traceback.format_exc()}"
         self._log_to_console(message=message_for_console, severity=severity)
 
     def _log_data(

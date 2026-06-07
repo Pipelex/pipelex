@@ -52,7 +52,7 @@ from pipelex.system.telemetry.otel_constants import OTelConstants
 if TYPE_CHECKING:
     from pipelex.core.memory.working_memory import WorkingMemory
     from pipelex.core.pipes.pipe_output import PipeOutput
-    from pipelex.graph.graph_context import GraphContext
+    from pipelex.graph.trace_context import TraceContext
     from pipelex.pipe_run.pipe_job import PipeJob
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 
@@ -87,7 +87,7 @@ class PipelexPipeRunOutput(BaseModel):
 
 async def run_pipe_via_bridge(
     input_payload: PipelexPipeRunInput,
-    graph_context: GraphContext | None = None,
+    trace_context: TraceContext | None = None,
 ) -> PipelexPipeRunOutput:
     """Run a Pipelex pipe from inside a host-runtime activity.
 
@@ -95,13 +95,13 @@ async def run_pipe_via_bridge(
     the input; opening a per-call scoped library if a ``library_crate_dump``
     is provided; then dispatching to the requested execution mode.
 
-    The optional ``graph_context`` is plumbed into ``JobMetadata`` so callers
+    The optional ``trace_context`` is plumbed into ``JobMetadata`` so callers
     (e.g. a streaming activity) that already opened a ``GraphTracerManager``
-    tracer for this pipeline run get per-step trace events flowing through
-    the configured event log. ``graph_context`` is honored for ``DIRECT``
+    tracer for this pipeline run get per-step graph/usage trace events flowing
+    through the configured event log. ``trace_context`` is honored for ``DIRECT``
     mode only — it is deliberately nulled for the Temporal modes, which have
     their own event-log infrastructure via ``pipeline_run_setup``. Forwarding
-    a host ``graph_context`` to a Temporal mode would make Pipelex's Temporal
+    a host ``trace_context`` to a Temporal mode would make Pipelex's Temporal
     workflow open its tracer under the host's graph id and merge its trace
     events into the host's graph, so the bridge does not thread it through.
     """
@@ -112,9 +112,9 @@ async def run_pipe_via_bridge(
     _validate_input(input_payload, delivery_assignment=delivery_assignment)
 
     async with _scoped_library_for_crate(library_crate):
-        # graph_context is honored for DIRECT only. The Temporal modes have their
+        # trace_context is honored for DIRECT only. The Temporal modes have their
         # own event-log infrastructure (via pipeline_run_setup); forwarding a host
-        # graph_context there would make WfPipeRouter open its tracer under the
+        # trace_context there would make WfPipeRouter open its tracer under the
         # host's graph_id and merge Pipelex's Temporal trace events into the host
         # graph — exactly the cross-contamination the contract forbids. Null it
         # for the non-DIRECT modes.
@@ -122,7 +122,7 @@ async def run_pipe_via_bridge(
         pipe_job = build_pipe_job_from_input(
             input_payload=input_payload,
             library_crate=library_crate,
-            graph_context=graph_context if is_direct else None,
+            trace_context=trace_context if is_direct else None,
         )
 
         match input_payload.execution_mode:
@@ -141,7 +141,7 @@ async def run_pipe_via_bridge(
 def build_pipe_job_from_input(
     input_payload: PipelexPipeRunInput,
     library_crate: LibraryCrate | None,
-    graph_context: GraphContext | None = None,
+    trace_context: TraceContext | None = None,
 ) -> PipeJob:
     """Hydrate a PipeJob from JSON-safe input.
 
@@ -149,7 +149,7 @@ def build_pipe_job_from_input(
     making sure the active library contains the pipe (by passing a
     ``library_crate_dump`` or pre-loading the library at boot).
 
-    The optional ``graph_context`` is plumbed into ``JobMetadata`` so a
+    The optional ``trace_context`` is plumbed into ``JobMetadata`` so a
     caller (e.g. a streaming activity) that has already opened a
     ``GraphTracerManager`` tracer for this pipeline run can have per-step
     ``PipeStartEvent`` / ``PipeEndSuccessEvent`` events flow through the
@@ -171,7 +171,7 @@ def build_pipe_job_from_input(
     job_metadata = JobMetadata(
         user_id=input_payload.user_id or OTelConstants.DEFAULT_USER_ID,
         pipeline_run_id=pipeline_run_id,
-        graph_context=graph_context,
+        trace_context=trace_context,
     )
     pipe_run_params = PipeRunParamsFactory.make_run_params()
 

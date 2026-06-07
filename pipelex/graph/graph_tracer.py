@@ -6,7 +6,6 @@ from typing import Any
 from typing_extensions import override
 
 from pipelex.graph.graph_config import DataInclusionConfig
-from pipelex.graph.graph_context import GraphContext
 from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
 from pipelex.graph.graphspec import (
     EdgeKind,
@@ -21,6 +20,7 @@ from pipelex.graph.graphspec import (
     PipelineRef,
     TimingSpec,
 )
+from pipelex.graph.trace_context import TraceContext
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # noqa: TC001 - used in __init__ annotations
 from pipelex.tracing.trace_events import (
     BatchAggregateEvent,
@@ -135,6 +135,10 @@ class GraphTracer(GraphTracerProtocol):
         # The branch_producer_node_id is snapshotted at registration time, before register_controller_output
         # overrides _stuff_producer_map to point branch stuff codes to the controller node
         self._parallel_combine_map: dict[str, tuple[str, list[tuple[str, str]]]] = {}
+        # Whether this run emits graph (node/edge) events and assembles a GraphSpec on teardown.
+        # In costs-only mode this is False: the tracer still mints node ids for the in-memory graph
+        # (so usage-event node_id correlation stays valid) but teardown skips the discarded spec build.
+        self._emit_graph_events: bool = True
         # Event log for distributed tracing (None = no event emission, direct mode)
         self._event_log: EventLogProtocol | None = None
         # "direct" for single-process mode, full Temporal workflow ID otherwise
@@ -216,7 +220,9 @@ class GraphTracer(GraphTracerProtocol):
         event_log: "EventLogProtocol | None" = None,
         workflow_id: str = "direct",
         pipeline_run_id: str | None = None,
-    ) -> GraphContext:
+        emit_graph_events: bool = True,
+        emit_usage_events: bool = True,
+    ) -> TraceContext:
         """Initialize tracing for a new pipeline run.
 
         Args:
@@ -229,8 +235,13 @@ class GraphTracer(GraphTracerProtocol):
             workflow_id: Temporal workflow ID or "direct" for single-process mode.
                 When not "direct", node/edge IDs include the workflow_id segment.
             pipeline_run_id: Pipeline run ID for event emission. Required when event_log is set.
+            emit_graph_events: Whether this run assembles a GraphSpec. When False (costs-only mode),
+                teardown skips the discarded spec build; the returned TraceContext carries the flag.
+            emit_usage_events: Whether this run emits usage (cost) events. Stamped onto the returned
+                TraceContext so it is born with the correct flag.
         """
         self._is_active = True
+        self._emit_graph_events = emit_graph_events
         self._graph_id = graph_id
         self._pipeline_ref = PipelineRef(
             domain=pipeline_ref_domain,
@@ -252,46 +263,57 @@ class GraphTracer(GraphTracerProtocol):
         self._pipe_registry = {}
         self._concept_registry = {}
 
-        return GraphContext(
+        return TraceContext(
             graph_id=graph_id,
             parent_node_id=None,
             node_sequence=0,
             data_inclusion=data_inclusion,
+            emit_graph_events=emit_graph_events,
+            emit_usage_events=emit_usage_events,
         )
 
     @override
     def teardown(self) -> GraphSpec | None:
-        """Finalize tracing and return the built GraphSpec."""
+        """Finalize tracing and return the built GraphSpec.
+
+        In costs-only mode (``emit_graph_events`` False) the GraphSpec is never consumed, so this
+        skips the edge-correlation passes and node-spec construction entirely — close-as-cleanup — and
+        returns None. The in-memory nodes accumulated during the run are simply discarded on reset.
+        """
         if not self._is_active:
             return None
 
-        # Mark any still-running nodes as canceled (shouldn't happen in normal flow)
-        for node_data in self._nodes.values():
-            if node_data.status == NodeStatus.RUNNING:
-                node_data.status = NodeStatus.CANCELED
-                node_data.ended_at = datetime.now(timezone.utc)
+        graph: GraphSpec | None = None
+        if self._emit_graph_events:
+            # Mark any still-running nodes as canceled (shouldn't happen in normal flow)
+            for node_data in self._nodes.values():
+                if node_data.status == NodeStatus.RUNNING:
+                    node_data.status = NodeStatus.CANCELED
+                    node_data.ended_at = datetime.now(timezone.utc)
 
-        # Generate DATA edges by correlating input stuff_codes with producer nodes
-        # (must happen before setting _is_active = False since add_edge checks it)
-        self._generate_data_edges()
-        self._generate_batch_item_edges()
-        self._generate_batch_aggregate_edges()
-        self._generate_parallel_combine_edges()
+            # Generate DATA edges by correlating input stuff_codes with producer nodes
+            # (must happen before setting _is_active = False since add_edge checks it)
+            self._generate_data_edges()
+            self._generate_batch_item_edges()
+            self._generate_batch_aggregate_edges()
+            self._generate_parallel_combine_edges()
+
+            self._is_active = False
+
+            # Build the final GraphSpec
+            nodes = [node_data.to_node_spec() for node_data in self._nodes.values()]
+
+            graph = GraphSpec(
+                graph_id=self._graph_id or "unknown",
+                created_at=self._created_at or datetime.now(timezone.utc),
+                pipeline_ref=self._pipeline_ref or PipelineRef(),
+                nodes=nodes,
+                edges=self._edges,
+                pipe_registry=dict(self._pipe_registry),
+                concept_registry=dict(self._concept_registry),
+            )
 
         self._is_active = False
-
-        # Build the final GraphSpec
-        nodes = [node_data.to_node_spec() for node_data in self._nodes.values()]
-
-        graph = GraphSpec(
-            graph_id=self._graph_id or "unknown",
-            created_at=self._created_at or datetime.now(timezone.utc),
-            pipeline_ref=self._pipeline_ref or PipelineRef(),
-            nodes=nodes,
-            edges=self._edges,
-            pipe_registry=dict(self._pipe_registry),
-            concept_registry=dict(self._concept_registry),
-        )
 
         # Reset internal state
         self._graph_id = None
@@ -569,7 +591,7 @@ class GraphTracer(GraphTracerProtocol):
     @override
     def on_pipe_start(
         self,
-        graph_context: GraphContext,
+        trace_context: TraceContext,
         pipe_code: str,
         pipe_type: str,
         node_kind: NodeKind,
@@ -579,12 +601,12 @@ class GraphTracer(GraphTracerProtocol):
         concept_data: list[dict[str, Any]] | None = None,
         description: str | None = None,
         domain_code: str | None = None,
-    ) -> tuple[str, GraphContext]:
+    ) -> tuple[str, TraceContext]:
         """Record the start of a pipe execution."""
         if not self._is_active:
             # Return dummy values when not active
-            node_id = graph_context.make_node_id()
-            child_context = graph_context.copy_for_child(node_id, graph_context.node_sequence + 1)
+            node_id = trace_context.make_node_id()
+            child_context = trace_context.copy_for_child(node_id, trace_context.node_sequence + 1)
             return node_id, child_context
 
         # Generate node ID (includes workflow_id in Temporal mode)
@@ -597,7 +619,7 @@ class GraphTracer(GraphTracerProtocol):
             pipe_type=pipe_type,
             node_kind=node_kind,
             started_at=started_at,
-            parent_node_id=graph_context.parent_node_id,
+            parent_node_id=trace_context.parent_node_id,
             input_specs=input_specs,
             description=description,
             domain_code=domain_code,
@@ -605,7 +627,7 @@ class GraphTracer(GraphTracerProtocol):
         self._nodes[node_id] = node_data
 
         # Accumulate pipe and concept registry data (deduplicated)
-        if graph_context.data_inclusion.pipe_and_concept_registry:
+        if trace_context.data_inclusion.pipe_and_concept_registry:
             if pipe_data is not None:
                 pipe_ref = f"{pipe_data.get('domain_code', '')}.{pipe_data.get('code', '')}"
                 if pipe_ref not in self._pipe_registry:
@@ -626,7 +648,7 @@ class GraphTracer(GraphTracerProtocol):
                     timestamp=started_at,
                     sequence=self._next_event_sequence(),
                     node_id=node_id,
-                    parent_node_id=graph_context.parent_node_id,
+                    parent_node_id=trace_context.parent_node_id,
                     pipe_code=pipe_code,
                     pipe_type=pipe_type,
                     node_kind=node_kind,
@@ -639,15 +661,15 @@ class GraphTracer(GraphTracerProtocol):
             )
 
         # Add containment edge from parent if this is a child pipe
-        if graph_context.parent_node_id is not None:
+        if trace_context.parent_node_id is not None:
             self.add_edge(
-                source_node_id=graph_context.parent_node_id,
+                source_node_id=trace_context.parent_node_id,
                 target_node_id=node_id,
                 edge_kind=EdgeKind.CONTAINS,
             )
 
         # Create child context - use copy_for_child to preserve include_full_data
-        child_context = graph_context.copy_for_child(
+        child_context = trace_context.copy_for_child(
             child_node_id=node_id,
             next_sequence=self._node_sequence,
         )

@@ -19,8 +19,8 @@ from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.graph.graph_config import DataInclusionConfig
-from pipelex.graph.graph_context import GraphContext
 from pipelex.graph.graphspec import EdgeKind, EdgeSpec, GraphSpec, NodeStatus, PipelineRef
+from pipelex.graph.trace_context import TraceContext
 from pipelex.hub import get_report_delegate
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.reporting.reporting_manager import ReportingManager
@@ -59,13 +59,22 @@ def route_activities_to(queue: str, activity_names: Iterable[str]) -> Generator[
                 worker_config.activity_queues[activity_name] = original
 
 
-def inject_graph_context(pipe_job: PipeJob, pipeline_run_id: str) -> PipeJob:
-    """Deep-copy a PipeJob and inject a GraphContext onto its JobMetadata.
+def inject_trace_context(
+    pipe_job: PipeJob,
+    pipeline_run_id: str,
+    *,
+    emit_graph_events: bool = True,
+    emit_usage_events: bool = True,
+) -> PipeJob:
+    """Deep-copy a PipeJob and inject a TraceContext onto its JobMetadata.
 
     Also overrides pipeline_run_id (must not be the dry-run sentinel,
     since NdjsonEventLog uses it as a directory name).
+
+    The emit flags default to True (the legacy "context present → emit both"
+    behavior); pass ``emit_graph_events=False`` to exercise costs-only mode.
     """
-    graph_context = GraphContext(
+    trace_context = TraceContext(
         graph_id=pipeline_run_id,
         parent_node_id=None,
         node_sequence=0,
@@ -76,10 +85,12 @@ def inject_graph_context(pipe_job: PipeJob, pipeline_run_id: str) -> PipeJob:
             stuff_html_content=False,
             error_stack_traces=False,
         ),
+        emit_graph_events=emit_graph_events,
+        emit_usage_events=emit_usage_events,
     )
     new_metadata = pipe_job.job_metadata.model_copy(
         update={
-            "graph_context": graph_context,
+            "trace_context": trace_context,
             "pipeline_run_id": pipeline_run_id,
         },
     )
@@ -109,7 +120,7 @@ async def execute_and_assemble(
     """
     # Give each execution its own pipeline_run_id to avoid event accumulation
     execution_run_id = f"tracing_exec_{uuid.uuid4().hex[:12]}"
-    execution_job = inject_graph_context(pipe_job, execution_run_id)
+    execution_job = inject_trace_context(pipe_job, execution_run_id)
 
     task_queue = str(uuid.uuid4())
     workflow_id = str(uuid.uuid4())
@@ -279,7 +290,7 @@ async def make_split_workers(
                 "act_jinja2_gen_text",
                 "act_extract_gen_extract_pages",
                 "act_render_page_views",
-                "act_assemble_graph",
+                "act_assemble_tracing",
                 "act_deliver",
             ],
         },

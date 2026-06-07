@@ -4,10 +4,10 @@ from datetime import datetime
 from typing import Any
 
 from pipelex.graph.graph_config import DataInclusionConfig
-from pipelex.graph.graph_context import GraphContext
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
 from pipelex.graph.graphspec import EdgeKind, GraphSpec, IOSpec, NodeKind
+from pipelex.graph.trace_context import TraceContext
 from pipelex.system.registries.singleton import ABCSingletonMeta, MetaSingleton
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # noqa: TC001 - used in open_tracer signature
 
@@ -100,7 +100,9 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         workflow_id: str = "direct",
         pipeline_run_id: str | None = None,
         tracer_key: str | None = None,
-    ) -> GraphContext:
+        emit_graph_events: bool = True,
+        emit_usage_events: bool = True,
+    ) -> TraceContext:
         """Create and initialize a new tracer for a pipeline run.
 
         Args:
@@ -115,9 +117,14 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             tracer_key: Lookup key for the tracer in the manager's dict. Defaults to graph_id.
                 In Temporal mode, use the workflow_id to avoid collisions when multiple
                 workflows share the same graph_id on the same process.
+            emit_graph_events: Whether this run assembles a GraphSpec / emits graph events.
+                Threaded into setup so the returned TraceContext is born with the correct flag
+                (no post-hoc model_copy needed at the call site).
+            emit_usage_events: Whether this run emits usage (cost) events. Threaded into setup
+                so the returned TraceContext is born with the correct flag.
 
         Returns:
-            Initial GraphContext to pass through JobMetadata.
+            Initial TraceContext to pass through JobMetadata.
 
         Raises:
             ValueError: If a tracer for this key already exists.
@@ -130,7 +137,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         tracer = GraphTracer()
         self._tracers[key] = tracer
 
-        graph_context = tracer.setup(
+        trace_context = tracer.setup(
             graph_id=graph_id,
             data_inclusion=data_inclusion,
             pipeline_ref_domain=pipeline_ref_domain,
@@ -138,11 +145,13 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             event_log=event_log,
             workflow_id=workflow_id,
             pipeline_run_id=pipeline_run_id,
+            emit_graph_events=emit_graph_events,
+            emit_usage_events=emit_usage_events,
         )
-        # Set the tracer_key on the GraphContext so downstream lookups use the same key
+        # Set the tracer_key on the TraceContext so downstream lookups use the same key
         if tracer_key is not None:
-            graph_context = graph_context.model_copy(update={"tracer_key": tracer_key})
-        return graph_context
+            trace_context = trace_context.model_copy(update={"tracer_key": tracer_key})
+        return trace_context
 
     def close_tracer(self, tracer_key: str) -> GraphSpec | None:
         """Finalize tracing for a specific pipeline run and return its GraphSpec.
@@ -190,7 +199,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def on_pipe_start(
         self,
-        graph_context: GraphContext,
+        trace_context: TraceContext,
         pipe_code: str,
         pipe_type: str,
         node_kind: NodeKind,
@@ -200,11 +209,11 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         concept_data: list[dict[str, Any]] | None = None,
         description: str | None = None,
         domain_code: str | None = None,
-    ) -> tuple[str | None, GraphContext | None]:
+    ) -> tuple[str | None, TraceContext | None]:
         """Record the start of a pipe execution.
 
         Args:
-            graph_context: Current graph context containing graph_id.
+            trace_context: Current trace context containing graph_id.
             pipe_code: The pipe code being executed.
             pipe_type: The pipe type (e.g., "PipeLLM", "PipeSequence").
             node_kind: The kind of node (controller, operator, etc.).
@@ -216,14 +225,14 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             domain_code: Optional domain code of the pipe (mirrored onto NodeSpec).
 
         Returns:
-            Tuple of (node_id, child_graph_context) if tracing is active, (None, None) otherwise.
+            Tuple of (node_id, child_trace_context) if tracing is active, (None, None) otherwise.
         """
-        tracer = self._get_tracer(graph_context.lookup_key)
+        tracer = self._get_tracer(trace_context.lookup_key)
         if tracer is None:
             return None, None
 
         return tracer.on_pipe_start(
-            graph_context=graph_context,
+            trace_context=trace_context,
             pipe_code=pipe_code,
             pipe_type=pipe_type,
             node_kind=node_kind,

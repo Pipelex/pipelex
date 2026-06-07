@@ -154,22 +154,25 @@ class PipelineExecutionConfig(ConfigModel):
     is_normalize_data_urls_to_storage: bool
     is_mock_inputs: bool
     is_generate_graph: bool
+    is_generate_usage: bool
     graph_config: GraphConfig
 
     # Bounded fan-out concurrency for PipeBatch (the resilience-without-Temporal pillar).
     # An integer caps the number of branches executed at once; the literal "unbounded" disables the bound.
     max_concurrency: Annotated[int, Field(ge=1)] | Literal["unbounded"]
 
-    def with_graph_config_overrides(
+    def with_execution_overrides(
         self,
         generate_graph: bool | None = None,
+        generate_usage: bool | None = None,
         force_include_full_data: bool | None = None,
         mock_inputs: bool | None = None,
     ) -> Self:
         """Create a copy of this config with optional overrides.
 
         Args:
-            generate_graph: If not None, overrides is_generate_graph.
+            generate_graph: If not None, overrides is_generate_graph (graph node/edge events + GraphSpec assembly).
+            generate_usage: If not None, overrides is_generate_usage (emit usage/cost tracing events).
             force_include_full_data: If not None, overrides all graph_config.data_inclusion flags
                 (stuff_json_content, stuff_text_content, stuff_html_content, error_stack_traces).
             mock_inputs: If not None, overrides is_mock_inputs. When True, generates mock
@@ -182,6 +185,9 @@ class PipelineExecutionConfig(ConfigModel):
 
         if generate_graph is not None:
             updates["is_generate_graph"] = generate_graph
+
+        if generate_usage is not None:
+            updates["is_generate_usage"] = generate_usage
 
         if mock_inputs is not None:
             updates["is_mock_inputs"] = mock_inputs

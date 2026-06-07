@@ -4,6 +4,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
+from pipelex.cogt.content_generation.exceptions import MockInferenceUnsupportedError
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck_check import check_search_choice_with_deck
@@ -82,6 +83,13 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeSearchOutput:
+        # Web search has no leaf-level mock and (unlike LLM/img-gen/extract) no cogt content_generation
+        # leaf — its provider spend happens right here. Under --mock-inference (run_mode stays LIVE) this
+        # live path runs, so guard here: fail loud rather than silently hit the real search provider.
+        if job_metadata.is_mock_inference:
+            error = MockInferenceUnsupportedError.for_operation("web search (PipeSearch)")
+            raise error
+
         # 0. Log the search run
         search_choice_desc = self.search_choice or "default"
         log.dev(f"✨ PipeSearch '{self.code}' running with search choice '{search_choice_desc}' ✨")
