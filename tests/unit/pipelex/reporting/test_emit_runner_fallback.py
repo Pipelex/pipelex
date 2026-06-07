@@ -25,7 +25,7 @@ from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.config import get_config
 from pipelex.graph.graph_config import DataInclusionConfig
-from pipelex.graph.graph_context import GraphContext
+from pipelex.graph.trace_context import TraceContext
 from pipelex.pipeline.job_metadata import JobMetadata, UnitJobId
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.system.configuration.configs import NdjsonTracingConfig, TracingBackend
@@ -47,7 +47,7 @@ DATA_INCLUSION_OFF = DataInclusionConfig(
 
 def _make_llm_job(
     pipeline_run_id: str,
-    graph_context: GraphContext | None,
+    trace_context: TraceContext | None,
     nb_input_tokens: int = 100,
     nb_output_tokens: int = 50,
 ) -> LLMJob:
@@ -55,7 +55,7 @@ def _make_llm_job(
     job_metadata = JobMetadata(
         user_id="test_user",
         pipeline_run_id=pipeline_run_id,
-        graph_context=graph_context,
+        trace_context=trace_context,
         started_at=now,
         completed_at=now + timedelta(seconds=1),
         unit_job_id=UnitJobId.LLM_GEN_TEXT,
@@ -76,12 +76,12 @@ def _make_llm_job(
     )
 
 
-def _make_graph_context(
+def _make_trace_context(
     graph_id: str,
     parent_node_id: str | None = "g:node_0",
     tracer_key: str | None = None,
-) -> GraphContext:
-    return GraphContext(
+) -> TraceContext:
+    return TraceContext(
         graph_id=graph_id,
         tracer_key=tracer_key,
         parent_node_id=parent_node_id,
@@ -119,8 +119,8 @@ class TestEmitRunnerFallback:
 
         manager = ReportingManager()
         manager.setup()
-        graph_context = _make_graph_context(graph_id="run_abc", tracer_key="wf_xyz", parent_node_id="g:node_2")
-        llm_job = _make_llm_job("run_abc", graph_context=graph_context)
+        trace_context = _make_trace_context(graph_id="run_abc", tracer_key="wf_xyz", parent_node_id="g:node_2")
+        llm_job = _make_llm_job("run_abc", trace_context=trace_context)
 
         manager.report_inference_job(llm_job)
 
@@ -143,19 +143,19 @@ class TestEmitRunnerFallback:
         tmp_path: Path,
         mocker: MockerFixture,
     ) -> None:
-        """workflow_id on the emitted event is graph_context.tracer_key when set, else graph_id."""
+        """workflow_id on the emitted event is trace_context.tracer_key when set, else graph_id."""
         _enable_ndjson_tracing(mocker, tmp_path)
 
         manager = ReportingManager()
         manager.setup()
 
         # Case 1: tracer_key set → workflow_id == tracer_key
-        ctx_with_tracer = _make_graph_context(graph_id="run_abc", tracer_key="wf_xyz")
-        manager.report_inference_job(_make_llm_job("run_abc", graph_context=ctx_with_tracer))
+        ctx_with_tracer = _make_trace_context(graph_id="run_abc", tracer_key="wf_xyz")
+        manager.report_inference_job(_make_llm_job("run_abc", trace_context=ctx_with_tracer))
 
         # Case 2: tracer_key None → workflow_id == graph_id
-        ctx_no_tracer = _make_graph_context(graph_id="run_def", tracer_key=None)
-        manager.report_inference_job(_make_llm_job("run_def", graph_context=ctx_no_tracer))
+        ctx_no_tracer = _make_trace_context(graph_id="run_def", tracer_key=None)
+        manager.report_inference_job(_make_llm_job("run_def", trace_context=ctx_no_tracer))
 
         reader = NdjsonEventLog(traces_dir=str(tmp_path))
         events_abc = [evt for evt in reader.read_events("run_abc") if isinstance(evt, UsageReportEvent)]
@@ -177,10 +177,10 @@ class TestEmitRunnerFallback:
 
         manager = ReportingManager()
         manager.setup()
-        graph_context = _make_graph_context(graph_id="run_abc", tracer_key="wf_xyz")
+        trace_context = _make_trace_context(graph_id="run_abc", tracer_key="wf_xyz")
 
-        manager.report_inference_job(_make_llm_job("run_abc", graph_context=graph_context))
-        manager.report_inference_job(_make_llm_job("run_abc", graph_context=graph_context))
+        manager.report_inference_job(_make_llm_job("run_abc", trace_context=trace_context))
+        manager.report_inference_job(_make_llm_job("run_abc", trace_context=trace_context))
 
         assert spy.call_count == 1
 
@@ -232,25 +232,25 @@ class TestEmitRunnerFallback:
 
         manager = ReportingManager()
         manager.setup()
-        graph_context = _make_graph_context(graph_id="run_silent", tracer_key="wf_silent")
+        trace_context = _make_trace_context(graph_id="run_silent", tracer_key="wf_silent")
 
-        manager.report_inference_job(_make_llm_job("run_silent", graph_context=graph_context))
+        manager.report_inference_job(_make_llm_job("run_silent", trace_context=trace_context))
 
         # No NDJSON files should have been created.
         assert list(tmp_path.glob("**/*.ndjson")) == []
 
-    def test_no_graph_context_skips_emit(
+    def test_no_trace_context_skips_emit(
         self,
         tmp_path: Path,
         mocker: MockerFixture,
     ) -> None:
-        """When job_metadata.graph_context is None, neither fast path nor fallback engages."""
+        """When job_metadata.trace_context is None, neither fast path nor fallback engages."""
         _enable_ndjson_tracing(mocker, tmp_path)
 
         manager = ReportingManager()
         manager.setup()
 
-        manager.report_inference_job(_make_llm_job("run_abc", graph_context=None))
+        manager.report_inference_job(_make_llm_job("run_abc", trace_context=None))
 
         assert list(tmp_path.glob("**/*.ndjson")) == []
 
@@ -283,11 +283,11 @@ class TestEmitRunnerFallback:
 
         manager = ReportingManager()
         manager.setup()
-        graph_context = _make_graph_context(graph_id="run_abc", tracer_key="wf_xyz")
+        trace_context = _make_trace_context(graph_id="run_abc", tracer_key="wf_xyz")
 
         with caplog.at_level(logging.WARNING):
             # Must not raise — the failure is logged and dropped.
-            manager.report_inference_job(_make_llm_job("run_abc", graph_context=graph_context))
+            manager.report_inference_job(_make_llm_job("run_abc", trace_context=trace_context))
 
         assert any(record.levelno == logging.WARNING for record in caplog.records)
 
@@ -314,10 +314,10 @@ class TestEmitRunnerFallback:
 
         manager = ReportingManager()
         manager.setup()
-        graph_context = _make_graph_context(graph_id="run_abc", tracer_key="wf_xyz")
+        trace_context = _make_trace_context(graph_id="run_abc", tracer_key="wf_xyz")
 
         with caplog.at_level(logging.WARNING):
-            manager.report_inference_job(_make_llm_job("run_abc", graph_context=graph_context))
+            manager.report_inference_job(_make_llm_job("run_abc", trace_context=trace_context))
 
         assert any(record.levelno == logging.WARNING for record in caplog.records)
 
@@ -332,11 +332,11 @@ class TestEmitRunnerFallback:
 
         manager = ReportingManager()
         manager.setup()
-        graph_context = _make_graph_context(graph_id="run_abc", tracer_key="wf_xyz")
+        trace_context = _make_trace_context(graph_id="run_abc", tracer_key="wf_xyz")
 
         with caplog.at_level(logging.WARNING):
             for _ in range(100):
-                manager.report_inference_job(_make_llm_job("run_abc", graph_context=graph_context))
+                manager.report_inference_job(_make_llm_job("run_abc", trace_context=trace_context))
 
         engaged_records = [record for record in caplog.records if "runner-side" in record.message.lower()]
         assert len(engaged_records) == 1
@@ -350,16 +350,16 @@ class TestEmitRunnerFallback:
         """Module-level once-flag survives multiple ReportingManager instances."""
         _enable_ndjson_tracing(mocker, tmp_path)
 
-        graph_context = _make_graph_context(graph_id="run_abc", tracer_key="wf_xyz")
+        trace_context = _make_trace_context(graph_id="run_abc", tracer_key="wf_xyz")
 
         with caplog.at_level(logging.WARNING):
             manager_a = ReportingManager()
             manager_a.setup()
-            manager_a.report_inference_job(_make_llm_job("run_abc", graph_context=graph_context))
+            manager_a.report_inference_job(_make_llm_job("run_abc", trace_context=trace_context))
 
             manager_b = ReportingManager()
             manager_b.setup()
-            manager_b.report_inference_job(_make_llm_job("run_abc", graph_context=graph_context))
+            manager_b.report_inference_job(_make_llm_job("run_abc", trace_context=trace_context))
 
         engaged_records = [record for record in caplog.records if "runner-side" in record.message.lower()]
         assert len(engaged_records) == 1
@@ -377,10 +377,10 @@ class TestEmitRunnerFallback:
 
         manager = ReportingManager()
         manager.setup()
-        graph_context = _make_graph_context(graph_id="run_abc", tracer_key="wf_xyz")
+        trace_context = _make_trace_context(graph_id="run_abc", tracer_key="wf_xyz")
 
-        manager.report_inference_job(_make_llm_job("run_abc", graph_context=graph_context))
-        manager.report_inference_job(_make_llm_job("run_abc", graph_context=graph_context))
+        manager.report_inference_job(_make_llm_job("run_abc", trace_context=trace_context))
+        manager.report_inference_job(_make_llm_job("run_abc", trace_context=trace_context))
 
         reader = NdjsonEventLog(traces_dir=str(tmp_path))
         events = [evt for evt in reader.read_events("run_abc") if isinstance(evt, UsageReportEvent)]

@@ -71,13 +71,13 @@ class PipeRun(PipeRunProtocol):
             # concerns are gated independently: graph events feed the GraphSpec (so a costs-only run does
             # not set an empty GraphSpec, preserving the --no-graph contract), usage events feed the
             # tokens_usages the submitter renders the cost report from.
-            graph_context = pipe_job.job_metadata.graph_context
-            if pipe_output is not None and graph_context is not None and (graph_context.emit_graph_events or graph_context.emit_usage_events):
+            trace_context = pipe_job.job_metadata.trace_context
+            if pipe_output is not None and trace_context is not None and (trace_context.emit_graph_events or trace_context.emit_usage_events):
                 assemble_tracing_on_output(
                     pipe_output=pipe_output,
                     pipeline_run_id=pipeline_run_id,
-                    assemble_graph=graph_context.emit_graph_events,
-                    assemble_usage=graph_context.emit_usage_events,
+                    assemble_graph=trace_context.emit_graph_events,
+                    assemble_usage=trace_context.emit_usage_events,
                     domain_code=pipe_job.pipe.domain_code,
                     main_pipe_code=pipe_job.pipe.code,
                 )

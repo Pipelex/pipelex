@@ -82,10 +82,10 @@ class TestCostReportRendering:
         mocker.patch.object(cfg, "backend", TracingBackend.NDJSON)
         mocker.patch.object(cfg, "ndjson", NdjsonTracingConfig(traces_dir=traces_dir))
 
-    def _config(self, *, generate_costs: bool) -> PipelineExecutionConfig:
+    def _config(self, *, generate_usage: bool) -> PipelineExecutionConfig:
         return get_config().pipelex.pipeline_execution_config.with_execution_overrides(
             generate_graph=False,
-            generate_costs=generate_costs,
+            generate_usage=generate_usage,
             mock_inputs=True,
         )
 
@@ -153,7 +153,7 @@ class TestCostReportRendering:
         console = _recording_console()
         mocker.patch("pipelex.cogt.usage.cost_registry.get_console", return_value=console)
 
-        pipe_output = await self._run(self._config(generate_costs=True))
+        pipe_output = await self._run(self._config(generate_usage=True))
 
         assert pipe_output.tokens_usages is not None
         assert len(pipe_output.tokens_usages) >= 1
@@ -174,7 +174,7 @@ class TestCostReportRendering:
         console = _recording_console()
         mocker.patch("pipelex.cogt.usage.cost_registry.get_console", return_value=console)
 
-        pipe_output = await self._run(self._config(generate_costs=False))
+        pipe_output = await self._run(self._config(generate_usage=False))
 
         assert pipe_output.tokens_usages is None
 

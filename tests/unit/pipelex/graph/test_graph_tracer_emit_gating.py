@@ -6,11 +6,11 @@ from tests.unit.pipelex.graph.conftest import make_defaulted_data_inclusion_conf
 
 
 class TestGraphTracerEmitGating:
-    """The emit flags threaded into setup are born onto the GraphContext and gate teardown (E1)."""
+    """The emit flags threaded into setup are born onto the TraceContext and gate teardown (E1)."""
 
     def _start_a_node(self, tracer: GraphTracer, context: object) -> None:
         tracer.on_pipe_start(
-            graph_context=context,  # type: ignore[arg-type]
+            trace_context=context,  # type: ignore[arg-type]
             pipe_code="some_pipe",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,

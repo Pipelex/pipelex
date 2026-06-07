@@ -34,7 +34,7 @@ from pipelex.tracing.event_log_factory import make_event_log
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_abstract import PipeAbstract
-    from pipelex.graph.graph_context import GraphContext
+    from pipelex.graph.trace_context import TraceContext
     from pipelex.tracing.event_log_protocol import EventLogProtocol
 
 
@@ -158,7 +158,7 @@ async def pipeline_run_setup(
     )
 
     library_manager = get_library_manager()
-    graph_context: GraphContext | None = None
+    trace_context: TraceContext | None = None
     event_log: EventLogProtocol | None = None
     success = False
     try:
@@ -188,10 +188,10 @@ async def pipeline_run_setup(
 
         # Initialize the tracing context if graph OR cost reporting is requested (after pipe is loaded so we
         # have domain info). The two concerns share one event-log transport and one in-memory tracer; the
-        # booleans on GraphContext (emit_graph_events / emit_usage_events) say which event stream to emit.
+        # booleans on TraceContext (emit_graph_events / emit_usage_events) say which event stream to emit.
         is_generate_graph = execution_config.is_generate_graph
-        is_generate_costs = execution_config.is_generate_costs
-        if is_generate_graph or is_generate_costs:
+        is_generate_usage = execution_config.is_generate_usage
+        if is_generate_graph or is_generate_usage:
             # Create the event log when tracing is enabled — it is the shared transport for both graph
             # (node/edge) events and usage (cost) events.
             config = get_config()
@@ -200,9 +200,9 @@ async def pipeline_run_setup(
                 event_log = make_event_log(tracing_config)
 
             graph_tracer_manager = GraphTracerManager.get_or_create_instance()
-            # The emit flags (D4) are threaded into open_tracer so the returned GraphContext is born with
+            # The emit flags (D4) are threaded into open_tracer so the returned TraceContext is born with
             # the correct values — no post-hoc model_copy. Propagated to child contexts via copy_for_child.
-            graph_context = graph_tracer_manager.open_tracer(
+            trace_context = graph_tracer_manager.open_tracer(
                 graph_id=pipeline_run_id,
                 data_inclusion=execution_config.graph_config.data_inclusion,
                 pipeline_ref_domain=pipe.domain_code,
@@ -214,7 +214,7 @@ async def pipeline_run_setup(
                 workflow_id="direct",
                 pipeline_run_id=pipeline_run_id,
                 emit_graph_events=is_generate_graph,
-                emit_usage_events=is_generate_costs,
+                emit_usage_events=is_generate_usage,
             )
 
         # TODO: rethink this, it's not forcing
@@ -228,7 +228,7 @@ async def pipeline_run_setup(
         # is on. In graph-only mode (--graph --no-costs) the tracer owns the event_log for graph events, but
         # no usage-event context is registered, so usage events are suppressed (the runner fallback also
         # gates on emit_usage_events).
-        if is_generate_costs and event_log is not None:
+        if is_generate_usage and event_log is not None:
             get_report_delegate().set_event_log(
                 context_key=pipeline_run_id,
                 event_log=event_log,
@@ -263,7 +263,7 @@ async def pipeline_run_setup(
             user_id=user_id,
             inputs=inputs,
             search_domain_codes=search_domain_codes,
-            graph_context=graph_context,
+            trace_context=trace_context,
             otel_context=otel_context,
             output_name=output_name,
             output_multiplicity=output_multiplicity,
@@ -286,7 +286,7 @@ async def pipeline_run_setup(
             # the exception propagate. Uses try/finally (not except) so a BaseException — e.g.
             # asyncio.CancelledError — is covered too. acquire_library owns teardown for load-time
             # failures (before this try); this block owns the post-acquire window.
-            if graph_context is not None:
+            if trace_context is not None:
                 tracer_manager = GraphTracerManager.get_instance()
                 if tracer_manager is not None:
                     tracer_manager.close_tracer(pipeline_run_id)

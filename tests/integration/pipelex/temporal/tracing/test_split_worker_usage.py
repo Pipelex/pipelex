@@ -37,7 +37,7 @@ from pipelex.tracing.usage_aggregator import UsageAggregator
 from tests.integration.pipelex.fixtures.pipe_job_helpers import pipe_job_from_bundle
 from tests.integration.pipelex.temporal.library_crate.helpers import rehydrate_pipe_output
 from tests.integration.pipelex.temporal.tracing.helpers import (
-    inject_graph_context,
+    inject_trace_context,
     make_split_workers,
     ndjson_files_for_run,
 )
@@ -126,7 +126,7 @@ class TestSplitWorkerUsageEmission:
         """Run the workflow on q_router; activities dispatch to q_runner."""
         q_router, q_runner = split_queues
         execution_run_id = f"split_exec_{uuid.uuid4().hex[:12]}"
-        execution_job = inject_graph_context(live_sequence_tracing_job, execution_run_id)
+        execution_job = inject_trace_context(live_sequence_tracing_job, execution_run_id)
         workflow_id = f"wf_{uuid.uuid4().hex[:12]}"
 
         async with make_split_workers(temporal_client, q_router=q_router, q_runner=q_runner):

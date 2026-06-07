@@ -3,13 +3,13 @@
 Pins that the two concerns are decoupled at setup time over the shared event-log transport:
 
 - **costs-only (``--no-graph --costs``):** the tracer is still opened (so node ids are minted), the
-  returned graph_context carries ``emit_graph_events=False`` / ``emit_usage_events=True``, and the
+  returned trace_context carries ``emit_graph_events=False`` / ``emit_usage_events=True``, and the
   usage event-log context IS registered on the report delegate (``set_event_log``).
-- **graph-only (``--graph --no-costs``):** the returned graph_context carries
+- **graph-only (``--graph --no-costs``):** the returned trace_context carries
   ``emit_graph_events=True`` / ``emit_usage_events=False`` and the usage event-log context is NOT
   registered (so usage events are suppressed).
 
-These assert the gating decisions D4/D5/D6 land on the run's GraphContext and the report delegate,
+These assert the gating decisions D4/D5/D6 land on the run's TraceContext and the report delegate,
 without needing an actual inference run.
 """
 
@@ -43,10 +43,10 @@ prompt = "Echo the $subject as a topic"
 """
 
 
-def _config(*, generate_graph: bool, generate_costs: bool) -> PipelineExecutionConfig:
+def _config(*, generate_graph: bool, generate_usage: bool) -> PipelineExecutionConfig:
     return get_config().pipelex.pipeline_execution_config.with_execution_overrides(
         generate_graph=generate_graph,
-        generate_costs=generate_costs,
+        generate_usage=generate_usage,
         mock_inputs=True,
     )
 
@@ -78,17 +78,17 @@ class TestPipelineRunSetupEmitGates:
         set_event_log_spy = mocker.spy(get_report_delegate(), "set_event_log")
 
         pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
-            execution_config=_config(generate_graph=False, generate_costs=True),
+            execution_config=_config(generate_graph=False, generate_usage=True),
             mthds_contents=[_GATE_MTHDS],
             pipe_code="echo_topic",
             pipe_run_mode=PipeRunMode.DRY,
         )
         try:
-            graph_context = pipe_job.job_metadata.graph_context
+            trace_context = pipe_job.job_metadata.trace_context
             # The tracer is opened in costs-only mode (D5), so the context exists and mints node ids.
-            assert graph_context is not None
-            assert graph_context.emit_graph_events is False
-            assert graph_context.emit_usage_events is True
+            assert trace_context is not None
+            assert trace_context.emit_graph_events is False
+            assert trace_context.emit_usage_events is True
             # The usage event-log context IS registered for this run (costs on).
             registered_keys = [call.kwargs.get("context_key") for call in set_event_log_spy.call_args_list]
             assert pipeline_run_id in registered_keys
@@ -100,16 +100,16 @@ class TestPipelineRunSetupEmitGates:
         set_event_log_spy = mocker.spy(get_report_delegate(), "set_event_log")
 
         pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
-            execution_config=_config(generate_graph=True, generate_costs=False),
+            execution_config=_config(generate_graph=True, generate_usage=False),
             mthds_contents=[_GATE_MTHDS],
             pipe_code="echo_topic",
             pipe_run_mode=PipeRunMode.DRY,
         )
         try:
-            graph_context = pipe_job.job_metadata.graph_context
-            assert graph_context is not None
-            assert graph_context.emit_graph_events is True
-            assert graph_context.emit_usage_events is False
+            trace_context = pipe_job.job_metadata.trace_context
+            assert trace_context is not None
+            assert trace_context.emit_graph_events is True
+            assert trace_context.emit_usage_events is False
             # No usage event-log context registered for this run (costs off) -> usage events suppressed.
             registered_keys = [call.kwargs.get("context_key") for call in set_event_log_spy.call_args_list]
             assert pipeline_run_id not in registered_keys

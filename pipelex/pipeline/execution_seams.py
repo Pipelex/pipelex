@@ -49,7 +49,7 @@ from pipelex.tools.misc.file_utils import reject_bare_str_or_path
 
 if TYPE_CHECKING:
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-    from pipelex.graph.graph_context import GraphContext
+    from pipelex.graph.trace_context import TraceContext
 
 
 def acquire_library(
@@ -164,7 +164,7 @@ async def prepare_pipe_job(
     user_id: str,
     inputs: PipelineInputs | WorkingMemory | None = None,
     search_domain_codes: list[str] | None = None,
-    graph_context: "GraphContext | None" = None,
+    trace_context: "TraceContext | None" = None,
     otel_context: OtelContext | None = None,
     output_name: str | None = None,
     output_multiplicity: VariableMultiplicity | None = None,
@@ -178,7 +178,7 @@ async def prepare_pipe_job(
     ``execution_config.is_mock_inputs``, optional data-url normalization), run
     params, job metadata, and the library crate. Performs no pipeline-manager
     registration, no report-registry open, no telemetry, no graph-tracer open,
-    and no library mutation. ``graph_context`` / ``otel_context`` are created by
+    and no library mutation. ``trace_context`` / ``otel_context`` are created by
     the caller and threaded onto the job metadata. ``is_mock_inference`` (the
     ``--mock-inference`` trigger) is the single-writer point onto
     :attr:`JobMetadata.is_mock_inference` — a LIVE run whose LLM inference-leaf calls are
@@ -222,7 +222,7 @@ async def prepare_pipe_job(
         user_id=user_id,
         pipeline_run_id=pipeline_run_id,
         otel_context=otel_context,
-        graph_context=graph_context,
+        trace_context=trace_context,
         request_id=request_id,
         is_mock_inference=is_mock_inference,
     )

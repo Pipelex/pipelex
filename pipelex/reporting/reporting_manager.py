@@ -11,7 +11,7 @@ from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.search.search_job import SearchJob
 from pipelex.config import get_config
-from pipelex.graph.graph_context import GraphContext
+from pipelex.graph.trace_context import TraceContext
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.system.exceptions import MissingDependencyError
@@ -59,7 +59,7 @@ class _EventLogContext(NamedTuple):
 
 class ReportingManager(ReportingProtocol):
     def __init__(self):
-        # Per-context event log state, keyed by graph_context.lookup_key.
+        # Per-context event log state, keyed by trace_context.lookup_key.
         # Each concurrent workflow/run gets its own isolated context.
         self._event_log_contexts: dict[str, _EventLogContext] = {}
 
@@ -78,7 +78,7 @@ class ReportingManager(ReportingProtocol):
         """Configure event log for a specific workflow/run context.
 
         Args:
-            context_key: Unique key for this context (graph_context.lookup_key).
+            context_key: Unique key for this context (trace_context.lookup_key).
             event_log: The event log backend for emitting UsageReportEvents.
             workflow_id: Temporal workflow ID or "direct".
             pipeline_run_id: Pipeline run ID for event correlation.
@@ -149,7 +149,7 @@ class ReportingManager(ReportingProtocol):
     def _emit_usage_event(self, inference_job: InferenceJobAbstract, tokens_usage: AnyTokensUsage) -> None:
         """Emit a UsageReportEvent for this job.
 
-        Fast path: when set_event_log was registered for this graph context's
+        Fast path: when set_event_log was registered for this trace context's
         lookup_key (router process or direct mode), emit through the cached
         per-context event log.
 
@@ -158,8 +158,8 @@ class ReportingManager(ReportingProtocol):
         log so the event still lands in the same backend partition as the
         rest of the run. See _emit_usage_event_runner_fallback for details.
         """
-        graph_context = inference_job.job_metadata.graph_context
-        if graph_context is None:
+        trace_context = inference_job.job_metadata.trace_context
+        if trace_context is None:
             return
 
         # Gate cost emission on emit_usage_events BEFORE the context lookup, so both the fast path
@@ -170,28 +170,28 @@ class ReportingManager(ReportingProtocol):
         # costs-enabled run could otherwise let a later graph-only run (emit_usage_events=False) emit
         # usage events through the fast path on a colliding lookup_key (reused pipeline_run_id /
         # workflow_id).
-        if not graph_context.emit_usage_events:
+        if not trace_context.emit_usage_events:
             return
 
-        context = self._event_log_contexts.get(graph_context.lookup_key)
+        context = self._event_log_contexts.get(trace_context.lookup_key)
         if context is not None:
-            self._emit_via_registered_context(context, graph_context, tokens_usage)
+            self._emit_via_registered_context(context, trace_context, tokens_usage)
             return
 
         self._emit_usage_event_runner_fallback(
             inference_job=inference_job,
             tokens_usage=tokens_usage,
-            graph_context=graph_context,
+            trace_context=trace_context,
         )
 
     @staticmethod
     def _emit_via_registered_context(
         context: _EventLogContext,
-        graph_context: GraphContext,
+        trace_context: TraceContext,
         tokens_usage: AnyTokensUsage,
     ) -> None:
         """Fast-path emit through a context registered via set_event_log."""
-        node_id = graph_context.parent_node_id or "unknown"
+        node_id = trace_context.parent_node_id or "unknown"
         seq = context.event_log.next_sequence()
 
         event = UsageReportEvent(
@@ -224,7 +224,7 @@ class ReportingManager(ReportingProtocol):
         self,
         inference_job: InferenceJobAbstract,
         tokens_usage: AnyTokensUsage,
-        graph_context: GraphContext,
+        trace_context: TraceContext,
     ) -> None:
         """Emit through a per-process activity event log when no context was registered.
 
@@ -260,8 +260,8 @@ class ReportingManager(ReportingProtocol):
         if process_event_log is None:
             return
 
-        workflow_id = graph_context.tracer_key or graph_context.graph_id
-        node_id = graph_context.parent_node_id or "unknown"
+        workflow_id = trace_context.tracer_key or trace_context.graph_id
+        node_id = trace_context.parent_node_id or "unknown"
 
         ActivityEventLogCache.warn_once_runner_fallback_engaged(workflow_id=workflow_id, writer_id=process_event_log.writer_id)
 
