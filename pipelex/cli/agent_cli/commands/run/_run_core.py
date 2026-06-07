@@ -105,12 +105,13 @@ async def run_pipeline_core(
     # JSON file and, when with_memory is True, included in the returned dict.
     side_effects: dict[str, Any] = {}
 
-    # Cost report: surfaced as a structured `cost_report` object in the JSON output (machine-first;
-    # no Rich table on stderr like the human CLI). build_cost_summary returns None only for runs that did
-    # no reportable work (dry runs: zero tokens and zero cost), so a real run on a free/zero-price model
-    # still carries a cost_report (with total_cost 0) while a dry run carries none. It rides the side-effect
-    # envelope: on disk always, and in the stdout result under --with-memory. The markdown renderer
-    # ignores the key, so the cost report is JSON-only.
+    # Cost report: best-effort structured `cost_report` object in the JSON output (machine-first; no Rich
+    # table on stderr like the human CLI). build_cost_summary returns None for runs that did no reportable
+    # work (dry runs: zero tokens and zero cost), so a free/zero-price real run yields a summary (total_cost
+    # 0) while a dry run yields None. When a summary is produced it rides the side-effect envelope: on disk
+    # always, and in the stdout result under --with-memory; the markdown renderer ignores the key, so it is
+    # JSON-only. It is therefore absent for dry runs, --no-costs (the gate below), or an aggregation failure
+    # (the guard below skips it without failing the run) — consumers treat it as optional.
     if costs and pipe_output.tokens_usages:
         # A cost-summary failure must never fail an otherwise-successful run (mirrors the main CLI's
         # render_run_cost_report guard): CostRegistry can raise CostRegistryError (a PipelexError) during
