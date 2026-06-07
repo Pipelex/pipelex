@@ -3,7 +3,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from pipelex.graph.graph_context import GraphContext
+from pipelex.graph.trace_context import TraceContext
 from pipelex.system.telemetry.otel_context import OtelContext
 from pipelex.types import StrEnum
 
@@ -69,12 +69,24 @@ class JobMetadata(BaseModel):
     # OTel context with precomputed trace/span IDs. None when telemetry is disabled.
     otel_context: OtelContext | None = None
 
-    # GraphSpec tracing context. None when graph tracing is disabled.
-    graph_context: GraphContext | None = None
+    # Per-execution trace context carrying the shared node tree for both the graph
+    # (node/edge) and usage (cost) event streams. None when neither stream is enabled.
+    trace_context: TraceContext | None = None
 
     content_generation_job_id: str | None = None
     unit_job_id: UnitJobId | None = None
     job_category: JobCategory | None = None
+
+    # Interim ``--mock-inference`` trigger: a LIVE run (``run_mode`` stays LIVE, so operators
+    # dispatch normally) whose AI calls are faked at the cogt leaf instead of hitting a provider.
+    # Lives here — not on ``PipeRunParams`` — because ``PipeRunParams.run_mode`` does not reach the
+    # leaf, whereas ``JobMetadata`` rides into every assignment and crosses the Temporal boundary, so
+    # the leaf branch (``llm_generate.py``) and the activity body both see it. Single-writer:
+    # ``prepare_pipe_job`` off the CLI flag. The leaf emits synthetic *non-zero* usage so a cost
+    # report renders (unlike ``run_mode=DRY`` whose zero-token usage is suppressed) — this is the
+    # cheap, deterministic cross-worker cost-report validation affordance. See
+    # ``cogt/content_generation/dry_mock.py`` and ``wip/dry-run-refactor/followup-leaf-run-mode-mock.md``.
+    is_mock_inference: bool = False
 
     started_at: datetime | None = Field(default_factory=datetime.now)
     completed_at: datetime | None = None
@@ -88,7 +100,7 @@ class JobMetadata(BaseModel):
     def copy_with_update(
         self,
         otel_context: OtelContext | None,
-        graph_context: GraphContext | None = None,
+        trace_context: TraceContext | None = None,
         **updates: Any,
     ) -> "JobMetadata":
         """Create a copy of this metadata with updates applied.
@@ -97,17 +109,17 @@ class JobMetadata(BaseModel):
             otel_context: OTel context to set on the copy. Always set explicitly
                 because it's computed fresh per pipe run and should replace the parent's context
                 (even when None, e.g. in dry mode or when tracing is disabled).
-            graph_context: GraphSpec tracing context to set on the copy. If None,
-                inherits from the current context (unlike otel_context).
+            trace_context: Per-execution trace context (graph + usage streams) to set on
+                the copy. If None, inherits from the current context (unlike otel_context).
             **updates: Fields to update on the copy.
         """
-        # graph_context defaults to current value if not provided (inheritance)
-        effective_graph_context = graph_context if graph_context is not None else self.graph_context
+        # trace_context defaults to current value if not provided (inheritance)
+        effective_trace_context = trace_context if trace_context is not None else self.trace_context
         return self.model_copy(
             deep=True,
             update={
                 "otel_context": otel_context,
-                "graph_context": effective_graph_context,
+                "trace_context": effective_trace_context,
                 **updates,
             },
         )

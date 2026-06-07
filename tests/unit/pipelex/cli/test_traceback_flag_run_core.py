@@ -60,7 +60,7 @@ class TestTracebackFlagInExecuteRunInnerExcepts:
 
         # Patch get_config to provide a minimal execution config
         mock_config = mocker.MagicMock()
-        mock_config.pipelex.pipeline_execution_config.with_graph_config_overrides.return_value = mocker.MagicMock()
+        mock_config.pipelex.pipeline_execution_config.with_execution_overrides.return_value = mocker.MagicMock()
         mocker.patch("pipelex.cli.commands.run._run_core.get_config", return_value=mock_config)
 
         ctx = click.Context(click.Command("run"), obj={"traceback": True})
@@ -83,9 +83,9 @@ class TestTracebackFlagInExecuteRunInnerExcepts:
                             graph_full_data=None,
                             output_dir=OUTPUT_DIR,
                             dry_run=False,
+                            mock_inference=False,
                             mock_inputs=False,
                             library_dir=None,
-                            cost_report=None,
                         )
                     )
 
@@ -113,9 +113,9 @@ class TestTracebackFlagInExecuteRunInnerExcepts:
                     graph_full_data=None,
                     output_dir=OUTPUT_DIR,
                     dry_run=False,
+                    mock_inference=False,
                     mock_inputs=False,
                     library_dir=None,
-                    cost_report=None,
                 )
             )
 
@@ -142,9 +142,9 @@ class TestTracebackFlagInExecuteRunInnerExcepts:
                     graph_full_data=None,
                     output_dir=OUTPUT_DIR,
                     dry_run=False,
+                    mock_inference=False,
                     mock_inputs=False,
                     library_dir=None,
-                    cost_report=None,
                 )
             )
 
@@ -171,9 +171,9 @@ class TestTracebackFlagInExecuteRunInnerExcepts:
                     graph_full_data=None,
                     output_dir=OUTPUT_DIR,
                     dry_run=False,
+                    mock_inference=False,
                     mock_inputs=False,
                     library_dir=None,
-                    cost_report=None,
                 )
             )
 

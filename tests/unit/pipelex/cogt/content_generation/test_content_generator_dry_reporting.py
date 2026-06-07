@@ -29,8 +29,10 @@ class TestContentGeneratorDryReporting:
 
         mock_delegate = mocker.MagicMock()
         mock_delegate.report_inference_job.side_effect = _capture
+        # ContentGeneratorDry now delegates synthetic-job reporting to dry_mock.report_dry_llm_job,
+        # so patch get_report_delegate where it is looked up at call time (dry_mock, not this module).
         mocker.patch(
-            "pipelex.cogt.content_generation.content_generator_dry.get_report_delegate",
+            "pipelex.cogt.content_generation.dry_mock.get_report_delegate",
             return_value=mock_delegate,
         )
 

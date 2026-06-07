@@ -11,7 +11,7 @@ from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
-from tests.unit.pipelex.graph.conftest import make_graph_context
+from tests.unit.pipelex.graph.conftest import make_trace_context
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -51,7 +51,7 @@ class TestRunPipeForwardsTracerMetadata:
         job_metadata = JobMetadata(
             user_id="pytest",
             pipeline_run_id="test-run-meta",
-            graph_context=make_graph_context(graph_id="test-run-meta"),
+            trace_context=make_trace_context(graph_id="test-run-meta"),
         )
 
         await pipe.run_pipe(

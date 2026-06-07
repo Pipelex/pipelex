@@ -6,13 +6,9 @@ from pipelex import pretty_print
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.hub import get_llm_worker, get_model_deck, get_report_delegate
+from pipelex.hub import get_llm_worker, get_model_deck
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.cogt.test_data import LLMTestCases
-
-
-def test_llm_report_without_running_anything():
-    get_report_delegate().generate_report()
 
 
 @pytest.mark.llm

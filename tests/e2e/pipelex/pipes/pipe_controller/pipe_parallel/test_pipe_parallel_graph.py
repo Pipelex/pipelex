@@ -46,7 +46,7 @@ class TestPipeParallelGraph:
         """
         # Build config with graph tracing and all graph outputs enabled
         base_config = get_config().pipelex.pipeline_execution_config
-        exec_config = base_config.with_graph_config_overrides(
+        exec_config = base_config.with_execution_overrides(
             generate_graph=True,
             force_include_full_data=False,
         )
@@ -186,7 +186,7 @@ class TestPipeParallelGraph:
         """
         # Build config with graph tracing
         base_config = get_config().pipelex.pipeline_execution_config
-        exec_config = base_config.with_graph_config_overrides(
+        exec_config = base_config.with_execution_overrides(
             generate_graph=True,
             force_include_full_data=False,
         )

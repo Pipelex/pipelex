@@ -46,7 +46,7 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
         event_log = None
         wf_graph_tracer_manager: GraphTracerManager | None = None
         wf_tracer_key: str | None = None
-        graph_context = workflow_arg.job_metadata.graph_context
+        trace_context = workflow_arg.job_metadata.trace_context
 
         pipe_output: PipeOutput | None = None
 
@@ -77,37 +77,47 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
             wf_workflow_id = workflow.info().workflow_id
 
             tracing_config = get_config().pipelex.tracing_config
-            if tracing_config.is_enabled and graph_context is not None:
+            if tracing_config.is_enabled and trace_context is not None:
                 try:
                     # Use BufferingEventLog inside workflows (no I/O allowed).
                     # Events are flushed to the real backend via act_flush_trace_events.
                     event_log = BufferingEventLog()
                     wf_graph_tracer_manager = GraphTracerManager.get_or_create_instance()
                     wf_tracer_key = wf_workflow_id
-                    wf_graph_context = wf_graph_tracer_manager.open_tracer(
-                        graph_id=graph_context.graph_id,
-                        data_inclusion=graph_context.data_inclusion,
-                        event_log=event_log,
+                    wf_trace_context = wf_graph_tracer_manager.open_tracer(
+                        graph_id=trace_context.graph_id,
+                        data_inclusion=trace_context.data_inclusion,
+                        # D5: only feed the event log to the tracer when graph events are wanted. In
+                        # costs-only mode the tracer still mints node ids but emits no graph events;
+                        # usage events flow via the report delegate's set_event_log below.
+                        event_log=event_log if trace_context.emit_graph_events else None,
                         workflow_id=wf_workflow_id,
                         pipeline_run_id=pipeline_run_id,
                         tracer_key=wf_tracer_key,
+                        # Threaded in so the returned context is born with the correct flags (no emit-flag
+                        # footgun in the model_copy below).
+                        emit_graph_events=trace_context.emit_graph_events,
+                        emit_usage_events=trace_context.emit_usage_events,
                     )
-                    # Update job_metadata with the per-workflow graph_context (carries tracer_key),
-                    # but preserve parent_node_id from the incoming context so CONTAINS edges
-                    # link back to the parent workflow's controller node.
-                    wf_graph_context = wf_graph_context.model_copy(
-                        update={"parent_node_id": graph_context.parent_node_id},
+                    # Update job_metadata with the per-workflow trace_context (carries tracer_key + emit
+                    # flags), but preserve parent_node_id from the incoming context so CONTAINS edges link
+                    # back to the parent workflow's controller node.
+                    wf_trace_context = wf_trace_context.model_copy(
+                        update={"parent_node_id": trace_context.parent_node_id},
                     )
                     workflow_arg.job_metadata = workflow_arg.job_metadata.model_copy(
-                        update={"graph_context": wf_graph_context},
+                        update={"trace_context": wf_trace_context},
                     )
-                    # Configure the report delegate for usage event emission
-                    get_report_delegate().set_event_log(
-                        context_key=wf_workflow_id,
-                        event_log=event_log,
-                        workflow_id=wf_workflow_id,
-                        pipeline_run_id=pipeline_run_id,
-                    )
+                    # Configure the report delegate for usage event emission — only when cost reporting
+                    # is on. In graph-only mode no usage context is registered, so usage events are
+                    # suppressed (the runner fallback also gates on emit_usage_events).
+                    if trace_context.emit_usage_events:
+                        get_report_delegate().set_event_log(
+                            context_key=wf_workflow_id,
+                            event_log=event_log,
+                            workflow_id=wf_workflow_id,
+                            pipeline_run_id=pipeline_run_id,
+                        )
                 except Exception as exc:  # noqa: BLE001
                     # Best-effort: per-workflow tracing setup must never fail the workflow — log and continue without it.
                     workflow_log.warning(f"Failed to set up per-workflow tracing, continuing without: {exc}")
@@ -138,11 +148,13 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         finally:
-            # Close per-workflow graph tracer (collects in-memory graph spec)
+            # Close per-workflow graph tracer (collects in-memory graph spec). F1: only assign the spec
+            # when graph events were requested — in costs-only mode close_tracer returns None (teardown
+            # skips the spec build), and this guard keeps the contract explicit even if that changes.
             if wf_graph_tracer_manager is not None and wf_tracer_key is not None:
                 try:
                     graph_spec = wf_graph_tracer_manager.close_tracer(wf_tracer_key)
-                    if graph_spec is not None and pipe_output is not None:
+                    if graph_spec is not None and pipe_output is not None and trace_context is not None and trace_context.emit_graph_events:
                         pipe_output.graph_spec = graph_spec
                 except Exception as tracer_exc:  # noqa: BLE001
                     # Best-effort: tracer close in the finally block must never fail the workflow — log and continue.

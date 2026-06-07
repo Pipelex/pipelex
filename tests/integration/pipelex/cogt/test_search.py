@@ -6,7 +6,7 @@ from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.search.search_job_factory import SearchJobFactory
 from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.cogt.search.search_worker_factory import SearchWorkerFactory
-from pipelex.hub import get_model_deck, get_report_delegate
+from pipelex.hub import get_model_deck
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.cogt.test_data import SearchTestCases
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo
@@ -47,7 +47,6 @@ class TestSearch:
         for source in result.sources:
             assert source.title, "Expected source to have a title"
             assert source.url, "Expected source to have a URL"
-        get_report_delegate().generate_report()
 
     @pytest.mark.parametrize(
         ("topic", "query"),
@@ -76,4 +75,3 @@ class TestSearch:
         assert "summary" in data, "Expected 'summary' key in data"
         assert "key_points" in data, "Expected 'key_points' key in data"
         assert len(result["sources"]) > 0, "Expected at least one source"
-        get_report_delegate().generate_report()

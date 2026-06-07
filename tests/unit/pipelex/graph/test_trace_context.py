@@ -1,21 +1,21 @@
-"""Unit tests for GraphContext."""
+"""Unit tests for TraceContext."""
 
-from tests.unit.pipelex.graph.conftest import make_graph_context
+from tests.unit.pipelex.graph.conftest import make_trace_context
 
 
-class TestGraphContext:
-    """Tests for GraphContext model."""
+class TestTraceContext:
+    """Tests for TraceContext model."""
 
     def test_make_node_id(self) -> None:
         """Test node ID generation."""
-        context = make_graph_context(graph_id="ctx-test", node_sequence=5)
+        context = make_trace_context(graph_id="ctx-test", node_sequence=5)
         node_id = context.make_node_id()
 
         assert node_id == "ctx-test:node_5"
 
     def test_copy_for_child(self) -> None:
         """Test creating child context."""
-        parent = make_graph_context(graph_id="ctx-test", parent_node_id=None, node_sequence=0)
+        parent = make_trace_context(graph_id="ctx-test", parent_node_id=None, node_sequence=0)
         child = parent.copy_for_child(child_node_id="ctx-test:node_0", next_sequence=1)
 
         assert child.graph_id == "ctx-test"
@@ -27,7 +27,7 @@ class TestGraphContext:
 
     def test_copy_for_child_preserves_data_inclusion(self) -> None:
         """Test that copy_for_child preserves data_inclusion config."""
-        parent = make_graph_context(
+        parent = make_trace_context(
             graph_id="ctx-test",
             stuff_json_content=True,
             stuff_text_content=True,

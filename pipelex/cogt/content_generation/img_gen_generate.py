@@ -1,5 +1,6 @@
 from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import ImgGenAssignment
+from pipelex.cogt.content_generation.exceptions import MockInferenceUnsupportedError
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job_factory import ImgGenJobFactory
@@ -8,6 +9,9 @@ from pipelex.hub import get_img_gen_worker
 
 
 async def img_gen_single_image(img_gen_assignment: ImgGenAssignment) -> GeneratedImageRawDetails:
+    if img_gen_assignment.job_metadata.is_mock_inference:
+        error = MockInferenceUnsupportedError.for_operation("image generation (PipeImgGen)")
+        raise error
     img_gen_worker = get_img_gen_worker(img_gen_handle=img_gen_assignment.img_gen_handle)
     img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt(
         img_gen_prompt=img_gen_assignment.img_gen_prompt,
@@ -21,6 +25,9 @@ async def img_gen_single_image(img_gen_assignment: ImgGenAssignment) -> Generate
 
 
 async def img_gen_image_list(img_gen_assignment: ImgGenAssignment) -> list[GeneratedImageRawDetails]:
+    if img_gen_assignment.job_metadata.is_mock_inference:
+        error = MockInferenceUnsupportedError.for_operation("image generation (PipeImgGen)")
+        raise error
     img_gen_worker = get_img_gen_worker(img_gen_handle=img_gen_assignment.img_gen_handle)
     img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt(
         img_gen_prompt=img_gen_assignment.img_gen_prompt,

@@ -165,7 +165,7 @@ async def generate_graph_for_bundle(
     """
     graph_spec, pipe_code = await _dry_run_bundle(bundle_path, library_dirs)
 
-    execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
+    execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
         generate_graph=True,
         mock_inputs=True,
     )
@@ -235,7 +235,7 @@ async def generate_view_for_bundle(
     """
     graph_spec, pipe_code = await _dry_run_bundle(bundle_path, library_dirs)
 
-    execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
+    execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
         generate_graph=True,
         mock_inputs=True,
     )

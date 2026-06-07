@@ -333,14 +333,19 @@ class PipeParallel(PipeController):
         PipeParallel to downstream consumers.
 
         Args:
-            job_metadata: The job metadata containing graph context.
+            job_metadata: The job metadata containing trace context.
             output_stuffs: Mapping of output_name to the branch output Stuff.
         """
-        graph_context = job_metadata.graph_context
-        if graph_context is None:
+        trace_context = job_metadata.trace_context
+        if trace_context is None:
+            return
+        # E1: in costs-only mode the GraphSpec is never assembled, so skip the controller-output
+        # registration entirely — its IOSpec payloads (smart_dump / rendered_pretty_*) would be built
+        # then discarded. The node ids minted by on_pipe_start are unaffected.
+        if not trace_context.emit_graph_events:
             return
         tracer_manager = GraphTracerManager.get_instance()
-        if tracer_manager is None or graph_context.parent_node_id is None:
+        if tracer_manager is None or trace_context.parent_node_id is None:
             return
         for output_name_key, output_stuff in output_stuffs.items():
             output_spec = IOSpec(
@@ -348,13 +353,13 @@ class PipeParallel(PipeController):
                 concept=output_stuff.concept.code,
                 content_type=output_stuff.content.content_type,
                 digest=output_stuff.stuff_code,
-                data=output_stuff.content.smart_dump() if graph_context.data_inclusion.stuff_json_content else None,
-                data_text=output_stuff.content.rendered_pretty_text() if graph_context.data_inclusion.stuff_text_content else None,
-                data_html=output_stuff.content.rendered_pretty_html() if graph_context.data_inclusion.stuff_html_content else None,
+                data=output_stuff.content.smart_dump() if trace_context.data_inclusion.stuff_json_content else None,
+                data_text=output_stuff.content.rendered_pretty_text() if trace_context.data_inclusion.stuff_text_content else None,
+                data_html=output_stuff.content.rendered_pretty_html() if trace_context.data_inclusion.stuff_html_content else None,
             )
             tracer_manager.register_controller_output(
-                lookup_key=graph_context.lookup_key,
-                node_id=graph_context.parent_node_id,
+                lookup_key=trace_context.lookup_key,
+                node_id=trace_context.parent_node_id,
                 output_spec=output_spec,
             )
 
@@ -370,22 +375,22 @@ class PipeParallel(PipeController):
         are merged into the combined output.
 
         Args:
-            job_metadata: The job metadata containing graph context.
+            job_metadata: The job metadata containing trace context.
             combined_stuff: The combined output Stuff.
             branch_stuffs: Mapping of output_name to the branch output Stuff.
         """
-        graph_context = job_metadata.graph_context
-        if graph_context is None:
+        trace_context = job_metadata.trace_context
+        if trace_context is None:
             return
         tracer_manager = GraphTracerManager.get_instance()
-        if tracer_manager is None or graph_context.parent_node_id is None:
+        if tracer_manager is None or trace_context.parent_node_id is None:
             return
         branch_stuff_codes = [stuff.stuff_code for stuff in branch_stuffs.values()]
         tracer_manager.register_parallel_combine(
-            lookup_key=graph_context.lookup_key,
+            lookup_key=trace_context.lookup_key,
             combined_stuff_code=combined_stuff.stuff_code,
             branch_stuff_codes=branch_stuff_codes,
-            parallel_controller_node_id=graph_context.parent_node_id,
+            parallel_controller_node_id=trace_context.parent_node_id,
         )
 
     @override

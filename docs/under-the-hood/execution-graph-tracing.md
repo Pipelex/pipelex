@@ -22,7 +22,7 @@ Pipe Execution → GraphTracer → GraphSpec → Renderers → HTML/Mermaid
 ```
 
 !!! info "Non-Intrusive Design"
-    Graph tracing is opt-in. When disabled, a no-op tracer is used with zero overhead. The tracer is injected via `GraphContext` in `JobMetadata`, not global state.
+    Graph tracing is opt-in. When disabled, a no-op tracer is used with zero overhead. The tracer is injected via `TraceContext` in `JobMetadata`, not global state.
 
 ---
 
@@ -66,7 +66,7 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 
 # Execute with graph tracing via config
 runner = PipelexRunner(
-    execution_config=config.with_graph_config_overrides(generate_graph=True),
+    execution_config=config.with_execution_overrides(generate_graph=True),
 )
 response = await runner.execute_pipeline(
     pipe_code="my_pipe",
@@ -76,7 +76,7 @@ pipe_output = response.pipe_output
 # Dry run with graph: the same runner in DRY mode with mock inputs — no separate code path.
 dry_runner = PipelexRunner(
     pipe_run_mode=PipeRunMode.DRY,
-    execution_config=config.with_graph_config_overrides(generate_graph=True, mock_inputs=True),
+    execution_config=config.with_execution_overrides(generate_graph=True, mock_inputs=True),
 )
 response = await dry_runner.execute_pipeline(pipe_code="my_pipe")
 graph_spec = response.pipe_output.graph_spec
@@ -111,7 +111,7 @@ flowchart TB
         direction TB
         MGR["GraphTracerManager<br/>(singleton)"]
         TRACER["GraphTracer"]
-        CTX["GraphContext"]
+        CTX["TraceContext"]
         MGR --> TRACER
         TRACER --> CTX
     end
@@ -214,7 +214,7 @@ class GraphSpec(BaseModel):
 ```python
 # 1. Manager opens tracer for pipeline run
 manager = GraphTracerManager.get_or_create_instance()
-graph_context = manager.open_tracer(
+trace_context = manager.open_tracer(
     graph_id=pipeline_run_id,
     data_inclusion=config.data_inclusion,
     pipeline_ref_domain="my_domain",
@@ -224,12 +224,12 @@ graph_context = manager.open_tracer(
 # 2. Context flows through JobMetadata to each pipe
 job_metadata = JobMetadata(
     pipeline_run_id=pipeline_run_id,
-    graph_context=graph_context,
+    trace_context=trace_context,
 )
 
 # 3. Each pipe reports start/end to tracer
 node_id, child_context = manager.on_pipe_start(
-    graph_context=graph_context,
+    trace_context=trace_context,
     pipe_code="extract_text",
     pipe_type="PipeExtract",
     node_kind=NodeKind.OPERATOR,
@@ -239,7 +239,7 @@ node_id, child_context = manager.on_pipe_start(
 
 # 4. On completion, report success with output
 manager.on_pipe_end_success(
-    graph_id=graph_context.graph_id,
+    graph_id=trace_context.graph_id,
     node_id=node_id,
     ended_at=datetime.now(timezone.utc),
     output_spec=IOSpec(...),
@@ -249,20 +249,20 @@ manager.on_pipe_end_success(
 graph_spec = manager.close_tracer(pipeline_run_id)
 ```
 
-### GraphContext Propagation
+### TraceContext Propagation
 
-GraphContext is a serializable context that flows through pipe execution:
+TraceContext is a serializable context that flows through pipe execution:
 
 ```python
-class GraphContext(BaseModel):
+class TraceContext(BaseModel):
     graph_id: str                           # Unique graph identifier
     parent_node_id: str | None              # Parent pipe's node ID
     node_sequence: int                      # Counter for generating node IDs
     data_inclusion: DataInclusionConfig     # What data to capture
 
-    def copy_for_child(self, child_node_id: str, next_sequence: int) -> GraphContext:
+    def copy_for_child(self, child_node_id: str, next_sequence: int) -> TraceContext:
         """Create context for nested pipe execution."""
-        return GraphContext(
+        return TraceContext(
             graph_id=self.graph_id,
             parent_node_id=child_node_id,
             node_sequence=next_sequence,
@@ -479,7 +479,7 @@ validate_graphspec(graph_spec)
 | `pipelex/graph/graph_tracer.py` | GraphTracer implementation |
 | `pipelex/graph/graph_tracer_manager.py` | Singleton manager for tracers |
 | `pipelex/graph/graph_tracer_protocol.py` | Protocol + NoOp implementation |
-| `pipelex/graph/graph_context.py` | Serializable tracing context |
+| `pipelex/graph/trace_context.py` | Serializable tracing context |
 | `pipelex/graph/graph_analysis.py` | Pre-computed graph analysis |
 | `pipelex/graph/graph_factory.py` | Output generation factory |
 | `pipelex/graph/graph_config.py` | Configuration models |

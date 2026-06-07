@@ -1,6 +1,6 @@
 from typing import Any
 
-from pydantic import BaseModel  # noqa: TC002
+from pydantic import BaseModel, ValidationError
 from temporalio import workflow
 from temporalio.exceptions import ActivityError, ApplicationError
 from typing_extensions import override
@@ -15,6 +15,7 @@ from pipelex.cogt.content_generation.assignment_models import (
     TemplatingAssignment,
 )
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
+from pipelex.cogt.content_generation.exceptions import MockInferenceObjectFidelityError
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
@@ -43,6 +44,34 @@ from pipelex.temporal.tprl_content_generation.act_llm_generate import (
 )
 from pipelex.temporal.tprl_content_generation.act_render_page_views import act_render_page_views
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+
+
+def _revalidate_against_object_class(
+    raw_obj: BaseModel,
+    object_class: type[BaseModelTypeVar],
+    *,
+    is_mock_inference: bool,
+) -> BaseModelTypeVar:
+    """Re-validate an activity-boundary object against the original ``object_class``.
+
+    The Temporal arm of ``ContentGenerator._revalidate_against_object_class``: round-trips the
+    activity-boundary ``BaseModel`` through json (``mode="json"`` is required for fields that need json-mode
+    serialization to round-trip cleanly) into the caller's original concrete class (e.g. ``StructuredContent``).
+
+    Under ``--mock-inference`` the object was built from the schema-reconstructed class inside
+    ``act_llm_gen_object*``, which can drop invariants the original class enforces (custom validators,
+    ``json_schema_extra`` format/pattern hints datamodel-code-generator omits on round-trip). That
+    re-validation failure is re-raised as a clear :class:`MockInferenceObjectFidelityError` rather than an
+    opaque pydantic crash mid-workflow (review F2). Scoped to the mock path only — a LIVE provider's invalid
+    output keeps its existing ``ValidationError``.
+    """
+    raw_data = raw_obj.model_dump(mode="json", serialize_as_any=True)
+    if not is_mock_inference:
+        return object_class.model_validate(raw_data)
+    try:
+        return object_class.model_validate(raw_data)
+    except ValidationError as exc:
+        raise MockInferenceObjectFidelityError.for_object_class(object_class.__name__) from exc
 
 
 class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
@@ -137,10 +166,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         log.verbose(f"ContentGeneratorInWorkflow generated object direct: {obj}")
-        # Round-trip through json so the activity-boundary BaseModel becomes the caller's
-        # original concrete class (e.g. StructuredContent). ``mode="json"`` is required
-        # for fields that need json-mode serialization to round-trip cleanly.
-        return object_class.model_validate(obj.model_dump(mode="json", serialize_as_any=True))
+        return _revalidate_against_object_class(obj, object_class, is_mock_inference=job_metadata.is_mock_inference)
 
     @override
     @update_job_metadata
@@ -181,7 +207,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         log.verbose(f"ContentGeneratorInWorkflow generated object list direct: {obj_list}")
-        return [object_class.model_validate(raw_obj.model_dump(mode="json", serialize_as_any=True)) for raw_obj in obj_list]
+        return [_revalidate_against_object_class(raw_obj, object_class, is_mock_inference=job_metadata.is_mock_inference) for raw_obj in obj_list]
 
     @override
     async def make_image_content(
