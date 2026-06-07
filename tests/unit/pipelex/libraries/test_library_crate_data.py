@@ -456,3 +456,38 @@ class BlueprintSamples:
             ),
         },
     )
+
+    # --- Domain metadata merge: order-independent, omission-quiet ---
+    # Under the additive model a same-domain library is authored as one root file (full domain header)
+    # plus membership-only sibling files that declare just `domain = "meta"`. These fixtures exercise the
+    # merge in isolation (no concepts/pipes needed — the metadata merge is independent of content).
+
+    # Root: carries the full domain header (description + system_prompt).
+    META_ROOT_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/meta_root.mthds",
+        domain="meta",
+        description="Meta domain",
+        system_prompt="You are a meta assistant.",
+    )
+
+    # Membership-only sibling: declares the domain, omits description and system_prompt.
+    META_MEMBER_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/meta_member.mthds",
+        domain="meta",
+    )
+
+    # Sibling re-declaring the SAME non-empty description and system_prompt as the root (no conflict).
+    META_SAME_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/meta_same.mthds",
+        domain="meta",
+        description="Meta domain",
+        system_prompt="You are a meta assistant.",
+    )
+
+    # Sibling declaring DIFFERENT non-empty description and system_prompt — a genuine double-declaration.
+    META_CONFLICT_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/meta_conflict.mthds",
+        domain="meta",
+        description="A different meta domain",
+        system_prompt="You are a different meta assistant.",
+    )

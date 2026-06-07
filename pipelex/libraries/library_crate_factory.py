@@ -1,6 +1,5 @@
 from typing import TYPE_CHECKING, NamedTuple
 
-from pipelex import log
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
@@ -8,6 +7,7 @@ from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.libraries.collision_messages import duplicate_ref_msg
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.contract_match import contracts_match
+from pipelex.libraries.domain.domain_metadata_merge import merge_domain_metadata_field
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 
@@ -40,7 +40,7 @@ class LibraryCrateFactory:
         1. Qualify concept codes with the bundle's domain -> concept_ref keys
         2. Qualify pipe codes with the bundle's domain -> pipe_ref keys
         3. Preserve string-described concepts as-is (no normalization to ConceptBlueprint)
-        4. Collect domain metadata (first-write-wins per domain code)
+        4. Collect domain metadata (order-independent, omission-quiet merge per domain code)
         5. Track source file for each concept_ref and pipe_ref
         6. Detect duplicate refs across bundles (raise ConceptLibraryError / PipeLibraryError)
         7. Compute SHA-256 fingerprint
@@ -60,7 +60,7 @@ class LibraryCrateFactory:
             domain_code = blueprint.domain
             source = blueprint.source
 
-            # Domain metadata: first-write-wins
+            # Domain metadata: order-independent, omission-quiet merge (see merge_domain_metadata_field).
             if domain_code not in domains:
                 domains[domain_code] = DomainBlueprint(
                     source=source,
@@ -70,17 +70,28 @@ class LibraryCrateFactory:
                     main_pipe=blueprint.main_pipe,
                 )
             else:
+                # Fold this file's domain metadata into the established blueprint: an omitted field
+                # defers to whichever same-domain file declared it, so the root's header wins over
+                # membership-only siblings regardless of load order. `main_pipe` is intentionally not
+                # merged — it is dropped when the runtime Domain is built, so first-write-wins is inert.
                 existing = domains[domain_code]
-                new_description = blueprint.description or ""
-                if existing.description != new_description:
-                    log.warning(
-                        f"Domain '{domain_code}' declared with different descriptions: "
-                        f"'{existing.description}' vs '{new_description}'. Keeping the first.",
+                existing.description = (
+                    merge_domain_metadata_field(
+                        domain_code=domain_code,
+                        field_label="description",
+                        established=existing.description,
+                        incoming=blueprint.description,
+                        show_values_on_conflict=True,
                     )
-                if existing.system_prompt != blueprint.system_prompt:
-                    log.warning(
-                        f"Domain '{domain_code}' declared with different system_prompts. Keeping the first.",
-                    )
+                    or ""
+                )
+                existing.system_prompt = merge_domain_metadata_field(
+                    domain_code=domain_code,
+                    field_label="system_prompt",
+                    established=existing.system_prompt,
+                    incoming=blueprint.system_prompt,
+                    show_values_on_conflict=False,
+                )
 
             # Concepts
             if blueprint.concept is not None:

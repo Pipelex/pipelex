@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
@@ -244,3 +246,45 @@ class TestLibraryCrate:
         """Differing multiplicity (incl. `[]` vs `[N]`), a different concept, or an external-domain ref still raises."""
         with pytest.raises(PipeLibraryError, match=r"mismatched contracts"):
             LibraryCrateFactory.make_from_blueprints(blueprints=blueprints)
+
+    @pytest.mark.parametrize(
+        "blueprints",
+        [
+            # Root first, then the membership-only sibling.
+            [BlueprintSamples.META_ROOT_BUNDLE, BlueprintSamples.META_MEMBER_BUNDLE],
+            # Sibling first (empty metadata): the root must still win — order-independent.
+            [BlueprintSamples.META_MEMBER_BUNDLE, BlueprintSamples.META_ROOT_BUNDLE],
+        ],
+    )
+    def test_domain_metadata_membership_sibling_defers_to_root(self, blueprints: list[PipelexBundleBlueprint], caplog: pytest.LogCaptureFixture):
+        """A membership-only sibling (no description/system_prompt) defers to the root's header in either order, silently."""
+        with caplog.at_level(logging.WARNING):
+            crate = LibraryCrateFactory.make_from_blueprints(blueprints=blueprints)
+        assert crate.domains["meta"].description == "Meta domain"
+        assert crate.domains["meta"].system_prompt == "You are a meta assistant."
+        assert not [record for record in caplog.records if "declared with different" in record.message]
+
+    def test_domain_metadata_same_values_no_warning(self, caplog: pytest.LogCaptureFixture):
+        """Two files declaring the same non-empty description/system_prompt merge without warning."""
+        with caplog.at_level(logging.WARNING):
+            crate = LibraryCrateFactory.make_from_blueprints(
+                blueprints=[BlueprintSamples.META_ROOT_BUNDLE, BlueprintSamples.META_SAME_BUNDLE],
+            )
+        assert crate.domains["meta"].description == "Meta domain"
+        assert crate.domains["meta"].system_prompt == "You are a meta assistant."
+        assert not [record for record in caplog.records if "declared with different" in record.message]
+
+    def test_domain_metadata_conflict_keeps_first_and_warns(self, caplog: pytest.LogCaptureFixture):
+        """Two files declaring different non-empty values keep the first and warn for each field."""
+        with caplog.at_level(logging.WARNING):
+            crate = LibraryCrateFactory.make_from_blueprints(
+                blueprints=[BlueprintSamples.META_ROOT_BUNDLE, BlueprintSamples.META_CONFLICT_BUNDLE],
+            )
+        assert crate.domains["meta"].description == "Meta domain"
+        assert crate.domains["meta"].system_prompt == "You are a meta assistant."
+        messages = [record.message for record in caplog.records]
+        assert any(
+            "Domain 'meta' declared with different descriptions: 'Meta domain' vs 'A different meta domain'. Keeping the first." in message
+            for message in messages
+        )
+        assert any("Domain 'meta' declared with different system_prompts. Keeping the first." in message for message in messages)
