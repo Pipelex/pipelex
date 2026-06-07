@@ -77,6 +77,9 @@ class TestTraceContextContract:
         fake_factory.return_value.run = mocker.AsyncMock(
             return_value=PipeOutput(working_memory=WorkingMemoryFactory.make_empty(), pipeline_run_id="temporal-run-id"),
         )
+        # The blocking branch reports make_workflow_id(...) as the workflow id; stub it to a string
+        # so PipelexPipeRunOutput validation passes (this test only asserts trace_context nulling).
+        fake_factory.return_value.make_workflow_id.return_value = "ut-temporal-run-id"
 
         await run_pipe_via_bridge(
             PipelexPipeRunInput(pipe_code="fake_pipe", execution_mode=PipelexExecutionMode.TEMPORAL_BLOCKING),

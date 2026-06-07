@@ -5,7 +5,7 @@ description: "Pipelex on Temporal vs Pipelex on Mistral Workflows — both are d
 
 # Choosing a Backend
 
-Both distributed-execution backends are durable execution on Temporal underneath. They give you the same core guarantees — crash survival, activity-level retries, replay. The real choice is **which control plane you want to operate**: your own Temporal deployment, or Mistral's managed Workflows service.
+Both distributed-execution backends are durable execution on Temporal underneath. They give you the same core guarantees: crash survival, activity-level retries, and deterministic replay (on recovery the workflow re-runs from its event history, reusing already-stored activity results rather than re-executing completed activities). The real choice is **which control plane you want to operate**: your own Temporal deployment, or Mistral's managed Workflows service.
 
 ## Side by side
 

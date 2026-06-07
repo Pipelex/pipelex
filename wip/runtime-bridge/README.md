@@ -39,6 +39,15 @@ A later `/review` pass on PR #966 (the bridge + the trace-event read hardening).
 
 `make agent-check` (ruff, plxt, pyright 0/0/0, mypy) and `make agent-test` (full suite) both green.
 
+## 4. PR #969 review rounds (live PR)
+
+PR #969 is the live PR (#959 and #966 closed). Successive bot rounds (greptile / cubic / codex) each re-examined the prior round's fixes plus new surface. Round-4 dispositions:
+
+- **Keyed tracers through the bridge** (`bridge.py:179`, greptile P1 + cubic P2) — ✅ **RESOLVED (loud guard).** Full triage + the deferred structural option in [`bridge-keyed-tracer-unsupported.md`](bridge-keyed-tracer-unsupported.md). `lookup_key` is kept and a boundary guard rejects a divergent `tracer_key` so it can never silently drop graph/cost data.
+- **Temporal blocking `workflow_id`** (`bridge.py:342`, codex P2 + cubic P1) — ✅ **RESOLVED (real fix).** Blocking reported the bare `pipeline_run_id`; the workflow is actually started with `make_workflow_id(...)`, which prefixes in non-NORMAL run modes (`ut-`/`ci-`/`cc-`/`cct-`). The bridge now reports `make_workflow_id(...)` — the same id fire-and-forget returns from `start()`, single source of truth. In `RunMode.NORMAL` (prod) the prefix is empty, so behavior is unchanged there. Wiring test: `tests/unit/pipelex/runtime_bridge/test_temporal_blocking_workflow_id.py`; prefix table covered by `tests/unit/pipelex/temporal/test_workflow_id_construction.py`.
+- **trace_flush pre-dedup** (`trace_flush.py:28`, cubic P2) — ➖ **False positive.** Dedup is a **read-side** contract: `EventLogProtocol.read_events` returns events deduplicated by `(workflow_id, writer_id, event_type, sequence)`, and the DynamoDB backend is write-idempotent via PK+SK ("natural deduplication for Temporal replay re-emissions"). NDJSON appends on retry but `read_events` collapses duplicates on assembly. The proposed pre-dedup key also **omits `pipeline_run_id`**, so it would wrongly collapse identical sequences across different runs. No code change. (Related async/blocking-IO note already on file: [`trace-flush-blocking-io.md`](trace-flush-blocking-io.md).)
+- **Mistral-workflows docs** (`index.md:29` cubic P2, `choosing-a-backend.md:8` cubic P3) — ✅ **RESOLVED (accuracy).** "Automatic activity retries — each leaf operator retries independently" overclaimed: in `direct` mode the whole pipe runs in one host activity. Reworded to be mode-aware (`direct` retries as a unit; `mistral_native` retries leaves independently). The "replay" guarantee line was reworded to state replay re-runs the workflow from history reusing stored activity results, not re-executing completed activities.
+
 ## Remaining
 
-Code/docs are done. What's left is the GitHub side, per the `/review-pr-agents` skill: reply on each PR #959 thread (`✅ Fixed` / `➖ False positive`) and resolve them. No threads need to stay open — every fork was decided and applied.
+Code/docs are done. What's left is the GitHub side, per the `/review-pr-agents` skill: reply on each PR #969 thread (`✅ Fixed` / `➖ False positive`) and resolve them. No threads need to stay open — every fork was decided and applied.

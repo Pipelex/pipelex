@@ -83,6 +83,9 @@ class TestDispatch:
         fake_temporal_run = mocker.AsyncMock(return_value=fake_output)
         fake_factory = mocker.patch("pipelex.temporal.tprl_pipe.temporal_pipe_run.make_temporal_pipe_run")
         fake_factory.return_value.run = fake_temporal_run
+        # The bridge reports the actual Temporal workflow id (make_workflow_id, which prefixes by run
+        # mode), not the bare pipeline_run_id. Stub it to a known value and assert the bridge surfaces it.
+        fake_factory.return_value.make_workflow_id.return_value = "ut-temporal-run-id"
 
         result = await run_pipe_via_bridge(
             PipelexPipeRunInput(
@@ -93,8 +96,9 @@ class TestDispatch:
 
         fake_factory.assert_called_once()
         assert fake_temporal_run.await_count == 1
+        fake_factory.return_value.make_workflow_id.assert_called_once_with(pipeline_run_id="caller-run-id")
         assert result.is_completed is True
-        assert result.workflow_id == "temporal-run-id"
+        assert result.workflow_id == "ut-temporal-run-id"
 
     async def test_temporal_fire_and_forget_returns_workflow_id_without_completion(self, mocker: MockerFixture) -> None:
         fake_job = _make_fake_pipe_job(mocker=mocker, pipe_code="fake_pipe", pipeline_run_id="caller-run-id")

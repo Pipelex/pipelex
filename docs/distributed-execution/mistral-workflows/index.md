@@ -26,7 +26,7 @@ You don't rewrite your methods. The same pipes that run in-process locally run u
 ## What you get
 
 - **Durable execution** — pipe runs survive worker restarts and transient failures, resuming from history.
-- **Automatic activity retries** — each leaf operator (LLM call, extraction, image generation) retries independently.
+- **Automatic retries** — what retries depends on the execution mode: in `direct` mode the whole pipe runs inside one host activity that retries as a unit; in `mistral_native` mode each leaf operator (LLM call, extraction, image generation) runs as its own host activity and retries independently. See [Execution Modes](execution-modes.md).
 - **Streaming progress** — surface live pipe progress through the Workflows Task event API. See [Streaming Progress](streaming.md).
 - **The same methods, unchanged** — your `.mthds` bundles don't change between local, Temporal, and Mistral Workflows execution.
 
