@@ -5,7 +5,7 @@ from botocore.exceptions import BotoCoreError, ClientError, EndpointConnectionEr
 from pytest_mock import MockerFixture
 
 from pipelex.tracing.dynamodb_event_log import DynamoDBEventLog
-from pipelex.tracing.exceptions import EventLogReadError
+from pipelex.tracing.exceptions import EventLogReadError, EventLogSetupError
 
 
 class TestDynamoDBEventLogReadEvents:
@@ -49,3 +49,14 @@ class TestDynamoDBEventLogReadEvents:
 
         with pytest.raises(EventLogReadError):
             event_log.read_events("plr-paginated")
+
+    def test_init_translates_construction_error(self, mocker: MockerFixture) -> None:
+        # A botocore failure while building the boto3 client (e.g. a misconfigured region) must surface as
+        # the domain EventLogSetupError so best-effort callers (tracing assembly) degrade rather than abort.
+        construction_error = EndpointConnectionError(endpoint_url="https://dynamodb.bad-region.amazonaws.com")
+        mocker.patch("pipelex.tracing.dynamodb_event_log.boto3.resource", side_effect=construction_error)
+
+        with pytest.raises(EventLogSetupError) as exc_info:
+            DynamoDBEventLog(table_name="trace-events-test", region="bad-region")
+
+        assert exc_info.value.__cause__ is construction_error

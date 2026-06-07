@@ -21,7 +21,7 @@ from pipelex import log
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.tracing.event_log_protocol import EventLogProtocol
-from pipelex.tracing.exceptions import EventLogReadError
+from pipelex.tracing.exceptions import EventLogReadError, EventLogSetupError
 from pipelex.tracing.trace_events import AnyTraceEvent, TraceEvent
 
 try:
@@ -59,8 +59,20 @@ class DynamoDBEventLog(EventLogProtocol):
         self._writer_id = writer_id
         self._sequence: int = 0
         self._sequence_lock = threading.Lock()
-        dynamodb: Any = boto3.resource("dynamodb", region_name=self._region)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-        self._table: Any = dynamodb.Table(self._table_name)  # pyright: ignore[reportUnknownMemberType]
+        # Translate construction-time botocore failures (e.g. a misconfigured region) into our
+        # domain EventLogSetupError, mirroring the read_events boundary. Best-effort callers
+        # (tracing assembly) catch the EventLogError base and degrade rather than aborting the run.
+        from botocore.exceptions import (  # noqa: PLC0415 - optional dependency, lazy import
+            BotoCoreError,
+            ClientError,
+        )
+
+        try:
+            dynamodb: Any = boto3.resource("dynamodb", region_name=self._region)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            self._table: Any = dynamodb.Table(self._table_name)  # pyright: ignore[reportUnknownMemberType]
+        except (ClientError, BotoCoreError) as exc:
+            msg = f"Failed to construct the DynamoDB event-log client for table={self._table_name} region={self._region}: {exc}"
+            raise EventLogSetupError(msg) from exc
 
     @property
     @override

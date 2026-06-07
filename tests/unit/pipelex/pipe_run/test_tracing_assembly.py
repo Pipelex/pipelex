@@ -13,7 +13,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_run.tracing_assembly import TracingAssembly, assemble_tracing, assemble_tracing_on_output
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.system.exceptions import MissingDependencyError
-from pipelex.tracing.exceptions import EventLogReadError
+from pipelex.tracing.exceptions import EventLogReadError, EventLogSetupError
 from pipelex.tracing.trace_events import UsageReportEvent
 
 _MODULE = "pipelex.pipe_run.tracing_assembly"
@@ -162,6 +162,23 @@ class TestTracingAssembly:
         assert result.graph_assembly_error is not None
         assert result.usage_assembly_error is not None
         event_log.close.assert_called_once()
+
+    def test_make_event_log_setup_error_is_caught(self, mocker: MockerFixture) -> None:
+        """A construction-time backend failure degrades instead of aborting the run.
+
+        When the DynamoDB client cannot even be built (botocore raising inside the constructor, surfaced as
+        our domain EventLogSetupError from make_event_log), the assembly layer catches the EventLogError base
+        — covering both setup and read failures — and records an assembly error on every requested concern.
+        """
+        self._enable_tracing(mocker)
+        mocker.patch(f"{_MODULE}.make_event_log", side_effect=EventLogSetupError("DynamoDB client construction failed"))
+
+        result = assemble_tracing(pipeline_run_id="plr", assemble_graph=True, assemble_usage=True)
+
+        assert result.graph_spec is None
+        assert result.tokens_usages is None
+        assert result.graph_assembly_error is not None
+        assert result.usage_assembly_error is not None
 
     def test_read_error_only_marks_requested_concern(self, mocker: MockerFixture) -> None:
         """A costs-only read failure sets usage_assembly_error but never graph_assembly_error."""

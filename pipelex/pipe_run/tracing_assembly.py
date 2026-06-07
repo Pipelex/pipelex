@@ -22,7 +22,7 @@ from pipelex.graph.graphspec import GraphSpec, PipelineRef
 from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.tracing.event_log_factory import make_event_log
-from pipelex.tracing.exceptions import EventLogReadError
+from pipelex.tracing.exceptions import EventLogError
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
 from pipelex.tracing.usage_aggregator import UsageAggregator
 
@@ -62,10 +62,11 @@ def assemble_tracing(
 
     Tracing is observability and treated as best-effort: runtime I/O issues (the
     DynamoDB backend converts its botocore throttle / auth / transport / timeout
-    failures into ``EventLogReadError`` at the store boundary; NDJSON read failures
-    surface as ``OSError`` / ``JSONDecodeError``), malformed event data, and broken
-    tracing infrastructure (config errors, missing optional dependencies) are caught
-    and recorded in the ``*_error`` fields, not propagated. Programming bugs (KeyError,
+    failures into ``EventLogReadError`` on read and ``EventLogSetupError`` on client
+    construction — both subclasses of ``EventLogError``; NDJSON read failures surface
+    as ``OSError`` / ``JSONDecodeError``), malformed event data, and broken tracing
+    infrastructure (config errors, missing optional dependencies) are caught and
+    recorded in the ``*_error`` fields, not propagated. Programming bugs (KeyError,
     AttributeError, etc.) propagate so they surface during development.
 
     Args:
@@ -85,17 +86,18 @@ def assemble_tracing(
     if not (assemble_graph or assemble_usage):
         return result
 
-    # Best-effort read: a backend failure degrades to an *_assembly_error note rather than failing the run.
+    # Best-effort: a backend failure degrades to an *_assembly_error note rather than failing the run.
     # The DynamoDB backend converts its botocore failures (ClientError / BotoCoreError) into our
-    # EventLogReadError inside ``DynamoDBEventLog.read_events``, so the assembly layer catches that domain
-    # error and never needs to import boto3 itself; NDJSON read failures surface as OSError / JSONDecodeError.
+    # EventLogError family — EventLogSetupError on client construction (make_event_log), EventLogReadError
+    # inside ``DynamoDBEventLog.read_events`` — so the assembly layer catches the EventLogError base and
+    # never imports boto3 itself; NDJSON read failures surface as OSError / JSONDecodeError.
     try:
         event_log = make_event_log(tracing_config)
         try:
             events = event_log.read_events(pipeline_run_id)
         finally:
             event_log.close()
-    except (OSError, json.JSONDecodeError, ValidationError, PipelexConfigError, MissingDependencyError, EventLogReadError) as read_error:
+    except (OSError, json.JSONDecodeError, ValidationError, PipelexConfigError, MissingDependencyError, EventLogError) as read_error:
         message = f"Tracing assembly failed to read events for pipeline_run_id={pipeline_run_id}: {read_error}"
         log.warning(message)
         if assemble_graph:

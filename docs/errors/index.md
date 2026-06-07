@@ -171,6 +171,7 @@ classification rules, and the cross-boundary Temporal bridge.
 
 - [`EventLogError`](event-log-error.md) — Event log
 - [`EventLogReadError`](event-log-read-error.md) — Event log read
+- [`EventLogSetupError`](event-log-setup-error.md) — Event log setup
 
 ## GraphSpecError
 
