@@ -353,7 +353,7 @@ class LibraryManager(LibraryManagerAbstract):
         # Load MTHDS files as concepts only (no pipes)
         log.debug(f"Loading concepts only from MTHDS files: {[str(p) for p in valid_mthds_paths]}")
         library = self.get_library(library_id=library_id)
-        all_concepts: list[Concept] = []
+        all_blueprints: list[PipelexBundleBlueprint] = []
         for mthds_path in valid_mthds_paths:
             # Track loaded path (resolve if possible)
             try:
@@ -362,11 +362,13 @@ class LibraryManager(LibraryManagerAbstract):
                 resolved_path = mthds_path
             library.loaded_mthds_paths.append(resolved_path)
 
-            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_path)
-            concepts = self.load_concepts_only_from_blueprints(library_id=library_id, blueprints=[blueprint])
-            all_concepts.extend(concepts)
+            all_blueprints.append(PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_path))
 
-        return all_concepts
+        # Load all sibling files as a single batch so same-domain concept references resolve against
+        # the merged set regardless of directory iteration order — mirroring load_concepts_only_from_directory.
+        # A one-file-at-a-time loop would make a valid additive concepts library fail based on file order
+        # (e.g. a file whose structure references a concept declared in a sibling that loads later).
+        return self.load_concepts_only_from_blueprints(library_id=library_id, blueprints=all_blueprints)
 
     @override
     def load_from_crate(self, library_id: str, crate: LibraryCrate) -> list[PipeAbstract]:

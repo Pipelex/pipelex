@@ -239,6 +239,63 @@ address = { type = "concept", concept_ref = "shared.Address", description = "The
             assert address is not None
             assert customer is not None
 
+    def test_load_concepts_only_library_dir_sibling_cross_reference(self, load_empty_library: Callable[[], str]):
+        """Sibling files in a library dir resolve same-domain concept refs regardless of load order.
+
+        The referencing file (``a_refers.mthds``) sorts before the declaring file (``b_declares.mthds``),
+        so loading each file as its own one-file batch would validate the reference before its
+        declaration is present and fail. Batching the directory's files together resolves it.
+        """
+        load_empty_library()
+        refers_mthds = """
+domain = "libdom"
+description = "Library domain"
+
+[concept.Order]
+description = "An order"
+
+[concept.Order.structure]
+line_item = { type = "concept", concept_ref = "libdom.LineItem", description = "A line item" }
+"""
+        declares_mthds = """
+domain = "libdom"
+description = "Library domain"
+
+[concept.LineItem]
+description = "A line item"
+
+[concept.LineItem.structure]
+sku = { type = "text", description = "SKU" }
+"""
+        main_mthds = """
+domain = "main"
+description = "Main domain"
+
+[concept.Customer]
+description = "A customer"
+
+[concept.Customer.structure]
+name = { type = "text", description = "Name" }
+"""
+
+        with tempfile.TemporaryDirectory() as lib_dir, tempfile.TemporaryDirectory() as main_dir:
+            # a_refers sorts before b_declares, so a one-file-batch loader would load the
+            # reference before its declaration and raise.
+            (Path(lib_dir) / "a_refers.mthds").write_text(refers_mthds, encoding="utf-8")
+            (Path(lib_dir) / "b_declares.mthds").write_text(declares_mthds, encoding="utf-8")
+            main_mthds_path = Path(main_dir) / "main.mthds"
+            main_mthds_path.write_text(main_mthds, encoding="utf-8")
+
+            result = load_concepts_only(mthds_file_path=main_mthds_path, library_dirs=[Path(lib_dir)])
+
+            assert result.concepts[0].code == "Customer"
+
+            library_manager = get_library_manager()
+            library = library_manager.get_current_library()
+
+            assert library.concept_library.get_required_concept("libdom.Order") is not None
+            assert library.concept_library.get_required_concept("libdom.LineItem") is not None
+
     def test_load_concepts_only_with_mthds_content(self, load_empty_library: Callable[[], str]):
         """Test loading concepts from MTHDS content string."""
         load_empty_library()
