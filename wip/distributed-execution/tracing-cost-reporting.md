@@ -2,7 +2,7 @@
 
 > **Status**: Shipped — the current tracing & cost-reporting implementation (supersedes an earlier distributed-tracing design, now retired). T1 **and** T2 are now fixed; cross-worker cost reporting works end to end.
 > **Last updated**: 2026-06-07
-> **Related**: [the distributed-execution plan](README.md), [the registry-lifecycle synthesis](../registry/registry-lifecycle-synthesis.md), and [the registry feature tracker](../registry/README.md).
+> **Related**: [the distributed-execution plan](README.md), [the registry overview](../registry/cost-reporting-overview.html), and [the registry feature](../registry/README.md).
 
 This file documents what actually shipped, plus the known gaps that the plan addresses.
 
@@ -54,7 +54,7 @@ The known retry-related over-counting case (R2) is documented and pinned by `tes
 
 **Status**: Resolved. Usage now rides on `PipeOutput` exactly like the graph spec, and the submitter renders the cost report from that field — so a cross-worker run produces a single, complete report.
 
-> **Design note (as resolved):** T2/P1 was the same lifecycle as the `UsageRegistry` success-path leak — the leak was the missing *close*, T2 was the missing *replay-populate*, of one per-run cost-aggregation buffer. **Option B (locked) resolved both by removal:** usage is assembled from the trace-event stream at the end of the run and rides back on `PipeOutput.tokens_usages`; with nothing populating a submitter-side registry, the registry was deleted and the leak became structurally impossible. The unified model and the locked decision live in [`../registry/registry-lifecycle-synthesis.md`](../registry/registry-lifecycle-synthesis.md); the as-built sequencing is in [`../registry/README.md`](../registry/README.md).
+> **Design note (as resolved):** T2/P1 was the same lifecycle as the `UsageRegistry` success-path leak — the leak was the missing *close*, T2 was the missing *replay-populate*, of one per-run cost-aggregation buffer. **Option B (locked) resolved both by removal:** usage is assembled from the trace-event stream at the end of the run and rides back on `PipeOutput.tokens_usages`; with nothing populating a submitter-side registry, the registry was deleted and the leak became structurally impossible. The unified model and the locked decision are explained in [the registry overview](../registry/cost-reporting-overview.html); the feature index is [`../registry/README.md`](../registry/README.md).
 
 **As built:**
 

@@ -1,32 +1,24 @@
-# `UsageRegistry` lifecycle — leak + distributed cost aggregation
+# `UsageRegistry` leak fix + distributed cost reporting
 
-This folder tracks one topic that grew as we worked it: the lifecycle of the per-run `UsageRegistry` held in the process-global `ReportingManager`. It started as a narrow "success-path leak" bug and, on investigation, turned out to be the same lifecycle as the deferred **distributed cost-report aggregation** (the distributed-execution track's T2 / P1). The leak is the missing *close*; cost aggregation is the missing *replay-populate*. Same buffer, same lifecycle, one piece of work.
+Cost reporting was reworked from a leaky per-run, in-process `UsageRegistry` buffer into an **event-sourced artifact that rides back on `PipeOutput`**. The success-path registry leak is gone by removal; a multi-worker (Temporal) run now aggregates usage from every worker into a single end-of-run cost report. A default-on `--costs` switch decouples cost collection from `--graph` over a shared event-log transport, and `--mock-inference` validates the distributed path cheaply.
 
-**Status: IMPLEMENTED.** All design decisions were locked, then built out across the phased plan in [`../../TODOS.md`](../../TODOS.md). Phases 1–5 (emit decoupling → usage on `PipeOutput` → renderer cutover → registry removal → `--mock-inference`) are committed on `fix/For-API-update`; Phase 6 (the `temporal-e2e-validate` skill's Tier 8b) and Phase 7 (changelog + these as-built docs) landed on top. The leak is fixed by removal and cross-worker cost reporting works end to end.
+Shipped in **PR #967** on `fix/For-API-update`, with the companion rename **#968** (`GraphContext → TraceContext`, `is_generate_costs → is_generate_usage`).
 
-## Start here
+> **Scope — NDJSON only.** The cost-reporting event log is implemented and validated through **NDJSON**. The end-of-run read-back is backend-agnostic, so the code path covers DynamoDB for free — but making distributed cost reporting actually work on DynamoDB is **deferred** and is not a validation target of this work.
 
-- [`../../TODOS.md`](../../TODOS.md) — **the canonical as-built record.** The sequenced phases, every checkpoint's cold-start notes (deleted symbols, new anchors, deviations), and §7's deferred-items list. Read this first when reviewing the branch.
-- [`registry-lifecycle-synthesis.md`](registry-lifecycle-synthesis.md) — the locked design the plan implemented: the unified model, Option B (usage on `PipeOutput`), the default-on `--costs` switch folding in `--cost-report`, events as the single source.
-- [`deferred-followups.md`](deferred-followups.md) — **the deferred non-goals** of this feature (D5 costs-only tracer skip, cost-per-node correlation, A1 factory, T5, T3, `--mock-inference` coverage). The two deferred *design decisions* are in [`cost-report-deferred-decisions.md`](cost-report-deferred-decisions.md).
-- [`graphcontext-rename-to-tracecontext.md`](graphcontext-rename-to-tracecontext.md) — **DONE** (landed on branch `refactor/Renamings`, separate from #967): renamed `GraphContext` → `TraceContext` (file, type, `graph_context` attribute) plus the companion gate rename `is_generate_costs` → `is_generate_usage` (public `--costs` flag and cost-computation cluster left alone). The optional `graph_id` → `run_id` nit was deferred. The diagnosis, field taxonomy, the "graph substrate is always present" constraint that bounds a deeper split, and the as-built notes are recorded there.
-- [`usage-reporting-without-cost.md`](usage-reporting-without-cost.md) — **capability idea, low priority.** The deeper question behind the naming cleanup: should usage (token counts) be a separately-requestable output with cost as one view on top, rather than usage-emission and cost-render being bundled under one switch? Decide the capability before touching the public `--costs` flag.
+## What we built
 
-## Review records (all resolved — kept for the audit trail)
+- [`cost-reporting-overview.html`](cost-reporting-overview.html) — **the illustrated overview. Start here.** TL;DR, the two-bugs-one-lifecycle framing, before/after architecture, the shared-transport `--costs` switch, the cross-worker flow, the critical diffs, and the deferred items.
 
-- [`phase1-emit-decoupling-review.md`](phase1-emit-decoupling-review.md) — multi-angle review of the Phase 1 implementation. Its correctness/efficiency/altitude cluster (F1/F2/E1/A2 etc.) was folded into Phase 2 — see TODOS Phase 2's review-driven additions and CHECKPOINT 2's "review cluster confirmed landed".
-- [`cost-report-deferred-decisions.md`](cost-report-deferred-decisions.md) — the two **still-deferred** design decisions from the Phase 3 review (the correctness/cleanup findings #1/#2/#4/#7 were fixed in Phase 3). #3: cost reporting is coupled to `tracing_config.is_enabled` (costs-on + tracing-off ⇒ no report). #6: the agent CLI gates on the raw `costs` param while the main CLI gates on the resolved config. Both still want a deliberate call — the only open design items from this track.
-- [`phase5-mock-inference-review.md`](phase5-mock-inference-review.md) — review of the Phase 5 `--mock-inference` change. The whole punch-list (F1 hard guard for img-gen/extract/search, F2 typed object-fidelity error, F3 shared flag validator, F4/F5) **landed** — see TODOS §7 "Post-CP5 review punch-list landed (2026-06-07)". The full per-operator mock coverage and the `is_mock_inference → run_mode=DRY` re-keying remain tracked in [`../dry-run-refactor/followup-leaf-run-mode-mock.md`](../dry-run-refactor/followup-leaf-run-mode-mock.md).
+## Open follow-ups
 
-## The trail (how we got here — findings still valid, recommendations superseded by the synthesis)
-
-- [`registry-success-path-leak-brief.md`](registry-success-path-leak-brief.md) — the original brief that opened the investigation: the success-path leak, evidence, and why it is not a one-line fix.
-- [`registry-success-path-leak-assessment.md`](registry-success-path-leak-assessment.md) — verification of the brief + extended blast radius (both API endpoints leak; `/pipeline/start` is dead weight; the dead `inject_tokens_usages`; the caller-id collision; `cocode` double-counting).
-- [`registry-success-path-leak-execution-contexts.md`](registry-success-path-leak-execution-contexts.md) — the revisit through DIRECT vs Temporal: the registry is a DIRECT-mode in-process buffer, and the leak is one of two facets later unified in the synthesis.
+- [`deferred-followups.md`](deferred-followups.md) — the deliberate non-goals: the costs-only in-memory tracer skip (E1 deep half), cost-per-node correlation, the A1 `TraceContext.from_execution_config` factory, T5, T3 request-scoped tracing state, `--mock-inference` coverage, and the leftover `graph_id → run_id` rename + shelved `TraceContext` split.
+- [`cost-report-deferred-decisions.md`](cost-report-deferred-decisions.md) — two deferred **design decisions**: (#3) cost reporting is coupled to `tracing_config.is_enabled` (costs-on + tracing-off ⇒ no report); (#6) the agent CLI gates costs on the raw `costs` param while the main CLI gates on the resolved `is_generate_usage`. Both want a deliberate call.
+- [`usage-reporting-without-cost.md`](usage-reporting-without-cost.md) — capability idea (low priority): make usage (token counts) a separately-requestable output, with cost as one view layered on top.
 
 ## Companion track
 
-The cost-reporting half lives in the distributed-execution plan, where the mirrored architecture (graph-spec assembly) is documented:
+The cost-reporting half mirrors graph-spec assembly, documented in the distributed-execution feature:
 
-- [`../distributed-execution/tracing-cost-reporting.md`](../distributed-execution/tracing-cost-reporting.md) — as-built tracing & cost reporting; **T2** (cross-worker cost report assembly) is now **FIXED** via this track's Option B.
-- [`../distributed-execution/README.md`](../distributed-execution/README.md) — the priority plan; **P0.1** (`--mock-inference`) and **P1** (cost-report assembly) are both **shipped** by this work.
+- [`../distributed-execution/tracing-cost-reporting.md`](../distributed-execution/tracing-cost-reporting.md) — as-built tracing & cost reporting (T2 cross-worker cost-report assembly = **FIXED** by this work).
+- [`../distributed-execution/README.md`](../distributed-execution/README.md) — the priority plan (P0.1 `--mock-inference` and P1 cost-report assembly both **shipped** here).

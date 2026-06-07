@@ -50,7 +50,7 @@ As built:
 - The synthetic usage is **reportable non-zero** (`MOCK_INFERENCE_NB_TOKENS_BY_CATEGORY = {INPUT: 100, OUTPUT: 50}`, model `mock_inference`) — distinct from `--dry-run`'s zero-token, suppressed usage — so the cross-worker cost report actually renders. This is the durable reason `--mock-inference` ≠ `--dry-run` at the reporting layer.
 - `temporal-e2e-validate` Tier 8b runs in this mode and surfaces `wf_*__w_act_*.ndjson` + a rendered cost report deterministically.
 
-**Scope deviations (deliberate):** the leaf mock covers the **LLM leaf only**; image-gen / extract / search under `--mock-inference` fail loud with `MockInferenceUnsupportedError` (their output is stored *above* the leaf, so a leaf mock would push synthetic data through storage). `--mock-inference` is on the main `run` subcommands only (not the agent CLI). Full per-operator coverage and the eventual `is_mock_inference → run_mode=DRY` re-keying are tracked in [`../dry-run-refactor/followup-leaf-run-mode-mock.md`](../dry-run-refactor/followup-leaf-run-mode-mock.md) (B2). See [the registry tracker](../registry/README.md) and `../registry/phase5-mock-inference-review.md` for the full as-built.
+**Scope deviations (deliberate):** the leaf mock covers the **LLM leaf only**; image-gen / extract / search under `--mock-inference` fail loud with `MockInferenceUnsupportedError` (their output is stored *above* the leaf, so a leaf mock would push synthetic data through storage). `--mock-inference` is on the main `run` subcommands only (not the agent CLI). Full per-operator coverage and the eventual `is_mock_inference → run_mode=DRY` re-keying are tracked in [`../dry-run-refactor/followup-leaf-run-mode-mock.md`](../dry-run-refactor/followup-leaf-run-mode-mock.md) (B2). See [the registry feature](../registry/README.md) and its [`cost-reporting-overview.html`](../registry/cost-reporting-overview.html) for the full as-built.
 
 ---
 
@@ -68,7 +68,7 @@ Each is independently scoped and not blocking. Pick up individually as signals d
 
 ## P1 — Cross-worker cost report assembly — DONE
 
-Shipped via **Option B** (locked in [`../registry/registry-lifecycle-synthesis.md`](../registry/registry-lifecycle-synthesis.md)): rather than wire `read events → inject_tokens_usages → generate_report` onto the process-singleton manager, usage rides on `PipeOutput` exactly like the graph spec, and the submitter renders the report from that field. This resolved P1 **and** the `UsageRegistry` success-path leak in one move — with nothing populating a submitter-side registry, the registry was removed outright.
+Shipped via **Option B** (the locked design; see [the registry overview](../registry/cost-reporting-overview.html)): rather than wire `read events → inject_tokens_usages → generate_report` onto the process-singleton manager, usage rides on `PipeOutput` exactly like the graph spec, and the submitter renders the report from that field. This resolved P1 **and** the `UsageRegistry` success-path leak in one move — with nothing populating a submitter-side registry, the registry was removed outright.
 
 As built:
 

@@ -4,7 +4,7 @@
 
 ## The capability gap
 
-Today usage-emission and cost-rendering are **bundled under one switch**. The `--costs` flag (→ internal gate, see [`graphcontext-rename-to-tracecontext.md`](graphcontext-rename-to-tracecontext.md) "Companion rename") turns on usage-event emission *and* the cost report is the only deliverable. There is **no mode that gives you token counts without dollar figures.**
+Today usage-emission and cost-rendering are **bundled under one switch**. The `--costs` flag (→ internal gate `is_generate_usage`, renamed from `is_generate_costs` in #968) turns on usage-event emission *and* the cost report is the only deliverable. There is **no mode that gives you token counts without dollar figures.**
 
 But usage (token counts) is valuable on its own, not just as an input to a cost number:
 
@@ -16,7 +16,7 @@ The data is already there — `UsageReportEvent` carries `TokensUsage` (`nb_toke
 
 ## Why this is the deeper question behind the naming cleanup
 
-The companion rename in [`graphcontext-rename-to-tracecontext.md`](graphcontext-rename-to-tracecontext.md) handles *consistency* — it aligns the internal gate name to the usage stream it feeds, and deliberately leaves the public `--costs` flag and the cost domain alone. It does **not** add any capability.
+The companion rename merged in #968 (`is_generate_costs → is_generate_usage`, `GraphContext → TraceContext`) handled *consistency* — it aligned the internal gate name to the usage stream it feeds, and deliberately left the public `--costs` flag and the cost domain alone. It did **not** add any capability.
 
 This doc is the *capability* question: should usage be a first-class, separately-requestable output, with cost as one **view** layered on top? If yes, the public `--costs`-vs-`--usage` naming falls out of it naturally (usage = the measured data, cost = a priced projection). If no, keeping "cost" as the single user-facing word is correct and the naming work stops at the internal gate. **Decide the capability first; the public naming is downstream of it.**
 
