@@ -54,6 +54,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
 
     def __init__(
         self,
+        *,
         library_id: str | None = None,
         library_dirs: list[str] | None = None,
         bundle_uris: list[str] | None = None,

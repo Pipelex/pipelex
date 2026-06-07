@@ -2,7 +2,9 @@
 
 The cost report is sourced from the ``tokens_usages`` list that rides back on ``PipeOutput``
 (assembled from the trace-event stream at the end of the run), not from a live per-process
-registry. Both the main and agent CLIs call this so the two output channels behave identically.
+registry. The **main** CLI (``pipelex run``) calls this to render the console table / CSV; the
+**agent** CLI does not — it builds a machine-readable ``cost_report`` object via
+``CostRegistry.build_cost_summary`` for its JSON envelope instead (no Rich table on its surface).
 """
 
 from collections.abc import Sequence
