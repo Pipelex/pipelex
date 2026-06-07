@@ -165,12 +165,13 @@ class TestBridgeDirect:
         self,
         bridge_test_library: str,  # noqa: ARG002
     ) -> None:
-        """With a trace_context but no pipeline_run_id, the run id adopts the graph_id.
+        """With a trace_context but no pipeline_run_id, the run id adopts the lookup_key.
 
-        The caller's tracer emits events under trace_context.graph_id; tracing assembly
-        reads them back by job_metadata.pipeline_run_id. Minting a fresh id would split the
-        two and silently drop the run's graph + cost data, so the bridge adopts the graph_id.
-        An explicit pipeline_run_id still wins; absent both, a fresh id is minted.
+        The caller's tracer is registered (and later closed) under trace_context.lookup_key
+        (tracer_key or graph_id), and tracing assembly reads events by job_metadata.pipeline_run_id.
+        Minting a fresh id would split the two — dropping the run's graph + cost data and leaking
+        the tracer — so the bridge adopts the lookup_key. An explicit pipeline_run_id still wins;
+        absent both, a fresh id is minted.
         """
         data_inclusion = DataInclusionConfig(
             stuff_json_content=False,
@@ -181,12 +182,22 @@ class TestBridgeDirect:
         )
         trace_context = TraceContext(graph_id="host-graph-id", data_inclusion=data_inclusion)
 
+        # No tracer_key: lookup_key == graph_id.
         job_from_trace = build_pipe_job_from_input(
             input_payload=PipelexPipeRunInput(pipe_code=PIPE_REF, inputs={"input_text": "x"}),
             library_crate=None,
             trace_context=trace_context,
         )
         assert job_from_trace.job_metadata.pipeline_run_id == "host-graph-id"
+
+        # tracer_key set: run id is the lookup_key (tracer_key), so tracer open/close stay aligned.
+        keyed_trace_context = TraceContext(graph_id="host-graph-id", tracer_key="host-tracer-key", data_inclusion=data_inclusion)
+        job_from_tracer_key = build_pipe_job_from_input(
+            input_payload=PipelexPipeRunInput(pipe_code=PIPE_REF, inputs={"input_text": "x"}),
+            library_crate=None,
+            trace_context=keyed_trace_context,
+        )
+        assert job_from_tracer_key.job_metadata.pipeline_run_id == "host-tracer-key"
 
         job_explicit = build_pipe_job_from_input(
             input_payload=PipelexPipeRunInput(pipe_code=PIPE_REF, inputs={"input_text": "x"}, pipeline_run_id="explicit-id"),

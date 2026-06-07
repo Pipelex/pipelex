@@ -165,16 +165,18 @@ def build_pipe_job_from_input(
     """
     pipe = get_required_pipe(pipe_code=input_payload.pipe_code)
 
-    # When the caller supplies a trace_context but no explicit pipeline_run_id, derive the run id
-    # from trace_context.graph_id. The caller's already-open tracer emits events under that id
-    # (GraphTracer._event_pipeline_run_id falls back to graph_id), and tracing_assembly reads them
-    # back by job_metadata.pipeline_run_id — minting a fresh id here would split the two, so graph /
-    # usage assembly would read an empty stream and silently drop the run's graph + cost data.
-    # graph_id is "typically the pipeline run id" by contract.
+    # When the caller supplies a trace_context but no explicit pipeline_run_id, adopt the
+    # trace_context's lookup_key (= tracer_key or graph_id) as the run id. This is the single key
+    # the caller's already-open tracer is registered under in GraphTracerManager (open raises if a
+    # tracer for that key already exists) AND the key PipeRun.run closes it under (close_tracer takes
+    # pipeline_run_id). Minting a fresh id here would (a) split event emission from tracing_assembly,
+    # which reads by job_metadata.pipeline_run_id, silently dropping the run's graph + cost data, and
+    # (b) leave the tracer registered under its lookup_key — leaking it and breaking the next run that
+    # reuses the key. In the common case tracer_key is None, so lookup_key == graph_id.
     if input_payload.pipeline_run_id is not None:
         pipeline_run_id = input_payload.pipeline_run_id
     elif trace_context is not None:
-        pipeline_run_id = trace_context.graph_id
+        pipeline_run_id = trace_context.lookup_key
     else:
         pipeline_run_id = shortuuid.uuid()
 
