@@ -2,13 +2,41 @@
 
 ## [Unreleased]
 
+This cycle reworks **cost reporting** so it survives distributed execution and stops leaking. Cost now rides on the run result instead of a side buffer: a multi-worker Temporal run aggregates usage from every worker into a single end-of-run report, the success-path registry leak is gone by removal, and a new `--costs` switch decouples cost collection from `--graph`. It also brings **additive multi-file library construction**, so a same-domain `.mthds` library can be built top-down as separate, additive files.
+
+### Added
+
+- **`--costs` / `--no-costs` (default on).** `pipelex run pipe|method|bundle` gains a dedicated cost switch that emits usage tracing events and renders the end-of-run cost report. It rides the shared trace-event transport independently of `--graph`, so `--no-graph --costs` reports cost without building a graph and `--graph --no-costs` builds a graph with no cost report. It replaces the removed `--cost-report` (see Changed).
+
+- **Distributed cost reporting.** In Temporal mode, usage emitted from inference activities running on separate worker processes is now aggregated into a single cost report at the submitter. Usage is assembled from the trace-event stream onto `PipeOutput` in both direct and Temporal execution, so a cross-worker run reports its true total — previously cross-worker usage was emitted but never rendered into a report.
+
+- **`tokens_usages` on `PipeOutput`.** New `tokens_usages: list[AnyTokensUsage] | None` and `usage_assembly_error: str | None` fields, mirroring `graph_spec` / `graph_assembly_error`. Cost is now part of the run result and is exposed automatically wherever a `PipeOutput` is returned, including the Pipelex API response. Render it with `CostRegistry.generate_report(tokens_usages=...)`.
+
+- **`--mock-inference`.** A LIVE run that fakes AI calls at the inference leaf with reportable synthetic usage: operators dispatch real activities (exercising the true distributed path) but no tokens are billed, so distributed cost reporting can be validated cheaply and deterministically. Mutually exclusive with `--dry-run`. It covers the LLM leaf; image-generation / extract / search under `--mock-inference` fail loud with `MockInferenceUnsupportedError` (pointing at `--dry-run`) rather than silently calling the real provider.
+
+- **Cost report in the agent CLI JSON.** `pipelex-agent run ... --with-memory` attaches a best-effort structured `cost_report` (`{total_cost, by_model}`, real USD) to its JSON envelope when the run did reportable work and summary aggregation succeeds — treat it as optional (absent for dry runs, `--no-costs`, the API-runner path, or an aggregation failure). The agent surface stays JSON-only — no Rich table on stderr; compact mode is unchanged.
+
 ### Changed
+
+- **`--cost-report` removed, folded into `--costs`.** Breaking: `--cost-report/--no-cost-report` is gone from `run pipe|method|bundle`. Use `--costs` (default on) instead.
+
+- **Cost reporting is event-sourced; the submitter-side `UsageRegistry` is removed.** The cost report is rendered from `PipeOutput.tokens_usages`, not from an in-process registry. `ReportingProtocol` (and `ReportingNoOp`) no longer expose `open_registry` / `close_registry` / `generate_report` / `inject_tokens_usages`, and the `UsageRegistry` model is gone. Embedders that rendered cost via `get_report_delegate().generate_report()` must render from the returned `pipe_output.tokens_usages` instead.
+
+- **`is_log_costs_to_console` now defaults `true`.** With `--costs` on, the CLI prints the cost table at end of run by default (parity with `--graph` producing visible output). Per-inference-job console logging is removed — the report renders once at the end, not per call. Library embedders who don't want console output set it `false`.
+
+- **Dry runs never emit a cost report; free-model runs still do.** Suppression keys on whether the run did reportable work (any tokens or any cost), not on total cost alone: a dry run (zero tokens, zero cost) is suppressed, while a real run on a free / zero-price model (e.g. Ollama) still reports its token usage with a zero total.
+
+- **Temporal `act_assemble_graph` renamed to `act_assemble_tracing`.** It now assembles both the graph (`GraphSpec`) and usage (`tokens_usages`) from a single trace-event read, gated per concern by the run's `--graph` / `--costs` flags.
 
 - **Additive multi-file library construction.** Merge-time rules now support building a same-domain `.mthds` library as separate, additive files (forward-declared headers + separate definitions), enabling parallel top-down method construction:
   - A `PipeSignature` and a concrete pipe with the same code reconcile — the concrete pipe satisfies the signature instead of raising a duplicate-code error. `PipeSignature` works like a forward declaration ("header"), its concrete pipe like the definition; their `inputs`/`output` contracts must match. Contracts are compared by *normalized concept identity*, so a header's bare `Brief` reconciles with a definition's domain-qualified `thisdomain.Brief` (and native `Text` with `native.Text`); multiplicity is compared structurally. Two concrete pipes with the same code, or two declarations with genuinely different contracts, remain errors.
   - Concept references resolve against the merged library instead of per file, so a concept declared once can be referenced by bare code from sibling files of the same domain — whether those files are loaded in the same directory batch or across separate load batches (e.g. a concept declared in a `-L` library directory referenced from a separately-loaded bundle). A concept declared twice remains a `ConceptLibraryError`, and a reference resolvable nowhere now surfaces as a structured validation error instead of a raw traceback.
   - Domain `description` / `system_prompt` now merge order-independently across same-domain files: a membership-only file that omits them defers to whichever file declares them, instead of warning and racing on filesystem load order. The root's header therefore always wins over siblings that carry only `domain = "..."`. Two files declaring *different* non-empty values still keep the first and warn — a genuine double-declaration to resolve.
   - **`pending_signatures` on the validate result.** A successful `validate bundle` (notably a lenient `--allow-signatures` run) now reports the library-wide set of pipes still declared as `PipeSignature` — the unimplemented headers left to satisfy. Surfaced as a `pending_signatures` array on the agent-CLI / builder validate JSON envelope and as a "Pending signatures" section in markdown, so a top-down build can see exactly what remains.
+
+### Fixed
+
+- **`UsageRegistry` success-path leak.** The per-run cost registry was opened during run setup but closed only on the failure path, so every successful run leaked its registry — and in a long-lived process (e.g. the Pipelex API) reusing a `pipeline_run_id` could collide on the orphaned registry. The registry is removed entirely, so the leak is structurally impossible.
 
 ## [v0.31.0] - 2026-06-04
 

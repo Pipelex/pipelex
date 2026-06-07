@@ -1,5 +1,6 @@
 from typing import Any
 
+from pydantic import BaseModel, ValidationError
 from typing_extensions import override
 
 from pipelex import log
@@ -11,6 +12,7 @@ from pipelex.cogt.content_generation.assignment_models import (
     TemplatingAssignment,
 )
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
+from pipelex.cogt.content_generation.exceptions import MockInferenceObjectFidelityError
 from pipelex.cogt.content_generation.extract_generate import extract_gen_pages
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.content_generation.img_gen_generate import img_gen_image_list, img_gen_single_image
@@ -32,6 +34,34 @@ from pipelex.core.stuffs.page_content import PageContent
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+
+
+def _revalidate_against_object_class(
+    raw_obj: BaseModel,
+    object_class: type[BaseModelTypeVar],
+    *,
+    is_mock_inference: bool,
+) -> BaseModelTypeVar:
+    """Re-validate a leaf-generated object's data against the original ``object_class``.
+
+    ``llm_gen_object`` / ``llm_gen_object_list`` return plain ``BaseModel``s reconstructed from the JSON
+    schema; re-validating their data against the original class makes the result the proper subtype (e.g.
+    ``StructuredContent``) the caller expects.
+
+    Under ``--mock-inference`` the object was built by polyfactory from the schema-reconstructed class, which
+    can drop invariants the original class enforces (custom validators, ``json_schema_extra`` format/pattern
+    hints datamodel-code-generator omits on round-trip). A re-validation failure there is the known object-mock
+    fidelity gap, so the ``ValidationError`` is re-raised as a clear typed
+    :class:`MockInferenceObjectFidelityError` that names the class and points at ``--dry-run``. The catch is
+    scoped to the mock path only — a LIVE provider's invalid output keeps its existing ``ValidationError``.
+    """
+    raw_data = raw_obj.model_dump(serialize_as_any=True)
+    if not is_mock_inference:
+        return object_class.model_validate(raw_data)
+    try:
+        return object_class.model_validate(raw_data)
+    except ValidationError as exc:
+        raise MockInferenceObjectFidelityError.for_object_class(object_class.__name__) from exc
 
 
 class ContentGenerator(ContentGeneratorProtocol):
@@ -79,10 +109,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         )
         raw_obj = await llm_gen_object(object_assignment=object_assignment)
         log.verbose(f"{self.__class__.__name__} generated object direct: {raw_obj}")
-        # llm_gen_object returns a plain BaseModel reconstructed from the JSON schema.
-        # Validate its data against the original class so the result is a proper subtype
-        # (e.g. StructuredContent) expected by the caller.
-        return object_class.model_validate(raw_obj.model_dump(serialize_as_any=True))
+        return _revalidate_against_object_class(raw_obj, object_class, is_mock_inference=job_metadata.is_mock_inference)
 
     @override
     @update_job_metadata
@@ -105,7 +132,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         )
         raw_list = await llm_gen_object_list(object_assignment=object_assignment)
         log.verbose(f"{self.__class__.__name__} generated object list direct: {raw_list}")
-        return [object_class.model_validate(raw_obj.model_dump(serialize_as_any=True)) for raw_obj in raw_list]
+        return [_revalidate_against_object_class(raw_obj, object_class, is_mock_inference=job_metadata.is_mock_inference) for raw_obj in raw_list]
 
     @override
     async def make_image_content(

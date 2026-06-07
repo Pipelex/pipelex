@@ -78,7 +78,7 @@ Splits responsibilities so workflows and activities run in different processes:
 - `router` worker registers all workflows (`WfPipeRouter`, `WfPipeRun`, …),
   `disable_all_activities = true`.
 - `runner` worker registers all activities (`act_deliver`, `act_llm_*`,
-  `act_assemble_graph`, `act_flush_trace_events`, …), `disable_all_workflows = true`.
+  `act_assemble_tracing`, `act_flush_trace_events`, …), `disable_all_workflows = true`.
 
 This forces every activity to be picked up by a *different* Python process than the
 workflow that scheduled it. The runner process never executes `WfPipeRouter`, so it
@@ -91,7 +91,7 @@ dynamic concept defined in the bundle.
 > - `WfPipeRouter` dehydrates `pipe_output` via `prepare_for_temporal()` before
 >   returning, so workflow-level transit carries raw dicts (no class lookup).
 > - `WfPipeRun` rehydrates back on the *router* (same process that loaded the crate).
-> - Activities the runner actually executes in dry-run (`act_assemble_graph`,
+> - Activities the runner actually executes in dry-run (`act_assemble_tracing`,
 >   `act_flush_trace_events`) operate on raw event records — no dynamic class needed.
 > - `act_deliver` is **only scheduled when `delivery_assignment is not None`**
 >   (`wf_pipe_run.py:79`), and `pipelex run bundle` does not pass one.

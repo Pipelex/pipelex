@@ -6,7 +6,7 @@ from typing import Annotated
 import typer
 
 from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME, DEFAULT_INPUTS_FILE_NAME
-from pipelex.cli.commands.run._run_core import COMMAND, execute_run
+from pipelex.cli.commands.run._run_core import COMMAND, execute_run, validate_run_flag_combination
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 
 
@@ -61,6 +61,13 @@ def run_bundle_cmd(
         bool,
         typer.Option("--dry-run", help="Run pipeline in dry mode (no actual inference calls)"),
     ] = False,
+    mock_inference: Annotated[
+        bool,
+        typer.Option(
+            "--mock-inference",
+            help="Live run that fakes AI calls at the inference leaf with reportable synthetic usage. Mutually exclusive with --dry-run.",
+        ),
+    ] = False,
     mock_inputs: Annotated[
         bool,
         typer.Option("--mock-inputs", help="Generate mock data for missing required inputs (requires --dry-run)"),
@@ -81,11 +88,11 @@ def run_bundle_cmd(
             help="Concept ref (e.g. 'document_qa.ReferenceCount') used to resolve a pipe whose output is declared as 'Dynamic'.",
         ),
     ] = None,
-    cost_report: Annotated[
+    costs: Annotated[
         bool | None,
         typer.Option(
-            "--cost-report/--no-cost-report",
-            help="Override config: --cost-report forces the cost table on; --no-cost-report skips reporting entirely (no table and no CSV file).",
+            "--costs/--no-costs",
+            help="Override config: emit usage (cost) tracing events and render the end-of-run cost report. Default on.",
         ),
     ] = None,
     save_csv: Annotated[
@@ -105,14 +112,7 @@ def run_bundle_cmd(
         pipelex run bundle my_bundle.mthds --pipe my_pipe --inputs data.json
         pipelex run bundle pipeline_01/ --dry-run
     """
-    # Validate --mock-inputs requires --dry-run
-    if mock_inputs and not dry_run:
-        typer.secho(
-            "Failed to run: --mock-inputs requires --dry-run",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        raise typer.Exit(1)
+    validate_run_flag_combination(dry_run=dry_run, mock_inference=mock_inference, mock_inputs=mock_inputs)
 
     pipe_code: str | None = pipe
     bundle_path: str | None = None
@@ -183,9 +183,10 @@ def run_bundle_cmd(
         graph_full_data=graph_full_data,
         output_dir=output_dir,
         dry_run=dry_run,
+        mock_inference=mock_inference,
         mock_inputs=mock_inputs,
         library_dir=library_dir,
-        cost_report=cost_report,
+        costs=costs,
         telemetry_command_label=f"{COMMAND} bundle",
         temporal=temporal,
         dynamic_output_concept_ref=dynamic_output_concept_ref,
