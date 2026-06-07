@@ -14,7 +14,7 @@ This cycle reworks **cost reporting** so it survives distributed execution and s
 
 - **`--mock-inference`.** A LIVE run that fakes AI calls at the inference leaf with reportable synthetic usage: operators dispatch real activities (exercising the true distributed path) but no tokens are billed, so distributed cost reporting can be validated cheaply and deterministically. Mutually exclusive with `--dry-run`. It covers the LLM leaf; image-generation / extract / search under `--mock-inference` fail loud with `MockInferenceUnsupportedError` (pointing at `--dry-run`) rather than silently calling the real provider.
 
-- **Cost report in the agent CLI JSON.** `pipelex-agent run ... --with-memory` attaches a structured `cost_report` (`{total_cost, by_model}`, real USD) to its JSON envelope. The agent surface stays JSON-only — no Rich table on stderr; compact mode is unchanged.
+- **Cost report in the agent CLI JSON.** `pipelex-agent run ... --with-memory` attaches a best-effort structured `cost_report` (`{total_cost, by_model}`, real USD) to its JSON envelope when the run did reportable work and summary aggregation succeeds — treat it as optional (absent for dry runs, `--no-costs`, the API-runner path, or an aggregation failure). The agent surface stays JSON-only — no Rich table on stderr; compact mode is unchanged.
 
 ### Changed
 
