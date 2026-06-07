@@ -26,10 +26,22 @@ def ensure_pipelex_booted(
 ) -> None:
     """Boot Pipelex on first call; no-op if already initialized.
 
-    Idempotent and thread-safe. Safe to call from inside an activity; safe to
-    call from a worker entry-point before activities start. If a Pipelex
-    singleton was already created externally (e.g. via the user's worker
-    bootstrap), this function adopts that singleton without re-initializing.
+    Idempotent and thread-safe across its own callers: ``_boot_lock`` serializes
+    concurrent first-calls so ``Pipelex.make`` runs exactly once and late callers
+    re-check ``is_fully_booted()`` and adopt the result without touching a
+    half-built instance. If the host already booted Pipelex (e.g. at worker
+    startup) and that singleton is fully booted, this adopts it without
+    re-initializing — the intended pattern is to boot Pipelex before serving
+    bridge traffic.
+
+    Not supported: racing a *separate* external ``Pipelex.make()`` that is
+    mid-initialization on another thread. That external boot does not take
+    ``_boot_lock``, so within its setup window ``is_fully_booted()`` is False and
+    this helper would attempt its own ``make`` and hit
+    ``PipelexSetupError("Pipelex is already initialized")``. Standard hosts boot
+    before bringing up concurrent bridge callers, so this is not reached; the
+    residual race and a bounded-wait fix are written up in
+    ``wip/runtime-bridge/bridge-bootstrap-external-race.md``.
     """
     if Pipelex.is_fully_booted():
         return
