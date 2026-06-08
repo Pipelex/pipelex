@@ -159,6 +159,8 @@ module = [
 ]
 
 [tool.pyright]
+venvPath = "."
+venv = ".venv"
 pythonVersion = "3.11"
 include = ["pipelex", "tests"]
 exclude = [
