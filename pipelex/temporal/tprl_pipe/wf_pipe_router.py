@@ -190,9 +190,12 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
             # carries a Temporal failure untouched for the submitter to recover. The propagate-vs-
             # convert decision and the invariant it relies on live in _carries_temporal_failure.
             # Scoped to PipelexError: transient Temporal/infra errors keep Temporal's task-retry.
+            # force_non_retryable: an inline error must fail terminally, not trigger a blunt whole-
+            # workflow retry that re-runs completed inline work — retry belongs at the activity
+            # boundary. It also keeps this workflow-side conversion config-free (deterministic).
             if _carries_temporal_failure(exc):
                 raise
-            raise TemporalError.from_message_exception(exc=exc) from exc
+            raise TemporalError.from_message_exception(exc=exc, force_non_retryable=True) from exc
         finally:
             # Close per-workflow graph tracer (collects in-memory graph spec). F1: only assign the spec
             # when graph events were requested — in costs-only mode close_tracer returns None (teardown

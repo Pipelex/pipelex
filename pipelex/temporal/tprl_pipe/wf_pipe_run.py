@@ -96,7 +96,10 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
             # child's TemporalError rides the ChildWorkflowError chain); the inline path has no such
             # child failure, so without this carrier the submitter would floor to a synthesized
             # UnrecoverableWorkflowFailureError. error_report (above) still feeds the webhook directly.
-            execution_error.__cause__ = TemporalError.from_message_exception(exc=exc)
+            # force_non_retryable: here the flag does not change WfPipeRun's own retry (the raised
+            # WorkflowExecutionError drives that, like the child-failure path) — it is set to keep
+            # this workflow-side conversion config-free (deterministic), matching the router.
+            execution_error.__cause__ = TemporalError.from_message_exception(exc=exc, force_non_retryable=True)
             workflow_log.error(f"WfPipeRun inline failure: {exc}")
 
         # Step 2: Assemble full graph + usage from trace events (cross-worker)

@@ -48,11 +48,13 @@ A workflow-task failure reaches **none** of the recovery handlers above (there i
 
 ## The exact chain (Search as the worked example)
 
-1. `WfPipeRouter.run()` executes the pipe inline (`pipelex/temporal/tprl_pipe/wf_pipe_router.py:139`). Its only handler is `except ActivityError` (`:146`).
+> Pre-fix walkthrough: line numbers are dropped and present-tense handler claims are framed as the pre-fix state, since the fix (the two `except PipelexError` catch-alls + the broadened worker registration) changed exactly the code this describes.
+
+1. `WfPipeRouter.run()` executes the pipe inline (its `pipe.run_pipe` call). At the time its only handler was `except ActivityError`.
 2. A `SearchJobFailureError` (a `CogtError`/`PipelexError`) is raised inline — **not** an `ActivityError`, **not** an `ApplicationError`, **not** a `WorkflowExecutionError`. It escapes the child workflow raw.
-3. Worker registers `workflow_failure_exception_types=[WorkflowExecutionError]` only (`pipelex/temporal/temporal_task_manager.py:148`). The escaping type isn't in it → **child workflow-task failure → child retries its task**, re-executing the inline search call for real on each retry (real provider spend + log spam; no result is recorded in history because there is no activity).
-4. The child never fails terminally, so `WfPipeRun`'s `except ChildWorkflowError` (`pipelex/temporal/tprl_pipe/wf_pipe_run.py:67-82`) — the handler that would have produced a classified `WorkflowExecutionError` and fired the failure webhook — **never runs**. The parent's `await workflow.execute_child_workflow(...)` (`:59`) blocks.
-5. The submitter's `execute_workflow(...)` (`pipelex/temporal/tprl/workflow_caller.py:91`) is awaiting the parent's result with `execution_timeout = workflow_execution_timeout` (configured **1h**, `:112`). The child has **no** execution timeout of its own (deliberately omitted for replay determinism — `wf_pipe_run.py:54-57`), so the whole tree is bounded only by the parent's 1h.
+3. Worker then registered `workflow_failure_exception_types=[WorkflowExecutionError]` only (`pipelex/temporal/temporal_task_manager.py`). The escaping type isn't in it → **child workflow-task failure → child retries its task**, re-executing the inline search call for real on each retry (real provider spend + log spam; no result is recorded in history because there is no activity).
+4. The child never fails terminally, so `WfPipeRun`'s `except ChildWorkflowError` (`pipelex/temporal/tprl_pipe/wf_pipe_run.py`) — the handler that would have produced a classified `WorkflowExecutionError` and fired the failure webhook — **never runs**. The parent's `await workflow.execute_child_workflow(...)` blocks.
+5. The submitter's `execute_workflow(...)` (`pipelex/temporal/tprl/workflow_caller.py`) is awaiting the parent's result with `execution_timeout = workflow_execution_timeout` (configured **1h**). The child has **no** execution timeout of its own (deliberately omitted for replay determinism — see `WfPipeRun.run`'s child-dispatch comment), so the whole tree is bounded only by the parent's 1h.
 6. After ~1h the parent execution times out. The submitter gets a `WorkflowFailureError(TimeoutError)`; `recover_error_report` finds no `ApplicationError` report in a timeout chain and synthesizes an `UnrecoverableWorkflowFailureError` (`error_domain=RUNTIME`). The API returns **that opaque timeout** — not the `SearchJobFailureError` that was plainly in the worker logs the entire hour.
 
 Net: a sync `/execute` request hangs for up to an hour and then returns the wrong, generic error, while the worker silently burns retries. The "improve error handling so it behaves well for the API" goal is fully defeated by this single uncovered mode.
@@ -80,7 +82,7 @@ Ordered by leverage. A and C are the floor; the rest harden and prevent regressi
 **A. Workflow-level fail-safe (highest leverage).** In both `WfPipeRouter.run()` and `WfPipeRun.run()`, add a final boundary that converts an escaping pipelex **domain** exception into a terminal `WorkflowExecutionError` carrying `recover_error_report(...)` classification — mirroring the existing `ActivityError`/`ChildWorkflowError` handlers, but for the "raised inline, never went through an activity" case. This guarantees no pipe-code exception can become a silent workflow-task-retry hang again, for *any* operator.
    - **Scope it carefully.** Do **not** blanket-convert `Exception`. Workflow-task retry is the *correct* behavior for genuinely transient Temporal/infra errors and for deterministic-replay glitches — making those terminal would throw away durability's whole point. Convert pipelex **domain** errors (`PipelexError` and friends), and let Temporal-internal exceptions keep their default. Per repo standards, a workflow-root `except` is one of the two sanctioned `except Exception` sites only if you immediately re-raise as terminal *and* you've reasoned about the transient case; prefer `except PipelexError` here.
 
-**B. Broaden `workflow_failure_exception_types` to include `PipelexError`.** Cheap belt-and-suspenders behind A: even a path that slips past the catch-all fails the workflow terminally instead of hanging. (`pipelex/temporal/temporal_task_manager.py:148`.) Verify interaction with the existing `WfPipeRun` contract test `test_wf_pipe_run_failure_path` (it pins the current `[WorkflowExecutionError]` value).
+**B. Broaden `workflow_failure_exception_types` to include `PipelexError`.** Cheap belt-and-suspenders behind A: even a path that slips past the catch-all fails the workflow terminally instead of hanging. (`pipelex/temporal/temporal_task_manager.py`.) Verify interaction with the existing `WfPipeRun` contract test `test_wf_pipe_run_failure_path` (it pins the current `[WorkflowExecutionError]` value).
 
 **C. Separate, short submitter-side deadline for synchronous execution.** Give the sync `/execute` path a bounded result-wait (config, seconds-to-low-minutes) distinct from the 1h durable `workflow_execution_timeout` that the async `/start` path legitimately needs. On deadline, surface a clear, classified timeout — never leave the HTTP request hanging on the durable budget. (Submitter side: `pipelex/temporal/tprl/workflow_caller.py` + the timeout config plumbed from `WorkerConfig`.)
 
@@ -96,10 +98,12 @@ The error-handling project optimized the **fail-loud** path to a high polish but
 
 ## Reference file map (relative to pipelex repo root / your worktree root)
 
-- Workflow that runs pipe code inline, catches only `ActivityError`: `pipelex/temporal/tprl_pipe/wf_pipe_router.py:139,146`
-- Parent workflow, catches only `ChildWorkflowError`; child started without its own execution timeout: `pipelex/temporal/tprl_pipe/wf_pipe_run.py:54-82`
-- Worker `workflow_failure_exception_types=[WorkflowExecutionError]`: `pipelex/temporal/temporal_task_manager.py:148`
-- Submitter wait + 1h `execution_timeout` applied: `pipelex/temporal/tprl/workflow_caller.py:91-117`
+> Symbolic refs (clause / function names), not line numbers — the fix shifted the lines and the catch-alls below now exist, so line-pinned navigation would mislead. Where the *gap* code differs from current reality it is noted inline.
+
+- Workflow that runs pipe code inline (`WfPipeRouter.run`'s `pipe.run_pipe` call): `pipelex/temporal/tprl_pipe/wf_pipe_router.py` — its `except ActivityError` handler, now backstopped by the `except PipelexError` inline fail-safe this fix added.
+- Parent workflow (`WfPipeRun.run`), `except ChildWorkflowError` plus the `except PipelexError` inline fail-safe this fix added; child started without its own execution timeout (deliberate, for replay determinism): `pipelex/temporal/tprl_pipe/wf_pipe_run.py`
+- Worker `workflow_failure_exception_types` (now `[WorkflowExecutionError, PipelexError]`; was `[WorkflowExecutionError]` pre-fix): `pipelex/temporal/temporal_task_manager.py`
+- Submitter wait + 1h `execution_timeout` applied (`WorkflowExecutor.execute_workflow`): `pipelex/temporal/tprl/workflow_caller.py`
 - Timeout config source (`workflow_execution_timeout`, `run_timeout`, `rpc_timeout`): `pipelex/temporal/config_temporal.py` (`WorkerConfig`) + `pipelex/pipelex.toml` temporal section (~line 489)
 - Activity error conversion (works for activity-dispatched leaves only): `pipelex/temporal/tprl/activity_error_boundary.py`
 - Submitter-side report recovery (terminal-failure path only): `pipelex/temporal/tprl/temporal_error.py` (`recover_error_report`)

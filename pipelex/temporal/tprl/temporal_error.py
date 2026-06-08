@@ -229,19 +229,32 @@ class TemporalError(ApplicationError):
         )
 
     @classmethod
-    def from_message_exception(cls, exc: PipelexError) -> Self:
-        """Convert a Pipelex exception raised inside an activity into a ``TemporalError``.
+    def from_message_exception(cls, exc: PipelexError, force_non_retryable: bool = False) -> Self:
+        """Convert a Pipelex exception into a ``TemporalError``.
 
-        When the exception's ``__cause__`` chain carries a ``CogtError`` with an
-        ``InferenceErrorCategory``, retryability flows from ``category.is_retryable``
-        — recovered even when wrapper exceptions (``PipeRunError``, ``PipeRouterError``,
-        ``PipelineExecutionError``) sit on top. A chain with no categorized ``CogtError``
-        falls back to the configured ``non_retryable_error_types`` class-name list.
+        **Activity-side (default).** Retryability is derived from the ``__cause__``
+        chain: a ``CogtError`` carrying an ``InferenceErrorCategory`` sets it from
+        ``category.is_retryable`` — recovered even when wrapper exceptions
+        (``PipeRunError``, ``PipeRouterError``, ``PipelineExecutionError``) sit on
+        top. A chain with no categorized ``CogtError`` falls back to the configured
+        ``non_retryable_error_types`` class-name list.
+
+        **Workflow-side inline (``force_non_retryable=True``).** The inline fail-safe
+        in ``WfPipeRouter`` / ``WfPipeRun`` converts a domain error raised directly in
+        workflow code. It forces ``non_retryable=True`` for two reasons: an inline
+        error must fail the workflow *terminally* rather than trigger a blunt whole-
+        workflow retry that re-runs already-completed inline work (retry belongs at
+        the activity boundary, where it is scoped and observable); and forcing the
+        flag short-circuits ``_is_non_retryable`` — the only ``get_config()`` read in
+        this method — so the conversion stays deterministic inside workflow code (a
+        config-derived decision is replay-fragile across deploys). The report's own
+        ``retryable`` field is config-free and preserved either way, as informational
+        metadata.
         """
         message = exc.message
         error_type = exc.__class__.__name__
         error_report = exc.to_error_report().to_dict()
-        non_retryable = cls._is_non_retryable(exc=exc, error_type=error_type)
+        non_retryable = force_non_retryable or cls._is_non_retryable(exc=exc, error_type=error_type)
         if non_retryable:
             cls._log_critical(f"Non retryable error from PipelexError[{error_type}]: {message}")
         else:
