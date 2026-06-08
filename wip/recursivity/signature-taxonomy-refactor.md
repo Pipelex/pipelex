@@ -1,6 +1,6 @@
 # Refactor: `PipeSignature` is a blueprint-layer contract, not an executable pipe type
 
-> **Status:** proposed, pre-merge. Raised by review of the additive-multi-file PR: *"I disagree that it's a new type of pipe. Pipe signatures are a substrate of the `PipeAbstract`. Each pipe has a pipe signature."* This plan implements the agreed reconciliation.
+> **Status:** ✅ implemented. Raised by review of the additive-multi-file PR: *"I disagree that it's a new type of pipe. Pipe signatures are a substrate of the `PipeAbstract`. Each pipe has a pipe signature."* This plan implemented the agreed reconciliation. All gates green (`make tb`, `make agent-check`, `make agent-test`); MTHDS schema regeneration produced **no diff** (the eviction is invisible to the generated schema — `pipe_category` is stripped from pipe defs and `type` is unchanged). **Step 1b (class-based `is_controller`) was deliberately skipped** — see [As-built notes](#as-built-notes).
 
 ## The decision
 
@@ -196,13 +196,20 @@ The headline feature reads truer. `library_crate_factory._reconcile_pipe_collisi
 
 ## Checklist
 
-- [ ] Step 1 — `is_signature` class-based (abstract + blueprint + overrides); (1b) `is_controller`
-- [ ] Step 2 — `PIPE_SIGNATURE` out of `PipeType` + `PipeCategory` (+ match arms)
-- [ ] Step 3 — base validators tolerate the signature tag + `None` category + early-return
-- [ ] Step 4 — factory branch
-- [ ] Step 5 — signature `pipe_category` → `None` (keep blueprint `exclude=True`)
-- [ ] Step 6 — `output_renderer` guard
-- [ ] Step 7 — delete `signature_for` guards, keep the field
-- [ ] Step 8 — spec `validate_pipe_type` widened
-- [ ] ⛳ `make tb` + schema regen + `make agent-check` + `make agent-test` green
-- [ ] Step 9 — docs / CHANGELOG / TODOS reframed
+- [x] Step 1 — `is_signature` class-based (abstract + blueprint + overrides); (1b) `is_controller` — **1b skipped on purpose** (see below)
+- [x] Step 2 — `PIPE_SIGNATURE` out of `PipeType` + `PipeCategory` (+ match arms)
+- [x] Step 3 — base validators tolerate the signature tag + `None` category + early-return
+- [x] Step 4 — factory branch
+- [x] Step 5 — signature `pipe_category` → `None` (keep blueprint `exclude=True`)
+- [x] Step 6 — `output_renderer` guard
+- [x] Step 7 — delete `signature_for` guards, keep the field
+- [x] Step 8 — spec `validate_pipe_type` widened
+- [x] ⛳ `make tb` + schema regen (no diff) + `make agent-check` + `make agent-test` green
+- [x] Step 9 — docs / CHANGELOG / TODOS reframed
+
+## As-built notes
+
+- **Step 1b (class-based `is_controller`) skipped — deliberate.** The plan flagged 1b as optional cleanliness, not correctness. Doing it would turn `PipeCategory.is_controller` and `PipeCategory.is_controller_by_str` into dead code (their only remaining caller is `PipeAbstract.is_controller`), and removing that dead code would diverge from Step 2's "edit the `is_controller` match arm" instruction. Keeping the base `PipeAbstract.is_controller` reading `PipeCategory.is_controller_by_str(self.pipe_category)` is already correct for a signature: `pipe_category` is now `None`, `PipeCategory(None)` raises `ValueError`, and the `except ValueError → False` path returns `False`. So `is_controller` stays correct, the two `PipeCategory` helpers stay legitimately used, and there is no dead code. The keystone (`is_signature` by class) is fully implemented. Revisit 1b only if `is_controller` ever needs to stop touching `pipe_category` for another reason.
+- **Allowlist expressed honestly.** A module-level `PIPE_SIGNATURE_TYPE_TAG = "PipeSignature"` in `pipe_blueprint.py` is the single source of the signature tag; `validate_pipe_type` on `PipeBlueprint`, `PipeAbstract`, and `PipeSpec` each check `value not in PipeType.value_list() and value != PIPE_SIGNATURE_TYPE_TAG`, and their error messages list `[*PipeType.value_list(), PIPE_SIGNATURE_TYPE_TAG]` so the signature tag shows up as a legal value.
+- **`signature_for` rejection is now structural.** Both `reject_signature_for_pipe_signature` guards (blueprint + spec) were deleted; the field is typed `PipeType | None` and `PipeSignature` is no longer a `PipeType`, so Pydantic rejects `signature_for = "PipeSignature"` on its own. Tests were updated to pass the raw string and assert `ValidationError`.
+- **Tests updated to the new model:** `test_pipe_blueprint_signature_enums.py` now locks in the eviction (members removed, tag not in either enum, coercion raises); `test_pipe_abstract_signature_surface.py` asserts the base descriptor returns `False` even for a stub whose `pipe_category == "PipeSignature"` (identity is class-based); `test_pipe_signature.py` asserts `type == "PipeSignature"` and `pipe_category is None`.

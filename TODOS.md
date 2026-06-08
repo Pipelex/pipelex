@@ -28,6 +28,8 @@ When two declarations of the same `pipe_ref` collide in the library merge:
 
 Whenever at least one side is a signature, the two contracts **must agree**. Agreement is **normalized concept identity**, not raw-string equality: a header's bare `Brief` and a definition's `thisdomain.Brief` denote the same concept, as do `Text` and `native.Text`; structural multiplicity (`[]` vs `[1]`) stays distinct. Mismatched contracts are an error. Input *names* must match exactly (they are variable names, not concepts).
 
+Conceptually this is **a contract fulfilled by an implementation**, not a swap between two pipe *types*: after the taxonomy eviction (below), `PipeSignature` is not a `PipeType`, so reconciliation keys off `blueprint.is_signature` (a class fact) — never an enum tag. `contracts_match()` is unchanged.
+
 - `pipelex/libraries/library_crate_factory.py` — `_reconcile_pipe_collision` + the merge loop. Operates on a small `PipeDeclaration` (blueprint + source) record.
 - `pipelex/libraries/contract_match.py` — **NEW.** `contracts_match()` + `_canonical_concept_spec()`: normalization-for-identity only (NOT refinement substitutability — that stays the dry-run's job).
 - `pipelex/libraries/collision_messages.py` — **NEW.** `duplicate_ref_msg()`: shared same-file vs cross-file message for duplicate concept/pipe.
@@ -114,10 +116,10 @@ The pipelex runtime support is complete here. The recursive **orchestrator** (`m
 
 ## CHANGELOG (under `[Unreleased]`)
 
-The `[Unreleased]` entry in `CHANGELOG.md` covers the additive multi-file construction (reconciliation, cross-file concept resolution, domain-metadata merge, `pending_signatures`).
+The `[Unreleased]` entry in `CHANGELOG.md` covers the additive multi-file construction (reconciliation, cross-file concept resolution, domain-metadata merge, `pending_signatures`) and the `PipeSignature` taxonomy eviction (removed `PipeType`/`PipeCategory.PIPE_SIGNATURE`).
 
 ---
 
-## Proposed pre-merge design change
+## Pre-merge design change — DONE
 
-Review flagged that `PipeSignature` should not be a peer pipe type — it's a contract substrate of `PipeAbstract`, not a sibling of `PipeLLM`/`PipeSequence`. Plan to evict it from the `PipeType`/`PipeCategory` taxonomy (keeping it a dry-run shim, keeping `signature_for` for mthds-plugins): [`signature-taxonomy-refactor.md`](wip/recursivity/signature-taxonomy-refactor.md). To settle before merge.
+Review flagged that `PipeSignature` should not be a peer pipe type — it's a contract substrate of `PipeAbstract`, not a sibling of `PipeLLM`/`PipeSequence`. **Landed:** `PipeSignature` is evicted from the executable taxonomy. `PipeType.PIPE_SIGNATURE` and `PipeCategory.PIPE_SIGNATURE` are removed; `is_signature` is now a class fact (base returns `False`, `PipeSignature` / `PipeSignatureBlueprint` override to `True`) instead of an enum read; a signature carries `type = "PipeSignature"` with `pipe_category = None`, admitted by the shared validators via a `PIPE_SIGNATURE_TYPE_TAG` allowlist entry. It stays a `PipeAbstract` subclass (the dry-run shim) and keeps `signature_for` for mthds-plugins (its `reject_signature_for_pipe_signature` guards are gone — the rejection is now structural, since `PipeSignature` is no longer a `PipeType` the field can coerce). As-built plan: [`signature-taxonomy-refactor.md`](wip/recursivity/signature-taxonomy-refactor.md).

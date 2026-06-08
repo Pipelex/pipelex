@@ -7,12 +7,14 @@ from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBluepri
 
 class TestPipeSignatureBlueprintValidator:
     def test_blueprint_rejects_signature_for_pipe_signature(self) -> None:
+        # `PipeSignature` is no longer a `PipeType` member, so Pydantic cannot coerce the string into
+        # `signature_for` — the rejection is now structural, not a custom validator.
         with pytest.raises(ValidationError):
             PipeSignatureBlueprint(
                 description="A signature cannot stand in for itself.",
                 inputs={"doc": "Text"},
                 output="Text",
-                signature_for=PipeType.PIPE_SIGNATURE,
+                signature_for="PipeSignature",  # type: ignore[arg-type]
             )
 
     def test_blueprint_accepts_signature_for_pipe_llm(self) -> None:
