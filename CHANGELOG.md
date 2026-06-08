@@ -6,6 +6,8 @@ This cycle reworks **cost reporting** so it survives distributed execution and s
 
 ### Added
 
+- **`--temporal` / `--no-temporal` on `pipelex validate`.** The `bundle`, `pipe`, and `method` validate subcommands (and `validate --all`) gain the same boot override `run` already had — it sets `temporal.is_enabled` for the process. Today the validation sweep always runs in-process regardless of backend (it scopes its own in-process router), so the flag does not change *what* validation does; it is the lever for booting validation under a Temporal-enabled hub — e.g. to verify the sweep stays in-process and never dispatches nested controller sub-pipes to Temporal. It is also forward-looking: once validation can run as a standalone Temporal activity, this flag becomes the switch that dispatches the sweep through that activity.
+
 - **`--costs` / `--no-costs` (default on).** `pipelex run pipe|method|bundle` gains a dedicated cost switch that emits usage tracing events and renders the end-of-run cost report. It rides the shared trace-event transport independently of `--graph`, so `--no-graph --costs` reports cost without building a graph and `--graph --no-costs` builds a graph with no cost report. It replaces the removed `--cost-report` (see Changed).
 
 - **Distributed cost reporting.** In Temporal mode, usage emitted from inference activities running on separate worker processes is now aggregated into a single cost report at the submitter. Usage is assembled from the trace-event stream onto `PipeOutput` in both direct and Temporal execution, so a cross-worker run reports its true total — previously cross-worker usage was emitted but never rendered into a report.
