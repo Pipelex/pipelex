@@ -2,13 +2,14 @@ from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
-from temporalio.exceptions import ActivityError, ApplicationError
+from temporalio.exceptions import ActivityError, ApplicationError, FailureError
 from typing_extensions import override
 
 with workflow.unsafe.imports_passed_through():
     from kajson.class_registry import ClassRegistry
     from kajson.kajson_manager import KajsonManager
 
+    from pipelex.base_exceptions import PipelexError
     from pipelex.config import get_config
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.graph.graph_tracer_manager import GraphTracerManager
@@ -20,6 +21,29 @@ with workflow.unsafe.imports_passed_through():
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
     from pipelex.temporal.tprl_pipe.act_flush_trace_events import FlushTraceEventsArg, act_flush_trace_events
     from pipelex.tracing.buffering_event_log import BufferingEventLog
+
+
+def _carries_temporal_failure(exc: BaseException) -> bool:
+    """True when ``exc`` or any error in its ``__cause__`` chain is a Temporal ``FailureError``.
+
+    Such an exception already originated from a Temporal boundary — an activity
+    (``ActivityError`` → a details-carrying ``ApplicationError``) or a nested child
+    workflow (``ChildWorkflowError``, wrapped by ``TemporalPipeRouter`` as a generic
+    ``WorkflowExecutionError``). It is therefore already terminal and its structured
+    classification is recoverable from the chain by ``recover_error_report`` at the
+    submitter. The inline fail-safe must leave it alone rather than re-wrap it, which
+    would flatten the recoverable report to a generic one. A genuine inline domain
+    error (raised by pipe code that never crossed a Temporal boundary) carries no such
+    failure and is the only case the fail-safe converts.
+    """
+    node: BaseException | None = exc
+    seen: set[int] = set()
+    while node is not None and id(node) not in seen:
+        if isinstance(node, FailureError):
+            return True
+        seen.add(id(node))
+        node = node.__cause__
+    return False
 
 
 @workflow.defn(name="wf_pipe_router")
@@ -147,6 +171,30 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
             if isinstance(exc.cause, ApplicationError):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
+        except PipelexError as exc:
+            # Fail-safe floor for the "raised inline, never went through an activity" case.
+            # A pipelex domain error raised directly in workflow code (e.g. an operator that runs
+            # its leaf inline instead of dispatching it as an activity) is neither an ActivityError
+            # nor an ApplicationError, so without this clause it would escape WfPipeRouter as a
+            # non-terminal *workflow-task* failure — which Temporal retries indefinitely, turning a
+            # clear failure into a silent, resource-burning hang that only surfaces (as the wrong,
+            # generic error) after the workflow execution timeout.
+            #
+            # Only GENUINE inline errors are converted. An escaping PipelexError that already
+            # carries a Temporal failure in its chain (e.g. a nested TemporalPipeRouter
+            # child-dispatch that wrapped a failed sub-pipe as WorkflowExecutionError) is already
+            # terminal — WorkflowExecutionError and PipelexError are both in the worker's
+            # workflow_failure_exception_types — and its rich classification is recoverable from
+            # the chain by recover_error_report at the submitter. Re-wrapping it via
+            # from_message_exception would flatten that to a generic report, so let it propagate
+            # untouched. A genuine inline error carries no Temporal failure: convert it to a
+            # terminal TemporalError (an ApplicationError) carrying the structured ErrorReport,
+            # exactly as the activity boundary does, so it surfaces immediately and classified.
+            # Deliberately scoped to PipelexError: transient Temporal/infra errors and
+            # deterministic-replay glitches are not domain errors and keep Temporal's task-retry.
+            if _carries_temporal_failure(exc):
+                raise
+            raise TemporalError.from_message_exception(exc=exc) from exc
         finally:
             # Close per-workflow graph tracer (collects in-memory graph spec). F1: only assign the spec
             # when graph events were requested — in costs-only mode close_tracer returns None (teardown

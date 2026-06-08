@@ -10,6 +10,7 @@ from temporalio.worker.workflow_sandbox import (
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.hub import get_class_registry
 from pipelex.system.runtime import WorkerMode, runtime_manager
@@ -135,17 +136,27 @@ class TemporalTaskManager(TaskManager):
             workflows=workflows,
             activities=activities,
             workflow_runner=workflow_runner,
-            # Register WorkflowExecutionError as a workflow-failure type so a
-            # workflow re-raising it (e.g. WfPipeRun re-raising the
-            # execution_error from a failed child) surfaces as a terminal
-            # workflow failure instead of being treated as an
-            # unhandled-exception workflow task failure (which retries
-            # indefinitely). WfPipeRun and TemporalPipeRouter both catch
-            # ChildWorkflowError from their workflow.execute_child_workflow
-            # calls and wrap it in-place as WorkflowExecutionError; without
-            # this registration Temporal cannot tell that re-raise apart from
-            # a programmer bug.
-            workflow_failure_exception_types=[WorkflowExecutionError],
+            # Treat these as terminal workflow failures instead of letting them
+            # fall through to Temporal's default "unhandled exception = workflow
+            # TASK failure", which retries the workflow task indefinitely — a
+            # silent, resource-burning hang that only surfaces (as the wrong,
+            # generic error) after the workflow execution timeout.
+            #
+            # - WorkflowExecutionError: WfPipeRun and TemporalPipeRouter catch
+            #   ChildWorkflowError from their workflow.execute_child_workflow
+            #   calls and wrap it in-place as WorkflowExecutionError; this
+            #   registration makes that re-raise end the workflow terminally
+            #   instead of looking like a programmer bug Temporal should retry.
+            # - PipelexError: the fail-safe floor. Any pipelex *domain* error that
+            #   escapes workflow code without having been converted to a terminal
+            #   failure (an operator running its leaf inline, an inline setup
+            #   error) fails the workflow terminally instead of hanging. The
+            #   workflow-level catch-alls in WfPipeRouter / WfPipeRun convert the
+            #   common paths to a richer TemporalError(ApplicationError) first;
+            #   this is the backstop for any path they don't cover. Scoped to
+            #   PipelexError on purpose — transient Temporal/infra errors are not
+            #   domain errors and keep Temporal's default task-retry behavior.
+            workflow_failure_exception_types=[WorkflowExecutionError, PipelexError],
             max_cached_workflows=profile.max_cached_workflows,
             max_concurrent_workflow_tasks=profile.max_concurrent_workflow_tasks,
             max_concurrent_activities=profile.max_concurrent_activities,
