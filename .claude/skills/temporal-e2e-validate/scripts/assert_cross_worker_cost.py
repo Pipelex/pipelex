@@ -29,7 +29,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-_INPUT_KEYS = ("input", "input_joined")
+_INPUT_KEYS = ("input",)
 _OUTPUT_KEYS = ("output",)
 
 
@@ -66,7 +66,7 @@ def _csv_token_totals(reports_dir: Path) -> tuple[int, int] | None:
     total_output = 0
     with latest.open(encoding="utf-8") as csv_file:
         for row in csv.DictReader(csv_file):
-            total_input += int(float(row.get("nb_tokens_input_joined") or row.get("nb_tokens_input") or 0))
+            total_input += int(float(row.get("nb_tokens_input_joined") or 0))
             total_output += int(float(row.get("nb_tokens_output") or 0))
     return total_input, total_output
 

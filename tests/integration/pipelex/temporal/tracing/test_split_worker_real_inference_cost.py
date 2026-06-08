@@ -47,8 +47,6 @@ from tests.integration.pipelex.temporal.tracing.test_data import SequenceTracing
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_output import PipeOutput
 
-_FAKE_RUNNER_MODEL_NAME = "split_runner_fake"
-
 
 @activity.defn(name="act_llm_gen_text")
 async def _real_runner_act_llm_gen_text(llm_assignment: LLMAssignment) -> str:
@@ -147,7 +145,6 @@ class TestSplitWorkerRealInferenceCost:
             for tokens_usage in tokens_usages
         ), "Real provider responses must carry non-zero input and output token counts"
         model_names = {tokens_usage.inference_model_name for tokens_usage in tokens_usages}
-        assert _FAKE_RUNNER_MODEL_NAME not in model_names, "Real inference must report a real model handle, not the fake sentinel"
         assert all(model_names), "Every usage record must name its real model handle"
 
         aggregated = CostRegistry.aggregate_costs(tokens_usages=tokens_usages)

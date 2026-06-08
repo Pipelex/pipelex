@@ -1,10 +1,12 @@
 # Cost-reporting test additions — two cleanup follow-ups
 
-**Status:** 🧹 Optional cleanups, no correctness impact. Surfaced by a code review of the distributed-cost-reporting test additions (see [`distributed-cost-reporting-test-coverage.md`](distributed-cost-reporting-test-coverage.md), "Resolution (as-built)"). The review found **no bugs**; these are cosmetic dead-code / weak-assertion items safe to defer or batch with the next touch of these files.
+**Status:** 🧹 Optional cleanups, no correctness impact. Both items resolved. Surfaced by a code review of the distributed-cost-reporting test additions (see [`distributed-cost-reporting-test-coverage.md`](distributed-cost-reporting-test-coverage.md), "Resolution (as-built)"). The review found **no bugs**; these were cosmetic dead-code / weak-assertion items.
 
 ---
 
-## 1. Dead CSV fallback + never-present NDJSON key in the skill helper
+## 1. Dead CSV fallback + never-present NDJSON key in the skill helper ✅ DONE
+
+**Resolution:** Verified against `pipelex/cogt/usage/cost_registry.py` and applied the fix. `INPUT_JOINED` is written into an `nb_tokens_by_category` dict only inside `complete_cost_report` (which `pop`s `INPUT` first), and the CSV is written exclusively from completed reports — so the column is always `nb_tokens_input_joined`, never `nb_tokens_input`. Raw NDJSON `UsageReportEvent`s only ever carry `input`. Dropped the `nb_tokens_input` CSV fallback and set `_INPUT_KEYS = ("input",)`. (Note: a `NB_TOKENS_INPUT = "nb_tokens_input"` enum value does exist in `llm_report.py`, but it is never emitted into a record, so the conclusion holds.)
 
 **File:** `.claude/skills/temporal-e2e-validate/scripts/assert_cross_worker_cost.py`
 

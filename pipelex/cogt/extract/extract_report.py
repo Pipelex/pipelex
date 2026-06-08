@@ -12,7 +12,6 @@ class ExtractTokenCostReportField(StrEnum):
     MODEL_TYPE = "model_type"
     EXTRACT_NAME = "extract_name"
     PLATFORM_EXTRACT_ID = "platform_extract_id"
-    NB_TOKENS_INPUT = "nb_tokens_input"
     NB_TOKENS_INPUT_CACHED = "nb_tokens_input_cached"
     NB_TOKENS_INPUT_NON_CACHED = "nb_tokens_input_non_cached"
     NB_TOKENS_INPUT_JOINED = "nb_tokens_input_joined"

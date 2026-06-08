@@ -12,7 +12,6 @@ class SearchTokenCostReportField(StrEnum):
     MODEL_TYPE = "model_type"
     SEARCH_NAME = "search_name"
     PLATFORM_SEARCH_ID = "platform_search_id"
-    NB_TOKENS_INPUT = "nb_tokens_input"
     NB_TOKENS_INPUT_CACHED = "nb_tokens_input_cached"
     NB_TOKENS_INPUT_NON_CACHED = "nb_tokens_input_non_cached"
     NB_TOKENS_INPUT_JOINED = "nb_tokens_input_joined"
