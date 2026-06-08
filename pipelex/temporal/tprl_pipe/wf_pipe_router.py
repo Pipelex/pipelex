@@ -2,13 +2,14 @@ from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
-from temporalio.exceptions import ActivityError, ApplicationError
+from temporalio.exceptions import ActivityError, ApplicationError, FailureError
 from typing_extensions import override
 
 with workflow.unsafe.imports_passed_through():
     from kajson.class_registry import ClassRegistry
     from kajson.kajson_manager import KajsonManager
 
+    from pipelex.base_exceptions import PipelexError, iter_cause_chain
     from pipelex.config import get_config
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.graph.graph_tracer_manager import GraphTracerManager
@@ -20,6 +21,39 @@ with workflow.unsafe.imports_passed_through():
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
     from pipelex.temporal.tprl_pipe.act_flush_trace_events import FlushTraceEventsArg, act_flush_trace_events
     from pipelex.tracing.buffering_event_log import BufferingEventLog
+
+
+def _carries_temporal_failure(exc: BaseException) -> bool:
+    """True when ``exc`` or any error in its ``__cause__`` chain is a Temporal ``FailureError``.
+
+    This is the hinge of the inline fail-safe: ``True`` ⇒ leave ``exc`` untouched,
+    ``False`` ⇒ convert it with ``from_message_exception``. Carrying a Temporal
+    ``FailureError`` *is* the definition of "already a terminal Temporal failure",
+    so it is the predicate, not a proxy for a narrower type.
+
+    The reachable case it protects: a controller pipe (e.g. ``PipeSequence``) runs a
+    sub-pipe as a child workflow; the sub-pipe fails; ``TemporalPipeRouter`` wraps the
+    ``ChildWorkflowError`` as ``WorkflowExecutionError`` (``temporal_pipe_router.py``),
+    which escapes the parent's ``pipe.run_pipe`` into the ``except PipelexError`` below.
+    That ``WorkflowExecutionError`` carries no report of its own — the rich leaf
+    classification lives deeper, in the child's ``ApplicationError.details``, reachable
+    only by ``recover_error_report``'s ``__cause__`` walk at the submitter (which
+    normalizes ``ChildWorkflowError.cause`` into the chain). A worker-side
+    ``from_message_exception`` here would flatten it, because ``to_error_report``'s
+    enrichment stops at the non-``PipelexError`` ``ChildWorkflowError``. So we propagate.
+
+    Invariant this relies on: disciplined ``raise … from`` usage. The one way it can
+    misattribute is "recover-then-rechain" — pipe code that handles a side failure and
+    then raises a *fresh, unrelated* error ``from`` the one it already recovered. The
+    fresh error would then carry that side ``FailureError`` and propagate untouched,
+    surfacing the side failure's classification instead of its own. Don't do that: a
+    fresh error must only be chained ``from`` the error that actually caused it.
+
+    Walks via ``iter_cause_chain`` (single cyclic-guard). See
+    ``docs/under-the-hood/error-model.md`` "Workflow-Level Fail-Safe Floor" for the
+    design narrative.
+    """
+    return any(isinstance(node, FailureError) for node in iter_cause_chain(exc))
 
 
 @workflow.defn(name="wf_pipe_router")
@@ -147,6 +181,21 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
             if isinstance(exc.cause, ApplicationError):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
+        except PipelexError as exc:
+            # Inline fail-safe floor: a domain error raised inline in workflow code (never via an
+            # activity) is neither an ActivityError nor an ApplicationError, so without this clause
+            # it escapes as a non-terminal workflow-task failure and retries indefinitely — a silent
+            # hang (see docs/under-the-hood/error-model.md "Workflow-Level Fail-Safe Floor"). Convert
+            # a genuine inline error to a terminal, classified TemporalError; leave one that already
+            # carries a Temporal failure untouched for the submitter to recover. The propagate-vs-
+            # convert decision and the invariant it relies on live in _carries_temporal_failure.
+            # Scoped to PipelexError: transient Temporal/infra errors keep Temporal's task-retry.
+            # force_non_retryable: an inline error must fail terminally, not trigger a blunt whole-
+            # workflow retry that re-runs completed inline work — retry belongs at the activity
+            # boundary. It also keeps this workflow-side conversion config-free (deterministic).
+            if _carries_temporal_failure(exc):
+                raise
+            raise TemporalError.from_message_exception(exc=exc, force_non_retryable=True) from exc
         finally:
             # Close per-workflow graph tracer (collects in-memory graph spec). F1: only assign the spec
             # when graph events were requested — in costs-only mode close_tracer returns None (teardown
