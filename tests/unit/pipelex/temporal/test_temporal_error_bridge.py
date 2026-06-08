@@ -156,6 +156,42 @@ class TestTemporalErrorBridge:
         assert temporal_error.error_report is not None
         assert temporal_error.error_report["error_type"] == "CogtError"
 
+    def test_force_non_retryable_is_deterministic_and_preserves_report_retryable(
+        self,
+        log_mocks: tuple[Any, Any],
+        mocker: MockerFixture,
+    ) -> None:
+        """The inline workflow-side conversion forces ``non_retryable=True``.
+
+        Workflow-inline callers (``WfPipeRouter`` / ``WfPipeRun``) pass
+        ``force_non_retryable=True`` so an inline domain error fails the workflow
+        terminally instead of triggering a blunt whole-workflow retry that re-runs
+        already-completed inline work — retry belongs at the activity boundary. The
+        forced path must also be config-free: it short-circuits the
+        ``_is_non_retryable`` decision (the only ``get_config()`` read in the
+        conversion), so the conversion stays deterministic for Temporal replay. The
+        report keeps its own ``retryable`` field as informational metadata,
+        independent of the Temporal retry flag.
+        """
+        _ = log_mocks  # silences the bridge log helpers; severity is asserted elsewhere
+        # A genuinely retryable error: a TRANSIENT CogtError reports retryable=True.
+        exc = CogtError("transient boom", error_category=InferenceErrorCategory.TRANSIENT)
+
+        # Default (activity-side) path still decides retryability normally — retryable here.
+        default_side = TemporalError.from_message_exception(exc=exc)
+        assert default_side.non_retryable is False
+
+        # Forced (workflow-inline) path skips the retry-decision logic entirely: no config read.
+        decision_spy = mocker.spy(TemporalError, "_is_non_retryable")
+        forced = TemporalError.from_message_exception(exc=exc, force_non_retryable=True)
+        decision_spy.assert_not_called()
+
+        # The Temporal retry flag is terminal regardless of the error's own retryability ...
+        assert forced.non_retryable is True
+        # ... while the report preserves the informational retryable metadata (still True).
+        assert forced.error_report is not None
+        assert forced.error_report["retryable"] is True
+
     @pytest.mark.parametrize(
         ("error_category", "expected_non_retryable"),
         [
