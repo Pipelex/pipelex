@@ -1,10 +1,12 @@
 # Temporal fail-safe — secondary review follow-ups
 
-**Status:** 🔎 open backlog. Lower-priority findings from the code review of the fail-safe floor that landed on `fix/Temporal-failsafe`. None blocks the merge. **Resolved in the guard-hardening session and removed from this doc:** Finding 4 (catch-all asymmetry — won't fix, harmless: a guarded branch in `WfPipeRun` would be dead code) and Finding 11 (rationale duplication — deduped onto `_carries_temporal_failure`'s docstring + `error-model.md`). Finding 12's comment overstatement was fixed there too; only its product question survives below. **Resolved in the review-agent triage session** (independently re-flagged by codex + cubic): Finding 2 — the inline conversions now force `non_retryable=True` (deterministic + terminal); see its resolution banner below. What remains open: a contract decision (Finding 3), and small cleanups (5, 8, 10).
+> **Gated on Temporal productionization — parked, not abandoned.** The silent-hang hole this branch closed is *done and shipped*; everything below is latent because Temporal is not in production (Findings 13/14 have no trigger until workflows actually run; C/D/F are pre-prod hardening; 3/12 are decisions, not bugs). **Do not execute piecemeal now** — run it as one focused pass when Temporal is scheduled to ship, with the system exercisable so the fixes are verifiable rather than speculative. The only "now" exception: fold the opportunistic one-liners (5, 8, 10) in *if* their file is touched for another reason.
+
+**Status:** 🔎 open backlog. Lower-priority findings from the code review of the fail-safe floor that landed on `fix/Temporal-failsafe`. None blocks the merge. **Resolved in the guard-hardening session and removed from this doc:** Finding 4 (catch-all asymmetry — won't fix, harmless: a guarded branch in `WfPipeRun` would be dead code) and Finding 11 (rationale duplication — deduped onto `_carries_temporal_failure`'s docstring + `error-model.md`). Finding 12's comment overstatement was fixed there too; only its product question survives below. **Resolved in the review-agent triage session** (independently re-flagged by codex + cubic): Finding 2 — the inline conversions now force `non_retryable=True` (deterministic + terminal); see its resolution banner below. What remains open: a contract decision (Finding 3), small cleanups (5, 8, 10), and two findings added by a later `/review` pass — **Finding 13** (the `_carries_temporal_failure` predicate floors inline errors chained from a report-less `FailureError` — deepens the Finding 1 fragility analysis) and **Finding 14** (a pre-existing replay-determinism hazard: `build_search_attributes` reads config on the recorded child-start command).
 
 **Companion docs:** the fix is described in [`temporal-error-handling-failsafe-gap.md`](./temporal-error-handling-failsafe-gap.md); the landed behavior in [`track-temporal-integration.md`](./track-temporal-integration.md). The four highest-value findings (the guard's correctness, consolidation, reuse, and missing test) are in [`temporal-failsafe-guard-hardening.md`](./temporal-failsafe-guard-hardening.md) — **read its Background section first**; this doc assumes that context.
 
-**Finding numbers** (2, 3, 5, 8, 10, 12) are kept from the original review. Findings 4 and 11 were resolved and removed (see Status).
+**Finding numbers** (2, 3, 5, 8, 10, 12) are kept from the original review. Findings 4 and 11 were resolved and removed (see Status). **Findings 13 and 14** were added by a later `/review` pass (adversarial subagent + verification); they continue this doc's numeric scheme. (The gap doc owns the `A`–`F` letters for its fix-plan items, so there is deliberately no letter/number overlap across the two docs.)
 
 ---
 
@@ -106,8 +108,48 @@ The fail-safe floor makes a pipelex **domain** error raised *inline in workflow 
 
 ---
 
+## Finding 13 — `_carries_temporal_failure` floors inline errors chained from a non-`ApplicationError` `FailureError` (deepens Finding 1)
+
+> **Provenance:** surfaced by a `/review` adversarial pass and verified against the live Temporal SDK hierarchy. Latent today, not a merge blocker. Extends [`temporal-failsafe-guard-hardening.md`](./temporal-failsafe-guard-hardening.md) Finding 1 with a third fragility mode its analysis did not consider.
+
+**Where:** `wf_pipe_router.py:56` (`_carries_temporal_failure`), gating the conversion at `:198`.
+
+**What:** the predicate is `any(isinstance(node, FailureError) for node in iter_cause_chain(exc))`. Verified: `TimeoutError`, `CancelledError`, `TerminatedError`, `ActivityError`, and `ChildWorkflowError` are **all** `FailureError` subclasses but **not** `ApplicationError` — and only `ApplicationError` carries the `details` payload where the structured `ErrorReport` rides. So an inline `PipelexError` chained `from` a bare Temporal failure that carries no recoverable report — e.g. pipe code that awaits an activity, the activity times out, and the code does `raise SomeDomainError(...) from timeout_exc` — returns `True` and is **propagated untouched**. At the submitter, `recover_error_report` walks `__cause__` for a report-bearing `ApplicationError`, finds none (a `TimeoutError`/`CancelledError` has no `details`), and synthesizes an `UnrecoverableWorkflowFailureError` — **dropping the domain error's own `error_type` / message** that `from_message_exception` (the convert branch) would have preserved. The guard's docstring assumes the chain's `FailureError` is a report-carrier ("the rich leaf classification lives deeper, in the child's `ApplicationError.details`"); that assumption is false for non-`ApplicationError` `FailureError`s.
+
+**Why it matters:** this is the exact classification-fidelity loss the error-handling project exists to prevent — surfacing neither the timeout nor the domain error, but a generic synthesized report. **Latent today:** the one real inline-leaf path (`content_generator_in_workflow.py`) raises `TemporalError.from_app_error(...)` — an `ApplicationError`-with-report — so it is classified correctly, and genuine inline errors (Search-missing-activity, crate-load, hydration) carry no `FailureError` and convert correctly. The gap opens the moment any operator catches a Temporal timeout/cancel and re-raises a *plain* `PipelexError` `from` it inline.
+
+**Why the obvious fix regresses (and what to do instead):** tightening the predicate to "carries a recoverable report" (`isinstance(node, ApplicationError) and error_report_dict_from_details(node.details) is not None`) **breaks the reachable case** Finding 1 protects: the controller-sub-pipe-as-child-workflow failure escapes as `WorkflowExecutionError` → `ChildWorkflowError`, whose leaf report lives in `ChildWorkflowError.cause` (recovered only by the submitter's `.cause`-normalizing walk), **not** in `__cause__` — so a worker-side `__cause__`-only report check would not find it and would wrongly convert. This is third confirmation that the broad-vs-narrow predicate is fundamentally fragile, and it strengthens the case for **Finding 1's deferred option (b)**: stop using the guard as the load-bearing decision — instead always mint a `TemporalError` but have `from_message_exception` *prefer an already-present report in the chain* over re-deriving, so flattening is impossible regardless of the `from`/`__cause__`/`.cause` shape.
+
+**Open questions:**
+
+1. Adopt Finding 1 option (b) (report-preserving conversion, guard demoted)? That subsumes both this finding and Finding 1's original two modes.
+2. Until then, is it worth a narrow guard tweak that treats a chain whose only `FailureError`s are report-less (`TimeoutError`/`CancelledError`/`TerminatedError`) as convert-eligible, while still propagating `ChildWorkflowError`/report-bearing `ApplicationError`? (More surface, partial fix — option (b) is cleaner.)
+3. Add a `True`-branch test variant where the chain carries a report-less `FailureError`, asserting the domain error's own classification survives (it currently does **not**).
+
+---
+
+## Finding 14 — `build_search_attributes` reads `get_config()` on the recorded child-start command (replay-determinism hazard, pre-existing)
+
+> **Provenance:** surfaced by a `/review` adversarial pass; verified that `build_search_attributes` reads config. **Pre-existing — not introduced by this branch** (`pipelex/temporal/tprl/observability.py` is untouched here). Filed here per the repo's "flag pre-existing bugs" principle because it directly undercuts the fail-safe's anti-hang purpose. Better tracked in a dedicated Temporal wip doc if one is opened.
+
+**Where:** `observability.py:104` (`config = get_config().temporal.search_attributes`) feeding `wf_pipe_run.py:63` and `temporal_pipe_router.py` (`search_attributes=build_search_attributes(pipe_job)` as an argument to `execute_child_workflow`).
+
+**What:** the `search_attributes` value is part of the recorded `StartChildWorkflowExecution` command. Because `build_search_attributes` derives it from `get_config().temporal.search_attributes` (`.enabled`, `.attributes`) — process/deploy state, not workflow input — editing that config while a workflow is live would make a later replay re-derive a *different* attribute set on the child-start command → a Temporal non-determinism mismatch. This contradicts the same file's load-bearing comment (`wf_pipe_run.py:50-57`), which deliberately keeps the child-dispatch command "a pure function of the workflow input" precisely so "replay after a config edit" cannot diverge — the comment enumerates `execution_timeout` / `retry_policy` / `task_queue` but overlooks that `search_attributes` is on the same command and is config-derived. The function's docstring calls itself pure because it "reads everything off `pipe_job`," which is inaccurate.
+
+**Why it matters:** a config-edit-during-live-workflow → stuck/failed replay is the exact silent-hang class the fail-safe exists to eliminate, sitting unguarded on the dispatch path. **Latent:** narrow trigger (a long-running workflow surviving a worker redeploy with edited search-attribute config) and Temporal is not yet in production.
+
+**Open questions:**
+
+1. Stamp the resolved search attributes onto `pipe_job`/`PipeRunArg` at submit time (submitter-side, before the durable boundary) so the workflow reads them off its input instead of `get_config()` — matching how the file already handles `execution_timeout` / `retry_policy` / `task_queue`.
+2. Or confirm (with a versioning/patch strategy) that search-attribute config is frozen for a workflow's lifetime, and correct the `build_search_attributes` docstring's "pure" claim either way.
+3. Does `build_static_summary` (also on the command) have any config dependency? (Spot-checked: no `get_config()` read — appears input-only, but confirm.)
+
+---
+
 ## Suggested handling
 
 - **Finding 2** is resolved (see its banner — inline conversions forced non-retryable + deterministic). **Finding 3** remains a genuine decision — surface it before the next Temporal release; it may be answered by the deferred **C/D** follow-ups in the gap doc.
 - **Findings 5 and 8** are cheap standalone cleanups (the Finding-6 shared helper that would have absorbed them was not built — see the hardening doc's light-touch resolution). Best folded in opportunistically the next time `wf_pipe_run.py` is touched; **5** is the higher-value of the two.
 - **Finding 10** is a one-line cleanup (drop the redundant entry, or keep it for intent) — batch it whenever `temporal_task_manager.py` is next edited. **Finding 12**'s comment is already fixed; only its product question lingers.
+- **Finding 13** is the higher-value of the two new ones: it converts Finding 1 from "resolved — kept the broad predicate" to "the broad predicate has a third, unhandled failure mode," and points at Finding 1 option (b) (report-preserving conversion) as the resolution that subsumes all of it. Decide 13 and Finding 1 together, before the next Temporal release. Latent today, so not urgent — but it is a correctness gap, not a cosmetic one.
+- **Finding 14** is pre-existing and out of this branch's scope; fold it into a dedicated Temporal wip doc (or fix it at submit time per its open question 1) when `observability.py` / the child-dispatch path is next touched.

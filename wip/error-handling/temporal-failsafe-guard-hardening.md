@@ -1,5 +1,7 @@
 # Temporal fail-safe — harden & consolidate the inline-error guard
 
+> **Cold start:** this doc is resolved rationale, read-only (findings 1/6/7/9, all handled). The live open backlog is in [`temporal-failsafe-review-followups.md`](./temporal-failsafe-review-followups.md); the directory index is [`README.md`](./README.md). Note: Finding 1's "resolved — kept the broad predicate" conclusion is *reopened* by Finding 13 in the followups doc (a third fragility mode the analysis here missed).
+
 **Status:** ✅ **RESOLVED** on `fix/Temporal-failsafe`. All four findings handled; the chain-walk and fail-safe suites are green. Summary of decisions (the original analysis is preserved below for the record):
 
 - **Finding 7 (done).** Extracted one cycle-guarded `iter_cause_chain(exc)` primitive in `base_exceptions.py`; the five hand-rolled `__cause__` walks (`_carries_temporal_failure`, `find_inference_error_category_in_chain`, `_find_error_report_dict`, `_message_from_exc`, and the cycle check in `_enrich_error_report_from_cause` — the doc missed this fifth one) now delegate to it.

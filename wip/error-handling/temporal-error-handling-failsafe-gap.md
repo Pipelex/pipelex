@@ -1,5 +1,7 @@
 # The real defect: the Temporal integration can hang silently instead of failing loud
 
+> **Cold start:** this doc is the *why* — resolved rationale, read-only. The live open backlog is in [`temporal-failsafe-review-followups.md`](./temporal-failsafe-review-followups.md); the directory index is [`README.md`](./README.md). Read here only when you need the rationale behind the fix or the deferred-hardening list (C/D/F) below.
+
 **Status:** ✅ **FIXED** (fixes A + B + E landed on `fix/Temporal-failsafe`). The fail-safe floor is in place; the silent-hang hole is closed. Deferred hardening (C, D, F) is tracked under "Deferred follow-ups" below — none of it is required to close the hole.
 **Severity:** high — this is a class of bug, not one bug. The missing Search activity (see [`search-operator-missing-temporal-activity.md`](./search-operator-missing-temporal-activity.md)) is only the first trigger. Any future code path where an exception escapes pipe execution without having been converted to a Temporal terminal failure would hang the runner the same way. Fixing Search closes the instance; the fix below closes the hole.
 **Companion brief:** read the Search brief first for the concrete instance; this one is about why the system let that instance become a silent hang.
