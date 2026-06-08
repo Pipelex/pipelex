@@ -28,8 +28,8 @@ from temporalio.client import Client as TemporalClient
 
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_run.pipe_job import PipeJob
+from pipelex.runtime_bridge.primitives.pipe_run_arg import PipeRunArg
 from pipelex.temporal.temporal_hub import get_task_manager
-from pipelex.temporal.tprl_pipe.pipe_run_arg import PipeRunArg
 from pipelex.temporal.tprl_pipe.wf_pipe_run import WfPipeRun
 from tests.integration.pipelex.temporal.library_crate.helpers import rehydrate_pipe_output
 from tests.integration.pipelex.temporal.tracing.helpers import inject_trace_context

@@ -8,6 +8,7 @@ from portkey_ai import (
 )
 from typing_extensions import override
 
+from pipelex.config import get_config
 from pipelex.plugins.gateway.gateway_constants import GatewayOpenAISdkVariant
 from pipelex.plugins.gateway.gateway_exceptions import GatewayFactoryError
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
@@ -40,6 +41,9 @@ class GatewayResponsesFactory(OpenAIResponsesFactory):
             # not the OpenAI Authorization header. The SDK rejects an empty api_key since
             # 2.34.0, so we pass a non-empty placeholder; the gateway ignores it.
             api_key="unused-auth-via-portkey-headers",
+            # Tier 1 transport retry: set explicitly from config rather than inheriting the SDK default,
+            # so a transport_max_retries override applies to the gateway LLM path too (matches PortkeyResponsesFactory).
+            max_retries=get_config().cogt.transport_max_retries,
             default_headers=createHeaders(
                 api_key=api_key,
                 debug=is_debug_enabled,

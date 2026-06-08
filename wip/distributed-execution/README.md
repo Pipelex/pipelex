@@ -14,6 +14,9 @@ This folder is the **distributed-execution track**: running MTHDS methods as Tem
 - [temporal-exception-model-revamp.md](temporal-exception-model-revamp.md) — deferred proposal to reparent workflow exceptions onto `ApplicationError`.
 - [schema-reconstruction-hardening.md](schema-reconstruction-hardening.md) — deferred hardening of cross-process Pydantic-schema reconstruction.
 - [unit-testing-worker-sandbox-validation.md](unit-testing-worker-sandbox-validation.md) — deferred bug: a sandboxed worker can't boot under `--is-unit-testing` because the registered test workflows fail temporalio sandbox validation.
+- [bridge-changes-sibling-repo-reconciliation.md](bridge-changes-sibling-repo-reconciliation.md) — **OPEN handoff:** how the `_bridge` dev-merge changed the runtime-bridge surface (param renames, deleted graph-assembly primitive, `graph_context→trace_context`, #967/#968) and what the downstream `pipelex-mistralai-workflows` + `_workflows` repos need reconciled. Greps/diagnosis not yet done.
+- [temporal-e2e-validate-skill.md](temporal-e2e-validate-skill.md) — validation status of the `/temporal-e2e-validate` skill and the Step 9 (queue-options) skill bugs patched in its `queue-options-battery.md`. Full dry + live run all green; open follow-ups are the vestigial `act_jinja2_gen_text` removal and a stale Mode 1 "Known xfails" note.
+- [mistral-workflows/](mistral-workflows/) — sub-track for landing the `pipelex-mistralai-workflows` plugin (the MISTRAL_NATIVE backend) onto current `dev`. Its [README](mistral-workflows/README.md) is the hub; verdict is split — land the bridge, hold the `mistralai` 1.x→2.x bump (blocked on instructor PR #2298). Carries the two ready-to-paste keep-alive prompts.
 
 ---
 

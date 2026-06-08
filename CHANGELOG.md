@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-This cycle reworks **cost reporting** so it survives distributed execution and stops leaking. Cost now rides on the run result instead of a side buffer: a multi-worker Temporal run aggregates usage from every worker into a single end-of-run report, the success-path registry leak is gone by removal, and a new `--costs` switch decouples cost collection from `--graph`.
+This cycle reworks **cost reporting** so it survives distributed execution and stops leaking. Cost now rides on the run result instead of a side buffer: a multi-worker Temporal run aggregates usage from every worker into a single end-of-run report, the success-path registry leak is gone by removal, and a new `--costs` switch decouples cost collection from `--graph`. It also extracts the **framework-agnostic runtime bridge** so any host runtime — not just Mistral Workflows — can embed Pipelex through one boundary.
 
 ### Added
 
@@ -17,6 +17,8 @@ This cycle reworks **cost reporting** so it survives distributed execution and s
 - **Cost report in the agent CLI JSON.** `pipelex-agent run ... --with-memory` attaches a best-effort structured `cost_report` (`{total_cost, by_model}`, real USD) to its JSON envelope when the run did reportable work and summary aggregation succeeds — treat it as optional (absent for dry runs, `--no-costs`, the API-runner path, or an aggregation failure). The agent surface stays JSON-only — no Rich table on stderr; compact mode is unchanged.
 
 ### Changed
+
+- **Mistral Workflows integration extracted into a dedicated package.** The optional `pipelex[mistralai-workflows]` extra and the `pipelex.plugins.mistralai_workflows.*` modules have been removed from `pipelex`. The Mistral Workflows integration now ships separately as its own package — coming soon; install and import details will follow once it publishes. The framework-agnostic runtime-bridge core (boundary types, `run_pipe_via_bridge`, `PipelexExecutionMode`, `ensure_pipelex_booted`) has been promoted from `pipelex.plugins.mistralai_workflows.*` to `pipelex.runtime_bridge.*` so any host runtime — not just Mistral Workflows — can embed Pipelex. No behavior changes; activities, boundary types, and execution modes are identical.
 
 - **`--cost-report` removed, folded into `--costs`.** Breaking: `--cost-report/--no-cost-report` is gone from `run pipe|method|bundle`. Use `--costs` (default on) instead.
 
@@ -185,7 +187,7 @@ This release hardens Pipelex at its edges. The headliners: a full **error-handli
 
 - **Pipeline run chain semantics shift (breaking, behavioral).** Because the Workflow ID is now derived from `pipeline_run_id`, callers that pass a stable `pipeline_run_id` to `PipelineFactory.make_pipeline(pipeline_run_id=...)` and re-execute now land on the same Temporal Workflow Execution Chain (with a fresh `run_id` per execution under the SDK-default `ALLOW_DUPLICATE` reuse policy). The previous behavior produced a fresh workflow_id per execution by accident, via the truncated session id and random shortuuid components — not by design. This is now documented behavior, not a bug.
 
-- **Child Workflow ID separator change (breaking).** Child workflow ids use `/` instead of `-` as the separator. Examples: the fixed-role `wf_pipe_router` child of `wf_pipe_run` is `{parent}/pipe-router`; a dynamic sub-pipe spawned by a router is `{parent}/{pipe_code}-{8-hex-chars}` (the 8 hex chars come from `workflow.uuid4()` for replay-safety). Operational tooling parsing the nested-id format must update.
+- **Child Workflow ID separator (breaking).** Child workflow ids use `_` as the separator (never `/`), so an id can be reused verbatim as an S3 key or file name without creating spurious path segments. Examples: the fixed-role `wf_pipe_router` child of `wf_pipe_run` is `{parent}_pipe-router`; a dynamic sub-pipe spawned by a router is `{parent}_{pipe_code}-{8-hex-chars}` (the 8 hex chars come from `workflow.uuid4()` for replay-safety). Operational tooling parsing the nested-id format must update.
 
 - **Activity ID change (breaking).** Pipelex no longer customizes `activity_id`. The Temporal Python SDK auto-assigns deterministic sequential integers (`"1"`, `"2"`, …) per workflow run, which guarantees per-`(workflow_id, run_id)` uniqueness by construction and is replay-safe (assigned by history position). Per-call meaning that previously lived in `activity_id` now lives in the per-activity `summary=`. Anything that filtered or grouped Event History by the old semantic strings (`"craft-text"`, `"craft-object-direct"`, `"jinja2-text"`, `"extract-pages"`, etc.) must read the per-activity `summary` or the Activity Type instead.
 

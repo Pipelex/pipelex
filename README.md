@@ -533,6 +533,10 @@ Install all extras:
 uv pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal,linkup,docling]"
 ```
 
+> **Mistral Workflows orchestration** *(coming soon)* is not a pipelex extra. It runs pipes through the runtime bridge inside Mistral Workflows activities and requires **Python 3.12+**, so it will ship as a separate, dedicated package that bundles pipelex. pipelex itself supports **Python 3.10+**; only this optional orchestration path needs 3.12.
+>
+> This package is still in active development and not published yet — install and import instructions will land here once it ships.
+
 ---
 
 **Privacy & Telemetry** — Pipelex Gateway collects only technical data (model names, token counts, latency) — never prompts or business data. If you want to avoid Gateway telemetry, disable `pipelex_gateway` and use your own provider keys or local AI instead. [Learn more](https://docs.pipelex.com/latest/setup/telemetry/)

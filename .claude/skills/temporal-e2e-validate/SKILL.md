@@ -305,7 +305,9 @@ loaded only for the work at hand. Read them as needed:
 
 - "validate temporal" / "full temporal test" / a broad regression check → `mode-2-setup.md`, then `mode-2-tiers.md`; offer the two batteries as opt-in extras.
 - "validate temporal error handling" / "error report" / "error propagation" → Mode 1 Step 2b above (the precise pytest assertions) **plus** `mode-2-setup.md` + `mode-2-tiers.md` Step 5f (Tiers 13–16, cross-process).
-- "cost report" / "distributed cost" / "mock inference" → `mode-2-setup.md` (split workers), then `mode-2-tiers.md` Step 5b' (Tier 8b) — `--mock-inference` makes it free and deterministic; no live spend needed.
+- "cost report" / "distributed cost" / "mock inference" → `mode-2-setup.md` (split workers), then `mode-2-tiers.md` Step 5b' (Tier 8b). This routing is **scope-aware**: once a request has landed here (via one of those three triggers), read the scope manifest at the top of Step 5b' and run the arms it selects:
+    - **default** (bare "cost report" / "distributed cost" / "mock inference") → the free, deterministic mock arms only (`--mock-inference`); no live spend.
+    - **explicit spend opt-in** — the canonical token `full` (aliases `thorough`, `every`, `with-spend`) qualifying the cost request (e.g. "cost reporting full", "cost report — every arm") → **every** cost arm, real spend authorized: mock primary + cross-child + CSV cross-check + the `--no-costs` negative gate + live LLM + live img-gen + live extract. Run them all and report PASS/FAIL per arm. Do **not** treat bare "live" or "all" as a spend opt-in — they're too easily incidental ("live" also collides with the default mock arm, which already runs in LIVE mode); if that's the only signal, confirm with the user before spending real money.
 - "queue options" / "runtime profile" / "routing" → `mode-2-setup.md`, then `routing-battery.md` and/or `queue-options-battery.md`.
 - Anything image-related → `mode-2-setup.md` + `mode-2-tiers.md` Tiers 4–5, run **live** — dry-run cannot surface payload-size bugs.
 

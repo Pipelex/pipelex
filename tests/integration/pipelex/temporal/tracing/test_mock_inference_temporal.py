@@ -26,8 +26,8 @@ from pipelex.cogt.content_generation.dry_mock import MOCK_INFERENCE_MODEL_NAME
 from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.runtime_bridge.primitives.pipe_run_arg import PipeRunArg
 from pipelex.temporal.temporal_hub import get_task_manager
-from pipelex.temporal.tprl_pipe.pipe_run_arg import PipeRunArg
 from pipelex.temporal.tprl_pipe.wf_pipe_run import WfPipeRun
 from tests.integration.pipelex.fixtures.pipe_job_helpers import pipe_job_from_bundle
 from tests.integration.pipelex.temporal.library_crate.helpers import rehydrate_pipe_output

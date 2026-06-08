@@ -101,6 +101,10 @@ class Pipelex(metaclass=MetaSingleton):
         config_cls: type[ConfigRoot] | None = None,
         config_overrides: dict[str, Any] | None = None,
     ) -> None:
+        # Readiness gate: flipped True only at the very end of make(), after setup() and the optional
+        # validate_model_deck() both succeed. Readers (ensure_pipelex_booted) must gate on this, NOT on
+        # mere registry presence -- MetaSingleton registers the instance before setup() configures the hub.
+        self.is_ready: bool = False
         self.is_pipelex_service_enabled = False  # Will be set during setup
         self.config_dir_path = config_dir_path or config_manager.pipelex_config_dir
         self.pipelex_hub = PipelexHub()
@@ -603,6 +607,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             if cls in MetaSingleton.instances:
                 del MetaSingleton.instances[cls]
             raise
+        # Publish readiness only now: setup() AND the optional validate_model_deck() have both succeeded
+        # and the delete-on-failure handler above is behind us, so a reader can never adopt an instance
+        # that is about to be removed from the registry.
+        pipelex_instance.is_ready = True
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} ready")
         return pipelex_instance
 
@@ -610,6 +618,17 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
     def get_optional_instance(cls) -> Self | None:
         instance = MetaSingleton.instances.get(cls)
         return cast("Self | None", instance)
+
+    @classmethod
+    def is_fully_booted(cls) -> bool:
+        """True only when a singleton exists AND has completed make() (setup + validation).
+
+        Distinct from ``get_optional_instance() is not None``: the metaclass registers the instance
+        before ``setup()`` configures the hub. Callers that must not touch a half-built instance
+        (``ensure_pipelex_booted``) gate on this.
+        """
+        instance = cls.get_optional_instance()
+        return instance is not None and instance.is_ready
 
     @classmethod
     def get_instance(cls) -> Self:
