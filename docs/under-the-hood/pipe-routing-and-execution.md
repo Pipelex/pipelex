@@ -1,11 +1,11 @@
 ---
 title: "Pipe Routing & Execution"
-description: "How PipeJobs are created, routed, and executed — covering both direct (single-process) and distributed (Temporal) execution modes."
+description: "How PipeJobs are created, routed, and executed — covering both direct (single-process) and distributed (host-runtime) execution."
 ---
 
 # Pipe Routing & Execution
 
-Pipelex supports two execution modes for running pipes: **direct execution** (single-process) and **distributed execution** (via Temporal workers). Both modes share the same pipe definitions, library loading, and controller logic. The key difference is *where* the pipe runs and how the PipeJob travels to get there.
+Pipelex runs pipes either **direct** (single-process) or **distributed** on a host runtime. Both share the same pipe definitions, library loading, and controller logic. The key difference is *where* the pipe runs and how the PipeJob travels to get there. The distributed host runtime today is your own Temporal workers ([Pipelex on Temporal](../distributed-execution/temporal/index.md)); a managed Mistral Workflows backend (also built on Temporal) is coming soon. Both reach pipe execution through the same framework-agnostic runtime bridge.
 
 ---
 
@@ -14,7 +14,12 @@ Pipelex supports two execution modes for running pipes: **direct execution** (si
 | Term | Meaning |
 |------|---------|
 | **Direct execution** | All pipes run in the same Python process. Library, class registry, and pipe resolution are shared in-memory. |
-| **Distributed execution** | PipeJob is serialized and sent to a remote Temporal worker. The worker is a separate process (potentially on a different machine). |
+| **Distributed execution** | PipeJob is serialized and sent to a remote worker — a Pipelex Temporal worker, or a Mistral Workflows activity. The worker is a separate process (potentially on a different machine). |
+
+---
+
+!!! note "The runtime bridge"
+    Both distributed paths go through the framework-agnostic runtime bridge (`pipelex/runtime_bridge/`). Its `primitives/` layer is shared by `pipelex.temporal` and the in-development Mistral Workflows host package: it classifies controller pipes as child workflows and leaf operators as activities (`pipe_classification.py`), hydrates working memory, flushes trace events, and delivers results in a host-neutral way. Graph and token-usage assembly is not a bridge primitive — it lives in `pipelex/pipe_run/tracing_assembly.py` and runs the same way for local and distributed runs.
 
 ---
 

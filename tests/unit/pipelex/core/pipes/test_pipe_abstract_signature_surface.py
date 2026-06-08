@@ -35,9 +35,12 @@ class TestPipeAbstractSignatureSurface:
         stub = _StubPipe(pipe_category="PipeController")
         assert _is_signature_of(stub) is False
 
-    def test_is_signature_true_for_signature_category(self) -> None:
+    def test_is_signature_false_ignores_pipe_category(self) -> None:
+        # Identity is class-based now: the base descriptor returns False regardless of `pipe_category` —
+        # even the legacy "PipeSignature" string no longer flips it. `PipeSignature` overrides to True
+        # (covered by the signature integration tests, which need a real `StuffSpec`/`Concept`).
         stub = _StubPipe(pipe_category="PipeSignature")
-        assert _is_signature_of(stub) is True
+        assert _is_signature_of(stub) is False
 
     def test_pipe_dependencies_default_returns_empty_set(self) -> None:
         stub = _StubPipe(pipe_category="PipeOperator")

@@ -12,7 +12,6 @@ class LLMTokenCostReportField(StrEnum):
     MODEL_TYPE = "model_type"
     LLM_NAME = "llm_name"
     PLATFORM_LLM_ID = "platform_llm_id"
-    NB_TOKENS_INPUT = "nb_tokens_input"
     NB_TOKENS_INPUT_CACHED = "nb_tokens_input_cached"
     NB_TOKENS_INPUT_NON_CACHED = "nb_tokens_input_non_cached"
     NB_TOKENS_INPUT_JOINED = "nb_tokens_input_joined"  # joined = cached + non-cached

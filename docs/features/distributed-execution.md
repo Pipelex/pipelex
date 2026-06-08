@@ -1,23 +1,34 @@
 ---
-title: "Distributed Execution with Temporal"
-description: "Run Pipelex pipelines as durable Temporal workflows across one or more worker processes. Per-activity routing, runtime profiles, and dashboard observability."
+title: "Distributed Execution"
+description: "Run Pipelex methods as durable workflows on either of two backends — your own Temporal cluster, or Mistral's managed Workflows control plane. Both built on Temporal."
 ---
 
-# Distributed Execution with Temporal
+# Distributed Execution
 
-Run your `.mthds` methods as durable Temporal workflows.
+Run your `.mthds` methods as durable workflows.
 
 ## Overview
 
-Pipelex pipelines normally run in-process. With the optional `pipelex[temporal]` integration, the same pipelines run as Temporal workflows: each pipe becomes a workflow, child pipes become child workflows, and every LLM call, image generation, or document extraction becomes an activity. Temporal handles durability, retries, scheduling, and visibility; Pipelex handles the AI work. Flip `[temporal] is_enabled = true` in `.pipelex/pipelex.toml` and the same methods run distributed without changing a line of method code.
+Pipelex pipelines normally run in-process. When you need durability, retries that survive failure, and horizontal scale, the same pipelines run as durable workflows — each pipe becomes a workflow, child pipes become child workflows, and every LLM call, image generation, or document extraction becomes an activity. The orchestration layer handles durability, retries, scheduling, and visibility; Pipelex handles the AI work, and the same methods run distributed without changing a line of method code.
 
-## Supported deployment patterns
+## Backends
+
+Distributed execution runs on Temporal. Today there is one backend, with a managed option coming soon:
+
+- **[Pipelex on Temporal](../distributed-execution/temporal/index.md)** — you run Pipelex's own Temporal workers against a Temporal cluster you operate (self-hosted or Temporal Cloud). Python 3.10+, `pipelex[temporal]`. Generally available.
+- **Pipelex on Mistral Workflows** *(coming soon)* — run pipes inside Mistral Workflows, Mistral's managed orchestration control plane (itself built on Temporal), with no cluster to operate. In active development; docs land once it ships.
+
+## Pipelex on Temporal
+
+Flip `[temporal] is_enabled = true` in `.pipelex/pipelex.toml`, install `pipelex[temporal]`, and the same methods run as Temporal workflows on workers you operate.
+
+### Supported deployment patterns
 
 - **Single worker** — one process polls one task queue, runs everything. Right for most deployments.
 - **Router + runners** — a dedicated workflow worker dispatches activities to one or more runner pools (LLM, image-gen, extract). Each runner pool scales independently and isolates failures.
 - **Per-provider isolation** — separate worker pools for OpenAI, Anthropic, image generation, and OCR, each on its own task queue with its own retry policy and rate cap.
 
-## Configuration
+### Configuration
 
 All knobs live under `[temporal.*]` in `.pipelex/pipelex.toml`:
 
@@ -31,4 +42,4 @@ All knobs live under `[temporal.*]` in `.pipelex/pipelex.toml`:
 
 ## Get started
 
-See the **[Distributed Execution with Temporal](../distributed-execution/index.md)** guide for the full walkthrough — overview, cluster setup, worker deployment, task-queue routing, and workflow observability.
+See the **[Distributed Execution](../distributed-execution/index.md)** guide for the full walkthrough — overview, cluster setup, worker deployment, task-queue routing, and workflow observability. A managed Mistral Workflows backend is coming soon.

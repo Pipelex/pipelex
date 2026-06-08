@@ -9,7 +9,7 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_class_registry, get_library_manager
 from pipelex.pipe_run.exceptions import PipeJobError
-from pipelex.temporal.tprl_pipe.submitter_hydration import rehydrate_pipe_output_with_crate
+from pipelex.runtime_bridge.primitives.submitter_hydration import rehydrate_pipe_output_with_crate
 
 
 def _text_concept() -> Concept:

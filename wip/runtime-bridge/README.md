@@ -1,0 +1,90 @@
+# runtime-bridge — review follow-ups
+
+Triage of the SWE-agent review comments on **PR #959** (`feat: extract framework-agnostic Pipelex runtime bridge`, branch `feature/Runtime-bridge-extraction`). The PR extracts `pipelex/runtime_bridge/` — a host-runtime-agnostic surface (`run_pipe_via_bridge`) that lets Mistral Workflows / raw Temporal / future plugins invoke Pipelex pipes from inside their own activities.
+
+Two review bots left 12 unresolved threads (**greptile-apps** + **cubic-dev-ai**). All 12 were verified against the code. **All are now resolved in the working tree** — the only thing left is replying to / resolving the GitHub threads (see "Remaining" at the bottom).
+
+## 1. Design forks — all resolved
+
+Each was a **confirmed** finding whose resolution was a genuine design choice. Each doc retains its full triage as the record of why.
+
+- **[direct-mode-nested-router-leak.md](direct-mode-nested-router-leak.md)** — ✅ **RESOLVED (Option A).** (greptile P1, + cubic P2 enabler) In `DIRECT` mode, nested controller sub-pipes resolved the *hub default* router and leaked to Temporal when a worker has `[temporal] is_enabled`. Fixed with a `scoped_pipe_router` helper in `hub.py` wrapping `_run_direct` (also resolves cubic's hub.py:615/teardown-clobber). The observer sub-question that gated the fork is written up in [`../observer-and-telemetry/observer-telemetry-posthog.md`](../observer-and-telemetry/observer-telemetry-posthog.md).
+- **[graph-context-temporal-contract.md](graph-context-temporal-contract.md)** — ✅ **RESOLVED (Option A).** (greptile P2) `graph_context` was threaded into the `PipeJob` for *all* modes despite the DIRECT-only docstring, and `WfPipeRouter` consumes it. Fixed: `run_pipe_via_bridge` now nulls `graph_context` for the Temporal modes (honoring the contract); docstring corrected. + regression test.
+- **[trace-flush-blocking-io.md](trace-flush-blocking-io.md)** — ✅ **RESOLVED (false positive / by-design).** (cubic P2) `flush_trace_events_to_backend` is `async` with blocking boto3/file I/O — but it runs in an *activity*, which is exactly where Temporal allows blocking I/O. No code change. The optional `asyncio.to_thread` throughput-offload note is kept on file for if/when Temporal ships and we profile worker contention.
+- **[bridge-error-name-collision.md](bridge-error-name-collision.md)** — ✅ **RESOLVED (renamed).** The near-mirror `PipelexBridgeRuntimeError` (leaf) vs `PipelexRuntimeBridgeError` (base) was renamed: the leaf is now **`PipelexBridgeDispatchError`**. Updated the class, `bridge.py` raises, `test_validation.py`, regenerated `docs/errors/` (old slug removed, new written; no mistral churn), and the `TODOS.md` prose.
+
+## 2. Mechanical fixes — all applied
+
+- **Boot race** — ✅ `pipelex/runtime_bridge/bootstrap.py`. Double-checked locking with a module-level `threading.Lock` (re-check inside the lock). Regression test: `tests/unit/pipelex/runtime_bridge/test_bootstrap_concurrency.py` (threaded barrier; asserts make runs once, no raise). **Follow-up (PR #966 review):** this closed the write-write race but not a lock-free read of a half-built singleton mid-`setup()` — **now also fixed** via Approach B (the bridge gates on `Pipelex.is_fully_booted()`; an instance-level `is_ready` is published only at the end of `make()`). See §3 / [`bootstrap-half-built-singleton-race.md`](bootstrap-half-built-singleton-race.md).
+- **Exceptions caller-facing flag** — ✅ `pipelex/runtime_bridge/exceptions.py`. Added `_authors_caller_facing_message = True` to `MissingPipelexTemporalExtraError` and `MissingMistralWorkflowsPluginError` so the pip-install hint survives STRICT disclosure. Regression test: `test_exceptions_disclosure.py`.
+- **streaming.mdx missing import** — ✅ added `import asyncio` to the example's import block.
+- **observability.mdx frontmatter id** — ✅ `id: observabilities` → `id: observability`.
+- **your-first-workflow.mdx grammar** — ✅ "It coordinate" → "It coordinates".
+- **your-first-workflow.mdx broken image** — ✅ removed the missing-PNG image, kept the instruction text.
+- **durable-execution.md overgeneralization** — ✅ rewrote the line to distinguish the two durable backends (the `[temporal] is_enabled` flag is the Pipelex-on-Temporal backend only; the Mistral Workflows path runs pipes via the runtime bridge inside Workflows activities).
+
+## 3. PR #966 pre-landing review
+
+A later `/review` pass on PR #966 (the bridge + the trace-event read hardening). One deferred item plus four cheap hardening fixes applied to the working tree.
+
+- **Bootstrap half-built-singleton race** — ✅ **applied (P1)**, see [`bootstrap-half-built-singleton-race.md`](bootstrap-half-built-singleton-race.md). The #959 lock closed the write-write race; this closes the remaining lock-free read of a mid-`setup()` singleton. Approach B (instance-level `is_ready`, gated via `Pipelex.is_fully_booted()`, published only at the end of `make()`) — chosen over a module-global flag so the existing `teardown_if_needed()` lifecycle auto-resets it. Regression tests added (mid-setup window + setup-failure re-boot).
+- **`library_id` widened** — ✅ `bridge.py` + `primitives/submitter_hydration.py`. Dropped the `uuid4().hex[:8]` truncation (32 bits) to full hex. `open_library` silently *reuses* a colliding id (`library_manager.py:148-149`), so a 32-bit collision between two overlapping calls would share and prematurely tear down one library; full hex matches the collision-safe Temporal path (full `workflow_id`).
+- **`act_assemble_graph` comment corrected** — ✅ the lifted primitive catches only a specific exception tuple, so the old "swallows every failure / no error ever crosses the boundary" comment was stale; reworded to say expected failures degrade to None while programming bugs deliberately propagate (pinned by `test_propagates_unexpected_keyerror`).
+- **Scoped-library open guarded** — ✅ `bridge.py::_scoped_library_for_crate` now opens the library inside the `try` (with a `library_opened` flag) so a throw between open and yield can't leak the manager entry — matches the sibling `rehydrate_pipe_output_with_crate`.
+- **Input decode wrapped** — ✅ `bridge.py` decodes `library_crate_dump` / `delivery_assignment_dump` once, translating raw `pydantic.ValidationError` into `PipelexBridgeDispatchError` so a malformed dump no longer escapes the entry point as a non-`PipelexError`; also removes the double-decode of the delivery dump. `_validate_input` now takes the decoded assignment (its unit tests updated).
+
+`make agent-check` (pyright 0/0/0, mypy clean) and `tests/unit/pipelex/runtime_bridge/` green after these.
+
+## Verification
+
+`make agent-check` (ruff, plxt, pyright 0/0/0, mypy) and `make agent-test` (full suite) both green.
+
+## 4. PR #969 review rounds (live PR)
+
+PR #969 is the live PR (#959 and #966 closed). Successive bot rounds (greptile / cubic / codex) each re-examined the prior round's fixes plus new surface. Round-4 dispositions:
+
+- **Keyed tracers through the bridge** (`bridge.py:179`, greptile P1 + cubic P2) — ✅ **RESOLVED (refuted as unreachable; no code change).** Full triage + the deferred structural option in [`bridge-keyed-tracer-unsupported.md`](bridge-keyed-tracer-unsupported.md). Correct abstract analysis but unreachable: keyed tracers (`tracer_key != graph_id`) are only opened by `wf_pipe_router`, which never calls the bridge; non-DIRECT modes null `trace_context`; on every reachable path `lookup_key == graph_id`. `lookup_key` is kept (round-3 fix; `graph_id` would re-break `close_tracer`) with a tightened comment documenting the unsupported keyed-tracer contract. A loud boundary guard was tried and **backed out** as over-engineering (defended a non-occurring config, was only partial, and stacked churn on the round-3 change defending the same case).
+- **Temporal blocking `workflow_id`** (`bridge.py:342`, codex P2 + cubic P1) — ✅ **RESOLVED (real fix).** Blocking reported the bare `pipeline_run_id`; the workflow is actually started with `make_workflow_id(...)`, which prefixes in non-NORMAL run modes (`ut-`/`ci-`/`cc-`/`cct-`). The bridge now reports `make_workflow_id(...)` — the same id fire-and-forget returns from `start()`, single source of truth. In `RunMode.NORMAL` (prod) the prefix is empty, so behavior is unchanged there. Wiring test: `tests/unit/pipelex/runtime_bridge/test_temporal_blocking_workflow_id.py`; prefix table covered by `tests/unit/pipelex/temporal/test_workflow_id_construction.py`.
+- **trace_flush pre-dedup** (`trace_flush.py:28`, cubic P2) — ➖ **False positive.** Dedup is a **read-side** contract: `EventLogProtocol.read_events` returns events deduplicated by `(workflow_id, writer_id, event_type, sequence)`, and the DynamoDB backend is write-idempotent via PK+SK ("natural deduplication for Temporal replay re-emissions"). NDJSON appends on retry but `read_events` collapses duplicates on assembly. The proposed pre-dedup key also **omits `pipeline_run_id`**, so it would wrongly collapse identical sequences across different runs. No code change. (Related async/blocking-IO note already on file: [`trace-flush-blocking-io.md`](trace-flush-blocking-io.md).)
+- **Mistral-workflows docs** (`index.md:29` cubic P2, `choosing-a-backend.md:8` cubic P3) — ✅ **RESOLVED (accuracy).** "Automatic activity retries — each leaf operator retries independently" overclaimed: in `direct` mode the whole pipe runs in one host activity. Reworded to be mode-aware (`direct` retries as a unit; `mistral_native` retries leaves independently). The "replay" guarantee line was reworded to state replay re-runs the workflow from history reusing stored activity results, not re-executing completed activities.
+
+Round-5 dispositions:
+
+- **Self-review back-out** — the round-4 keyed-tracer guard was removed (see the keyed-tracer bullet above; details in [`bridge-keyed-tracer-unsupported.md`](bridge-keyed-tracer-unsupported.md)).
+- **Gateway `transport_max_retries`** (`gateway_completions_factory.py` / `gateway_responses_factory.py`, cubic P2) — ✅ **RESOLVED (real fix).** The gateway LLM client factories built `openai.AsyncOpenAI` without `max_retries`, silently ignoring a `transport_max_retries` override on the primary inference path (the near-identical `Portkey*Factory` siblings pass it). Wired it into both. The gateway extract/img-gen path uses `AsyncPortkey` (no `max_retries` param — verified), so the `automatic-retries.md` doc was corrected to scope the claim precisely.
+
+Round-6 dispositions:
+
+- **Gateway wiring test missing** (`gateway_completions_factory.py:128`, cubic P2) — ✅ **RESOLVED (real gap, my round-5 omission).** `test_transport_retry_wiring.py` has a dedicated test per factory; the round-5 gateway fix shipped without the matching cases. Added `test_gateway_completions_factory_passes_max_retries` / `test_gateway_responses_factory_passes_max_retries`. (A wiring test is exactly what would have caught the round-5 gateway bug — so it earns its keep here, contra the general "don't test trivial lib-config swaps" rule.)
+- **Durable-execution retry claim** (`durable-execution.md:14`, cubic P2) — ✅ **RESOLVED (accuracy).** Same flavor as the round-4 docs fix: per-leaf retry is the Temporal model; Mistral `direct` mode retries the pipe as a unit. Qualified the bullet.
+- **choosing-a-backend table** (`choosing-a-backend.md:17`, cubic P3 ×2) — ✅ **RESOLVED.** Added the `.pipelex/pipelex.toml` config-path for `[temporal] is_enabled`, and reworded the Mistral cell to "invoke … through the runtime bridge inside your Mistral Workflows activity".
+- **`PipelexBridgeDispatchError` caller-facing flag** (`exceptions.py:22`, cubic P2) — ➖ **Declined.** The class is raised for BOTH caller-facing validation (malformed `library_crate_dump`/`delivery_assignment_dump`) AND execution wrapping that embeds downstream `{exc}` internals (sites 321/341/369/452). Marking the whole class `_authors_caller_facing_message=True` would expose execution internals under STRICT — the exact over-broad-disclosure leak greptile caught in round 3 for `PipelexSetupError`. STRICT is never the active render mode in prod (default VERBOSE — grep-confirmed no prod call site passes STRICT), so the validation detail already shows. If STRICT is ever adopted at a boundary AND validation detail is wanted there, the right fix is splitting the class, not flagging the mixed one — deferred.
+- **Bootstrap concurrent-boot race** (`bootstrap.py:39`, cubic P2 conf 8) — ✅ **RESOLVED (reachable cases) + deferred (residual).** Full triage in [`bridge-bootstrap-external-race.md`](bridge-bootstrap-external-race.md). The reachable case (two `ensure_pipelex_booted` threads) is lock-serialized and tested — `make()` runs inside `_boot_lock`, so no second `make()` races. The genuine residual is a *concurrent external* `Pipelex.make()` (not under `_boot_lock`) mid-setup; narrow/non-standard (hosts boot before serving). Tightened the docstring to state the real contract; the bounded-wait fix is recorded as deferred (poll loop + TOCTOU catch = over-engineering for a non-occurring setup).
+
+Round-7 disposition:
+
+- **Tracing assembly drops DynamoDB construction failures** (`tracing_assembly.py:98`, cubic P2 conf 8) — ✅ **RESOLVED (real regression from this PR's refactor).** Pre-PR `assemble_tracing` caught botocore directly, covering BOTH `make_event_log()` construction and `read_events()`. The refactor pushed the botocore→`EventLogReadError` conversion into `DynamoDBEventLog.read_events` only, but `__init__` eagerly builds the boto3 client — so a construction-time botocore failure (e.g. a misconfigured region) escaped the catch and would abort a completed run instead of degrading. Fixed: new `EventLogSetupError(EventLogError)`; `__init__` translates construction botocore → `EventLogSetupError`; `assemble_tracing` catches the `EventLogError` base (read + setup). Regression tests both sides; error docs regenerated.
+
+## 5. PR #969 `/review` final pass (gstack)
+
+The finalization `/review` pass (specialist army + adversarial Claude/Codex) on the full diff against `dev`. 0 critical. Findings triaged:
+
+- **WorkflowExecutionError escapes the dispatch contract** (`bridge.py:339,367`, red-team conf 8) — **decided with the user.** `_run_temporal_blocking` / `_run_temporal_fire_and_forget` catch `(PipeRunError, PipeJobError, PipeRouterError, PipeExecutionError, PipelineExecutionError)`, but `TemporalPipeRun.run()`/`.start()` actually raise `WorkflowExecutionError` (a `TemporalFlowError(PipelexError)`, not in the tuple) on a pipe failure (`workflow_caller.py:133/176`). So a Temporal-mode failure escapes `run_pipe_via_bridge` un-wrapped — asymmetric with DIRECT/mistral, and the catch tuple is dead for the dominant failure mode. The catch's presence shows uniform-wrapping was the intent. (Disposition recorded inline at finalization.)
+- **`pipe_classification` docstring falsely claimed `pipelex.temporal` uses it** — ✅ **RESOLVED (accuracy).** Zero in-tree callers; the helpers are forward-looking `MISTRAL_NATIVE` plumbing (sibling host package, not landed). Docstring corrected to say so; module kept (it is in-scope bridge-side plumbing per `TODOS.md`).
+- **`_serialize_completed_output(pipe_job=...)` unused param** (`bridge.py:383`, maintainability conf 7) — kept-for-future YAGNI; decided with the user at finalization.
+- **`LibraryManager._pipe_source_map` not per-call scoped + unlocked** (red-team conf 7/6) — ➖ **Deferred.** Pre-existing manager behaviour, observability-only impact, Temporal not in prod. Full mechanism + fix shape in [`library-manager-pipe-source-map-concurrency.md`](library-manager-pipe-source-map-concurrency.md).
+- **`output_dict` python-mode dump** (`bridge.py:80`, api-contract conf 8) — ➖ **Declined.** `dump_for_temporal()` uses `model_dump(serialize_as_any=True)`, but the model is JSON-safe via pydantic's own `model_dump(mode="json")`/`model_dump_json()` (and the kajson Temporal converter); only the naive `json.dumps(output.model_dump())` misuse fails, loudly. Usage caveat, not a defect. `extra="forbid"` skew, `trace_flush` async-IO, `delivery` pass-through, and the scoped-library 3× duplication were all re-confirmed as previously-considered/by-design.
+- **Test gaps** (testing conf 5–7) — `_decode_*` error path, `trace_flush` guards, `_run_mistral_native` success path are untested "lake" gaps; noted, added per the user's finalization call.
+
+## Open deferred follow-ups (not bugs)
+
+Carried forward, each recorded so review tooling doesn't re-raise them as new findings:
+
+- **[execution-mode-property-helpers-unused.md](execution-mode-property-helpers-unused.md)** — the three `PipelexExecutionMode` `@property` helpers are tested but not yet consumed by `bridge.py` (which inlines the equivalent checks). Wire them in or remove; no correctness impact.
+- **[library-manager-pipe-source-map-concurrency.md](library-manager-pipe-source-map-concurrency.md)** — pre-existing `LibraryManager._pipe_source_map` is manager-level, not per-call scoped. Observability-only, Temporal not in prod.
+- **[bridge-bootstrap-external-race.md](bridge-bootstrap-external-race.md)** — residual race against a *concurrent external* `Pipelex.make()` mid-setup; narrow/non-standard, bounded-wait fix deferred.
+- **[distributed-cost-reporting-test-coverage.md](distributed-cost-reporting-test-coverage.md)** — audit (from a full `/temporal-e2e-validate` Mode 2 run) of cost-reporting test coverage in split-worker mode. No automated test asserts real-inference distributed cost numbers; the real-provider *capture* branch is asserted nowhere; cross-child sum and img-gen/extract/search usage are uncovered; plus two real risks (R2 retry over-count — documented/accepted; zero-token silent emit). Code-grounded map + prioritized test additions by layer, written as the input for a follow-up planning session.
+
+## Remaining
+
+Code/docs are done. What's left is the GitHub side, per the `/review-pr-agents` skill: reply on each PR #969 thread (`✅ Fixed` / `➖ False positive`) and resolve them. No threads need to stay open — every fork was decided and applied.

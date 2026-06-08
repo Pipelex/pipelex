@@ -22,6 +22,7 @@ from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobParams, LLMJ
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
+from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.config import get_config
 from pipelex.graph.graph_config import DataInclusionConfig
@@ -35,6 +36,7 @@ from pipelex.tracing.activity_event_log import ActivityEventLogCache
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog
 from pipelex.tracing.trace_events import UsageReportEvent
+from pipelex.tracing.usage_aggregator import UsageAggregator
 
 DATA_INCLUSION_OFF = DataInclusionConfig(
     pipe_and_concept_registry=False,
@@ -386,3 +388,43 @@ class TestEmitRunnerFallback:
         events = [evt for evt in reader.read_events("run_abc") if isinstance(evt, UsageReportEvent)]
         assert len(events) == 2
         assert sorted(evt.sequence for evt in events) == [0, 1]
+
+    def test_retried_activity_double_counts_cost_total_documenting_r2(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+    ) -> None:
+        """Pins R2 at the billing level: a retried inference is counted twice in the cost total.
+
+        The inference ran once (100 input + 50 output tokens), but the retry re-emits a second
+        usage event, so ``aggregate_costs`` sums both — doubling the reported tokens and cost. This
+        is the *accepted* current behavior (see docs tracing-cost-reporting R2); the test makes the
+        over-count regression-visible. If the idempotent-resequence fix lands, flip these to the
+        single-count values.
+        """
+        _enable_ndjson_tracing(mocker, tmp_path)
+
+        manager = ReportingManager()
+        manager.setup()
+        trace_context = _make_trace_context(graph_id="run_abc", tracer_key="wf_xyz")
+
+        single_input, single_output = 100, 50
+        manager.report_inference_job(
+            _make_llm_job("run_abc", trace_context=trace_context, nb_input_tokens=single_input, nb_output_tokens=single_output)
+        )
+        manager.report_inference_job(
+            _make_llm_job("run_abc", trace_context=trace_context, nb_input_tokens=single_input, nb_output_tokens=single_output)
+        )
+
+        reader = NdjsonEventLog(traces_dir=str(tmp_path))
+        events = reader.read_events("run_abc")
+        usage_events = [evt for evt in events if isinstance(evt, UsageReportEvent)]
+        assert len(usage_events) == 2, "R2: the retried activity re-emits, yielding two usage events for one inference"
+
+        tokens_usages = UsageAggregator.aggregate(events)
+        aggregated = CostRegistry.aggregate_costs(tokens_usages=tokens_usages)
+
+        # Over-count: the single inference's tokens are counted twice in the run total.
+        assert aggregated.total_nb_tokens == 2 * (single_input + single_output)
+        # unit_costs are per-million: 100*1.0/1e6 + 50*2.0/1e6 = 2e-4 per emit, doubled by the retry.
+        assert abs(aggregated.total_cost - 2 * 2e-4) < 1e-12

@@ -11,7 +11,7 @@ from pipelex import log
 from pipelex.cogt.content_generation.dry_run_factory import MockFormat
 from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.validation import validate_concept_ref_or_code
-from pipelex.core.pipes.pipe_blueprint import PipeBlueprint, PipeCategory, PipeType
+from pipelex.core.pipes.pipe_blueprint import PipeBlueprint, PipeCategory, PipeType, valid_pipe_type_tags
 from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, parse_concept_with_multiplicity
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.pretty import PrettyPrintable
@@ -79,8 +79,9 @@ class PipeSpec(StructuredContent):
     @field_validator("type", mode="after")
     @classmethod
     def validate_pipe_type(cls, value: Any) -> Any:
-        if value not in PipeType.value_list():
-            msg = f"Invalid pipe type '{value}'. Must be one of: {PipeType.value_list()}"
+        allowed = valid_pipe_type_tags()
+        if value not in allowed:
+            msg = f"Invalid pipe type '{value}'. Must be one of: {allowed}"
             raise ValueError(msg)
         return value
 

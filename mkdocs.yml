@@ -361,6 +361,16 @@ not_in_nav: |
   !errors/index.md
   agents/*.md
 
+# exclude_docs: forward-looking pages kept in the repo but NOT built or served on
+#   the live site yet. The Mistral Workflows backend ships as a separate package
+#   (pipelex-mistralai-workflows) that is not published yet, so its user docs are
+#   held back to avoid advertising an unreleased package. Re-publish them — delete
+#   this block and restore the "Mistral Workflows" nav entries under Distributed
+#   Execution — once the package lands. See
+#   wip/distributed-execution/bridge-changes-sibling-repo-reconciliation.md.
+exclude_docs: |
+  distributed-execution/mistral-workflows/
+
 nav:
   - Get Started:
     - Build & Run AI Methods: index.md
@@ -397,13 +407,6 @@ nav:
     - Viewpoint:
       - The Know-How Graph: viewpoint/viewpoint.md
   - Guide:
-    - Retries & Resilience: reliability/retries-and-resilience.md
-    - Distributed Execution with Temporal:
-      - Overview: distributed-execution/index.md
-      - Cluster Setup: distributed-execution/cluster-setup.md
-      - Worker Deployment: distributed-execution/workers.md
-      - Task-Queue Routing: distributed-execution/task-routing.md
-      - Workflow Observability: distributed-execution/observability.md
     - Features:
       - Overview: features/index.md
       - Declarative AI Methods:
@@ -424,7 +427,7 @@ nav:
         - Execution Graph Visualization: features/execution-graph.md
       - Production & Operations:
         - Validation & Dry Run: features/validation-dry-run.md
-        - Distributed Execution with Temporal: features/distributed-execution.md
+        - Distributed Execution: features/distributed-execution.md
         - Telemetry & Observability: features/telemetry.md
         - Cloud Storage: features/cloud-storage.md
         - Cost Tracking & Reporting: features/cost-tracking.md
@@ -469,6 +472,19 @@ nav:
         - Signature Pipes: building-methods/pipes/signature-pipes.md
       - Optimize Cost & Quality: building-methods/configure-ai-llm-to-optimize-methods.md
       - LLM Prompting Style: building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
+    - Retries & Resilience:
+      - Overview: reliability/retries-and-resilience.md
+      - Automatic Retries: reliability/automatic-retries.md
+      - Failure Classification: reliability/failure-classification.md
+      - Durable Execution: reliability/durable-execution.md
+    - Distributed Execution:
+      - Overview: distributed-execution/index.md
+      - Temporal:
+        - Overview: distributed-execution/temporal/index.md
+        - Cluster Setup: distributed-execution/cluster-setup.md
+        - Worker Deployment: distributed-execution/workers.md
+        - Task-Queue Routing: distributed-execution/task-routing.md
+        - Workflow Observability: distributed-execution/observability.md
   - Reference:
     - CLI Reference:
       - Overview: tools/cli/index.md

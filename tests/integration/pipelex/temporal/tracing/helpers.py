@@ -2,7 +2,7 @@
 
 import uuid
 from collections import defaultdict
-from collections.abc import AsyncGenerator, Generator, Iterable
+from collections.abc import AsyncGenerator, Awaitable, Callable, Generator, Iterable
 from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -251,6 +251,7 @@ async def make_split_workers(
     temporal_client: TemporalClient,
     q_router: str,
     q_runner: str,
+    runner_act_llm_gen_text: Callable[[LLMAssignment], Awaitable[str]] = _runner_isolated_act_llm_gen_text,
 ) -> AsyncGenerator[None, None]:
     """Open two scoped workers on two task queues in the current process.
 
@@ -260,9 +261,12 @@ async def make_split_workers(
       `task_queue` argument — the activity lands on the workflow's own queue
       and would never be picked up if the router registered no activities.
     - `q_runner`: activity-only (runner scope, `disable_all_workflows=True`),
-      with `act_llm_gen_text` substituted by the isolation wrapper that clears
-      the in-process `_event_log_contexts` cache so the runner cannot
-      accidentally use the router's registered context.
+      with `act_llm_gen_text` substituted by ``runner_act_llm_gen_text``. The
+      default isolation wrapper clears the in-process `_event_log_contexts`
+      cache (so the runner cannot accidentally use the router's registered
+      context) and synthesizes usage instead of calling a real LLM. Pass a
+      different substitute — e.g. one that clears the cache and then runs real
+      inference — to exercise the fallback with real provider token counts.
 
     Pair this with `worker_config.activity_queues[act_llm_gen_text.__name__] =
     ActivityRouteConfig(default=q_runner, by_handle={})` so the workflow on
@@ -308,7 +312,7 @@ async def make_split_workers(
             task_queue=q_runner,
             is_not_sandboxed=True,
             scope=runner_scope,
-            substitute_activities={act_llm_gen_text: _runner_isolated_act_llm_gen_text},
+            substitute_activities={act_llm_gen_text: runner_act_llm_gen_text},
         ),
     ):
         yield

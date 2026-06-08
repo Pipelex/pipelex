@@ -28,9 +28,9 @@ from typing_extensions import override
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
 from pipelex.pipe_run.pipe_job import PipeJob
+from pipelex.runtime_bridge.primitives.pipe_run_arg import PipeRunArg
 from pipelex.temporal.exceptions import WorkflowExecutionError
 from pipelex.temporal.tprl_pipe.act_deliver import DeliveryActivityArg
-from pipelex.temporal.tprl_pipe.pipe_run_arg import PipeRunArg
 from pipelex.temporal.tprl_pipe.wf_pipe_run import WfPipeRun
 from tests.integration.pipelex.fixtures.pipe_job_helpers import pipe_job_from_bundle
 from tests.integration.pipelex.temporal.test_data import LibraryCrateTestData

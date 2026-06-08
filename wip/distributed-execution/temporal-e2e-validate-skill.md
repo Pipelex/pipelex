@@ -2,6 +2,8 @@
 
 Current-state record for the `/temporal-e2e-validate` skill (`.claude/skills/temporal-e2e-validate/`), captured 2026-06-02 on branch `feature/Validate-with-signatures-4-fix-dry-run`. It exists to cold-start a follow-up session: what the skill validates, what a full run found, the Step 9 skill bugs that were patched, and the open follow-ups.
 
+For ready-to-paste invocation prompts (per-area + run-it-all-in-one-go), see the sibling [`temporal-e2e-validate-prompt-menu.md`](temporal-e2e-validate-prompt-menu.md).
+
 ## What the skill is
 
 `/temporal-e2e-validate` validates that Pipelex pipelines execute correctly across separate Temporal worker processes. Two modes:
@@ -36,7 +38,7 @@ Also fixed in the same file: Scenario D's measurement (it read a single workflow
 
 - **Vestigial `act_jinja2_gen_text`.** Only reachable via the test fixture `pipelex/temporal/test_extras/wf_test_content_generator_child.py` (and the dry stub); still registered in `pipelex/temporal/tasks.py` and the `runner-jinja2` scope (`pipelex/pipelex.toml:665`). No pipe dispatches it (PipeCompose renders inline). Candidate for removal: the activity + its `act_jinja2_generate.py` + the `runner-jinja2` scope + the fixture path. User chose to defer; not removed.
 - **Stale "Known xfails" note in `SKILL.md`** (Mode 1). The StuffArtefact-serialization xfails now xpass — the note should be refreshed or the xfail markers dropped. Out of scope for the Step 9 fixes; not patched.
-- **Worker can't boot under `--is-unit-testing` (product bug, not a skill issue).** Surfaced by the Scenario F sanity-check: a sandboxed worker started with `--is-unit-testing` fails temporalio's workflow-sandbox validation on the registered test workflows, so it never boots. Queue-name-independent and orthogonal to the queue-options surface — the task-queue validator (`worker_cli.py:75`) already passed before it fires. Tracked with full evidence and likely fix locus in [distributed-execution/unit-testing-worker-sandbox-validation.md](distributed-execution/unit-testing-worker-sandbox-validation.md). Not investigated or fixed here.
+- **Worker can't boot under `--is-unit-testing` (product bug, not a skill issue).** Surfaced by the Scenario F sanity-check: a sandboxed worker started with `--is-unit-testing` fails temporalio's workflow-sandbox validation on the registered test workflows, so it never boots. Queue-name-independent and orthogonal to the queue-options surface — the task-queue validator (`worker_cli.py:75`) already passed before it fires. Tracked with full evidence and likely fix locus in [unit-testing-worker-sandbox-validation.md](unit-testing-worker-sandbox-validation.md). Not investigated or fixed here.
 
 ## Cold-start: re-verify the patched skill
 
