@@ -81,28 +81,21 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
             execution_error.__cause__ = exc
             workflow_log.error(f"WfPipeRouter failed: {exc}")
         except PipelexError as exc:
-            # Fail-safe floor for a pipelex domain error raised *inline in this parent workflow
-            # itself* — e.g. while building the child's search attributes / static summary, which
-            # are evaluated here as arguments to ``execute_child_workflow``. Such an error is not a
-            # ``ChildWorkflowError``, so without this clause it would escape ``WfPipeRun`` as a
-            # non-terminal workflow-task failure and retry indefinitely (a silent hang). Route it
-            # through the same deferred-re-raise path as a child failure so ``act_deliver`` still
-            # fires the FAILED webhook (a terminal failure must always notify the receiver), then
-            # re-raise terminally in the post-delivery block below. Unlike the child path this
-            # error never crossed the activity bridge, so its rich classification comes straight
-            # from ``exc.to_error_report()`` rather than ``recover_error_report``. Scoped to
-            # ``PipelexError``: transient Temporal/infra errors keep their default task-retry.
+            # Inline fail-safe floor, parent side: a domain error raised inline in this workflow
+            # (e.g. building the child's search attributes / static summary, evaluated as arguments
+            # to execute_child_workflow) is not a ChildWorkflowError, so without this clause it
+            # escapes as a non-terminal workflow-task failure and hangs (see error-model.md
+            # "Workflow-Level Fail-Safe Floor"). Route it through the same deferred re-raise as a
+            # child failure so act_deliver still fires the FAILED webhook on the failure path, then
+            # re-raise terminally below. Scoped to PipelexError: transient infra errors keep task-retry.
             status = DeliveryStatus.FAILED
             error_report = exc.to_error_report()
             execution_error = WorkflowExecutionError(exc.message, error_report=error_report)
-            # Chain a details-carrying ``TemporalError`` (an ``ApplicationError``) as the cause so
-            # the rich classification ALSO survives the workflow -> submitter serialization. The
-            # child-failure path above gets this for free — the child's ``TemporalError`` sits in
-            # the ``ChildWorkflowError`` chain, and ``recover_error_report`` walks ``__cause__`` to
-            # find it. The inline path has no such child failure, so mint the equivalent carrier
-            # here; without it the submitter would floor to a synthesized
-            # ``UnrecoverableWorkflowFailureError`` (the message survives, the classification does
-            # not). ``error_report`` (above) still feeds the FAILED webhook directly, in-process.
+            # Mint a details-carrying TemporalError as the cause so the classification survives the
+            # workflow -> submitter serialization. The child-failure path gets this for free (the
+            # child's TemporalError rides the ChildWorkflowError chain); the inline path has no such
+            # child failure, so without this carrier the submitter would floor to a synthesized
+            # UnrecoverableWorkflowFailureError. error_report (above) still feeds the webhook directly.
             execution_error.__cause__ = TemporalError.from_message_exception(exc=exc)
             workflow_log.error(f"WfPipeRun inline failure: {exc}")
 

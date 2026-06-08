@@ -136,26 +136,14 @@ class TemporalTaskManager(TaskManager):
             workflows=workflows,
             activities=activities,
             workflow_runner=workflow_runner,
-            # Treat these as terminal workflow failures instead of letting them
-            # fall through to Temporal's default "unhandled exception = workflow
-            # TASK failure", which retries the workflow task indefinitely — a
-            # silent, resource-burning hang that only surfaces (as the wrong,
-            # generic error) after the workflow execution timeout.
-            #
-            # - WorkflowExecutionError: WfPipeRun and TemporalPipeRouter catch
-            #   ChildWorkflowError from their workflow.execute_child_workflow
-            #   calls and wrap it in-place as WorkflowExecutionError; this
-            #   registration makes that re-raise end the workflow terminally
-            #   instead of looking like a programmer bug Temporal should retry.
-            # - PipelexError: the fail-safe floor. Any pipelex *domain* error that
-            #   escapes workflow code without having been converted to a terminal
-            #   failure (an operator running its leaf inline, an inline setup
-            #   error) fails the workflow terminally instead of hanging. The
-            #   workflow-level catch-alls in WfPipeRouter / WfPipeRun convert the
-            #   common paths to a richer TemporalError(ApplicationError) first;
-            #   this is the backstop for any path they don't cover. Scoped to
-            #   PipelexError on purpose — transient Temporal/infra errors are not
-            #   domain errors and keep Temporal's default task-retry behavior.
+            # Make an escaping domain error a terminal workflow failure instead of Temporal's
+            # default "unhandled exception = workflow-task failure", which retries indefinitely —
+            # a silent hang (see docs/under-the-hood/error-model.md "Workflow-Level Fail-Safe
+            # Floor"). PipelexError is the floor: any domain error that slips past the workflow-
+            # level catch-alls in WfPipeRouter / WfPipeRun still fails terminally (degraded to a
+            # synthesized report) rather than hanging. WorkflowExecutionError — the child-dispatch
+            # wrapper raised by those workflows — is listed explicitly for intent. Scoped to
+            # PipelexError, not Exception: transient Temporal/infra errors keep their task-retry.
             workflow_failure_exception_types=[WorkflowExecutionError, PipelexError],
             max_cached_workflows=profile.max_cached_workflows,
             max_concurrent_workflow_tasks=profile.max_concurrent_workflow_tasks,

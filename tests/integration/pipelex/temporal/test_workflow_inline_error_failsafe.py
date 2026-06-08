@@ -43,6 +43,7 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.runtime_bridge.primitives.pipe_run_arg import PipeRunArg
 from pipelex.temporal.exceptions import WorkflowExecutionError, WorkflowInputError
 from pipelex.temporal.temporal_hub import get_task_manager
+from pipelex.temporal.tprl.temporal_error import TemporalError
 from pipelex.temporal.tprl.workflow_caller import WorkflowExecutor
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 from pipelex.temporal.tprl_pipe.wf_pipe_run import WfPipeRun
@@ -143,6 +144,75 @@ class TestWorkflowInlineErrorFailsafe:
         assert report.provider == ErrorReportParityTestData.FAILURE_PROVIDER
         assert report.user_action is not None
         assert report.user_action.kind == ErrorReportParityTestData.EXPECTED_USER_ACTION_KIND
+
+    async def test_router_already_terminal_error_propagates_untouched_preserving_leaf_classification(
+        self,
+        temporal_client: TemporalClient,
+        mocker: MockerFixture,
+        temporal_enabled: None,  # noqa: ARG002 - enables temporal.is_enabled for the duration
+        failing_pipe_job: PipeJob,
+    ) -> None:
+        """An escaping error that ALREADY carries a Temporal failure propagates untouched.
+
+        Pins the ``_carries_temporal_failure`` True branch — the reachable case where a controller
+        pipe's sub-pipe fails as a child workflow and ``TemporalPipeRouter`` wraps the
+        ``ChildWorkflowError`` as ``WorkflowExecutionError``, which then escapes the parent's
+        ``pipe.run_pipe``. The rich leaf report rides an ``ApplicationError`` (a Temporal
+        ``FailureError``) in the ``__cause__`` chain and is recoverable only by
+        ``recover_error_report`` at the submitter. A regression that negated or deleted the guard
+        would convert it via ``from_message_exception`` instead, flattening ``error_type`` to
+        ``WorkflowExecutionError`` and dropping model / provider / category — so these assertions
+        fail loudly on exactly that regression (the convert-branch sibling test above would still
+        pass, which is why this branch needs its own coverage).
+        """
+        # The structured leaf report the nested failure carries, built like the activity bridge:
+        # an LLMCompletionError -> ErrorReport -> dict, packed into ApplicationError.details.
+        leaf_report_dict = ErrorReportParityTestData.make_failing_llm_error().to_error_report().to_dict()
+        # The already-terminal carrier: a TemporalError IS an ApplicationError (a Temporal
+        # FailureError) holding the leaf report in details — what sits in the chain after a child
+        # WfPipeRouter fails. Wrapped via ``from`` as WorkflowExecutionError, mirroring
+        # TemporalPipeRouter's ``raise WorkflowExecutionError(...) from ChildWorkflowError``.
+        already_terminal = TemporalError(
+            message=ErrorReportParityTestData.FAILURE_MESSAGE,
+            error_type="LLMCompletionError",
+            non_retryable=True,
+            error_report=leaf_report_dict,
+        )
+        nested_failure = WorkflowExecutionError("nested sub-pipe failed")
+        nested_failure.__cause__ = already_terminal
+        mocker.patch.object(
+            PipeAbstract,
+            "run_pipe",
+            new=mocker.AsyncMock(side_effect=nested_failure),
+        )
+
+        task_queue = f"q_inline_passthrough_{uuid.uuid4().hex[:8]}"
+        workflow_id = f"wf_inline_passthrough_{uuid.uuid4().hex[:8]}"
+        executor: WorkflowExecutor[PipeJob, PipeOutput] = WorkflowExecutor(
+            temporal_client=temporal_client,
+            task_queue=task_queue,
+            retry_policy=RetryPolicy(maximum_attempts=1),
+            workflow_execution_timeout=_FAILSAFE_EXECUTION_TIMEOUT,
+        )
+
+        async with get_task_manager().make_worker(temporal_client, task_queue=task_queue, is_not_sandboxed=True):
+            with pytest.raises(WorkflowExecutionError) as exc_info:
+                await executor.execute_workflow(
+                    workflow_class=WfPipeRouter,
+                    workflow_arg=failing_pipe_job,
+                    workflow_id=workflow_id,
+                )
+
+        report = exc_info.value.to_error_report()
+        # The LEAF classification survived end-to-end: error_type is the leaf's, NOT
+        # "WorkflowExecutionError" — proof the guard propagated the error untouched and let the
+        # submitter recover the original report, rather than re-wrapping it into a generic one.
+        assert report.error_type == "LLMCompletionError"
+        assert ErrorReportParityTestData.FAILURE_MESSAGE in report.message
+        assert report.error_category == ErrorReportParityTestData.FAILURE_CATEGORY
+        assert report.retryable == ErrorReportParityTestData.EXPECTED_RETRYABLE
+        assert report.model == ErrorReportParityTestData.FAILURE_MODEL
+        assert report.provider == ErrorReportParityTestData.FAILURE_PROVIDER
 
     async def test_wf_pipe_run_inline_error_fires_failed_webhook_and_surfaces_classification(
         self,

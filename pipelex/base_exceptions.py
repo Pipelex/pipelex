@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict
@@ -6,6 +7,28 @@ from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, U
 from pipelex.tools.misc.string_utils import pascal_case_to_kebab, pascal_case_to_sentence
 from pipelex.types import StrEnum
 from pipelex.urls import URLs
+
+
+def iter_cause_chain(exc: BaseException) -> Iterator[BaseException]:
+    """Yield ``exc`` and each error along its ``__cause__`` chain, exactly once.
+
+    The single cycle-guarded ``__cause__`` walk shared across the error-reporting
+    paths — classification recovery (``find_inference_error_category_in_chain``),
+    report extraction and message synthesis (``_find_error_report_dict`` /
+    ``_message_from_exc``), and the inline fail-safe guard
+    (``_carries_temporal_failure``). The ``id()`` set makes a cyclic ``__cause__``
+    chain terminate instead of spinning forever. That guard runs *on the error
+    path*, so getting it wrong would turn the failure being reported into the very
+    hang the reporting exists to surface — centralizing it here means it is
+    written, and audited, once.
+    """
+    node: BaseException | None = exc
+    seen: set[int] = set()
+    while node is not None and id(node) not in seen:
+        seen.add(id(node))
+        yield node
+        node = node.__cause__
+
 
 # Placeholder ``message`` substituted into a STRICT-mode serialization of a
 # report whose ``message`` is not caller-facing copy. A report flagged
@@ -504,13 +527,8 @@ class PipelexError(Exception):
         # Guard against a cyclic __cause__ chain: if self is reachable from cause, recursing
         # into cause.to_error_report() would never terminate. Bail out with the enrichment
         # gathered so far rather than raising a RecursionError from the error-reporting path.
-        node: BaseException | None = cause
-        seen: set[int] = set()
-        while node is not None and id(node) not in seen:
-            if node is self:
-                return report
-            seen.add(id(node))
-            node = node.__cause__
+        if any(node is self for node in iter_cause_chain(cause)):
+            return report
         cause_report = cause.to_error_report()
         # Only the cause-merged classification fields are updated; the wrapper-wins
         # fields (error_type, message, title, type_uri, caller_facing_message)

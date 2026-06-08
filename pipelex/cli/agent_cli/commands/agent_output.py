@@ -26,7 +26,7 @@ from typing import Any, NoReturn, cast
 
 import typer
 
-from pipelex.base_exceptions import PipelexError
+from pipelex.base_exceptions import PipelexError, iter_cause_chain
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.tools.misc.json_utils import clean_json_dumps
 from pipelex.types import StrEnum
@@ -197,11 +197,9 @@ def _build_error_source(exc: BaseException) -> list[str]:
         List of source location strings, outermost first.
     """
     sources: list[str] = []
-    current: BaseException | None = exc
-    while current is not None:
+    for current in iter_cause_chain(exc):
         if current.__traceback__ is None:
             sources.append(f"{type(current).__name__} (no traceback)")
-            current = current.__cause__
             continue
         tbe = traceback.extract_tb(current.__traceback__)
         if tbe:
@@ -214,7 +212,6 @@ def _build_error_source(exc: BaseException) -> list[str]:
             sources.append(location)
         else:
             sources.append(f"{type(current).__name__} (no traceback)")
-        current = current.__cause__
     return sources
 
 

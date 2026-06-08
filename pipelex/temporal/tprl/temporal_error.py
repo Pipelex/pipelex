@@ -5,7 +5,7 @@ from pydantic import ValidationError
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
-from pipelex.base_exceptions import ErrorReport, PipelexError
+from pipelex.base_exceptions import ErrorReport, PipelexError, iter_cause_chain
 from pipelex.cogt.exceptions import find_inference_error_category_in_chain
 from pipelex.config import get_config
 from pipelex.temporal.exceptions import UnrecoverableWorkflowFailureError
@@ -53,15 +53,11 @@ def _find_error_report_dict(exc: BaseException) -> dict[str, Any] | None:
     its failure via ``ChildWorkflowError.cause`` rather than ``__cause__``, so
     its caller passes ``exc.cause`` straight in.
     """
-    node: BaseException | None = exc
-    seen: set[int] = set()
-    while node is not None and id(node) not in seen:
+    for node in iter_cause_chain(exc):
         if isinstance(node, ApplicationError):
             report_dict = error_report_dict_from_details(node.details)
             if report_dict is not None:
                 return report_dict
-        seen.add(id(node))
-        node = node.__cause__
     return None
 
 
@@ -79,14 +75,10 @@ def _message_from_exc(exc: BaseException) -> str:
     win and the synthesized preamble would be visually broken.
     """
     deepest_message = ""
-    node: BaseException | None = exc
-    seen: set[int] = set()
-    while node is not None and id(node) not in seen:
-        seen.add(id(node))
+    for node in iter_cause_chain(exc):
         text = str(node)
         if text.strip():
             deepest_message = text
-        node = node.__cause__
     return deepest_message or repr(exc)
 
 

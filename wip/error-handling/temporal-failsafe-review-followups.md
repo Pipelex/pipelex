@@ -61,6 +61,8 @@ The fail-safe floor makes a pipelex **domain** error raised *inline in workflow 
 
 **Open question:** this is **subsumed by Finding 6** in the hardening doc — if both catch-alls are folded onto one `convert_inline_pipelex_error` helper, the guard becomes non-optional and the asymmetry disappears. Decide whether to fix it standalone (add the guard to `WfPipeRun`) or only as part of the Finding-6 consolidation. Recommendation: fold into Finding 6.
 
+**Resolution (open, assessed harmless).** Finding 6 was resolved *light-touch* — the catch-alls were **not** folded onto a shared helper (their control flow is irreducibly different: router raises immediately, parent defers so `act_deliver` fires the webhook), so the asymmetry remains by design. It is harmless: `WfPipeRun`'s `try` body holds only `execute_child_workflow` (caught by the prior `except ChildWorkflowError`) plus the pure `build_search_attributes` / `build_static_summary` argument evaluation, none of which can raise a `FailureError`-carrying `PipelexError`. A guarded branch in `WfPipeRun` would therefore be dead code. Revisit only if that `try` body gains a call that dispatches a Temporal boundary.
+
 ---
 
 ## Finding 5 — The inline path drops the original exception from the worker-side cause chain
@@ -111,6 +113,8 @@ The fail-safe floor makes a pipelex **domain** error raised *inline in workflow 
 **What:** the same argument — "only genuine inline errors are converted / an already-terminal escapee propagates untouched / scoped to `PipelexError` because transient infra errors keep task-retry" — is written out in full in many places. Any change to the policy must be edited in all of them or it rots.
 
 **Open question:** state the rationale once (the shared helper's docstring once Finding 6 lands, plus the `error-model.md` section which is the user-facing home), and have the call-sites carry a one-line pointer instead of re-deriving the whole argument. Confirm which location is canonical — recommendation: the helper docstring for the *code* contract, `error-model.md` for the *design* narrative.
+
+**Resolution (done, with the Finding-6 light touch).** Rationale deduped. Canonical homes: `_carries_temporal_failure`'s docstring for the *code* contract (the propagate-vs-convert decision + the `raise … from` invariant), and `docs/under-the-hood/error-model.md` "Workflow-Level Fail-Safe Floor" for the *design* narrative. No shared helper was introduced (the catch-alls stay separate), so the docstring of the guard — not a helper — is the code home. The router catch-all, the `WfPipeRun` catch-all, and the worker-registration comment were each trimmed to a one-line statement plus a pointer to those two homes. CHANGELOG keeps its single fail-safe entry.
 
 ---
 
