@@ -115,3 +115,9 @@ The pipelex runtime support is complete here. The recursive **orchestrator** (`m
 ## CHANGELOG (under `[Unreleased]`)
 
 The `[Unreleased]` entry in `CHANGELOG.md` covers the additive multi-file construction (reconciliation, cross-file concept resolution, domain-metadata merge, `pending_signatures`).
+
+---
+
+## Proposed pre-merge design change
+
+Review flagged that `PipeSignature` should not be a peer pipe type — it's a contract substrate of `PipeAbstract`, not a sibling of `PipeLLM`/`PipeSequence`. Plan to evict it from the `PipeType`/`PipeCategory` taxonomy (keeping it a dry-run shim, keeping `signature_for` for mthds-plugins): [`signature-taxonomy-refactor.md`](wip/recursivity/signature-taxonomy-refactor.md). To settle before merge.
