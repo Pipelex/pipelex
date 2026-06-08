@@ -4,8 +4,8 @@ Pins the shape documented in
 ``wip/temporal-primitives/id-and-naming-design.md`` §"Layer 1 — Identity":
 
 - Top-level: ``{env_prefix}{pipeline_run_id}``.
-- Fixed-role child: ``{parent}/pipe-router``.
-- Dynamic child (sub-pipe spawned by a router): ``{parent}/{pipe_code}-{8-hex}``.
+- Fixed-role child: ``{parent}_pipe-router``.
+- Dynamic child (sub-pipe spawned by a router): ``{parent}_{pipe_code}-{8-hex}``.
 
 The dynamic-child id uses ``workflow.uuid4()`` for replay-safety — Temporal's
 ``workflow.uuid4()`` is deterministic, unlike stdlib ``uuid.uuid4()`` (which
@@ -93,17 +93,19 @@ class TestChildWorkflowIdConstruction:
     sites — the formula itself is the contract.
     """
 
-    def test_fixed_role_child_uses_slash_pipe_router_suffix(self) -> None:
+    def test_fixed_role_child_uses_underscore_pipe_router_suffix(self) -> None:
         parent_workflow_id = "ut-3f9c8b2a-1e4d-4f5b-9c7a-2d8e1f0a6b3c"
 
         # Mirrors the construction in wf_pipe_run.py:
-        child_id = f"{parent_workflow_id}/pipe-router"
+        child_id = f"{parent_workflow_id}_pipe-router"
 
-        assert child_id == "ut-3f9c8b2a-1e4d-4f5b-9c7a-2d8e1f0a6b3c/pipe-router"
-        # The separator is `/`, not `-`, to keep the path structure unambiguous.
-        assert child_id.split("/") == [parent_workflow_id, "pipe-router"]
+        assert child_id == "ut-3f9c8b2a-1e4d-4f5b-9c7a-2d8e1f0a6b3c_pipe-router"
+        # The separator is `_`, never `/`: workflow ids must stay free of path
+        # separators so they can be reused verbatim as S3 keys / file names.
+        assert "/" not in child_id
+        assert child_id.endswith("_pipe-router")
 
-    def test_dynamic_child_uses_slash_pipe_code_and_8_hex_disambiguator(self, mocker: MockerFixture) -> None:
+    def test_dynamic_child_uses_underscore_pipe_code_and_8_hex_disambiguator(self, mocker: MockerFixture) -> None:
         """The dynamic-child id must be fully determined by
         (parent_workflow_id, pipe_code, workflow.uuid4() output) — i.e. the
         implementation must use ``workflow.uuid4()`` (replay-safe), not
@@ -119,10 +121,11 @@ class TestChildWorkflowIdConstruction:
         pipe_code = "translate_doc"
 
         # Mirrors the construction in temporal_pipe_router.py (child branch):
-        child_id = f"{parent_workflow_id}/{pipe_code}-{str(workflow.uuid4())[:8]}"
+        child_id = f"{parent_workflow_id}_{pipe_code}-{str(workflow.uuid4())[:8]}"
 
-        assert child_id == "ut-3f9c8b2a-1e4d-4f5b-9c7a-2d8e1f0a6b3c/translate_doc-7c1e2f8a"
+        assert child_id == "ut-3f9c8b2a-1e4d-4f5b-9c7a-2d8e1f0a6b3c_translate_doc-7c1e2f8a"
+        assert "/" not in child_id
         # Replay-determinism: re-running the same construction with the same
         # mock yields the same id.
-        child_id_again = f"{parent_workflow_id}/{pipe_code}-{str(workflow.uuid4())[:8]}"
+        child_id_again = f"{parent_workflow_id}_{pipe_code}-{str(workflow.uuid4())[:8]}"
         assert child_id_again == child_id

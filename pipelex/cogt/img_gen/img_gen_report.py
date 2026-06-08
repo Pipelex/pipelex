@@ -12,7 +12,6 @@ class ImgGenTokenCostReportField(StrEnum):
     MODEL_TYPE = "model_type"
     IMG_GEN_NAME = "img_gen_name"
     PLATFORM_IMG_GEN_ID = "platform_img_gen_id"
-    NB_TOKENS_INPUT = "nb_tokens_input"
     NB_TOKENS_INPUT_CACHED = "nb_tokens_input_cached"
     NB_TOKENS_INPUT_NON_CACHED = "nb_tokens_input_non_cached"
     NB_TOKENS_INPUT_JOINED = "nb_tokens_input_joined"

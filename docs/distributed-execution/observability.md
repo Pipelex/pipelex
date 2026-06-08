@@ -43,16 +43,16 @@ Because the workflow id is derived from `pipeline_run_id`, a caller that control
 
 ### Child workflows
 
-Pipelex builds child workflow ids as slash-separated paths off the parent's workflow id:
+Pipelex builds child workflow ids off the parent's workflow id, joined with an underscore:
 
 ```
-{parent_workflow_id}/pipe-router               # the fixed WfPipeRouter child of WfPipeRun
-{parent_workflow_id}/{pipe_code}-{8-hex}       # a sub-pipe spawned by a router
+{parent_workflow_id}_pipe-router               # the fixed WfPipeRouter child of WfPipeRun
+{parent_workflow_id}_{pipe_code}-{8-hex}       # a sub-pipe spawned by a router
 ```
 
-The 8-hex suffix comes from `workflow.uuid4()` — Temporal's replay-safe UUID generator — so child workflow ids stay deterministic across worker restarts.
+The 8-hex suffix comes from `workflow.uuid4()` — Temporal's replay-safe UUID generator — so child workflow ids stay deterministic across worker restarts. The separator is an underscore, never a slash, so a workflow id can be reused verbatim as an S3 key or file name without creating spurious path segments.
 
-Operational tooling that parsed the previous nested-id format (which used `-` as the separator) must update to handle `/`.
+Operational tooling that parses the nested-id format must handle `_` as the separator.
 
 ---
 

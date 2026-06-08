@@ -611,7 +611,55 @@ def get_required_concept(concept_ref: str) -> Concept:
     return get_pipelex_hub().get_library().concept_library.get_required_concept(concept_ref=concept_ref)
 
 
+_current_pipe_router: ContextVar["PipeRouterProtocol | None"] = ContextVar("current_pipe_router", default=None)
+
+
+def set_pipe_router(pipe_router: "PipeRouterProtocol") -> None:
+    """Override the active pipe router for the current async context.
+
+    Used by host runtimes that want controllers to dispatch sub-pipes
+    through their own router (e.g. Mistral-native mode swaps in a router
+    that turns sub-pipe calls into child workflows / activities). The
+    override is contextvar-scoped, so concurrent runs on the same hub
+    don't leak into each other. Pass ``None`` via
+    ``teardown_current_pipe_router()`` to restore the hub default.
+    """
+    _current_pipe_router.set(pipe_router)
+
+
+def teardown_current_pipe_router() -> None:
+    """Clear any contextvar-scoped router override set by ``set_pipe_router``."""
+    _current_pipe_router.set(None)
+
+
+@contextmanager
+def scoped_pipe_router(pipe_router: "PipeRouterProtocol") -> Generator[None, None, None]:
+    """Set ``pipe_router`` as the active router for the scope, then restore the prior value on exit.
+
+    Captures the prior ``_current_pipe_router`` ContextVar value before setting
+    the new one. On exit — success or exception — restores the prior override
+    (or clears it if there wasn't one). Use this whenever a call needs its own
+    router for the *whole* run (root pipe + nested controller sub-pipes, which
+    resolve :func:`get_pipe_router`) without clobbering an outer caller's
+    override. Mirrors :func:`scoped_current_library`.
+
+    Prefer this over the raw ``set_pipe_router`` / ``teardown_current_pipe_router``
+    pair internally: the raw teardown unconditionally resets the override to
+    ``None`` and so does not restore an outer override. The raw pair is kept
+    because the external ``pipelex-mistralai-workflows`` plugin depends on it.
+    """
+    prev = _current_pipe_router.get()
+    _current_pipe_router.set(pipe_router)
+    try:
+        yield
+    finally:
+        _current_pipe_router.set(prev)
+
+
 def get_pipe_router() -> "PipeRouterProtocol":
+    override = _current_pipe_router.get()
+    if override is not None:
+        return override
     return get_pipelex_hub().get_required_pipe_router()
 
 

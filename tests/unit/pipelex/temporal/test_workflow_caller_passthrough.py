@@ -96,7 +96,7 @@ class TestWorkflowCallerPassthrough:
         await executor.execute_child_workflow(
             workflow_class=_StubWorkflow,
             workflow_arg={"foo": "bar"},
-            workflow_id="ut-test-run/pipe-router",
+            workflow_id="ut-test-run_pipe-router",
             search_attributes=_SEARCH_ATTRS,
             static_summary=_SUMMARY,
             static_details=_DETAILS,
@@ -117,7 +117,7 @@ class TestWorkflowCallerPassthrough:
         await executor.start_child_workflow(
             workflow_class=_StubWorkflow,
             workflow_arg={"foo": "bar"},
-            workflow_id="ut-test-run/pipe-router",
+            workflow_id="ut-test-run_pipe-router",
             search_attributes=_SEARCH_ATTRS,
             static_summary=_SUMMARY,
             static_details=_DETAILS,
