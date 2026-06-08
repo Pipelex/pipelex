@@ -61,12 +61,15 @@ class TemporalPipeRouter(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtoc
 
         if is_in_temporal_workflow():
             # Child workflow dispatch (inside a Temporal workflow).
-            # The child id is a slash-separated path off the parent's workflow id,
-            # with a pipe-code prefix for readability and an 8-hex-char disambiguator
-            # from ``workflow.uuid4()`` (replay-safe — Temporal's uuid4 is deterministic).
+            # The child id is built off the parent's workflow id with an underscore
+            # separator, a pipe-code segment for readability and an 8-hex-char
+            # disambiguator from ``workflow.uuid4()`` (replay-safe — Temporal's uuid4
+            # is deterministic). The separator is ``_``, never ``/``: workflow ids must
+            # stay free of path separators so they can be reused verbatim as S3 keys or
+            # file names without spawning spurious directory segments.
             log.debug("TemporalPipeRouter: child workflow dispatch")
             parent_workflow_id = workflow.info().workflow_id
-            child_workflow_id = f"{parent_workflow_id}/{pipe_job.pipe.code}-{str(workflow.uuid4())[:8]}"
+            child_workflow_id = f"{parent_workflow_id}_{pipe_job.pipe.code}-{str(workflow.uuid4())[:8]}"
             # Dispatch via ``workflow.execute_child_workflow`` directly. The
             # ``WorkflowExecutorFactory`` is only safe at the submitter boundary
             # because it reads ``get_config().temporal.worker_config`` to seed

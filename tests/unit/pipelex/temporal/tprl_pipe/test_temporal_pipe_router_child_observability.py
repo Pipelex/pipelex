@@ -114,5 +114,5 @@ class TestTemporalPipeRouterChildObservability:
         # Existing kwargs must still be present on the child dispatch.
         assert kwargs.get("static_summary") == expected_summary
         assert kwargs.get("search_attributes") is not None
-        # Child workflow id is built as `{parent}/{pipe_code}-{8 hex}`.
-        assert kwargs.get("id") == "ut-parent-wf-id/translate_doc-deadbeef"
+        # Child workflow id is built as `{parent}_{pipe_code}-{8 hex}`.
+        assert kwargs.get("id") == "ut-parent-wf-id_translate_doc-deadbeef"

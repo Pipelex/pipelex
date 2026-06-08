@@ -59,7 +59,7 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
             pipe_output = await workflow.execute_child_workflow(
                 WfPipeRouter.run,
                 arg=pipe_job,
-                id=f"{workflow.info().workflow_id}/pipe-router",
+                id=f"{workflow.info().workflow_id}_pipe-router",
                 search_attributes=build_search_attributes(pipe_job),
                 static_summary=build_static_summary(pipe_job.pipe),
             )
