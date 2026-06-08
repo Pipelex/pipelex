@@ -1,124 +1,159 @@
-# PipeSearch has no Temporal activity — search pipes hang the runner API
+# Bug: `/validate` dry-run leaks nested controller sub-pipes to Temporal
 
-**Status:** fixed in this PR — search now routes through the ContentGenerator seam (`act_search_generate.py`, `search_generate.py`, `ContentGeneratorProtocol.make_search_*`, and the `PipeSearch._live_run_operator_pipe` rewrite). The root-cause analysis below is retained as the as-built record of the work.
-**Severity:** high — any MTHDS bundle with a `PipeSearch` step, run through the Temporal path, hangs the caller forever instead of returning (or failing). On the happy path it is also unsound (non-deterministic on replay — see below).
-**Discovered from:** `pipelex-api` running locally against a local `pipelex-worker` + `temporal server start-dev`, all three on the same local `pipelex` checkout. Repro bundle: `pipelex-demos/mthds-wip/fashion_moodboard` (has a search step). Control bundle that works: `pipelex-demos/mthds-wip/joke_judge` (LLM only).
+> ## ✅ RESOLVED (branch `fix/Temporal-dry-run`)
+>
+> Fixed with the `scoped_pipe_router` approach below — **no** Temporal validation activity or leaf run-mode-mock follow-up was needed. The sweep was always meant to run fully in-process (per `BundleValidator`'s own docstring); the leak was simply that the in-process router was built but never installed as the active `get_pipe_router()` override, so nested controllers fell through to the hub-default Temporal router. The fix mirrors the existing DIRECT-mode precedent in `runtime_bridge/bridge.py::_run_direct`.
+>
+> **Changed:**
+>
+> - `pipelex/pipeline/bundle_validator.py` — keep the in-process `PipeRouter` as `self._pipe_router`; wrap the per-pipe sweep loop in `with scoped_pipe_router(self._pipe_router)`.
+> - `tests/integration/pipelex/pipeline/test_bundle_validator.py` — regression test `test_standalone_batch_sweep_scopes_in_process_router`: installs a raising hub-default router and asserts a standalone-`PipeBatch` sweep classifies SUCCESS without ever touching it (verified it fails without the scope).
+>
+> **Verified:** `make agent-check` clean; targeted pipeline/pipe_run/pipes/graph suites + full `make agent-test` green. The two deferred follow-ups (`wip/dry-run-refactor/followup-temporal-validation-activity.md`, `followup-leaf-run-mode-mock.md`) remain validly deferred — distributed-execution evolutions, not prerequisites for this fix.
+>
+> ### ⚠️ Correction to the "Secondary issue" section below — it was MISDIAGNOSED
+>
+> The secondary section claims `dry_run_pipeline()` (the best-effort graph step in `validate.py`) has "the same leak." **It does not.** The graph step does a **single** top-level dispatch of the main pipe — no concurrent same-id collision — so under Temporal it dispatches the one workflow to the worker, which (tracing enabled, `backend = "temporal_dynamodb"`) assembles the `GraphSpec` and returns it on `PipeOutput`. That is the intended distributed design: `pipelex-api` runs with `[pipelex.tracing_config] is_enabled = false` (thin submitter, does not trace); the **worker** owns tracing + graph assembly.
+>
+> An attempt to "fix" this by forcing `dry_run_pipeline` in-process (scoped in-process router + injected `PipeRun`) was **reverted** — it broke graph generation: forced into the API process where tracing is off, `assemble_tracing` early-returns empty → `graph_spec` None → the route logs `"dry-run did not produce a graph (PipelexError)"` and drops the graph. The graph step is left dispatching to Temporal (worker assembles + returns the graph). If a `/validate` graph is wanted **without** a worker, the real lever is enabling tracing in the API (`[pipelex.tracing_config] is_enabled = true` with an in-process backend like `ndjson`), not changing the router — a separate deployment decision, not part of this bug.
 
-## Where this brief lives vs. where the fix happens
-
-This brief is written in `pipelex-api/wip/` because that's where the symptom surfaced, but **the entire fix is in the `pipelex` repo** (the open-source runtime). The next session is expected to run from a `pipelex` worktree.
-
-**Path convention for the next session:** every `pipelex/...` path below is relative to the **pipelex repo root**. You are in a worktree, so that root is your worktree root — use the paths as-is. Do **not** reach into a sibling `../pipelex/` checkout; work entirely inside your worktree. (Per workspace `CLAUDE.md`, dirs starting with `_` are pipelex worktrees; treat the worktree as the root.)
-
-Nothing in `pipelex-api` needs to change for this bug. The API just calls `runner.execute_pipeline(...)`; the runner dispatches to Temporal; the gap is entirely on the worker/workflow side in `pipelex`.
+**Where the fix belongs:** `pipelex` core (the runtime), **not** `pipelex-api`. Paths below are relative to the `pipelex` repo (locally the editable `_search` worktree on branch `feature/PipeSearch-Temporal`). No change is needed in `pipelex-api`.
 
 ## Symptom
 
-Running a bundle whose pipe includes a web-search step against the API (sync `POST /api/v1/pipeline/execute`, which goes through Temporal because `temporal.is_enabled = true` in the local config) **never returns**. The HTTP request hangs. The worker logs show the underlying error repeating, e.g.:
+With the API running Temporal-enabled (`.pipelex/pipelex_override.toml` → `[temporal] is_enabled = true`, task queue `pipelex_dev`) and a worker up:
+
+- `make bundle-validate BUNDLE=.../fashion_moodboard` → **HTTP 422**
+- `make bundle-validate BUNDLE=.../joke_judge` → **OK**
+- `make bundle-run BUNDLE=.../fashion_moodboard` (full run) → **OK**
+- `pipelex validate bundle .../fashion_moodboard` (CLI) → **OK**
+
+The 422 body:
 
 ```
-SearchJobFailureError: gateway inference failed for model 'linkup-standard →
-SDK[gateway_search]•Backend[pipelex_gateway]•Model[linkup/standard]': Connection error.
+ValidateBundleError (error_domain=input), 422
+detail: "Dry run failed with 1 unexpected pipe failure(s):
+  'fashion_moodboard.create_moodboards': ... status=DryRunStatus.FAILURE
+  error_message=\"Dry run failed for pipe 'fashion_moodboard.create_moodboards':
+  Failed to execute workflow WfPipeRouter\""
 ```
 
-The connection error itself is incidental (local Linkup creds/network). The bug is that **this error — or any search outcome — never crosses the Temporal boundary back to the submitter**, so all the error-handling work in `pipelex/wip/error-handling/` (RFC 7807 problem responses, `ErrorReport` parity, submitter-side report recovery) never gets a chance to run. The same call run with Temporal *disabled* would surface the error correctly as an RFC 7807 response (direct path: `SearchJobFailureError` → propagates → `PipelineExecutionError` → API global handler).
+The string **"Failed to execute workflow WfPipeRouter"** (no trailing detail) is produced only at `pipelex/temporal/tprl/workflow_caller.py:136`, the `(WorkflowAlreadyStartedError, RPCError)` branch of `WorkflowExecutor.execute_workflow` — i.e. a **top-level** Temporal workflow dispatch from the submitter side. A dry run should never reach that code.
 
 ## Root cause
 
-**`PipeSearch` is the only inference operator that does not route its leaf call through the swappable `ContentGenerator` abstraction, and there is no `act_search` Temporal activity.**
+The `/validate` path runs an **in-process** dry-run sweep, but nested controller sub-pipes leak out to the Temporal router.
 
-Every other inference operator calls `get_content_generator()` and invokes a `make_*` method on it:
+Flow: `api/routes/pipelex/validate.py` → `validate_bundle()` (`pipelex/pipeline/validate_bundle.py`) → `BundleValidator.validate_pipes()` (`pipelex/pipeline/bundle_validator.py`).
 
-| Operator dir | uses `get_content_generator()` | calls a `*WorkerFactory` directly |
-|---|---|---|
-| `llm` | yes | no |
-| `img_gen` | yes | no |
-| `extract` | yes | no |
-| `compose` | yes | no |
-| `structure` | yes | no |
-| **`search`** | **no** | **yes** |
+`BundleValidator` deliberately builds a **local, in-process** execution primitive so the sweep never touches Temporal — its own module docstring says so:
 
-When `temporal.is_enabled`, `Pipelex.make()` sets the hub's content generator to `ContentGeneratorInWorkflow` (`pipelex/pipelex.py:373-385`). That class implements every `make_*` method as `await workflow.execute_activity(act_*)` (`pipelex/temporal/tprl_content_generation/content_generator_in_workflow.py`). So inside the workflow, an LLM/img/extract leaf automatically becomes an activity. The activity is wrapped with `@convert_pipelex_errors` (`pipelex/temporal/tprl/activity_error_boundary.py`), which converts any `PipelexError` into `TemporalError(ApplicationError)`.
+```python
+# pipelex/pipeline/bundle_validator.py  (__init__)
+self._pipe_run: PipeRunProtocol = PipeRun(pipe_router=PipeRouter(observer=ObserverNoOp()))
+```
 
-`PipeSearch._live_run_operator_pipe` (`pipelex/pipe_operators/search/pipe_search.py:78-165`) does **none** of that. It builds a worker directly via `SearchWorkerFactory.make_search_worker(...)` and calls `worker.search_sourced_answer(...)` / `worker.search_structured(...)` **inline** (lines 122, 138, 141). There is no `make_search*` on the `ContentGenerator` protocol (`pipelex/cogt/content_generation/content_generator_protocol.py`), and `grep -rn act_search` across the repo returns nothing — **the activity was never created.** Search was added long after the other operators (per the repo owner) and this wiring step was missed.
+> "The per-pipe execution primitive is a **locally-constructed** `PipeRun` — explicitly **not** the hub's `get_pipe_run()`, which under a Temporal hub would spawn a workflow per pipe."
 
-Because `pipe.run_pipe(...)` executes *inside* the workflow (`pipelex/temporal/tprl_pipe/wf_pipe_router.py:139`), the search worker's real HTTP call runs **inside the workflow event loop** — which is only not-immediately-rejected because the worker is started with `--no-sandbox`.
+**But that local router is only used for the _top-level_ pipe.** Every controller dispatches its nested sub-pipes through the **hub's** `get_pipe_router()`, not the injected router. This is broad — it is **not** specific to `PipeBatch`:
 
-## Exact mechanism of the hang
+```python
+# pipelex/pipe_controllers/batch/pipe_batch.py  (_live_run_controller_pipe)
+return await get_pipe_router().run(pipe_job=PipeJobFactory.make_pipe_job(...))
 
-Temporal distinguishes two failure kinds raised from workflow code:
+# pipelex/pipe_controllers/sub_pipe.py  (SubPipe.run_pipe — used by EVERY PipeSequence step;
+# also the inline `batch_over` path and the PipeCondition path)
+pipe_output = await get_pipe_router().run(pipe_job=PipeJobFactory.make_pipe_job(...))
+```
 
-- **Workflow execution failure (terminal):** raised when the exception is an `ApplicationError`/`FailureError`, or a type listed in the worker's `workflow_failure_exception_types`. The workflow ends; the failure is returned to the submitter.
-- **Workflow task failure (non-terminal):** any *other* exception. Temporal assumes it's a transient/code bug and **retries the workflow task indefinitely**. The workflow never ends; the submitter waits forever.
+`get_pipe_router()` (`pipelex/hub.py`) returns a contextvar override **if one is set**, else the hub default:
 
-The pipelex worker registers `workflow_failure_exception_types=[WorkflowExecutionError]` (`pipelex/temporal/temporal_task_manager.py:148`). So:
+```python
+def get_pipe_router() -> "PipeRouterProtocol":
+    override = _current_pipe_router.get()
+    if override is not None:
+        return override
+    return get_pipelex_hub().get_required_pipe_router()
+```
 
-- **LLM leaf (works):** activity raises `TemporalError(ApplicationError)`; on the workflow side `ContentGeneratorInWorkflow` / `WfPipeRouter`'s `except ActivityError` re-raises `TemporalError.from_app_error(...)` (an `ApplicationError`). `ApplicationError` always fails the workflow terminally → propagates to the API → RFC 7807. ✅
-- **Search leaf (hangs):** raises a raw `SearchJobFailureError` (a `CogtError`/`PipelexError`, **not** an `ApplicationError`, **not** a `WorkflowExecutionError`). It is not caught by `WfPipeRouter`'s only handler (`except ActivityError`, `wf_pipe_router.py:146` — a `SearchJobFailureError` is not an `ActivityError`). It propagates out of the workflow as an unclassified exception → **workflow task failure → infinite workflow-task retry → submitter hangs.** The worker log line repeats once per retry. ❌
+In the Temporal-enabled API process the hub default is the **`TemporalPipeRouter`** (wired in `pipelex/pipelex.py` ~L452). Called from the API process — i.e. **outside** any Temporal workflow (`is_in_temporal_workflow()` is False) — `TemporalPipeRouter._run_pipe_job` (`pipelex/temporal/tprl_pipe/temporal_pipe_router.py`) takes the **top-level dispatch** branch → `executor.execute_workflow(WfPipeRouter, ...)` → fails → "Failed to execute workflow WfPipeRouter". The per-pipe dry run is marked `FAILURE`, `BundleValidator._aggregate` raises `DryRunError`, `validate_bundle` translates it to `ValidateBundleError`, and the global handler renders 422.
 
-That is the full chain that produces "errors but they are not returned by the API, it all just hangs."
+`BundleValidator` builds the in-process router but **never installs it as the `scoped_pipe_router(...)` override**, so the nested controllers fall through to the hub default (Temporal).
 
-## The happy path is also unsound (not just the error path)
+## FAIL vs. FALSE-PASS — the leak happens always; only some shapes 422
 
-Even when the search call *succeeds*, running it inline in the workflow is the classic "side effect inside a workflow" anti-pattern:
+The leak (nested dispatch → `TemporalPipeRouter`) happens for **every** bundle with a controller. Whether the dry run **fails** depends on a Temporal **workflow-id collision**:
 
-- The result is **not recorded in workflow history** (no activity = no recorded result). On any replay — worker restart, a later workflow task, cache eviction — Temporal re-executes the workflow code and **re-runs the real search** (extra provider spend, different results) or trips a non-determinism check.
-- Real network I/O on the deterministic workflow loop is unsupported in general; `--no-sandbox` only removes the import/static sandbox, not the determinism contract.
+- `make_top_workflow_id` (`pipelex/temporal/temporal_manager.py`) is `f"{prefix}{pipeline_run_id}"` — derived from `pipeline_run_id` **alone** (prefix empty in NORMAL mode). The whole sweep shares **one** `dry_run_pipeline_id` (set once in `validate_pipes`, passed as every pipe's `pipeline_run_id`). So **every** top-level Temporal dispatch in a sweep computes the **same** workflow id.
+- `WorkflowExecutor.execute_workflow` **waits for completion**, and no `id_reuse_policy` is set → Temporal's default `ALLOW_DUPLICATE` (reuse allowed once the prior run has *closed*). So **serial** dispatches reusing that id are fine; only **concurrent** same-id dispatches collide → `WorkflowAlreadyStartedError` → caught at `workflow_caller.py:136` → `WorkflowExecutionError("Failed to execute workflow WfPipeRouter")`. (`WorkflowExecutionError` is a `PipelexError`, so `_classify_pipe` records it as a dry-run `FAILURE` → 422, not a 500.)
 
-So "add the missing activity" is a correctness fix for search-on-Temporal as a whole; the hang is merely its most visible symptom.
+The deciding structural factor is **standalone batch/parallel vs. batch-reached-as-a-sub-pipe**:
 
-## The fix (mirror the established LLM pattern)
+- A **standalone top-level `PipeBatch`/`PipeParallel`** that the sweep dry-runs *directly* runs its top level on the local in-process router, but its **fan-out loop executes in the API process** (`_live_run_controller_pipe` → `gather_bounded`) and fires **N concurrent top-level Temporal dispatches** with the same id → collision → **FAILURE**. A mocked "multiple" list yields `nb_stuffs = 3` (`working_memory_factory.py:232`), so N≥2.
+- A **batch reached as a sub-pipe** (inline `batch_over` step, or a batch nested under a sequence/parallel) is dispatched as a **single** top-level workflow — the fan-out into branches then happens **inside the worker** as child workflows (legal). Sequence steps run serially, so it's one dispatch at a time → **no concurrent collision** → it **passes** (still round-tripping Temporal, just not colliding).
 
-The clean fix makes search a first-class, swappable content-generation operation exactly like LLM/img/extract. All paths in `pipelex`:
+## Why each observed case behaves as it does
 
-1. **Framework-agnostic activity core.** Add a `search_generate.py` under `pipelex/cogt/content_generation/` (sibling of `llm_generate.py`) with async functions that take a serializable assignment and call the search worker — e.g. `search_gen_sourced_answer(search_assignment)` and `search_gen_structured(search_assignment)`. Internally they do what `pipe_search.py:122-141` does today (resolve `inference_model` → `SearchWorkerFactory.make_search_worker` → `worker.search_*`).
+- **`joke_judge` via API:** simple pipe, no nested controller dispatch → never calls `get_pipe_router()` → stays in-process. ✅ (genuinely correct)
+- **`fashion_moodboard` via API → 422:** `create_moodboards` is a **standalone `PipeBatch`** (`inputs = { inspirations = "FashionInspiration[]" }`). Swept directly → fan-out of 3 mock items → 3 concurrent same-id top-level dispatches → `WorkflowAlreadyStartedError`. This is also why **only** `create_moodboards` was reported failing and **not** `create_collection_moodboards` (the sequence that has it as a step): as a step the batch is one top-level dispatch (no collision); only the standalone direct sweep fans out concurrently in-process. ❌
+- **`cv_batch_screening` via API → passes, but FALSE PASS:** no standalone `PipeBatch`; its only batch is the inline `batch_over` on the `process_cv` step (`main_pipe` is a `PipeSequence`). Every batch is reached as a sub-pipe → single top-level dispatch, serial → no collision. It still **round-trips nested pipes through Temporal** for a "no-inference, no-cost" dry run, and would 422 if the worker were down (→ `RPCError`, same `except` branch) or if any standalone batch/parallel were ever swept. ⚠️
+- **`fashion_moodboard` full run (`make bundle-run`):** goes through Temporal on purpose; the top level runs as a workflow on the worker, where `is_in_temporal_workflow()` is True → controllers do **child-workflow** dispatch (legal). ✅
+- **CLI `pipelex validate bundle`:** Temporal disabled → hub default router *is* the in-process `PipeRouter`. ✅
 
-2. **Serializable assignment model.** Add a `SearchAssignment` next to `LLMAssignment`/`ObjectAssignment` (`pipelex/cogt/content_generation/assignment_models.py`) carrying `job_metadata`, the rendered `query`, the resolved `SearchSetting`/model handle, and the `include_domains`/`exclude_domains`/`from_date`/`to_date` overrides. Confirm it round-trips through the Temporal payload codec (`SearchJob`, `SearchSetting` already look serializable — verify).
+The `scoped_pipe_router` fix below removes the Temporal round-trip for the whole sweep, fixing both the real `create_moodboards`-style failure **and** the silent false-pass leak.
 
-3. **Activity.** Add `pipelex/temporal/tprl_content_generation/act_search_generate.py` with `act_search_*` functions decorated `@activity.defn` + `@convert_pipelex_errors` (copy `act_llm_generate.py` verbatim as the template). This is what converts `SearchJobFailureError` → `TemporalError(ApplicationError)` so it fails the workflow terminally and surfaces.
+## The fix (mirror an existing, already-correct pattern)
 
-4. **Register the activity.** Add the new activities to `Tasks.TASK_PACKS[PackName.CRAFTING].activity_list` (`pipelex/temporal/tasks.py:24-35`) and to the worker-scope `required_activities` / `crafting` pack in the config TOMLs (`pipelex/pipelex.toml` + `.pipelex/pipelex.toml` + `pipelex/kit/configs/pipelex.toml` — grep `act_llm_gen_text` to find every list that enumerates activities and add the search ones alongside).
+The codebase already solved this exact leak for DIRECT mode in `pipelex/runtime_bridge/bridge.py::_run_direct`, with a comment describing the precise failure mode:
 
-5. **Protocol + all three implementations.** Add `make_search*` to `ContentGeneratorProtocol` (`content_generator_protocol.py`), then implement in:
-   - `ContentGenerator` (direct, `content_generator.py`) — call the core inline.
-   - `ContentGeneratorInWorkflow` (`content_generator_in_workflow.py`) — `await workflow.execute_activity(act_search_*, arg=search_assignment, **resolve_dispatch(...).to_execute_kwargs())`, with the same `except ActivityError → from_app_error` block as `make_llm_text` (lines 115-126). Use `worker_config.resolve_dispatch(activity_name=act_search_*.__name__, routing_key=<search handle>, ...)` for queue/timeout/retry.
-   - `ContentGeneratorDry` (`content_generator_dry.py`) — return the dry-run mock currently built in `PipeSearch._dry_run_operator_pipe` (lines 167-204), so the dry-run mock moves behind the same seam.
+```python
+# DIRECT mode forces in-process execution even inside a Temporal-enabled worker.
+# Scope the in-process router as the active router for the WHOLE run so nested
+# controller sub-pipes — which dispatch through get_pipe_router() — resolve THIS
+# router rather than falling back to the hub default. Without the scope, the hub
+# default in a Temporal-enabled worker is the Temporal router, so a DIRECT-mode
+# sequence/batch would leak its nested pipes to Temporal, defeating the point of DIRECT.
+direct_router = PipeRouter()
+with scoped_pipe_router(direct_router):
+    pipe_run = PipeRun(pipe_router=direct_router)
+    ...
+```
 
-6. **Rewrite `PipeSearch._live_run_operator_pipe`** to call `content_generator = get_content_generator()` then `await content_generator.make_search*(...)` instead of building the worker directly. Keep prompt rendering (step 1, lines 97-102) and model/setting resolution (steps 2-4, lines 104-119) where they are, *or* push them into the core — your call, but match how `PipeLLM` splits "resolve setting in the operator" vs "run leaf in the generator".
+`BundleValidator` needs the same guard around its dry-run sweep:
 
-**Structured-search tip for crossing the boundary:** `search_structured` returns a `result_dict` that `PipeSearch` then `model_validate`s into the output structure class (`pipe_search.py:141-142`). Have the activity return the **raw dict** and do `output_structure_class.model_validate(result_dict)` on the submitter side *after* the activity returns (it's pure and deterministic). That sidesteps having to ship a dynamic output class across the Temporal boundary — simpler than the `ObjectAssignment`/library-crate machinery the object activities use. `search_sourced_answer` returns a `SearchResultContent` (a `StuffContent` `BaseModel`) which is directly serializable.
+1. In `__init__`, keep the router instance (don't discard it inside `PipeRun(...)`):
+   ```python
+   self._pipe_router = PipeRouter(observer=ObserverNoOp())
+   self._pipe_run: PipeRunProtocol = PipeRun(pipe_router=self._pipe_router)
+   ```
+2. In `validate_pipes`, wrap the **per-pipe dry-run sweep loop** (step 4 — the `for pipe in sweepable_pipes: ... _classify_pipe(...)`) in:
+   ```python
+   from pipelex.hub import scoped_pipe_router  # add to the existing hub import block
 
-**Optional hardening:** add a loud guard so a search leaf can never again silently run inline in a workflow — e.g. in the search path, if `workflow.in_workflow()` is true and the call did not go through an activity, raise a clear `PipelexError`. Cheap insurance against the next operator that forgets this wiring.
+   with scoped_pipe_router(self._pipe_router):
+       for pipe in sweepable_pipes:
+           results[pipe.pipe_ref] = await self._classify_pipe(...)
+   ```
+   Wrapping `validate_pipes` covers all entry points (`acquire_and_validate`, `validate_current_library`, and the direct `validate_bundle` path all funnel through it). Steps 1–3 (wiring check, signature pre-pass, telemetry) don't run pipes, so they don't need the scope.
 
-## How to reproduce
+### Why this is safe
+- `scoped_pipe_router` is **contextvar-scoped** and restores the prior value on exit, so concurrent `/validate` requests don't leak into each other.
+- `PipeBatch` fans branches out via `gather_bounded` → `asyncio.gather`, whose Tasks copy the current context at creation (and creation happens inside the `with` scope), so each branch task inherits the override and resolves the in-process router too.
 
-Pipelex-native (no `pipelex-api` needed), from your worktree:
-1. Ensure `temporal.is_enabled = true` and a local Temporal dev server is up (`temporal server start-dev`).
-2. Start a worker against your worktree: `pipelex worker --no-sandbox` (the `crafting` + `pipe` packs).
-3. Run any bundle with a `PipeSearch` step through the Temporal path (a search pipe; `fashion_moodboard` from `pipelex-demos/mthds-wip/` is the known one). Either force a search failure (bad/empty Linkup creds → "Connection error") **or** let it succeed and then kill+restart the worker mid-run to trigger replay.
-4. Observe: the workflow never completes; the Temporal UI shows the workflow stuck with a repeating **workflow-task failure** (not a workflow execution failure), and the worker logs print the search error once per retry.
+## Secondary issue (related, lower priority)
 
-Original repro that found it (in `pipelex-api`, for reference only): `make bundle-run BUNDLE=/Users/lchoquel/repos/Pipelex/pipelex-demos/mthds-wip/fashion_moodboard` with the API + worker + temporal all running — the command hangs.
+The best-effort **graph** step in `validate.py` — `dry_run_pipeline()` (`pipelex/pipe_run/dry_run_pipeline.py`) → `PipelexRunner(...).execute_pipeline(...)` — has the **same leak**: with Temporal enabled, the runner's `_pipe_run` defaults to the hub's `get_pipe_run()` (Temporal), so nested controllers/graph generation also try to hit Temporal. It does not 422 because `validate.py` wraps it in `try/except PipelexError` and just logs a warning, **but it means `/validate` silently never returns a `graph_spec` in Temporal mode.** Same root cause, same style of fix (run the dry run in-process / scope an in-process router). Worth fixing in the same change so the validate response actually carries the graph.
 
-## How to verify the fix
+## How to verify after fixing (local setup)
 
-- The same search-failure run now **returns** a classified error: the workflow fails terminally (workflow *execution* failure, visible in Temporal UI), and the submitter gets a `PipelineExecutionError` whose `to_error_report()` carries the search `error_category`/`model`/`provider` — same data as the identical run on the direct (non-Temporal) path. Through the API that becomes an RFC 7807 `application/problem+json` response instead of a hang.
-- A *successful* search now shows an `act_search_*` activity in the workflow history (result recorded → replay-safe).
-- Add a parity test mirroring the existing pair (`tests/integration/pipelex/temporal/test_workflow_error_report_full_chain.py` ↔ `tests/integration/pipelex/error_handling/test_error_report_local_full_chain.py`) but for a search pipe, asserting identical `ErrorReport` local vs Temporal.
+API on :8081 (`make run`), Temporal server + worker up (from `pipelex-worker`), both on the editable `pipelex` checkout.
 
-## Reference file map (all relative to pipelex repo root / your worktree root)
+```bash
+# was failing → should now 200 with validated bundle (+ graph if the secondary issue is fixed too)
+make bundle-validate BUNDLE=/Users/lchoquel/repos/Pipelex/pipelex-demos/mthds-wip/fashion_moodboard
+# regression guard → still 200
+make bundle-validate BUNDLE=/Users/lchoquel/repos/Pipelex/pipelex-demos/mthds-wip/joke_judge
+```
 
-- Bug site: `pipelex/pipe_operators/search/pipe_search.py` (`_live_run_operator_pipe` lines 78-165; dry-run lines 167-204)
-- Pattern to copy — activity: `pipelex/temporal/tprl_content_generation/act_llm_generate.py`
-- Pattern to copy — in-workflow dispatch: `pipelex/temporal/tprl_content_generation/content_generator_in_workflow.py:94-128` (`make_llm_text`)
-- Protocol to extend: `pipelex/cogt/content_generation/content_generator_protocol.py`
-- Direct impl: `pipelex/cogt/content_generation/content_generator.py`; dry impl: `content_generator_dry.py`
-- Assignment models: `pipelex/cogt/content_generation/assignment_models.py`
-- Activity error boundary: `pipelex/temporal/tprl/activity_error_boundary.py` (`convert_pipelex_errors`)
-- Activity registration: `pipelex/temporal/tasks.py`
-- Worker `workflow_failure_exception_types`: `pipelex/temporal/temporal_task_manager.py:148`
-- Workflow that runs the pipe inline and only catches `ActivityError`: `pipelex/temporal/tprl_pipe/wf_pipe_router.py:139,146`
-- Content-generator selection at make: `pipelex/pipelex.py:370-385`
-- Retry/timeout config (bounded: `maximum_attempts = 3`, `workflow_execution_timeout = 1h`): `pipelex/pipelex.toml` (temporal section ~line 489) — confirms the hang is *workflow-task* retry (unbounded), not activity retry (bounded)
-- Search worker/error types: `pipelex/cogt/search/search_worker_*.py`, `pipelex/plugins/{linkup,gateway}/*search*.py`, `SearchJobFailureError` in `pipelex/cogt/exceptions.py:376` (a `CogtError` → `PipelexError`)
-- Background on the error-handling design this restores parity with: `pipelex/wip/error-handling/` (esp. `track-temporal-integration.md`, `track-retry-and-resilience.md`)
+Add a regression test in `pipelex`: a `BundleValidator.validate_pipes` sweep of a bundle containing a controller pipe (PipeBatch/PipeParallel) under a Temporal-enabled hub must **not** invoke the Temporal router — assert the scoped in-process router handles the nested dispatch (e.g. spy that `get_pipe_router()` resolves to the in-process router inside the controller branch, or that no `execute_workflow` is called).
+```
