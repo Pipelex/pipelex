@@ -32,6 +32,8 @@ This cycle reworks **cost reporting** so it survives distributed execution and s
 
 ### Fixed
 
+- **Docs deploy crashed on a fresh runner with `InferenceSetupRequiredError`.** `pipelex-dev generate-error-pages` (a prerequisite of every `docs-*` make target) bootstrapped Pipelex with `needs_inference=True`, so on a CI runner with the gateway enabled but no on-disk service config it hit the first-run inference-setup gate and exited non-zero — breaking the `Deploy docs` workflow on `main`. The command only introspects `PipelexError` subclasses to write markdown and never calls inference, so it now bootstraps with `needs_inference=False`.
+
 - **`UsageRegistry` success-path leak.** The per-run cost registry was opened during run setup but closed only on the failure path, so every successful run leaked its registry — and in a long-lived process (e.g. the Pipelex API) reusing a `pipeline_run_id` could collide on the orphaned registry. The registry is removed entirely, so the leak is structurally impossible.
 
 ## [v0.31.0] - 2026-06-04
