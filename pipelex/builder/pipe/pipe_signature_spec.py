@@ -45,6 +45,10 @@ class PipeSignatureSpec(PipeSpec):
     """
 
     type: SkipJsonSchema[Literal["PipeSignature"]] = "PipeSignature"
+    # Spec-layer display/authoring tag only: NOT propagated by `to_blueprint()`, which leaves the
+    # blueprint (and runtime) at `pipe_category = None` because a signature is outside the executable
+    # taxonomy. Kept per the scope decision in wip/recursivity/signature-taxonomy-refactor.md; it only
+    # surfaces in `rendered_pretty` below.
     pipe_category: SkipJsonSchema[Literal["PipeSignature"]] = "PipeSignature"
     signature_for: PipeType | None = Field(
         default=None,
