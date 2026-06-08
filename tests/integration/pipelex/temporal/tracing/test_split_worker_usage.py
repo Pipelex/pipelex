@@ -24,6 +24,8 @@ from typing import TYPE_CHECKING
 import pytest
 from temporalio.client import Client as TemporalClient
 
+from pipelex.cogt.usage.cost_registry import CostRegistry
+from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.config import get_config
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -230,3 +232,43 @@ class TestSplitWorkerUsageEmission:
         assert tokens_usages, "Expected the aggregator to surface at least one token-usage record"
         assert len(tokens_usages) == len(usage_events)
         assert tokens_usages == [evt.tokens_usage for evt in usage_events]
+
+    async def test_runner_usage_sums_to_expected_cost_total(
+        self,
+        live_sequence_tracing_job: PipeJob,
+        temporal_client: TemporalClient,
+        tracing_tmp_dir: Path,
+        split_queues: tuple[str, str],
+        route_llm_text_to_runner_queue: None,  # noqa: ARG002
+    ) -> None:
+        """The cross-worker usage events feed the production ``CostRegistry`` aggregation and price
+        into a single run total. This pins the *summed total* in split-worker mode — the previous
+        tests assert only landing / per-node de-dup / 1:1 passthrough, never that the numbers add up.
+
+        ``total_nb_tokens`` is computed independently from each runner-emitted event's raw token
+        counts and must equal what ``aggregate_costs`` reports. The fake runner model is priced at
+        zero, so ``total_cost`` is 0 while the run still counts as reportable (tokens > 0) — the same
+        free-model path a real zero-cost model would take.
+        """
+        run_id = await self._execute_split(live_sequence_tracing_job, temporal_client, split_queues)
+
+        reader = NdjsonEventLog(traces_dir=str(tracing_tmp_dir))
+        try:
+            events = reader.read_events(run_id)
+        finally:
+            reader.close()
+
+        usage_events = [evt for evt in events if isinstance(evt, UsageReportEvent)]
+        assert usage_events, "Expected at least one UsageReportEvent across the run"
+
+        tokens_usages = UsageAggregator.aggregate(events)
+        expected_total = sum(
+            tokens_usage.nb_tokens_by_category.get(TokenCategory.INPUT, 0) + tokens_usage.nb_tokens_by_category.get(TokenCategory.OUTPUT, 0)
+            for tokens_usage in tokens_usages
+        )
+
+        aggregated = CostRegistry.aggregate_costs(tokens_usages=tokens_usages)
+        assert aggregated.total_nb_tokens == expected_total
+        assert expected_total >= len(usage_events), "Each runner emit carries at least one input + one output token"
+        assert aggregated.total_cost == 0.0
+        assert aggregated.has_reportable_usage is True

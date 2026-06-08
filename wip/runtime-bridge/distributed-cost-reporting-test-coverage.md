@@ -1,8 +1,47 @@
 # Cost reporting in distributed (split-worker) mode — test-coverage audit
 
-**Status:** 🔍 **OPEN — audit only, no code changed.** Findings are verified against the code; this doc is the input for a follow-up planning session, not a resolution.
+**Status:** ✅ **RESOLVED — coverage added.** The prioritized additions below were implemented and are green. See "Resolution (as-built)" for the exact files and the decisions taken. The audit body is retained as the code-grounded map and rationale.
 **Source:** Audit triggered during `/temporal-e2e-validate` (full Mode 2 run on `feature/Runtime-bridge-extraction`). Question asked: *do we have comprehensive testing of cost reporting in distributed mode with real inference — emission and aggregation — and what should we add?*
 **Scope:** the token-usage → cost-report path when inference runs on a **separate Temporal `runner` worker process** (split-worker topology), with **real** provider inference. Touches `pipelex/reporting/`, `pipelex/tracing/`, `pipelex/cogt/usage/`, `pipelex/temporal/tprl_pipe/`, and the test tree under `tests/`.
+
+---
+
+## Resolution (as-built)
+
+All four audit questions now have automated coverage. No production code changed — these are characterization/regression tests plus one test-helper extension and a skill upgrade. **R2 decision: keep accepting** the activity-retry over-count (matches the existing documented stance); it is now regression-visible at the cost-total level rather than fixed.
+
+**Capture (stage 1 — the biggest blind spot, real-provider branch previously asserted nowhere):**
+
+- `tests/unit/pipelex/plugins/openai/test_openai_completions_usage_capture.py` — factory mapping (incl. cached/audio/reasoning/prediction detail fields) + `_gen_text` worker wiring reads `response.usage` into `nb_tokens_by_category`; plus the no-`usage` case pinned (stays empty → the documented silent zero-token emit).
+- `tests/unit/pipelex/plugins/openai/test_openai_responses_usage_capture.py` — same for the Responses API.
+- `tests/unit/pipelex/plugins/openai/test_openai_img_gen_worker_usage_capture.py` — `_gen_image_list` reads `ImagesResponse.usage`.
+- `tests/unit/pipelex/cogt/extract/test_extract_worker_usage_capture.py` — extract page-count fallback, both directions (fills when provider reports none; not overridden when provider sets usage).
+
+**Aggregate + non-LLM (stage 3, the discriminated-union wire concern):**
+
+- `tests/unit/pipelex/tracing/test_non_llm_usage_aggregation.py` — img-gen/extract/search usage JSON-round-trip through `UsageReportEvent` (discriminator intact) → `UsageAggregator.aggregate` → `CostRegistry.aggregate_costs` with exact per-type totals.
+- `tests/unit/pipelex/reporting/test_emit_runner_fallback_non_llm.py` — the previously-untested `_report_img_gen_job` / `_report_extract_job` dispatch branches emit through the real runner fallback to NDJSON and read back as the right concrete type.
+
+**Distributed (split-worker) summed totals + cross-child + R2:**
+
+- `tests/integration/pipelex/temporal/tracing/test_split_worker_usage.py` — added `test_runner_usage_sums_to_expected_cost_total` (summed total via `aggregate_costs`, computed independently from the cross-worker events — no longer just landing/dedup/passthrough).
+- `tests/integration/pipelex/temporal/tracing/test_split_worker_cross_child_usage.py` — PipeParallel fan-out: usage from ≥2 distinct child workflows aggregates into one parent total over the shared `pipeline_run_id` partition.
+- `tests/unit/pipelex/reporting/test_emit_runner_fallback.py` — added `test_retried_activity_double_counts_cost_total_documenting_r2` pinning R2 at the billing level (retry → doubled tokens/cost). Flip these assertions if the idempotent-resequence fix ever lands.
+
+**E2E (real inference, gated/opt-in — the thing that was invisible):**
+
+- `tests/integration/pipelex/temporal/tracing/test_split_worker_real_inference_cost.py` — marked `inference`/`llm` (default lanes deselect it; passes when run). Real `llm_gen_text` runs on the runner queue with the context cache cleared, so real provider tokens are captured → runner fallback → aggregated to a non-zero total with a real model handle. Enabled by a backward-compatible `runner_act_llm_gen_text` param on `make_split_workers` in `helpers.py`.
+
+**`/temporal-e2e-validate` skill — manual eyeball → numeric assertion:**
+
+- `.claude/skills/temporal-e2e-validate/scripts/assert_cross_worker_cost.py` — sums input/output tokens straight from the NDJSON usage events, checks event count + `act_*` fallback + optional un-truncated CSV cross-check, and asserts model-type / non-zero. Wired into Tier 8b (`references/mode-2-tiers.md`) for the mock, cross-child, live, and img-gen/extract-live arms.
+
+**Deferred / accepted (unchanged by design):**
+
+- **R2 over-count** — accepted; pinned, not fixed (decision above).
+- **Zero-token silent emit** — capture side pinned (no-`usage` → empty); the downstream zero-token `UsageReportEvent` emission remains accepted behavior.
+- **Best-effort drops** — unchanged; the existing `_emit_best_effort` / child-flush WARNING-and-drop behavior is by design and already has gating tests.
+- **Non-LLM full Temporal activity hop** — the runner-fallback emit path is type-agnostic (proven for LLM via the split-worker tests) and non-LLM usage is covered at the `ReportingManager`/aggregator level + the skill's live arm; a dedicated split-worker bundle with fake img-gen/extract activities was judged redundant.
 
 ---
 
@@ -134,7 +173,7 @@ The aggregator and renderer themselves are lossless — all risk lives in the ca
 
 ---
 
-## Prioritized additions (menu for the plan, not committed)
+## Prioritized additions (the original menu — now implemented; see "Resolution (as-built)" above for the landed files)
 
 ### Unit — cheapest, closes the biggest blind spot (real capture)
 
