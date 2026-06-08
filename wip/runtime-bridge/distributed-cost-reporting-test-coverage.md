@@ -208,6 +208,7 @@ The aggregator and renderer themselves are lossless — all risk lives in the ca
 
 ## Related
 
+- [`cost-reporting-validation-prompts.md`](cost-reporting-validation-prompts.md) — operator cheat-sheet of `/temporal-e2e-validate` prompts that drive the Tier 8b arms this audit motivated.
 - `../observer-and-telemetry/` — sibling tracing/telemetry follow-ups.
 - `docs/.../tracing-cost-reporting.md` (R2 documentation) and the `wip/registry/cost-report-deferred-decisions.md` deferred items (e.g. `tracing_config.is_enabled=false` + `--costs` → silent no-report).
 - This audit was produced cross-checking three independent code sweeps (emission, aggregation, test inventory); the file:line anchors above are the load-bearing evidence — re-verify any that look stale before building on them.

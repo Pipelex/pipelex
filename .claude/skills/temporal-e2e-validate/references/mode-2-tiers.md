@@ -407,6 +407,28 @@ listens on, and confirm both workers are running with the latest code
 
 ### Step 5b': Tier 8b — Cross-worker cost report assembly (`--mock-inference`, free + deterministic)
 
+#### Scope manifest — which arms to run
+
+Tier 8b has several arms. By default, run only the free, deterministic mock arms (the **default** scope — arms A–B). If the request carries an **explicit spend opt-in** — the canonical token `full` (aliases `thorough`, `every`, `with-spend`), shown as the **full** scope in the table below — run **every** arm, including the live ones that cost real money, and report PASS/FAIL for each. Do not stop after the cheap arms when a spend opt-in is present. Do **not** treat bare "live" or "all" as the opt-in (too easily incidental; "live" also collides with the default mock arm, which already runs in LIVE mode) — if that's the only signal, confirm before spending.
+
+Run each arm in listed order. After each, surface the asserted token totals (where the arm produces them) and PASS/FAIL, then continue. **Arm D is the exception** — it runs no assertion script and emits no `RESULT: PASS` or token totals; its pass is the *absence* of a cost table and usage events (see its sub-section), so do not treat the missing totals as a failure. For every arm that *does* run the assertion script, if it cannot reach `RESULT: PASS`, stop and report it rather than silently continuing.
+
+| # | Arm | Scope | Spend | Expected assertion |
+|---|---|---|---|---|
+| A | **Mock primary** — `--mock-inference` `native_text_sequence` | default + full | free | 2 events / 200 input / 100 output, `--expected-model-type llm --require-fallback` |
+| B | **Cross-child fan-out** — `--mock-inference` `temporal_parallel` | default + full | free | 3 events / 300 input / 150 output, `--expected-model-type llm --require-fallback` (the CLI assert checks the summed total, **not** workflow-span; the cross-child guarantee itself is enforced by the pytest counterpart `test_split_worker_cross_child_usage.py`) |
+| C | **CSV un-truncated cross-check** — flip `reporting_config.is_generate_cost_report_file_enabled=true`, rerun arm A, confirm CSV totals == NDJSON totals, restore to `false` | full | free | `csv tokens` line matches NDJSON totals |
+| D | **`--no-costs` negative gate** | full | free | no cost table, no `usage_report` events, `reactflow.html` still assembles |
+| E | **Live LLM arm** — drop `--mock-inference` on `native_text_sequence` | full | **real** | non-zero total, real `model_names` (not `mock_inference`), `--require-fallback --require-nonzero` |
+| F | **Live img-gen arm** — run a Tier 4/5 image bundle live with `--graph --costs` | full | **real** | `--expected-model-type img_gen --require-fallback --require-nonzero` |
+| G | **Live extract arm** — run the extract bundle `pdf_extract_page_views.mthds` (`--pipe pdf_extract_with_page_views`) live against the plain split workers with `--graph --costs` | full | **real** | `--expected-model-type extract --require-fallback --require-nonzero` |
+
+Arms F and G validate non-LLM usage, which `--mock-inference` cannot reach (the mock leaves raise `MockInferenceUnsupportedError`), so they are **live-only** — they are the sole way to prove img-gen / extract token usage crosses the runner fallback and aggregates into the cost report. Each arm's full command + assertion is detailed in the sub-sections below; arms A/C map to "Primary check", B to "Cross-child aggregation", D to "Negative check", E to "Live arm", F/G to "Non-LLM cross-worker cost". Arms F and G run their bundles on the **same plain router+runner split workers** as the other arms — they do **not** need the routing battery's multi-queue (`q_extract` / `q_image_gen`) setup. On plain split workers the img-gen / extract activity runs on the runner and emits via the `act_*` fallback, which is exactly what `--require-fallback` checks.
+
+Tier 8 (Step 5b above — the writer-id landing pytest) is the precursor to all of these and should pass first under any scope.
+
+---
+
 Tier 8 proves a runner-side `UsageReportEvent` *lands* in the NDJSON partition.
 Tier 8b proves the next link end-to-end: those cross-worker usage events
 *assemble* onto `PipeOutput.tokens_usages` (via `act_assemble_tracing` with

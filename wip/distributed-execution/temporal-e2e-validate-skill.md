@@ -2,6 +2,8 @@
 
 Current-state record for the `/temporal-e2e-validate` skill (`.claude/skills/temporal-e2e-validate/`), captured 2026-06-02 on branch `feature/Validate-with-signatures-4-fix-dry-run`. It exists to cold-start a follow-up session: what the skill validates, what a full run found, the Step 9 skill bugs that were patched, and the open follow-ups.
 
+For ready-to-paste invocation prompts (per-area + run-it-all-in-one-go), see the sibling [`temporal-e2e-validate-prompt-menu.md`](temporal-e2e-validate-prompt-menu.md).
+
 ## What the skill is
 
 `/temporal-e2e-validate` validates that Pipelex pipelines execute correctly across separate Temporal worker processes. Two modes:
