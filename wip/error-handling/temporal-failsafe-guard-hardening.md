@@ -30,11 +30,15 @@ The fix has two layers:
 
 The "genuine inline" decision is made by **`_carries_temporal_failure(exc)`** in `wf_pipe_router.py:26`. It walks the exception's `__cause__` chain and returns `True` if any node is a Temporal `FailureError`. `True` ⇒ the error already originated at a Temporal boundary (activity / child workflow), is already terminal, and its report is recoverable from the chain by `recover_error_report` at the submitter — so the catch-all leaves it untouched. `False` ⇒ a genuine inline error that never crossed a boundary — convert it via `TemporalError.from_message_exception`.
 
-**Key fact established during review (why none of these is a live bug yet):** the real inline-leaf path, `pipelex/temporal/tprl_content_generation/content_generator_in_workflow.py`, dispatches activities and, on `ActivityError`, raises `TemporalError.from_app_error(exc=exc.cause) from exc` — a `FailureError`, wired with `from`. So `_carries_temporal_failure` classifies it correctly. Genuine inline errors (the Search-operator-missing-activity case, crate-load, hydration setup) carry no `FailureError` and are converted correctly. There is **no confirmed live trigger** for the findings below — they are latent fragilities in a mechanism that the entire fix leans on.
+**Key fact established during review (why none of these is a live bug yet):** the real inline-leaf path, `pipelex/temporal/tprl_content_generation/content_generator_in_workflow.py`, dispatches activities and, on `ActivityError`, raises `TemporalError.from_app_error(exc=exc.cause) from exc` — a `FailureError`, wired with `from`. So `_carries_temporal_failure` classifies it correctly. Genuine inline errors (the Search-operator-missing-activity case, crate-load, hydration setup) carry no `FailureError` and are converted correctly.
+
+> **Correction (this session).** The original review claimed "no confirmed live trigger" for the guard's `True` branch. That was wrong, and it reshaped Finding 1: the `True` branch **is** reachable — a controller sub-pipe failing as a child workflow is wrapped by `TemporalPipeRouter` (`temporal_pipe_router.py:92-94`) as `WorkflowExecutionError(msg)` and escapes the parent's `pipe.run_pipe`. So the guard is load-bearing on a real path, not just a latent safeguard. What *remains* latent are only the two **misclassification** fragilities below (under-/over-inclusive), each of which requires a `raise … from` discipline violation that no operator currently makes.
 
 ---
 
-## Finding 1 — `_carries_temporal_failure` uses chain-membership as a proxy for "already terminal", which is fragile both ways
+## ✅ Finding 1 — `_carries_temporal_failure` uses chain-membership as a proxy for "already terminal", which is fragile both ways
+
+> **Resolved — kept the guard, not rewritten.** Both proposed directions regress the *reachable* nested-failure case (worker-side conversion flattens a report only the submitter can recover). The broad "carries a Temporal `FailureError`" predicate is correct — it *is* the definition of "already terminal" — and now sits on `iter_cause_chain` with a docstring stating the reachable case + the `raise … from` invariant. Pinned by the Finding 9 test. (Detail in the top summary.)
 
 **Where:** `pipelex/temporal/tprl_pipe/wf_pipe_router.py:26` (the helper), `:195` (the guard call), `:197` (the conversion it gates).
 
@@ -57,7 +61,9 @@ The "genuine inline" decision is made by **`_carries_temporal_failure(exc)`** in
 
 ---
 
-## Finding 7 — `_carries_temporal_failure` is the 4th hand-rolled `__cause__`-chain walk
+## ✅ Finding 7 — `_carries_temporal_failure` is the 4th hand-rolled `__cause__`-chain walk
+
+> **Resolved — done.** Extracted `iter_cause_chain(exc)` in `base_exceptions.py`; all five `__cause__` walks (the four named here + the cycle check in `_enrich_error_report_from_cause`) plus two unguarded strays found while sweeping (`agent_output._build_error_source`, `pipe_llm._format_llm_error` — both previously missing the cycle guard) now delegate to it.
 
 **Where:** `pipelex/temporal/tprl_pipe/wf_pipe_router.py:26`. Siblings that re-implement the same walk: `find_inference_error_category_in_chain` (`pipelex/cogt/exceptions.py`, ~`:129`), `_find_error_report_dict` (`pipelex/temporal/tprl/temporal_error.py:41`), `_message_from_exc` (`.../temporal_error.py:68`).
 
@@ -74,7 +80,9 @@ The "genuine inline" decision is made by **`_carries_temporal_failure(exc)`** in
 
 ---
 
-## Finding 6 — Two near-identical catch-alls were copy-pasted into two workflows; the worker-floor registration is the actual hole-closer (altitude)
+## ✅ Finding 6 — Two near-identical catch-alls were copy-pasted into two workflows; the worker-floor registration is the actual hole-closer (altitude)
+
+> **Resolved — light touch.** Catch-alls kept separate (their control flow is irreducibly different: router raises immediately, parent defers so `act_deliver` fires the FAILED webhook). The duplicated *rationale prose* was deduped onto `_carries_temporal_failure`'s docstring (code contract) + `error-model.md` (design); the router / parent / worker-registration comments now carry a statement + pointer. No shared helper — that would have forced a dead guarded branch into `WfPipeRun` (followups Finding 4).
 
 **Where:** the `except PipelexError` clause in `wf_pipe_router.py:174` and in `wf_pipe_run.py:83`; the registration in `temporal_task_manager.py:159`.
 
@@ -95,7 +103,9 @@ The "genuine inline" decision is made by **`_carries_temporal_failure(exc)`** in
 
 ---
 
-## Finding 9 — The `_carries_temporal_failure` `True` branch is untested
+## ✅ Finding 9 — The `_carries_temporal_failure` `True` branch is untested
+
+> **Resolved — done.** Added `test_router_already_terminal_error_propagates_untouched_preserving_leaf_classification`. Proven meaningful: forcing the guard to `False` flips the submitter's `error_type` from the leaf `LLMCompletionError` to the generic `WorkflowExecutionError`, which the new test catches while the convert-branch sibling stays green.
 
 **Where:** `tests/integration/pipelex/temporal/test_workflow_inline_error_failsafe.py`.
 
@@ -109,11 +119,11 @@ The "genuine inline" decision is made by **`_carries_temporal_failure(exc)`** in
 
 ---
 
-## Suggested sequencing
+## What was done (final sequencing)
 
-These four are one coherent unit of work:
+All four landed as one unit of work:
 
-1. **Finding 7** first — extract `find_first_in_cause_chain`; it's mechanical and unblocks a clean rewrite of the guard.
-2. **Finding 1** — decide the predicate-vs-report-preserving direction and rewrite the conversion on top of the new primitive.
-3. **Finding 6** — fold both catch-alls onto one `convert_inline_pipelex_error` helper that embeds the Finding-1 decision (also closes followups Finding 4).
-4. **Finding 9** — add the `True`-branch (and, if cheap, the sandboxed) test against the consolidated helper.
+1. **Finding 7** — extracted `iter_cause_chain` (a generator, not `find_first_in_cause_chain`: it also subsumes the accumulator walk `_message_from_exc` and the is-self cycle check, which a first-match primitive could not). Migrated all five named walks plus two unguarded strays.
+2. **Finding 1** — *kept* the guard rather than rewriting it: verification showed the `True` branch is reachable and both proposed rewrites regress it. Refactored the predicate onto the primitive and documented the invariant.
+3. **Finding 6** — light touch: deduped the rationale prose, kept the two catch-alls separate (no shared helper — see followups Finding 4's resolution).
+4. **Finding 9** — added the `True`-branch test and proved it meaningful via a deliberate guard-regression check. The sandboxed-smoke open question (above) was left as the pre-existing suite-wide gap it is.
