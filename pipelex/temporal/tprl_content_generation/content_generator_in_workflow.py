@@ -12,6 +12,8 @@ from pipelex.cogt.content_generation.assignment_models import (
     LLMAssignment,
     ObjectAssignment,
     RenderPageViewsAssignment,
+    SearchAssignment,
+    SearchObjectAssignment,
     TemplatingAssignment,
 )
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
@@ -30,6 +32,7 @@ from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
+from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.temporal.exceptions import ContentGenerationError
 from pipelex.temporal.tprl.observability import build_activity_summary
@@ -43,6 +46,7 @@ from pipelex.temporal.tprl_content_generation.act_llm_generate import (
     act_llm_gen_text,
 )
 from pipelex.temporal.tprl_content_generation.act_render_page_views import act_render_page_views
+from pipelex.temporal.tprl_content_generation.act_search_generate import act_search_gen_sourced_answer, act_search_gen_structured
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
@@ -477,3 +481,67 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
                 page_content.page_view = page_view_contents.pop(0)
 
         return page_contents
+
+    @override
+    async def make_search_sourced_answer(
+        self,
+        search_assignment: SearchAssignment,
+    ) -> SearchResultContent:
+        worker_config = get_config().temporal.worker_config
+        dispatch_kwargs = worker_config.resolve_dispatch(
+            activity_name=act_search_gen_sourced_answer.__name__,
+            routing_key=search_assignment.search_handle,
+            queue_options_by_queue=get_config().temporal.queue_options,
+            is_traced=get_config().temporal.temporal_config.temporal_log_config.is_dispatch_resolution_traced,
+        ).to_execute_kwargs()
+        try:
+            search_result: SearchResultContent = await workflow.execute_activity(
+                act_search_gen_sourced_answer,
+                arg=search_assignment,
+                summary=build_activity_summary(
+                    "Search sourced answer", search_assignment.job_metadata, extras={"model": search_assignment.search_handle}
+                ),
+                **dispatch_kwargs,
+            )
+        except ActivityError as exc:
+            log.error(f"ActivityError caused by: {exc.cause}")
+            if isinstance(exc.cause, ApplicationError):
+                raise TemporalError.from_app_error(exc=exc.cause) from exc
+            raise
+        log.verbose(f"ContentGeneratorInWorkflow generated search result: {search_result}")
+        return search_result
+
+    @override
+    async def make_search_structured(
+        self,
+        output_structure_class: type[BaseModelTypeVar],
+        search_assignment: SearchAssignment,
+    ) -> BaseModelTypeVar:
+        worker_config = get_config().temporal.worker_config
+        search_object_assignment = SearchObjectAssignment.make_for_class(
+            output_class=output_structure_class,
+            search_assignment=search_assignment,
+        )
+        dispatch_kwargs = worker_config.resolve_dispatch(
+            activity_name=act_search_gen_structured.__name__,
+            routing_key=search_assignment.search_handle,
+            queue_options_by_queue=get_config().temporal.queue_options,
+            is_traced=get_config().temporal.temporal_config.temporal_log_config.is_dispatch_resolution_traced,
+        ).to_execute_kwargs()
+        try:
+            result_dict: dict[str, Any] = await workflow.execute_activity(
+                act_search_gen_structured,
+                arg=search_object_assignment,
+                summary=build_activity_summary(
+                    "Search structured", search_assignment.job_metadata, extras={"class": output_structure_class.__name__}
+                ),
+                **dispatch_kwargs,
+            )
+        except ActivityError as exc:
+            log.error(f"ActivityError caused by: {exc.cause}")
+            if isinstance(exc.cause, ApplicationError):
+                raise TemporalError.from_app_error(exc=exc.cause) from exc
+            raise
+        # Re-validate on the submitter (workflow) side against the original class — pure and
+        # deterministic, so the dynamic output class never has to cross the activity boundary.
+        return output_structure_class.model_validate(result_dict)

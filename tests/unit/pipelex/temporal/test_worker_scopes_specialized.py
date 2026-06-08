@@ -1,9 +1,9 @@
 """Unit tests for the specialized worker scopes (runner-llm, runner-img-gen,
-runner-extract, runner-jinja2) shipped in `pipelex/pipelex.toml`.
+runner-extract, runner-jinja2, runner-search) shipped in `pipelex/pipelex.toml`.
 
 These scopes let deployment manifests spin up one worker pool per backend
 class. The tests verify (a) each scope registers exactly the activities its
-name implies and (b) the union of all four specialized scopes covers the
+name implies and (b) the union of the specialized scopes covers the
 full ``runner`` registration with no orphan activities.
 """
 
@@ -39,6 +39,7 @@ class TestSpecializedWorkerScopes:
             ("runner-img-gen", {"act_img_gen_images", "act_render_page_views"}),
             ("runner-extract", {"act_extract_gen_extract_pages", "act_render_page_views"}),
             ("runner-jinja2", {"act_jinja2_gen_text"}),
+            ("runner-search", {"act_search_gen_sourced_answer", "act_search_gen_structured"}),
         ],
     )
     def test_scope_registers_expected_activities(self, scope_name: str, expected_activity_names: set[str]) -> None:
@@ -61,7 +62,7 @@ class TestSpecializedWorkerScopes:
         runner_names = {activity.__name__ for activity in runner_activities}
 
         specialized_union: set[str] = set()
-        for scope_name in ("runner-llm", "runner-img-gen", "runner-extract", "runner-jinja2"):
+        for scope_name in ("runner-llm", "runner-img-gen", "runner-extract", "runner-jinja2", "runner-search"):
             scope = worker_scopes.scopes[scope_name]
             _, scope_activities = tasks.workflows_and_activities(scope=scope)
             specialized_union.update(activity.__name__ for activity in scope_activities)

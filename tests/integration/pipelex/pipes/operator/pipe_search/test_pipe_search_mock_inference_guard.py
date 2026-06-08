@@ -1,12 +1,13 @@
-"""Integration test for the ``is_mock_inference`` hard guard in PipeSearch.
+"""Integration test for the ``is_mock_inference`` hard guard for web search.
 
-Web search has no leaf-level mock, and unlike the LLM/img-gen/extract operators it has no
-``cogt/content_generation`` leaf — its provider spend happens directly in
-``PipeSearch._live_run_operator_pipe``. Under ``--mock-inference`` (``run_mode=LIVE`` +
-``JobMetadata.is_mock_inference``) the operator takes that live path, so the guard lives there and must
-fail loud before the search worker is built. ``MockInferenceUnsupportedError`` is a plain
-``PipelexError`` (not a model-availability error), so ``PipeOperator._live_run_pipe`` does not re-wrap
-it — it propagates unchanged through the router.
+Web search has no leaf-level mock. It now goes through the same ``cogt/content_generation`` seam as
+LLM/img-gen/extract: ``PipeSearch`` calls the content generator, whose direct impl runs the
+framework-agnostic ``search_generate`` leaf. Under ``--mock-inference`` (``run_mode=LIVE`` +
+``JobMetadata.is_mock_inference``) the live path runs, so the guard lives at the top of that leaf
+(``search_gen_sourced_answer``) and must fail loud before the search worker is built.
+``MockInferenceUnsupportedError`` is a plain ``PipelexError`` (not a model-availability error and not a
+``CogtError``), so neither ``PipeOperator._live_run_pipe`` nor the router re-wraps it — it propagates
+unchanged.
 """
 
 from typing import Callable
@@ -37,7 +38,7 @@ class TestPipeSearchMockInferenceGuard:
         """A LIVE PipeSearch run with is_mock_inference=True raises the guard before any provider call."""
         load_empty_library()
 
-        worker_factory_spy = mocker.patch("pipelex.pipe_operators.search.pipe_search.SearchWorkerFactory.make_search_worker")
+        worker_factory_spy = mocker.patch("pipelex.cogt.content_generation.search_generate.SearchWorkerFactory.make_search_worker")
 
         pipe = PipeFactory[PipeSearch].make_from_blueprint(
             domain_code="generic",
