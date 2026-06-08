@@ -1,6 +1,5 @@
 from typing import Annotated
 
-import click
 import typer
 from click import Command, Context
 from typer.core import TyperGroup
@@ -117,9 +116,11 @@ def app_callback(
     console = get_console()
     package_version = get_package_version()
 
-    # Get no_logo flag from context (set by PipelexCLI.make_context)
-    click_ctx = click.get_current_context()
-    no_logo = click_ctx.obj.get("no_logo", False) if click_ctx.obj else False
+    # Get no_logo flag from context (set by PipelexCLI.make_context). Use the
+    # ctx parameter Typer injects rather than click.get_current_context(): the
+    # global context stack is not populated when a subcommand is dispatched
+    # under typer >= 0.26 / click >= 8.4, which made every subcommand crash.
+    no_logo = ctx.obj.get("no_logo", False) if ctx.obj else False
 
     if no_logo:
         console.print(f"Pipelex v{package_version}")

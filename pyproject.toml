@@ -53,7 +53,10 @@ dependencies = [
   "shortuuid>=1.0.13",
   "tomli>=2.3.0",
   "tomlkit>=0.13.2",
-  "typer>=0.16.0",
+  # Capped: pipelex subclasses typer's TyperGroup and overrides make_context, so
+  # it is coupled to typer/click internals. Tested through 0.26; the dependency
+  # canary flags new releases to validate before raising this bound.
+  "typer>=0.16.0,<0.27",
   "typing-extensions>=4.13.2",
   "urllib3>=2.7.0",
 ]

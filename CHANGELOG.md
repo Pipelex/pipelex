@@ -30,11 +30,15 @@ This cycle reworks **cost reporting** so it survives distributed execution and s
 
 - **Temporal `act_assemble_graph` renamed to `act_assemble_tracing`.** It now assembles both the graph (`GraphSpec`) and usage (`tokens_usages`) from a single trace-event read, gated per concern by the run's `--graph` / `--costs` flags.
 
+- **`typer` is now capped (`>=0.16,<0.27`).** pipelex subclasses typer's `TyperGroup` and overrides `make_context`, so it is coupled to typer/click internals and a future typer minor can break the CLI. The cap is tested through 0.26; a new dependency-canary CI job resolves the latest dependencies on a schedule so the bound is bumped deliberately rather than discovered in a user's install.
+
 ### Fixed
 
 - **Docs deploy crashed on a fresh runner with `InferenceSetupRequiredError`.** `pipelex-dev generate-error-pages` (a prerequisite of every `docs-*` make target) bootstrapped Pipelex with `needs_inference=True`, so on a CI runner with the gateway enabled but no on-disk service config it hit the first-run inference-setup gate and exited non-zero — breaking the `Deploy docs` workflow on `main`. The command only introspects `PipelexError` subclasses to write markdown and never calls inference, so it now bootstraps with `needs_inference=False`.
 
 - **`UsageRegistry` success-path leak.** The per-run cost registry was opened during run setup but closed only on the failure path, so every successful run leaked its registry — and in a long-lived process (e.g. the Pipelex API) reusing a `pipeline_run_id` could collide on the orphaned registry. The registry is removed entirely, so the leak is structurally impossible.
+
+- **CLI no longer crashes under newer typer/click.** Every `pipelex` subcommand (`build`, `run`, `validate`, `init`, `worker`, …) raised `RuntimeError: There is no active click context` and exited 1 when run against `typer >= 0.26` / `click >= 8.4` — the versions a fresh `pip install pipelex` resolves. The root `app_callback` fetched the context via the global `click.get_current_context()` instead of the `ctx` Typer already injects; the global context stack isn't populated when a subcommand is dispatched under those versions. It now uses the injected `ctx`, which is version-robust. A subprocess CLI smoke test (`tests/unit/pipelex/cli/test_cli_entrypoint_smoke.py`) guards every subcommand against regressing.
 
 ## [v0.31.0] - 2026-06-04
 
