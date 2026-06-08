@@ -8,36 +8,64 @@ from pipelex.cli.agent_cli.commands.validate._output_helpers import format_valid
 
 
 class TestFormatValidateMarkdown:
-    def test_renders_pending_signatures_section_when_present(self):
-        """A populated pending_signatures list produces a "Pending signatures" section listing each ref."""
+    def test_renders_pending_signatures_section_with_not_runnable_verdict(self):
+        """A populated pending_signatures list renders the verbatim section heading, an explicit
+        "NOT yet runnable" verdict, and each ref as a bullet.
+        """
         result: dict[str, Any] = {
             "success": True,
             "bundle_path": "/fake/method.mthds",
             "validated_pipes": [{"pipe_code": "research.research_brief", "status": "SUCCESS"}],
             "total_pipes": 1,
             "pending_signatures": ["research.find_key_findings", "research.rank_findings"],
+            "is_runnable": False,
         }
 
         markdown = format_validate_markdown(result)
 
         assert markdown.startswith("# Validation passed")
+        # Heading kept verbatim — a downstream plugin reads this exact string.
         assert "## Pending signatures (2)" in markdown
+        # Explicit negative verdict, with the count, immediately above the list.
+        assert "⚠️ This method is NOT yet runnable" in markdown
+        assert "2 pipe(s) are still `PipeSignature` placeholders" in markdown
         assert "- `research.find_key_findings`" in markdown
         assert "- `research.rank_findings`" in markdown
 
-    def test_omits_pending_section_when_empty_or_absent(self):
-        """An empty (or missing) pending_signatures must not emit a "Pending signatures" section."""
-        with_empty: dict[str, Any] = {
+    def test_renders_runnable_verdict_for_complete_bundle(self):
+        """A present-but-empty pending_signatures (complete bundle) renders an explicit runnable
+        verdict and no "Pending signatures" section.
+        """
+        result: dict[str, Any] = {
             "success": True,
+            "bundle_path": "/fake/method.mthds",
             "validated_pipes": [{"pipe_code": "research.research_brief", "status": "SUCCESS"}],
             "total_pipes": 1,
             "pending_signatures": [],
+            "is_runnable": True,
         }
+
+        markdown = format_validate_markdown(result)
+
+        assert markdown.startswith("# Validation passed")
+        assert "✅ All pipes are concretely implemented" in markdown
+        assert "this method is runnable." in markdown
+        assert "Pending signatures" not in markdown
+
+    def test_omits_runnability_verdict_when_key_absent(self):
+        """The `validate all` / `validate pipe` shape omits the `pending_signatures` key entirely —
+        so no runnability verdict (positive or negative) leaks onto those non-bundle surfaces.
+        """
         without_key: dict[str, Any] = {
             "success": True,
             "validated_pipes": [{"pipe_code": "research.research_brief", "status": "SUCCESS"}],
             "total_pipes": 1,
         }
 
-        assert "Pending signatures" not in format_validate_markdown(with_empty)
-        assert "Pending signatures" not in format_validate_markdown(without_key)
+        markdown = format_validate_markdown(without_key)
+
+        assert markdown.startswith("# Validation passed")
+        assert "Pending signatures" not in markdown
+        assert "runnable" not in markdown
+        assert "✅" not in markdown
+        assert "⚠️" not in markdown

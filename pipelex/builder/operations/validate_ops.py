@@ -74,6 +74,7 @@ async def validate_bundle_file(
         "validated_pipes": build_validated_pipes(result.dry_run_result),
         "total_pipes": len(result.dry_run_result),
         "pending_signatures": result.pending_signatures,
+        "is_runnable": not result.pending_signatures,
     }
 
 
@@ -101,6 +102,7 @@ async def validate_bundle_content(
         "validated_pipes": build_validated_pipes(validate_bundle_result.dry_run_result),
         "total_pipes": len(validate_bundle_result.dry_run_result),
         "pending_signatures": validate_bundle_result.pending_signatures,
+        "is_runnable": not validate_bundle_result.pending_signatures,
     }
 
 
@@ -185,4 +187,5 @@ async def validate_pipe_in_bundle(
         "validated_pipes": build_validated_pipes(result.dry_run_result),
         "total_pipes": len(result.dry_run_result),
         "pending_signatures": result.pending_signatures,
+        "is_runnable": not result.pending_signatures,
     }

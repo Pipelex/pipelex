@@ -133,6 +133,10 @@ class TestAgentValidatePipeInBundle:
         pipe_codes = {entry["pipe_code"] for entry in result["validated_pipes"]}
         # Identity is the namespaced pipe_ref (domain.code) on every validate surface.
         assert "slice_bundle.implemented_pipe" in pipe_codes
+        # pending_signatures is library-wide: the unrelated standalone signature still counts, so even
+        # this successful slice reports the bundle as not-yet-runnable.
+        assert "slice_bundle.draft_pipe" in result["pending_signatures"]
+        assert result["is_runnable"] is False
 
     def test_whole_bundle_strict_still_rejects_unrelated_signature(
         self,
@@ -197,3 +201,6 @@ class TestAgentValidatePipeInBundle:
         statuses = {entry["pipe_code"]: entry["status"] for entry in result["validated_pipes"]}
         # Identity is the namespaced pipe_ref (domain.code), not the bare code.
         assert statuses == {"slice_xpkg.cross_parallel": "SKIPPED"}
+        # This bundle has no PipeSignature pipes, so it is runnable — the envelope reports it.
+        assert result["pending_signatures"] == []
+        assert result["is_runnable"] is True

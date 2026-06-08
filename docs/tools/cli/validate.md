@@ -95,8 +95,10 @@ pipelex validate bundle methods/draft_pipeline.mthds --allow-signatures
 !!! note
     When validating a bundle, ALL pipes in that bundle are validated, not just the main pipe.
 
-!!! tip "Pending signatures"
+!!! tip "Pending signatures and runnability"
     A successful `validate bundle` run also reports `pending_signatures` — the library-wide list of pipes still declared as [`PipeSignature`](../../building-methods/pipes/signature-pipes.md) (unimplemented forward declarations), each namespaced by `pipe_ref` (`domain.code`). It is a non-blocking nudge, most useful on a lenient `--allow-signatures` run: it tells a top-down build exactly which headers remain to implement. It surfaces as a "Pending signatures" section in the output (and a `pending_signatures` array in the JSON envelope).
+
+    The output is also explicit about whether the method is runnable. In markdown, a complete bundle states it is runnable, while a bundle with pending signatures states it is **not yet runnable** immediately above the "Pending signatures" section — so you never have to infer completeness from an absent section. In JSON, the same signal is the boolean `is_runnable` (`true` when `pending_signatures` is empty).
 
 ## Validate Method
 

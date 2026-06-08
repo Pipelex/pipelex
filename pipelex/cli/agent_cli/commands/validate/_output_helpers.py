@@ -33,13 +33,29 @@ def format_validate_markdown(result: dict[str, Any]) -> str:
     for entry in validated_pipes:
         lines.append(f"- `{entry.get('pipe_code')}` — {entry.get('status')}")
 
-    pending_signatures: list[str] = result.get("pending_signatures") or []
-    if pending_signatures:
-        lines += ["", f"## Pending signatures ({len(pending_signatures)})", ""]
-        lines.append("These pipes are still forward declarations (`PipeSignature`) awaiting a concrete definition:")
-        lines.append("")
-        for pending_ref in pending_signatures:
-            lines.append(f"- `{pending_ref}`")
+    # Runnability verdict — gated on key *presence*, not truthiness. Only the bundle-validate
+    # surfaces put `pending_signatures` in the result; `validate all` / `validate pipe` omit the key,
+    # so they get no verdict (claiming runnability there would be misleading). Present-and-empty is a
+    # complete bundle (runnable); present-and-non-empty still has forward declarations to implement.
+    if "pending_signatures" in result:
+        pending_signatures: list[str] = result["pending_signatures"] or []
+        if pending_signatures:
+            lines += ["", f"## Pending signatures ({len(pending_signatures)})", ""]
+            lines.append(
+                f"⚠️ This method is NOT yet runnable — {len(pending_signatures)} pipe(s) are still "
+                "`PipeSignature` placeholders and must be implemented before running:"
+            )
+            lines.append("")
+            for pending_ref in pending_signatures:
+                lines.append(f"- `{pending_ref}`")
+        else:
+            lines += [
+                "",
+                (
+                    "✅ All pipes are concretely implemented — no `PipeSignature` placeholders remain. "
+                    "Strict validation will pass; this method is runnable."
+                ),
+            ]
 
     graph_files = result.get("graph_files")
     if isinstance(graph_files, dict):

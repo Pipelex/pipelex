@@ -88,6 +88,7 @@ async def validate_bundle_core(
         "validated_pipes": build_validated_pipes(result.dry_run_result),
         "total_pipes": len(result.dry_run_result),
         "pending_signatures": result.pending_signatures,
+        "is_runnable": not result.pending_signatures,
     }
 
 
@@ -187,4 +188,5 @@ async def validate_pipe_in_bundle_core(
         "validated_pipes": build_validated_pipes(result.dry_run_result),
         "total_pipes": len(result.dry_run_result),
         "pending_signatures": result.pending_signatures,
+        "is_runnable": not result.pending_signatures,
     }
