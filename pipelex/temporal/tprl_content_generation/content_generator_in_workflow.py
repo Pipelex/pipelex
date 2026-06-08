@@ -543,5 +543,15 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         # Re-validate on the submitter (workflow) side against the original class — pure and
-        # deterministic, so the dynamic output class never has to cross the activity boundary.
-        return output_structure_class.model_validate(result_dict)
+        # deterministic, so the dynamic output class never has to cross the activity boundary. The
+        # activity returns the provider's raw dict unvalidated (e.g. the gateway worker returns
+        # json.loads(...)), so a malformed structured response raises a bare ValidationError here in
+        # workflow code. Left raw it is neither WorkflowExecutionError nor PipelexError, so Temporal
+        # treats it as a workflow-task failure and retries forever, hanging the submitter — the exact
+        # failure mode this seam exists to prevent. Convert it to a terminal ContentGenerationError (a
+        # PipelexError) so the workflow fails and surfaces as an ErrorReport, matching the direct path.
+        try:
+            return output_structure_class.model_validate(result_dict)
+        except ValidationError as exc:
+            msg = f"Structured search result failed validation against {output_structure_class.__name__}: {exc}"
+            raise ContentGenerationError(msg) from exc

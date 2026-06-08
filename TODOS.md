@@ -1,6 +1,6 @@
 # PipeSearch has no Temporal activity — search pipes hang the runner API
 
-**Status:** confirmed by code inspection, not yet fixed. No code changed.
+**Status:** fixed in this PR — search now routes through the ContentGenerator seam (`act_search_generate.py`, `search_generate.py`, `ContentGeneratorProtocol.make_search_*`, and the `PipeSearch._live_run_operator_pipe` rewrite). The root-cause analysis below is retained as the as-built record of the work.
 **Severity:** high — any MTHDS bundle with a `PipeSearch` step, run through the Temporal path, hangs the caller forever instead of returning (or failing). On the happy path it is also unsound (non-deterministic on replay — see below).
 **Discovered from:** `pipelex-api` running locally against a local `pipelex-worker` + `temporal server start-dev`, all three on the same local `pipelex` checkout. Repro bundle: `pipelex-demos/mthds-wip/fashion_moodboard` (has a search step). Control bundle that works: `pipelex-demos/mthds-wip/joke_judge` (LLM only).
 
