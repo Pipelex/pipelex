@@ -377,6 +377,10 @@
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
+         <loc>https://docs.pipelex.com/latest/errors/authoring-and-language/</loc>
+         <lastmod>2026-06-09</lastmod>
+    </url>
+    <url>
          <loc>https://docs.pipelex.com/latest/errors/aws-credentials-error/</loc>
          <lastmod>2026-06-09</lastmod>
     </url>
@@ -541,6 +545,10 @@
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
+         <loc>https://docs.pipelex.com/latest/errors/execution-and-runtime/</loc>
+         <lastmod>2026-06-09</lastmod>
+    </url>
+    <url>
          <loc>https://docs.pipelex.com/latest/errors/extract-capability-error/</loc>
          <lastmod>2026-06-09</lastmod>
     </url>
@@ -678,6 +686,10 @@
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/img-gen-settings-validation-error/</loc>
+         <lastmod>2026-06-09</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/inference-and-providers/</loc>
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
@@ -1074,6 +1086,10 @@
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipeline-manager-not-found-error/</loc>
+         <lastmod>2026-06-09</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/platform-and-tooling/</loc>
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
