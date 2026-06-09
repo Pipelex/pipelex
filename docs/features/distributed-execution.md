@@ -1,6 +1,6 @@
 ---
 title: "Distributed Execution"
-description: "Run Pipelex methods as durable workflows on either of two backends — your own Temporal cluster, or Mistral's managed Workflows control plane. Both built on Temporal."
+description: "Run Pipelex methods as durable workflows on Temporal — your own cluster today, with Mistral's managed Workflows backend coming soon."
 ---
 
 # Distributed Execution
