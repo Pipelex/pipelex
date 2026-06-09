@@ -16,10 +16,12 @@ Everything below is **not yet done**. Each deferred workstream has its own track
 
 ### Deferred workstreams — own branches
 
+> **Parts B and C are the two dry-run modes** (full-distribution-with-leaf-mocks, and one-in-process-activity-in-memory). How they relate, what they share, and who builds the common `scoped_content_generator` seam → [`dry-run-modes-master-plan.md`](./dry-run-modes-master-plan.md).
+
 | Workstream | What it delivers | Status / gate | Tracker |
 |---|---|---|---|
 | **Part B — leaf-level run-mode mock** | Move the LIVE/DRY decision down to the cogt leaf so DRY *honors the backend* (DRY-on-Temporal dispatches `act_llm_gen_*` and mocks inside the activity). Retires the "DRY → local" shortcut. (req 1) | Not started. Has **pre-flight human-input items** (run_mode carrier, object-mock fidelity, synthetic-report disposition) — resolve before phase B1. | [`followup-leaf-run-mode-mock.md`](./followup-leaf-run-mode-mock.md) |
-| **Part C — distributed validation as a Temporal activity** | The API dispatches the whole validation sweep to a worker as one standalone activity; worker runs it in-process and returns the status map. (req 2) | Not started. **HARD-GATED** on a `temporalio` bump past 1.23.0 + Temporal Cloud/server standalone-activity support — needs human input. Depends on Part A **and** Part B. | [`followup-temporal-validation-activity.md`](./followup-temporal-validation-activity.md) |
+| **Part C — dry-run + validation as one in-process Temporal activity** | The API dispatches the whole job — validation sweep **+** graph-producing dry-run — to a worker as one activity that runs in-process and traces the graph **in memory** (no DynamoDB round-trip, no NDJSON, no usage/cost). Returns the status map **+** `GraphSpec`. (req 2) | **In progress** — branch `feature/Dry-run-as-temporal-activity`; executable plan in [`../../TODOS.md`](../../TODOS.md). Part B is **no longer a hard prereq** (the sweep is already in-process via `scoped_pipe_router`/#976). **All decisions resolved (2026-06-09); no human gate remains** — dispatch uses a one-step wrapper workflow (no `temporalio` bump); a true standalone activity is a deferred optional optimization. | [`followup-temporal-validation-activity.md`](./followup-temporal-validation-activity.md) |
 | **Run-outcome seam** *(optional)* | Have the run primitive *return* its classified outcome so `BundleValidator` consumes a typed outcome instead of re-catching + chain-walking the re-raised exception (D-plan D6). | Not started. **Optional tightening, not a bug** — gated on "is it worth the cross-backend churn?" Default: leave it. | [`followup-run-outcome-seam.md`](./followup-run-outcome-seam.md) |
 
 ### Cross-repo

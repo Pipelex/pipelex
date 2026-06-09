@@ -4,11 +4,24 @@
 >
 > **Design rationale:** [`D-plan.md`](./D-plan.md) §3.5 (run mode ⟂ backend) and §4.8 (leaf-level mock). **Risks:** D-plan §8 (object-mock fidelity, req-1 fidelity regressions).
 >
-> **Depends on:** the consolidation ([`consolidation-as-built.md`](./consolidation-as-built.md)) is *not* a hard prerequisite (this is a separable cogt/operator refactor), but the Temporal-validation follow-up builds on **both**, so sequence this after the consolidation lands. **Branch off the same D-plan.**
+> **Depends on:** the consolidation ([`consolidation-as-built.md`](./consolidation-as-built.md)) is *not* a hard prerequisite (this is a separable cogt/operator refactor). **Branch off the same D-plan.**
+>
+> **Relationship to the in-memory activity follow-up (corrected 2026-06-09):** this follow-up (req 1) is **orthogonal** to [`followup-temporal-validation-activity.md`](./followup-temporal-validation-activity.md) (req 2), **not** a prerequisite for it — see "Still relevant — a distinct dry-run mode" below.
 >
 > **⚠️ Coordinate with the registry branch's Phase 5 (`fix/For-API-update`, decided 2026-06-06).** That branch ships `--mock-inference` / `is_mock_inference` as an *interim* trigger, deliberately built **leaf-first so it lands B1's core ahead of time**: a shared `cogt/content_generation/dry_mock.py` + a per-leaf dry branch keyed on a per-run flag carried on `JobMetadata`. So when this follow-up runs, **B1 collapses to "re-key that helper from `is_mock_inference` → `run_mode`"** (carrier + helper already exist — verify before building from scratch), and **B2 settles the fate of `is_mock_inference`** (retire vs keep a thin reportable-mock — see B2). One distinction to preserve when re-keying: `--mock-inference` emits *non-zero* synthetic usage so a cost report renders; `--dry-run` stays zero-token and its report is *suppressed*. See the registry feature's [`../registry/deferred-followups.md`](../registry/deferred-followups.md) (`--mock-inference` coverage + the `is_mock_inference` fate decision).
 
 Goal: move the LIVE/DRY decision **down to the cogt leaf** so DRY honors the configured backend — DRY-on-Temporal dispatches `act_llm_gen_*` and mocks **inside** the activity, retiring the "DRY → local in-process" shortcut. Separable cogt/operator refactor (§4.8). **Resolve the Pre-flight items before starting.**
+
+## Still relevant — a distinct dry-run mode (do NOT drop this file)
+
+This describes a **different** dry-run mode from the in-memory in-process activity ([`followup-temporal-validation-activity.md`](./followup-temporal-validation-activity.md)). Both are wanted; they're orthogonal `run_mode × backend` combinations of one foundation (mock at the leaf; the backend decides where the leaf runs — D-plan §3.5):
+
+- **This file (req 1) — full distribution, leaf-only mocks.** A DRY run goes through the **real** Temporal path (`WfPipeRouter` → child workflows → `act_llm_gen_*` activities) and the **leaf inside each activity** mocks instead of calling the model. Purpose: **test the distribution machinery** (dispatch, scheduling, serialization, routing, cross-worker propagation) without AI cost or latency.
+- **The other file (req 2) — one in-process activity, in-memory tracing.** The whole dry-run + validation runs **in-process inside a single activity** (nothing nested is dispatched), tracing the graph in memory. Purpose: offload validate+graph to a worker cheaply.
+
+**Already partly shipped:** `is_mock_inference` (the registry branch's interim trigger) **is** the LLM slice of this mode — `run_mode` stays LIVE so operators dispatch `act_llm_gen_*` normally, but the leaf fakes the call (`JobMetadata.is_mock_inference` → the `llm_generate.py` leaf branch). So req-1 behavior already coexists, today, alongside the pipe-level DRY path — concrete proof the two modes don't conflict. B1/B2 generalize it from LLM-only + `is_mock_inference` to all leaves + `run_mode=DRY`.
+
+**Shared seam with the in-memory activity — `scoped_content_generator`.** B2 routes the DRY mock through `get_content_generator()` at the leaf. Under a Temporal-enabled hub that returns `ContentGeneratorInWorkflow` **globally** (boot-time, `pipelex.py:370-385`). So after Part B, the **in-process** activity (req 2) must **force the inline content generator** or its leaf would dispatch — i.e. Part B reintroduces the `scoped_content_generator` need over there. Whichever follow-up lands first builds the inline-content-generator scope; the other consumes it. Coordinate the two so the seam is built once.
 
 ## Status at a glance
 
@@ -61,14 +74,40 @@ Resolve **before** the phase that depends on it. Record the answer in the releva
 
 ## Phase B3 — Verify Temporal + DRY end-to-end (**req-1 acceptance gate**)
 
-- [ ] With a Temporal server (`temporal-e2e-validate` topology), run a pipeline `run_mode=DRY` and assert: `act_llm_gen_*` + extract/img-gen activities **are dispatched** and **mock inside the activity**; LibraryCrate propagation, cross-process serialization, graph tracing behave as LIVE; **no real LLM/IO** occurs.
-- [ ] Add a DRY arm to the Temporal e2e suite.
-- [ ] `make agent-check` + `make agent-test` green; Temporal e2e green.
+The acceptance gate is a **specific distributed scenario** in the repo's `temporal-e2e-validate` skill — **Tier 17** — built to the Tier 2c/2d precedent (a 3-process scenario in `references/mode-2-tiers.md`, a Mode-1 pytest, a Step-7 master-table row). Full spec below.
+
+- [ ] **Add `temporal-e2e-validate` Tier 17 — "DRY honors the Temporal backend (leaf mock inside the activity)".** Mode-2 3-process GREEN + RED + Mode-1 pytest + master-table row. See [§ Distributed verification](#distributed-verification--temporal-e2e-validate-mode-2--tier-17).
+- [ ] `make agent-check` + `make agent-test` green; Temporal e2e green (Tier 17 GREEN and RED-proven).
+
+## Distributed verification — `temporal-e2e-validate` (Mode 2 / Tier 17)
+
+This tier **flips the current Tier 8 note** ("dry-run instantiates `ContentGeneratorDry` on the router and never dispatches `act_llm_gen_text`"): after Part B, DRY honors the backend and DOES dispatch, mocking inside the activity. That behavior change is the req-1 deliverable, so its proof is a new tier.
+
+**Tier 17 — DRY honors the Temporal backend (leaf mock inside the activity).** New sequential tier (Step 3 family).
+
+**Mode 2 (3-process) GREEN** — split workers up (`mode-2-setup.md`), Temporal-enabled; run a multi-step LLM bundle DRY:
+
+```
+pipelex run bundle .../library_crate/native_text_sequence.mthds --pipe native_text_sequence --temporal --dry-run --mock-inputs --no-logo --graph
+```
+
+- exit 0; **the worker DID dispatch `act_llm_gen_text`** (grep the runner session / `WorkflowHandle.fetch_history()` shows `ActivityTaskScheduled` for it) — the runner actually ran the activity. *(Pre-Part-B this dispatches nothing — that's the behavior we're changing.)*
+- **The leaf mocked inside the activity:** no real provider call, **runs with NO API keys** (the "dry works with no inference configured" invariant must hold even though the activity dispatches), zero real spend, output is the DRY mock (`"DRY RUN: …"` / minted object), and usage is **zero-token / report suppressed** — distinct from `--mock-inference`, which keeps non-zero synthetic usage for a rendered cost report.
+- cross-worker graph tracing assembled (`reactflow.html`); LibraryCrate propagation + serialization behaved as LIVE.
+- **Extend to non-LLM leaves once B1 adds them:** rerun against extract (`pdf_extract_page_views`) and img-gen (`generate_image`) and assert `act_extract_gen_extract_pages` / `act_img_gen_images` are dispatched and mocked inside — this **replaces** the current `MockInferenceUnsupportedError` fail-loud guard at those leaves.
+
+**Mode 2 RED (prove it bites):** revert B1's leaf re-key (DRY not threaded to the leaf) → DRY mocks on the router and dispatches nothing (the OLD behavior — fails the "dispatched" assertion); **or** force a real call (needs keys / spends). Confirm the **dispatched + mocked-inside + no-spend + no-keys** quartet flips. Restore.
+
+**Mode 1 (pytest) companion** — `tests/integration/pipelex/temporal/test_dry_run_dispatches_and_mocks.py` (the DRY analogue of the existing `test_mock_inference_temporal.py`): assert `run_mode=DRY` over the in-process server dispatches `act_llm_gen_*` and the leaf mints the DRY mock with **zero-token, suppressed** usage, no real inference.
+
+**Coordination with Tier 8b.** The existing `--mock-inference` cost arms (Tier 8b) are the LLM **cost-rendering** slice of this same mode (LIVE run mode + leaf mock, non-zero usage). B2's `is_mock_inference` fate decision (retire vs keep a thin reportable-mock) determines whether Tier 8b is **re-keyed** onto `run_mode=DRY` or kept as-is — settle it there, and update Tier 8b's scope manifest accordingly.
+
+**Step-7 master-table row to add:** `Tier 17: DRY honors the backend | a --temporal --dry-run run dispatches act_llm_gen_* (+ extract/img-gen) to the worker and mocks INSIDE the activity — no real IO, no API keys needed, zero-token suppressed usage, cross-worker graph still assembles | PASS/FAIL | path | — `.
 
 > ### ⛔ CHECKPOINT E — after Phase B3 — **Follow-up complete** — **MANDATORY STOP**
 >
 > Run mode is now orthogonal to backend across all four cells. **Req 1 satisfied.** Foundation for the Temporal-validation follow-up is in place.
 >
-> **Verify:** Temporal+DRY e2e green · full `make agent-test` green · commit.
+> **Verify:** `temporal-e2e-validate` **Tier 17 GREEN and RED-proven** · full `make agent-test` green · commit.
 >
 > **Handoff (fill in):** (template) — **Next:** [`followup-temporal-validation-activity.md`](./followup-temporal-validation-activity.md) (HARD GATE — get the `temporalio` answer first).
