@@ -95,6 +95,30 @@ class TestPipelineRunSetupEmitGates:
         finally:
             _cleanup(pipeline_run_id, library_id)
 
+    async def test_tracing_disabled_attaches_no_trace_context(self, mocker: MockerFixture) -> None:
+        """Master switch off (``tracing_config.is_enabled = False``) attaches NO trace_context — even
+        with ``--costs`` on (``generate_usage=True``). is_enabled is resolved here, at submit time, into
+        the durable payload; the Temporal worker gates its per-workflow tracing solely on the presence of
+        that trace_context and never reads its own ``get_config()`` inside a workflow (which would break
+        replay determinism, TMPRL1100). A missing context therefore means no tracing work — no buffering,
+        no no-op ``act_flush_trace_events`` activity — and no usage event-log registration.
+        """
+        mocker.patch.object(get_config().pipelex.tracing_config, "is_enabled", False)
+        set_event_log_spy = mocker.spy(get_report_delegate(), "set_event_log")
+
+        pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
+            execution_config=_config(generate_graph=True, generate_usage=True),
+            mthds_contents=[_GATE_MTHDS],
+            pipe_code="echo_topic",
+            pipe_run_mode=PipeRunMode.DRY,
+        )
+        try:
+            assert pipe_job.job_metadata.trace_context is None
+            registered_keys = [call.kwargs.get("context_key") for call in set_event_log_spy.call_args_list]
+            assert pipeline_run_id not in registered_keys
+        finally:
+            _cleanup(pipeline_run_id, library_id)
+
     async def test_graph_only_does_not_register_usage_log(self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture) -> None:
         self._enable_ndjson_tracing(mocker, str(tmp_path_factory.mktemp("traces_graph_only")))
         set_event_log_spy = mocker.spy(get_report_delegate(), "set_event_log")

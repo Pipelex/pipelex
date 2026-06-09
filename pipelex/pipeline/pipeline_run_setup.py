@@ -196,26 +196,37 @@ async def pipeline_run_setup(
             # (node/edge) events and usage (cost) events.
             config = get_config()
             tracing_config = config.pipelex.tracing_config
+            # tracing_config.is_enabled is the master switch and it gates the trace_context itself, not
+            # just the event-log transport: when tracing is disabled we attach NO trace_context to the
+            # payload, so downstream execution does no tracing work at all. This is the single place the
+            # is_enabled decision is resolved. It MUST happen here at submit time, never inside workflow
+            # code: the Temporal worker gates its per-workflow tracing solely on the durable trace_context,
+            # because worker-local config is not a pure function of the workflow history and reading it in
+            # a workflow body breaks Temporal replay determinism (TMPRL1100). Resolving it here keeps the
+            # decision durable and identical on every replay. (is_enabled=False already yields an empty
+            # graph/cost report on both paths — assemble_tracing short-circuits on it — so skipping the
+            # trace_context changes no output, only the wasted no-op flush activity it used to schedule.)
             if tracing_config.is_enabled:
+                # Create the event log — the shared transport for both graph (node/edge) and usage (cost) events.
                 event_log = make_event_log(tracing_config)
 
-            graph_tracer_manager = GraphTracerManager.get_or_create_instance()
-            # The emit flags (D4) are threaded into open_tracer so the returned TraceContext is born with
-            # the correct values — no post-hoc model_copy. Propagated to child contexts via copy_for_child.
-            trace_context = graph_tracer_manager.open_tracer(
-                graph_id=pipeline_run_id,
-                data_inclusion=execution_config.graph_config.data_inclusion,
-                pipeline_ref_domain=pipe.domain_code,
-                pipeline_ref_main_pipe=pipe_code,
-                # D5: in costs-only mode (--no-graph --costs) pass event_log=None so the tracer accumulates
-                # the in-memory graph and keeps minting node ids, but emits NO graph events. Usage events
-                # are wired separately via set_event_log below.
-                event_log=event_log if is_generate_graph else None,
-                workflow_id="direct",
-                pipeline_run_id=pipeline_run_id,
-                emit_graph_events=is_generate_graph,
-                emit_usage_events=is_generate_usage,
-            )
+                graph_tracer_manager = GraphTracerManager.get_or_create_instance()
+                # The emit flags (D4) are threaded into open_tracer so the returned TraceContext is born with
+                # the correct values — no post-hoc model_copy. Propagated to child contexts via copy_for_child.
+                trace_context = graph_tracer_manager.open_tracer(
+                    graph_id=pipeline_run_id,
+                    data_inclusion=execution_config.graph_config.data_inclusion,
+                    pipeline_ref_domain=pipe.domain_code,
+                    pipeline_ref_main_pipe=pipe_code,
+                    # D5: in costs-only mode (--no-graph --costs) pass event_log=None so the tracer accumulates
+                    # the in-memory graph and keeps minting node ids, but emits NO graph events. Usage events
+                    # are wired separately via set_event_log below.
+                    event_log=event_log if is_generate_graph else None,
+                    workflow_id="direct",
+                    pipeline_run_id=pipeline_run_id,
+                    emit_graph_events=is_generate_graph,
+                    emit_usage_events=is_generate_usage,
+                )
 
         # TODO: rethink this, it's not forcing
         if pipe_run_mode is None:

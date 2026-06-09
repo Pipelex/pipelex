@@ -239,6 +239,20 @@ In dry-run mode, PipeLLM produces `StuffArtefact` debug objects as working memor
 
 ---
 
+## Workflow Determinism
+
+Temporal does not re-run a workflow from scratch each time it makes progress. It keeps the running workflow in a worker's sticky in-memory cache and advances it; it only rebuilds the workflow state by **replaying** the recorded history when that cache is gone — worker restart, deploy, scale-in, sticky-cache eviction, task timeout, or another worker picking up the next task. Replay re-executes the workflow code and checks that it issues the **same command sequence** the history already recorded. If it doesn't, Temporal raises `[TMPRL1100] Nondeterminism error` and the workflow task fails (then retries, fails again, and the workflow stalls).
+
+The hard rule this imposes: **workflow code must be a pure function of its inputs and recorded history.** Anything that decides *which activities get scheduled, in what order* must derive only from durable, payload-carried state — never from mutable, worker-local state.
+
+The sharpest trap is reading `get_config()` inside a `@workflow.defn` body. Config is worker-local: it differs across pods, across a rolling deploy, and across pipelex versions. A decision gated on config is deterministic only as long as every worker that ever replays the workflow reads the *same* value — which is exactly what you cannot guarantee. The symptom is a workflow that runs fine end-to-end on a single uniform worker (it never replays) but fails on a multi-pod fleet, after a deploy, or when a workflow started under one image is replayed under another.
+
+The concrete case that bit us: `WfPipeRouter` gated whether to schedule the `act_flush_trace_events` activity on `get_config().pipelex.tracing_config.is_enabled`. A worker with tracing disabled, replaying a history written by a worker with tracing enabled, skipped the flush the history required — `[TMPRL1100] Nondeterminism error: Activity type of scheduled event 'act_flush_trace_events' does not match …`. The fix gates the tracing block solely on the durable `trace_context` carried in the `PipeJob` payload (identical on every replay). The worker-local "tracing off" preference is still honored, but **at the activity layer** — `flush_trace_events_to_backend` no-ops when tracing is disabled. That is the general escape hatch: **a worker-local or otherwise non-deterministic decision belongs inside the activity (activities may be non-deterministic), or at submit time (bake it into the payload) — never in the workflow's control flow.**
+
+Guarded by `tests/integration/pipelex/temporal/test_wf_pipe_router_flush_replay_determinism.py`, which replays a recorded history under both worker tracing configs with Temporal's in-process `Replayer` (no server needed) and asserts neither diverges.
+
+---
+
 ## File Reference
 
 | Component | File |

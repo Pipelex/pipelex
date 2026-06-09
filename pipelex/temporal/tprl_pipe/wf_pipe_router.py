@@ -10,7 +10,6 @@ with workflow.unsafe.imports_passed_through():
     from kajson.kajson_manager import KajsonManager
 
     from pipelex.base_exceptions import PipelexError, iter_cause_chain
-    from pipelex.config import get_config
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.graph.graph_tracer_manager import GraphTracerManager
     from pipelex.hub import clear_current_library, get_library_manager, get_report_delegate, set_current_library
@@ -106,12 +105,21 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                     workflow_arg.working_memory = hydrate_working_memory(workflow_arg.working_memory_raw)
                     workflow_arg.working_memory_raw = None
 
-            # Set up per-workflow graph tracing if enabled
+            # Set up per-workflow graph tracing if a trace_context was attached by the submitter.
             pipeline_run_id = workflow_arg.job_metadata.pipeline_run_id
             wf_workflow_id = workflow.info().workflow_id
 
-            tracing_config = get_config().pipelex.tracing_config
-            if tracing_config.is_enabled and trace_context is not None:
+            # Determinism: gate solely on the durable, payload-carried trace_context — NEVER on
+            # get_config().pipelex.tracing_config.is_enabled. That config is worker-local and mutable
+            # (it differs across pods, across a rolling deploy, and across pipelex versions), so reading
+            # it inside the workflow body makes activity scheduling — specifically whether
+            # act_flush_trace_events gets scheduled in the finally block — depend on something that is
+            # not a pure function of the workflow history. On replay by a worker whose config differs
+            # from the one that wrote the history, the command stream diverges and Temporal raises
+            # TMPRL1100 (Nondeterminism error). The worker-local "tracing disabled" preference is still
+            # honored — but at the activity level, where non-determinism is harmless:
+            # flush_trace_events_to_backend() no-ops when tracing_config.is_enabled is false.
+            if trace_context is not None:
                 try:
                     # Use BufferingEventLog inside workflows (no I/O allowed).
                     # Events are flushed to the real backend via act_flush_trace_events.

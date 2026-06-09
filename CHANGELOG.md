@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **Temporal workflows no longer fail to replay with `[TMPRL1100] Nondeterminism error` when a worker's tracing config differs from the one that recorded the history.** `WfPipeRouter` read `get_config().pipelex.tracing_config.is_enabled` inside the workflow body to decide whether to schedule the `act_flush_trace_events` activity. That config is worker-local and mutable — it differs across pods, across a rolling deploy, and across pipelex versions — so it made activity scheduling depend on something that is not a pure function of the workflow history. When a worker whose tracing config differed from the one that wrote the history replayed the workflow (worker restart, deploy, scale-in, or a workflow started under an earlier image), the command stream diverged and Temporal raised `[TMPRL1100] Nondeterminism error: Activity type of scheduled event 'act_flush_trace_events' does not match …`. The workflow's tracing block is now gated solely on the durable, payload-carried `trace_context`, never on worker-local config. The `is_enabled` master switch is now resolved once, at submit time (`pipeline_run_setup`): when tracing is disabled, no `trace_context` is attached to the payload at all, so the worker does no tracing work — and in particular schedules no `act_flush_trace_events` activity, where previously a disabled-tracing worker would still set up the tracer and schedule a flush that merely no-ops. Output is unchanged (`assemble_tracing` already short-circuits to an empty graph/cost report when tracing is disabled, on both the direct and Temporal paths). Guarded by a server-free replay regression test (`tests/integration/pipelex/temporal/test_wf_pipe_router_flush_replay_determinism.py`) that replays a recorded history under both worker tracing configs, plus a `pipeline_run_setup` emit-gate test asserting a disabled master switch attaches no `trace_context`.
+
 ## [v0.32.1] - 2026-06-09
 
 ### Added
