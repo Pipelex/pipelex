@@ -18,4 +18,4 @@ Raised when a storage configuration is invalid.
 | Defined in | `pipelex.tools.storage.exceptions` |
 | Parent class | [`StorageError`](storage-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

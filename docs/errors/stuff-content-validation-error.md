@@ -18,4 +18,4 @@ Raised when content validation fails during type conversion.
 | Defined in | `pipelex.core.stuffs.exceptions` |
 | Parent class | [`StuffError`](stuff-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

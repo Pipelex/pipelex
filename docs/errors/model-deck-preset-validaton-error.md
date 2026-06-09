@@ -16,4 +16,4 @@ description: "Reference for the `ModelDeckPresetValidatonError` Pipelex error cl
 | Defined in | `pipelex.cogt.exceptions` |
 | Parent class | [`ModelDeckValidatonError`](model-deck-validaton-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

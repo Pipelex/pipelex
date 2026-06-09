@@ -16,4 +16,4 @@ description: "Reference for the `StructureClassError` Pipelex error class."
 | Defined in | `pipelex.core.concepts.structure_generation.exceptions` |
 | Parent class | [`ConceptFactoryError`](concept-factory-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

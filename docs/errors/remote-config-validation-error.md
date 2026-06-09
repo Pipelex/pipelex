@@ -18,4 +18,4 @@ Raised when remote configuration payload validation fails.
 | Defined in | `pipelex.system.pipelex_service.exceptions` |
 | Parent class | [`PipelexServiceError`](pipelex-service-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

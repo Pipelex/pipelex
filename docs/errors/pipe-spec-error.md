@@ -18,4 +18,4 @@ Raised when a pipe spec is malformed against its authoring contract.
 | Defined in | `pipelex.builder.pipe.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

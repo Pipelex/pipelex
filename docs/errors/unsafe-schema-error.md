@@ -16,4 +16,4 @@ description: "Reference for the `UnsafeSchemaError` Pipelex error class."
 | Defined in | `pipelex.cogt.content_generation.exceptions` |
 | Parent class | [`SecurityError`](security-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

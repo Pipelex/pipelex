@@ -16,4 +16,4 @@ description: "Reference for the `MistralModelListingError` Pipelex error class."
 | Defined in | `pipelex.plugins.mistral.mistral_exceptions` |
 | Parent class | [`MistralPluginError`](mistral-plugin-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

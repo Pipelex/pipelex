@@ -18,4 +18,4 @@ Raised when a pipe cannot be created from a blueprint.
 | Defined in | `pipelex.core.pipes.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

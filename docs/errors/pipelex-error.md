@@ -16,4 +16,4 @@ description: "Reference for the `PipelexError` Pipelex error class."
 | Defined in | `pipelex.base_exceptions` |
 | Parent class | `Exception` (Python builtin) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

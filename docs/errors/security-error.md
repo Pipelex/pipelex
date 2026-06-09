@@ -18,4 +18,4 @@ Base for security-policy violations.
 | Defined in | `pipelex.base_exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

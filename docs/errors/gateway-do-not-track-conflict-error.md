@@ -18,4 +18,4 @@ Raised when DO_NOT_TRACK is set but Pipelex Gateway requires telemetry.
 | Defined in | `pipelex.system.pipelex_service.exceptions` |
 | Parent class | [`PipelexServiceError`](pipelex-service-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

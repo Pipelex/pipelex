@@ -18,4 +18,4 @@ Raised when a ``--mock-inference`` synthetic object fails re-validation against 
 | Defined in | `pipelex.cogt.content_generation.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

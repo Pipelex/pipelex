@@ -16,4 +16,4 @@ description: "Reference for the `BedrockFactoryError` Pipelex error class."
 | Defined in | `pipelex.plugins.bedrock.bedrock_exceptions` |
 | Parent class | [`CogtError`](cogt-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

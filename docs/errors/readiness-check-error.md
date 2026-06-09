@@ -18,4 +18,4 @@ Raised when readiness checks fail (missing dependencies or dev mode without venv
 | Defined in | `pipelex.cli.exceptions` |
 | Parent class | [`PipelexCLIError`](pipelex-cli-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

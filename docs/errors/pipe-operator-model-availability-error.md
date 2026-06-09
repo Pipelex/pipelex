@@ -16,4 +16,4 @@ description: "Reference for the `PipeOperatorModelAvailabilityError` Pipelex err
 | Defined in | `pipelex.pipe_operators.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

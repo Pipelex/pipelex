@@ -18,4 +18,4 @@ Error raised when a model choice cannot be found in the model deck.
 | Defined in | `pipelex.cogt.exceptions` |
 | Parent class | [`CogtError`](cogt-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

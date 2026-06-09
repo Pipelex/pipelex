@@ -18,4 +18,4 @@ Raised when a pipe dispatched through the bridge fails (validation or execution)
 | Defined in | `pipelex.runtime_bridge.exceptions` |
 | Parent class | [`PipelexRuntimeBridgeError`](pipelex-runtime-bridge-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

@@ -18,4 +18,4 @@ Raised when a fresh fetch failed AND no usable cached fallback exists.
 | Defined in | `pipelex.system.pipelex_service.exceptions` |
 | Parent class | [`PipelexServiceError`](pipelex-service-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

@@ -16,4 +16,4 @@ description: "Reference for the `PipeControllerOutputConceptMismatchError` Pipel
 | Defined in | `pipelex.pipe_controllers.exceptions` |
 | Parent class | [`PipeControllerError`](pipe-controller-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

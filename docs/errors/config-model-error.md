@@ -16,4 +16,4 @@ description: "Reference for the `ConfigModelError` Pipelex error class."
 | Defined in | `pipelex.system.exceptions` |
 | Parent class | [`FatalError`](fatal-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)
