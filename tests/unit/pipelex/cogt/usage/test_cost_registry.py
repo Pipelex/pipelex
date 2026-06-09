@@ -498,3 +498,100 @@ class TestCostRegistry:
             rows = list(csv.DictReader(file))
         assert len(rows) == 1
         assert rows[0][LLMTokenCostReportField.LLM_NAME] == "test-model"
+
+    def test_aggregate_costs_totals_and_reportability(self, job_metadata: JobMetadata):
+        """One aggregation pass yields the run total and the reportable-work flag.
+
+        ``has_reportable_usage`` is True for a priced run AND for a free/zero-price run with real tokens
+        (cost 0), but False for a dry run (zero tokens, zero cost) — so dry runs are the only thing suppressed.
+        """
+        priced = LLMTokensUsage(
+            job_metadata=job_metadata,
+            inference_model_name="m",
+            inference_model_id="m-id",
+            nb_tokens_by_category={TokenCategory.INPUT: 100, TokenCategory.OUTPUT: 50},
+            unit_costs={CostCategory.INPUT: 1000, CostCategory.OUTPUT: 2000},  # 0.1 + 0.1 = 0.2
+        )
+        free = LLMTokensUsage(
+            job_metadata=job_metadata,
+            inference_model_name="ollama-x",
+            inference_model_id="ollama-x-id",
+            nb_tokens_by_category={TokenCategory.INPUT: 100, TokenCategory.OUTPUT: 50},
+            unit_costs={},  # real tokens, no price -> cost 0
+        )
+        dry = LLMTokensUsage(
+            job_metadata=job_metadata,
+            inference_model_name="dry",
+            inference_model_id="dry-run",
+            nb_tokens_by_category={},
+            unit_costs={},
+        )
+
+        priced_aggregated = CostRegistry.aggregate_costs([priced])
+        assert priced_aggregated.total_cost == 0.2
+        assert priced_aggregated.total_nb_tokens == 150
+        assert priced_aggregated.has_reportable_usage is True
+
+        free_aggregated = CostRegistry.aggregate_costs([free])
+        assert free_aggregated.total_cost == 0.0
+        assert free_aggregated.total_nb_tokens == 150
+        assert free_aggregated.has_reportable_usage is True  # tokens but no cost -> still reportable
+
+        dry_aggregated = CostRegistry.aggregate_costs([dry])
+        assert dry_aggregated.total_cost == 0.0
+        assert dry_aggregated.total_nb_tokens == 0
+        assert dry_aggregated.has_reportable_usage is False  # the only case we suppress
+
+    def test_build_cost_summary_non_zero(self, job_metadata: JobMetadata):
+        """A priced run yields a JSON-serializable summary with a total and per-model rows."""
+        usage = LLMTokensUsage(
+            job_metadata=job_metadata,
+            inference_model_name="claude-x",
+            inference_model_id="claude-x-id",
+            nb_tokens_by_category={TokenCategory.INPUT: 100, TokenCategory.OUTPUT: 50},
+            unit_costs={CostCategory.INPUT: 1000, CostCategory.OUTPUT: 2000},
+        )
+
+        summary = CostRegistry.build_cost_summary([usage])
+
+        assert summary is not None
+        assert summary["total_cost"] == 0.2
+        assert len(summary["by_model"]) == 1
+        row = summary["by_model"][0]
+        assert row["model"] == "claude-x"
+        assert row["model_type"] == "llm"
+        assert row["nb_tokens_input"] == 100
+        assert row["nb_tokens_output"] == 50
+        assert row["cost"] == 0.2
+
+    def test_build_cost_summary_free_model_returns_summary(self, job_metadata: JobMetadata):
+        """A free/zero-price model with real tokens still reports its usage, with total_cost 0."""
+        free = LLMTokensUsage(
+            job_metadata=job_metadata,
+            inference_model_name="ollama-x",
+            inference_model_id="ollama-x-id",
+            nb_tokens_by_category={TokenCategory.INPUT: 100, TokenCategory.OUTPUT: 50},
+            unit_costs={},
+        )
+
+        summary = CostRegistry.build_cost_summary([free])
+
+        assert summary is not None
+        assert summary["total_cost"] == 0.0
+        row = summary["by_model"][0]
+        assert row["model"] == "ollama-x"
+        assert row["nb_tokens_input"] == 100
+        assert row["nb_tokens_output"] == 50
+        assert row["cost"] == 0.0
+
+    def test_build_cost_summary_dry_run_returns_none(self, job_metadata: JobMetadata):
+        """A dry-run-shaped usage (zero tokens, zero cost) does no reportable work, so no summary."""
+        dry = LLMTokensUsage(
+            job_metadata=job_metadata,
+            inference_model_name="dry",
+            inference_model_id="dry-run",
+            nb_tokens_by_category={},
+            unit_costs={},
+        )
+
+        assert CostRegistry.build_cost_summary([dry]) is None

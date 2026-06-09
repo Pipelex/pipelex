@@ -7,7 +7,7 @@ import shortuuid
 from pytest_mock import MockerFixture
 
 from pipelex import log
-from pipelex.hub import get_library_manager, get_report_delegate, set_current_library
+from pipelex.hub import get_library_manager, set_current_library
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.system.pipelex_service.pipelex_service_config import (
@@ -169,21 +169,16 @@ def load_empty_library() -> Generator[Callable[[], str], None, None]:
 
 
 @pytest.fixture
-def job_metadata(request: pytest.FixtureRequest) -> Generator[JobMetadata, None, None]:
+def job_metadata(request: pytest.FixtureRequest) -> JobMetadata:
     """Provide a JobMetadata instance with test-specific values.
 
     Uses the test node ID as pipeline_run_id for better traceability in logs.
-    Opens a registry for the pipeline run ID before the test and closes it after.
     """
     test_id: str = request.node.nodeid  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
     random_code: str = shortuuid.uuid()[:5]
     pipeline_run_id: str = f"{test_id}-{random_code}"
 
-    get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
-
-    yield JobMetadata(
+    return JobMetadata(
         user_id="pytest",
         pipeline_run_id=pipeline_run_id,
     )
-
-    get_report_delegate().close_registry(pipeline_run_id=pipeline_run_id)

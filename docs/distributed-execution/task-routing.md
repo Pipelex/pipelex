@@ -51,6 +51,8 @@ The **routing key** is the runtime handle the activity is about to call:
 | `act_llm_gen_object_list`         | LLM model handle       | The `llm_handle` on the call    |
 | `act_img_gen_images`              | `img_gen_handle`       | The image generation backend    |
 | `act_extract_gen_extract_pages`   | `extract_handle`       | The OCR / extract backend       |
+| `act_search_gen_sourced_answer`   | `search_handle`        | The web search backend          |
+| `act_search_gen_structured`       | `search_handle`        | The web search backend          |
 | `act_jinja2_gen_text`             | (none — pass `None`)   | Template rendering has no handle |
 | `act_render_page_views`           | (none — pass `None`)   | Page-view rendering has no handle |
 

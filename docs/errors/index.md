@@ -167,6 +167,12 @@ classification rules, and the cross-boundary Temporal bridge.
 
 - [`DryRunError`](dry-run-error.md) — Dry run
 
+## EventLogError
+
+- [`EventLogError`](event-log-error.md) — Event log
+- [`EventLogReadError`](event-log-read-error.md) — Event log read
+- [`EventLogSetupError`](event-log-setup-error.md) — Event log setup
+
 ## GraphSpecError
 
 - [`GraphSpecError`](graph-spec-error.md) — Graph spec
@@ -201,6 +207,14 @@ classification rules, and the cross-boundary Temporal bridge.
 ## MissingDependencyError
 
 - [`MissingDependencyError`](missing-dependency-error.md) — Missing dependency
+
+## MockInferenceObjectFidelityError
+
+- [`MockInferenceObjectFidelityError`](mock-inference-object-fidelity-error.md) — Mock inference object fidelity
+
+## MockInferenceUnsupportedError
+
+- [`MockInferenceUnsupportedError`](mock-inference-unsupported-error.md) — Mock inference unsupported
 
 ## ModelReferenceParseError
 
@@ -352,6 +366,13 @@ classification rules, and the cross-boundary Temporal bridge.
 
 - [`BundleElaboratorError`](bundle-elaborator-error.md) — Bundle elaborator
 - [`PipelexInterpreterError`](pipelex-interpreter-error.md) — Pipelex interpreter
+
+## PipelexRuntimeBridgeError
+
+- [`MissingMistralWorkflowsPluginError`](missing-mistral-workflows-plugin-error.md) — Missing mistral workflows plugin
+- [`MissingPipelexTemporalExtraError`](missing-pipelex-temporal-extra-error.md) — Missing pipelex temporal extra
+- [`PipelexBridgeDispatchError`](pipelex-bridge-dispatch-error.md) — Pipelex bridge dispatch
+- [`PipelexRuntimeBridgeError`](pipelex-runtime-bridge-error.md) — Pipelex runtime bridge
 
 ## PipelexServiceConfigValidationError
 

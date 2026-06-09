@@ -1,5 +1,6 @@
 from typing import Any
 
+from pydantic import BaseModel, ValidationError
 from typing_extensions import override
 
 from pipelex import log
@@ -8,13 +9,17 @@ from pipelex.cogt.content_generation.assignment_models import (
     ImgGenAssignment,
     LLMAssignment,
     ObjectAssignment,
+    SearchAssignment,
+    SearchObjectAssignment,
     TemplatingAssignment,
 )
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
+from pipelex.cogt.content_generation.exceptions import MockInferenceObjectFidelityError
 from pipelex.cogt.content_generation.extract_generate import extract_gen_pages
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.content_generation.img_gen_generate import img_gen_image_list, img_gen_single_image
 from pipelex.cogt.content_generation.llm_generate import llm_gen_object, llm_gen_object_list, llm_gen_text
+from pipelex.cogt.content_generation.search_generate import search_gen_sourced_answer, search_gen_structured
 from pipelex.cogt.content_generation.templating_generate import templating_gen_text
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
@@ -29,9 +34,38 @@ from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
+from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+
+
+def _revalidate_against_object_class(
+    raw_obj: BaseModel,
+    object_class: type[BaseModelTypeVar],
+    *,
+    is_mock_inference: bool,
+) -> BaseModelTypeVar:
+    """Re-validate a leaf-generated object's data against the original ``object_class``.
+
+    ``llm_gen_object`` / ``llm_gen_object_list`` return plain ``BaseModel``s reconstructed from the JSON
+    schema; re-validating their data against the original class makes the result the proper subtype (e.g.
+    ``StructuredContent``) the caller expects.
+
+    Under ``--mock-inference`` the object was built by polyfactory from the schema-reconstructed class, which
+    can drop invariants the original class enforces (custom validators, ``json_schema_extra`` format/pattern
+    hints datamodel-code-generator omits on round-trip). A re-validation failure there is the known object-mock
+    fidelity gap, so the ``ValidationError`` is re-raised as a clear typed
+    :class:`MockInferenceObjectFidelityError` that names the class and points at ``--dry-run``. The catch is
+    scoped to the mock path only — a LIVE provider's invalid output keeps its existing ``ValidationError``.
+    """
+    raw_data = raw_obj.model_dump(serialize_as_any=True)
+    if not is_mock_inference:
+        return object_class.model_validate(raw_data)
+    try:
+        return object_class.model_validate(raw_data)
+    except ValidationError as exc:
+        raise MockInferenceObjectFidelityError.for_object_class(object_class.__name__) from exc
 
 
 class ContentGenerator(ContentGeneratorProtocol):
@@ -79,10 +113,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         )
         raw_obj = await llm_gen_object(object_assignment=object_assignment)
         log.verbose(f"{self.__class__.__name__} generated object direct: {raw_obj}")
-        # llm_gen_object returns a plain BaseModel reconstructed from the JSON schema.
-        # Validate its data against the original class so the result is a proper subtype
-        # (e.g. StructuredContent) expected by the caller.
-        return object_class.model_validate(raw_obj.model_dump(serialize_as_any=True))
+        return _revalidate_against_object_class(raw_obj, object_class, is_mock_inference=job_metadata.is_mock_inference)
 
     @override
     @update_job_metadata
@@ -105,7 +136,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         )
         raw_list = await llm_gen_object_list(object_assignment=object_assignment)
         log.verbose(f"{self.__class__.__name__} generated object list direct: {raw_list}")
-        return [object_class.model_validate(raw_obj.model_dump(serialize_as_any=True)) for raw_obj in raw_list]
+        return [_revalidate_against_object_class(raw_obj, object_class, is_mock_inference=job_metadata.is_mock_inference) for raw_obj in raw_list]
 
     @override
     async def make_image_content(
@@ -290,3 +321,24 @@ class ContentGenerator(ContentGeneratorProtocol):
                 page_content.page_view = page_view_contents.pop(0)
 
         return page_contents
+
+    @override
+    async def make_search_sourced_answer(
+        self,
+        search_assignment: SearchAssignment,
+    ) -> SearchResultContent:
+        return await search_gen_sourced_answer(search_assignment=search_assignment)
+
+    @override
+    async def make_search_structured(
+        self,
+        output_structure_class: type[BaseModelTypeVar],
+        search_assignment: SearchAssignment,
+    ) -> BaseModelTypeVar:
+        result_dict = await search_gen_structured(
+            search_object_assignment=SearchObjectAssignment.make_for_class(
+                output_class=output_structure_class,
+                search_assignment=search_assignment,
+            ),
+        )
+        return output_structure_class.model_validate(result_dict)

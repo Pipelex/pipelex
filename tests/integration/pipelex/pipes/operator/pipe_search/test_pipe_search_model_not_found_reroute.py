@@ -40,7 +40,7 @@ class TestPipeSearchModelNotFoundReroute:
         fake_worker = mocker.MagicMock()
         fake_worker.search_sourced_answer = mocker.AsyncMock(side_effect=not_found_error)
         mocker.patch(
-            "pipelex.pipe_operators.search.pipe_search.SearchWorkerFactory.make_search_worker",
+            "pipelex.cogt.content_generation.search_generate.SearchWorkerFactory.make_search_worker",
             return_value=fake_worker,
         )
 

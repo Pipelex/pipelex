@@ -57,7 +57,7 @@ default_directory_base_name = "pipeline"
 is_reporting_enabled = true
 
 [pipelex.reporting_config]
-is_log_costs_to_console = false
+is_log_costs_to_console = true
 is_generate_cost_report_file_enabled = false
 cost_report_dir_path = "reports"
 cost_report_base_name = "cost_report"
@@ -294,6 +294,7 @@ pipe_stack_limit = 20
 is_normalize_data_urls_to_storage = true
 is_mock_inputs = false
 is_generate_graph = true
+is_generate_usage = true
 
 # Bounded fan-out concurrency for PipeBatch: at most this many branches run at once.
 # A modest default keeps a large workload (one pipe over many items) from overwhelming
@@ -663,6 +664,18 @@ disable_all_activities = false
 required_tasks_packs = []
 required_workflows = []
 required_activities = ["act_jinja2_gen_text"]
+excluded_workflows = []
+excluded_activities = []
+disable_all_workflows = true
+disable_all_activities = false
+
+[temporal.worker_scopes.scopes.runner-search]
+required_tasks_packs = []
+required_workflows = []
+required_activities = [
+  "act_search_gen_sourced_answer",
+  "act_search_gen_structured",
+]
 excluded_workflows = []
 excluded_activities = []
 disable_all_workflows = true

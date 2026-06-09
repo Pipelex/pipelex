@@ -62,7 +62,7 @@ async def dry_run_pipeline(
 
     pipe_code: str = main_pipe_code
 
-    execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
+    execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
         generate_graph=True,
         mock_inputs=True,
     )

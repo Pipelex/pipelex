@@ -33,7 +33,6 @@ class TestLLMInference:
         generated_text = await llm_worker.gen_text(llm_job=llm_job)
         assert generated_text
         pretty_print(generated_text)
-        # get_report_delegate().generate_report()
 
     async def test_simple_gen_object_from_text(self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_combo: ModelCombo):
         log.info(f"test_simple_gen_object_from_text: Testing llm_handle '{llm_combo.handle}'")
@@ -53,7 +52,6 @@ class TestLLMInference:
         generated_object = await llm_worker.gen_object(llm_job=llm_job, schema=Person)
         assert generated_object
         pretty_print(generated_object)
-        # get_report_delegate().generate_report()
 
     async def test_simple_gen_object_list_from_text(self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_combo: ModelCombo):
         """Generate a list of structured objects from a text prompt."""
@@ -108,7 +106,6 @@ class TestLLMInference:
             pretty_print(generated_text, title=f"Vision of {image_path}")
         except PromptImageFormatError as exc:
             pytest.skip(f"Prompt Image format not supported for this LLM: {llm_combo.handle} because {exc}")
-        # get_report_delegate().generate_report()
 
     @pytest.mark.parametrize("image_path", [LLMVisionTestCases.PATH_IMG_PNG_1])
     async def test_gen_object_from_image(self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_combo: ModelCombo, image_path: str):
@@ -143,4 +140,3 @@ class TestLLMInference:
             pretty_print(generated_object, title=f"Image Description of {image_path}")
         except PromptImageFormatError as exc:
             pytest.skip(f"Prompt Image format not supported for this LLM: {llm_combo.handle} because {exc}")
-        # get_report_delegate().generate_report()

@@ -2,24 +2,58 @@ from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
-from temporalio.exceptions import ActivityError, ApplicationError
+from temporalio.exceptions import ActivityError, ApplicationError, FailureError
 from typing_extensions import override
 
 with workflow.unsafe.imports_passed_through():
     from kajson.class_registry import ClassRegistry
     from kajson.kajson_manager import KajsonManager
 
+    from pipelex.base_exceptions import PipelexError, iter_cause_chain
     from pipelex.config import get_config
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.graph.graph_tracer_manager import GraphTracerManager
     from pipelex.hub import clear_current_library, get_library_manager, get_report_delegate, set_current_library
     from pipelex.pipe_run.pipe_job import PipeJob
+    from pipelex.runtime_bridge.primitives.hydration import hydrate_working_memory
     from pipelex.temporal.log_temporal import WorkflowLog
     from pipelex.temporal.tprl.temporal_error import TemporalError
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
     from pipelex.temporal.tprl_pipe.act_flush_trace_events import FlushTraceEventsArg, act_flush_trace_events
-    from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
     from pipelex.tracing.buffering_event_log import BufferingEventLog
+
+
+def _carries_temporal_failure(exc: BaseException) -> bool:
+    """True when ``exc`` or any error in its ``__cause__`` chain is a Temporal ``FailureError``.
+
+    This is the hinge of the inline fail-safe: ``True`` ⇒ leave ``exc`` untouched,
+    ``False`` ⇒ convert it with ``from_message_exception``. Carrying a Temporal
+    ``FailureError`` *is* the definition of "already a terminal Temporal failure",
+    so it is the predicate, not a proxy for a narrower type.
+
+    The reachable case it protects: a controller pipe (e.g. ``PipeSequence``) runs a
+    sub-pipe as a child workflow; the sub-pipe fails; ``TemporalPipeRouter`` wraps the
+    ``ChildWorkflowError`` as ``WorkflowExecutionError`` (``temporal_pipe_router.py``),
+    which escapes the parent's ``pipe.run_pipe`` into the ``except PipelexError`` below.
+    That ``WorkflowExecutionError`` carries no report of its own — the rich leaf
+    classification lives deeper, in the child's ``ApplicationError.details``, reachable
+    only by ``recover_error_report``'s ``__cause__`` walk at the submitter (which
+    normalizes ``ChildWorkflowError.cause`` into the chain). A worker-side
+    ``from_message_exception`` here would flatten it, because ``to_error_report``'s
+    enrichment stops at the non-``PipelexError`` ``ChildWorkflowError``. So we propagate.
+
+    Invariant this relies on: disciplined ``raise … from`` usage. The one way it can
+    misattribute is "recover-then-rechain" — pipe code that handles a side failure and
+    then raises a *fresh, unrelated* error ``from`` the one it already recovered. The
+    fresh error would then carry that side ``FailureError`` and propagate untouched,
+    surfacing the side failure's classification instead of its own. Don't do that: a
+    fresh error must only be chained ``from`` the error that actually caused it.
+
+    Walks via ``iter_cause_chain`` (single cyclic-guard). See
+    ``docs/under-the-hood/error-model.md`` "Workflow-Level Fail-Safe Floor" for the
+    design narrative.
+    """
+    return any(isinstance(node, FailureError) for node in iter_cause_chain(exc))
 
 
 @workflow.defn(name="wf_pipe_router")
@@ -46,7 +80,7 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
         event_log = None
         wf_graph_tracer_manager: GraphTracerManager | None = None
         wf_tracer_key: str | None = None
-        graph_context = workflow_arg.job_metadata.graph_context
+        trace_context = workflow_arg.job_metadata.trace_context
 
         pipe_output: PipeOutput | None = None
 
@@ -77,37 +111,47 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
             wf_workflow_id = workflow.info().workflow_id
 
             tracing_config = get_config().pipelex.tracing_config
-            if tracing_config.is_enabled and graph_context is not None:
+            if tracing_config.is_enabled and trace_context is not None:
                 try:
                     # Use BufferingEventLog inside workflows (no I/O allowed).
                     # Events are flushed to the real backend via act_flush_trace_events.
                     event_log = BufferingEventLog()
                     wf_graph_tracer_manager = GraphTracerManager.get_or_create_instance()
                     wf_tracer_key = wf_workflow_id
-                    wf_graph_context = wf_graph_tracer_manager.open_tracer(
-                        graph_id=graph_context.graph_id,
-                        data_inclusion=graph_context.data_inclusion,
-                        event_log=event_log,
+                    wf_trace_context = wf_graph_tracer_manager.open_tracer(
+                        graph_id=trace_context.graph_id,
+                        data_inclusion=trace_context.data_inclusion,
+                        # D5: only feed the event log to the tracer when graph events are wanted. In
+                        # costs-only mode the tracer still mints node ids but emits no graph events;
+                        # usage events flow via the report delegate's set_event_log below.
+                        event_log=event_log if trace_context.emit_graph_events else None,
                         workflow_id=wf_workflow_id,
                         pipeline_run_id=pipeline_run_id,
                         tracer_key=wf_tracer_key,
+                        # Threaded in so the returned context is born with the correct flags (no emit-flag
+                        # footgun in the model_copy below).
+                        emit_graph_events=trace_context.emit_graph_events,
+                        emit_usage_events=trace_context.emit_usage_events,
                     )
-                    # Update job_metadata with the per-workflow graph_context (carries tracer_key),
-                    # but preserve parent_node_id from the incoming context so CONTAINS edges
-                    # link back to the parent workflow's controller node.
-                    wf_graph_context = wf_graph_context.model_copy(
-                        update={"parent_node_id": graph_context.parent_node_id},
+                    # Update job_metadata with the per-workflow trace_context (carries tracer_key + emit
+                    # flags), but preserve parent_node_id from the incoming context so CONTAINS edges link
+                    # back to the parent workflow's controller node.
+                    wf_trace_context = wf_trace_context.model_copy(
+                        update={"parent_node_id": trace_context.parent_node_id},
                     )
                     workflow_arg.job_metadata = workflow_arg.job_metadata.model_copy(
-                        update={"graph_context": wf_graph_context},
+                        update={"trace_context": wf_trace_context},
                     )
-                    # Configure the report delegate for usage event emission
-                    get_report_delegate().set_event_log(
-                        context_key=wf_workflow_id,
-                        event_log=event_log,
-                        workflow_id=wf_workflow_id,
-                        pipeline_run_id=pipeline_run_id,
-                    )
+                    # Configure the report delegate for usage event emission — only when cost reporting
+                    # is on. In graph-only mode no usage context is registered, so usage events are
+                    # suppressed (the runner fallback also gates on emit_usage_events).
+                    if trace_context.emit_usage_events:
+                        get_report_delegate().set_event_log(
+                            context_key=wf_workflow_id,
+                            event_log=event_log,
+                            workflow_id=wf_workflow_id,
+                            pipeline_run_id=pipeline_run_id,
+                        )
                 except Exception as exc:  # noqa: BLE001
                     # Best-effort: per-workflow tracing setup must never fail the workflow — log and continue without it.
                     workflow_log.warning(f"Failed to set up per-workflow tracing, continuing without: {exc}")
@@ -137,12 +181,29 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
             if isinstance(exc.cause, ApplicationError):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
+        except PipelexError as exc:
+            # Inline fail-safe floor: a domain error raised inline in workflow code (never via an
+            # activity) is neither an ActivityError nor an ApplicationError, so without this clause
+            # it escapes as a non-terminal workflow-task failure and retries indefinitely — a silent
+            # hang (see docs/under-the-hood/error-model.md "Workflow-Level Fail-Safe Floor"). Convert
+            # a genuine inline error to a terminal, classified TemporalError; leave one that already
+            # carries a Temporal failure untouched for the submitter to recover. The propagate-vs-
+            # convert decision and the invariant it relies on live in _carries_temporal_failure.
+            # Scoped to PipelexError: transient Temporal/infra errors keep Temporal's task-retry.
+            # force_non_retryable: an inline error must fail terminally, not trigger a blunt whole-
+            # workflow retry that re-runs completed inline work — retry belongs at the activity
+            # boundary. It also keeps this workflow-side conversion config-free (deterministic).
+            if _carries_temporal_failure(exc):
+                raise
+            raise TemporalError.from_message_exception(exc=exc, force_non_retryable=True) from exc
         finally:
-            # Close per-workflow graph tracer (collects in-memory graph spec)
+            # Close per-workflow graph tracer (collects in-memory graph spec). F1: only assign the spec
+            # when graph events were requested — in costs-only mode close_tracer returns None (teardown
+            # skips the spec build), and this guard keeps the contract explicit even if that changes.
             if wf_graph_tracer_manager is not None and wf_tracer_key is not None:
                 try:
                     graph_spec = wf_graph_tracer_manager.close_tracer(wf_tracer_key)
-                    if graph_spec is not None and pipe_output is not None:
+                    if graph_spec is not None and pipe_output is not None and trace_context is not None and trace_context.emit_graph_events:
                         pipe_output.graph_spec = graph_spec
                 except Exception as tracer_exc:  # noqa: BLE001
                     # Best-effort: tracer close in the finally block must never fail the workflow — log and continue.

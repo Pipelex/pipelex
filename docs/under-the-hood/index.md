@@ -27,7 +27,7 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
     You don't need to read this section to use Pipelex effectively. The [Home](../index.md) section covers everything you need to build methods.
 
 !!! tip "Looking for Temporal deployment and operations?"
-    For running Pipelex on Temporal — cluster setup, workers, task-queue routing, and dashboard observability — see the user-facing [Distributed Execution with Temporal](../distributed-execution/index.md) guide. The pages below cover the runtime mechanics that make distributed execution work under the hood.
+    For running Pipelex on Temporal — cluster setup, workers, task-queue routing, and dashboard observability — see the user-facing [Distributed Execution with Temporal](../distributed-execution/temporal/index.md) guide. The pages below cover the runtime mechanics that make distributed execution work under the hood.
 
 ---
 

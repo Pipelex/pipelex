@@ -15,6 +15,7 @@ from pipelex.cogt.extract.bounding_box import BoundingBox
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.cogt.image.prompt_image import PromptImageDetail
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
+from pipelex.config import get_config
 from pipelex.plugins.gateway.gateway_constants import GatewayOpenAISdkVariant
 from pipelex.plugins.gateway.gateway_exceptions import GatewayExtractResponseError, GatewayFactoryError
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
@@ -122,6 +123,9 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
             # not the OpenAI Authorization header. The SDK rejects an empty api_key since
             # 2.34.0, so we pass a non-empty placeholder; the gateway ignores it.
             api_key="unused-auth-via-portkey-headers",
+            # Tier 1 transport retry: set explicitly from config rather than inheriting the SDK default,
+            # so a transport_max_retries override applies to the gateway LLM path too (matches PortkeyCompletionsFactory).
+            max_retries=get_config().cogt.transport_max_retries,
             default_headers=createHeaders(
                 api_key=api_key,
                 strict_open_ai_compliance=False,
