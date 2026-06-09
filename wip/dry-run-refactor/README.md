@@ -34,6 +34,8 @@ Everything below is **not yet done**. Each deferred workstream has its own track
 
 ### Hardening & cleanups — anytime, small
 
+Part-C operational hardening (heartbeat/cancellation, CPU-bound activity body, worker-vs-API config drift, double dry-run of the main pipe, `_pipe_source_map` scoping, selected-pipe wire field, per-queue dispatch tuning) has its own tracker: [`followup-dry-validate-hardening.md`](./followup-dry-validate-hardening.md).
+
 | Item | Where | Note |
 |---|---|---|
 | **Per-sweep unique `pipeline_run_id`** | `bundle_validator.validate_pipes` | The report registry + per-pipe graph-trace read are keyed by the **constant** `SpecialPipelineId.DRY_RUN_UNTITLED`, so two concurrent in-process sweeps collide (2nd `open_registry` raises "already exists"; interleaved `close_registry` can drop the other's registry). Mint a unique id per sweep and thread it through `open_registry` + `prepare_pipe_job` + `close_registry` — one fix also scopes the per-pipe trace read to an empty dir. **Rides with Part C** (no concurrent sweeping exists in-process today). `close_registry` is already hardened to `pop(..., None)`. |

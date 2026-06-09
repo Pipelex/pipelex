@@ -704,8 +704,12 @@ def scoped_event_log(event_log: "EventLogProtocol") -> Generator[None, None, Non
     store bridges the two sides). A set override implies tracing-enabled: it is honored
     even when ``tracing_config.is_enabled`` is False.
 
-    The scope owner keeps ownership of the instance's lifecycle — the pipeline machinery
-    never calls ``cleanup`` on it and the read side does not ``close`` it. Mirrors
+    Lifecycle: the machinery never calls ``cleanup`` on the instance and the read side does
+    not ``close`` it — but the write-side tracer DOES call ``close()`` on its event log at
+    teardown (``GraphTracer._reset``), which happens BEFORE the read side assembles. A scoped
+    event log's ``close()`` must therefore be safe to call mid-lifecycle — idempotent or a
+    no-op, as ``InMemoryEventLog``'s is. Scoping a backend whose ``close()`` releases a real
+    resource (NDJSON file handle, DynamoDB client) would break its own assembly read. Mirrors
     :func:`scoped_pipe_router`.
     """
     prev = _event_log_override.get()

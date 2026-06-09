@@ -9,7 +9,7 @@ For ready-to-paste invocation prompts (per-area + run-it-all-in-one-go), see the
 `/temporal-e2e-validate` validates that Pipelex pipelines execute correctly across separate Temporal worker processes. Two modes:
 
 - **Mode 1** — pytest against a real Temporal dev server with an in-process worker (`SKILL.md`). Fast regression path; folds in the error-handling suite (activity error boundary, workflow error-report full chain, local parity arm).
-- **Mode 2** — true 3-process setup (server + separate worker process(es) + submitter). Reference files under `references/`: `mode-2-setup.md` (server + workers), `mode-2-tiers.md` (Tiers 1–16), `routing-battery.md` (Step 8, v1 `activity_queues` routing), `queue-options-battery.md` (Step 9, v2 queue options + worker-runtime profiles).
+- **Mode 2** — true 3-process setup (server + separate worker process(es) + submitter). Reference files under `references/`: `mode-2-setup.md` (server + workers), `mode-2-tiers.md` (Tiers 1–16 plus the later-added 2c — direct `/validate` sweep stays in-process, PR #976 — and 2d — Temporal-dispatched `/validate` as one in-memory activity, added with `act_dry_validate`), `routing-battery.md` (Step 8, v1 `activity_queues` routing), `queue-options-battery.md` (Step 9, v2 queue options + worker-runtime profiles).
 
 ## Full-run result (2026-06-02)
 

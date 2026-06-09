@@ -214,7 +214,7 @@ exit 0 with distinct `graph_id`s / status maps — no shared or merged trace eve
 RED (prove it bites) — the fix is committed, so neutralize it in the working tree. Either arm:
 
 - **Drop the content-generator scope:** in `pipelex/pipe_run/dry_run_pipeline.py`
-  (`dry_run_pipe_in_process`), remove `scoped_content_generator(ContentGeneratorDry())` from the
+  (`dry_run_pipe_in_process`), remove `scoped_content_generator(content_generator)` from the
   `with` line. Under Part-B leaf-mock semantics the leaf reaches the hub
   `ContentGeneratorInWorkflow` and dies with `_NotInWorkflowEventLoopError` / the strong check shows
   dispatch. (Today's pipe-level DRY mock masks this arm in Mode 2 — the CI-cheap Mode-1 companion
@@ -222,10 +222,12 @@ RED (prove it bites) — the fix is committed, so neutralize it in the working t
   and is the deterministic RED for it.)
 - **Drop the shared event log:** in the same function, remove `scoped_event_log(event_log)` from
   the `with` line — the two-instance regression: emit and assemble no longer share the instance, the
-  assembly finds zero events, and the submitter gets `EXIT=1` with `In-process dry-run of pipe '...'
-  did not produce a graph spec` (the bare `PipelexError` is deliberately OUTSIDE the activity's D5
-  narrow best-effort catch — a broken tracing pipeline is an infra bug and fails loudly, it does not
-  silently degrade to `graph=None`).
+  assembly finds zero events, and `dry_run_pipe_in_process` raises `In-process dry-run of pipe '...'
+  did not produce a graph spec`. In the activity that PipelexError degrades per the parity
+  best-effort catch, so the submitter still exits 0 — the RED signal is `GRAPH: None` where the
+  GREEN run produced a real graph (nodes/edges + the JSON file). The loud, CI-cheap guard for the
+  same regression is the Mode-1 companion `test_dry_run_graph_in_process.py` (it calls
+  `dry_run_pipe_in_process` directly and asserts a non-empty graph).
 
 **Restore immediately:** `git checkout -- pipelex/pipe_run/dry_run_pipeline.py`.
 

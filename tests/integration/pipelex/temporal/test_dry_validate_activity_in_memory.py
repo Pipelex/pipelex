@@ -30,8 +30,11 @@ from temporalio.common import RetryPolicy
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
 from pipelex.config import get_config
+from pipelex.hub import clear_current_library, get_current_library_id_or_none, get_library_manager
 from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipeline.bundle_validator import DryRunStatus
+from pipelex.pipeline.execution_seams import acquire_library
+from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.configuration.configs import NdjsonTracingConfig, TracingBackend
 from pipelex.temporal.tprl.temporal_error import recover_error_report
 from pipelex.temporal.tprl_pipe.act_dry_validate import DryValidateArg, DryValidateResult, act_dry_validate
@@ -78,6 +81,18 @@ main_pipe = "beta_single"
 [pipe.beta_single]
 type = "PipeLLM"
 description = "Single beta pipe"
+inputs = { topic = "Text" }
+output = "Text"
+prompt = "Expand on $topic"
+"""
+
+_NO_MAIN_MTHDS = """
+domain = "dry_validate_no_main"
+description = "Bundle with no main_pipe, for the no-graph arm"
+
+[pipe.lone_pipe]
+type = "PipeLLM"
+description = "Single pipe, no main_pipe declared"
 inputs = { topic = "Text" }
 output = "Text"
 prompt = "Expand on $topic"
@@ -245,6 +260,56 @@ class TestDryValidateActivityInMemory:
 
         assert result.dry_run_outputs["dry_validate_sig.sig_caller"].status == DryRunStatus.SUCCESS
         assert result.graph_spec is not None
+
+    async def test_validation_failure_does_not_retry_activity(self, temporal_client: TemporalClient, mocker: MockerFixture) -> None:
+        """D-C5 regression: a deterministic validation failure must run the activity exactly once.
+        ValidateBundleError is non-retryable at the activity tier via a string match on the
+        ApplicationError type name — if that match drifts (class rename, boundary change), the
+        whole sweep silently re-runs and only this assertion catches it.
+        """
+        sweep_spy = mocker.patch(
+            "pipelex.temporal.tprl_pipe.act_dry_validate.validate_bundle",
+            wraps=validate_bundle,
+        )
+        with pytest.raises(WorkflowFailureError):
+            await self._execute(temporal_client, DryValidateArg(mthds_contents=[_SIGNATURE_MTHDS], allow_signatures=False))
+        assert sweep_spy.call_count == 1
+
+    async def test_no_main_pipe_and_no_pipe_code_yields_no_graph(self, temporal_client: TemporalClient) -> None:
+        """Without a declared main_pipe and without an explicit pipe_code, the graph arm is
+        skipped: validation succeeds with graph_spec=None.
+        """
+        result = await self._execute(temporal_client, DryValidateArg(mthds_contents=[_NO_MAIN_MTHDS]))
+
+        assert result.dry_run_outputs["dry_validate_no_main.lone_pipe"].status == DryRunStatus.SUCCESS
+        assert result.graph_spec is None
+
+    async def test_unknown_explicit_pipe_code_degrades_to_no_graph(self, temporal_client: TemporalClient) -> None:
+        """Graph-arm parity: an unknown explicit pipe_code is a graph-arm domain failure
+        (PipeNotFoundError, a PipelexError) and degrades to graph_spec=None with validation
+        still successful — the same answer the direct route gives, never a failed request.
+        """
+        result = await self._execute(temporal_client, DryValidateArg(mthds_contents=[_ALPHA_MTHDS], pipe_code="dry_validate_alpha.does_not_exist"))
+
+        assert result.graph_spec is None
+        assert result.dry_run_outputs["dry_validate_alpha.alpha_sequence"].status == DryRunStatus.SUCCESS
+
+    async def test_direct_call_restores_outer_current_library(self) -> None:
+        """The activity's finally restores the caller's outer current-library (the
+        prev != validated arm) after tearing the validated library down. Exercised by calling
+        the activity directly — through a worker, the activity runs in its own copied context
+        and the test task could not observe the ContextVar restore.
+        """
+        outer_library_id = "outer_lib_dry_validate"
+        acquire_library(library_id=outer_library_id, mthds_contents=[_BETA_MTHDS])
+        try:
+            result = await act_dry_validate(DryValidateArg(mthds_contents=[_ALPHA_MTHDS]))
+
+            assert result.graph_spec is not None
+            assert get_current_library_id_or_none() == outer_library_id
+        finally:
+            get_library_manager().teardown(library_id=outer_library_id)
+            clear_current_library()
 
     async def test_concurrent_invocations_do_not_cross_contaminate(self, temporal_client: TemporalClient, mocker: MockerFixture) -> None:
         """Two concurrent dispatches return distinct GraphSpecs with no shared/merged trace events."""

@@ -6,6 +6,8 @@ and get back the per-pipe status map + the best-effort ``GraphSpec``. Used by th
 (cross-repo, ``pipelex-api``) and by the Tier-2d e2e submitter script.
 """
 
+from datetime import timedelta
+
 from temporalio.common import RetryPolicy
 
 from pipelex.config import get_config
@@ -29,7 +31,7 @@ async def dispatch_dry_validate(
     surfaces, which the API renders as an RFC 7807 422.
 
     Args:
-        arg: The serializable activity input (contents, dirs, uris, allow_signatures, pipe_code).
+        arg: The serializable activity input (mthds_contents, allow_signatures, pipe_code).
         task_queue: Optional task-queue override; defaults to the configured default queue.
         should_auto_connect_temporal: Whether the executor may auto-connect the Temporal client.
 
@@ -40,6 +42,11 @@ async def dispatch_dry_validate(
     executor = WorkflowExecutorFactory[DryValidateArg, DryValidateResult]().create_executor(
         task_queue=task_queue or worker_config.default_task_queue,
         should_auto_connect_temporal=should_auto_connect_temporal,
+        # Interactive round-trip: bound the whole workflow to the activity retry budget
+        # (2 × 5 min attempts + dispatch slack) instead of the config default — a batch-tuned
+        # 1-hour window during which a worker outage would queue stale validation work that no
+        # HTTP caller is still waiting for. With this bound, an outage fails the caller fast.
+        workflow_execution_timeout=timedelta(minutes=12),
         # No workflow-level retry (D-C5): validation is deterministic, so re-running the whole
         # wrapper workflow on failure is pure waste — the config default policy would re-run a
         # failed validation up to 3 times (its non_retryable list doesn't know ValidateBundleError).

@@ -25,21 +25,23 @@ cross the boundary as structured ``ErrorReport``s via ``convert_pipelex_errors``
 renders them as the same RFC 7807 422 the direct path produces (identical ``error_type``,
 ``error_domain=input``, caller-facing message carrying the offending refs).
 
-Graph best-effort (D5): only the expected dry-run-failure shapes — ``DryRunError`` /
-``PipeRunError`` / ``PipeRouterError`` (the run-failure wrappers) and pydantic
-``ValidationError`` / polyfactory ``FactoryException`` (the mock-input mint shapes, mirroring
-``BundleValidator._classify_pipe``) — degrade to ``graph_spec=None``. Any other ``PipelexError``
-(config, library, tracing infra) and every non-Pipelex programming bug propagate and fail the
-activity, mirroring ``assemble_tracing``'s bug-propagation policy.
+Graph best-effort (D5, widened to cross-backend parity): any ``PipelexError`` raised while
+resolving or dry-running the graph pipe — plus pydantic ``ValidationError`` / polyfactory
+``FactoryException`` (the mock-input mint shapes) — degrades to ``graph_spec=None``. This is
+the exact contract the direct-mode route applies around ``dry_run_pipeline`` and the same
+catch ``BundleValidator._classify_pipe`` uses, so both backends answer identically for the
+same bundle. Only non-Pipelex programming bugs propagate and fail the activity, mirroring
+``assemble_tracing``'s bug-propagation policy.
 """
 
-from pathlib import Path
+import sys
 
 from polyfactory.exceptions import FactoryException
 from pydantic import BaseModel, ValidationError
 from temporalio import activity
 
 from pipelex import log
+from pipelex.base_exceptions import PipelexError
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.graph.graphspec import GraphSpec
@@ -51,7 +53,6 @@ from pipelex.hub import (
     set_current_library,
 )
 from pipelex.pipe_run.dry_run_pipeline import dry_run_pipe_in_process
-from pipelex.pipe_run.exceptions import DryRunError, PipeRouterError, PipeRunError
 from pipelex.pipeline.bundle_validator import DryRunOutput
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.temporal.tprl.activity_error_boundary import convert_pipelex_errors
@@ -61,7 +62,6 @@ class DryValidateArg(BaseModel):
     """Input for the dry-run+validation activity (serializable across the Temporal boundary)."""
 
     mthds_contents: list[str] | None = None
-    library_dirs: list[str] | None = None
     allow_signatures: bool = False
     # Optional explicit pipe selection for the graph arm; defaults to the bundle's declared
     # main_pipe (qualified from the first blueprint declaring one). The sweep always covers the
@@ -92,19 +92,20 @@ async def act_dry_validate(arg: DryValidateArg) -> DryValidateResult:
     # Success → the library is left loaded + current (D6) and THIS activity owns the teardown.
     validate_result = await validate_bundle(
         mthds_contents=arg.mthds_contents,
-        library_dirs=[Path(lib_dir) for lib_dir in arg.library_dirs] if arg.library_dirs is not None else None,
         allow_signatures=arg.allow_signatures,
     )
     library_id = get_current_library_id_or_none()
     try:
-        # Graph: best-effort (D5), against the SAME loaded library.
+        # Graph: best-effort (D5), against the SAME loaded library. Pipe resolution sits INSIDE
+        # the catch on purpose: an unknown explicit pipe_code degrades to graph_spec=None just
+        # like any other graph-arm domain failure — same answer the direct route gives.
         graph_spec: GraphSpec | None = None
         graph_pipe_ref = arg.pipe_code or _qualified_main_pipe(validate_result.blueprints)
         if graph_pipe_ref and library_id:
-            main_pipe = get_required_pipe(pipe_code=graph_pipe_ref)
             try:
+                main_pipe = get_required_pipe(pipe_code=graph_pipe_ref)
                 graph_spec = await dry_run_pipe_in_process(pipe=main_pipe, library_id=library_id)
-            except (DryRunError, PipeRunError, PipeRouterError, ValidationError, FactoryException) as graph_error:
+            except (PipelexError, ValidationError, FactoryException) as graph_error:
                 log.warning(
                     f"act_dry_validate: graph dry-run of '{graph_pipe_ref}' did not produce a graph "
                     f"({type(graph_error).__name__}); returning validation result without graph_spec"
@@ -114,12 +115,25 @@ async def act_dry_validate(arg: DryValidateArg) -> DryValidateResult:
     finally:
         # Restore the caller's outer current-library FIRST so the guarantee survives a teardown
         # raise, then tear the validated library down once — mirrors acquire_and_validate.
+        primary_error = sys.exc_info()[1]
         if prev_library_id is not None and prev_library_id != library_id:
             set_current_library(library_id=prev_library_id)
         else:
             clear_current_library()
         if library_id is not None:
-            get_library_manager().teardown(library_id=library_id)
+            try:
+                get_library_manager().teardown(library_id=library_id)
+            except PipelexError as teardown_error:
+                # A teardown failure must not REPLACE the body's in-flight error (the caller's
+                # 422 would name the teardown instead of the user's actual problem) — suppress
+                # it and let the primary propagate; raise it only when the body succeeded.
+                # Mirrors PipeRun.run's close_tracer handling.
+                if primary_error is None:
+                    raise
+                log.error(
+                    f"act_dry_validate: library teardown also failed after a body error; "
+                    f"raising the original error. Suppressed teardown error: {teardown_error}"
+                )
 
 
 def _qualified_main_pipe(blueprints: list[PipelexBundleBlueprint]) -> str | None:

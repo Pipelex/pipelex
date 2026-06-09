@@ -267,7 +267,7 @@ Semantics:
 
 - The override is ContextVar-scoped (mirrors `scoped_pipe_router`), so concurrent runs with separate scopes never cross-contaminate, and the prior value is restored on exit.
 - A set override **implies tracing-enabled**: it is honored even when `tracing_config.is_enabled` is `False`, on both the write side and the read side's early-return.
-- The scope owner keeps the instance's lifecycle — the read side does not `close()` it and the machinery never calls `cleanup()` on it.
+- Lifecycle: the read side does not `close()` the scoped instance and the machinery never calls `cleanup()` on it — but the write-side tracer DOES call `close()` on its event log at teardown, before the read side assembles. A scoped event log's `close()` must therefore be idempotent or a no-op (as `InMemoryEventLog`'s is); scoping a backend whose `close()` releases a real resource would break its own assembly read.
 
 This is what lets a graph-producing dry-run trace entirely in memory (no NDJSON file, no DynamoDB round-trip) — e.g. when validation and graph dry-run are hosted inside a single Temporal activity.
 

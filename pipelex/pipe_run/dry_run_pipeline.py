@@ -139,6 +139,15 @@ async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str) -> Gra
     pipeline_run_id = f"dry_run_graph_{PipelineFactory.make_pipeline_run_id()}"
     event_log = InMemoryEventLog()
 
+    # Local, direct execution primitives — NOT get_pipe_run() (a Temporal hub would spawn a
+    # workflow). Keep the router instance: the scope installs it for nested sub-pipes.
+    # Constructed BEFORE the tracer opens so nothing can raise between open_tracer and the
+    # try/finally that guarantees its close — an entry in the process-wide GraphTracerManager
+    # must never outlive this call.
+    pipe_router = PipeRouter(observer=ObserverNoOp())
+    pipe_run = PipeRun(pipe_router=pipe_router)
+    content_generator = ContentGeneratorDry()
+
     graph_tracer_manager = GraphTracerManager.get_or_create_instance()
     trace_context = graph_tracer_manager.open_tracer(
         graph_id=pipeline_run_id,
@@ -151,13 +160,8 @@ async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str) -> Gra
         emit_graph_events=True,
         emit_usage_events=False,
     )
-
-    # Local, direct execution primitive — NOT get_pipe_run() (a Temporal hub would spawn a
-    # workflow). Keep the router instance: the scope installs it for nested sub-pipes.
-    pipe_router = PipeRouter(observer=ObserverNoOp())
-    pipe_run = PipeRun(pipe_router=pipe_router)
     try:
-        with scoped_event_log(event_log), scoped_pipe_router(pipe_router), scoped_content_generator(ContentGeneratorDry()):
+        with scoped_event_log(event_log), scoped_pipe_router(pipe_router), scoped_content_generator(content_generator):
             pipe_job = await prepare_pipe_job(
                 pipe=pipe,
                 library_id=library_id,
