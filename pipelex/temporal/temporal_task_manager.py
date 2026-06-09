@@ -10,6 +10,7 @@ from temporalio.worker.workflow_sandbox import (
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.hub import get_class_registry
 from pipelex.system.runtime import WorkerMode, runtime_manager
@@ -135,17 +136,15 @@ class TemporalTaskManager(TaskManager):
             workflows=workflows,
             activities=activities,
             workflow_runner=workflow_runner,
-            # Register WorkflowExecutionError as a workflow-failure type so a
-            # workflow re-raising it (e.g. WfPipeRun re-raising the
-            # execution_error from a failed child) surfaces as a terminal
-            # workflow failure instead of being treated as an
-            # unhandled-exception workflow task failure (which retries
-            # indefinitely). WfPipeRun and TemporalPipeRouter both catch
-            # ChildWorkflowError from their workflow.execute_child_workflow
-            # calls and wrap it in-place as WorkflowExecutionError; without
-            # this registration Temporal cannot tell that re-raise apart from
-            # a programmer bug.
-            workflow_failure_exception_types=[WorkflowExecutionError],
+            # Make an escaping domain error a terminal workflow failure instead of Temporal's
+            # default "unhandled exception = workflow-task failure", which retries indefinitely —
+            # a silent hang (see docs/under-the-hood/error-model.md "Workflow-Level Fail-Safe
+            # Floor"). PipelexError is the floor: any domain error that slips past the workflow-
+            # level catch-alls in WfPipeRouter / WfPipeRun still fails terminally (degraded to a
+            # synthesized report) rather than hanging. WorkflowExecutionError — the child-dispatch
+            # wrapper raised by those workflows — is listed explicitly for intent. Scoped to
+            # PipelexError, not Exception: transient Temporal/infra errors keep their task-retry.
+            workflow_failure_exception_types=[WorkflowExecutionError, PipelexError],
             max_cached_workflows=profile.max_cached_workflows,
             max_concurrent_workflow_tasks=profile.max_concurrent_workflow_tasks,
             max_concurrent_activities=profile.max_concurrent_activities,

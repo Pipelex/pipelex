@@ -25,6 +25,7 @@ from temporalio.exceptions import ApplicationError
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 from typing_extensions import override
 
+from pipelex.base_exceptions import PipelexError
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
 from pipelex.pipe_run.pipe_job import PipeJob
@@ -114,7 +115,7 @@ class TestWfPipeRunRequestIdLogging:
                 workflows=[WfPipeRun, WfPipeRouterFailingStub],
                 activities=[stub_act_deliver],
                 workflow_runner=UnsandboxedWorkflowRunner(),
-                workflow_failure_exception_types=[WorkflowExecutionError],
+                workflow_failure_exception_types=[WorkflowExecutionError, PipelexError],
             ):
                 with pytest.raises(WorkflowFailureError):
                     # ``maximum_attempts=1`` keeps the failure terminal and single — see

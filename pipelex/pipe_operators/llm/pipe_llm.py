@@ -4,6 +4,7 @@ from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.base_exceptions import iter_cause_chain
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.exceptions import LLMCompletionError
@@ -382,12 +383,10 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     def _format_llm_error(self, exc: LLMCompletionError, settings: list[LLMSetting]) -> str:
         """Format an LLMCompletionError, extracting and formatting any ValidationError in the chain."""
         error_details = str(exc)
-        current_exc: BaseException | None = exc
-        while current_exc is not None:
+        for current_exc in iter_cause_chain(exc):
             if isinstance(current_exc, ValidationError):
                 error_details += f"\n{format_pydantic_validation_error(current_exc)}"
                 break
-            current_exc = current_exc.__cause__
         return f"{error_details}\nLLM settings: {settings}"
 
     @override

@@ -1,0 +1,8 @@
+domain      = "native_search_test"
+description = "Single PipeSearch step over the native SearchResult concept (no dynamic classes)"
+
+[pipe.native_search]
+type        = "PipeSearch"
+description = "Search the web for a fixed query"
+output      = "SearchResult"
+prompt      = "What are the latest developments in AI safety research?"

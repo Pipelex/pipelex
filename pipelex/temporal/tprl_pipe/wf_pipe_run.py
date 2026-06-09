@@ -6,14 +6,14 @@ from temporalio.exceptions import ActivityError, ChildWorkflowError
 from typing_extensions import override
 
 with workflow.unsafe.imports_passed_through():
-    from pipelex.base_exceptions import ErrorReport  # noqa: TC001  # must traverse the workflow sandbox
+    from pipelex.base_exceptions import ErrorReport, PipelexError  # must traverse the workflow sandbox
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryStatus
     from pipelex.runtime_bridge.primitives.pipe_run_arg import PipeRunArg
     from pipelex.temporal.exceptions import WorkflowExecutionError
     from pipelex.temporal.log_temporal import WorkflowLog
     from pipelex.temporal.tprl.observability import build_search_attributes, build_static_summary
-    from pipelex.temporal.tprl.temporal_error import recover_error_report
+    from pipelex.temporal.tprl.temporal_error import TemporalError, recover_error_report
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
     from pipelex.temporal.tprl_pipe.act_assemble_tracing import AssembleTracingArg, act_assemble_tracing
     from pipelex.temporal.tprl_pipe.act_deliver import DeliveryActivityArg, act_deliver
@@ -80,6 +80,27 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
             execution_error = WorkflowExecutionError("WfPipeRouter failed", error_report=error_report)
             execution_error.__cause__ = exc
             workflow_log.error(f"WfPipeRouter failed: {exc}")
+        except PipelexError as exc:
+            # Inline fail-safe floor, parent side: a domain error raised inline in this workflow
+            # (e.g. building the child's search attributes / static summary, evaluated as arguments
+            # to execute_child_workflow) is not a ChildWorkflowError, so without this clause it
+            # escapes as a non-terminal workflow-task failure and hangs (see error-model.md
+            # "Workflow-Level Fail-Safe Floor"). Route it through the same deferred re-raise as a
+            # child failure so act_deliver still fires the FAILED webhook on the failure path, then
+            # re-raise terminally below. Scoped to PipelexError: transient infra errors keep task-retry.
+            status = DeliveryStatus.FAILED
+            error_report = exc.to_error_report()
+            execution_error = WorkflowExecutionError(exc.message, error_report=error_report)
+            # Mint a details-carrying TemporalError as the cause so the classification survives the
+            # workflow -> submitter serialization. The child-failure path gets this for free (the
+            # child's TemporalError rides the ChildWorkflowError chain); the inline path has no such
+            # child failure, so without this carrier the submitter would floor to a synthesized
+            # UnrecoverableWorkflowFailureError. error_report (above) still feeds the webhook directly.
+            # force_non_retryable: here the flag does not change WfPipeRun's own retry (the raised
+            # WorkflowExecutionError drives that, like the child-failure path) — it is set to keep
+            # this workflow-side conversion config-free (deterministic), matching the router.
+            execution_error.__cause__ = TemporalError.from_message_exception(exc=exc, force_non_retryable=True)
+            workflow_log.error(f"WfPipeRun inline failure: {exc}")
 
         # Step 2: Assemble full graph + usage from trace events (cross-worker)
         # Runs as an activity because DynamoDB reads are I/O forbidden in workflows. The dispatch is

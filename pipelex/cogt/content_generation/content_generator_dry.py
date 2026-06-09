@@ -3,8 +3,10 @@ from typing import Any
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.content_generation.assignment_models import SearchAssignment
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
 from pipelex.cogt.content_generation.dry_mock import build_mock_object, report_dry_llm_job
+from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.extract.extract_output import ExtractOutput, Page
@@ -17,8 +19,10 @@ from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
+from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -291,3 +295,25 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
                 page_content.page_view = page_view_contents.pop(0)
 
         return page_contents
+
+    @override
+    async def make_search_sourced_answer(
+        self,
+        search_assignment: SearchAssignment,
+    ) -> SearchResultContent:
+        log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.make_search_sourced_answer")
+        nb_sources = get_config().pipelex.dry_run_config.nb_list_items
+        doc_factory = DryRunFactory.make_dry_run_factory(DocumentContent)
+        mock_sources = [doc_factory.build() for _ in range(nb_sources)]
+        search_result_factory = DryRunFactory.make_dry_run_factory(SearchResultContent)
+        return search_result_factory.build(sources=mock_sources)
+
+    @override
+    async def make_search_structured(
+        self,
+        output_structure_class: type[BaseModelTypeVar],
+        search_assignment: SearchAssignment,
+    ) -> BaseModelTypeVar:
+        log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.make_search_structured")
+        structured_factory = DryRunFactory.make_dry_run_factory(output_structure_class)
+        return structured_factory.build()

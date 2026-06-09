@@ -25,6 +25,7 @@ from temporalio.common import RetryPolicy
 from temporalio.exceptions import ApplicationError
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
+from pipelex.base_exceptions import PipelexError
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus
 from pipelex.pipe_run.pipe_job import PipeJob
@@ -105,10 +106,11 @@ class TestWfPipeRunFailurePath:
             activities=[stub_act_deliver],
             workflow_runner=UnsandboxedWorkflowRunner(),
             # Mirror the production ``make_worker`` config: register
-            # ``WorkflowExecutionError`` as a workflow failure type so
-            # ``WfPipeRun`` re-raising it ends the workflow execution
-            # terminally instead of triggering indefinite task-failure retry.
-            workflow_failure_exception_types=[WorkflowExecutionError],
+            # ``WorkflowExecutionError`` (the wrapped child failure) and the
+            # ``PipelexError`` fail-safe floor as workflow failure types so a
+            # workflow re-raising either ends the execution terminally instead
+            # of triggering indefinite task-failure retry.
+            workflow_failure_exception_types=[WorkflowExecutionError, PipelexError],
         ):
             with pytest.raises(WorkflowFailureError):
                 # ``maximum_attempts=1`` disables the workflow-level retry so the

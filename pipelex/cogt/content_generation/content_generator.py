@@ -9,6 +9,8 @@ from pipelex.cogt.content_generation.assignment_models import (
     ImgGenAssignment,
     LLMAssignment,
     ObjectAssignment,
+    SearchAssignment,
+    SearchObjectAssignment,
     TemplatingAssignment,
 )
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
@@ -17,6 +19,7 @@ from pipelex.cogt.content_generation.extract_generate import extract_gen_pages
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.content_generation.img_gen_generate import img_gen_image_list, img_gen_single_image
 from pipelex.cogt.content_generation.llm_generate import llm_gen_object, llm_gen_object_list, llm_gen_text
+from pipelex.cogt.content_generation.search_generate import search_gen_sourced_answer, search_gen_structured
 from pipelex.cogt.content_generation.templating_generate import templating_gen_text
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
@@ -31,6 +34,7 @@ from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
+from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
@@ -317,3 +321,24 @@ class ContentGenerator(ContentGeneratorProtocol):
                 page_content.page_view = page_view_contents.pop(0)
 
         return page_contents
+
+    @override
+    async def make_search_sourced_answer(
+        self,
+        search_assignment: SearchAssignment,
+    ) -> SearchResultContent:
+        return await search_gen_sourced_answer(search_assignment=search_assignment)
+
+    @override
+    async def make_search_structured(
+        self,
+        output_structure_class: type[BaseModelTypeVar],
+        search_assignment: SearchAssignment,
+    ) -> BaseModelTypeVar:
+        result_dict = await search_gen_structured(
+            search_object_assignment=SearchObjectAssignment.make_for_class(
+                output_class=output_structure_class,
+                search_assignment=search_assignment,
+            ),
+        )
+        return output_structure_class.model_validate(result_dict)
