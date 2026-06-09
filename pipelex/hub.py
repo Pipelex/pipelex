@@ -464,7 +464,33 @@ def get_report_delegate() -> ReportingProtocol:
     return get_pipelex_hub().get_report_delegate()
 
 
+_content_generator_override: ContextVar[ContentGeneratorProtocol | None] = ContextVar("content_generator_override", default=None)
+
+
+@contextmanager
+def scoped_content_generator(content_generator: ContentGeneratorProtocol) -> Generator[None, None, None]:
+    """Set ``content_generator`` as the active generator for the scope, then restore the prior value on exit.
+
+    Inference leaves (PipeLLM / PipeImgGen / PipeExtract / PipeSearch / PipeCompose) resolve
+    :func:`get_content_generator` when no explicit generator is passed; under a Temporal-enabled
+    hub that default is ``ContentGeneratorInWorkflow``, which dispatches activities. An in-process
+    run (e.g. the dry-run/validation activity body) wraps itself in this scope with an inline
+    generator so its leaves never dispatch — regardless of where the DRY mock lives (pipe level
+    today, leaf level after Part B). ContextVar-scoped like :func:`scoped_pipe_router`, so
+    concurrent runs don't cross-contaminate.
+    """
+    prev = _content_generator_override.get()
+    _content_generator_override.set(content_generator)
+    try:
+        yield
+    finally:
+        _content_generator_override.set(prev)
+
+
 def get_content_generator() -> ContentGeneratorProtocol:
+    override = _content_generator_override.get()
+    if override is not None:
+        return override
     return get_pipelex_hub().get_required_content_generator()
 
 

@@ -64,8 +64,8 @@ All decisions are resolved up front so a cold-start session runs autonomously th
 |---|---|---|
 | 1 | `scoped_event_log` + shared in-memory tracing (in-repo, no Temporal) | ☑ done |
 | | **⛔ CHECKPOINT 1 — in-memory tracing verified in direct mode** | ☑ done (suite green, committed) |
-| 2 | In-process, in-memory graph dry-run safe under a Temporal hub (+ `scoped_content_generator`) | ☐ |
-| | **⛔ CHECKPOINT 2 — graph dry-run verified under a Temporal hub** | |
+| 2 | In-process, in-memory graph dry-run safe under a Temporal hub (+ `scoped_content_generator`) | ☑ done |
+| | **⛔ CHECKPOINT 2 — graph dry-run verified under a Temporal hub** | ☑ done (suite green, committed) |
 | 3 | The `act_dry_validate` activity + wrapper-workflow dispatch + worker registration + isolation test | ☐ |
 | | **⛔ CHECKPOINT 3 — activity registered + isolation-tested** | |
 | 4 | API dispatch (cross-repo `pipelex-api`) | ☐ |
@@ -110,18 +110,26 @@ Pure in-repo capability, no Temporal, no cross-repo. Fully testable in direct mo
 
 Make the graph-producing dry-run run fully in-process even under a Temporal-enabled hub, tracing into the Phase-1 in-memory log. Reuse the bridge DIRECT primitive (it already forces in-process via `scoped_pipe_router` + a local `PipeRun`, and `run_pipe_via_bridge` already honors a `trace_context` in DIRECT mode).
 
-- [ ] *Tests first* (`tests/integration/pipelex/temporal/`): under a **Temporal-enabled** hub, the in-process graph dry-run (a) returns a correct `GraphSpec`, (b) dispatches **zero** workflows/activities (spy `WorkflowExecutor.execute_workflow` like `test_validate_sweep_stays_in_process.py`), and (c) writes no files / touches no DDB.
-- [ ] Add an in-process graph-dry-run entry (e.g. a sibling to `dry_run_pipeline` or a flag on it): open a `GraphTracerManager` tracer against an `InMemoryEventLog` under `scoped_event_log`, build the `trace_context`, and run the main pipe via the **`prepare_pipe_job` seam** (`execution_seams.py:199`, `pipe_run_mode=PipeRunMode.DRY` + `execution_config(mock_inputs=True, generate_graph=True)`) + a **local `PipeRun`** — **not** the bridge, **not** `PipelexRunner`/`get_pipe_run()`. *(REVISED by eng review 2026-06-09 — D-C1: the bridge can't carry DRY+mock_inputs. The local `PipeRun` under `scoped_pipe_router` gives the same in-process guarantee the bridge gave.)* The `GraphSpec` rides back on `PipeOutput` (assembled from the same in-memory log via Phase 1). Open the tracer at `graph_id=pipeline_run_id` and close by `pipeline_run_id` — keys aligned by construction (D-C7); forbid a divergent `tracer_key`.
-- [ ] **(per the pre-flight content-generator decision; default = do it now)** Add `scoped_content_generator(inline_generator)` in `hub.py` mirroring `scoped_pipe_router`, and wrap the in-process run in it so the leaf uses the inline `ContentGenerator` even under a Temporal-enabled hub (where `get_content_generator()` is globally `ContentGeneratorInWorkflow`). The Phase-2 zero-dispatch test must pass **with the leaf mock already at the leaf** (simulate Part B by forcing `run_mode=DRY` through `get_content_generator()`), not only with today's pipe-level mock — otherwise the guard is a no-op until Part B and silently regresses then.
-- [ ] Confirm tracer-key alignment: emit and assemble must use the same `pipeline_run_id` / `tracer_key` partition (see `build_pipe_job_from_input`'s `lookup_key` note in `bridge.py`). Pin with a test.
-- [ ] Keep `dry_run_pipeline`'s existing (worker-workflow + DynamoDB) path intact for now — the API still uses it until Phase 4.
-- [ ] `make agent-check` clean · the zero-dispatch / in-memory-graph tests green.
+- [x] *Tests first* (`tests/integration/pipelex/temporal/test_dry_run_graph_in_process.py`): under the suite's **Temporal-enabled** hub (real `TemporalPipeRouter` + `ContentGeneratorInWorkflow` as hub defaults, asserted as preconditions), the in-process graph dry-run (a) returns a correct `GraphSpec` covering the full `temporal_parallel` controller topology, (b) dispatches **zero** workflows (spy `WorkflowExecutor.execute_workflow`), and (c) touches no file/DDB transport (`make_event_log` forbidden via patch).
+- [x] Added `dry_run_pipe_in_process(pipe, *, library_id)` in `pipelex/pipe_run/dry_run_pipeline.py`: opens a `GraphTracerManager` tracer against an `InMemoryEventLog`, runs via `prepare_pipe_job` (DRY + mock_inputs + generate_graph) + a local `PipeRun` under the three scopes (`scoped_event_log` + `scoped_pipe_router` + `scoped_content_generator`) — not the bridge, not `PipelexRunner` (D-C1). `GraphSpec` rides back on `PipeOutput`. Caller owns the library lifecycle (mirrors `validate_pipes`, ready for D4).
+- [x] Added `scoped_content_generator(content_generator)` in `hub.py` (ContextVar + contextmanager + `get_content_generator()` prefers the override). Leaf-level-mock simulation test (`test_leaf_level_mock_stays_in_process`) forces DRY through `get_content_generator()` and stays zero-dispatch; **RED-proven**: with the scope removed, the leaf reached `ContentGeneratorInWorkflow` and failed with `_NotInWorkflowEventLoopError`.
+- [x] Tracer-key alignment (D-C7): tracer opened at `graph_id=pipeline_run_id` and closed by `pipeline_run_id` in `PipeRun.run`'s finally — aligned by construction, no divergent `tracer_key` parameter exposed; pinned by the non-empty-graph assertions (a divergent key would assemble an empty graph).
+- [x] `dry_run_pipeline`'s existing (worker-workflow + DynamoDB) path left intact — the API still uses it until Phase 4.
+- [x] `make agent-check` clean · zero-dispatch / in-memory-graph tests green.
 
 > ### ⛔ CHECKPOINT 2 — after Phase 2 — **MANDATORY STOP**
 >
 > **Verify:** under a Temporal-enabled hub the in-process graph dry-run yields a `GraphSpec` with **zero** nested dispatch and **zero** file/DDB I/O · `make agent-test` green · commit.
 >
-> **Handoff (fill in):** the new entry point's name + signature · how it opens/closes the tracer and threads `trace_context` through the bridge · the tracer-key alignment decision · any divergence from `_run_direct` you had to make. **Next: Phase 3.**
+> **Handoff (filled in, 2026-06-09):**
+>
+> - **Entry point:** `dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str) -> GraphSpec` in `pipelex/pipe_run/dry_run_pipeline.py`. Takes a resolved pipe + an already-open library (caller owns the library lifecycle — fits D4's load-once activity shape). Raises `PipelexError` when the run fails or yields no graph.
+> - **Tracer lifecycle:** `open_tracer(graph_id=pipeline_run_id, event_log=InMemoryEventLog, workflow_id="direct", emit_graph_events=True, emit_usage_events=False)` before the run; `trace_context` threaded via `prepare_pipe_job(trace_context=...)` (no bridge involved — D-C1); closed by `pipeline_run_id` inside `PipeRun.run`'s `finally` (which also assembles from the scoped log onto `PipeOutput`); a safety-net `close_tracer(pipeline_run_id)` in the entry's own `finally` covers pre-run failures (idempotent pop).
+> - **Tracer-key alignment:** `graph_id == pipeline_run_id == close key`, by construction; no `tracer_key` parameter exposed. A unique `dry_run_graph_<uuid>` run id is minted per call.
+> - **Scopes:** `scoped_event_log(event_log)` + `scoped_pipe_router(PipeRouter(observer=ObserverNoOp()))` + `scoped_content_generator(ContentGeneratorDry())` wrap `prepare_pipe_job` + `pipe_run.run`. `scoped_content_generator` is new in `hub.py`; `get_content_generator()` now prefers the ContextVar override.
+> - **Divergence from plan:** none of substance. No `PipelineManager.add_new_pipeline` registration and no report-delegate usage-event wiring (mirrors the sweep, not `pipeline_run_setup`) — deliberate: no usage/cost in this mode.
+>
+> **Next: Phase 3.**
 
 ---
 
