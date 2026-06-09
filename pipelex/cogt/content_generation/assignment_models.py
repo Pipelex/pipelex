@@ -10,6 +10,7 @@ from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -107,3 +108,49 @@ class RenderPageViewsAssignment(BaseModel):
     job_metadata: JobMetadata
     document_uri: str
     page_views_dpi: int
+
+
+class SearchAssignment(BaseModel):
+    """Serializable unit for a single web-search leaf call.
+
+    Carries everything the framework-agnostic ``search_generate`` core needs to rebuild the
+    ``SearchJob`` on the other side of the Temporal boundary: the rendered ``query``, the fully
+    resolved ``search_setting`` (its ``model`` is the resolved provider handle, also the routing
+    key), and the per-call domain/date overrides. Mirrors ``LLMAssignment`` for the LLM leaf.
+    """
+
+    job_metadata: JobMetadata
+    query: str
+    search_setting: SearchSetting
+    include_domains: list[str] | None = None
+    exclude_domains: list[str] | None = None
+    from_date: str | None = None
+    to_date: str | None = None
+
+    @property
+    def search_handle(self) -> str:
+        return self.search_setting.model
+
+
+class SearchObjectAssignment(BaseModel):
+    """Structured-search counterpart of ``ObjectAssignment``.
+
+    Ships the output structure's JSON schema (not the live class) across the boundary so the
+    activity can reconstruct a throwaway class via ``SchemaToModelFactory`` for the provider call.
+    The submitter re-validates the returned dict against the original class.
+    """
+
+    output_class_name: str
+    output_class_schema: dict[str, Any]
+    search_assignment: SearchAssignment
+
+    @staticmethod
+    def make_for_class(
+        output_class: type[BaseModel],
+        search_assignment: SearchAssignment,
+    ) -> "SearchObjectAssignment":
+        return SearchObjectAssignment(
+            output_class_name=output_class.__name__,
+            output_class_schema=output_class.model_json_schema(),
+            search_assignment=search_assignment,
+        )

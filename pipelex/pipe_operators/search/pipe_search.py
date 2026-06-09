@@ -3,23 +3,20 @@ from typing import TYPE_CHECKING, Any, Literal
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
-from pipelex.cogt.content_generation.exceptions import MockInferenceUnsupportedError
+from pipelex.cogt.content_generation.assignment_models import SearchAssignment
+from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
+from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck_check import check_search_choice_with_deck
-from pipelex.cogt.search.search_job_factory import SearchJobFactory
 from pipelex.cogt.search.search_setting import SearchModelChoice, SearchSetting
-from pipelex.cogt.search.search_worker_factory import SearchWorkerFactory
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.stuffs.document_content import DocumentContent
-from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_model_deck
+from pipelex.hub import get_content_generator, get_model_deck
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -82,13 +79,9 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
+        content_generator: ContentGeneratorProtocol | None = None,
     ) -> PipeSearchOutput:
-        # Web search has no leaf-level mock and (unlike LLM/img-gen/extract) no cogt content_generation
-        # leaf — its provider spend happens right here. Under --mock-inference (run_mode stays LIVE) this
-        # live path runs, so guard here: fail loud rather than silently hit the real search provider.
-        if job_metadata.is_mock_inference:
-            error = MockInferenceUnsupportedError.for_operation("web search (PipeSearch)")
-            raise error
+        content_generator = content_generator or get_content_generator()
 
         # 0. Log the search run
         search_choice_desc = self.search_choice or "default"
@@ -106,7 +99,8 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
         search_choice: SearchModelChoice = self.search_choice or model_deck.search_choice_default
         search_setting: SearchSetting = model_deck.get_search_setting(search_choice=search_choice)
 
-        # 3. Resolve the model handle (waterfalls/aliases → actual provider/variant handle)
+        # 3. Resolve the model handle (waterfalls/aliases → actual provider/variant handle). Pin
+        # search_setting.model to the resolved handle so it doubles as the Temporal routing key.
         inference_model = model_deck.get_required_inference_model(model_handle=search_setting.model, model_type=ModelType.SEARCH)
         resolved_model_handle = inference_model.name
         if resolved_model_handle != search_setting.model:
@@ -118,30 +112,31 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
         if self.max_results_override is not None:
             search_setting = search_setting.model_copy(update={"max_results": self.max_results_override})
 
-        # 5. Get search worker from factory
-        worker = SearchWorkerFactory.make_search_worker(inference_model=inference_model)
-
-        # 6. Create search job
-        search_job = SearchJobFactory.make_search_job(
+        # 5. Build the serializable assignment and run the search behind the content-generation seam.
+        # The leaf goes through the same swappable generator as LLM/img-gen/extract: direct inline, a
+        # Temporal activity when in-workflow, or a dry mock. That makes search-on-Temporal replay-safe
+        # and lets its failures cross the workflow boundary as classified errors instead of hanging.
+        search_assignment = SearchAssignment(
+            job_metadata=job_metadata,
             query=query_text,
             search_setting=search_setting,
-            job_metadata=job_metadata,
             include_domains=self.include_domains,
             exclude_domains=self.exclude_domains,
             from_date=self.from_date,
             to_date=self.to_date,
         )
 
-        # 7. Execute search based on output type
         content: StuffContent
         if not self.is_structured_output:
-            content = await worker.search_sourced_answer(search_job=search_job)
+            content = await content_generator.make_search_sourced_answer(search_assignment=search_assignment)
         else:
             output_structure_class = self.output.concept.get_structure_class()
-            result_dict = await worker.search_structured(search_job=search_job, schema=output_structure_class)
-            content = output_structure_class.model_validate(result_dict)
+            content = await content_generator.make_search_structured(
+                output_structure_class=output_structure_class,
+                search_assignment=search_assignment,
+            )
 
-        # 8. Create Stuff, set in working memory, and return output
+        # 6. Create Stuff, set in working memory, and return output
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
             concept=self.output.concept,
@@ -172,35 +167,14 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeSearchOutput:
-        content: StuffContent
-        if not self.is_structured_output:
-            doc_factory = DryRunFactory.make_dry_run_factory(DocumentContent)
-            mock_sources = [doc_factory.build() for _ in range(3)]
-            search_result_factory = DryRunFactory.make_dry_run_factory(SearchResultContent)
-            content = search_result_factory.build(sources=mock_sources)
-        else:
-            output_structure_class = self.output.concept.get_structure_class()
-            structured_factory = DryRunFactory.make_dry_run_factory(output_structure_class)
-            content = structured_factory.build()
-
-        output_stuff = StuffFactory.make_stuff(
-            name=output_name,
-            concept=self.output.concept,
-            content=content,
-        )
-        working_memory.set_new_main_stuff(
-            stuff=output_stuff,
-            name=output_name,
-        )
-        execution_data_dict: dict[str, Any] = {
-            "rendered_query": "mock",
-            "resolved_model": "mock",
-            "is_structured_output": self.is_structured_output,
-        }
-        self._register_execution_data(job_metadata, execution_data_dict)
-        return PipeSearchOutput(
+        # Dry run reuses the live path with the dry content generator — identical to PipeLLM — so the
+        # search mock now lives behind the same seam (ContentGeneratorDry.make_search_*) as every leaf.
+        return await self._live_run_operator_pipe(
+            job_metadata=job_metadata,
             working_memory=working_memory,
-            pipeline_run_id=job_metadata.pipeline_run_id,
+            pipe_run_params=pipe_run_params,
+            output_name=output_name,
+            content_generator=ContentGeneratorDry(),
         )
 
     @override

@@ -44,6 +44,24 @@ Recommended order: run the **no-spend** sweep first to confirm the plumbing chea
 /temporal-e2e-validate validate cross-process registry                                   # Tier 2b
 ```
 
+### Validation sweep stays in-process — Temporal-leak guard (free)
+
+Guards the `/validate` dry-run leak (nested controller sub-pipes dispatching to Temporal → HTTP 422 on a standalone `PipeBatch`). Two layers, both free; the contract is "the validation sweep never dispatches to Temporal, even under a Temporal-enabled boot".
+
+```text
+/temporal-e2e-validate validate the dry-run sweep stays in-process under a Temporal-enabled boot   # Mode 2 Tier 2c
+```
+
+- **Mode-1 pytest** (real `TemporalPipeRouter` as hub default, spies `WorkflowExecutor.execute_workflow`, asserts never called). It lives *outside* `library_crate/`, so the generic "Mode 1 pytest suite" prompt above does **not** pick it up — run it by path:
+
+  ```text
+  timeout 180 .venv/bin/pytest tests/integration/pipelex/temporal/test_validate_sweep_stays_in_process.py -m temporal --temporal-server local --timeout=60
+  ```
+
+  (Self-contained — GREEN never dispatches, so no live server is actually required; `--temporal-server none` works too.)
+
+- **Mode-2 Tier 2c** (deployment-faithful: `validate bundle --temporal` over a standalone `PipeBatch` → exit 0 **and** worker idle / no `WfPipeRouter` dispatch). Reached via the prompt above; full GREEN/RED procedure in `references/mode-2-tiers.md` Step 3, Tier 2c.
+
 ### Graph tracing (free)
 
 ```text

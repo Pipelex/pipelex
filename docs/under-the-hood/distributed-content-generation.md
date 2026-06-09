@@ -7,7 +7,10 @@ description: "How Pipelex serializes dynamic Pydantic models and large binary co
 
 This page is for contributors working on Pipelex internals. If you're deploying or operating Pipelex on Temporal, see the user-facing [Distributed Execution with Temporal](../distributed-execution/temporal/index.md) guide instead.
 
-This page covers the serialization mechanisms that enable content generation (LLM structured output, image generation, PDF extraction) to run across Temporal worker processes. For the broader Temporal architecture — LibraryCrate propagation, deferred hydration, per-workflow scoping — see [Temporal Integration](./temporal-integration.md).
+This page covers the serialization mechanisms that enable content generation (LLM structured output, image generation, PDF extraction, web search) to run across Temporal worker processes. For the broader Temporal architecture — LibraryCrate propagation, deferred hydration, per-workflow scoping — see [Temporal Integration](./temporal-integration.md).
+
+!!! note "Every inference leaf goes through the same seam"
+    All inference operators dispatch their leaf call through the swappable `ContentGenerator` abstraction: direct inline (`ContentGenerator`), as a Temporal activity (`ContentGeneratorInWorkflow`), or as a dry mock (`ContentGeneratorDry`). Web search (`PipeSearch`) joined this seam last — its `act_search_gen_*` activities make search-on-Temporal replay-safe (the result is recorded in workflow history) and let search failures cross the workflow boundary as classified errors. An operator that runs its leaf inline instead would re-execute it on every replay and, on failure, hang the submitter with an unclassified workflow-task error.
 
 ---
 
@@ -137,6 +140,10 @@ sequenceDiagram
     S->>S: model_validate() → original type
 ```
 
+### Structured web search reuses the same mechanism
+
+Structured web search (`PipeSearch` with a non-text output concept) faces the identical dynamic-class problem and solves it the same way. `SearchObjectAssignment` mirrors `ObjectAssignment` — it ships `output_class_name` + `output_class_schema` alongside the `SearchAssignment`, the activity reconstructs a throwaway class via `SchemaToModelFactory` to drive the provider call, and the activity returns the **raw result dict**. The submitter re-validates that dict against the original output class (`output_structure_class.model_validate(result_dict)`) — a pure, deterministic step that keeps the dynamic class on the submitter side and never ships it across the boundary. The sourced-answer path (`make_search_sourced_answer`) has no dynamic class at all: it returns a `SearchResultContent`, a native serializable model.
+
 ---
 
 ## Large Payload Management
@@ -179,6 +186,8 @@ async def act_img_gen_images(img_gen_assignment: ImgGenAssignment) -> list[Image
 | Rendered page views | `act_render_page_views` | PDF page renders → S3 | `list[ImageContent]` with URIs |
 | LLM text | `act_llm_gen_text` | Nothing stored (text is small) | Plain `str` |
 | LLM object | `act_llm_gen_object` | Nothing stored (JSON is small) | `BaseModel` + `__kajson_class_source__` in metadata |
+| Search sourced answer | `act_search_gen_sourced_answer` | Nothing stored (answer + source refs are small) | `SearchResultContent` (answer + `DocumentContent` sources) |
+| Search structured | `act_search_gen_structured` | Nothing stored (JSON is small) | Raw `dict`, re-validated against the output class on the submitter |
 
 ---
 
@@ -215,13 +224,15 @@ Resolution order:
 | Component | File |
 |-----------|------|
 | Assignment models (schema embedding) | `pipelex/cogt/content_generation/assignment_models.py` |
-| Schema-to-model reconstruction | `pipelex/cogt/content_generation/schema_to_model.py` |
+| Schema-to-model reconstruction | `pipelex/cogt/content_generation/schema_to_model_factory.py` |
 | Content generator (type bridge) | `pipelex/cogt/content_generation/content_generator.py` |
 | LLM generation functions | `pipelex/cogt/content_generation/llm_generate.py` |
+| Search generation functions | `pipelex/cogt/content_generation/search_generate.py` |
 | Generated content factory (storage) | `pipelex/cogt/content_generation/generated_content_factory.py` |
 | Temporal data converter | `pipelex/temporal/temporal_data_converter.py` |
 | Image generation activity | `pipelex/temporal/tprl_content_generation/act_img_gen_generate.py` |
 | Extract activity | `pipelex/temporal/tprl_content_generation/act_extract_generate.py` |
+| Search activity | `pipelex/temporal/tprl_content_generation/act_search_generate.py` |
 | Page view rendering activity | `pipelex/temporal/tprl_content_generation/act_render_page_views.py` |
 | Kajson serialization | `kajson` (external PyPI package) |
 | ImageContent model | `pipelex/core/stuffs/image_content.py` |

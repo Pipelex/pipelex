@@ -43,6 +43,7 @@ from pipelex.hub import (
     get_library_manager,
     get_pipe_library,
     get_telemetry_manager,
+    scoped_pipe_router,
     set_current_library,
 )
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
@@ -103,7 +104,12 @@ class BundleValidator:
     def __init__(self) -> None:
         # Locally-constructed, direct execution primitive — NOT get_pipe_run() (see module docstring).
         # The ObserverNoOp keeps the sweep observation-silent; validation surfaces its own report.
-        self._pipe_run: PipeRunProtocol = PipeRun(pipe_router=PipeRouter(observer=ObserverNoOp()))
+        # Keep the router instance (don't discard it inside PipeRun): the sweep installs it as the active
+        # router via scoped_pipe_router (see validate_pipes) so nested controller sub-pipes — which
+        # dispatch through get_pipe_router() — resolve THIS in-process router instead of the hub default.
+        # Mirrors runtime_bridge.bridge._run_direct.
+        self._pipe_router = PipeRouter(observer=ObserverNoOp())
+        self._pipe_run: PipeRunProtocol = PipeRun(pipe_router=self._pipe_router)
 
     async def acquire_and_validate(
         self,
@@ -235,10 +241,20 @@ class BundleValidator:
             mock_inputs=True,
         )
         dry_run_pipeline_id = f"dry_run_{PipelineFactory.make_pipeline_run_id()}"
-        for pipe in sweepable_pipes:
-            results[pipe.pipe_ref] = await self._classify_pipe(
-                pipe=pipe, library_id=library_id, execution_config=execution_config, dry_run_pipeline_id=dry_run_pipeline_id
-            )
+        # Install the in-process router as the active router for the WHOLE sweep so nested controller
+        # sub-pipes — which dispatch through get_pipe_router() — resolve THIS router instead of falling
+        # back to the hub default. Under a Temporal-enabled hub the default is the Temporal router, so
+        # without the scope a controller (a PipeBatch/PipeParallel fan-out, or any PipeSequence step)
+        # would leak its nested pipes to Temporal — turning a no-cost in-process dry run into real
+        # top-level workflow dispatches (HTTP 422). Mirrors runtime_bridge.bridge._run_direct. The
+        # scope is contextvar-based, so concurrent /validate sweeps don't cross-contaminate, and the
+        # asyncio tasks a batch fan-out spawns copy the context at creation (inside this scope) so they
+        # inherit the override too.
+        with scoped_pipe_router(self._pipe_router):
+            for pipe in sweepable_pipes:
+                results[pipe.pipe_ref] = await self._classify_pipe(
+                    pipe=pipe, library_id=library_id, execution_config=execution_config, dry_run_pipeline_id=dry_run_pipeline_id
+                )
 
         # 5. Aggregate + report.
         return self._aggregate(results=results, start_time=start_time)
