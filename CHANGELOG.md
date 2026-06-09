@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [v0.32.0] - 2026-06-09
 
 This cycle reworks **cost reporting** so it survives distributed execution and stops leaking. Cost now rides on the run result instead of a side buffer: a multi-worker Temporal run aggregates usage from every worker into a single end-of-run report, the success-path registry leak is gone by removal, and a new `--costs` switch decouples cost collection from `--graph`. It also extracts the **framework-agnostic runtime bridge** so any host runtime — not just Mistral Workflows — can embed Pipelex through one boundary.
 
