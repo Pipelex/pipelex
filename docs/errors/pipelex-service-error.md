@@ -18,4 +18,4 @@ Base exception for Pipelex service errors.
 | Defined in | `pipelex.system.pipelex_service.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

@@ -16,4 +16,4 @@ description: "Reference for the `WorkingMemoryTypeError` Pipelex error class."
 | Defined in | `pipelex.core.memory.exceptions` |
 | Parent class | [`WorkingMemoryVariableError`](working-memory-variable-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

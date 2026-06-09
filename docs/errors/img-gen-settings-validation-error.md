@@ -16,4 +16,4 @@ description: "Reference for the `ImgGenSettingsValidationError` Pipelex error cl
 | Defined in | `pipelex.cogt.exceptions` |
 | Parent class | [`CogtError`](cogt-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

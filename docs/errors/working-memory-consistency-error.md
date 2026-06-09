@@ -16,4 +16,4 @@ description: "Reference for the `WorkingMemoryConsistencyError` Pipelex error cl
 | Defined in | `pipelex.core.memory.exceptions` |
 | Parent class | [`WorkingMemoryError`](working-memory-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

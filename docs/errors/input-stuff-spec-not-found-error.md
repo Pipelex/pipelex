@@ -16,4 +16,4 @@ description: "Reference for the `InputStuffSpecNotFoundError` Pipelex error clas
 | Defined in | `pipelex.core.pipes.inputs.exceptions` |
 | Parent class | [`InputStuffSpecsError`](input-stuff-specs-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

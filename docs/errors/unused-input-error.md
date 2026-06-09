@@ -18,4 +18,4 @@ Raised when an input is declared but never referenced in the template.
 | Defined in | `pipelex.pipe_operators.shared.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

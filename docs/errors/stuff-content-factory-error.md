@@ -16,4 +16,4 @@ description: "Reference for the `StuffContentFactoryError` Pipelex error class."
 | Defined in | `pipelex.core.stuffs.exceptions` |
 | Parent class | [`StuffError`](stuff-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

@@ -18,4 +18,4 @@ Raised when GCP credentials file is not found or invalid.
 | Defined in | `pipelex.tools.storage.exceptions` |
 | Parent class | [`StorageGcpError`](storage-gcp-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

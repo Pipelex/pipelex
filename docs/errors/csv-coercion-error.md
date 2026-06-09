@@ -18,4 +18,4 @@ Raised when a CSV cell value cannot be coerced to its declared field type.
 | Defined in | `pipelex.tools.tabular.exceptions` |
 | Parent class | [`CsvError`](csv-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

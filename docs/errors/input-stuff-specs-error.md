@@ -16,4 +16,4 @@ description: "Reference for the `InputStuffSpecsError` Pipelex error class."
 | Defined in | `pipelex.core.pipes.inputs.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)
