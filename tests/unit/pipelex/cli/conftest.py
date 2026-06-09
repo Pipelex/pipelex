@@ -7,9 +7,23 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, set_agent_cli_error_format
+from pipelex.cli.error_handlers import set_traceback_requested
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+
+@pytest.fixture(autouse=True)
+def reset_traceback_requested() -> Iterator[None]:
+    """Keep the --traceback ContextVar from leaking between cli/ tests.
+
+    ``PipelexCLI.make_context`` (and tests that call ``set_traceback_requested``) set
+    this flag; without a reset a leaked ``True`` would make a sibling test's "no flag"
+    assertion order-dependent.
+    """
+    set_traceback_requested(False)
+    yield
+    set_traceback_requested(False)
 
 
 @pytest.fixture(autouse=True)

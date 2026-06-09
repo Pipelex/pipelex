@@ -1,6 +1,5 @@
 from typing import Annotated
 
-import click
 import typer
 from click import Command, Context
 from typer.core import TyperGroup
@@ -20,6 +19,7 @@ from pipelex.cli.commands.validate.app import validate_app
 from pipelex.cli.commands.which_cmd import which_cmd
 from pipelex.cli.commands.worker_cmd import worker_cmd
 from pipelex.cli.deck_notice import warn_if_deck_stale
+from pipelex.cli.error_handlers import set_traceback_requested
 from pipelex.cli.readiness import check_readiness
 from pipelex.hub import get_console
 from pipelex.tools.misc.package_utils import get_package_version
@@ -81,6 +81,9 @@ class PipelexCLI(TyperGroup):
         ctx.ensure_object(dict)
         ctx.obj["no_logo"] = no_logo
         ctx.obj["traceback"] = traceback
+        # Record at parse time so error handlers honor --traceback without relying on
+        # an active global Click context (absent under typer >= 0.26 / click >= 8.4).
+        set_traceback_requested(traceback)
         return ctx
 
 
@@ -117,9 +120,11 @@ def app_callback(
     console = get_console()
     package_version = get_package_version()
 
-    # Get no_logo flag from context (set by PipelexCLI.make_context)
-    click_ctx = click.get_current_context()
-    no_logo = click_ctx.obj.get("no_logo", False) if click_ctx.obj else False
+    # Get no_logo flag from context (set by PipelexCLI.make_context). Use the
+    # ctx parameter Typer injects rather than click.get_current_context(): the
+    # global context stack is not populated when a subcommand is dispatched
+    # under typer >= 0.26 / click >= 8.4, which made every subcommand crash.
+    no_logo = ctx.obj.get("no_logo", False) if ctx.obj else False
 
     if no_logo:
         console.print(f"Pipelex v{package_version}")
