@@ -6,6 +6,7 @@ from pipelex.temporal.tprl_content_generation.act_img_gen_generate import act_im
 from pipelex.temporal.tprl_content_generation.act_jinja2_generate import act_jinja2_gen_text
 from pipelex.temporal.tprl_content_generation.act_llm_generate import act_llm_gen_object, act_llm_gen_object_list, act_llm_gen_text
 from pipelex.temporal.tprl_content_generation.act_render_page_views import act_render_page_views
+from pipelex.temporal.tprl_content_generation.act_search_generate import act_search_gen_sourced_answer, act_search_gen_structured
 from pipelex.temporal.tprl_pipe.act_assemble_tracing import act_assemble_tracing
 from pipelex.temporal.tprl_pipe.act_deliver import act_deliver
 from pipelex.temporal.tprl_pipe.act_flush_trace_events import act_flush_trace_events
@@ -31,6 +32,8 @@ class Tasks:
                 act_jinja2_gen_text,
                 act_extract_gen_extract_pages,
                 act_render_page_views,
+                act_search_gen_sourced_answer,
+                act_search_gen_structured,
             ],
         ),
         PackName.PIPE: TaskPack(

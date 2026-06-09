@@ -2,6 +2,7 @@ from collections.abc import Awaitable, Callable, Coroutine
 from functools import wraps
 from typing import Any, ParamSpec, Protocol, TypeVar
 
+from pipelex.cogt.content_generation.assignment_models import SearchAssignment
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.extract.extract_output import ExtractOutput
@@ -14,6 +15,7 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
+from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
@@ -125,3 +127,14 @@ class ContentGeneratorProtocol(Protocol):
         extract_job_params: ExtractJobParams,
         extract_job_config: ExtractJobConfig,
     ) -> Coroutine[Any, Any, list[PageContent]]: ...
+
+    def make_search_sourced_answer(
+        self,
+        search_assignment: SearchAssignment,
+    ) -> Coroutine[Any, Any, SearchResultContent]: ...
+
+    def make_search_structured(
+        self,
+        output_structure_class: type[BaseModelTypeVar],
+        search_assignment: SearchAssignment,
+    ) -> Coroutine[Any, Any, BaseModelTypeVar]: ...

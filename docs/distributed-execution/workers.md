@@ -75,6 +75,7 @@ Built-in scopes:
 | `runner-img-gen`  | None      | `act_img_gen_images`, `act_render_page_views`       | One pool dedicated to image generation.                                   |
 | `runner-extract`  | None      | `act_extract_gen_extract_pages`, `act_render_page_views` | One pool dedicated to OCR / document extraction.                          |
 | `runner-jinja2`   | None      | `act_jinja2_gen_text`                               | One pool dedicated to template rendering (rare; usually fine in-band).    |
+| `runner-search`   | None      | `act_search_gen_sourced_answer`, `act_search_gen_structured` | One pool dedicated to web search calls.                                   |
 
 `act_render_page_views` is intentionally registered under **both** `runner-img-gen` and `runner-extract` so neither pool breaks when the activity is routed to either. The `runner-llm` scope splits all three LLM activity types (text, object, object-list) onto the same pool — they share the same provider connections so splitting further would only add operational overhead.
 

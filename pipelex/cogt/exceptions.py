@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
-from pipelex.base_exceptions import ErrorReport, PipelexError
+from pipelex.base_exceptions import ErrorReport, PipelexError, iter_cause_chain
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.system.pipelex_service.types import RemoteConfigSource
 from pipelex.types import StrEnum
@@ -122,17 +122,12 @@ def find_inference_error_category_in_chain(exc: BaseException) -> InferenceError
     (``non_retryable``) from the underlying failure's category. A ``CogtError`` carrying no
     category is skipped — the walk continues to the first one that actually classifies the failure.
 
-    The ``id()`` set guards against a cyclic ``__cause__`` chain: without it a cycle would
-    spin this loop forever — and it runs on the error path, so the failure being classified
-    would be lost to a hang rather than reported.
+    Walks via ``iter_cause_chain``, which owns the cyclic-``__cause__`` guard so a cycle
+    terminates the walk instead of hanging the error path.
     """
-    current: BaseException | None = exc
-    seen: set[int] = set()
-    while current is not None and id(current) not in seen:
-        seen.add(id(current))
-        if isinstance(current, CogtError) and current.error_category is not None:
-            return current.error_category
-        current = current.__cause__
+    for node in iter_cause_chain(exc):
+        if isinstance(node, CogtError) and node.error_category is not None:
+            return node.error_category
     return None
 
 

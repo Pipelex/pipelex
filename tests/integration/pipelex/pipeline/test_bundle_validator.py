@@ -14,17 +14,48 @@ from typing import Any
 
 import pytest
 from pytest_mock import MockerFixture
+from typing_extensions import override
 
+from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.hub import (
     clear_current_library,
     get_library_manager,
+    get_pipelex_hub,
     get_required_pipe,
     get_telemetry_manager,
 )
+from pipelex.observer.observer_protocol import ObserverNoOp
+from pipelex.pipe_run.pipe_job import PipeJob
+from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipeline import bundle_validator
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunStatus
 from pipelex.pipeline.execution_seams import acquire_library
 from pipelex.system.telemetry.events import EventName
+
+
+class _RaisingPipeRouter(PipeRouter):
+    """Hub-default stand-in for the Temporal router: trips if a sweep resolves the hub default.
+
+    A validation sweep is meant to run fully in-process. Nested controller sub-pipes dispatch through
+    ``get_pipe_router()``; if the sweep fails to scope its own in-process router, that resolves the hub
+    default — the Temporal router in a Temporal-enabled API process — and leaks the dry run to Temporal.
+    Installing this as the hub default makes that leak fail loudly instead of silently round-tripping.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(observer=ObserverNoOp())
+        self.run_called = False
+
+    @override
+    async def _run_pipe_job(self, pipe_job: PipeJob) -> PipeOutput:
+        self.run_called = True
+        _ = pipe_job  # required by the override signature; unused — the leak is detected by run_called
+        msg = (
+            "Hub-default pipe router was invoked during a validation sweep — a nested controller leaked "
+            "out of the scoped in-process router (the Temporal /validate leak regressed)."
+        )
+        raise AssertionError(msg)
+
 
 _BV_DOMAIN = "bundle_validator_test"
 _BV_MTHDS = f"""
@@ -75,6 +106,39 @@ combined_output = "Text"
 branches = [
   {{ pipe = "ext->otherpkg.missing_pipe", result = "branch_result" }},
 ]
+"""
+
+
+# A bundle whose top-level pipe is a STANDALONE PipeBatch — the shape that 422'd the Temporal /validate
+# route. Swept directly, PipeBatch fans out (mock_inputs mints a multi-item list) and each branch
+# dispatches through get_pipe_router(); without the sweep scoping its in-process router those branches
+# resolve the hub default (the Temporal router) and fire concurrent top-level workflow dispatches.
+_BV_BATCH_DOMAIN = "bundle_validator_batch"
+_BV_BATCH_MTHDS = f"""
+domain = "{_BV_BATCH_DOMAIN}"
+description = "Bundle with a standalone PipeBatch — router-scoping regression"
+
+[concept.Item]
+description = "An item to summarize"
+
+[concept.Summary]
+description = "A summary of an item"
+
+[pipe.summarize_item]
+type = "PipeLLM"
+description = "Summarize a single item"
+inputs = {{ item = "Item" }}
+output = "Summary"
+prompt = "Summarize $item"
+
+[pipe.summarize_items]
+type = "PipeBatch"
+description = "Standalone batch fanning out over items"
+inputs = {{ items = "Item[]" }}
+output = "Summary[]"
+branch_pipe_code = "summarize_item"
+input_list_name = "items"
+input_item_name = "item"
 """
 
 
@@ -188,6 +252,32 @@ class TestBundleValidatorIntegration:
             assert results[f"{_BV_XPKG_DOMAIN}.cross_parallel"].status == DryRunStatus.SKIPPED
             assert results[f"{_BV_XPKG_DOMAIN}.implemented_leaf"].status.is_success
         finally:
+            library_manager.teardown(library_id=library_id)
+            clear_current_library()
+
+    async def test_standalone_batch_sweep_scopes_in_process_router(self) -> None:
+        # Regression for the Temporal /validate leak: a standalone PipeBatch fans out its branches via
+        # get_pipe_router(). The sweep must scope its own in-process router for the whole sweep so those
+        # branches resolve it — NOT the hub default, which in a Temporal-enabled API process is the
+        # Temporal router (the leak that produced HTTP 422). We install a hub default that raises if its
+        # run is ever reached, then assert the batch (and its branch leaf) classify SUCCESS without the
+        # hub default ever being touched.
+        hub = get_pipelex_hub()
+        original_router = hub.get_required_pipe_router()
+        sentinel = _RaisingPipeRouter()
+        library_manager = get_library_manager()
+        library_id = "bv_batch_scope_lib"
+        acquire_library(library_id=library_id, mthds_contents=[_BV_BATCH_MTHDS])
+        hub.set_pipe_router(pipe_router=sentinel)
+        try:
+            batch_pipe = get_required_pipe(pipe_code=f"{_BV_BATCH_DOMAIN}.summarize_items")
+            leaf_pipe = get_required_pipe(pipe_code=f"{_BV_BATCH_DOMAIN}.summarize_item")
+            results = await BundleValidator().validate_pipes([batch_pipe, leaf_pipe], library_id=library_id)
+            assert results[f"{_BV_BATCH_DOMAIN}.summarize_items"].status.is_success
+            assert results[f"{_BV_BATCH_DOMAIN}.summarize_item"].status.is_success
+            assert sentinel.run_called is False, "Nested batch dispatch leaked to the hub default router"
+        finally:
+            hub.set_pipe_router(pipe_router=original_router)
             library_manager.teardown(library_id=library_id)
             clear_current_library()
 
