@@ -121,7 +121,7 @@ pipe (`batch_temporal_describe_topics`), so its sweep fans out — the exact sha
 timeout 120 .venv/bin/pipelex validate bundle \
   tests/integration/pipelex/temporal/library_crate/temporal_batch.mthds \
   --temporal 2>&1 | tail -20
-echo "EXIT=$?"
+echo "EXIT=${PIPESTATUS[0]}"   # first pipe stage = pipelex's exit, NOT tail's (load-bearing for GREEN/RED)
 ```
 
 GREEN: `EXIT=0` and `Successfully validated bundle ...`. **Strong check** (the point of the scenario):
