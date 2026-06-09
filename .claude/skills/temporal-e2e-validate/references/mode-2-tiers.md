@@ -229,6 +229,44 @@ RED (prove it bites) — the fix is committed, so neutralize it in the working t
 
 **Restore immediately:** `git checkout -- pipelex/pipe_run/dry_run_pipeline.py`.
 
+**API arm (after Phase 4 — the real `/validate` route in `../pipelex-api`).** With the server +
+split workers up, exercise the actual route code performing the real dispatch (the sibling repo's
+venv must have this pipelex installed, e.g. `cd ../pipelex-api && uv pip install -e ../<this-worktree>`):
+
+```bash
+# From ../pipelex-api: boot PYTEST-mode with temporal_enabled=True, point the dispatch at the
+# e2e queue, and POST a real bundle through TestClient (full route + handler chain, real worker).
+cd ../pipelex-api && timeout 120 .venv/bin/python - <<'PY'
+import os
+os.environ.setdefault("COMPLETION_CALLBACK_SECRET", "tier2d-placeholder")
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from pipelex.config import get_config
+from pipelex.pipelex import Pipelex
+from pipelex.system.runtime import IntegrationMode
+
+BUNDLE = open("../pipelex/tests/integration/pipelex/temporal/library_crate/native_text_sequence.mthds").read()  # or any main_pipe bundle
+Pipelex.make(IntegrationMode.PYTEST, temporal_enabled=True)
+get_config().temporal.worker_config.default_task_queue = "temporal_task_queue"
+from api.exception_handlers import register_exception_handlers
+from api.routes import router as api_router
+app = FastAPI(); app.include_router(api_router, prefix="/api/v1"); register_exception_handlers(app)
+resp = TestClient(app).post("/api/v1/validate", json={"mthds_contents": [BUNDLE]})
+print(resp.status_code, resp.json().get("graph_spec") is not None)
+Pipelex.teardown_if_needed()
+PY
+```
+
+GREEN: `200 True` (one round-trip returned the envelope with a worker-assembled `graph_spec`), the
+worker shows only `wf_dry_validate` + one `act_dry_validate` (same strong check as above), and a
+strict-mode signature bundle POSTed the same way returns **422** with
+`error_type=ValidateBundleError`, `error_domain=input` — identical to the direct path. The failed
+workflow must appear exactly ONCE in `temporal workflow list` (the dispatch pins
+`RetryPolicy(maximum_attempts=1)` on the wrapper workflow — a deterministic validation failure
+must not re-run). The bundle's graph is best-effort: a bundle with no `main_pipe` 422s on the
+API-side precondition; the worker-side `graph_spec=None` arm is covered by the route's unit tests
+(`tests/unit/test_validate_temporal_dispatch.py`).
+
 After this completes, tell the user:
 
 - PASS (GREEN exits 0 · status map all SUCCESS · non-empty GraphSpec · worker shows ONLY the

@@ -68,8 +68,8 @@ All decisions are resolved up front so a cold-start session runs autonomously th
 | | **⛔ CHECKPOINT 2 — graph dry-run verified under a Temporal hub** | ☑ done (suite green, committed) |
 | 3 | The `act_dry_validate` activity + wrapper-workflow dispatch + worker registration + isolation test | ☑ done |
 | | **⛔ CHECKPOINT 3 — activity registered + isolation-tested** | ☑ done (suite green, Tier 2d GREEN+RED, committed) |
-| 4 | API dispatch (cross-repo `pipelex-api`) | ☐ |
-| | **⛔ CHECKPOINT F — all requirements met** | |
+| 4 | API dispatch (cross-repo `pipelex-api`) | ☑ done |
+| | **⛔ CHECKPOINT F — all requirements met** | ☑ done (both suites green, Tier 2d both arms GREEN, committed) |
 | G0 | *(optional, deferred)* `temporalio` bump → true standalone activity | ☐ later |
 
 Status legend: ☐ not started · ◐ in progress · ☑ done. **No human gate remains** (dispatch = wrapper workflow).
@@ -163,10 +163,10 @@ Wrap the sweep + the in-memory graph dry-run in one activity, dispatched via a o
 
 ## Phase 4 — API dispatch (cross-repo `pipelex-api`)
 
-- [ ] In `../pipelex-api/api/routes/pipelex/validate.py`: when Temporal is enabled, dispatch the **wrapper workflow** (→ `act_dry_validate`) and await `{status map, GraphSpec}` in one round-trip, instead of running `validate_bundle` + `dry_run_pipeline` as two paths (the latter a top-level worker workflow). In direct mode, keep the current in-process behavior unchanged. Preserve the best-effort-graph contract (graph failure ⇒ still return the validated bundle, no graph) and the 422/RFC-7807 error shape.
-- [ ] Test both backends against the API (Temporal-enabled dispatches the activity and returns graph+status from one round-trip; direct stays in-process).
-- [ ] **Distributed verification — extend Tier 2d with the API arm:** with the API process up + Temporal-enabled (+ split workers), a real `POST /validate` returns `{status map, graph_spec}` in one round-trip, the worker shows only the wrapper workflow + one `act_dry_validate` (no nested dispatch), and a bundle that fails its graph dry-run still returns 200 with `graph_spec=null` (best-effort). See the spec below.
-- [ ] Update docs in the repo whose code changed (pipelex `docs/` for the activity/tracing; pipelex-api `docs/` for the route) + CHANGELOG `[Unreleased]`.
+- [x] `../pipelex-api/api/routes/pipelex/validate.py` split into `_validate_direct` (today's body, unchanged) + `_validate_via_temporal`, gated on `get_config().temporal.is_enabled`. Temporal branch: **dispatch FIRST** (before any API-side parsing, so every validation failure surfaces through the worker's `validate_bundle` cascade with the identical categorized `ValidateBundleError` 422 — `WorkflowExecutionError.to_error_report()` returns the recovered report and the existing global handler renders it; zero route-side catch), then re-parse blueprints for the envelope, check the `main_pipe` precondition, and build `pipe_structures` from a local **load-only** `acquire_library` (no sweep, no dry-run, no tracing API-side). Best-effort graph rides back as `graph_spec` on the activity result.
+- [x] Both backends tested (`tests/unit/test_validate_temporal_dispatch.py`): Temporal-enabled returns the envelope from one round-trip (graph + blueprint + structures, dispatch awaited exactly once with the request's contents/allow_signatures), best-effort `graph_spec=null` → 200, validation failure renders the same 422 (`ValidateBundleError`/`input`, refs in `detail`), and direct mode **never** touches the dispatch helper. Existing direct-path tests (`test_allow_signatures` etc.) green against the refactored route.
+- [x] **Tier 2d API arm RUN live** (real route + real dispatch via TestClient in the pipelex-api venv, against the running server + split workers): 200 with worker-assembled `graph_spec` (3 nodes/3 edges) in one round-trip; signature bundle → 422 `ValidateBundleError`/`input` through the real activity→workflow→submitter→handler chain; **found+fixed in the process:** the config-default workflow retry policy re-ran a deterministically-failed validation (same workflow id listed twice) — `dispatch_dry_validate` now pins `RetryPolicy(maximum_attempts=1)` on the wrapper workflow (D-C5 at the workflow tier), re-verified (failed workflow appears exactly once). API-arm procedure added to the Tier-2d skill scenario.
+- [x] Docs + CHANGELOG `[Unreleased]` in both repos (pipelex: tracing doc + temporal-integration doc + CHANGELOG, done in Phases 1–3; pipelex-api: `docs/pipe-validate.md` "Execution Backends" section + CHANGELOG entry noting the pipelex version requirement).
 
 > ### ⛔ CHECKPOINT F — after Phase 4 — **ALL REQUIREMENTS MET**
 >
@@ -174,7 +174,17 @@ Wrap the sweep + the in-memory graph dry-run in one activity, dispatched via a o
 >
 > **Verify:** `pipelex` `make agent-test` green · Temporal e2e green · **Tier 2d (activity + API arms) GREEN** · `pipelex-api` tests green on **both** backends · commit.
 >
-> **Handoff (fill in):** as-built summary (what each phase delivered, file:symbol) · how the API now dispatches · any follow-ups (e.g. retiring the old worker-workflow graph path once the activity path is proven; D-plan §7 endpoint unification). Then fold this into `wip/dry-run-refactor/consolidation-as-built.md` and the README open-follow-ups table.
+> **Handoff (filled in, 2026-06-09) — as-built summary:**
+>
+> - **Phase 1** — `pipelex/hub.py`: `scoped_event_log` / `get_event_log_override` (ContextVar scope); write side `pipeline_run_setup.py` and read side `tracing_assembly.py::assemble_tracing` prefer the override (override implies tracing-enabled, read side doesn't `close()` it). The two-instance fix.
+> - **Phase 2** — `pipelex/pipe_run/dry_run_pipeline.py::dry_run_pipe_in_process(pipe, *, library_id)`: graph dry-run with zero dispatch under the three scopes (`scoped_event_log` + `scoped_pipe_router` + new `hub.scoped_content_generator`, which `get_content_generator()` prefers); tracer keys aligned by construction.
+> - **Phase 3** — `pipelex/temporal/tprl_pipe/act_dry_validate.py` (`DryValidateArg`/`DryValidateResult`, activity composes `validate_bundle` + `dry_run_pipe_in_process`, D4 load-once, D5 narrow best-effort graph), `wf_dry_validate.py::WfDryValidate` (one-step wrapper, D-C5 activity retry bounds), `dry_validate_dispatch.py::dispatch_dry_validate` (submitter helper, `maximum_attempts=1` at the workflow tier), registered in `tasks.py`; `BundleValidator.validate_pipes` also scopes the dry content generator. Tier 2d (skill scenario + `submit_dry_validate.py` + master-table row) GREEN+RED on a real 3-process stack.
+> - **Phase 4** — `pipelex-api` route split (`_validate_direct` unchanged / `_validate_via_temporal` dispatch-first), unit tests for both backends, live API-arm verification, docs+CHANGELOG both repos.
+> - **How the API dispatches now:** `dispatch_dry_validate(DryValidateArg(mthds_contents, allow_signatures))` → `wf_dry_validate` → one `act_dry_validate` on the worker → `{dry_run_outputs, graph_spec}` in one round-trip; failures cross as `WorkflowExecutionError` carrying the recovered `ValidateBundleError` report → existing 422 handler.
+> - **Cross-repo shipping note:** the `pipelex-api` branch (`feature/Update-dry-run-api`) imports `pipelex.temporal.tprl_pipe.act_dry_validate` — it needs a pipelex release/rev **newer than v0.32.1** (bump the `pipelex` pin + `[tool.uv.sources]` rev) before its CI can pass; local verification used `uv pip install -e ../_dry`.
+> - **Follow-ups (deferred):** retire the old worker-workflow graph path for `/validate` (now unused by the API; `dry_run_pipeline` still serves the direct CLI/API path) · Phase G0 standalone activity (`temporalio` bump) · D-plan §7 endpoint unification · consider moving `pipe_structures` into the activity result to drop the API-side load-only library acquisition (today it double-loads: worker + API).
+>
+> Folded into `wip/dry-run-refactor/consolidation-as-built.md` (§ "Part C as built") and the README workstream table.
 
 ---
 

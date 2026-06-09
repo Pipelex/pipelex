@@ -6,6 +6,8 @@ and get back the per-pipe status map + the best-effort ``GraphSpec``. Used by th
 (cross-repo, ``pipelex-api``) and by the Tier-2d e2e submitter script.
 """
 
+from temporalio.common import RetryPolicy
+
 from pipelex.config import get_config
 from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.temporal.tprl.workflow_caller import WorkflowExecutorFactory
@@ -38,6 +40,12 @@ async def dispatch_dry_validate(
     executor = WorkflowExecutorFactory[DryValidateArg, DryValidateResult]().create_executor(
         task_queue=task_queue or worker_config.default_task_queue,
         should_auto_connect_temporal=should_auto_connect_temporal,
+        # No workflow-level retry (D-C5): validation is deterministic, so re-running the whole
+        # wrapper workflow on failure is pure waste — the config default policy would re-run a
+        # failed validation up to 3 times (its non_retryable list doesn't know ValidateBundleError).
+        # Transient infra failures are already retried at the ACTIVITY tier by WfDryValidate's own
+        # bounded policy.
+        retry_policy=RetryPolicy(maximum_attempts=1),
     )
     workflow_id = executor.make_workflow_id(pipeline_run_id=f"dry_validate_{PipelineFactory.make_pipeline_run_id()}")
     return await executor.execute_workflow(
