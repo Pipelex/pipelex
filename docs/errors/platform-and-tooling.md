@@ -53,6 +53,11 @@ own page. Classes are grouped by subsystem.
 - [`VarFallbackPatternError`](var-fallback-pattern-error.md) — Var fallback pattern
 - [`VarNotFoundError`](var-not-found-error.md) — Var not found
 
+## Kit
+
+- [`KitError`](kit-error.md) — Kit
+- [`KitIndexLoadingError`](kit-index-loading-error.md) — Kit index loading
+
 ## System & configuration
 
 - [`ConfigModelError`](config-model-error.md) — Config model

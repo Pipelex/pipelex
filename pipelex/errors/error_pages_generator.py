@@ -270,15 +270,28 @@ def generate_error_pages(
 
     Raises a loud ``RuntimeError`` if two target classes resolve to the same
     kebab slug (e.g. ``LLMError`` and ``LlmError`` both kebab to ``llm-error``),
-    so the collision is caught at generation time instead of silently — the
-    second page would overwrite the first.
+    or if a class slug collides with a generated listing-page stem (the index or
+    a macro-area page), so either collision is caught at generation time instead
+    of silently overwriting a page.
     """
     output_dir.mkdir(parents=True, exist_ok=True)
     target_classes = list(classes) if classes is not None else list(iter_pipelex_error_subclasses())
 
+    # Stems owned by the generated listing pages (the index + one per macro area). A
+    # per-class page is committed first, then the listing pages to the same dir, so a
+    # class whose slug lands here would have its reference page silently overwritten —
+    # catch it loudly at generation time instead.
+    reserved_stems = {INDEX_STEM, *(slug for slug, _ in _MACRO_SECTIONS)}
     slug_owners: dict[str, type[PipelexError]] = {}
     for cls in target_classes:
         slug = page_slug(cls)
+        if slug in reserved_stems:
+            msg = (
+                f"Reserved-slug collision on {slug!r}: {cls.__module__}.{cls.__name__} kebabs to "
+                "the stem of a generated listing page (the index or a macro-area page), whose "
+                "content would overwrite the per-class page. Rename the class."
+            )
+            raise RuntimeError(msg)
         previous = slug_owners.get(slug)
         if previous is not None and previous is not cls:
             msg = (
@@ -387,7 +400,6 @@ _SUBSYSTEM_SECTIONS: tuple[tuple[str, str, str], ...] = (
     ("pipe_signature", "authoring-and-language", "Pipe signatures"),
     ("builder", "authoring-and-language", "Builder"),
     ("libraries", "authoring-and-language", "Libraries"),
-    ("kit", "authoring-and-language", "Kit"),
     # Execution & runtime
     ("pipe_run", "execution-and-runtime", "Pipe execution"),
     ("pipeline", "execution-and-runtime", "Pipeline execution"),
@@ -401,6 +413,7 @@ _SUBSYSTEM_SECTIONS: tuple[tuple[str, str, str], ...] = (
     # Platform & tooling
     ("base_exceptions", "platform-and-tooling", "Base & root errors"),
     ("tools", "platform-and-tooling", "Tools"),
+    ("kit", "platform-and-tooling", "Kit"),
     ("system", "platform-and-tooling", "System & configuration"),
     ("cli", "platform-and-tooling", "CLI"),
 )
@@ -499,7 +512,7 @@ def render_index_page(by_subsystem: dict[str, list[type[PipelexError]]]) -> str:
     lines: list[str] = [
         "---",
         'title: "Error Reference"',
-        'description: "Auto-generated reference index — one page per Pipelex error class."',
+        'description: "Auto-generated overview of the Pipelex error reference, grouped into macro areas of error classes."',
         "---",
         "",
         f"{GENERATED_MARKER}",

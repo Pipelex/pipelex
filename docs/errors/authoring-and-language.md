@@ -102,9 +102,4 @@ own page. Classes are grouped by subsystem.
 - [`PipeLoadingError`](pipe-loading-error.md) — Pipe loading
 - [`PipeNotFoundError`](pipe-not-found-error.md) — Pipe not found
 
-## Kit
-
-- [`KitError`](kit-error.md) — Kit
-- [`KitIndexLoadingError`](kit-index-loading-error.md) — Kit index loading
-
 [Back to Error Reference](index.md)

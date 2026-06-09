@@ -1,6 +1,6 @@
 ---
 title: "Error Reference"
-description: "Auto-generated reference index — one page per Pipelex error class."
+description: "Auto-generated overview of the Pipelex error reference, grouped into macro areas of error classes."
 ---
 
 <!-- pipelex:generated -->
@@ -15,10 +15,10 @@ Every Pipelex error class has a stable RFC 7807 `type` URI on the form
 The classes are grouped into a few macro areas — pick the one that matches where
 the error came from:
 
-- [Authoring & language](authoring-and-language.md) — Core language, Pipe operators, Pipe controllers, Pipe signatures, Builder, Libraries, Kit.
+- [Authoring & language](authoring-and-language.md) — Core language, Pipe operators, Pipe controllers, Pipe signatures, Builder, Libraries.
 - [Execution & runtime](execution-and-runtime.md) — Pipe execution, Pipeline execution, Temporal execution, Runtime bridge, Graph, Tracing.
 - [Inference & providers](inference-and-providers.md) — Inference (Cogt), Provider plugins.
-- [Platform & tooling](platform-and-tooling.md) — Base & root errors, Tools, System & configuration, CLI.
+- [Platform & tooling](platform-and-tooling.md) — Base & root errors, Tools, Kit, System & configuration, CLI.
 
 See [Error Model](../under-the-hood/error-model.md) for the underlying contract,
 classification rules, and the cross-boundary Temporal bridge.

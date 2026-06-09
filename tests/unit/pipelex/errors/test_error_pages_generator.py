@@ -26,6 +26,16 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 
+def _find_mkdocs_config() -> Path:
+    """Walk up from this test module to the repo root holding ``mkdocs.yml``."""
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / "mkdocs.yml"
+        if candidate.is_file():
+            return candidate
+    msg = "mkdocs.yml not found in any parent of the test module"
+    raise FileNotFoundError(msg)
+
+
 class TestErrorPagesGenerator:
     def test_emits_one_page_per_loaded_subclass_plus_index_and_macros(self, tmp_path: Path) -> None:
         """Every subclass gets a per-class page; a landing ``index.md`` and the macro pages are emitted too."""
@@ -66,6 +76,17 @@ class TestErrorPagesGenerator:
         for slug, _ in _MACRO_SECTIONS:
             if (tmp_path / f"{slug}.md").exists():
                 assert f"]({slug}.md)" in index_body, f"index missing link to macro page {slug!r}"
+
+    def test_macro_slugs_are_wired_into_mkdocs_nav(self) -> None:
+        """Each generator macro slug must be wired into ``mkdocs.yml`` — as a nav entry and a
+        ``not_in_nav`` re-include — so the hand-maintained nav can never drift from
+        ``_MACRO_SECTIONS`` and break ``mkdocs build --strict`` on a missing or renamed page.
+        """
+        config_lines = [line.strip() for line in _find_mkdocs_config().read_text(encoding="utf-8").splitlines()]
+        for slug, _ in _MACRO_SECTIONS:
+            nav_suffix = f": errors/{slug}.md"
+            assert any(line.endswith(nav_suffix) for line in config_lines), f"mkdocs.yml nav has no entry for macro page errors/{slug}.md"
+            assert f"!errors/{slug}.md" in config_lines, f"mkdocs.yml not_in_nav is missing the re-include !errors/{slug}.md"
 
     def test_run_is_idempotent(self, tmp_path: Path) -> None:
         """Re-running the generator over its own output writes nothing — every page is byte-identical."""
@@ -123,6 +144,19 @@ class TestErrorPagesGenerator:
 
         with pytest.raises(RuntimeError, match="Kebab-slug collision on 'llm-error'"):
             generate_error_pages(output_dir=tmp_path, classes=[LLMError, LlmError])
+
+    def test_reserved_slug_collision_raises(self, tmp_path: Path) -> None:
+        """A class kebab-ing to a listing-page stem (a macro area, here ``platform-and-tooling``)
+        fails loudly instead of having its per-class page silently overwritten by the listing page.
+        """
+
+        # Deliberately no `Error` suffix: the collision can only arise for a name that kebabs
+        # onto a reserved listing-page stem, and an ``…Error`` name always kebabs to ``…-error``.
+        class PlatformAndTooling(PipelexError):  # noqa: N818
+            pass
+
+        with pytest.raises(RuntimeError, match="Reserved-slug collision on 'platform-and-tooling'"):
+            generate_error_pages(output_dir=tmp_path, classes=[PlatformAndTooling])
 
     def test_orphan_generated_page_is_deleted(self, tmp_path: Path) -> None:
         """A generated page whose slug is no longer in target_classes is deleted and reported under ``removed``."""
