@@ -118,10 +118,13 @@ pipe (`batch_temporal_describe_topics`), so its sweep fans out — the exact sha
 ```bash
 # Server + worker up (Mode 2). The boot connects Temporal-enabled; with the fix the sweep stays
 # in-process, so the worker must receive NO workflow for this validate run.
+# Capture pipelex's OWN exit code (load-bearing for GREEN/RED). Don't pipe the command into
+# `tail` and read `$?` — that's tail's exit; and `${PIPESTATUS[0]}` is bash-only (blank in zsh).
+# Redirect to a file, read `$?` with no pipe in between, then tail the log. Works in bash AND zsh.
 timeout 120 .venv/bin/pipelex validate bundle \
   tests/integration/pipelex/temporal/library_crate/temporal_batch.mthds \
-  --temporal 2>&1 | tail -20
-echo "EXIT=${PIPESTATUS[0]}"   # first pipe stage = pipelex's exit, NOT tail's (load-bearing for GREEN/RED)
+  --temporal > /tmp/tier2c-validate.log 2>&1; echo "EXIT=$?"
+tail -20 /tmp/tier2c-validate.log
 ```
 
 GREEN: `EXIT=0` and `Successfully validated bundle ...`. **Strong check** (the point of the scenario):
