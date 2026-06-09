@@ -18,4 +18,4 @@ Error raised when loading library components fails.
 | Defined in | `pipelex.libraries.exceptions` |
 | Parent class | [`LibraryError`](library-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

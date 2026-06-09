@@ -16,4 +16,4 @@ description: "Reference for the `PipeLoadingError` Pipelex error class."
 | Defined in | `pipelex.libraries.exceptions` |
 | Parent class | [`LibraryLoadingError`](library-loading-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

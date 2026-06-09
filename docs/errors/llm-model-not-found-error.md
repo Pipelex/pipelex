@@ -16,4 +16,4 @@ description: "Reference for the `LLMModelNotFoundError` Pipelex error class."
 | Defined in | `pipelex.cogt.exceptions` |
 | Parent class | [`ModelNotFoundError`](model-not-found-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

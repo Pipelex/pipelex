@@ -18,4 +18,4 @@ Raised when there's an error in CLI usage or operation.
 | Defined in | `pipelex.cli.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

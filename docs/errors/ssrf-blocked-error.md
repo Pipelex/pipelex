@@ -18,4 +18,4 @@ Raised when an outbound request is refused because the destination host resolved
 | Defined in | `pipelex.tools.network.exceptions` |
 | Parent class | [`SecurityError`](security-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

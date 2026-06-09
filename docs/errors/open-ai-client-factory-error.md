@@ -16,4 +16,4 @@ description: "Reference for the `OpenAIClientFactoryError` Pipelex error class."
 | Defined in | `pipelex.plugins.openai.openai_exceptions` |
 | Parent class | [`CogtError`](cogt-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

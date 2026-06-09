@@ -16,4 +16,4 @@ description: "Reference for the `DomainLibraryError` Pipelex error class."
 | Defined in | `pipelex.libraries.domain.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

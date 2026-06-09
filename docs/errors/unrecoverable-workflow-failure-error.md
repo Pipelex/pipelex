@@ -18,4 +18,4 @@ Synthesized when a Temporal workflow failure carries no recoverable ``ErrorRepor
 | Defined in | `pipelex.temporal.exceptions` |
 | Parent class | [`TemporalFlowError`](temporal-flow-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

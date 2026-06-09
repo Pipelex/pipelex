@@ -18,4 +18,4 @@ Raised at worker boot when the namespace is reachable but missing a configured c
 | Defined in | `pipelex.temporal.exceptions` |
 | Parent class | [`TemporalConfigError`](temporal-config-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

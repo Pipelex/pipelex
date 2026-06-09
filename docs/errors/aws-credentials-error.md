@@ -16,4 +16,4 @@ description: "Reference for the `AwsCredentialsError` Pipelex error class."
 | Defined in | `pipelex.tools.aws.exceptions` |
 | Parent class | [`CredentialsError`](credentials-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

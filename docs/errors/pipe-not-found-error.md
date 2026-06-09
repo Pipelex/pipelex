@@ -16,4 +16,4 @@ description: "Reference for the `PipeNotFoundError` Pipelex error class."
 | Defined in | `pipelex.libraries.pipe.exceptions` |
 | Parent class | [`PipeLibraryError`](pipe-library-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

@@ -16,4 +16,4 @@ description: "Reference for the `PipeParallelFactoryError` Pipelex error class."
 | Defined in | `pipelex.pipe_controllers.parallel.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

@@ -16,4 +16,4 @@ description: "Reference for the `AnthropicWorkerConfigurationError` Pipelex erro
 | Defined in | `pipelex.plugins.anthropic.anthropic_exceptions` |
 | Parent class | [`CogtError`](cogt-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

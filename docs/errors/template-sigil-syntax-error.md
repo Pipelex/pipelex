@@ -18,4 +18,4 @@ Raised when a template contains a Pipelex sigil shape that violates the strict l
 | Defined in | `pipelex.cogt.templating.exceptions` |
 | Parent class | [`ToolError`](tool-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)
