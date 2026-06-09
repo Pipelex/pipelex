@@ -1878,9 +1878,9 @@ This section covers all Pipelex capabilities, organized by area.
 
     Pipeline validation without execution, dry run with mocked LLM responses, input validation, and allowed-to-fail pipes.
 
--   **[Distributed Execution with Temporal](distributed-execution.md)**
+-   **[Distributed Execution](distributed-execution.md)**
 
-    Run pipelines as durable Temporal workflows across worker pools. Per-activity routing, named runtime profiles, dashboard observability with custom search attributes.
+    Run methods as durable workflows on Temporal with your own workers, with a managed Mistral Workflows backend coming soon. Per-activity routing, named runtime profiles, and dashboard observability on the Temporal backend.
 
 -   **[Telemetry & Observability](telemetry.md)**
 
@@ -4783,6 +4783,8 @@ A pipeline is composed of pipes. There are two fundamental types of pipes you wi
 
 *   **[Pipe Operators](./pipe-operators/index.md)**: These are the "workers" of your pipeline. They perform concrete actions like calling an LLM (`PipeLLM`), extracting text from a document (`PipeExtract`), searching the web (`PipeSearch`), or running a Python function (`PipeFunc`). Each operator is a specialized tool designed for a specific task.
 *   **[Pipe Controllers](./pipe-controllers/index.md)**: These are the "managers" of your pipeline. They don't perform tasks themselves but orchestrate the execution flow of other pipes. They define the logic of your method, such as running pipes in sequence (`PipeSequence`), in parallel (`PipeParallel`), or based on a condition (`PipeCondition`).
+
+A third, design-time-only kind of pipe — **[Signature Pipes](./signature-pipes.md)** (`PipeSignature`) — lets you stub a pipe's contract (inputs and output) without an implementation. Signatures dry-run as mocks under `--allow-signatures`, so you can sketch a pipeline top-down before writing each operator. Strict validation refuses pipelines that still depend on a signature.
 
 ## Designing a Pipeline: Composition in MTHDS
 
@@ -8680,6 +8682,163 @@ add_alias_from_expression_to = "category_type"
 - [Provide Inputs](../provide-inputs.md) - Passing inputs to pipes and pipelines
 
 
+## Signature Pipes
+
+# Signature Pipes
+
+A `PipeSignature` is a contract-only pipe: it declares inputs, an output, and a purpose without providing an implementation. It is the placeholder you reach for when you want to design the shape of a pipeline (or one of its steps) before committing to the operator that will eventually do the work.
+
+Signatures let an agent (or a human author) build a complete, dry-runnable bundle while leaving some pipes deliberately unimplemented. Strict validation refuses any pipeline that still depends on a signature; lenient mode (`--allow-signatures`) dry-runs them as mocks, so you can keep iterating on the structure of a method before writing every step.
+
+## When to use a `PipeSignature`
+
+- **Sketching a pipeline top-down.** Define the controller (e.g. a `PipeSequence`) and stub each step as a `PipeSignature` so the structure dry-runs end-to-end.
+- **Designing the contract first.** Capture inputs and outputs precisely — multiplicity included — before deciding whether the implementation will be a `PipeLLM`, a `PipeFunc`, or another operator.
+- **Handing work between agents.** A planner agent emits signatures for the steps; an implementer agent replaces each one with a real operator.
+
+## How a signature behaves at runtime
+
+| Mode | Behavior |
+| ---- | -------- |
+| **Strict validation** (default) | A pipeline that reaches a signature through its dependency graph is rejected with a `SignaturesNotAllowedError`. The error names every reachable signature plus the controller chain that leads to it. |
+| **Lenient validation** (`--allow-signatures`) | Signatures are accepted. During dry-run, each signature mints a mock `Stuff` matching its declared `output` (including multiplicity). |
+| **Live execution** | Running a pipeline that hits a signature raises `PipeSignatureNotExecutableError` — a signature has no implementation to execute. |
+
+## MTHDS Parameters
+
+| Parameter           | Type   | Description                                                                                                  | Required |
+| ------------------- | ------ | ------------------------------------------------------------------------------------------------------------ | -------- |
+| `type`              | string | Always `"PipeSignature"`.                                                                                    | Yes      |
+| `description`       | string | Human-readable purpose of the contract.                                                                      | Yes      |
+| `inputs`            | object | Mapping of input variable names to concept references. Multiplicity is supported (`Doc[]`, `Image[3]`).      | No       |
+| `output`            | string | The concept the signature promises to produce. Multiplicity is supported.                                    | Yes      |
+| `signature_for`     | string | Optional hint naming the downstream pipe type (e.g. `"PipeLLM"`) the signature stands in for. Tooling-only.  | No       |
+
+`signature_for` cannot be set to `"PipeSignature"` — a signature standing in for a signature is nonsensical and is rejected at load time.
+
+## Examples
+
+### A single contract pipe
+
+The simplest signature: a pipe that promises to summarize a document, with no implementation.
+
+```toml
+domain = "signature_demo"
+main_pipe = "summarize_doc"
+
+[concept]
+SigDocument = "A document concept used for testing signatures."
+
+[pipe.summarize_doc]
+type = "PipeSignature"
+description = "Produces a summary of a document (contract only)."
+inputs = { doc = "SigDocument" }
+output = "Text"
+```
+
+Validating this in strict mode fails (the main pipe *is* a signature). Validating it with `--allow-signatures` succeeds and dry-runs to a mock `Text`.
+
+### A signature inside a `PipeSequence`
+
+A common pattern: an existing operator runs first, then a signature stands in for the step that hasn't been implemented yet.
+
+```toml
+domain = "signature_mixed"
+main_pipe = "process_doc"
+
+[concept]
+MixDoc = "A document concept."
+MixSummary = "A summary concept."
+
+[pipe.extract_doc]
+type = "PipeLLM"
+description = "Extract text from a document."
+inputs = { doc = "MixDoc" }
+output = "Text"
+prompt = "Extract text from $doc."
+
+[pipe.summarize_extracted]
+type = "PipeSignature"
+description = "Summarize extracted text (contract only)."
+inputs = { extracted = "Text" }
+output = "MixSummary"
+
+[pipe.process_doc]
+type = "PipeSequence"
+description = "Extract then summarize."
+inputs = { doc = "MixDoc" }
+output = "MixSummary"
+steps = [
+  { pipe = "extract_doc", result = "extracted" },
+  { pipe = "summarize_extracted", result = "summary" },
+]
+```
+
+Strict validation reports the dependency chain (`process_doc → summarize_extracted`) so you know exactly which controllers reach the signature. Lenient validation dry-runs the whole sequence: `extract_doc` mocks a `Text`, then `summarize_extracted` mocks a `MixSummary`.
+
+### Multiplicity in a signature's inputs
+
+Signatures honor the same multiplicity rules as other pipes (see [Understanding Multiplicity](understanding-multiplicity.md)).
+
+```toml
+domain = "signature_multiplicity"
+main_pipe = "fuse_docs_and_images"
+
+[concept]
+FuseDoc = "A document."
+FuseImage = "An image."
+FuseReport = "A report."
+
+[pipe.fuse_docs_and_images]
+type = "PipeSignature"
+description = "Combine docs and exactly 3 images (contract only)."
+inputs = { docs = "FuseDoc[]", images = "FuseImage[3]" }
+output = "FuseReport"
+```
+
+Variable lists (`FuseDoc[]`) and fixed-length lists (`FuseImage[3]`) round-trip through the interpreter unchanged.
+
+## Validating signatures from the CLI
+
+Signatures interact with the [`pipelex validate`](../../tools/cli/validate.md) command via the `--allow-signatures` flag:
+
+```bash
+# Strict (default): fails if any reachable pipe is a PipeSignature
+pipelex validate process_doc
+
+# Lenient: signatures dry-run as mocks
+pipelex validate process_doc --allow-signatures
+
+# Same flag works for bundles and the --all sweep
+pipelex validate bundle methods/draft_pipeline.mthds --allow-signatures
+pipelex validate --all --allow-signatures
+```
+
+When `--all` runs in strict mode, signature pipes themselves are skipped during the iteration (an unreached signature is fine). Strict mode only fires when a non-signature pipe *depends on* a signature.
+
+## Replacing a signature with a real implementation
+
+When you are ready to implement, change the `type` of the pipe and add the operator-specific fields. The pipe code, `description`, `inputs`, and `output` typically carry over unchanged — that is the value of having declared the contract first.
+
+```toml
+[pipe.summarize_extracted]
+type = "PipeLLM"
+description = "Summarize extracted text."
+inputs = { extracted = "Text" }
+output = "MixSummary"
+prompt = "Summarize the following text:\n\n$extracted"
+```
+
+Once every signature in the dependency graph is replaced, strict validation succeeds and the pipeline can be run live.
+
+## Related Documentation
+
+- [Understanding Multiplicity](understanding-multiplicity.md) — the bracket notation used for both inputs and outputs.
+- [Pipe Operators](pipe-operators/index.md) — operators you can swap a signature out for.
+- [Pipe Controllers](pipe-controllers/index.md) — controllers that orchestrate signatures alongside real pipes.
+- [CLI Validate](../../tools/cli/validate.md) — the `--allow-signatures` flag and validation surface.
+
+
 ## Optimize Cost & Quality
 
 # LLM Settings Guide
@@ -8909,6 +9068,13 @@ The Pipelex CLI is organized into several command groups:
 | [**show**](show.md) | Inspect configuration, pipes, and AI models |
 | [**run**](run.md) | Execute pipelines |
 | [**build**](build/index.md) | Generate pipelines, runners, and structures |
+
+## Global flags
+
+These flags work on any `pipelex` command and are position-agnostic — place them anywhere in the invocation:
+
+- `--traceback` - print the full Rich-rendered stack trace before the friendly one-line error. Off by default. Both `pipelex run --traceback pipe ...` and `pipelex run pipe ... --traceback` work.
+- `--no-logo` - suppress the startup logo banner. Handy for clean logs and to save tokens in agent output.
 
 ## Related CLI Surface
 
@@ -9212,6 +9378,7 @@ Validates and dry-runs a specific pipe from your imported packages, or all pipes
 
 - `--all`, `-a` - Validate all discovered pipes
 - `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
+- `--allow-signatures` - Accept `PipeSignature` placeholders in the dependency graph (lenient mode). See [Signature Pipes](../../building-methods/pipes/signature-pipes.md).
 
 **Examples:**
 
@@ -9229,6 +9396,10 @@ pipelex validate pipe --all
 # Validate with custom library directories
 pipelex validate my_pipe -L ./pipelines
 pipelex validate --all -L ./pipelines -L ./shared_pipes
+
+# Allow PipeSignature placeholders during dry-run
+pipelex validate my_draft_pipe --allow-signatures
+pipelex validate --all --allow-signatures
 ```
 
 ## Validate Bundle
@@ -9246,6 +9417,7 @@ Validates all pipes defined in a bundle file (`.mthds`) or a pipeline directory.
 **Options:**
 
 - `--library-dir`, `-L` - Directory to search for additional pipe definitions. Can be specified multiple times.
+- `--allow-signatures` - Accept `PipeSignature` placeholders in the dependency graph (lenient mode). See [Signature Pipes](../../building-methods/pipes/signature-pipes.md).
 
 **Examples:**
 
@@ -9259,6 +9431,9 @@ pipelex validate bundle pipelines/invoice_processor/
 
 # Validate with additional library directories
 pipelex validate bundle my_bundle.mthds -L ./shared_pipes
+
+# Allow PipeSignature placeholders during dry-run
+pipelex validate bundle methods/draft_pipeline.mthds --allow-signatures
 ```
 
 !!! note
@@ -9339,6 +9514,7 @@ Runs a pipe by code from your project's pipe library.
 - `--save-main-stuff` / `--no-save-main-stuff` - Whether to save the main output to a file
 - `--save-working-memory` / `--no-save-working-memory` - Whether to save the full working memory
 - `--working-memory-path` - Custom path for the working memory output file
+- `--save-csv` - Write the main stuff to this literal CSV path (**not** under `--output-dir`; absolute or `~`/relative paths all work). Requires a flat list output. See [CSV Input & Output](../../building-methods/pipes/csv-input-and-output.md)
 - `--no-pretty-print` - Skip pretty printing the main output
 - `--graph` / `--no-graph` - Enable/disable execution graph visualization
 - `--graph-full-data` / `--graph-no-data` - Include full data in the graph visualization
@@ -9360,6 +9536,9 @@ pipelex run pipe hello_world --output-dir my_output/
 
 # Run without saving or pretty printing
 pipelex run pipe my_pipe --no-save-main-stuff --no-pretty-print
+
+# Write a flat list output to CSV (literal path, not under --output-dir)
+pipelex run pipe summarize_people --inputs people.json --save-csv summaries.csv
 
 # Dry-run (no AI calls)
 pipelex run pipe my_pipe --dry-run
@@ -9388,6 +9567,7 @@ Runs a pipeline from a bundle file (`.mthds`) or a pipeline directory. When a di
 - `--save-main-stuff` / `--no-save-main-stuff` - Whether to save the main output
 - `--save-working-memory` / `--no-save-working-memory` - Whether to save the full working memory
 - `--working-memory-path` - Custom path for the working memory output file
+- `--save-csv` - Write the main stuff to this literal CSV path (**not** under `--output-dir`; absolute or `~`/relative paths all work). Requires a flat list output. See [CSV Input & Output](../../building-methods/pipes/csv-input-and-output.md)
 - `--no-pretty-print` - Skip pretty printing the main output
 - `--graph` / `--no-graph` - Enable/disable execution graph visualization
 - `--graph-full-data` / `--graph-no-data` - Include full data in the graph visualization
@@ -9434,6 +9614,7 @@ Runs a pipeline from an installed method package.
 - `--save-main-stuff` / `--no-save-main-stuff` - Whether to save the main output
 - `--save-working-memory` / `--no-save-working-memory` - Whether to save the full working memory
 - `--working-memory-path` - Custom path for the working memory output file
+- `--save-csv` - Write the main stuff to this literal CSV path (**not** under `--output-dir`; absolute or `~`/relative paths all work). Requires a flat list output. See [CSV Input & Output](../../building-methods/pipes/csv-input-and-output.md)
 - `--no-pretty-print` - Skip pretty printing the main output
 - `--graph` / `--no-graph` - Enable/disable execution graph visualization
 - `--graph-full-data` / `--graph-no-data` - Include full data in the graph visualization
@@ -9476,6 +9657,7 @@ The output JSON contains the complete working memory after pipeline execution, i
 
 - [Executing Pipelines](../../building-methods/pipes/executing-pipelines.md)
 - [Providing Inputs to Pipelines](../../building-methods/pipes/provide-inputs.md)
+- [CSV Input & Output](../../building-methods/pipes/csv-input-and-output.md)
 - [Design and Run Pipelines](../../building-methods/pipes/index.md)
 
 
@@ -10368,6 +10550,7 @@ pipelex-agent validate method <NAME> [OPTIONS]
 **Common options:**
 
 - `--library-dir`, `-L` - Additional library directory
+- `--allow-signatures` - Accept [`PipeSignature`](../../building-methods/pipes/signature-pipes.md) placeholders in the dependency graph (lenient mode)
 - `--format` - Success output format: `markdown` (default) or `json`
 - `--error-format` - Error output format: `markdown` or `json` (defaults to `--format`'s value)
 
@@ -10377,6 +10560,9 @@ For `bundle`, additional options are available:
 - `--graph`, `-g` - Generate an execution graph visualization
 - `--graph-format`, `-f` - Graph output format (`mermaidflow`, `reactflow`, or `both`)
 - `--direction` - Graph layout direction
+
+!!! note "Signature pipes"
+    `pipelex-agent validate` is strict by default — same as `pipelex validate`. A bundle whose dependency graph reaches a `PipeSignature` is rejected unless you pass `--allow-signatures`, which dry-runs signatures as mocks.
 
 ### Inputs
 
@@ -10935,12 +11121,12 @@ The reporting configuration controls how Pipelex generates and manages cost repo
 ### Console Logging
 
 ```toml
-is_log_costs_to_console = false
+is_log_costs_to_console = true
 ```
 
-- Controls whether costs are logged to the console in **real-time**
-- When enabled, displays token cost reports after each LLM operation (and other operations with costs)
-- Default: `false`
+- Controls whether the end-of-run cost table is printed to the console
+- When enabled (and `--costs` is on), prints a single cost-by-model table after the pipeline finishes — but only when the run had reportable usage; it is suppressed for dry runs (zero tokens and zero cost) and on a usage-assembly/aggregation failure (which never fails the run)
+- Default: `true` — library embedders who don't want console output can set it to `false`
 
 ### Cost Report File Generation
 
@@ -12022,7 +12208,7 @@ Define user-friendly names that map to model names. Aliases are defined in the d
 # Simple aliases map to a single model
 best-claude = "claude-4.5-opus"
 best-gpt = "gpt-5.2"
-best-gemini = "gemini-3.0-pro"
+best-gemini = "gemini-3.1-pro"
 
 # Default aliases (used in presets)
 default-general = "claude-4.5-sonnet"
@@ -12166,7 +12352,7 @@ for_object = "@my-custom-alias"
 
 # Add custom waterfalls - lists of models tried in order
 [llm.waterfalls]
-premium-llm = ["claude-4.5-opus", "gemini-3.0-pro", "gpt-5.2"]
+premium-llm = ["claude-4.5-opus", "gemini-3.1-pro", "gpt-5.2"]
 small-llm = ["gemini-2.5-flash-lite", "gpt-4o-mini", "claude-3-haiku"]
 ```
 
@@ -12180,7 +12366,7 @@ document_extractor = ["azure-document-intelligence", "mistral-document-ai-2505"]
 When using waterfalls in `.mthds` files, prefix them with `~`:
 
 ```toml
-model = "~premium-llm"    # Will try claude-4.5-opus, then gemini-3.0-pro, then gpt-5.2
+model = "~premium-llm"    # Will try claude-4.5-opus, then gemini-3.1-pro, then gpt-5.2
 model = "~small-llm"      # Will try gemini-2.5-flash-lite, then gpt-4o-mini, etc.
 ```
 
@@ -13675,7 +13861,7 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
     You don't need to read this section to use Pipelex effectively. The [Home](../index.md) section covers everything you need to build methods.
 
 !!! tip "Looking for Temporal deployment and operations?"
-    For running Pipelex on Temporal — cluster setup, workers, task-queue routing, and dashboard observability — see the user-facing [Distributed Execution with Temporal](../distributed-execution/index.md) guide. The pages below cover the runtime mechanics that make distributed execution work under the hood.
+    For running Pipelex on Temporal — cluster setup, workers, task-queue routing, and dashboard observability — see the user-facing [Distributed Execution with Temporal](../distributed-execution/temporal/index.md) guide. The pages below cover the runtime mechanics that make distributed execution work under the hood.
 
 ---
 
@@ -13914,7 +14100,7 @@ Practical consequences:
 - Across any serialization boundary — kajson dump, library cache, Temporal payload, MTHDS export — the metadata is gone. Downstream consumers that need it today have to re-elaborate.
 - The dependency loader handles one specific consequence: when a manifest restricts exports, synthetic helpers of exported parents are still loaded, even though they are never named in the manifest. This is implemented inline in `LibraryManager._load_single_dependency`.
 
-When a future consumer (graph viewer, persistent observability store) wants the metadata across boundaries, dropping `exclude=True` is the deliberate next step — captured as a follow-up in `TODOS.md`.
+When a future consumer (graph viewer, persistent observability store) wants the metadata across boundaries, dropping `exclude=True` is the deliberate next step.
 
 ## Multiplicity rule
 
@@ -13987,7 +14173,7 @@ class ConceptSpec(StructuredContent):
 Standard mock generators (like Polyfactory) produce random strings like `"uygNjiAuDMOtZEyibgHw"` which fail validation. The dry run system addresses this at two levels:
 
 1. **Field-level**: Generate values matching expected formats (snake_case, PascalCase, concept refs, etc.)
-2. **Model-level**: Bypass validators using `factory_use_construct=True`
+2. **Model-level**: Bypass validators using `factoVry_use_construct=True`
 
 ---
 
@@ -14300,7 +14486,7 @@ Pipe Execution → GraphTracer → GraphSpec → Renderers → HTML/Mermaid
 ```
 
 !!! info "Non-Intrusive Design"
-    Graph tracing is opt-in. When disabled, a no-op tracer is used with zero overhead. The tracer is injected via `GraphContext` in `JobMetadata`, not global state.
+    Graph tracing is opt-in. When disabled, a no-op tracer is used with zero overhead. The tracer is injected via `TraceContext` in `JobMetadata`, not global state.
 
 ---
 
@@ -14311,7 +14497,7 @@ Pipe Execution → GraphTracer → GraphSpec → Renderers → HTML/Mermaid
 | Generate execution graph | `pipelex run pipe my_pipe --graph` | `PipelexRunner(execution_config=...).execute_pipeline(...)` | GraphSpec JSON + HTML viewers |
 | Force include full data | `--graph --graph-full-data` | `data_inclusion.stuff_json_content=True` | Data embedded in IOSpec |
 | Force exclude data | `--graph --graph-no-data` | All `data_inclusion.*=False` | Previews only |
-| Dry run with graph | `--dry-run --graph` | `dry_run_pipe_with_graph(pipe)` | Graph of mock execution |
+| Dry run with graph | `--dry-run --graph` | `PipelexRunner(pipe_run_mode=PipeRunMode.DRY, execution_config=...)` | Graph of mock execution |
 
 !!! info "Full Data Included by Default"
     The default configuration includes full data in graphs (`stuff_json_content`, `stuff_text_content`, `stuff_html_content`, and `error_stack_traces` are all `true`). Use `--graph-full-data` or `--graph-no-data` only to override project-specific settings.
@@ -14340,20 +14526,28 @@ pipelex run pipe my_pipe --dry-run --graph --mock-inputs
 
 ```python
 from pipelex.pipeline.runner import PipelexRunner
-from pipelex.pipe_run.dry_run_with_graph import dry_run_pipe_with_graph
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 
 # Execute with graph tracing via config
 runner = PipelexRunner(
-    execution_config=config.with_graph_config_overrides(generate_graph=True),
+    execution_config=config.with_execution_overrides(generate_graph=True),
 )
 response = await runner.execute_pipeline(
     pipe_code="my_pipe",
 )
 pipe_output = response.pipe_output
 
-# Dry run directly returns GraphSpec
-graph_spec = await dry_run_pipe_with_graph(pipe)
+# Dry run with graph: the same runner in DRY mode with mock inputs — no separate code path.
+dry_runner = PipelexRunner(
+    pipe_run_mode=PipeRunMode.DRY,
+    execution_config=config.with_execution_overrides(generate_graph=True, mock_inputs=True),
+)
+response = await dry_runner.execute_pipeline(pipe_code="my_pipe")
+graph_spec = response.pipe_output.graph_spec
 ```
+
+!!! tip "Dry run from MTHDS content"
+    To dry-run an entire bundle straight from MTHDS content and get back a `GraphSpec`, use `dry_run_pipeline(mthds_contents=...)` (`pipelex/pipe_run/dry_run_pipeline.py`) — the shared entrypoint behind the CLI graph commands and the API, which wires the same DRY-mode runner for you.
 
 ### Outputs
 
@@ -14381,7 +14575,7 @@ flowchart TB
         direction TB
         MGR["GraphTracerManager<br/>(singleton)"]
         TRACER["GraphTracer"]
-        CTX["GraphContext"]
+        CTX["TraceContext"]
         MGR --> TRACER
         TRACER --> CTX
     end
@@ -14484,7 +14678,7 @@ class GraphSpec(BaseModel):
 ```python
 # 1. Manager opens tracer for pipeline run
 manager = GraphTracerManager.get_or_create_instance()
-graph_context = manager.open_tracer(
+trace_context = manager.open_tracer(
     graph_id=pipeline_run_id,
     data_inclusion=config.data_inclusion,
     pipeline_ref_domain="my_domain",
@@ -14494,12 +14688,12 @@ graph_context = manager.open_tracer(
 # 2. Context flows through JobMetadata to each pipe
 job_metadata = JobMetadata(
     pipeline_run_id=pipeline_run_id,
-    graph_context=graph_context,
+    trace_context=trace_context,
 )
 
 # 3. Each pipe reports start/end to tracer
 node_id, child_context = manager.on_pipe_start(
-    graph_context=graph_context,
+    trace_context=trace_context,
     pipe_code="extract_text",
     pipe_type="PipeExtract",
     node_kind=NodeKind.OPERATOR,
@@ -14509,7 +14703,7 @@ node_id, child_context = manager.on_pipe_start(
 
 # 4. On completion, report success with output
 manager.on_pipe_end_success(
-    graph_id=graph_context.graph_id,
+    graph_id=trace_context.graph_id,
     node_id=node_id,
     ended_at=datetime.now(timezone.utc),
     output_spec=IOSpec(...),
@@ -14519,20 +14713,20 @@ manager.on_pipe_end_success(
 graph_spec = manager.close_tracer(pipeline_run_id)
 ```
 
-### GraphContext Propagation
+### TraceContext Propagation
 
-GraphContext is a serializable context that flows through pipe execution:
+TraceContext is a serializable context that flows through pipe execution:
 
 ```python
-class GraphContext(BaseModel):
+class TraceContext(BaseModel):
     graph_id: str                           # Unique graph identifier
     parent_node_id: str | None              # Parent pipe's node ID
     node_sequence: int                      # Counter for generating node IDs
     data_inclusion: DataInclusionConfig     # What data to capture
 
-    def copy_for_child(self, child_node_id: str, next_sequence: int) -> GraphContext:
+    def copy_for_child(self, child_node_id: str, next_sequence: int) -> TraceContext:
         """Create context for nested pipe execution."""
-        return GraphContext(
+        return TraceContext(
             graph_id=self.graph_id,
             parent_node_id=child_node_id,
             node_sequence=next_sequence,
@@ -14749,7 +14943,7 @@ validate_graphspec(graph_spec)
 | `pipelex/graph/graph_tracer.py` | GraphTracer implementation |
 | `pipelex/graph/graph_tracer_manager.py` | Singleton manager for tracers |
 | `pipelex/graph/graph_tracer_protocol.py` | Protocol + NoOp implementation |
-| `pipelex/graph/graph_context.py` | Serializable tracing context |
+| `pipelex/graph/trace_context.py` | Serializable tracing context |
 | `pipelex/graph/graph_analysis.py` | Pre-computed graph analysis |
 | `pipelex/graph/graph_factory.py` | Output generation factory |
 | `pipelex/graph/graph_config.py` | Configuration models |
@@ -15300,13 +15494,13 @@ Effort is translated to a `thinking_budget` token count:
 model = { model = "gemini-2.5-pro", temperature = 0.3, reasoning_effort = "medium" }
 ```
 
-**Gemini 3.0 Pro — adaptive mode**
+**Gemini 3.1 Pro — adaptive mode**
 
 Effort maps to a `ThinkingLevel` enum sent to the Google SDK:
 
 ```toml
 # Adaptive: effort "high" -> ThinkingLevel.HIGH
-model = { model = "gemini-3.0-pro", temperature = 0.3, reasoning_effort = "high" }
+model = { model = "gemini-3.1-pro", temperature = 0.3, reasoning_effort = "high" }
 ```
 
 **GPT-5.2 — manual mode**
@@ -15602,7 +15796,7 @@ thinking_mode = "manual"
 thinking_mode = "adaptive"
 
 # Google Gemini 3 with adaptive reasoning
-["gemini-3.0-pro"]
+["gemini-3.1-pro"]
 thinking_mode = "adaptive"
 
 # Model without reasoning (or inherited from defaults)
@@ -16856,7 +17050,7 @@ This ensures the fix targets the same directory where the issue was found — if
 
 # Pipe Routing & Execution
 
-Pipelex supports two execution modes for running pipes: **direct execution** (single-process) and **distributed execution** (via Temporal workers). Both modes share the same pipe definitions, library loading, and controller logic. The key difference is *where* the pipe runs and how the PipeJob travels to get there.
+Pipelex runs pipes either **direct** (single-process) or **distributed** on a host runtime. Both share the same pipe definitions, library loading, and controller logic. The key difference is *where* the pipe runs and how the PipeJob travels to get there. The distributed host runtime today is your own Temporal workers ([Pipelex on Temporal](../distributed-execution/temporal/index.md)); a managed Mistral Workflows backend (also built on Temporal) is coming soon. Both reach pipe execution through the same framework-agnostic runtime bridge.
 
 ---
 
@@ -16865,7 +17059,12 @@ Pipelex supports two execution modes for running pipes: **direct execution** (si
 | Term | Meaning |
 |------|---------|
 | **Direct execution** | All pipes run in the same Python process. Library, class registry, and pipe resolution are shared in-memory. |
-| **Distributed execution** | PipeJob is serialized and sent to a remote Temporal worker. The worker is a separate process (potentially on a different machine). |
+| **Distributed execution** | PipeJob is serialized and sent to a remote worker — a Pipelex Temporal worker, or a Mistral Workflows activity. The worker is a separate process (potentially on a different machine). |
+
+---
+
+!!! note "The runtime bridge"
+    Both distributed paths go through the framework-agnostic runtime bridge (`pipelex/runtime_bridge/`). Its `primitives/` layer is shared by `pipelex.temporal` and the in-development Mistral Workflows host package: it classifies controller pipes as child workflows and leaf operators as activities (`pipe_classification.py`), hydrates working memory, flushes trace events, and delivers results in a host-neutral way. Graph and token-usage assembly is not a bridge primitive — it lives in `pipelex/pipe_run/tracing_assembly.py` and runs the same way for local and distributed runs.
 
 ---
 
@@ -17245,12 +17444,14 @@ Classification happens once, at **Layer 1**. Layers 2–5 are wrappers: they att
 
 ## ErrorReport — the Serialization Schema
 
-`ErrorReport` (`pipelex/base_exceptions.py`) is the single source of truth for error serialization. It is a frozen Pydantic dataclass with `extra="forbid"`.
+`ErrorReport` (`pipelex/base_exceptions.py`) is the single source of truth for error serialization. It is a frozen Pydantic model with `extra="forbid"`.
 
 | Field | Type | Meaning |
 |-------|------|---------|
 | `error_type` | `str` | The exception class name |
 | `message` | `str` | Human-readable message |
+| `title` | `str` | Stable human-readable summary — the RFC 7807 `title` |
+| `type_uri` | `str` | Per-class documentation URI — the RFC 7807 `type` |
 | `error_category` | `str \| None` | `InferenceErrorCategory` value (inference errors only) |
 | `error_domain` | `str \| None` | `ErrorDomain` value — `input` / `config` / `runtime` |
 | `retryable` | `bool \| None` | Whether a retry could succeed |
@@ -17269,7 +17470,7 @@ report.http_status       # 422 / 429 / 500 — for HTTP adapters
 ```
 
 !!! warning "`ErrorReport` is `extra="forbid"`"
-    `from_dict()` rejects unknown keys. When recovering a report across a version boundary (e.g. a Temporal payload from a newer worker), trim to known fields *before* calling `from_dict()` — `recover_error_report()` does exactly this.
+    `from_dict()` rejects unknown keys. `recover_error_report()` calls it directly: a report dict that is found but fails validation is an internal contract bug — the activity bridge and the submitter share the schema within one deploy. `recover_error_report()` catches the `ValidationError` and synthesizes an `UnrecoverableWorkflowFailureError` fallback (carrying the recovered message plus an `[error report failed schema validation]` marker) so failure-webhook delivery stays intact; the workflow still fails afterwards, keeping the contract bug visible. Any other caller of `from_dict()` should treat the validation failure as a bug to fix.
 
 ---
 
@@ -17440,27 +17641,31 @@ async def act_llm_gen_text(llm_assignment: LLMAssignment) -> str:
 
 ### Submitter Side — `recover_error_report`
 
-Once the failure returns to the process that submitted the workflow, `recover_error_report()` walks the `__cause__` chain for the `ApplicationError`, pulls the details-packed dict, and rebuilds the `ErrorReport`.
+Once the failure returns to the process that submitted the workflow, `recover_error_report()` walks the `__cause__` chain for the `ApplicationError`, pulls the details-packed dict, and rebuilds the `ErrorReport`. It is **total** — callers in the error-recovery path always get a structured report.
 
 ```python
-def recover_error_report(exc: BaseException) -> ErrorReport | None:
+def recover_error_report(exc: BaseException) -> ErrorReport:
     report_dict = _find_error_report_dict(exc)
-    if report_dict is None:
-        return None
-    known = {f.name for f in fields(ErrorReport)}
-    trimmed = {k: v for k, v in report_dict.items() if k in known}  # tolerate skew
-    try:
-        return ErrorReport.from_dict(trimmed)
-    except ValidationError:
-        return None
+    if report_dict is not None:
+        return ErrorReport.from_dict(report_dict)
+    return UnrecoverableWorkflowFailureError(_message_from_exc(exc)).to_error_report()
 ```
+
+When no report dict is found in the chain — a non-Pipelex exception, a worker crash, a heartbeat timeout — the function synthesizes an `UnrecoverableWorkflowFailureError` report so the recovery path always has structured classification to surface. A report dict that fails `ErrorReport.from_dict` validation is treated as an internal contract bug (writer and reader share the schema within one deploy) and is also synthesized into the same `UnrecoverableWorkflowFailureError` fallback — carrying the recovered message plus an `[error report failed schema validation]` marker — so the failure webhook still fires; the workflow still fails afterwards, keeping the contract bug visible.
 
 The recovered report is carried on `WorkflowExecutionError(error_report=...)`, whose `to_error_report()` override returns it. Since `WorkflowExecutionError` is a `PipelexError`, `PipelineExecutionError` inherits the classification natively.
 
-!!! info "Version skew is tolerated"
-    During a rolling deploy a worker and a submitter may run different Pipelex versions. Unknown keys are trimmed before validation, and a dict that still fails validation yields `None` — the error path degrades gracefully instead of crashing.
+### Workflow-Level Fail-Safe Floor
 
-**Net effect:** a pipe failing on a Temporal worker reaches the CLI and HTTP adapters with the *same* `error_category` / `retryable` / `model` / `provider` / `user_action` as the identical failure run locally.
+The activity bridge converts every error that crosses an *activity* boundary. But a `PipelexError` raised **inline in workflow code** — an operator that runs its leaf inline instead of dispatching it as an activity, or an inline setup error — is neither an `ActivityError` nor an `ApplicationError`. Temporal's default for an unhandled exception in workflow code that is *not* a recognized failure type is to treat it as a **workflow-task failure** and retry the task indefinitely (bounded only by the workflow execution timeout). That is the single worst outcome a durable-execution system can produce: invisible, resource-consuming, and surfaced only after ~the timeout as a generic timeout error rather than the real cause. The fail-safe floor closes that hole on two levels:
+
+- **Workflow-level catch-all (rich path).** `WfPipeRouter.run()` and `WfPipeRun.run()` each end their boundary handling with an `except PipelexError` clause. `WfPipeRouter` converts a genuine inline error to a terminal `TemporalError` via `from_message_exception` (same conversion the activity bridge does — the structured report rides in `ApplicationError.details`). `WfPipeRun` routes it through its deferred-delivery path so the FAILED webhook still fires, then chains a details-carrying `TemporalError` so the classification also survives to the submitter. The catch-all only converts *genuine* inline errors: an escaping `PipelexError` that already carries a Temporal failure in its `__cause__` chain (e.g. a nested child-dispatch that already wrapped a sub-pipe failure as `WorkflowExecutionError`) is already terminal and recoverable, so it propagates untouched rather than being flattened to a generic report.
+
+- **Worker-level floor (belt-and-suspenders).** The worker registers `workflow_failure_exception_types=[WorkflowExecutionError, PipelexError]`. Any domain error that slips past the catch-alls still fails the workflow **terminally** instead of hanging — degrading to a synthesized `UnrecoverableWorkflowFailureError` report (message preserved, classification floored) rather than a silent retry loop. The scope is deliberately `PipelexError`, not `Exception`: genuinely transient Temporal/infra errors and deterministic-replay glitches are not domain errors, and workflow-task retry is the *correct* behavior for them — so they keep Temporal's default.
+
+The rule of thumb: in a durable-execution system the default for "unexpected exception in business logic inside a workflow" is the most dangerous behavior available (retry forever), so "we convert all the errors we know about" is not enough — the floor must hold for the errors, and the code paths, that nobody enumerated.
+
+**Net effect:** a pipe failing on a Temporal worker reaches the CLI and HTTP adapters with the *same* `error_category` / `retryable` / `model` / `provider` / `user_action` as the identical failure run locally — and a failure that escapes inline fails loud and bounded instead of hanging.
 
 ---
 
@@ -17612,7 +17817,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable   # True — only TRANSIENT
 | Connection dropped mid-request | `AMBIGUOUS` → non-retryable (outcome unknown) |
 | Wrapper exception (no own category) | Inherits cause's classification via enrichment |
 | Failure on a Temporal worker | `ErrorReport` recovered from `ApplicationError.details` — same classification as local |
-| Worker/submitter version skew | Unknown keys trimmed; unrecoverable dict yields `None` |
+| Worker exception with no `ErrorReport` | Synthesized `UnrecoverableWorkflowFailureError` report — `error_domain = RUNTIME` |
 
 ---
 
@@ -17628,7 +17833,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable   # True — only TRANSIENT
 
 # Temporal Integration
 
-This page is for contributors working on Pipelex internals. If you're deploying or operating Pipelex on Temporal, see the user-facing [Distributed Execution with Temporal](../distributed-execution/index.md) guide instead.
+This page is for contributors working on Pipelex internals. If you're deploying or operating Pipelex on Temporal, see the user-facing [Distributed Execution with Temporal](../distributed-execution/temporal/index.md) guide instead.
 
 This page covers the Temporal-specific mechanisms that enable distributed pipe execution. For the general pipe routing architecture (shared between direct and distributed modes), see [Pipe Routing & Execution](./pipe-routing-and-execution.md).
 
@@ -17775,7 +17980,7 @@ Each `WfPipeRouter.run()` creates its own scoped state:
 
 3. **ClassRegistry lookup chain**: `hub.get_class_registry()` reads `_library_id` from the `ContextVar`, gets the library's attached `ClassRegistry`. Falls back to the global registry if no library is set.
 
-4. **Cleanup**: `library_manager.teardown(library_id)` deletes the library and its `ClassRegistry`. The `ContextVar` is reset via `teardown_current_library()`. No manual GC needed — the `ClassRegistry` is garbage-collected with the `Library`.
+4. **Cleanup**: `library_manager.teardown(library_id)` deletes the library and its `ClassRegistry`. The `ContextVar` is reset via `clear_current_library()`. No manual GC needed — the `ClassRegistry` is garbage-collected with the `Library`.
 
 ### Kajson integration
 
@@ -17888,9 +18093,12 @@ In dry-run mode, PipeLLM produces `StuffArtefact` debug objects as working memor
 
 # Distributed Content Generation
 
-This page is for contributors working on Pipelex internals. If you're deploying or operating Pipelex on Temporal, see the user-facing [Distributed Execution with Temporal](../distributed-execution/index.md) guide instead.
+This page is for contributors working on Pipelex internals. If you're deploying or operating Pipelex on Temporal, see the user-facing [Distributed Execution with Temporal](../distributed-execution/temporal/index.md) guide instead.
 
-This page covers the serialization mechanisms that enable content generation (LLM structured output, image generation, PDF extraction) to run across Temporal worker processes. For the broader Temporal architecture — LibraryCrate propagation, deferred hydration, per-workflow scoping — see [Temporal Integration](./temporal-integration.md).
+This page covers the serialization mechanisms that enable content generation (LLM structured output, image generation, PDF extraction, web search) to run across Temporal worker processes. For the broader Temporal architecture — LibraryCrate propagation, deferred hydration, per-workflow scoping — see [Temporal Integration](./temporal-integration.md).
+
+!!! note "Every inference leaf goes through the same seam"
+    All inference operators dispatch their leaf call through the swappable `ContentGenerator` abstraction: direct inline (`ContentGenerator`), as a Temporal activity (`ContentGeneratorInWorkflow`), or as a dry mock (`ContentGeneratorDry`). Web search (`PipeSearch`) joined this seam last — its `act_search_gen_*` activities make search-on-Temporal replay-safe (the result is recorded in workflow history) and let search failures cross the workflow boundary as classified errors. An operator that runs its leaf inline instead would re-execute it on every replay and, on failure, hang the submitter with an unclassified workflow-task error.
 
 ---
 
@@ -18020,6 +18228,10 @@ sequenceDiagram
     S->>S: model_validate() → original type
 ```
 
+### Structured web search reuses the same mechanism
+
+Structured web search (`PipeSearch` with a non-text output concept) faces the identical dynamic-class problem and solves it the same way. `SearchObjectAssignment` mirrors `ObjectAssignment` — it ships `output_class_name` + `output_class_schema` alongside the `SearchAssignment`, the activity reconstructs a throwaway class via `SchemaToModelFactory` to drive the provider call, and the activity returns the **raw result dict**. The submitter re-validates that dict against the original output class (`output_structure_class.model_validate(result_dict)`) — a pure, deterministic step that keeps the dynamic class on the submitter side and never ships it across the boundary. The sourced-answer path (`make_search_sourced_answer`) has no dynamic class at all: it returns a `SearchResultContent`, a native serializable model.
+
 ---
 
 ## Large Payload Management
@@ -18062,6 +18274,8 @@ async def act_img_gen_images(img_gen_assignment: ImgGenAssignment) -> list[Image
 | Rendered page views | `act_render_page_views` | PDF page renders → S3 | `list[ImageContent]` with URIs |
 | LLM text | `act_llm_gen_text` | Nothing stored (text is small) | Plain `str` |
 | LLM object | `act_llm_gen_object` | Nothing stored (JSON is small) | `BaseModel` + `__kajson_class_source__` in metadata |
+| Search sourced answer | `act_search_gen_sourced_answer` | Nothing stored (answer + source refs are small) | `SearchResultContent` (answer + `DocumentContent` sources) |
+| Search structured | `act_search_gen_structured` | Nothing stored (JSON is small) | Raw `dict`, re-validated against the output class on the submitter |
 
 ---
 
@@ -18098,13 +18312,15 @@ Resolution order:
 | Component | File |
 |-----------|------|
 | Assignment models (schema embedding) | `pipelex/cogt/content_generation/assignment_models.py` |
-| Schema-to-model reconstruction | `pipelex/cogt/content_generation/schema_to_model.py` |
+| Schema-to-model reconstruction | `pipelex/cogt/content_generation/schema_to_model_factory.py` |
 | Content generator (type bridge) | `pipelex/cogt/content_generation/content_generator.py` |
 | LLM generation functions | `pipelex/cogt/content_generation/llm_generate.py` |
+| Search generation functions | `pipelex/cogt/content_generation/search_generate.py` |
 | Generated content factory (storage) | `pipelex/cogt/content_generation/generated_content_factory.py` |
 | Temporal data converter | `pipelex/temporal/temporal_data_converter.py` |
 | Image generation activity | `pipelex/temporal/tprl_content_generation/act_img_gen_generate.py` |
 | Extract activity | `pipelex/temporal/tprl_content_generation/act_extract_generate.py` |
+| Search activity | `pipelex/temporal/tprl_content_generation/act_search_generate.py` |
 | Page view rendering activity | `pipelex/temporal/tprl_content_generation/act_render_page_views.py` |
 | Kajson serialization | `kajson` (external PyPI package) |
 | ImageContent model | `pipelex/core/stuffs/image_content.py` |
