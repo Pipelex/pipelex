@@ -1,8 +1,10 @@
 # Fix: `/validate` dry-run leaked nested controller sub-pipes to Temporal
 
-> **Status: SHIPPED** on branch `fix/Temporal-dry-run` (commits `3377babb` + `b8eadeda`). This is the as-shipped recap — what the bug was, what changed, and why. The one piece still open is a deployment-faithful e2e scenario + a CI pytest companion, both fully specced in [`wip/distributed-execution/validate-sweep-temporal-leak-repro.md`](wip/distributed-execution/validate-sweep-temporal-leak-repro.md).
+> **Status: DONE.** Bug fixed and all three layers of test coverage are in place. This doc is the PR-review guide — what the bug was, what changed, why it's correct, and how it's guarded.
+>
+> **Stacking:** this branch (`fix/Temporal-dry-run`) is stacked on `feature/PipeSearch-Temporal` (open PR [#974](https://github.com/Pipelex/pipelex/pull/974)). The `pipe_search.py` / `search_generate.py` / `content_generator_in_workflow.py` / `native_search.mthds` / `structured_search.mthds` / `test_workflow_search_*` files in the diff belong to **#974**, not to this change — review them there. The files owned by **this** change are listed under [Files in this change](#files-in-this-change) below.
 
-**Where the fix lives:** `pipelex` core (the runtime), **not** `pipelex-api`. All paths below are relative to the `pipelex` repo (locally the editable `_search` worktree). No change was needed in `pipelex-api`.
+**Where the fix lives:** `pipelex` core (the runtime), **not** `pipelex-api`. All paths are relative to the `pipelex` repo (locally the editable `_search` worktree). No change was needed in `pipelex-api`.
 
 ## Symptom
 
@@ -42,17 +44,7 @@ return await get_pipe_router().run(pipe_job=PipeJobFactory.make_pipe_job(...))
 pipe_output = await get_pipe_router().run(pipe_job=PipeJobFactory.make_pipe_job(...))
 ```
 
-`get_pipe_router()` (`pipelex/hub.py`) returns a contextvar override **if one is set**, else the hub default:
-
-```python
-def get_pipe_router() -> "PipeRouterProtocol":
-    override = _current_pipe_router.get()
-    if override is not None:
-        return override
-    return get_pipelex_hub().get_required_pipe_router()
-```
-
-In the Temporal-enabled API process the hub default is the **`TemporalPipeRouter`** (wired in `pipelex/pipelex.py` ~L452). Called from the API process — i.e. **outside** any Temporal workflow (`is_in_temporal_workflow()` is False) — `TemporalPipeRouter._run_pipe_job` (`pipelex/temporal/tprl_pipe/temporal_pipe_router.py`) took the **top-level dispatch** branch → `executor.execute_workflow(WfPipeRouter, ...)` → failed → "Failed to execute workflow WfPipeRouter". The per-pipe dry run was marked `FAILURE`, `BundleValidator._aggregate` raised `DryRunError`, `validate_bundle` translated it to `ValidateBundleError`, and the global handler rendered 422.
+`get_pipe_router()` (`pipelex/hub.py`) returns a contextvar override **if one is set**, else the hub default. In the Temporal-enabled API process the hub default is the **`TemporalPipeRouter`** (wired in `pipelex/pipelex.py` when `get_config().temporal.is_enabled`). Called from the API process — i.e. **outside** any Temporal workflow (`is_in_temporal_workflow()` is False) — `TemporalPipeRouter._run_pipe_job` took the **top-level dispatch** branch → `executor.execute_workflow(WfPipeRouter, ...)` → failed → "Failed to execute workflow WfPipeRouter". The per-pipe dry run was marked `FAILURE`, `BundleValidator._aggregate` raised `DryRunError`, `validate_bundle` translated it to `ValidateBundleError`, and the global handler rendered 422.
 
 `BundleValidator` built the in-process router but **never installed it as the `scoped_pipe_router(...)` override**, so the nested controllers fell through to the hub default (Temporal).
 
@@ -60,23 +52,15 @@ In the Temporal-enabled API process the hub default is the **`TemporalPipeRouter
 
 The leak (nested dispatch → `TemporalPipeRouter`) happened for **every** bundle with a controller. Whether the dry run **failed** depended on a Temporal **workflow-id collision**:
 
-- `make_top_workflow_id` (`pipelex/temporal/temporal_manager.py`) is `f"{prefix}{pipeline_run_id}"` — derived from `pipeline_run_id` **alone** (prefix empty in NORMAL mode). The whole sweep shares **one** `dry_run_pipeline_id` (set once in `validate_pipes`, passed as every pipe's `pipeline_run_id`). So **every** top-level Temporal dispatch in a sweep computed the **same** workflow id.
-- `WorkflowExecutor.execute_workflow` **waits for completion**, and no `id_reuse_policy` is set → Temporal's default `ALLOW_DUPLICATE` (reuse allowed once the prior run has *closed*). So **serial** dispatches reusing that id are fine; only **concurrent** same-id dispatches collide → `WorkflowAlreadyStartedError` → caught at `workflow_caller.py:136` → `WorkflowExecutionError("Failed to execute workflow WfPipeRouter")`. (`WorkflowExecutionError` is a `PipelexError`, so `_classify_pipe` records it as a dry-run `FAILURE` → 422, not a 500.)
+- `make_top_workflow_id` (`pipelex/temporal/temporal_manager.py`) is `f"{prefix}{pipeline_run_id}"` — derived from `pipeline_run_id` **alone**. The whole sweep shares **one** `dry_run_pipeline_id`, so **every** top-level Temporal dispatch in a sweep computed the **same** workflow id.
+- `WorkflowExecutor.execute_workflow` **waits for completion**, and no `id_reuse_policy` is set → Temporal's default `ALLOW_DUPLICATE` (reuse allowed once the prior run has *closed*). So **serial** dispatches reusing that id are fine; only **concurrent** same-id dispatches collide → `WorkflowAlreadyStartedError` → `WorkflowExecutionError("Failed to execute workflow WfPipeRouter")`. (`WorkflowExecutionError` is a `PipelexError`, so it records as a dry-run `FAILURE` → 422, not a 500.)
 
 The deciding structural factor is **standalone batch/parallel vs. batch-reached-as-a-sub-pipe**:
 
-- A **standalone top-level `PipeBatch`/`PipeParallel`** that the sweep dry-runs *directly* runs its top level on the local in-process router, but its **fan-out loop executes in the API process** (`_live_run_controller_pipe` → `gather_bounded`) and fires **N concurrent top-level Temporal dispatches** with the same id → collision → **FAILURE**. A mocked "multiple" list yields `nb_stuffs = 3` (`working_memory_factory.py:232`), so N≥2.
-- A **batch reached as a sub-pipe** (inline `batch_over` step, or a batch nested under a sequence/parallel) is dispatched as a **single** top-level workflow — the fan-out into branches then happens **inside the worker** as child workflows (legal). Sequence steps run serially, so it's one dispatch at a time → **no concurrent collision** → it **passed** (still round-tripping Temporal, just not colliding).
+- A **standalone top-level `PipeBatch`/`PipeParallel`** the sweep dry-runs *directly* runs its top level on the local in-process router, but its **fan-out loop executes in the API process** (`_live_run_controller_pipe` → `gather_bounded`) and fires **N concurrent top-level Temporal dispatches** with the same id → collision → **FAILURE**. A mocked "multiple" list yields `nb_stuffs = 3`, so N≥2.
+- A **batch reached as a sub-pipe** (inline `batch_over` step, or a batch nested under a sequence/parallel) is dispatched as a **single** top-level workflow — the fan-out into branches then happens **inside the worker** as child workflows (legal). Sequence steps run serially, so it's one dispatch at a time → **no concurrent collision** → it **passed** (still round-tripping Temporal, just not colliding — a false pass).
 
-### Why each observed case behaved as it did
-
-- **`joke_judge` via API:** simple pipe, no nested controller dispatch → never calls `get_pipe_router()` → stayed in-process. ✅ (genuinely correct)
-- **`fashion_moodboard` via API → 422:** `create_moodboards` is a **standalone `PipeBatch`** (`inputs = { inspirations = "FashionInspiration[]" }`). Swept directly → fan-out of 3 mock items → 3 concurrent same-id top-level dispatches → `WorkflowAlreadyStartedError`. This is also why **only** `create_moodboards` was reported failing and **not** `create_collection_moodboards` (the sequence that has it as a step): as a step the batch is one top-level dispatch (no collision); only the standalone direct sweep fans out concurrently in-process. ❌
-- **`cv_batch_screening` via API → passed, but FALSE PASS:** no standalone `PipeBatch`; its only batch is the inline `batch_over` on the `process_cv` step (`main_pipe` is a `PipeSequence`). Every batch is reached as a sub-pipe → single top-level dispatch, serial → no collision. It still **round-tripped nested pipes through Temporal** for a "no-inference, no-cost" dry run, and would 422 if the worker were down (→ `RPCError`, same `except` branch) or if any standalone batch/parallel were ever swept. ⚠️
-- **`fashion_moodboard` full run (`make bundle-run`):** goes through Temporal on purpose; the top level runs as a workflow on the worker, where `is_in_temporal_workflow()` is True → controllers do **child-workflow** dispatch (legal). ✅
-- **CLI `pipelex validate bundle`:** Temporal disabled → hub default router *is* the in-process `PipeRouter`. ✅
-
-The fix removes the Temporal round-trip for the whole sweep, fixing both the real `create_moodboards`-style failure **and** the silent false-pass leak.
+So `fashion_moodboard`'s `create_moodboards` (a standalone `PipeBatch`) 422'd, while a sequence-nested batch silently round-tripped Temporal and passed. The fix removes the Temporal round-trip for the whole sweep, fixing both the real failure **and** the silent false-pass leak.
 
 ## The fix as shipped
 
@@ -102,29 +86,42 @@ The codebase had already solved this exact leak for DIRECT mode in `pipelex/runt
 - `scoped_pipe_router` is **contextvar-scoped** and restores the prior value on exit, so concurrent `/validate` requests don't leak into each other.
 - `PipeBatch` fans branches out via `gather_bounded` → `asyncio.gather`, whose Tasks copy the current context at creation (and creation happens inside the `with` scope), so each branch task inherits the override and resolves the in-process router too.
 
-**Regression guard (deterministic, no Temporal needed):**
-`tests/integration/pipelex/pipeline/test_bundle_validator.py::TestBundleValidatorIntegration::test_standalone_batch_sweep_scopes_in_process_router` — installs a hub-default router that raises if reached, sweeps a standalone `PipeBatch`, and asserts SUCCESS with the hub default never touched. Verified RED without the scope.
-
 ### Part 2 — `--temporal/--no-temporal` flag on `validate` (commit `b8eadeda`)
 
 A `--temporal/--no-temporal` flag was added to `pipelex validate bundle`, `pipe`, and `method` (and therefore `validate --all`, which routes to `validate pipe`), giving parity with `pipelex run`. It threads through `_validate_core.execute_validate(temporal=...)` → `make_pipelex_for_cli(temporal_enabled=...)`, overriding `temporal.is_enabled` **for the boot only**.
 
 **This flag is behavior-neutral for validation today.** The sweep always runs in-process regardless of the flag (Part 1 guarantees that). The flag does not change *what* validation does — it controls *how Pipelex boots*, which is the lever for exercising the "validation stays in-process even on a Temporal-enabled hub" contract without juggling a `pipelex_temporary_override.toml`. It is also forward-looking: once validation runs as a standalone Temporal activity ([`wip/dry-run-refactor/followup-temporal-validation-activity.md`](wip/dry-run-refactor/followup-temporal-validation-activity.md)), `--temporal` stops being a no-op and becomes the switch that dispatches the sweep through that activity.
 
-Guarded by `tests/unit/pipelex/cli/test_validate_temporal_flag.py` (locks the public CLI surface: each subcommand exposes `--temporal/--no-temporal`; `--help` short-circuits before any boot, keeping it a true unit test).
+## Reviewer note — the graph step was deliberately NOT changed
 
-## Reverted: the misdiagnosed "secondary fix" to the graph step
+An earlier diagnosis claimed the best-effort **graph** step in `validate.py` — `dry_run_pipeline()` (`pipelex/pipe_run/dry_run_pipeline.py`) → `PipelexRunner(...).execute_pipeline(...)` — had "the same leak." **It does not**, and an attempt to "fix" it was **reverted**. The graph step does a **single** top-level dispatch of the main pipe — no concurrent same-id collision — so under Temporal it dispatches the one workflow to the worker, which (tracing enabled, `backend = "temporal_dynamodb"`) assembles the `GraphSpec` and returns it on `PipeOutput`. That is the intended distributed design: `pipelex-api` runs with tracing disabled (thin submitter); the **worker** owns tracing + graph assembly. Forcing it in-process broke graph generation (tracing off in the API → empty `GraphSpec` → graph dropped). **Do not "fix" the graph step to run in-process** — if a `/validate` graph is wanted without a worker, the lever is enabling tracing in the API, a separate deployment decision.
 
-An earlier diagnosis claimed the best-effort **graph** step in `validate.py` — `dry_run_pipeline()` (`pipelex/pipe_run/dry_run_pipeline.py`) → `PipelexRunner(...).execute_pipeline(...)` — had "the same leak." **It does not.** The graph step does a **single** top-level dispatch of the main pipe — no concurrent same-id collision — so under Temporal it dispatches the one workflow to the worker, which (tracing enabled, `backend = "temporal_dynamodb"`) assembles the `GraphSpec` and returns it on `PipeOutput`. That is the intended distributed design: `pipelex-api` runs with `[pipelex.tracing_config] is_enabled = false` (thin submitter, does not trace); the **worker** owns tracing + graph assembly.
+## Test coverage — all three layers in place
 
-An attempt to "fix" this by forcing `dry_run_pipeline` in-process (scoped in-process router + injected `PipeRun`) was **reverted** — it broke graph generation: forced into the API process where tracing is off, `assemble_tracing` early-returns empty → `graph_spec` None → the route logs `"dry-run did not produce a graph (PipelexError)"` and drops the graph. The graph step is left dispatching to Temporal (worker assembles + returns the graph). If a `/validate` graph is wanted **without** a worker, the real lever is enabling tracing in the API (`[pipelex.tracing_config] is_enabled = true` with an in-process backend like `ndjson`), not changing the router — a separate deployment decision, not part of this bug.
+The contract — *the validation sweep never dispatches to Temporal* — is guarded at three complementary layers (none redundant):
 
-## Still TODO — deployment-faithful test coverage
+| Layer | Where it runs | CI-automated | What it adds | Status |
+|---|---|---|---|---|
+| **Sentinel regression test** (no Temporal) | `tests/integration/pipelex/pipeline/test_bundle_validator.py::TestBundleValidatorIntegration::test_standalone_batch_sweep_scopes_in_process_router` | ✅ | Installs a *raising* hub-default router; sweeps a standalone `PipeBatch`; asserts SUCCESS with the hub default never touched. Deterministic, zero Temporal infra. | exists |
+| **Mode-1 pytest** (real Temporal router) | `tests/integration/pipelex/temporal/test_validate_sweep_stays_in_process.py::TestValidateSweepStaysInProcess` | ✅ | Resolves the **real** `TemporalPipeRouter` as the hub default (proving the config→hub-default *wiring* the sentinel bypasses); spies `WorkflowExecutor.execute_workflow` and asserts it's never called. | **new — this change** |
+| **Mode-2 scenario** (3 separate processes) | `temporal-e2e-validate` skill, Tier 2c (agent-run) | ✗ | Production-faithful API↔worker boundary: `validate bundle --temporal` over a standalone `PipeBatch` exits 0 **and** the worker stays idle (no `WfPipeRouter` dispatch). Documents the GREEN/RED procedure. | **new — this change** |
 
-The in-process regression test guards the leak deterministically and runs in CI. Two complementary guards remain to be added, both fully specced (cold-start ready) in [`wip/distributed-execution/validate-sweep-temporal-leak-repro.md`](wip/distributed-execution/validate-sweep-temporal-leak-repro.md):
+The Mode-1 pytest is the cheaper automated catch (fast, deterministic, runs in CI); the Mode-2 scenario is the deployment-faithful demonstration and the only one that also exercises the genuinely cross-process surfaces (LibraryCrate propagation, serialization). Both were verified RED with the `scoped_pipe_router` scope removed and GREEN with it in place.
 
-- **Mode-1 pytest** (real Temporal, in-process server + worker, runs in CI) — resolves the **real** `TemporalPipeRouter` as the hub default (proving the config→hub-default wiring the sentinel test bypasses), runs the sweep over a standalone `PipeBatch`, and asserts `WorkflowExecutor.execute_workflow` is never called.
-- **Mode-2 e2e scenario** for the `temporal-e2e-validate` skill — the production-faithful 3-process topology (separate API + worker), reusing `temporal_batch.mthds`'s `batch_temporal_describe_topics` and the new `--temporal` flag; GREEN = exit 0 **and** worker received no dispatch.
+The repro bundle reuses an existing fixture (no new fixture): `tests/integration/pipelex/temporal/library_crate/temporal_batch.mthds` already declares a standalone `type = "PipeBatch"` pipe (`batch_temporal_describe_topics`) whose direct sweep fans out — the exact shape that 422'd.
+
+## Files in this change
+
+Owned by **this** change (the rest of the diff belongs to PR #974 — see [Stacking](#fix-validate-dry-run-leaked-nested-controller-sub-pipes-to-temporal)):
+
+- `pipelex/pipeline/bundle_validator.py` — the fix (`__init__` keeps `self._pipe_router`; `validate_pipes` wraps the sweep in `scoped_pipe_router`).
+- `pipelex/cli/commands/validate/{_validate_core,bundle_cmd,method_cmd,pipe_cmd}.py` — the `--temporal/--no-temporal` flag.
+- `tests/integration/pipelex/pipeline/test_bundle_validator.py` — sentinel regression test (+ siblings).
+- `tests/integration/pipelex/temporal/test_validate_sweep_stays_in_process.py` — **new** Mode-1 pytest.
+- `tests/unit/pipelex/cli/test_validate_temporal_flag.py` — locks the CLI surface (each subcommand exposes `--temporal/--no-temporal`; `--help` short-circuits before boot).
+- `.claude/skills/temporal-e2e-validate/references/mode-2-tiers.md` — **new** Tier 2c scenario (+ Contents + Step 7 row).
+- `CHANGELOG.md` — entry under `[Unreleased]`.
+- `TODOS.md`, `wip/distributed-execution/validate-sweep-temporal-leak-repro.md` — this guide + the repro brief.
 
 ## How to verify (local setup)
 
@@ -137,4 +134,4 @@ make bundle-validate BUNDLE=/Users/lchoquel/repos/Pipelex/pipelex-demos/mthds-wi
 make bundle-validate BUNDLE=/Users/lchoquel/repos/Pipelex/pipelex-demos/mthds-wip/joke_judge
 ```
 
-CLI parity check (no override file needed): `pipelex validate bundle <bundle> --temporal` boots Temporal-enabled yet the sweep stays in-process — exits 0 with no workflow dispatched to the worker. See the wip repro doc for the full GREEN/RED procedure.
+CLI parity check (no override file needed): `pipelex validate bundle <bundle> --temporal` boots Temporal-enabled yet the sweep stays in-process — exits 0 with no workflow dispatched to the worker. See [`wip/distributed-execution/validate-sweep-temporal-leak-repro.md`](wip/distributed-execution/validate-sweep-temporal-leak-repro.md) for the full GREEN/RED procedure (now implemented as Tier 2c in the `temporal-e2e-validate` skill).

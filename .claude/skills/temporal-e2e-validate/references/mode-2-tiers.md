@@ -7,7 +7,7 @@
 
 ## Contents
 
-- **Step 3** — Sequential tests: Tier 1 (sequence), Tier 2 (hydration), Tier 2b (cross-process registry), Tier 3 (parallel), Tier 4 (image generation), Tier 5 (image flow)
+- **Step 3** — Sequential tests: Tier 1 (sequence), Tier 2 (hydration), Tier 2b (cross-process registry), Tier 2c (validate sweep stays in-process), Tier 3 (parallel), Tier 4 (image generation), Tier 5 (image flow)
 - **Step 4** — Verify graph output
 - **Step 5** — Concurrent isolation tests (concept / pipe / multi-concept)
 - **Step 5b** — Tier 8: cross-worker usage emission; Tier 8b: cross-worker cost report assembly (`--mock-inference`, free)
@@ -99,6 +99,62 @@ After this completes, tell the user:
   `tmux capture-pane -t temporal-worker-runner -p -S -300 | tail -120`
   and quote the `KajsonDecoderError` and `ApplicationError: Failed decoding arguments`
   lines verbatim, plus the activity name (`act_deliver`).
+
+**Tier 2c — Validate sweep stays in-process under a Temporal-enabled boot (submitter-side leak guard).**
+
+This is **not** a `run` — it's a `validate`. It guards the production bug where the `/validate`
+dry-run sweep leaked nested controller sub-pipes to Temporal: a standalone `PipeBatch` swept directly
+fans out over a mock list and dispatches each branch through `get_pipe_router()`, which under a
+Temporal-enabled hub is the `TemporalPipeRouter`. Those concurrent same-id top-level dispatches raised
+`WorkflowAlreadyStartedError` → the API returned **HTTP 422** with `Failed to execute workflow
+WfPipeRouter`. The fix scopes an in-process router for the whole sweep; the contract here is that
+validation **never dispatches to Temporal**, even when booted Temporal-enabled.
+
+The `--temporal` flag (parity with `pipelex run`) flips the boot's hub default to the Temporal router
+with no `pipelex_temporary_override.toml` juggling. With the fix, the sweep still stays in-process —
+which is exactly what this asserts. `temporal_batch.mthds` declares a standalone `type = "PipeBatch"`
+pipe (`batch_temporal_describe_topics`), so its sweep fans out — the exact shape that 422'd.
+
+```bash
+# Server + worker up (Mode 2). The boot connects Temporal-enabled; with the fix the sweep stays
+# in-process, so the worker must receive NO workflow for this validate run.
+timeout 120 .venv/bin/pipelex validate bundle \
+  tests/integration/pipelex/temporal/library_crate/temporal_batch.mthds \
+  --temporal 2>&1 | tail -20
+echo "EXIT=$?"
+```
+
+GREEN: `EXIT=0` and `Successfully validated bundle ...`. **Strong check** (the point of the scenario):
+the worker stayed idle — it received no top-level dispatch. Capture both worker sessions and confirm
+no new `WfPipeRouter` / `WfPipeRun` execution appeared for this run (split workers are the Step 2
+default; fall back to `temporal-worker` for the single-worker setup):
+
+```bash
+tmux capture-pane -t temporal-worker-router -p -S -200 | grep -i WfPipeRouter   # expect: nothing new
+tmux capture-pane -t temporal-worker-runner -p -S -200 | grep -i WfPipeRun      # expect: nothing new
+```
+
+RED (prove the scenario bites) — the fix is committed, so neutralize it in the working tree. Surgical:
+in `pipelex/pipeline/bundle_validator.py`, inside `validate_pipes`, drop the `with
+scoped_pipe_router(self._pipe_router):` wrapper so the sweep loop runs unscoped (de-indent the loop
+one level). Re-run the GREEN command — expect `EXIT=1`, `Dry run failed with 1 unexpected pipe
+failure(s): 'temporal_batch_test.batch_temporal_describe_topics': ... Failed to execute workflow
+WfPipeRouter`, and the worker session now shows `WfPipeRouter` activity (the leak). **Restore the fix
+immediately:** `git checkout -- pipelex/pipeline/bundle_validator.py`.
+
+After this completes, tell the user:
+- PASS (GREEN exits 0 **and** worker idle — no dispatch) / FAIL.
+- Caveats worth stating: only a *standalone* `PipeBatch`/`PipeParallel` swept directly turns the leak
+  fatal (concurrent same-id collision); a batch reached only as a sequence sub-pipe round-trips
+  Temporal but passes (a false pass), so "validate exited 0" alone is **not** sufficient — the
+  worker-idle check is the real assertion. Worker up vs down are **both** RED (collision
+  `WorkflowAlreadyStartedError` vs no-worker `RPCError`, same `except` branch); keep the worker up to
+  match production.
+- The cheaper CI-automated companion to this scenario is the Mode-1 pytest
+  `tests/integration/pipelex/temporal/test_validate_sweep_stays_in_process.py` (real
+  `TemporalPipeRouter` as hub default, spies `WorkflowExecutor.execute_workflow`, asserts never
+  called). This Mode-2 scenario is the deployment-faithful demonstration across the real API↔worker
+  process boundary.
 
 **Tier 3 — Do parallel branches execute as separate child workflows?**
 
@@ -1069,6 +1125,7 @@ ls results/*/reactflow.html
 | Tier 1: Sequence | Worker can unpack crate and run a pipe sequence | PASS/FAIL | path | — |
 | Tier 2: Hydration | Worker handles dynamic concepts it has never seen | PASS/FAIL | path | — |
 | Tier 2b: Cross-process registry | `act_deliver` decodes hydrated `pipe_output` on runner (forced via `delivery_assignment`) | PASS/FAIL | — | — |
+| Tier 2c: Validate sweep stays in-process | `validate bundle --temporal` over a standalone `PipeBatch` exits 0 **and** the worker received no `WfPipeRouter` dispatch (the sweep never leaks to Temporal) | PASS/FAIL | — | — |
 | Tier 3: Parallel | Branches execute as concurrent child workflows | PASS/FAIL | path | — |
 | Tier 4: ImgGen | Image generation pipeline works through Temporal | PASS/FAIL | path | yes/no |
 | Tier 5: Image flow | Generated image flows as input to next pipe step | PASS/FAIL | path | yes/no |

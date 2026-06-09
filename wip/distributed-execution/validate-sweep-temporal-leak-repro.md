@@ -1,6 +1,6 @@
 # Bug brief + e2e repro — the `/validate` dry-run sweep leaked nested controller sub-pipes to Temporal
 
-> **Status:** bug FIXED (commit `3377babb` on `fix/Temporal-dry-run`); guarded by an in-process regression test. **This doc is the brief for adding a deployment-faithful RED scenario to the `temporal-e2e-validate` skill** — it is not yet added. Written for a cold start: everything needed is here.
+> **Status:** bug FIXED (commit `3377babb` on `fix/Temporal-dry-run`). **All three guard layers are now implemented:** the in-process sentinel regression test, the **Mode-1 pytest** (`tests/integration/pipelex/temporal/test_validate_sweep_stays_in_process.py`), and the **Mode-2 scenario** (Tier 2c in the `temporal-e2e-validate` skill). This doc is retained as the cold-start brief + reproduction record. See [`/TODOS.md`](../../TODOS.md) for the PR-review guide.
 >
 > **Track:** part of the [distributed-execution](./README.md) track — the class of bug that only the true 3-process topology surfaces.
 
