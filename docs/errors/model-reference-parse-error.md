@@ -18,4 +18,4 @@ Error raised when a model reference string cannot be parsed.
 | Defined in | `pipelex.cogt.models.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

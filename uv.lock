@@ -3692,7 +3692,7 @@ wheels = [
 
 [[package]]
 name = "pipelex"
-version = "0.32.0"
+version = "0.32.1"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -3901,7 +3901,7 @@ requires-dist = [
     { name = "temporalio", marker = "extra == 'temporal'", specifier = "==1.24.0" },
     { name = "tomli", specifier = ">=2.3.0" },
     { name = "tomlkit", specifier = ">=0.13.2" },
-    { name = "typer", specifier = ">=0.16.0" },
+    { name = "typer", specifier = ">=0.16.0,<0.27" },
     { name = "types-aioboto3", extras = ["bedrock", "bedrock-runtime"], marker = "extra == 'dev'", specifier = ">=13.4.0" },
     { name = "types-aiofiles", marker = "extra == 'dev'", specifier = ">=24.1.0.20240626" },
     { name = "types-jsonschema", marker = "extra == 'dev'", specifier = ">=4.20.0" },

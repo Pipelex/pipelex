@@ -18,4 +18,4 @@ Exception raised when GraphSpec validation fails.
 | Defined in | `pipelex.graph.exceptions` |
 | Parent class | [`GraphSpecError`](graph-spec-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

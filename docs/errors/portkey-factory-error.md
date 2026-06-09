@@ -16,4 +16,4 @@ description: "Reference for the `PortkeyFactoryError` Pipelex error class."
 | Defined in | `pipelex.plugins.portkey.portkey_exceptions` |
 | Parent class | [`PortkeyError`](portkey-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

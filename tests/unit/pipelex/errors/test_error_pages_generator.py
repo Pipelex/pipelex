@@ -9,6 +9,7 @@ import pytest
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.error_pages_generator import (
+    _MACRO_SECTIONS,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
     AUTHORED_MARKER,
     GENERATED_MARKER,
     INDEX_STEM,
@@ -25,32 +26,67 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 
+def _find_mkdocs_config() -> Path:
+    """Walk up from this test module to the repo root holding ``mkdocs.yml``."""
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / "mkdocs.yml"
+        if candidate.is_file():
+            return candidate
+    msg = "mkdocs.yml not found in any parent of the test module"
+    raise FileNotFoundError(msg)
+
+
 class TestErrorPagesGenerator:
-    def test_emits_one_page_per_loaded_subclass_plus_index(self, tmp_path: Path) -> None:
-        """Every loaded ``PipelexError`` subclass gets a per-class page, plus a landing ``index.md``."""
+    def test_emits_one_page_per_loaded_subclass_plus_index_and_macros(self, tmp_path: Path) -> None:
+        """Every subclass gets a per-class page; a landing ``index.md`` and the macro pages are emitted too."""
         report = generate_error_pages(output_dir=tmp_path)
 
         subclasses = list(iter_pipelex_error_subclasses())
-        expected_stems = {pascal_case_to_kebab(cls.__name__) for cls in subclasses} | {INDEX_STEM}
+        class_stems = {pascal_case_to_kebab(cls.__name__) for cls in subclasses}
+        macro_stems = {slug for slug, _ in _MACRO_SECTIONS}
 
-        assert report.total == len(expected_stems)
-        assert report.removed == []
         emitted_paths = report.written + report.unchanged + report.preserved
-        assert {path.stem for path in emitted_paths} == expected_stems
+        emitted_stems = {path.stem for path in emitted_paths}
 
-        for stem in expected_stems:
+        assert class_stems <= emitted_stems, "every per-class page must be emitted"
+        assert INDEX_STEM in emitted_stems
+        assert macro_stems <= emitted_stems, "every macro listing page must be emitted (all are non-empty in the full set)"
+        assert report.removed == []
+        assert report.total == len(emitted_stems)
+
+        for stem in emitted_stems:
             page = tmp_path / f"{stem}.md"
             assert page.exists(), f"missing page for stem {stem!r}"
-            content = page.read_text(encoding="utf-8")
-            assert GENERATED_MARKER in content
+            assert GENERATED_MARKER in page.read_text(encoding="utf-8")
 
-    def test_index_page_links_every_class(self, tmp_path: Path) -> None:
-        """The landing ``index.md`` lists each per-class page (link by kebab slug)."""
+    def test_macro_pages_link_every_class(self, tmp_path: Path) -> None:
+        """Every per-class page is reachable from exactly one macro listing page."""
         generate_error_pages(output_dir=tmp_path)
-        index_body = (tmp_path / f"{INDEX_STEM}.md").read_text(encoding="utf-8")
+        macro_bodies = "".join(
+            (tmp_path / f"{slug}.md").read_text(encoding="utf-8") for slug, _ in _MACRO_SECTIONS if (tmp_path / f"{slug}.md").exists()
+        )
         for cls in iter_pipelex_error_subclasses():
             link_target = f"]({page_slug(cls)}.md)"
-            assert link_target in index_body, f"index missing link {link_target!r}"
+            assert link_target in macro_bodies, f"no macro page links {link_target!r}"
+
+    def test_index_links_each_emitted_macro_page(self, tmp_path: Path) -> None:
+        """The overview ``index.md`` links every macro listing page that was emitted."""
+        generate_error_pages(output_dir=tmp_path)
+        index_body = (tmp_path / f"{INDEX_STEM}.md").read_text(encoding="utf-8")
+        for slug, _ in _MACRO_SECTIONS:
+            if (tmp_path / f"{slug}.md").exists():
+                assert f"]({slug}.md)" in index_body, f"index missing link to macro page {slug!r}"
+
+    def test_macro_slugs_are_wired_into_mkdocs_nav(self) -> None:
+        """Each generator macro slug must be wired into ``mkdocs.yml`` — as a nav entry and a
+        ``not_in_nav`` re-include — so the hand-maintained nav can never drift from
+        ``_MACRO_SECTIONS`` and break ``mkdocs build --strict`` on a missing or renamed page.
+        """
+        config_lines = [line.strip() for line in _find_mkdocs_config().read_text(encoding="utf-8").splitlines()]
+        for slug, _ in _MACRO_SECTIONS:
+            nav_suffix = f": errors/{slug}.md"
+            assert any(line.endswith(nav_suffix) for line in config_lines), f"mkdocs.yml nav has no entry for macro page errors/{slug}.md"
+            assert f"!errors/{slug}.md" in config_lines, f"mkdocs.yml not_in_nav is missing the re-include !errors/{slug}.md"
 
     def test_run_is_idempotent(self, tmp_path: Path) -> None:
         """Re-running the generator over its own output writes nothing — every page is byte-identical."""
@@ -108,6 +144,19 @@ class TestErrorPagesGenerator:
 
         with pytest.raises(RuntimeError, match="Kebab-slug collision on 'llm-error'"):
             generate_error_pages(output_dir=tmp_path, classes=[LLMError, LlmError])
+
+    def test_reserved_slug_collision_raises(self, tmp_path: Path) -> None:
+        """A class kebab-ing to a listing-page stem (a macro area, here ``platform-and-tooling``)
+        fails loudly instead of having its per-class page silently overwritten by the listing page.
+        """
+
+        # Deliberately no `Error` suffix: the collision can only arise for a name that kebabs
+        # onto a reserved listing-page stem, and an ``…Error`` name always kebabs to ``…-error``.
+        class PlatformAndTooling(PipelexError):  # noqa: N818
+            pass
+
+        with pytest.raises(RuntimeError, match="Reserved-slug collision on 'platform-and-tooling'"):
+            generate_error_pages(output_dir=tmp_path, classes=[PlatformAndTooling])
 
     def test_orphan_generated_page_is_deleted(self, tmp_path: Path) -> None:
         """A generated page whose slug is no longer in target_classes is deleted and reported under ``removed``."""

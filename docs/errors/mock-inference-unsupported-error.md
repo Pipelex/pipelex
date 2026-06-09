@@ -18,4 +18,4 @@ Raised when ``--mock-inference`` reaches an inference operation that has no leaf
 | Defined in | `pipelex.cogt.content_generation.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

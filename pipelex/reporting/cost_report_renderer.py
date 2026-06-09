@@ -14,6 +14,7 @@ from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.config import get_config
+from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.tools.misc.file_utils import ensure_path, get_incremental_file_path
 
@@ -80,3 +81,31 @@ def render_run_cost_report(
         )
     except (OSError, UnicodeEncodeError, PipelexError) as cost_report_error:
         log.warning(f"Cost report generation failed (run succeeded): {cost_report_error}")
+
+
+def render_cost_report_for_output(pipe_output: PipeOutput) -> None:
+    """Render the end-of-run cost report from a finished output (self-contained, one-arg submitter helper).
+
+    The standard submitter convenience over :func:`render_run_cost_report`: a finished
+    :class:`~pipelex.core.pipes.pipe_output.PipeOutput` already carries the three values the primitive
+    needs, so callers (the ``pipelex run`` CLI, external embedders) no longer re-derive them by hand.
+
+    Crucially, the ``--costs`` gate is read **off the output, not config**:
+    :attr:`~pipelex.core.pipes.pipe_output.PipeOutput.tokens_usages` is ``None`` exactly when cost
+    reporting was off for this run. The runner already resolved that decision at run time (with all
+    ``--costs/--no-costs`` overrides applied) and recorded it on the output. Re-reading global config to
+    reconstruct it would only be correct when config wasn't overridden or mutated between run and render —
+    the output is authoritative, config is not.
+
+    Outcome-identical to the historical CLI gate (``execution_config.is_generate_usage``): the primitive
+    ANDs both guards (``not is_generate_costs or not tokens_usages``), so the cases where the two sources
+    disagree (usage on but tracing off → ``tokens_usages is None``) no-op either way.
+
+    Args:
+        pipe_output: The finished run output carrying ``pipeline_run_id`` and ``tokens_usages``.
+    """
+    render_run_cost_report(
+        pipeline_run_id=pipe_output.pipeline_run_id,
+        tokens_usages=pipe_output.tokens_usages,
+        is_generate_costs=pipe_output.tokens_usages is not None,
+    )

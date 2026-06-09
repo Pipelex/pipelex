@@ -18,4 +18,4 @@ Raised when CSV headers do not line up with the row concept's fields.
 | Defined in | `pipelex.tools.tabular.exceptions` |
 | Parent class | [`CsvError`](csv-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

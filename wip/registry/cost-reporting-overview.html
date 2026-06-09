@@ -391,6 +391,15 @@ sequenceDiagram
     except (OSError, UnicodeEncodeError, PipelexError) as e:
         log.warning(f"Cost report generation failed (run succeeded): {e}")</code></pre>
       <p class="mini">A cost-report failure never fails an otherwise-successful run — aggregation, CSV setup, and render all sit inside one run-succeeded <code>try</code>. The agent CLI takes a different path: no Rich table, a machine-readable <code>cost_report</code> object on its <code>--with-memory</code> JSON envelope instead.</p>
+      <p>Submitters don't call <code>render_run_cost_report</code> directly. They call the one-arg convenience <code>render_cost_report_for_output(pipe_output)</code>, which unpacks the three primitive arguments from a finished <code>PipeOutput</code> — and, crucially, <strong>derives the <code>--costs</code> gate from the output itself</strong>: <code>pipe_output.tokens_usages is None</code> is exactly the signal that cost reporting was off for this run. The runner already resolved that decision at run time (with all <code>--costs/--no-costs</code> overrides applied) and recorded it on the output, so re-reading global config afterwards would only re-derive — incorrectly, if config was overridden or mutated between run and render — a fact the output already carries authoritatively.</p>
+      <span class="filename">pipelex/reporting/cost_report_renderer.py</span>
+      <pre class="code"><code>def render_cost_report_for_output(pipe_output: PipeOutput) -> None:
+    render_run_cost_report(
+        pipeline_run_id=pipe_output.pipeline_run_id,
+        tokens_usages=pipe_output.tokens_usages,
+        is_generate_costs=pipe_output.tokens_usages is not None,  # gate read off the output, not config
+    )</code></pre>
+      <p class="mini">This is a pure de-dup + correct-source-of-truth change, not a behavior change: the primitive ANDs both guards (<code>not is_generate_costs or not tokens_usages</code>), so the one case where output and config disagree (costs on but tracing off ⇒ <code>tokens_usages is None</code> — decision #3) no-ops either way. <code>render_run_cost_report</code> stays the low-level primitive for paths where the three values genuinely come from different places: the agent CLI's <code>build_cost_summary</code> JSON envelope, and any distributed reassembly where the output isn't the single carrier. The <code>pipelex run</code> CLI and external embedders (e.g. cocode) collapse to the one-arg form.</p>
     </div>
   </details>
 

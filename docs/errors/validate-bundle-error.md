@@ -19,4 +19,4 @@ Raised when bundle validation fails.
 | Parent class | [`PipelexError`](pipelex-error.md) |
 | `user_action` | `change_input` — Check the validation_errors array for specific issues |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

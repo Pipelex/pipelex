@@ -18,4 +18,4 @@ Raised when MISTRAL_NATIVE mode is requested without ``pipelex-mistralai-workflo
 | Defined in | `pipelex.runtime_bridge.exceptions` |
 | Parent class | [`PipelexRuntimeBridgeError`](pipelex-runtime-bridge-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

@@ -16,4 +16,4 @@ description: "Reference for the `PipeRunInputsError` Pipelex error class."
 | Defined in | `pipelex.core.pipes.inputs.exceptions` |
 | Parent class | [`PipeRunError`](pipe-run-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

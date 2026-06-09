@@ -16,4 +16,4 @@ description: "Reference for the `ConceptRefineError` Pipelex error class."
 | Defined in | `pipelex.core.concepts.exceptions` |
 | Parent class | [`ConceptError`](concept-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

@@ -18,4 +18,4 @@ A Temporal workflow failure observed on the submitter side.
 | Defined in | `pipelex.temporal.exceptions` |
 | Parent class | [`TemporalFlowError`](temporal-flow-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

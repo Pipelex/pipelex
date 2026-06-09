@@ -18,4 +18,4 @@ Raised when a concept used with CSV is not flat.
 | Defined in | `pipelex.tools.tabular.exceptions` |
 | Parent class | [`CsvError`](csv-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

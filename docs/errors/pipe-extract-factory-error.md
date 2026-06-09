@@ -16,4 +16,4 @@ description: "Reference for the `PipeExtractFactoryError` Pipelex error class."
 | Defined in | `pipelex.pipe_operators.extract.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

@@ -16,4 +16,4 @@ description: "Reference for the `GatewayDeckError` Pipelex error class."
 | Defined in | `pipelex.plugins.gateway.gateway_exceptions` |
 | Parent class | [`GatewayError`](gateway-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

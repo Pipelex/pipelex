@@ -18,4 +18,4 @@ Raised when a required dependency is not installed.
 | Defined in | `pipelex.system.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

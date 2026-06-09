@@ -16,4 +16,4 @@ description: "Reference for the `PyPdfium2RendererError` Pipelex error class."
 | Defined in | `pipelex.tools.pdf.exceptions` |
 | Parent class | [`ToolError`](tool-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

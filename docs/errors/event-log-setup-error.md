@@ -18,4 +18,4 @@ Raised when constructing the configured event-log backend fails.
 | Defined in | `pipelex.tracing.exceptions` |
 | Parent class | [`EventLogError`](event-log-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)
