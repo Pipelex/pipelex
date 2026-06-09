@@ -7,7 +7,7 @@
 
 ## Contents
 
-- **Step 3** — Sequential tests: Tier 1 (sequence), Tier 2 (hydration), Tier 2b (cross-process registry), Tier 2c (validate sweep stays in-process), Tier 3 (parallel), Tier 4 (image generation), Tier 5 (image flow)
+- **Step 3** — Sequential tests: Tier 1 (sequence), Tier 2 (hydration), Tier 2b (cross-process registry), Tier 2c (validate sweep stays in-process), Tier 2d (dry-run+validate as one in-memory activity), Tier 3 (parallel), Tier 4 (image generation), Tier 5 (image flow)
 - **Step 4** — Verify graph output
 - **Step 5** — Concurrent isolation tests (concept / pipe / multi-concept)
 - **Step 5b** — Tier 8: cross-worker usage emission; Tier 8b: cross-worker cost report assembly (`--mock-inference`, free)
@@ -158,6 +158,87 @@ After this completes, tell the user:
   `TemporalPipeRouter` as hub default, spies `WorkflowExecutor.execute_workflow`, asserts never
   called). This Mode-2 scenario is the deployment-faithful demonstration across the real API↔worker
   process boundary.
+
+**Tier 2d — Dry-run + validation runs as ONE in-process, in-memory activity.**
+
+Sibling to Tier 2c: where 2c proves the *direct* `/validate` sweep doesn't leak to Temporal, 2d
+proves the *Temporal-dispatched* path runs the whole sweep **+** graph dry-run inside a single
+activity (`act_dry_validate`, dispatched via the one-step wrapper workflow `wf_dry_validate`), in
+memory, returning `{status map, GraphSpec}` in one round-trip. The submitter script below is the
+same dispatch shape the Temporal-enabled API `/validate` uses.
+
+```bash
+# Server + split workers up (Mode 2). Dispatch the wrapper-workflow→activity over the parallel
+# controller bundle (interesting graph: sequence → parallel fan-out → 2 branches → summary).
+timeout 120 .venv/bin/python .claude/skills/temporal-e2e-validate/scripts/submit_dry_validate.py \
+  --bundle tests/integration/pipelex/temporal/library_crate/temporal_parallel.mthds \
+  --pipe temporal_parallel_test.temporal_parallel_sequence > /tmp/tier2d-validate.log 2>&1; echo "EXIT=$?"
+tail -20 /tmp/tier2d-validate.log
+```
+
+GREEN: `EXIT=0` · the STATUS MAP lists every pipe in the bundle as `SUCCESS` · `GRAPH:` line shows a
+non-empty GraphSpec (nodes for the whole controller topology) and the JSON landed at
+`/tmp/tier2d-graph-spec.json`.
+
+**Strong check (the point):** during the run the worker ran the wrapper workflow + exactly one
+`act_dry_validate` and **nothing else** — NO child `WfPipeRouter`/`WfPipeRun`, NO `act_llm_gen_*`,
+NO `act_assemble_tracing`/`act_flush_trace_events`. Capture both worker sessions and grep — expect
+only `wf_dry_validate` / `act_dry_validate` for this run (mirrors Tier 2c's worker-idle check, but
+here the one activity is expected; what must be absent is everything *nested*):
+
+```bash
+tmux capture-pane -t temporal-worker-router -p -S -200 | grep -iE "WfPipeRouter|WfPipeRun|act_llm_gen|act_assemble_tracing|act_flush_trace_events"   # expect: nothing new
+tmux capture-pane -t temporal-worker-runner -p -S -200 | grep -iE "WfPipeRouter|WfPipeRun|act_llm_gen|act_assemble_tracing|act_flush_trace_events"   # expect: nothing new
+```
+
+**In-memory tracing:** no new NDJSON partition appears under `.pipelex/traces/` for the activity's
+internal graph dry-run, and no DynamoDB write — the `GraphSpec` rode back on the activity result,
+assembled from the in-memory log. **No usage/cost:** no cost table, no `usage_report` events.
+
+**Best-effort graph sub-case:** dispatch a bundle with no `main_pipe` and no `--pipe` (so the graph
+arm has nothing to target):
+
+```bash
+timeout 120 .venv/bin/python .claude/skills/temporal-e2e-validate/scripts/submit_dry_validate.py \
+  --bundle tests/integration/pipelex/temporal/library_crate/temporal_batch.mthds \
+  --no-pipe > /tmp/tier2d-nograph.log 2>&1; echo "EXIT=$?"
+tail -5 /tmp/tier2d-nograph.log
+```
+
+GREEN: `EXIT=0`, full STATUS MAP, and `GRAPH: None (best-effort — validation still succeeded)`.
+
+**Concurrency:** launch two submitter invocations in parallel (e.g. `temporal_parallel.mthds` and
+`temporal_batch.mthds --no-pipe` with `--graph-out` pointing at distinct files) and confirm both
+exit 0 with distinct `graph_id`s / status maps — no shared or merged trace events.
+
+RED (prove it bites) — the fix is committed, so neutralize it in the working tree. Either arm:
+
+- **Drop the content-generator scope:** in `pipelex/pipe_run/dry_run_pipeline.py`
+  (`dry_run_pipe_in_process`), remove `scoped_content_generator(ContentGeneratorDry())` from the
+  `with` line. Under Part-B leaf-mock semantics the leaf reaches the hub
+  `ContentGeneratorInWorkflow` and dies with `_NotInWorkflowEventLoopError` / the strong check shows
+  dispatch. (Today's pipe-level DRY mock masks this arm in Mode 2 — the CI-cheap Mode-1 companion
+  `test_dry_run_graph_in_process.py::test_leaf_level_mock_stays_in_process` simulates the leaf mock
+  and is the deterministic RED for it.)
+- **Drop the shared event log:** in the same function, remove `scoped_event_log(event_log)` from
+  the `with` line — the two-instance regression: emit and assemble no longer share the instance, the
+  assembly finds zero events, and the submitter gets `EXIT=1` with `In-process dry-run of pipe '...'
+  did not produce a graph spec` (the bare `PipelexError` is deliberately OUTSIDE the activity's D5
+  narrow best-effort catch — a broken tracing pipeline is an infra bug and fails loudly, it does not
+  silently degrade to `graph=None`).
+
+**Restore immediately:** `git checkout -- pipelex/pipe_run/dry_run_pipeline.py`.
+
+After this completes, tell the user:
+
+- PASS (GREEN exits 0 · status map all SUCCESS · non-empty GraphSpec · worker shows ONLY the
+  wrapper workflow + one `act_dry_validate` · no NDJSON/DDB write · best-effort sub-case returns
+  `GRAPH: None` with exit 0) / FAIL.
+- The cheaper CI-automated companion is the Mode-1 pytest
+  `tests/integration/pipelex/temporal/test_dry_validate_activity_in_memory.py` (real worker against
+  the in-process server; zero-nested-dispatch asserted on the Temporal history; in-memory tracing
+  with `make_event_log` forbidden; best-effort graph; structured `ErrorReport` on validation
+  failure; concurrent isolation).
 
 **Tier 3 — Do parallel branches execute as separate child workflows?**
 
@@ -1129,6 +1210,7 @@ ls results/*/reactflow.html
 | Tier 2: Hydration | Worker handles dynamic concepts it has never seen | PASS/FAIL | path | — |
 | Tier 2b: Cross-process registry | `act_deliver` decodes hydrated `pipe_output` on runner (forced via `delivery_assignment`) | PASS/FAIL | — | — |
 | Tier 2c: Validate sweep stays in-process | `validate bundle --temporal` over a standalone `PipeBatch` exits 0 **and** the worker received no `WfPipeRouter` dispatch (the sweep never leaks to Temporal) | PASS/FAIL | — | — |
+| Tier 2d: Dry-run+validate as one in-memory activity | the Temporal-dispatched /validate runs the whole sweep + graph dry-run inside ONE in-process activity (zero nested dispatch), traces the graph in memory (no NDJSON/DDB), returns {status, GraphSpec}; best-effort graph → None on failure | PASS/FAIL | path | — |
 | Tier 3: Parallel | Branches execute as concurrent child workflows | PASS/FAIL | path | — |
 | Tier 4: ImgGen | Image generation pipeline works through Temporal | PASS/FAIL | path | yes/no |
 | Tier 5: Image flow | Generated image flows as input to next pipe step | PASS/FAIL | path | yes/no |

@@ -214,6 +214,21 @@ Both call `ContentGeneratorInWorkflow.make_templated_text` from inside `WfPipeRo
 
 ---
 
+## Validation Dispatch: One In-Process Activity
+
+Pipeline *execution* fans out across workflows and activities as described above — but *validation* deliberately does the opposite. When Temporal is enabled, a `/validate` job (validation sweep + graph-producing dry-run) dispatches as the one-step wrapper workflow `wf_dry_validate`, which runs a single `act_dry_validate` activity and returns `{per-pipe status map, GraphSpec | None}` in one round-trip.
+
+Inside the activity everything is in-process and in-memory:
+
+- The library is loaded once: the sweep half is `validate_bundle` itself (the same function the direct-mode route calls, so both backends share the categorized `ValidateBundleError` contract), which leaves the library loaded; the graph dry-run (`dry_run_pipe_in_process`) runs against that same library; teardown happens once in the activity's `finally`.
+- ContextVar scopes pin the run in-process: `scoped_pipe_router` (nested controller sub-pipes resolve a local router, not the `TemporalPipeRouter`), `scoped_content_generator` (inference leaves resolve an inline dry generator, not `ContentGeneratorInWorkflow`), and `scoped_event_log` (the graph traces into a shared `InMemoryEventLog` — no NDJSON file, no DynamoDB round-trip; the `GraphSpec` rides back on the activity result). No usage/cost events are emitted.
+- The graph is best-effort: an expected dry-run failure (the run-failure wrappers, or a mock-input mint failure) returns `graph_spec=None` with validation still successful; any other error propagates and fails the activity.
+- Validation failures cross the boundary as structured `ErrorReport`s via the activity error boundary — a strict-mode `SignaturesNotAllowedError` keeps its offending-pipe and signature refs, so the API can render a meaningful 422.
+
+Submitters call `dispatch_dry_validate` (`pipelex/temporal/tprl_pipe/dry_validate_dispatch.py`) for the whole round-trip. The wrapper workflow exists so the dispatch works on the current `temporalio` SDK; replacing it with a true standalone activity is a deferred optimization.
+
+---
+
 ## Known Limitation: StuffArtefact Serialization in Dry-Run
 
 In dry-run mode, PipeLLM produces `StuffArtefact` debug objects as working memory content. When controllers dispatch internal templating activities that carry working memory contents through the Temporal data converter, Kajson fails with `TypeError: Type <class 'StuffArtefact'> is not JSON serializable`.
