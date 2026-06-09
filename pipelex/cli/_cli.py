@@ -19,6 +19,7 @@ from pipelex.cli.commands.validate.app import validate_app
 from pipelex.cli.commands.which_cmd import which_cmd
 from pipelex.cli.commands.worker_cmd import worker_cmd
 from pipelex.cli.deck_notice import warn_if_deck_stale
+from pipelex.cli.error_handlers import set_traceback_requested
 from pipelex.cli.readiness import check_readiness
 from pipelex.hub import get_console
 from pipelex.tools.misc.package_utils import get_package_version
@@ -80,6 +81,9 @@ class PipelexCLI(TyperGroup):
         ctx.ensure_object(dict)
         ctx.obj["no_logo"] = no_logo
         ctx.obj["traceback"] = traceback
+        # Record at parse time so error handlers honor --traceback without relying on
+        # an active global Click context (absent under typer >= 0.26 / click >= 8.4).
+        set_traceback_requested(traceback)
         return ctx
 
 

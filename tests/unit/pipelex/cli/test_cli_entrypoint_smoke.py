@@ -28,11 +28,24 @@ from pathlib import Path
 
 import pytest
 
-# Resolve the console script next to the running interpreter (the test venv);
-# fall back to PATH. Resolving from sys.executable keeps it correct under
-# tox/nox/uv venvs regardless of how PATH is set.
-_CANDIDATE = Path(sys.executable).parent / "pipelex"
-PIPELEX_BIN = str(_CANDIDATE) if _CANDIDATE.exists() else (shutil.which("pipelex") or str(_CANDIDATE))
+
+def _resolve_pipelex_bin() -> str | None:
+    """Locate the installed `pipelex` console script.
+
+    Prefer the one next to the running interpreter (the test venv) so it's correct
+    under tox/nox/uv venvs regardless of PATH; fall back to PATH. Returns None when
+    not found, so the test can fail with a clear message instead of letting
+    subprocess raise FileNotFoundError.
+    """
+    bin_dir = Path(sys.executable).parent
+    for name in ("pipelex", "pipelex.exe"):  # .exe covers Windows venvs
+        candidate = bin_dir / name
+        if candidate.exists():
+            return str(candidate)
+    return shutil.which("pipelex")  # PATH fallback (resolves .exe via PATHEXT on Windows)
+
+
+PIPELEX_BIN = _resolve_pipelex_bin()
 
 
 class TestCliEntrypointStarts:
@@ -50,8 +63,11 @@ class TestCliEntrypointStarts:
         ],
     )
     def test_subcommand_starts_and_exits_zero(self, args: list[str]) -> None:
+        bin_path = PIPELEX_BIN
+        if bin_path is None:
+            pytest.fail("`pipelex` console script not found next to the interpreter or on PATH; install the package before running this test.")
         result = subprocess.run(  # noqa: S603 -- fixed, trusted argv
-            [PIPELEX_BIN, *args],
+            [bin_path, *args],
             capture_output=True,
             text=True,
             timeout=120,
