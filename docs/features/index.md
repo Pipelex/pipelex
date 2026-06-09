@@ -97,7 +97,7 @@ This section covers all Pipelex capabilities, organized by area.
 
 -   **[Distributed Execution](distributed-execution.md)**
 
-    Run methods as durable workflows on either backend — your own Temporal workers or Mistral's managed Workflows. Per-activity routing, named runtime profiles, and dashboard observability on the Temporal backend.
+    Run methods as durable workflows on Temporal with your own workers, with a managed Mistral Workflows backend coming soon. Per-activity routing, named runtime profiles, and dashboard observability on the Temporal backend.
 
 -   **[Telemetry & Observability](telemetry.md)**
 

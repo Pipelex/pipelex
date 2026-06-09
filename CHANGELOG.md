@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`render_cost_report_for_output(pipe_output)` submitter helper.** A one-arg convenience over `render_run_cost_report` that unpacks `pipeline_run_id` and `tokens_usages` from a finished `PipeOutput` and derives the `--costs` gate from the output itself — `pipe_output.tokens_usages is None` is exactly the signal that cost reporting was off for the run, the decision the runner already resolved (with all `--costs/--no-costs` overrides applied) and recorded on the output. Embedders and the `pipelex run` CLI no longer re-derive the three primitive arguments by hand or re-read global config to reconstruct the gate. `render_run_cost_report` is unchanged as the low-level primitive for paths where the three values come from different places (the agent CLI's `build_cost_summary` JSON envelope, distributed reassembly).
+
+## [v0.32.0] - 2026-06-09
+
 This cycle reworks **cost reporting** so it survives distributed execution and stops leaking. Cost now rides on the run result instead of a side buffer: a multi-worker Temporal run aggregates usage from every worker into a single end-of-run report, the success-path registry leak is gone by removal, and a new `--costs` switch decouples cost collection from `--graph`. It also extracts the **framework-agnostic runtime bridge** so any host runtime — not just Mistral Workflows — can embed Pipelex through one boundary.
 
 ### Added
