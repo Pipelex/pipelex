@@ -486,6 +486,7 @@ nav:
         - Task-Queue Routing: distributed-execution/task-routing.md
         - Workflow Observability: distributed-execution/observability.md
   - Reference:
+    - Gateway Available Models: setup/gateway-models.md
     - CLI Reference:
       - Overview: tools/cli/index.md
       - Init: tools/cli/init.md
@@ -501,6 +502,13 @@ nav:
         - Inputs: tools/cli/build/inputs.md
         - Output: tools/cli/build/output.md
       - Agent CLI: tools/cli/agent-cli.md
+    - Tools:
+      - plxt (Formatter & Linter): tools/plxt.md
+      - Logging: tools/logging.md
+    - Analytics:
+      - Observer Data Extraction: analytics/data-extraction.md
+      - Telemetry: setup/telemetry.md
+    - Error Reference: errors/index.md
     - Configuration (TOML reference):
       - Overview: configuration/index.md
       - Pipeline Validation Configuration:
@@ -516,14 +524,6 @@ nav:
         - LLM Providers & Models: configuration/config-technical/inference-backend-config.md
         - Library: configuration/config-technical/library-config.md
         - Feature: configuration/config-advanced/feature-config.md
-    - Tools:
-      - plxt (Formatter & Linter): tools/plxt.md
-      - Logging: tools/logging.md
-    - Analytics:
-      - Observer Data Extraction: analytics/data-extraction.md
-    - Telemetry: setup/telemetry.md
-    - Gateway Available Models: setup/gateway-models.md
-    - Error Reference: errors/index.md
   - Advanced:
     - Advanced Customizations:
       - Overview: advanced/index.md
