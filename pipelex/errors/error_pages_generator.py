@@ -257,13 +257,16 @@ def generate_error_pages(
     """Write one markdown page per :class:`PipelexError` subclass into ``output_dir``.
 
     ``classes`` defaults to every loaded production subclass via
-    :func:`iter_pipelex_error_subclasses`. Pages bearing :data:`AUTHORED_MARKER`
-    are left untouched and reported under ``preserved``; pages whose generated
-    content matches what's already on disk are reported as ``unchanged`` (no
-    write, no mtime churn). Pre-existing generated pages whose slug no longer
-    appears in ``target_classes`` are deleted and reported under ``removed`` —
-    pages with :data:`AUTHORED_MARKER` are never removed, the index page is
-    never removed.
+    :func:`iter_pipelex_error_subclasses`. Alongside the per-class pages it
+    emits an ``index.md`` overview and one macro listing page per non-empty
+    :data:`_MACRO_SECTIONS` area (the entries nested under "Error Reference" in
+    the nav). Pages bearing :data:`AUTHORED_MARKER` are left untouched and
+    reported under ``preserved``; pages whose generated content matches what's
+    already on disk are reported as ``unchanged`` (no write, no mtime churn).
+    Pre-existing generated pages whose slug no longer appears in
+    ``target_classes`` (or a macro page that lost all its classes) are deleted
+    and reported under ``removed`` — pages with :data:`AUTHORED_MARKER` are never
+    removed, the index page is never removed.
 
     Raises a loud ``RuntimeError`` if two target classes resolve to the same
     kebab slug (e.g. ``LLMError`` and ``LlmError`` both kebab to ``llm-error``),
@@ -293,8 +296,20 @@ def generate_error_pages(
         target = output_dir / f"{page_slug(cls)}.md"
         _commit_page(target, render_error_page(cls), report)
 
+    # Macro listing pages — one per non-empty macro area. Their stems join
+    # ``expected_stems`` so a macro that still has classes is never treated as an
+    # orphan, while a macro that loses all its classes (none written this run)
+    # falls through to ``_remove_orphans`` and is deleted like any stale page.
+    by_subsystem = _group_by_subsystem(target_classes)
+    for macro_slug, macro_heading in _MACRO_SECTIONS:
+        sections = _subsystems_for_macro(macro_slug, by_subsystem)
+        if not sections:
+            continue
+        _commit_page(output_dir / f"{macro_slug}.md", render_macro_page(macro_heading, sections), report)
+        expected_stems.add(macro_slug)
+
     index_target = output_dir / f"{INDEX_STEM}.md"
-    _commit_page(index_target, render_index_page(target_classes), report)
+    _commit_page(index_target, render_index_page(by_subsystem), report)
 
     _remove_orphans(output_dir=output_dir, expected_stems=expected_stems, report=report)
 
@@ -337,19 +352,150 @@ def _commit_page(target: Path, new_content: str, report: ErrorPagesReport) -> No
     report.written.append(target)
 
 
-def render_index_page(classes: Iterable[type[PipelexError]]) -> str:
-    """Render the landing page that lists every per-class error page.
+# Macro sections — the top-level left-sidebar groups nested under "Error
+# Reference" in ``mkdocs.yml``, in display order. ``(slug, heading)``. Each
+# bundles several subsystems (see :data:`_SUBSYSTEM_SECTIONS`) onto one listing
+# page so the nav shows a handful of macro areas instead of one flat entry.
+# The slugs are the page stems (``errors/<slug>.md``) and MUST stay in sync with
+# the nav block + ``not_in_nav`` re-includes in ``mkdocs.yml``.
+_MACRO_SECTIONS: tuple[tuple[str, str], ...] = (
+    ("authoring-and-language", "Authoring & language"),
+    ("execution-and-runtime", "Execution & runtime"),
+    ("inference-and-providers", "Inference & providers"),
+    ("platform-and-tooling", "Platform & tooling"),
+)
 
-    Pages are grouped by the top-level :class:`PipelexError` branch they belong
-    to (e.g. ``CogtError``, ``PipelineExecutionError``, ``TemporalFlowError``)
-    so readers can find a class without scrolling the full alphabetical list.
+# The macro that adopts any subsystem not explicitly assigned in
+# :data:`_SUBSYSTEM_SECTIONS` — keeps a newly-added ``pipelex.<area>`` reachable
+# in the nav (under a humanized heading) without a manifest edit. Must be one of
+# the :data:`_MACRO_SECTIONS` slugs.
+_FALLBACK_MACRO_SLUG = "platform-and-tooling"
+
+# Curated subsystem sections, in display order *within* their macro. Each entry
+# is ``(subsystem_key, macro_slug, heading)``. ``subsystem_key`` is the second
+# segment of a class's defining module (``pipelex.<subsystem>.…``) — the layer
+# that groups errors by the area of the codebase they originate from. A subsystem
+# missing from this tuple still renders: it lands in the fallback macro under a
+# humanized heading (see :func:`_subsystems_for_macro`), so adding a new
+# ``pipelex/<area>/…_exceptions.py`` needs no edit here — the curation only pins
+# label wording, macro placement, and ordering, never completeness.
+_SUBSYSTEM_SECTIONS: tuple[tuple[str, str, str], ...] = (
+    # Authoring & language
+    ("core", "authoring-and-language", "Core language"),
+    ("pipe_operators", "authoring-and-language", "Pipe operators"),
+    ("pipe_controllers", "authoring-and-language", "Pipe controllers"),
+    ("pipe_signature", "authoring-and-language", "Pipe signatures"),
+    ("builder", "authoring-and-language", "Builder"),
+    ("libraries", "authoring-and-language", "Libraries"),
+    ("kit", "authoring-and-language", "Kit"),
+    # Execution & runtime
+    ("pipe_run", "execution-and-runtime", "Pipe execution"),
+    ("pipeline", "execution-and-runtime", "Pipeline execution"),
+    ("temporal", "execution-and-runtime", "Temporal execution"),
+    ("runtime_bridge", "execution-and-runtime", "Runtime bridge"),
+    ("graph", "execution-and-runtime", "Graph"),
+    ("tracing", "execution-and-runtime", "Tracing"),
+    # Inference & providers
+    ("cogt", "inference-and-providers", "Inference (Cogt)"),
+    ("plugins", "inference-and-providers", "Provider plugins"),
+    # Platform & tooling
+    ("base_exceptions", "platform-and-tooling", "Base & root errors"),
+    ("tools", "platform-and-tooling", "Tools"),
+    ("system", "platform-and-tooling", "System & configuration"),
+    ("cli", "platform-and-tooling", "CLI"),
+)
+
+
+def _subsystem_key(cls: type[PipelexError]) -> str:
+    """Return the subsystem grouping key for ``cls`` — the second segment of its module path.
+
+    Every ``PipelexError`` subclass lives at ``pipelex.<subsystem>.…exceptions``
+    (root errors live directly in ``pipelex.base_exceptions``), so the second
+    dotted segment names the area of the codebase the error belongs to. That is
+    the axis the listing pages group on.
     """
-    sorted_classes = sorted(classes, key=lambda c: c.__name__)
-    by_branch: dict[str, list[type[PipelexError]]] = {}
-    for cls in sorted_classes:
-        branch_label = _top_level_branch_label(cls)
-        by_branch.setdefault(branch_label, []).append(cls)
+    parts = cls.__module__.split(".")
+    return parts[1] if len(parts) > 1 else parts[0]
 
+
+def _humanize_subsystem(key: str) -> str:
+    """Fallback heading for an uncurated subsystem ``key`` (snake_case → Sentence case)."""
+    return key.replace("_", " ").capitalize()
+
+
+def _group_by_subsystem(classes: Iterable[type[PipelexError]]) -> dict[str, list[type[PipelexError]]]:
+    """Bucket ``classes`` by :func:`_subsystem_key`, each bucket alphabetized by class name."""
+    by_subsystem: dict[str, list[type[PipelexError]]] = {}
+    for cls in sorted(classes, key=lambda c: c.__name__):
+        by_subsystem.setdefault(_subsystem_key(cls), []).append(cls)
+    return by_subsystem
+
+
+def _subsystems_for_macro(
+    macro_slug: str,
+    by_subsystem: dict[str, list[type[PipelexError]]],
+) -> list[tuple[str, list[type[PipelexError]]]]:
+    """Return the ``(heading, classes)`` subsystem sections that belong on a macro page.
+
+    Curated subsystems assigned to ``macro_slug`` come first, in
+    :data:`_SUBSYSTEM_SECTIONS` order. The fallback macro additionally adopts any
+    uncurated subsystem present, appended alphabetically under a humanized
+    heading. Subsystems with no loaded classes are skipped, so a macro with
+    nothing to show yields an empty list and no page is written.
+    """
+    sections: list[tuple[str, list[type[PipelexError]]]] = []
+    for key, assigned_macro, heading in _SUBSYSTEM_SECTIONS:
+        if assigned_macro == macro_slug and key in by_subsystem:
+            sections.append((heading, by_subsystem[key]))
+    if macro_slug == _FALLBACK_MACRO_SLUG:
+        curated = {key for key, _, _ in _SUBSYSTEM_SECTIONS}
+        for key in sorted(by_subsystem):
+            if key not in curated:
+                sections.append((_humanize_subsystem(key), by_subsystem[key]))
+    return sections
+
+
+def render_macro_page(macro_heading: str, sections: list[tuple[str, list[type[PipelexError]]]]) -> str:
+    """Render one macro listing page: a ``## subsystem`` block per section, class links beneath.
+
+    ``sections`` is the output of :func:`_subsystems_for_macro` — already ordered
+    and non-empty.
+    """
+    description = f"Pipelex error classes in the {macro_heading} area, grouped by subsystem."
+    lines: list[str] = [
+        "---",
+        f'title: "{macro_heading}"',
+        f'description: "{description}"',
+        "---",
+        "",
+        f"{GENERATED_MARKER}",
+        "",
+        f"# {macro_heading}",
+        "",
+        "Each error class below has a stable RFC 7807 `type` URI that dereferences to its",
+        "own page. Classes are grouped by subsystem.",
+        "",
+    ]
+    for heading, classes in sections:
+        lines.append(f"## {heading}")
+        lines.append("")
+        for cls in classes:
+            lines.append(f"- [`{cls.__name__}`]({page_slug(cls)}.md) — {cls.title()}")
+        lines.append("")
+    lines.append("[Back to Error Reference](index.md)")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def render_index_page(by_subsystem: dict[str, list[type[PipelexError]]]) -> str:
+    """Render the Error Reference overview that links to each macro listing page.
+
+    The overview stays light: it explains the ``type`` URI contract and lists the
+    macro sections (in :data:`_MACRO_SECTIONS` order), each annotated with the
+    subsystems it covers — derived live from ``by_subsystem`` so the annotation
+    never drifts from what the macro pages actually contain. A macro with no
+    loaded classes is omitted.
+    """
     lines: list[str] = [
         "---",
         'title: "Error Reference"',
@@ -364,42 +510,26 @@ def render_index_page(classes: Iterable[type[PipelexError]]) -> str:
         "# Error Reference",
         "",
         "Every Pipelex error class has a stable RFC 7807 `type` URI on the form",
-        "`<base_uri>/<kebab-class-name>/`, and that URI dereferences to one of the pages",
-        "below. The list is grouped by the top-level branch a class belongs to so the",
-        "structural shape of the hierarchy stays visible.",
-        "",
-        "See [Error Model](../under-the-hood/error-model.md) for the underlying contract,",
-        "classification rules, and the cross-boundary Temporal bridge.",
+        "`<base_uri>/<kebab-class-name>/`, and that URI dereferences to a per-class page.",
+        "The classes are grouped into a few macro areas — pick the one that matches where",
+        "the error came from:",
         "",
     ]
-    for branch in sorted(by_branch):
-        lines.append(f"## {branch}")
-        lines.append("")
-        for cls in by_branch[branch]:
-            lines.append(f"- [`{cls.__name__}`]({page_slug(cls)}.md) — {cls.title()}")
-        lines.append("")
+    for macro_slug, macro_heading in _MACRO_SECTIONS:
+        sections = _subsystems_for_macro(macro_slug, by_subsystem)
+        if not sections:
+            continue
+        covered = ", ".join(heading for heading, _ in sections)
+        lines.append(f"- [{macro_heading}]({macro_slug}.md) — {covered}.")
+    lines.extend(
+        [
+            "",
+            "See [Error Model](../under-the-hood/error-model.md) for the underlying contract,",
+            "classification rules, and the cross-boundary Temporal bridge.",
+            "",
+        ]
+    )
     return "\n".join(lines)
-
-
-def _top_level_branch_label(cls: type[PipelexError]) -> str:
-    """Return a stable grouping label for the index — name of the direct ``PipelexError`` child ancestor.
-
-    Multi-base subclasses (rare in this hierarchy) are grouped under their
-    first ``PipelexError`` base — ``__bases__[0]`` wins. The grouping is
-    cosmetic, so first-base-wins is fine; the per-class page still links to
-    its actual first parent which preserves the structural ambiguity.
-    """
-    if cls is PipelexError:
-        return "PipelexError (root)"
-    current: type[PipelexError] = cls
-    while True:
-        parents = [base for base in current.__bases__ if issubclass(base, PipelexError)]
-        if not parents:
-            return current.__name__
-        first_pipelex_parent = parents[0]
-        if first_pipelex_parent is PipelexError:
-            return current.__name__
-        current = first_pipelex_parent
 
 
 def has_authored_marker(content: str) -> bool:

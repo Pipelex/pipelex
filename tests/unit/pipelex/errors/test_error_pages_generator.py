@@ -9,6 +9,7 @@ import pytest
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.error_pages_generator import (
+    _MACRO_SECTIONS,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
     AUTHORED_MARKER,
     GENERATED_MARKER,
     INDEX_STEM,
@@ -26,31 +27,45 @@ if TYPE_CHECKING:
 
 
 class TestErrorPagesGenerator:
-    def test_emits_one_page_per_loaded_subclass_plus_index(self, tmp_path: Path) -> None:
-        """Every loaded ``PipelexError`` subclass gets a per-class page, plus a landing ``index.md``."""
+    def test_emits_one_page_per_loaded_subclass_plus_index_and_macros(self, tmp_path: Path) -> None:
+        """Every subclass gets a per-class page; a landing ``index.md`` and the macro pages are emitted too."""
         report = generate_error_pages(output_dir=tmp_path)
 
         subclasses = list(iter_pipelex_error_subclasses())
-        expected_stems = {pascal_case_to_kebab(cls.__name__) for cls in subclasses} | {INDEX_STEM}
+        class_stems = {pascal_case_to_kebab(cls.__name__) for cls in subclasses}
+        macro_stems = {slug for slug, _ in _MACRO_SECTIONS}
 
-        assert report.total == len(expected_stems)
-        assert report.removed == []
         emitted_paths = report.written + report.unchanged + report.preserved
-        assert {path.stem for path in emitted_paths} == expected_stems
+        emitted_stems = {path.stem for path in emitted_paths}
 
-        for stem in expected_stems:
+        assert class_stems <= emitted_stems, "every per-class page must be emitted"
+        assert INDEX_STEM in emitted_stems
+        assert macro_stems <= emitted_stems, "every macro listing page must be emitted (all are non-empty in the full set)"
+        assert report.removed == []
+        assert report.total == len(emitted_stems)
+
+        for stem in emitted_stems:
             page = tmp_path / f"{stem}.md"
             assert page.exists(), f"missing page for stem {stem!r}"
-            content = page.read_text(encoding="utf-8")
-            assert GENERATED_MARKER in content
+            assert GENERATED_MARKER in page.read_text(encoding="utf-8")
 
-    def test_index_page_links_every_class(self, tmp_path: Path) -> None:
-        """The landing ``index.md`` lists each per-class page (link by kebab slug)."""
+    def test_macro_pages_link_every_class(self, tmp_path: Path) -> None:
+        """Every per-class page is reachable from exactly one macro listing page."""
         generate_error_pages(output_dir=tmp_path)
-        index_body = (tmp_path / f"{INDEX_STEM}.md").read_text(encoding="utf-8")
+        macro_bodies = "".join(
+            (tmp_path / f"{slug}.md").read_text(encoding="utf-8") for slug, _ in _MACRO_SECTIONS if (tmp_path / f"{slug}.md").exists()
+        )
         for cls in iter_pipelex_error_subclasses():
             link_target = f"]({page_slug(cls)}.md)"
-            assert link_target in index_body, f"index missing link {link_target!r}"
+            assert link_target in macro_bodies, f"no macro page links {link_target!r}"
+
+    def test_index_links_each_emitted_macro_page(self, tmp_path: Path) -> None:
+        """The overview ``index.md`` links every macro listing page that was emitted."""
+        generate_error_pages(output_dir=tmp_path)
+        index_body = (tmp_path / f"{INDEX_STEM}.md").read_text(encoding="utf-8")
+        for slug, _ in _MACRO_SECTIONS:
+            if (tmp_path / f"{slug}.md").exists():
+                assert f"]({slug}.md)" in index_body, f"index missing link to macro page {slug!r}"
 
     def test_run_is_idempotent(self, tmp_path: Path) -> None:
         """Re-running the generator over its own output writes nothing — every page is byte-identical."""
