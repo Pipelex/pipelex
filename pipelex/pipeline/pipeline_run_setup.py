@@ -8,6 +8,7 @@ from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import (
     clear_current_library,
     get_current_library_id_or_none,
+    get_event_log_override,
     get_library_manager,
     get_otel_tracer,
     get_pipeline_manager,
@@ -196,7 +197,10 @@ async def pipeline_run_setup(
             # (node/edge) events and usage (cost) events.
             config = get_config()
             tracing_config = config.pipelex.tracing_config
-            if tracing_config.is_enabled:
+            # A scoped override (see hub.scoped_event_log) is the run's transport and implies
+            # tracing-enabled (D1); otherwise build the configured backend when tracing is on.
+            event_log = get_event_log_override()
+            if event_log is None and tracing_config.is_enabled:
                 event_log = make_event_log(tracing_config)
 
             graph_tracer_manager = GraphTracerManager.get_or_create_instance()

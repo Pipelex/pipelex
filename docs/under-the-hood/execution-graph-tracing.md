@@ -249,6 +249,28 @@ manager.on_pipe_end_success(
 graph_spec = manager.close_tracer(pipeline_run_id)
 ```
 
+### Event-Log Transport and the Scoped Override
+
+Trace events travel through an `EventLogProtocol` backend (`pipelex/tracing/`): the tracer emits events into it during the run (write side, wired in `pipeline_run_setup`), and `assemble_tracing` reads them back after the run to build the `GraphSpec` and usage aggregates (read side, triggered from `PipeRun.run`). Both sides normally build their backend instance independently from `tracing_config` via `make_event_log` — NDJSON files or DynamoDB bridge the two instances through external storage.
+
+For fully in-process runs, `pipelex.hub.scoped_event_log` pins one shared instance for both sides instead:
+
+```python
+from pipelex.hub import scoped_event_log
+from pipelex.tracing.in_memory_event_log import InMemoryEventLog
+
+with scoped_event_log(InMemoryEventLog()):
+    response = await runner.execute_pipeline(...)  # graph assembles in memory
+```
+
+Semantics:
+
+- The override is ContextVar-scoped (mirrors `scoped_pipe_router`), so concurrent runs with separate scopes never cross-contaminate, and the prior value is restored on exit.
+- A set override **implies tracing-enabled**: it is honored even when `tracing_config.is_enabled` is `False`, on both the write side and the read side's early-return.
+- The scope owner keeps the instance's lifecycle — the read side does not `close()` it and the machinery never calls `cleanup()` on it.
+
+This is what lets a graph-producing dry-run trace entirely in memory (no NDJSON file, no DynamoDB round-trip) — e.g. when validation and graph dry-run are hosted inside a single Temporal activity.
+
 ### TraceContext Propagation
 
 TraceContext is a serializable context that flows through pipe execution:

@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`scoped_event_log` — a shared, scope-pinned trace-event transport.** New `pipelex.hub.scoped_event_log(event_log)` context manager (with `get_event_log_override()` accessor, mirroring `scoped_pipe_router`): both the write side (tracer emission in `pipeline_run_setup`) and the read side (`assemble_tracing`) now prefer the scoped instance over building their own backend via `make_event_log`, so a run can trace into ONE shared `InMemoryEventLog` — no NDJSON file, no DynamoDB round-trip — and still assemble its `GraphSpec` from it. A set override implies tracing-enabled (honored even when `tracing_config.is_enabled` is off), and the scope owner keeps the instance's lifecycle. ContextVar-scoped, so concurrent runs with separate scopes stay isolated. This is the foundation for running the `/validate` graph dry-run fully in-process and in-memory inside a Temporal activity.
+
 ## [v0.32.1] - 2026-06-09
 
 ### Added

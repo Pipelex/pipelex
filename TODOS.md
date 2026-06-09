@@ -62,8 +62,8 @@ All decisions are resolved up front so a cold-start session runs autonomously th
 
 | Phase | Title | Status |
 |---|---|---|
-| 1 | `scoped_event_log` + shared in-memory tracing (in-repo, no Temporal) | ☐ not started |
-| | **⛔ CHECKPOINT 1 — in-memory tracing verified in direct mode** | |
+| 1 | `scoped_event_log` + shared in-memory tracing (in-repo, no Temporal) | ☑ done |
+| | **⛔ CHECKPOINT 1 — in-memory tracing verified in direct mode** | ☑ done (suite green, committed) |
 | 2 | In-process, in-memory graph dry-run safe under a Temporal hub (+ `scoped_content_generator`) | ☐ |
 | | **⛔ CHECKPOINT 2 — graph dry-run verified under a Temporal hub** | |
 | 3 | The `act_dry_validate` activity + wrapper-workflow dispatch + worker registration + isolation test | ☐ |
@@ -80,12 +80,12 @@ Status legend: ☐ not started · ◐ in progress · ☑ done. **No human gate r
 
 Pure in-repo capability, no Temporal, no cross-repo. Fully testable in direct mode. **TDD: write the failing tests first.**
 
-- [ ] *Tests first* (`tests/unit/pipelex/tracing/` + a direct-mode dry-run-with-graph integration test): assert that running a dry-run-with-graph under `with scoped_event_log(InMemoryEventLog())` (a) produces a non-empty, correct `GraphSpec`, (b) writes **no** NDJSON file and touches **no** configured backend, and (c) emit and assemble hit the **same** instance. Add a concurrency/nesting test: two concurrently-scoped in-memory logs don't cross-contaminate, and the override restores on exit.
-- [ ] Add to `pipelex/hub.py` (mirroring `scoped_pipe_router`): `_event_log_override: ContextVar[EventLogProtocol | None]`, a `scoped_event_log(event_log)` `@contextmanager` (save/set/restore), and an accessor (e.g. `get_event_log_override()`).
-- [ ] Make the **write side** prefer the override: in `pipeline_run_setup.py`, where it does `event_log = make_event_log(tracing_config)`, use the scoped override if set, else the factory. (Keep the `is_enabled` gate semantics sane — decide whether a scoped override implies enabled.)
-- [ ] Make the **read side** prefer the override: in `tracing_assembly.py::assemble_tracing`, where it does `make_event_log(tracing_config)`, use the scoped override if set, else the factory. Mind the existing `tracing_config.is_enabled` early-return — an override must not be skipped by it.
-- [ ] Confirm the `EventLogProtocol` surface is sufficient (`emit` / `read_events` / `next_sequence` / `close` / `cleanup`); no protocol change expected.
-- [ ] `make agent-check` clean · relevant tracing tests green.
+- [x] *Tests first* (`tests/unit/pipelex/tracing/test_scoped_event_log.py` + `tests/integration/pipelex/pipeline/test_scoped_in_memory_tracing.py`): assert that running a dry-run-with-graph under `with scoped_event_log(InMemoryEventLog())` (a) produces a non-empty, correct `GraphSpec`, (b) writes **no** NDJSON file and touches **no** configured backend, and (c) emit and assemble hit the **same** instance. Concurrency/nesting tests included (unit: ContextVar isolation + nesting + exception restore; integration: two concurrent scoped dry-runs stay isolated).
+- [x] Added to `pipelex/hub.py` (mirroring `scoped_pipe_router`): `_event_log_override: ContextVar["EventLogProtocol | None"]`, `scoped_event_log(event_log)` `@contextmanager` (save/set/restore), and accessor `get_event_log_override()`.
+- [x] Write side prefers the override: `pipeline_run_setup.py` (`event_log = get_event_log_override()`, factory only when `None` and `is_enabled`). D1: a set override implies tracing-enabled.
+- [x] Read side prefers the override: `tracing_assembly.py::assemble_tracing` — the `is_enabled` early-return is bypassed when an override is set (D1); the override is read **without** `close()` (the scope owner keeps the instance's lifecycle).
+- [x] `EventLogProtocol` surface confirmed sufficient — no protocol change.
+- [x] `make agent-check` clean · new tracing tests green (7/7).
 
 > ### ⛔ CHECKPOINT 1 — after Phase 1 — **MANDATORY STOP**
 >
@@ -93,7 +93,16 @@ Pure in-repo capability, no Temporal, no cross-repo. Fully testable in direct mo
 >
 > **Verify:** `make agent-check` clean · `make agent-test` green · the new in-memory-tracing tests pass (same-instance emit+read, zero file/backend, concurrency-safe) · commit.
 >
-> **Handoff (fill in):** final `scoped_event_log` signature + accessor name · exact write/read call-site edits (file:symbol) · the `is_enabled`-vs-override semantics decided · any `EventLogProtocol` change (expected: none). **Next: Phase 2.**
+> **Handoff (filled in, 2026-06-09):**
+>
+> - **Scope API (`pipelex/hub.py`, right after `get_pipe_router`):** `scoped_event_log(event_log: EventLogProtocol)` — `@contextmanager`, ContextVar save/set/restore, mirrors `scoped_pipe_router`. Accessor: `get_event_log_override() -> EventLogProtocol | None`. ContextVar: `_event_log_override`.
+> - **Write-side edit:** `pipeline_run_setup.py::pipeline_run_setup` — `event_log = get_event_log_override()`; falls back to `make_event_log(tracing_config)` only when no override AND `tracing_config.is_enabled`.
+> - **Read-side edit:** `tracing_assembly.py::assemble_tracing` — early-return is now `if event_log_override is None and not tracing_config.is_enabled`; with an override, `read_events` is called on it directly and it is NOT `close()`d (scope owner keeps lifecycle; the no-override branch keeps its `make_event_log` + `close()` shape — D2 symmetric primitive).
+> - **`is_enabled` vs override (D1):** a set override **implies tracing-enabled** at both guards; regression-tested (`test_override_implies_enabled_when_tracing_disabled`).
+> - **`EventLogProtocol`:** unchanged.
+> - **Other `make_event_log` call sites left alone (intentional):** `tracing/activity_event_log.py` (Temporal worker per-process usage log — Phase-3 activity never reaches it) and `runtime_bridge/primitives/trace_flush.py` (bridge DIRECT flush — off-path since D-C1 dropped the bridge).
+>
+> **Next: Phase 2.**
 
 ---
 

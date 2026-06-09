@@ -49,6 +49,7 @@ if TYPE_CHECKING:
 
     from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
+    from pipelex.tracing.event_log_protocol import EventLogProtocol
 
 
 class PipelexHub:
@@ -661,6 +662,37 @@ def get_pipe_router() -> "PipeRouterProtocol":
     if override is not None:
         return override
     return get_pipelex_hub().get_required_pipe_router()
+
+
+_event_log_override: ContextVar["EventLogProtocol | None"] = ContextVar("event_log_override", default=None)
+
+
+@contextmanager
+def scoped_event_log(event_log: "EventLogProtocol") -> Generator[None, None, None]:
+    """Pin ``event_log`` as the trace-event transport for the scope, then restore the prior value on exit.
+
+    Both the write side (tracer emission, set up in ``pipeline_run_setup``) and the read
+    side (``tracing_assembly.assemble_tracing``) prefer this override over building a new
+    backend via ``make_event_log``, so emit and assemble share the SAME instance — which
+    is what makes a plain in-memory event log usable for graph assembly (no external
+    store bridges the two sides). A set override implies tracing-enabled: it is honored
+    even when ``tracing_config.is_enabled`` is False.
+
+    The scope owner keeps ownership of the instance's lifecycle — the pipeline machinery
+    never calls ``cleanup`` on it and the read side does not ``close`` it. Mirrors
+    :func:`scoped_pipe_router`.
+    """
+    prev = _event_log_override.get()
+    _event_log_override.set(event_log)
+    try:
+        yield
+    finally:
+        _event_log_override.set(prev)
+
+
+def get_event_log_override() -> "EventLogProtocol | None":
+    """Return the contextvar-scoped event-log override set by :func:`scoped_event_log`, or None."""
+    return _event_log_override.get()
 
 
 def get_pipe_run() -> "PipeRunProtocol":
