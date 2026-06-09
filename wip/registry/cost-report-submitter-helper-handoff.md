@@ -1,5 +1,7 @@
 # Handoff — one-arg `render_cost_report_for_output(pipe_output)` submitter helper
 
+**Status: ✅ Shipped** (`feature/Cost-report-helper`). `render_cost_report_for_output` is in `pipelex/reporting/cost_report_renderer.py`, the `pipelex run` CLI (`_run_core.py`) uses it, `render_run_cost_report` is unchanged as the primitive, unit tests pin the gate-from-output derivation (`tests/unit/pipelex/reporting/test_render_cost_report_for_output.py`), and the as-built overview + `docs/features/cost-tracking.md` document the surface. Downstream cocode collapse is still pending (re-pin `pipelex`, then delete cocode's local `_render_cost_report` gate). The rationale below is kept because it composes with the still-open decisions #3/#6 in `cost-report-deferred-decisions.md`.
+
 **Task:** add a thin, self-contained cost-report rendering helper to `pipelex/reporting/cost_report_renderer.py` that takes only a finished `PipeOutput`, so every "submitter" (the `pipelex run` CLI, and external embedders like cocode) stops re-deriving the same three arguments — and stops re-reading global config to reconstruct a decision the run already recorded on the output.
 
 This is the **submitter-ergonomics facet** of the same theme as the deferred decisions in this registry (`cost-report-deferred-decisions.md` #3/#6, and its cross-cutting note: "there is no single owner of *is cost reporting on for this run?*"). It does not resolve #3 or #6 — it is a smaller, additive convenience that should land on its own, and it composes cleanly with whatever those decisions settle.

@@ -32,7 +32,7 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexRunner
-from pipelex.reporting.cost_report_renderer import render_run_cost_report
+from pipelex.reporting.cost_report_renderer import render_cost_report_for_output
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.exceptions import JsonTypeError
@@ -312,16 +312,11 @@ async def _execute_run(
             raise typer.Exit(1) from csv_exc
         log.verbose(f"Main stuff CSV saved to: {save_csv}")
 
-    # Render the end-of-run cost report from the usage assembled onto pipe_output (event-sourced),
-    # gated by the resolved --costs. Channels (console / CSV) follow the reporting config (D6).
-    # The renderer keeps its cost-domain name (`is_generate_costs`) on purpose; it is fed the usage
-    # gate (`is_generate_usage`) — "if usage was generated, render the cost view". Do not "align" the
-    # keyword to the field: the cost report is a view over usage, not the same switch.
-    render_run_cost_report(
-        pipeline_run_id=response.pipeline_run_id,
-        tokens_usages=pipe_output.tokens_usages,
-        is_generate_costs=execution_config.is_generate_usage,
-    )
+    # Render the end-of-run cost report from the usage assembled onto pipe_output (event-sourced).
+    # The gate is read off the output itself — pipe_output.tokens_usages is None exactly when cost
+    # reporting was off for this run — so the submitter no longer re-derives it from config. Channels
+    # (console / CSV) follow the reporting config (D6).
+    render_cost_report_for_output(pipe_output)
 
     # Print completion recap
     console = get_console()
