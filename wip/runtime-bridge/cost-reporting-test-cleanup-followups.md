@@ -1,6 +1,6 @@
-# Cost-reporting test additions — two cleanup follow-ups
+# Cost-reporting test additions — cleanup follow-ups
 
-**Status:** 🧹 Optional cleanups, no correctness impact. Both items resolved. Surfaced by a code review of the distributed-cost-reporting test additions (see [`distributed-cost-reporting-test-coverage.md`](distributed-cost-reporting-test-coverage.md), "Resolution (as-built)"). The review found **no bugs**; these were cosmetic dead-code / weak-assertion items.
+**Status:** 🧹 Optional cleanups, no correctness impact. Items #1–#2 surfaced by a code review of the distributed-cost-reporting test additions (see [`distributed-cost-reporting-test-coverage.md`](distributed-cost-reporting-test-coverage.md), "Resolution (as-built)") and are resolved. Item #3 surfaced on the v0.32.0 release PR #977 and is deferred (dev/test helper only). The reviews found **no shipped-code bugs**; these are cosmetic dead-code / weak-assertion / test-helper-correctness items.
 
 ---
 
@@ -43,6 +43,20 @@ assert _FAKE_RUNNER_MODEL_NAME not in model_names, "Real inference must report a
 - Or, if a guard against accidentally falling back to the fake substitute is still wanted, import `_RUNNER_FAKE_INFERENCE_MODEL_NAME` from `helpers.py` rather than re-declaring it, so a rename can't rot it.
 
 ---
+
+## 3. Global CSV selection in the cross-worker cost assert ⏭️ DEFERRED
+
+**File:** `.claude/skills/temporal-e2e-validate/scripts/assert_cross_worker_cost.py` (`_csv_token_totals`, ~lines 54-75)
+
+**Status:** ⏭️ Deferred — dev/test helper only (not shipped library code). Surfaced by **greptile (P2)** on the v0.32.0 release PR #977; left open on that PR for a fast-follow.
+
+`_csv_token_totals(reports_dir)` picks the cost-report CSV to compare against with `sorted(reports_dir.glob("cost_report*.csv"))[-1]` — the lexicographically-latest file in the **global** reports dir — even though the caller passes the run-specific `--run-dir` for the NDJSON side of the comparison. If another run already wrote a later-numbered `cost_report*.csv`, the assert compares the current run's NDJSON usage against a **stale CSV from a different run**, which can fail a good run or pass a bad one.
+
+This is the same helper as item #1, but a distinct concern: item #1 was about the *column* read inside a row (`nb_tokens_input` fallback, ~line 224); this is about *which file* is selected (~lines 54-75).
+
+**Why deferred, not fixed:** it's a `.claude/skills/` test helper, out of scope for the docs-only v0.32.0 release-branch pass. Real enough to fix on `dev`.
+
+**Fix:** tie CSV selection to the run being asserted — either point `--reports-dir` at a per-run subdir (e.g. `run_dir / "reports"`) and glob there, or filter `cost_report*.csv` by the run id derived from `run_dir.name`. Re-confirm where the runner writes `cost_report*.csv` relative to `--run-dir` before choosing.
 
 ## Verification
 

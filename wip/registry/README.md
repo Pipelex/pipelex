@@ -12,7 +12,7 @@ Shipped in **PR #967** on `fix/For-API-update`, with the companion rename **#968
 
 ## Open follow-ups
 
-- [`deferred-followups.md`](deferred-followups.md) — the deliberate non-goals: the costs-only in-memory tracer skip (E1 deep half), cost-per-node correlation, the A1 `TraceContext.from_execution_config` factory, T5, T3 request-scoped tracing state, `--mock-inference` coverage, and the leftover `graph_id → run_id` rename + shelved `TraceContext` split.
+- [`deferred-followups.md`](deferred-followups.md) — the deliberate non-goals: the costs-only in-memory tracer skip (E1 deep half), cost-per-node correlation, the A1 `TraceContext.from_execution_config` factory, T5, T3 request-scoped tracing state, the costs-only event-log explicit-close cleanup (PR #977 re-review), `--mock-inference` coverage, and the leftover `graph_id → run_id` rename + shelved `TraceContext` split.
 - [`cost-report-deferred-decisions.md`](cost-report-deferred-decisions.md) — two deferred **design decisions**: (#3) cost reporting is coupled to `tracing_config.is_enabled` (costs-on + tracing-off ⇒ no report); (#6) the agent CLI gates costs on the raw `costs` param while the main CLI gates on the resolved `is_generate_usage`. Both want a deliberate call.
 - [`usage-reporting-without-cost.md`](usage-reporting-without-cost.md) — capability idea (low priority): make usage (token counts) a separately-requestable output, with cost as one view layered on top.
 

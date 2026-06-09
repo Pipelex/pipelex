@@ -9,7 +9,7 @@ Whichever path runs, every inference failure is classified the moment it happens
 
 | Category | Meaning | Retried by Temporal? |
 |----------|---------|----------------------|
-| `transient` | A brief, self-correcting failure (rate limit, 5xx, connection/timeout) | ✅ Yes |
+| `transient` | A brief, self-correcting failure (rate limit, 5xx, connection/timeout, transport errors) | ✅ Yes |
 | `configuration` | The setup is wrong (bad API key, missing backend) | ❌ No |
 | `content` | The input or prompt is wrong (content-policy violation) | ❌ No |
 | `capacity` | Account quota or billing exhausted | ❌ No |
