@@ -32,14 +32,14 @@ The single place the two modes touch. Under a Temporal-enabled hub, `get_content
 - **Mode 2 wants that default** — the in-workflow generator *is* how it dispatches leaf activities.
 - **Mode 1 must override it to inline** — otherwise, once Part B routes the DRY mock through `get_content_generator()` at the leaf, Mode 1's in-process activity would dispatch `act_llm_gen_*` and break.
 
-So `scoped_content_generator` (a hub ContextVar + context manager, mirroring `scoped_pipe_router` at `hub.py:635`, with `get_content_generator()` preferring the override) is needed by Mode 1 and is the seam Part C originally specced. **Decision (2026-06-09): build it now, in Mode 1's branch**, so Mode 1 is correct regardless of when Part B lands and the seam exists once for both.
+So `scoped_content_generator` (a hub ContextVar + context manager, mirroring `scoped_pipe_router` in `hub.py`, with `get_content_generator()` preferring the override) is needed by Mode 1 and is the seam Part C originally specced. **Decision (2026-06-09): build it now, in Mode 1's branch**, so Mode 1 is correct regardless of when Part B lands and the seam exists once for both.
 
 ### The ContextVar scope family (`pipelex/hub.py`)
 
 | Scope | Exists? | Used by | Forces |
 |---|---|---|---|
-| `scoped_current_library` | yes (`hub.py:518`) | both / general | which library is current |
-| `scoped_pipe_router` | yes (`hub.py:635`, PR #976) | Mode 1 | nested controllers run in-process, not via the Temporal router |
+| `scoped_current_library` | yes (`hub.py`) | both / general | which library is current |
+| `scoped_pipe_router` | yes (`hub.py`, PR #976) | Mode 1 | nested controllers run in-process, not via the Temporal router |
 | `scoped_content_generator` | **to build (Mode 1 branch)** | Mode 1 | the leaf uses the inline generator, not the in-workflow one |
 | `scoped_event_log` | **to build (Mode 1 branch, Phase 1)** | Mode 1 | graph trace events share one in-memory log across emit + assemble |
 
