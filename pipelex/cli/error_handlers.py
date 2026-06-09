@@ -1,3 +1,4 @@
+from contextvars import ContextVar
 from pathlib import Path
 from typing import NoReturn
 
@@ -46,8 +47,24 @@ class ErrorContext(StrEnum):
     KIT = "Kit operation"
 
 
+# Whether --traceback was passed, recorded at parse time by PipelexCLI.make_context.
+# This is a ContextVar (mirroring set_agent_cli_error_format) rather than a read of the
+# global Click context: typer >= 0.26 / click >= 8.4 do not push a global context during
+# subcommand dispatch, so reading the flag there silently lost it on handled errors.
+_traceback_requested: ContextVar[bool] = ContextVar("pipelex_cli_traceback_requested", default=False)
+
+
+def set_traceback_requested(value: bool) -> None:
+    """Record whether --traceback was passed, independent of the Click context."""
+    _traceback_requested.set(value)
+
+
 def is_traceback_requested() -> bool:
     """Check whether the --traceback global flag was passed on the CLI invocation."""
+    # Authoritative path: the flag recorded at parse time, context-independent.
+    if _traceback_requested.get():
+        return True
+    # Fallback for callers that push a Click context directly (tests / embedders).
     try:
         ctx = click.get_current_context(silent=True)
     except RuntimeError:

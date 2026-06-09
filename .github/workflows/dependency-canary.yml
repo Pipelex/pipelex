@@ -1,0 +1,85 @@
+name: Dependency canary
+
+# Early warning for the failure mode that broke the CLI when typer 0.26 shipped:
+# an upstream release that a fresh `pip install pipelex` would pull, but our
+# committed uv.lock masks. Runs DAILY against newer-than-locked dependencies and
+# exercises the REAL CLI (it's the CLI that broke), so such a break shows up here
+# — on our dashboard — instead of in a user's install or a deploy.
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # every day, 06:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  # 1. Resolve every dependency to the latest version still allowed by our
+  #    declared ranges, then run the suite AND real CLI commands. Catches
+  #    breakage from any floor-only / uncapped dependency the moment it releases.
+  latest-within-ranges:
+    name: Latest deps within ranges (py${{ matrix.python-version }})
+    runs-on: [aca-runner-test]
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/.venv
+      ENV: dev
+      PIPELEX_NO_DECK_NOTICE: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install
+        run: PYTHON_VERSION=${{ matrix.python-version }} make install
+
+      - name: Upgrade dependencies to latest within ranges
+        run: uv lock --upgrade && uv sync --all-extras
+
+      - name: Run tests
+        run: make gha-tests
+
+      - name: Exercise the real CLI (config-free, no secrets)
+        run: |
+          .venv/bin/pipelex --version
+          .venv/bin/pipelex validate bundle tests/data/packages/analytics_dep/analytics.mthds
+          .venv/bin/pipelex run bundle tests/data/packages/analytics_dep/analytics.mthds --dry-run --mock-inputs
+
+  # 2. Force the typer/click family PAST its pyproject cap, then run the CLI
+  #    smoke test and the real CLI commands. This is the signal to bump the cap:
+  #    when it goes red, a new typer/click broke the CLI -- validate, fix if
+  #    needed, then raise the bound in pyproject.toml. `uv pip install` ignores
+  #    the cap on purpose.
+  beyond-typer-cap:
+    name: Beyond typer cap (real CLI)
+    runs-on: [aca-runner-test]
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/.venv
+      ENV: dev
+      PIPELEX_NO_DECK_NOTICE: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install
+        run: make install
+
+      - name: Force latest typer/click (ignores the cap)
+        run: uv pip install --upgrade typer click
+
+      - name: CLI smoke test (every subcommand starts)
+        run: .venv/bin/pytest tests/unit/pipelex/cli/test_cli_entrypoint_smoke.py -q
+
+      - name: Exercise the real CLI (validate + dry-run a real pipeline)
+        run: |
+          .venv/bin/pipelex --version
+          .venv/bin/pipelex validate bundle tests/data/packages/analytics_dep/analytics.mthds
+          .venv/bin/pipelex run bundle tests/data/packages/analytics_dep/analytics.mthds --dry-run --mock-inputs
