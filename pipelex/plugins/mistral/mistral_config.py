@@ -9,7 +9,7 @@ from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
-    from mistralai.models import MistralPromptMode
+    from mistralai.client.models import MistralPromptMode
 
     from pipelex.cogt.llm.llm_job_components import ReasoningEffort
 

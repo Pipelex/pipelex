@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 import pytest
-from mistralai import MistralError
+from mistralai.client.errors import MistralError
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
