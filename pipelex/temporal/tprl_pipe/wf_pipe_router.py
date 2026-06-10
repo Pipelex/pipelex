@@ -10,7 +10,6 @@ with workflow.unsafe.imports_passed_through():
     from kajson.kajson_manager import KajsonManager
 
     from pipelex.base_exceptions import PipelexError, iter_cause_chain
-    from pipelex.config import get_config
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.graph.graph_tracer_manager import GraphTracerManager
     from pipelex.hub import clear_current_library, get_library_manager, get_report_delegate, set_current_library
@@ -110,8 +109,14 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
             pipeline_run_id = workflow_arg.job_metadata.pipeline_run_id
             wf_workflow_id = workflow.info().workflow_id
 
-            tracing_config = get_config().pipelex.tracing_config
-            if tracing_config.is_enabled and trace_context is not None:
+            # Determinism: whether tracing is set up — and therefore whether the finally
+            # block schedules act_flush_trace_events — must be a pure function of the
+            # workflow payload, never of worker-local config (which can differ between
+            # the worker that recorded the history and the one replaying it, causing a
+            # [TMPRL1100] nondeterminism error). The presence of trace_context IS the
+            # submitter's decision; the worker-local tracing_config.is_enabled check
+            # lives in the flush activity, where reading local config is legal.
+            if trace_context is not None:
                 try:
                     # Use BufferingEventLog inside workflows (no I/O allowed).
                     # Events are flushed to the real backend via act_flush_trace_events.

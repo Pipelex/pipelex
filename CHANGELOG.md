@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **Temporal workflows no longer hang when worker tracing config differs across replays.** `WfPipeRouter` decided whether to set up per-workflow tracing — and therefore whether to schedule `act_flush_trace_events` — by reading `tracing_config.is_enabled` from worker-local config inside the workflow body. Replaying a workflow on a worker whose tracing config differed from the recorder's (worker restart, rolling deploy, scale-in) produced a divergent command stream, and Temporal's `[TMPRL1100]` nondeterminism error surfaced as a silently hung workflow stuck in workflow-task retries. The workflow now gates tracing setup purely on the presence of `trace_context` in the payload — the submitter's decision, recorded in history — and the worker-local `is_enabled` check happens only inside the flush activity, where reading local config is deterministic-safe (it already no-ops there when tracing is disabled). Side benefit: per-workflow graph assembly no longer requires the worker to have a tracing backend enabled. Guarded by a replay regression test that flips the worker's tracing config mid-workflow.
+
 ## [v0.32.1] - 2026-06-09
 
 ### Added
