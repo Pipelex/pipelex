@@ -39,3 +39,9 @@ One dict for all libraries: load overwrites entries, teardown pops by `pipe_ref`
 ## 7. Per-queue dispatch tuning doesn't reach `act_dry_validate`
 
 `WfDryValidate` hardcodes `start_to_close_timeout=5min` / `maximum_attempts=2` in workflow code (per D-C5, precedented by `WfPipeRun`'s own hardcoded utility-activity bounds), so the v2 `resolve_dispatch` overlays (`queue_options`, per-handle options) cannot tune the validation activity. Fine while one bound fits all deployments; revisit if a deployment needs a larger validation budget (big bundles WILL hit the 5-minute cap — see item 1 for what happens then).
+
+## 8. Payload-converter exceptions in workflow tasks hang the submitter (retry-forever), and aware datetimes were the live trigger
+
+Root-caused 2026-06-10 (CI py3.11–3.14 hang on the three GraphSpec-crossing tests): an exception raised by the data converter while decoding an activity result fails the *workflow task*, which Temporal retries indefinitely — the submitter's `execute_workflow` never returns. The trigger was environmental (`ZoneInfoNotFoundError`: no IANA tzdata on the runner for py3.11+; fixed by making `tzdata` a direct dependency), but the failure *shape* is general: any deterministic decode bug (kajson registry miss, schema drift, future enum rename) will present as an infinite hang on every host, not a failed run. `dispatch_dry_validate`'s 12-minute `workflow_execution_timeout` bounds the API path; direct `execute_workflow` callers (tests, scripts) have no bound.
+
+**Direction (design tradeoff, do not reflexively patch):** consider making deterministic conversion errors fail-fast — e.g. catch `KajsonDecoderError` in `BaseModelPayloadConverter.from_payload` and re-raise as a non-retryable shape, or document that every submitter must set `workflow_execution_timeout`. Temporal's retry-forever default exists so a code redeploy can heal a bad task; trading that away deserves a deliberate decision.

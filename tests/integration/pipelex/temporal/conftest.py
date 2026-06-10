@@ -1,3 +1,7 @@
+import faulthandler
+import logging
+import os
+from pathlib import Path
 from typing import AsyncGenerator, Generator, cast
 
 import pytest
@@ -20,6 +24,67 @@ from pipelex.test_extras.shared_pytest_plugins import ClassRegistryMode
 
 TEMPORAL_SERVER_NONE = "none"
 TEMPORAL_SERVER_TIME_SKIPPING = "time-skipping"
+
+HANG_DUMP_DIR_ENV_VAR = "PIPELEX_HANG_DUMP_DIR"
+HANG_DUMP_DELAY_SECONDS = 150.0
+
+
+@pytest.fixture(scope="session", autouse=True)
+def temporal_failure_log_capture() -> Generator[None, None, None]:
+    """Mirror temporalio WARNING+ logs (with tracebacks) to a file under the hang-dump dir.
+
+    Enabled only when ``PIPELEX_HANG_DUMP_DIR`` is set (CI hang debugging). A payload-conversion
+    error inside a workflow task makes Temporal retry the task forever — the test then hangs
+    until pytest-timeout's thread-method kill, which destroys pytest's captured logs along with
+    the process. temporalio logs each failed workflow activation WITH the offending traceback,
+    so mirroring its logger to a file preserves the actual error across the kill.
+    """
+    dump_dir_value = os.environ.get(HANG_DUMP_DIR_ENV_VAR)
+    if not dump_dir_value:
+        yield
+        return
+    dump_dir = Path(dump_dir_value)
+    dump_dir.mkdir(parents=True, exist_ok=True)
+    handler = logging.FileHandler(dump_dir / f"temporalio-pid{os.getpid()}.log", encoding="utf-8")
+    handler.setLevel(logging.WARNING)
+    handler.setFormatter(logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s"))
+    temporalio_logger = logging.getLogger("temporalio")
+    temporalio_logger.addHandler(handler)
+    try:
+        yield
+    finally:
+        temporalio_logger.removeHandler(handler)
+        handler.close()
+
+
+@pytest.fixture(autouse=True)
+def temporal_hang_watchdog(request: FixtureRequest) -> Generator[None, None, None]:
+    """Dump every thread's stack to a file when a temporal test exceeds the watchdog delay.
+
+    Enabled only when the ``PIPELEX_HANG_DUMP_DIR`` env var is set (CI hang debugging).
+    The delay sits below pytest-timeout's ``--timeout`` so the dump lands BEFORE the
+    thread-method kill (``os._exit``) destroys the process — pytest-xdist swallows worker
+    stderr on "node down", so a file under the dump dir is the only way to see where a
+    hung test was stuck on a remote runner. One file per worker process; each test appends
+    an armed/disarmed marker, so the hung test is the last armed entry without a disarm.
+    """
+    dump_dir_value = os.environ.get(HANG_DUMP_DIR_ENV_VAR)
+    if not dump_dir_value:
+        yield
+        return
+    test_id = cast("str", request.node.nodeid)  # pyright: ignore[reportUnknownMemberType]
+    dump_dir = Path(dump_dir_value)
+    dump_dir.mkdir(parents=True, exist_ok=True)
+    dump_path = dump_dir / f"hang-pid{os.getpid()}.txt"
+    with dump_path.open("a", encoding="utf-8") as dump_file:
+        dump_file.write(f"\n===== armed: {test_id} =====\n")
+        dump_file.flush()
+        faulthandler.dump_traceback_later(HANG_DUMP_DELAY_SECONDS, file=dump_file)
+        try:
+            yield
+        finally:
+            faulthandler.cancel_dump_traceback_later()
+            dump_file.write(f"===== disarmed: {test_id} =====\n")
 
 
 def pytest_addoption(parser: Parser) -> None:
