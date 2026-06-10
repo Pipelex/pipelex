@@ -7,7 +7,7 @@ description: "Reference for the `MockInferenceObjectFidelityError` Pipelex error
 
 # Mock inference object fidelity
 
-Raised when a ``--mock-inference`` synthetic object fails re-validation against its original class.
+Raised when a leaf-mocked synthetic object fails re-validation against its original class.
 
 | Field | Value |
 |---|---|

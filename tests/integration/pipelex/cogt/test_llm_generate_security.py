@@ -10,6 +10,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.content_generation.assignment_models import LLMAssignment, ObjectAssignment
+from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.exceptions import UnsafeSchemaError
 from pipelex.cogt.content_generation.llm_generate import llm_gen_object, llm_gen_object_list
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -20,6 +21,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 def _make_stub_llm_assignment() -> LLMAssignment:
     return LLMAssignment(
         job_metadata=JobMetadata(user_id="test-user", pipeline_run_id="test-run"),
+        cogt_run_params=CogtRunParams(),
         llm_setting=LLMSetting(model="test-model", temperature=0.7),
         llm_prompt=LLMPrompt(user_text="test prompt"),
     )

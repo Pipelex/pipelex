@@ -157,6 +157,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         )
         page_contents = await content_generator.make_extract_pages(
             extract_input=extract_input,
+            cogt_run_params=pipe_run_params.cogt_run_params,
             extract_handle=extract_setting.model,
             job_metadata=job_metadata,
             extract_job_params=extract_job_params,

@@ -242,6 +242,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             try:
                 generated_text: str = await content_generator.make_llm_text(
                     job_metadata=job_metadata,
+                    cogt_run_params=pipe_run_params.cogt_run_params,
                     llm_prompt_for_text=llm_prompt_1_for_text,
                     llm_setting_main=llm_setting_main,
                 )
@@ -349,6 +350,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             try:
                 generated_objects = await content_generator.make_object_list(
                     job_metadata=job_metadata,
+                    cogt_run_params=pipe_run_params.cogt_run_params,
                     object_class=content_class,
                     llm_prompt_for_object_list=llm_prompt_for_object,
                     llm_setting_for_object_list=llm_setting_for_object,
@@ -367,6 +369,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         try:
             return await content_generator.make_object(
                 job_metadata=job_metadata,
+                cogt_run_params=pipe_run_params.cogt_run_params,
                 object_class=content_class,
                 llm_prompt_for_object=llm_prompt_for_object,
                 llm_setting_for_object=llm_setting_for_object,

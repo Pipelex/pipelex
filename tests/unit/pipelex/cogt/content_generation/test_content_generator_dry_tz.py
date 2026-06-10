@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 import pytest
 from pytest_mock import MockerFixture
 
+from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -59,6 +60,7 @@ class TestContentGeneratorDryTimezone:
 
         await generator.make_llm_text(
             job_metadata=job_metadata,
+            cogt_run_params=CogtRunParams(),
             llm_setting_main=llm_setting,
             llm_prompt_for_text=llm_prompt,
         )

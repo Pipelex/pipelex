@@ -17,12 +17,11 @@ produce unique-per-run ids by construction.
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
+from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.temporal.tprl_content_generation.content_generator_in_workflow import ContentGeneratorInWorkflow
-from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 
 
 def _make_job_metadata() -> JobMetadata:
@@ -30,8 +29,7 @@ def _make_job_metadata() -> JobMetadata:
 
 
 def _make_generator() -> ContentGeneratorInWorkflow:
-    factory = GeneratedContentFactory(storage_provider=InMemoryStorageProvider())
-    return ContentGeneratorInWorkflow(generated_content_factory=factory)
+    return ContentGeneratorInWorkflow()
 
 
 def _make_llm_setting() -> LLMSetting:
@@ -58,11 +56,13 @@ class TestDefaultActivityIdCollisionBug:
 
         await generator.make_llm_text(
             job_metadata=_make_job_metadata(),
+            cogt_run_params=CogtRunParams(),
             llm_setting_main=_make_llm_setting(),
             llm_prompt_for_text=LLMPrompt(user_text="hello"),
         )
         await generator.make_llm_text(
             job_metadata=_make_job_metadata(),
+            cogt_run_params=CogtRunParams(),
             llm_setting_main=_make_llm_setting(),
             llm_prompt_for_text=LLMPrompt(user_text="hello again"),
         )

@@ -10,6 +10,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.content_generation.assignment_models import LLMAssignment
+from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.llm_generate import llm_gen_text
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
@@ -20,6 +21,7 @@ class TestLlmGenerateMockBranch:
     def _assignment(self, *, is_mock_inference: bool) -> LLMAssignment:
         return LLMAssignment(
             job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_branch", is_mock_inference=is_mock_inference),
+            cogt_run_params=CogtRunParams(),
             llm_setting=LLMSetting(model="gpt-4o", temperature=0.5),
             llm_prompt=LLMPrompt(),
         )

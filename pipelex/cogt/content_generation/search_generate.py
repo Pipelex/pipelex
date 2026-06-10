@@ -11,6 +11,7 @@ loop, which left search failures hanging the submitter — see ``wip/`` brief).
 from typing import Any
 
 from pipelex.cogt.content_generation.assignment_models import SearchAssignment, SearchObjectAssignment
+from pipelex.cogt.content_generation.dry_mock import dry_search_gen_sourced_answer, dry_search_gen_structured
 from pipelex.cogt.content_generation.exceptions import MockInferenceUnsupportedError
 from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
 from pipelex.cogt.model_backends.model_type import ModelType
@@ -23,8 +24,9 @@ from pipelex.hub import get_model_deck
 
 
 def _guard_no_mock_inference(search_assignment: SearchAssignment) -> None:
-    # Web search has no leaf-level mock — under --mock-inference (run_mode stays LIVE) this live
-    # path runs, so fail loud rather than silently hit the real provider (use --dry-run instead).
+    # Web search has no *reportable* leaf mock for --mock-inference (run_mode stays LIVE), so this
+    # live path would silently hit the real provider — fail loud instead (use --dry-run, whose leaf
+    # branch above mints a full synthetic result).
     if search_assignment.job_metadata.is_mock_inference:
         error = MockInferenceUnsupportedError.for_operation("web search (PipeSearch)")
         raise error
@@ -52,6 +54,8 @@ def _make_search_job(search_assignment: SearchAssignment) -> SearchJob:
 
 
 async def search_gen_sourced_answer(search_assignment: SearchAssignment) -> SearchResultContent:
+    if search_assignment.cogt_run_params.run_mode.is_dry:
+        return dry_search_gen_sourced_answer(search_assignment)
     _guard_no_mock_inference(search_assignment)
     worker = _make_search_worker(search_assignment)
     search_job = _make_search_job(search_assignment)
@@ -66,6 +70,8 @@ async def search_gen_structured(search_object_assignment: SearchObjectAssignment
     which sidesteps shipping a dynamic output class across the Temporal boundary.
     """
     search_assignment = search_object_assignment.search_assignment
+    if search_assignment.cogt_run_params.run_mode.is_dry:
+        return dry_search_gen_structured(search_object_assignment)
     _guard_no_mock_inference(search_assignment)
     worker = _make_search_worker(search_assignment)
     search_job = _make_search_job(search_assignment)

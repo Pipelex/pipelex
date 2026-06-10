@@ -6,8 +6,8 @@ from temporalio import workflow
 # protocol is therefore deliberate — moving it under ``TYPE_CHECKING`` would
 # break replay because the symbol is type-annotated on a runtime variable.
 with workflow.unsafe.imports_passed_through():
+    from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
     from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol  # noqa: TC001
-    from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
     from pipelex.cogt.llm.llm_prompt import LLMPrompt
     from pipelex.cogt.llm.llm_setting import LLMSetting
     from pipelex.pipeline.job_metadata import JobMetadata
@@ -15,7 +15,6 @@ with workflow.unsafe.imports_passed_through():
     from pipelex.temporal.log_temporal import workflow_log
     from pipelex.temporal.test_extras.temporal_registry_test_models import FixtureCustomer, FixtureInvoice, FixtureLineItem
     from pipelex.temporal.tprl_content_generation.content_generator_in_workflow_factory import ContentGeneratorInWorkflowFactory
-    from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 
 
 @workflow.defn(name="wf_test_structured_output_cross_process")
@@ -33,18 +32,17 @@ class WfTestStructuredOutputCrossProcess:
     @workflow.run
     async def run(self, is_list: bool) -> None:
         workflow_log.debug("Workflow start")
-        generated_content_factory = GeneratedContentFactory(storage_provider=InMemoryStorageProvider())
-        content_generator: ContentGeneratorProtocol = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow(
-            generated_content_factory=generated_content_factory,
-        )
+        content_generator: ContentGeneratorProtocol = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow()
 
         job_metadata = JobMetadata(user_id="temporal-test", pipeline_run_id=workflow.info().workflow_id)
+        cogt_run_params = CogtRunParams()
         llm_setting = LLMSetting(model="$testing-structured", temperature=0.0)
         prompt = LLMPrompt(user_text="round-trip nested structured output")
 
         if is_list:
             invoices = await content_generator.make_object_list(
                 job_metadata=job_metadata,
+                cogt_run_params=cogt_run_params,
                 object_class=FixtureInvoice,
                 llm_setting_for_object_list=llm_setting,
                 llm_prompt_for_object_list=prompt,
@@ -53,6 +51,7 @@ class WfTestStructuredOutputCrossProcess:
         else:
             invoice = await content_generator.make_object(
                 job_metadata=job_metadata,
+                cogt_run_params=cogt_run_params,
                 object_class=FixtureInvoice,
                 llm_setting_for_object=llm_setting,
                 llm_prompt_for_object=prompt,

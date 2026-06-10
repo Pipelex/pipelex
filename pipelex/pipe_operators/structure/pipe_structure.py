@@ -155,6 +155,7 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
             try:
                 generated_objects = await content_generator.make_object_list(
                     job_metadata=job_metadata,
+                    cogt_run_params=pipe_run_params.cogt_run_params,
                     object_class=content_class,
                     llm_prompt_for_object_list=llm_prompt,
                     llm_setting_for_object_list=llm_setting_for_object,
@@ -169,6 +170,7 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
             try:
                 the_content = await content_generator.make_object(
                     job_metadata=job_metadata,
+                    cogt_run_params=pipe_run_params.cogt_run_params,
                     object_class=content_class,
                     llm_prompt_for_object=llm_prompt,
                     llm_setting_for_object=llm_setting_for_object,

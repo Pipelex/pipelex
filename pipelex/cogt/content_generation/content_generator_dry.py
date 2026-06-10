@@ -4,6 +4,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import SearchAssignment
+from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
 from pipelex.cogt.content_generation.dry_mock import build_mock_object, report_dry_llm_job
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
@@ -56,6 +57,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     async def make_llm_text(
         self,
         job_metadata: JobMetadata,
+        cogt_run_params: CogtRunParams,
         llm_setting_main: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
     ) -> str:
@@ -70,6 +72,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     async def make_object(
         self,
         job_metadata: JobMetadata,
+        cogt_run_params: CogtRunParams,
         object_class: type[BaseModelTypeVar],
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_object: LLMPrompt,
@@ -84,6 +87,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     async def make_object_list(
         self,
         job_metadata: JobMetadata,
+        cogt_run_params: CogtRunParams,
         object_class: type[BaseModelTypeVar],
         llm_setting_for_object_list: LLMSetting,
         llm_prompt_for_object_list: LLMPrompt,
@@ -96,6 +100,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         for idx in range(nb_list_items):
             item = await self.make_object(
                 job_metadata=job_metadata,
+                cogt_run_params=cogt_run_params,
                 object_class=object_class,
                 llm_setting_for_object=llm_setting_for_object_list,
                 llm_prompt_for_object=llm_prompt_for_object_list,
@@ -107,10 +112,8 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
             items.append(item)
         return items
 
-    @override
     async def make_image_content(
         self,
-        job_metadata: JobMetadata,
         generated_image_raw_details: GeneratedImageRawDetails,
         img_gen_prompt: ImgGenPrompt | None,
     ) -> ImageContent:
@@ -120,10 +123,8 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
             image_content.source_negative_prompt = img_gen_prompt.negative_text
         return image_content
 
-    @override
     async def make_page_contents(
         self,
-        job_metadata: JobMetadata,
         extract_output: ExtractOutput,
     ) -> list[PageContent]:
         page_contents: list[PageContent] = []
@@ -132,7 +133,6 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
             page_images: list[ImageContent] = []
             for extracted_image in page.extracted_images:
                 image_content = await self.make_image_content(
-                    job_metadata=job_metadata,
                     generated_image_raw_details=extracted_image,
                     img_gen_prompt=None,
                 )
@@ -153,6 +153,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     async def make_single_image(
         self,
         job_metadata: JobMetadata,
+        cogt_run_params: CogtRunParams,
         img_gen_handle: str,
         img_gen_prompt: ImgGenPrompt,
         img_gen_job_params: ImgGenJobParams | None = None,
@@ -163,7 +164,6 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         image_urls = get_config().pipelex.dry_run_config.image_urls
         image_url = image_urls[0]
         return await self.make_image_content(
-            job_metadata=job_metadata,
             generated_image_raw_details=GeneratedImageRawDetails(
                 actual_url=image_url,
                 size=ImageSize(width=1024, height=1024),
@@ -177,6 +177,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     async def make_image_list(
         self,
         job_metadata: JobMetadata,
+        cogt_run_params: CogtRunParams,
         img_gen_handle: str,
         img_gen_prompt: ImgGenPrompt,
         nb_images: int,
@@ -189,7 +190,6 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         image_contents: list[ImageContent] = []
         for image_index in range(nb_images):
             image_content = await self.make_image_content(
-                job_metadata=job_metadata,
                 generated_image_raw_details=GeneratedImageRawDetails(
                     actual_url=image_urls[image_index % len(image_urls)],
                     size=ImageSize(width=1024, height=1024),
@@ -204,6 +204,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     async def make_templated_text(
         self,
         job_metadata: JobMetadata,
+        cogt_run_params: CogtRunParams,
         context: dict[str, Any],
         template: str,
         templating_style: TemplatingStyle | None = None,
@@ -222,6 +223,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     async def make_render_page_views(
         self,
         job_metadata: JobMetadata,
+        cogt_run_params: CogtRunParams,
         extract_input: ExtractInput,
         extract_handle: str,
         extract_job_params: ExtractJobParams | None = None,
@@ -248,6 +250,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     async def make_extract_pages(
         self,
         job_metadata: JobMetadata,
+        cogt_run_params: CogtRunParams,
         extract_input: ExtractInput,
         extract_handle: str,
         extract_job_params: ExtractJobParams | None = None,
@@ -281,6 +284,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
             if extract_input.document_uri:
                 page_view_contents = await self.make_render_page_views(
                     extract_input=extract_input,
+                    cogt_run_params=cogt_run_params,
                     extract_handle=extract_handle,
                     job_metadata=job_metadata,
                     extract_job_params=extract_job_params,

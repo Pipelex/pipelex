@@ -10,6 +10,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.content_generation.assignment_models import LLMAssignment
+from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.dry_mock import (
     DRY_RUN_INFERENCE_MODEL_NAME,
     MOCK_INFERENCE_MODEL_NAME,
@@ -77,6 +78,7 @@ class TestDryMock:
         captured = self._capture_reported_job(mocker)
         assignment = LLMAssignment(
             job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_text", is_mock_inference=True),
+            cogt_run_params=CogtRunParams(),
             llm_setting=LLMSetting(model="gpt-4o", temperature=0.5),
             llm_prompt=LLMPrompt(),
         )

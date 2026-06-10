@@ -375,10 +375,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                     ContentGeneratorInWorkflowFactory,
                 )
 
-                generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
-                content_generator = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow(
-                    generated_content_factory=generated_content_factory,
-                )
+                content_generator = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow()
             else:
                 generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
                 content_generator = ContentGenerator(generated_content_factory=generated_content_factory)

@@ -1,15 +1,18 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from pipelex import log
+from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.core.memory.working_memory import BATCH_ITEM_STUFF_NAME, MAIN_STUFF_NAME
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity, VariableMultiplicityResolution
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.types import Self, StrEnum
+
+if TYPE_CHECKING:
+    from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 
 
 class PipeRunParamKey(StrEnum):
@@ -135,7 +138,15 @@ class BatchParams(BaseModel):
 
 
 class PipeRunParams(BaseModel):
-    run_mode: PipeRunMode = PipeRunMode.LIVE
+    # `extra="forbid"` so a stale `PipeRunParams(run_mode=...)` constructor fails loudly instead of
+    # silently building a LIVE-mode instance (run_mode is a read-only property now, not a field).
+    model_config = ConfigDict(extra="forbid")
+
+    # The ONLY copy of `run_mode` lives inside `cogt_run_params` (eng review D2) — see the
+    # `run_mode` delegating property below. Written once at construction by
+    # `PipeRunParamsFactory.make_run_params`; operators slice this field off and thread it
+    # into the content-generator protocol so the cogt leaf sees the same mode on any backend.
+    cogt_run_params: CogtRunParams = Field(default_factory=CogtRunParams)
     final_stuff_code: str | None = None
     output_multiplicity: VariableMultiplicity | None = None
     dynamic_output_concept_ref: str | None = None
@@ -145,6 +156,11 @@ class PipeRunParams(BaseModel):
     pipe_stack_limit: int
     pipe_stack: list[str] = Field(default_factory=list)
     pipe_layers: list[str] = Field(default_factory=list)
+
+    @property
+    def run_mode(self) -> PipeRunMode:
+        """Delegates to the single copy on ``cogt_run_params`` — zero duplication (D2)."""
+        return self.cogt_run_params.run_mode
 
     @property
     def pipe_stack_str(self) -> str:

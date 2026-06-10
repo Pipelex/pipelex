@@ -1,8 +1,10 @@
 from typing import Any
 
+from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.config import get_config
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
-from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunMode, PipeRunParams
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
 
 
 class PipeRunParamsFactory:
@@ -16,9 +18,10 @@ class PipeRunParamsFactory:
         batch_params: BatchParams | None = None,
         params: dict[str, Any] | None = None,
     ) -> PipeRunParams:
+        """Single writer of ``run_mode``: builds the nested ``CogtRunParams`` here (D2)."""
         pipe_stack_limit = pipe_stack_limit or get_config().pipelex.pipe_run_config.pipe_stack_limit
         return PipeRunParams(
-            run_mode=pipe_run_mode,
+            cogt_run_params=CogtRunParams(run_mode=pipe_run_mode),
             pipe_stack_limit=pipe_stack_limit,
             output_multiplicity=output_multiplicity,
             dynamic_output_concept_ref=dynamic_output_concept_ref,

@@ -236,6 +236,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         if nb_images > 1:
             image_content_list = await content_generator.make_image_list(
                 job_metadata=job_metadata,
+                cogt_run_params=pipe_run_params.cogt_run_params,
                 img_gen_handle=img_gen_handle,
                 img_gen_prompt=img_gen_prompt,
                 nb_images=nb_images,
@@ -253,6 +254,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         else:
             image_content = await content_generator.make_single_image(
                 job_metadata=job_metadata,
+                cogt_run_params=pipe_run_params.cogt_run_params,
                 img_gen_handle=img_gen_handle,
                 img_gen_prompt=img_gen_prompt,
                 img_gen_job_params=img_gen_job_params,

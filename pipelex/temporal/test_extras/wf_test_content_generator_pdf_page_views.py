@@ -2,16 +2,16 @@ from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
     from pipelex import pretty_print
+    from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
     from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
     from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol  # noqa: TC001
-    from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
     from pipelex.cogt.extract.extract_input import ExtractInput
     from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
+    from pipelex.pipe_run.pipe_run_mode import PipeRunMode
     from pipelex.pipeline.job_metadata import JobMetadata
     from pipelex.temporal.exceptions import ContentGenerationError
     from pipelex.temporal.log_temporal import workflow_log
     from pipelex.temporal.tprl_content_generation.content_generator_in_workflow_factory import ContentGeneratorInWorkflowFactory
-    from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
     from tests.integration.pipelex.temporal.test_data import PipeTestCases
 
 
@@ -33,20 +33,20 @@ class WfTestContentGeneratorPdfPageViews:
         if is_dry_run:
             content_generator = ContentGeneratorDry()
         else:
-            generated_content_factory = GeneratedContentFactory(storage_provider=InMemoryStorageProvider())
-            content_generator = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow(
-                generated_content_factory=generated_content_factory,
-            )
+            content_generator = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow()
 
         job_metadata = JobMetadata(
             user_id="temporal-test",
             pipeline_run_id=workflow.info().workflow_id,
         )
+        run_mode = PipeRunMode.DRY if is_dry_run else PipeRunMode.LIVE
+        cogt_run_params = CogtRunParams(run_mode=run_mode)
 
         page_contents = await content_generator.make_extract_pages(
             extract_input=ExtractInput(
                 document_uri=PipeTestCases.JOB_OFFER_PDF_LOCAL,
             ),
+            cogt_run_params=cogt_run_params,
             extract_handle="azure-document-intelligence",
             job_metadata=job_metadata,
             extract_job_params=ExtractJobParams(

@@ -14,6 +14,7 @@ own page. Classes are grouped by subsystem.
 
 - [`CogtError`](cogt-error.md) — AI inference failed
 - [`CostRegistryError`](cost-registry-error.md) — Cost registry
+- [`DryRunMockBuildError`](dry-run-mock-build-error.md) — Dry run mock build
 - [`ExtractCapabilityError`](extract-capability-error.md) — Extract capability
 - [`ExtractHandleNotFoundError`](extract-handle-not-found-error.md) — Extract handle not found
 - [`ExtractInputError`](extract-input-error.md) — Extract input

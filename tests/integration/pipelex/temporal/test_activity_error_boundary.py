@@ -31,6 +31,7 @@ from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
 from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import ExtractAssignment, LLMAssignment
+from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
@@ -153,6 +154,7 @@ class TestActivityErrorBoundary:
 
         llm_assignment = LLMAssignment(
             job_metadata=JobMetadata(user_id="test", pipeline_run_id="test"),
+            cogt_run_params=CogtRunParams(),
             llm_setting=get_model_deck().get_llm_setting(llm_choice="$testing-text"),
             llm_prompt=LLMPrompt(user_text="never reaches the model — llm_gen_text is mocked"),
         )
@@ -208,6 +210,7 @@ class TestActivityErrorBoundary:
 
         extract_assignment = ExtractAssignment(
             job_metadata=JobMetadata(user_id="test", pipeline_run_id="test"),
+            cogt_run_params=CogtRunParams(),
             extract_handle="extract-handle-never-reached",
             extract_input=ExtractInput(document_uri="file://never-reached.pdf"),
             extract_job_params=ExtractJobParams.make_default_extract_job_params(),

@@ -10,6 +10,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.content_generation.assignment_models import ExtractAssignment
+from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.exceptions import MockInferenceUnsupportedError
 from pipelex.cogt.content_generation.extract_generate import extract_gen_pages
 from pipelex.cogt.extract.extract_input import ExtractInput
@@ -21,6 +22,7 @@ class TestExtractGenerateMockGuard:
     def _assignment(self, *, is_mock_inference: bool) -> ExtractAssignment:
         return ExtractAssignment(
             job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_extract_guard", is_mock_inference=is_mock_inference),
+            cogt_run_params=CogtRunParams(),
             extract_handle="mock-extract-handle",
             extract_input=ExtractInput(document_uri="file:///tmp/doc.pdf"),
             extract_job_params=ExtractJobParams(

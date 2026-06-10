@@ -502,10 +502,12 @@ backoff_coefficient = 2.0
 maximum_interval = "unlimited"
 maximum_attempts = 3
 non_retryable_error_types = [
+  "DryRunMockBuildError",
   "ExtractHandleNotFoundError",
   "FileNotFoundError",
   "ImgGenHandleNotFoundError",
   "LLMHandleNotFoundError",
+  "MockInferenceUnsupportedError",
   "ModelNotFoundError",
   "ValidationError",
 ]

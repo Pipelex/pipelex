@@ -118,6 +118,7 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
         # and lets its failures cross the workflow boundary as classified errors instead of hanging.
         search_assignment = SearchAssignment(
             job_metadata=job_metadata,
+            cogt_run_params=pipe_run_params.cogt_run_params,
             query=query_text,
             search_setting=search_setting,
             include_domains=self.include_domains,

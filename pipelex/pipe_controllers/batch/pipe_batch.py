@@ -163,7 +163,6 @@ class PipeBatch(PipeController):
                     "output_multiplicity": None,
                 },
             )
-            branch_pipe_run_params.run_mode = pipe_run_params.run_mode
             return await get_pipe_router().run(
                 pipe_job=PipeJobFactory.make_pipe_job(
                     pipe=sub_pipe,
