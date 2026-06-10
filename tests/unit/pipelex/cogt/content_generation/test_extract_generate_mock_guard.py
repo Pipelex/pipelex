@@ -3,7 +3,7 @@
 ``--mock-inference`` has no leaf-level mock for document extraction, so reaching the extract leaf under
 the flag would dispatch to the real provider and spend. The leaf must fail loud instead: raise
 ``MockInferenceUnsupportedError`` before ``get_extract_worker`` is ever called. With the flag off, the
-real worker path runs unchanged — proving the guard is keyed strictly on ``job_metadata.is_mock_inference``.
+real worker path runs unchanged — proving the guard is keyed strictly on ``cogt_run_params.is_mock_inference``.
 """
 
 import pytest
@@ -21,8 +21,8 @@ from pipelex.pipeline.job_metadata import JobMetadata
 class TestExtractGenerateMockGuard:
     def _assignment(self, *, is_mock_inference: bool) -> ExtractAssignment:
         return ExtractAssignment(
-            job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_extract_guard", is_mock_inference=is_mock_inference),
-            cogt_run_params=CogtRunParams(),
+            job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_extract_guard"),
+            cogt_run_params=CogtRunParams(is_mock_inference=is_mock_inference),
             extract_handle="mock-extract-handle",
             extract_input=ExtractInput(document_uri="file:///tmp/doc.pdf"),
             extract_job_params=ExtractJobParams(

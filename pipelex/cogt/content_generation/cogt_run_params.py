@@ -25,6 +25,24 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 
 
 class CogtRunParams(BaseModel):
-    """Execution-mode contract carried on every cogt assignment (crosses the Temporal wire)."""
+    """Execution-mode contract carried on every cogt assignment (crosses the Temporal wire).
+
+    Precedence at the leaf: ``run_mode=DRY`` wins over ``is_mock_inference`` — every leaf checks
+    ``run_mode.is_dry`` first, so a DRY run with the mock flag set mocks dry (zero-token,
+    suppressed report), never the reportable mock.
+    """
 
     run_mode: PipeRunMode = PipeRunMode.LIVE
+
+    # The ``--mock-inference`` trigger (the thin reportable-mock kept by eng review D8): a LIVE run
+    # whose LLM leaf calls are faked with *non-zero* synthetic usage so a cost report renders —
+    # unlike ``run_mode=DRY`` whose zero-token usage is suppressed. This is the cheap, deterministic
+    # cross-worker cost-report validation affordance. Single writer:
+    # ``PipeRunParamsFactory.make_run_params`` (fed by ``prepare_pipe_job`` off the CLI flag).
+    # Non-LLM leaves have no reportable mock and fail loud (``MockInferenceUnsupportedError``).
+    is_mock_inference: bool = False
+
+    @property
+    def is_mock_built(self) -> bool:
+        """True when the leaf output is a synthetic mock (either trigger) — arms the object-fidelity guard."""
+        return self.run_mode.is_dry or self.is_mock_inference

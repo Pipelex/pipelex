@@ -3,8 +3,6 @@ from typing import Any, Literal
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
-from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.exceptions import LLMCompletionError
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting
@@ -107,9 +105,8 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-        content_generator: ContentGeneratorProtocol | None = None,
     ) -> PipeStructureOutput:
-        content_generator = content_generator or get_content_generator()
+        content_generator = get_content_generator()
 
         text_str = working_memory.get_stuff_as_str(name=self.text_input_name)
 
@@ -205,22 +202,6 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
 
     def _format_error_location(self, pipe_run_params: PipeRunParams) -> str:
         return f"in pipe '{pipe_run_params.pipe_stack_str}'"
-
-    @override
-    async def _dry_run_operator_pipe(
-        self,
-        job_metadata: JobMetadata,
-        working_memory: WorkingMemory,
-        pipe_run_params: PipeRunParams,
-        output_name: str | None = None,
-    ) -> PipeStructureOutput:
-        return await self._live_run_operator_pipe(
-            job_metadata=job_metadata,
-            working_memory=working_memory,
-            pipe_run_params=pipe_run_params,
-            output_name=output_name,
-            content_generator=ContentGeneratorDry(),
-        )
 
     @override
     async def _validate_before_run(

@@ -77,16 +77,6 @@ class JobMetadata(BaseModel):
     unit_job_id: UnitJobId | None = None
     job_category: JobCategory | None = None
 
-    # ``--mock-inference`` trigger: a LIVE run (``run_mode`` stays LIVE, so operators dispatch
-    # normally) whose LLM calls are faked at the cogt leaf instead of hitting a provider.
-    # Single-writer: ``prepare_pipe_job`` off the CLI flag. The leaf emits synthetic *non-zero*
-    # usage so a cost report renders (unlike ``run_mode=DRY`` whose zero-token usage is suppressed)
-    # — this is the cheap, deterministic cross-worker cost-report validation affordance. See
-    # ``cogt/content_generation/dry_mock.py``. Planned migration (eng review D8): this flag moves
-    # from ``JobMetadata`` into ``CogtRunParams`` so there is one flag-transport style — see
-    # ``wip/dry-run-refactor/followup-leaf-run-mode-mock.md`` Phase B2.
-    is_mock_inference: bool = False
-
     started_at: datetime | None = Field(default_factory=datetime.now)
     completed_at: datetime | None = None
 

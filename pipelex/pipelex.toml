@@ -368,7 +368,6 @@ region = ""
 ####################################################################################################
 
 [pipelex.dry_run_config]
-apply_to_jinja2_rendering = false
 text_gen_truncate_length = 256
 nb_list_items = 3
 nb_extract_pages = 4

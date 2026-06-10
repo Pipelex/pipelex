@@ -214,7 +214,7 @@ def pytest_collection_modifyitems(config: Config, items: list[pytest.Item]) -> N
     - Are NOT marked with @pytest.mark.dry_runnable
 
     Tests marked with both inference and dry_runnable can still run because
-    they use the mock ContentGeneratorDry.
+    the cogt leaf mocks under run_mode=DRY.
     """
     if not config.getoption("--disable-inference", default=False):
         return

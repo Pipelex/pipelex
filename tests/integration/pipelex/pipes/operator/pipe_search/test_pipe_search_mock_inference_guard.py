@@ -3,7 +3,7 @@
 Web search has no leaf-level mock. It now goes through the same ``cogt/content_generation`` seam as
 LLM/img-gen/extract: ``PipeSearch`` calls the content generator, whose direct impl runs the
 framework-agnostic ``search_generate`` leaf. Under ``--mock-inference`` (``run_mode=LIVE`` +
-``JobMetadata.is_mock_inference``) the live path runs, so the guard lives at the top of that leaf
+``CogtRunParams.is_mock_inference``) the live path runs, so the guard lives at the top of that leaf
 (``search_gen_sourced_answer``) and must fail loud before the search worker is built.
 ``MockInferenceUnsupportedError`` is a plain ``PipelexError`` (not a model-availability error and not a
 ``CogtError``), so neither ``PipeOperator._live_run_pipe`` nor the router re-wraps it — it propagates
@@ -53,8 +53,8 @@ class TestPipeSearchMockInferenceGuard:
 
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=pipe,
-            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.LIVE),
-            job_metadata=job_metadata.model_copy(update={"is_mock_inference": True}),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.LIVE, is_mock_inference=True),
+            job_metadata=job_metadata,
         )
 
         with pytest.raises(MockInferenceUnsupportedError):

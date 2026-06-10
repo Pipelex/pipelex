@@ -77,8 +77,8 @@ class TestDryMock:
         """mock_llm_gen_text returns a synthetic string and reports one reportable usage event."""
         captured = self._capture_reported_job(mocker)
         assignment = LLMAssignment(
-            job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_text", is_mock_inference=True),
-            cogt_run_params=CogtRunParams(),
+            job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_text"),
+            cogt_run_params=CogtRunParams(is_mock_inference=True),
             llm_setting=LLMSetting(model="gpt-4o", temperature=0.5),
             llm_prompt=LLMPrompt(),
         )

@@ -1,4 +1,4 @@
-"""Pin that the dry generator copes with both naive and aware ``started_at``.
+"""Pin that the dry synthetic-job reporting copes with both naive and aware ``started_at``.
 
 The synthetic ``completed_at`` must share the tzinfo of the incoming
 ``started_at`` so ``JobMetadata.duration`` can subtract them without crossing
@@ -12,15 +12,14 @@ from datetime import datetime, timezone
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
-from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
+from pipelex.cogt.content_generation.dry_mock import report_dry_llm_job
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
-class TestContentGeneratorDryTimezone:
+class TestDryReportTimezone:
     @pytest.mark.parametrize(
         "started_at",
         [
@@ -29,8 +28,7 @@ class TestContentGeneratorDryTimezone:
             pytest.param(None, id="none_uses_default_factory"),
         ],
     )
-    @pytest.mark.asyncio
-    async def test_duration_is_finite_for_any_started_at_tz(
+    def test_duration_is_finite_for_any_started_at_tz(
         self,
         started_at: datetime | None,
         mocker: MockerFixture,
@@ -42,27 +40,22 @@ class TestContentGeneratorDryTimezone:
 
         mock_delegate = mocker.MagicMock()
         mock_delegate.report_inference_job.side_effect = _capture
-        # The tz-handling logic now lives in dry_mock; ContentGeneratorDry delegates to it, so patch
-        # get_report_delegate where it is looked up at call time (dry_mock, not this module).
+        # Patch get_report_delegate where it is looked up at call time (dry_mock).
         mocker.patch(
             "pipelex.cogt.content_generation.dry_mock.get_report_delegate",
             return_value=mock_delegate,
         )
 
-        generator = ContentGeneratorDry()
         job_metadata = JobMetadata(
             user_id="test_user",
             pipeline_run_id="run_dry_tz",
             started_at=started_at,
         )
-        llm_setting = LLMSetting(model="gpt-4o", temperature=0.5)
-        llm_prompt = LLMPrompt()
 
-        await generator.make_llm_text(
+        report_dry_llm_job(
             job_metadata=job_metadata,
-            cogt_run_params=CogtRunParams(),
-            llm_setting_main=llm_setting,
-            llm_prompt_for_text=llm_prompt,
+            llm_setting=LLMSetting(model="gpt-4o", temperature=0.5),
+            llm_prompt=LLMPrompt(),
         )
 
         assert len(captured_jobs) == 1

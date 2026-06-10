@@ -14,7 +14,7 @@ both backends and ``run_mode`` stays orthogonal to backend choice (D-plan §3.5)
   templating) mint synthetic outputs without reporting usage. For img-gen and
   extract, the DRY branch lives at the ``*_and_store`` layer — one step above the
   raw provider leaf — so a dry run performs **no storage IO** (eng review D10).
-- ``--mock-inference`` (``run_mode=LIVE`` + ``JobMetadata.is_mock_inference``):
+- ``--mock-inference`` (``run_mode=LIVE`` + ``CogtRunParams.is_mock_inference``):
   the LLM leaf routes to :func:`mock_llm_gen_text` / :func:`mock_llm_gen_object` /
   :func:`mock_llm_gen_object_list`, which report **non-zero** synthetic usage via
   :func:`report_mock_inference_llm_job`. Non-zero tokens ⇒ a cost report *renders*.
@@ -29,7 +29,7 @@ code path, identical mock everywhere); exotic format constraints must declare
 ``examples`` / ``mock_format`` — see ``MockInferenceObjectFidelityError``.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import datetime
 from typing import Any
 
@@ -68,6 +68,10 @@ from pipelex.hub import get_report_delegate
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+
+# The pipe code every mocked bundle answers to — shared with BundleHeaderSpec.main_pipe's
+# examples so bundle dry-validation's mocked header names a pipe that exists (D3).
+MOCK_MAIN_PIPE_CODE = "mock_main"
 
 # Sentinel model identifiers so a synthetic usage record is never confused with real inference.
 DRY_RUN_INFERENCE_MODEL_NAME = "dry_run"
@@ -222,6 +226,23 @@ def _reconstruct_object_class(object_assignment: ObjectAssignment) -> type[BaseM
     )
 
 
+def stamp_mock_main_coordination(items: Sequence[Any]) -> None:
+    """Set the first item's ``pipe_code`` to ``"mock_main"`` — the single home of this coordination (D3).
+
+    WHY: bundle dry-validation mocks a ``BundleHeaderSpec`` whose ``main_pipe`` field declares
+    ``examples=["mock_main"]`` (``pipelex/builder/bundle_header_spec.py``), so the polyfactory mock
+    header names ``mock_main`` as the bundle's main pipe. Every mock that fabricates a *list of pipe
+    specs* must therefore make its first item answer to that name, or the mocked bundle fails its own
+    main-pipe check. Callers: the mock-input factory (``working_memory_factory``), the batch
+    controller's dry aggregation (``pipe_batch``), and the dry object-list leaf mock
+    (:func:`dry_llm_gen_object_list`). The stamp is a no-op for items without a ``pipe_code`` field.
+    ``--mock-inference`` deliberately does NOT stamp: it is a LIVE run that never drives bundle
+    dry-validation (see :func:`mock_llm_gen_object_list`).
+    """
+    if items and hasattr(items[0], "pipe_code"):
+        items[0].pipe_code = MOCK_MAIN_PIPE_CODE
+
+
 def _nb_list_items(object_assignment: ObjectAssignment) -> int:
     """Resolve the object-list mock length: the assignment's fixed ``nb_items`` wins (D11)."""
     return object_assignment.nb_items or get_config().pipelex.dry_run_config.nb_list_items
@@ -266,21 +287,17 @@ def mock_llm_gen_object(object_assignment: ObjectAssignment) -> BaseModel:
 def mock_llm_gen_object_list(object_assignment: ObjectAssignment) -> list[BaseModel]:
     """Leaf mock for ``llm_gen_object_list``: ``nb_items`` builds + one reportable usage event.
 
-    The ``pipe_code='mock_main'`` first-item coordination that satisfies ``BundleHeaderSpec.main_pipe``
-    during bundle dry-validation lives ONLY in ``ContentGeneratorDry.make_object_list`` today; the leaf
-    mocks (this one and the dry one) do not perform it. ``--mock-inference`` never drives bundle
-    dry-validation so it never needs it; the dry leaf gains it in Phase B2 via the shared
-    ``stamp_mock_main_coordination()`` helper when ``ContentGeneratorDry`` is deleted (see
-    ``wip/dry-run-refactor/followup-leaf-run-mode-mock.md``).
+    Deliberately does NOT apply :func:`stamp_mock_main_coordination`: ``--mock-inference`` is a LIVE
+    run that never drives bundle dry-validation, so there is no main-pipe check to satisfy — only the
+    dry leaf (:func:`dry_llm_gen_object_list`) stamps.
     """
     return _leaf_gen_object_list(object_assignment, report_func=report_mock_inference_llm_job)
 
 
 # --- Dry leaf helpers (``run_mode == DRY``) -------------------------------------------------------
 #
-# Each helper is the leaf-level counterpart of the corresponding ``ContentGeneratorDry`` method:
-# same synthetic output, but minted at the leaf so it runs identically inline (direct backend) and
-# inside a Temporal activity (the backend dispatches normally; the leaf mocks).
+# Each helper mints the synthetic output for one leaf, so a dry run behaves identically inline
+# (direct backend) and inside a Temporal activity (the backend dispatches normally; the leaf mocks).
 
 
 def _dry_text_gen_truncate_length() -> int:
@@ -307,9 +324,15 @@ def dry_llm_gen_object(object_assignment: ObjectAssignment) -> BaseModel:
 
 
 def dry_llm_gen_object_list(object_assignment: ObjectAssignment) -> list[BaseModel]:
-    """Dry leaf for ``llm_gen_object_list``: ``nb_items`` schema-built mocks + one zero-token report."""
+    """Dry leaf for ``llm_gen_object_list``: ``nb_items`` schema-built mocks + one zero-token report.
+
+    Applies :func:`stamp_mock_main_coordination` so bundle dry-validation's mocked
+    ``BundleHeaderSpec.main_pipe`` check passes through the leaf mock (D3).
+    """
     log.verbose(f"🤡 DRY RUN: llm_gen_object_list for '{object_assignment.object_class_name}'")
-    return _leaf_gen_object_list(object_assignment, report_func=report_dry_llm_job)
+    items = _leaf_gen_object_list(object_assignment, report_func=report_dry_llm_job)
+    stamp_mock_main_coordination(items)
+    return items
 
 
 def dry_templating_gen_text(templating_assignment: TemplatingAssignment) -> str:

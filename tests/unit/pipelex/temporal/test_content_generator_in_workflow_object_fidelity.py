@@ -47,8 +47,8 @@ def _make_generator() -> ContentGeneratorInWorkflow:
     return ContentGeneratorInWorkflow()
 
 
-def _mock_job_metadata(*, is_mock_inference: bool) -> JobMetadata:
-    return JobMetadata(user_id="u", pipeline_run_id="run", pipe_code="my_pipe", is_mock_inference=is_mock_inference)
+def _job_metadata() -> JobMetadata:
+    return JobMetadata(user_id="u", pipeline_run_id="run", pipe_code="my_pipe")
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -64,8 +64,8 @@ class TestContentGeneratorInWorkflowObjectFidelity:
 
         with pytest.raises(MockInferenceObjectFidelityError) as exc_info:
             await _make_generator().make_object(
-                job_metadata=_mock_job_metadata(is_mock_inference=True),
-                cogt_run_params=CogtRunParams(),
+                job_metadata=_job_metadata(),
+                cogt_run_params=CogtRunParams(is_mock_inference=True),
                 object_class=ConstrainedName,
                 llm_setting_for_object=LLMSetting(model="test-llm", temperature=0.5),
                 llm_prompt_for_object=LLMPrompt(user_text="hello"),
@@ -78,8 +78,8 @@ class TestContentGeneratorInWorkflowObjectFidelity:
 
         with pytest.raises(MockInferenceObjectFidelityError):
             await _make_generator().make_object_list(
-                job_metadata=_mock_job_metadata(is_mock_inference=True),
-                cogt_run_params=CogtRunParams(),
+                job_metadata=_job_metadata(),
+                cogt_run_params=CogtRunParams(is_mock_inference=True),
                 object_class=ConstrainedName,
                 llm_setting_for_object_list=LLMSetting(model="test-llm", temperature=0.5),
                 llm_prompt_for_object_list=LLMPrompt(user_text="hello"),
@@ -91,7 +91,7 @@ class TestContentGeneratorInWorkflowObjectFidelity:
 
         with pytest.raises(MockInferenceObjectFidelityError):
             await _make_generator().make_object(
-                job_metadata=_mock_job_metadata(is_mock_inference=False),
+                job_metadata=_job_metadata(),
                 cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
                 object_class=ConstrainedName,
                 llm_setting_for_object=LLMSetting(model="test-llm", temperature=0.5),
@@ -104,7 +104,7 @@ class TestContentGeneratorInWorkflowObjectFidelity:
 
         with pytest.raises(ValidationError):
             await _make_generator().make_object(
-                job_metadata=_mock_job_metadata(is_mock_inference=False),
+                job_metadata=_job_metadata(),
                 cogt_run_params=CogtRunParams(),
                 object_class=ConstrainedName,
                 llm_setting_for_object=LLMSetting(model="test-llm", temperature=0.5),

@@ -20,7 +20,7 @@ import pytest
 from pipelex.cogt.content_generation.assignment_models import LLMAssignment, ObjectAssignment, SearchAssignment, SearchObjectAssignment
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
-from pipelex.cogt.content_generation.dry_mock import dry_llm_gen_object, dry_llm_gen_object_list
+from pipelex.cogt.content_generation.dry_mock import dry_llm_gen_object, dry_llm_gen_object_list, mock_llm_gen_object_list
 from pipelex.cogt.content_generation.exceptions import MockInferenceObjectFidelityError
 from pipelex.cogt.content_generation.search_generate import search_gen_structured
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -50,6 +50,13 @@ class StructuredAnswer(StructuredContent):
     confidence: float
 
 
+class SpecWithPipeCode(StructuredContent):
+    """Pipe-spec-shaped item: carries the ``pipe_code`` field the mock_main coordination targets."""
+
+    pipe_code: str
+    description: str
+
+
 def _dry_object_assignment(object_class: type[StructuredContent], nb_items: int | None = None) -> ObjectAssignment:
     llm_assignment = LLMAssignment(
         job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_dry_objects"),
@@ -77,6 +84,32 @@ class TestLeafDryObjectMocks:
         mocks = dry_llm_gen_object_list(_dry_object_assignment(RepresentativeInvoiceLine, nb_items=4))
 
         assert len(mocks) == 4
+
+    async def test_dry_object_list_stamps_mock_main_coordination(self) -> None:
+        """The dry leaf stamps the first pipe-spec-shaped item with pipe_code='mock_main' (D3).
+
+        This is what keeps builder-bundle dry-validation working through the leaf mock: the mocked
+        ``BundleHeaderSpec.main_pipe`` (``examples=["mock_main"]``) must name an existing pipe.
+        """
+        mocks = dry_llm_gen_object_list(_dry_object_assignment(SpecWithPipeCode, nb_items=3))
+
+        first_item_pipe_code = getattr(mocks[0], "pipe_code", None)
+        assert first_item_pipe_code == "mock_main"
+
+    async def test_mock_inference_object_list_does_not_stamp_mock_main(self) -> None:
+        """--mock-inference (LIVE) never drives bundle dry-validation, so it must NOT stamp (D3)."""
+        llm_assignment = LLMAssignment(
+            job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_mock_no_stamp"),
+            cogt_run_params=CogtRunParams(is_mock_inference=True),
+            llm_setting=LLMSetting(model="gpt-4o", temperature=0.5),
+            llm_prompt=LLMPrompt(user_text="make specs"),
+        )
+        object_assignment = ObjectAssignment.make_for_class(object_class=SpecWithPipeCode, llm_assignment=llm_assignment, nb_items=3)
+
+        mocks = mock_llm_gen_object_list(object_assignment)
+
+        first_item_pipe_code = getattr(mocks[0], "pipe_code", None)
+        assert first_item_pipe_code != "mock_main"
 
     async def test_dry_object_list_defaults_to_config_length(self) -> None:
         """Without nb_items the dry list falls back to dry_run_config.nb_list_items."""

@@ -38,7 +38,7 @@ flowchart TD
     C --> D[DryRunFactory.make_dry_run_factory]
     D --> E[Polyfactory with custom providers]
 
-    F[PipeLLM dry run] --> G[ContentGeneratorDry.make_object_direct]
+    F[PipeLLM dry run] --> G[cogt leaf: dry_llm_gen_object in dry_mock.py]
     G --> H[DryRunFactory.make_dry_run_factory]
     H --> E
 
@@ -46,10 +46,12 @@ flowchart TD
     J --> K[model_validate with resolved values]
 ```
 
+A dry run does not swap in a special content generator: `run_mode=DRY` rides `CogtRunParams` on every cogt assignment, and each inference leaf (`llm_generate`, the `*_and_store` image/extract leaves, search, templating) branches to its `dry_*` mock helper in `dry_mock.py` — identically whether the leaf runs inline or inside a Temporal activity.
+
 | Trigger | Entry Point | Mock Generation |
 |---------|-------------|-----------------|
 | `pipelex validate` | `dry_run_pipe()` | `WorkingMemoryFactory.make_mock_inputs()` |
-| `PipeLLM` output in dry mode | `ContentGeneratorDry.make_object_direct()` | `DryRunFactory` (auto-detects from field definitions) |
+| `PipeLLM` output in dry mode | `dry_llm_gen_object()` / `dry_llm_gen_object_list()` (cogt leaf, `dry_mock.py`) | `DryRunFactory` via the schema-reconstructed class |
 | `PipeFunc` output in dry mode | `WorkingMemoryFactory.make_mock_content()` | `DryRunFactory` (with explicit field constraints) |
 | `PipeCompose` in dry mode | `StructuredContentComposer.compose()` | Uses resolved values from working memory (no mocks) |
 
@@ -217,14 +219,14 @@ The `factory_use_construct=True` flag bypasses `field_validator` and `model_vali
 
 ### LLM Output Generation
 
-When `ContentGeneratorDry.make_object_direct()` generates mock LLM outputs:
+When the dry LLM leaf (`dry_llm_gen_object` in `dry_mock.py`) generates mock outputs, it reconstructs the output class from the JSON schema carried on the assignment (the same class on any backend), then builds via `build_mock_object()`:
 
 ```python
-object_factory = DryRunFactory.make_dry_run_factory(object_class)
-return object_factory.build(factory_use_construct=True)
+item_class = SchemaToModelFactory.make_from_json_schema(schema=..., class_name=...)
+return build_mock_object(item_class)
 ```
 
-No explicit field constraints are passed—the factory auto-detects `MockFormat` from field definitions.
+No explicit field constraints are passed — the factory auto-detects `MockFormat` from field definitions. Note that `json_schema_extra` hints can be dropped by the schema round-trip: classes with exotic format constraints should declare `examples` / `mock_format`, otherwise re-validation against the original class raises a typed `MockInferenceObjectFidelityError`.
 
 ### PipeCompose Resolution
 
@@ -250,7 +252,7 @@ In dry run mode, the working memory already contains properly formatted mock val
 | Scenario | Format Constraints | Validators Bypassed |
 |----------|-------------------|---------------------|
 | `WorkingMemoryFactory.make_mock_content()` | Yes (from `json_schema_extra` + explicit params) | Yes (`factory_use_construct`) |
-| `ContentGeneratorDry.make_object_direct()` | Yes (from `json_schema_extra` only) | Yes (`factory_use_construct`) |
+| `dry_llm_gen_object()` (cogt leaf) | Yes (from `json_schema_extra` surviving the schema round-trip) | No (validators run; failures raise typed `DryRunMockBuildError`) |
 | `StructuredContentComposer.compose()` | N/A (uses resolved values) | No (validates) |
 
 ---
@@ -304,7 +306,7 @@ class MySpec(StructuredContent):
 | File | Purpose |
 |------|---------|
 | `pipelex/cogt/content_generation/dry_run_factory.py` | `DryRunFactory` class with `MockFormat` enum and generators |
-| `pipelex/cogt/content_generation/content_generator_dry.py` | `ContentGeneratorDry` for mock LLM/image outputs |
+| `pipelex/cogt/content_generation/dry_mock.py` | Leaf-level dry/mock helpers (`dry_llm_gen_*`, `build_mock_object`, `stamp_mock_main_coordination`) |
 | `pipelex/core/memory/working_memory_factory.py` | `WorkingMemoryFactory.make_mock_content()` with field constraints |
 | `pipelex/pipe_operators/compose/structured_content_composer.py` | Composes `StructuredContent` from working memory (no mocks) |
 | `pipelex/pipe_run/dry_run.py` | `dry_run_pipe()` orchestration |

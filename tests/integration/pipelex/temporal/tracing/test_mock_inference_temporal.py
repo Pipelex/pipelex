@@ -2,14 +2,13 @@
 
 The DIRECT counterpart lives in
 ``tests/integration/pipelex/pipeline/test_mock_inference_direct.py``. This arm proves the part DIRECT
-cannot: that ``JobMetadata.is_mock_inference`` survives the Temporal serialization boundary and the
+cannot: that ``CogtRunParams.is_mock_inference`` survives the Temporal serialization boundary and the
 **real** ``act_llm_gen_text`` activity honors it — faking the LLM at the cogt leaf inside the activity
 body (no provider call), with the synthetic, reportable usage assembling back onto
 ``PipeOutput.tokens_usages`` via Step 2's ``act_assemble_tracing``.
 
-Run LIVE (``PipeRunMode.LIVE``) so the workflow actually dispatches ``act_llm_gen_text`` (DRY would
-swap ``ContentGeneratorDry`` in pre-dispatch and never reach the activity). The only thing faked is the
-inference leaf, keyed on the per-run flag.
+Run LIVE (``PipeRunMode.LIVE``) so the synthetic usage is *reportable* (non-zero — DRY's zero-token
+usage is suppressed by design). The only thing faked is the inference leaf, keyed on the per-run flag.
 
 Like its sibling tracing tests this is ``gha_disabled`` by the directory conftest (the in-process
 WorkflowEnvironment + concurrent pipe execution hangs under CI xdist); verify locally/serially.
@@ -55,9 +54,10 @@ class TestTemporalMockInference:
             pipe_run_mode=PipeRunMode.LIVE,
             isolated_registry=is_class_registry_isolated,
         ):
-            yield pipe_job.model_copy(
-                update={"job_metadata": pipe_job.job_metadata.model_copy(update={"is_mock_inference": True})},
+            mocked_run_params = pipe_job.pipe_run_params.model_copy(
+                update={"cogt_run_params": pipe_job.pipe_run_params.cogt_run_params.model_copy(update={"is_mock_inference": True})},
             )
+            yield pipe_job.model_copy(update={"pipe_run_params": mocked_run_params})
 
     async def test_mock_inference_assembles_reportable_usage_cross_process(
         self,
@@ -73,7 +73,7 @@ class TestTemporalMockInference:
             emit_graph_events=False,
             emit_usage_events=True,
         )
-        assert execution_job.job_metadata.is_mock_inference, "inject_trace_context must preserve is_mock_inference"
+        assert execution_job.pipe_run_params.cogt_run_params.is_mock_inference, "inject_trace_context must preserve is_mock_inference"
 
         pipe_run_arg = PipeRunArg(pipe_job=execution_job).prepare_for_temporal()
         task_queue = str(uuid.uuid4())

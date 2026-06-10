@@ -181,8 +181,14 @@ async def prepare_pipe_job(
     and no library mutation. ``trace_context`` / ``otel_context`` are created by
     the caller and threaded onto the job metadata. ``is_mock_inference`` (the
     ``--mock-inference`` trigger) is the single-writer point onto
-    :attr:`JobMetadata.is_mock_inference` — a LIVE run whose LLM inference-leaf calls are
+    :attr:`CogtRunParams.is_mock_inference` — a LIVE run whose LLM inference-leaf calls are
     faked (non-LLM leaves — image-gen / extract / search — raise ``MockInferenceUnsupportedError``).
+
+    A keyless boot (``Pipelex.make(needs_inference=False)``) forces the run to DRY (eng review
+    D4): the backend still dispatches normally and the cogt leaf mocks, so a keyless Temporal
+    submitter exercises the real distribution machinery at zero spend. The flag is resolved by
+    ``PipeRunParamsFactory.make_run_params`` (the single writer of ``run_mode``), so it covers
+    every entry point that builds run params, not just this one.
     """
     working_memory: WorkingMemory | None = None
 
@@ -224,13 +230,13 @@ async def prepare_pipe_job(
         otel_context=otel_context,
         trace_context=trace_context,
         request_id=request_id,
-        is_mock_inference=is_mock_inference,
     )
 
     pipe_run_params = PipeRunParamsFactory.make_run_params(
         output_multiplicity=output_multiplicity,
         dynamic_output_concept_ref=dynamic_output_concept_ref,
         pipe_run_mode=pipe_run_mode,
+        is_mock_inference=is_mock_inference,
     )
 
     # Build the library crate from all accumulated blueprints for Temporal dispatch.

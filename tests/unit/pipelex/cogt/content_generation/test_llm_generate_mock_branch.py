@@ -2,7 +2,7 @@
 
 The leaf is the single point where direct execution and the Temporal activities converge, so branching
 there covers both modes. These tests pin that the branch is keyed strictly on
-``job_metadata.is_mock_inference``: when set, the worker is never touched and the mock helper answers;
+``cogt_run_params.is_mock_inference``: when set, the worker is never touched and the mock helper answers;
 when unset, the real worker path runs.
 """
 
@@ -20,8 +20,8 @@ from pipelex.pipeline.job_metadata import JobMetadata
 class TestLlmGenerateMockBranch:
     def _assignment(self, *, is_mock_inference: bool) -> LLMAssignment:
         return LLMAssignment(
-            job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_branch", is_mock_inference=is_mock_inference),
-            cogt_run_params=CogtRunParams(),
+            job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_branch"),
+            cogt_run_params=CogtRunParams(is_mock_inference=is_mock_inference),
             llm_setting=LLMSetting(model="gpt-4o", temperature=0.5),
             llm_prompt=LLMPrompt(),
         )

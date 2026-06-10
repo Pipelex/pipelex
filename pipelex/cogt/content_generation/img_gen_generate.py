@@ -10,7 +10,7 @@ from pipelex.hub import get_img_gen_worker
 
 
 async def img_gen_single_image(img_gen_assignment: ImgGenAssignment) -> GeneratedImageRawDetails:
-    if img_gen_assignment.job_metadata.is_mock_inference:
+    if img_gen_assignment.cogt_run_params.is_mock_inference:
         error = MockInferenceUnsupportedError.for_operation("image generation (PipeImgGen)")
         raise error
     img_gen_worker = get_img_gen_worker(img_gen_handle=img_gen_assignment.img_gen_handle)
@@ -26,7 +26,7 @@ async def img_gen_single_image(img_gen_assignment: ImgGenAssignment) -> Generate
 
 
 async def img_gen_image_list(img_gen_assignment: ImgGenAssignment) -> list[GeneratedImageRawDetails]:
-    if img_gen_assignment.job_metadata.is_mock_inference:
+    if img_gen_assignment.cogt_run_params.is_mock_inference:
         error = MockInferenceUnsupportedError.for_operation("image generation (PipeImgGen)")
         raise error
     img_gen_worker = get_img_gen_worker(img_gen_handle=img_gen_assignment.img_gen_handle)

@@ -523,12 +523,11 @@ stamped with a runner-process `writer_id` (`act_{pid}_{uuid8}`). It's the e2e
 counterpart to the Phase 4 integration test
 `tests/integration/pipelex/temporal/tracing/test_split_worker_usage.py`.
 
-**Important — dry-run does NOT exercise this path.** In dry-run mode, `PipeLLM`
-(and friends) instantiate `ContentGeneratorDry()` directly inside the workflow
-body — on the router process — and never dispatch `act_llm_gen_text` to the
-runner. So a vanilla `pipelex run bundle --temporal --dry-run` against
-router+runner workers will emit ALL `usage_report` events with
-`writer_id="primary"`, never `act_*`.
+**Important — dry-run does NOT exercise the *reportable*-usage path.** Since
+Part B (leaf-level mock), `--temporal --dry-run` DOES dispatch `act_llm_gen_text`
+to the runner (the leaf mocks inside the activity — that's Tier 17's subject),
+but its synthetic usage is **zero-token and suppressed by design**, so no
+rendered cost report and no reportable usage events come back from it.
 
 **Cheap deterministic CLI way: `--mock-inference` (Tier 8b below).** To observe
 runner-side `act_*` writer files from the CLI *without LLM spend*, use
@@ -615,10 +614,10 @@ Tier 8b proves the next link end-to-end: those cross-worker usage events
 `assemble_usage=True`) and the submitter renders a **single** end-of-run cost
 report covering usage from all workers — with **no LLM spend**.
 
-**Why `--mock-inference` and not `--dry-run`.** Dry-run instantiates
-`ContentGeneratorDry` inside the workflow body *on the router* and never
-dispatches `act_llm_gen_text` to the runner (Tier 8 note), and its usage is
-zero-token → the cost report is *suppressed*. `--mock-inference` keeps
+**Why `--mock-inference` and not `--dry-run`.** Since Part B, dry-run also
+dispatches `act_llm_gen_text` to the runner (the leaf mocks inside the
+activity), but its synthetic usage is zero-token → the cost report is
+*suppressed* by design. `--mock-inference` keeps
 `run_mode=LIVE` so operators dispatch the real `act_llm_gen_text` to the runner
 exactly like a paid run; only the inference *leaf* is faked, emitting reportable
 non-zero synthetic usage (model `mock_inference`). So the runner emits `act_*`

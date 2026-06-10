@@ -172,8 +172,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         log.verbose(f"ContentGeneratorInWorkflow generated object direct: {obj}")
-        is_mock_built = cogt_run_params.run_mode.is_dry or job_metadata.is_mock_inference
-        return _revalidate_against_object_class(obj, object_class, is_mock_built=is_mock_built)
+        return _revalidate_against_object_class(obj, object_class, is_mock_built=cogt_run_params.is_mock_built)
 
     @override
     @update_job_metadata
@@ -217,8 +216,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         log.verbose(f"ContentGeneratorInWorkflow generated object list direct: {obj_list}")
-        is_mock_built = cogt_run_params.run_mode.is_dry or job_metadata.is_mock_inference
-        return [_revalidate_against_object_class(raw_obj, object_class, is_mock_built=is_mock_built) for raw_obj in obj_list]
+        return [_revalidate_against_object_class(raw_obj, object_class, is_mock_built=cogt_run_params.is_mock_built) for raw_obj in obj_list]
 
     @override
     @update_job_metadata
@@ -543,8 +541,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
         try:
             return output_structure_class.model_validate(result_dict)
         except ValidationError as exc:
-            is_mock_built = search_assignment.cogt_run_params.run_mode.is_dry or search_assignment.job_metadata.is_mock_inference
-            if is_mock_built:
+            if search_assignment.cogt_run_params.is_mock_built:
                 raise MockInferenceObjectFidelityError.for_object_class(output_structure_class.__name__) from exc
             msg = f"Structured search result failed validation against {output_structure_class.__name__}: {exc}"
             raise ContentGenerationError(msg) from exc

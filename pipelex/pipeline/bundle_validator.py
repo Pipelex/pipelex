@@ -34,7 +34,7 @@ from pydantic import BaseModel, ValidationError
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
-from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
+from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.hub import (
@@ -252,12 +252,12 @@ class BundleValidator:
         # scope is contextvar-based, so concurrent /validate sweeps don't cross-contaminate, and the
         # asyncio tasks a batch fan-out spawns copy the context at creation (inside this scope) so they
         # inherit the override too.
-        # scoped_content_generator: the sweep is always DRY, so its inference leaves must resolve
-        # the inline dry generator even under a Temporal-enabled hub (where get_content_generator()
-        # is ContentGeneratorInWorkflow). Today the DRY mock sits at the pipe level and never calls
-        # get_content_generator(); once Part B relocates the mock to the leaf, this scope is what
-        # keeps the sweep in-process — same rationale as the router scope above.
-        with scoped_pipe_router(self._pipe_router), scoped_content_generator(ContentGeneratorDry()):
+        # scoped_content_generator: the sweep is always DRY and must stay in-process, so its
+        # inference leaves resolve an inline ContentGenerator even under a Temporal-enabled hub
+        # (where get_content_generator() is ContentGeneratorInWorkflow) — same rationale as the
+        # router scope above. The DRY mock lives at the cogt leaf (Part B), so the inline
+        # generator's leaves mock without dispatching and without touching storage.
+        with scoped_pipe_router(self._pipe_router), scoped_content_generator(ContentGenerator.make_inline()):
             for pipe in sweepable_pipes:
                 results[pipe.pipe_ref] = await self._classify_pipe(
                     pipe=pipe, library_id=library_id, execution_config=execution_config, dry_run_pipeline_id=dry_run_pipeline_id

@@ -3,7 +3,6 @@ from temporalio import workflow
 with workflow.unsafe.imports_passed_through():
     from pipelex import pretty_print
     from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
-    from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
     from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol  # noqa: TC001
     from pipelex.cogt.extract.extract_input import ExtractInput
     from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
@@ -46,11 +45,9 @@ class WfTestContentGeneratorChild:
     @workflow.run
     async def run(self, is_dry_run: bool = False):
         workflow_log.debug("Workflow start")
-        content_generator: ContentGeneratorProtocol
-        if is_dry_run:
-            content_generator = ContentGeneratorDry()
-        else:
-            content_generator = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow()
+        # One generator for both arms: under is_dry_run the activities are still dispatched and
+        # the cogt leaf mocks inside them (run_mode=DRY rides cogt_run_params — Part B).
+        content_generator: ContentGeneratorProtocol = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow()
 
         job_metadata = JobMetadata(
             user_id="temporal-test",

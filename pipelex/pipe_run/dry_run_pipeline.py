@@ -5,7 +5,7 @@ producing a GraphSpec. Used by both the CLI graph commands and the API.
 """
 
 from pipelex.base_exceptions import PipelexError
-from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
+from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.config import get_config
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
@@ -109,10 +109,9 @@ async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str) -> Gra
       (no NDJSON file, no DynamoDB round-trip); the ``GraphSpec`` rides back on ``PipeOutput``.
     - ``scoped_pipe_router(local PipeRouter)`` — nested controller sub-pipes resolve the local
       router instead of the hub's ``TemporalPipeRouter`` (mirrors ``BundleValidator``).
-    - ``scoped_content_generator(ContentGeneratorDry())`` — inference leaves resolve the inline
-      dry generator instead of the hub's ``ContentGeneratorInWorkflow``, so the in-process
-      guarantee holds regardless of where the DRY mock lives (pipe level today, leaf level after
-      Part B).
+    - ``scoped_content_generator(inline ContentGenerator)`` — inference leaves resolve an inline
+      generator instead of the hub's ``ContentGeneratorInWorkflow``, so nothing dispatches; the
+      DRY mock lives at the cogt leaf (Part B), which also skips all storage IO.
 
     The tracer is opened at ``graph_id=pipeline_run_id`` and closed by ``pipeline_run_id`` (in
     ``PipeRun.run``'s ``finally``) — emit and assemble keys are aligned by construction (D-C7).
@@ -146,7 +145,7 @@ async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str) -> Gra
     # must never outlive this call.
     pipe_router = PipeRouter(observer=ObserverNoOp())
     pipe_run = PipeRun(pipe_router=pipe_router)
-    content_generator = ContentGeneratorDry()
+    content_generator = ContentGenerator.make_inline()
 
     graph_tracer_manager = GraphTracerManager.get_or_create_instance()
     trace_context = graph_tracer_manager.open_tracer(

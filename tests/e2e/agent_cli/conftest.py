@@ -52,7 +52,7 @@ UNREACHABLE_REMOTE_CONFIG_URL = "http://127.0.0.1:1/pipelex_remote_config.json"
 # gateway_img_gen (image), gateway_extract, gateway_search — i.e. a value the matching worker factory's
 # gateway branch accepts (an unrecognized sdk like "gateway_image" hits ``case _: raise NotImplementedError``).
 # The sdk is consumed only at worker creation, which the offline dry-run tests never reach
-# (ContentGeneratorDry mocks generation), so the membership check is indifferent to it — but it must still
+# (the cogt leaf mocks generation under DRY), so the membership check is indifferent to it — but it must still
 # be real so the fake cache stays faithful and any non-dry consumer of this helper can build a worker.
 _GATEWAY_SPEC_TEMPLATE_BY_TYPE: dict[ModelType, dict[str, Any]] = {
     ModelType.LLM: {"sdk": "gateway_completions", "model_type": "llm", "inputs": ["text"], "outputs": ["text", "structured"]},

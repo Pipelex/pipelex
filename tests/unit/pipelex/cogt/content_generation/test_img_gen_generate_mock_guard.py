@@ -3,7 +3,7 @@
 ``--mock-inference`` has no leaf-level mock for image generation, so reaching the img-gen leaf under
 the flag would dispatch to the real provider and spend. The leaf must fail loud instead: raise
 ``MockInferenceUnsupportedError`` before ``get_img_gen_worker`` is ever called. With the flag off, the
-real worker path runs unchanged — proving the guard is keyed strictly on ``job_metadata.is_mock_inference``.
+real worker path runs unchanged — proving the guard is keyed strictly on ``cogt_run_params.is_mock_inference``.
 """
 
 from collections.abc import Awaitable, Callable
@@ -23,8 +23,8 @@ from pipelex.pipeline.job_metadata import JobMetadata
 class TestImgGenGenerateMockGuard:
     def _assignment(self, *, is_mock_inference: bool) -> ImgGenAssignment:
         return ImgGenAssignment(
-            job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_img_guard", is_mock_inference=is_mock_inference),
-            cogt_run_params=CogtRunParams(),
+            job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_img_guard"),
+            cogt_run_params=CogtRunParams(is_mock_inference=is_mock_inference),
             img_gen_handle="mock-img-handle",
             img_gen_prompt=ImgGenPrompt(positive_text="a red apple"),
             img_gen_job_params=ImgGenJobParams(aspect_ratio=AspectRatio.SQUARE, background=Background.AUTO),

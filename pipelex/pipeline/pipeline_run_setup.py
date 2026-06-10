@@ -107,10 +107,10 @@ async def pipeline_run_setup(
         to ``PipeRunMode.LIVE`` if the environment variable is not set.
     is_mock_inference:
         The ``--mock-inference`` trigger: keep ``run_mode`` LIVE (operators dispatch
-        normally) but fake every AI call at the cogt leaf. Threaded onto
-        :attr:`JobMetadata.is_mock_inference`, which reaches the leaf in both direct and
-        Temporal modes. Distinct from ``--dry-run``: it exercises the live control flow and
-        emits reportable (non-zero) synthetic usage so a cost report renders.
+        normally) but fake the LLM calls at the cogt leaf. Threaded onto
+        :attr:`CogtRunParams.is_mock_inference`, which rides every assignment to the leaf in
+        both direct and Temporal modes. Distinct from ``--dry-run``: it exercises the live
+        control flow and emits reportable (non-zero) synthetic usage so a cost report renders.
     search_domain_codes:
         List of domain codes to search for pipes. The executed pipe's domain is automatically
         added if not already present.

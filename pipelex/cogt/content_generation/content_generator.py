@@ -73,6 +73,18 @@ class ContentGenerator(ContentGeneratorProtocol):
     def __init__(self, generated_content_factory: GeneratedContentFactory) -> None:
         self._generated_content_factory = generated_content_factory
 
+    @classmethod
+    def make_inline(cls) -> "ContentGenerator":
+        """Inline generator wired to the hub storage provider.
+
+        The single home for the in-process scopes' generator (``bundle_validator``,
+        ``dry_run_pipeline``): under DRY its leaves mock without dispatching and without
+        touching storage.
+        """
+        from pipelex.hub import get_storage_provider  # noqa: PLC0415 — avoids a module-level cogt->hub cycle
+
+        return cls(generated_content_factory=GeneratedContentFactory(storage_provider=get_storage_provider()))
+
     @override
     @update_job_metadata
     async def make_llm_text(
@@ -118,8 +130,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         )
         raw_obj = await llm_gen_object(object_assignment=object_assignment)
         log.verbose(f"{self.__class__.__name__} generated object direct: {raw_obj}")
-        is_mock_built = cogt_run_params.run_mode.is_dry or job_metadata.is_mock_inference
-        return _revalidate_against_object_class(raw_obj, object_class, is_mock_built=is_mock_built)
+        return _revalidate_against_object_class(raw_obj, object_class, is_mock_built=cogt_run_params.is_mock_built)
 
     @override
     @update_job_metadata
@@ -145,8 +156,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         )
         raw_list = await llm_gen_object_list(object_assignment=object_assignment)
         log.verbose(f"{self.__class__.__name__} generated object list direct: {raw_list}")
-        is_mock_built = cogt_run_params.run_mode.is_dry or job_metadata.is_mock_inference
-        return [_revalidate_against_object_class(raw_obj, object_class, is_mock_built=is_mock_built) for raw_obj in raw_list]
+        return [_revalidate_against_object_class(raw_obj, object_class, is_mock_built=cogt_run_params.is_mock_built) for raw_obj in raw_list]
 
     @override
     @update_job_metadata
@@ -319,8 +329,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         )
         # Same fidelity guard as the object paths (D6): a mock-built dict that fails re-validation
         # against the original class is the known schema-round-trip gap, not a provider fault.
-        is_mock_built = search_assignment.cogt_run_params.run_mode.is_dry or search_assignment.job_metadata.is_mock_inference
-        if not is_mock_built:
+        if not search_assignment.cogt_run_params.is_mock_built:
             return output_structure_class.model_validate(result_dict)
         try:
             return output_structure_class.model_validate(result_dict)

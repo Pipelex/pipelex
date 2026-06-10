@@ -27,7 +27,7 @@ def _guard_no_mock_inference(search_assignment: SearchAssignment) -> None:
     # Web search has no *reportable* leaf mock for --mock-inference (run_mode stays LIVE), so this
     # live path would silently hit the real provider — fail loud instead (use --dry-run, whose leaf
     # branch above mints a full synthetic result).
-    if search_assignment.job_metadata.is_mock_inference:
+    if search_assignment.cogt_run_params.is_mock_inference:
         error = MockInferenceUnsupportedError.for_operation("web search (PipeSearch)")
         raise error
 

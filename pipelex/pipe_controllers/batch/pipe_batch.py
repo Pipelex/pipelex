@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.content_generation.dry_mock import stamp_mock_main_coordination
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
@@ -270,16 +271,12 @@ class PipeBatch(PipeController):
             output_name=output_name,
             library_crate=library_crate,
         )
-        # For dry run coordination: set the first item's pipe_code to "mock_main"
-        # to match the BundleHeaderSpec.main_pipe examples=["mock_main"]
+        # Dry-run coordination: see stamp_mock_main_coordination's docstring (single home, D3).
         main_stuff = pipe_output.main_stuff
         content = main_stuff.content
         if isinstance(content, ListContent):
             list_content = cast("ListContent[StuffContent]", content)
-            if list_content.items:
-                first_item = list_content.items[0]
-                if hasattr(first_item, "pipe_code"):
-                    first_item.pipe_code = "mock_main"  # pyright: ignore[reportAttributeAccessIssue]
+            stamp_mock_main_coordination(list_content.items)
         return pipe_output
 
     @override

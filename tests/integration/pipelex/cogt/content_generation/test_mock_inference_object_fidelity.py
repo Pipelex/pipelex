@@ -25,8 +25,8 @@ from tests.integration.pipelex.cogt.content_generation.test_data import Constrai
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestMockInferenceObjectFidelity:
-    def _mock_job_metadata(self, job_metadata: JobMetadata) -> JobMetadata:
-        return job_metadata.model_copy(update={"is_mock_inference": True})
+    def _mock_cogt_run_params(self) -> CogtRunParams:
+        return CogtRunParams(is_mock_inference=True)
 
     async def test_make_object_raises_typed_error_on_fidelity_gap(
         self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol
@@ -34,8 +34,8 @@ class TestMockInferenceObjectFidelity:
         """make_object re-raises the dropped-invariant ValidationError as MockInferenceObjectFidelityError."""
         with pytest.raises(MockInferenceObjectFidelityError) as exc_info:
             await content_generator.make_object(
-                job_metadata=self._mock_job_metadata(job_metadata),
-                cogt_run_params=CogtRunParams(),
+                job_metadata=job_metadata,
+                cogt_run_params=self._mock_cogt_run_params(),
                 object_class=ConstrainedName,
                 llm_prompt_for_object=LLMPrompt(user_text="make a prefixed name"),
                 llm_setting_for_object=LLMSetting(model="gpt-4o", temperature=0.5),
@@ -49,8 +49,8 @@ class TestMockInferenceObjectFidelity:
         """make_object_list re-raises the per-item fidelity failure as the same typed error."""
         with pytest.raises(MockInferenceObjectFidelityError):
             await content_generator.make_object_list(
-                job_metadata=self._mock_job_metadata(job_metadata),
-                cogt_run_params=CogtRunParams(),
+                job_metadata=job_metadata,
+                cogt_run_params=self._mock_cogt_run_params(),
                 object_class=ConstrainedName,
                 llm_prompt_for_object_list=LLMPrompt(user_text="make prefixed names"),
                 llm_setting_for_object_list=LLMSetting(model="gpt-4o", temperature=0.5),
@@ -61,8 +61,8 @@ class TestMockInferenceObjectFidelity:
     ) -> None:
         """A class whose constraints survive the round-trip mocks and re-validates without the guard firing."""
         result = await content_generator.make_object(
-            job_metadata=self._mock_job_metadata(job_metadata),
-            cogt_run_params=CogtRunParams(),
+            job_metadata=job_metadata,
+            cogt_run_params=self._mock_cogt_run_params(),
             object_class=PlainName,
             llm_prompt_for_object=LLMPrompt(user_text="make a plain name"),
             llm_setting_for_object=LLMSetting(model="gpt-4o", temperature=0.5),

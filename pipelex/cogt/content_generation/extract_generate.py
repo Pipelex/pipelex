@@ -9,7 +9,7 @@ from pipelex.hub import get_extract_worker
 
 
 async def extract_gen_pages(extract_assignment: ExtractAssignment) -> ExtractOutput:
-    if extract_assignment.job_metadata.is_mock_inference:
+    if extract_assignment.cogt_run_params.is_mock_inference:
         error = MockInferenceUnsupportedError.for_operation("document extraction (PipeExtract)")
         raise error
     extract_worker = get_extract_worker(extract_handle=extract_assignment.extract_handle)
