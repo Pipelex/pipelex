@@ -1,10 +1,10 @@
-"""Cogt-tier slice of the run params (D-plan Part B, eng review D2).
+"""Cogt-tier slice of the run params (D-plan Part B).
 
-``CogtRunParams`` carries the execution-mode contract down to the cogt leaf. It is
-the ONLY home of ``run_mode``: ``PipeRunParams`` nests an instance and exposes a
-delegating ``run_mode`` property, so pipe-tier readers see one value with zero
-duplication. Single writer: ``PipeRunParamsFactory.make_run_params`` (fed by
-``prepare_pipe_job``).
+``CogtRunParams`` carries the execution-mode contract down to the cogt leaf. The
+facts (``run_mode``, ``is_mock_usage``) are owned by ``PipeRunParams`` as direct
+fields; its derived ``cogt_run_params`` property mints this carrier on demand, so
+there is exactly one stored copy. Single writer of the facts:
+``PipeRunParamsFactory.make_run_params`` (fed by ``prepare_pipe_job``).
 
 Route to the leaf: operators slice ``pipe_run_params.cogt_run_params`` off and pass
 it into the content-generator protocol methods; generators stamp it as a field on

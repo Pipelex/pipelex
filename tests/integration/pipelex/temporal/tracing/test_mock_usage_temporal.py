@@ -55,9 +55,7 @@ class TestTemporalMockUsage:
             pipe_run_mode=PipeRunMode.DRY,
             isolated_registry=is_class_registry_isolated,
         ):
-            mocked_run_params = pipe_job.pipe_run_params.model_copy(
-                update={"cogt_run_params": pipe_job.pipe_run_params.cogt_run_params.model_copy(update={"is_mock_usage": True})},
-            )
+            mocked_run_params = pipe_job.pipe_run_params.model_copy(update={"is_mock_usage": True})
             yield pipe_job.model_copy(update={"pipe_run_params": mocked_run_params})
 
     async def test_mock_usage_assembles_reportable_usage_cross_process(

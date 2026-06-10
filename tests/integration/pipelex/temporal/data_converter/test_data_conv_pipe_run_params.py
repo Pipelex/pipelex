@@ -20,7 +20,8 @@ class TestDataConverterForPipeRunParams:
         payload_converter: BaseModelPayloadConverter,
     ):
         pipe_run_params = PipeRunParams(
-            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
+            run_mode=PipeRunMode.DRY,
+            is_mock_usage=True,
             pipe_stack_limit=20,
             pipe_stack=["root", "child"],
         )
@@ -30,5 +31,7 @@ class TestDataConverterForPipeRunParams:
         restored: PipeRunParams = payload_converter.from_payload(payload, type_hint=PipeRunParams)
 
         assert restored == pipe_run_params
-        assert restored.cogt_run_params.run_mode.is_dry
-        assert restored.run_mode.is_dry  # the delegating property reads the restored nested copy
+        assert restored.run_mode.is_dry
+        assert restored.is_mock_usage
+        # The derived carrier reads the restored fields — what generators stamp on assignments.
+        assert restored.cogt_run_params == CogtRunParams(run_mode=PipeRunMode.DRY, is_mock_usage=True)

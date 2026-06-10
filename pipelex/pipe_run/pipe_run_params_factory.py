@@ -1,7 +1,6 @@
 from typing import Any
 
 from pipelex import log
-from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.config import get_config
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.hub import is_dry_run_forced
@@ -22,26 +21,29 @@ class PipeRunParamsFactory:
         batch_params: BatchParams | None = None,
         params: dict[str, Any] | None = None,
     ) -> PipeRunParams:
-        """Single writer of ``run_mode`` and ``is_mock_usage``: builds the nested ``CogtRunParams`` here (D2).
+        """Single writer of ``run_mode`` and ``is_mock_usage`` — direct fields on ``PipeRunParams``.
 
         The keyless-boot forced-DRY flag (eng review D4) is resolved HERE — at the single writer —
         so every execution entry point is covered (``prepare_pipe_job``, the runtime bridge,
         ``PipeJobFactory`` defaults), not just the pipeline-API path.
 
-        The carrier is built from the REQUESTED mode before the forced-DRY coercion, so a contract
-        violation (``is_mock_usage`` on a LIVE request) fails loud on every boot — the keyless
-        coercion must not silently turn an illegal request into a legal one.
+        The REQUESTED mode is validated before the forced-DRY coercion, so a contract violation
+        (``is_mock_usage`` on a LIVE request) fails loud on every boot — the keyless coercion must
+        not silently turn an illegal request into a legal one.
         """
-        cogt_run_params = CogtRunParams(run_mode=pipe_run_mode, is_mock_usage=is_mock_usage)
-        if is_dry_run_forced() and cogt_run_params.run_mode.is_live:
+        if is_mock_usage and pipe_run_mode.is_live:
+            msg = "is_mock_usage is a sub-flag of run_mode=DRY: it cannot be set on a LIVE run"
+            raise ValueError(msg)
+        if is_dry_run_forced() and pipe_run_mode.is_live:
             log.warning(
                 "LIVE run requested under a keyless boot (needs_inference=False): forcing run_mode to DRY — "
                 "outputs will be synthetic mocks, not real inference."
             )
-            cogt_run_params = CogtRunParams(run_mode=PipeRunMode.DRY, is_mock_usage=is_mock_usage)
+            pipe_run_mode = PipeRunMode.DRY
         pipe_stack_limit = pipe_stack_limit or get_config().pipelex.pipe_run_config.pipe_stack_limit
         return PipeRunParams(
-            cogt_run_params=cogt_run_params,
+            run_mode=pipe_run_mode,
+            is_mock_usage=is_mock_usage,
             pipe_stack_limit=pipe_stack_limit,
             output_multiplicity=output_multiplicity,
             dynamic_output_concept_ref=dynamic_output_concept_ref,

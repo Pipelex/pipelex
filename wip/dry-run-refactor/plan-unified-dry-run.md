@@ -68,6 +68,10 @@ The design deferred these to plan time; resolved here, taking the design's propo
 
 - [x] `make agent-check` + `make agent-test` green; commit.
 
+## Post-review change (PR #986 round 2, human review)
+
+Reviewer + user direction: `run_mode` belongs on `PipeRunParams` directly. Implemented as an inversion of the D2 carrier shape — `run_mode` and `is_mock_usage` are direct fields of `PipeRunParams` (single stored copy, model-validator enforces the DRY-only sub-flag rule); `cogt_run_params` became a **derived property** minting the frozen cogt-tier carrier on demand. The wire contract is unchanged (`CogtRunParams` still stamped on every assignment, still validates at its own boundary); operators' `pipe_run_params.cogt_run_params` reads work as before. The factory validates the REQUESTED mode before the keyless forced-DRY coercion so the contract violation cannot be masked (greptile round-1 finding, kept).
+
 ## Cross-repo note (design §3.7)
 
 `pipelex-api` carries `is_mock_inference` on its public runner API params (fed from `_run_core` → runner). That change rides a pipelex version bump like any other public-surface change — grep `mock_inference` in `pipelex-api/` when bumping the pin there; NOT part of this branch.

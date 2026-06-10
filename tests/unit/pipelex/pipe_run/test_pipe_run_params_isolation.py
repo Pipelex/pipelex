@@ -1,4 +1,3 @@
-from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 
@@ -10,7 +9,7 @@ class TestPipeRunParamsIsolation:
 
     def test_make_deep_copy_isolates_pipe_stack(self) -> None:
         """A deep copy's pipe_stack is an independent list — a push on one branch does not leak into the other."""
-        original = PipeRunParams(cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE), pipe_stack_limit=20, pipe_stack=["root"])
+        original = PipeRunParams(run_mode=PipeRunMode.LIVE, pipe_stack_limit=20, pipe_stack=["root"])
 
         branch = original.make_deep_copy()
         assert branch.pipe_stack is not original.pipe_stack, "a deep copy must not share the pipe_stack list object"
