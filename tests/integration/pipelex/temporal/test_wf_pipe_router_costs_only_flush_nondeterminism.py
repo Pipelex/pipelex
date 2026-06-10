@@ -35,14 +35,18 @@ tracer emissions re-fire deterministically on replay, the buffer is non-empty on
 and the replay succeeds even with the bug present — proving that the costs-only buffer gating,
 not the replay harness, is what breaks the command stream.
 
-Fix shape: gate the flush schedule purely on the payload (``trace_context`` presence + emit
-flags) and let the flush activity no-op on an empty event list; stop routing activity-side
-usage events through the workflow's in-sandbox buffer.
+Fix shape (as landed): activity-side usage events never route through the workflow's
+in-sandbox buffer (they take the per-process runner fallback), and the flush schedule is a
+pure function of the payload. The payload-pure gate goes further than "always schedule": in
+costs-only LIVE mode the buffer is deterministically empty (no graph events, no inline usage
+emissions), so the flush activity is skipped entirely — the costs-only arm therefore asserts
+the flush is ABSENT from history and that the recorded history still replays cleanly. The
+``graph-and-usage`` arm keeps the original vacuity guard (flush present in history).
 """
 
 import uuid
 from collections.abc import Generator
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import pytest
 from temporalio import activity
@@ -50,11 +54,6 @@ from temporalio.client import Client as TemporalClient
 from temporalio.worker import Replayer, UnsandboxedWorkflowRunner
 
 from pipelex.cogt.content_generation.assignment_models import LLMAssignment
-from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobReport
-from pipelex.cogt.llm.llm_report import LLMTokensUsage
-from pipelex.cogt.usage.cost_category import CostCategory
-from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import get_report_delegate
@@ -63,10 +62,16 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.temporal.temporal_data_converter import data_converter
 from pipelex.temporal.temporal_hub import get_task_manager
 from pipelex.temporal.tprl_content_generation.act_llm_generate import act_llm_gen_text
-from pipelex.temporal.tprl_pipe.act_flush_trace_events import FlushTraceEventsArg, act_flush_trace_events
+from pipelex.temporal.tprl_pipe.act_flush_trace_events import act_flush_trace_events
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 from tests.integration.pipelex.fixtures.pipe_job_helpers import pipe_job_from_bundle
-from tests.integration.pipelex.temporal.tracing.helpers import inject_trace_context, route_activities_to
+from tests.integration.pipelex.temporal.tracing.helpers import (
+    act_flush_noop,
+    inject_trace_context,
+    make_synthetic_usage_llm_job,
+    route_activities_to,
+    scheduled_activity_names,
+)
 from tests.integration.pipelex.temporal.tracing.test_data import SequenceTracingTestData
 
 _LEAF_PIPE_CODE = "step_one"
@@ -80,42 +85,19 @@ _FAKE_RESPONSE_TEXT = "costs-only replay guard fake response"
 async def _act_llm_gen_text_reports_usage(llm_assignment: LLMAssignment) -> str:  # noqa: RUF029
     """Substitute for ``act_llm_gen_text`` that emits usage from a CO-LOCATED activity.
 
-    Unlike the split-worker helper, this stub does NOT clear ``_event_log_contexts``:
-    the point is that ``report_inference_job`` takes the ReportingManager fast path and
-    writes the ``UsageReportEvent`` into the workflow's registered ``BufferingEventLog``
-    from the activity thread — the cross-thread population that replay cannot reproduce.
+    The point is that ``report_inference_job`` runs on the activity thread in the same
+    process as the workflow's registered ``BufferingEventLog`` — exactly the co-located
+    emission that pre-H1 took the ReportingManager fast path into the workflow's buffer
+    (the cross-thread population that replay cannot reproduce). Post-H1 it must take the
+    per-process activity event log instead.
     """
-    now = datetime.now()
-    synthetic_metadata = llm_assignment.job_metadata.model_copy(
-        update={
-            "started_at": llm_assignment.job_metadata.started_at or now,
-            "completed_at": now,
-        },
-    )
-    tokens_usage = LLMTokensUsage(
-        job_metadata=synthetic_metadata,
+    synthetic_job = make_synthetic_usage_llm_job(
+        llm_assignment=llm_assignment,
         inference_model_name=_FAKE_INFERENCE_MODEL_NAME,
         inference_model_id=_FAKE_INFERENCE_MODEL_ID,
-        unit_costs={CostCategory.INPUT: 0.0, CostCategory.OUTPUT: 0.0},
-        nb_tokens_by_category={TokenCategory.INPUT: 1, TokenCategory.OUTPUT: 1},
-    )
-    synthetic_job = LLMJob(
-        job_metadata=synthetic_metadata,
-        llm_prompt=llm_assignment.llm_prompt,
-        job_params=llm_assignment.llm_setting.make_llm_job_params(),
-        job_config=LLMJobConfig(schema_reask_max_attempts=1),
-        job_report=LLMJobReport(llm_tokens_usage=tokens_usage),
     )
     get_report_delegate().report_inference_job(inference_job=synthetic_job)
     return _FAKE_RESPONSE_TEXT
-
-
-@activity.defn(name=_FLUSH_ACTIVITY_NAME)
-async def _act_flush_noop(arg: FlushTraceEventsArg) -> None:
-    """No-op flush substitute: keeps the test independent of any tracing backend.
-
-    Only the *schedule* of this activity matters to the command stream under test.
-    """
 
 
 @pytest.fixture(scope="class")
@@ -173,7 +155,7 @@ class TestWfPipeRouterCostsOnlyFlushNondeterminism:
                 is_not_sandboxed=True,
                 substitute_activities={
                     act_llm_gen_text: _act_llm_gen_text_reports_usage,
-                    act_flush_trace_events: _act_flush_noop,
+                    act_flush_trace_events: act_flush_noop,
                 },
             ):
                 workflow_handle = await temporal_client.start_workflow(  # pyright: ignore[reportUnknownMemberType]
@@ -189,16 +171,16 @@ class TestWfPipeRouterCostsOnlyFlushNondeterminism:
                 assert isinstance(pipe_output, PipeOutput)
                 history = await workflow_handle.fetch_history()
 
-        # Guard against a vacuous pass: the recorded history must contain the flush
-        # schedule — that is the command the costs-only replay drops. If this fails,
-        # the activity-side usage emission never reached the workflow's buffer and
-        # the reproduction harness itself is broken.
-        scheduled_activity_names = [
-            event.activity_task_scheduled_event_attributes.activity_type.name
-            for event in history.events
-            if event.HasField("activity_task_scheduled_event_attributes")
-        ]
-        assert _FLUSH_ACTIVITY_NAME in scheduled_activity_names, f"history must record the flush schedule, got: {scheduled_activity_names}"
+        scheduled_names = scheduled_activity_names(history)
+        if emit_graph_events:
+            # Vacuity guard for the replay assertion: the graph arm must record the flush
+            # schedule (inline graph events populate the buffer deterministically).
+            assert _FLUSH_ACTIVITY_NAME in scheduled_names, f"history must record the flush schedule, got: {scheduled_names}"
+        else:
+            # Costs-only LIVE: the buffer is deterministically empty (activity-side usage
+            # emissions take the per-process runner fallback, never the workflow buffer),
+            # so the payload-pure gate skips the guaranteed-empty flush round-trip.
+            assert _FLUSH_ACTIVITY_NAME not in scheduled_names, f"costs-only LIVE must skip the empty flush schedule, got: {scheduled_names}"
 
         # Replay the recorded history — the exact code path of a post-eviction worker.
         # With the bug, the costs-only arm raises here with a nondeterminism error.

@@ -61,7 +61,7 @@ from pipelex.temporal.temporal_hub import get_task_manager
 from pipelex.temporal.tprl_pipe.act_flush_trace_events import FlushTraceEventsArg, act_flush_trace_events
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 from tests.integration.pipelex.fixtures.pipe_job_helpers import pipe_job_from_bundle
-from tests.integration.pipelex.temporal.tracing.helpers import inject_trace_context
+from tests.integration.pipelex.temporal.tracing.helpers import act_flush_noop, inject_trace_context, scheduled_activity_names
 from tests.integration.pipelex.temporal.tracing.test_data import SequenceTracingTestData
 
 _LEAF_PIPE_CODE = "step_one"
@@ -78,11 +78,6 @@ async def _act_flush_flips_worker_tracing_config(arg: FlushTraceEventsArg) -> No
     config drift does across real workers.
     """
     get_config().pipelex.tracing_config.is_enabled = False
-
-
-@activity.defn(name=_FLUSH_ACTIVITY_NAME)
-async def _act_flush_noop(arg: FlushTraceEventsArg) -> None:
-    """Control substitute: same shape as the flipping stub, leaves the config alone."""
 
 
 @pytest.fixture
@@ -123,7 +118,7 @@ class TestWfPipeRouterTracingConfigNondeterminism:
         worker_config_flips: bool,
     ) -> None:
         execution_job = inject_trace_context(leaf_tracing_job, f"tracing_replay_guard_{uuid.uuid4().hex[:12]}")
-        flush_substitute = _act_flush_flips_worker_tracing_config if worker_config_flips else _act_flush_noop
+        flush_substitute = _act_flush_flips_worker_tracing_config if worker_config_flips else act_flush_noop
 
         # Build the worker directly (not via make_worker) for the two knobs the
         # reproduction needs: cache eviction after every workflow task, and terminal
@@ -160,9 +155,5 @@ class TestWfPipeRouterTracingConfigNondeterminism:
             # schedule, otherwise there is nothing for a config-divergent replay to
             # diverge on (and the control arm would prove nothing).
             history = await workflow_handle.fetch_history()
-            scheduled_activity_names = [
-                event.activity_task_scheduled_event_attributes.activity_type.name
-                for event in history.events
-                if event.HasField("activity_task_scheduled_event_attributes")
-            ]
-            assert _FLUSH_ACTIVITY_NAME in scheduled_activity_names, f"history must record the flush schedule, got: {scheduled_activity_names}"
+            scheduled_names = scheduled_activity_names(history)
+            assert _FLUSH_ACTIVITY_NAME in scheduled_names, f"history must record the flush schedule, got: {scheduled_names}"

@@ -1,5 +1,4 @@
 from datetime import timedelta
-from typing import TYPE_CHECKING
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
@@ -21,9 +20,6 @@ with workflow.unsafe.imports_passed_through():
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
     from pipelex.temporal.tprl_pipe.act_flush_trace_events import FlushTraceEventsArg, act_flush_trace_events
     from pipelex.tracing.buffering_event_log import BufferingEventLog
-
-if TYPE_CHECKING:
-    from pipelex.tracing.trace_events import TraceEvent
 
 
 def _carries_temporal_failure(exc: BaseException) -> bool:
@@ -75,14 +71,23 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
         pipe = workflow_arg.pipe
         workflow_log.verbose(f"Routing {pipe.__class__.__name__} pipe '{workflow_arg.pipe.code}': {pipe.description}")
 
+        # Run-scoped identity for ALL per-run worker-local state (library id, tracer key,
+        # event-log context key) and for event/node-id stamps: run_id is replay-stable but
+        # unique per run, so a reused workflow id (workflow-level retry_policy, Temporal
+        # reset, resubmission of the same pipeline_run_id) can never collide with a live
+        # successor run's state on the same worker.
+        wf_run_id = workflow.info().run_id
+
         # Set up per-workflow library if a library crate is present
         library_crate = workflow_arg.library_crate
         wf_library_id: str | None = None
 
-        # Per-workflow tracing state (declared before try for finally block access)
+        # Per-workflow tracing state (declared before try for finally block access).
+        # schedule_flush is the payload-pure flush gate, computed in the tracing setup
+        # block below (see the determinism comments there and in the finally).
         event_log = None
-        wf_graph_tracer_manager: GraphTracerManager | None = None
         wf_tracer_key: str | None = None
+        schedule_flush: bool = False
         trace_context = workflow_arg.job_metadata.trace_context
 
         pipe_output: PipeOutput | None = None
@@ -94,15 +99,20 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                 workflow_registry = ClassRegistry()
                 workflow_registry.register_classes_dict(global_registry.get_classes_dict())
 
-                # 2. Open library and attach registry to it. The library id is deterministic
-                # (derived from the workflow id), so a pre-existing library under it can only be
-                # the leftover of an evicted/interrupted predecessor execution whose finally never
-                # ran (H2): reusing it would fingerprint-skip the crate load below against the
-                # fresh registry, so the crate's dynamic classes never land in it and inline
-                # hydration fails where history recorded success. open_fresh_library tears any
-                # such leftover down — pure in-memory, no commands emitted, so it is replay-safe.
+                # 2. Open library and attach registry to it. The library id is keyed by run_id —
+                # replay-stable (a replay of this run sees the same run_id) but unique per run.
+                # Keying by workflow_id would collide across runs: workflow ids are reused by
+                # workflow-level retry_policy, Temporal reset, and resubmission of the same
+                # pipeline_run_id (make_workflow_id is deterministic), so a closed predecessor
+                # run's late eviction cleanup could tear down a live successor run's library.
+                # With run_id keying, a pre-existing library under this id can only be THIS run's
+                # own leftover — an evicted/interrupted execution whose finally never ran (H2):
+                # reusing it would fingerprint-skip the crate load below against the fresh
+                # registry, so the crate's dynamic classes never land in it and inline hydration
+                # fails where history recorded success. open_fresh_library tears any such
+                # leftover down — pure in-memory, no commands emitted, so it is replay-safe.
                 library_manager = get_library_manager()
-                wf_library_id = f"wf_{workflow.info().workflow_id}"
+                wf_library_id = f"wf_{wf_run_id}"
                 wf_library = library_manager.open_fresh_library(library_id=wf_library_id)
                 wf_library.set_class_registry(workflow_registry)
                 set_current_library(library_id=wf_library_id)
@@ -115,9 +125,8 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                     workflow_arg.working_memory = hydrate_working_memory(workflow_arg.working_memory_raw)
                     workflow_arg.working_memory_raw = None
 
-            # Set up per-workflow graph tracing if enabled
+            # Set up per-workflow graph tracing if enabled.
             pipeline_run_id = workflow_arg.job_metadata.pipeline_run_id
-            wf_workflow_id = workflow.info().workflow_id
 
             # Determinism: whether tracing is set up — and therefore whether the finally
             # block schedules act_flush_trace_events — must be a pure function of the
@@ -135,16 +144,23 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                 # Use BufferingEventLog inside workflows (no I/O allowed).
                 # Events are flushed to the real backend via act_flush_trace_events.
                 event_log = BufferingEventLog()
-                wf_graph_tracer_manager = GraphTracerManager.get_or_create_instance()
-                wf_tracer_key = wf_workflow_id
-                wf_trace_context = wf_graph_tracer_manager.open_tracer(
+                wf_tracer_key = wf_run_id
+                # Payload-pure flush gate: the buffer is populated exclusively by inline
+                # (workflow-thread) emissions — graph events from the tracer when
+                # emit_graph_events is on, and usage events from dry-run inline reporting.
+                # In costs-only LIVE mode neither source exists (every LIVE usage emission
+                # happens activity-side via the per-process runner fallback), so the buffer
+                # is deterministically empty and the flush round-trip is skipped. Both gate
+                # inputs ride in the payload, so the decision replays identically.
+                schedule_flush = trace_context.emit_graph_events or workflow_arg.pipe_run_params.run_mode.is_dry
+                wf_trace_context = GraphTracerManager.get_or_create_instance().open_tracer(
                     graph_id=trace_context.graph_id,
                     data_inclusion=trace_context.data_inclusion,
                     # D5: only feed the event log to the tracer when graph events are wanted. In
                     # costs-only mode the tracer still mints node ids but emits no graph events;
                     # usage events flow via the report delegate's set_event_log below.
                     event_log=event_log if trace_context.emit_graph_events else None,
-                    workflow_id=wf_workflow_id,
+                    workflow_id=wf_run_id,
                     pipeline_run_id=pipeline_run_id,
                     tracer_key=wf_tracer_key,
                     # Threaded in so the returned context is born with the correct flags (no emit-flag
@@ -170,9 +186,9 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                 # deterministic function of inline execution and re-fires identically on replay.
                 if trace_context.emit_usage_events:
                     get_report_delegate().set_event_log(
-                        context_key=wf_workflow_id,
+                        context_key=wf_tracer_key,
                         event_log=event_log,
-                        workflow_id=wf_workflow_id,
+                        workflow_id=wf_run_id,
                         pipeline_run_id=pipeline_run_id,
                     )
 
@@ -204,35 +220,29 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                 raise
             raise TemporalError.from_message_exception(exc=exc, force_non_retryable=True) from exc
         finally:
-            # Close per-workflow graph tracer (collects in-memory graph spec). F1: only assign the spec
-            # when graph events were requested — in costs-only mode close_tracer returns None (teardown
-            # skips the spec build), and this guard keeps the contract explicit even if that changes.
-            if wf_graph_tracer_manager is not None and wf_tracer_key is not None:
+            # ALL worker-local cleanup in this finally is synchronous and runs before the
+            # awaited flush activity at the end. Eviction safety (H2): the flush await is a
+            # suspension point where a BaseException can be raised (_WorkflowBeingEvictedError
+            # on sticky-cache eviction) — it escapes the `except Exception` around the flush
+            # and aborts the rest of this finally block. Worker-local cleanup (tracer,
+            # event-log context, per-workflow library + crate fingerprint) must therefore run
+            # BEFORE that await, so an eviction can no longer leak state keyed by the
+            # deterministic wf_{run_id} into the worker-local singletons and poison a
+            # same-worker replay. (Workflow cancellation is NOT such an interruption: at an
+            # activity await the SDK surfaces it as an ActivityError — an Exception — which
+            # the best-effort except around the flush swallows.)
+
+            # Close per-workflow graph tracer (collects in-memory graph spec). In costs-only
+            # mode close_tracer returns None by contract (teardown skips the spec build), so
+            # the graph_spec gate alone keeps costs-only outputs spec-free.
+            if wf_tracer_key is not None:
                 try:
-                    graph_spec = wf_graph_tracer_manager.close_tracer(wf_tracer_key)
-                    if graph_spec is not None and pipe_output is not None and trace_context is not None and trace_context.emit_graph_events:
+                    graph_spec = GraphTracerManager.get_or_create_instance().close_tracer(wf_tracer_key)
+                    if graph_spec is not None and pipe_output is not None:
                         pipe_output.graph_spec = graph_spec
                 except Exception as tracer_exc:  # noqa: BLE001
                     # Best-effort: tracer close in the finally block must never fail the workflow — log and continue.
                     workflow_log.warning(f"Failed to close per-workflow tracer: {tracer_exc}")
-
-            # Drain the buffer and finish ALL worker-local cleanup before the awaited flush
-            # activity below. Eviction safety (H2): the flush await is a suspension point where
-            # a BaseException can be raised (_WorkflowBeingEvictedError on sticky-cache
-            # eviction, CancelledError on workflow cancellation) — it escapes the
-            # `except Exception` around the flush and aborts the rest of this finally block.
-            # Worker-local cleanup (event-log context, per-workflow library + crate
-            # fingerprint) must therefore run BEFORE that await, so an eviction can no longer
-            # leak state keyed by the deterministic wf_{workflow_id} into the worker-local
-            # singletons and poison a same-worker replay/re-run.
-            buffered_events: list[TraceEvent] | None = None
-            if event_log is not None:
-                buffered_events = event_log.drain()
-                event_log.close()
-
-                # Clear stale event log state from the report delegate
-                if wf_tracer_key is not None:
-                    get_report_delegate().clear_event_log(context_key=wf_tracer_key)
 
             if wf_library_id is not None:
                 try:
@@ -240,29 +250,40 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                 finally:
                     clear_current_library()
 
-            # The awaited flush comes LAST: an interruption here can only skip the flush
-            # itself, never the worker-local cleanup above — and on replay the buffer is
-            # rebuilt deterministically from inline execution, so the flush re-fires with
-            # the same content.
-            if buffered_events is not None:
-                # Determinism (H1): the flush activity is scheduled unconditionally — the gate
-                # (buffered_events is not None ⇔ event_log was set up) is a pure function of the
-                # payload (trace_context is not None). The schedule must NOT be gated on the
-                # buffer CONTENT: anything written into the buffer from outside the workflow
-                # thread would not be re-written on replay (activities do not re-execute), so a
-                # content-gated schedule recorded in history could vanish from the replayed
-                # command stream after a routine sticky-cache eviction ([TMPRL1100]). The
-                # activity no-ops on an empty list.
-                try:
-                    await workflow.execute_activity(
-                        act_flush_trace_events,
-                        arg=FlushTraceEventsArg(events=buffered_events),
-                        start_to_close_timeout=timedelta(seconds=30),
-                        retry_policy=RetryPolicy(maximum_attempts=3),
-                    )
-                except Exception as flush_exc:  # noqa: BLE001
-                    # Best-effort: trace-event flush in the finally block must never fail the workflow — log and continue.
-                    workflow_log.warning(f"Failed to flush trace events: {flush_exc}")
+            if event_log is not None:
+                buffered_events = event_log.drain()
+                event_log.close()
+                # Clear stale event log state from the report delegate. wf_run_id is the
+                # context key (set_event_log above); clear_event_log is a no-op pop when
+                # no context was registered (e.g. graph-only mode).
+                get_report_delegate().clear_event_log(context_key=wf_run_id)
+
+                # The awaited flush comes LAST: an interruption here can only skip the flush
+                # itself, never the worker-local cleanup above — and on replay the buffer is
+                # rebuilt deterministically from inline execution, so the flush re-fires with
+                # the same content.
+                #
+                # Determinism (H1): the schedule is a pure function of the payload — the
+                # event_log sentinel (trace_context presence) and schedule_flush
+                # (emit_graph_events or DRY run mode, both payload fields). It must NOT be
+                # gated on the buffer CONTENT: anything written into the buffer from outside
+                # the workflow thread would not be re-written on replay (activities do not
+                # re-execute), so a content-gated schedule recorded in history could vanish
+                # from the replayed command stream after a routine sticky-cache eviction
+                # ([TMPRL1100]). The payload-pure schedule_flush gate only skips costs-only
+                # LIVE runs, where the buffer is deterministically empty (see the tracing
+                # setup block). The activity no-ops on an empty list either way.
+                if schedule_flush:
+                    try:
+                        await workflow.execute_activity(
+                            act_flush_trace_events,
+                            arg=FlushTraceEventsArg(events=buffered_events),
+                            start_to_close_timeout=timedelta(seconds=30),
+                            retry_policy=RetryPolicy(maximum_attempts=3),
+                        )
+                    except Exception as flush_exc:  # noqa: BLE001
+                        # Best-effort: trace-event flush in the finally block must never fail the workflow — log and continue.
+                        workflow_log.warning(f"Failed to flush trace events: {flush_exc}")
 
         # Dehydrate PipeOutput for Temporal transit: serialize WorkingMemory to
         # raw dict so the parent's data converter can deserialize without needing

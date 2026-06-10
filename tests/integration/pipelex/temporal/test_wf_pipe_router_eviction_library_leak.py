@@ -6,8 +6,8 @@ worker-local library teardown sits in the workflow's ``finally`` block AFTER the
 (``_WorkflowBeingEvictedError`` is a ``BaseException``) bypasses the ``except Exception``
 around the flush and aborts the rest of the ``finally``: the per-workflow library and its
 crate fingerprint leak in the worker-local ``LibraryManager`` singleton, keyed by the
-*deterministic* ``wf_{workflow_id}``. When the same worker then replays or re-runs that
-workflow, ``open_library`` returns the stale library, ``set_class_registry`` installs a
+*deterministic, replay-stable* ``wf_{run_id}``. When the same worker then replays that
+run, ``open_library`` returns the stale library, ``set_class_registry`` installs a
 FRESH registry seeded only from the global one, and ``load_from_crate`` is
 fingerprint-skipped — so the crate's dynamic classes are never registered into the new
 registry and inline hydration fails where history recorded success: command-stream
@@ -17,11 +17,13 @@ silent hang.
 How the reproduction works:
 
 Forcing a real eviction exactly during the flush await is racy, so the test installs the
-*post-eviction leaked state* directly: it performs the same setup steps the interrupted
-predecessor execution would have performed — open the library under ``wf_{workflow_id}``,
-attach a scoped class registry, ``load_from_crate`` — and deliberately skips teardown,
-leaving the library and the crate fingerprint behind in the ``LibraryManager``. It then
-runs ``WfPipeRouter`` with that exact workflow id and a payload whose
+*post-eviction leaked state* directly: it starts the workflow with no worker listening
+(so the run id is known but nothing executes yet), performs the same setup steps the
+interrupted predecessor execution would have performed — open the library under
+``wf_{run_id}``, attach a scoped class registry, ``load_from_crate`` — and deliberately
+skips teardown, leaving the library and the crate fingerprint behind in the
+``LibraryManager``. Only then does it open the worker, so the workflow executes against
+that leaked state with a payload whose
 ``working_memory_raw`` carries a dynamic-concept stuff (the deferred-hydration path).
 With the bug, the fingerprint skip leaves the dynamic class unregistered in the fresh
 per-workflow registry and the workflow fails inline at hydration. The test asserts the
@@ -47,18 +49,15 @@ from kajson.class_registry import ClassRegistry
 from kajson.kajson_manager import KajsonManager
 from temporalio.client import Client as TemporalClient
 
-from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.core.stuffs.stuff import Stuff
-from pipelex.core.stuffs.stuff_content_factory import StuffContentFactory
-from pipelex.hub import get_current_library, get_library_manager, get_required_concept, set_current_library
+from pipelex.hub import get_current_library, get_library_manager, set_current_library
 from pipelex.libraries.exceptions import LibraryError
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.temporal.temporal_hub import get_task_manager
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 from tests.integration.pipelex.fixtures.pipe_job_helpers import pipe_job_from_bundle
-from tests.integration.pipelex.temporal.library_crate.helpers import rehydrate_pipe_output
+from tests.integration.pipelex.temporal.library_crate.helpers import make_prepared_greeting_job, rehydrate_pipe_output
 from tests.integration.pipelex.temporal.test_data import DeferredHydrationTestData
 
 
@@ -85,7 +84,7 @@ class TestWfPipeRouterEvictionLibraryLeak:
         temporal_client: TemporalClient,
         isolated_hydration_job: PipeJob,
     ) -> None:
-        """A leaked predecessor library under the same ``wf_{workflow_id}`` must not poison the run.
+        """A leaked predecessor library under the same ``wf_{run_id}`` must not poison the run.
 
         With the bug, ``load_from_crate`` is fingerprint-skipped against the leaked
         library while ``set_class_registry`` already swapped in a fresh registry, so
@@ -94,26 +93,32 @@ class TestWfPipeRouterEvictionLibraryLeak:
         """
         # Build an input WorkingMemory carrying a dynamic-concept stuff, then dehydrate it
         # for Temporal transit so the workflow must hydrate it inline after crate loading.
-        greeting_concept = get_required_concept(concept_ref=f"{DeferredHydrationTestData.DOMAIN}.Greeting")
-        greeting_content = StuffContentFactory.make_stuff_content_from_concept_required(
-            concept=greeting_concept,
-            value={"message": "Bonjour le monde", "language": "French"},
-        )
-        greeting_stuff = Stuff(
-            stuff_code="leak_input",
-            stuff_name="greeting_result",
-            concept=greeting_concept,
-            content=greeting_content,
-        )
-        input_memory = WorkingMemory()
-        input_memory.root["greeting_result"] = greeting_stuff
-        prepared_job = isolated_hydration_job.model_copy(update={"working_memory": input_memory}).prepare_for_temporal()
+        prepared_job = make_prepared_greeting_job(isolated_hydration_job, stuff_code="leak_input")
         assert prepared_job.working_memory_raw is not None, "prepare_for_temporal must populate working_memory_raw"
         library_crate = prepared_job.library_crate
         assert library_crate is not None, "the dynamic-concept job must carry a library crate"
 
         workflow_id = f"wf_eviction_leak_{uuid.uuid4().hex[:8]}"
-        leaked_library_id = f"wf_{workflow_id}"
+        task_queue = f"q_eviction_leak_{uuid.uuid4().hex[:8]}"
+
+        # Start the workflow with NO worker listening on the task queue: the server
+        # assigns the run id immediately but nothing executes until the worker opens
+        # below. The per-run library id is derived from that run id (run-scoped keying:
+        # workflow ids are reused across retry/reset/resubmission, run ids are not).
+        workflow_handle = await temporal_client.start_workflow(  # pyright: ignore[reportUnknownMemberType]
+            workflow=WfPipeRouter.run,
+            arg=prepared_job,
+            id=workflow_id,
+            task_queue=task_queue,
+            # With the bug this fails the workflow: the inline hydration failure is
+            # converted to a terminal TemporalError by the workflow's fail-safe floor.
+            # The execution timeout is a safety net in case a regression turns the
+            # inline failure into a workflow-task retry loop.
+            execution_timeout=timedelta(seconds=60),
+        )
+        run_id = workflow_handle.first_execution_run_id
+        assert run_id is not None
+        leaked_library_id = f"wf_{run_id}"
 
         # Install the post-eviction leaked state: replay the interrupted predecessor's
         # setup steps (mirroring WfPipeRouter.run) and deliberately skip teardown, so the
@@ -131,24 +136,13 @@ class TestWfPipeRouterEvictionLibraryLeak:
         finally:
             set_current_library(library_id=fixture_library_id)
 
-        task_queue = f"q_eviction_leak_{uuid.uuid4().hex[:8]}"
         try:
             async with get_task_manager().make_worker(
                 temporal_client,
                 task_queue=task_queue,
                 is_not_sandboxed=True,
             ):
-                # With the bug this raises WorkflowFailureError: the inline hydration
-                # failure is converted to a terminal TemporalError by the workflow's
-                # fail-safe floor. The execution timeout is a safety net in case a
-                # regression turns the inline failure into a workflow-task retry loop.
-                pipe_output: PipeOutput = await temporal_client.execute_workflow(  # pyright: ignore[reportUnknownMemberType]
-                    workflow=WfPipeRouter.run,
-                    arg=prepared_job,
-                    id=workflow_id,
-                    task_queue=task_queue,
-                    execution_timeout=timedelta(seconds=60),
-                )
+                pipe_output: PipeOutput = await workflow_handle.result()
         finally:
             # The workflow's own finally tears the library down on most paths; suppress
             # covers early failures so the leak never escapes into other tests.
