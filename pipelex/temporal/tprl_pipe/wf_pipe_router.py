@@ -1,4 +1,5 @@
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
@@ -20,6 +21,9 @@ with workflow.unsafe.imports_passed_through():
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
     from pipelex.temporal.tprl_pipe.act_flush_trace_events import FlushTraceEventsArg, act_flush_trace_events
     from pipelex.tracing.buffering_event_log import BufferingEventLog
+
+if TYPE_CHECKING:
+    from pipelex.tracing.trace_events import TraceEvent
 
 
 def _carries_temporal_failure(exc: BaseException) -> bool:
@@ -90,10 +94,16 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                 workflow_registry = ClassRegistry()
                 workflow_registry.register_classes_dict(global_registry.get_classes_dict())
 
-                # 2. Open library and attach registry to it
+                # 2. Open library and attach registry to it. The library id is deterministic
+                # (derived from the workflow id), so a pre-existing library under it can only be
+                # the leftover of an evicted/interrupted predecessor execution whose finally never
+                # ran (H2): reusing it would fingerprint-skip the crate load below against the
+                # fresh registry, so the crate's dynamic classes never land in it and inline
+                # hydration fails where history recorded success. open_fresh_library tears any
+                # such leftover down — pure in-memory, no commands emitted, so it is replay-safe.
                 library_manager = get_library_manager()
                 wf_library_id = f"wf_{workflow.info().workflow_id}"
-                _wf_library_id, wf_library = library_manager.open_library(library_id=wf_library_id)
+                wf_library = library_manager.open_fresh_library(library_id=wf_library_id)
                 wf_library.set_class_registry(workflow_registry)
                 set_current_library(library_id=wf_library_id)
 
@@ -206,27 +216,18 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                     # Best-effort: tracer close in the finally block must never fail the workflow — log and continue.
                     workflow_log.warning(f"Failed to close per-workflow tracer: {tracer_exc}")
 
-            # Flush trace events and clean up event log
+            # Drain the buffer and finish ALL worker-local cleanup before the awaited flush
+            # activity below. Eviction safety (H2): the flush await is a suspension point where
+            # a BaseException can be raised (_WorkflowBeingEvictedError on sticky-cache
+            # eviction, CancelledError on workflow cancellation) — it escapes the
+            # `except Exception` around the flush and aborts the rest of this finally block.
+            # Worker-local cleanup (event-log context, per-workflow library + crate
+            # fingerprint) must therefore run BEFORE that await, so an eviction can no longer
+            # leak state keyed by the deterministic wf_{workflow_id} into the worker-local
+            # singletons and poison a same-worker replay/re-run.
+            buffered_events: list[TraceEvent] | None = None
             if event_log is not None:
-                # Determinism (H1): the flush activity is scheduled unconditionally — event_log
-                # presence is a pure function of the payload (trace_context is not None). The
-                # schedule must NOT be gated on the buffer content: anything written into the
-                # buffer from outside the workflow thread would not be re-written on replay
-                # (activities do not re-execute), so a content-gated schedule recorded in
-                # history could vanish from the replayed command stream after a routine
-                # sticky-cache eviction ([TMPRL1100]). The activity no-ops on an empty list.
                 buffered_events = event_log.drain()
-                try:
-                    await workflow.execute_activity(
-                        act_flush_trace_events,
-                        arg=FlushTraceEventsArg(events=buffered_events),
-                        start_to_close_timeout=timedelta(seconds=30),
-                        retry_policy=RetryPolicy(maximum_attempts=3),
-                    )
-                except Exception as flush_exc:  # noqa: BLE001
-                    # Best-effort: trace-event flush in the finally block must never fail the workflow — log and continue.
-                    workflow_log.warning(f"Failed to flush trace events: {flush_exc}")
-
                 event_log.close()
 
                 # Clear stale event log state from the report delegate
@@ -238,6 +239,30 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                     get_library_manager().teardown(library_id=wf_library_id)
                 finally:
                     clear_current_library()
+
+            # The awaited flush comes LAST: an interruption here can only skip the flush
+            # itself, never the worker-local cleanup above — and on replay the buffer is
+            # rebuilt deterministically from inline execution, so the flush re-fires with
+            # the same content.
+            if buffered_events is not None:
+                # Determinism (H1): the flush activity is scheduled unconditionally — the gate
+                # (buffered_events is not None ⇔ event_log was set up) is a pure function of the
+                # payload (trace_context is not None). The schedule must NOT be gated on the
+                # buffer CONTENT: anything written into the buffer from outside the workflow
+                # thread would not be re-written on replay (activities do not re-execute), so a
+                # content-gated schedule recorded in history could vanish from the replayed
+                # command stream after a routine sticky-cache eviction ([TMPRL1100]). The
+                # activity no-ops on an empty list.
+                try:
+                    await workflow.execute_activity(
+                        act_flush_trace_events,
+                        arg=FlushTraceEventsArg(events=buffered_events),
+                        start_to_close_timeout=timedelta(seconds=30),
+                        retry_policy=RetryPolicy(maximum_attempts=3),
+                    )
+                except Exception as flush_exc:  # noqa: BLE001
+                    # Best-effort: trace-event flush in the finally block must never fail the workflow — log and continue.
+                    workflow_log.warning(f"Failed to flush trace events: {flush_exc}")
 
         # Dehydrate PipeOutput for Temporal transit: serialize WorkingMemory to
         # raw dict so the parent's data converter can deserialize without needing

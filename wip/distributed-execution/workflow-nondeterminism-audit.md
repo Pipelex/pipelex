@@ -1,6 +1,6 @@
 # Workflow Nondeterminism Audit — worker-local inputs leaking into the command stream
 
-**Status: H1 and M1 fixed; remaining findings are diagnosis only.** Multi-agent audit of all code reachable inline from `@workflow.defn` bodies, run on top of the PR #984 fix (commit `db669ea62`, which gated `act_flush_trace_events` on the payload's `trace_context` instead of worker-local `tracing_config.is_enabled`). Every finding below was adversarially verified against the actual code; refuted candidates are listed at the end so they don't get re-chased.
+**Status: H1, H2, and M1 fixed; remaining findings are diagnosis only.** Multi-agent audit of all code reachable inline from `@workflow.defn` bodies, run on top of the PR #984 fix (commit `db669ea62`, which gated `act_flush_trace_events` on the payload's `trace_context` instead of worker-local `tracing_config.is_enabled`). Every finding below was adversarially verified against the actual code; refuted candidates are listed at the end so they don't get re-chased.
 
 **The breach definition used throughout:** any input read in code executing inline on the workflow thread (the `@workflow.run` body and everything it calls outside `@activity.defn` functions) that is not derived from the workflow payload or workflow APIs (`workflow.now()`, `workflow.uuid4()`, history), and that influences the command stream — whether/which/how many activities or child workflows get scheduled, their order, arguments, timeouts, retry policies, or task queues. Config reads inside activity bodies or at submission time are fine.
 
@@ -26,7 +26,9 @@ These two finish what PR #984 started: scheduling around the flush activity and 
 
 **Fix:** gate the flush dispatch purely on the payload (`trace_context` presence / emit flags) and let the activity no-op on an empty event list; stop routing activity-side usage events through the workflow's in-sandbox buffer (co-located activities should use the same runner-fallback per-process event log they use when remote).
 
-### H2. Eviction skips library teardown → leaked fingerprint poisons same-worker replay
+### H2. Eviction skips library teardown → leaked fingerprint poisons same-worker replay — **FIXED**
+
+> **Fixed:** two complementary moves. (1) Self-healing setup: `WfPipeRouter` opens its per-workflow library via the new `LibraryManager.open_fresh_library`, which force-tears-down any pre-existing library under the deterministic `wf_{workflow_id}` — a leftover there can only be an interrupted predecessor, and a clean teardown removes the whole stale-state class (fingerprint, pipes, concepts, registry), which is strictly stronger than scoping the fingerprint dedup (re-loading a crate into a half-stale library would hit duplicate-add errors). (2) Eviction-safe cleanup ordering: the workflow `finally` now runs ALL worker-local cleanup (event-log drain/close, report-delegate context clear, library teardown) BEFORE the awaited flush activity, which moved last — a `BaseException` raised at that await can only skip the flush itself, never the teardown. Guarded by `tests/integration/pipelex/temporal/test_wf_pipe_router_eviction_library_leak.py`.
 
 `pipelex/temporal/tprl_pipe/wf_pipe_router.py:96` (setup) and `:241` (teardown)
 
@@ -116,7 +118,7 @@ Root cause: `pipelex/core/stuffs/stuff_factory.py:44` — `make_stuff_code()` is
 ## Suggested fix order
 
 1. ~~**H1 + M1 together**~~ — **DONE**: `act_flush_trace_events` scheduling is a pure function of `trace_context` (always scheduled when present; activity no-ops on empty events), `open_tracer` is collision-proof, and activity-side usage events never route through the in-sandbox buffer. This finishes PR #984.
-2. **H2** — fingerprint-cache scoping / force-teardown on `open_library`, plus eviction-safe cleanup ordering in the `finally`.
+2. ~~**H2**~~ — **DONE**: `open_fresh_library` force-teardown of leaked predecessor state, plus eviction-safe cleanup ordering in the `finally` (worker-local cleanup before the awaited flush).
 3. **Dispatch options to payload** — resolve `DispatchOptions` at the submission boundary and carry them in `PipeJob` (`ContentGeneratorInWorkflow` then reads only the payload), closing M2's sibling and the biggest argument-drift surface in one move.
 4. **Replay-safe id/clock provider** for the randomness cluster.
 5. **M3/M4/M5** individually as the dry-run-as-activity and PipeFunc-as-activity work lands.

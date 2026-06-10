@@ -153,6 +153,16 @@ class LibraryManager(LibraryManagerAbstract):
 
         return library_id, the_library
 
+    @override
+    def open_fresh_library(self, library_id: str) -> Library:
+        if library_id in self._libraries:
+            log.warning(
+                f"open_fresh_library: tearing down pre-existing library '{library_id}' — leftover of an interrupted execution whose cleanup never ran"
+            )
+            self.teardown(library_id=library_id)
+        _library_id, the_library = self.open_library(library_id=library_id)
+        return the_library
+
     ############################################################
     # Public library accessors
     ############################################################

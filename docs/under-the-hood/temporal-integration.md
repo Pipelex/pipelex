@@ -148,11 +148,11 @@ Each `WfPipeRouter.run()` creates its own scoped state:
 
 1. **ClassRegistry**: A new `ClassRegistry` pre-seeded from the global registry (which has base classes from `PIPELEXPATH`). Dynamic classes from the crate are registered here — not in the global registry.
 
-2. **Library**: A new `Library` instance opened via `library_manager.open_library()`, with the `ClassRegistry` attached as a `PrivateAttr`. The library is set as the current library via the `_library_id` `ContextVar`.
+2. **Library**: A new `Library` instance opened via `library_manager.open_fresh_library()`, with the `ClassRegistry` attached as a `PrivateAttr`. The library is set as the current library via the `_library_id` `ContextVar`. The library id is deterministic (`wf_{workflow_id}`), so `open_fresh_library` tears down any pre-existing library under that id before opening: such a leftover can only come from an interrupted predecessor execution whose cleanup never ran, and reusing it would fingerprint-skip the crate load against the fresh registry — the crate's dynamic classes would never land in it.
 
 3. **ClassRegistry lookup chain**: `hub.get_class_registry()` reads `_library_id` from the `ContextVar`, gets the library's attached `ClassRegistry`. Falls back to the global registry if no library is set.
 
-4. **Cleanup**: `library_manager.teardown(library_id)` deletes the library and its `ClassRegistry`. The `ContextVar` is reset via `clear_current_library()`. No manual GC needed — the `ClassRegistry` is garbage-collected with the `Library`.
+4. **Cleanup**: `library_manager.teardown(library_id)` deletes the library and its `ClassRegistry`. The `ContextVar` is reset via `clear_current_library()`. No manual GC needed — the `ClassRegistry` is garbage-collected with the `Library`. In the workflow's `finally` block, this worker-local cleanup runs BEFORE the awaited `act_flush_trace_events` activity: the await is a suspension point where an eviction-time `BaseException` can abort the rest of the block, so ordering cleanup first guarantees an eviction can only skip the flush itself, never the teardown.
 
 ### Kajson integration
 
