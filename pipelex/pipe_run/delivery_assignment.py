@@ -17,7 +17,7 @@ class DeliveryStatus(StrEnum):
 # (see ``DeliveryExecutor._notify_webhook``). A caller's static ``payload``
 # must not declare any of them — otherwise the value would shift silently
 # with delivery status. Enforced at construction by ``_reject_reserved_keys``.
-_RESERVED_WEBHOOK_PAYLOAD_KEYS: frozenset[str] = frozenset({"pipeline_run_id", "status", "result_url", "error"})
+_RESERVED_WEBHOOK_PAYLOAD_KEYS: frozenset[str] = frozenset({"run_id", "state", "pipeline_run_id", "status", "result_url", "error"})
 
 
 class WebhookTarget(BaseModel):
@@ -32,8 +32,9 @@ class WebhookTarget(BaseModel):
     def _reject_reserved_keys(cls, value: dict[str, Any]) -> dict[str, Any]:
         """Reject caller payload keys that Pipelex assigns per delivery.
 
-        ``DeliveryExecutor._notify_webhook`` writes ``pipeline_run_id`` /
-        ``status`` / ``result_url`` / ``error`` onto the outgoing body. A static
+        ``DeliveryExecutor._notify_webhook`` writes ``run_id`` / ``state``
+        (protocol spellings) plus the transitional ``pipeline_run_id`` /
+        ``status`` aliases, ``result_url`` and ``error`` onto the outgoing body. A static
         payload that declares any of them would have its meaning shift with
         delivery status — fail loudly at construction instead of silently at
         delivery time.

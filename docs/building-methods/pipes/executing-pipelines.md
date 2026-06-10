@@ -88,7 +88,7 @@ When using `PipelexMTHDSProtocol`, you can control library behavior with these p
 
 - **`library_dirs`**: A list of directory paths to load pipe definitions from. **These directories must contain both your `.mthds` files AND any Python files defining `StructuredContent` classes** (e.g., `*_struct.py` files). If not specified, Pipelex falls back to the `PIPELEXPATH` environment variable, then to the current working directory.
 
-- **`mthds_content`**: When provided to `PipelexMTHDSProtocol.execute()`, Pipelex will load only this content into the library, bypassing directory scanning. This is useful for dynamic pipeline execution without file-based definitions.
+- **`mthds_contents`**: When provided to `PipelexMTHDSProtocol.execute()`, Pipelex will load only this content into the library, bypassing directory scanning. This is useful for dynamic pipeline execution without file-based definitions.
 
 !!! info "Python Structure Classes"
     If your concepts use Python `StructuredContent` classes instead of inline structures, those Python files must be in the directories specified by `library_dirs`. Pipelex auto-discovers and registers these classes during library loading. Learn more about [Python StructuredContent Classes](../concepts/python-classes.md).
@@ -201,7 +201,7 @@ Pipelex.make()
 
 runner = PipelexMTHDSProtocol()
 response = await runner.execute(
-    mthds_content=my_pipe_content,
+    mthds_contents=[my_pipe_content],
     inputs={
         "description": {
             "concept": "ProductDescription",

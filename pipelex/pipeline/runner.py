@@ -305,11 +305,27 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             PipelexError: When the bundle is invalid (parse, static validation, or dry-run failure).
         """
         library_dirs = [Path(library_dir) for library_dir in self.library_dirs] if self.library_dirs else None
-        result = await validate_bundle(
-            mthds_contents=mthds_contents,
-            library_dirs=library_dirs,
-            allow_signatures=allow_signatures,
-        )
+        # `validate_bundle` deliberately leaves its validation library OPEN and
+        # current on success (the CLI surfaces consume it before process exit).
+        # This protocol wrapper is a long-lived entry point, so restore the
+        # caller's current-library and tear the validation library down on the
+        # way out — on failure `validate_bundle` already did both, making the
+        # cleanup below a no-op.
+        prev_library_id = get_current_library_id_or_none()
+        try:
+            result = await validate_bundle(
+                mthds_contents=mthds_contents,
+                library_dirs=library_dirs,
+                allow_signatures=allow_signatures,
+            )
+        finally:
+            validation_library_id = get_current_library_id_or_none()
+            if validation_library_id is not None and validation_library_id != prev_library_id:
+                if prev_library_id is not None:
+                    set_current_library(library_id=prev_library_id)
+                else:
+                    clear_current_library()
+                get_library_manager().teardown(library_id=validation_library_id)
         blueprints_dump: list[dict[str, Any]] = [blueprint.model_dump(mode="json") for blueprint in result.blueprints]
         pipe_structures: dict[str, Any] = {pipe.code: pipe.model_dump(mode="json") for pipe in result.pipes}
         return ValidationReport(
@@ -356,7 +372,13 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             VersionInfo with the installed pipelex version as both the
             implementation and runtime version.
         """
-        pipelex_version = metadata.version("pipelex")
+        pipelex_version: str
+        try:
+            pipelex_version = metadata.version("pipelex")
+        except metadata.PackageNotFoundError:
+            # Source checkout on PYTHONPATH without an installed distribution —
+            # the runtime still works, so version() must not fail.
+            pipelex_version = "unknown"
         return VersionInfo(
             protocol_version=MTHDS_PROTOCOL_VERSION,
             implementation="pipelex",

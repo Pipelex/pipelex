@@ -270,6 +270,12 @@ class DeliveryExecutor:
         """
         try:
             payload: dict[str, Any] = dict(webhook.payload)
+            # Wire fields follow the MTHDS Protocol (run_id/state — master D1). The
+            # legacy spellings (pipeline_run_id/status) ride along for one release so
+            # receivers can migrate without a deploy-window gap (the hosted
+            # run-completion Lambda accepts both during the Phase C skew).
+            payload["run_id"] = pipeline_run_id
+            payload["state"] = status
             payload["pipeline_run_id"] = pipeline_run_id
             payload["status"] = status
             if result_url is not None:
