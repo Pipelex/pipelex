@@ -215,11 +215,10 @@ RED (prove it bites) — the fix is committed, so neutralize it in the working t
 
 - **Drop the content-generator scope:** in `pipelex/pipe_run/dry_run_pipeline.py`
   (`dry_run_pipe_in_process`), remove `scoped_content_generator(content_generator)` from the
-  `with` line. Under Part-B leaf-mock semantics the leaf reaches the hub
+  `with` line. The DRY mock lives at the cogt leaf, so the leaf resolves the hub
   `ContentGeneratorInWorkflow` and dies with `_NotInWorkflowEventLoopError` / the strong check shows
-  dispatch. (Today's pipe-level DRY mock masks this arm in Mode 2 — the CI-cheap Mode-1 companion
-  `test_dry_run_graph_in_process.py::test_leaf_level_mock_stays_in_process` simulates the leaf mock
-  and is the deterministic RED for it.)
+  dispatch. (The CI-cheap Mode-1 companion is
+  `test_dry_run_graph_in_process.py::test_leaf_level_mock_stays_in_process`.)
 - **Drop the shared event log:** in the same function, remove `scoped_event_log(event_log)` from
   the `with` line — the two-instance regression: emit and assemble no longer share the instance, the
   assembly finds zero events, and `dry_run_pipe_in_process` raises `In-process dry-run of pipe '...'
@@ -1127,6 +1126,104 @@ If you continue to Step 6 or later tiers, restart the shared worker(s) per Step 
 
 ---
 
+### Step 5g: Tier 17 — DRY honors the Temporal backend (leaf mock inside the activity)
+
+Contract under test: `run_mode` is orthogonal to the backend — a `--temporal --dry-run` run goes
+through the REAL distribution machinery (`WfPipeRouter` → child workflows → `act_*_gen_*`
+activities on the worker) and the cogt **leaf inside each activity** mocks instead of calling a
+provider (`run_mode=DRY` rides `CogtRunParams` on every assignment across the wire). A regression
+to the old behavior — dry-run short-circuiting at the operator/router and dispatching nothing —
+must turn this tier red. Purpose: test dispatch, scheduling, serialization, routing, and
+cross-worker propagation at zero AI cost.
+
+The Mode-1 (pytest) companion is
+`tests/integration/pipelex/temporal/tracing/test_dry_run_dispatches_and_mocks.py` — it asserts the
+dispatch via workflow history (`ActivityTaskScheduled` across the parent + child workflows), the
+`DRY RUN:` leaf output, and the zero-token suppressed usage over the in-process server.
+
+**Setup.** Split workers up (router + runner per Step 2 in `mode-2-setup.md`), Temporal-enabled.
+The dry leaves never touch a provider or storage, so this tier needs NO API keys — the "dry works
+with no inference configured" invariant must hold even though activities dispatch.
+
+**GREEN arm — LLM bundle:**
+
+```bash
+timeout 600 .venv/bin/pipelex run bundle \
+  tests/integration/pipelex/temporal/library_crate/native_text_sequence.mthds \
+  --pipe native_text_sequence \
+  --temporal --dry-run --mock-inputs --no-logo --graph > /tmp/tier17.log 2>&1
+echo "EXIT=$?"
+tail -15 /tmp/tier17.log
+# The runner DID execute the LLM activity (pre-Part-B: nothing inference-related ran here):
+tmux capture-pane -t temporal-worker-runner -p -S -300 | grep -c "act_llm_gen_text"
+# The leaf mocked INSIDE the activity — no provider call, no storage write on the runner:
+tmux capture-pane -t temporal-worker-runner -p -S -300 | grep -iE "openai|anthropic|provider|storing|uploaded" | head -5
+```
+
+Report to the user:
+
+- **PASS** = exit 0 · the runner pane shows `act_llm_gen_text` executions (count ≥ 1) · no
+  provider/storage lines on the runner · the output `main_stuff` text starts with `DRY RUN:` ·
+  **no cost table rendered** (zero-token dry usage is suppressed by design — contrast Tier 8b) ·
+  `reactflow.html` generated (cross-worker graph tracing assembled, LibraryCrate propagated).
+- **FAIL** = non-zero exit; or the runner pane shows NO `act_llm_gen_text` (the dry run didn't
+  dispatch — the pre-Part-B shortcut is back); or any provider/storage activity on the runner.
+
+**GREEN arm — non-LLM leaves** (each replaces the old `MockInferenceUnsupportedError` fail-loud
+guard for dry runs at that leaf — img/extract DRY branches sit at the `*_and_store` layer, so also
+assert no storage writes):
+
+```bash
+# Extract (two activities: act_extract_gen_extract_pages + act_render_page_views):
+timeout 600 .venv/bin/pipelex run bundle \
+  tests/integration/pipelex/temporal/library_crate/pdf_extract_page_views.mthds \
+  --pipe pdf_extract_with_page_views \
+  --temporal --dry-run --mock-inputs --no-logo > /tmp/tier17-extract.log 2>&1
+echo "EXIT=$?"
+tmux capture-pane -t temporal-worker-runner -p -S -200 | grep -cE "act_extract_gen_extract_pages|act_render_page_views"
+
+# Image generation:
+timeout 600 .venv/bin/pipelex run bundle \
+  tests/integration/pipelex/pipes/pipelines/test_image_out_in.mthds \
+  --pipe generate_image \
+  --temporal --dry-run --mock-inputs --no-logo > /tmp/tier17-img.log 2>&1
+echo "EXIT=$?"
+tmux capture-pane -t temporal-worker-runner -p -S -200 | grep -c "act_img_gen_images"
+
+# Web search:
+timeout 600 .venv/bin/pipelex run bundle \
+  tests/integration/pipelex/temporal/library_crate/native_search.mthds \
+  --pipe native_search \
+  --temporal --dry-run --mock-inputs --no-logo > /tmp/tier17-search.log 2>&1
+echo "EXIT=$?"
+tmux capture-pane -t temporal-worker-runner -p -S -200 | grep -c "act_search_gen_sourced_answer"
+```
+
+- **PASS** per arm = exit 0 + the named activity count ≥ 1 on the runner + no storage writes
+  (no bucket/object upload lines in the runner pane) + zero provider calls.
+
+**No-keys GREEN arm — prove dry needs no inference configured.** The dispatched-and-mocked
+behavior must hold on a worker with NO usable credentials. Tamper `.env` with invalid keys and
+restart the runner using the same backup/restore method as Tiers 13–16 (Step 5f), then re-run the
+GREEN LLM command:
+
+- **PASS** = exit 0 with the keyless runner — the dry leaves never resolve a provider, so invalid
+  credentials are never exercised. Keep this runner for the RED arm below.
+
+**RED arm — prove the leaf branch bites.** There is no router-level mock to revert to,
+so the RED mutation is at the leaf: temporarily disable the DRY branch in `llm_gen_text`
+(`pipelex/cogt/content_generation/llm_generate.py` — comment out the
+`if llm_assignment.cogt_run_params.run_mode.is_dry:` short-circuit), restart the **runner** worker
+(it must boot WITHOUT inference credentials — same `.env` tamper method as Tiers 13–16 if your
+`.env` has real keys), and re-run the GREEN LLM command:
+
+- **RED-PASS** = the dispatched `act_llm_gen_text` attempts a real call and **fails loud** on
+  missing/invalid keys — the dispatched + mocked-inside + no-spend + no-keys quartet flips.
+- Restore the leaf branch (`git checkout -- pipelex/cogt/content_generation/llm_generate.py`),
+  restore `.env` if tampered, restart the workers, and re-run GREEN to confirm recovery.
+
+---
+
 ### Step 6: StoragePayloadCodec tests — does the codec work end-to-end?
 
 These tests validate Phase 5: large payloads are transparently offloaded to external
@@ -1267,6 +1364,7 @@ ls results/*/reactflow.html
 | Tier 14: Extract error propagation | Same for a non-LLM (`act_extract_gen_extract_pages`) activity failure | PASS/FAIL | — | — |
 | Tier 15: Image-gen error propagation | Same for the image-generation (`act_img_gen_images`) activity failure | PASS/FAIL | — | — |
 | Tier 16: Batch child-workflow error propagation | A per-branch failure inside a `PipeBatch` fan-out child workflow crosses the fan-in carrying its `ErrorReport`, not a generic batch wrapper | PASS/FAIL | — | — |
+| Tier 17: DRY honors the backend | a `--temporal --dry-run` run dispatches `act_llm_gen_*` (+ extract/img-gen/search) to the worker and mocks INSIDE the activity — no real IO, no API keys needed, zero-token suppressed usage, cross-worker graph still assembles | PASS/FAIL | path | — |
 | Scenario A: v2 multi-class routing | Specialized scopes + per-class runners cover LLM/img-gen/extract without cross-class leakage | PASS/FAIL/SKIPPED | — | — |
 | Scenario B: per-queue timeout | `queue_options[X].start_to_close_timeout` overrides the worker_config baseline and flows into `ActivityTaskScheduled.start_to_close_timeout` | PASS/FAIL/SKIPPED | — | — |
 | Scenario C: per-handle override | `handle_options[<handle>].start_to_close_timeout` wins over per-queue value for that one handle | PASS/FAIL/SKIPPED | — | — |

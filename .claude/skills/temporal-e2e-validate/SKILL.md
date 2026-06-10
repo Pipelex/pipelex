@@ -19,7 +19,9 @@ description: >
   parity arm); Mode 2 Tiers 13-16 validate that a worker-side failure — from an
   LLM, extract, image-gen, or batched child-workflow activity — carries
   a structured `ErrorReport` across the activity -> workflow -> submitter
-  boundary.
+  boundary. Tier 17 validates that a `--temporal --dry-run` run dispatches the
+  real inference activities and mocks INSIDE them (run mode orthogonal to
+  backend — no API keys, no storage IO, zero-token suppressed usage).
   Use when the user says "validate temporal", "e2e temporal",
   "temporal regression", "temporal validation", "3-process test", "full temporal
   test", "validate phases", "image temporal", "queue options", "runtime profile",
@@ -305,6 +307,7 @@ loaded only for the work at hand. Read them as needed:
 
 - "validate temporal" / "full temporal test" / a broad regression check → `mode-2-setup.md`, then `mode-2-tiers.md`; offer the two batteries as opt-in extras.
 - "validate temporal error handling" / "error report" / "error propagation" → Mode 1 Step 2b above (the precise pytest assertions) **plus** `mode-2-setup.md` + `mode-2-tiers.md` Step 5f (Tiers 13–16, cross-process).
+- "dry run temporal" / "dry-run dispatch" / "leaf mock" → `mode-2-setup.md` + `mode-2-tiers.md` Step 5g (Tier 17: DRY honors the backend — dispatch + mock inside the activity, no keys needed), plus the Mode-1 pytest `tests/integration/pipelex/temporal/tracing/test_dry_run_dispatches_and_mocks.py`.
 - "cost report" / "distributed cost" / "mock inference" → `mode-2-setup.md` (split workers), then `mode-2-tiers.md` Step 5b' (Tier 8b). This routing is **scope-aware**: once a request has landed here (via one of those three triggers), read the scope manifest at the top of Step 5b' and run the arms it selects:
     - **default** (bare "cost report" / "distributed cost" / "mock inference") → the free, deterministic mock arms only (`--mock-inference`); no live spend.
     - **explicit spend opt-in** — the canonical token `full` (aliases `thorough`, `every`, `with-spend`) qualifying the cost request (e.g. "cost reporting full", "cost report — every arm") → **every** cost arm, real spend authorized: mock primary + cross-child + CSV cross-check + the `--no-costs` negative gate + live LLM + live img-gen + live extract. Run them all and report PASS/FAIL per arm. Do **not** treat bare "live" or "all" as a spend opt-in — they're too easily incidental ("live" also collides with the default mock arm, which already runs in LIVE mode); if that's the only signal, confirm with the user before spending real money.

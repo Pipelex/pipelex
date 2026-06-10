@@ -1,6 +1,6 @@
 # Follow-up — Leaf-level run-mode mock (DRY honors the backend)
 
-> **Status: deferred — own branch, not yet started.** Implements **D-plan Part B / D4 / req 1**. Split out of [`consolidation-as-built.md`](./consolidation-as-built.md) on 2026-06-01 (eng-review D1) so the in-process consolidation ships alone.
+> **Status: COMPLETE (2026-06-10) — built on `feature/Mock-activities`, all phases done, Checkpoint E reached.** Implements **D-plan Part B / D4 / req 1**. Split out of [`consolidation-as-built.md`](./consolidation-as-built.md) on 2026-06-01 (eng-review D1) so the in-process consolidation ships alone.
 >
 > **Design rationale:** [`D-plan.md`](./D-plan.md) §3.5 (run mode ⟂ backend) and §4.8 (leaf-level mock). **Risks:** D-plan §8 (object-mock fidelity, req-1 fidelity regressions).
 >
@@ -42,9 +42,9 @@ This describes a **different** dry-run mode from the in-memory in-process activi
 |---|---|---|---|
 | B1 | Thread `run_mode` to cogt leaf + leaf DRY branch | ☑ done | `feat(dry-run): thread run_mode to the cogt leaf via CogtRunParams` (2026-06-10, review-fixed) |
 | B2 | Collapse operator dry path | ☑ done | `feat(dry-run): collapse the operator dry path onto the leaf mock` (2026-06-10) |
-| | **⛔ CHECKPOINT D** | | |
-| B3 | Verify Temporal + DRY e2e (**req-1 gate**) | ☐ | |
-| | **⛔ CHECKPOINT E — follow-up complete** | | |
+| | **⛔ CHECKPOINT D — cleared 2026-06-10** | | |
+| B3 | Verify Temporal + DRY e2e (**req-1 gate**) | ☑ done | `test(temporal): Tier 17 — DRY honors the Temporal backend` (2026-06-10) |
+| | **⛔ CHECKPOINT E — follow-up complete — REACHED 2026-06-10** | | |
 
 Status legend: ☐ not started · ◐ in progress · ☑ done.
 
@@ -122,8 +122,8 @@ Additional deferred items from the B2 code review (2026-06-10):
 
 The acceptance gate is a **specific distributed scenario** in the repo's `temporal-e2e-validate` skill — **Tier 17** — built to the Tier 2c/2d precedent (a 3-process scenario in `references/mode-2-tiers.md`, a Mode-1 pytest, a Step-7 master-table row). Full spec below.
 
-- [ ] **Add `temporal-e2e-validate` Tier 17 — "DRY honors the Temporal backend (leaf mock inside the activity)".** Mode-2 3-process GREEN + RED + Mode-1 pytest + master-table row. See [§ Distributed verification](#distributed-verification--temporal-e2e-validate-mode-2--tier-17).
-- [ ] `make agent-check` + `make agent-test` green; Temporal e2e green (Tier 17 GREEN and RED-proven).
+- [x] **Add `temporal-e2e-validate` Tier 17 — "DRY honors the Temporal backend (leaf mock inside the activity)".** Added as Step 5g in `mode-2-tiers.md` (GREEN LLM + extract/img-gen/search arms + no-keys arm + RED mutate-the-leaf procedure) + Step-7 master-table row + SKILL.md routing entry; the Tier 8 / Tier 8b / routing-battery stale notes were already corrected in B2's review round. Mode-1 pytest: `tests/integration/pipelex/temporal/tracing/test_dry_run_dispatches_and_mocks.py` (under `tracing/` so the directory conftest applies the CI-xdist quarantine and the tmp-dir trace redirect) — asserts dispatch via workflow history across the parent + child workflow tree (the LLM activity is scheduled by the controller's child workflows, not the root), the `DRY RUN:` leaf output, and zero-token suppressed usage under the `dry_run` sentinel.
+- [x] `make agent-check` + `make agent-test` green; **Temporal e2e RUN AND GREEN (2026-06-10, real `temporal server start-dev` + split router/runner workers)**: GREEN LLM arm (exit 0, `act_llm_gen_text` ×2 executed on the runner, zero provider/storage lines, `DRY RUN: llm_gen_text` in output, no cost table, `reactflow.html` assembled) · GREEN extract (`act_extract_gen_extract_pages` + `act_render_page_views` dispatched) · GREEN img-gen (`act_img_gen_images`) · GREEN search (`act_search_gen_sourced_answer`) · **no-keys GREEN** (runner booted with invalid credentials — dry run still exit 0) · **RED-proven** (DRY branch disabled in `llm_gen_text` + keyless runner → exit 1, dispatched activity failed loud with HTTP 401 carried back to the submitter) · recovery confirmed (leaf restored → exit 0).
 
 ## Distributed verification — `temporal-e2e-validate` (Mode 2 / Tier 17)
 
@@ -145,19 +145,19 @@ pipelex run bundle .../library_crate/native_text_sequence.mthds --pipe native_te
 
 **Mode 2 RED (prove it bites):** temporarily key the leaf branch to LIVE (mutate the `run_mode` check in `llm_generate.py`) → the dispatched activity attempts a real call and **fails loud on missing keys / would spend** — the **dispatched + mocked-inside + no-spend + no-keys** quartet flips. Restore. *(Outside-voice fold: post-B2 there is no router-level mock to "revert to", so the RED arm is mutate-the-leaf, not revert-the-re-key.)*
 
-**Mode 1 (pytest) companion** — `tests/integration/pipelex/temporal/test_dry_run_dispatches_and_mocks.py` (the DRY analogue of the existing `test_mock_inference_temporal.py`): assert `run_mode=DRY` over the in-process server dispatches `act_llm_gen_*` and the leaf mints the DRY mock with **zero-token, suppressed** usage, no real inference.
+**Mode 1 (pytest) companion** — `tests/integration/pipelex/temporal/tracing/test_dry_run_dispatches_and_mocks.py` (the DRY analogue of the existing `test_mock_inference_temporal.py`): assert `run_mode=DRY` over the in-process server dispatches `act_llm_gen_*` and the leaf mints the DRY mock with **zero-token, suppressed** usage, no real inference.
 
 **Coordination with Tier 8b.** The existing `--mock-inference` cost arms (Tier 8b) are the LLM **cost-rendering** slice of this same mode (LIVE run mode + leaf mock, non-zero usage). **Decided (D8): the thin reportable-mock survives**, migrating into `CogtRunParams` — Tier 8b stays rendered-report-based, re-pointed at the migrated flag; update its scope manifest in B2. Also **update the Tier 8 note** in the `temporal-e2e-validate` skill as part of B3 — Tier 17 flips its meaning ("dry-run never dispatches" becomes pre-Part-B history).
 
 **Step-7 master-table row to add:** `Tier 17: DRY honors the backend | a --temporal --dry-run run dispatches act_llm_gen_* (+ extract/img-gen) to the worker and mocks INSIDE the activity — no real IO, no API keys needed, zero-token suppressed usage, cross-worker graph still assembles | PASS/FAIL | path | — `.
 
-> ### ⛔ CHECKPOINT E — after Phase B3 — **Follow-up complete** — **MANDATORY STOP**
+> ### ⛔ CHECKPOINT E — after Phase B3 — **Follow-up complete** — **REACHED 2026-06-10**
 >
 > Run mode is now orthogonal to backend across all four cells. **Req 1 satisfied.** Foundation for the Temporal-validation follow-up is in place.
 >
-> **Verify:** `temporal-e2e-validate` **Tier 17 GREEN and RED-proven** · full `make agent-test` green · commit.
+> **Verified:** `temporal-e2e-validate` **Tier 17 GREEN and RED-proven** (all arms, incl. no-keys; see B3 checklist for the run log summary) · full `make agent-test` green · committed.
 >
-> **Handoff (fill in):** (template) — **Next:** [`followup-temporal-validation-activity.md`](./followup-temporal-validation-activity.md) (HARD GATE — get the `temporalio` answer first).
+> **Handoff:** the four `run_mode × backend` cells all behave: LIVE/direct (unchanged), LIVE/temporal (unchanged), DRY/direct (leaf mock inline, no storage), DRY/temporal (real dispatch, leaf mock inside the activity — Tier 17). The `--mock-inference` reportable-mock coexists on the LIVE row (Tier 8b unchanged at the CLI surface, flag carried by `CogtRunParams`). Branch `feature/Mock-activities` → PR against `feature/Dry-run-as-temporal-activity`. — **Next:** [`followup-temporal-validation-activity.md`](./followup-temporal-validation-activity.md) (HARD GATE — get the `temporalio` answer first).
 
 ## GSTACK REVIEW REPORT
 
