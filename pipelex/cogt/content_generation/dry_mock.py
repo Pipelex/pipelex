@@ -12,7 +12,8 @@ extract, the DRY branch lives at the ``*_and_store`` layer — one step above th
 raw provider leaf — so a dry run performs **no storage IO** (eng review D10).
 
 Usage reporting is keyed on the internal ``CogtRunParams.is_mock_usage``
-sub-flag (DRY-only, no public CLI surface):
+sub-flag (DRY-only; the only CLI access is the hidden ``--mock-usage`` test
+trigger, which requires ``--dry-run`` and is not shown in --help):
 
 - ``is_mock_usage=False`` (default): the LLM leaves report a **zero-token**
   synthetic job via :func:`report_dry_llm_job`. Zero tokens ⇒

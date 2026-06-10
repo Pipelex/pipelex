@@ -149,7 +149,8 @@ class PipeRunParams(BaseModel):
     # any backend.
     run_mode: PipeRunMode = Field(frozen=True)
 
-    # Internal sub-flag of DRY (no public CLI surface): when True, the dry LLM leaves report
+    # Internal sub-flag of DRY — only CLI access is the hidden `--mock-usage` test trigger
+    # (requires `--dry-run`, not shown in --help): when True, the dry LLM leaves report
     # *non-zero* synthetic usage so the end-of-run cost report renders — the cheap, deterministic
     # cross-worker cost-report validation affordance. Rejected on a LIVE run (validator below);
     # frozen for the same reason as `run_mode`.

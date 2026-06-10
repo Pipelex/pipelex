@@ -56,7 +56,8 @@ class CogtRunParams(BaseModel):
 
     run_mode: PipeRunMode
 
-    # Sub-flag of DRY (internal — no public CLI surface): when True, the dry LLM leaves report
+    # Internal sub-flag of DRY — only CLI access is the hidden `--mock-usage` test trigger
+    # (requires `--dry-run`, not shown in --help): when True, the dry LLM leaves report
     # *non-zero* synthetic usage (deterministic sentinel counts, $0 cost) so the end-of-run cost
     # report renders — the cheap, deterministic cross-worker cost-report validation affordance.
     # Default False keeps dry runs zero-token with the report suppressed. Single writer:

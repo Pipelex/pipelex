@@ -106,7 +106,8 @@ async def pipeline_run_setup(
         inferred from the environment variable ``PIPELEX_FORCE_DRY_RUN_MODE``. Defaults
         to ``PipeRunMode.LIVE`` if the environment variable is not set.
     is_mock_usage:
-        Internal sub-flag of ``run_mode=DRY`` (no public CLI surface): when True, the dry
+        Internal sub-flag of ``run_mode=DRY`` — only CLI access is the hidden ``--mock-usage``
+        test trigger (requires ``--dry-run``, not shown in --help): when True, the dry
         LLM leaves report *non-zero* synthetic usage so the end-of-run cost report renders —
         the cheap, deterministic cross-worker cost-report validation affordance. Threaded onto
         :attr:`CogtRunParams.is_mock_usage`, which rides every assignment to the leaf in both
