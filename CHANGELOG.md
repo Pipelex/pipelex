@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **`--dry-run` now honors the configured backend — the mock moved from the operators to the cogt leaf.** `run_mode` rides a new `CogtRunParams` carrier (nested in `PipeRunParams`, stamped on every cogt assignment, serialized across the Temporal wire), so a DRY run on a Temporal backend dispatches the REAL `act_llm_gen_*` / extract / img-gen / search / render activities and the leaf mocks **inside** the activity — testing dispatch, scheduling, serialization, routing, and cross-worker propagation at zero AI cost, with no API keys and no storage IO (the img/extract DRY branches sit above the store step). `ContentGeneratorDry` is deleted: operators no longer swap generators (the base operator's dry path simply reuses the live path), and the in-process validation scopes pass an inline `ContentGenerator`. Object mocks are now schema-built on every backend — identical mock on direct and Temporal; classes with exotic format constraints should declare `examples`/`mock_format` (a re-validation failure surfaces as a typed `MockInferenceObjectFidelityError`, and a deterministic mock-build failure as the new non-retryable `DryRunMockBuildError`). The acceptance gate is Tier 17 of the `temporal-e2e-validate` skill (GREEN on all leaf families + keyless worker, RED-proven) plus a Mode-1 pytest.
+- **`--mock-inference` flag transport moved: `JobMetadata.is_mock_inference` → `CogtRunParams.is_mock_inference`.** One flag-transport style for both run-mode facts; the CLI surface and behavior are unchanged (LIVE run, LLM leaf mocked with reportable non-zero usage so the cost report renders). Precedence is documented: DRY wins over the mock flag at every leaf.
+- **Keyless boot (`needs_inference=False`) now forces every run to DRY instead of installing a mock generator.** Generator selection is purely backend-keyed (a keyless Temporal submitter still dispatches and mocks inside activities); the forced-DRY flag is consumed at `PipeRunParamsFactory.make_run_params` — the single writer of `run_mode` — so every execution entry point is covered, including the runtime bridge.
+
+### Removed
+
+- **`dry_run_config.apply_to_jinja2_rendering`** config key: it was dead — PipeCompose renders templates directly and the jinja2 parse check survives in the templating leaf's DRY branch. Remove it from your `.pipelex/pipelex.toml` override if present (config is strict and will reject the unknown key).
+
 ### Fixed
 
 - **`tzdata` is now a direct dependency — tz-aware payloads no longer hang Temporal callers on hosts without system tz files.** kajson decodes timezone-aware datetimes via `ZoneInfo(...)`, which needs the IANA tz database: system tz files or the `tzdata` package. On hosts with neither (slim containers, uv-managed standalone Pythons — including the CI test runner, where `tzdata` only arrived transitively via pandas on Python < 3.11), decoding any aware-datetime payload crossing the Temporal boundary (e.g. the `GraphSpec` on `act_dry_validate`'s result) raised `ZoneInfoNotFoundError` *inside the workflow task* — which Temporal retries forever, so the submitter hung instead of failing. Declaring `tzdata` makes the decode work everywhere. A regression test pins the aware-datetime round trip with system tz files hidden.
