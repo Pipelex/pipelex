@@ -1,6 +1,6 @@
 # Workflow Nondeterminism Audit — worker-local inputs leaking into the command stream
 
-**Status: diagnosis only — no fixes applied.** Multi-agent audit of all code reachable inline from `@workflow.defn` bodies, run on top of the PR #984 fix (commit `db669ea62`, which gated `act_flush_trace_events` on the payload's `trace_context` instead of worker-local `tracing_config.is_enabled`). Every finding below was adversarially verified against the actual code; refuted candidates are listed at the end so they don't get re-chased.
+**Status: H1 and M1 fixed; remaining findings are diagnosis only.** Multi-agent audit of all code reachable inline from `@workflow.defn` bodies, run on top of the PR #984 fix (commit `db669ea62`, which gated `act_flush_trace_events` on the payload's `trace_context` instead of worker-local `tracing_config.is_enabled`). Every finding below was adversarially verified against the actual code; refuted candidates are listed at the end so they don't get re-chased.
 
 **The breach definition used throughout:** any input read in code executing inline on the workflow thread (the `@workflow.run` body and everything it calls outside `@activity.defn` functions) that is not derived from the workflow payload or workflow APIs (`workflow.now()`, `workflow.uuid4()`, history), and that influences the command stream — whether/which/how many activities or child workflows get scheduled, their order, arguments, timeouts, retry policies, or task queues. Config reads inside activity bodies or at submission time are fine.
 
@@ -16,7 +16,9 @@ Everything from `WfPipeRouter.run` → `pipe.run_pipe` → controller/operator `
 
 These two finish what PR #984 started: scheduling around the flush activity and library teardown in `wf_pipe_router.py` is still not a pure function of payload + history.
 
-### H1. Flush activity gated on a buffer that activities populate cross-thread — empty on replay
+### H1. Flush activity gated on a buffer that activities populate cross-thread — empty on replay — **FIXED**
+
+> **Fixed:** `WfPipeRouter` now schedules `act_flush_trace_events` unconditionally whenever the payload carries a `trace_context` (the activity no-ops on an empty list), and `ReportingManager._emit_usage_event` routes any emission coming from inside a Temporal activity (`activity.in_activity()`) to the per-process runner fallback — co-located activities never write into the workflow's in-sandbox buffer. Guarded by `tests/integration/pipelex/temporal/test_wf_pipe_router_costs_only_flush_nondeterminism.py`.
 
 `pipelex/reporting/reporting_manager.py:176` + `pipelex/temporal/tprl_pipe/wf_pipe_router.py:221`
 
@@ -36,7 +38,9 @@ Worker-local cleanup (`get_library_manager().teardown(wf_library_id)`) sits in t
 
 ## MEDIUM — command-stream breaches (which/how many commands, or known-residual divergence)
 
-### M1. The known residual: best-effort tracing-setup `except Exception`
+### M1. The known residual: best-effort tracing-setup `except Exception` — **FIXED**
+
+> **Fixed:** `GraphTracerManager.open_tracer` is now collision-proof (pop-and-replace of a stale tracer key with a WARNING, instead of raising), and the best-effort `except Exception` around tracing setup in `WfPipeRouter` was removed entirely — the setup block is pure in-memory state, so any failure is a real bug that surfaces deterministically (and re-fires identically on replay).
 
 `pipelex/temporal/tprl_pipe/wf_pipe_router.py:160`
 
@@ -111,7 +115,7 @@ Root cause: `pipelex/core/stuffs/stuff_factory.py:44` — `make_stuff_code()` is
 
 ## Suggested fix order
 
-1. **H1 + M1 together** — make `act_flush_trace_events` scheduling a pure function of `trace_context` (always schedule when present; activity no-ops on empty events), make `open_tracer` collision-proof, and stop routing activity-side usage events through the in-sandbox buffer. This finishes PR #984.
+1. ~~**H1 + M1 together**~~ — **DONE**: `act_flush_trace_events` scheduling is a pure function of `trace_context` (always scheduled when present; activity no-ops on empty events), `open_tracer` is collision-proof, and activity-side usage events never route through the in-sandbox buffer. This finishes PR #984.
 2. **H2** — fingerprint-cache scoping / force-teardown on `open_library`, plus eviction-safe cleanup ordering in the `finally`.
 3. **Dispatch options to payload** — resolve `DispatchOptions` at the submission boundary and carry them in `PipeJob` (`ContentGeneratorInWorkflow` then reads only the payload), closing M2's sibling and the biggest argument-drift surface in one move.
 4. **Replay-safe id/clock provider** for the randomness cluster.

@@ -19,6 +19,20 @@ from pipelex.tracing.activity_event_log import ActivityEventLogCache
 from pipelex.tracing.event_log_protocol import EventLogProtocol
 from pipelex.tracing.trace_events import UsageReportEvent
 
+# temporalio is an optional extra (pipelex[temporal]). When present, _emit_usage_event uses
+# activity.in_activity() to detect emissions coming from inside a Temporal activity; when absent
+# there is no activity context to exist in, so the registered-context fast path is always allowed.
+try:
+    from temporalio import activity as _temporal_activity
+except ImportError:
+    _temporal_activity = None  # type: ignore[assignment]
+
+
+def _is_in_temporal_activity() -> bool:
+    """True when the current call stack runs inside a Temporal activity."""
+    return _temporal_activity is not None and _temporal_activity.in_activity()
+
+
 # DynamoDB PutItem failures come in two sibling botocore base classes (neither subclasses the other):
 # ClientError (service-side throttle / auth) and BotoCoreError (transport / credential / timeout, e.g.
 # EndpointConnectionError, ReadTimeoutError, NoCredentialsError). Both are imported together (present or
@@ -150,13 +164,23 @@ class ReportingManager(ReportingProtocol):
         """Emit a UsageReportEvent for this job.
 
         Fast path: when set_event_log was registered for this trace context's
-        lookup_key (router process or direct mode), emit through the cached
+        lookup_key (workflow-thread or direct mode), emit through the cached
         per-context event log.
 
+        Activity path: an emission coming from inside a Temporal activity NEVER
+        takes the fast path, even when the activity runs co-located with the
+        workflow worker. The registered context there is the workflow's
+        in-sandbox BufferingEventLog, and activities do not re-execute on
+        replay — a cross-thread write into that buffer makes the workflow's
+        buffer content depend on whether activities actually ran, breaking
+        replay determinism (audit finding H1). Activities must behave
+        identically whether co-located or remote: per-process fallback.
+
         Fallback: when context lookup misses (runner process — set_event_log
-        was never called here), emit through the per-process activity event
-        log so the event still lands in the same backend partition as the
-        rest of the run. See _emit_usage_event_runner_fallback for details.
+        was never called here) or the emission comes from an activity, emit
+        through the per-process activity event log so the event still lands in
+        the same backend partition as the rest of the run. See
+        _emit_usage_event_runner_fallback for details.
         """
         trace_context = inference_job.job_metadata.trace_context
         if trace_context is None:
@@ -173,10 +197,11 @@ class ReportingManager(ReportingProtocol):
         if not trace_context.emit_usage_events:
             return
 
-        context = self._event_log_contexts.get(trace_context.lookup_key)
-        if context is not None:
-            self._emit_via_registered_context(context, trace_context, tokens_usage)
-            return
+        if not _is_in_temporal_activity():
+            context = self._event_log_contexts.get(trace_context.lookup_key)
+            if context is not None:
+                self._emit_via_registered_context(context, trace_context, tokens_usage)
+                return
 
         self._emit_usage_event_runner_fallback(
             inference_job=inference_job,

@@ -3,6 +3,7 @@
 from datetime import datetime
 from typing import Any
 
+from pipelex import log
 from pipelex.graph.graph_config import DataInclusionConfig
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
@@ -125,14 +126,17 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
         Returns:
             Initial TraceContext to pass through JobMetadata.
-
-        Raises:
-            ValueError: If a tracer for this key already exists.
         """
         key = tracer_key or graph_id
-        if key in self._tracers:
-            msg = f"Tracer for key '{key}' already exists"
-            raise ValueError(msg)
+        stale_tracer = self._tracers.pop(key, None)
+        if stale_tracer is not None:
+            # Collision-proof pop-and-replace: a stale tracer under this key can only be the
+            # leftover of a prior interrupted execution (e.g. a Temporal workflow evicted before
+            # its finally-block close_tracer ran). Raising would let worker-local leak state
+            # decide whether tracing setup succeeds — a replay-determinism breach (audit
+            # finding M1). Tear the stale tracer down (releases its event log) and replace it.
+            log.warning(f"Tracer for key '{key}' already exists; replacing stale tracer left by a prior interrupted execution")
+            stale_tracer.teardown()
 
         tracer = GraphTracer()
         self._tracers[key] = tracer

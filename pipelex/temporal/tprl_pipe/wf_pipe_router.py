@@ -111,68 +111,60 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
 
             # Determinism: whether tracing is set up — and therefore whether the finally
             # block schedules act_flush_trace_events — must be a pure function of the
-            # workflow payload, never of worker-local config (which can differ between
+            # workflow payload, never of worker-local state (which can differ between
             # the worker that recorded the history and the one replaying it, causing a
             # [TMPRL1100] nondeterminism error). The presence of trace_context IS the
             # submitter's decision; the worker-local tracing_config.is_enabled check
-            # lives in the flush activity, where reading local config is legal.
+            # lives in the flush activity, where reading local config is legal. No
+            # best-effort guard around this block: every step is pure in-memory state
+            # (no I/O, no config reads) and open_tracer is collision-proof against
+            # tracer keys leaked by a prior interrupted execution, so a failure here
+            # is a real bug that must surface — and being inline-deterministic, it
+            # re-fires identically on replay.
             if trace_context is not None:
-                try:
-                    # Use BufferingEventLog inside workflows (no I/O allowed).
-                    # Events are flushed to the real backend via act_flush_trace_events.
-                    event_log = BufferingEventLog()
-                    wf_graph_tracer_manager = GraphTracerManager.get_or_create_instance()
-                    wf_tracer_key = wf_workflow_id
-                    wf_trace_context = wf_graph_tracer_manager.open_tracer(
-                        graph_id=trace_context.graph_id,
-                        data_inclusion=trace_context.data_inclusion,
-                        # D5: only feed the event log to the tracer when graph events are wanted. In
-                        # costs-only mode the tracer still mints node ids but emits no graph events;
-                        # usage events flow via the report delegate's set_event_log below.
-                        event_log=event_log if trace_context.emit_graph_events else None,
+                # Use BufferingEventLog inside workflows (no I/O allowed).
+                # Events are flushed to the real backend via act_flush_trace_events.
+                event_log = BufferingEventLog()
+                wf_graph_tracer_manager = GraphTracerManager.get_or_create_instance()
+                wf_tracer_key = wf_workflow_id
+                wf_trace_context = wf_graph_tracer_manager.open_tracer(
+                    graph_id=trace_context.graph_id,
+                    data_inclusion=trace_context.data_inclusion,
+                    # D5: only feed the event log to the tracer when graph events are wanted. In
+                    # costs-only mode the tracer still mints node ids but emits no graph events;
+                    # usage events flow via the report delegate's set_event_log below.
+                    event_log=event_log if trace_context.emit_graph_events else None,
+                    workflow_id=wf_workflow_id,
+                    pipeline_run_id=pipeline_run_id,
+                    tracer_key=wf_tracer_key,
+                    # Threaded in so the returned context is born with the correct flags (no emit-flag
+                    # footgun in the model_copy below).
+                    emit_graph_events=trace_context.emit_graph_events,
+                    emit_usage_events=trace_context.emit_usage_events,
+                )
+                # Update job_metadata with the per-workflow trace_context (carries tracer_key + emit
+                # flags), but preserve parent_node_id from the incoming context so CONTAINS edges link
+                # back to the parent workflow's controller node.
+                wf_trace_context = wf_trace_context.model_copy(
+                    update={"parent_node_id": trace_context.parent_node_id},
+                )
+                workflow_arg.job_metadata = workflow_arg.job_metadata.model_copy(
+                    update={"trace_context": wf_trace_context},
+                )
+                # Configure the report delegate for usage event emission — only when cost reporting
+                # is on. In graph-only mode no usage context is registered, so usage events are
+                # suppressed (the runner fallback also gates on emit_usage_events). Only emissions
+                # from the workflow thread itself (e.g. dry-run inline reporting) land in this
+                # buffer: ReportingManager routes activity-side emissions to its per-process
+                # fallback even when the activity runs co-located, so the buffer content stays a
+                # deterministic function of inline execution and re-fires identically on replay.
+                if trace_context.emit_usage_events:
+                    get_report_delegate().set_event_log(
+                        context_key=wf_workflow_id,
+                        event_log=event_log,
                         workflow_id=wf_workflow_id,
                         pipeline_run_id=pipeline_run_id,
-                        tracer_key=wf_tracer_key,
-                        # Threaded in so the returned context is born with the correct flags (no emit-flag
-                        # footgun in the model_copy below).
-                        emit_graph_events=trace_context.emit_graph_events,
-                        emit_usage_events=trace_context.emit_usage_events,
                     )
-                    # Update job_metadata with the per-workflow trace_context (carries tracer_key + emit
-                    # flags), but preserve parent_node_id from the incoming context so CONTAINS edges link
-                    # back to the parent workflow's controller node.
-                    wf_trace_context = wf_trace_context.model_copy(
-                        update={"parent_node_id": trace_context.parent_node_id},
-                    )
-                    workflow_arg.job_metadata = workflow_arg.job_metadata.model_copy(
-                        update={"trace_context": wf_trace_context},
-                    )
-                    # Configure the report delegate for usage event emission — only when cost reporting
-                    # is on. In graph-only mode no usage context is registered, so usage events are
-                    # suppressed (the runner fallback also gates on emit_usage_events).
-                    if trace_context.emit_usage_events:
-                        get_report_delegate().set_event_log(
-                            context_key=wf_workflow_id,
-                            event_log=event_log,
-                            workflow_id=wf_workflow_id,
-                            pipeline_run_id=pipeline_run_id,
-                        )
-                except Exception as exc:  # noqa: BLE001
-                    # Best-effort: per-workflow tracing setup must never fail the workflow — log and continue without it.
-                    workflow_log.warning(f"Failed to set up per-workflow tracing, continuing without: {exc}")
-                    # Clean up partially initialized resources before nulling (the finally block
-                    # won't be able to clean up after we null these references)
-                    if wf_graph_tracer_manager is not None and wf_tracer_key is not None:
-                        try:
-                            wf_graph_tracer_manager.close_tracer(wf_tracer_key)
-                        except Exception as tracer_exc:  # noqa: BLE001
-                            # Best-effort cleanup: closing a partially-initialized tracer must not mask the setup failure.
-                            workflow_log.warning(f"Failed to close partially initialized tracer: {tracer_exc}")
-                    if event_log is not None:
-                        event_log.close()
-                    get_report_delegate().clear_event_log(context_key=wf_workflow_id)
-                    event_log = None
-                    wf_graph_tracer_manager = None
 
             working_memory = workflow_arg.get_working_memory()
             pipe_output = await pipe.run_pipe(
@@ -216,19 +208,24 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
 
             # Flush trace events and clean up event log
             if event_log is not None:
-                # Drain buffered events and flush to the real backend via activity
+                # Determinism (H1): the flush activity is scheduled unconditionally — event_log
+                # presence is a pure function of the payload (trace_context is not None). The
+                # schedule must NOT be gated on the buffer content: anything written into the
+                # buffer from outside the workflow thread would not be re-written on replay
+                # (activities do not re-execute), so a content-gated schedule recorded in
+                # history could vanish from the replayed command stream after a routine
+                # sticky-cache eviction ([TMPRL1100]). The activity no-ops on an empty list.
                 buffered_events = event_log.drain()
-                if buffered_events:
-                    try:
-                        await workflow.execute_activity(
-                            act_flush_trace_events,
-                            arg=FlushTraceEventsArg(events=buffered_events),
-                            start_to_close_timeout=timedelta(seconds=30),
-                            retry_policy=RetryPolicy(maximum_attempts=3),
-                        )
-                    except Exception as flush_exc:  # noqa: BLE001
-                        # Best-effort: trace-event flush in the finally block must never fail the workflow — log and continue.
-                        workflow_log.warning(f"Failed to flush trace events: {flush_exc}")
+                try:
+                    await workflow.execute_activity(
+                        act_flush_trace_events,
+                        arg=FlushTraceEventsArg(events=buffered_events),
+                        start_to_close_timeout=timedelta(seconds=30),
+                        retry_policy=RetryPolicy(maximum_attempts=3),
+                    )
+                except Exception as flush_exc:  # noqa: BLE001
+                    # Best-effort: trace-event flush in the finally block must never fail the workflow — log and continue.
+                    workflow_log.warning(f"Failed to flush trace events: {flush_exc}")
 
                 event_log.close()
 
