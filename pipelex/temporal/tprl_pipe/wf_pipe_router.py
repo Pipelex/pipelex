@@ -247,6 +247,12 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
             if wf_library_id is not None:
                 try:
                     get_library_manager().teardown(library_id=wf_library_id)
+                except Exception as teardown_exc:  # noqa: BLE001
+                    # Best-effort: library teardown in the finally block must never fail the
+                    # workflow or skip the remaining worker-local cleanup below — log and
+                    # continue. LibraryManager forgets the entry pop-first even when the
+                    # library's own teardown raises, so no poisoned state remains.
+                    workflow_log.warning(f"Failed to tear down per-workflow library: {teardown_exc}")
                 finally:
                     clear_current_library()
 
