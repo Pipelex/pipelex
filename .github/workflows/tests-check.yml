@@ -24,6 +24,7 @@ jobs:
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
       ENV: dev
+      PIPELEX_HANG_DUMP_DIR: ${{ runner.temp }}/pipelex-hang-dumps
     steps:
       - uses: actions/checkout@v4
 
@@ -35,6 +36,19 @@ jobs:
 
       - name: Run tests
         run: make gha-tests
+
+      - name: Show hang dumps
+        if: failure()
+        run: |
+          if ls "$PIPELEX_HANG_DUMP_DIR"/hang-*.txt >/dev/null 2>&1; then
+            for dump_file in "$PIPELEX_HANG_DUMP_DIR"/hang-*.txt; do
+              echo "::group::$dump_file"
+              cat "$dump_file"
+              echo "::endgroup::"
+            done
+          else
+            echo "No hang dumps were produced."
+          fi
 
 # --------------------------------------------------------------------------
 # 2.  Aggregator job — the *single* required status check
