@@ -19,7 +19,7 @@ that must stay pipe-agnostic. This class is the cogt slice and grows only
 cogt-relevant flags.
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 
@@ -31,6 +31,10 @@ class CogtRunParams(BaseModel):
     ``run_mode.is_dry`` first, so a DRY run with the mock flag set mocks dry (zero-token,
     suppressed report), never the reportable mock.
     """
+
+    # `extra="forbid"`: a stale or typo'd key on a wire payload must fail loud, not silently fall
+    # back to the default LIVE mode (mirrors PipeRunParams).
+    model_config = ConfigDict(extra="forbid")
 
     run_mode: PipeRunMode = PipeRunMode.LIVE
 
