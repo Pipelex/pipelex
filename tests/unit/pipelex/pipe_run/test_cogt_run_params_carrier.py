@@ -30,15 +30,32 @@ class TestCogtRunParamsCarrier:
         assert run_params.cogt_run_params.run_mode.is_dry
 
     def test_forced_dry_coerces_live_and_warns(self, mocker: MockerFixture) -> None:
-        """Keyless boot: a LIVE request is coerced to DRY with a warning; the mock-usage flag survives."""
+        """Keyless boot: a LIVE request is coerced to DRY with a warning."""
         mocker.patch("pipelex.pipe_run.pipe_run_params_factory.is_dry_run_forced", return_value=True)
         warning_spy = mocker.patch("pipelex.pipe_run.pipe_run_params_factory.log.warning")
 
-        run_params = PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.LIVE, is_mock_usage=True)
+        run_params = PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.LIVE)
+
+        assert run_params.run_mode.is_dry
+        warning_spy.assert_called_once()
+
+    def test_forced_dry_does_not_mask_mock_usage_violation(self, mocker: MockerFixture) -> None:
+        """Keyless boot: LIVE + is_mock_usage still fails loud — the coercion validates the REQUESTED
+        mode first, so it cannot silently turn an illegal request into a reportable dry run.
+        """
+        mocker.patch("pipelex.pipe_run.pipe_run_params_factory.is_dry_run_forced", return_value=True)
+
+        with pytest.raises(ValidationError, match="is_mock_usage"):
+            PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.LIVE, is_mock_usage=True)
+
+    def test_forced_dry_keeps_mock_usage_on_dry_request(self, mocker: MockerFixture) -> None:
+        """Keyless boot: an explicit DRY + is_mock_usage request is legal and passes through untouched."""
+        mocker.patch("pipelex.pipe_run.pipe_run_params_factory.is_dry_run_forced", return_value=True)
+
+        run_params = PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY, is_mock_usage=True)
 
         assert run_params.run_mode.is_dry
         assert run_params.cogt_run_params.is_mock_usage
-        warning_spy.assert_called_once()
 
     def test_stale_run_mode_kwarg_fails_loudly(self) -> None:
         """run_mode is a property, not a field: passing it as a kwarg must raise, not silently default to LIVE."""
