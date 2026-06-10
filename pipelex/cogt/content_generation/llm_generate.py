@@ -8,9 +8,6 @@ from pipelex.cogt.content_generation.dry_mock import (
     dry_llm_gen_object,
     dry_llm_gen_object_list,
     dry_llm_gen_text,
-    mock_llm_gen_object,
-    mock_llm_gen_object_list,
-    mock_llm_gen_text,
 )
 from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
@@ -20,8 +17,6 @@ from pipelex.hub import get_llm_worker
 async def llm_gen_text(llm_assignment: LLMAssignment) -> str:
     if llm_assignment.cogt_run_params.run_mode.is_dry:
         return dry_llm_gen_text(llm_assignment)
-    if llm_assignment.cogt_run_params.is_mock_inference:
-        return mock_llm_gen_text(llm_assignment)
     llm_worker = get_llm_worker(llm_handle=llm_assignment.llm_handle)
     llm_job = LLMJobFactory.make_llm_job(
         job_metadata=llm_assignment.job_metadata,
@@ -37,8 +32,6 @@ async def llm_gen_object(object_assignment: ObjectAssignment) -> BaseModel:
     llm_assignment = object_assignment.llm_assignment_for_object
     if object_assignment.cogt_run_params.run_mode.is_dry:
         return dry_llm_gen_object(object_assignment)
-    if llm_assignment.cogt_run_params.is_mock_inference:
-        return mock_llm_gen_object(object_assignment)
     llm_worker = get_llm_worker(llm_handle=llm_assignment.llm_handle)
     llm_job = LLMJobFactory.make_llm_job(
         job_metadata=llm_assignment.job_metadata,
@@ -60,8 +53,6 @@ async def llm_gen_object_list(object_assignment: ObjectAssignment) -> list[BaseM
     llm_assignment = object_assignment.llm_assignment_for_object
     if object_assignment.cogt_run_params.run_mode.is_dry:
         return dry_llm_gen_object_list(object_assignment)
-    if llm_assignment.cogt_run_params.is_mock_inference:
-        return mock_llm_gen_object_list(object_assignment)
     log.verbose(f"llm_gen_object_list to generate a list of '{object_assignment.object_class_name}'")
     llm_worker = get_llm_worker(llm_handle=llm_assignment.llm_handle)
     llm_job = LLMJobFactory.make_llm_job(

@@ -39,4 +39,4 @@ List specific pipe codes in `pipelex.dry_run_config.allowed_to_fail_pipes` so dr
 
 For configuration details, see [Dry Run Configuration](../configuration/config-pipeline-validation/dry-run-config.md).
 
-Dry run is one of three run modes (live, dry run, mock inference), each of which works in-process or distributed on Temporal — see [Run Modes & Backends](../building-methods/pipes/run-modes-and-backends.md) for the full matrix.
+Dry run is one of two run modes (live, dry run), each of which works in-process or distributed on Temporal — see [Run Modes & Backends](../building-methods/pipes/run-modes-and-backends.md) for the full matrix.

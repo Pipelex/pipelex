@@ -1,4 +1,4 @@
-"""Shared fixture classes for the object-mock fidelity tests (mock-inference and DRY arms)."""
+"""Shared fixture classes for the object-mock fidelity tests (dry-run fidelity arms)."""
 
 from pydantic import field_validator
 

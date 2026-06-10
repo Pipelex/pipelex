@@ -7,9 +7,8 @@ codegen. Contracts pinned here:
 - a representative ``StructuredContent`` mocks into a valid instance of the original class
   (the object-mock fidelity pin mandated by pre-flight decision 2);
 - ``nb_items`` carried on ``ObjectAssignment`` controls the dry list length, falling back to
-  ``dry_run_config.nb_list_items`` (eng review D11) — same for the ``--mock-inference`` arm;
-- a hidden invariant the schema round-trip drops surfaces as ``MockInferenceObjectFidelityError``
-  on the DRY arm too (eng review D6);
+  ``dry_run_config.nb_list_items`` (eng review D11);
+- a hidden invariant the schema round-trip drops surfaces as ``DryRunObjectFidelityError`` (eng review D6);
 - the structured-search dry leaf returns a dict that validates against the original class.
 
 No provider is ever called (the leaves short-circuit before any worker), so no inference marker.
@@ -20,8 +19,8 @@ import pytest
 from pipelex.cogt.content_generation.assignment_models import LLMAssignment, ObjectAssignment, SearchAssignment, SearchObjectAssignment
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
-from pipelex.cogt.content_generation.dry_mock import dry_llm_gen_object, dry_llm_gen_object_list, mock_llm_gen_object_list
-from pipelex.cogt.content_generation.exceptions import MockInferenceObjectFidelityError
+from pipelex.cogt.content_generation.dry_mock import dry_llm_gen_object, dry_llm_gen_object_list
+from pipelex.cogt.content_generation.exceptions import DryRunObjectFidelityError
 from pipelex.cogt.content_generation.search_generate import search_gen_structured
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
@@ -97,20 +96,20 @@ class TestLeafDryObjectMocks:
         first_item_pipe_code = getattr(mocks[0], "pipe_code", None)
         assert first_item_pipe_code == "mock_main"
 
-    async def test_mock_inference_object_list_does_not_stamp_mock_main(self) -> None:
-        """--mock-inference (LIVE) never drives bundle dry-validation, so it must NOT stamp (D3)."""
+    async def test_dry_object_list_stamps_regardless_of_mock_usage(self) -> None:
+        """The stamp is unconditional on the is_mock_usage sub-flag — it only changes reporting (D3)."""
         llm_assignment = LLMAssignment(
-            job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_mock_no_stamp"),
-            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE, is_mock_inference=True),
+            job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_mock_usage_stamp"),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY, is_mock_usage=True),
             llm_setting=LLMSetting(model="gpt-4o", temperature=0.5),
             llm_prompt=LLMPrompt(user_text="make specs"),
         )
         object_assignment = ObjectAssignment.make_for_class(object_class=SpecWithPipeCode, llm_assignment=llm_assignment, nb_items=3)
 
-        mocks = mock_llm_gen_object_list(object_assignment)
+        mocks = dry_llm_gen_object_list(object_assignment)
 
         first_item_pipe_code = getattr(mocks[0], "pipe_code", None)
-        assert first_item_pipe_code != "mock_main"
+        assert first_item_pipe_code == "mock_main"
 
     async def test_dry_object_list_defaults_to_config_length(self) -> None:
         """Without nb_items the dry list falls back to dry_run_config.nb_list_items."""
@@ -136,7 +135,7 @@ class TestLeafDryObjectMocks:
         self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol
     ) -> None:
         """The DRY arm of the fidelity wrapper fires (D6): a dropped invariant surfaces as the typed error."""
-        with pytest.raises(MockInferenceObjectFidelityError) as exc_info:
+        with pytest.raises(DryRunObjectFidelityError) as exc_info:
             await content_generator.make_object(
                 job_metadata=job_metadata,
                 cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),

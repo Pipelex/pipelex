@@ -1,32 +1,33 @@
-"""Leaf-level inference mocking shared by ``--dry-run`` and ``--mock-inference``.
+"""Leaf-level inference mocking for ``--dry-run`` (``run_mode=DRY``).
 
-Two triggers, one mechanism. Both fake the AI call *at the cogt leaf* — the
-lowest point where ``ContentGenerator`` (direct, inline) and the Temporal
-activities (``act_llm_gen_*`` and friends) converge — so a single branch covers
-both backends and ``run_mode`` stays orthogonal to backend choice (D-plan §3.5):
+One non-live mode, one mechanism. The dry run fakes the AI call *at the cogt
+leaf* — the lowest point where ``ContentGenerator`` (direct, inline) and the
+Temporal activities (``act_llm_gen_*`` and friends) converge — so a single
+branch covers both backends and ``run_mode`` stays orthogonal to backend choice
+(D-plan §3.5). ``CogtRunParams.run_mode == DRY`` rides every assignment; the
+leaf routes to the :func:`dry_llm_gen_text` / :func:`dry_llm_gen_object` / ...
+helpers here. Non-LLM dry leaves (img-gen / extract / render / search /
+templating) mint synthetic outputs without reporting usage. For img-gen and
+extract, the DRY branch lives at the ``*_and_store`` layer — one step above the
+raw provider leaf — so a dry run performs **no storage IO** (eng review D10).
 
-- ``--dry-run`` (``CogtRunParams.run_mode == DRY``, carried on every assignment):
-  the leaf routes to the :func:`dry_llm_gen_text` / :func:`dry_llm_gen_object` /
-  ... helpers here, which report a **zero-token** synthetic LLM job via
-  :func:`report_dry_llm_job`. Zero tokens ⇒ ``AggregatedCosts.has_reportable_usage``
-  is False ⇒ the end-of-run cost report is suppressed (correct: a dry run did no
-  real work). Non-LLM dry leaves (img-gen / extract / render / search /
-  templating) mint synthetic outputs without reporting usage. For img-gen and
-  extract, the DRY branch lives at the ``*_and_store`` layer — one step above the
-  raw provider leaf — so a dry run performs **no storage IO** (eng review D10).
-- ``--mock-inference`` (``run_mode=LIVE`` + ``CogtRunParams.is_mock_inference``):
-  the LLM leaf routes to :func:`mock_llm_gen_text` / :func:`mock_llm_gen_object` /
-  :func:`mock_llm_gen_object_list`, which report **non-zero** synthetic usage via
-  :func:`report_mock_inference_llm_job`. Non-zero tokens ⇒ a cost report *renders*.
-  This is the durable reason the two modes differ at the reporting layer: only a
-  non-zero mock can validate cross-worker cost-report rendering cheaply and
-  deterministically (no provider spend). Non-LLM leaves have no reportable mock
-  and keep their ``MockInferenceUnsupportedError`` fail-loud guard.
+Usage reporting is keyed on the internal ``CogtRunParams.is_mock_usage``
+sub-flag (DRY-only, no public CLI surface):
+
+- ``is_mock_usage=False`` (default): the LLM leaves report a **zero-token**
+  synthetic job via :func:`report_dry_llm_job`. Zero tokens ⇒
+  ``AggregatedCosts.has_reportable_usage`` is False ⇒ the end-of-run cost report
+  is suppressed (correct: a dry run did no real work).
+- ``is_mock_usage=True``: the LLM leaves report **non-zero** synthetic usage via
+  :func:`report_mock_usage_llm_job`. Non-zero tokens ⇒ a cost report *renders*.
+  Only a non-zero mock can validate cross-worker cost-report rendering cheaply
+  and deterministically (no provider spend) — that is this flag's whole reason
+  to exist. Non-LLM leaves keep their no-usage dry behavior either way.
 
 This module is the single home for "what a mocked inference produces". Object
 mocks are built from the **schema-reconstructed** class on both backends (one
 code path, identical mock everywhere); exotic format constraints must declare
-``examples`` / ``mock_format`` — see ``MockInferenceObjectFidelityError``.
+``examples`` / ``mock_format`` — see ``DryRunObjectFidelityError``.
 """
 
 from collections.abc import Callable, Sequence
@@ -47,6 +48,7 @@ from pipelex.cogt.content_generation.assignment_models import (
     SearchObjectAssignment,
     TemplatingAssignment,
 )
+from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.content_generation.exceptions import DryRunMockBuildError
 from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
@@ -76,15 +78,15 @@ MOCK_MAIN_PIPE_CODE = "mock_main"
 # Sentinel model identifiers so a synthetic usage record is never confused with real inference.
 DRY_RUN_INFERENCE_MODEL_NAME = "dry_run"
 DRY_RUN_INFERENCE_MODEL_ID = "dry_run"
-MOCK_INFERENCE_MODEL_NAME = "mock_inference"
-MOCK_INFERENCE_MODEL_ID = "mock_inference"
+MOCK_USAGE_MODEL_NAME = "mock_usage"
+MOCK_USAGE_MODEL_ID = "mock_usage"
 
-# Synthetic, deterministic, clearly non-real token counts for ``--mock-inference``. Non-zero so the
+# Synthetic, deterministic, clearly non-real token counts for ``is_mock_usage=True``. Non-zero so the
 # assembled usage is reportable (``AggregatedCosts.has_reportable_usage`` True → the cost report renders),
-# which is exactly what ``--dry-run``'s zero-token usage deliberately suppresses. Input/output differ so
-# the rendered table distinguishes the two columns. Cost stays 0 (``unit_costs={}``): a mocked run has
-# token usage but no real spend — the "free model" reporting case.
-MOCK_INFERENCE_NB_TOKENS_BY_CATEGORY: NbTokensByCategoryDict = {
+# which is exactly what the default dry run's zero-token usage deliberately suppresses. Input/output
+# differ so the rendered table distinguishes the two columns. Cost stays 0 (``unit_costs={}``): a mocked
+# run has token usage but no real spend — the "free model" reporting case.
+MOCK_USAGE_NB_TOKENS_BY_CATEGORY: NbTokensByCategoryDict = {
     TokenCategory.INPUT: 100,
     TokenCategory.OUTPUT: 50,
 }
@@ -102,7 +104,7 @@ def _report_synthetic_llm_job(
     """Build a synthetic ``LLMJob`` and report it through ``get_report_delegate()``.
 
     Shared core of :func:`report_dry_llm_job` (zero tokens) and
-    :func:`report_mock_inference_llm_job` (non-zero tokens). Reporting it makes the runner-side
+    :func:`report_mock_usage_llm_job` (non-zero tokens). Reporting it makes the runner-side
     cross-worker emission path observable without a real LLM call.
 
     The synthetic ``job_metadata`` copy gets ``completed_at`` set so ``report_inference_job`` can
@@ -149,15 +151,15 @@ def report_dry_llm_job(job_metadata: JobMetadata, llm_setting: LLMSetting, llm_p
     )
 
 
-def report_mock_inference_llm_job(job_metadata: JobMetadata, llm_setting: LLMSetting, llm_prompt: LLMPrompt) -> None:
-    """Report a non-zero synthetic LLM job for a ``--mock-inference`` call (cost report renders)."""
+def report_mock_usage_llm_job(job_metadata: JobMetadata, llm_setting: LLMSetting, llm_prompt: LLMPrompt) -> None:
+    """Report a non-zero synthetic LLM job for a dry run with ``is_mock_usage=True`` (cost report renders)."""
     _report_synthetic_llm_job(
         job_metadata=job_metadata,
         llm_setting=llm_setting,
         llm_prompt=llm_prompt,
-        inference_model_name=MOCK_INFERENCE_MODEL_NAME,
-        inference_model_id=MOCK_INFERENCE_MODEL_ID,
-        nb_tokens_by_category=dict(MOCK_INFERENCE_NB_TOKENS_BY_CATEGORY),
+        inference_model_name=MOCK_USAGE_MODEL_NAME,
+        inference_model_id=MOCK_USAGE_MODEL_ID,
+        nb_tokens_by_category=dict(MOCK_USAGE_NB_TOKENS_BY_CATEGORY),
     )
 
 
@@ -194,31 +196,13 @@ def build_mock_objects(model_class: type[BaseModelTypeVar], count: int) -> list[
         raise DryRunMockBuildError.for_object_class(model_class.__name__) from exc
 
 
-def _mock_text(*, llm_prompt: LLMPrompt, llm_setting: LLMSetting) -> str:
-    truncate_length = get_config().pipelex.dry_run_config.text_gen_truncate_length
-    prompt_truncated = llm_prompt.desc(truncate_text_length=truncate_length)
-    return f"MOCK INFERENCE • llm_setting={llm_setting.desc()} • prompt={prompt_truncated}"
-
-
-def mock_llm_gen_text(llm_assignment: LLMAssignment) -> str:
-    """Leaf mock for ``llm_gen_text``: synthetic text + reportable usage, no provider call."""
-    job_metadata = llm_assignment.job_metadata
-    log.verbose(f"🤡 MOCK INFERENCE: llm_gen_text for '{job_metadata.pipeline_run_id}'")
-    report_mock_inference_llm_job(
-        job_metadata=job_metadata,
-        llm_setting=llm_assignment.llm_setting,
-        llm_prompt=llm_assignment.llm_prompt,
-    )
-    return _mock_text(llm_prompt=llm_assignment.llm_prompt, llm_setting=llm_assignment.llm_setting)
-
-
 def _reconstruct_object_class(object_assignment: ObjectAssignment) -> type[BaseModel]:
     """Reconstruct the object's model class from its JSON schema.
 
-    Shared by the dry and mock-inference object mocks. The leaf carries only the JSON
-    schema (not the original class), so the class is rebuilt via :class:`SchemaToModelFactory`.
-    This is the single schema-based mock site: both backends build the same mock, and fidelity
-    bugs surface in cheap local unit tests instead of only on a worker (pre-flight decision 2).
+    The leaf carries only the JSON schema (not the original class), so the class is rebuilt via
+    :class:`SchemaToModelFactory`. This is the single schema-based mock site: both backends build
+    the same mock, and fidelity bugs surface in cheap local unit tests instead of only on a worker
+    (pre-flight decision 2).
     """
     return SchemaToModelFactory.make_from_json_schema(
         schema=object_assignment.object_class_schema,
@@ -236,8 +220,6 @@ def stamp_mock_main_coordination(items: Sequence[Any]) -> None:
     main-pipe check. Callers: the mock-input factory (``working_memory_factory``), the batch
     controller's dry aggregation (``pipe_batch``), and the dry object-list leaf mock
     (:func:`dry_llm_gen_object_list`). The stamp is a no-op for items without a ``pipe_code`` field.
-    ``--mock-inference`` deliberately does NOT stamp: it is a LIVE run that never drives bundle
-    dry-validation (see :func:`mock_llm_gen_object_list`).
     """
     if items and hasattr(items[0], "pipe_code"):
         items[0].pipe_code = MOCK_MAIN_PIPE_CODE
@@ -260,7 +242,7 @@ def _leaf_gen_object(object_assignment: ObjectAssignment, report_func: _ReportLL
     class), so format hints encoded via ``json_schema_extra`` that datamodel-code-generator drops on
     round-trip are not honored — exotic-format schemas may yield mock data the original class would
     reject. The generator re-validates against the original class and re-raises that failure as
-    ``MockInferenceObjectFidelityError`` (review F2); declare ``examples`` / ``mock_format`` on the
+    ``DryRunObjectFidelityError`` (review F2); declare ``examples`` / ``mock_format`` on the
     constrained fields to fix it.
 
     Reports exactly once — the live leaf makes one ``gen_object`` call (a list is one call against a
@@ -285,25 +267,21 @@ def _leaf_gen_object_list(object_assignment: ObjectAssignment, report_func: _Rep
     return mock_objects
 
 
-def mock_llm_gen_object(object_assignment: ObjectAssignment) -> BaseModel:
-    """Leaf mock for ``llm_gen_object``: schema-built mock + reportable (non-zero) usage."""
-    return _leaf_gen_object(object_assignment, report_func=report_mock_inference_llm_job)
-
-
-def mock_llm_gen_object_list(object_assignment: ObjectAssignment) -> list[BaseModel]:
-    """Leaf mock for ``llm_gen_object_list``: ``nb_items`` builds + one reportable usage event.
-
-    Deliberately does NOT apply :func:`stamp_mock_main_coordination`: ``--mock-inference`` is a LIVE
-    run that never drives bundle dry-validation, so there is no main-pipe check to satisfy — only the
-    dry leaf (:func:`dry_llm_gen_object_list`) stamps.
-    """
-    return _leaf_gen_object_list(object_assignment, report_func=report_mock_inference_llm_job)
-
-
 # --- Dry leaf helpers (``run_mode == DRY``) -------------------------------------------------------
 #
 # Each helper mints the synthetic output for one leaf, so a dry run behaves identically inline
 # (direct backend) and inside a Temporal activity (the backend dispatches normally; the leaf mocks).
+
+
+def _dry_report_func(cogt_run_params: CogtRunParams) -> _ReportLLMJobFunc:
+    """Select the synthetic-job report func for a dry LLM leaf on the ``is_mock_usage`` sub-flag.
+
+    Default: zero-token (cost report suppressed). ``is_mock_usage=True``: non-zero sentinel counts
+    (cost report renders) — the cross-worker cost-report validation affordance.
+    """
+    if cogt_run_params.is_mock_usage:
+        return report_mock_usage_llm_job
+    return report_dry_llm_job
 
 
 def _dry_text_gen_truncate_length() -> int:
@@ -311,32 +289,31 @@ def _dry_text_gen_truncate_length() -> int:
 
 
 def dry_llm_gen_text(llm_assignment: LLMAssignment) -> str:
-    """Dry leaf for ``llm_gen_text``: zero-token synthetic job report + a ``DRY RUN:`` marker string."""
+    """Dry leaf for ``llm_gen_text``: synthetic job report + a ``DRY RUN:`` marker string."""
     job_metadata = llm_assignment.job_metadata
     log.verbose(f"🤡 DRY RUN: llm_gen_text for '{job_metadata.pipeline_run_id}'")
-    report_dry_llm_job(
-        job_metadata=job_metadata,
-        llm_setting=llm_assignment.llm_setting,
-        llm_prompt=llm_assignment.llm_prompt,
-    )
+    report_func = _dry_report_func(llm_assignment.cogt_run_params)
+    report_func(job_metadata, llm_assignment.llm_setting, llm_assignment.llm_prompt)
     prompt_truncated = llm_assignment.llm_prompt.desc(truncate_text_length=_dry_text_gen_truncate_length())
     return f"DRY RUN: llm_gen_text • llm_setting={llm_assignment.llm_setting.desc()} • prompt={prompt_truncated}"
 
 
 def dry_llm_gen_object(object_assignment: ObjectAssignment) -> BaseModel:
-    """Dry leaf for ``llm_gen_object``: schema-built mock instance + zero-token job report."""
+    """Dry leaf for ``llm_gen_object``: schema-built mock instance + synthetic job report."""
     log.verbose(f"🤡 DRY RUN: llm_gen_object for '{object_assignment.object_class_name}'")
-    return _leaf_gen_object(object_assignment, report_func=report_dry_llm_job)
+    return _leaf_gen_object(object_assignment, report_func=_dry_report_func(object_assignment.cogt_run_params))
 
 
 def dry_llm_gen_object_list(object_assignment: ObjectAssignment) -> list[BaseModel]:
-    """Dry leaf for ``llm_gen_object_list``: ``nb_items`` schema-built mocks + one zero-token report.
+    """Dry leaf for ``llm_gen_object_list``: ``nb_items`` schema-built mocks + one synthetic report.
 
     Applies :func:`stamp_mock_main_coordination` so bundle dry-validation's mocked
-    ``BundleHeaderSpec.main_pipe`` check passes through the leaf mock (D3).
+    ``BundleHeaderSpec.main_pipe`` check passes through the leaf mock (D3). The stamp is
+    unconditional on ``is_mock_usage`` — it only matters to bundle dry-validation and is
+    harmless elsewhere.
     """
     log.verbose(f"🤡 DRY RUN: llm_gen_object_list for '{object_assignment.object_class_name}'")
-    items = _leaf_gen_object_list(object_assignment, report_func=report_dry_llm_job)
+    items = _leaf_gen_object_list(object_assignment, report_func=_dry_report_func(object_assignment.cogt_run_params))
     stamp_mock_main_coordination(items)
     return items
 

@@ -15,6 +15,7 @@ own page. Classes are grouped by subsystem.
 - [`CogtError`](cogt-error.md) — AI inference failed
 - [`CostRegistryError`](cost-registry-error.md) — Cost registry
 - [`DryRunMockBuildError`](dry-run-mock-build-error.md) — Dry run mock build
+- [`DryRunObjectFidelityError`](dry-run-object-fidelity-error.md) — Dry run object fidelity
 - [`ExtractCapabilityError`](extract-capability-error.md) — Extract capability
 - [`ExtractHandleNotFoundError`](extract-handle-not-found-error.md) — Extract handle not found
 - [`ExtractInputError`](extract-input-error.md) — Extract input
@@ -47,8 +48,6 @@ own page. Classes are grouped by subsystem.
 - [`LLMPromptSpecError`](llm-prompt-spec-error.md) — LLM prompt spec
 - [`LLMPromptTemplateInputsError`](llm-prompt-template-inputs-error.md) — LLM prompt template inputs
 - [`LLMSettingsValidationError`](llm-settings-validation-error.md) — LLM settings validation
-- [`MockInferenceObjectFidelityError`](mock-inference-object-fidelity-error.md) — Mock inference object fidelity
-- [`MockInferenceUnsupportedError`](mock-inference-unsupported-error.md) — Mock inference unsupported
 - [`ModelChoiceNotFoundError`](model-choice-not-found-error.md) — Model choice not found
 - [`ModelDeckNotFoundError`](model-deck-not-found-error.md) — Model deck not found
 - [`ModelDeckPresetValidatonError`](model-deck-preset-validaton-error.md) — Model deck preset validaton

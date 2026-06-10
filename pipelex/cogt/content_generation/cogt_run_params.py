@@ -19,17 +19,18 @@ that must stay pipe-agnostic. This class is the cogt slice and grows only
 cogt-relevant flags.
 """
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.types import Self
 
 
 class CogtRunParams(BaseModel):
     """Execution-mode contract carried on every cogt assignment (crosses the Temporal wire).
 
-    Precedence at the leaf: ``run_mode=DRY`` wins over ``is_mock_inference`` — every leaf checks
-    ``run_mode.is_dry`` first, so a DRY run with the mock flag set mocks dry (zero-token,
-    suppressed report), never the reportable mock.
+    There is exactly one non-live mode: ``run_mode=DRY`` (no provider calls, no storage IO, no
+    user-code execution). ``is_mock_usage`` is a secondary, internal flag that only has meaning
+    on a DRY run — setting it on a LIVE carrier is a contract violation rejected at validation.
     """
 
     # `extra="forbid"`: a stale or typo'd key on a wire payload must fail loud (mirrors
@@ -41,15 +42,16 @@ class CogtRunParams(BaseModel):
 
     run_mode: PipeRunMode
 
-    # The ``--mock-inference`` trigger (the thin reportable-mock kept by eng review D8): a LIVE run
-    # whose LLM leaf calls are faked with *non-zero* synthetic usage so a cost report renders —
-    # unlike ``run_mode=DRY`` whose zero-token usage is suppressed. This is the cheap, deterministic
-    # cross-worker cost-report validation affordance. Single writer:
-    # ``PipeRunParamsFactory.make_run_params`` (fed by ``prepare_pipe_job`` off the CLI flag).
-    # Non-LLM leaves have no reportable mock and fail loud (``MockInferenceUnsupportedError``).
-    is_mock_inference: bool = False
+    # Sub-flag of DRY (internal — no public CLI surface): when True, the dry LLM leaves report
+    # *non-zero* synthetic usage (deterministic sentinel counts, $0 cost) so the end-of-run cost
+    # report renders — the cheap, deterministic cross-worker cost-report validation affordance.
+    # Default False keeps dry runs zero-token with the report suppressed. Single writer:
+    # ``PipeRunParamsFactory.make_run_params`` (fed by ``prepare_pipe_job``).
+    is_mock_usage: bool = False
 
-    @property
-    def is_mock_built(self) -> bool:
-        """True when the leaf output is a synthetic mock (either trigger) — arms the object-fidelity guard."""
-        return self.run_mode.is_dry or self.is_mock_inference
+    @model_validator(mode="after")
+    def validate_mock_usage_requires_dry(self) -> Self:
+        if self.is_mock_usage and self.run_mode.is_live:
+            msg = "is_mock_usage is a sub-flag of run_mode=DRY: it cannot be set on a LIVE run"
+            raise ValueError(msg)
+        return self

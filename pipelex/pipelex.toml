@@ -506,7 +506,6 @@ non_retryable_error_types = [
   "FileNotFoundError",
   "ImgGenHandleNotFoundError",
   "LLMHandleNotFoundError",
-  "MockInferenceUnsupportedError",
   "ModelNotFoundError",
   "ValidationError",
 ]

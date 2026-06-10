@@ -16,7 +16,7 @@ from pipelex.cogt.content_generation.assignment_models import (
 )
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
-from pipelex.cogt.content_generation.exceptions import MockInferenceObjectFidelityError
+from pipelex.cogt.content_generation.exceptions import DryRunObjectFidelityError
 from pipelex.cogt.content_generation.extract_generate import extract_gen_pages_and_store
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.content_generation.img_gen_generate import img_gen_image_list_and_store, img_gen_single_image_and_store
@@ -53,12 +53,12 @@ def _revalidate_against_object_class(
     schema; re-validating their data against the original class makes the result the proper subtype (e.g.
     ``StructuredContent``) the caller expects.
 
-    Under a leaf mock (``run_mode=DRY`` or ``--mock-inference``) the object was built by polyfactory from
+    Under the dry-run leaf mock (``run_mode=DRY``) the object was built by polyfactory from
     the schema-reconstructed class, which can drop invariants the original class enforces (custom
     validators, ``json_schema_extra`` format/pattern hints datamodel-code-generator omits on round-trip).
     A re-validation failure there is the known object-mock fidelity gap, so the ``ValidationError`` is
-    re-raised as a clear typed :class:`MockInferenceObjectFidelityError` naming the class and the
-    ``examples`` / ``mock_format`` remedy. The catch is scoped to the mock path only — a LIVE provider's
+    re-raised as a clear typed :class:`DryRunObjectFidelityError` naming the class and the
+    ``examples`` / ``mock_format`` remedy. The catch is scoped to the dry path only — a LIVE provider's
     invalid output keeps its existing ``ValidationError``.
     """
     raw_data = raw_obj.model_dump(serialize_as_any=True)
@@ -67,7 +67,7 @@ def _revalidate_against_object_class(
     try:
         return object_class.model_validate(raw_data)
     except ValidationError as exc:
-        raise MockInferenceObjectFidelityError.for_object_class(object_class.__name__) from exc
+        raise DryRunObjectFidelityError.for_object_class(object_class.__name__) from exc
 
 
 class ContentGenerator(ContentGeneratorProtocol):
@@ -129,7 +129,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         )
         raw_obj = await llm_gen_object(object_assignment=object_assignment)
         log.verbose(f"{self.__class__.__name__} generated object direct: {raw_obj}")
-        return _revalidate_against_object_class(raw_obj, object_class, is_mock_built=cogt_run_params.is_mock_built)
+        return _revalidate_against_object_class(raw_obj, object_class, is_mock_built=cogt_run_params.run_mode.is_dry)
 
     @override
     @update_job_metadata
@@ -155,7 +155,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         )
         raw_list = await llm_gen_object_list(object_assignment=object_assignment)
         log.verbose(f"{self.__class__.__name__} generated object list direct: {raw_list}")
-        return [_revalidate_against_object_class(raw_obj, object_class, is_mock_built=cogt_run_params.is_mock_built) for raw_obj in raw_list]
+        return [_revalidate_against_object_class(raw_obj, object_class, is_mock_built=cogt_run_params.run_mode.is_dry) for raw_obj in raw_list]
 
     @override
     @update_job_metadata
@@ -328,9 +328,9 @@ class ContentGenerator(ContentGeneratorProtocol):
         )
         # Same fidelity guard as the object paths (D6): a mock-built dict that fails re-validation
         # against the original class is the known schema-round-trip gap, not a provider fault.
-        if not search_assignment.cogt_run_params.is_mock_built:
+        if not search_assignment.cogt_run_params.run_mode.is_dry:
             return output_structure_class.model_validate(result_dict)
         try:
             return output_structure_class.model_validate(result_dict)
         except ValidationError as exc:
-            raise MockInferenceObjectFidelityError.for_object_class(output_structure_class.__name__) from exc
+            raise DryRunObjectFidelityError.for_object_class(output_structure_class.__name__) from exc

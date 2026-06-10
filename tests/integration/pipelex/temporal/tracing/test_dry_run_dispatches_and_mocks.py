@@ -1,6 +1,6 @@
 """Mode-1 companion of Tier 17: DRY honors the Temporal backend (Part B, req 1).
 
-The DRY analogue of ``test_mock_inference_temporal.py``. Pre-Part-B, a Temporal dry run never
+The default-dry analogue of ``test_mock_usage_temporal.py``. Pre-Part-B, a Temporal dry run never
 dispatched ``act_llm_gen_*`` (operators swapped in a workflow-side dry generator); after Part B,
 ``run_mode=DRY`` rides ``CogtRunParams`` across the serialization boundary, the workflow dispatches
 the REAL ``act_llm_gen_text`` activity, and the cogt leaf mocks INSIDE the activity — zero-token
@@ -47,7 +47,7 @@ EXPECTED_LLM_DISPATCHES = 2
 class TestTemporalDryRunDispatchesAndMocks:
     @pytest.fixture
     def dry_sequence_job(self, is_class_registry_isolated: bool) -> Generator[PipeJob, None, None]:
-        """A DRY native_text_sequence job — same bundle as the mock-inference arm, dry run mode."""
+        """A DRY native_text_sequence job — same bundle as the mock-usage arm, default dry reporting."""
         yield from pipe_job_from_bundle(
             bundle_file=SequenceTracingTestData.BUNDLE_FILE,
             pipe_code=SequenceTracingTestData.PIPE_CODE,
@@ -96,7 +96,7 @@ class TestTemporalDryRunDispatchesAndMocks:
         assert "DRY RUN:" in pipe_output.main_stuff_as_text.text
 
         # One zero-token usage per step under the dry_run sentinel — assembled back cross-process,
-        # but the cost report stays suppressed (the inverse of --mock-inference's reportable usage).
+        # but the cost report stays suppressed (the inverse of is_mock_usage's reportable payload).
         assert pipe_output.tokens_usages is not None
         assert len(pipe_output.tokens_usages) == EXPECTED_LLM_DISPATCHES
         assert all(usage.inference_model_name == DRY_RUN_INFERENCE_MODEL_NAME for usage in pipe_output.tokens_usages)

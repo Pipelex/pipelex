@@ -51,7 +51,7 @@ async def pipeline_run_setup(
     output_multiplicity: VariableMultiplicity | None = None,
     dynamic_output_concept_ref: str | None = None,
     pipe_run_mode: PipeRunMode | None = None,
-    is_mock_inference: bool = False,
+    is_mock_usage: bool = False,
     search_domain_codes: list[str] | None = None,
     user_id: str | None = None,
     pipeline_run_id: str | None = None,
@@ -105,12 +105,12 @@ async def pipeline_run_setup(
         Pipe run mode: ``PipeRunMode.LIVE`` or ``PipeRunMode.DRY``. If not specified,
         inferred from the environment variable ``PIPELEX_FORCE_DRY_RUN_MODE``. Defaults
         to ``PipeRunMode.LIVE`` if the environment variable is not set.
-    is_mock_inference:
-        The ``--mock-inference`` trigger: keep ``run_mode`` LIVE (operators dispatch
-        normally) but fake the LLM calls at the cogt leaf. Threaded onto
-        :attr:`CogtRunParams.is_mock_inference`, which rides every assignment to the leaf in
-        both direct and Temporal modes. Distinct from ``--dry-run``: it exercises the live
-        control flow and emits reportable (non-zero) synthetic usage so a cost report renders.
+    is_mock_usage:
+        Internal sub-flag of ``run_mode=DRY`` (no public CLI surface): when True, the dry
+        LLM leaves report *non-zero* synthetic usage so the end-of-run cost report renders —
+        the cheap, deterministic cross-worker cost-report validation affordance. Threaded onto
+        :attr:`CogtRunParams.is_mock_usage`, which rides every assignment to the leaf in both
+        direct and Temporal modes. Requires a DRY run; setting it on a LIVE run fails validation.
     search_domain_codes:
         List of domain codes to search for pipes. The executed pipe's domain is automatically
         added if not already present.
@@ -262,7 +262,7 @@ async def pipeline_run_setup(
             library_id=library_id,
             execution_config=execution_config,
             pipe_run_mode=pipe_run_mode,
-            is_mock_inference=is_mock_inference,
+            is_mock_usage=is_mock_usage,
             pipeline_run_id=pipeline_run_id,
             user_id=user_id,
             inputs=inputs,

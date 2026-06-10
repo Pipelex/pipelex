@@ -10,7 +10,7 @@
 - **Step 3** — Sequential tests: Tier 1 (sequence), Tier 2 (hydration), Tier 2b (cross-process registry), Tier 2c (validate sweep stays in-process), Tier 2d (dry-run+validate as one in-memory activity), Tier 3 (parallel), Tier 4 (image generation), Tier 5 (image flow)
 - **Step 4** — Verify graph output
 - **Step 5** — Concurrent isolation tests (concept / pipe / multi-concept)
-- **Step 5b** — Tier 8: cross-worker usage emission; Tier 8b: cross-worker cost report assembly (`--mock-inference`, free)
+- **Step 5b** — Tier 8: cross-worker usage emission; Tier 8b: cross-worker cost report assembly (`--dry-run --mock-usage`, free)
 - **Step 5c** — Tier 9: object generation cross-process
 - **Step 5d** — Tier 11: `make_extract_pages` two-activity cross-process
 - **Step 5e** — Tier 12: deeply-nested controller stack (CV batch screening)
@@ -522,17 +522,17 @@ stamped with a runner-process `writer_id` (`act_{pid}_{uuid8}`). It's the e2e
 counterpart to the Phase 4 integration test
 `tests/integration/pipelex/temporal/tracing/test_split_worker_usage.py`.
 
-**Important — dry-run does NOT exercise the *reportable*-usage path.** Since
-Part B (leaf-level mock), `--temporal --dry-run` DOES dispatch `act_llm_gen_text`
+**Important — the default dry run does NOT exercise the *reportable*-usage path.**
+`--temporal --dry-run` DOES dispatch `act_llm_gen_text`
 to the runner (the leaf mocks inside the activity — that's Tier 17's subject),
-but its synthetic usage is **zero-token and suppressed by design**, so no
+but its default synthetic usage is **zero-token and suppressed by design**, so no
 rendered cost report and no reportable usage events come back from it.
 
-**Cheap deterministic CLI way: `--mock-inference` (Tier 8b below).** To observe
-runner-side `act_*` writer files from the CLI *without LLM spend*, use
-`--mock-inference`: a LIVE run (operators dispatch `act_llm_gen_text` to the
-runner exactly as a real run does) whose AI calls are faked at the inference leaf
-with reportable synthetic usage. This is the deterministic, free path — prefer it
+**Cheap deterministic CLI way: `--dry-run --mock-usage` (Tier 8b below).** To observe
+runner-side `act_*` writer files from the CLI *without LLM spend*, add the hidden
+`--mock-usage` flag to a dry run: the dry run dispatches `act_llm_gen_text` to the
+runner exactly as a real run does, and the flag flips the dry leaf's reporting to
+reportable non-zero synthetic usage. This is the deterministic, free path — prefer it
 over live mode for writer-id observation, and see **Tier 8b** for the full
 cross-worker cost-report assertion. The two other paths below remain valid: the
 Phase 4 integration test (which substitutes the inference activity with a wrapper
@@ -583,7 +583,7 @@ own `task_queue`) so that `act_llm_gen_text` resolves to a queue the runner
 listens on, and confirm both workers are running with the latest code
 (restart them if they predate the Phase 2 runner-side fallback commit).
 
-### Step 5b': Tier 8b — Cross-worker cost report assembly (`--mock-inference`, free + deterministic)
+### Step 5b': Tier 8b — Cross-worker cost report assembly (`--dry-run --mock-usage`, free + deterministic)
 
 #### Scope manifest — which arms to run
 
@@ -593,15 +593,15 @@ Run each arm in listed order. After each, surface the asserted token totals (whe
 
 | # | Arm | Scope | Spend | Expected assertion |
 |---|---|---|---|---|
-| A | **Mock primary** — `--mock-inference` `native_text_sequence` | default + full | free | 2 events / 200 input / 100 output, `--expected-model-type llm --require-fallback` |
-| B | **Cross-child fan-out** — `--mock-inference` `temporal_parallel` | default + full | free | 3 events / 300 input / 150 output, `--expected-model-type llm --require-fallback` (the CLI assert checks the summed total, **not** workflow-span; the cross-child guarantee itself is enforced by the pytest counterpart `test_split_worker_cross_child_usage.py`) |
+| A | **Mock primary** — `--dry-run --mock-usage` `native_text_sequence` | default + full | free | 2 events / 200 input / 100 output, `--expected-model-type llm --require-fallback` |
+| B | **Cross-child fan-out** — `--dry-run --mock-usage` `temporal_parallel` | default + full | free | 3 events / 300 input / 150 output, `--expected-model-type llm --require-fallback` (the CLI assert checks the summed total, **not** workflow-span; the cross-child guarantee itself is enforced by the pytest counterpart `test_split_worker_cross_child_usage.py`) |
 | C | **CSV un-truncated cross-check** — flip `reporting_config.is_generate_cost_report_file_enabled=true`, rerun arm A, confirm CSV totals == NDJSON totals, restore to `false` | full | free | `csv tokens` line matches NDJSON totals |
 | D | **`--no-costs` negative gate** | full | free | no cost table, no `usage_report` events, `reactflow.html` still assembles |
-| E | **Live LLM arm** — drop `--mock-inference` on `native_text_sequence` | full | **real** | non-zero total, real `model_names` (not `mock_inference`), `--require-fallback --require-nonzero` |
+| E | **Live LLM arm** — drop `--dry-run --mock-usage` on `native_text_sequence` | full | **real** | non-zero total, real `model_names` (not `mock_usage`), `--require-fallback --require-nonzero` |
 | F | **Live img-gen arm** — run a Tier 4/5 image bundle live with `--graph --costs` | full | **real** | `--expected-model-type img_gen --require-fallback --require-nonzero` |
 | G | **Live extract arm** — run the extract bundle `pdf_extract_page_views.mthds` (`--pipe pdf_extract_with_page_views`) live against the plain split workers with `--graph --costs` | full | **real** | `--expected-model-type extract --require-fallback --require-nonzero` |
 
-Arms F and G validate non-LLM usage, which `--mock-inference` cannot reach (the mock leaves raise `MockInferenceUnsupportedError`), so they are **live-only** — they are the sole way to prove img-gen / extract token usage crosses the runner fallback and aggregates into the cost report. Each arm's full command + assertion is detailed in the sub-sections below; arms A/C map to "Primary check", B to "Cross-child aggregation", D to "Negative check", E to "Live arm", F/G to "Non-LLM cross-worker cost". Arms F and G run their bundles on the **same plain router+runner split workers** as the other arms — they do **not** need the routing battery's multi-queue (`q_extract` / `q_image_gen`) setup. On plain split workers the img-gen / extract activity runs on the runner and emits via the `act_*` fallback, which is exactly what `--require-fallback` checks.
+Arms F and G validate non-LLM usage, which the mock arms cannot reach (non-LLM dry leaves emit no synthetic usage), so they are **live-only** — they are the sole way to prove img-gen / extract token usage crosses the runner fallback and aggregates into the cost report. Each arm's full command + assertion is detailed in the sub-sections below; arms A/C map to "Primary check", B to "Cross-child aggregation", D to "Negative check", E to "Live arm", F/G to "Non-LLM cross-worker cost". Arms F and G run their bundles on the **same plain router+runner split workers** as the other arms — they do **not** need the routing battery's multi-queue (`q_extract` / `q_image_gen`) setup. On plain split workers the img-gen / extract activity runs on the runner and emits via the `act_*` fallback, which is exactly what `--require-fallback` checks.
 
 Tier 8 (Step 5b above — the writer-id landing pytest) is the precursor to all of these and should pass first under any scope.
 
@@ -613,20 +613,19 @@ Tier 8b proves the next link end-to-end: those cross-worker usage events
 `assemble_usage=True`) and the submitter renders a **single** end-of-run cost
 report covering usage from all workers — with **no LLM spend**.
 
-**Why `--mock-inference` and not `--dry-run`.** Since Part B, dry-run also
+**Why the `--mock-usage` sub-flag.** A dry run
 dispatches `act_llm_gen_text` to the runner (the leaf mocks inside the
-activity), but its synthetic usage is zero-token → the cost report is
-*suppressed* by design. `--mock-inference` keeps
-`run_mode=LIVE` so operators dispatch the real `act_llm_gen_text` to the runner
-exactly like a paid run; only the inference *leaf* is faked, emitting reportable
-non-zero synthetic usage (model `mock_inference`). So the runner emits `act_*`
-usage events AND the report is non-suppressed — the one thing dry-run can't
-validate cheaply.
+activity), but its default synthetic usage is zero-token → the cost report is
+*suppressed* by design. The hidden `--mock-usage` flag (requires `--dry-run`)
+keeps that exact dispatch and flips the dry leaf's reporting to reportable
+non-zero synthetic usage (model `mock_usage`). So the runner emits `act_*`
+usage events AND the report is non-suppressed — the one thing the default dry
+run can't validate cheaply.
 
 **Requires split router+runner workers** (Step 2 in `mode-2-setup.md`). The point
 is that the usage events originate on the *runner* process and must aggregate
-into the report assembled for the *router*/submitter. `--mock-inference` is on the
-main `run` subcommands (pipe/method/bundle) and is mutually exclusive with
+into the report assembled for the *router*/submitter. `--mock-usage` is a hidden
+option on the main `run` subcommands (pipe/method/bundle) and requires
 `--dry-run`.
 
 **Primary check — both artifacts assemble from one event read (D3):**
@@ -635,15 +634,15 @@ main `run` subcommands (pipe/method/bundle) and is mutually exclusive with
 timeout 180 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/temporal/library_crate/native_text_sequence.mthds \
   --pipe native_text_sequence \
-  --temporal --mock-inference --no-logo --graph --costs 2>&1 | tail -30
+  --temporal --dry-run --mock-usage --mock-inputs --no-logo --graph --costs 2>&1 | tail -30
 echo "EXIT=$?"
 ```
 
 Expect, at the end of the submitter output:
 
-- A Rich **cost table** with model `mock_inference`, non-zero input/output token
+- A Rich **cost table** with model `mock_usage`, non-zero input/output token
   counts, and a run total (the synthetic per-call counts are
-  `MOCK_INFERENCE_NB_TOKENS_BY_CATEGORY = {INPUT: 100, OUTPUT: 50}`, so a
+  `MOCK_USAGE_NB_TOKENS_BY_CATEGORY = {INPUT: 100, OUTPUT: 50}`, so a
   2-LLM-step sequence totals 200 input / 100 output).
 - A `reactflow.html` for the run (graph assembles from the *same* event read).
 - Exit 0.
@@ -652,8 +651,8 @@ Then **assert the numbers** (don't eyeball — the terminal table truncates wide
 columns to `0 … …`). The `assert_cross_worker_cost.py` helper sums input/output
 tokens straight from the NDJSON usage events, counts them, checks a runner `act_*`
 writer engaged, and (if a CSV report exists) cross-checks the un-truncated CSV
-totals. For mock-inference the per-call counts are fixed
-(`MOCK_INFERENCE_NB_TOKENS_BY_CATEGORY = {INPUT: 100, OUTPUT: 50}`), so a
+totals. For mock-usage the per-call counts are fixed
+(`MOCK_USAGE_NB_TOKENS_BY_CATEGORY = {INPUT: 100, OUTPUT: 50}`), so a
 2-LLM-step sequence must total exactly 2 events / 200 input / 100 output:
 
 ```bash
@@ -689,7 +688,7 @@ from multiple child workflows aggregates into a single submitter report:
 timeout 180 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/temporal/library_crate/temporal_parallel.mthds \
   --pipe temporal_parallel_sequence \
-  --temporal --mock-inference --no-logo --graph --costs 2>&1 | tail -30
+  --temporal --dry-run --mock-usage --mock-inputs --no-logo --graph --costs 2>&1 | tail -30
 echo "EXIT=$?"
 ```
 
@@ -716,7 +715,7 @@ The pytest counterpart for this cross-child aggregation (no spend) is
 timeout 180 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/temporal/library_crate/native_text_sequence.mthds \
   --pipe native_text_sequence \
-  --temporal --mock-inference --no-logo --graph --no-costs 2>&1 | tail -30
+  --temporal --dry-run --mock-usage --mock-inputs --no-logo --graph --no-costs 2>&1 | tail -30
 echo "EXIT=$?"
 RUN_ID=$(ls -t .pipelex/traces/ | head -1)
 grep -l '"event_kind":"usage_report"' .pipelex/traces/$RUN_ID/*.ndjson || echo "No usage_report events (expected with --no-costs)"
@@ -729,7 +728,7 @@ still assembles — proving `--costs` gates only the cost channel, independent o
 `--graph`.
 
 **Live arm (real spend, opt-in)** — mirrors Tier 8's live block for the
-real-payload case. Drop `--mock-inference` so the real `act_llm_gen_text` runs on
+real-payload case. Drop `--dry-run --mock-usage` so the real `act_llm_gen_text` runs on
 the runner and bills real tokens:
 
 ```bash
@@ -751,15 +750,15 @@ RUN_ID=$(ls -t .pipelex/traces/ | head -1)
 ```
 
 Expect `RESULT: PASS` with non-zero `total tokens` and a real `model_names` entry
-(not `mock_inference`). The pytest counterpart for this real-inference cross-worker
+(not `mock_usage`). The pytest counterpart for this real-inference cross-worker
 path (gated, opt-in spend) is
 `tests/integration/pipelex/temporal/tracing/test_split_worker_real_inference_cost.py`
 (marked `inference`/`llm`; the no-spend counterpart is
-`tests/integration/pipelex/temporal/tracing/test_mock_inference_temporal.py`).
+`tests/integration/pipelex/temporal/tracing/test_mock_usage_temporal.py`).
 
-**Non-LLM cross-worker cost (img-gen / extract — live only).** `--mock-inference`
-cannot cover image generation or extraction: their mock leaves raise
-`MockInferenceUnsupportedError`, so non-LLM usage only crosses the runner boundary
+**Non-LLM cross-worker cost (img-gen / extract — live only).** `--mock-usage`
+cannot cover image generation or extraction: non-LLM dry leaves emit no synthetic
+usage, so non-LLM token usage only crosses the runner boundary
 on a real run. The img-gen / extract live tiers (Tiers 4 / 5 / 10c) already
 exercise those activities cross-process but never check the cost numbers. After
 running one of those live tiers with `--graph --costs` against split workers,
@@ -1169,9 +1168,8 @@ Report to the user:
 - **FAIL** = non-zero exit; or the runner pane shows NO `act_llm_gen_text` (the dry run didn't
   dispatch — the pre-Part-B shortcut is back); or any provider/storage activity on the runner.
 
-**GREEN arm — non-LLM leaves** (each replaces the old `MockInferenceUnsupportedError` fail-loud
-guard for dry runs at that leaf — img/extract DRY branches sit at the `*_and_store` layer, so also
-assert no storage writes):
+**GREEN arm — non-LLM leaves** (every leaf mocks under DRY — img/extract DRY branches sit at the
+`*_and_store` layer, so also assert no storage writes):
 
 ```bash
 # Extract (two activities: act_extract_gen_extract_pages + act_render_page_views):
@@ -1353,7 +1351,7 @@ ls results/*/reactflow.html
 | Tier 6: Codec transparency | Existing pipelines work unchanged with codec enabled | PASS/FAIL | path | — |
 | Tier 7: Large payload | Multi-step pipeline with codec stress test | PASS/FAIL | path | — |
 | Tier 8: Cross-worker usage | Runner-side `UsageReportEvent` lands in same NDJSON dir with `act_*` writer_id (live mode or integration test) | PASS/FAIL | — | — |
-| Tier 8b: Cross-worker cost report | `--mock-inference` (free): runner-side usage assembles onto `PipeOutput.tokens_usages` and the submitter renders a single non-suppressed cost report (model `mock_inference`); `--no-costs` renders none while `--graph` still assembles. **Numeric assertion** via `scripts/assert_cross_worker_cost.py` (sums NDJSON usage tokens, checks count + `act_*` fallback + optional CSV cross-check) — mock: 2 events/200 input/100 output; parallel: 3/300/150; live arms `--require-nonzero`; img-gen/extract `--expected-model-type` (live only) | PASS/FAIL | path | — |
+| Tier 8b: Cross-worker cost report | `--dry-run --mock-usage` (free): runner-side usage assembles onto `PipeOutput.tokens_usages` and the submitter renders a single non-suppressed cost report (model `mock_usage`); `--no-costs` renders none while `--graph` still assembles. **Numeric assertion** via `scripts/assert_cross_worker_cost.py` (sums NDJSON usage tokens, checks count + `act_*` fallback + optional CSV cross-check) — mock: 2 events/200 input/100 output; parallel: 3/300/150; live arms `--require-nonzero`; img-gen/extract `--expected-model-type` (live only) | PASS/FAIL | path | — |
 | Tier 9: Object gen cross-process | `act_llm_gen_object` / `act_llm_gen_object_list` survive the JSON round-trip with nested fields intact | PASS/FAIL | path | — |
 | Tier 10a: Multi-activity routing | `activity_queues.default` routes both `act_llm_gen_text` and `act_img_gen_images` to their dedicated worker pools; default runner sees 0 hits for either | PASS/FAIL/SKIPPED | — | — |
 | Tier 10b: Per-handle routing | `activity_queues.by_handle` overrides the activity default per model handle — two distinct handles in one workflow land on two distinct workers | PASS/FAIL/SKIPPED | path | — |

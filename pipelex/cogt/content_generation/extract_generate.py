@@ -1,6 +1,5 @@
 from pipelex.cogt.content_generation.assignment_models import ExtractAssignment
 from pipelex.cogt.content_generation.dry_mock import dry_extract_page_contents
-from pipelex.cogt.content_generation.exceptions import MockInferenceUnsupportedError
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.extract.extract_job_factory import ExtractJobFactory
 from pipelex.cogt.extract.extract_output import ExtractOutput
@@ -9,9 +8,6 @@ from pipelex.hub import get_extract_worker
 
 
 async def extract_gen_pages(extract_assignment: ExtractAssignment) -> ExtractOutput:
-    if extract_assignment.cogt_run_params.is_mock_inference:
-        error = MockInferenceUnsupportedError.for_operation("document extraction (PipeExtract)")
-        raise error
     extract_worker = get_extract_worker(extract_handle=extract_assignment.extract_handle)
     extract_job = ExtractJobFactory.make_extract_job(
         extract_input=extract_assignment.extract_input,

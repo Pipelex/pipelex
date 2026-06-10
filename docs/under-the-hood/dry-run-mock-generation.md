@@ -226,7 +226,7 @@ item_class = SchemaToModelFactory.make_from_json_schema(schema=..., class_name=.
 return build_mock_object(item_class)
 ```
 
-No explicit field constraints are passed — the factory auto-detects `MockFormat` from field definitions. Note that `json_schema_extra` hints can be dropped by the schema round-trip: classes with exotic format constraints should declare `examples` / `mock_format`, otherwise re-validation against the original class raises a typed `MockInferenceObjectFidelityError`.
+No explicit field constraints are passed — the factory auto-detects `MockFormat` from field definitions. Note that `json_schema_extra` hints can be dropped by the schema round-trip: classes with exotic format constraints should declare `examples` / `mock_format`, otherwise re-validation against the original class raises a typed `DryRunObjectFidelityError`.
 
 ### PipeCompose Resolution
 

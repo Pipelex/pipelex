@@ -18,7 +18,7 @@ from pipelex.cogt.content_generation.assignment_models import (
 )
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
-from pipelex.cogt.content_generation.exceptions import MockInferenceObjectFidelityError
+from pipelex.cogt.content_generation.exceptions import DryRunObjectFidelityError
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
@@ -60,12 +60,12 @@ def _revalidate_against_object_class(
     activity-boundary ``BaseModel`` through json (``mode="json"`` is required for fields that need json-mode
     serialization to round-trip cleanly) into the caller's original concrete class (e.g. ``StructuredContent``).
 
-    Under a leaf mock (``run_mode=DRY`` or ``--mock-inference``) the object was built from the
+    Under the dry-run leaf mock (``run_mode=DRY``) the object was built from the
     schema-reconstructed class inside ``act_llm_gen_object*``, which can drop invariants the original class
     enforces (custom validators, ``json_schema_extra`` format/pattern hints datamodel-code-generator omits
     on round-trip). That re-validation failure is re-raised as a clear
-    :class:`MockInferenceObjectFidelityError` rather than an opaque pydantic crash mid-workflow (review F2).
-    Scoped to the mock path only — a LIVE provider's invalid output keeps its existing ``ValidationError``.
+    :class:`DryRunObjectFidelityError` rather than an opaque pydantic crash mid-workflow (review F2).
+    Scoped to the dry path only — a LIVE provider's invalid output keeps its existing ``ValidationError``.
     """
     raw_data = raw_obj.model_dump(mode="json", serialize_as_any=True)
     if not is_mock_built:
@@ -73,7 +73,7 @@ def _revalidate_against_object_class(
     try:
         return object_class.model_validate(raw_data)
     except ValidationError as exc:
-        raise MockInferenceObjectFidelityError.for_object_class(object_class.__name__) from exc
+        raise DryRunObjectFidelityError.for_object_class(object_class.__name__) from exc
 
 
 class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
@@ -172,7 +172,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         log.verbose(f"ContentGeneratorInWorkflow generated object direct: {obj}")
-        return _revalidate_against_object_class(obj, object_class, is_mock_built=cogt_run_params.is_mock_built)
+        return _revalidate_against_object_class(obj, object_class, is_mock_built=cogt_run_params.run_mode.is_dry)
 
     @override
     @update_job_metadata
@@ -216,7 +216,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         log.verbose(f"ContentGeneratorInWorkflow generated object list direct: {obj_list}")
-        return [_revalidate_against_object_class(raw_obj, object_class, is_mock_built=cogt_run_params.is_mock_built) for raw_obj in obj_list]
+        return [_revalidate_against_object_class(raw_obj, object_class, is_mock_built=cogt_run_params.run_mode.is_dry) for raw_obj in obj_list]
 
     @override
     @update_job_metadata
@@ -541,7 +541,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
         try:
             return output_structure_class.model_validate(result_dict)
         except ValidationError as exc:
-            if search_assignment.cogt_run_params.is_mock_built:
-                raise MockInferenceObjectFidelityError.for_object_class(output_structure_class.__name__) from exc
+            if search_assignment.cogt_run_params.run_mode.is_dry:
+                raise DryRunObjectFidelityError.for_object_class(output_structure_class.__name__) from exc
             msg = f"Structured search result failed validation against {output_structure_class.__name__}: {exc}"
             raise ContentGenerationError(msg) from exc

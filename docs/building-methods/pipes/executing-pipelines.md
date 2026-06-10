@@ -237,4 +237,4 @@ The public Python entry point is `PipelexRunner.execute_pipeline()`. The older s
 
 ## Run Modes & Backends
 
-Every execution method above accepts a run mode (live, dry run, or mock inference) and a backend (in-process or Temporal). See [Run Modes & Backends](run-modes-and-backends.md) for the full matrix and when to use each combination.
+Every execution method above accepts a run mode (live or dry run) and a backend (in-process or Temporal). See [Run Modes & Backends](run-modes-and-backends.md) for the full matrix and when to use each combination.

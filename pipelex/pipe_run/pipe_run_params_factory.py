@@ -15,36 +15,28 @@ class PipeRunParamsFactory:
         cls,
         *,
         pipe_run_mode: PipeRunMode = PipeRunMode.LIVE,
-        is_mock_inference: bool = False,
+        is_mock_usage: bool = False,
         pipe_stack_limit: int | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
         dynamic_output_concept_ref: str | None = None,
         batch_params: BatchParams | None = None,
         params: dict[str, Any] | None = None,
     ) -> PipeRunParams:
-        """Single writer of ``run_mode`` and ``is_mock_inference``: builds the nested ``CogtRunParams`` here (D2/D8).
+        """Single writer of ``run_mode`` and ``is_mock_usage``: builds the nested ``CogtRunParams`` here (D2).
 
         The keyless-boot forced-DRY flag (eng review D4) is resolved HERE — at the single writer —
         so every execution entry point is covered (``prepare_pipe_job``, the runtime bridge,
         ``PipeJobFactory`` defaults), not just the pipeline-API path.
         """
         if is_dry_run_forced() and pipe_run_mode.is_live:
-            if is_mock_inference:
-                log.warning(
-                    "--mock-inference requested under a keyless boot (needs_inference=False): the run is forced "
-                    "to DRY, which takes precedence at the leaf — the rendered synthetic cost report will NOT be "
-                    "produced (DRY usage is zero-token and suppressed). Boot with inference configured to use "
-                    "--mock-inference."
-                )
-            else:
-                log.warning(
-                    "LIVE run requested under a keyless boot (needs_inference=False): forcing run_mode to DRY — "
-                    "outputs will be synthetic mocks, not real inference."
-                )
+            log.warning(
+                "LIVE run requested under a keyless boot (needs_inference=False): forcing run_mode to DRY — "
+                "outputs will be synthetic mocks, not real inference."
+            )
             pipe_run_mode = PipeRunMode.DRY
         pipe_stack_limit = pipe_stack_limit or get_config().pipelex.pipe_run_config.pipe_stack_limit
         return PipeRunParams(
-            cogt_run_params=CogtRunParams(run_mode=pipe_run_mode, is_mock_inference=is_mock_inference),
+            cogt_run_params=CogtRunParams(run_mode=pipe_run_mode, is_mock_usage=is_mock_usage),
             pipe_stack_limit=pipe_stack_limit,
             output_multiplicity=output_multiplicity,
             dynamic_output_concept_ref=dynamic_output_concept_ref,
