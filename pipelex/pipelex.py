@@ -561,7 +561,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             observers: Custom observers for pipeline events
             library_dirs: Default library directories for pipeline execution. If provided, these
                 directories will be used instead of the PIPELEXPATH environment variable.
-                Per-call library_dirs in execute_pipeline/start_pipeline will override this default.
+                Per-call library_dirs in execute/start will override this default.
             config_overrides: Optional dict deep-merged on top of all TOML config layers
                 as the highest-priority override. Useful for tests that need specific
                 config without editing TOML files.

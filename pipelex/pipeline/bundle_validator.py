@@ -6,7 +6,7 @@ A validation sweep is **not** a run: it is a batch *policy* that *uses* runs. So
 ``SUCCESS / FAILURE / SKIPPED`` aggregation, ``allowed_to_fail`` policy) and
 **composes** the shared execution seams (``acquire_library`` /
 ``prepare_pipe_job``) plus a direct, in-process ``PipeRun`` — the same execution
-core ``PipelexRunner`` reaches for a single run. It never forks the runner and
+core ``PipelexMTHDSProtocol`` reaches for a single run. It never forks the runner and
 never threads validation-only flags through it.
 
 Two lifecycles (D6):

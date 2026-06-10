@@ -11,7 +11,7 @@ from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 
 async def dry_run_pipeline(
@@ -67,13 +67,13 @@ async def dry_run_pipeline(
         mock_inputs=True,
     )
 
-    runner = PipelexRunner(
+    runner = PipelexMTHDSProtocol(
         bundle_uris=bundle_uris,
         pipe_run_mode=PipeRunMode.DRY,
         execution_config=execution_config,
         library_dirs=library_dirs or [],
     )
-    response = await runner.execute_pipeline(
+    response = await runner.execute(
         pipe_code=pipe_code,
         mthds_contents=mthds_contents,
     )

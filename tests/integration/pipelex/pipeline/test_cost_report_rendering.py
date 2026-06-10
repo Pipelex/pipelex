@@ -24,7 +24,7 @@ from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.reporting.cost_report_renderer import render_run_cost_report
 from pipelex.system.configuration.configs import NdjsonTracingConfig, PipelineExecutionConfig, TracingBackend
 
@@ -90,8 +90,8 @@ class TestCostReportRendering:
         )
 
     async def _run(self, execution_config: PipelineExecutionConfig) -> PipeOutput:
-        runner = PipelexRunner(pipe_run_mode=PipeRunMode.DRY, execution_config=execution_config)
-        response = await runner.execute_pipeline(pipe_code="echo_topic", mthds_contents=[_MTHDS])
+        runner = PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, execution_config=execution_config)
+        response = await runner.execute(pipe_code="echo_topic", mthds_contents=[_MTHDS])
         return response.pipe_output
 
     async def test_renders_correct_non_zero_totals(self, mocker: MockerFixture, job_metadata: JobMetadata) -> None:

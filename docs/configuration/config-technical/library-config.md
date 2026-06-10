@@ -26,22 +26,22 @@ pipelex run bundle path/to/my_bundle.mthds --pipe my_pipe
 ```
 
 ```python
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 # Python: run the bundle's main_pipe
-runner = PipelexRunner(
+runner = PipelexMTHDSProtocol(
     bundle_uri="path/to/my_bundle.mthds",
 )
-response = await runner.execute_pipeline(
+response = await runner.execute(
     inputs={...},
 )
 pipe_output = response.pipe_output
 
 # Python: run a specific pipe from the bundle
-runner = PipelexRunner(
+runner = PipelexMTHDSProtocol(
     bundle_uri="path/to/my_bundle.mthds",
 )
-response = await runner.execute_pipeline(
+response = await runner.execute(
     pipe_code="my_pipe",
     inputs={...},
 )
@@ -145,33 +145,33 @@ pipelex which my_pipe -L /path/to/pipelines/dir
 
 ### Setting Instance Defaults with `Pipelex.make()`
 
-For Python applications, you can set a default library directory when initializing Pipelex. This default will be used for all subsequent `PipelexRunner.execute_pipeline()` calls unless overridden.
+For Python applications, you can set a default library directory when initializing Pipelex. This default will be used for all subsequent `PipelexMTHDSProtocol.execute()` calls unless overridden.
 
 ```python
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 # Set instance-level defaults at initialization
 Pipelex.make(
     library_dirs=["/path/to/shared_pipes", "/path/to/project_pipes"]
 )
 
-# All PipelexRunner.execute_pipeline() calls will use these directories by default
-runner = PipelexRunner()
-response = await runner.execute_pipeline(
+# All PipelexMTHDSProtocol.execute() calls will use these directories by default
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(
     pipe_code="my_pipe",
     inputs={"input": "value"},
 )
 pipe_output = response.pipe_output
 ```
 
-### Per-Runner Override with `PipelexRunner`
+### Per-Runner Override with `PipelexMTHDSProtocol`
 
-For maximum flexibility, you can override library directories on each `PipelexRunner` instance:
+For maximum flexibility, you can override library directories on each `PipelexMTHDSProtocol` instance:
 
 ```python
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 # Initialize with default directories
 Pipelex.make(
@@ -179,28 +179,28 @@ Pipelex.make(
 )
 
 # Use the default directories
-runner1 = PipelexRunner()
-response1 = await runner1.execute_pipeline(
+runner1 = PipelexMTHDSProtocol()
+response1 = await runner1.execute(
     pipe_code="default_pipe",
     inputs={"input": "value"},
 )
 pipe_output1 = response1.pipe_output
 
 # Override for a specific execution
-runner2 = PipelexRunner(
+runner2 = PipelexMTHDSProtocol(
     library_dirs=["/path/to/special_pipes"],  # Overrides instance default
 )
-response2 = await runner2.execute_pipeline(
+response2 = await runner2.execute(
     pipe_code="special_pipe",
     inputs={"input": "value"},
 )
 pipe_output2 = response2.pipe_output
 
 # Disable directory loading (use only mthds_content)
-runner3 = PipelexRunner(
+runner3 = PipelexMTHDSProtocol(
     library_dirs=[],  # Empty list disables directory-based loading
 )
-response3 = await runner3.execute_pipeline(
+response3 = await runner3.execute(
     mthds_content=my_mthds_string,
     inputs={"input": "value"},
 )
@@ -217,14 +217,14 @@ export PIPELEXPATH="/shared/pipes"
 ```
 
 ```python
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 # Python: No library_dirs specified anywhere
 Pipelex.make()  # No library_dirs
 
 # Uses PIPELEXPATH: /shared/pipes
-runner = PipelexRunner()
-response = await runner.execute_pipeline(pipe_code="my_pipe", inputs={...})
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(pipe_code="my_pipe", inputs={...})
 pipe_output = response.pipe_output
 ```
 
@@ -236,29 +236,29 @@ export PIPELEXPATH="/shared/pipes"
 ```
 
 ```python
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 # Python: Instance default set
 Pipelex.make(library_dirs=["/project/pipes"])
 
 # Uses instance default: /project/pipes (PIPELEXPATH ignored)
-runner = PipelexRunner()
-response = await runner.execute_pipeline(pipe_code="my_pipe", inputs={...})
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(pipe_code="my_pipe", inputs={...})
 pipe_output = response.pipe_output
 ```
 
 **Example 3: Per-call override takes highest priority**
 
 ```python
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 Pipelex.make(library_dirs=["/default/pipes"])
 
 # Uses per-runner value: /special/pipes
-runner = PipelexRunner(
+runner = PipelexMTHDSProtocol(
     library_dirs=["/special/pipes"],  # Highest priority
 )
-response = await runner.execute_pipeline(
+response = await runner.execute(
     pipe_code="my_pipe",
     inputs={...},
 )

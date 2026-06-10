@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+from mthds.client.client import MthdsAPIClient
 from mthds.client.pipeline import MAIN_STUFF_NAME
-from mthds.runners.api_runner import ApiRunner
 
 from pipelex.cli.agent_cli.commands.run._output_helpers import build_run_output
 
@@ -36,12 +36,12 @@ async def run_pipeline_core_api(
         ClientAuthenticationError: If API credentials are invalid or missing.
         PipelineRequestError: If the pipeline request is malformed.
     """
-    runner = ApiRunner()
-    response = await runner.execute_pipeline(
-        pipe_code=pipe_code,
-        mthds_contents=mthds_contents,
-        inputs=inputs,
-    )
+    async with MthdsAPIClient() as runner:
+        response = await runner.execute(
+            pipe_code=pipe_code,
+            mthds_contents=mthds_contents,
+            inputs=inputs,
+        )
 
     # Extract main stuff content from the working memory
     main_stuff_json: dict[str, Any] = {}
@@ -65,7 +65,7 @@ async def run_pipeline_core_api(
         working_memory_dump=response.pipe_output.working_memory.model_dump(),
         compact_result=compact_result,
         extra_metadata={
-            "pipeline_run_id": response.pipeline_run_id,
-            "pipeline_state": response.pipeline_state,
+            "pipeline_run_id": response.run_id,
+            "pipeline_state": response.state,
         },
     )

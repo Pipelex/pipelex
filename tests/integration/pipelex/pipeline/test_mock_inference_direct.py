@@ -23,7 +23,7 @@ from pipelex.cogt.content_generation.dry_mock import MOCK_INFERENCE_MODEL_NAME
 from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.reporting.cost_report_renderer import render_run_cost_report
 from pipelex.system.configuration.configs import NdjsonTracingConfig, PipelineExecutionConfig, TracingBackend
 
@@ -76,8 +76,8 @@ class TestMockInferenceDirect:
 
     async def _run_mock_inference(self, pipe_code: str) -> PipeOutput:
         # pipe_run_mode left as None -> LIVE; is_mock_inference fakes only the AI leaf.
-        runner = PipelexRunner(is_mock_inference=True, execution_config=self._config())
-        response = await runner.execute_pipeline(pipe_code=pipe_code, mthds_contents=[_MTHDS])
+        runner = PipelexMTHDSProtocol(is_mock_inference=True, execution_config=self._config())
+        response = await runner.execute(pipe_code=pipe_code, mthds_contents=[_MTHDS])
         return response.pipe_output
 
     async def test_text_pipe_mocks_leaf_and_assembles_reportable_usage(self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture) -> None:

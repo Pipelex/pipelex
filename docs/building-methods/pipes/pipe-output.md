@@ -24,7 +24,7 @@ The **main_stuff** is the final output produced by the last pipe in your pipelin
 When you execute a pipeline, you receive a `PipeOutput` object:
 
 ```python
-pipe_output = await execute_pipeline(
+pipe_output = await execute(
     pipe_code="process_invoice",
     inputs={...}
 )
@@ -43,7 +43,7 @@ If the output concept was defined as a Python class (inheriting from `Structured
 ```python
 from my_project.finance.finance_struct import Invoice
 
-pipe_output = await execute_pipeline(
+pipe_output = await execute(
     pipe_code="extract_invoice",
     inputs={...}
 )
@@ -58,7 +58,7 @@ invoice = pipe_output.main_stuff_as(content_type=Invoice)
 If the output concept was defined with [inline structures](../concepts/inline-structures.md) directly in the `.mthds` file, the generated class is not importable. Use the `PipeOutput` accessor methods instead:
 
 ```python
-pipe_output = await execute_pipeline(
+pipe_output = await execute(
     pipe_code="extract_invoice",
     inputs={...}
 )

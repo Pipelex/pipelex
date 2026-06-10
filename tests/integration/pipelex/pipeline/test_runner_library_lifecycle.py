@@ -1,11 +1,11 @@
-"""Library-lifecycle guarantee for :meth:`PipelexRunner.execute_pipeline`.
+"""Library-lifecycle guarantee for :meth:`PipelexMTHDSProtocol.execute`.
 
 Pins that a *successful* run RESTORES the caller's outer current-library instead of
 clobbering it to ``None``.
 
 ``pipeline_run_setup`` leaves the run library open and current on success (teardown is
 the caller's job — pinned by ``test_pipeline_run_setup_characterization.py``).
-``execute_pipeline``'s ``finally`` then tears the run library down, and must restore the
+``execute``'s ``finally`` then tears the run library down, and must restore the
 outer binding the caller held before the run — mirroring ``pipeline_run_setup``'s own
 error-path restore. Without that, a run started inside an outer-library context leaves the
 next operation with "No current library set" (or silently falling back to the global class
@@ -32,7 +32,7 @@ from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipeline.exceptions import PipelineExecutionError
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -70,7 +70,7 @@ def _dry_mock_config() -> PipelineExecutionConfig:
 
 
 class _FailingPipeRun(PipeRunProtocol):
-    """A PipeRun whose ``run`` always raises, so the failure lands in ``execute_pipeline``'s finally
+    """A PipeRun whose ``run`` always raises, so the failure lands in ``execute``'s finally
     AFTER setup has succeeded and resolved the run library — exercising the runner's own teardown guard.
     """
 
@@ -91,15 +91,15 @@ class TestRunnerLibraryLifecycle:
     async def test_success_restores_outer_current_library(self, load_empty_library: Callable[[], str]) -> None:
         # A run started inside an outer-library context must leave that outer library current after a
         # SUCCESSFUL run. We pass no library_id, so the run uses its own auto-generated library id;
-        # execute_pipeline's finally tears that run library down and must RESTORE the outer binding
+        # execute's finally tears that run library down and must RESTORE the outer binding
         # rather than clear it to None.
         outer_library_id = load_empty_library()
         try:
-            runner = PipelexRunner(
+            runner = PipelexMTHDSProtocol(
                 pipe_run_mode=PipeRunMode.DRY,
                 execution_config=_dry_mock_config(),
             )
-            await runner.execute_pipeline(
+            await runner.execute(
                 pipe_code="echo_topic",
                 mthds_contents=[_RUNNER_LIFECYCLE_MTHDS],
             )
@@ -113,18 +113,18 @@ class TestRunnerLibraryLifecycle:
         # branch still clears (set_current_library cannot take None). Clearing first makes this
         # deterministic under xdist's per-worker shared current-library state.
         clear_current_library()
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             pipe_run_mode=PipeRunMode.DRY,
             execution_config=_dry_mock_config(),
         )
-        await runner.execute_pipeline(
+        await runner.execute(
             pipe_code="echo_topic",
             mthds_contents=[_RUNNER_LIFECYCLE_MTHDS],
         )
         assert get_current_library_id_or_none() is None
 
     async def test_failure_when_outer_is_run_library_clears_instead_of_dangling(self) -> None:
-        # execute_pipeline's OWN finally guard, mirroring pipeline_run_setup's edge: when the runner's
+        # execute's OWN finally guard, mirroring pipeline_run_setup's edge: when the runner's
         # library_id equals the outer current-library, prev == library_id_resolved. Restoring then
         # tearing down the same id would leave current-library pointing at a torn-down library; the guard
         # clears instead. Setup succeeds (echo_topic resolves), then the injected pipe_run raises so the
@@ -133,14 +133,14 @@ class TestRunnerLibraryLifecycle:
         collide_library_id, _ = library_manager.open_library()
         set_current_library(library_id=collide_library_id)
         try:
-            runner = PipelexRunner(
+            runner = PipelexMTHDSProtocol(
                 library_id=collide_library_id,
                 pipe_run_mode=PipeRunMode.DRY,
                 execution_config=_dry_mock_config(),
                 pipe_run=_FailingPipeRun(),
             )
             with pytest.raises(PipelineExecutionError):
-                await runner.execute_pipeline(
+                await runner.execute(
                     pipe_code="echo_topic",
                     mthds_contents=[_RUNNER_LIFECYCLE_MTHDS],
                 )

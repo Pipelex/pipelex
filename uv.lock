@@ -2663,8 +2663,8 @@ wheels = [
 
 [[package]]
 name = "mthds"
-version = "0.3.0"
-source = { registry = "https://pypi.org/simple" }
+version = "0.4.0"
+source = { git = "https://github.com/mthds-ai/mthds-python.git?branch=refactor%2Fprotocol#7a45f915c69debf0d3b94e291a0d32bfa76c6d4f" }
 dependencies = [
     { name = "backports-strenum", marker = "python_full_version < '3.11'" },
     { name = "httpx" },
@@ -2673,10 +2673,6 @@ dependencies = [
     { name = "tomli", marker = "python_full_version < '3.11'" },
     { name = "tomlkit" },
     { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/5b/3c/eea615b49c011657246ff61371ca4a95ab3baa94d4b79541bd4b0f816ae5/mthds-0.3.0.tar.gz", hash = "sha256:de479f977b2ec3614b23bdb53ed3e28e2332a2f1653ee92e118c530fe3d5d820", size = 112693, upload-time = "2026-04-29T12:50:11.426Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f3/86/1184f31583d3089baea9316853b329720cb786d8e01f38f303a17f1e3f4c/mthds-0.3.0-py3-none-any.whl", hash = "sha256:3f9822c23beb82607ec4bafcff99717fb6531eed8d19b86086dc9deb7825b06b", size = 49356, upload-time = "2026-04-29T12:50:09.734Z" },
 ]
 
 [[package]]
@@ -3692,7 +3688,7 @@ wheels = [
 
 [[package]]
 name = "pipelex"
-version = "0.32.1"
+version = "0.33.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -3863,7 +3859,7 @@ requires-dist = [
     { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = ">=1.1.0" },
     { name = "mkdocs-redirects", marker = "extra == 'docs'", specifier = "==1.2.2" },
     { name = "moto", extras = ["dynamodb", "s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "mthds", specifier = ">=0.3.0" },
+    { name = "mthds", git = "https://github.com/mthds-ai/mthds-python.git?branch=refactor%2Fprotocol" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
     { name = "networkx", specifier = ">=3.4.2" },
     { name = "openai", specifier = ">=2.0.0" },

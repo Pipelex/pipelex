@@ -4,7 +4,7 @@ import pytest
 
 from pipelex import pretty_print
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from tests.e2e.pipelex.pipes.pipe_controller.pipe_sequence.test_tweet import OptimizedTweet
 
 SAMPLE_DRAFT_TWEET = """
@@ -94,11 +94,11 @@ class TestPipeSequenceWithInputMemory:
     async def test_optimize_tweet_sequence_with_input_memory(self, pipe_run_mode: PipeRunMode):
         """Test the optimize_tweet_sequence pipeline using inputs parameter."""
         # Execute the pipeline using inputs
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             library_dirs=["tests/e2e/pipelex/pipes/pipe_controller/pipe_sequence/"],
             pipe_run_mode=pipe_run_mode,
         )
-        response = await runner.execute_pipeline(
+        response = await runner.execute(
             pipe_code="optimize_tweet_sequence",
             inputs={
                 "draft_tweet": {

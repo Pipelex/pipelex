@@ -1,5 +1,21 @@
 # Changelog
 
+## [v0.33.0] - 2026-06-10
+
+### Breaking Changes
+
+- **`PipelexRunner` → `PipelexMTHDSProtocol`** — the runner class now implements the MTHDS Protocol standard via `mthds.client.protocol.MTHDSProtocol` (mthds >= 0.4.0). Method renames: `execute_pipeline` → `execute`, `start_pipeline` → `start` (still `NotImplementedError` locally; gains the protocol's `run_id`/`callback_urls`/`method_id` kwargs). Response classes renamed: `PipelexPipelineExecuteResponse` → `PipelexRunResult`, `PipelexPipelineStartResponse` → `PipelexStartAck` (subclassing the renamed mthds models); wire fields `pipeline_run_id` → `run_id`, `pipeline_state` → `state` on the response models ONLY — runtime internals (PipeOutput, tracing, telemetry, Temporal) keep `pipeline_run_id`.
+- **`mthds` pin bumped to >= 0.4.0** — brings the protocol rename and the single `/v1` base-path client. The agent CLI's API run path now uses `MthdsAPIClient` directly (the `ApiRunner` wrapper was deleted upstream).
+
+### Added
+
+- **Protocol `validate` / `models` / `version` on `PipelexMTHDSProtocol`** — `validate` wraps `validate_bundle` (blueprints + per-pipe structures mapped into the protocol `ValidationReport`); `models` wraps the builder's `list_models` into the protocol `ModelDeck`; `version` reports `protocol_version` 0.1.0 with the installed pipelex version.
+
+### Coordination
+
+- **pipelex-worker lockstep** — the Temporal payload models cross into `pipelex-worker` via the `pipelex` pin; the worker must ship the same `pipelex` version as `pipelex-api` when Phase C of the MTHDS Protocol unification deploys (wire field renames).
+
+
 ## [v0.32.1] - 2026-06-09
 
 ### Added

@@ -225,7 +225,7 @@ class TestGenerateRunnerCode:
         runner_code = generate_runner_code(mock_pipe_single_output)
         assert "import asyncio" in runner_code
         assert "from pipelex.pipelex import Pipelex" in runner_code
-        assert "from pipelex.pipeline.runner import PipelexRunner" in runner_code
+        assert "from pipelex.pipeline.runner import PipelexMTHDSProtocol" in runner_code
 
     def test_runner_code_includes_structure_imports(self, mock_pipe_single_output: MagicMock) -> None:
         """Test that generated runner code includes structure class imports."""

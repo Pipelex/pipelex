@@ -27,7 +27,7 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.hub import get_library_manager
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.tools.tabular.csv_codec import csv_from_list_content
 
 if TYPE_CHECKING:
@@ -100,8 +100,8 @@ class TestCsvRoundtrip:
     @pytest.mark.inference
     @pytest.mark.asyncio
     async def test_full_pipeline_round_trip(self, pipe_run_mode: PipeRunMode) -> None:
-        runner = PipelexRunner(library_dirs=[str(BUNDLE_DIR)], pipe_run_mode=pipe_run_mode)
-        response = await runner.execute_pipeline(pipe_code="summarize_people", inputs=people_inputs())
+        runner = PipelexMTHDSProtocol(library_dirs=[str(BUNDLE_DIR)], pipe_run_mode=pipe_run_mode)
+        response = await runner.execute(pipe_code="summarize_people", inputs=people_inputs())
 
         content = response.pipe_output.main_stuff.content
         assert isinstance(content, ListContent)

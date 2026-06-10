@@ -14,7 +14,7 @@ from pipelex.hub import get_required_pipe
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from tests.integration.pipelex.pipes.controller.pipe_sequence.pipe_sequence import Document, ProductRating
 
 
@@ -67,8 +67,8 @@ async def test_review_analysis_sequence_with_batching(
         )
         working_memory = WorkingMemoryFactory.make_from_single_stuff(document_stuff)
         # Execute the pipeline
-        runner = PipelexRunner()
-        response = await runner.execute_pipeline(
+        runner = PipelexMTHDSProtocol()
+        response = await runner.execute(
             pipe_code="analyze_reviews_sequence",
             inputs=working_memory,
         )
