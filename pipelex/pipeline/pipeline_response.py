@@ -10,13 +10,13 @@ class PipelexRunResult(RunResult[PipeOutput]):
     def from_pipe_output(
         cls,
         pipe_output: PipeOutput,
-        run_id: str = "",
+        pipeline_run_id: str = "",
         created_at: str = "",
         state: RunState = RunState.COMPLETED,
         finished_at: str | None = None,
     ) -> PipelexRunResult:
         return cls(
-            run_id=run_id,
+            pipeline_run_id=pipeline_run_id,
             created_at=created_at,
             state=state,
             finished_at=finished_at,

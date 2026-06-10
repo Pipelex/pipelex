@@ -65,7 +65,7 @@ async def run_pipeline_core_api(
         working_memory_dump=response.pipe_output.working_memory.model_dump(),
         compact_result=compact_result,
         extra_metadata={
-            "pipeline_run_id": response.run_id,
+            "pipeline_run_id": response.pipeline_run_id,
             "pipeline_state": response.state,
         },
     )

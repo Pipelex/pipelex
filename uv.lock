@@ -2664,7 +2664,7 @@ wheels = [
 [[package]]
 name = "mthds"
 version = "0.4.0"
-source = { git = "https://github.com/mthds-ai/mthds-python.git?branch=refactor%2Fprotocol#7a45f915c69debf0d3b94e291a0d32bfa76c6d4f" }
+source = { git = "https://github.com/mthds-ai/mthds-python.git?branch=refactor%2Fprotocol#dadb8130184664d24a1a9724ec40b3646f41d3b9" }
 dependencies = [
     { name = "backports-strenum", marker = "python_full_version < '3.11'" },
     { name = "httpx" },

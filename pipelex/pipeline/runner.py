@@ -252,7 +252,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         finished_at = datetime.now(timezone.utc).isoformat()
         return PipelexRunResult.from_pipe_output(
             pipe_output=pipe_output,
-            run_id=pipe_output.pipeline_run_id,
+            pipeline_run_id=pipe_output.pipeline_run_id,
             created_at=created_at,
             state=RunState.COMPLETED,
             finished_at=finished_at,
@@ -267,7 +267,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
         dynamic_output_concept_ref: str | None = None,
-        run_id: str | None = None,
+        pipeline_run_id: str | None = None,
         callback_urls: list[str] | None = None,
         method_id: str | None = None,
     ) -> StartAck[PipeOutput]:
@@ -277,7 +277,17 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         (pipelex-api overrides this with Temporal dispatch) and the hosted
         platform; locally, use `execute`.
         """
-        _ = (pipe_code, mthds_contents, inputs, output_name, output_multiplicity, dynamic_output_concept_ref, run_id, callback_urls, method_id)
+        _ = (
+            pipe_code,
+            mthds_contents,
+            inputs,
+            output_name,
+            output_multiplicity,
+            dynamic_output_concept_ref,
+            pipeline_run_id,
+            callback_urls,
+            method_id,
+        )
         msg = "start is not implemented by the local runtime. Use execute, or run against an MTHDS API runner."
         raise NotImplementedError(msg)
 

@@ -4,7 +4,7 @@
 
 ### Breaking Changes
 
-- **`PipelexRunner` → `PipelexMTHDSProtocol`** — the runner class now implements the MTHDS Protocol standard via `mthds.client.protocol.MTHDSProtocol` (mthds >= 0.4.0). Method renames: `execute_pipeline` → `execute`, `start_pipeline` → `start` (still `NotImplementedError` locally; gains the protocol's `run_id`/`callback_urls`/`method_id` kwargs). Response classes renamed: `PipelexPipelineExecuteResponse` → `PipelexRunResult`, `PipelexPipelineStartResponse` → `PipelexStartAck` (subclassing the renamed mthds models); wire fields `pipeline_run_id` → `run_id`, `pipeline_state` → `state` on the response models ONLY — runtime internals (PipeOutput, tracing, telemetry, Temporal) keep `pipeline_run_id`.
+- **`PipelexRunner` → `PipelexMTHDSProtocol`** — the runner class now implements the MTHDS Protocol standard via `mthds.client.protocol.MTHDSProtocol` (mthds >= 0.4.0). Method renames: `execute_pipeline` → `execute`, `start_pipeline` → `start` (still `NotImplementedError` locally; gains the protocol's `run_id`/`callback_urls`/`method_id` kwargs). Response classes renamed: `PipelexPipelineExecuteResponse` → `PipelexRunResult`, `PipelexPipelineStartResponse` → `PipelexStartAck` (subclassing the renamed mthds models); wire field `pipeline_state` → `state` on the response models; the run identifier keeps the name `pipeline_run_id` everywhere (wire and internals — D1 as revised 2026-06-10).
 - **`mthds` pin bumped to >= 0.4.0** — brings the protocol rename and the single `/v1` base-path client. The agent CLI's API run path now uses `MthdsAPIClient` directly (the `ApiRunner` wrapper was deleted upstream).
 
 ### Added

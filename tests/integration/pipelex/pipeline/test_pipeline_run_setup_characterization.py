@@ -239,7 +239,7 @@ class TestPipelineRunSetupCharacterization:
         # cleared it. Assert against THIS run's key rather than global emptiness — _event_log_contexts is a
         # process-global singleton that sibling tests on the same xdist worker can populate.
         if isinstance(delegate, ReportingManager):
-            assert response.run_id not in delegate._event_log_contexts  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            assert response.pipeline_run_id not in delegate._event_log_contexts  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
     async def test_failure_after_acquire_restores_outer_current_library(self, load_empty_library: Callable[[], str]) -> None:
         # acquire_library restores the outer current-library on its own load failure; the wrapper's
