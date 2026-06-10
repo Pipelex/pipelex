@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from pipelex import log
-from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
+from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams  # noqa: TC001 — pydantic resolves the field annotation at runtime
 from pipelex.core.memory.working_memory import BATCH_ITEM_STUFF_NAME, MAIN_STUFF_NAME
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity, VariableMultiplicityResolution
 from pipelex.pipeline.exceptions import PipeStackOverflowError
@@ -143,10 +143,11 @@ class PipeRunParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     # The ONLY copy of `run_mode` lives inside `cogt_run_params` (eng review D2) — see the
-    # `run_mode` delegating property below. Written once at construction by
+    # `run_mode` delegating property below. REQUIRED (no default): a payload missing the carrier
+    # must fail loud instead of silently running LIVE. Written once at construction by
     # `PipeRunParamsFactory.make_run_params`; operators slice this field off and thread it
     # into the content-generator protocol so the cogt leaf sees the same mode on any backend.
-    cogt_run_params: CogtRunParams = Field(default_factory=CogtRunParams)
+    cogt_run_params: CogtRunParams
     final_stuff_code: str | None = None
     output_multiplicity: VariableMultiplicity | None = None
     dynamic_output_concept_ref: str | None = None

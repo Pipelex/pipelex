@@ -14,6 +14,7 @@ from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.llm_generate import llm_gen_text
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
@@ -21,7 +22,7 @@ class TestLlmGenerateMockBranch:
     def _assignment(self, *, is_mock_inference: bool) -> LLMAssignment:
         return LLMAssignment(
             job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_branch"),
-            cogt_run_params=CogtRunParams(is_mock_inference=is_mock_inference),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE, is_mock_inference=is_mock_inference),
             llm_setting=LLMSetting(model="gpt-4o", temperature=0.5),
             llm_prompt=LLMPrompt(),
         )

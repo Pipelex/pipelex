@@ -268,17 +268,21 @@ def _leaf_gen_object(object_assignment: ObjectAssignment, report_func: _ReportLL
     cross-worker assertions count.
     """
     item_class = _reconstruct_object_class(object_assignment)
+    mock_object = build_mock_object(item_class)
+    # Report only after a successful build — a failed mock must not leave a usage event behind.
     llm_assignment = object_assignment.llm_assignment_for_object
     report_func(llm_assignment.job_metadata, llm_assignment.llm_setting, llm_assignment.llm_prompt)
-    return build_mock_object(item_class)
+    return mock_object
 
 
 def _leaf_gen_object_list(object_assignment: ObjectAssignment, report_func: _ReportLLMJobFunc) -> list[BaseModel]:
     """List counterpart of :func:`_leaf_gen_object`: one report, ``nb_items`` builds (D11)."""
     item_class = _reconstruct_object_class(object_assignment)
+    mock_objects = build_mock_objects(item_class, _nb_list_items(object_assignment))
+    # Report only after a successful build — a failed mock must not leave a usage event behind.
     llm_assignment = object_assignment.llm_assignment_for_object
     report_func(llm_assignment.job_metadata, llm_assignment.llm_setting, llm_assignment.llm_prompt)
-    return build_mock_objects(item_class, _nb_list_items(object_assignment))
+    return mock_objects
 
 
 def mock_llm_gen_object(object_assignment: ObjectAssignment) -> BaseModel:

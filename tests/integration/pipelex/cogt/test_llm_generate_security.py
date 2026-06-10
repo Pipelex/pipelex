@@ -15,13 +15,14 @@ from pipelex.cogt.content_generation.exceptions import UnsafeSchemaError
 from pipelex.cogt.content_generation.llm_generate import llm_gen_object, llm_gen_object_list
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
 def _make_stub_llm_assignment() -> LLMAssignment:
     return LLMAssignment(
         job_metadata=JobMetadata(user_id="test-user", pipeline_run_id="test-run"),
-        cogt_run_params=CogtRunParams(),
+        cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
         llm_setting=LLMSetting(model="test-model", temperature=0.7),
         llm_prompt=LLMPrompt(user_text="test prompt"),
     )

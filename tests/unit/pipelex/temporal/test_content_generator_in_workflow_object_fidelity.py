@@ -65,7 +65,7 @@ class TestContentGeneratorInWorkflowObjectFidelity:
         with pytest.raises(MockInferenceObjectFidelityError) as exc_info:
             await _make_generator().make_object(
                 job_metadata=_job_metadata(),
-                cogt_run_params=CogtRunParams(is_mock_inference=True),
+                cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE, is_mock_inference=True),
                 object_class=ConstrainedName,
                 llm_setting_for_object=LLMSetting(model="test-llm", temperature=0.5),
                 llm_prompt_for_object=LLMPrompt(user_text="hello"),
@@ -79,7 +79,7 @@ class TestContentGeneratorInWorkflowObjectFidelity:
         with pytest.raises(MockInferenceObjectFidelityError):
             await _make_generator().make_object_list(
                 job_metadata=_job_metadata(),
-                cogt_run_params=CogtRunParams(is_mock_inference=True),
+                cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE, is_mock_inference=True),
                 object_class=ConstrainedName,
                 llm_setting_for_object_list=LLMSetting(model="test-llm", temperature=0.5),
                 llm_prompt_for_object_list=LLMPrompt(user_text="hello"),
@@ -105,7 +105,7 @@ class TestContentGeneratorInWorkflowObjectFidelity:
         with pytest.raises(ValidationError):
             await _make_generator().make_object(
                 job_metadata=_job_metadata(),
-                cogt_run_params=CogtRunParams(),
+                cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
                 object_class=ConstrainedName,
                 llm_setting_for_object=LLMSetting(model="test-llm", temperature=0.5),
                 llm_prompt_for_object=LLMPrompt(user_text="hello"),

@@ -10,6 +10,7 @@ with workflow.unsafe.imports_passed_through():
     from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol  # noqa: TC001
     from pipelex.cogt.llm.llm_prompt import LLMPrompt
     from pipelex.cogt.llm.llm_setting import LLMSetting
+    from pipelex.pipe_run.pipe_run_mode import PipeRunMode
     from pipelex.pipeline.job_metadata import JobMetadata
     from pipelex.temporal.exceptions import ContentGenerationError
     from pipelex.temporal.log_temporal import workflow_log
@@ -35,7 +36,7 @@ class WfTestStructuredOutputCrossProcess:
         content_generator: ContentGeneratorProtocol = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow()
 
         job_metadata = JobMetadata(user_id="temporal-test", pipeline_run_id=workflow.info().workflow_id)
-        cogt_run_params = CogtRunParams()
+        cogt_run_params = CogtRunParams(run_mode=PipeRunMode.LIVE)
         llm_setting = LLMSetting(model="$testing-structured", temperature=0.0)
         prompt = LLMPrompt(user_text="round-trip nested structured output")
 

@@ -28,13 +28,18 @@ class PipeRunParamsFactory:
         so every execution entry point is covered (``prepare_pipe_job``, the runtime bridge,
         ``PipeJobFactory`` defaults), not just the pipeline-API path.
         """
-        if is_dry_run_forced():
-            if pipe_run_mode.is_live and is_mock_inference:
+        if is_dry_run_forced() and pipe_run_mode.is_live:
+            if is_mock_inference:
                 log.warning(
                     "--mock-inference requested under a keyless boot (needs_inference=False): the run is forced "
                     "to DRY, which takes precedence at the leaf — the rendered synthetic cost report will NOT be "
                     "produced (DRY usage is zero-token and suppressed). Boot with inference configured to use "
                     "--mock-inference."
+                )
+            else:
+                log.warning(
+                    "LIVE run requested under a keyless boot (needs_inference=False): forcing run_mode to DRY — "
+                    "outputs will be synthetic mocks, not real inference."
                 )
             pipe_run_mode = PipeRunMode.DRY
         pipe_stack_limit = pipe_stack_limit or get_config().pipelex.pipe_run_config.pipe_stack_limit

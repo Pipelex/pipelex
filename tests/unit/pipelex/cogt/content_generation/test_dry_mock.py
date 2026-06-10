@@ -22,6 +22,7 @@ from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.usage.cost_registry import CostRegistry
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
@@ -78,7 +79,7 @@ class TestDryMock:
         captured = self._capture_reported_job(mocker)
         assignment = LLMAssignment(
             job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_text"),
-            cogt_run_params=CogtRunParams(is_mock_inference=True),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE, is_mock_inference=True),
             llm_setting=LLMSetting(model="gpt-4o", temperature=0.5),
             llm_prompt=LLMPrompt(),
         )

@@ -32,11 +32,14 @@ class CogtRunParams(BaseModel):
     suppressed report), never the reportable mock.
     """
 
-    # `extra="forbid"`: a stale or typo'd key on a wire payload must fail loud, not silently fall
-    # back to the default LIVE mode (mirrors PipeRunParams).
-    model_config = ConfigDict(extra="forbid")
+    # `extra="forbid"`: a stale or typo'd key on a wire payload must fail loud (mirrors
+    # PipeRunParams). `frozen=True`: the same carrier instance is shared by reference across every
+    # assignment of a run — single-writer is enforced, not just convention. `run_mode` is REQUIRED:
+    # a wire payload that omits it must fail loud rather than silently default to the spending
+    # direction (LIVE) or the mock direction (DRY).
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
-    run_mode: PipeRunMode = PipeRunMode.LIVE
+    run_mode: PipeRunMode
 
     # The ``--mock-inference`` trigger (the thin reportable-mock kept by eng review D8): a LIVE run
     # whose LLM leaf calls are faked with *non-zero* synthetic usage so a cost report renders —

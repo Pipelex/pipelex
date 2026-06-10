@@ -36,6 +36,7 @@ from pipelex.config import get_config
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
+from pipelex.hub import get_storage_provider
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
@@ -81,8 +82,6 @@ class ContentGenerator(ContentGeneratorProtocol):
         ``dry_run_pipeline``): under DRY its leaves mock without dispatching and without
         touching storage.
         """
-        from pipelex.hub import get_storage_provider  # noqa: PLC0415 — avoids a module-level cogt->hub cycle
-
         return cls(generated_content_factory=GeneratedContentFactory(storage_provider=get_storage_provider()))
 
     @override

@@ -20,6 +20,7 @@ from pytest_mock import MockerFixture
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.temporal.tprl_content_generation.content_generator_in_workflow import ContentGeneratorInWorkflow
 
@@ -56,13 +57,13 @@ class TestDefaultActivityIdCollisionBug:
 
         await generator.make_llm_text(
             job_metadata=_make_job_metadata(),
-            cogt_run_params=CogtRunParams(),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
             llm_setting_main=_make_llm_setting(),
             llm_prompt_for_text=LLMPrompt(user_text="hello"),
         )
         await generator.make_llm_text(
             job_metadata=_make_job_metadata(),
-            cogt_run_params=CogtRunParams(),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
             llm_setting_main=_make_llm_setting(),
             llm_prompt_for_text=LLMPrompt(user_text="hello again"),
         )

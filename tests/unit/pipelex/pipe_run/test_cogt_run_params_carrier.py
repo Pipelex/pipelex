@@ -7,6 +7,7 @@ must fail loudly instead of silently building a LIVE-mode instance.
 
 import pytest
 from pydantic import ValidationError
+from pytest_mock import MockerFixture
 
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -27,6 +28,17 @@ class TestCogtRunParamsCarrier:
         run_params = PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY)
 
         assert run_params.cogt_run_params.run_mode.is_dry
+
+    def test_forced_dry_coerces_live_and_warns(self, mocker: MockerFixture) -> None:
+        """Keyless boot: a LIVE request is coerced to DRY with a warning; the mock flag survives."""
+        mocker.patch("pipelex.pipe_run.pipe_run_params_factory.is_dry_run_forced", return_value=True)
+        warning_spy = mocker.patch("pipelex.pipe_run.pipe_run_params_factory.log.warning")
+
+        run_params = PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.LIVE, is_mock_inference=True)
+
+        assert run_params.run_mode.is_dry
+        assert run_params.cogt_run_params.is_mock_inference
+        warning_spy.assert_called_once()
 
     def test_stale_run_mode_kwarg_fails_loudly(self) -> None:
         """run_mode is a property, not a field: passing it as a kwarg must raise, not silently default to LIVE."""

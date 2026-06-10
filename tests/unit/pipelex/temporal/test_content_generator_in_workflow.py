@@ -27,6 +27,7 @@ from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.temporal.tprl_content_generation.content_generator_in_workflow import ContentGeneratorInWorkflow
 
@@ -91,7 +92,7 @@ class TestContentGeneratorInWorkflow:
 
         await generator.make_llm_text(
             job_metadata=_make_job_metadata(),
-            cogt_run_params=CogtRunParams(),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
             llm_setting_main=_make_llm_setting(),
             llm_prompt_for_text=LLMPrompt(user_text="hello"),
         )
@@ -141,7 +142,7 @@ class TestContentGeneratorInWorkflow:
 
         await generator.make_extract_pages(
             job_metadata=_make_job_metadata(),
-            cogt_run_params=CogtRunParams(),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
             extract_input=ExtractInput(image_uri="test://image.png"),
             extract_handle="test-handle",
             extract_job_params=ExtractJobParams.make_default_extract_job_params(),
@@ -166,7 +167,7 @@ class TestContentGeneratorInWorkflow:
         params.should_include_page_views = True
         await generator.make_extract_pages(
             job_metadata=_make_job_metadata(),
-            cogt_run_params=CogtRunParams(),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
             extract_input=ExtractInput(image_uri="test://image.png"),
             extract_handle="test-handle",
             extract_job_params=params,
@@ -199,7 +200,7 @@ class TestContentGeneratorInWorkflow:
         params.should_include_page_views = True
         result = await generator.make_extract_pages(
             job_metadata=_make_job_metadata(),
-            cogt_run_params=CogtRunParams(),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
             extract_input=ExtractInput(document_uri="test://doc.pdf"),
             extract_handle="test-handle",
             extract_job_params=params,
@@ -228,7 +229,7 @@ class TestContentGeneratorInWorkflow:
 
         await generator.make_templated_text(
             job_metadata=job_metadata,
-            cogt_run_params=CogtRunParams(),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
             context={"key": "value"},
             template="{{ key }}",
         )
@@ -251,7 +252,7 @@ class TestContentGeneratorInWorkflow:
         with pytest.raises(TemporalError) as exc_info:
             await generator.make_llm_text(
                 job_metadata=_make_job_metadata(),
-                cogt_run_params=CogtRunParams(),
+                cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
                 llm_setting_main=_make_llm_setting(),
                 llm_prompt_for_text=LLMPrompt(user_text="hello"),
             )
@@ -274,7 +275,7 @@ class TestContentGeneratorInWorkflow:
         with pytest.raises(ActivityError) as exc_info:
             await generator.make_llm_text(
                 job_metadata=_make_job_metadata(),
-                cogt_run_params=CogtRunParams(),
+                cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
                 llm_setting_main=_make_llm_setting(),
                 llm_prompt_for_text=LLMPrompt(user_text="hello"),
             )
@@ -306,7 +307,7 @@ class TestContentGeneratorInWorkflow:
         if caller == "make_object":
             return await generator.make_object(
                 job_metadata=job_metadata,
-                cogt_run_params=CogtRunParams(),
+                cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
                 object_class=_Person,
                 llm_setting_for_object=_make_llm_setting(),
                 llm_prompt_for_object=LLMPrompt(user_text="hello"),
@@ -314,7 +315,7 @@ class TestContentGeneratorInWorkflow:
         if caller == "make_object_list":
             return await generator.make_object_list(
                 job_metadata=job_metadata,
-                cogt_run_params=CogtRunParams(),
+                cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
                 object_class=_Person,
                 llm_setting_for_object_list=_make_llm_setting(),
                 llm_prompt_for_object_list=LLMPrompt(user_text="hello"),
@@ -322,14 +323,14 @@ class TestContentGeneratorInWorkflow:
         if caller == "make_single_image":
             return await generator.make_single_image(
                 job_metadata=job_metadata,
-                cogt_run_params=CogtRunParams(),
+                cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
                 img_gen_handle="test-handle",
                 img_gen_prompt=ImgGenPrompt(positive_text="prompt"),
             )
         if caller == "make_image_list":
             return await generator.make_image_list(
                 job_metadata=job_metadata,
-                cogt_run_params=CogtRunParams(),
+                cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
                 img_gen_handle="test-handle",
                 img_gen_prompt=ImgGenPrompt(positive_text="prompt"),
                 nb_images=2,
@@ -337,14 +338,14 @@ class TestContentGeneratorInWorkflow:
         if caller == "make_templated_text":
             return await generator.make_templated_text(
                 job_metadata=job_metadata,
-                cogt_run_params=CogtRunParams(),
+                cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
                 context={"key": "value"},
                 template="{{ key }}",
             )
         if caller == "make_render_page_views":
             return await generator.make_render_page_views(
                 job_metadata=job_metadata,
-                cogt_run_params=CogtRunParams(),
+                cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
                 extract_input=ExtractInput(document_uri="test://doc.pdf"),
                 extract_handle="test-handle",
             )

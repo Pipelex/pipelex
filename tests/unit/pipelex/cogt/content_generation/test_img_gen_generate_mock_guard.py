@@ -17,6 +17,7 @@ from pipelex.cogt.content_generation.exceptions import MockInferenceUnsupportedE
 from pipelex.cogt.content_generation.img_gen_generate import img_gen_image_list, img_gen_single_image
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
@@ -24,7 +25,7 @@ class TestImgGenGenerateMockGuard:
     def _assignment(self, *, is_mock_inference: bool) -> ImgGenAssignment:
         return ImgGenAssignment(
             job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_img_guard"),
-            cogt_run_params=CogtRunParams(is_mock_inference=is_mock_inference),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE, is_mock_inference=is_mock_inference),
             img_gen_handle="mock-img-handle",
             img_gen_prompt=ImgGenPrompt(positive_text="a red apple"),
             img_gen_job_params=ImgGenJobParams(aspect_ratio=AspectRatio.SQUARE, background=Background.AUTO),

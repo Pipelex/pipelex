@@ -10,7 +10,7 @@ import pytest
 from pydantic import field_validator
 
 from pipelex.base_exceptions import PipelexError
-from pipelex.cogt.content_generation.dry_mock import build_mock_object
+from pipelex.cogt.content_generation.dry_mock import build_mock_object, build_mock_objects
 from pipelex.cogt.content_generation.exceptions import DryRunMockBuildError
 from pipelex.core.stuffs.structured_content import StructuredContent
 
@@ -44,6 +44,11 @@ class TestDryRunMockBuildError:
         assert isinstance(exc_info.value, PipelexError)
         assert UnbuildableName.__name__ in str(exc_info.value)
         assert "mock_format" in str(exc_info.value)
+
+    def test_unbuildable_class_list_variant_raises_same_typed_error(self) -> None:
+        """The list builder carries the same terminal-error contract as the single builder."""
+        with pytest.raises(DryRunMockBuildError):
+            build_mock_objects(UnbuildableName, 2)
 
     def test_buildable_class_builds(self) -> None:
         """Control arm: an unconstrained class builds a valid instance."""

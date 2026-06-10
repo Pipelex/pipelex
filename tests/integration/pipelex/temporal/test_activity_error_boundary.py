@@ -37,6 +37,7 @@ from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.hub import get_model_deck
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.temporal.tprl.temporal_error import TemporalError
 from pipelex.temporal.tprl_content_generation.act_extract_generate import act_extract_gen_extract_pages
@@ -154,7 +155,7 @@ class TestActivityErrorBoundary:
 
         llm_assignment = LLMAssignment(
             job_metadata=JobMetadata(user_id="test", pipeline_run_id="test"),
-            cogt_run_params=CogtRunParams(),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
             llm_setting=get_model_deck().get_llm_setting(llm_choice="$testing-text"),
             llm_prompt=LLMPrompt(user_text="never reaches the model — llm_gen_text is mocked"),
         )
@@ -210,7 +211,7 @@ class TestActivityErrorBoundary:
 
         extract_assignment = ExtractAssignment(
             job_metadata=JobMetadata(user_id="test", pipeline_run_id="test"),
-            cogt_run_params=CogtRunParams(),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
             extract_handle="extract-handle-never-reached",
             extract_input=ExtractInput(document_uri="file://never-reached.pdf"),
             extract_job_params=ExtractJobParams.make_default_extract_job_params(),

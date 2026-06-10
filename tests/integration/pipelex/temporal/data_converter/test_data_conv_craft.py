@@ -48,7 +48,7 @@ class TestDataConverterForCrafting:
         llm_prompt_for_object = LLMPrompt(user_text=user_text)
         llm_assignment_for_object = LLMAssignment(
             job_metadata=JobMetadata(user_id="test", pipeline_run_id="test"),
-            cogt_run_params=CogtRunParams(),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
             llm_setting=llm_setting_for_object,
             llm_prompt=llm_prompt_for_object,
         )

@@ -366,7 +366,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             )
             raise PipelexSetupError(error_msg) from credentials_exc
 
-        # Keyless boot forces every run to DRY (consumed at prepare_pipe_job); generator selection is
+        # Keyless boot forces every run to DRY — consumed at PipeRunParamsFactory.make_run_params,
+        # the single writer of run_mode, covering every entry point; generator selection is
         # backend-keyed unconditionally (eng review D4) — a keyless Temporal submitter must still
         # dispatch activities and mock inside them, so `needs_inference` plays no role in picking the
         # generator. Its other boot roles (gateway/model setup, credentials, telemetry) are unchanged.
@@ -537,11 +538,13 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         Args:
             integration_mode: Integration mode (CLI, FASTAPI, DOCKER, MCP, N8N, PYTHON, PYTEST)
-            needs_inference: When False, forces every run to DRY mode (consumed at
-                prepare_pipe_job: operators dispatch normally and the cogt leaf mocks) and loads
-                backends leniently (skipping those with missing credentials). This skips gateway
-                terms check and model deck validation. Useful for commands like validate/show
-                that don't call inference APIs. Generator selection stays backend-keyed.
+            needs_inference: When False, forces every run THIS process initiates to DRY mode
+                (consumed at PipeRunParamsFactory.make_run_params, the single writer of run_mode:
+                operators dispatch normally and the cogt leaf mocks) and loads backends leniently
+                (skipping those with missing credentials). This skips gateway terms check and model
+                deck validation. Useful for commands like validate/show that don't call inference
+                APIs. Generator selection stays backend-keyed. Submitter-side contract only: it does
+                not constrain work this process executes as a Temporal worker.
             temporal_enabled: When provided, overrides the temporal.is_enabled config value.
                 True forces Temporal workflow execution, False forces direct execution.
             needs_model_specs: When True, load real model specs even if needs_inference

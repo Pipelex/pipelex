@@ -22,10 +22,10 @@ from pipelex.pipeline.job_metadata import JobMetadata
 
 
 class TestLlmGenerateDryBranch:
-    def _assignment(self, *, run_mode: PipeRunMode) -> LLMAssignment:
+    def _assignment(self, *, run_mode: PipeRunMode, is_mock_inference: bool = False) -> LLMAssignment:
         return LLMAssignment(
             job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_dry_branch"),
-            cogt_run_params=CogtRunParams(run_mode=run_mode),
+            cogt_run_params=CogtRunParams(run_mode=run_mode, is_mock_inference=is_mock_inference),
             llm_setting=LLMSetting(model="gpt-4o", temperature=0.5),
             llm_prompt=LLMPrompt(),
         )
@@ -59,6 +59,24 @@ class TestLlmGenerateDryBranch:
         aggregated = CostRegistry.aggregate_costs([usage])
         assert not aggregated.has_reportable_usage
         assert aggregated.total_nb_tokens == 0
+
+    @pytest.mark.asyncio
+    async def test_dry_wins_over_mock_inference(self, mocker: MockerFixture) -> None:
+        """Precedence pin: DRY + is_mock_inference -> the DRY arm answers (zero-token), never the
+        reportable mock — the combination forced-DRY produces when --mock-inference was requested.
+        """
+        worker_spy = mocker.patch("pipelex.cogt.content_generation.llm_generate.get_llm_worker")
+        mock_delegate = mocker.MagicMock()
+        mocker.patch("pipelex.cogt.content_generation.dry_mock.get_report_delegate", return_value=mock_delegate)
+
+        result = await llm_gen_text(self._assignment(run_mode=PipeRunMode.DRY, is_mock_inference=True))
+
+        worker_spy.assert_not_called()
+        assert result.startswith("DRY RUN:")
+        reported_job = mock_delegate.report_inference_job.call_args.kwargs["inference_job"]
+        usage = reported_job.job_report.llm_tokens_usage
+        assert usage is not None
+        assert usage.inference_model_name == DRY_RUN_INFERENCE_MODEL_NAME
 
     @pytest.mark.asyncio
     async def test_live_mode_uses_real_worker(self, mocker: MockerFixture) -> None:

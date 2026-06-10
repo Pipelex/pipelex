@@ -15,6 +15,7 @@ from pipelex.cogt.content_generation.exceptions import MockInferenceUnsupportedE
 from pipelex.cogt.content_generation.extract_generate import extract_gen_pages
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
@@ -22,7 +23,7 @@ class TestExtractGenerateMockGuard:
     def _assignment(self, *, is_mock_inference: bool) -> ExtractAssignment:
         return ExtractAssignment(
             job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_extract_guard"),
-            cogt_run_params=CogtRunParams(is_mock_inference=is_mock_inference),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE, is_mock_inference=is_mock_inference),
             extract_handle="mock-extract-handle",
             extract_input=ExtractInput(document_uri="file:///tmp/doc.pdf"),
             extract_job_params=ExtractJobParams(

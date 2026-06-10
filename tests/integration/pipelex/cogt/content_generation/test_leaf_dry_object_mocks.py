@@ -101,7 +101,7 @@ class TestLeafDryObjectMocks:
         """--mock-inference (LIVE) never drives bundle dry-validation, so it must NOT stamp (D3)."""
         llm_assignment = LLMAssignment(
             job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_mock_no_stamp"),
-            cogt_run_params=CogtRunParams(is_mock_inference=True),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE, is_mock_inference=True),
             llm_setting=LLMSetting(model="gpt-4o", temperature=0.5),
             llm_prompt=LLMPrompt(user_text="make specs"),
         )

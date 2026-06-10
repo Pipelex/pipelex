@@ -19,6 +19,7 @@ from pipelex.cogt.content_generation.content_generator_protocol import ContentGe
 from pipelex.cogt.content_generation.exceptions import MockInferenceObjectFidelityError
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.cogt.content_generation.test_data import ConstrainedName, PlainName
 
@@ -26,7 +27,7 @@ from tests.integration.pipelex.cogt.content_generation.test_data import Constrai
 @pytest.mark.asyncio(loop_scope="class")
 class TestMockInferenceObjectFidelity:
     def _mock_cogt_run_params(self) -> CogtRunParams:
-        return CogtRunParams(is_mock_inference=True)
+        return CogtRunParams(run_mode=PipeRunMode.LIVE, is_mock_inference=True)
 
     async def test_make_object_raises_typed_error_on_fidelity_gap(
         self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol
