@@ -128,15 +128,17 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             Initial TraceContext to pass through JobMetadata.
         """
         key = tracer_key or graph_id
-        stale_tracer = self._tracers.pop(key, None)
-        if stale_tracer is not None:
-            # Collision-proof pop-and-replace: a stale tracer under this key can only be the
-            # leftover of a prior interrupted execution (e.g. a Temporal workflow evicted before
-            # its finally-block close_tracer ran). Raising would let worker-local leak state
-            # decide whether tracing setup succeeds — a replay-determinism breach (audit
-            # finding M1). Tear the stale tracer down (releases its event log) and replace it.
+        # Collision-proof pop-and-replace: a stale tracer under this key can only be the
+        # leftover of a prior interrupted execution (e.g. a Temporal workflow evicted before
+        # its finally-block close_tracer ran). Raising would let worker-local leak state
+        # decide whether tracing setup succeeds — a replay-determinism breach (audit
+        # finding M1). Delegate the eviction to close_tracer (the single teardown path).
+        # The warning is gated on key membership, not on close_tracer's return value: that
+        # value is ambiguous (None both when no tracer existed and when a costs-only tracer
+        # legitimately tears down without a GraphSpec).
+        if key in self._tracers:
             log.warning(f"Tracer for key '{key}' already exists; replacing stale tracer left by a prior interrupted execution")
-            stale_tracer.teardown()
+            self.close_tracer(key)
 
         tracer = GraphTracer()
         self._tracers[key] = tracer

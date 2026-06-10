@@ -1,12 +1,13 @@
-"""Process-local cached event log for runner-side activity emission.
+"""Process-local cached event log for activity-side usage emission.
 
-When activities run on a separate worker pool from the workflow router,
-the router's `set_event_log` never registers a context on the runner's
-ReportingManager — the runner-side `_event_log_contexts` dict is permanently
-empty for every workflow that runs there. This module provides the per-process
-backstop: a lazily-constructed event log, stamped with a stable
-`act_{pid}_{uuid8}` writer_id, that emits into the same backend partition as
-the rest of the run.
+Every usage emission that happens inside a Temporal activity goes through this
+per-process event log — by design, whether the activity runs co-located with
+the workflow router or on a separate worker pool. Activities do not re-execute
+on replay, so routing their emissions into the workflow's in-sandbox buffer
+would make the buffer content depend on whether activities actually ran
+(replay-determinism breach, audit finding H1). The per-process log, stamped
+with a stable `act_{pid}_{uuid8}` writer_id, emits into the same backend
+partition as the rest of the run.
 
 The cache-and-writer-id construction is guarded by `threading.Lock` with
 double-checked locking so concurrent first-emitters from N activity threads
@@ -36,7 +37,7 @@ class ActivityEventLogCache:
     _lock: ClassVar[threading.Lock] = threading.Lock()
     _cached_event_log: ClassVar[EventLogProtocol | None] = None
     _writer_id: ClassVar[str | None] = None
-    _warning_emitted: ClassVar[bool] = False
+    _fallback_logged: ClassVar[bool] = False
     _atexit_registered: ClassVar[bool] = False
 
     @classmethod
@@ -76,26 +77,28 @@ class ActivityEventLogCache:
             return cls._cached_event_log
 
     @classmethod
-    def warn_once_runner_fallback_engaged(cls, workflow_id: str, writer_id: str) -> None:
-        """Log a single WARNING the first time the runner fallback engages.
+    def log_once_runner_fallback_engaged(cls, workflow_id: str, writer_id: str) -> None:
+        """Log a single INFO the first time activity-side emission engages.
 
-        The warning is per-process; subsequent fallback emissions from the same
-        process are silent. Operators see one unmistakable signal in the worker
-        logs that runner-side emission is in use, without WARNING spam at high
-        activity throughput.
+        The log is per-process; subsequent emissions from the same process are
+        silent. This is the normal path for every activity-side usage emission
+        (co-located or split deployment alike) — INFO level, one line, so
+        operators can see the writer_id in the worker logs without log spam at
+        high activity throughput.
         """
-        if cls._warning_emitted:
+        if cls._fallback_logged:
             return
         with cls._lock:
-            if cls._warning_emitted:
+            if cls._fallback_logged:
                 return
-            cls._warning_emitted = True
-        log.warning(
-            f"Runner-side usage event emission engaged "
+            cls._fallback_logged = True
+        log.info(
+            f"Activity-side usage event emission engaged "
             f"(workflow_id={workflow_id}, writer_id={writer_id}). "
-            "Activity is emitting into the per-process activity event log because "
-            "no _event_log_contexts entry was registered in this process. "
-            "This is expected when activities run on a separate worker pool from the workflow router."
+            "Activities always emit through the per-process activity event log, by design: "
+            "activity emissions must never land in the workflow's replay-rebuilt buffer "
+            "(replay determinism), whether the activity runs co-located with the workflow "
+            "router or on a separate worker pool."
         )
 
     @classmethod
@@ -103,7 +106,7 @@ class ActivityEventLogCache:
         """Reset cache state. For test fixtures only — never call from production code.
 
         Closes any cached event log, clears the writer_id, and resets the one-shot
-        warning flag so subsequent tests observe a fresh process-like state. The
+        log flag so subsequent tests observe a fresh process-like state. The
         atexit registration flag is intentionally left alone — the registration
         is process-global and the handler is a no-op once the cache is cleared.
         """
@@ -114,7 +117,7 @@ class ActivityEventLogCache:
                 pass
         cls._cached_event_log = None
         cls._writer_id = None
-        cls._warning_emitted = False
+        cls._fallback_logged = False
 
     @classmethod
     def _close_atexit(cls) -> None:

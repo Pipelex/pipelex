@@ -94,9 +94,19 @@ class ReportingManager(ReportingProtocol):
         Args:
             context_key: Unique key for this context (trace_context.lookup_key).
             event_log: The event log backend for emitting UsageReportEvents.
-            workflow_id: Temporal workflow ID or "direct".
+            workflow_id: Run-scoped execution identity stamped into events
+                (Temporal run ID, or "direct" outside Temporal).
             pipeline_run_id: Pipeline run ID for event correlation.
         """
+        # The silent overwrite-on-existing-key below is intentional and load-bearing.
+        # Shared contract: worker-local state keyed by a deterministic per-run id must be
+        # self-healing on open/set, because a leaked entry from a prior interrupted
+        # execution remains possible (deadlock-detector thread abandonment skips finally
+        # entirely; worker kill between set and clear). The same idiom exists in
+        # LibraryManager.open_fresh_library and GraphTracerManager.open_tracer (both
+        # explicit, WARNING); here the bare dict assignment is the healing mechanism.
+        # Adding "context already exists -> raise" collision detection would reintroduce
+        # the eviction-poison class on the cost path (pre-M1 open_tracer did exactly that).
         self._event_log_contexts[context_key] = _EventLogContext(
             event_log=event_log,
             workflow_id=workflow_id,
@@ -288,7 +298,7 @@ class ReportingManager(ReportingProtocol):
         workflow_id = trace_context.tracer_key or trace_context.graph_id
         node_id = trace_context.parent_node_id or "unknown"
 
-        ActivityEventLogCache.warn_once_runner_fallback_engaged(workflow_id=workflow_id, writer_id=process_event_log.writer_id)
+        ActivityEventLogCache.log_once_runner_fallback_engaged(workflow_id=workflow_id, writer_id=process_event_log.writer_id)
 
         seq = process_event_log.next_sequence()
         event = UsageReportEvent(
