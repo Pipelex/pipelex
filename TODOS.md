@@ -21,19 +21,19 @@ For each item: re-verify → then one of:
 
 Check the box when the item reaches its terminal state (FIXED / DISMISSED / SURFACED), and append the outcome to the line — e.g. `→ FIXED (commit abc123)`, `→ DISMISSED (unreachable, see follow-ups doc)`, `→ SURFACED (decisions doc §2)`.
 
-- [ ] **0 — PRIORITY: rekey per-run worker-local state by `run_id`, not `workflow_id`** — verify → likely FIX, possibly SURFACE. CONFIRMED against temporalio SDK source (eviction runs the `finally`; closed-run cleanup can destroy a live successor's library under a reused workflow id — reachable via workflow `retry_policy`, reset, same-`pipeline_run_id` resubmission). The fix ripples: library id naming (`wf_{run_id}`), tracer key, event-log context key, docs that say `wf_{workflow_id}`, and the eviction test's key assumptions. If the ripple makes you hesitate, SURFACE with a concrete diff sketch instead of half-fixing.
-- [ ] **0bis — cancellation test pinning the `finally`-ordering invariant** — FIX (test only). Recipe is in the doc: blocked-flush stub via `substitute_activities` (pattern in `test_wf_pipe_router_tracing_config_nondeterminism.py`), `handle.cancel()` at the flush await, assert manager + report delegate clean. Land before/with item 5.
-- [ ] **1 — stale runner-fallback warning message** (`activity_event_log.py`) — FIX. Message + maybe level. Trivial.
-- [ ] **2 — dead `_event_log_contexts.clear()`** in `tracing/helpers.py` — FIX. Delete + fix docstring.
-- [ ] **3 — test-scaffolding dedup** (synthetic LLMJob builder, `_act_flush_noop`, history scan, Greeting setup) — FIX. Mechanical; shared helpers in `tracing/helpers.py` / `library_crate` helpers.
-- [ ] **4 — `open_tracer` stale-eviction → delegate to `close_tracer`** — FIX. Caveat in doc: warn on `key in self._tracers`, not on `close_tracer`'s ambiguous `None` return.
-- [ ] **5 — skip the guaranteed-empty flush activity in costs-only LIVE** — verify → FIX or SURFACE. Payload-pure gate (`emit_graph_events or run-mode DRY`) is argued legal under H1's rationale, but it changes command emission — re-derive the determinism argument yourself before trusting it. Temporal is unshipped, so no wire-compat concern. Combine with 6 + 9 (same block).
-- [ ] **6 — trim redundant null conjuncts in the `finally`** — FIX. Sentinels stay (load-bearing for crate-load failure paths) — only the inner conjuncts go. Fold into 9.
-- [ ] **8 — document `set_event_log` overwrite as load-bearing** — FIX. A comment; trivially safe.
-- [ ] **9 — single-block `finally` simplification** (kills the `buffered_events` sentinel + TYPE_CHECKING import) — FIX. Verified equivalent; fold 5/6/9 into one edit of the block, then run the temporal suite.
-- [ ] **10 — shared scoped-library helper for the two uuid-keyed `runtime_bridge` copies** — verify → FIX or SURFACE. Maintenance-only (verified: those copies don't need `open_fresh_library`). If extraction gets invasive, surface instead.
-- [ ] **11 — `LibraryManager.teardown`: forget the entry even if `library.teardown()` raises** — FIX. One-liner (pop first or `del` in `finally`). Unreachable today, cheap insurance.
-- [ ] **7 — graph events lack an H1-style guard** (design note) — SURFACE. Already marked "no action yet" — carry it into the decisions doc with the T3 pointer rather than fixing.
+- [x] **0 — PRIORITY: rekey per-run worker-local state by `run_id`, not `workflow_id`** → FIXED. `wf_run_id` keys library/tracer/event-log context (and event/node-id stamps — one identity); `open_fresh_library` made pop-based (atomic, concurrent-teardown tolerant). New RED-first guard `test_wf_pipe_router_run_scoped_state_keying.py`; eviction-leak test converted to start-then-install under `wf_{run_id}`; `temporal-integration.md` keying story updated.
+- [x] **0bis — cancellation test pinning the `finally`-ordering invariant** → FIXED, premise corrected: cancellation at an activity await surfaces as `ActivityError` (an `Exception`, swallowed by the best-effort except) — it CANNOT abort the finally. The guard instead forces eviction via worker shutdown: `test_wf_pipe_router_eviction_cleanup_ordering.py`, verified RED against a reordered finally.
+- [x] **1 — stale runner-fallback warning message** → FIXED. Renamed `log_once_runner_fallback_engaged`, INFO level, message states the post-H1 contract; module docstring + the two unit tests updated.
+- [x] **2 — dead `_event_log_contexts.clear()`** → FIXED. Deleted in `tracing/helpers.py` AND the same dead clear in `test_split_worker_real_inference_cost.py`; docstrings rewritten.
+- [x] **3 — test-scaffolding dedup** → FIXED (two sub-points DISMISSED with evidence in the follow-ups doc: the enable-tracing fixture has only one copy; the extract-pages scan needs `(name, activity_id)` pairs). Shared: `make_synthetic_usage_llm_job`, `act_flush_noop`, `scheduled_activity_names` in `tracing/helpers.py`; `make_prepared_greeting_job` in `library_crate/helpers.py`.
+- [x] **4 — `open_tracer` stale-eviction → delegate to `close_tracer`** → FIXED with the membership-gated warning.
+- [x] **5 — skip the guaranteed-empty flush activity in costs-only LIVE** → FIXED. Determinism argument re-derived (gate inputs payload-pure; costs-only LIVE buffer provably empty; Temporal unshipped). `schedule_flush` computed in setup, consumed in finally; costs-only test arm now asserts flush ABSENT + clean replay.
+- [x] **6 — trim redundant null conjuncts in the `finally`** → FIXED (folded into 5/9 rewrite; sentinels kept).
+- [x] **8 — document `set_event_log` overwrite as load-bearing** → FIXED (contract comment naming the three idioms).
+- [x] **9 — single-block `finally` simplification** → FIXED (sentinel + TYPE_CHECKING import gone; temporal suite green).
+- [x] **10 — shared scoped-library helper for the two uuid-keyed `runtime_bridge` copies** → FIXED. Sync `scoped_library_for_crate` in `runtime_bridge/primitives/scoped_library.py`; `wf_pipe_router` left bespoke.
+- [x] **11 — `LibraryManager.teardown`: forget the entry even if `library.teardown()` raises** → FIXED (`_pop_and_teardown_library`, RED-first unit tests).
+- [x] **7 — graph events lack an H1-style guard** (design note) → SURFACED (decisions doc §1, with options + recommendation; ties into T3).
 
 ## Constraints and gotchas
 
@@ -45,11 +45,11 @@ Check the box when the item reaches its terminal state (FIXED / DISMISSED / SURF
 
 ## Acceptance
 
-- [ ] Every checklist item above is checked with its outcome appended (**FIXED** / **DISMISSED (reason)** / **SURFACED → decisions doc**), and the follow-ups doc reflects the same status per item.
-- [ ] `wip/distributed-execution/nondeterminism-follow-ups-decisions-needed.md` exists iff anything was surfaced, and the track `README.md` links it.
-- [ ] Targeted suites green along the way (`.venv/bin/pytest tests/integration/pipelex/temporal/ tests/unit/pipelex/libraries/ ...`).
-- [ ] `make agent-check` clean at the end.
-- [ ] Full `make agent-test` green at the end.
-- [ ] CHANGELOG `[Unreleased]` updated for any behavior change; `docs/under-the-hood/temporal-integration.md` updated if item 0 changes the keying story.
+- [x] Every checklist item above is checked with its outcome appended (**FIXED** / **DISMISSED (reason)** / **SURFACED → decisions doc**), and the follow-ups doc reflects the same status per item.
+- [x] `wip/distributed-execution/nondeterminism-follow-ups-decisions-needed.md` exists iff anything was surfaced, and the track `README.md` links it.
+- [x] Targeted suites green along the way (temporal integration + unit libraries/reporting/tracing/graph + runtime_bridge).
+- [x] `make agent-check` clean at the end.
+- [x] Full `make agent-test` green at the end.
+- [x] CHANGELOG `[Unreleased]` updated for any behavior change; `docs/under-the-hood/temporal-integration.md` updated if item 0 changes the keying story.
 
 Update THIS file as you go (checkpoint style): check boxes and append outcomes as each item lands, so a further session can resume cold.
