@@ -1,4 +1,5 @@
 import faulthandler
+import logging
 import os
 from pathlib import Path
 from typing import AsyncGenerator, Generator, cast
@@ -26,6 +27,34 @@ TEMPORAL_SERVER_TIME_SKIPPING = "time-skipping"
 
 HANG_DUMP_DIR_ENV_VAR = "PIPELEX_HANG_DUMP_DIR"
 HANG_DUMP_DELAY_SECONDS = 150.0
+
+
+@pytest.fixture(scope="session", autouse=True)
+def temporal_failure_log_capture() -> Generator[None, None, None]:
+    """Mirror temporalio WARNING+ logs (with tracebacks) to a file under the hang-dump dir.
+
+    Enabled only when ``PIPELEX_HANG_DUMP_DIR`` is set (CI hang debugging). A payload-conversion
+    error inside a workflow task makes Temporal retry the task forever — the test then hangs
+    until pytest-timeout's thread-method kill, which destroys pytest's captured logs along with
+    the process. temporalio logs each failed workflow activation WITH the offending traceback,
+    so mirroring its logger to a file preserves the actual error across the kill.
+    """
+    dump_dir_value = os.environ.get(HANG_DUMP_DIR_ENV_VAR)
+    if not dump_dir_value:
+        yield
+        return
+    dump_dir = Path(dump_dir_value)
+    dump_dir.mkdir(parents=True, exist_ok=True)
+    handler = logging.FileHandler(dump_dir / f"temporalio-pid{os.getpid()}.log", encoding="utf-8")
+    handler.setLevel(logging.WARNING)
+    handler.setFormatter(logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s"))
+    temporalio_logger = logging.getLogger("temporalio")
+    temporalio_logger.addHandler(handler)
+    try:
+        yield
+    finally:
+        temporalio_logger.removeHandler(handler)
+        handler.close()
 
 
 @pytest.fixture(autouse=True)

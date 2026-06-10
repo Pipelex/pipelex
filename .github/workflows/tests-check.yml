@@ -40,8 +40,8 @@ jobs:
       - name: Show hang dumps
         if: failure()
         run: |
-          if ls "$PIPELEX_HANG_DUMP_DIR"/hang-*.txt >/dev/null 2>&1; then
-            for dump_file in "$PIPELEX_HANG_DUMP_DIR"/hang-*.txt; do
+          if ls "$PIPELEX_HANG_DUMP_DIR"/* >/dev/null 2>&1; then
+            for dump_file in "$PIPELEX_HANG_DUMP_DIR"/*; do
               echo "::group::$dump_file"
               cat "$dump_file"
               echo "::endgroup::"
