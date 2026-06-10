@@ -50,7 +50,7 @@ A dry run does not swap in a special content generator: `run_mode=DRY` rides `Co
 
 | Trigger | Entry Point | Mock Generation |
 |---------|-------------|-----------------|
-| `pipelex validate` | `dry_run_pipe()` | `WorkingMemoryFactory.make_mock_inputs()` |
+| `pipelex validate` | `BundleValidator.validate_pipes()` | `WorkingMemoryFactory.make_mock_inputs()` |
 | `PipeLLM` output in dry mode | `dry_llm_gen_object()` / `dry_llm_gen_object_list()` (cogt leaf, `dry_mock.py`) | `DryRunFactory` via the schema-reconstructed class |
 | `PipeFunc` output in dry mode | `WorkingMemoryFactory.make_mock_content()` | `DryRunFactory` (with explicit field constraints) |
 | `PipeCompose` in dry mode | `StructuredContentComposer.compose()` | Uses resolved values from working memory (no mocks) |
@@ -309,7 +309,7 @@ class MySpec(StructuredContent):
 | `pipelex/cogt/content_generation/dry_mock.py` | Leaf-level dry/mock helpers (`dry_llm_gen_*`, `build_mock_object`, `stamp_mock_main_coordination`) |
 | `pipelex/core/memory/working_memory_factory.py` | `WorkingMemoryFactory.make_mock_content()` with field constraints |
 | `pipelex/pipe_operators/compose/structured_content_composer.py` | Composes `StructuredContent` from working memory (no mocks) |
-| `pipelex/pipe_run/dry_run.py` | `dry_run_pipe()` orchestration |
+| `pipelex/pipe_run/dry_run_pipeline.py` | `dry_run_pipeline()` / `dry_run_pipe_in_process()` orchestration |
 
 ---
 

@@ -276,6 +276,7 @@ maximum_interval = "unlimited"
 maximum_attempts = 3
 non_retryable_error_types = [
   "DryRunMockBuildError",
+  "DryRunObjectFidelityError",
   "ExtractHandleNotFoundError",
   "FileNotFoundError",
   "ImgGenHandleNotFoundError",

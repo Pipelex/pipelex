@@ -1,6 +1,7 @@
 from typing import Any
 
 from pipelex import log
+from pipelex.cogt.content_generation.cogt_run_params import check_mock_usage_requires_dry
 from pipelex.config import get_config
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.hub import is_dry_run_forced
@@ -31,9 +32,7 @@ class PipeRunParamsFactory:
         (``is_mock_usage`` on a LIVE request) fails loud on every boot — the keyless coercion must
         not silently turn an illegal request into a legal one.
         """
-        if is_mock_usage and pipe_run_mode.is_live:
-            msg = "is_mock_usage is a sub-flag of run_mode=DRY: it cannot be set on a LIVE run"
-            raise ValueError(msg)
+        check_mock_usage_requires_dry(run_mode=pipe_run_mode, is_mock_usage=is_mock_usage)
         if is_dry_run_forced() and pipe_run_mode.is_live:
             log.warning(
                 "LIVE run requested under a keyless boot (needs_inference=False): forcing run_mode to DRY — "

@@ -5,7 +5,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from pipelex import log
-from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
+from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams, check_mock_usage_requires_dry
 from pipelex.core.memory.working_memory import BATCH_ITEM_STUFF_NAME, MAIN_STUFF_NAME
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity, VariableMultiplicityResolution
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode  # noqa: TC001 — pydantic resolves the field annotation at runtime
@@ -141,16 +141,19 @@ class PipeRunParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     # REQUIRED (no default): a payload missing the run mode must fail loud instead of silently
-    # running LIVE (the spending direction) or DRY (the mock direction). Written once at
-    # construction by `PipeRunParamsFactory.make_run_params`; operators slice the derived
-    # `cogt_run_params` off and thread it into the content-generator protocol so the cogt leaf
-    # sees the same mode on any backend.
-    run_mode: PipeRunMode
+    # running LIVE (the spending direction) or DRY (the mock direction). `frozen=True` because a
+    # post-construction DRY→LIVE flip would bypass the validator below and flow straight into
+    # real provider spend via the derived carrier — written once at construction by
+    # `PipeRunParamsFactory.make_run_params`; operators slice the derived `cogt_run_params` off
+    # and thread it into the content-generator protocol so the cogt leaf sees the same mode on
+    # any backend.
+    run_mode: PipeRunMode = Field(frozen=True)
 
     # Internal sub-flag of DRY (no public CLI surface): when True, the dry LLM leaves report
     # *non-zero* synthetic usage so the end-of-run cost report renders — the cheap, deterministic
-    # cross-worker cost-report validation affordance. Rejected on a LIVE run (validator below).
-    is_mock_usage: bool = False
+    # cross-worker cost-report validation affordance. Rejected on a LIVE run (validator below);
+    # frozen for the same reason as `run_mode`.
+    is_mock_usage: bool = Field(default=False, frozen=True)
 
     final_stuff_code: str | None = None
     output_multiplicity: VariableMultiplicity | None = None
@@ -164,9 +167,7 @@ class PipeRunParams(BaseModel):
 
     @model_validator(mode="after")
     def validate_mock_usage_requires_dry(self) -> Self:
-        if self.is_mock_usage and self.run_mode.is_live:
-            msg = "is_mock_usage is a sub-flag of run_mode=DRY: it cannot be set on a LIVE run"
-            raise ValueError(msg)
+        check_mock_usage_requires_dry(run_mode=self.run_mode, is_mock_usage=self.is_mock_usage)
         return self
 
     @property

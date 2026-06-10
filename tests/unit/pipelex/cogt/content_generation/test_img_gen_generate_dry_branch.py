@@ -48,6 +48,23 @@ class TestImgGenGenerateDryBranch:
         assert image_content.source_negative_prompt == "no worms"
 
     @pytest.mark.asyncio
+    async def test_dry_single_yields_one_mock_even_with_nb_images_above_one(self, mocker: MockerFixture) -> None:
+        """The single path mints exactly ONE mock regardless of the assignment's nb_images —
+        matching the live single path's one-provider-call semantics — without mutating the
+        assignment.
+        """
+        mocker.patch("pipelex.cogt.content_generation.img_gen_generate.get_img_gen_worker")
+        assignment = self._assignment(run_mode=PipeRunMode.DRY, nb_images=3)
+
+        image_content = await img_gen_single_image_and_store(
+            img_gen_assignment=assignment,
+            generated_content_factory=mocker.MagicMock(),
+        )
+
+        assert image_content.url
+        assert assignment.nb_images == 3  # the normalization copies, never mutates
+
+    @pytest.mark.asyncio
     async def test_dry_list_returns_nb_images_mocks_without_io(self, mocker: MockerFixture) -> None:
         """DRY image list: exactly nb_images URL-only mocks, no provider, no storage."""
         worker_spy = mocker.patch("pipelex.cogt.content_generation.img_gen_generate.get_img_gen_worker")

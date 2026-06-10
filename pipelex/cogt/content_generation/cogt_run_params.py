@@ -25,6 +25,19 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.types import Self
 
 
+def check_mock_usage_requires_dry(*, run_mode: PipeRunMode, is_mock_usage: bool) -> None:
+    """Single home of the rule: ``is_mock_usage`` is a sub-flag of ``run_mode=DRY``.
+
+    Raises ``ValueError`` on the illegal LIVE combination — called by the model validators on
+    both ``CogtRunParams`` and ``PipeRunParams`` (each guards its own boundary) and by
+    ``PipeRunParamsFactory.make_run_params`` (which must reject the REQUESTED mode before the
+    keyless forced-DRY coercion can mask it).
+    """
+    if is_mock_usage and run_mode.is_live:
+        msg = "is_mock_usage is a sub-flag of run_mode=DRY: it cannot be set on a LIVE run"
+        raise ValueError(msg)
+
+
 class CogtRunParams(BaseModel):
     """Execution-mode contract carried on every cogt assignment (crosses the Temporal wire).
 
@@ -34,10 +47,11 @@ class CogtRunParams(BaseModel):
     """
 
     # `extra="forbid"`: a stale or typo'd key on a wire payload must fail loud (mirrors
-    # PipeRunParams). `frozen=True`: the same carrier instance is shared by reference across every
-    # assignment of a run — single-writer is enforced, not just convention. `run_mode` is REQUIRED:
-    # a wire payload that omits it must fail loud rather than silently default to the spending
-    # direction (LIVE) or the mock direction (DRY).
+    # PipeRunParams). `frozen=True`: the carrier is an immutable value object — once minted from
+    # `PipeRunParams.cogt_run_params` and stamped on an assignment, no leaf can mutate the
+    # execution contract mid-run. `run_mode` is REQUIRED: a wire payload that omits it must fail
+    # loud rather than silently default to the spending direction (LIVE) or the mock direction
+    # (DRY).
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     run_mode: PipeRunMode
@@ -51,7 +65,5 @@ class CogtRunParams(BaseModel):
 
     @model_validator(mode="after")
     def validate_mock_usage_requires_dry(self) -> Self:
-        if self.is_mock_usage and self.run_mode.is_live:
-            msg = "is_mock_usage is a sub-flag of run_mode=DRY: it cannot be set on a LIVE run"
-            raise ValueError(msg)
+        check_mock_usage_requires_dry(run_mode=self.run_mode, is_mock_usage=self.is_mock_usage)
         return self

@@ -145,6 +145,26 @@ class TestLeafDryObjectMocks:
             )
         assert ConstrainedName.__name__ in str(exc_info.value)
 
+    async def test_dry_search_structured_fidelity_gap_raises_typed_error(
+        self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol
+    ) -> None:
+        """The structured-search path carries the same D6 fidelity guard as the object paths:
+        a schema-built dict that drops a hidden invariant surfaces as DryRunObjectFidelityError.
+        """
+        search_assignment = SearchAssignment(
+            job_metadata=job_metadata,
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
+            query="what is pipelex?",
+            search_setting=SearchSetting(model="mock-search-handle"),
+        )
+
+        with pytest.raises(DryRunObjectFidelityError) as exc_info:
+            await content_generator.make_search_structured(
+                output_structure_class=ConstrainedName,
+                search_assignment=search_assignment,
+            )
+        assert ConstrainedName.__name__ in str(exc_info.value)
+
     async def test_dry_search_structured_dict_validates_against_original_class(self) -> None:
         """The structured-search dry leaf returns a dict the original output class accepts."""
         search_assignment = SearchAssignment(

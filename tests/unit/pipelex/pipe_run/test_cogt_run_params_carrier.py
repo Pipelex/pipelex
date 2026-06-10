@@ -62,12 +62,29 @@ class TestCogtRunParamsCarrier:
         assert run_params.is_mock_usage
 
     def test_stale_cogt_run_params_kwarg_fails_loudly(self) -> None:
-        """cogt_run_params is a derived property, not a field: passing it as a kwarg must raise."""
-        with pytest.raises(ValidationError):
+        """cogt_run_params is a derived property, not a field: passing it as a kwarg must raise.
+
+        run_mode is supplied so the ONLY thing that can raise is the forbidden extra — without
+        it the test would pass on the missing-required-field error even if extra="forbid" were
+        dropped.
+        """
+        with pytest.raises(ValidationError, match="cogt_run_params"):
             PipeRunParams(
+                run_mode=PipeRunMode.DRY,
                 cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),  # type: ignore[call-arg] # pyright: ignore[reportCallIssue]
                 pipe_stack_limit=20,
             )
+
+    def test_run_mode_fields_are_frozen(self) -> None:
+        """A post-construction DRY→LIVE flip (or mock-usage flip) must raise — it would bypass
+        the construction validator and flow into real provider spend via the derived carrier.
+        """
+        run_params = PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=20)
+
+        with pytest.raises(ValidationError, match="frozen"):
+            run_params.run_mode = PipeRunMode.LIVE  # type: ignore[misc]  # the static read-only error is the runtime contract under test
+        with pytest.raises(ValidationError, match="frozen"):
+            run_params.is_mock_usage = True  # type: ignore[misc]  # the static read-only error is the runtime contract under test
 
     def test_mock_usage_requires_dry_on_pipe_run_params(self) -> None:
         """is_mock_usage is a sub-flag of DRY: setting it on a LIVE PipeRunParams is a contract violation."""
