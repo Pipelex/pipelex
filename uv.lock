@@ -3733,7 +3733,6 @@ dependencies = [
     { name = "tomlkit" },
     { name = "typer" },
     { name = "typing-extensions" },
-    { name = "tzdata" },
     { name = "urllib3" },
 ]
 
@@ -3911,7 +3910,6 @@ requires-dist = [
     { name = "types-networkx", marker = "extra == 'dev'", specifier = ">=3.3.0.20241020" },
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.12.20250326" },
     { name = "typing-extensions", specifier = ">=4.13.2" },
-    { name = "tzdata", specifier = ">=2024.1" },
     { name = "urllib3", specifier = ">=2.7.0" },
 ]
 provides-extras = ["anthropic", "bedrock", "docling", "fal", "gcp-storage", "google", "google-genai", "huggingface", "linkup", "mistralai", "dynamodb", "s3", "temporal", "docs", "dev"]
