@@ -28,7 +28,7 @@ dependencies = [
   "instructor>=1.13",                                   # 1.13+ exposes instructor.core; 1.11/1.12 had mypy typing errors
   "jinja2>=3.1.4",
   "json2html>=1.3.0",
-  "kajson==0.6.0",
+  "kajson==0.7.0",
   "markdown>=3.6",
   "mthds>=0.3.0",
   "networkx>=3.4.2",
@@ -59,7 +59,6 @@ dependencies = [
   "typer>=0.16.0,<0.27",
   "typing-extensions>=4.13.2",
   "urllib3>=2.7.0",
-  "tzdata>=2024.1",
 ]
 
 [project.urls]
