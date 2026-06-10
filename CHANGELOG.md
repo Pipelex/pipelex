@@ -2,7 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`tzdata` is now a direct dependency — tz-aware payloads no longer hang Temporal callers on hosts without system tz files.** kajson decodes timezone-aware datetimes via `ZoneInfo(...)`, which needs the IANA tz database: system tz files or the `tzdata` package. On hosts with neither (slim containers, uv-managed standalone Pythons — including the CI test runner, where `tzdata` only arrived transitively via pandas on Python < 3.11), decoding any aware-datetime payload crossing the Temporal boundary (e.g. the `GraphSpec` on `act_dry_validate`'s result) raised `ZoneInfoNotFoundError` *inside the workflow task* — which Temporal retries forever, so the submitter hung instead of failing. Declaring `tzdata` makes the decode work everywhere. A regression test pins the aware-datetime round trip with system tz files hidden.
+
 ### Added
+
+- **Temporal test hang diagnostics (CI).** Setting `PIPELEX_HANG_DUMP_DIR` arms a per-test watchdog in the temporal integration suite that dumps every thread's stack to a file before pytest-timeout's thread-method kill destroys the process, and mirrors temporalio's failure logs (which carry the workflow-task traceback) to the same directory. The tests workflow prints these dumps when a job fails — pytest-xdist swallows worker stderr on a crash, so this is the only post-mortem signal for a hung test on a remote runner.
 
 - **`act_dry_validate` — the whole `/validate` job as ONE in-process Temporal activity.** New activity (+ one-step wrapper workflow `wf_dry_validate` and submitter helper `dispatch_dry_validate`) that runs the validation sweep **and** the graph-producing dry-run in one round-trip: the library is loaded once, the sweep borrows it, the graph dry-run traces into an in-memory event log against the same library, and the result carries `{per-pipe status map, GraphSpec | None}`. Zero nested Temporal dispatch, no NDJSON/DynamoDB tracing I/O, no usage/cost reporting. The graph is best-effort (an expected dry-run failure returns `graph_spec=None` with validation still successful); the sweep half is `validate_bundle` itself, so validation failures cross the activity boundary as structured `ErrorReport`s carrying the same categorized `ValidateBundleError` identity the direct path surfaces (a strict-mode signature refusal keeps its offending-pipe and signature refs in the caller-facing message). Registered in the `pipe` task pack; verified end-to-end in a real 3-process deployment (Tier 2d of the `temporal-e2e-validate` skill).
 
