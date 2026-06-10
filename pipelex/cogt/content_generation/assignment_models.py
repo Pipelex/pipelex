@@ -1,6 +1,6 @@
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing_extensions import override
 
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
@@ -73,8 +73,9 @@ class ObjectAssignment(BaseModel):
     llm_assignment_for_object: LLMAssignment
     # Fixed list size for object-list generation (None = leaf mock falls back to
     # `dry_run_config.nb_list_items`). Carried on the assignment so the leaf mock
-    # preserves fixed-size list lengths on any backend (eng review D11).
-    nb_items: int | None = None
+    # preserves fixed-size list lengths on any backend (eng review D11). ge=0: a negative
+    # count must fail loud at construction, not silently mock an empty list.
+    nb_items: int | None = Field(default=None, ge=0)
 
     @property
     def cogt_run_params(self) -> CogtRunParams:
