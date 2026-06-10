@@ -1,5 +1,7 @@
 # Follow-up — Leaf-level run-mode mock (DRY honors the backend)
 
+> **⚠ Decision D8 superseded (2026-06-10, post-completion):** `is_mock_inference` will NOT survive as a thin reportable-mock mode — it becomes an internal `is_mock_usage` sub-flag of DRY. See [`design-unified-dry-run.md`](./design-unified-dry-run.md). Everything else in this file stands as the as-built record.
+>
 > **Status: COMPLETE (2026-06-10) — built on `feature/Mock-activities`, all phases done, Checkpoint E reached.** Implements **D-plan Part B / D4 / req 1**. Split out of [`consolidation-as-built.md`](./consolidation-as-built.md) on 2026-06-01 (eng-review D1) so the in-process consolidation ships alone.
 >
 > **Design rationale:** [`D-plan.md`](./D-plan.md) §3.5 (run mode ⟂ backend) and §4.8 (leaf-level mock). **Risks:** D-plan §8 (object-mock fidelity, req-1 fidelity regressions).

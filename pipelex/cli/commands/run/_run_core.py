@@ -54,10 +54,11 @@ def validate_run_flag_combination(*, dry_run: bool, mock_inference: bool, mock_i
     Single owner of which run-flag combinations are legal, shared by the ``pipe`` / ``method`` / ``bundle``
     run subcommands so they can't drift:
 
-    - ``--mock-inputs`` requires ``--dry-run`` — it fills missing required inputs for the dry generator
-      that ``--dry-run`` swaps in pre-dispatch; without ``--dry-run`` there is nothing for it to feed.
-    - ``--mock-inference`` cannot be combined with ``--dry-run`` — ``--dry-run`` swaps the generator
-      pre-dispatch so the leaf is never reached, which would silently ignore ``--mock-inference``.
+    - ``--mock-inputs`` requires ``--dry-run`` — it synthesizes missing required inputs for a dry
+      run; a live run must be fed real inputs.
+    - ``--mock-inference`` cannot be combined with ``--dry-run`` — DRY wins at the inference leaf
+      (every leaf mocks with zero-token suppressed usage), which would silently swallow the
+      non-zero synthetic usage ``--mock-inference`` exists to produce.
 
     Prints the offending combination to stderr and raises ``typer.Exit(1)``; returns ``None`` when the
     combination is legal.
