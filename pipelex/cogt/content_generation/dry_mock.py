@@ -244,8 +244,10 @@ def stamp_mock_main_coordination(items: Sequence[Any]) -> None:
 
 
 def _nb_list_items(object_assignment: ObjectAssignment) -> int:
-    """Resolve the object-list mock length: the assignment's fixed ``nb_items`` wins (D11)."""
-    return object_assignment.nb_items or get_config().pipelex.dry_run_config.nb_list_items
+    """Resolve the object-list mock length: the assignment's fixed ``nb_items`` wins (D11), including 0."""
+    if object_assignment.nb_items is not None:
+        return object_assignment.nb_items
+    return get_config().pipelex.dry_run_config.nb_list_items
 
 
 _ReportLLMJobFunc = Callable[[JobMetadata, LLMSetting, LLMPrompt], None]
@@ -345,8 +347,11 @@ def dry_templating_gen_text(templating_assignment: TemplatingAssignment) -> str:
     )
     log.verbose("🤡 DRY RUN: templating_gen_text")
     jinja2_truncated = templating_assignment.template[: _dry_text_gen_truncate_length()]
+    # Context KEYS only: the context is built from working memory, so dumping values would leak
+    # inputs the real template never renders (and bloat the mock output).
+    context_keys = sorted(templating_assignment.context.keys())
     return (
-        f"DRY RUN: templating_gen_text • context={templating_assignment.context} • "
+        f"DRY RUN: templating_gen_text • context_keys={context_keys} • "
         f"jinja2={jinja2_truncated} • templating_style={templating_assignment.templating_style} • "
         f"template_category={templating_assignment.category}"
     )

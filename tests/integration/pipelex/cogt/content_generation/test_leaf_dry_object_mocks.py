@@ -79,11 +79,12 @@ class TestLeafDryObjectMocks:
         assert isinstance(revalidated.unit_price, float)
         assert isinstance(revalidated.discounted, bool)
 
-    async def test_dry_object_list_honors_fixed_nb_items(self) -> None:
-        """A fixed nb_items on the assignment controls the dry list length (D11)."""
-        mocks = dry_llm_gen_object_list(_dry_object_assignment(RepresentativeInvoiceLine, nb_items=4))
+    @pytest.mark.parametrize("nb_items", [4, 0])
+    async def test_dry_object_list_honors_fixed_nb_items(self, nb_items: int) -> None:
+        """A fixed nb_items on the assignment controls the dry list length (D11) — including an explicit 0."""
+        mocks = dry_llm_gen_object_list(_dry_object_assignment(RepresentativeInvoiceLine, nb_items=nb_items))
 
-        assert len(mocks) == 4
+        assert len(mocks) == nb_items
 
     async def test_dry_object_list_stamps_mock_main_coordination(self) -> None:
         """The dry leaf stamps the first pipe-spec-shaped item with pipe_code='mock_main' (D3).

@@ -13,6 +13,7 @@ class PipeRunParamsFactory:
     @classmethod
     def make_run_params(
         cls,
+        *,
         pipe_run_mode: PipeRunMode = PipeRunMode.LIVE,
         is_mock_inference: bool = False,
         pipe_stack_limit: int | None = None,

@@ -55,7 +55,9 @@ async def img_gen_single_image_and_store(
     "unify" it downward into the raw leaf.
     """
     if img_gen_assignment.cogt_run_params.run_mode.is_dry:
-        return dry_img_gen_image_contents(img_gen_assignment)[0]
+        # Exactly one mock, matching the live single path's one-provider-call semantics
+        # regardless of the assignment's nb_images.
+        return dry_img_gen_image_contents(img_gen_assignment.model_copy(update={"nb_images": 1}))[0]
     generated_image = await img_gen_single_image(img_gen_assignment)
     image_content = await generated_content_factory.make_image_content(
         primary_id=img_gen_assignment.job_metadata.user_id,

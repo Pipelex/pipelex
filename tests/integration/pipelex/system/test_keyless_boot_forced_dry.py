@@ -22,7 +22,7 @@ from pipelex.pipe_operators.search.pipe_search_blueprint import PipeSearchBluepr
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execution_seams import load_libraries_and_activate, prepare_pipe_job
-from pipelex.system.runtime import IntegrationMode
+from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.temporal.tprl_content_generation.content_generator_in_workflow import ContentGeneratorInWorkflow
 
 
@@ -33,11 +33,16 @@ def reset_pipelex_config_fixture() -> Generator[None, None, None]:
     Pipelex.teardown_if_needed()
 
 
+def _test_integration_mode() -> IntegrationMode:
+    """CI mode on CI runners (no terms acceptance), PYTEST locally — mirrors the global conftest boot."""
+    return IntegrationMode.CI if runtime_manager.is_ci_testing else IntegrationMode.PYTEST
+
+
 class TestKeylessBootForcedDry:
     def _boot_keyless(self, *, temporal_enabled: bool) -> None:
         Pipelex.teardown_if_needed()
         Pipelex.make(
-            integration_mode=IntegrationMode.PYTEST,
+            integration_mode=_test_integration_mode(),
             needs_inference=False,
             temporal_enabled=temporal_enabled,
         )
@@ -86,7 +91,7 @@ class TestKeylessBootForcedDry:
         """Control arm: a normal boot leaves the flag unset."""
         try:
             Pipelex.teardown_if_needed()
-            Pipelex.make(integration_mode=IntegrationMode.PYTEST)
+            Pipelex.make(integration_mode=_test_integration_mode())
             assert not is_dry_run_forced()
         finally:
             Pipelex.teardown_if_needed()
