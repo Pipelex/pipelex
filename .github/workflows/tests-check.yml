@@ -24,7 +24,7 @@ jobs:
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
       ENV: dev
-      PIPELEX_HANG_DUMP_DIR: ${{ runner.temp }}/pipelex-hang-dumps
+      PIPELEX_HANG_DUMP_DIR: /tmp/pipelex-hang-dumps-${{ github.run_id }}-py${{ matrix.python-version }}
     steps:
       - uses: actions/checkout@v4
 
