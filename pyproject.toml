@@ -457,9 +457,6 @@ convention = "google"
   "BLE001", # Broad `except Exception` is acceptable in tests (asserting failure modes, defensive fixtures)
 ]
 
-[tool.uv.sources]
-mthds = { git = "https://github.com/mthds-ai/mthds-python.git", rev = "33fcdf0681d894d09d57eab699894552360d954c" }
-
 [tool.uv]
 required-version = ">=0.7.2"
 
