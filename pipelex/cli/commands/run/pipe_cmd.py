@@ -62,7 +62,7 @@ def run_pipe_cmd(
         typer.Option(
             "--mock-usage",
             hidden=True,
-            help="Internal test trigger: dry run whose LLM leaves report non-zero synthetic usage so the cost report renders. Requires --dry-run.",
+            help="Internal test trigger: dry run whose LLM leaf mocks report nonzero synthetic usage so the cost report renders. Requires --dry-run.",
         ),
     ] = False,
     mock_inputs: Annotated[
