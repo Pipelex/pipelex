@@ -323,27 +323,27 @@ class TestEmitRunnerFallback:
 
         assert any(record.levelno == logging.WARNING for record in caplog.records)
 
-    def test_warning_emitted_once_per_process_when_fallback_engages(
+    def test_engaged_log_emitted_once_per_process(
         self,
         tmp_path: Path,
         mocker: MockerFixture,
         caplog: pytest.LogCaptureFixture,
     ) -> None:
-        """The 'runner fallback engaged' warning fires only on the first emission per process."""
+        """The 'activity-side emission engaged' INFO log fires only on the first emission per process."""
         _enable_ndjson_tracing(mocker, tmp_path)
 
         manager = ReportingManager()
         manager.setup()
         trace_context = _make_trace_context(graph_id="run_abc", tracer_key="wf_xyz")
 
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.INFO):
             for _ in range(100):
                 manager.report_inference_job(_make_llm_job("run_abc", trace_context=trace_context))
 
-        engaged_records = [record for record in caplog.records if "runner-side" in record.message.lower()]
+        engaged_records = [record for record in caplog.records if "activity-side usage event emission engaged" in record.message.lower()]
         assert len(engaged_records) == 1
 
-    def test_warning_emitted_once_even_with_multiple_managers(
+    def test_engaged_log_emitted_once_even_with_multiple_managers(
         self,
         tmp_path: Path,
         mocker: MockerFixture,
@@ -354,7 +354,7 @@ class TestEmitRunnerFallback:
 
         trace_context = _make_trace_context(graph_id="run_abc", tracer_key="wf_xyz")
 
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.INFO):
             manager_a = ReportingManager()
             manager_a.setup()
             manager_a.report_inference_job(_make_llm_job("run_abc", trace_context=trace_context))
@@ -363,7 +363,7 @@ class TestEmitRunnerFallback:
             manager_b.setup()
             manager_b.report_inference_job(_make_llm_job("run_abc", trace_context=trace_context))
 
-        engaged_records = [record for record in caplog.records if "runner-side" in record.message.lower()]
+        engaged_records = [record for record in caplog.records if "activity-side usage event emission engaged" in record.message.lower()]
         assert len(engaged_records) == 1
 
     def test_retried_activity_emits_duplicate_usage_event_documenting_r2(

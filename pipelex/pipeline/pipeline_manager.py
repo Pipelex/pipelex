@@ -44,3 +44,7 @@ class PipelineManager(PipelineManagerAbstract, RootModel[PipelineManagerRoot]):
         pipeline = PipelineFactory.make_pipeline(pipeline_run_id=pipeline_run_id)
         self._set_pipeline(pipeline_run_id=pipeline.pipeline_run_id, pipeline=pipeline)
         return pipeline
+
+    @override
+    def remove_pipeline(self, pipeline_run_id: str) -> None:
+        self.root.pop(pipeline_run_id, None)

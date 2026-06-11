@@ -17,15 +17,11 @@ from the global, load the crate into it, hydrate inside the scope, then tear
 down — leaving the submitter's global registry untouched.
 """
 
-import uuid
 from typing import TYPE_CHECKING
 
-from kajson.class_registry import ClassRegistry
-from kajson.kajson_manager import KajsonManager
-
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.hub import get_library_manager, scoped_current_library
 from pipelex.runtime_bridge.primitives.hydration import hydrate_working_memory
+from pipelex.runtime_bridge.primitives.scoped_library import scoped_library_for_crate
 
 if TYPE_CHECKING:
     from pipelex.libraries.library_crate import LibraryCrate
@@ -49,33 +45,8 @@ def rehydrate_pipe_output_with_crate(
     if pipe_output.working_memory_raw is None:
         return pipe_output
 
-    if library_crate is None:
+    with scoped_library_for_crate(library_crate, library_id_prefix="rehydrate"):
         pipe_output.working_memory = hydrate_working_memory(pipe_output.working_memory_raw)
         pipe_output.working_memory_raw = None
-        return pipe_output
-
-    library_manager = get_library_manager()
-    rehydration_library_id = f"rehydrate_{uuid.uuid4().hex}"
-    # open_library + set_class_registry live inside the try so a throw before the yield
-    # still tears the library down. scoped_current_library captures and restores the
-    # prior current-library ContextVar, so this rehydration doesn't clobber the caller's
-    # context. Mirrors bridge._scoped_library_for_crate.
-    library_opened = False
-    try:
-        _opened_library_id, rehydration_library = library_manager.open_library(library_id=rehydration_library_id)
-        library_opened = True
-
-        global_registry = KajsonManager.get_class_registry()
-        scoped_registry = ClassRegistry()
-        scoped_registry.register_classes_dict(global_registry.get_classes_dict())
-        rehydration_library.set_class_registry(scoped_registry)
-
-        with scoped_current_library(library_id=rehydration_library_id):
-            library_manager.load_from_crate(library_id=rehydration_library_id, crate=library_crate)
-            pipe_output.working_memory = hydrate_working_memory(pipe_output.working_memory_raw)
-            pipe_output.working_memory_raw = None
-    finally:
-        if library_opened:
-            library_manager.teardown(library_id=rehydration_library_id)
 
     return pipe_output

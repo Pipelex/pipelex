@@ -34,6 +34,7 @@ from pydantic import BaseModel, ValidationError
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
+from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.hub import (
@@ -43,6 +44,7 @@ from pipelex.hub import (
     get_library_manager,
     get_pipe_library,
     get_telemetry_manager,
+    scoped_content_generator,
     scoped_pipe_router,
     set_current_library,
 )
@@ -250,7 +252,12 @@ class BundleValidator:
         # scope is contextvar-based, so concurrent /validate sweeps don't cross-contaminate, and the
         # asyncio tasks a batch fan-out spawns copy the context at creation (inside this scope) so they
         # inherit the override too.
-        with scoped_pipe_router(self._pipe_router):
+        # scoped_content_generator: the sweep is always DRY and must stay in-process, so its
+        # inference leaves resolve an inline ContentGenerator even under a Temporal-enabled hub
+        # (where get_content_generator() is ContentGeneratorInWorkflow) — same rationale as the
+        # router scope above. The DRY mock lives at the cogt leaf (Part B), so the inline
+        # generator's leaves mock without dispatching and without touching storage.
+        with scoped_pipe_router(self._pipe_router), scoped_content_generator(ContentGenerator.make_inline()):
             for pipe in sweepable_pipes:
                 results[pipe.pipe_ref] = await self._classify_pipe(
                     pipe=pipe, library_id=library_id, execution_config=execution_config, dry_run_pipeline_id=dry_run_pipeline_id

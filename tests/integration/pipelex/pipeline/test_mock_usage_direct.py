@@ -1,16 +1,15 @@
-"""Integration tests for ``--mock-inference`` in DIRECT mode (Phase 5).
+"""Integration tests for the ``is_mock_usage`` dry sub-flag in DIRECT mode.
 
-A ``--mock-inference`` run stays LIVE (real control flow, real templating) but fakes every AI call
-at the cogt leaf, emitting *reportable* (non-zero) synthetic usage. These tests prove the end-to-end
-contract without any provider spend:
+A dry run with ``is_mock_usage=True`` keeps the dry contract (no provider, no spend, leaf mocks) but
+emits *reportable* (non-zero) synthetic usage. These tests prove the end-to-end contract:
 
 - The leaf never reaches the LLM worker (``get_llm_worker`` is not called).
-- Usage rides back on ``PipeOutput.tokens_usages`` under the ``mock_inference`` sentinel model, with
+- Usage rides back on ``PipeOutput.tokens_usages`` under the ``mock_usage`` sentinel model, with
   non-zero tokens — so ``AggregatedCosts.has_reportable_usage`` is True and the cost report renders
-  (unlike ``--dry-run``, whose zero-token usage Phase 3 deliberately suppresses).
+  (unlike the default dry run, whose zero-token usage is deliberately suppressed).
 
-Both the text path (``mock_llm_gen_text``) and the structured-object path (``mock_llm_gen_object``)
-are covered. NDJSON tracing is enabled so the usage events assemble onto ``PipeOutput``.
+Both the text path and the structured-object path are covered. NDJSON tracing is enabled so the
+usage events assemble onto ``PipeOutput``.
 """
 
 import io
@@ -19,18 +18,19 @@ import pytest
 from pytest_mock import MockerFixture
 from rich.console import Console
 
-from pipelex.cogt.content_generation.dry_mock import MOCK_INFERENCE_MODEL_NAME
+from pipelex.cogt.content_generation.dry_mock import MOCK_USAGE_MODEL_NAME
 from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.reporting.cost_report_renderer import render_run_cost_report
 from pipelex.system.configuration.configs import NdjsonTracingConfig, PipelineExecutionConfig, TracingBackend
 
-_DOMAIN = "mock_inference_direct"
+_DOMAIN = "mock_usage_direct"
 _MTHDS = f"""
 domain = "{_DOMAIN}"
-description = "Minimal bundle for --mock-inference DIRECT tests"
+description = "Minimal bundle for is_mock_usage DIRECT tests"
 
 [concept.Topic]
 description = "A topic"
@@ -59,7 +59,7 @@ def _recording_console() -> Console:
 
 
 @pytest.mark.asyncio(loop_scope="class")
-class TestMockInferenceDirect:
+class TestMockUsageDirect:
     def _enable_ndjson_tracing(self, mocker: MockerFixture, traces_dir: str) -> None:
         cfg = get_config().pipelex.tracing_config
         mocker.patch.object(cfg, "is_enabled", True)
@@ -67,30 +67,30 @@ class TestMockInferenceDirect:
         mocker.patch.object(cfg, "ndjson", NdjsonTracingConfig(traces_dir=traces_dir))
 
     def _config(self) -> PipelineExecutionConfig:
-        # Costs on (default) so usage assembles; mock_inputs fills the `subject` input for the LIVE run.
+        # Costs on (default) so usage assembles; mock_inputs fills the `subject` input for the dry run.
         return get_config().pipelex.pipeline_execution_config.with_execution_overrides(
             generate_graph=False,
             generate_usage=True,
             mock_inputs=True,
         )
 
-    async def _run_mock_inference(self, pipe_code: str) -> PipeOutput:
-        # pipe_run_mode left as None -> LIVE; is_mock_inference fakes only the AI leaf.
-        runner = PipelexMTHDSProtocol(is_mock_inference=True, execution_config=self._config())
+    async def _run_mock_usage(self, pipe_code: str) -> PipeOutput:
+        # A DRY run; is_mock_usage switches the leaf reporting to non-zero synthetic usage.
+        runner = PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, is_mock_usage=True, execution_config=self._config())
         response = await runner.execute(pipe_code=pipe_code, mthds_contents=[_MTHDS])
         return response.pipe_output
 
     async def test_text_pipe_mocks_leaf_and_assembles_reportable_usage(self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture) -> None:
-        """A LIVE text pipe under --mock-inference never calls the worker, yet assembles non-zero usage."""
+        """A dry text pipe under is_mock_usage never calls the worker, yet assembles non-zero usage."""
         self._enable_ndjson_tracing(mocker, str(tmp_path_factory.mktemp("traces_mock_text")))
         worker_spy = mocker.patch("pipelex.cogt.content_generation.llm_generate.get_llm_worker")
 
-        pipe_output = await self._run_mock_inference("write_text")
+        pipe_output = await self._run_mock_usage("write_text")
 
         worker_spy.assert_not_called()  # no provider call -> no spend
         assert pipe_output.tokens_usages is not None
         assert len(pipe_output.tokens_usages) >= 1
-        assert all(usage.inference_model_name == MOCK_INFERENCE_MODEL_NAME for usage in pipe_output.tokens_usages)
+        assert all(usage.inference_model_name == MOCK_USAGE_MODEL_NAME for usage in pipe_output.tokens_usages)
 
         aggregated = CostRegistry.aggregate_costs(pipe_output.tokens_usages)
         assert aggregated.has_reportable_usage  # non-zero tokens -> the report is NOT suppressed
@@ -99,11 +99,11 @@ class TestMockInferenceDirect:
     async def test_object_pipe_mocks_leaf_and_assembles_reportable_usage(
         self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture
     ) -> None:
-        """The structured-object path (mock_llm_gen_object) also fakes the leaf and reports non-zero usage."""
+        """The structured-object path also fakes the leaf and reports non-zero usage."""
         self._enable_ndjson_tracing(mocker, str(tmp_path_factory.mktemp("traces_mock_object")))
         worker_spy = mocker.patch("pipelex.cogt.content_generation.llm_generate.get_llm_worker")
 
-        pipe_output = await self._run_mock_inference("write_topic")
+        pipe_output = await self._run_mock_usage("write_topic")
 
         worker_spy.assert_not_called()
         assert pipe_output.tokens_usages is not None
@@ -114,8 +114,8 @@ class TestMockInferenceDirect:
         main_stuff = pipe_output.working_memory.get_optional_main_stuff()
         assert main_stuff is not None
 
-    async def test_cost_report_renders_for_mock_inference(self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture) -> None:
-        """The end-of-run cost report RENDERS for a --mock-inference run (non-suppressed), under the sentinel model."""
+    async def test_cost_report_renders_for_mock_usage(self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture) -> None:
+        """The end-of-run cost report RENDERS for an is_mock_usage run (non-suppressed), under the sentinel model."""
         self._enable_ndjson_tracing(mocker, str(tmp_path_factory.mktemp("traces_mock_render")))
         mocker.patch("pipelex.cogt.content_generation.llm_generate.get_llm_worker")
         reporting_config = get_config().pipelex.reporting_config
@@ -124,7 +124,7 @@ class TestMockInferenceDirect:
         console = _recording_console()
         mocker.patch("pipelex.cogt.usage.cost_registry.get_console", return_value=console)
 
-        pipe_output = await self._run_mock_inference("write_text")
+        pipe_output = await self._run_mock_usage("write_text")
 
         render_run_cost_report(
             pipeline_run_id=pipe_output.pipeline_run_id,
@@ -132,5 +132,5 @@ class TestMockInferenceDirect:
             is_generate_costs=True,
         )
         rendered = console.export_text()
-        assert MOCK_INFERENCE_MODEL_NAME in rendered  # the table is shown (NOT suppressed like a dry run)
+        assert MOCK_USAGE_MODEL_NAME in rendered  # the table is shown (NOT suppressed like a default dry run)
         assert "Total" in rendered

@@ -4,8 +4,6 @@ from pydantic import Field
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
-from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_rendering import render_template
@@ -20,7 +18,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_class_registry, get_concept_library, get_content_generator, get_native_concept
+from pipelex.hub import get_class_registry, get_concept_library, get_native_concept
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
 from pipelex.pipe_operators.compose.exceptions import PipeComposeError, StructuredContentComposerValueError
 from pipelex.pipe_operators.compose.structured_content_composer import StructuredContentComposer
@@ -147,17 +145,13 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-        content_generator: ContentGeneratorProtocol | None = None,
     ) -> PipeComposeOutput:
-        content_generator = content_generator or get_content_generator()
-
         if self.is_construct_mode:
             return await self._run_construct_mode(
                 job_metadata=job_metadata,
                 working_memory=working_memory,
                 pipe_run_params=pipe_run_params,
                 output_name=output_name,
-                content_generator=content_generator,
             )
         else:
             return await self._run_template_mode(
@@ -231,7 +225,6 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None,
-        content_generator: ContentGeneratorProtocol,
     ) -> PipeComposeOutput:
         """Run PipeCompose in construct mode (produces StructuredContent output)."""
         if self.construct_blueprint is None:
@@ -245,14 +238,12 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         )
 
         # Create composer and compose the structured content
-        # Pass runtime params, extra context, and content generator for template fields (consistent with _run_template_mode)
         composer = StructuredContentComposer(
             construct_blueprint=self.construct_blueprint,
             working_memory=working_memory,
             output_class=output_class,
             runtime_params=pipe_run_params.params if pipe_run_params else None,
             extra_context=self.extra_context,
-            content_generator=content_generator,
             pipe_run_params=pipe_run_params,
         )
         try:
@@ -288,14 +279,6 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeComposeOutput:
-        content_generator_used: ContentGeneratorProtocol
-        if get_config().pipelex.dry_run_config.apply_to_jinja2_rendering:
-            log.verbose(f"PipeCompose: using dry run operator pipe for jinja2 rendering: {self.code}")
-            content_generator_used = ContentGeneratorDry()
-        else:
-            log.verbose(f"PipeCompose: using regular operator pipe for jinja2 rendering (dry run not applied to jinja2): {self.code}")
-            content_generator_used = get_content_generator()
-
         if self.is_construct_mode:
             try:
                 return await self._live_run_operator_pipe(
@@ -303,7 +286,6 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
                     working_memory=working_memory,
                     pipe_run_params=pipe_run_params,
                     output_name=output_name,
-                    content_generator=content_generator_used,
                 )
             except PipeComposeError as exc:
                 # Construct mode can fail with mock data (e.g., description-only concepts
@@ -327,7 +309,6 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
                 working_memory=working_memory,
                 pipe_run_params=pipe_run_params,
                 output_name=output_name,
-                content_generator=content_generator_used,
             )
 
     def _make_mock_construct_output(

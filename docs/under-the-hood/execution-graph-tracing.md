@@ -83,7 +83,7 @@ graph_spec = response.pipe_output.graph_spec
 ```
 
 !!! tip "Dry run from MTHDS content"
-    To dry-run an entire bundle straight from MTHDS content and get back a `GraphSpec`, use `dry_run_pipeline(mthds_contents=...)` (`pipelex/pipe_run/dry_run_pipeline.py`) — the shared entrypoint behind the CLI graph commands and the API, which wires the same DRY-mode runner for you.
+    To dry-run an entire bundle straight from MTHDS content and get back a `GraphSpec`, use `dry_run_pipeline(mthds_contents=...)` (`pipelex/pipe_run/dry_run_pipeline.py`) — the shared entrypoint behind the CLI graph commands and the API, which wires the same DRY-mode runner for you. It owns its graph transport (a scoped in-memory event log), so it produces the graph regardless of the host's `tracing_config` and never writes trace files as a side effect.
 
 ### Outputs
 
@@ -248,6 +248,28 @@ manager.on_pipe_end_success(
 # 5. Manager closes tracer and returns GraphSpec
 graph_spec = manager.close_tracer(pipeline_run_id)
 ```
+
+### Event-Log Transport and the Scoped Override
+
+Trace events travel through an `EventLogProtocol` backend (`pipelex/tracing/`): the tracer emits events into it during the run (write side, wired in `pipeline_run_setup`), and `assemble_tracing` reads them back after the run to build the `GraphSpec` and usage aggregates (read side, triggered from `PipeRun.run`). Both sides normally build their backend instance independently from `tracing_config` via `make_event_log` — NDJSON files or DynamoDB bridge the two instances through external storage.
+
+For fully in-process runs, `pipelex.hub.scoped_event_log` pins one shared instance for both sides instead:
+
+```python
+from pipelex.hub import scoped_event_log
+from pipelex.tracing.in_memory_event_log import InMemoryEventLog
+
+with scoped_event_log(InMemoryEventLog()):
+    response = await runner.execute_pipeline(...)  # graph assembles in memory
+```
+
+Semantics:
+
+- The override is ContextVar-scoped (mirrors `scoped_pipe_router`), so concurrent runs with separate scopes never cross-contaminate, and the prior value is restored on exit.
+- A set override **implies tracing-enabled**: it is honored even when `tracing_config.is_enabled` is `False`, on both the write side and the read side's early-return.
+- Lifecycle: the read side does not `close()` the scoped instance and the machinery never calls `cleanup()` on it — but the write-side tracer DOES call `close()` on its event log at teardown, before the read side assembles. A scoped event log's `close()` must therefore be idempotent or a no-op (as `InMemoryEventLog`'s is); scoping a backend whose `close()` releases a real resource would break its own assembly read.
+
+This is what lets a graph-producing dry-run trace entirely in memory (no NDJSON file, no DynamoDB round-trip). Both dry-run entrypoints in `pipelex/pipe_run/dry_run_pipeline.py` rely on it: `dry_run_pipe_in_process` (validation and graph dry-run hosted inside a single Temporal activity) and `dry_run_pipeline` itself — these functions exist to produce a graph, so they install their own scoped `InMemoryEventLog` rather than depending on the host having tracing configured (a host with `tracing_config.is_enabled = false`, like pipelex-api's `/validate` in direct mode, still gets its graph). A run that nonetheless finishes without a graph raises the typed `DryRunGraphNotProducedError`.
 
 ### TraceContext Propagation
 

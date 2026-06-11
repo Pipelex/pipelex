@@ -8,10 +8,12 @@ from typing import Any
 import pytest
 
 from pipelex.cogt.content_generation.assignment_models import LLMAssignment, ObjectAssignment
+from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.exceptions import UnsafeSchemaError
 from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
@@ -25,6 +27,7 @@ def _make_stub_job_metadata() -> JobMetadata:
 def _make_stub_llm_assignment() -> LLMAssignment:
     return LLMAssignment(
         job_metadata=_make_stub_job_metadata(),
+        cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
         llm_setting=LLMSetting(model="test-model", temperature=0.7),
         llm_prompt=LLMPrompt(user_text="test prompt"),
     )
