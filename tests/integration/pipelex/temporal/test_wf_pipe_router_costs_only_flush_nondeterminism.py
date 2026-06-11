@@ -54,6 +54,7 @@ from temporalio.client import Client as TemporalClient
 from temporalio.worker import Replayer, UnsandboxedWorkflowRunner
 
 from pipelex.cogt.content_generation.assignment_models import LLMAssignment
+from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import get_report_delegate
@@ -123,6 +124,23 @@ class TestWfPipeRouterCostsOnlyFlushNondeterminism:
         """Reset the process-lifetime tracer singleton so arms cannot leak tracer keys."""
         yield
         GraphTracerManager.clear_instance()
+
+    @pytest.fixture(scope="class", autouse=True)
+    def redirect_traces_dir(self, tmp_path_factory: pytest.TempPathFactory) -> Generator[None, None, None]:
+        """Point the NDJSON traces_dir at a temp directory for this class.
+
+        The stub activity's ``report_inference_job`` takes the per-process activity
+        event log path, which lazily builds an NDJSON writer in the configured
+        traces_dir — without this redirect the test writes stray trace files into the
+        repo's default ``.pipelex/traces``.
+        """
+        ndjson_config = get_config().pipelex.tracing_config.ndjson
+        original_dir = ndjson_config.traces_dir if ndjson_config else ""
+        if ndjson_config:
+            ndjson_config.traces_dir = str(tmp_path_factory.mktemp("traces"))
+        yield
+        if ndjson_config:
+            ndjson_config.traces_dir = original_dir
 
     @pytest.mark.parametrize("emit_graph_events", [True, False], ids=["graph-and-usage", "costs-only"])
     async def test_recorded_history_replays_deterministically(

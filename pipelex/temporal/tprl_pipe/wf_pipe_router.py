@@ -243,6 +243,10 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                 except Exception as tracer_exc:  # noqa: BLE001
                     # Best-effort: tracer close in the finally block must never fail the workflow — log and continue.
                     workflow_log.warning(f"Failed to close per-workflow tracer: {tracer_exc}")
+                # Clear stale event log state from the report delegate, under the SAME key
+                # set_event_log registered it with (clear_event_log is a no-op pop when no
+                # context was registered, e.g. graph-only mode).
+                get_report_delegate().clear_event_log(context_key=wf_tracer_key)
 
             if wf_library_id is not None:
                 try:
@@ -259,10 +263,6 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
             if event_log is not None:
                 buffered_events = event_log.drain()
                 event_log.close()
-                # Clear stale event log state from the report delegate. wf_run_id is the
-                # context key (set_event_log above); clear_event_log is a no-op pop when
-                # no context was registered (e.g. graph-only mode).
-                get_report_delegate().clear_event_log(context_key=wf_run_id)
 
                 # The awaited flush comes LAST: an interruption here can only skip the flush
                 # itself, never the worker-local cleanup above — and on replay the buffer is
@@ -290,6 +290,12 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                     except Exception as flush_exc:  # noqa: BLE001
                         # Best-effort: trace-event flush in the finally block must never fail the workflow — log and continue.
                         workflow_log.warning(f"Failed to flush trace events: {flush_exc}")
+                elif buffered_events:
+                    # Tripwire, not a guard: the costs-only-LIVE buffer is deterministically
+                    # empty by the invariant above, so this branch is unreachable today. If a
+                    # future inline emission path breaks that invariant, these events would be
+                    # silently discarded — turn that into a log line instead.
+                    workflow_log.warning(f"Discarding {len(buffered_events)} buffered trace events: flush skipped by the costs-only LIVE gate")
 
         # Dehydrate PipeOutput for Temporal transit: serialize WorkingMemory to
         # raw dict so the parent's data converter can deserialize without needing

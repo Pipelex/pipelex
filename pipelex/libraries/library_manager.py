@@ -146,13 +146,18 @@ class LibraryManager(LibraryManagerAbstract):
                 raise LibraryError(msg)
             return
 
-        for library in self._libraries.values():
-            library.teardown()
-        self._libraries = {}
-        self._pipe_source_map = {}
-        self._blueprints = {}
-        self._crate_cache = {}
-        self._loaded_fingerprints = {}
+        # Same forget-even-on-raise contract as the single-id branch: entries are dropped
+        # in the finally even when a library's own teardown raises mid-loop, so no kept
+        # entry can poison later open_fresh_library calls on this worker.
+        try:
+            for lib_id in list(self._libraries):
+                self._pop_and_teardown_library(library_id=lib_id)
+        finally:
+            self._libraries = {}
+            self._pipe_source_map = {}
+            self._blueprints = {}
+            self._crate_cache = {}
+            self._loaded_fingerprints = {}
 
     @override
     def reset(self) -> None:

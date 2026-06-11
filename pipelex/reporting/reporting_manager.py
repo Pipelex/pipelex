@@ -261,12 +261,15 @@ class ReportingManager(ReportingProtocol):
         tokens_usage: AnyTokensUsage,
         trace_context: TraceContext,
     ) -> None:
-        """Emit through a per-process activity event log when no context was registered.
+        """Emit through the per-process activity event log.
 
-        On the runner, ``set_event_log`` was never called — the workflow only
-        registered a context on the router process. We fall back to a
-        process-local event log built from ``tracing_config``, stamped with a
-        stable per-process writer_id of the form ``act_{pid}_{uuid8}``.
+        This is the universal path for activity-side usage emissions (audit finding
+        H1): every emission from inside a Temporal activity routes here, co-located
+        or remote alike, so the workflow's in-sandbox buffer stays a pure function
+        of inline execution. It also covers the original fallback case — a runner
+        process where ``set_event_log`` was never called. The event log is
+        process-local, built from ``tracing_config``, stamped with a stable
+        per-process writer_id of the form ``act_{pid}_{uuid8}``.
 
         Documented over-counting risk (R2): retried activities re-emit a fresh
         event at sequence N+1 instead of overwriting the original at N, so the

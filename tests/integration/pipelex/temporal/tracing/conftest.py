@@ -12,7 +12,6 @@ import pytest
 from pipelex.config import get_config
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.pipe_run.pipe_job import PipeJob
-from pipelex.tracing.activity_event_log import ActivityEventLogCache
 from tests.integration.pipelex.fixtures.pipe_job_helpers import pipe_job_from_bundle
 from tests.integration.pipelex.temporal.tracing.test_data import (
     BatchTracingTestData,
@@ -69,22 +68,6 @@ def enable_tracing(tracing_tmp_dir: Path) -> Generator[None, None, None]:
     if ndjson_config:
         ndjson_config.traces_dir = original_dir
     GraphTracerManager.clear_instance()
-
-
-@pytest.fixture(autouse=True)
-def reset_activity_event_log_cache() -> Generator[None, None, None]:
-    """Reset the per-process activity event log cache around every test in this directory.
-
-    ReportingManager routes every activity-side usage emission through the per-process
-    fallback (even co-located activities — see audit finding H1), and the fallback's
-    event log is process-cached on ``ActivityEventLogCache`` with the traces_dir it was
-    first built with. Without this reset, a cache created by an earlier test class would
-    keep writing into that class's (class-scoped) tmp dir and the current test's events
-    would silently land elsewhere.
-    """
-    ActivityEventLogCache.reset_for_tests()
-    yield
-    ActivityEventLogCache.reset_for_tests()
 
 
 @pytest.fixture(scope="class")
