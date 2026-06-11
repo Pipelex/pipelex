@@ -232,3 +232,9 @@ Pipelex has a REST API for executing pipelines. See more about it [here](https:/
 <!-- start_pipeline exists on PipelexRunner as a protocol stub (raises NotImplementedError).
      The public entry point is execute_pipeline(). Keep this note so reviewers don't flag the stub as contradictory. -->
 The public Python entry point is `PipelexRunner.execute_pipeline()`. The older standalone `start_pipeline` function is no longer a documented entry point.
+
+---
+
+## Run Modes & Backends
+
+Every execution method above accepts a run mode (live or dry run) and a backend (in-process or Temporal). See [Run Modes & Backends](run-modes-and-backends.md) for the full matrix and when to use each combination.

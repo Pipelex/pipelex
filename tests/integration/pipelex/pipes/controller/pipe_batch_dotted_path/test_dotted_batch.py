@@ -15,7 +15,8 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_required_pipe
 from pipelex.pipe_controllers.sub_pipe import SubPipe
-from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunMode
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipe_run.pipe_run_params import BatchParams
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 

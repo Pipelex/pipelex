@@ -9,7 +9,9 @@ from pipelex.temporal.tprl_content_generation.act_render_page_views import act_r
 from pipelex.temporal.tprl_content_generation.act_search_generate import act_search_gen_sourced_answer, act_search_gen_structured
 from pipelex.temporal.tprl_pipe.act_assemble_tracing import act_assemble_tracing
 from pipelex.temporal.tprl_pipe.act_deliver import act_deliver
+from pipelex.temporal.tprl_pipe.act_dry_validate import act_dry_validate
 from pipelex.temporal.tprl_pipe.act_flush_trace_events import act_flush_trace_events
+from pipelex.temporal.tprl_pipe.wf_dry_validate import WfDryValidate
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 from pipelex.temporal.tprl_pipe.wf_pipe_run import WfPipeRun
 from pipelex.types import StrEnum
@@ -40,10 +42,12 @@ class Tasks:
             workflow_list=[
                 WfPipeRouter,
                 WfPipeRun,
+                WfDryValidate,
             ],
             activity_list=[
                 act_assemble_tracing,
                 act_deliver,
+                act_dry_validate,
                 act_flush_trace_events,
             ],
         ),

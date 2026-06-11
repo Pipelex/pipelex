@@ -135,7 +135,6 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             raise ValueError(msg)
 
         tracer = GraphTracer()
-        self._tracers[key] = tracer
 
         trace_context = tracer.setup(
             graph_id=graph_id,
@@ -151,6 +150,10 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         # Set the tracer_key on the TraceContext so downstream lookups use the same key
         if tracer_key is not None:
             trace_context = trace_context.model_copy(update={"tracer_key": tracer_key})
+
+        # Register only once setup has fully succeeded: a failure above must not leave
+        # an unusable tracer entry in the process-wide manager.
+        self._tracers[key] = tracer
         return trace_context
 
     def close_tracer(self, tracer_key: str) -> GraphSpec | None:

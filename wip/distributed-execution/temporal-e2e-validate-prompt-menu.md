@@ -9,13 +9,13 @@ Convention below: `$` marks prompts that spend real money (live inference / live
 ### Complete sweep, real spend authorized ($)
 
 ```text
-/temporal-e2e-validate run the COMPLETE sweep with real spend authorized — do NOT skip the opt-in batteries or the live arms. Mode 1 pytest dry then live. Mode 2 every tier: 1/2/2b/3 core, 4 & 5 live (image payload), Step 4 graph tracing, Step 5 concurrent isolation, Tier 8 usage emission, Tier 8b cost reporting FULL (arms A–G), Tier 9 object-gen, Tier 11 extract, Tier 12 CV batch live, Tiers 13–16 error propagation, Tiers 6/7 codec. Then Step 8 routing battery (10a–10c) and Step 9 queue-options + worker-runtime-profile battery (Scenarios A–F). Finish with the master results table — PASS/FAIL per tier/scenario — and stop-and-report on any failure.
+/temporal-e2e-validate run the COMPLETE sweep with real spend authorized — do NOT skip the opt-in batteries or the live arms. Mode 1 pytest dry then live. Mode 2 every tier: 1/2/2b/2c/2d/3 core, 4 & 5 live (image payload), Step 4 graph tracing, Step 5 concurrent isolation, Tier 8 usage emission, Tier 8b cost reporting FULL (arms A–G), Tier 9 object-gen, Tier 11 extract, Tier 12 CV batch live, Tiers 13–16 error propagation, Tiers 6/7 codec. Then Step 8 routing battery (10a–10c) and Step 9 queue-options + worker-runtime-profile battery (Scenarios A–F). Finish with the master results table — PASS/FAIL per tier/scenario — and stop-and-report on any failure.
 ```
 
 ### Complete sweep, no spend (full structural pass)
 
 ```text
-/temporal-e2e-validate run the full sweep DRY/mock only — no real spend. Mode 1 dry, Mode 2 all tiers in dry/mock (Tier 8b cost reporting via --mock-inference, arms A–B), Step 5 isolation, Tiers 6/7 codec, plus Scenario C (pytest) and Scenario F (CLI typo). Skip the live-only arms: image payload (4/5), CV batch live (12), routing battery (10a–10c), queue-options live scenarios (A/B/D/E), and the live cost arms (E–G). Master results table at the end.
+/temporal-e2e-validate run the full sweep DRY/mock only — no real spend. Mode 1 dry, Mode 2 all tiers in dry/mock (incl. 2c and 2d — both free; Tier 8b cost reporting via --mock-inference, arms A–B), Step 5 isolation, Tiers 6/7 codec, plus Scenario C (pytest) and Scenario F (CLI typo). Skip the live-only arms: image payload (4/5), CV batch live (12), routing battery (10a–10c), queue-options live scenarios (A/B/D/E), and the live cost arms (E–G). Master results table at the end.
 ```
 
 Recommended order: run the **no-spend** sweep first to confirm the plumbing cheaply, then the **real-spend** sweep once it's green. The all-in-one is long and runs tiers sequentially (reporting after each); if a live backend isn't configured, that arm stops-and-reports rather than silently passing — see Prerequisites.
@@ -61,6 +61,23 @@ Guards the `/validate` dry-run leak (nested controller sub-pipes dispatching to 
   (Self-contained — GREEN never dispatches, so no live server is actually required; `--temporal-server none` works too.)
 
 - **Mode-2 Tier 2c** (deployment-faithful: `validate bundle --temporal` over a standalone `PipeBatch` → exit 0 **and** worker idle / no `WfPipeRouter` dispatch). Reached via the prompt above; full GREEN/RED procedure in `references/mode-2-tiers.md` Step 3, Tier 2c.
+
+### Dry-run + validation as ONE in-memory activity — Tier 2d (free)
+
+Sibling of Tier 2c: where 2c proves the *direct* `/validate` sweep never dispatches, 2d proves the *Temporal-dispatched* `/validate` runs the whole sweep **+** graph dry-run inside a single in-process activity (`wf_dry_validate` → `act_dry_validate`) — zero nested dispatch on the workflow history, in-memory tracing (no NDJSON/DDB), `{status map, GraphSpec}` in one round-trip, best-effort graph (`GRAPH: None` on a graph-arm failure, validation still OK). Needs split workers up (workflow lands on the router worker, the activity on the runner).
+
+```text
+/temporal-e2e-validate validate the Temporal-dispatched /validate runs as one in-process in-memory activity   # Mode 2 Tier 2d
+```
+
+- **Submitter:** `.claude/skills/temporal-e2e-validate/scripts/submit_dry_validate.py` (dispatches the wrapper workflow, prints the status map, writes the GraphSpec JSON). Full GREEN/RED procedure + the API arm (real `../pipelex-api` route via TestClient) in `references/mode-2-tiers.md` Step 3, Tier 2d. RED note: the event-log-drop arm signals `GRAPH: None` where GREEN produced a real graph (it no longer exits 1 — the activity's parity best-effort catch degrades it); the content-generator arm's deterministic RED is the Mode-1 leaf-mock test below.
+- **Mode-1 pytest companions** (also outside `library_crate/`, so run them by path — the generic "Mode 1 pytest suite" prompt does not pick them up):
+
+  ```text
+  timeout 180 .venv/bin/pytest tests/integration/pipelex/temporal/test_dry_validate_activity_in_memory.py tests/integration/pipelex/temporal/test_dry_run_graph_in_process.py -m temporal --timeout=120
+  ```
+
+  (Self-contained against the in-process server — `--temporal-server none` default works; covers zero-nested-dispatch on the Temporal history, in-memory tracing, best-effort + bug-propagates arms, no-retry pin, ErrorReport crossing, concurrency.)
 
 ### Graph tracing (free)
 

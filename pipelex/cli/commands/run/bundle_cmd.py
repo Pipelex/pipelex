@@ -61,11 +61,12 @@ def run_bundle_cmd(
         bool,
         typer.Option("--dry-run", help="Run pipeline in dry mode (no actual inference calls)"),
     ] = False,
-    mock_inference: Annotated[
+    mock_usage: Annotated[
         bool,
         typer.Option(
-            "--mock-inference",
-            help="Live run that fakes AI calls at the inference leaf with reportable synthetic usage. Mutually exclusive with --dry-run.",
+            "--mock-usage",
+            hidden=True,
+            help="Internal test trigger: dry run whose LLM leaf mocks report nonzero synthetic usage so the cost report renders. Requires --dry-run.",
         ),
     ] = False,
     mock_inputs: Annotated[
@@ -112,7 +113,7 @@ def run_bundle_cmd(
         pipelex run bundle my_bundle.mthds --pipe my_pipe --inputs data.json
         pipelex run bundle pipeline_01/ --dry-run
     """
-    validate_run_flag_combination(dry_run=dry_run, mock_inference=mock_inference, mock_inputs=mock_inputs)
+    validate_run_flag_combination(dry_run=dry_run, mock_usage=mock_usage, mock_inputs=mock_inputs)
 
     pipe_code: str | None = pipe
     bundle_path: str | None = None
@@ -183,7 +184,7 @@ def run_bundle_cmd(
         graph_full_data=graph_full_data,
         output_dir=output_dir,
         dry_run=dry_run,
-        mock_inference=mock_inference,
+        mock_usage=mock_usage,
         mock_inputs=mock_inputs,
         library_dir=library_dir,
         costs=costs,
