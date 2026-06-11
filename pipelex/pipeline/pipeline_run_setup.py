@@ -149,19 +149,21 @@ async def pipeline_run_setup(
     # acquire_library's own load-failure teardown).
     prev_library_id = get_current_library_id_or_none()
 
-    # Seam 1: open the library and load dirs + blueprints. Owns its own load-failure teardown.
-    library_id, qualified_main_pipe = acquire_library(
-        library_id=library_id,
-        library_dirs=library_dirs,
-        mthds_contents=mthds_contents,
-        bundle_uris=bundle_uris,
-    )
-
     library_manager = get_library_manager()
+    library_acquired = False
     trace_context: TraceContext | None = None
     event_log: EventLogProtocol | None = None
     success = False
     try:
+        # Seam 1: open the library and load dirs + blueprints. Owns its own load-failure teardown.
+        library_id, qualified_main_pipe = acquire_library(
+            library_id=library_id,
+            library_dirs=library_dirs,
+            mthds_contents=mthds_contents,
+            bundle_uris=bundle_uris,
+        )
+        library_acquired = True
+
         # Resolve the pipe to execute against the now-open library.
         pipe: PipeAbstract
         if mthds_contents:
@@ -281,25 +283,33 @@ async def pipeline_run_setup(
         return pipe_job, pipeline_run_id, library_id
     finally:
         if not success:
-            # Error-path-only cleanup for failures after the library was acquired: tear down the graph
-            # tracer, event-log state, and the library, and restore the outer current-library, then let
-            # the exception propagate. Uses try/finally (not except) so a BaseException — e.g.
-            # asyncio.CancelledError — is covered too. acquire_library owns teardown for load-time
-            # failures (before this try); this block owns the post-acquire window.
+            # Error-path-only cleanup for failures after the run was registered: tear down the graph
+            # tracer and event-log state, free the pipeline-manager entry, and restore + tear down the
+            # library, then let the exception propagate. Uses try/finally (not except) so a
+            # BaseException — e.g. asyncio.CancelledError — is covered too. acquire_library owns
+            # library teardown for its own load-time failures (the `library_acquired` guard); this
+            # block owns the post-acquire window.
             if trace_context is not None:
                 tracer_manager = GraphTracerManager.get_instance()
                 if tracer_manager is not None:
                     tracer_manager.close_tracer(pipeline_run_id)
             if event_log is not None:
                 get_report_delegate().clear_event_log(context_key=pipeline_run_id)
-            # Restore the caller's outer current-library FIRST so the guarantee survives a teardown raise,
-            # then tear the library down — mirroring validate_bundle. set_current_library cannot take None,
-            # so route the "no outer was set" case through clear_current_library. The `!= library_id` guard
-            # covers the collision validate_bundle never hits (it always opens a fresh uuid): when the caller
-            # passed a library_id equal to its own outer current-library, "restoring" it would leave the
-            # ContextVar pointing at the library we are about to tear down — so clear instead of dangling.
-            if prev_library_id is not None and prev_library_id != library_id:
-                set_current_library(library_id=prev_library_id)
-            else:
-                clear_current_library()
-            library_manager.teardown(library_id=library_id)
+            # Free the per-run registry entry so the same pipeline_run_id can be resubmitted after this
+            # failure. Must come after close_tracer: while the entry is registered, add_new_pipeline's
+            # collision raise shields the live direct-mode tracer (keyed by the caller-suppliable
+            # pipeline_run_id) from open_tracer's stale-key pop-and-replace healing. Placed before the
+            # library block so a teardown raise cannot strand the entry.
+            get_pipeline_manager().remove_pipeline(pipeline_run_id=pipeline_run_id)
+            if library_acquired:
+                # Restore the caller's outer current-library FIRST so the guarantee survives a teardown raise,
+                # then tear the library down — mirroring validate_bundle. set_current_library cannot take None,
+                # so route the "no outer was set" case through clear_current_library. The `!= library_id` guard
+                # covers the collision validate_bundle never hits (it always opens a fresh uuid): when the caller
+                # passed a library_id equal to its own outer current-library, "restoring" it would leave the
+                # ContextVar pointing at the library we are about to tear down — so clear instead of dangling.
+                if prev_library_id is not None and prev_library_id != library_id:
+                    set_current_library(library_id=prev_library_id)
+                else:
+                    clear_current_library()
+                library_manager.teardown(library_id=library_id)

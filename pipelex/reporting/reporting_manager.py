@@ -1,3 +1,4 @@
+import sys
 from datetime import datetime, timezone
 from typing import NamedTuple, cast
 
@@ -19,18 +20,22 @@ from pipelex.tracing.activity_event_log import ActivityEventLogCache
 from pipelex.tracing.event_log_protocol import EventLogProtocol
 from pipelex.tracing.trace_events import UsageReportEvent
 
-# temporalio is an optional extra (pipelex[temporal]). When present, _emit_usage_event uses
-# activity.in_activity() to detect emissions coming from inside a Temporal activity; when absent
-# there is no activity context to exist in, so the registered-context fast path is always allowed.
-try:
-    from temporalio import activity as _temporal_activity
-except ImportError:
-    _temporal_activity = None  # type: ignore[assignment]
-
 
 def _is_in_temporal_activity() -> bool:
-    """True when the current call stack runs inside a Temporal activity."""
-    return _temporal_activity is not None and _temporal_activity.in_activity()
+    """True when the current call stack runs inside a Temporal activity.
+
+    ``sys.modules`` sniff instead of importing temporalio: if ``temporalio.activity`` was never
+    imported in this process, no activity context can exist — the context is set by temporalio's
+    own machinery, which requires the module to be imported. Importing it here would put the
+    entire temporalio extra (Rust bridge, protobuf) on every boot's critical path wherever the
+    ``pipelex[temporal]`` extra is installed, even for processes that never touch Temporal.
+    Worker processes are unaffected: by the time any activity runs, ``temporalio.activity`` is
+    necessarily in ``sys.modules``.
+    """
+    activity_module = sys.modules.get("temporalio.activity")
+    if activity_module is None:
+        return False
+    return cast("bool", activity_module.in_activity())
 
 
 # DynamoDB PutItem failures come in two sibling botocore base classes (neither subclasses the other):
