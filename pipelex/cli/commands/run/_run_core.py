@@ -31,7 +31,7 @@ from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.reporting.cost_report_renderer import render_cost_report_for_output
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
@@ -113,7 +113,7 @@ async def _execute_run(
         try:
             mthds_content = Path(bundle_path).read_text(encoding="utf-8")
             # Use lightweight parsing to extract main_pipe without full validation
-            # Full validation happens later during execute_pipeline
+            # Full validation happens later during execute
             if not pipe_code:
                 bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
                 main_pipe_code = bundle_blueprint.main_pipe
@@ -175,14 +175,14 @@ async def _execute_run(
     )
 
     try:
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             bundle_uris=[bundle_path] if bundle_path else None,
             pipe_run_mode=pipe_run_mode,
             is_mock_usage=mock_usage,
             execution_config=execution_config,
             library_dirs=library_dir,
         )
-        response = await runner.execute_pipeline(
+        response = await runner.execute(
             pipe_code=pipe_code,
             mthds_contents=[mthds_content] if mthds_content else None,
             inputs=pipeline_inputs,

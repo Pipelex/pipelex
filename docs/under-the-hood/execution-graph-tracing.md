@@ -30,10 +30,10 @@ Pipe Execution → GraphTracer → GraphSpec → Renderers → HTML/Mermaid
 
 | Scenario | CLI | API | Result |
 |----------|-----|-----|--------|
-| Generate execution graph | `pipelex run pipe my_pipe --graph` | `PipelexRunner(execution_config=...).execute_pipeline(...)` | GraphSpec JSON + HTML viewers |
+| Generate execution graph | `pipelex run pipe my_pipe --graph` | `PipelexMTHDSProtocol(execution_config=...).execute(...)` | GraphSpec JSON + HTML viewers |
 | Force include full data | `--graph --graph-full-data` | `data_inclusion.stuff_json_content=True` | Data embedded in IOSpec |
 | Force exclude data | `--graph --graph-no-data` | All `data_inclusion.*=False` | Previews only |
-| Dry run with graph | `--dry-run --graph` | `PipelexRunner(pipe_run_mode=PipeRunMode.DRY, execution_config=...)` | Graph of mock execution |
+| Dry run with graph | `--dry-run --graph` | `PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, execution_config=...)` | Graph of mock execution |
 
 !!! info "Full Data Included by Default"
     The default configuration includes full data in graphs (`stuff_json_content`, `stuff_text_content`, `stuff_html_content`, and `error_stack_traces` are all `true`). Use `--graph-full-data` or `--graph-no-data` only to override project-specific settings.
@@ -61,24 +61,24 @@ pipelex run pipe my_pipe --dry-run --graph --mock-inputs
 ### API
 
 ```python
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 
 # Execute with graph tracing via config
-runner = PipelexRunner(
+runner = PipelexMTHDSProtocol(
     execution_config=config.with_execution_overrides(generate_graph=True),
 )
-response = await runner.execute_pipeline(
+response = await runner.execute(
     pipe_code="my_pipe",
 )
 pipe_output = response.pipe_output
 
 # Dry run with graph: the same runner in DRY mode with mock inputs — no separate code path.
-dry_runner = PipelexRunner(
+dry_runner = PipelexMTHDSProtocol(
     pipe_run_mode=PipeRunMode.DRY,
     execution_config=config.with_execution_overrides(generate_graph=True, mock_inputs=True),
 )
-response = await dry_runner.execute_pipeline(pipe_code="my_pipe")
+response = await dry_runner.execute(pipe_code="my_pipe")
 graph_spec = response.pipe_output.graph_spec
 ```
 

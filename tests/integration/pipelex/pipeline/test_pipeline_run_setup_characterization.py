@@ -10,7 +10,7 @@ What is pinned here:
 - **Success path (DRY + mock inputs):** the returned ``PipeJob`` resolves the
   requested pipe with ``run_mode = DRY`` and mock working memory for the pipe's
   needed inputs; the library is left **open and current** (``pipeline_run_setup``
-  does *not* tear down on success — the caller, ``execute_pipeline``, owns
+  does *not* tear down on success — the caller, ``execute``, owns
   teardown); exactly one ``PIPELINE_EXECUTE`` telemetry event is emitted; and the
   pipeline is registered in the pipeline manager.
 - **``search_domain_codes`` in-place mutation (trap at the domain-insert block):**
@@ -30,12 +30,12 @@ What is pinned here:
   current-library before propagating. This is an **intentional fix**
   introduced by the seam extraction: previously the open/load/resolve ran
   *outside* ``pipeline_run_setup``'s ``try`` so this exact failure leaked the
-  library (``execute_pipeline``'s ``finally`` only tore down when setup returned
+  library (``execute``'s ``finally`` only tore down when setup returned
   a ``library_id``, which it never did). ``acquire_library`` now owns load-time
   teardown and the recomposed ``try``/``finally`` owns the post-acquire window,
   matching the already-hardened ``validate_bundle``.
 - **Success path leaves no per-run reporting state (Phase 4 — leak fixed by removal):** a
-  successful run through ``execute_pipeline`` leaves the ``ReportingManager`` with no accumulated
+  successful run through ``execute`` leaves the ``ReportingManager`` with no accumulated
   per-run state — the per-run event-log context is cleared on the way out, and the live usage
   registry has been removed entirely, so the success-path leak it used to suffer (a per-run
   registry opened in setup and never closed) is structurally impossible.
@@ -48,7 +48,7 @@ What is pinned here:
 from collections.abc import Callable
 
 import pytest
-from mthds.models.pipeline_inputs import PipelineInputs
+from mthds.protocol.pipeline_inputs import PipelineInputs
 from pytest_mock import MockerFixture
 
 from pipelex.config import get_config
@@ -64,7 +64,7 @@ from pipelex.hub import (
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.system.configuration.configs import NdjsonTracingConfig, PipelineExecutionConfig, TracingBackend
 from pipelex.system.telemetry.events import EventName
@@ -213,7 +213,7 @@ class TestPipelineRunSetupCharacterization:
     async def test_success_path_leaves_no_per_run_reporting_state(self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture) -> None:
         # Phase 4: the live usage registry is removed entirely, so the success-path leak (a per-run
         # registry opened in pipeline_run_setup and never closed) is structurally impossible. Run a real
-        # DRY pipeline through execute_pipeline with tracing + costs on (so a usage event-log context IS
+        # DRY pipeline through execute with tracing + costs on (so a usage event-log context IS
         # registered during the run), then assert the ReportingManager carries NO per-run state afterward:
         # the registry concept no longer exists, and the event-log context was cleared on the success path.
         traces_dir = str(tmp_path_factory.mktemp("char_no_leak"))
@@ -231,8 +231,8 @@ class TestPipelineRunSetupCharacterization:
             generate_usage=True,
             mock_inputs=True,
         )
-        runner = PipelexRunner(pipe_run_mode=PipeRunMode.DRY, execution_config=execution_config)
-        response = await runner.execute_pipeline(pipe_code="echo_topic", mthds_contents=[_CHAR_MTHDS])
+        runner = PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, execution_config=execution_config)
+        response = await runner.execute(pipe_code="echo_topic", mthds_contents=[_CHAR_MTHDS])
 
         assert not hasattr(delegate, "_usage_registries")
         # This run registered a usage event-log context (tracing + costs on); the success path must have

@@ -21,7 +21,7 @@ from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.hub import scoped_event_log
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.configuration.configs import NdjsonTracingConfig, TracingBackend
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 
@@ -58,8 +58,8 @@ class TestScopedInMemoryTracing:
             generate_graph=True,
             mock_inputs=True,
         )
-        runner = PipelexRunner(pipe_run_mode=PipeRunMode.DRY, execution_config=execution_config)
-        response = await runner.execute_pipeline(pipe_code="echo_topic", mthds_contents=[_SCOPED_MTHDS])
+        runner = PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, execution_config=execution_config)
+        response = await runner.execute(pipe_code="echo_topic", mthds_contents=[_SCOPED_MTHDS])
         return response.pipe_output
 
     async def test_in_memory_graph_same_instance_no_backend(self, tmp_path: Path, mocker: MockerFixture) -> None:

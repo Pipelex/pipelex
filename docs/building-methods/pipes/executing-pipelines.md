@@ -30,15 +30,15 @@ pipelex run bundle path/to/my_bundle.mthds --inputs inputs.json
 
 ```python
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 Pipelex.make()
 
 # Run the bundle's main_pipe
-runner = PipelexRunner(
+runner = PipelexMTHDSProtocol(
     bundle_uri="path/to/my_bundle.mthds",
 )
-response = await runner.execute_pipeline(
+response = await runner.execute(
     inputs={
         "my_input": {
             "concept": "Text",
@@ -49,10 +49,10 @@ response = await runner.execute_pipeline(
 pipe_output = response.pipe_output
 
 # Or run a specific pipe from the bundle
-runner = PipelexRunner(
+runner = PipelexMTHDSProtocol(
     bundle_uri="path/to/my_bundle.mthds",
 )
-response = await runner.execute_pipeline(
+response = await runner.execute(
     pipe_code="my_specific_pipe",
     inputs={...},
 )
@@ -82,13 +82,13 @@ When executing pipelines programmatically, Pipelex can load pipe **libraries** -
 
 #### Library Parameters
 
-When using `PipelexRunner`, you can control library behavior with these parameters:
+When using `PipelexMTHDSProtocol`, you can control library behavior with these parameters:
 
 - **`library_id`**: A unique identifier for the library instance. If not specified, it defaults to the `pipeline_run_id` (a unique ID generated for each pipeline execution).
 
 - **`library_dirs`**: A list of directory paths to load pipe definitions from. **These directories must contain both your `.mthds` files AND any Python files defining `StructuredContent` classes** (e.g., `*_struct.py` files). If not specified, Pipelex falls back to the `PIPELEXPATH` environment variable, then to the current working directory.
 
-- **`mthds_content`**: When provided to `PipelexRunner.execute_pipeline()`, Pipelex will load only this content into the library, bypassing directory scanning. This is useful for dynamic pipeline execution without file-based definitions.
+- **`mthds_contents`**: When provided to `PipelexMTHDSProtocol.execute()`, Pipelex will load only this content into the library, bypassing directory scanning. This is useful for dynamic pipeline execution without file-based definitions.
 
 !!! info "Python Structure Classes"
     If your concepts use Python `StructuredContent` classes instead of inline structures, those Python files must be in the directories specified by `library_dirs`. Pipelex auto-discovers and registers these classes during library loading. Learn more about [Python StructuredContent Classes](../concepts/python-classes.md).
@@ -107,14 +107,14 @@ This approach loads pipe definitions from directories and executes a specific pi
 
 ```python
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 # First, initialize Pipelex (this loads all pipeline definitions)
 Pipelex.make()
 
 # Execute the pipeline and wait for the result
-runner = PipelexRunner()
-response = await runner.execute_pipeline(
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(
     pipe_code="description_to_tagline",
     inputs={
         "description": {
@@ -130,10 +130,10 @@ pipe_output = response.pipe_output
 
 ```python
 # Load pipes from specific directories
-runner = PipelexRunner(
+runner = PipelexMTHDSProtocol(
     library_dirs=["./pipelines", "./shared_pipes"],
 )
-response = await runner.execute_pipeline(
+response = await runner.execute(
     pipe_code="description_to_tagline",
     inputs={
         "description": {
@@ -149,11 +149,11 @@ pipe_output = response.pipe_output
 
 ```python
 # Use a custom library ID for managing multiple library instances
-runner = PipelexRunner(
+runner = PipelexMTHDSProtocol(
     library_id="my_marketing_library",
     library_dirs=["./marketing_pipes"],
 )
-response = await runner.execute_pipeline(
+response = await runner.execute(
     pipe_code="description_to_tagline",
     inputs={
         "description": {
@@ -170,11 +170,11 @@ pipe_output = response.pipe_output
 
 ### Using MTHDS Content Directly
 
-You can directly pass MTHDS content as a string to `PipelexRunner.execute_pipeline()`, useful for dynamic pipeline execution without file-based definitions.
+You can directly pass MTHDS content as a string to `PipelexMTHDSProtocol.execute()`, useful for dynamic pipeline execution without file-based definitions.
 
 ```python
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 my_pipe_content = """
 domain = "marketing"
@@ -199,9 +199,9 @@ Generate a catchy tagline based on the above description. The tagline should be 
 
 Pipelex.make()
 
-runner = PipelexRunner()
-response = await runner.execute_pipeline(
-    mthds_content=my_pipe_content,
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(
+    mthds_contents=[my_pipe_content],
     inputs={
         "description": {
             "concept": "ProductDescription",
@@ -229,9 +229,9 @@ Pipelex has a REST API for executing pipelines. See more about it [here](https:/
 
 ## Background Execution
 
-<!-- start_pipeline exists on PipelexRunner as a protocol stub (raises NotImplementedError).
-     The public entry point is execute_pipeline(). Keep this note so reviewers don't flag the stub as contradictory. -->
-The public Python entry point is `PipelexRunner.execute_pipeline()`. The older standalone `start_pipeline` function is no longer a documented entry point.
+<!-- start exists on PipelexMTHDSProtocol as a protocol stub (raises NotImplementedError).
+     The public entry point is execute(). Keep this note so reviewers don't flag the stub as contradictory. -->
+The public Python entry point is `PipelexMTHDSProtocol.execute()`. The older standalone `start` function is no longer a documented entry point.
 
 ---
 

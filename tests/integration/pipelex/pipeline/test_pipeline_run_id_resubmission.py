@@ -5,8 +5,8 @@ so a later run can resubmit the same explicit ``pipeline_run_id`` (the hosted ru
 client-supplied id into ``pipeline_run_setup``; before this fix the entry was process-permanent
 and every resubmission raised ``PipelineManagerAlreadyExistsError``):
 
-- ``execute_pipeline`` success: the runner's ``finally`` removes the entry.
-- ``execute_pipeline`` failure (pipe-run raises after setup succeeded): same ``finally`` removes it.
+- ``execute`` success: the runner's ``finally`` removes the entry.
+- ``execute`` failure (pipe-run raises after setup succeeded): same ``finally`` removes it.
 - ``pipeline_run_setup`` failure after registration (pipe missing from the bundle): setup removes
   its OWN registration — the runner never learns the id on this path, so setup must self-clean —
   and a resubmission of the same explicit id then succeeds.
@@ -40,7 +40,7 @@ from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -78,7 +78,7 @@ def _dry_mock_config() -> PipelineExecutionConfig:
 
 
 class _FailingPipeRun(PipeRunProtocol):
-    """A PipeRun whose ``run`` always raises, so the failure lands in ``execute_pipeline``'s
+    """A PipeRun whose ``run`` always raises, so the failure lands in ``execute``'s
     finally AFTER setup has succeeded and registered the run — exercising the runner-side removal.
     """
 
@@ -97,11 +97,11 @@ class _FailingPipeRun(PipeRunProtocol):
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipelineRunIdResubmission:
     async def test_success_clears_registry_entry(self) -> None:
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             pipe_run_mode=PipeRunMode.DRY,
             execution_config=_dry_mock_config(),
         )
-        response = await runner.execute_pipeline(
+        response = await runner.execute(
             pipe_code="echo_topic",
             mthds_contents=[_RESUBMISSION_MTHDS],
         )
@@ -113,13 +113,13 @@ class TestPipelineRunIdResubmission:
         # rejects spy attribute injection).
         manager = get_pipeline_manager()
         mint_spy = mocker.spy(PipelineFactory, "make_pipeline")
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             pipe_run_mode=PipeRunMode.DRY,
             execution_config=_dry_mock_config(),
             pipe_run=_FailingPipeRun(),
         )
         with pytest.raises(PipelineExecutionError):
-            await runner.execute_pipeline(
+            await runner.execute(
                 pipe_code="echo_topic",
                 mthds_contents=[_RESUBMISSION_MTHDS],
             )
@@ -157,7 +157,7 @@ class TestPipelineRunIdResubmission:
             assert get_pipeline_manager().get_optional_pipeline(pipeline_run_id=explicit_run_id) is not None
         finally:
             # Caller-side teardown (pipeline_run_setup leaves the library open and the run
-            # registered on success — execute_pipeline's finally owns this in production).
+            # registered on success — execute's finally owns this in production).
             get_pipeline_manager().remove_pipeline(pipeline_run_id=explicit_run_id)
             get_library_manager().teardown(library_id=library_id)
             clear_current_library()

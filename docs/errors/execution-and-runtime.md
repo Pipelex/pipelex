@@ -30,6 +30,7 @@ own page. Classes are grouped by subsystem.
 - [`PipeExecutionError`](pipe-execution-error.md) — Pipe execution
 - [`PipeStackOverflowError`](pipe-stack-overflow-error.md) — Pipe stack overflow
 - [`PipelineExecutionError`](pipeline-execution-error.md) — Pipeline execution
+- [`PipelineInputContentError`](pipeline-input-content-error.md) — Pipeline input content
 - [`PipelineManagerAlreadyExistsError`](pipeline-manager-already-exists-error.md) — Pipeline manager already exists
 - [`PipelineManagerNotFoundError`](pipeline-manager-not-found-error.md) — Pipeline manager not found
 - [`ValidateBundleError`](validate-bundle-error.md) — Validate bundle

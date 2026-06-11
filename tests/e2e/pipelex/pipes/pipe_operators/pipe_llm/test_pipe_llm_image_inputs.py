@@ -1,4 +1,4 @@
-"""E2E tests for image inputs in PipeLLM using execute_pipeline()."""
+"""E2E tests for image inputs in PipeLLM using execute()."""
 
 import pytest
 
@@ -9,7 +9,7 @@ from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from tests.cases import ImageTestCases
 from tests.e2e.pipelex.pipes.pipe_operators.pipe_llm.pipe_llm_image_inputs import (
     ImageDescriptionE2E,
@@ -26,15 +26,15 @@ LIBRARY_DIRS = ["tests/e2e/pipelex/pipes/pipe_operators"]
 @pytest.mark.dry_runnable
 @pytest.mark.asyncio
 class TestImageInputsE2E:
-    """E2E tests for image input handling using execute_pipeline()."""
+    """E2E tests for image input handling using execute()."""
 
     async def test_direct_single_image(self, pipe_run_mode: PipeRunMode) -> None:
         """Test single direct image input."""
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             library_dirs=LIBRARY_DIRS,
             pipe_run_mode=pipe_run_mode,
         )
-        response = await runner.execute_pipeline(
+        response = await runner.execute(
             pipe_code="describe_single_image_e2e",
             inputs={
                 "image": ImageContent(url=LLMVisionTestCases.URL_CLOUDFRONT_ALAN_TURING_JPG),
@@ -57,11 +57,11 @@ class TestImageInputsE2E:
             ]
         )
 
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             library_dirs=LIBRARY_DIRS,
             pipe_run_mode=pipe_run_mode,
         )
-        response = await runner.execute_pipeline(
+        response = await runner.execute(
             pipe_code="analyze_image_list_e2e",
             inputs={"images": images},
         )
@@ -78,11 +78,11 @@ class TestImageInputsE2E:
         collection_a = ListContent[ImageContent](items=[ImageContent(url=LLMVisionTestCases.URL_CLOUDFRONT_ALAN_TURING_JPG)])
         collection_b = ListContent[ImageContent](items=[ImageContent(url=ImageTestCases.LOGO_TINY_PNG_DATA_URL)])
 
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             library_dirs=LIBRARY_DIRS,
             pipe_run_mode=pipe_run_mode,
         )
-        response = await runner.execute_pipeline(
+        response = await runner.execute(
             pipe_code="compare_image_lists_e2e",
             inputs={
                 "collection_a": collection_a,
@@ -109,11 +109,11 @@ class TestImageInputsE2E:
             page_view=ImageContent(url=ImageTestCases.LOGO_TINY_PNG_DATA_URL),
         )
 
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             library_dirs=LIBRARY_DIRS,
             pipe_run_mode=pipe_run_mode,
         )
-        response = await runner.execute_pipeline(
+        response = await runner.execute(
             pipe_code="describe_page_with_images_e2e",
             inputs={"page": page_content},
         )
@@ -138,11 +138,11 @@ class TestImageInputsE2E:
             page_view=ImageContent(url=ImageTestCases.LOGO_TINY_PNG_DATA_URL),
         )
 
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             library_dirs=LIBRARY_DIRS,
             pipe_run_mode=pipe_run_mode,
         )
-        response = await runner.execute_pipeline(
+        response = await runner.execute(
             pipe_code="describe_page_text_only_e2e",
             inputs={"page": page_content},
         )
@@ -165,11 +165,11 @@ class TestImageInputsE2E:
             page_view=ImageContent(url=ImageTestCases.LOGO_TINY_PNG_DATA_URL),
         )
 
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             library_dirs=LIBRARY_DIRS,
             pipe_run_mode=pipe_run_mode,
         )
-        response = await runner.execute_pipeline(
+        response = await runner.execute(
             pipe_code="mixed_image_inputs_e2e",
             inputs={
                 "direct_image": ImageContent(url=LLMVisionTestCases.URL_CLOUDFRONT_ALAN_TURING_JPG),

@@ -1,4 +1,4 @@
-"""E2E tests for document inputs in PipeLLM using execute_pipeline()."""
+"""E2E tests for document inputs in PipeLLM using execute()."""
 
 import pytest
 
@@ -7,7 +7,7 @@ from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from tests.cases.documents import DocumentTestCases
 from tests.e2e.pipelex.pipes.pipe_operators.pipe_llm.pipe_llm_document_inputs import (
     DocumentListAnalysisE2E,
@@ -24,11 +24,11 @@ LIBRARY_DIRS = ["tests/e2e/pipelex/pipes/pipe_operators"]
 @pytest.mark.dry_runnable
 @pytest.mark.asyncio
 class TestDocumentInputsE2E:
-    """E2E tests for document input handling using execute_pipeline()."""
+    """E2E tests for document input handling using execute()."""
 
     async def test_direct_single_document(self, pipe_run_mode: PipeRunMode) -> None:
         """Test single direct document input with local PDF file."""
-        pipeline_response = await PipelexRunner(library_dirs=LIBRARY_DIRS, pipe_run_mode=pipe_run_mode).execute_pipeline(
+        pipeline_response = await PipelexMTHDSProtocol(library_dirs=LIBRARY_DIRS, pipe_run_mode=pipe_run_mode).execute(
             pipe_code="summarize_single_document_e2e",
             inputs={
                 "document": DocumentContent(url=DocumentTestCases.PDF_FILE_PATH_2),
@@ -44,7 +44,7 @@ class TestDocumentInputsE2E:
 
     async def test_direct_single_document_by_url(self, pipe_run_mode: PipeRunMode) -> None:
         """Test single direct document input with remote URL."""
-        pipeline_response = await PipelexRunner(library_dirs=LIBRARY_DIRS, pipe_run_mode=pipe_run_mode).execute_pipeline(
+        pipeline_response = await PipelexMTHDSProtocol(library_dirs=LIBRARY_DIRS, pipe_run_mode=pipe_run_mode).execute(
             pipe_code="summarize_single_document_e2e",
             inputs={
                 "document": DocumentContent(url=DocumentTestCases.PDF_FILE_URL_1),
@@ -66,7 +66,7 @@ class TestDocumentInputsE2E:
             ]
         )
 
-        pipeline_response = await PipelexRunner(library_dirs=LIBRARY_DIRS, pipe_run_mode=pipe_run_mode).execute_pipeline(
+        pipeline_response = await PipelexMTHDSProtocol(library_dirs=LIBRARY_DIRS, pipe_run_mode=pipe_run_mode).execute(
             pipe_code="analyze_document_list_e2e",
             inputs={"documents": documents},
         )
@@ -82,7 +82,7 @@ class TestDocumentInputsE2E:
         collection_a = ListContent[DocumentContent](items=[DocumentContent(url=DocumentTestCases.PDF_FILE_PATH_2)])
         collection_b = ListContent[DocumentContent](items=[DocumentContent(url=DocumentTestCases.PDF_FILE_PATH_3)])
 
-        pipeline_response = await PipelexRunner(library_dirs=LIBRARY_DIRS, pipe_run_mode=pipe_run_mode).execute_pipeline(
+        pipeline_response = await PipelexMTHDSProtocol(library_dirs=LIBRARY_DIRS, pipe_run_mode=pipe_run_mode).execute(
             pipe_code="compare_document_lists_e2e",
             inputs={
                 "collection_a": collection_a,
@@ -99,7 +99,7 @@ class TestDocumentInputsE2E:
 
     async def test_mixed_document_and_image_inputs(self, pipe_run_mode: PipeRunMode) -> None:
         """Test combining document with image input."""
-        pipeline_response = await PipelexRunner(library_dirs=LIBRARY_DIRS, pipe_run_mode=pipe_run_mode).execute_pipeline(
+        pipeline_response = await PipelexMTHDSProtocol(library_dirs=LIBRARY_DIRS, pipe_run_mode=pipe_run_mode).execute(
             pipe_code="mixed_document_image_inputs_e2e",
             inputs={
                 "document": DocumentContent(url=DocumentTestCases.PDF_FILE_PATH_2),
