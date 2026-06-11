@@ -33,7 +33,6 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.temporal.config_temporal import ActivityRouteConfig
 from pipelex.temporal.tprl_content_generation.act_llm_generate import act_llm_gen_text
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
-from pipelex.tracing.activity_event_log import ActivityEventLogCache
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog
 from pipelex.tracing.trace_events import UsageReportEvent
 from pipelex.tracing.usage_aggregator import UsageAggregator
@@ -91,12 +90,6 @@ class TestSplitWorkerRealInferenceCost:
             worker_config.activity_queues.pop(activity_name, None)
         else:
             worker_config.activity_queues[activity_name] = original_entry
-
-    @pytest.fixture(autouse=True)
-    def reset_activity_event_log(self) -> Generator[None, None, None]:
-        ActivityEventLogCache.reset_for_tests()
-        yield
-        ActivityEventLogCache.reset_for_tests()
 
     async def test_real_provider_usage_aggregates_to_nonzero_cost(
         self,

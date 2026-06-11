@@ -32,7 +32,6 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.temporal.config_temporal import ActivityRouteConfig
 from pipelex.temporal.tprl_content_generation.act_llm_generate import act_llm_gen_text
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
-from pipelex.tracing.activity_event_log import ActivityEventLogCache
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog
 from pipelex.tracing.trace_events import PipeStartEvent, UsageReportEvent
 from pipelex.tracing.usage_aggregator import UsageAggregator
@@ -55,9 +54,9 @@ class TestSplitWorkerUsageEmission:
     """Cross-process emission: router on q_router, runner on q_runner.
 
     Each test uses its own pair of task queues (UUID-named) so concurrent
-    executions don't share queue state, and resets the per-process activity
-    event log cache so the writer_id is regenerated and the warn-once flag
-    re-arms for each test.
+    executions don't share queue state. The per-process activity event log
+    cache is reset around every test by the temporal conftest's autouse
+    ``reset_activity_event_log_cache`` fixture.
     """
 
     @pytest.fixture
@@ -104,19 +103,6 @@ class TestSplitWorkerUsageEmission:
             worker_config.activity_queues.pop(activity_name, None)
         else:
             worker_config.activity_queues[activity_name] = original_entry
-
-    @pytest.fixture(autouse=True)
-    def reset_activity_event_log(self) -> Generator[None, None, None]:
-        """Clear the per-process activity event log cache between tests.
-
-        The cache (writer_id, event log instance, warn-once flag) is class-level
-        on `ActivityEventLogCache`. Without this reset, two tests in the same
-        module would share a writer_id and the second test would find a stale,
-        possibly closed, event log handle.
-        """
-        ActivityEventLogCache.reset_for_tests()
-        yield
-        ActivityEventLogCache.reset_for_tests()
 
     async def _execute_split(
         self,
