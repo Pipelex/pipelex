@@ -11,6 +11,7 @@ contract pinned here.
 import logging
 
 import pytest
+from pytest_mock import MockerFixture
 
 from pipelex.graph.graph_config import DataInclusionConfig
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
@@ -59,6 +60,27 @@ class TestGraphTracerManagerStaleKeyHealing:
         assert fresh_tracer is not None
         assert fresh_tracer is not stale_tracer, "the stale tracer must be evicted, not reused"
         assert "already exists" in caplog.text
+
+    def test_open_tracer_heals_even_when_stale_teardown_raises(self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture) -> None:
+        """A stale tracer's raising teardown must not fail the fresh run's setup.
+
+        The stale teardown runs graph assembly over arbitrary half-built state from an
+        interrupted execution; letting its exception propagate would make a fresh run's
+        tracing setup depend on leaked predecessor state — the M1 class all over again.
+        """
+        manager = GraphTracerManager.get_or_create_instance()
+        self._open_tracer(manager)
+        stale_tracer = manager.get_tracer(_TRACER_KEY)
+        assert stale_tracer is not None
+        mocker.patch.object(stale_tracer, "teardown", side_effect=RuntimeError("half-built state"))
+
+        with caplog.at_level(logging.WARNING):
+            # Must not raise despite the stale teardown blowing up.
+            self._open_tracer(manager)
+
+        fresh_tracer = manager.get_tracer(_TRACER_KEY)
+        assert fresh_tracer is not None
+        assert fresh_tracer is not stale_tracer, "the stale tracer must be evicted even when its teardown raises"
 
     def test_open_tracer_fresh_key_does_not_warn(self, caplog: pytest.LogCaptureFixture) -> None:
         """The healing warning must be gated on key membership: a fresh key opens silently."""

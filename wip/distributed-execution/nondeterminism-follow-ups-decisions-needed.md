@@ -22,7 +22,7 @@ B as the cheap interim guard if any activity-side tracing work is planned before
 
 ---
 
-The items below were surfaced by the pre-landing review army on PR #987 (gstack `/review`: specialists + adversarial passes). Same rule as above: real, but judgment calls — deferred rather than fixed unilaterally. The review's clear wins (full-teardown pop-first hardening, stale-key healing unit tests, conftest cache-reset hoist, doc/changelog corrections, finally-block key symmetry + discarded-buffer tripwire) were applied directly on the branch and are NOT listed here.
+The items below were surfaced by the pre-landing review army on PR #987 (gstack `/review`: specialists + adversarial passes). Same rule as above: real, but judgment calls — deferred rather than fixed unilaterally. The review's clear wins (full-teardown forget-even-on-raise hardening with every sibling teardown still attempted, stale-key healing unit tests, best-effort containment of the stale tracer's teardown inside the healing branch, conftest cache-reset hoist, doc/changelog corrections, finally-block key symmetry + discarded-buffer tripwire) were applied directly on the branch and are NOT listed here.
 
 ## 2. Tracing-disabled workers silently drop submitter-requested trace/cost events
 
@@ -50,6 +50,3 @@ Two accepted-but-undocumented residuals of the run-id rekeying, plus one perf no
 
 Two latent edges of the H1 routing check: (a) a host app running a DIRECT pipelex pipeline inside its **own** temporalio activity (legit runtime-bridge embedding) gets its registered direct-mode context bypassed — emissions divert to the per-process fallback with a restamped `workflow_id`, ignoring a custom event-log backend; (b) an emission from a thread spawned inside an activity without contextvar propagation (the `run_in_executor(None, ...)` pattern that exists in `bedrock_client_boto3.py`) would report `in_activity()=False` and resurrect the H1 cross-thread buffer write. All current `report_inference_job` call sites run in the activity's own context, so both are latent — same class as item 1; fold into the same T3-adjacent decision.
 
-## 7. `open_tracer`'s healing branch runs the stale tracer's teardown unguarded (latent)
-
-The pop-and-replace heal calls `close_tracer(key)`, which runs the STALE tracer's full `teardown()` — graph assembly over arbitrary half-built state from an interrupted execution. If that teardown ever raises, the exception propagates into the now-unguarded tracing-setup block: a fresh run's setup failing because of leaked predecessor state, the exact M1 class. Today `GraphTracer.teardown` is pure dict/list work and effectively cannot raise, so this is a latent contract gap, not a live bug. **Option:** best-effort-contain just the stale tracer's teardown inside the healing branch (pop stays unconditional), mirroring the router's "other runs' cleanup must never fail this run" pattern.

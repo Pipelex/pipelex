@@ -138,7 +138,15 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         # legitimately tears down without a GraphSpec).
         if key in self._tracers:
             log.warning(f"Tracer for key '{key}' already exists; replacing stale tracer left by a prior interrupted execution")
-            self.close_tracer(key)
+            try:
+                self.close_tracer(key)
+            except Exception as stale_teardown_exc:  # noqa: BLE001
+                # Best-effort: the stale tracer's teardown runs graph assembly over arbitrary
+                # half-built state from the interrupted execution — its failure must never
+                # fail the fresh run's setup (that would be the M1 class again: worker-local
+                # leak state deciding setup success). close_tracer pops before tearing down,
+                # so the key is free either way.
+                log.warning(f"Stale tracer teardown for key '{key}' failed; replacing anyway: {stale_teardown_exc}")
 
         tracer = GraphTracer()
         self._tracers[key] = tracer

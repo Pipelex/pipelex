@@ -47,16 +47,22 @@ class TestLibraryManagerTeardownForgetsEntry:
         assert manager.get_library(library_id=_POISONED_LIBRARY_ID) is fresh_library
 
     def test_full_teardown_forgets_all_entries_when_a_library_teardown_raises(self, mocker: MockerFixture) -> None:
-        """The full-teardown branch (``library_id=None``) shares the forget-even-on-raise contract."""
+        """The full-teardown branch (``library_id=None``) shares the forget-even-on-raise contract,
+        AND attempts every library's own teardown — a raise from one library must not skip the
+        resource-closing of the others.
+        """
         manager = LibraryManager()
         manager.open_library(library_id="lib_a")
         manager.open_library(library_id="lib_b")
-        mocker.patch.object(Library, "teardown", side_effect=RuntimeError("boom"))
+        teardown_mock = mocker.patch.object(Library, "teardown", side_effect=RuntimeError("boom"))
 
         with pytest.raises(RuntimeError, match="boom"):
             manager.teardown()
 
-        # ALL entries must be gone — a raising teardown mid-loop must not strand the
+        # Every library's teardown must have been ATTEMPTED, not just the first raising one.
+        assert teardown_mock.call_count == 2, "a raising teardown must not skip the remaining libraries' teardowns"
+
+        # And ALL entries must be gone — a raising teardown mid-loop must not strand the
         # remaining libraries (or the bookkeeping maps) in the manager.
         mocker.stopall()
         with pytest.raises(LibraryError):
