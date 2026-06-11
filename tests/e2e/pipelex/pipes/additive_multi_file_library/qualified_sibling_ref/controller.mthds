@@ -1,0 +1,12 @@
+domain      = "research"
+description = "Research brief controller (qualified sibling ref)"
+
+# The step references its own-domain pipe by its *qualified* name `research.find_key_findings`,
+# while the concrete definition lives only in the sibling `definition.mthds`. Qualified same-domain
+# references are deferred to the merged library just like bare ones, so this resolves across files.
+[pipe.research_brief]
+type        = "PipeSequence"
+description = "Produce a research brief from a document."
+inputs      = { doc = "Text" }
+output      = "KeyFinding"
+steps       = [{ pipe = "research.find_key_findings", result = "findings" }]
