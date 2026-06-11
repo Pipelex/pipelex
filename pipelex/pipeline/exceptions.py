@@ -125,3 +125,22 @@ class ValidateBundleError(PipelexError):
         """
         # TODO: refactor so we don't need this anymore?
         return self.pipe_validation_errors + self.pipe_concept_instantiation_errors
+
+
+class PipelineInputContentError(PipelexError):
+    """A pipeline input's content reference (url) is unusable.
+
+    Raised by the input normalizer when an Image/Document input carries a
+    blank url, or a local path that cannot be read. The caller supplied the
+    value — INPUT domain, so API servers answer 422, never a sanitized 500
+    (a blank url used to surface as IsADirectoryError('.') → 500).
+    """
+
+    error_domain = ErrorDomain.INPUT
+    user_action = UserAction(
+        kind=UserActionKind.CHANGE_INPUT,
+        detail=(
+            "Provide a valid url on every Image/Document input (https://, data:, pipelex-storage://, or an existing local file when running locally)."
+        ),
+    )
+    caller_facing_message = True
