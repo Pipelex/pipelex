@@ -16,6 +16,7 @@ from pipelex.hub import (
     get_current_library_id_or_none,
     get_library_manager,
     get_pipe_run,
+    get_pipeline_manager,
     get_report_delegate,
     get_telemetry_manager,
     set_current_library,
@@ -215,6 +216,17 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
             # Clear event log state from the report delegate (direct execution path)
             if pipeline_run_id is not None:
                 get_report_delegate().clear_event_log(context_key=pipeline_run_id)
+
+            # Free the per-run registry entry so a later run can resubmit the same explicit
+            # pipeline_run_id (serial resubmission is a supported scenario; only genuinely
+            # concurrent same-id runs should collide in add_new_pipeline). Must come after
+            # close_tracer: while the entry is registered, the collision raise shields the live
+            # direct-mode tracer (keyed by the caller-suppliable pipeline_run_id) from
+            # open_tracer's stale-key pop-and-replace healing. The pop is tolerant — when
+            # pipeline_run_setup failed it already removed its own registration (and
+            # pipeline_run_id is None here anyway).
+            if pipeline_run_id is not None:
+                get_pipeline_manager().remove_pipeline(pipeline_run_id=pipeline_run_id)
 
             # Only teardown library if it was successfully created
             if library_id_resolved is not None:

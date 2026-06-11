@@ -3,6 +3,7 @@
 from datetime import datetime
 from typing import Any
 
+from pipelex import log
 from pipelex.graph.graph_config import DataInclusionConfig
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
@@ -125,14 +126,27 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
         Returns:
             Initial TraceContext to pass through JobMetadata.
-
-        Raises:
-            ValueError: If a tracer for this key already exists.
         """
         key = tracer_key or graph_id
+        # Collision-proof pop-and-replace: a stale tracer under this key can only be the
+        # leftover of a prior interrupted execution (e.g. a Temporal workflow evicted before
+        # its finally-block close_tracer ran). Raising would let worker-local leak state
+        # decide whether tracing setup succeeds — a replay-determinism breach (audit
+        # finding M1). Delegate the eviction to close_tracer (the single teardown path).
+        # The warning is gated on key membership, not on close_tracer's return value: that
+        # value is ambiguous (None both when no tracer existed and when a costs-only tracer
+        # legitimately tears down without a GraphSpec).
         if key in self._tracers:
-            msg = f"Tracer for key '{key}' already exists"
-            raise ValueError(msg)
+            log.warning(f"Tracer for key '{key}' already exists; replacing stale tracer left by a prior interrupted execution")
+            try:
+                self.close_tracer(key)
+            except Exception as stale_teardown_exc:  # noqa: BLE001
+                # Best-effort: the stale tracer's teardown runs graph assembly over arbitrary
+                # half-built state from the interrupted execution — its failure must never
+                # fail the fresh run's setup (that would be the M1 class again: worker-local
+                # leak state deciding setup success). close_tracer pops before tearing down,
+                # so the key is free either way.
+                log.warning(f"Stale tracer teardown for key '{key}' failed; replacing anyway: {stale_teardown_exc}")
 
         tracer = GraphTracer()
 

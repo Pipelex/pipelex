@@ -14,21 +14,15 @@ The Temporal extra is lazy-imported only inside the temporal-mode branches.
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any, AsyncGenerator, Callable, cast
-from uuid import uuid4
+from typing import TYPE_CHECKING, Any, Callable, cast
 
 import shortuuid
-from kajson.class_registry import ClassRegistry
-from kajson.kajson_manager import KajsonManager
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import (
-    get_library_manager,
     get_required_pipe,
-    scoped_current_library,
     scoped_pipe_router,
 )
 from pipelex.libraries.library_crate import LibraryCrate
@@ -47,6 +41,7 @@ from pipelex.runtime_bridge.exceptions import (
     PipelexBridgeDispatchError,
 )
 from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
+from pipelex.runtime_bridge.primitives.scoped_library import scoped_library_for_crate
 from pipelex.system.telemetry.otel_constants import OTelConstants
 
 if TYPE_CHECKING:
@@ -134,7 +129,7 @@ async def run_pipe_via_bridge(
     delivery_assignment = _decode_delivery_assignment(input_payload.delivery_assignment_dump)
     _validate_input(input_payload, delivery_assignment=delivery_assignment)
 
-    async with _scoped_library_for_crate(library_crate):
+    with scoped_library_for_crate(library_crate, library_id_prefix="runtime_bridge"):
         # trace_context is honored for DIRECT only. The Temporal modes have their
         # own event-log infrastructure (via pipeline_run_setup); forwarding a host
         # trace_context there would make WfPipeRouter open its tracer under the
@@ -268,51 +263,6 @@ def _decode_delivery_assignment(delivery_assignment_dump: dict[str, Any] | None)
     except ValidationError as exc:
         msg = f"Invalid delivery_assignment_dump passed to the runtime bridge: {exc}"
         raise PipelexBridgeDispatchError(msg) from exc
-
-
-@asynccontextmanager
-async def _scoped_library_for_crate(library_crate: LibraryCrate | None) -> AsyncGenerator[str | None, None]:  # noqa: RUF029
-    """Open a per-call scoped library for the duration of a pipe run.
-
-    When ``library_crate`` is None, this is a no-op: callers fall back to the
-    library that was loaded into the active class registry at boot. When
-    provided, opens a fresh library, loads the crate into it, sets it as the
-    current library for the duration of the pipe execution, and tears it down
-    on the way out.
-    """
-    if library_crate is None:
-        yield None
-        return
-
-    library_manager = get_library_manager()
-    library_id = f"runtime_bridge_{uuid4().hex}"
-
-    # Pre-seed a per-call ClassRegistry from the global one so classes generated
-    # from the crate's inline structured concepts register into this scoped
-    # registry (discarded on teardown) rather than leaking into / colliding in
-    # the global Kajson registry. Mirrors the Temporal worker hydration path
-    # (see wf_pipe_router.py).
-    global_registry = KajsonManager.get_class_registry()
-    scoped_registry = ClassRegistry()
-    scoped_registry.register_classes_dict(global_registry.get_classes_dict())
-    # open_library + set_class_registry live inside the try so a throw between
-    # opening the library and reaching the yield still tears it down (the entry
-    # is registered in the manager the moment open_library returns). Mirrors the
-    # library_opened guard in submitter_hydration.rehydrate_pipe_output_with_crate.
-    library_opened = False
-    try:
-        _opened_library_id, library = library_manager.open_library(library_id=library_id)
-        library_opened = True
-        library.set_class_registry(scoped_registry)
-        # scoped_current_library captures and restores the prior current-library
-        # ContextVar, so a bridge call made from within an already-scoped library
-        # doesn't clobber the caller's context.
-        with scoped_current_library(library_id=library_id):
-            library_manager.load_from_crate(library_id=library_id, crate=library_crate)
-            yield library_id
-    finally:
-        if library_opened:
-            library_manager.teardown(library_id=library_id)
 
 
 async def _run_direct(

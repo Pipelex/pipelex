@@ -1,4 +1,5 @@
 import uuid
+from contextlib import ExitStack
 from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -110,30 +111,56 @@ class LibraryManager(LibraryManagerAbstract):
     def setup(self) -> None:
         pass
 
-    @override
-    def teardown(self, library_id: str | None = None) -> None:
-        if library_id:
-            if library_id not in self._libraries:
-                msg = f"Trying to teardown a library that does not exist: '{library_id}'"
-                raise LibraryError(msg)
-            library = self._libraries[library_id]
+    def _pop_and_teardown_library(self, library_id: str) -> bool:
+        """Atomically forget a library entry, then tear it down.
+
+        The entry is popped BEFORE ``library.teardown()`` runs and the associated maps are
+        cleared in a ``finally``, so the manager forgets the library even if its teardown
+        raises — a kept entry would turn ``open_fresh_library`` into a deterministic
+        re-raise on every rerun of that library id on this worker (permanent worker-local
+        poison). The pop also makes the operation tolerant of a concurrent teardown of the
+        same id from another workflow thread: whichever caller pops the entry tears it
+        down, the other sees a clean miss.
+
+        Returns:
+            True when an entry existed and was removed, False when there was none.
+        """
+        library = self._libraries.pop(library_id, None)
+        if library is None:
+            return False
+        try:
             # Remove source map entries for pipes in this library
             for pipe_ref in library.pipe_library.root:
                 self._pipe_source_map.pop(pipe_ref, None)
             library.teardown()
-            del self._libraries[library_id]
+        finally:
             self._blueprints.pop(library_id, None)
             self._crate_cache.pop(library_id, None)
             self._loaded_fingerprints.pop(library_id, None)
+        return True
+
+    @override
+    def teardown(self, library_id: str | None = None) -> None:
+        if library_id:
+            if not self._pop_and_teardown_library(library_id=library_id):
+                msg = f"Trying to teardown a library that does not exist: '{library_id}'"
+                raise LibraryError(msg)
             return
 
-        for library in self._libraries.values():
-            library.teardown()
+        # Same forget-even-on-raise contract as the single-id branch, extended to the loop:
+        # all bookkeeping is dropped upfront, and ExitStack guarantees EVERY library's own
+        # teardown is attempted even when one of them raises — the first failure propagates
+        # only after the rest have run, so neither a kept entry nor a skipped sibling
+        # teardown can result from a raising library.
+        libraries = list(self._libraries.values())
         self._libraries = {}
         self._pipe_source_map = {}
         self._blueprints = {}
         self._crate_cache = {}
         self._loaded_fingerprints = {}
+        with ExitStack() as teardown_stack:
+            for library in libraries:
+                teardown_stack.callback(library.teardown)
 
     @override
     def reset(self) -> None:
@@ -152,6 +179,28 @@ class LibraryManager(LibraryManagerAbstract):
             self._libraries[library_id] = the_library
 
         return library_id, the_library
+
+    @override
+    def open_fresh_library(self, library_id: str) -> Library:
+        try:
+            removed_existing = self._pop_and_teardown_library(library_id=library_id)
+        except Exception as stale_teardown_exc:  # noqa: BLE001
+            # Best-effort: the stale library's teardown runs over arbitrary half-built state
+            # from an interrupted execution — its failure must never fail the fresh open
+            # (worker-local leak state deciding setup success would be the M1 class again).
+            # _pop_and_teardown_library forgets the entry pop-first, so the id is free either way.
+            log.warning(
+                f"open_fresh_library: stale teardown of pre-existing library '{library_id}' raised; "
+                f"continuing with a fresh library: {stale_teardown_exc}"
+            )
+        else:
+            if removed_existing:
+                log.warning(
+                    f"open_fresh_library: tore down pre-existing library '{library_id}' — "
+                    f"leftover of an interrupted execution whose cleanup never ran"
+                )
+        _library_id, the_library = self.open_library(library_id=library_id)
+        return the_library
 
     ############################################################
     # Public library accessors
