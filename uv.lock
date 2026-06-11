@@ -2663,8 +2663,8 @@ wheels = [
 
 [[package]]
 name = "mthds"
-version = "0.5.0"
-source = { git = "https://github.com/mthds-ai/mthds-python.git?branch=refactor%2Fprotocol#da1e0ef984676af572fe235fa41d948c38b2cca4" }
+version = "0.4.0"
+source = { git = "https://github.com/mthds-ai/mthds-python.git?rev=33fcdf0681d894d09d57eab699894552360d954c#33fcdf0681d894d09d57eab699894552360d954c" }
 dependencies = [
     { name = "backports-strenum", marker = "python_full_version < '3.11'" },
     { name = "httpx" },
@@ -3859,7 +3859,7 @@ requires-dist = [
     { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = ">=1.1.0" },
     { name = "mkdocs-redirects", marker = "extra == 'docs'", specifier = "==1.2.2" },
     { name = "moto", extras = ["dynamodb", "s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "mthds", git = "https://github.com/mthds-ai/mthds-python.git?branch=refactor%2Fprotocol" },
+    { name = "mthds", git = "https://github.com/mthds-ai/mthds-python.git?rev=33fcdf0681d894d09d57eab699894552360d954c" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
     { name = "networkx", specifier = ">=3.4.2" },
     { name = "openai", specifier = ">=2.0.0" },

@@ -48,7 +48,7 @@ What is pinned here:
 from collections.abc import Callable
 
 import pytest
-from mthds.models.pipeline_inputs import PipelineInputs
+from mthds.protocol.pipeline_inputs import PipelineInputs
 from pytest_mock import MockerFixture
 
 from pipelex.config import get_config

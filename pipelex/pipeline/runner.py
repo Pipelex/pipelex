@@ -5,13 +5,12 @@ from importlib import metadata
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from mthds.client.exceptions import PipelineRequestError
-from mthds.client.pipeline import RunState
-from mthds.client.protocol import MTHDSProtocol
-from mthds.client.protocol_models import ModelCategory as MthdsModelCategory
-from mthds.client.protocol_models import ModelDeck as MthdsModelDeck
-from mthds.client.protocol_models import ModelInfo as MthdsModelInfo
-from mthds.client.protocol_models import ValidationReport, VersionInfo
+from mthds.protocol.exceptions import PipelineRequestError
+from mthds.protocol.models import ModelCategory as MthdsModelCategory
+from mthds.protocol.models import ModelDeck as MthdsModelDeck
+from mthds.protocol.models import ModelInfo as MthdsModelInfo
+from mthds.protocol.models import ValidationReport, VersionInfo
+from mthds.protocol.protocol import MTHDSProtocol
 from pydantic import Field, ValidationError
 from typing_extensions import override
 
@@ -30,7 +29,7 @@ from pipelex.hub import (
 )
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
-from pipelex.pipeline.pipeline_response import PipelexRunResult
+from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
@@ -39,10 +38,9 @@ from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 if TYPE_CHECKING:
     import asyncio
 
-    from mthds.client.pipeline import StartAck
-    from mthds.models.pipe_output import VariableMultiplicity
-    from mthds.models.pipeline_inputs import PipelineInputs
-    from mthds.models.working_memory import WorkingMemoryAbstract
+    from mthds.protocol.pipe_output import VariableMultiplicity
+    from mthds.protocol.pipeline_inputs import PipelineInputs
+    from mthds.protocol.working_memory import WorkingMemoryAbstract
 
     from pipelex.core.memory.working_memory import WorkingMemory
     from pipelex.core.pipes.pipe_output import PipeOutput
@@ -128,7 +126,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         dynamic_output_concept_ref: str | None = None,
         extra: dict[str, Any] | None = None,
         delivery_assignment: DeliveryAssignment | None = None,
-    ) -> PipelexRunResult:
+    ) -> PipelexRunResultExecute:
         """Execute a pipeline and wait for its completion.
 
         This method executes a pipe and returns its output. Unlike ``start``,
@@ -166,7 +164,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
 
         Returns:
         -------
-        PipelexRunResult
+        PipelexRunResultExecute
             The pipeline execution response wrapping the pipe output, including
             pipeline run ID, timestamps, and pipeline state. If ``generate_graph``
             was True, the execution graph is available in the pipe output's
@@ -291,7 +289,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         get_telemetry_manager().track_event(event_name=EventName.PIPELINE_COMPLETE, properties=properties)
 
         finished_at = datetime.now(timezone.utc).isoformat()
-        return PipelexRunResult.from_pipe_output(
+        return PipelexRunResultExecute.from_pipe_output(
             pipe_output=pipe_output,
             pipeline_run_id=pipe_output.pipeline_run_id,
             created_at=created_at,
@@ -308,9 +306,8 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
         dynamic_output_concept_ref: str | None = None,
-        pipeline_run_id: str | None = None,
         extra: dict[str, Any] | None = None,
-    ) -> StartAck[PipeOutput]:
+    ) -> PipelexRunResultStart:
         """Start a method asynchronously — not implemented by the local runtime.
 
         Asynchronous execution is owned by the API layer (pipelex-api overrides
@@ -324,7 +321,6 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             output_name,
             output_multiplicity,
             dynamic_output_concept_ref,
-            pipeline_run_id,
             extra,
         )
         msg = "start is not implemented by the local runtime. Use execute, or run against an MTHDS API runner."

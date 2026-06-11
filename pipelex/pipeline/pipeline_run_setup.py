@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from mthds.models.pipeline_inputs import PipelineInputs
+from mthds.protocol.pipeline_inputs import PipelineInputs
 
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory

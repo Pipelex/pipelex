@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 import pytest
-from mthds.models.pipeline_inputs import PipelineInputs
+from mthds.protocol.pipeline_inputs import PipelineInputs
 
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.list_content import ListContent

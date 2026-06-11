@@ -1,5 +1,5 @@
 import shortuuid
-from mthds.models.pipeline_inputs import PipelineInputs
+from mthds.protocol.pipeline_inputs import PipelineInputs
 from polyfactory.exceptions import FactoryException
 from pydantic import BaseModel, ValidationError
 
