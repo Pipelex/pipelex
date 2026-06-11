@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING
 
 from mthds.models.pipeline_inputs import PipelineInputs
 
+from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
@@ -299,13 +300,23 @@ async def pipeline_run_setup(
                 # add_new_pipeline's collision raise shields the live direct-mode tracer (keyed by the
                 # caller-suppliable pipeline_run_id) from open_tracer's stale-key pop-and-replace healing.
                 # It can also raise — GraphTracer.teardown closes the event log, and a file-backed
-                # transport's close() flushes to disk — so the registry free and library restore live in
-                # the inner finally. Safe even then: close_tracer pops the tracer BEFORE teardown, so no
-                # stale tracer remains under the key when the id is freed.
+                # transport's close() flushes to disk. The known OSError is suppressed below so it cannot
+                # mask the original setup failure (callers type-match: runner.py wraps PipelexError into
+                # PipelineExecutionError, the API maps error types to status codes — mirrors PipeRun.run).
+                # The registry free and library restore still live in the inner finally as a guarantee
+                # against any other teardown raise. Safe even then: close_tracer pops the tracer BEFORE
+                # teardown, so no stale tracer remains under the key when the id is freed.
                 if trace_context is not None:
                     tracer_manager = GraphTracerManager.get_instance()
                     if tracer_manager is not None:
-                        tracer_manager.close_tracer(pipeline_run_id)
+                        try:
+                            tracer_manager.close_tracer(pipeline_run_id)
+                        except OSError as tracer_close_error:
+                            log.error(
+                                f"close_tracer also failed for pipeline_run_id={pipeline_run_id} "
+                                f"during setup-failure cleanup; raising original setup error. "
+                                f"Suppressed tracer close error: {tracer_close_error}"
+                            )
             finally:
                 if event_log is not None:
                     get_report_delegate().clear_event_log(context_key=pipeline_run_id)

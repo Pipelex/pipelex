@@ -163,13 +163,17 @@ class TestPipelineRunIdResubmission:
             clear_current_library()
 
     async def test_setup_failure_frees_entry_even_when_tracer_teardown_raises(self, mocker: MockerFixture) -> None:
-        """A raise inside the error-path tracer teardown must not strand the registry entry.
+        """A raise inside the error-path tracer teardown must not strand the registry entry nor mask the original failure.
 
         ``close_tracer`` runs before ``remove_pipeline`` in setup's failure cleanup (that ordering
         is load-bearing — see the module docstring), and ``GraphTracer.teardown`` can raise: it
         closes the event log, and a file-backed transport's ``close()`` flushes to disk. If that
         raise skipped ``remove_pipeline`` and the library restore, the entry would be
-        process-permanent again — exactly the bug this module exists to pin.
+        process-permanent again — exactly the bug this module exists to pin. And it must not
+        replace the original setup failure as the propagating exception either: callers type-match
+        (the runner wraps ``PipelexError`` into ``PipelineExecutionError``, the API maps error
+        types to status codes), so the flush error is logged and suppressed, mirroring
+        ``PipeRun.run``'s close_tracer handling.
         """
         explicit_run_id = "resubmission-teardown-raise-run-id"
         graph_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
@@ -191,7 +195,8 @@ class TestPipelineRunIdResubmission:
             side_effect=OSError("Injected event-log flush failure on close"),
         )
 
-        with pytest.raises(OSError, match="Injected event-log flush failure"):
+        # The ORIGINAL setup failure propagates — the flush error must not replace it.
+        with pytest.raises(RuntimeError, match=prepare_failure_msg):
             await pipeline_run_setup(
                 execution_config=graph_config,
                 mthds_contents=[_RESUBMISSION_MTHDS],
@@ -200,6 +205,9 @@ class TestPipelineRunIdResubmission:
                 pipeline_run_id=explicit_run_id,
             )
 
+        # The suppression path was actually exercised (the cleanup did close a tracer and the
+        # injected flush failure did fire) — otherwise the RuntimeError assert above is vacuous.
+        teardown_mock.assert_called_once()
         # The teardown raise must not strand the entry nor clobber the caller's current-library.
         assert get_pipeline_manager().get_optional_pipeline(pipeline_run_id=explicit_run_id) is None
         assert get_current_library_id_or_none() == outer_library_id
