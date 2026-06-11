@@ -22,7 +22,9 @@ from pipelex.builder.pipe.pipe_func_spec import PipeFuncSpec
 from pipelex.builder.pipe.pipe_img_gen_spec import PipeImgGenSpec
 from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
+from pipelex.builder.pipe.pipe_search_spec import PipeSearchSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
+from pipelex.builder.pipe.pipe_signature_spec import PipeSignatureSpec
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
 from pipelex.builder.pipe.pipe_structure_spec import PipeStructureSpec
@@ -160,6 +162,25 @@ def _add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDocum
 
     elif isinstance(pipe_spec, PipeFuncSpec):
         pipe_table.add("function_name", pipe_spec.function_name)
+
+    elif isinstance(pipe_spec, PipeSearchSpec):
+        if pipe_spec.model:
+            pipe_table.add("model", pipe_spec.model)
+        pipe_table.add("prompt", format_toml_string(pipe_spec.prompt))
+        if pipe_spec.from_date is not None:
+            pipe_table.add("from_date", pipe_spec.from_date)
+        if pipe_spec.to_date is not None:
+            pipe_table.add("to_date", pipe_spec.to_date)
+        if pipe_spec.include_domains is not None:
+            pipe_table.add("include_domains", pipe_spec.include_domains)
+        if pipe_spec.exclude_domains is not None:
+            pipe_table.add("exclude_domains", pipe_spec.exclude_domains)
+        if pipe_spec.max_results is not None:
+            pipe_table.add("max_results", pipe_spec.max_results)
+
+    elif isinstance(pipe_spec, PipeSignatureSpec):
+        if pipe_spec.signature_for is not None:
+            pipe_table.add("signature_for", pipe_spec.signature_for)
 
 
 def pipe_cmd(

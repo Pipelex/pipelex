@@ -31,6 +31,8 @@ class TestFormatValidateMarkdown:
         assert "2 pipe(s) are still `PipeSignature` placeholders" in markdown
         assert "- `research.find_key_findings`" in markdown
         assert "- `research.rank_findings`" in markdown
+        # The verdict must precede the verbatim heading — consumers expect the note directly above it.
+        assert markdown.index("⚠️ This method is NOT yet runnable") < markdown.index("## Pending signatures")
 
     def test_renders_runnable_verdict_for_complete_bundle(self):
         """A present-but-empty pending_signatures (complete bundle) renders an explicit runnable

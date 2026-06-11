@@ -40,12 +40,18 @@ def format_validate_markdown(result: dict[str, Any]) -> str:
     if "pending_signatures" in result:
         pending_signatures: list[str] = result["pending_signatures"] or []
         if pending_signatures:
-            lines += ["", f"## Pending signatures ({len(pending_signatures)})", ""]
-            lines.append(
-                f"⚠️ This method is NOT yet runnable — {len(pending_signatures)} pipe(s) are still "
-                "`PipeSignature` placeholders and must be implemented before running:"
-            )
-            lines.append("")
+            # Verdict line is emitted immediately above the verbatim "Pending signatures" heading —
+            # downstream consumers rely on that exact ordering (see agent_cli/CLAUDE.md).
+            lines += [
+                "",
+                (
+                    f"⚠️ This method is NOT yet runnable — {len(pending_signatures)} pipe(s) are still "
+                    "`PipeSignature` placeholders and must be implemented before running:"
+                ),
+                "",
+                f"## Pending signatures ({len(pending_signatures)})",
+                "",
+            ]
             for pending_ref in pending_signatures:
                 lines.append(f"- `{pending_ref}`")
         else:

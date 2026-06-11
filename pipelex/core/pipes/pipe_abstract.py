@@ -151,7 +151,7 @@ class PipeAbstract(ABC, BaseModel):
     def validate_pipe_type(cls, value: Any) -> Any:
         allowed = valid_pipe_type_tags()
         if value not in allowed:
-            msg = f"Invalid pipe type '{value}' for pipe '{cls.code}'. Must be one of: {allowed}"
+            msg = f"Invalid pipe type '{value}'. Must be one of: {allowed}"
             raise ValueError(msg)
         return value
 
@@ -161,7 +161,7 @@ class PipeAbstract(ABC, BaseModel):
         # A signature carries `pipe_category = None` (no executable category); every executable pipe
         # pins a `Literal["PipeOperator"|"PipeController"]`, so `None` unambiguously means "signature".
         if value is not None and value not in PipeCategory.value_list():
-            msg = f"Invalid pipe category '{value}' for pipe '{cls.code}'. Must be one of: {PipeCategory.value_list()}"
+            msg = f"Invalid pipe category '{value}'. Must be one of: {PipeCategory.value_list()}"
             raise ValueError(msg)
         return value
 
