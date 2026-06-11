@@ -26,8 +26,10 @@ import pytest
 from typing_extensions import override
 
 from pipelex.config import get_config
+from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.hub import (
     clear_current_library,
+    get_current_library_id_or_none,
     get_library_manager,
     get_pipeline_manager,
 )
@@ -156,6 +158,66 @@ class TestPipelineRunIdResubmission:
         finally:
             # Caller-side teardown (pipeline_run_setup leaves the library open and the run
             # registered on success — execute_pipeline's finally owns this in production).
+            get_pipeline_manager().remove_pipeline(pipeline_run_id=explicit_run_id)
+            get_library_manager().teardown(library_id=library_id)
+            clear_current_library()
+
+    async def test_setup_failure_frees_entry_even_when_tracer_teardown_raises(self, mocker: MockerFixture) -> None:
+        """A raise inside the error-path tracer teardown must not strand the registry entry.
+
+        ``close_tracer`` runs before ``remove_pipeline`` in setup's failure cleanup (that ordering
+        is load-bearing — see the module docstring), and ``GraphTracer.teardown`` can raise: it
+        closes the event log, and a file-backed transport's ``close()`` flushes to disk. If that
+        raise skipped ``remove_pipeline`` and the library restore, the entry would be
+        process-permanent again — exactly the bug this module exists to pin.
+        """
+        explicit_run_id = "resubmission-teardown-raise-run-id"
+        graph_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+            generate_graph=True,
+            mock_inputs=True,
+        )
+        outer_library_id = get_current_library_id_or_none()
+
+        # Fail setup AFTER open_tracer so the cleanup path actually closes a tracer.
+        prepare_failure_msg = "Injected post-tracer setup failure"
+        prepare_mock = mocker.patch(
+            "pipelex.pipeline.pipeline_run_setup.prepare_pipe_job",
+            side_effect=RuntimeError(prepare_failure_msg),
+        )
+        # Simulate the event-log flush failing on close (e.g. NDJSON file handle on a full disk).
+        teardown_mock = mocker.patch.object(
+            GraphTracer,
+            "teardown",
+            side_effect=OSError("Injected event-log flush failure on close"),
+        )
+
+        with pytest.raises(OSError, match="Injected event-log flush failure"):
+            await pipeline_run_setup(
+                execution_config=graph_config,
+                mthds_contents=[_RESUBMISSION_MTHDS],
+                pipe_code="echo_topic",
+                pipe_run_mode=PipeRunMode.DRY,
+                pipeline_run_id=explicit_run_id,
+            )
+
+        # The teardown raise must not strand the entry nor clobber the caller's current-library.
+        assert get_pipeline_manager().get_optional_pipeline(pipeline_run_id=explicit_run_id) is None
+        assert get_current_library_id_or_none() == outer_library_id
+
+        # Resubmission of the SAME explicit id succeeds once the fault is gone.
+        mocker.stop(prepare_mock)
+        mocker.stop(teardown_mock)
+        pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
+            execution_config=_dry_mock_config(),
+            mthds_contents=[_RESUBMISSION_MTHDS],
+            pipe_code="echo_topic",
+            pipe_run_mode=PipeRunMode.DRY,
+            pipeline_run_id=explicit_run_id,
+        )
+        try:
+            assert pipeline_run_id == explicit_run_id
+            assert pipe_job.pipe.code == "echo_topic"
+        finally:
             get_pipeline_manager().remove_pipeline(pipeline_run_id=explicit_run_id)
             get_library_manager().teardown(library_id=library_id)
             clear_current_library()
