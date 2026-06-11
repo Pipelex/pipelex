@@ -12,7 +12,7 @@ from mthds.client.protocol_models import ModelCategory as MthdsModelCategory
 from mthds.client.protocol_models import ModelDeck as MthdsModelDeck
 from mthds.client.protocol_models import ModelInfo as MthdsModelInfo
 from mthds.client.protocol_models import ValidationReport, VersionInfo
-from pydantic import ValidationError
+from pydantic import Field, ValidationError
 from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
@@ -54,6 +54,35 @@ if TYPE_CHECKING:
 
 # The MTHDS Protocol version this runtime implements (mthds-protocol.openapi.yaml).
 MTHDS_PROTOCOL_VERSION = "0.1.0"
+
+
+class PipelexValidationReport(ValidationReport):
+    """Pipelex's validation artifacts — this implementation's extensions on the
+    protocol's `ValidationReport` (which declares no body fields).
+    """
+
+    blueprint: Any = None
+    graph_spec: Any = None
+    pipe_structures: Any = None
+
+
+class PipelexModelDeck(MthdsModelDeck):
+    """Pipelex's model deck — the protocol base plus this implementation's
+    routing metadata (aliases, waterfalls).
+    """
+
+    aliases: dict[str, str] = Field(default_factory=dict)
+    waterfalls: dict[str, list[str]] = Field(default_factory=dict)
+
+
+class PipelexVersionInfo(VersionInfo):
+    """Pipelex's version handshake — the protocol base plus this
+    implementation's identification.
+    """
+
+    implementation: str
+    implementation_version: str
+    runtime_version: str | None = None
 
 
 class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
@@ -348,7 +377,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 get_library_manager().teardown(library_id=validation_library_id)
         blueprints_dump: list[dict[str, Any]] = [blueprint.model_dump(mode="json") for blueprint in result.blueprints]
         pipe_structures: dict[str, Any] = {pipe.code: pipe.model_dump(mode="json") for pipe in result.pipes}
-        return ValidationReport(
+        return PipelexValidationReport(
             blueprint=blueprints_dump[0] if len(blueprints_dump) == 1 else blueprints_dump,
             graph_spec=None,
             pipe_structures=pipe_structures,
@@ -382,15 +411,15 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             aliases.update(category_aliases)
         for category_waterfalls in waterfalls_by_category.values():
             waterfalls.update(category_waterfalls)
-        return MthdsModelDeck(models=models, aliases=aliases, waterfalls=waterfalls)
+        return PipelexModelDeck(models=models, aliases=aliases, waterfalls=waterfalls)
 
     @override
     async def version(self) -> VersionInfo:
-        """Protocol + implementation versions — protocol `version`.
+        """Protocol + runner versions — protocol `version`.
 
         Returns:
-            VersionInfo with the installed pipelex version as both the
-            implementation and runtime version.
+            VersionInfo with the installed pipelex version as the runner
+            version, plus pipelex's identification extensions.
         """
         pipelex_version: str
         try:
@@ -399,8 +428,9 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             # Source checkout on PYTHONPATH without an installed distribution —
             # the runtime still works, so version() must not fail.
             pipelex_version = "unknown"
-        return VersionInfo(
+        return PipelexVersionInfo(
             protocol_version=MTHDS_PROTOCOL_VERSION,
+            runner_version=pipelex_version,
             implementation="pipelex",
             implementation_version=pipelex_version,
             runtime_version=pipelex_version,
